@@ -73,29 +73,32 @@ class AWSCompute(Compute):
         self, requirements: Optional[Requirements] = None
     ) -> List[InstanceOfferWithAvailability]:
         filter = _supported_instances
+        if requirements and requirements.reservation:
+            region_to_reservation = {}
+            for region in self.config.regions:
+                reservation = aws_resources.get_reservation(
+                    ec2_client=self.session.client("ec2", region_name=region),
+                    reservation_id=requirements.reservation,
+                    instance_count=1,
+                )
+                if reservation is not None:
+                    region_to_reservation[region] = reservation
 
-        # filter = _supported_instances
-        # if requirements and requirements.reservation:
-        #     region_to_reservation = {}
-        #     for region in self.config.regions:
-        #         reservation = _get_reservation(
-        #             ec2_client=self.session.client("ec2", region_name=region),
-        #             reservation_id=requirements.reservation,
-        #             instance_types=[],  # TODO find a way to enable instance type filtering
-        #             instance_count=1,  # TODO find a way to pass instance count
-        #             is_capacity_block=False  # TODO Check with maintainers whether should be set to True
-        #         )
-        #         if reservation:
-        #             region_to_reservation[region] = reservation
-        #
-        #     def _supported_instances_with_reservation(offer: InstanceOffer) -> bool:
-        #         if not _supported_instances(offer):
-        #             return False
-        #         region = offer.region
-        #         reservation = region_to_reservation.get(region)
-        #         return bool(reservation and offer.instance.name == reservation["InstanceType"])
-        #
-        #     filter = _supported_instances_with_reservation
+            def _supported_instances_with_reservation(offer: InstanceOffer) -> bool:
+                # Filter: only instance types supported by dstack
+                if not _supported_instances(offer):
+                    return False
+                # Filter: Spot instances can't be used with reservations
+                if offer.instance.resources.spot:
+                    return False
+                region = offer.region
+                reservation = region_to_reservation.get(region)
+                # Filter: only instance types matching the capacity reservation
+                if not bool(reservation and offer.instance.name == reservation["InstanceType"]):
+                    return False
+                return True
+
+            filter = _supported_instances_with_reservation
 
         offers = get_catalog_offers(
             backend=BackendType.AWS,
@@ -185,6 +188,19 @@ class AWSCompute(Compute):
                 ec2_client=ec2_client,
                 subnet_ids=subnet_ids,
             )
+            if instance_config.reservation:
+                reservation = aws_resources.get_reservation(
+                    ec2_client=ec2_client,
+                    reservation_id=instance_config.reservation,
+                    instance_count=1,
+                )
+                if reservation is not None:
+                    # Filter out az different from capacity reservation
+                    subnet_id_to_az_map = {
+                        k: v
+                        for k, v in subnet_id_to_az_map.items()
+                        if v == reservation["AvailabilityZone"]
+                    }
         except botocore.exceptions.ClientError as e:
             logger.warning("Got botocore.exceptions.ClientError: %s", e)
             raise NoCapacityError()
@@ -238,6 +254,7 @@ class AWSCompute(Compute):
                     internal_ip=instance.private_ip_address,
                     region=instance_offer.region,
                     availability_zone=az,
+                    reservation=instance.capacity_reservation_id,
                     price=instance_offer.price,
                     username=username,
                     ssh_port=22,
@@ -267,6 +284,7 @@ class AWSCompute(Compute):
             ],
             job_docker_config=None,
             user=run.user,
+            reservation=run.run_spec.configuration.reservation,
         )
         if len(volumes) > 0:
             volume = volumes[0]
@@ -617,35 +635,6 @@ class AWSCompute(Compute):
             Device=volume.attachment_data.device_name,
         )
         logger.debug("Detached EBS volume %s from instance %s", volume.volume_id, instance_id)
-
-
-def _get_reservation(
-    ec2_client: botocore.client.BaseClient,
-    reservation_id: str,
-    instance_count: int,
-    instance_types: Optional[List[str]] = None,
-    is_capacity_block: Optional[bool] = False,
-) -> Optional[str]:
-    filters = [{"Name": "state", "Values": ["active"]}]
-    if instance_types:
-        filters.append({"Name": "instance-type", "Values": instance_types})
-    try:
-        response = ec2_client.describe_capacity_reservations(
-            CapacityReservationIds=[reservation_id], Filters=filters
-        )
-    except botocore.exceptions.ClientError as e:
-        if e.response.get("Error", {}).get("Code") == "InvalidCapacityReservationId.NotFound":
-            return None
-        raise
-    reservation = response["CapacityReservations"][0]
-
-    if reservation["AvailableInstanceCount"] < instance_count:
-        return None
-
-    if is_capacity_block and reservation["ReservationType"] != "capacity-block":
-        return None
-
-    return reservation
 
 
 def get_maximum_efa_interfaces(ec2_client: botocore.client.BaseClient, instance_type: str) -> int:

@@ -602,3 +602,35 @@ def _is_private_subnet_with_internet_egress(
                     return True
 
     return False
+
+
+def get_reservation(
+    ec2_client: botocore.client.BaseClient,
+    reservation_id: str,
+    instance_count: Optional[int] = 0,
+    instance_types: Optional[List[str]] = None,
+    is_capacity_block: Optional[bool] = False,
+) -> Optional[str]:
+    filters = [{"Name": "state", "Values": ["active"]}]
+    if instance_types:
+        filters.append({"Name": "instance-type", "Values": instance_types})
+    try:
+        response = ec2_client.describe_capacity_reservations(
+            CapacityReservationIds=[reservation_id], Filters=filters
+        )
+    except botocore.exceptions.ClientError as e:
+        if e.response.get("Error", {}).get("Code") == "InvalidCapacityReservationId.NotFound":
+            logger.debug(
+                "Skipping reservation %s . Capacity Reservation  not found.", reservation_id
+            )
+            return None
+        raise
+    reservation = response["CapacityReservations"][0]
+
+    if instance_count > 0 and reservation["AvailableInstanceCount"] < instance_count:
+        return None
+
+    if is_capacity_block and reservation["ReservationType"] != "capacity-block":
+        return None
+
+    return reservation

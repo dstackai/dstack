@@ -149,6 +149,7 @@ class Requirements(CoreModel):
     resources: ResourcesSpec
     max_price: Optional[float]
     spot: Optional[bool]
+    reservation: Optional[str]
 
     def pretty_format(self, resources_only: bool = False):
         res = self.resources.pretty_format()
@@ -210,6 +211,7 @@ class JobProvisioningData(CoreModel):
     instance_network: Optional[str] = None
     region: str
     availability_zone: Optional[str] = None
+    reservation: Optional[str] = None
     price: float
     username: str
     # ssh_port be different from 22 for some backends.

@@ -167,6 +167,7 @@ class JobConfigurator(ABC):
             resources=self.run_spec.configuration.resources,
             max_price=self.run_spec.merged_profile.max_price,
             spot=None if spot_policy == SpotPolicy.AUTO else (spot_policy == SpotPolicy.SPOT),
+            reservation=self.run_spec.merged_profile.reservation,
         )
 
     def _retry(self) -> Optional[Retry]:

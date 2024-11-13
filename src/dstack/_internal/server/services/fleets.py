@@ -650,6 +650,7 @@ def _get_fleet_requirements(fleet_spec: FleetSpec) -> Requirements:
         resources=fleet_spec.configuration.resources or ResourcesSpec(),
         max_price=profile.max_price,
         spot=get_policy_map(profile.spot_policy, default=SpotPolicy.ONDEMAND),
+        reservation=fleet_spec.configuration.reservation,
     )
     return requirements
 
