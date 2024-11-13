@@ -15,7 +15,7 @@ import { selectAuthToken, setUserData } from './slice';
 
 const localStorageIsAvailable = 'localStorage' in window;
 
-const IGNORED_AUTH_PATHS = [ROUTES.AUTH.GITHUB_CALLBACK, ROUTES.AUTH.TOKEN];
+const IGNORED_AUTH_PATHS = [ROUTES.AUTH.GITHUB_CALLBACK, ROUTES.AUTH.OKTA_CALLBACK, ROUTES.AUTH.TOKEN];
 
 const LoginFormComponent = process.env.UI_VERSION === 'enterprise' ? EnterpriseLogin : LoginByGithub;
 
