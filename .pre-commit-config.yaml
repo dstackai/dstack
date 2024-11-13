@@ -7,8 +7,8 @@ repos:
         args: ['--fix']
       - id: ruff-format
   - repo: https://github.com/golangci/golangci-lint
-    rev: v1.58.1
+    rev: v1.62.0  # Should match .github/workflows/build.yml
     hooks:
       - id: golangci-lint-full
-        entry: bash -c 'cd runner && golangci-lint run -D depguard --presets import,module,unused "$@"'
+        entry: bash -c 'cd runner && golangci-lint run'
         stages: [manual]
