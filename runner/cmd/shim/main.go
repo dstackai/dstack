@@ -137,7 +137,7 @@ func main() {
 					log.Printf("Config Runner: %+v\n", args.Runner)
 					log.Printf("Config Docker: %+v\n", args.Docker)
 
-					dockerRunner, err := shim.NewDockerRunner(args)
+					dockerRunner, err := shim.NewDockerRunner(&args)
 					if err != nil {
 						return cli.Exit(err, 1)
 					}

@@ -64,7 +64,7 @@ func (s *MetricsCollector) GetCPUUsageMicroseconds() (uint64, error) {
 
 	data, err := os.ReadFile(cgroupCPUUsagePath)
 	if err != nil {
-		return 0, fmt.Errorf("could not read CPU usage: %v", err)
+		return 0, fmt.Errorf("could not read CPU usage: %w", err)
 	}
 
 	if s.cgroupVersion == 1 {
@@ -72,7 +72,7 @@ func (s *MetricsCollector) GetCPUUsageMicroseconds() (uint64, error) {
 		usageStr := strings.TrimSpace(string(data))
 		cpuUsage, err := strconv.ParseUint(usageStr, 10, 64)
 		if err != nil {
-			return 0, fmt.Errorf("could not parse CPU usage: %v", err)
+			return 0, fmt.Errorf("could not parse CPU usage: %w", err)
 		}
 		// convert nanoseconds to microseconds
 		return cpuUsage / 1000, nil
@@ -87,7 +87,7 @@ func (s *MetricsCollector) GetCPUUsageMicroseconds() (uint64, error) {
 			}
 			usageMicroseconds, err := strconv.ParseUint(parts[1], 10, 64)
 			if err != nil {
-				return 0, fmt.Errorf("could not parse usage_usec: %v", err)
+				return 0, fmt.Errorf("could not parse usage_usec: %w", err)
 			}
 			return usageMicroseconds, nil
 		}
@@ -103,13 +103,13 @@ func (s *MetricsCollector) GetMemoryUsageBytes() (uint64, error) {
 
 	data, err := os.ReadFile(cgroupMemoryUsagePath)
 	if err != nil {
-		return 0, fmt.Errorf("could not read memory usage: %v", err)
+		return 0, fmt.Errorf("could not read memory usage: %w", err)
 	}
 	usageStr := strings.TrimSpace(string(data))
 
 	usedMemory, err := strconv.ParseUint(usageStr, 10, 64)
 	if err != nil {
-		return 0, fmt.Errorf("could not parse memory usage: %v", err)
+		return 0, fmt.Errorf("could not parse memory usage: %w", err)
 	}
 	return usedMemory, nil
 }
@@ -122,7 +122,7 @@ func (s *MetricsCollector) GetMemoryCacheBytes() (uint64, error) {
 
 	statData, err := os.ReadFile(cgroupMemoryStatPath)
 	if err != nil {
-		return 0, fmt.Errorf("could not read memory.stat: %v", err)
+		return 0, fmt.Errorf("could not read memory.stat: %w", err)
 	}
 
 	lines := strings.Split(string(statData), "\n")
@@ -135,7 +135,7 @@ func (s *MetricsCollector) GetMemoryCacheBytes() (uint64, error) {
 			}
 			cacheBytes, err := strconv.ParseUint(parts[1], 10, 64)
 			if err != nil {
-				return 0, fmt.Errorf("could not parse cache value: %v", err)
+				return 0, fmt.Errorf("could not parse cache value: %w", err)
 			}
 			return cacheBytes, nil
 		}
@@ -162,7 +162,7 @@ func (s *MetricsCollector) GetNVIDIAGPUMetrics() ([]schemas.GPUMetrics, error) {
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	if err := cmd.Run(); err != nil {
-		return metrics, fmt.Errorf("failed to execute nvidia-smi: %v", err)
+		return metrics, fmt.Errorf("failed to execute nvidia-smi: %w", err)
 	}
 
 	lines := strings.Split(strings.TrimSpace(out.String()), "\n")
@@ -173,11 +173,11 @@ func (s *MetricsCollector) GetNVIDIAGPUMetrics() ([]schemas.GPUMetrics, error) {
 		}
 		memUsed, err := strconv.ParseUint(strings.TrimSpace(parts[0]), 10, 64)
 		if err != nil {
-			return metrics, fmt.Errorf("failed to parse memory used: %v", err)
+			return metrics, fmt.Errorf("failed to parse memory used: %w", err)
 		}
 		utilization, err := strconv.ParseUint(strings.TrimSpace(strings.TrimSuffix(parts[1], "%")), 10, 64)
 		if err != nil {
-			return metrics, fmt.Errorf("failed to parse GPU utilization: %v", err)
+			return metrics, fmt.Errorf("failed to parse GPU utilization: %w", err)
 		}
 		metrics = append(metrics, schemas.GPUMetrics{
 			GPUMemoryUsage: memUsed * 1024 * 1024, // Convert MiB to bytes
@@ -195,7 +195,7 @@ func (s *MetricsCollector) GetAMDGPUMetrics() ([]schemas.GPUMetrics, error) {
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("failed to execute amd-smi: %v", err)
+		return nil, fmt.Errorf("failed to execute amd-smi: %w", err)
 	}
 
 	lines := strings.Split(strings.TrimSpace(out.String()), "\n")
@@ -206,11 +206,11 @@ func (s *MetricsCollector) GetAMDGPUMetrics() ([]schemas.GPUMetrics, error) {
 		}
 		memUsed, err := strconv.ParseUint(strings.TrimSpace(fields[3]), 10, 64)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse VRAM used: %v", err)
+			return nil, fmt.Errorf("failed to parse VRAM used: %w", err)
 		}
 		utilization, err := strconv.ParseUint(strings.TrimSpace(fields[1]), 10, 64)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse GPU utilization: %v", err)
+			return nil, fmt.Errorf("failed to parse GPU utilization: %w", err)
 		}
 		metrics = append(metrics, schemas.GPUMetrics{
 			GPUMemoryUsage: memUsed * 1024 * 1024,
@@ -224,7 +224,7 @@ func (s *MetricsCollector) GetAMDGPUMetrics() ([]schemas.GPUMetrics, error) {
 func getCgroupVersion() (int, error) {
 	data, err := os.ReadFile("/proc/self/mountinfo")
 	if err != nil {
-		return 0, fmt.Errorf("could not read /proc/self/mountinfo: %v", err)
+		return 0, fmt.Errorf("could not read /proc/self/mountinfo: %w", err)
 	}
 
 	for _, line := range strings.Split(string(data), "\n") {
