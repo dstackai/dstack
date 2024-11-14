@@ -401,6 +401,7 @@
     "user": "User",
     "repository": "Repository",
     "backend": "Backend",
+    "code": "Code",
     "empty_message_title": "No models",
     "empty_message_text": "No models to display.",
     "nomatch_message_title": "No matches",
