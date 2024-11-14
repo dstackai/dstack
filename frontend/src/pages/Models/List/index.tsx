@@ -46,7 +46,7 @@ export const List: React.FC = () => {
         return (
             _sortBy<IRun>(data, [(i) => -i.submitted_at])
                 // Should show models of active runs only
-                .filter((run) => unfinishedRuns.includes(run.status))
+                .filter((run) => unfinishedRuns.includes(run.status) && run.service?.model)
                 .reduce<IModelExtended[]>((acc, run) => {
                     const model = getExtendedModelFromRun(run);
 
