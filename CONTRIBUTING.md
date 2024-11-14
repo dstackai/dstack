@@ -33,6 +33,23 @@ We use [`ruff`](https://docs.astral.sh/ruff/) to format Python code and to sort 
 
 > There are also helper pre-commits installed for [`ruff`](https://docs.astral.sh/ruff/integrations/#pre-commit) that make commits fail if the code is not formatted or the imports are not sorted. They also change the code as required so that you can review the changes and commit again.
 
+### Run tests
+
+It's recommended to run tests locally before running them in CI.
+To run Python tests, first ensure you've install dev dependencies as described in [contributing/DEVELOPMENT.md](contributing/DEVELOPMENT.md).
+Then you can do:
+
+```shell
+pytest src/tests
+```
+
+(Optionally) By default, tests run against SQLite.
+Use the `--runpostgres` flag to run the tests against Postgres as well:
+
+```shell
+pytest src/tests --runpostgres
+```
+
 ## Add a new backend
 
 If you'd like to integrate a new cloud provider to `dstack`, follow [contributing/BACKENDS.md](contributing/BACKENDS.md).
