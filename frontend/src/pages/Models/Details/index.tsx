@@ -40,7 +40,6 @@ import { getCurlModelCode, getPythonModelCode } from './helpers';
 import { IModelExtended } from '../List/types';
 import { FormValues, Message, Role } from './types';
 
-import { ReactComponent as SourceIcon } from 'assets/icons/source.svg';
 import css from './styles.module.scss';
 
 const MESSAGE_ROLE_MAP: Record<Role, string> = {
@@ -305,6 +304,11 @@ export const ModelDetails: React.FC = () => {
                             <Box variant="h1">{paramRunName}</Box>
                         </NavigateLink>
                     }
+                    actionButtons={
+                        <Button disabled={loading} onClick={() => setViewCodeVisible(true)}>
+                            {t('models.code')}
+                        </Button>
+                    }
                 />
             }
         >
@@ -340,8 +344,6 @@ export const ModelDetails: React.FC = () => {
 
                         <form className={css.modelForm} onSubmit={handleSubmit(onSubmit)}>
                             <div className={css.buttons}>
-                                <Button iconSvg={<SourceIcon />} disabled={loading} onClick={() => setViewCodeVisible(true)} />
-
                                 <Button iconName="remove" disabled={loading || !messages.length} onClick={clearChat} />
                             </div>
 
