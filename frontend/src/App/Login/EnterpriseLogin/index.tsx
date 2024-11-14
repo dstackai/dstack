@@ -17,7 +17,7 @@ export const EnterpriseLogin: React.FC = () => {
     const { t } = useTranslation();
     const { data } = useGetOktaInfoQuery();
 
-    const oktaEnabled = !data?.enabled;
+    const oktaEnabled = data?.enabled;
 
     return (
         <UnauthorizedLayout>
