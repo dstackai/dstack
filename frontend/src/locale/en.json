@@ -461,6 +461,8 @@
     "empty_message_text": "No volumes to display.",
     "nomatch_message_title": "No matches",
     "nomatch_message_text": "We can't find a match.",
+    "delete_volumes_confirm_title": "Delete volumes",
+    "delete_volumes_confirm_message": "Are you sure you want to delete these volumes?",
     "active_only": "Active volumes",
 
     "name": "Name",
