@@ -93,7 +93,7 @@ If you run a task, `dstack apply` automatically forwards the remote ports to `lo
 <div class="termy">
 
 ```shell
-$ curl http://127.0.0.1:3000/proxy/services/main/v1/chat/completions \
+$ curl http://127.0.0.1:3000/proxy/services/main/llama32/v1/chat/completions \
     -H 'Content-Type: application/json' \
     -H 'Authorization: Bearer token' \
     --data '{
