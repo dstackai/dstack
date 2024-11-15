@@ -1,16 +1,7 @@
 # Services
 
-A service allows you to deploy a web app or a model as a scalable endpoint. It lets you configure
+A service allows you to deploy a model or a web app as an endpoint. It lets you configure
 dependencies, resources, authorization, auto-scaling rules, etc.
-
-Services are provisioned behind a [gateway](concepts/gateways.md) which provides an HTTPS endpoint mapped to your domain,
-handles authentication, distributes load, and performs auto-scaling.
-
-??? info "Gateways"
-    If you're using the open-source server, you must set up a [gateway](concepts/gateways.md) before you can run a service.
-
-    If you're using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"},
-    the gateway is already set up for you.
 
 ## Define a configuration
 
@@ -26,7 +17,7 @@ type: service
 name: llama31-service
 
 # If `image` is not specified, dstack uses its default image
-python: "3.10"
+python: "3.11"
 
 # Required environment variables
 env:
@@ -37,15 +28,15 @@ commands:
 # Expose the vllm server port
 port: 8000
 
+# Specify a name if it's an Open-AI compatible model
+model: meta-llama/Meta-Llama-3.1-8B-Instruct
+
 # Use either spot or on-demand instances
 spot_policy: auto
 
+# Required resources
 resources:
-  # Change to what is required
   gpu: 24GB
-
-# Comment out if you won't access the model via https://gateway.<gateway domain>
-model: meta-llama/Meta-Llama-3.1-8B-Instruct
 ```
 
 </div>
@@ -53,10 +44,15 @@ model: meta-llama/Meta-Llama-3.1-8B-Instruct
 If you don't specify your Docker image, `dstack` uses the [base](https://hub.docker.com/r/dstackai/base/tags) image
 (pre-configured with Python, Conda, and essential CUDA drivers).
 
-!!! info "Auto-scaling"
-    By default, the service is deployed to a single instance. However, you can specify the
-    [number of replicas and scaling policy](reference/dstack.yml/service.md#auto-scaling).
-    In this case, `dstack` auto-scales it based on the load.
+Note, the `model` property is optional and not needed when deploying a non-OpenAI-compatible model or a regular web app.
+
+!!! info "Gateway"
+    By default, services run on a single instance. However, you can specify `replicas` and `target` to enable 
+    [auto-scaling](reference/dstack.yml/service.md#auto-scaling).
+
+    Note, to use auto-scaling, a custom domain, or HTTPS, set up a 
+    [gateway](concepts/gateways.md) before running the service.
+    A gateway pre-configured for you if you are using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"}.
 
 !!! info "Reference"
     See [.dstack.yml](reference/dstack.yml/service.md) for all the options supported by
@@ -83,7 +79,8 @@ Submit the run llama31-service? [y/n]: y
 Provisioning...
 ---> 100%
 
-Service is published at https://llama31-service.example.com
+Service is published at: 
+  http://localhost:3000/proxy/services/main/llama31-service
 ```
 
 </div>
@@ -93,14 +90,17 @@ To avoid uploading large files, ensure they are listed in `.gitignore`.
 
 ## Access the endpoint
 
-One the service is up, its endpoint is accessible at `https://<run name>.<gateway domain>`.
+### Service
+
+If no gateway is created, the service’s endpoint will be accessible at `<dstack server URL>
+/proxy/services/<project name>/<run name>`.
 
 By default, the service endpoint requires the `Authorization` header with `Bearer <dstack token>`.
 
 <div class="termy">
 
 ```shell
-$ curl https://llama31-service.example.com/v1/chat/completions \
+$ curl http://localhost:3000/proxy/services/main/llama31-service/v1/chat/completions \
     -H 'Content-Type: application/json' \
     -H 'Authorization: Bearer &lt;dstack token&gt;' \
     -d '{
@@ -119,10 +119,15 @@ $ curl https://llama31-service.example.com/v1/chat/completions \
 Authorization can be disabled by setting [`auth`](reference/dstack.yml/service.md#authorization) to `false` in the
 service configuration file.
 
-### Gateway endpoint
+> When a [gateway](concepts/gateways.md) is configured, the service endpoint will be accessible at `https://<run name>.<gateway domain>`.
 
-In case the service has the [model mapping](reference/dstack.yml/service.md#model-mapping) configured, you will also be
-able to access the model at `https://gateway.<gateway domain>` via the OpenAI-compatible interface.
+### Model
+
+If the service defines the `model` property, the model can be accessed with
+the OpenAI-compatible endpoint at `<dstack server URL>/proxy/models/<project name>`,
+or via the control plane UI's playground.
+
+> When a [gateway](concepts/gateways.md) is configured, the OpenAI-compatible endpoint is available at `https://gateway.<gateway domain>`.
 
 ## Manage runs
 
