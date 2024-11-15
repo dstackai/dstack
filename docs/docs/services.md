@@ -18,7 +18,7 @@ First, create a YAML file in your project folder. Its name must end with `.dstac
 `service.dstack.yml`
 are both acceptable).
 
-<div editor-title="service.dstack.yml"> 
+<div editor-title="examples/deployment/vllm/service.dstack.yml"> 
 
 ```yaml
 type: service
