@@ -27,7 +27,7 @@ const SEARCHABLE_COLUMNS = ['project_name', 'owner.username'];
 export const ProjectList: React.FC = () => {
     const { t } = useTranslation();
 
-    const { isLoading, data } = useGetProjectsQuery();
+    const { isLoading, isFetching, data, refetch } = useGetProjectsQuery();
     const { isAvailableDeletingPermission, isAvailableProjectManaging } = useCheckAvailableProjectPermission();
     const { deleteProject, deleteProjects, isDeleting } = useDeleteProject();
     const navigate = useNavigate();
@@ -116,7 +116,7 @@ export const ProjectList: React.FC = () => {
                 variant="full-page"
                 columnDefinitions={columns}
                 items={items}
-                loading={isLoading}
+                loading={isLoading || isFetching}
                 loadingText={t('common.loading')}
                 selectionType={isAvailableProjectManaging ? 'multi' : undefined}
                 stickyHeader={true}
@@ -138,6 +138,13 @@ export const ProjectList: React.FC = () => {
                                     </ButtonWithConfirmation>
 
                                     <Button onClick={addProjectHandler}>{t('common.add')}</Button>
+
+                                    <Button
+                                        iconName="refresh"
+                                        disabled={isLoading || isFetching}
+                                        ariaLabel={t('common.refresh')}
+                                        onClick={refetch}
+                                    />
                                 </SpaceBetween>
                             )
                         }

@@ -6,12 +6,11 @@ import { Button, ListEmptyMessage, StatusIndicator } from 'components';
 import { SelectCSDProps } from 'components';
 
 import { DATE_TIME_FORMAT, DEFAULT_TABLE_PAGE_SIZE } from 'consts';
+import { useNotifications } from 'hooks';
 import { useLocalStorageState } from 'hooks/useLocalStorageState';
 import { getStatusIconType } from 'libs/volumes';
 import { useGetProjectsQuery } from 'services/project';
 import { useDeleteVolumesMutation, useLazyGetAllVolumesQuery } from 'services/volume';
-
-import { useNotifications } from '../../../hooks';
 
 export const useVolumesTableEmptyMessages = ({
     clearFilters,

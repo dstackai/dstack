@@ -25,7 +25,7 @@ export const UserList: React.FC = () => {
     const [showDeleteConfirm, setShowConfirmDelete] = useState(false);
     const userData = useAppSelector(selectUserData);
     const userGlobalRole = userData?.global_role ?? '';
-    const { isLoading, data } = useGetUserListQuery();
+    const { isLoading, isFetching, data, refetch } = useGetUserListQuery();
     const [deleteUsers, { isLoading: isDeleting }] = useDeleteUsersMutation();
     const navigate = useNavigate();
     const [pushNotification] = useNotifications();
@@ -150,7 +150,7 @@ export const UserList: React.FC = () => {
                 isItemDisabled={getIsTableItemDisabled}
                 columnDefinitions={COLUMN_DEFINITIONS}
                 items={items}
-                loading={isLoading}
+                loading={isLoading || isFetching}
                 loadingText={t('common.loading')}
                 selectionType="multi"
                 stickyHeader={true}
@@ -171,6 +171,13 @@ export const UserList: React.FC = () => {
                                 <Button formAction="none" onClick={addUserHandler} disabled={userGlobalRole !== 'admin'}>
                                     {t('common.add')}
                                 </Button>
+
+                                <Button
+                                    iconName="refresh"
+                                    disabled={isLoading || isFetching}
+                                    ariaLabel={t('common.refresh')}
+                                    onClick={refetch}
+                                />
                             </SpaceBetween>
                         }
                     >
