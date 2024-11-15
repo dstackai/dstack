@@ -1,8 +1,13 @@
+import { getModelGateway } from '../helpers';
+
 import { IModelExtended } from '../List/types';
 
-export const getPythonModelCode = (model?: IModelExtended | null) => {
+export const getPythonModelCode = ({ model, token }: { model?: IModelExtended | null; token?: string }) => {
     return `from openai import OpenAI
-client = OpenAI()
+client = OpenAI(
+    api_key="${token}"
+    base_url="${getModelGateway(model?.base_url ?? '')}"
+)
 
 response = client.chat.completions.create(
   model="${model?.name ?? ''}",
@@ -15,10 +20,10 @@ response = client.chat.completions.create(
 )`;
 };
 
-export const getCurlModelCode = (model?: IModelExtended | null) => {
-    return `curl https://api.openai.com/v1/chat/completions \\
+export const getCurlModelCode = ({ model, token }: { model?: IModelExtended | null; token?: string }) => {
+    return `curl ${getModelGateway(model?.base_url ?? '')} \\
   -H "Content-Type: application/json" \\
-  -H "Authorization: Bearer $OPENAI_API_KEY" \\
+  -H "Authorization: Bearer ${token}" \\
   -d '{
   "model": "${model?.name ?? ''}",
   "messages": [],

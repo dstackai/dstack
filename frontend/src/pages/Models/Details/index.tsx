@@ -20,9 +20,8 @@ import {
     Loader,
     Modal,
     NavigateLink,
-    SelectCSD,
-    SelectCSDProps,
     SpaceBetween,
+    Tabs,
 } from 'components';
 
 import { useAppSelector, useBreadcrumbs, useNotifications } from 'hooks';
@@ -49,17 +48,17 @@ const MESSAGE_ROLE_MAP: Record<Role, string> = {
     assistant: 'Assistant',
 };
 
-const VIEW_CODE_TYPE_OPTIONS = [
-    { label: 'Python', value: 'python' },
-    { label: 'Curl', value: 'curl' },
-];
+enum CodeTab {
+    Python = 'python',
+    Curl = 'curl',
+}
 
 export const ModelDetails: React.FC = () => {
     const { t } = useTranslation();
     const token = useAppSelector(selectAuthToken);
     const [messages, setMessages] = useState<Message[]>([]);
     const [viewCodeVisible, setViewCodeVisible] = useState<boolean>(false);
-    const [selectedCode, setSelectedCode] = useState<SelectCSDProps.Option>(VIEW_CODE_TYPE_OPTIONS[0]);
+    const [codeTab, setCodeTab] = useState<CodeTab>(CodeTab.Python);
     const [loading, setLoading] = useState<boolean>(false);
     const params = useParams();
     const paramProjectName = params.projectName ?? '';
@@ -282,15 +281,15 @@ export const ModelDetails: React.FC = () => {
         }
     };
 
-    const pythonCode = getPythonModelCode(modelData);
+    const pythonCode = getPythonModelCode({ model: modelData, token });
 
-    const curlCode = getCurlModelCode(modelData);
+    const curlCode = getCurlModelCode({ model: modelData, token });
 
     const onCopyCode = () => {
-        switch (selectedCode.value) {
-            case VIEW_CODE_TYPE_OPTIONS[0].value:
+        switch (codeTab) {
+            case CodeTab.Python:
                 return copyToClipboard(pythonCode);
-            case VIEW_CODE_TYPE_OPTIONS[1].value:
+            case CodeTab.Curl:
                 return copyToClipboard(curlCode);
         }
     };
@@ -413,21 +412,27 @@ export const ModelDetails: React.FC = () => {
                             <Box>{t('models.details.view_code_description')}</Box>
 
                             <div className={css.viewCodeControls}>
-                                <SelectCSD
-                                    options={VIEW_CODE_TYPE_OPTIONS}
-                                    selectedOption={selectedCode}
-                                    expandToViewport={true}
-                                    onChange={(event) => {
-                                        setSelectedCode(event.detail.selectedOption);
-                                    }}
+                                <div className={css.copyButton}>
+                                    <Button iconName="copy" onClick={onCopyCode}></Button>
+                                </div>
+
+                                <Tabs
+                                    onChange={({ detail }) => setCodeTab(detail.activeTabId as CodeTab)}
+                                    activeTabId={codeTab}
+                                    tabs={[
+                                        {
+                                            label: 'Python',
+                                            id: CodeTab.Python,
+                                            content: <Code>{pythonCode}</Code>,
+                                        },
+                                        {
+                                            label: 'Curl',
+                                            id: CodeTab.Curl,
+                                            content: <Code>{curlCode}</Code>,
+                                        },
+                                    ]}
                                 />
-
-                                <Button iconName="copy" onClick={onCopyCode}></Button>
                             </div>
-
-                            {selectedCode.value === VIEW_CODE_TYPE_OPTIONS[0].value && <Code>{pythonCode}</Code>}
-
-                            {selectedCode.value === VIEW_CODE_TYPE_OPTIONS[1].value && <Code>{curlCode}</Code>}
                         </SpaceBetween>
                     </Modal>
                 </>

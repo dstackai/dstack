@@ -1,4 +1,4 @@
-export interface IModelExtended extends IModel {
+export interface IModelExtended extends Partial<IModel> {
     run_name: string;
     project_name: string;
     submitted_at: string;
