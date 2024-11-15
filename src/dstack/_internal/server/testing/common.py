@@ -62,6 +62,7 @@ from dstack._internal.server.models import (
     PlacementGroupModel,
     PoolModel,
     ProjectModel,
+    RepoCredsModel,
     RepoModel,
     RunModel,
     UserModel,
@@ -173,6 +174,24 @@ async def create_repo(
             "repo_user_name": "",
             "repo_name": "dstack",
         }
+    repo = RepoModel(
+        project_id=project_id,
+        name=repo_name,
+        type=repo_type,
+        info=json.dumps(info),
+        creds=json.dumps(creds) if creds is not None else None,
+    )
+    session.add(repo)
+    await session.commit()
+    return repo
+
+
+async def create_repo_creds(
+    session: AsyncSession,
+    repo_id: UUID,
+    user_id: UUID,
+    creds: Optional[dict] = None,
+) -> RepoCredsModel:
     if creds is None:
         creds = {
             "protocol": "https",
@@ -180,16 +199,14 @@ async def create_repo(
             "private_key": None,
             "oauth_token": "test_token",
         }
-    repo = RepoModel(
-        project_id=project_id,
-        name=repo_name,
-        type=repo_type,
-        info=json.dumps(info),
-        creds=json.dumps(creds),
+    repo_creds = RepoCredsModel(
+        repo_id=repo_id,
+        user_id=user_id,
+        creds=DecryptedString(plaintext=json.dumps(creds)),
     )
-    session.add(repo)
+    session.add(repo_creds)
     await session.commit()
-    return repo
+    return repo_creds
 
 
 def get_run_spec(

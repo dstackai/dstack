@@ -6,15 +6,27 @@ from fastapi import UploadFile
 from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dstack._internal.core.errors import RepoDoesNotExistError, ServerClientError
+from dstack._internal.core.errors import (
+    RepoDoesNotExistError,
+    ResourceExistsError,
+    ResourceNotExistsError,
+    ServerClientError,
+)
 from dstack._internal.core.models.repos import (
-    AnyRepoHead,
     AnyRepoInfo,
     RepoHead,
     RepoHeadWithCreds,
 )
+from dstack._internal.core.models.repos.base import RepoType
 from dstack._internal.core.models.repos.remote import RemoteRepoCreds
-from dstack._internal.server.models import CodeModel, ProjectModel, RepoModel
+from dstack._internal.server.models import (
+    CodeModel,
+    DecryptedString,
+    ProjectModel,
+    RepoCredsModel,
+    RepoModel,
+    UserModel,
+)
 from dstack._internal.server.services.storage import get_default_storage
 from dstack._internal.server.utils.common import run_async
 
@@ -31,6 +43,7 @@ async def list_repos(
 async def get_repo(
     session: AsyncSession,
     project: ProjectModel,
+    user: UserModel,
     repo_id: str,
     include_creds: bool,
 ) -> Optional[RepoHeadWithCreds]:
@@ -41,15 +54,52 @@ async def get_repo(
     )
     if repo is None:
         return None
-    return repo_model_to_repo_head(repo, include_creds=include_creds)
+    if not include_creds or repo.type != RepoType.REMOTE:
+        return RepoHeadWithCreds.parse_obj(repo_model_to_repo_head(repo))
+    repo_creds = await get_repo_creds(
+        session=session,
+        repo=repo,
+        user=user,
+    )
+    return repo_model_to_repo_head_with_creds(repo, repo_creds)
 
 
 async def init_repo(
     session: AsyncSession,
     project: ProjectModel,
+    user: UserModel,
     repo_id: str,
     repo_info: AnyRepoInfo,
     repo_creds: Optional[RemoteRepoCreds],
+) -> RepoModel:
+    repo = await create_or_update_repo(
+        session=session,
+        project=project,
+        repo_id=repo_id,
+        repo_info=repo_info,
+    )
+    if repo.type == RepoType.REMOTE:
+        if repo_creds is not None:
+            await create_or_update_repo_creds(
+                session=session,
+                repo=repo,
+                user=user,
+                creds=repo_creds,
+            )
+        else:
+            await delete_repo_creds(
+                session=session,
+                repo=repo,
+                user=user,
+            )
+    return repo
+
+
+async def create_or_update_repo(
+    session: AsyncSession,
+    project: ProjectModel,
+    repo_id: str,
+    repo_info: AnyRepoInfo,
 ) -> RepoModel:
     try:
         return await create_repo(
@@ -57,17 +107,13 @@ async def init_repo(
             project=project,
             repo_id=repo_id,
             repo_info=repo_info,
-            repo_creds=repo_creds,
         )
-    except sqlalchemy.exc.IntegrityError:
-        await session.rollback()
-        await session.refresh(project)
+    except ResourceExistsError:
         return await update_repo(
             session=session,
             project=project,
             repo_id=repo_id,
             repo_info=repo_info,
-            repo_creds=repo_creds,
         )
 
 
@@ -76,16 +122,18 @@ async def create_repo(
     project: ProjectModel,
     repo_id: str,
     repo_info: AnyRepoInfo,
-    repo_creds: Optional[RemoteRepoCreds],
 ) -> RepoModel:
     repo = RepoModel(
         project_id=project.id,
         name=repo_id,
         type=repo_info.repo_type,
         info=repo_info.json(),
-        creds=repo_creds.json() if repo_creds else None,
     )
-    session.add(repo)
+    try:
+        async with session.begin_nested():
+            session.add(repo)
+    except sqlalchemy.exc.IntegrityError:
+        raise ResourceExistsError()
     await session.commit()
     return repo
 
@@ -95,15 +143,7 @@ async def update_repo(
     project: ProjectModel,
     repo_id: str,
     repo_info: AnyRepoInfo,
-    repo_creds: Optional[RemoteRepoCreds],
 ) -> RepoModel:
-    repo = RepoModel(
-        project_id=project.id,
-        name=repo_id,
-        type=repo_info.repo_type,
-        info=repo_info.json(),
-        creds=repo_creds.json() if repo_creds else None,
-    )
     await session.execute(
         update(RepoModel)
         .where(
@@ -111,11 +151,13 @@ async def update_repo(
             RepoModel.name == repo_id,
         )
         .values(
-            info=repo.info,
-            creds=repo.creds,
+            info=repo_info.json(),
         )
     )
     await session.commit()
+    repo = await get_repo_model(session=session, project=project, repo_id=repo_id)
+    if repo is None:
+        raise ResourceNotExistsError()
     return repo
 
 
@@ -126,6 +168,99 @@ async def delete_repos(
 ):
     await session.execute(
         delete(RepoModel).where(RepoModel.project_id == project.id, RepoModel.name.in_(repos_ids))
+    )
+    await session.commit()
+
+
+async def get_repo_creds(
+    session: AsyncSession,
+    repo: RepoModel,
+    user: UserModel,
+) -> Optional[RepoCredsModel]:
+    res = await session.execute(
+        select(RepoCredsModel).where(
+            RepoCredsModel.repo_id == repo.id,
+            RepoCredsModel.user_id == user.id,
+        )
+    )
+    return res.scalar()
+
+
+async def create_or_update_repo_creds(
+    session: AsyncSession,
+    repo: RepoModel,
+    user: UserModel,
+    creds: RemoteRepoCreds,
+) -> RepoCredsModel:
+    try:
+        return await create_repo_creds(
+            session=session,
+            repo=repo,
+            user=user,
+            creds=creds,
+        )
+    except ResourceExistsError:
+        return await update_repo_creds(
+            session=session,
+            repo=repo,
+            user=user,
+            creds=creds,
+        )
+
+
+async def create_repo_creds(
+    session: AsyncSession,
+    repo: RepoModel,
+    user: UserModel,
+    creds: RemoteRepoCreds,
+) -> RepoCredsModel:
+    repo_creds = RepoCredsModel(
+        repo_id=repo.id,
+        user_id=user.id,
+        creds=DecryptedString(plaintext=creds.json()),
+    )
+    try:
+        async with session.begin_nested():
+            session.add(repo_creds)
+    except sqlalchemy.exc.IntegrityError:
+        raise ResourceExistsError()
+    await session.commit()
+    return repo_creds
+
+
+async def update_repo_creds(
+    session: AsyncSession,
+    repo: RepoModel,
+    user: UserModel,
+    creds: RemoteRepoCreds,
+) -> RepoCredsModel:
+    await session.execute(
+        update(RepoCredsModel)
+        .where(
+            RepoCredsModel.repo_id == repo.id,
+            RepoCredsModel.user_id == user.id,
+        )
+        .values(
+            creds=DecryptedString(plaintext=creds.json()),
+        )
+    )
+    await session.commit()
+    repo_creds = await get_repo_creds(session=session, repo=repo, user=user)
+    if repo_creds is None:
+        raise ResourceNotExistsError()
+    return repo_creds
+
+
+async def delete_repo_creds(
+    session: AsyncSession,
+    repo: RepoModel,
+    user: UserModel,
+):
+    await session.execute(
+        delete(RepoCredsModel).where(
+            RepoCredsModel.repo_id == repo.id,
+            RepoCredsModel.user_id == user.id,
+        )
     )
     await session.commit()
 
@@ -196,21 +331,27 @@ async def get_code_model(
     return res.scalar()
 
 
-def repo_model_to_repo_head(
-    repo_model: RepoModel,
-    include_creds: bool = False,
-) -> AnyRepoHead:
-    if include_creds:
-        return RepoHeadWithCreds.__response__.parse_obj(
-            {
-                "repo_id": repo_model.name,
-                "repo_info": json.loads(repo_model.info),
-                "repo_creds": json.loads(repo_model.creds) if repo_model.creds else None,
-            }
-        )
+def repo_model_to_repo_head(repo_model: RepoModel) -> RepoHead:
     return RepoHead.__response__.parse_obj(
         {
             "repo_id": repo_model.name,
             "repo_info": json.loads(repo_model.info),
+        }
+    )
+
+
+def repo_model_to_repo_head_with_creds(
+    repo_model: RepoModel, repo_creds_model: Optional[RepoCredsModel]
+) -> RepoHeadWithCreds:
+    repo_creds_raw: Optional[str]
+    if repo_creds_model is None:
+        repo_creds_raw = repo_model.creds
+    else:
+        repo_creds_raw = repo_creds_model.creds.plaintext
+    return RepoHeadWithCreds.__response__.parse_obj(
+        {
+            "repo_id": repo_model.name,
+            "repo_info": json.loads(repo_model.info),
+            "repo_creds": json.loads(repo_creds_raw) if repo_creds_raw else None,
         }
     )
