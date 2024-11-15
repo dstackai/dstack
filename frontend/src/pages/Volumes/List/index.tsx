@@ -1,7 +1,17 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Button, ButtonWithConfirmation, FormField, Header, Pagination, SelectCSD, Table, Toggle } from 'components';
+import {
+    Button,
+    ButtonWithConfirmation,
+    FormField,
+    Header,
+    Pagination,
+    SelectCSD,
+    SpaceBetween,
+    Table,
+    Toggle,
+} from 'components';
 
 import { useBreadcrumbs, useCollection } from 'hooks';
 import { ROUTES } from 'routes';
@@ -80,15 +90,24 @@ export const VolumeList: React.FC = () => {
                 <Header
                     variant="awsui-h1-sticky"
                     actions={
-                        <ButtonWithConfirmation
-                            disabled={isDisabledDeleteSelected}
-                            formAction="none"
-                            onClick={deleteSelectedVolumes}
-                            confirmTitle={t('volume.delete_volumes_confirm_title')}
-                            confirmContent={t('volume.delete_volumes_confirm_message')}
-                        >
-                            {t('common.delete')}
-                        </ButtonWithConfirmation>
+                        <SpaceBetween size="xs" direction="horizontal">
+                            <ButtonWithConfirmation
+                                disabled={isDisabledDeleteSelected}
+                                formAction="none"
+                                onClick={deleteSelectedVolumes}
+                                confirmTitle={t('volume.delete_volumes_confirm_title')}
+                                confirmContent={t('volume.delete_volumes_confirm_message')}
+                            >
+                                {t('common.delete')}
+                            </ButtonWithConfirmation>
+
+                            <Button
+                                iconName="refresh"
+                                disabled={isLoading}
+                                ariaLabel={t('common.refresh')}
+                                onClick={refreshList}
+                            />
+                        </SpaceBetween>
                     }
                 >
                     {t('volume.volumes')}

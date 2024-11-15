@@ -26,7 +26,7 @@ export const List: React.FC = () => {
         projectSearchKey: 'project',
     });
 
-    const { data, isLoading } = useGetRunsQuery({
+    const { data, isLoading, isFetching, refetch } = useGetRunsQuery({
         project_name: selectedProject?.value,
     });
 
@@ -83,11 +83,25 @@ export const List: React.FC = () => {
             variant="full-page"
             columnDefinitions={columns}
             items={items}
-            loading={isLoading}
+            loading={isLoading || isFetching}
             loadingText={t('common.loading')}
             stickyHeader={true}
             columnDisplay={preferences.contentDisplay}
-            header={<Header variant="awsui-h1-sticky">{t('navigation.models')}</Header>}
+            header={
+                <Header
+                    variant="awsui-h1-sticky"
+                    actions={
+                        <Button
+                            iconName="refresh"
+                            disabled={isLoading || isFetching}
+                            ariaLabel={t('common.refresh')}
+                            onClick={refetch}
+                        />
+                    }
+                >
+                    {t('navigation.models')}
+                </Header>
+            }
             filter={
                 <div className={styles.selectFilters}>
                     <div className={styles.select}>

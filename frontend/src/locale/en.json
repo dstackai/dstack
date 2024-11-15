@@ -44,7 +44,8 @@
     "docs": "Docs",
     "discord": "Discord",
     "danger_zone": "Danger Zone",
-    "control_plane": "Control plane"
+    "control_plane": "Control plane",
+    "refresh": "Refresh"
   },
 
   "auth": {
