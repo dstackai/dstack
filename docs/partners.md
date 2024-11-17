@@ -51,7 +51,7 @@ Here are some cloud providers `dstack` integrates with and collaborates:
     </a>
 
     <a href="https://www.runpod.io/" class="feature-cell" target="_blank">
-        <img width="45" src="/assets/images/runpod-logo.svg">
+        <img width="40" src="/assets/images/runpod-logo.svg">
         <h3>
             RunPod
         </h3>
