@@ -200,6 +200,7 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 		"REPO_ID":               ex.run.RepoId,  // deprecated, remove in 0.19
 		"DSTACK_RUN_NAME":       ex.run.RunName,
 		"DSTACK_REPO_ID":        ex.run.RepoId,
+		"DSTACK_NODES_IPS":      strings.Join(ex.clusterInfo.JobIPs, "\n"),
 		"DSTACK_MASTER_NODE_IP": ex.clusterInfo.MasterJobIP,
 		"DSTACK_NODE_RANK":      strconv.Itoa(node_rank),
 		"DSTACK_NODES_NUM":      strconv.Itoa(nodes_num),
@@ -262,11 +263,11 @@ func (ex *RunExecutor) setupCredentials(ctx context.Context) (func(), error) {
 		if _, err := os.Stat(keyPath); err == nil {
 			return nil, gerrors.New("private key already exists")
 		}
-		if err := os.MkdirAll(filepath.Dir(keyPath), 0700); err != nil {
+		if err := os.MkdirAll(filepath.Dir(keyPath), 0o700); err != nil {
 			return nil, gerrors.Wrap(err)
 		}
 		log.Info(ctx, "Writing private key", "path", keyPath)
-		if err := os.WriteFile(keyPath, []byte(*ex.repoCredentials.PrivateKey), 0600); err != nil {
+		if err := os.WriteFile(keyPath, []byte(*ex.repoCredentials.PrivateKey), 0o600); err != nil {
 			return nil, gerrors.Wrap(err)
 		}
 		return func() {
@@ -281,7 +282,7 @@ func (ex *RunExecutor) setupCredentials(ctx context.Context) (func(), error) {
 		if _, err := os.Stat(hostsPath); err == nil {
 			return nil, gerrors.New("hosts.yml file already exists")
 		}
-		if err := os.MkdirAll(filepath.Dir(hostsPath), 0700); err != nil {
+		if err := os.MkdirAll(filepath.Dir(hostsPath), 0o700); err != nil {
 			return nil, gerrors.Wrap(err)
 		}
 		log.Info(ctx, "Writing OAuth token", "path", hostsPath)
@@ -290,7 +291,7 @@ func (ex *RunExecutor) setupCredentials(ctx context.Context) (func(), error) {
 			return nil, gerrors.Wrap(err)
 		}
 		ghHost := fmt.Sprintf("%s:\n  oauth_token: \"%s\"\n", cloneURL.Hostname(), *ex.repoCredentials.OAuthToken)
-		if err := os.WriteFile(hostsPath, []byte(ghHost), 0644); err != nil {
+		if err := os.WriteFile(hostsPath, []byte(ghHost), 0o600); err != nil {
 			return nil, gerrors.Wrap(err)
 		}
 		return func() {
@@ -304,16 +305,15 @@ func (ex *RunExecutor) setupCredentials(ctx context.Context) (func(), error) {
 func isPtyError(err error) bool {
 	/* read /dev/ptmx: input/output error */
 	var e *os.PathError
-	return errors.As(err, &e) && e.Err == syscall.EIO
+	return errors.As(err, &e) && errors.Is(e.Err, syscall.EIO)
 }
 
 func buildLDLibraryPathEnv() (string, error) {
 	// Execute shell command to get Python prefix
 	cmd := exec.Command("bash", "-i", "-c", "python3-config --prefix")
 	output, err := cmd.Output()
-
 	if err != nil {
-		return "", fmt.Errorf("error executing command: %v", err)
+		return "", fmt.Errorf("error executing command: %w", err)
 	}
 
 	// Extract and trim the prefix path

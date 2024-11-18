@@ -25,46 +25,50 @@ module.exports = {
         extensions: ['.js', '.jsx', '.ts', '.tsx'],
     },
     module: {
-        strictExportPresence: true,
+        strictExportPresence: false,
         rules: [
             {
-                oneOf: [
+                test: /\.jsx?$/,
+                exclude: /node_modules/,
+                use: {
+                    loader: 'babel-loader',
+                }
+            },
+            {
+                test: /\.tsx?$/,
+                exclude: /node_modules/,
+                use: {
+                    loader: 'babel-loader',
+                }
+            },
+            {
+                test: /\.svg$/,
+                use: [
                     {
-                        test: [/\.jsx?$/],
-                        loader: 'babel-loader',
-                        exclude: /node_modules/,
-                    },
-                    {
-                        test: /\.tsx?$/,
-                        exclude: /node_modules/,
-                        loader: 'babel-loader'
-                    },
-                    {
-                        test: /\.svg$/,
-                        use: [
-                            {
-                                loader: require.resolve('@svgr/webpack'),
-                                options: {
-                                    prettier: false,
-                                    svgo: false,
-                                    svgoConfig: {
-                                        plugins: [{ removeViewBox: false }],
-                                    },
-                                    titleProp: true,
-                                    ref: true,
-                                },
+                        loader: require.resolve('@svgr/webpack'),
+                        options: {
+                            prettier: false,
+                            svgo: false,
+                            svgoConfig: {
+                                plugins: [{ removeViewBox: false }],
                             },
-                            {
-                                loader: require.resolve('file-loader'),
-                                options: {
-                                    name: 'static/media/[name].[hash].[ext]',
-                                },
-                            },
-                        ],
-                        issuer: {
-                            and: [/\.(ts|tsx|js|jsx|md|mdx)$/],
+                            titleProp: true,
+                            ref: true,
                         },
                     },
+                    {
+                        loader: require.resolve('file-loader'),
+                        options: {
+                            name: 'static/media/[name].[hash].[ext]',
+                        },
+                    },
+                ],
+                issuer: {
+                    and: [/\.(ts|tsx|js|jsx|md|mdx)$/],
+                },
+            },
+            {
+                oneOf: [
                     {
                         test: cssRegex,
                         exclude: [cssModuleRegex, '/node_modules'],
@@ -115,10 +119,10 @@ module.exports = {
                             'sass-loader'
                         ),
                     },
-                    {
-                        exclude: [/^$/, /\.(js|mjs|jsx|ts|tsx)$/, /\.html$/, /\.json$/],
-                        type: 'asset/resource',
-                    }
+                    // {
+                    //     exclude: [/^$/, /\.(js|mjs|jsx|ts|tsx)$/, /\.html$/, /\.json$/],
+                    //     type: 'asset/resource',
+                    // }
                 ]
             }
         ],

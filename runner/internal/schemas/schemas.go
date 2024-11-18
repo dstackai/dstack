@@ -50,8 +50,9 @@ type JobSpec struct {
 }
 
 type ClusterInfo struct {
-	MasterJobIP string `json:"master_job_ip"`
-	GPUSPerJob  int    `json:"gpus_per_job"`
+	JobIPs      []string `json:"job_ips"`
+	MasterJobIP string   `json:"master_job_ip"`
+	GPUSPerJob  int      `json:"gpus_per_job"`
 }
 
 type RepoCredentials struct {

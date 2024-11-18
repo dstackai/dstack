@@ -14,6 +14,7 @@ from dstack._internal.core.models.repos import RemoteRepoCreds
 from dstack._internal.core.models.runs import (
     ClusterInfo,
     Job,
+    JobProvisioningData,
     JobSpec,
     JobStatus,
     JobTerminationReason,
@@ -38,7 +39,7 @@ from dstack._internal.server.services.repos import get_code_model, repo_model_to
 from dstack._internal.server.services.runner import client
 from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
 from dstack._internal.server.services.runs import (
-    get_run_volumes,
+    get_job_volumes,
     run_model_to_run,
 )
 from dstack._internal.server.services.storage import get_default_storage
@@ -121,16 +122,17 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
             await session.commit()
             return
 
-    master_job = find_job(run.jobs, job_model.replica_num, 0)
-    cluster_info = ClusterInfo(
-        master_job_ip=master_job.job_submissions[-1].job_provisioning_data.internal_ip or "",
-        gpus_per_job=len(job_provisioning_data.instance_type.resources.gpus),
+    cluster_info = _get_cluster_info(
+        jobs=run.jobs,
+        replica_num=job.job_spec.replica_num,
+        job_provisioning_data=job_provisioning_data,
     )
 
-    volumes = await get_run_volumes(
+    volumes = await get_job_volumes(
         session=session,
         project=project,
         run_spec=run.run_spec,
+        job_provisioning_data=job_provisioning_data,
     )
 
     server_ssh_private_key = project.ssh_private_key
@@ -154,6 +156,19 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
         if job_provisioning_data.hostname is None:
             await _wait_for_instance_provisioning_data(job_model=job_model)
         else:
+            # Wait until all other jobs in the replica have IPs assigned.
+            # This is needed to ensure cluster_info has all IPs set.
+            for other_job in run.jobs:
+                if (
+                    other_job.job_spec.replica_num == job.job_spec.replica_num
+                    and other_job.job_submissions[-1].status == JobStatus.PROVISIONING
+                    and other_job.job_submissions[-1].job_provisioning_data is not None
+                    and other_job.job_submissions[-1].job_provisioning_data.hostname is None
+                ):
+                    job_model.last_processed_at = common_utils.get_current_datetime()
+                    await session.commit()
+                    return
+
             # fails are acceptable until timeout is exceeded
             if job_provisioning_data.dockerized:
                 logger.debug(
@@ -395,11 +410,16 @@ def _process_provisioning_with_shim(
     instance_mounts: List[InstanceMountPoint] = []
     for mount in run.run_spec.configuration.volumes:
         if is_core_model_instance(mount, VolumeMountPoint):
-            volume_mounts.append(mount)
+            volume_mounts.append(mount.copy())
         elif is_core_model_instance(mount, InstanceMountPoint):
             instance_mounts.append(mount)
         else:
             assert False, f"unexpected mount point: {mount!r}"
+
+    # Run configuration may specify list of possible volume names.
+    # We should resolve in to the actual volume attached.
+    for volume, volume_mount in zip(volumes, volume_mounts):
+        volume_mount.name = volume.name
 
     shim_client.submit(
         username=username,
@@ -528,6 +548,28 @@ def _process_running(
             # delay_job_instance_termination(job_model)
         logger.info("%s: now is %s", fmt(job_model), job_model.status.name)
     return True
+
+
+def _get_cluster_info(
+    jobs: List[Job],
+    replica_num: int,
+    job_provisioning_data: JobProvisioningData,
+) -> ClusterInfo:
+    job_ips = []
+    for job in jobs:
+        if job.job_spec.replica_num == replica_num:
+            job_ips.append(
+                common_utils.get_or_error(
+                    job.job_submissions[-1].job_provisioning_data
+                ).internal_ip
+                or ""
+            )
+    cluster_info = ClusterInfo(
+        job_ips=job_ips,
+        master_job_ip=job_ips[0],
+        gpus_per_job=len(job_provisioning_data.instance_type.resources.gpus),
+    )
+    return cluster_info
 
 
 async def _get_job_code(

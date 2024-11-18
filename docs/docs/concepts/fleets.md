@@ -20,27 +20,27 @@ are both acceptable).
     To create a cloud fleet, specify `resources`, `nodes`, 
     and other optional parameters.
     
-    <div editor-title="examples/fine-tuning/alignment-handbook/fleet-distrib.dstack.yml">
+    <div editor-title="examples/misc/fleets/distrib.dstack.yml">
     
     ```yaml
     type: fleet
     # The name is optional, if not specified, generated randomly
-    name: ah-fleet-distrib
+    name: fleet-distrib
     
-    # Size of the cluster
+    # Number of instances
     nodes: 2
-    # Ensure instances are interconnected
+    # Ensure instances are inter-connected
     placement: cluster
     
-    # Use either spot or on-demand instances
-    spot_policy: auto
-    
+    # Terminate if idle for 3 days
+    termination_idle_time: 3d 
+
     resources:
       gpu:
         # 24GB or more vRAM
         memory: 24GB..
-        # One or more GPU
-        count: 1..
+        # Two or more GPUs
+        count: 2..
     ```
     
     </div>
@@ -76,14 +76,14 @@ are both acceptable).
     To create an SSH fleet, specify `ssh_config` to allow the `dstack` server to connect to these servers
     via SSH.
 
-    <div editor-title="fleet-ssh.dstack.yml"> 
+    <div editor-title="examples/misc/fleets/distrib-ssh.dstack.yml"> 
     
     ```yaml
     type: fleet
     # The name is optional, if not specified, generated randomly
-    name: my-ssh-fleet
+    name: fleet-distrib-ssh
 
-    # Ensure instances are interconnected
+    # Ensure instances are inter-connected
     placement: cluster
 
     # The user, private SSH key, and hostnames of the on-prem servers

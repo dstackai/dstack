@@ -226,6 +226,7 @@ class JobProvisioningData(CoreModel):
 
 
 class ClusterInfo(CoreModel):
+    job_ips: List[str]
     master_job_ip: str
     gpus_per_job: int
 

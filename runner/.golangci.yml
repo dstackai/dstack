@@ -6,19 +6,17 @@ run:
   timeout: 1m
 
   # exit code when at least one issue was found, default is 1
-  issues-exit-code: 0
+  issues-exit-code: 1
 
   # include test files or not, default is true
   tests: false
-
-  skip-dirs:
-    - data
 
 # output configuration options
 output:
   # colored-line-number|line-number|json|tab|checkstyle|code-climate|junit-xml|github-actions
   # default is "colored-line-number"
-  format: colored-line-number
+  formats:
+    - format: colored-line-number
 
 # all available settings of specific linters
 linters-settings:
@@ -40,7 +38,6 @@ linters-settings:
     # default is false: such cases aren't reported by default.
     check-blank: false
 
-
   errorlint:
     # Check whether fmt.Errorf uses the %w verb for formatting errors. See the readme for caveats
     errorf: true
@@ -56,15 +53,6 @@ linters-settings:
     # 'default' case is present, even if all enum members aren't listed in the
     # switch
     default-signifies-exhaustive: false
-
-  exhaustivestruct:
-    # Struct Patterns is list of expressions to match struct packages and names
-    # The struct packages have the form example.com/package.ExampleStruct
-    # The matching patterns can use matching syntax from https://pkg.go.dev/path#Match
-    # If this list is empty, all structs are tested.
-    struct-patterns:
-      - '*.Test'
-      - 'example.com/package.ExampleStruct'
 
   funlen:
     lines: 60
@@ -157,10 +145,6 @@ linters-settings:
     # it's a comma-separated list of prefixes
     local-prefixes: github.com/dstackai/dstackai
 
-  golint:
-    # minimal confidence for issues, default is 0.8
-    min-confidence: 0.8
-
   gosec:
     # To select a subset of rules to run.
     # Available rules: https://github.com/securego/gosec#available-rules
@@ -186,15 +170,10 @@ linters-settings:
         truncate: "32"
 
   gosimple:
-    # Select the Go version to target. The default is '1.13'.
-    go: "1.18"
     # https://staticcheck.io/docs/options#checks
     checks: [ "all" ]
 
   govet:
-    # report about shadowed variables
-    check-shadowing: true
-
     # settings per analyzer
     settings:
       printf: # analyzer name, run `go tool vet help` to see all analyzers
@@ -206,19 +185,10 @@ linters-settings:
 
     # enable or disable analyzers by name
     # run `go tool vet help` to see all analyzers
-    enable:
-      - atomicalign
-    enable-all: false
+    enable-all: true
     disable:
       - shadow
-    disable-all: false
-
-  ifshort:
-    # Maximum length of variable declaration measured in number of lines, after which linter won't suggest using short syntax.
-    # Has higher priority than max-decl-chars.
-    max-decl-lines: 1
-    # Maximum length of variable declaration measured in number of characters, after which linter won't suggest using short syntax.
-    max-decl-chars: 30
+      - fieldalignment
 
   importas:
     # if set to `true`, force to use alias.
@@ -245,14 +215,10 @@ linters-settings:
     tab-width: 1
 
   staticcheck:
-    # Select the Go version to target. The default is '1.13'.
-    go: "1.18"
     # https://staticcheck.io/docs/options#checks
     checks: [ "all" ]
 
   stylecheck:
-    # Select the Go version to target. The default is '1.13'.
-    go: "1.18"
     # https://staticcheck.io/docs/options#checks
     checks: [ "all", "-ST1000", "-ST1003", "-ST1016", "-ST1020", "-ST1021", "-ST1022" ]
     # https://staticcheck.io/docs/options#dot_import_whitelist
@@ -298,25 +264,22 @@ linters-settings:
       name: true
       begin: true
 
-  unused:
-    # Select the Go version to target. The default is '1.13'.
-    go: "1.18"
-
   whitespace:
     multi-if: false   # Enforces newlines (or comments) after every multi-line if statement
     multi-func: false # Enforces newlines (or comments) after every multi-line function signatur
 
 linters:
-  enable:
-    - megacheck
-    - govet
-  disable:
-    - maligned
-    - prealloc
-  disable-all: false
   presets:
     - bugs
     - unused
+    - import
+    - module
+    - format
+  disable:
+    - depguard
+    - gomodguard
+    - unparam
+    - contextcheck
   fast: false
 
 

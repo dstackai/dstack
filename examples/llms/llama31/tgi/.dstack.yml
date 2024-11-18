@@ -1,20 +1,21 @@
-type: dev-environment
-# The name is optional, if not specified, generated randomly
-name: llama31-vscode-tgi
+type: service
+name: llama31
 
-# The official TGI Docker image
 image: ghcr.io/huggingface/text-generation-inference:latest
-
-# Required environment variables
 env:
   - HF_TOKEN
-ide: vscode
+  - MODEL_ID=meta-llama/Meta-Llama-3.1-8B-Instruct
+  - MAX_INPUT_LENGTH=4000
+  - MAX_TOTAL_TOKENS=4096
+commands:
+  - NUM_SHARD=$DSTACK_GPUS_NUM text-generation-launcher
+port: 80
+model: meta-llama/Meta-Llama-3.1-8B-Instruct
 
 # Use either spot or on-demand instances
 spot_policy: auto
-# Uncomment to ensure it doesn't create a new fleet
-# creation_policy: reuse
 
 resources:
-  # Required resources
   gpu: 24GB
+  # Uncomment if using multiple GPUs
+  #shm_size: 24GB

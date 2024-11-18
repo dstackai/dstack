@@ -121,7 +121,7 @@ func TestExecutor_RemoteRepo(t *testing.T) {
 		RepoConfigEmail: "developer@dstack.ai",
 	}
 	ex.jobSpec.Commands = append(ex.jobSpec.Commands, "git rev-parse HEAD && git config user.name && git config user.email")
-	err := os.WriteFile(ex.codePath, []byte{}, 0600) // empty diff
+	err := os.WriteFile(ex.codePath, []byte{}, 0o600) // empty diff
 	require.NoError(t, err)
 
 	err = ex.setupRepo(context.TODO())
@@ -164,11 +164,11 @@ func makeTestExecutor(t *testing.T) *RunExecutor {
 	}
 
 	temp := filepath.Join(baseDir, "temp")
-	_ = os.Mkdir(temp, 0700)
+	_ = os.Mkdir(temp, 0o700)
 	home := filepath.Join(baseDir, "home")
-	_ = os.Mkdir(home, 0700)
+	_ = os.Mkdir(home, 0o700)
 	repo := filepath.Join(baseDir, "repo")
-	_ = os.Mkdir(repo, 0700)
+	_ = os.Mkdir(repo, 0o700)
 	ex := NewRunExecutor(temp, home, repo)
 	ex.SetJob(body)
 	ex.SetCodePath(filepath.Join(baseDir, "code")) // note: create file before run
@@ -187,7 +187,7 @@ func makeCodeTar(t *testing.T, path string) {
 	}
 
 	for _, f := range files {
-		hdr := &tar.Header{Name: f.name, Mode: 0600, Size: int64(len(f.body))}
+		hdr := &tar.Header{Name: f.name, Mode: 0o600, Size: int64(len(f.body))}
 		require.NoError(t, tw.WriteHeader(hdr))
 		_, err := tw.Write([]byte(f.body))
 		require.NoError(t, err)

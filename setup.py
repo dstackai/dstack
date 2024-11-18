@@ -36,7 +36,7 @@ BASE_DEPS = [
     "python-dateutil",
     "gitpython",
     "jsonschema",
-    "paramiko",
+    "paramiko>=3.2.0",
     "cursor",
     "rich",
     "rich-argparse",
@@ -81,7 +81,7 @@ AZURE_DEPS = [
     "azure-identity>=1.12.0",
     "azure-mgmt-subscription>=3.1.1",
     "azure-mgmt-compute>=29.1.0",
-    "azure-mgmt-network>=23.0.0",
+    "azure-mgmt-network>=23.0.0,<28.0.0",
     "azure-mgmt-resource>=22.0.0",
     "azure-mgmt-authorization>=3.0.0",
 ]
