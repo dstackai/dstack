@@ -618,6 +618,13 @@ func getSSHShellCommands(openSSHPort int, publicSSHKey string) []string {
 		// regenerate host keys
 		"rm -rf /etc/ssh/ssh_host_*",
 		"ssh-keygen -A > /dev/null",
+		// Ensure that PRIVSEP_PATH 1) exists 2) empty 3) owned by root,
+		// see https://github.com/dstackai/dstack/issues/1999
+		// /run/sshd is used in Debian-based distros, including Ubuntu:
+		// https://salsa.debian.org/ssh-team/openssh/-/blob/debian/1%259.7p1-7/debian/rules#L60
+		// /var/empty is the default path if not configured via ./configure --with-privsep-path=...
+		"rm -rf /run/sshd && mkdir -p /run/sshd && chown root:root /run/sshd",
+		"rm -rf /var/empty && mkdir -p /var/empty && chown root:root /var/empty",
 		// start sshd
 		fmt.Sprintf("/usr/sbin/sshd -p %d -o PermitUserEnvironment=yes", openSSHPort),
 		// restore ld.so variables
