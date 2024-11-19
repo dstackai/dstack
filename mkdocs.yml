@@ -117,6 +117,9 @@ plugins:
         'docs/examples/llms/llama31.md': 'examples/llms/llama31/index.md'
         'docs/examples/llms/llama32.md': 'examples/llms/llama32/index.md'
         'docs/examples/accelerators/amd/index.md': 'examples/accelerators/amd/index.md'
+        'docs/examples/deployment/nim/index.md': 'examples/deployment/nim/index.md'
+        'docs/examples/deployment/vllm/index.md': 'examples/deployment/vllm/index.md'
+        'docs/examples/deployment/tgi/index.md': 'examples/deployment/tgi/index.md'
         'providers.md': 'partners.md'
         'backends.md': 'partners.md'
   - typeset
@@ -232,9 +235,12 @@ nav:
               - REST API: docs/reference/api/rest/index.md
   - Examples:
     - examples.md
+    - Deployment:
+        - vLLM: examples/deployment/vllm/index.md
+        - TGI:  examples/deployment/tgi/index.md
+        - NIM: examples/deployment/nim/index.md
     - Fine-tuning:
         - Axolotl: examples/fine-tuning/axolotl/index.md
-        - Alignment Handbook: examples/fine-tuning/alignment-handbook/index.md
         - TRL: examples/fine-tuning/trl/index.md
     - Accelerators:
         - AMD: examples/accelerators/amd/index.md

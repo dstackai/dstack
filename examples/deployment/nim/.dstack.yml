@@ -1,18 +1,18 @@
 type: service
 
 image: nvcr.io/nim/meta/llama3-8b-instruct:latest
-
 env:
   - NGC_API_KEY
 registry_auth:
   username: $oauthtoken
   password: ${{ env.NGC_API_KEY }}
-
 port: 8000
+model: meta/llama3-8b-instruct
 
 spot_policy: auto
 
 resources:
   gpu: 24GB
 
+# Exclude non-VM backends
 backends: ["aws", "azure", "cudo", "datacrunch", "gcp", "lambda", "oci", "tensordock"]
