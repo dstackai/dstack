@@ -1,6 +1,6 @@
 # gateway
 
-The `gateway` configuration type allows creating and updating [gateways](../../services.md).
+The `gateway` configuration type allows creating and updating [gateways](../../concepts/gateways.md).
 
 > Configuration files must be inside the project repo, and their names must end with `.dstack.yml` 
 > (e.g. `.dstack.yml` or `gateway.dstack.yml` are both acceptable).

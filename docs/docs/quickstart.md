@@ -109,7 +109,7 @@ Your folder can be a regular local folder or a Git repo.
     </div>
 
     By default, tasks run on a single instance. To run a distributed task, specify 
-    [`nodes` and system environment variables](reference/dstack.yml/task.md#distributed-tasks), 
+    [`nodes`](reference/dstack.yml/task.md#distributed-tasks), 
     and `dstack` will run it on a cluster.
 
     ##### Run the configuration
@@ -119,7 +119,7 @@ Your folder can be a regular local folder or a Git repo.
     <div class="termy">
 
     ```shell
-    $ dstack apply -f streamlit.dstack.yml
+    $ dstack apply -f serve-task.dstack.yml
     
      #  BACKEND  REGION           RESOURCES                 SPOT  PRICE
      1  gcp      us-west4         2xCPU, 8GB, 100GB (disk)  yes   $0.010052
@@ -127,8 +127,6 @@ Your folder can be a regular local folder or a Git repo.
      3  gcp      europe-central2  2xCPU, 8GB, 100GB (disk)  yes   $0.013248
      
     Submit the run streamlit? [y/n]: y
-     
-    Continue? [y/n]: y
     
     Provisioning `streamlit`...
     ---> 100%
@@ -169,7 +167,7 @@ Your folder can be a regular local folder or a Git repo.
     # Expose the vllm server port
     port: 8000
 
-    # Specify a name if it's an Open-AI compatible model
+    # Specify a name if it's an OpenAI-compatible model
     model: meta-llama/Meta-Llama-3.1-8B-Instruct
     
     # Required resources
@@ -186,22 +184,20 @@ Your folder can be a regular local folder or a Git repo.
     <div class="termy">
 
     ```shell
-    $ dstack apply -f streamlit.dstack.yml
+    $ dstack apply -f service.dstack.yml
     
-     #  BACKEND  REGION           RESOURCES                 SPOT  PRICE
-     1  gcp      us-west4         2xCPU, 8GB, 100GB (disk)  yes   $0.010052
-     2  azure    westeurope       2xCPU, 8GB, 100GB (disk)  yes   $0.0132
-     3  gcp      europe-central2  2xCPU, 8GB, 100GB (disk)  yes   $0.013248
+     #  BACKEND  REGION     INSTANCE       RESOURCES                    SPOT  PRICE
+     1  aws      us-west-2  g5.4xlarge     16xCPU, 64GB, 1xA10G (24GB)  yes   $0.22
+     2  aws      us-east-2  g6.xlarge      4xCPU, 16GB, 1xL4 (24GB)     yes   $0.27
+     3  gcp      us-west1   g2-standard-4  4xCPU, 16GB, 1xL4 (24GB)     yes   $0.27
      
-    Submit the run streamlit? [y/n]: y
-     
-    Continue? [y/n]: y
+    Submit the run llama31-service? [y/n]: y
     
-    Provisioning `streamlit`...
+    Provisioning `llama31-service`...
     ---> 100%
 
     Service is published at: 
-      http://localhost:3000/proxy/services/main/llama31-service
+      http://localhost:3000/proxy/services/main/llama31-service/
     ```
     
     </div>
@@ -209,13 +205,10 @@ Your folder can be a regular local folder or a Git repo.
     If you specified `model`, the model will also be available via an OpenAI-compatible endpoint at
     `<dstack server URL>/proxy/models/<project name>`.
 
-    ??? info "Gateway"
-        By default, services run on a single instance. However, you can specify `replicas` and `target` to enable 
-        [auto-scaling](reference/dstack.yml/service.md#auto-scaling).
-
-        Note, to use auto-scaling, a custom domain, or HTTPS, set up a 
+    !!! info "Gateway"
+        To publish a service with a custom domain and HTTPS, set up a 
         [gateway](concepts/gateways.md) before running the service.
-        A gateway pre-configured for you if you are using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"}.
+        A gateway is pre-configured for you if you are using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"}.
 
 `dstack apply` automatically provisions instances, uploads the code from the current repo (incl. your local uncommitted changes).
 

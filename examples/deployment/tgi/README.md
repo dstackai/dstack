@@ -69,8 +69,9 @@ Provisioning...
 ```
 </div>
 
-If no gateway is created, the service’s endpoint will be accessible at 
-`<dstack server URL>/proxy/services/<project name>/<run name>`.
+Once the service is up, the model will be available via the OpenAI-compatible endpoint
+at `<dstack server URL>/proxy/models/<project name>`
+or at `https://gateway.<gateway domain>` if your project has a gateway.
 
 <div class="termy">
 

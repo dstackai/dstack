@@ -93,9 +93,26 @@ This allows you to access the remote `8501` port on `localhost:8501` while the C
     
     This will forward the remote `8501` port to `localhost:3000`.
 
-[Services](../services.md) require a gateway but they also provide additional features for
-production-grade service deployment not offered by tasks, such as HTTPS domains and auto-scaling.
-If you run a web app as a task and it works, go ahead and run it as a service.
+[Services](../services.md) provide additional features not offered by tasks,
+such as authorization, load balancing, auto-scaling, an OpenAI-compatible endpoint for models, etc.
+
+Unlike tasks, services are accessible throughout their lifetime, not only when the CLI is attached.
+By default, they are published at `<dstack server URL>/proxy/services/<project name>/<run name>/`.
+Additionally, if your project has a [gateway](../concepts/gateways.md),
+services can be published at a custom domain with HTTPS instead.
+
+So what should you choose for running a web app? Here are some suggestions:
+
+- If you are running a simple app that you only need temporarily, consider **tasks**.
+- If your app needs to be available at all times or if it needs to benefit from advanced features
+  such as authorization or load balancing, use **services**.
+    - If the service will only be accessed by you and other `dstack` users and supports running
+      behind a URL path prefix, **no gateway** is needed.
+    - If the service requires public access, a custom domain, HTTPS, or increased network throughput,
+      **create a gateway** first.
+
+??? info "Auto-scaling and WebSockets"
+    Services using WebSockets or auto-scaling currently require a gateway.
 
 ## Docker and Docker Compose
 

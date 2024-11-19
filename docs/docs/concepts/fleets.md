@@ -205,7 +205,7 @@ on the hosts specified in `ssh_config`.
 
 ### List fleets
 
-The [`dstack fleet`](../reference/cli/index.md#dstack-gateway-list) command lists fleet instances and theri status:
+The [`dstack fleet`](../reference/cli/index.md#dstack-fleet-list) command lists fleet instances and their status:
 
 <div class="termy">
 
