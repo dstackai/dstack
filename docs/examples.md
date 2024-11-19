@@ -21,7 +21,7 @@ hide:
            vLLM
        </h3>
        <p>
-            Deploy Llama with vLLM
+            Deploy Llama 3.1 with vLLM
         </p>
     </a>
     <a href="/examples/deployment/tgi" 
@@ -30,7 +30,7 @@ hide:
            TGI
        </h3>
        <p>
-            Deploy Mistral with TGI
+            Deploy Llama 3.1 with TGI
         </p>
     </a>
     <a href="/examples/deployment/nim" 
@@ -39,7 +39,7 @@ hide:
            NIM
        </h3>
        <p>
-            Deploy Llama3-8b-instruct with Nvidia NIM
+            Deploy Llama 3.1 with NIM
         </p>
     </a>
 </div>

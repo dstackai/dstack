@@ -1,5 +1,6 @@
 # vLLM
-This example shows how to deploy `NousResearch/Llama-2-7b-chat-hf` with `dstack` using [vLLM :material-arrow-top-right-thin:{ .external }](https://docs.vllm.ai/en/latest/)
+
+This example shows how to deploy Llama 3.1 8B with `dstack` using [vLLM :material-arrow-top-right-thin:{ .external }](https://docs.vllm.ai/en/latest/){:target="_blank"}.
 
 ??? info "Prerequisites"
     Once `dstack` is [installed](https://dstack.ai/docs/installation), go ahead clone the repo, and run `dstack init`.
@@ -16,33 +17,37 @@ This example shows how to deploy `NousResearch/Llama-2-7b-chat-hf` with `dstack`
 
 ## Deployment
 
-### Running as a task
-If you'd like to run NousResearch/Llama-2-7b-chat-hf for development purposes, consider using `dstack` [tasks](https://dstack.ai/docs/tasks/).
-<div editor-title="examples/deployment/vllm/serve-task.dstack.yml">
+Here's an example of a service that deploys Llama 3.1 8B using vLLM.
+
+<div editor-title="examples/deployment/vllm/.dstack.yml">
 
 ```yaml
-type: task
-# This task runs Llama 2 with vllm
+type: service
+name: llama31
 
-image: vllm/vllm-openai:latest
+python: "3.11"
 env:
-  - MODEL=NousResearch/Llama-2-7b-chat-hf
-  - PYTHONPATH=/workspace
+  - HF_TOKEN
+  - MODEL_ID=meta-llama/Meta-Llama-3.1-8B-Instruct
+  - MAX_MODEL_LEN=4096
 commands:
-  - python3 -m vllm.entrypoints.openai.api_server --model $MODEL --port 8000
-ports:
-  - 8000
+  - pip install vllm
+  - vllm serve $MODEL_ID 
+    --max-model-len $MAX_MODEL_LEN
+    --tensor-parallel-size $DSTACK_GPUS_NUM
+port: 8000
+model: meta-llama/Meta-Llama-3.1-8B-Instruct
+
+# Use either spot or on-demand instances
+spot_policy: auto
 
 resources:
   gpu: 24GB
+  # Uncomment if using multiple GPUs
+  #shm_size: 24GB
 ```
 
 </div>
-
-### Deploying as a service
-
-If you'd like to deploy the model as an auto-scalable and secure endpoint,
-use the [service](https://dstack.ai/docs/services) configuration. You can find it at [`examples/deployment/vllm/serve.dstack.yml` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/deployment/vllm/serve.dstack.yml)
 
 ### Running a configuration
 
@@ -51,18 +56,46 @@ To run a configuration, use the [`dstack apply`](https://dstack.ai/docs/referenc
 <div class="termy">
 
 ```shell
-$ dstack apply -f examples/deployment/vllm/serve-task.dstack.yml
+$ dstack apply -f examples/deployment/vllm/.dstack.yml
 
- #  BACKEND  REGION         INSTANCE         RESOURCES   SPOT  PRICE     
- 1  cudo     ca-montreal-1  intel-broadwell  2xCPU, 8GB,  no   $0.0276   
- 2  cudo     ca-montreal-2  intel-broadwell  2xCPU, 8GB,  no   $0.0286   
- 3  cudo     fi-tampere-1   intel-broadwell  2xCPU, 8GB,  no   $0.0383  
+ #  BACKEND  REGION    RESOURCES                    SPOT  PRICE     
+ 1  runpod   CA-MTL-1  18xCPU, 100GB, A5000:24GB    yes   $0.12
+ 2  runpod   EU-SE-1   18xCPU, 100GB, A5000:24GB    yes   $0.12
+ 3  gcp      us-west4  27xCPU, 150GB, A5000:24GB:2  yes   $0.23
 
 Submit a new run? [y/n]: y
 
 Provisioning...
 ---> 100%
 ```
+</div>
+
+If no gateway is created, the service’s endpoint will be accessible at 
+`<dstack server URL>/proxy/services/<project name>/<run name>`.
+
+<div class="termy">
+
+```shell
+$ curl http://127.0.0.1:3000/proxy/models/main/chat/completions \
+    -X POST \
+    -H 'Authorization: Bearer &lt;dstack token&gt;' \
+    -H 'Content-Type: application/json' \
+    -d '{
+      "model": "meta-llama/Meta-Llama-3.1-8B-Instruct",
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are a helpful assistant."
+        },
+        {
+          "role": "user",
+          "content": "What is Deep Learning?"
+        }
+      ],
+      "max_tokens": 128
+    }'
+```
+
 </div>
 
 ## Source code
@@ -72,8 +105,8 @@ The source-code of this example can be found in
 
 ## What's next?
 
-1. Check [dev environments](https://dstack.ai/docs/dev-environments), [tasks](https://dstack.ai/docs/tasks), 
-   [services](https://dstack.ai/docs/services), and [protips](https://dstack.ai/docs/protips).
-2. Browse [Deployment on AMD :material-arrow-top-right-thin:{ .external }](https://dstack.ai/examples/accelerators/amd/) and
-   [Deployment on TPU :material-arrow-top-right-thin:{ .external }](https://dstack.ai/examples/accelerators/tpu/).
-   
+1. Check [services](https://dstack.ai/docs/services)
+2. Browse the [Llama 3.1](https://dstack.ai/examples/llms/llama31/), [TGI](https://dstack.ai/examples/deployment/tgi/)
+   and [NIM](https://dstack.ai/examples/deployment/nim/) examples
+3. See also [AMD](https://dstack.ai/examples/accelerators/amd/) and
+   [TPU](https://dstack.ai/examples/accelerators/tpu/)
