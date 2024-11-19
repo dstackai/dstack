@@ -81,7 +81,6 @@ To run the task, use `dstack apply`:
 ```shell
 $ HF_TOKEN=...
 $ WANDB_API_KEY=...
-
 $ dstack apply -f examples/fine-tuning/alignment-handbook/train.dstack.yml
 ```
 

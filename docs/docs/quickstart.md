@@ -83,7 +83,7 @@ Your folder can be a regular local folder or a Git repo.
 
     Create the following configuration file inside the repo:
 
-    <div editor-title="examples/misc/streamlit/serve-task.dstack.yml"> 
+    <div editor-title="task.dstack.yml"> 
 
     ```yaml
     type: task
@@ -119,7 +119,7 @@ Your folder can be a regular local folder or a Git repo.
     <div class="termy">
 
     ```shell
-    $ dstack apply -f serve-task.dstack.yml
+    $ dstack apply -f task.dstack.yml
     
      #  BACKEND  REGION           RESOURCES                 SPOT  PRICE
      1  gcp      us-west4         2xCPU, 8GB, 100GB (disk)  yes   $0.010052
@@ -148,7 +148,7 @@ Your folder can be a regular local folder or a Git repo.
 
     Create the following configuration file inside the repo:
 
-    <div editor-title="examples/deployment/vllm/service.dstack.yml"> 
+    <div editor-title="service.dstack.yml"> 
 
     ```yaml
     type: service
@@ -184,6 +184,7 @@ Your folder can be a regular local folder or a Git repo.
     <div class="termy">
 
     ```shell
+    $ HF_TOKEN=...
     $ dstack apply -f service.dstack.yml
     
      #  BACKEND  REGION     INSTANCE       RESOURCES                    SPOT  PRICE
@@ -206,9 +207,10 @@ Your folder can be a regular local folder or a Git repo.
     `<dstack server URL>/proxy/models/<project name>`.
 
     !!! info "Gateway"
-        To publish a service with a custom domain and HTTPS, set up a 
-        [gateway](concepts/gateways.md) before running the service.
-        A gateway is pre-configured for you if you are using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"}.
+        To enable [auto-scaling](reference/dstack.yml/service.md#auto-scaling), or use a custom domain with HTTPS, 
+        set up a [gateway](concepts/gateways.md) before running the service.
+        If you're using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"},
+        a gateway is pre-configured for you.
 
 `dstack apply` automatically provisions instances, uploads the code from the current repo (incl. your local uncommitted changes).
 

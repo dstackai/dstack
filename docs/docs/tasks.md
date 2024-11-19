@@ -62,7 +62,6 @@ To run a configuration, use the [`dstack apply`](reference/cli/index.md#dstack-a
 ```shell
 $ HF_TOKEN=...
 $ WANDB_API_KEY=...
-
 $ dstack apply -f examples/.dstack.yml
 
  #  BACKEND  REGION    RESOURCES                    SPOT  PRICE

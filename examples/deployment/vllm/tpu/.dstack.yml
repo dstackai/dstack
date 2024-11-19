@@ -9,7 +9,6 @@ env:
   - TORCH_VERSION=2.5.0
   - VLLM_TARGET_DEVICE=tpu
   - MAX_MODEL_LEN=4096
-
 commands:
   - pip install https://storage.googleapis.com/pytorch-xla-releases/wheels/tpuvm/torch-${TORCH_VERSION}.dev${DATE}-cp311-cp311-linux_x86_64.whl
   - pip3 install https://storage.googleapis.com/pytorch-xla-releases/wheels/tpuvm/torch_xla-${TORCH_VERSION}.dev${DATE}-cp311-cp311-linux_x86_64.whl
@@ -24,14 +23,12 @@ commands:
       --tensor-parallel-size 4 
       --max-model-len $MAX_MODEL_LEN
       --port 8000
-
 # Expose the vllm server port
 port: 8000
+# Register the model
+model: meta-llama/Meta-Llama-3.1-8B-Instruct
 
 spot_policy: auto
 
 resources:
   gpu: v5litepod-4
-
-# (Optional) Enable the OpenAI-compatible endpoint
-model: meta-llama/Meta-Llama-3.1-8B-Instruct
