@@ -164,7 +164,9 @@ Provisioning...
 
 </div>
 
-If you run a task, `dstack apply` automatically forwards the remote ports to `localhost` for convenient access.
+Once the service is up, the model will be available via the OpenAI-compatible endpoint
+at `<dstack server URL>/proxy/models/<project name>`
+or at `https://gateway.<gateway domain>` if your project has a gateway.
 
 <div class="termy">
 

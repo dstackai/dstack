@@ -4,6 +4,7 @@
 
 dist/
 venv/
+/site/
 /.cache/
 .pytest_cache/
 .coverage

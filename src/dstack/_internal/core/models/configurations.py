@@ -222,7 +222,7 @@ class ServiceConfigurationParams(CoreModel):
         Optional[Union[AnyModel, str]],
         Field(
             description=(
-                "Mapping of the model for the model gateway."
+                "Mapping of the model for the OpenAI-compatible endpoint provided by `dstack`."
                 " Can be a full model format definition or just a model name."
                 " If it's a name, the service is expected to expose an OpenAI-compatible"
                 " API at the `/v1` path"

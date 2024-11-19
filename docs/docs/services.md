@@ -28,7 +28,7 @@ commands:
 # Expose the vllm server port
 port: 8000
 
-# Specify a name if it's an Open-AI compatible model
+# Specify a name if it's an OpenAI-compatible model
 model: meta-llama/Meta-Llama-3.1-8B-Instruct
 
 # Use either spot or on-demand instances
@@ -47,12 +47,9 @@ If you don't specify your Docker image, `dstack` uses the [base](https://hub.doc
 Note, the `model` property is optional and not needed when deploying a non-OpenAI-compatible model or a regular web app.
 
 !!! info "Gateway"
-    By default, services run on a single instance. However, you can specify `replicas` and `target` to enable 
-    [auto-scaling](reference/dstack.yml/service.md#auto-scaling).
-
-    Note, to use auto-scaling, a custom domain, or HTTPS, set up a 
+    To publish a service with a custom domain and HTTPS, set up a 
     [gateway](concepts/gateways.md) before running the service.
-    A gateway pre-configured for you if you are using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"}.
+    A gateway is pre-configured for you if you are using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"}.
 
 !!! info "Reference"
     See [.dstack.yml](reference/dstack.yml/service.md) for all the options supported by
@@ -80,7 +77,7 @@ Provisioning...
 ---> 100%
 
 Service is published at: 
-  http://localhost:3000/proxy/services/main/llama31-service
+  http://localhost:3000/proxy/services/main/llama31-service/
 ```
 
 </div>
@@ -92,8 +89,8 @@ To avoid uploading large files, ensure they are listed in `.gitignore`.
 
 ### Service
 
-If no gateway is created, the service’s endpoint will be accessible at `<dstack server URL>
-/proxy/services/<project name>/<run name>`.
+If no gateway is created, the service’s endpoint will be accessible at
+`<dstack server URL>/proxy/services/<project name>/<run name>/`.
 
 By default, the service endpoint requires the `Authorization` header with `Bearer <dstack token>`.
 

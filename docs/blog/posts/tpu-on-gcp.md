@@ -120,8 +120,8 @@ and [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/vllm-
     </div>
 
 ??? info "Control plane"
-    If you specify `model` when running a service, `dstack` will automatically register the model on the gateway's global
-    endpoint and allow you to use it for chat via the control plane UI.
+    If you specify `model` when running a service, `dstack` will automatically register the model on
+    an OpenAI-compatible endpoint and allow you to use it for chat via the control plane UI.
     
     <img src="https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-control-plane-model-llama31.png?raw=true" width="750px" />
 
