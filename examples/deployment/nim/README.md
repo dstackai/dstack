@@ -52,9 +52,6 @@ resources:
   gpu: 24GB
   # Uncomment if using multiple GPUs
   #shm_size: 24GB
-  
-# VM-based backends only
-backends: ["aws", "gcp", "azure", "lambda",  "cudo", "datacrunch","oci", "tensordock"]
 ```
 </div>
 
@@ -117,9 +114,8 @@ The source-code of this example can be found in
 [`examples/deployment/nim` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/deployment/nim){:target="_blank"}.
 
 ??? warning "Limitations"
-    NIM works on all VM-based backends.
-    Support for non-VM options like RunPod, Vast.ai, and Kubernetes is on the way. 
-    Follow the [issue :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/1535){:target="_blank"} for progress.
+    NIM isn't working yet with `runpod` and `vastai` backends. 
+    Track the [issue :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/1535){:target="_blank"} for progress.
 
 ## What's next?
 

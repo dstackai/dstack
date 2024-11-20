@@ -122,9 +122,6 @@ Here's an example of a service that deploys Llama 3.1 8B using vLLM, TGI, and NI
       gpu: 24GB
       # Uncomment if using multiple GPUs
       #shm_size: 24GB
-      
-    # VM-based backends only
-    backends: ["aws", "gcp", "azure", "lambda",  "cudo", "datacrunch","oci", "tensordock"]
     ```
 
     </div>

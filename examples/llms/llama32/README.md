@@ -44,8 +44,8 @@ port: 8000
 model: meta-llama/Llama-3.2-11B-Vision-Instruct
 
 # Uncomment to cache downloaded models
-volumes:
-  - /root/.cache/huggingface/hub:/root/.cache/huggingface/hub
+#volumes:
+#  - /root/.cache/huggingface/hub:/root/.cache/huggingface/hub
 
 resources:
   gpu: 40GB..48GB
