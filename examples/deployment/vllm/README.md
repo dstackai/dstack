@@ -70,9 +70,8 @@ Provisioning...
 ```
 </div>
 
-Once the service is up, the model will be available via the OpenAI-compatible endpoint
-at `<dstack server URL>/proxy/models/<project name>`
-or at `https://gateway.<gateway domain>` if your project has a gateway.
+If no gateway is created, the model will be available via the OpenAI-compatible endpoint 
+at `<dstack server URL>/proxy/models/<project name>/`.
 
 <div class="termy">
 
@@ -98,6 +97,9 @@ $ curl http://127.0.0.1:3000/proxy/models/main/chat/completions \
 ```
 
 </div>
+
+When a [gateway](https://dstack.ai/docs/concepts/gateways.md) is configured, the OpenAI-compatible endpoint 
+is available at `https://gateway.<gateway domain>/`.
 
 ## Source code
 

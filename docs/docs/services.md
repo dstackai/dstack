@@ -9,7 +9,7 @@ First, create a YAML file in your project folder. Its name must end with `.dstac
 `service.dstack.yml`
 are both acceptable).
 
-<div editor-title="examples/deployment/vllm/service.dstack.yml"> 
+<div editor-title="service.dstack.yml"> 
 
 ```yaml
 type: service
@@ -18,13 +18,14 @@ name: llama31-service
 
 # If `image` is not specified, dstack uses its default image
 python: "3.11"
-
 # Required environment variables
 env:
   - HF_TOKEN
+  - MODEL_ID=meta-llama/Meta-Llama-3.1-8B-Instruct
 commands:
   - pip install vllm
-  - vllm serve meta-llama/Meta-Llama-3.1-8B-Instruct --max-model-len 4096
+  - vllm serve $MODEL_ID
+    --max-model-len 4096
 # Expose the vllm server port
 port: 8000
 
@@ -47,9 +48,10 @@ If you don't specify your Docker image, `dstack` uses the [base](https://hub.doc
 Note, the `model` property is optional and not needed when deploying a non-OpenAI-compatible model or a regular web app.
 
 !!! info "Gateway"
-    To publish a service with a custom domain and HTTPS, set up a 
-    [gateway](concepts/gateways.md) before running the service.
-    A gateway is pre-configured for you if you are using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"}.
+    To enable [auto-scaling](reference/dstack.yml/service.md#auto-scaling), or use a custom domain with HTTPS, 
+    set up a [gateway](concepts/gateways.md) before running the service.
+    If you're using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"},
+    a gateway is pre-configured for you.
 
 !!! info "Reference"
     See [.dstack.yml](reference/dstack.yml/service.md) for all the options supported by
@@ -63,7 +65,6 @@ To run a configuration, use the [`dstack apply`](reference/cli/index.md#dstack-a
 
 ```shell
 $ HF_TOKEN=...
-
 $ dstack apply -f service.dstack.yml
 
  #  BACKEND  REGION    RESOURCES                    SPOT  PRICE
@@ -92,8 +93,6 @@ To avoid uploading large files, ensure they are listed in `.gitignore`.
 If no gateway is created, the service’s endpoint will be accessible at
 `<dstack server URL>/proxy/services/<project name>/<run name>/`.
 
-By default, the service endpoint requires the `Authorization` header with `Bearer <dstack token>`.
-
 <div class="termy">
 
 ```shell
@@ -113,18 +112,19 @@ $ curl http://localhost:3000/proxy/services/main/llama31-service/v1/chat/complet
 
 </div>
 
+When a [gateway](concepts/gateways.md) is configured, the service endpoint will be accessible at `https://<run name>.<gateway domain>`.
+
+By default, the service endpoint requires the `Authorization` header with `Bearer <dstack token>`.
 Authorization can be disabled by setting [`auth`](reference/dstack.yml/service.md#authorization) to `false` in the
 service configuration file.
-
-> When a [gateway](concepts/gateways.md) is configured, the service endpoint will be accessible at `https://<run name>.<gateway domain>`.
 
 ### Model
 
 If the service defines the `model` property, the model can be accessed with
-the OpenAI-compatible endpoint at `<dstack server URL>/proxy/models/<project name>`,
+the OpenAI-compatible endpoint at `<dstack server URL>/proxy/models/<project name>/`,
 or via the control plane UI's playground.
 
-> When a [gateway](concepts/gateways.md) is configured, the OpenAI-compatible endpoint is available at `https://gateway.<gateway domain>`.
+When a [gateway](concepts/gateways.md) is configured, the OpenAI-compatible endpoint is available at `https://gateway.<gateway domain>/`.
 
 ## Manage runs
 
@@ -157,7 +157,9 @@ or creates a new fleet through backends.
 
 ## What's next?
 
-1. Check the [TGI :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/deployment/tgi/README.md){:target="_blank"} and [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/deployment/vllm/README.md){:target="_blank"} examples
+1. Check the [TGI :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/deployment/tgi/README.md){:target="_blank"},
+   [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/deployment/vllm/README.md){:target="_blank"}, and 
+   [NIM :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/deployment/nim/README.md){:target="_blank"} examples
 2. See [gateways](concepts/gateways.md) on how to set up a gateway
 3. Browse [examples](/examples)
 4. See [fleets](concepts/fleets.md) on how to manage fleets

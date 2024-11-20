@@ -17,9 +17,7 @@ This example walks you through how to deploy Llama 3.2 vision model with `dstack
 
 ## Deployment
 
-### Running as a task
-
-If you'd like to run Llama 3.2 vision model for development purposes, consider using `dstack` tasks.
+Here's an example of a service that deploys Llama 3.2 11B using vLLM.
 
 <div editor-title="examples/llms/llama32/vllm/.dstack.yml"> 
 
@@ -71,7 +69,6 @@ To run a configuration, use the [`dstack apply`](https://dstack.ai/docs/referenc
 
 ```shell
 $ HF_TOKEN=...
-
 $ dstack apply -f examples/llms/llama32/vllm/.dstack.yml
 
  #  BACKEND  REGION     RESOURCES                    SPOT  PRICE   
@@ -88,9 +85,8 @@ Provisioning...
 
 </div>
 
-Once the service is up, the model will be available via the OpenAI-compatible endpoint
-at `<dstack server URL>/proxy/models/<project name>`
-or at `https://gateway.<gateway domain>` if your project has a gateway.
+Once the service is up, it will be available via the service endpoint
+at `<dstack server URL>/proxy/services/<project name>/<run name>/`.
 
 <div class="termy">
 
@@ -113,6 +109,9 @@ $ curl http://127.0.0.1:3000/proxy/services/main/llama32/v1/chat/completions \
 ```
 
 </div>
+
+When a [gateway](https://dstack.ai/docs/concepts/gateways.md) is configured, the service endpoint 
+is available at `https://<run name>.<gateway domain>/`.
 
 [//]: # (TODO: https://github.com/dstackai/dstack/issues/1777)
 

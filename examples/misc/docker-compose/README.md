@@ -121,7 +121,6 @@ To run a configuration, use the [`dstack apply`](https://dstack.ai/docs/referenc
 
 ```shell
 $ HF_TOKEN=...
-
 $ dstack apply -f examples/examples/misc/docker-compose/task.dstack.yml
 
  #  BACKEND  REGION    RESOURCES                    SPOT  PRICE

@@ -18,7 +18,7 @@ This example walks you through how to deploy and fine-tuning Llama 3.1 with `dst
 ## Deployment
 
 You can use any serving frameworks.
-Here's an example of a service that deploys Llama 3.1 8B using vLLM, TGI, and Ollama.
+Here's an example of a service that deploys Llama 3.1 8B using vLLM, TGI, and NIM.
 
 === "vLLM"
 
@@ -82,29 +82,29 @@ Here's an example of a service that deploys Llama 3.1 8B using vLLM, TGI, and Ol
 
     </div>
 
-=== "Ollama"
+=== "NIM"
 
     <div editor-title="examples/llms/llama31/ollama/.dstack.yml"> 
 
     ```yaml
     type: service
-    name: llama31
+
+    image: nvcr.io/nim/meta/llama3-8b-instruct:latest
+    env:
+      - NGC_API_KEY
+    registry_auth:
+      username: $oauthtoken
+      password: ${{ env.NGC_API_KEY }}
+    port: 8000
+    model: meta/llama3-8b-instruct
     
-    image: ollama/ollama
-    commands:
-      - ollama serve &
-      - sleep 3
-      - ollama pull llama3.1
-      - fg
-    port: 11434
-    model: llama3.1
-    
-    # Use either spot or on-demand instances
     spot_policy: auto
     
-    # Required resources
     resources:
       gpu: 24GB
+    
+    # NIM is supported only with VM-based backends
+    backends: ["aws", "azure", "cudo", "datacrunch", "gcp", "lambda", "oci", "tensordock"]
     ```
 
     </div>
@@ -148,7 +148,6 @@ To run a configuration, use the [`dstack apply`](https://dstack.ai/docs/referenc
 
 ```shell
 $ HF_TOKEN=...
-
 $ dstack apply -f examples/llms/llama31/vllm/.dstack.yml
 
  #  BACKEND  REGION    RESOURCES                    SPOT  PRICE
@@ -165,8 +164,7 @@ Provisioning...
 </div>
 
 Once the service is up, the model will be available via the OpenAI-compatible endpoint
-at `<dstack server URL>/proxy/models/<project name>`
-or at `https://gateway.<gateway domain>` if your project has a gateway.
+at `<dstack server URL>/proxy/models/<project name>/.
 
 <div class="termy">
 
@@ -192,6 +190,9 @@ $ curl http://127.0.0.1:3000/proxy/models/main/chat/completions \
 ```
 
 </div>
+
+When a [gateway](https://dstack.ai/docs/concepts/gateways.md) is configured, the OpenAI-compatible endpoint 
+is available at `https://gateway.<gateway domain>/`.
 
 [//]: # (TODO: How to prompting and tool calling)
 

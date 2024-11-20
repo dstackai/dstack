@@ -93,26 +93,13 @@ This allows you to access the remote `8501` port on `localhost:8501` while the C
     
     This will forward the remote `8501` port to `localhost:3000`.
 
-[Services](../services.md) provide additional features not offered by tasks,
-such as authorization, load balancing, auto-scaling, an OpenAI-compatible endpoint for models, etc.
+> Use [tasks](../tasks.md) when you don't need authorization, OpenAI-compatible endpoint,
+custom domain with HTTPS, multiple replicas, and when you don't need to let 
+other users access the endpoint.
 
-Unlike tasks, services are accessible throughout their lifetime, not only when the CLI is attached.
-By default, they are published at `<dstack server URL>/proxy/services/<project name>/<run name>/`.
-Additionally, if your project has a [gateway](../concepts/gateways.md),
-services can be published at a custom domain with HTTPS instead.
+In all other cases, use [services](../services.md).
 
-So what should you choose for running a web app? Here are some suggestions:
-
-- If you are running a simple app that you only need temporarily, consider **tasks**.
-- If your app needs to be available at all times or if it needs to benefit from advanced features
-  such as authorization or load balancing, use **services**.
-    - If the service will only be accessed by you and other `dstack` users and supports running
-      behind a URL path prefix, **no gateway** is needed.
-    - If the service requires public access, a custom domain, HTTPS, or increased network throughput,
-      **create a gateway** first.
-
-??? info "Auto-scaling and WebSockets"
-    Services using WebSockets or auto-scaling currently require a gateway.
+[//]: # (TODO: Mention gateways
 
 ## Docker and Docker Compose
 
@@ -123,6 +110,7 @@ inside `dstack` runs. To do that, additional configuration steps are required:
 2. Set the `image` property to `dstackai/dind` (or another DinD image).
 3. For tasks and services, add `start-dockerd` as the first command. For dev environments, add `start-dockerd` as the first command
    in the `init` property.
+
 Note, `start-dockerd` is a part of `dstackai/dind` image, if you use a different DinD image,
 replace it with a corresponding command to start Docker daemon.
 
@@ -206,22 +194,35 @@ ide: vscode
 
 Then, you can pass the environment variable either via the shell:
 
+<div class="termy">
+
 ```shell
-HF_TOKEN=... dstack apply -f .dstack.yml
+$ HF_TOKEN=... 
+$ dstack apply -f .dstack.yml
 ```
+
+</div>
 
 Or via the `-e` option of the `dstack apply` command:
 
+<div class="termy">
+
 ```shell
-dstack apply -f .dstack.yml -e HF_TOKEN=...
+$ dstack apply -e HF_TOKEN=... -f .dstack.yml
 ```
 
-??? info ".env"
-    A better way to configure environment variables not hardcoded in YAML is by specifying them in a `.env` file:
+</div>
 
+??? info ".envrc"
+    A better way to configure environment variables not hardcoded in YAML is by specifying them in a `.envrc` file:
+
+    <div editor-title=".envrc"> 
+
+    ```shell
+    export HF_TOKEN=...
     ```
-    HF_TOKEN=...
-    ```
+
+    </div>
     
     If you install [`direnv` :material-arrow-top-right-thin:{ .external }](https://direnv.net/){:target="_blank"},
     it will automatically pass the environment variables from the `.env` file to the `dstack apply` command.
@@ -238,6 +239,10 @@ You can also load and save data using an object storage like S3 or HuggingFace D
 For models, it's best to use services like HuggingFace Hub.
 `dstack` has no explicit support for object storage.
 You can load and save data directly from your code.
+
+[//]: # (TODO: Mention instance volumes)
+
+[//]: # (TODO: Mention multiple volumes per mount point)
 
 ## Idle duration
 
@@ -302,6 +307,8 @@ The GPU vendor is indicated by one of the following case-insensitive values:
 
 ??? info "AMD"
     Currently, when an AMD GPU is specified, either by name or by vendor, the `image` property must be specified as well.
+
+[//]: # (TODO: Mention `tpu:`, `nvidia:`, and `amd:` prefixes)
 
 ## Monitoring metrics
 

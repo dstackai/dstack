@@ -8,6 +8,7 @@ commands:
   - ollama pull llama3.1
   - fg
 port: 11434
+# Register the model
 model: llama3.1
 
 # Use either spot or on-demand instances
