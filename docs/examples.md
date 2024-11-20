@@ -80,7 +80,7 @@ hide:
         </h3>
 
         <p>
-            Learn how to deploy and fine-tune LLMs on AMD.
+            Deploy and fine-tune LLMs on AMD
         </p>
     </a>
 
@@ -91,7 +91,7 @@ hide:
         </h3>
 
         <p>
-            Learn how to deploy and fine-tune LLMs on TPU.
+            Deploy and fine-tune LLMs on TPU
         </p>
     </a>
 </div>
@@ -106,7 +106,7 @@ hide:
         </h3>
 
         <p>
-            Learn how to deploy and fine-tune Llama 3.1.
+            Deploy and fine-tune Llama 3.1
         </p>
     </a>
     <a href="/examples/llms/llama32"
@@ -116,7 +116,7 @@ hide:
         </h3>
 
         <p>
-            Learn how to deploy Llama 3.2 vision models.
+            Deploy Llama 3.2 vision models
         </p>
     </a>
 </div>
@@ -131,7 +131,7 @@ hide:
         </h3>
 
         <p>
-            Learn how to use Docker and Docker Compose inside runs.
+            Use Docker and Docker Compose inside runs
         </p>
     </a>
 </div>
