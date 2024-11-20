@@ -92,19 +92,14 @@ This allows you to access the remote `8501` port on `localhost:8501` while the C
     </div>
     
     This will forward the remote `8501` port to `localhost:3000`.
-    
-Note, a task's port is forwarded to `localhost` only while the CLI is attached.
 
 > Use [tasks](../tasks.md) when you don't need authorization, OpenAI-compatible endpoint,
 custom domain with HTTPS, multiple replicas, and when you don't need to let 
 other users access the endpoint.
+
 In all other cases, use [services](../services.md).
 
-!!! info "Gateway"
-    To enable [auto-scaling](reference/dstack.yml/service.md#auto-scaling), or use a custom domain with HTTPS, 
-    set up a [gateway](concepts/gateways.md) before running the service.
-    If you're using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"},
-    a gateway is pre-configured for you.
+[//]: # (TODO: Mention gateways
 
 ## Docker and Docker Compose
 
@@ -115,6 +110,7 @@ inside `dstack` runs. To do that, additional configuration steps are required:
 2. Set the `image` property to `dstackai/dind` (or another DinD image).
 3. For tasks and services, add `start-dockerd` as the first command. For dev environments, add `start-dockerd` as the first command
    in the `init` property.
+
 Note, `start-dockerd` is a part of `dstackai/dind` image, if you use a different DinD image,
 replace it with a corresponding command to start Docker daemon.
 

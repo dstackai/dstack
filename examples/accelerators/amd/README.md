@@ -52,7 +52,7 @@ Llama 3.1 70B in FP16 using [TGI :material-arrow-top-right-thin:{ .external }](h
     type: service
     name: llama31-service-vllm-amd
     
-# Using RunPod's ROCm Docker image
+    # Using RunPod's ROCm Docker image
     image: runpod/pytorch:2.4.0-py3.10-rocm6.1.0-ubuntu22.04
     # Required environment variables
     env:
