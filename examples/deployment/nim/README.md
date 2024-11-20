@@ -23,27 +23,35 @@ Here's an example of a service that deploys Llama 3.1 8B using vLLM.
 
 ```yaml
 type: service
+name: llama31
 
-image: nvcr.io/nim/meta/llama3-8b-instruct:latest
+image: nvcr.io/nim/meta/llama-3.1-8b-instruct:latest
 env:
   - NGC_API_KEY
+  - NIM_MAX_MODEL_LEN=4096
 registry_auth:
   username: $oauthtoken
   password: ${{ env.NGC_API_KEY }}
 port: 8000
-model: meta/llama3-8b-instruct
+# Register the model
+model: meta/llama-3.1-8b-instruct
 
-spot_policy: auto
+# Uncomment to leverage spot instances
+#spot_policy: auto
+
+# Cache downloaded models
+volumes:
+  - /root/.cache/nim:/opt/nim/.cache
 
 resources:
   gpu: 24GB
-
-# Exclude non-VM backends
-backends: ["aws", "azure", "cudo", "datacrunch", "gcp", "lambda", "oci", "tensordock"]
+  # Uncomment if using multiple GPUs
+  #shm_size: 24GB
+  
+# VM-based backends only
+backends: ["aws", "gcp", "azure", "lambda",  "cudo", "datacrunch","oci", "tensordock"]
 ```
 </div>
-
-> Currently, NIM is supported on every backend except RunPod, Vast.ai, and Kubernetes.
 
 ### Running a configuration
 
@@ -53,7 +61,6 @@ To run a configuration, use the [`dstack apply`](https://dstack.ai/docs/referenc
 
 ```shell
 $ NGC_API_KEY=...
-
 $ dstack apply -f examples/deployment/nim/.dstack.yml
 
  #  BACKEND  REGION             RESOURCES                 SPOT  PRICE       
@@ -102,7 +109,12 @@ is available at `https://gateway.<gateway domain>/`.
 ## Source code
 
 The source-code of this example can be found in 
-[`examples/deployment/nim` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/deployment/nim).
+[`examples/deployment/nim` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/deployment/nim){:target="_blank"}.
+
+??? warning "Limitations"
+    NIM works on all VM-based backends.
+    Support for non-VM options like RunPod, Vast.ai, and Kubernetes is on the way. 
+    Follow the [issue :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/1535){:target="_blank"} for progress.
 
 ## What's next?
 

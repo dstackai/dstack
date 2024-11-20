@@ -94,12 +94,10 @@ This allows you to access the remote `8501` port on `localhost:8501` while the C
     This will forward the remote `8501` port to `localhost:3000`.
 
 > Use [tasks](../tasks.md) when you don't need authorization, OpenAI-compatible endpoint,
-custom domain with HTTPS, multiple replicas, and when you don't need to let 
-other users access the endpoint.
+> custom domain with HTTPS, multiple replicas, and when you don't need to let
+> other users access the endpoint.
 
 In all other cases, use [services](../services.md).
-
-[//]: # (TODO: Mention gateways
 
 ## Docker and Docker Compose
 
@@ -229,20 +227,17 @@ $ dstack apply -e HF_TOKEN=... -f .dstack.yml
 
     Remember to add `.env` to `.gitignore` to avoid pushing it to the repo.    
 
-## Data and models
+## Volumes
 
-`dstack` has support for [volumes](../concepts/volumes.md)
-to persist data across different runs and instance interruptions.
-Volumes are ideal for storing intermediate work and data that should be quickly accessible.
+To persist data across runs, it is recommended to use volumes.
+`dstack` supports two types of volumes: [network](../concepts/volumes.md#network-volumes)
+and [instance](../concepts/volumes.md#instance-volumes).
 
-You can also load and save data using an object storage like S3 or HuggingFace Datasets.
-For models, it's best to use services like HuggingFace Hub.
-`dstack` has no explicit support for object storage.
-You can load and save data directly from your code.
+Network volumes are ideal for persisting data even if the instance is interrupted.
 
-[//]: # (TODO: Mention instance volumes)
+Instance volumes are useful for persisting cached data across runs while the instance remains active.
 
-[//]: # (TODO: Mention multiple volumes per mount point)
+> Besides volumes, you can load and save data using object storage services such as S3, HuggingFace Hub, and others.
 
 ## Idle duration
 
@@ -284,7 +279,7 @@ allows specifying not only memory size but also GPU vendor, names, their memory,
 Examples:
 
 - `1` (any GPU)
-- `AMD:2` (two AMD GPUs)
+- `amd:2` (two AMD GPUs)
 - `A100` (A100)
 - `24GB..` (any GPU starting from 24GB)
 - `24GB..40GB:2` (two GPUs between 24GB and 40GB)
@@ -307,8 +302,6 @@ The GPU vendor is indicated by one of the following case-insensitive values:
 
 ??? info "AMD"
     Currently, when an AMD GPU is specified, either by name or by vendor, the `image` property must be specified as well.
-
-[//]: # (TODO: Mention `tpu:`, `nvidia:`, and `amd:` prefixes)
 
 ## Monitoring metrics
 
@@ -371,3 +364,5 @@ corresponding service quotas for each type of instance in each region.
     - `GPUs for GPU3 based VM and BM instances` (on-demand V100)
 
 Note, for AWS, GCP, and Azure, service quota values are measured with the number of CPUs rather than GPUs.
+
+[//]: # (TODO: Mention spot policy)

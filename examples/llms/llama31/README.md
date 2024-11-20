@@ -39,10 +39,15 @@ Here's an example of a service that deploys Llama 3.1 8B using vLLM, TGI, and NI
         --max-model-len $MAX_MODEL_LEN
         --tensor-parallel-size $DSTACK_GPUS_NUM
     port: 8000
-    
+    # Register the model
     model: meta-llama/Meta-Llama-3.1-8B-Instruct
     
-    spot_policy: auto
+    # Uncomment to leverage spot instances
+    #spot_policy: auto
+
+    # Uncomment to cache downloaded models
+    #volumes:
+    #  - /root/.cache/huggingface/hub:/root/.cache/huggingface/hub
     
     resources:
       gpu: 24GB
@@ -69,10 +74,15 @@ Here's an example of a service that deploys Llama 3.1 8B using vLLM, TGI, and NI
     commands:
       - NUM_SHARD=$DSTACK_GPUS_NUM text-generation-launcher
     port: 80
+    # Register the model
     model: meta-llama/Meta-Llama-3.1-8B-Instruct
     
-    # Use either spot or on-demand instances
-    spot_policy: auto
+    # Uncomment to leverage spot instances
+    #spot_policy: auto
+
+    # Uncomment to cache downloaded models  
+    #volumes:
+    #  - /data:/data
     
     resources:
       gpu: 24GB
@@ -88,23 +98,33 @@ Here's an example of a service that deploys Llama 3.1 8B using vLLM, TGI, and NI
 
     ```yaml
     type: service
-
-    image: nvcr.io/nim/meta/llama3-8b-instruct:latest
+    name: llama31
+    
+    image: nvcr.io/nim/meta/llama-3.1-8b-instruct:latest
     env:
       - NGC_API_KEY
+      - NIM_MAX_MODEL_LEN=4096
     registry_auth:
       username: $oauthtoken
       password: ${{ env.NGC_API_KEY }}
     port: 8000
-    model: meta/llama3-8b-instruct
+    # Register the model
+    model: meta/llama-3.1-8b-instruct
     
-    spot_policy: auto
+    # Uncomment to leverage spot instances
+    #spot_policy: auto
+    
+    # Cache downloaded models
+    volumes:
+      - /root/.cache/nim:/opt/nim/.cache
     
     resources:
       gpu: 24GB
-    
-    # NIM is supported only with VM-based backends
-    backends: ["aws", "azure", "cudo", "datacrunch", "gcp", "lambda", "oci", "tensordock"]
+      # Uncomment if using multiple GPUs
+      #shm_size: 24GB
+      
+    # VM-based backends only
+    backends: ["aws", "gcp", "azure", "lambda",  "cudo", "datacrunch","oci", "tensordock"]
     ```
 
     </div>

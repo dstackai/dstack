@@ -20,14 +20,12 @@ name: vscode
 python: "3.11"
 # Uncomment to use a custom Docker image
 #image: dstackai/base:py3.13-0.6-cuda-12.1
-
 ide: vscode
 
-# Use either spot or on-demand instances
-spot_policy: auto
+# Uncomment to leverage spot instances
+#spot_policy: auto
 
 resources:
-  # Required resources
   gpu: 24GB
 ```
 

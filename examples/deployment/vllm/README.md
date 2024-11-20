@@ -32,14 +32,19 @@ env:
   - MAX_MODEL_LEN=4096
 commands:
   - pip install vllm
-  - vllm serve $MODEL_ID 
+  - vllm serve $MODEL_ID
     --max-model-len $MAX_MODEL_LEN
     --tensor-parallel-size $DSTACK_GPUS_NUM
 port: 8000
+# Register the model
 model: meta-llama/Meta-Llama-3.1-8B-Instruct
 
-# Use either spot or on-demand instances
-spot_policy: auto
+# Uncomment to leverage spot instances
+#spot_policy: auto
+
+# Uncomment to cache downloaded models
+#volumes:
+#  - /root/.cache/huggingface/hub:/root/.cache/huggingface/hub
 
 resources:
   gpu: 24GB

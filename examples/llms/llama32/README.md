@@ -40,7 +40,12 @@ commands:
     --limit-mm-per-prompt "image=1"
     --tensor-parallel-size $DSTACK_GPUS_NUM
 port: 8000
+# Register the model
 model: meta-llama/Llama-3.2-11B-Vision-Instruct
+
+# Uncomment to cache downloaded models
+volumes:
+  - /root/.cache/huggingface/hub:/root/.cache/huggingface/hub
 
 resources:
   gpu: 40GB..48GB

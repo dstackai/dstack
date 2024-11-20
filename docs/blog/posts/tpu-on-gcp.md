@@ -65,15 +65,17 @@ and [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/vllm-
     commands:
       - text-generation-launcher --port 8000
     port: 8000
-    
-    spot_policy: auto
-    resources:
-      gpu: v5litepod-4 
-    
+    # Register the model
     model:
       format: tgi
       type: chat
       name: meta-llama/Meta-Llama-3.1-8B-Instruct
+    
+    # Uncomment to leverage spot instances
+    #spot_policy: auto
+
+    resources:
+      gpu: v5litepod-4 
     ```
     </div>
 
@@ -108,14 +110,15 @@ and [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/vllm-
           --tensor-parallel-size 4 
           --max-model-len $MAX_MODEL_LEN
           --port 8000
-    port:
-      - 8000
+    port: 8000
+    # Register the model
+    model: meta-llama/Meta-Llama-3.1-8B-Instruct
 
-    spot_policy: auto
+    # Uncomment to leverage spot instances
+    #spot_policy: auto
+
     resources:
       gpu: v5litepod-4
-
-    model: meta-llama/Meta-Llama-3.1-8B-Instruct
     ```
     </div>
 

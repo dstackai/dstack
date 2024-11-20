@@ -46,12 +46,12 @@ using [Docker Compose :material-arrow-top-right-thin:{ .external }](https://docs
     ports:
       - 9000
     
-    # Use either spot or on-demand instances
-    spot_policy: auto
+    # Uncomment to leverage spot instances
+    #spot_policy: auto
     
     resources:
       # Required resources
-      gpu: "NVIDIA:24GB"
+      gpu: "nvidia:24GB"
     ```
     
     </div>
@@ -159,12 +159,12 @@ commands:
 ports:
   - 9000
 
-# Use either spot or on-demand instances
-spot_policy: auto
+# Uncomment to leverage spot instances
+#spot_policy: auto
 
 resources:
   # Required resources
-  gpu: "NVIDIA:24GB"
+  gpu: "nvidia:24GB"
 
 volumes:
   - name: my-dind-volume

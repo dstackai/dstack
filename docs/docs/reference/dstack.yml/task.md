@@ -324,8 +324,8 @@ commands:
   - pip install -r fine-tuning/qlora/requirements.txt
   - python fine-tuning/qlora/train.py
 
-# Use either spot or on-demand instances
-spot_policy: auto
+# Uncomment to leverage spot instances
+#spot_policy: auto
 ```
 
 </div>

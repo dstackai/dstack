@@ -13,12 +13,12 @@ commands:
 port: 9000
 auth: false
 
-# Use either spot or on-demand instances
-spot_policy: auto
+# Uncomment to leverage spot instances
+#spot_policy: auto
 
 resources:
   # Required resources
-  gpu: "NVIDIA:24GB"
+  gpu: "nvidia:24GB"
 
 # Uncomment to persist data
 #volumes:

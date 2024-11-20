@@ -24,8 +24,8 @@ commands:
   - cd ..
   - python examples/fine-tuning/trl/amd/train.py
 
-# Use either spot or on-demand instances
-spot_policy: auto
+# Uncomment to leverage spot instances
+#spot_policy: auto
 
 resources:
   gpu: MI300X

@@ -19,8 +19,8 @@ model:
   type: chat
   name: meta-llama/Meta-Llama-3.1-8B-Instruct
 
-# Use either spot or on-demand instances
-spot_policy: auto
+# Uncomment to leverage spot instances
+#spot_policy: auto
 
 resources:
   # Required resources

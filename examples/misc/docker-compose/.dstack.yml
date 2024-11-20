@@ -10,7 +10,8 @@ ide: vscode
 init:
   - start-dockerd
 
-spot_policy: auto
+# Uncomment to leverage spot instances
+#spot_policy: auto
 
 resources:
   gpu: 24GB
