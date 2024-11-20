@@ -19,22 +19,19 @@ Llama 3.1 70B in FP16 using [TGI :material-arrow-top-right-thin:{ .external }](h
     # Using the official TGI's ROCm Docker image
     image: ghcr.io/huggingface/text-generation-inference:sha-a379d55-rocm
 
-    # Required environment variables
     env:
       - HF_TOKEN
       - MODEL_ID=meta-llama/Meta-Llama-3.1-70B-Instruct
       - TRUST_REMOTE_CODE=true
       - ROCM_USE_FLASH_ATTN_V2_TRITON=true
-    # Commands of the task
     commands:
       - text-generation-launcher --port 8000
-    # Service port
     port: 8000
     # Register the model
     model: meta-llama/Meta-Llama-3.1-70B-Instruct
     
-    # Use spot or on-demand instances
-    spot_policy: auto
+    # Uncomment to leverage spot instances
+    #spot_policy: auto
     
     resources:
       gpu: MI300X
@@ -87,7 +84,8 @@ Llama 3.1 70B in FP16 using [TGI :material-arrow-top-right-thin:{ .external }](h
     # Register the model
     model: meta-llama/Meta-Llama-3.1-70B-Instruct
     
-    spot_policy: auto
+    # Uncomment to leverage spot instances
+    #spot_policy: auto
     
     resources:
       gpu: MI300X
@@ -143,8 +141,8 @@ To request multiple GPUs, specify the quantity after the GPU name, separated by 
       - cd ..
       - python examples/fine-tuning/trl/amd/train.py
     
-    # Use spot or on-demand instances
-    spot_policy: auto
+    # Uncomment to leverage spot instances
+    #spot_policy: auto
     
     resources:
       gpu: MI300X
@@ -193,8 +191,8 @@ To request multiple GPUs, specify the quantity after the GPU name, separated by 
       - cd ..
       - accelerate launch -m axolotl.cli.train axolotl/examples/llama-3/fft-8b.yaml
     
-    # Use spot or on-demand instances
-    spot_policy: auto
+    # Uncomment to leverage spot instances
+    #spot_policy: auto
 
     resources:
       gpu: MI300X

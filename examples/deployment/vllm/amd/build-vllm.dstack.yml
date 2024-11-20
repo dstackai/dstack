@@ -39,7 +39,8 @@ command:
   - cd dist
   - aws s3 cp "$(ls -1 | head -n 1)" s3://$BUCKET_NAME/ --acl public-read
 
-spot_policy: auto
+# Uncomment to leverage spot instances
+#spot_policy: auto
 
 resources:
   gpu: MI300X

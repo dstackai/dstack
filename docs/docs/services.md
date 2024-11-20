@@ -13,29 +13,26 @@ are both acceptable).
 
 ```yaml
 type: service
-# The name is optional, if not specified, generated randomly
-name: llama31-service
+name: llama31
 
 # If `image` is not specified, dstack uses its default image
 python: "3.11"
-# Required environment variables
 env:
   - HF_TOKEN
   - MODEL_ID=meta-llama/Meta-Llama-3.1-8B-Instruct
+  - MAX_MODEL_LEN=4096
 commands:
   - pip install vllm
   - vllm serve $MODEL_ID
-    --max-model-len 4096
-# Expose the vllm server port
+    --max-model-len $MAX_MODEL_LEN
+    --tensor-parallel-size $DSTACK_GPUS_NUM
 port: 8000
-
-# Specify a name if it's an OpenAI-compatible model
+# Register the model
 model: meta-llama/Meta-Llama-3.1-8B-Instruct
 
-# Use either spot or on-demand instances
-spot_policy: auto
+# Uncomment to leverage spot instances
+#spot_policy: auto
 
-# Required resources
 resources:
   gpu: 24GB
 ```
@@ -72,13 +69,13 @@ $ dstack apply -f service.dstack.yml
  2  runpod   EU-SE-1   18xCPU, 100GB, A5000:24GB:2  yes   $0.22
  3  gcp      us-west4  27xCPU, 150GB, A5000:24GB:3  yes   $0.33
  
-Submit the run llama31-service? [y/n]: y
+Submit the run llama31? [y/n]: y
 
 Provisioning...
 ---> 100%
 
 Service is published at: 
-  http://localhost:3000/proxy/services/main/llama31-service/
+  http://localhost:3000/proxy/services/main/llama31/
 ```
 
 </div>
@@ -96,7 +93,7 @@ If no gateway is created, the service’s endpoint will be accessible at
 <div class="termy">
 
 ```shell
-$ curl http://localhost:3000/proxy/services/main/llama31-service/v1/chat/completions \
+$ curl http://localhost:3000/proxy/services/main/llama31/v1/chat/completions \
     -H 'Content-Type: application/json' \
     -H 'Authorization: Bearer &lt;dstack token&gt;' \
     -d '{

@@ -57,14 +57,15 @@ you can now specify an AMD GPU under `resources`. Below are a few examples.
     commands:
       - text-generation-launcher --port 8000
     port: 8000
-    
+    # Register the model
+    model: meta-llama/Meta-Llama-3.1-70B-Instruct
+
+    # Uncomment to leverage spot instances
+    #spot_policy: auto
+
     resources:
       gpu: MI300X
       disk: 150GB
-    
-    spot_policy: auto
-
-    model: meta-llama/Meta-Llama-3.1-70B-Instruct
     ```
     
     </div>
@@ -84,11 +85,12 @@ you can now specify an AMD GPU under `resources`. Below are a few examples.
       - ROCM_USE_FLASH_ATTN_V2_TRITON=true
     ide: vscode
     
+    # Uncomment to leverage spot instances
+    #spot_policy: auto
+
     resources:
       gpu: MI300X
       disk: 150GB
-    
-    spot_policy: auto
     ```
 
 !!! info "Docker image"

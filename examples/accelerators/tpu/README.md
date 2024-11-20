@@ -80,7 +80,8 @@ and [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/vllm-
     # Register the model
     model: meta-llama/Meta-Llama-3.1-8B-Instruct
     
-    spot_policy: auto
+    # Uncomment to leverage spot instances
+    #spot_policy: auto
     
     resources:
       gpu: v5litepod-4

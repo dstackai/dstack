@@ -13,7 +13,8 @@ port: 8000
 # Register the model
 model: meta-llama/Meta-Llama-3.1-70B-Instruct
 
-spot_policy: auto
+# Uncomment to leverage spot instances
+#spot_policy: auto
 
 resources:
   gpu: MI300X

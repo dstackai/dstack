@@ -332,8 +332,8 @@ commands:
 # The port of the service
 port: 8000
 
-# Use either spot or on-demand instances
-spot_policy: auto
+# Uncomment to leverage spot instances
+#spot_policy: auto
 ```
 
 </div>

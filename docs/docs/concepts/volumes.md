@@ -93,8 +93,9 @@ volumes:
 Once you run this configuration, the contents of the volume will be attached to `/volume_data` inside the dev environment, 
 and its contents will persist across runs.
 
-!!! Info "Different volumes at the same path"
-    You can specify a list of volumes for the same mount path:
+!!! info "Attaching volumes across regions and backends"
+    If you're unsure in advance which region or backend you'd like to use (or which is available),
+    you can specify multiple volumes for the same path.
 
     <div editor-title=".dstack.yml">
 
@@ -106,10 +107,9 @@ and its contents will persist across runs.
 
     </div>
 
-    `dstack` will choose and mount one volume from the list.
-    This can be used to increase GPU availability by specifying different volumes for different regions.
+    `dstack` will attach one of the volumes based on the region and backend of the run.  
 
-!!! info "Limitations"
+??? info "Limitations"
     When you're running a dev environment, task, or service with `dstack`, it automatically mounts the project folder contents
     to `/workflow` (and sets that as the current working directory). Right now, `dstack` doesn't allow you to 
     attach volumes to `/workflow` or any of its subdirectories.

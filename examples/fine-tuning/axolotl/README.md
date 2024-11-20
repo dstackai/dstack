@@ -47,8 +47,8 @@ env:
 commands:
   - accelerate launch -m axolotl.cli.train examples/fine-tuning/axolotl/config.yaml
 
-# Use spot or on-demand instances
-spot_policy: auto
+# Uncomment to leverage spot instances
+#spot_policy: auto
 
 resources:
   gpu:
