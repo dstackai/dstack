@@ -35,7 +35,11 @@ from dstack._internal.server.services.jobs import (
 )
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.logging import fmt
-from dstack._internal.server.services.repos import get_code_model, repo_model_to_repo_head
+from dstack._internal.server.services.repos import (
+    get_code_model,
+    get_repo_creds,
+    repo_model_to_repo_head_with_creds,
+)
 from dstack._internal.server.services.runner import client
 from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
 from dstack._internal.server.services.runs import (
@@ -149,7 +153,9 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
         server_ssh_private_key = remote_conn_info.ssh_keys[0].private
 
     secrets = {}  # TODO secrets
-    repo_creds = repo_model_to_repo_head(repo_model, include_creds=True).repo_creds
+
+    repo_creds_model = await get_repo_creds(session=session, repo=repo_model, user=run_model.user)
+    repo_creds = repo_model_to_repo_head_with_creds(repo_model, repo_creds_model).repo_creds
 
     initial_status = job_model.status
     if initial_status == JobStatus.PROVISIONING:
