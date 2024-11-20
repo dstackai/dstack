@@ -92,10 +92,12 @@ jobs:
         with:
           go-version-file: runner/go.mod
           cache-dependency-path: runner/go.sum
+      - name: Check if go.mod and go.sum are up-to-date
+        run: go mod tidy -diff
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v6
         with:
-          version: v1.58
+          version: v1.62.0
           args: --timeout=20m
           working-directory: runner
       - name: Test
