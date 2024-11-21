@@ -15,7 +15,7 @@ import styles from './styles.module.scss';
 
 export const EnterpriseLogin: React.FC = () => {
     const { t } = useTranslation();
-    const { data } = useGetOktaInfoQuery();
+    const { data, isLoading } = useGetOktaInfoQuery();
 
     const oktaEnabled = data?.enabled;
 
@@ -27,10 +27,10 @@ export const EnterpriseLogin: React.FC = () => {
                         {t('auth.sign_in_to_dstack_enterprise')}
                     </Box>
 
-                    {data && !oktaEnabled && <LoginByTokenForm />}
-                    {data && oktaEnabled && <LoginByOkta className={styles.okta} />}
+                    {!isLoading && !oktaEnabled && <LoginByTokenForm />}
+                    {!isLoading && oktaEnabled && <LoginByOkta className={styles.okta} />}
 
-                    {data && oktaEnabled && (
+                    {!isLoading && oktaEnabled && (
                         <Box color="text-body-secondary">
                             <NavigateLink href={ROUTES.AUTH.TOKEN}>{t('auth.login_by_token')}</NavigateLink>
                         </Box>
