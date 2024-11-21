@@ -1,7 +1,6 @@
 from datetime import datetime, timedelta
 from enum import Enum
 from typing import Any, Dict, List, Optional, Type
-from urllib.parse import urlparse
 
 from pydantic import UUID4, Field, root_validator
 from typing_extensions import Annotated
@@ -30,7 +29,7 @@ from dstack._internal.core.models.profiles import (
 from dstack._internal.core.models.repos import AnyRunRepoData
 from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.utils import common as common_utils
-from dstack._internal.utils.common import concat_url_path, format_pretty_duration
+from dstack._internal.utils.common import format_pretty_duration
 
 
 class AppSpec(CoreModel):
@@ -301,7 +300,9 @@ class RunSpec(CoreModel):
 
 class ServiceModelSpec(CoreModel):
     name: str
-    base_url: str
+    base_url: Annotated[
+        str, Field(description="Full URL or path relative to dstack-server's base URL")
+    ]
     type: str
 
 
@@ -309,18 +310,6 @@ class ServiceSpec(CoreModel):
     url: Annotated[str, Field(description="Full URL or path relative to dstack-server's base URL")]
     model: Optional[ServiceModelSpec] = None
     options: Dict[str, Any] = {}
-
-    def full_url(self, server_base_url: str) -> str:
-        service_url = urlparse(self.url)
-        if service_url.scheme and service_url.netloc:
-            return self.url
-        server_url = urlparse(server_base_url)
-        service_url = service_url._replace(
-            scheme=server_url.scheme or "http",
-            netloc=server_url.netloc,
-            path=concat_url_path(server_url.path, service_url.path),
-        )
-        return service_url.geturl()
 
 
 class RunStatus(str, Enum):

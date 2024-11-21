@@ -187,10 +187,7 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
 
                 current_job_submission = run._run.latest_job_submission
                 if run.status in (RunStatus.RUNNING, RunStatus.DONE):
-                    if run._run.run_spec.configuration.type == RunConfigurationType.SERVICE.value:
-                        console.print(
-                            f"Service is published at [link={run.service_url}]{run.service_url}[/]\n"
-                        )
+                    _print_service_urls(run)
                     bind_address: Optional[str] = getattr(
                         configurator_args, _BIND_ADDRESS_ARG, None
                     )
@@ -477,6 +474,18 @@ def _detect_vscode_version(exe: str = "code") -> Optional[str]:
     if run.returncode == 0:
         return run.stdout.decode().split("\n")[1].strip()
     return None
+
+
+def _print_service_urls(run: Run) -> None:
+    if run._run.run_spec.configuration.type != RunConfigurationType.SERVICE.value:
+        return
+    console.print(f"Service is published at:\n  [link={run.service_url}]{run.service_url}[/]")
+    if model := run.service_model:
+        console.print(
+            f"Model [code]{model.name}[/] is published at:"
+            f"\n  [link={model.url}]{model.url}[/] [secondary](OpenAI-compatible)[/]"
+        )
+    console.print()
 
 
 def _print_finished_message(run: Run):

@@ -199,12 +199,11 @@ Your folder can be a regular local folder or a Git repo.
 
     Service is published at: 
       http://localhost:3000/proxy/services/main/llama31-service/
+    Model meta-llama/Meta-Llama-3.1-8B-Instruct is published at:
+      http://localhost:3000/proxy/models/main/ (OpenAI-compatible)
     ```
     
     </div>
-
-    If you specified `model`, the model will also be available via an OpenAI-compatible endpoint at
-    `<dstack server URL>/proxy/models/<project name>`.
 
     !!! info "Gateway"
         To enable [auto-scaling](reference/dstack.yml/service.md#auto-scaling), or use a custom domain with HTTPS, 
