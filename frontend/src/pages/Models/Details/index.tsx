@@ -294,6 +294,8 @@ export const ModelDetails: React.FC = () => {
         }
     };
 
+    console.log({ modelData });
+
     return (
         <ContentLayout
             header={

@@ -26,6 +26,8 @@ export const getStatusIconType = (status: IRun['status']): StatusIndicatorProps[
 };
 
 export const getExtendedModelFromRun = (run: IRun): IModelExtended | null => {
+    if (!run?.service?.model) return null;
+
     return {
         ...(run.service?.model ?? {}),
         project_name: run.project_name,
