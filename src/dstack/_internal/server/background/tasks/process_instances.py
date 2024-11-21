@@ -18,7 +18,6 @@ from dstack._internal.core.backends import (
 )
 from dstack._internal.core.backends.base.compute import (
     DSTACK_WORKING_DIR,
-    get_dstack_runner_version,
     get_shim_env,
     get_shim_pre_start_commands,
 )
@@ -356,15 +355,13 @@ def _deploy_instance(
     ) as client:
         logger.info(f"Connected to {remote_details.ssh_user} {remote_details.host}")
 
-        runner_build = get_dstack_runner_version()
-
         # Execute pre start commands
-        shim_pre_start_commands = get_shim_pre_start_commands(runner_build)
+        shim_pre_start_commands = get_shim_pre_start_commands()
         run_pre_start_commands(client, shim_pre_start_commands, authorized_keys)
         logger.debug("The script for installing dstack has been executed")
 
         # Upload envs
-        shim_envs = get_shim_env(runner_build, authorized_keys)
+        shim_envs = get_shim_env(authorized_keys)
         try:
             fleet_configuration_envs = remote_details.env.as_dict()
         except ValueError as e:

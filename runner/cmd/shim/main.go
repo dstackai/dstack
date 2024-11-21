@@ -65,16 +65,10 @@ func main() {
 				EnvVars:     []string{"DSTACK_RUNNER_LOG_LEVEL"},
 			},
 			&cli.StringFlag{
-				Name:        "runner-version",
-				Usage:       "Set runner's version",
-				Value:       "latest",
-				Destination: &args.Runner.Version,
-				EnvVars:     []string{"DSTACK_RUNNER_VERSION"},
-			},
-			&cli.BoolFlag{
-				Name:        "dev",
-				Usage:       "Use stgn channel",
-				Destination: &args.Runner.DevChannel,
+				Name:        "runner-download-url",
+				Usage:       "Set runner's download URL",
+				Destination: &args.Runner.DownloadURL,
+				EnvVars:     []string{"DSTACK_RUNNER_DOWNLOAD_URL"},
 			},
 			&cli.PathFlag{
 				Name:        "runner-binary-path",
