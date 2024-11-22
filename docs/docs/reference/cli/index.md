@@ -426,6 +426,8 @@ $ dstack pool delete --help
      * `DSTACK_SERVER_UVICORN_LOG_LEVEL` – (Optional) Sets uvicorn logger log level. Defaults to `ERROR`.
      * `DSTACK_PROFILE` – (Optional) Has the same effect as `--profile`. Defaults to `None`.
      * `DSTACK_PROJECT` – (Optional) Has the same effect as `--project`. Defaults to `None`.
-     * `DSTACK_RUNNER_VERSION` – (Optional) Sets exact runner version for debug. Defaults to `latest`.
+     * `DSTACK_RUNNER_VERSION` – (Optional) Sets exact runner version for debug. Defaults to `latest`. Ignored if `DSTACK_RUNNER_DOWNLOAD_URL` is set.
+     * `DSTACK_RUNNER_DOWNLOAD_URL` – (Optional) Overrides `dstack-runner` binary download URL.
+     * `DSTACK_SHIM_DOWNLOAD_URL` – (Optional) Overrides `dstack-shim` binary download URL.
      * `DSTACK_DEFAULT_CREDS_DISABLED` – (Optional) Disables default credentials detection if set. Defaults to `None`.
      * `DSTACK_LOCAL_BACKEND_ENABLED` – (Optional) Enables local backend for debug if set. Defaults to `None`.
