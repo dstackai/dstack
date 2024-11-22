@@ -70,6 +70,7 @@ BASE_DEPS = [
     "alembic-postgresql-enum",
     "asyncpg",
     "jinja2",
+    "psutil",
 ]
 
 AWS_DEPS = [
