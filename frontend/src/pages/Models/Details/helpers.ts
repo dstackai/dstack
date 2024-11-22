@@ -23,7 +23,8 @@ response = client.chat.completions.create(
 };
 
 export const getCurlModelCode = ({ model, token }: { model?: IModelExtended | null; token?: string }) => {
-    return `curl ${getModelGateway(model?.base_url ?? '') + 'chat/completions'} \\
+    const url = getModelGateway(model?.base_url ?? '').replace(/\/$/, '') + '/chat/completions';
+    return `curl ${url} \\
   -H "Content-Type: application/json" \\
   -H "Authorization: Bearer ${token}" \\
   -d '{
@@ -35,6 +36,6 @@ export const getCurlModelCode = ({ model, token }: { model?: IModelExtended | nu
     }
   ],
   "stream": true,
-  "max_tokens": 512,
+  "max_tokens": 512
 }'`;
 };
