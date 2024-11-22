@@ -141,18 +141,29 @@ the dev environment is stopped. Use `--abort` or `-x` to stop the run abruptly.
 
 ## Manage fleets
 
-By default, `dstack apply` reuses `idle` instances from one of the existing [fleets](concepts/fleets.md), 
-or creates a new fleet through backends.
+By default, `dstack apply` reuses `idle` instances from an existing [fleet](concepts/fleets.md), 
+or automatically creates a new fleet via backends.
 
-!!! info "Idle duration"
-    To ensure the created fleets are deleted automatically, set
-    [`termination_idle_time`](reference/dstack.yml/fleet.md#termination_idle_time).
-    By default, it's set to `5min`.
+### Creation policy
 
-!!! info "Creation policy"
-    To ensure `dstack apply` always reuses an existing fleet and doesn't create a new one,
-    pass `--reuse` to `dstack apply` (or set [`creation_policy`](reference/dstack.yml/task.md#creation_policy) to `reuse` in the task configuration).
-    The default policy is `reuse_or_create`.
+To ensure `dstack apply` doesn't create a new fleet but reuses an existing one,
+pass `-R` (or `--reuse`) to `dstack apply`.
+
+<div class="termy">
+
+```shell
+$ dstack apply -R -f examples/.dstack.yml
+```
+
+</div>
+
+Alternatively, set [`creation_policy`](reference/dstack.yml/dev-environment.md#creation_policy) to `reuse` in the task configuration.
+
+### Termination policy
+
+To ensure the created fleets are deleted automatically, set
+[`termination_idle_time`](reference/dstack.yml/fleet.md#termination_idle_time).
+By default, it's set to `5min`.
 
 ## What's next?
 
