@@ -1,7 +1,12 @@
 # Fleets
 
-Fleets enable efficient provisioning and management of clusters and instances, both in the cloud and on-prem. Once a
-fleet is created, it can be reused by dev environments, tasks, and services.
+By default, when you run `dstack apply` with a dev environment, task, or service,
+`dstack` reuses `idle` instances from an existing [fleet](concepts/fleets.md).
+If no `idle` instances matching the requirements, it automatically creates a new fleet 
+using backends.
+
+For more control over configuration and lifecycle management, or to set up fleets out of on-prem servers, use fleets
+directly.
 
 ## Define a configuration
 
@@ -193,13 +198,12 @@ the hosts meet the requirements (see above).
 If the requirements are met but the fleet still fails to be created, check `/root/.dstack/shim.log` for logs 
 on the hosts specified in `ssh_config`.
 
-[//]: # (## Creation policy)
+## Termination policy
 
-[//]: # (By default, when running dev environments, tasks, and services, `dstack apply` tries to reuse `idle` )
-[//]: # (instances from existing fleets. )
-[//]: # (If no `idle` instances meet the requirements, it creates a new fleet automatically.)
-[//]: # (To avoid creating new fleet, specify pass `--reuse` to `dstack apply` or &#40;or set [)
-[//]: # (`creation_policy`]&#40;../reference/dstack.yml/dev-environment.md#creation_policy&#41; to `reuse` in the configuration&#41;.)
+If you want a fleet to be automatically deleted after a certain idle time,
+you can set the [`termination_idle_time`](../reference/dstack.yml/fleet.md#termination_idle_time) property.
+
+[//]: # (Add Idle time example to the reference page)
 
 ## Manage fleets
 
@@ -236,13 +240,6 @@ Fleet my-gcp-fleet deleted
 You can pass either the path to the configuration file or the fleet name directly.
 
 To terminate and delete specific instances from a fleet, pass `-i INSTANCE_NUM`.
-
-#### Termination policy
-
-If you want a fleet to be automatically deleted after a certain idle time,
-you can set the [`termination_idle_time`](../reference/dstack.yml/fleet.md#termination_idle_time) property.
-
-[//]: # (Add Idle time example to the reference page)
 
 ## What's next?
 
