@@ -1,7 +1,12 @@
 # Fleets
 
-Fleets enable efficient provisioning and management of clusters and instances, both in the cloud and on-prem. Once a
-fleet is created, it can be reused by dev environments, tasks, and services.
+By default, when you run `dstack apply` with a dev environment, task, or service,
+`dstack` reuses `idle` instances from an existing [fleet](concepts/fleets.md).
+If no `idle` instances matching the requirements, it automatically creates a new fleet 
+using backends.
+
+For more control over configuration and lifecycle management, or to set up fleets out of on-prem servers, use fleets
+directly.
 
 ## Define a configuration
 
@@ -192,24 +197,6 @@ the hosts meet the requirements (see above).
 
 If the requirements are met but the fleet still fails to be created, check `/root/.dstack/shim.log` for logs 
 on the hosts specified in `ssh_config`.
-
-## Creation policy
-
-By default, `dstack apply` reuses `idle` instances from an existing [fleet](../concepts/fleets.md), 
-or automatically creates a new fleet via backends.
-
-To ensure `dstack apply` doesn't create a new fleet but reuses an existing one,
-pass `-R` (or `--reuse`) to `dstack apply`.
-
-<div class="termy">
-
-```shell
-$ dstack apply -R -f examples/.dstack.yml
-```
-
-</div>
-
-Alternatively, set [`creation_policy`](reference/dstack.yml/dev-environment.md#creation_policy) to `reuse` in the task configuration.
 
 ## Termination policy
 

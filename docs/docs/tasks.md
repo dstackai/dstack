@@ -1,10 +1,6 @@
 # Tasks
 
-A task allows you to schedule a job or run a web app. It lets you configure dependencies, resources, ports, and more.
-Tasks can be distributed and run on clusters.
-
-Tasks are ideal for training and fine-tuning jobs. They can also be used instead of services if you want to run a web
-app but don't need a public endpoint.
+A task allows you to schedule a job or run a web app. Tasks can be distributed and can forward ports.
 
 ## Define a configuration
 
@@ -109,10 +105,12 @@ the dev environment is stopped. Use `--abort` or `-x` to stop the run abruptly.
 
 ## Manage fleets
 
-By default, `dstack apply` reuses `idle` instances from an existing [fleet](concepts/fleets.md), 
-or automatically creates a new fleet via backends.
-
 ### Creation policy
+
+By default, when you run `dstack apply` with a dev environment, task, or service,
+`dstack` reuses `idle` instances from an existing [fleet](concepts/fleets.md).
+If no `idle` instances matching the requirements, it automatically creates a new fleet 
+using backends.
 
 To ensure `dstack apply` doesn't create a new fleet but reuses an existing one,
 pass `-R` (or `--reuse`) to `dstack apply`.
@@ -125,13 +123,18 @@ $ dstack apply -R -f examples/.dstack.yml
 
 </div>
 
-Alternatively, set [`creation_policy`](reference/dstack.yml/dev-environment.md#creation_policy) to `reuse` in the task configuration.
+Alternatively, set [`creation_policy`](reference/dstack.yml/dev-environment.md#creation_policy) to `reuse` in the run configuration.
 
 ### Termination policy
 
-To ensure the created fleets are deleted automatically, set
-[`termination_idle_time`](reference/dstack.yml/fleet.md#termination_idle_time).
-By default, it's set to `5min`.
+If a fleet is created automatically, it remains `idle` for 5 minutes and can be reused within that time.
+To change the default idle duration, set
+[`termination_idle_time`](reference/dstack.yml/fleet.md#termination_idle_time) in the run configuration (e.g., to 0 or a
+longer duration).
+
+!!! info "Fleets"
+    For greater control over fleet provisioning, configuration, and lifecycle management, it is recommended to use
+    [fleets](concepts/fleets.md) directly.
 
 ## What's next?
 
