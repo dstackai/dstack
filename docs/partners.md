@@ -56,6 +56,13 @@ Here are some cloud providers `dstack` integrates with and collaborates:
             RunPod
         </h3>
     </a>
+
+    <a href="https://www.cudocompute.com/" class="feature-cell">
+        <img width="38" padding="padding: 4px 0" src="/assets/images/cudo-logo.svg">
+        <h3>
+            CUDO Compute
+        </h3>
+    </a>
 </div>
 
 <div class="providers tx-landing__highlights_grid other">
@@ -63,13 +70,6 @@ Here are some cloud providers `dstack` integrates with and collaborates:
         <img width="36" style="padding: 4px 0" src="/assets/images/vastai-logo.svg">
         <h3>
             Vast.ai
-        </h3>
-    </a>
-
-    <a href="https://www.cudocompute.com/" class="feature-cell">
-        <img width="34" style="padding: 4px 0" src="/assets/images/cudo-logo.svg">
-        <h3>
-            CUDO
         </h3>
     </a>
 
