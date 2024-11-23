@@ -1,6 +1,11 @@
-# Text Generation Inference
+---
+title: HuggingFace TGI
+description: "This example shows how to deploy Llama 3.1 to any cloud or on-premises environment using HuggingFace TGI and dstack."
+---
 
-This example shows how to deploy Llama 3.1 8B with `dstack` using [TGI :material-arrow-top-right-thin:{ .external }](https://huggingface.co/docs/text-generation-inference/en/index){:target="_blank"}.
+# HuggingFace TGI
+
+This example shows how to deploy Llama 3.1 8B with `dstack` using [HuggingFace TGI :material-arrow-top-right-thin:{ .external }](https://huggingface.co/docs/text-generation-inference/en/index){:target="_blank"}.
 
 ??? info "Prerequisites"
     Once `dstack` is [installed](https://dstack.ai/docs/installation), go ahead clone the repo, and run `dstack init`.

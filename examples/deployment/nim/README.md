@@ -1,9 +1,9 @@
 ---
-title: Deploying LLMs with dstack using NIM
+title: NVIDIA NIM
 description: "This example shows how to deploy Llama 3.1 to any cloud or on-premises environment using NVIDIA NIM and dstack."
 ---
 
-# NIM 
+# NVIDIA NIM 
 
 This example shows how to deploy LLama 3.1 using [NVIDIA NIM :material-arrow-top-right-thin:{ .external }](https://docs.nvidia.com/nim/large-language-models/latest/getting-started.html){:target="_blank"} and `dstack`.
 

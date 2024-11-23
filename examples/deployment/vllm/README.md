@@ -1,3 +1,7 @@
+---
+description: "This example shows how to deploy Llama 3.1 to any cloud or on-premises environment using vLLM and dstack."
+---
+
 # vLLM
 
 This example shows how to deploy Llama 3.1 8B with `dstack` using [vLLM :material-arrow-top-right-thin:{ .external }](https://docs.vllm.ai/en/latest/){:target="_blank"}.
