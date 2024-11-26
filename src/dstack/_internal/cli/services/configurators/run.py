@@ -482,8 +482,7 @@ def _print_service_urls(run: Run) -> None:
     console.print(f"Service is published at:\n  [link={run.service_url}]{run.service_url}[/]")
     if model := run.service_model:
         console.print(
-            f"Model [code]{model.name}[/] is published at:"
-            f"\n  [link={model.url}]{model.url}[/] [secondary](OpenAI-compatible)[/]"
+            f"Model [code]{model.name}[/] is published at:\n  [link={model.url}]{model.url}[/]"
         )
     console.print()
 
