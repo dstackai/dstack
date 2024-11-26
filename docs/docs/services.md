@@ -78,7 +78,7 @@ Provisioning...
 Service is published at: 
   http://localhost:3000/proxy/services/main/llama31/
 Model meta-llama/Meta-Llama-3.1-8B-Instruct is published at:
-  http://localhost:3000/proxy/models/main/ (OpenAI-compatible)
+  http://localhost:3000/proxy/models/main/
 ```
 
 </div>
