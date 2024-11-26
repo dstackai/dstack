@@ -93,9 +93,11 @@ This allows you to access the remote `8501` port on `localhost:8501` while the C
     
     This will forward the remote `8501` port to `localhost:3000`.
 
-[Services](../services.md) require a gateway but they also provide additional features for
-production-grade service deployment not offered by tasks, such as HTTPS domains and auto-scaling.
-If you run a web app as a task and it works, go ahead and run it as a service.
+> Use [tasks](../tasks.md) when you don't need authorization, OpenAI-compatible endpoint,
+> custom domain with HTTPS, multiple replicas, and when you don't need to let
+> other users access the endpoint.
+
+In all other cases, use [services](../services.md).
 
 ## Docker and Docker Compose
 
@@ -106,6 +108,7 @@ inside `dstack` runs. To do that, additional configuration steps are required:
 2. Set the `image` property to `dstackai/dind` (or another DinD image).
 3. For tasks and services, add `start-dockerd` as the first command. For dev environments, add `start-dockerd` as the first command
    in the `init` property.
+
 Note, `start-dockerd` is a part of `dstackai/dind` image, if you use a different DinD image,
 replace it with a corresponding command to start Docker daemon.
 
@@ -189,38 +192,52 @@ ide: vscode
 
 Then, you can pass the environment variable either via the shell:
 
+<div class="termy">
+
 ```shell
-HF_TOKEN=... dstack apply -f .dstack.yml
+$ HF_TOKEN=... 
+$ dstack apply -f .dstack.yml
 ```
+
+</div>
 
 Or via the `-e` option of the `dstack apply` command:
 
+<div class="termy">
+
 ```shell
-dstack apply -f .dstack.yml -e HF_TOKEN=...
+$ dstack apply -e HF_TOKEN=... -f .dstack.yml
 ```
 
-??? info ".env"
-    A better way to configure environment variables not hardcoded in YAML is by specifying them in a `.env` file:
+</div>
 
+??? info ".envrc"
+    A better way to configure environment variables not hardcoded in YAML is by specifying them in a `.envrc` file:
+
+    <div editor-title=".envrc"> 
+
+    ```shell
+    export HF_TOKEN=...
     ```
-    HF_TOKEN=...
-    ```
+
+    </div>
     
     If you install [`direnv` :material-arrow-top-right-thin:{ .external }](https://direnv.net/){:target="_blank"},
     it will automatically pass the environment variables from the `.env` file to the `dstack apply` command.
 
     Remember to add `.env` to `.gitignore` to avoid pushing it to the repo.    
 
-## Data and models
+## Volumes
 
-`dstack` has support for [volumes](../concepts/volumes.md)
-to persist data across different runs and instance interruptions.
-Volumes are ideal for storing intermediate work and data that should be quickly accessible.
+To persist data across runs, it is recommended to use volumes.
+`dstack` supports two types of volumes: [network](../concepts/volumes.md#network-volumes)
+and [instance](../concepts/volumes.md#instance-volumes).
 
-You can also load and save data using an object storage like S3 or HuggingFace Datasets.
-For models, it's best to use services like HuggingFace Hub.
-`dstack` has no explicit support for object storage.
-You can load and save data directly from your code.
+Network volumes are ideal for persisting data even if the instance is interrupted.
+
+Instance volumes are useful for persisting cached data across runs while the instance remains active.
+
+> Besides volumes, you can load and save data using object storage services such as S3, HuggingFace Hub, and others.
 
 ## Idle duration
 
@@ -262,7 +279,7 @@ allows specifying not only memory size but also GPU vendor, names, their memory,
 Examples:
 
 - `1` (any GPU)
-- `AMD:2` (two AMD GPUs)
+- `amd:2` (two AMD GPUs)
 - `A100` (A100)
 - `24GB..` (any GPU starting from 24GB)
 - `24GB..40GB:2` (two GPUs between 24GB and 40GB)
@@ -347,3 +364,5 @@ corresponding service quotas for each type of instance in each region.
     - `GPUs for GPU3 based VM and BM instances` (on-demand V100)
 
 Note, for AWS, GCP, and Azure, service quota values are measured with the number of CPUs rather than GPUs.
+
+[//]: # (TODO: Mention spot policy)

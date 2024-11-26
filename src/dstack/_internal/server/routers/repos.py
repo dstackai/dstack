@@ -34,10 +34,11 @@ async def get_repo(
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
 ) -> RepoHeadWithCreds:
-    _, project = user_project
+    user, project = user_project
     repo = await repos.get_repo(
         session=session,
         project=project,
+        user=user,
         repo_id=body.repo_id,
         include_creds=body.include_creds,
     )
@@ -52,11 +53,12 @@ async def init_repo(
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
 ):
-    _, project = user_project
+    user, project = user_project
     repo_creds = body.repo_creds.to_remote_repo_creds(body.repo_info) if body.repo_creds else None
     await repos.init_repo(
         session=session,
         project=project,
+        user=user,
         repo_id=body.repo_id,
         repo_info=body.repo_info,
         repo_creds=repo_creds,

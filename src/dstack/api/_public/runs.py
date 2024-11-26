@@ -41,7 +41,7 @@ from dstack._internal.core.services.logs import URLReplacer
 from dstack._internal.core.services.ssh.attach import SSHAttach
 from dstack._internal.core.services.ssh.ports import PortsLock
 from dstack._internal.server.schemas.logs import PollLogsRequest
-from dstack._internal.utils.common import get_or_error
+from dstack._internal.utils.common import get_or_error, make_proxy_url
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.path import PathLike, path_in_dir
 from dstack.api.server import APIClient
@@ -101,7 +101,24 @@ class Run(ABC):
     def service_url(self) -> str:
         if self._run.run_spec.configuration.type != "service":
             raise ValueError("The run is not a service")
-        return self._run.service.full_url(server_base_url=self._api_client.base_url)
+        return make_proxy_url(
+            server_url=self._api_client.base_url,
+            proxy_url=self._run.service.url,
+        )
+
+    @property
+    def service_model(self) -> Optional["ServiceModel"]:
+        if self._run.run_spec.configuration.type != "service":
+            raise ValueError("The run is not a service")
+        if self._run.service.model is None:
+            return None
+        return ServiceModel(
+            name=self._run.service.model.name,
+            url=make_proxy_url(
+                server_url=self._api_client.base_url,
+                proxy_url=self._run.service.model.base_url,
+            ),
+        )
 
     def _attached_logs(
         self,
@@ -338,6 +355,23 @@ class Run(ABC):
 
     def __repr__(self) -> str:
         return f"<Run '{self.name}'>"
+
+
+class ServiceModel:
+    def __init__(self, name: str, url: str) -> None:
+        self._name = name
+        self._url = url
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def url(self) -> str:
+        return self._url
+
+    def __repr__(self) -> str:
+        return f"<ServiceModel '{self.name}'>"
 
 
 class RunCollection:

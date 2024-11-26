@@ -17,54 +17,42 @@ This example walks you through how to deploy Llama 3.2 vision model with `dstack
 
 ## Deployment
 
-### Running as a task
+Here's an example of a service that deploys Llama 3.2 11B using vLLM.
 
-If you'd like to run Llama 3.2 vision model for development purposes, consider using `dstack` tasks.
-
-<div editor-title="examples/llms/llama32/vllm/task.dstack.yml"> 
+<div editor-title="examples/llms/llama32/vllm/.dstack.yml"> 
 
 ```yaml
-type: task
-name: llama32-task-vllm
+type: service
+name: llama32
 
-# If `image` is not specified, dstack uses its default image
-python: "3.10"
-# Required environment variables
+image: vllm/vllm-openai:latest
 env:
   - HF_TOKEN
   - MODEL_ID=meta-llama/Llama-3.2-11B-Vision-Instruct
-  - MAX_MODEL_LEN=13488
-  - MAX_NUM_SEQS=40
+  - MAX_MODEL_LEN=4096
+  - MAX_NUM_SEQS=8
 commands:
-  - pip install vllm
   - vllm serve $MODEL_ID
-    --tensor-parallel-size $DSTACK_GPUS_NUM
     --max-model-len $MAX_MODEL_LEN
     --max-num-seqs $MAX_NUM_SEQS
     --enforce-eager
     --disable-log-requests
     --limit-mm-per-prompt "image=1"
-# Expose the vllm server port
-ports: 
-  - 8000
-# Use either spot or on-demand instances
-spot_policy: auto
+    --tensor-parallel-size $DSTACK_GPUS_NUM
+port: 8000
+# Register the model
+model: meta-llama/Llama-3.2-11B-Vision-Instruct
+
+# Uncomment to cache downloaded models
+#volumes:
+#  - /root/.cache/huggingface/hub:/root/.cache/huggingface/hub
 
 resources:
-  # Required resources
-  gpu: 48GB
+  gpu: 40GB..48GB
 ```
 </div>
 
-Note, maximum size of vLLM’s `KV cache` is `13488`, consequently we must set `MAX_MODEL_LEN` to `13488`. `MAX_NUM_SEQS`
-greater than 40 results in an out of memory error.
-
-### Deploying as a service
-
-If you'd like to deploy Llama 3.2 vision model as public auto-scalable and secure endpoint,
-consider using `dstack` [services](https://dstack.ai/docs/services).
-
-[//]: # (TODO: Service example)
+[//]: # (TODO: Comment on MAX_MODEL_LEN and MAX_NUM_SEQS)
 
 ### Memory requirements
 
@@ -86,8 +74,7 @@ To run a configuration, use the [`dstack apply`](https://dstack.ai/docs/referenc
 
 ```shell
 $ HF_TOKEN=...
-
-$ dstack apply -f examples/llms/llama32/vllm/task.dstack.yml
+$ dstack apply -f examples/llms/llama32/vllm/.dstack.yml
 
  #  BACKEND  REGION     RESOURCES                    SPOT  PRICE   
  1  runpod   CA-MTL-1   9xCPU, 50GB, 1xA40 (48GB)    yes   $0.24   
@@ -95,7 +82,7 @@ $ dstack apply -f examples/llms/llama32/vllm/task.dstack.yml
  3  runpod   EU-SE-1    9xCPU, 50GB, 1xA6000 (48GB)  yes   $0.25   
 
  
-Submit the run llama32-task-vllm? [y/n]: y
+Submit the run llama32? [y/n]: y
 
 Provisioning...
 ---> 100%
@@ -103,12 +90,13 @@ Provisioning...
 
 </div>
 
-If you run a task, `dstack apply` automatically forwards the remote ports to `localhost` for convenient access.
+Once the service is up, it will be available via the service endpoint
+at `<dstack server URL>/proxy/services/<project name>/<run name>/`.
 
 <div class="termy">
 
 ```shell
-$ curl http://localhost:8000/v1/chat/completions \
+$ curl http://127.0.0.1:3000/proxy/services/main/llama32/v1/chat/completions \
     -H 'Content-Type: application/json' \
     -H 'Authorization: Bearer token' \
     --data '{
@@ -126,6 +114,11 @@ $ curl http://localhost:8000/v1/chat/completions \
 ```
 
 </div>
+
+When a [gateway](https://dstack.ai/docs/concepts/gateways.md) is configured, the service endpoint 
+is available at `https://<run name>.<gateway domain>/`.
+
+[//]: # (TODO: https://github.com/dstackai/dstack/issues/1777)
 
 ## Source code
 

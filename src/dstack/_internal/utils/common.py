@@ -4,6 +4,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterable, List, Optional, TypeVar, Union
+from urllib.parse import urlparse
 
 
 def get_dstack_dir() -> Path:
@@ -238,18 +239,26 @@ def batched(seq: Iterable[T], n: int) -> Iterable[List[T]]:
 StrT = TypeVar("StrT", str, bytes)
 
 
-def lstrip_one(string: StrT, substring: StrT) -> StrT:
-    """Remove at most one occurrence of `substring` at the start of `string`"""
-    return string[len(substring) :] if substring and string.startswith(substring) else string
-
-
-def rstrip_one(string: StrT, substring: StrT) -> StrT:
-    """Remove at most one occurrence of `substring` at the end of `string`"""
-    return string[: -len(substring)] if substring and string.endswith(substring) else string
-
-
 def concat_url_path(a: StrT, b: StrT) -> StrT:
     if not b:
         return a
     sep = "/" if isinstance(a, str) else b"/"
-    return rstrip_one(a, sep) + sep + lstrip_one(b, sep)
+    return a.removesuffix(sep) + sep + b.removeprefix(sep)
+
+
+def make_proxy_url(server_url: str, proxy_url: str) -> str:
+    """
+    Constructs a URL to dstack-proxy services or endpoints.
+    `proxy_url` can be a full URL (gateway), in which case it is returned as is,
+    or a path (in-server proxy), in which case it is concatenated with `server_url`
+    """
+    proxy = urlparse(proxy_url)
+    if proxy.scheme and proxy.netloc:
+        return proxy_url
+    server = urlparse(server_url)
+    proxy = proxy._replace(
+        scheme=server.scheme or "http",
+        netloc=server.netloc,
+        path=concat_url_path(server.path, proxy.path),
+    )
+    return proxy.geturl()

@@ -1,15 +1,43 @@
-type: dev-environment
-name: dev-vLLM-amd
+type: service
+name: llama31-service-vllm-amd
 
 image: runpod/pytorch:2.4.0-py3.10-rocm6.1.0-ubuntu22.04
-
 env:
   - HF_TOKEN
+  - MODEL_ID=meta-llama/Meta-Llama-3.1-70B-Instruct
+  - MAX_MODEL_LEN=126192
+commands:
+  - export PATH=/opt/conda/envs/py_3.10/bin:$PATH
+  - wget https://github.com/ROCm/hipBLAS/archive/refs/tags/rocm-6.1.0.zip
+  - unzip rocm-6.1.0.zip
+  - cd hipBLAS-rocm-6.1.0
+  - python rmake.py
+  - cd ..
+  - git clone https://github.com/vllm-project/vllm.git
+  - cd vllm
+  - pip install triton
+  - pip uninstall torch -y
+  - pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/rocm6.1
+  - pip install /opt/rocm/share/amd_smi
+  - pip install --upgrade numba scipy huggingface-hub[cli]
+  - pip install "numpy<2"
+  - pip install -r requirements-rocm.txt
+  - wget -N https://github.com/ROCm/vllm/raw/fa78403/rocm_patch/libamdhip64.so.6 -P /opt/rocm/lib
+  - rm -f "$(python3 -c 'import torch; print(torch.__path__[0])')"/lib/libamdhip64.so*
+  - export PYTORCH_ROCM_ARCH="gfx90a;gfx942"
+  - wget https://dstack-binaries.s3.amazonaws.com/vllm-0.6.0%2Brocm614-cp310-cp310-linux_x86_64.whl
+  - pip install vllm-0.6.0+rocm614-cp310-cp310-linux_x86_64.whl
+  - vllm serve $MODEL_ID
+      --max-model-len $MAX_MODEL_LEN
+      --port 8000
+# Expose the vllm server port
+port: 8000
+# Register the model
+model: meta-llama/Meta-Llama-3.1-70B-Instruct
 
-ide: vscode
+# Uncomment to leverage spot instances
+#spot_policy: auto
 
 resources:
   gpu: MI300X
-  disk: 150GB
-
-spot_policy: auto
+  disk: 200GB

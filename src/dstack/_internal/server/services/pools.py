@@ -398,21 +398,26 @@ def filter_pool_instances(
     fleet_model: Optional[FleetModel] = None,
     multinode: bool = False,
     master_job_provisioning_data: Optional[JobProvisioningData] = None,
-    volumes: Optional[List[Volume]] = None,
+    volumes: Optional[List[List[Volume]]] = None,
 ) -> List[InstanceModel]:
     instances: List[InstanceModel] = []
     candidates: List[InstanceModel] = []
 
     backend_types = profile.backends
     regions = profile.regions
-    zone = None
+    zones = None
 
     if volumes:
-        volume = volumes[0]
-        backend_types = [volume.configuration.backend]
-        regions = [volume.configuration.region]
-        if volume.provisioning_data is not None:
-            zone = volume.provisioning_data.availability_zone
+        mount_point_volumes = volumes[0]
+        backend_types = [v.configuration.backend for v in mount_point_volumes]
+        regions = [v.configuration.region for v in mount_point_volumes]
+        volume_zones = [
+            v.provisioning_data.availability_zone
+            for v in mount_point_volumes
+            if v.provisioning_data is not None
+        ]
+        if volume_zones:
+            zones = volume_zones
 
     if multinode:
         if not backend_types:
@@ -456,8 +461,8 @@ def filter_pool_instances(
         if (
             jpd is not None
             and jpd.availability_zone is not None
-            and zone is not None
-            and jpd.availability_zone != zone
+            and zones is not None
+            and jpd.availability_zone not in zones
         ):
             continue
 

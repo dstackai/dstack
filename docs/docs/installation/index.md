@@ -18,11 +18,12 @@ You can skip backends configuration if you intend to run containers  only on you
 
 ## Start the server
 
-Once backends are configured, proceed and start the server:
+The server can run on your laptop, a dedicated server, a private cloud VPC, or any location with access to your
+cloud or on-prem clusters.
 
 === "pip"
 
-    > The server can be set up via `pip` on Linux, macOS, and Windows (as long as you use WSL 2).
+    > The server can be set up via `pip` on Linux, macOS, and Windows (via WSL 2).
     > It requires Git and OpenSSH.
 
     <div class="termy">
@@ -56,8 +57,26 @@ Once backends are configured, proceed and start the server:
         
     </div>
 
-> For more details on server configuration options, see the
-> [server deployment guide](../guides/server-deployment.md).
+=== "CloudFormation"
+
+    If you'd like to deploy the server to a private AWS VPC, you can use 
+    our CloudFormation [template :material-arrow-top-right-thin:{ .external }](https://console.aws.amazon.com/cloudformation/home#/stacks/quickcreate?templateURL=https://get-dstack.s3.eu-west-1.amazonaws.com/cloudformation/template.yaml){:target="_blank"}.
+
+    First, ensure, you've set up a private VPC with public and private subnets.
+
+    ![](https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-aws-private-vpc-example-v2.png?raw=true)
+
+    Create a stack using the template, and specify the VPC and private subnets.
+    Once, the stack is created, go to `Outputs` for the server URL and admin token.
+
+    To access the server URL, ensure you're connected to the VPC, e.g. via VPN client.
+
+    > If you'd like to adjust anything, the source code of the template can be found at
+    [`examples/server-deployment/cloudformation/template.yaml` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/server-deployment/cloudformation/template.yaml){:target="_blank"}.
+
+!!! info "Server deployment"
+    For more details on server configuration options, see the
+    [server deployment](../guides/server-deployment.md) guide.
 
 ## Set up the CLI
 

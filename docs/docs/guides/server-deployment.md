@@ -18,7 +18,7 @@ You can run the server either through `pip` or using Docker.
     
     </div>
 
-    > The server can be set up via `pip` on Linux, macOS, and Windows (as long as you use WSL 2).
+    > The server can be set up via `pip` on Linux, macOS, and Windows (via WSL 2).
     > It requires Git and OpenSSH.
 
 === "Docker"
@@ -37,6 +37,23 @@ You can run the server either through `pip` or using Docker.
     ```
         
     </div>
+
+=== "CloudFormation"
+
+    If you'd like to deploy the server to a private AWS VPC, you can use 
+    our CloudFormation [template :material-arrow-top-right-thin:{ .external }](https://console.aws.amazon.com/cloudformation/home#/stacks/quickcreate?templateURL=https://get-dstack.s3.eu-west-1.amazonaws.com/cloudformation/template.yaml){:target="_blank"}.
+
+    First, ensure, you've set up a private VPC with public and private subnets.
+
+    ![](https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-aws-private-vpc-example-v2.png?raw=true)
+
+    Create a stack using the template, and specify the VPC and private subnets.
+    Once, the stack is created, go to `Outputs` for the server URL and admin token.
+
+    To access the server URL, ensure you're connected to the VPC, e.g. via VPN client.
+
+    > If you'd like to adjust anything, the source code of the template can be found at
+    [`examples/server-deployment/cloudformation/template.yaml` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/server-deployment/cloudformation/template.yaml){:target="_blank"}.
 
 ## Backend configuration
 
@@ -114,11 +131,6 @@ To store the state externally, use the `DSTACK_DATABASE_URL` and `DSTACK_SERVER_
        
        If you encounter errors, please [submit an issue](https://github.com/dstackai/dstack/issues/new/choose).
 
-### Encryption
-
-If you want backend credentials and user tokens to be encrypted, you can set up encryption keys via
-[`~/.dstack/server/config.yml`](../reference/server/config.yml.md#encryption_1).
-
 ## Logs storage
 
 By default, `dstack` stores workload logs in `~/.dstack/server/projects/<project_name>/logs`.
@@ -154,7 +166,12 @@ The log group must be created beforehand, `dstack` won't try to create it.
     }
     ```
 
-## Deploying multiple replicas of the server
+## Running multiple replicas of the server
 
-If you'd like to deploy multiple server replicas, make sure to configure `dstack` to use [PostgreSQL](#postgresql)
+If you'd like to run multiple server replicas, make sure to configure `dstack` to use [PostgreSQL](#postgresql)
 and [AWS CloudWatch](#aws-cloudwatch).
+
+## Enabling encryption
+
+If you want backend credentials and user tokens to be encrypted, you can set up encryption keys via
+[`~/.dstack/server/config.yml`](../reference/server/config.yml.md#encryption_1).

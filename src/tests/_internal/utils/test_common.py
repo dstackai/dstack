@@ -6,10 +6,9 @@ from freezegun import freeze_time
 
 from dstack._internal.utils.common import (
     concat_url_path,
-    lstrip_one,
+    make_proxy_url,
     parse_memory,
     pretty_date,
-    rstrip_one,
     split_chunks,
 )
 
@@ -119,36 +118,6 @@ class TestSplitChunks:
 
 
 @pytest.mark.parametrize(
-    ("string", "substring", "result"),
-    [
-        ("ababc", "ab", "abc"),
-        ("ababc", "bc", "ababc"),
-        ("ababc", "", "ababc"),
-        ("", "a", ""),
-        ("", "", ""),
-    ],
-)
-def test_lstrip_one(string: str, substring: str, result: str) -> None:
-    assert lstrip_one(string, substring) == result
-    assert lstrip_one(string.encode(), substring.encode()) == result.encode()
-
-
-@pytest.mark.parametrize(
-    ("string", "substring", "result"),
-    [
-        ("abcbc", "bc", "abc"),
-        ("abcbc", "ab", "abcbc"),
-        ("abcbc", "", "abcbc"),
-        ("", "a", ""),
-        ("", "", ""),
-    ],
-)
-def test_rstrip_one(string: str, substring: str, result: str) -> None:
-    assert rstrip_one(string, substring) == result
-    assert rstrip_one(string.encode(), substring.encode()) == result.encode()
-
-
-@pytest.mark.parametrize(
     ("a", "b", "result"),
     [
         ("/a/b", "c/d", "/a/b/c/d"),
@@ -164,3 +133,37 @@ def test_rstrip_one(string: str, substring: str, result: str) -> None:
 def test_concat_url_path(a: str, b: str, result: str) -> None:
     assert concat_url_path(a, b) == result
     assert concat_url_path(a.encode(), b.encode()) == result.encode()
+
+
+@pytest.mark.parametrize(
+    ("server_url", "proxy_url", "expected_url"),
+    [
+        pytest.param(
+            "http://localhost:3000",
+            "https://gateway.mycompany.example/",
+            "https://gateway.mycompany.example/",
+        ),
+        (
+            "https://dstack.mycompany.example/",
+            "http://gateway.mycompany.example/some/path",
+            "http://gateway.mycompany.example/some/path",
+        ),
+        (
+            "http://localhost:3000",
+            "/proxy/services/main/service/",
+            "http://localhost:3000/proxy/services/main/service/",
+        ),
+        (
+            "http://localhost:3000/",
+            "/proxy/models/main",
+            "http://localhost:3000/proxy/models/main",
+        ),
+        (
+            "https://dstack.mycompany.example/some/prefix",
+            "/proxy/models/main",
+            "https://dstack.mycompany.example/some/prefix/proxy/models/main",
+        ),
+    ],
+)
+def test_make_proxy_url(server_url, proxy_url, expected_url):
+    assert make_proxy_url(server_url, proxy_url) == expected_url

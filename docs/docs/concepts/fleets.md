@@ -1,7 +1,12 @@
 # Fleets
 
-Fleets enable efficient provisioning and management of clusters and instances, both in the cloud and on-prem. Once a
-fleet is created, it can be reused by dev environments, tasks, and services.
+By default, when you run `dstack apply` with a dev environment, task, or service,
+`dstack` reuses `idle` instances from an existing [fleet](concepts/fleets.md).
+If no `idle` instances matching the requirements, it automatically creates a new fleet 
+using backends.
+
+For more control over configuration and lifecycle management, or to set up fleets out of on-prem servers, use fleets
+directly.
 
 ## Define a configuration
 
@@ -20,27 +25,27 @@ are both acceptable).
     To create a cloud fleet, specify `resources`, `nodes`, 
     and other optional parameters.
     
-    <div editor-title="examples/fine-tuning/alignment-handbook/fleet-distrib.dstack.yml">
+    <div editor-title="examples/misc/fleets/distrib.dstack.yml">
     
     ```yaml
     type: fleet
     # The name is optional, if not specified, generated randomly
-    name: ah-fleet-distrib
+    name: fleet-distrib
     
-    # Size of the cluster
+    # Number of instances
     nodes: 2
-    # Ensure instances are interconnected
+    # Ensure instances are inter-connected
     placement: cluster
     
-    # Use either spot or on-demand instances
-    spot_policy: auto
-    
+    # Terminate if idle for 3 days
+    termination_idle_time: 3d 
+
     resources:
       gpu:
         # 24GB or more vRAM
         memory: 24GB..
-        # One or more GPU
-        count: 1..
+        # Two or more GPUs
+        count: 2..
     ```
     
     </div>
@@ -76,14 +81,14 @@ are both acceptable).
     To create an SSH fleet, specify `ssh_config` to allow the `dstack` server to connect to these servers
     via SSH.
 
-    <div editor-title="fleet-ssh.dstack.yml"> 
+    <div editor-title="examples/misc/fleets/distrib-ssh.dstack.yml"> 
     
     ```yaml
     type: fleet
     # The name is optional, if not specified, generated randomly
-    name: my-ssh-fleet
+    name: fleet-distrib-ssh
 
-    # Ensure instances are interconnected
+    # Ensure instances are inter-connected
     placement: cluster
 
     # The user, private SSH key, and hostnames of the on-prem servers
@@ -193,19 +198,18 @@ the hosts meet the requirements (see above).
 If the requirements are met but the fleet still fails to be created, check `/root/.dstack/shim.log` for logs 
 on the hosts specified in `ssh_config`.
 
-[//]: # (## Creation policy)
+## Termination policy
 
-[//]: # (By default, when running dev environments, tasks, and services, `dstack apply` tries to reuse `idle` )
-[//]: # (instances from existing fleets. )
-[//]: # (If no `idle` instances meet the requirements, it creates a new fleet automatically.)
-[//]: # (To avoid creating new fleet, specify pass `--reuse` to `dstack apply` or &#40;or set [)
-[//]: # (`creation_policy`]&#40;../reference/dstack.yml/dev-environment.md#creation_policy&#41; to `reuse` in the configuration&#41;.)
+If you want a fleet to be automatically deleted after a certain idle time,
+you can set the [`termination_idle_time`](../reference/dstack.yml/fleet.md#termination_idle_time) property.
+
+[//]: # (Add Idle time example to the reference page)
 
 ## Manage fleets
 
 ### List fleets
 
-The [`dstack fleet`](../reference/cli/index.md#dstack-gateway-list) command lists fleet instances and theri status:
+The [`dstack fleet`](../reference/cli/index.md#dstack-fleet-list) command lists fleet instances and their status:
 
 <div class="termy">
 
@@ -236,13 +240,6 @@ Fleet my-gcp-fleet deleted
 You can pass either the path to the configuration file or the fleet name directly.
 
 To terminate and delete specific instances from a fleet, pass `-i INSTANCE_NUM`.
-
-#### Termination policy
-
-If you want a fleet to be automatically deleted after a certain idle time,
-you can set the [`termination_idle_time`](../reference/dstack.yml/fleet.md#termination_idle_time) property.
-
-[//]: # (Add Idle time example to the reference page)
 
 ## What's next?
 

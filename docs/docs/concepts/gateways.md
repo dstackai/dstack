@@ -1,9 +1,8 @@
 # Gateways
 
-Gateways manage the ingress traffic of running services and provide them with an HTTPS endpoint mapped to your domain,
+Gateways manage the ingress traffic of running [services](../services.md)
+and provide them with an HTTPS endpoint mapped to your domain,
 handling authentication, load distribution, and auto-scaling.
-
-To run a service, you need at least one gateway set up.
 
 > If you're using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"},
 > the gateway is already set up for you.
@@ -43,12 +42,11 @@ To create or update the gateway, simply call the [`dstack apply`](../reference/c
 <div class="termy">
 
 ```shell
-$ dstack apply . -f examples/deployment/gateway.dstack.yml
+$ dstack apply -f gateway.dstack.yml
 The example-gateway doesn't exist. Create it? [y/n]: y
 
  BACKEND  REGION     NAME             HOSTNAME  DOMAIN       DEFAULT  STATUS
  aws      eu-west-1  example-gateway            example.com  ✓        submitted
-
 ```
 
 </div>
@@ -56,7 +54,10 @@ The example-gateway doesn't exist. Create it? [y/n]: y
 ## Update DNS records
 
 Once the gateway is assigned a hostname, go to your domain's DNS settings
-and add an `A` DNS record for `*.<gateway domain>` (e.g., `*.example.com`) pointing to the gateway's hostname.
+and add a DNS record for `*.<gateway domain>`, e.g. `*.example.com`.
+The record should point to the gateway's hostname shown in `dstack`
+and should be of type `A` if the hostname is an IP address (most cases),
+or of type `CNAME` if the hostname is another domain (some private gateways and Kubernetes).
 
 ## Manage gateways
 

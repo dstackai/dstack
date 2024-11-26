@@ -173,6 +173,10 @@ def get_instance_name(run: Run, job: Job) -> str:
     return f"{run.project_name.lower()}-{job.job_spec.job_name}"
 
 
+def get_cloud_config(**config) -> str:
+    return "#cloud-config\n" + yaml.dump(config, default_flow_style=False)
+
+
 def get_user_data(
     authorized_keys: List[str], backend_specific_commands: Optional[List[str]] = None
 ) -> str:
@@ -184,11 +188,10 @@ def get_user_data(
     )
 
 
-def get_shim_env(build: str, authorized_keys: List[str]) -> Dict[str, str]:
-    build = get_dstack_runner_version()
+def get_shim_env(authorized_keys: List[str]) -> Dict[str, str]:
     envs = {
         "DSTACK_RUNNER_LOG_LEVEL": "6",
-        "DSTACK_RUNNER_VERSION": build,
+        "DSTACK_RUNNER_DOWNLOAD_URL": get_dstack_runner_download_url(),
         "DSTACK_PUBLIC_SSH_KEY": "\n".join(authorized_keys),
         "DSTACK_HOME": DSTACK_WORKING_DIR,
     }
@@ -198,11 +201,8 @@ def get_shim_env(build: str, authorized_keys: List[str]) -> Dict[str, str]:
 def get_shim_commands(
     authorized_keys: List[str], *, is_privileged: bool = False, pjrt_device: Optional[str] = None
 ) -> List[str]:
-    build = get_dstack_runner_version()
-    commands = get_shim_pre_start_commands(
-        build,
-    )
-    for k, v in get_shim_env(build, authorized_keys).items():
+    commands = get_shim_pre_start_commands()
+    for k, v in get_shim_env(authorized_keys).items():
         commands += [f'export "{k}={v}"']
     commands += get_run_shim_script(is_privileged, pjrt_device)
     return commands
@@ -217,17 +217,32 @@ def get_dstack_runner_version() -> str:
     return version or "latest"
 
 
-def get_cloud_config(**config) -> str:
-    return "#cloud-config\n" + yaml.dump(config, default_flow_style=False)
-
-
-def get_shim_pre_start_commands(build: str) -> List[str]:
-    bucket = "dstack-runner-downloads-stgn"
+def get_dstack_runner_download_url() -> str:
+    if url := os.environ.get("DSTACK_RUNNER_DOWNLOAD_URL"):
+        return url
+    build = get_dstack_runner_version()
     if settings.DSTACK_VERSION is not None:
         bucket = "dstack-runner-downloads"
+    else:
+        bucket = "dstack-runner-downloads-stgn"
+    return (
+        f"https://{bucket}.s3.eu-west-1.amazonaws.com/{build}/binaries/dstack-runner-linux-amd64"
+    )
 
-    url = f"https://{bucket}.s3.eu-west-1.amazonaws.com/{build}/binaries/dstack-shim-linux-amd64"
 
+def get_dstack_shim_download_url() -> str:
+    if url := os.environ.get("DSTACK_SHIM_DOWNLOAD_URL"):
+        return url
+    build = get_dstack_runner_version()
+    if settings.DSTACK_VERSION is not None:
+        bucket = "dstack-runner-downloads"
+    else:
+        bucket = "dstack-runner-downloads-stgn"
+    return f"https://{bucket}.s3.eu-west-1.amazonaws.com/{build}/binaries/dstack-shim-linux-amd64"
+
+
+def get_shim_pre_start_commands() -> List[str]:
+    url = get_dstack_shim_download_url()
     dstack_shim_binary_name = "dstack-shim"
     dstack_shim_binary_path = f"/usr/local/bin/{dstack_shim_binary_name}"
 
@@ -242,12 +257,11 @@ def get_shim_pre_start_commands(build: str) -> List[str]:
 
 
 def get_run_shim_script(is_privileged: bool, pjrt_device: Optional[str]) -> List[str]:
-    dev_flag = "" if settings.DSTACK_VERSION is not None else "--dev"
     privileged_flag = "--privileged" if is_privileged else ""
     pjrt_device_env = f"--pjrt-device={pjrt_device}" if pjrt_device else ""
 
     return [
-        f"nohup dstack-shim {dev_flag} docker {privileged_flag} {pjrt_device_env} >{DSTACK_WORKING_DIR}/shim.log 2>&1 &",
+        f"nohup dstack-shim docker {privileged_flag} {pjrt_device_env} >{DSTACK_WORKING_DIR}/shim.log 2>&1 &",
     ]
 
 
@@ -308,6 +322,13 @@ def get_docker_commands(
         # regenerate host keys
         "rm -rf /etc/ssh/ssh_host_*",
         "ssh-keygen -A > /dev/null",
+        # Ensure that PRIVSEP_PATH 1) exists 2) empty 3) owned by root,
+        # see https://github.com/dstackai/dstack/issues/1999
+        # /run/sshd is used in Debian-based distros, including Ubuntu:
+        # https://salsa.debian.org/ssh-team/openssh/-/blob/debian/1%259.7p1-7/debian/rules#L60
+        # /var/empty is the default path if not configured via ./configure --with-privsep-path=...
+        "rm -rf /run/sshd && mkdir -p /run/sshd && chown root:root /run/sshd",
+        "rm -rf /var/empty && mkdir -p /var/empty && chown root:root /var/empty",
         # start sshd
         "/usr/sbin/sshd -p 10022 -o PermitUserEnvironment=yes",
         # restore ld.so variables

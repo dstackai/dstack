@@ -1,9 +1,0 @@
-type: dev-environment
-name: vscode-tpu
-
-# If `image` is not specified, dstack uses its default image
-python: "3.11"
-ide: vscode
-
-resources:
-  gpu: v2-8

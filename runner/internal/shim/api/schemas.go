@@ -29,4 +29,3 @@ type PullResponse struct {
 type StopResponse struct {
 	State string `json:"state"`
 }
-
