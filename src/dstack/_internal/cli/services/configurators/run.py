@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
 
 import gpuhunt
+from rich.live import Live
 
 import dstack._internal.core.models.resources as resources
 from dstack._internal.cli.services.args import disk_spec, gpu_spec, port_mapping
@@ -14,8 +15,13 @@ from dstack._internal.cli.services.configurators.base import (
     BaseApplyConfigurator,
 )
 from dstack._internal.cli.services.profile import apply_profile_args, register_profile_args
-from dstack._internal.cli.utils.common import confirm_ask, console
-from dstack._internal.cli.utils.run import print_run_plan
+from dstack._internal.cli.utils.common import (
+    LIVE_TABLE_PROVISION_INTERVAL_SECS,
+    LIVE_TABLE_REFRESH_RATE_PER_SEC,
+    confirm_ask,
+    console,
+)
+from dstack._internal.cli.utils.run import get_runs_table, print_run_plan
 from dstack._internal.core.errors import (
     CLIError,
     ConfigurationError,
@@ -166,21 +172,19 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
         try:
             # We can attach to run multiple times if it goes from running to pending (retried).
             while True:
-                with console.status(f"Launching [code]{run.name}[/]") as status:
+                # Live table setup
+                with Live(
+                    console=console, refresh_per_second=LIVE_TABLE_REFRESH_RATE_PER_SEC
+                ) as live:
                     while run.status in (
                         RunStatus.SUBMITTED,
                         RunStatus.PENDING,
                         RunStatus.PROVISIONING,
                     ):
-                        job_statuses = "\n".join(
-                            f"  - {job.job_spec.job_name} [secondary]({job.job_submissions[-1].status.value})[/]"
-                            for job in run._run.jobs
-                        )
-                        status.update(
-                            f"Launching [code]{run.name}[/] [secondary]({run.status.value})[/]\n{job_statuses}"
-                        )
+                        live.update(get_runs_table([run], verbose=True))
                         time.sleep(5)
                         run.refresh()
+
                 console.print(
                     f"[code]{run.name}[/] provisioning completed [secondary]({run.status.value})[/]"
                 )
@@ -206,7 +210,7 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
                         run.detach()
 
                 # After reading the logs, the run may not be marked as finished immediately.
-                # Give the run some time to transit into a finished state before exiting.
+                # Give the run some time to transition to a finished state before exiting.
                 reattach = False
                 for _ in range(30):
                     run.refresh()
@@ -224,6 +228,9 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
                         " Check `dstack ps` to see if it's done or failed."
                     )
                     exit(1)
+                    break
+                time.sleep(LIVE_TABLE_PROVISION_INTERVAL_SECS)
+                run.refresh()
         except KeyboardInterrupt:
             try:
                 if not confirm_ask(f"\nStop the run [code]{run.name}[/] before detaching?"):
