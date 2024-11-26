@@ -16,7 +16,6 @@ from dstack._internal.cli.services.configurators.base import (
 )
 from dstack._internal.cli.services.profile import apply_profile_args, register_profile_args
 from dstack._internal.cli.utils.common import (
-    LIVE_TABLE_PROVISION_INTERVAL_SECS,
     LIVE_TABLE_REFRESH_RATE_PER_SEC,
     confirm_ask,
     console,
@@ -172,21 +171,24 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
         try:
             # We can attach to run multiple times if it goes from running to pending (retried).
             while True:
-                # Live table setup
+                console.print()
                 with Live(
                     console=console, refresh_per_second=LIVE_TABLE_REFRESH_RATE_PER_SEC
                 ) as live:
-                    while run.status in (
-                        RunStatus.SUBMITTED,
-                        RunStatus.PENDING,
-                        RunStatus.PROVISIONING,
-                    ):
+                    while True:
                         live.update(get_runs_table([run], verbose=True))
+                        if run.status not in (
+                            RunStatus.SUBMITTED,
+                            RunStatus.PENDING,
+                            RunStatus.PROVISIONING,
+                            RunStatus.TERMINATING,
+                        ):
+                            break
                         time.sleep(5)
                         run.refresh()
 
                 console.print(
-                    f"[code]{run.name}[/] provisioning completed [secondary]({run.status.value})[/]"
+                    f"\n[code]{run.name}[/] provisioning completed [secondary]({run.status.value})[/]"
                 )
 
                 current_job_submission = run._run.latest_job_submission
@@ -225,9 +227,6 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
                         " Check `dstack ps` to see if it's done or failed."
                     )
                     exit(1)
-                    break
-                time.sleep(LIVE_TABLE_PROVISION_INTERVAL_SECS)
-                run.refresh()
         except KeyboardInterrupt:
             try:
                 if not confirm_ask(f"\nStop the run [code]{run.name}[/] before detaching?"):
