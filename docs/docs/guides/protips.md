@@ -4,14 +4,43 @@ Below are tips and tricks to use `dstack` more efficiently.
 
 ## Fleets
 
-By default, when running dev environments, tasks, or services, `dstack apply` reuses `idle` 
-instances from existing fleets. If no `idle` instances match the requirements, it creates a new fleet automatically.
+### Creation policy
 
-To avoid creating new fleet automatically, 
-set [ `creation_policy`](../reference/dstack.yml/dev-environment.md#creation_policy) to `reuse` in the configuration.
+By default, when you run `dstack apply` with a dev environment, task, or service,
+`dstack` reuses `idle` instances from an existing [fleet](concepts/fleets.md).
+If no `idle` instances matching the requirements, it automatically creates a new fleet 
+using backends.
 
-> Use [fleets](../fleets.md) configurations to create fleets manually. This reduces startup time for dev environments,
-> tasks, and services, and is very convenient if you want to reuse fleets across runs.
+To ensure `dstack apply` doesn't create a new fleet but reuses an existing one,
+pass `-R` (or `--reuse`) to `dstack apply`.
+
+<div class="termy">
+
+```shell
+$ dstack apply -R -f examples/.dstack.yml
+```
+
+</div>
+
+### Termination policy
+
+If a fleet is created automatically, it remains `idle` for 5 minutes and can be reused within that time.
+To change the default idle duration, set
+[`termination_idle_time`](../reference/dstack.yml/fleet.md#termination_idle_time) in the run configuration (e.g., to 0 or a
+longer duration).
+
+!!! info "Fleets"
+    For greater control over fleet provisioning, configuration, and lifecycle management, it is recommended to use
+    [fleets](../concepts/fleets.md) directly.
+
+## Volumes
+
+To persist data across runs, it is recommended to use volumes.
+`dstack` supports two types of volumes: [network](../concepts/volumes.md#network-volumes) 
+(for persisting data even if the instance is interrupted)
+and [instance](../concepts/volumes.md#instance-volumes) (useful for persisting cached data across runs while the instance remains active).
+
+> If you use [SSH fleets](../concepts/fleets.md#ssh-fleets), you can mount network storage (e.g., NFS or SMB) to the hosts and access it in runs via instance volumes.
 
 ## Dev environments
 
@@ -42,7 +71,7 @@ Once the commands work, go ahead and run them as a task or a service.
     
     ```
 
-## Tasks vs. services
+## Tasks
 
 Tasks can be used not only for batch jobs but also for web applications.
 
@@ -93,11 +122,8 @@ This allows you to access the remote `8501` port on `localhost:8501` while the C
     
     This will forward the remote `8501` port to `localhost:3000`.
 
-> Use [tasks](../tasks.md) when you don't need authorization, OpenAI-compatible endpoint,
-> custom domain with HTTPS, multiple replicas, and when you don't need to let
-> other users access the endpoint.
-
-In all other cases, use [services](../services.md).
+> Use [tasks](../tasks.md) when you don't need multiple replicas or external access to the endpoint. For other cases,
+> use [services](../services.md).
 
 ## Docker and Docker Compose
 
@@ -227,29 +253,6 @@ $ dstack apply -e HF_TOKEN=... -f .dstack.yml
 
     Remember to add `.env` to `.gitignore` to avoid pushing it to the repo.    
 
-## Volumes
-
-To persist data across runs, it is recommended to use volumes.
-`dstack` supports two types of volumes: [network](../concepts/volumes.md#network-volumes)
-and [instance](../concepts/volumes.md#instance-volumes).
-
-Network volumes are ideal for persisting data even if the instance is interrupted.
-
-Instance volumes are useful for persisting cached data across runs while the instance remains active.
-
-> Besides volumes, you can load and save data using object storage services such as S3, HuggingFace Hub, and others.
-
-## Idle duration
-
-If you run a dev environment, task, or service via `dstack apply`,
-and it creates a new fleet, it sets the idle duration to `5m`. If instances of the fleet are `idle`
-for this time, `dstack` terminates them.
-
-If you create a fleet manually, the idle duration is not set.
-
-> You can override idle duration for fleets, dev environment, tasks, and services by
-> setting [`termination_idle_time`](../reference/dstack.yml/dev-environment.md#termination_idle_time) in the configuration file. 
-
 [//]: # (## Profiles)
 [//]: # ()
 [//]: # (If you don't want to specify the same parameters for each configuration, you can define them once via [profiles]&#40;../reference/profiles.yml.md&#41;)
@@ -296,12 +299,12 @@ The GPU vendor is indicated by one of the following case-insensitive values:
 - `amd` (AMD GPUs)
 - `tpu` (Google Cloud TPUs)
 
+??? info "AMD"
+    Currently, when an AMD GPU is specified, either by name or by vendor, the `image` property must be specified as well.
+
 ??? info "TPU"
     Currently, you can't specify other than 8 TPU cores. This means only single host workloads are supported.
     Support for multiple hosts is coming soon.
-
-??? info "AMD"
-    Currently, when an AMD GPU is specified, either by name or by vendor, the `image` property must be specified as well.
 
 ## Monitoring metrics
 
@@ -366,3 +369,5 @@ corresponding service quotas for each type of instance in each region.
 Note, for AWS, GCP, and Azure, service quota values are measured with the number of CPUs rather than GPUs.
 
 [//]: # (TODO: Mention spot policy)
+
+[//]: # (TODO: Mention retry policy)
