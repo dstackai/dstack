@@ -38,7 +38,7 @@ You can run the server either through `pip` or using Docker.
         
     </div>
 
-=== "CloudFormation"
+=== "AWS CloudFormation"
 
     If you'd like to deploy the server to a private AWS VPC, you can use 
     our CloudFormation [template :material-arrow-top-right-thin:{ .external }](https://console.aws.amazon.com/cloudformation/home#/stacks/quickcreate?templateURL=https://get-dstack.s3.eu-west-1.amazonaws.com/cloudformation/template.yaml){:target="_blank"}.
