@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from dstack._internal.core.errors import ResourceNotExistsError
 from dstack._internal.core.models.metrics import JobMetrics, Metric
 from dstack._internal.server.models import JobMetricsPoint, JobModel, ProjectModel
-from dstack._internal.server.services.jobs import list_run_job_models
+from dstack._internal.server.services.jobs import get_run_job_model
 
 
 async def get_job_metrics(
@@ -17,16 +17,15 @@ async def get_job_metrics(
     replica_num: int,
     job_num: int,
 ) -> JobMetrics:
-    job_models = await list_run_job_models(
+    job_model = await get_run_job_model(
         session=session,
         project=project,
         run_name=run_name,
         replica_num=replica_num,
         job_num=job_num,
     )
-    if len(job_models) == 0:
+    if job_model is None:
         raise ResourceNotExistsError("Found no job with given parameters")
-    job_model = job_models[-1]
     job_metrics = await _get_job_metrics(
         session=session,
         job_model=job_model,

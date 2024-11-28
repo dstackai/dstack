@@ -108,3 +108,47 @@ class TestGetJobMetrics:
                 },
             ]
         }
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_ignores_deleted_runs(self, test_db, session: AsyncSession, client: AsyncClient):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        repo = await create_repo(session=session, project_id=project.id)
+        deleted_run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_name="test-run",
+            deleted=True,
+        )
+        active_run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_name="test-run",
+        )
+        await create_job(session=session, run=deleted_run, job_num=0)
+        await create_job(session=session, run=deleted_run, job_num=1)
+        await create_job(session=session, run=active_run, job_num=0)
+        response_job_0 = await client.get(
+            f"/api/project/{project.name}/metrics/job/test-run",
+            params={"job_num": 0},
+            headers=get_auth_headers(user.token),
+        )
+        response_job_1 = await client.get(
+            f"/api/project/{project.name}/metrics/job/test-run",
+            params={"job_num": 1},
+            headers=get_auth_headers(user.token),
+        )
+        # Only deleted_run has job_num=1, but it's deleted
+        assert response_job_1.status_code == 400
+        assert response_job_1.json()["detail"][0]["code"] == "resource_not_exists"
+        # job_num=0 is taken from active_run
+        assert response_job_0.status_code == 200
+        assert response_job_0.json() == {"metrics": []}

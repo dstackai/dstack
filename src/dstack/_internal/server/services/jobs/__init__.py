@@ -22,7 +22,13 @@ from dstack._internal.core.models.runs import (
     RunSpec,
 )
 from dstack._internal.core.services.ssh.tunnel import SSHTunnel, ports_to_forwarded_sockets
-from dstack._internal.server.models import InstanceModel, JobModel, ProjectModel, VolumeModel
+from dstack._internal.server.models import (
+    InstanceModel,
+    JobModel,
+    ProjectModel,
+    RunModel,
+    VolumeModel,
+)
 from dstack._internal.server.services.backends import get_project_backend_by_type
 from dstack._internal.server.services.jobs.configurators.base import JobConfigurator
 from dstack._internal.server.services.jobs.configurators.dev import DevEnvironmentJobConfigurator
@@ -63,20 +69,24 @@ def find_job(jobs: List[Job], replica_num: int, job_num: int) -> Job:
     )
 
 
-async def list_run_job_models(
+async def get_run_job_model(
     session: AsyncSession, project: ProjectModel, run_name: str, replica_num: int, job_num: int
-) -> List[JobModel]:
+) -> Optional[JobModel]:
     res = await session.execute(
         select(JobModel)
+        .join(JobModel.run)
         .where(
-            JobModel.project_id == project.id,
-            JobModel.run_name == run_name,
+            RunModel.project_id == project.id,
+            # assuming run_name is unique for non-deleted runs
+            RunModel.run_name == run_name,
+            RunModel.deleted == False,
             JobModel.replica_num == replica_num,
             JobModel.job_num == job_num,
         )
-        .order_by(JobModel.submission_num)
+        .order_by(JobModel.submission_num.desc())
+        .limit(1)
     )
-    return list(res.scalars().all())
+    return res.scalar_one_or_none()
 
 
 def job_model_to_job_submission(job_model: JobModel) -> JobSubmission:

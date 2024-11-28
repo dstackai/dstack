@@ -240,6 +240,7 @@ async def create_run(
     submitted_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
     run_spec: Optional[RunSpec] = None,
     run_id: Optional[UUID] = None,
+    deleted: bool = False,
 ) -> RunModel:
     if run_spec is None:
         run_spec = get_run_spec(
@@ -250,6 +251,7 @@ async def create_run(
         run_id = uuid.uuid4()
     run = RunModel(
         id=run_id,
+        deleted=deleted,
         project_id=project.id,
         repo_id=repo.id,
         user_id=user.id,
