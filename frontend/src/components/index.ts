@@ -47,6 +47,10 @@ export { default as TutorialPanel } from '@cloudscape-design/components/tutorial
 export type { TutorialPanelProps } from '@cloudscape-design/components/tutorial-panel';
 export { default as AnnotationContext } from '@cloudscape-design/components/annotation-context';
 export type { AnnotationContextProps } from '@cloudscape-design/components/annotation-context';
+export { default as ChatBubble } from '@cloudscape-design/chat-components/chat-bubble';
+export type { ChatBubbleProps } from '@cloudscape-design/chat-components/chat-bubble';
+export { default as Avatar } from '@cloudscape-design/chat-components/avatar';
+export type { AvatarProps } from '@cloudscape-design/chat-components/avatar';
 export type { ModalProps } from '@cloudscape-design/components/modal';
 export type { TilesProps } from '@cloudscape-design/components/tiles';
 

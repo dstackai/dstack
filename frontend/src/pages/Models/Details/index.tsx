@@ -3,12 +3,13 @@ import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
 import reactStringReplace from 'react-string-replace';
-import cn from 'classnames';
 import OpenAI from 'openai';
 
 import {
+    Avatar,
     Box,
     Button,
+    ChatBubble,
     Code,
     ColumnLayout,
     Container,
@@ -368,11 +369,20 @@ export const ModelDetails: React.FC = () => {
                                 )}
 
                                 {messageForShowing.map((message, index) => (
-                                    <div key={index} className={cn(css.message, css[message.role])}>
-                                        <Box variant="h4">
-                                            {MESSAGE_ROLE_MAP[message.role as keyof typeof MESSAGE_ROLE_MAP]}
-                                        </Box>
-                                        {renderMessageBody(message.content || '...')}
+                                    <div key={index} className={css.message}>
+                                        <ChatBubble
+                                            ariaLabel=""
+                                            type={message.role === 'user' ? 'outgoing' : 'incoming'}
+                                            avatar={
+                                                <Avatar
+                                                    ariaLabel={MESSAGE_ROLE_MAP[message.role as keyof typeof MESSAGE_ROLE_MAP]}
+                                                    color={message.role === 'user' ? 'default' : 'gen-ai'}
+                                                    iconName={message.role === 'user' ? 'user-profile' : 'gen-ai'}
+                                                />
+                                            }
+                                        >
+                                            {renderMessageBody(message.content || '...')}
+                                        </ChatBubble>
                                     </div>
                                 ))}
                             </div>
