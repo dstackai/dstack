@@ -158,8 +158,10 @@ async def _process_instance(session: AsyncSession, instance: InstanceModel):
         and instance.termination_policy == TerminationPolicy.DESTROY_AFTER_IDLE
         and instance.job_id is None
     ):
-        await _terminate_idle_instance(instance)
-    elif instance.status == InstanceStatus.PENDING:
+        # terminates the instance and sets instance.status to TERMINATED (along other fields)
+        # if termination_idle_time is reached, noop otherwise
+        await _maybe_terminate_idle_instance(instance)
+    if instance.status == InstanceStatus.PENDING:
         if instance.remote_connection_info is not None:
             await _add_remote(instance)
         else:
@@ -180,7 +182,7 @@ async def _process_instance(session: AsyncSession, instance: InstanceModel):
     await session.commit()
 
 
-async def _terminate_idle_instance(instance: InstanceModel):
+async def _maybe_terminate_idle_instance(instance: InstanceModel):
     current_time = get_current_datetime()
     idle_duration = _get_instance_idle_duration(instance)
     idle_seconds = instance.termination_idle_time

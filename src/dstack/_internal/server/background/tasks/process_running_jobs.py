@@ -427,7 +427,7 @@ def _process_provisioning_with_shim(
     for volume, volume_mount in zip(volumes, volume_mounts):
         volume_mount.name = volume.name
 
-    shim_client.submit(
+    submitted = shim_client.submit(
         username=username,
         password=password,
         image_name=job_spec.image_name,
@@ -444,6 +444,20 @@ def _process_provisioning_with_shim(
         volumes=volumes,
         instance_mounts=instance_mounts,
     )
+    if not submitted:
+        # This can happen when we lost connection to the runner (e.g., network issues), marked
+        # the job as failed, released the instance (status=BUSY->IDLE, job_id={id}->None),
+        # but the job container is in fact alive, running the previous job. As we force-stop
+        # the container via shim API when cancelling the current job anyway (when either the user
+        # aborts the submission process or the submission deadline is reached), it's safe to kill
+        # the previous job container now, making the shim available (state=running->pending)
+        # for the next try.
+        logger.warning(
+            "%s: failed to sumbit, shim is already running a job, stopping it now, retry later",
+            fmt(job_model),
+        )
+        shim_client.stop(force=True)
+        return False
 
     job_model.status = JobStatus.PULLING
     logger.info("%s: now is %s", fmt(job_model), job_model.status.name)
