@@ -4,7 +4,7 @@ from rich.table import Table
 
 from dstack._internal.cli.utils.common import console
 from dstack._internal.core.models.volumes import Volume
-from dstack._internal.utils.common import pretty_date
+from dstack._internal.utils.common import DateFormatter, pretty_date
 
 
 def print_volumes_table(volumes: List[Volume], verbose: bool = False):
@@ -13,7 +13,9 @@ def print_volumes_table(volumes: List[Volume], verbose: bool = False):
     console.print()
 
 
-def get_volumes_table(volumes: List[Volume], verbose: bool = False) -> Table:
+def get_volumes_table(
+    volumes: List[Volume], verbose: bool = False, format_date: DateFormatter = pretty_date
+) -> Table:
     table = Table(box=None)
     table.add_column("NAME", no_wrap=True)
     table.add_column("BACKEND")
@@ -27,7 +29,7 @@ def get_volumes_table(volumes: List[Volume], verbose: bool = False) -> Table:
             volume.name,
             f"{volume.configuration.backend.value} ({volume.configuration.region})",
             volume.status,
-            pretty_date(volume.created_at),
+            format_date(volume.created_at),
         ]
         if verbose:
             renderables.append(volume.status_message)

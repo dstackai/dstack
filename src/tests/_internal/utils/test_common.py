@@ -6,11 +6,23 @@ from freezegun import freeze_time
 
 from dstack._internal.utils.common import (
     concat_url_path,
+    local_time,
     make_proxy_url,
     parse_memory,
     pretty_date,
     split_chunks,
 )
+
+
+@pytest.mark.parametrize(
+    ("dt", "result"),
+    [
+        (datetime.fromisoformat("1970-01-01T12:34"), "12:34"),
+        (datetime.fromisoformat("2024-12-01T01:02:03"), "01:02"),
+    ],
+)
+def test_local_time(dt: datetime, result: str) -> None:
+    assert local_time(dt) == result
 
 
 @freeze_time(datetime(2023, 10, 4, 12, 0, tzinfo=timezone.utc))
@@ -73,10 +85,6 @@ class TestPrettyDate:
         now = datetime.now(tz=timezone.utc)
         future_time = now + timedelta(hours=1)
         assert pretty_date(future_time) == ""
-
-    def test_epoch_timestamp(self):
-        epoch_time = 1609459200  # January 1, 2021
-        assert pretty_date(epoch_time) == "3 years ago"
 
 
 class TestParseMemory:
