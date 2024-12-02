@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import List, Optional
 
 import requests
-from rich.console import Group
 from rich.table import Table
 
 from dstack._internal.cli.services.configurators.base import (
@@ -17,6 +16,7 @@ from dstack._internal.cli.utils.common import (
     console,
 )
 from dstack._internal.cli.utils.fleet import get_fleets_table
+from dstack._internal.cli.utils.rich import MultiItemStatus
 from dstack._internal.core.errors import ConfigurationError, ResourceNotExistsError
 from dstack._internal.core.models.configurations import ApplyConfigurationType
 from dstack._internal.core.models.fleets import (
@@ -118,10 +118,12 @@ class FleetConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
             console.print("Fleet configuration submitted. Exiting...")
             return
         try:
-            with console.status("") as live:
+            with MultiItemStatus(
+                f"Provisioning [code]{fleet.name}[/]...", console=console
+            ) as live:
                 while not _finished_provisioning(fleet):
                     table = get_fleets_table([fleet])
-                    live.update(Group(f"Provisioning [code]{fleet.name}[/]...\n", table))
+                    live.update(table)
                     time.sleep(LIVE_TABLE_PROVISION_INTERVAL_SECS)
                     fleet = self.api.client.fleets.get(self.api.project, fleet.name)
         except KeyboardInterrupt:
@@ -133,7 +135,6 @@ class FleetConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
             else:
                 console.print("Exiting... Fleet provisioning will continue in the background.")
             return
-        console.print()
         console.print(
             get_fleets_table(
                 [fleet],

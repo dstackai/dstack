@@ -1,8 +1,12 @@
 import logging
 from datetime import datetime
-from typing import TYPE_CHECKING, Callable, Iterable, List, Optional, Union
+from types import TracebackType
+from typing import TYPE_CHECKING, Callable, Iterable, List, Optional, Type, Union
 
+from rich.console import Group
+from rich.live import Live
 from rich.logging import RichHandler
+from rich.spinner import Spinner
 from rich.text import Text
 from rich.traceback import Traceback
 
@@ -122,3 +126,31 @@ class DstackRichHandler(RichHandler):
                 path = path + "[/link]"
         message = f"[log.path]{path}[/] " + message
         return message
+
+
+class MultiItemStatus:
+    """An alternative to rich.status.Status that allows extra renderables below the spinner"""
+
+    def __init__(self, status: "RenderableType", *, console: Optional["Console"] = None) -> None:
+        self._spinner = Spinner("dots", text=status, style="status.spinner")
+        self._live = Live(
+            renderable=self._spinner,
+            console=console,
+            refresh_per_second=12.5,
+            transient=True,
+        )
+
+    def update(self, *renderables: "RenderableType") -> None:
+        self._live.update(renderable=Group(self._spinner, *renderables))
+
+    def __enter__(self) -> "MultiItemStatus":
+        self._live.start()
+        return self
+
+    def __exit__(
+        self,
+        exc_type: Optional[Type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[TracebackType],
+    ) -> None:
+        self._live.stop()

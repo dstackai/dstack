@@ -2,7 +2,6 @@ import argparse
 import time
 from typing import List
 
-from rich.console import Group
 from rich.table import Table
 
 from dstack._internal.cli.services.configurators.base import BaseApplyConfigurator
@@ -12,6 +11,7 @@ from dstack._internal.cli.utils.common import (
     console,
 )
 from dstack._internal.cli.utils.gateway import get_gateways_table
+from dstack._internal.cli.utils.rich import MultiItemStatus
 from dstack._internal.core.errors import ResourceNotExistsError
 from dstack._internal.core.models.configurations import ApplyConfigurationType
 from dstack._internal.core.models.gateways import (
@@ -100,10 +100,12 @@ class GatewayConfigurator(BaseApplyConfigurator):
             console.print("Gateway configuration submitted. Exiting...")
             return
         try:
-            with console.status("") as live:
+            with MultiItemStatus(
+                f"Provisioning [code]{gateway.name}[/]...", console=console
+            ) as live:
                 while not _finished_provisioning(gateway):
                     table = get_gateways_table([gateway], include_created=True)
-                    live.update(Group(f"Provisioning [code]{gateway.name}[/]...\n", table))
+                    live.update(table)
                     time.sleep(LIVE_TABLE_PROVISION_INTERVAL_SECS)
                     gateway = self.api.client.gateways.get(self.api.project, gateway.name)
         except KeyboardInterrupt:
@@ -116,7 +118,6 @@ class GatewayConfigurator(BaseApplyConfigurator):
             else:
                 console.print("Exiting... Gateway provisioning will continue in the background.")
             return
-        console.print()
         console.print(
             get_gateways_table(
                 [gateway],
