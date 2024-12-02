@@ -220,6 +220,71 @@ class TestCheckShim:
         assert instance.termination_reason == "Termination deadline"
         assert instance.health_status == health_status
 
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ["termination_policy", "has_job"],
+        [
+            pytest.param(TerminationPolicy.DESTROY_AFTER_IDLE, False, id="destroy-no-job"),
+            pytest.param(TerminationPolicy.DESTROY_AFTER_IDLE, True, id="destroy-with-job"),
+            pytest.param(TerminationPolicy.DONT_DESTROY, False, id="dont-destroy-no-job"),
+            pytest.param(TerminationPolicy.DONT_DESTROY, True, id="dont-destroy-with-job"),
+        ],
+    )
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_check_shim_process_ureachable_state(
+        self,
+        test_db,
+        session: AsyncSession,
+        termination_policy: TerminationPolicy,
+        has_job: bool,
+    ):
+        # see https://github.com/dstackai/dstack/issues/2041
+        project = await create_project(session=session)
+        pool = await create_pool(session, project)
+        if has_job:
+            user = await create_user(session=session)
+            repo = await create_repo(
+                session=session,
+                project_id=project.id,
+            )
+            run = await create_run(
+                session=session,
+                project=project,
+                repo=repo,
+                user=user,
+            )
+            job = await create_job(
+                session=session,
+                run=run,
+                status=JobStatus.SUBMITTED,
+            )
+        else:
+            job = None
+        instance = await create_instance(
+            session,
+            project,
+            pool,
+            created_at=get_current_datetime(),
+            termination_policy=termination_policy,
+            status=InstanceStatus.IDLE,
+            unreachable=True,
+            job=job,
+        )
+
+        await session.commit()
+
+        with patch(
+            "dstack._internal.server.background.tasks.process_instances._instance_healthcheck"
+        ) as healthcheck:
+            healthcheck.return_value = HealthStatus(healthy=True, reason="OK")
+            await process_instances()
+
+        await session.refresh(instance)
+
+        assert instance is not None
+        assert instance.status == InstanceStatus.IDLE
+        assert not instance.unreachable
+
 
 class TestTerminateIdleTime:
     @pytest.mark.asyncio

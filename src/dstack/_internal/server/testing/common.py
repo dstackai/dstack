@@ -30,6 +30,7 @@ from dstack._internal.core.models.profiles import (
     DEFAULT_POOL_NAME,
     DEFAULT_POOL_TERMINATION_IDLE_TIME,
     Profile,
+    TerminationPolicy,
 )
 from dstack._internal.core.models.repos.base import RepoType
 from dstack._internal.core.models.repos.local import LocalRunRepoData
@@ -443,6 +444,7 @@ async def create_instance(
     pool: PoolModel,
     fleet: Optional[FleetModel] = None,
     status: InstanceStatus = InstanceStatus.IDLE,
+    unreachable: bool = False,
     created_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
     finished_at: Optional[datetime] = None,
     spot: bool = False,
@@ -453,6 +455,8 @@ async def create_instance(
     job: Optional[JobModel] = None,
     instance_num: int = 0,
     backend: BackendType = BackendType.DATACRUNCH,
+    termination_policy: Optional[TerminationPolicy] = None,
+    termination_idle_time: int = DEFAULT_POOL_TERMINATION_IDLE_TIME,
     region: str = "eu-west",
     remote_connection_info: Optional[RemoteConnectionInfo] = None,
 ) -> InstanceModel:
@@ -523,7 +527,7 @@ async def create_instance(
         fleet=fleet,
         project=project,
         status=status,
-        unreachable=False,
+        unreachable=unreachable,
         created_at=created_at,
         started_at=created_at,
         finished_at=finished_at,
@@ -532,7 +536,8 @@ async def create_instance(
         price=1,
         region=region,
         backend=backend,
-        termination_idle_time=DEFAULT_POOL_TERMINATION_IDLE_TIME,
+        termination_policy=termination_policy,
+        termination_idle_time=termination_idle_time,
         profile=profile.json(),
         requirements=requirements.json(),
         instance_configuration=instance_configuration.json(),
