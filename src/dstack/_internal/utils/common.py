@@ -1,9 +1,10 @@
 import itertools
 import re
 import time
+from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Iterable, List, Optional, TypeVar, Union
+from typing import Any, Iterable, List, Optional, TypeVar
 from urllib.parse import urlparse
 
 
@@ -19,14 +20,18 @@ def get_milliseconds_since_epoch() -> int:
     return int(round(time.time() * 1000))
 
 
-def pretty_date(time: Union[datetime, int] = False) -> str:
+DateFormatter = Callable[[datetime], str]
+
+
+def local_time(time: datetime) -> str:
+    """Return HH:MM in local timezone"""
+    return time.astimezone().strftime("%H:%M")
+
+
+def pretty_date(time: datetime) -> str:
     """
-    Get a datetime object or an epoch timestamp and return a
-    pretty string like 'an hour ago', 'Yesterday', '3 months ago',
-    'just now', etc
+    Return a pretty string like 'an hour ago', 'Yesterday', '3 months ago', 'just now', etc
     """
-    if isinstance(time, int):
-        time = datetime.fromtimestamp(time, tz=timezone.utc)
     now = get_current_datetime()
     diff = now - time
     if diff.days < 0:

@@ -6,7 +6,7 @@ from dstack._internal.cli.utils.common import console
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.fleets import Fleet, FleetStatus
 from dstack._internal.core.models.instances import InstanceStatus
-from dstack._internal.utils.common import pretty_date
+from dstack._internal.utils.common import DateFormatter, pretty_date
 
 
 def print_fleets_table(fleets: List[Fleet], verbose: bool = False) -> None:
@@ -14,7 +14,9 @@ def print_fleets_table(fleets: List[Fleet], verbose: bool = False) -> None:
     console.print()
 
 
-def get_fleets_table(fleets: List[Fleet], verbose: bool = False) -> Table:
+def get_fleets_table(
+    fleets: List[Fleet], verbose: bool = False, format_date: DateFormatter = pretty_date
+) -> Table:
     table = Table(box=None)
     table.add_column("FLEET", no_wrap=True)
     table.add_column("INSTANCE")
@@ -56,7 +58,7 @@ def get_fleets_table(fleets: List[Fleet], verbose: bool = False) -> Table:
                 resources,
                 f"${instance.price:.4}" if instance.price is not None else "",
                 status,
-                pretty_date(instance.created),
+                format_date(instance.created),
             ]
 
             if verbose:
@@ -75,7 +77,7 @@ def get_fleets_table(fleets: List[Fleet], verbose: bool = False) -> Table:
                 "-",
                 "-",
                 "-",
-                pretty_date(fleet.created_at),
+                format_date(fleet.created_at),
             ]
             table.add_row(*row)
 

@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
 
 import gpuhunt
-from rich.live import Live
+from rich.console import Group
 
 import dstack._internal.core.models.resources as resources
 from dstack._internal.cli.services.args import disk_spec, gpu_spec, port_mapping
@@ -16,7 +16,6 @@ from dstack._internal.cli.services.configurators.base import (
 )
 from dstack._internal.cli.services.profile import apply_profile_args, register_profile_args
 from dstack._internal.cli.utils.common import (
-    LIVE_TABLE_REFRESH_RATE_PER_SEC,
     confirm_ask,
     console,
 )
@@ -43,6 +42,7 @@ from dstack._internal.core.models.configurations import (
 from dstack._internal.core.models.runs import JobSubmission, JobTerminationReason, RunStatus
 from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.core.services.diff import diff_models
+from dstack._internal.utils.common import local_time
 from dstack._internal.utils.interpolator import InterpolatorError, VariablesInterpolator
 from dstack._internal.utils.logging import get_logger
 from dstack.api._public.runs import Run
@@ -171,22 +171,26 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
         try:
             # We can attach to run multiple times if it goes from running to pending (retried).
             while True:
-                console.print()
-                with Live(
-                    console=console, refresh_per_second=LIVE_TABLE_REFRESH_RATE_PER_SEC
-                ) as live:
-                    while True:
-                        live.update(get_runs_table([run], verbose=True))
-                        if run.status not in (
-                            RunStatus.SUBMITTED,
-                            RunStatus.PENDING,
-                            RunStatus.PROVISIONING,
-                            RunStatus.TERMINATING,
-                        ):
-                            break
+                with console.status("") as live:
+                    while run.status in (
+                        RunStatus.SUBMITTED,
+                        RunStatus.PENDING,
+                        RunStatus.PROVISIONING,
+                        RunStatus.TERMINATING,
+                    ):
+                        table = get_runs_table([run])
+                        live.update(Group(f"Launching [code]{run.name}[/]...\n", table))
                         time.sleep(5)
                         run.refresh()
 
+                console.print()
+                console.print(
+                    get_runs_table(
+                        [run],
+                        verbose=run.status == RunStatus.FAILED,
+                        format_date=local_time,
+                    )
+                )
                 console.print(
                     f"\n[code]{run.name}[/] provisioning completed [secondary]({run.status.value})[/]"
                 )
