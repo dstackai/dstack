@@ -1,5 +1,5 @@
 import ipaddress
-from typing import Optional, Sequence
+from typing import List, Optional, Sequence
 
 
 def get_ip_from_network(network: Optional[str], addresses: Sequence[str]) -> Optional[str]:
@@ -32,3 +32,19 @@ def get_ip_from_network(network: Optional[str], addresses: Sequence[str]) -> Opt
     # return any ipv4
     internal_ip = str(ip_addresses[0]) if ip_addresses else None
     return internal_ip
+
+
+def is_ip_among_addresses(ip_address: str, addresses: Sequence[str]) -> bool:
+    ip_addresses = get_ips_from_addresses(addresses)
+    return ip_address in ip_addresses
+
+
+def get_ips_from_addresses(addresses: Sequence[str]) -> List[str]:
+    ip_addresses = []
+    for address in addresses:
+        try:
+            interface = ipaddress.IPv4Interface(address)
+            ip_addresses.append(interface.ip)
+        except ipaddress.AddressValueError:
+            continue
+    return [str(ip) for ip in ip_addresses]

@@ -402,11 +402,13 @@ async def create_fleet_ssh_instance_model(
         ssh_user = ssh_params.user
         ssh_key = ssh_params.ssh_key
         port = ssh_params.port
+        internal_ip = None
     else:
         hostname = host.hostname
         ssh_user = host.user or ssh_params.user
         ssh_key = host.ssh_key or ssh_params.ssh_key
         port = host.port or ssh_params.port
+        internal_ip = host.internal_ip
 
     if ssh_user is None or ssh_key is None:
         # This should not be reachable but checked by fleet spec validation
@@ -422,6 +424,7 @@ async def create_fleet_ssh_instance_model(
         ssh_user=ssh_user,
         ssh_keys=[ssh_key],
         env=env,
+        internal_ip=internal_ip,
         instance_network=ssh_params.network,
         port=port or 22,
     )
