@@ -310,12 +310,10 @@ def get_docker_commands(
         # prohibit password authentication
         'sed -i "s/.*PasswordAuthentication.*/PasswordAuthentication no/g" /etc/ssh/sshd_config',
         # create ssh dirs and add public key
-        "mkdir -p /run/sshd ~/.ssh",
+        "mkdir -p ~/.ssh",
         "chmod 700 ~/.ssh",
         f"echo '{authorized_keys_content}' > ~/.ssh/authorized_keys",
         "chmod 600 ~/.ssh/authorized_keys",
-        # preserve environment variables for SSH clients
-        "env >> ~/.ssh/environment",
         "sed -ie '1s@^@export PATH=\"'\"$PATH\"':$PATH\"\\n\\n@' ~/.profile"
         if fix_path_in_dot_profile
         else ":",
@@ -337,19 +335,13 @@ def get_docker_commands(
     ]
 
     runner = "/usr/local/bin/dstack-runner"
-
-    build = get_dstack_runner_version()
-    bucket = "dstack-runner-downloads-stgn"
-    if settings.DSTACK_VERSION is not None:
-        bucket = "dstack-runner-downloads"
-
-    url = f"https://{bucket}.s3.eu-west-1.amazonaws.com/{build}/binaries/dstack-runner-linux-amd64"
-
+    url = get_dstack_runner_download_url()
     commands += [
         f"curl --connect-timeout 60 --max-time 240 --retry 1 --output {runner} {url}",
         f"chmod +x {runner}",
         f"{runner} --log-level 6 start --http-port 10999 --temp-dir /tmp/runner --home-dir /root --working-dir /workflow",
     ]
+
     return commands
 
 

@@ -5,7 +5,7 @@ go 1.23
 require (
 	github.com/alexellis/go-execute/v2 v2.2.1
 	github.com/bluekeyes/go-gitdiff v0.7.2
-	github.com/creack/pty v1.1.21
+	github.com/creack/pty v1.1.24
 	github.com/docker/docker v26.0.0+incompatible
 	github.com/docker/go-connections v0.5.0
 	github.com/docker/go-units v0.5.0
@@ -15,7 +15,7 @@ require (
 	github.com/inhies/go-bytesize v0.0.0-20220417184213-4913239db9cf
 	github.com/shirou/gopsutil/v3 v3.24.3
 	github.com/sirupsen/logrus v1.9.3
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.10.0
 	github.com/urfave/cli/v2 v2.27.1
 	github.com/ztrue/tracerr v0.4.0
 	golang.org/x/crypto v0.22.0

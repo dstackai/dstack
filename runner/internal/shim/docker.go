@@ -608,12 +608,10 @@ func getSSHShellCommands(openSSHPort int, publicSSHKey string) []string {
 		// prohibit password authentication
 		"sed -i \"s/.*PasswordAuthentication.*/PasswordAuthentication no/g\" /etc/ssh/sshd_config",
 		// create ssh dirs and add public key
-		"mkdir -p /run/sshd ~/.ssh",
+		"mkdir -p ~/.ssh",
 		"chmod 700 ~/.ssh",
 		fmt.Sprintf("echo '%s' > ~/.ssh/authorized_keys", publicSSHKey),
 		"chmod 600 ~/.ssh/authorized_keys",
-		// preserve environment variables for SSH clients
-		"env >> ~/.ssh/environment",
 		"sed -ie '1s@^@export PATH=\"'\"$PATH\"':$PATH\"\\n\\n@' ~/.profile",
 		// regenerate host keys
 		"rm -rf /etc/ssh/ssh_host_*",

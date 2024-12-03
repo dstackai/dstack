@@ -28,6 +28,7 @@ from dstack._internal.core.models.profiles import (
 )
 from dstack._internal.core.models.repos import AnyRunRepoData
 from dstack._internal.core.models.resources import ResourcesSpec
+from dstack._internal.core.models.unix import UnixUser
 from dstack._internal.utils import common as common_utils
 from dstack._internal.utils.common import format_pretty_duration
 
@@ -176,6 +177,7 @@ class JobSpec(CoreModel):
     job_name: str
     jobs_per_replica: int = 1  # default value for backward compatibility
     app_specs: Optional[List[AppSpec]]
+    user: Optional[UnixUser] = None  # default value for backward compatibility
     commands: List[str]
     env: Dict[str, str]
     home_dir: Optional[str]
