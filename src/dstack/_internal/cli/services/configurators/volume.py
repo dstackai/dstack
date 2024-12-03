@@ -2,7 +2,6 @@ import argparse
 import time
 from typing import List
 
-from rich.console import Group
 from rich.table import Table
 
 from dstack._internal.cli.services.configurators.base import BaseApplyConfigurator
@@ -11,6 +10,7 @@ from dstack._internal.cli.utils.common import (
     confirm_ask,
     console,
 )
+from dstack._internal.cli.utils.rich import MultiItemStatus
 from dstack._internal.cli.utils.volume import get_volumes_table
 from dstack._internal.core.errors import ResourceNotExistsError
 from dstack._internal.core.models.configurations import ApplyConfigurationType
@@ -98,10 +98,12 @@ class VolumeConfigurator(BaseApplyConfigurator):
             console.print("Volume configuration submitted. Exiting...")
             return
         try:
-            with console.status("") as live:
+            with MultiItemStatus(
+                f"Provisioning [code]{volume.name}[/]...", console=console
+            ) as live:
                 while not _finished_provisioning(volume):
                     table = get_volumes_table([volume])
-                    live.update(Group(f"Provisioning [code]{volume.name}[/]...\n", table))
+                    live.update(table)
                     time.sleep(LIVE_TABLE_PROVISION_INTERVAL_SECS)
                     volume = self.api.client.volumes.get(self.api.project, volume.name)
         except KeyboardInterrupt:
@@ -113,7 +115,6 @@ class VolumeConfigurator(BaseApplyConfigurator):
             else:
                 console.print("Exiting... Volume provisioning will continue in the background.")
             return
-        console.print()
         console.print(
             get_volumes_table(
                 [volume],

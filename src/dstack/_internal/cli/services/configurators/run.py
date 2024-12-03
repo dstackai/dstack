@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
 
 import gpuhunt
-from rich.console import Group
 
 import dstack._internal.core.models.resources as resources
 from dstack._internal.cli.services.args import disk_spec, gpu_spec, port_mapping
@@ -19,6 +18,7 @@ from dstack._internal.cli.utils.common import (
     confirm_ask,
     console,
 )
+from dstack._internal.cli.utils.rich import MultiItemStatus
 from dstack._internal.cli.utils.run import get_runs_table, print_run_plan
 from dstack._internal.core.errors import (
     CLIError,
@@ -171,7 +171,7 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
         try:
             # We can attach to run multiple times if it goes from running to pending (retried).
             while True:
-                with console.status("") as live:
+                with MultiItemStatus(f"Launching [code]{run.name}[/]...", console=console) as live:
                     while run.status in (
                         RunStatus.SUBMITTED,
                         RunStatus.PENDING,
@@ -179,11 +179,10 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
                         RunStatus.TERMINATING,
                     ):
                         table = get_runs_table([run])
-                        live.update(Group(f"Launching [code]{run.name}[/]...\n", table))
+                        live.update(table)
                         time.sleep(5)
                         run.refresh()
 
-                console.print()
                 console.print(
                     get_runs_table(
                         [run],
