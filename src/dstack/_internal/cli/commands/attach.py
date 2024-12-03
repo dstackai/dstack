@@ -46,7 +46,7 @@ class AttachCommand(APIBaseCommand):
         )
         self._parser.add_argument(
             "--replica",
-            help="The relica number. Defaults to 0.",
+            help="The replica number. Defaults to 0.",
             type=int,
             default=0,
         )
