@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime
 from types import TracebackType
-from typing import TYPE_CHECKING, Callable, Iterable, List, Optional, Type, Union
+from typing import TYPE_CHECKING, Callable, Iterable, List, Optional, Union
 
 from rich.console import Group
 from rich.live import Live
@@ -149,7 +149,7 @@ class MultiItemStatus:
 
     def __exit__(
         self,
-        exc_type: Optional[Type[BaseException]],
+        exc_type: Optional[type[BaseException]],
         exc_val: Optional[BaseException],
         exc_tb: Optional[TracebackType],
     ) -> None:
