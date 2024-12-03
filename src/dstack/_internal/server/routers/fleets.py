@@ -14,14 +14,34 @@ from dstack._internal.server.schemas.fleets import (
     DeleteFleetsRequest,
     GetFleetPlanRequest,
     GetFleetRequest,
+    ListFleetsRequest,
 )
-from dstack._internal.server.security.permissions import ProjectMember
+from dstack._internal.server.security.permissions import Authenticated, ProjectMember
 
-router = APIRouter(prefix="/api/project/{project_name}/fleets", tags=["fleets"])
+root_router = APIRouter(prefix="/api/fleets", tags=["fleets"])
+project_router = APIRouter(prefix="/api/project/{project_name}/fleets", tags=["fleets"])
 
 
-@router.post("/list")
+@root_router.post("/list")
 async def list_fleets(
+    body: ListFleetsRequest,
+    session: AsyncSession = Depends(get_session),
+    user: UserModel = Depends(Authenticated()),
+) -> List[Fleet]:
+    return await fleets_services.list_fleets(
+        session=session,
+        user=user,
+        project_name=body.project_name,
+        only_active=body.only_active,
+        prev_created_at=body.prev_created_at,
+        prev_id=body.prev_id,
+        limit=body.limit,
+        ascending=body.ascending,
+    )
+
+
+@project_router.post("/list")
+async def list_project_fleets(
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
 ) -> List[Fleet]:
@@ -29,7 +49,7 @@ async def list_fleets(
     return await fleets_services.list_project_fleets(session=session, project=project)
 
 
-@router.post("/get")
+@project_router.post("/get")
 async def get_fleet(
     body: GetFleetRequest,
     session: AsyncSession = Depends(get_session),
@@ -44,7 +64,7 @@ async def get_fleet(
     return fleet
 
 
-@router.post("/get_plan")
+@project_router.post("/get_plan")
 async def get_plan(
     body: GetFleetPlanRequest,
     session: AsyncSession = Depends(get_session),
@@ -60,7 +80,7 @@ async def get_plan(
     return plan
 
 
-@router.post("/create")
+@project_router.post("/create")
 async def create_fleet(
     body: CreateFleetRequest,
     session: AsyncSession = Depends(get_session),
@@ -75,7 +95,7 @@ async def create_fleet(
     )
 
 
-@router.post("/delete")
+@project_router.post("/delete")
 async def delete_fleets(
     body: DeleteFleetsRequest,
     session: AsyncSession = Depends(get_session),
@@ -90,7 +110,7 @@ async def delete_fleets(
     )
 
 
-@router.post("/delete_instances")
+@project_router.post("/delete_instances")
 async def delete_fleet_instances(
     body: DeleteFleetInstancesRequest,
     session: AsyncSession = Depends(get_session),

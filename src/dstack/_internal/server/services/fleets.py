@@ -1,10 +1,10 @@
 import random
 import string
 import uuid
-from datetime import timezone
+from datetime import datetime, timezone
 from typing import List, Optional, Tuple, Union, cast
 
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
@@ -65,13 +65,96 @@ from dstack._internal.server.services.locking import (
     string_to_lock_id,
 )
 from dstack._internal.server.services.pools import list_active_remote_instances
-from dstack._internal.server.services.projects import get_member, get_member_permissions
+from dstack._internal.server.services.projects import (
+    get_member,
+    get_member_permissions,
+    list_project_models,
+    list_user_project_models,
+)
 from dstack._internal.utils import common as common_utils
 from dstack._internal.utils import random_names
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.ssh import pkey_from_str
 
 logger = get_logger(__name__)
+
+
+async def list_fleets(
+    session: AsyncSession,
+    user: UserModel,
+    project_name: Optional[str],
+    only_active: bool,
+    prev_created_at: Optional[datetime],
+    prev_id: Optional[uuid.UUID],
+    limit: int,
+    ascending: bool,
+) -> List[Fleet]:
+    if user.global_role == GlobalRole.ADMIN:
+        projects = await list_project_models(session=session)
+    else:
+        projects = await list_user_project_models(session=session, user=user)
+    if project_name is not None:
+        projects = [p for p in projects if p.name == project_name]
+    fleet_models = await list_projects_fleet_models(
+        session=session,
+        projects=projects,
+        only_active=only_active,
+        prev_created_at=prev_created_at,
+        prev_id=prev_id,
+        limit=limit,
+        ascending=ascending,
+    )
+    return [
+        fleet_model_to_fleet(v, include_deleted_instances=not only_active) for v in fleet_models
+    ]
+
+
+async def list_projects_fleet_models(
+    session: AsyncSession,
+    projects: List[ProjectModel],
+    only_active: bool,
+    prev_created_at: Optional[datetime],
+    prev_id: Optional[uuid.UUID],
+    limit: int,
+    ascending: bool,
+) -> List[FleetModel]:
+    filters = []
+    filters.append(FleetModel.project_id.in_(p.id for p in projects))
+    if only_active:
+        filters.append(FleetModel.deleted == False)
+    if prev_created_at is not None:
+        if ascending:
+            if prev_id is None:
+                filters.append(FleetModel.created_at > prev_created_at)
+            else:
+                filters.append(
+                    or_(
+                        FleetModel.created_at > prev_created_at,
+                        and_(FleetModel.created_at == prev_created_at, FleetModel.id < prev_id),
+                    )
+                )
+        else:
+            if prev_id is None:
+                filters.append(FleetModel.created_at < prev_created_at)
+            else:
+                filters.append(
+                    or_(
+                        FleetModel.created_at < prev_created_at,
+                        and_(FleetModel.created_at == prev_created_at, FleetModel.id > prev_id),
+                    )
+                )
+    order_by = (FleetModel.created_at.desc(), FleetModel.id)
+    if ascending:
+        order_by = (FleetModel.created_at.asc(), FleetModel.id.desc())
+    res = await session.execute(
+        select(FleetModel)
+        .where(*filters)
+        .order_by(*order_by)
+        .limit(limit)
+        .options(joinedload(FleetModel.instances))
+    )
+    fleet_models = list(res.unique().scalars().all())
+    return fleet_models
 
 
 async def list_project_fleets(
@@ -397,17 +480,21 @@ async def delete_fleets(
         await session.commit()
 
 
-def fleet_model_to_fleet(fleet_model: FleetModel, include_sensitive: bool = False) -> Fleet:
-    instances = [
-        pools_services.instance_model_to_instance(i)
-        for i in fleet_model.instances
-        if not i.deleted
-    ]
+def fleet_model_to_fleet(
+    fleet_model: FleetModel,
+    include_deleted_instances: bool = False,
+    include_sensitive: bool = False,
+) -> Fleet:
+    instance_models = fleet_model.instances
+    if not include_deleted_instances:
+        instance_models = [i for i in instance_models if not i.deleted]
+    instances = [pools_services.instance_model_to_instance(i) for i in instance_models]
     instances = sorted(instances, key=lambda i: i.instance_num)
     spec = get_fleet_spec(fleet_model)
     if not include_sensitive:
         _remove_fleet_spec_sensitive_info(spec)
     return Fleet(
+        id=fleet_model.id,
         name=fleet_model.name,
         project_name=fleet_model.project.name,
         spec=spec,

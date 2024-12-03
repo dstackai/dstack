@@ -1,4 +1,5 @@
 import ipaddress
+import uuid
 from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional, Type, Union
@@ -196,6 +197,8 @@ class FleetSpec(CoreModel):
 
 
 class Fleet(CoreModel):
+    # id is Optional for backward compatibility within 0.18.x
+    id: Optional[uuid.UUID] = None
     name: str
     project_name: str
     spec: FleetSpec
