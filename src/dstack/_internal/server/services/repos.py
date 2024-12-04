@@ -28,7 +28,7 @@ from dstack._internal.server.models import (
     UserModel,
 )
 from dstack._internal.server.services.storage import get_default_storage
-from dstack._internal.server.utils.common import run_async
+from dstack._internal.utils.common import run_async
 
 
 async def list_repos(

@@ -11,8 +11,7 @@ from dstack._internal.server.models import PlacementGroupModel, ProjectModel
 from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.placement import placement_group_model_to_placement_group
-from dstack._internal.server.utils.common import run_async
-from dstack._internal.utils.common import get_current_datetime
+from dstack._internal.utils.common import get_current_datetime, run_async
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)

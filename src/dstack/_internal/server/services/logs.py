@@ -20,7 +20,7 @@ from dstack._internal.server import settings
 from dstack._internal.server.models import ProjectModel
 from dstack._internal.server.schemas.logs import PollLogsRequest
 from dstack._internal.server.schemas.runner import LogEvent as RunnerLogEvent
-from dstack._internal.server.utils.common import run_async
+from dstack._internal.utils.common import run_async
 from dstack._internal.utils.logging import get_logger
 
 BOTO_AVAILABLE = True

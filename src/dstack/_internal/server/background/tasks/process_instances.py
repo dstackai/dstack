@@ -89,8 +89,7 @@ from dstack._internal.server.services.pools import (
 from dstack._internal.server.services.runner import client as runner_client
 from dstack._internal.server.services.runner.client import HealthStatus
 from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
-from dstack._internal.server.utils.common import run_async
-from dstack._internal.utils.common import get_current_datetime
+from dstack._internal.utils.common import get_current_datetime, run_async
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.network import get_ip_from_network, is_ip_among_addresses
 from dstack._internal.utils.ssh import (

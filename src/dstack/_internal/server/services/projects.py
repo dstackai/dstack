@@ -22,8 +22,7 @@ from dstack._internal.server.services import users
 from dstack._internal.server.services.backends import get_configurator
 from dstack._internal.server.services.permissions import get_default_permissions
 from dstack._internal.server.settings import DEFAULT_PROJECT_NAME
-from dstack._internal.server.utils.common import run_async
-from dstack._internal.utils.common import get_current_datetime
+from dstack._internal.utils.common import get_current_datetime, run_async
 from dstack._internal.utils.crypto import generate_rsa_key_pair_bytes
 from dstack._internal.utils.logging import get_logger
 
