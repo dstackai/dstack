@@ -261,9 +261,7 @@ async def _add_remote(instance: InstanceModel) -> None:
         authorized_keys.append(instance.project.ssh_public_key.strip())
 
         try:
-            future = asyncio.get_running_loop().run_in_executor(
-                None, _deploy_instance, remote_details, pkeys, authorized_keys
-            )
+            future = run_async(_deploy_instance, remote_details, pkeys, authorized_keys)
             deploy_timeout = 20 * 60  # 20 minutes
             result = await asyncio.wait_for(future, timeout=deploy_timeout)
             health, host_info = result
