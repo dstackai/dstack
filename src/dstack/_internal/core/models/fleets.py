@@ -54,7 +54,7 @@ class SSHHostParams(CoreModel):
         Optional[str],
         Field(
             description=(
-                "The internal IP of the host used for communication inside the cluster. "
+                "The internal IP of the host used for communication inside the cluster."
                 " If not specified, `dstack` will use the IP address from `network` or from the first found internal network."
             )
         ),
