@@ -50,7 +50,28 @@ class SSHHostParams(CoreModel):
     identity_file: Annotated[
         Optional[str], Field(description="The private key to use for this host")
     ] = None
+    internal_ip: Annotated[
+        Optional[str],
+        Field(
+            description=(
+                "The internal IP of the host used for communication inside the cluster."
+                " If not specified, `dstack` will use the IP address from `network` or from the first found internal network."
+            )
+        ),
+    ] = None
     ssh_key: Optional[SSHKey] = None
+
+    @validator("internal_ip")
+    def validate_internal_ip(cls, value):
+        if value is None:
+            return value
+        try:
+            internal_ip = ipaddress.ip_address(value)
+        except ValueError as e:
+            raise ValueError("Invalid IP address") from e
+        if not internal_ip.is_private:
+            raise ValueError("IP address is not private")
+        return value
 
 
 class SSHParams(CoreModel):
@@ -70,7 +91,13 @@ class SSHParams(CoreModel):
     ]
     network: Annotated[
         Optional[str],
-        Field(description="The network address for cluster setup in the format `<ip>/<netmask>`"),
+        Field(
+            description=(
+                "The network address for cluster setup in the format `<ip>/<netmask>`."
+                " `dstack` will use IP addresses from this network for communication between hosts."
+                " If not specified, `dstack` will use IPs from the first found internal network."
+            )
+        ),
     ]
 
     @validator("network")

@@ -92,7 +92,7 @@ from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
 from dstack._internal.server.utils.common import run_async
 from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.logging import get_logger
-from dstack._internal.utils.network import get_ip_from_network
+from dstack._internal.utils.network import get_ip_from_network, is_ip_among_addresses
 from dstack._internal.utils.ssh import (
     pkey_from_str,
 )
@@ -290,16 +290,20 @@ async def _add_remote(instance: InstanceModel) -> None:
 
     instance_type = host_info_to_instance_type(host_info)
     instance_network = None
+    internal_ip = None
     try:
         default_jpd = JobProvisioningData.__response__.parse_raw(instance.job_provisioning_data)
         instance_network = default_jpd.instance_network
+        internal_ip = default_jpd.internal_ip
     except ValidationError:
         pass
 
-    internal_ip = get_ip_from_network(
-        network=instance_network,
-        addresses=host_info.get("addresses", []),
-    )
+    host_network_addresses = host_info.get("addresses", [])
+    if internal_ip is None:
+        internal_ip = get_ip_from_network(
+            network=instance_network,
+            addresses=host_network_addresses,
+        )
     if instance_network is not None and internal_ip is None:
         instance.status = InstanceStatus.TERMINATED
         instance.termination_reason = "Failed to locate internal IP address on the given network"
@@ -312,6 +316,21 @@ async def _add_remote(instance: InstanceModel) -> None:
             },
         )
         return
+    if internal_ip is not None:
+        if not is_ip_among_addresses(ip_address=internal_ip, addresses=host_network_addresses):
+            instance.status = InstanceStatus.TERMINATED
+            instance.termination_reason = (
+                "Specified internal IP not found among instance interfaces"
+            )
+            logger.warning(
+                "Failed to add instance %s: specified internal IP not found among instance interfaces",
+                instance.name,
+                extra={
+                    "instance_name": instance.name,
+                    "instance_status": InstanceStatus.TERMINATED.value,
+                },
+            )
+            return
 
     region = instance.region
     jpd = JobProvisioningData(
