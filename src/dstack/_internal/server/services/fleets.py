@@ -681,6 +681,7 @@ def _validate_fleet_spec(spec: FleetSpec):
         for host in spec.configuration.ssh_config.hosts:
             if is_core_model_instance(host, SSHHostParams) and host.ssh_key is not None:
                 _validate_ssh_key(host.ssh_key)
+        _validate_internal_ips(spec.configuration.ssh_config)
 
 
 def _validate_all_ssh_params_specified(ssh_config: SSHParams):
@@ -707,6 +708,17 @@ def _validate_ssh_key(ssh_key: SSHKey):
             "Unsupported key type. "
             "The key type should be RSA, ECDSA, or Ed25519 and should not be encrypted with passphrase."
         )
+
+
+def _validate_internal_ips(ssh_config: SSHParams):
+    internal_ips_num = 0
+    for host in ssh_config.hosts:
+        if not isinstance(host, str) and host.internal_ip is not None:
+            internal_ips_num += 1
+    if internal_ips_num != 0 and internal_ips_num != len(ssh_config.hosts):
+        raise ServerClientError("internal_ip must be specified for all hosts")
+    if internal_ips_num > 0 and ssh_config.network is not None:
+        raise ServerClientError("internal_ip is mutually exclusive with network")
 
 
 def _get_fleet_nodes_to_provision(spec: FleetSpec) -> int:

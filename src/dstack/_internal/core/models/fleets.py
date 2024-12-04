@@ -61,6 +61,18 @@ class SSHHostParams(CoreModel):
     ] = None
     ssh_key: Optional[SSHKey] = None
 
+    @validator("internal_ip")
+    def validate_internal_ip(cls, value):
+        if value is None:
+            return value
+        try:
+            internal_ip = ipaddress.ip_address(value)
+        except ValueError as e:
+            raise ValueError("Invalid IP address") from e
+        if not internal_ip.is_private:
+            raise ValueError("IP address is not private")
+        return value
+
 
 class SSHParams(CoreModel):
     user: Annotated[Optional[str], Field(description="The user to log in with on all hosts")] = (
