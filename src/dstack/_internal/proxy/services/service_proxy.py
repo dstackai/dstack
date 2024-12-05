@@ -31,7 +31,7 @@ async def proxy(
     if service.auth:
         await auth.enforce()
 
-    client = await get_service_replica_client(project_name, service, repo)
+    client = await get_service_replica_client(service, repo)
 
     try:
         upstream_request = await build_upstream_request(request, path, client)

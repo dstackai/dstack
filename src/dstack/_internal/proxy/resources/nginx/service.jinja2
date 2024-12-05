@@ -1,7 +1,7 @@
-{% if servers %}
-upstream {{ service_id }} {
-    {% for replica_id, server in servers.items() %}
-    server {{ server }}; # REPLICA:{{ replica_id }}
+{% if replicas %}
+upstream {{ run_name }} {
+    {% for replica in replicas %}
+    server unix:{{ replica.socket }};  # replica {{ replica.id }}
     {% endfor %}
 }
 {% else %}
@@ -10,7 +10,7 @@ upstream {{ service_id }} {
 server {
     server_name {{ domain }};
 
-    access_log {{ access_log_path }} dstack_stat;
+    access_log /var/log/nginx/dstack.access.log dstack_stat;
     client_max_body_size {{ client_max_body_size }};
 
     location / {
@@ -18,16 +18,16 @@ server {
         auth_request /auth;
         {% endif %}
 
-        {% if servers %}
+        {% if replicas %}
         try_files /nonexistent @$http_upgrade;
         {% else %}
         return 503;
         {% endif %}
     }
 
-    {% if servers %}
+    {% if replicas %}
     location @websocket {
-        proxy_pass http://{{ service_id }};
+        proxy_pass http://{{ run_name }};
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header Host $host;
         proxy_http_version 1.1;
@@ -36,7 +36,7 @@ server {
         proxy_read_timeout 300s;
     }
     location @ {
-        proxy_pass http://{{ service_id }};
+        proxy_pass http://{{ run_name }};
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header Host $host;
         proxy_read_timeout 300s;
@@ -49,7 +49,7 @@ server {
         if ($remote_addr = 127.0.0.1) {
             return 200;
         }
-        proxy_pass http://localhost:{{ gateway_port }}/auth/{{ project }};
+        proxy_pass http://localhost:{{ proxy_port }}/auth/{{ project_name }};
         proxy_pass_request_body off;
         proxy_set_header Content-Length "";
         proxy_set_header X-Original-URI $request_uri;

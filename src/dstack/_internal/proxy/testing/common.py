@@ -4,7 +4,8 @@ import httpx
 from fastapi import FastAPI
 
 from dstack._internal.proxy.deps import BaseProxyDependencyInjector
-from dstack._internal.proxy.repos.base import BaseProxyRepo, Project, Replica, Service
+from dstack._internal.proxy.repos.base import BaseProxyRepo
+from dstack._internal.proxy.repos.models import Project, Replica, Service
 from dstack._internal.proxy.routers.model_proxy import router as model_router
 from dstack._internal.proxy.routers.service_proxy import router as service_router
 
@@ -40,15 +41,19 @@ def make_project(name: str) -> Project:
     return Project(name=name, ssh_private_key="secret")
 
 
-def make_service(run_name: str, auth: bool = False) -> Service:
+def make_service(
+    project_name: str, run_name: str, domain: Optional[str] = None, auth: bool = False
+) -> Service:
     return Service(
-        id="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        project_name=project_name,
         run_name=run_name,
+        domain=domain,
+        https=None,
         auth=auth,
-        app_port=80,
         replicas=[
             Replica(
                 id="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+                app_port=80,
                 ssh_destination="ubuntu@server",
                 ssh_port=22,
                 ssh_proxy=None,
