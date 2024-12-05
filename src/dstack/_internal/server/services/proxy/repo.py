@@ -16,9 +16,9 @@ from dstack._internal.core.models.runs import (
     RunStatus,
     ServiceSpec,
 )
-from dstack._internal.proxy.repos.base import (
+from dstack._internal.proxy.repos.base import BaseProxyRepo
+from dstack._internal.proxy.repos.models import (
     AnyModelFormat,
-    BaseProxyRepo,
     ChatModel,
     OpenAIChatModelFormat,
     Project,
@@ -81,20 +81,21 @@ class DBProxyRepo(BaseProxyRepo):
                 )
             replica = Replica(
                 id=job.id.hex,
+                app_port=run_spec.configuration.port.container_port,
                 ssh_destination=ssh_destination,
                 ssh_port=ssh_port,
                 ssh_proxy=ssh_proxy,
             )
             replicas.append(replica)
         return Service(
-            id=run.id.hex,
             run_name=run.run_name,
+            domain=None,
+            https=None,
             auth=run_spec.configuration.auth,
-            app_port=run_spec.configuration.port.container_port,
             replicas=replicas,
         )
 
-    async def add_service(self, project_name: str, service: Service) -> None:
+    async def set_service(self, project_name: str, service: Service) -> None:
         pass
 
     async def list_models(self, project_name: str) -> List[ChatModel]:
@@ -133,7 +134,7 @@ class DBProxyRepo(BaseProxyRepo):
         # If there are many models with the same name, choose the most recent
         return max(models, key=lambda m: m.created_at)
 
-    async def add_model(self, project_name: str, model: ChatModel) -> None:
+    async def set_model(self, project_name: str, model: ChatModel) -> None:
         pass
 
     async def get_project(self, name: str) -> Optional[Project]:
@@ -146,7 +147,7 @@ class DBProxyRepo(BaseProxyRepo):
             ssh_private_key=project.ssh_private_key,
         )
 
-    async def add_project(self, project: Project) -> None:
+    async def set_project(self, project: Project) -> None:
         pass
 
     async def is_project_member(self, project_name: str, token: str) -> bool:

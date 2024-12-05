@@ -1,7 +1,7 @@
 import httpx
 
 from dstack._internal.proxy.errors import UnexpectedProxyError
-from dstack._internal.proxy.repos.base import ChatModel
+from dstack._internal.proxy.repos.models import ChatModel
 from dstack._internal.proxy.services.model_proxy.clients import ChatCompletionsClient
 from dstack._internal.proxy.services.model_proxy.clients.openai import OpenAIChatCompletions
 from dstack._internal.proxy.services.model_proxy.clients.tgi import TGIChatCompletions

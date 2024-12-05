@@ -1,11 +1,13 @@
 from datetime import datetime
-from typing import AsyncIterator, Generator, Optional
+from typing import AsyncIterator, Generator
 from unittest.mock import patch
 
 import openai
 import pytest
 
-from dstack._internal.proxy.repos.base import BaseProxyRepo, ChatModel, OpenAIChatModelFormat
+from dstack._internal.proxy.repos.base import BaseProxyRepo
+from dstack._internal.proxy.repos.gateway import GatewayProxyRepo
+from dstack._internal.proxy.repos.models import ChatModel, OpenAIChatModelFormat
 from dstack._internal.proxy.schemas.model_proxy import (
     ChatCompletionsChoice,
     ChatCompletionsChunk,
@@ -15,9 +17,10 @@ from dstack._internal.proxy.schemas.model_proxy import (
     ChatCompletionsUsage,
     ChatMessage,
 )
+from dstack._internal.proxy.services.auth.base import BaseProxyAuthProvider
 from dstack._internal.proxy.services.model_proxy.clients import ChatCompletionsClient
+from dstack._internal.proxy.testing.auth import ProxyTestAuthProvider
 from dstack._internal.proxy.testing.common import make_app_client, make_project, make_service
-from dstack._internal.proxy.testing.repo import ProxyTestRepo
 
 SAMPLE_RESPONSE = "Hello there, how may I assist you today?"
 
@@ -67,9 +70,10 @@ class ChatClientStub(ChatCompletionsClient):
 
 
 def make_model(
-    name: str, run_name: str, created_at: datetime = datetime.fromtimestamp(0)
+    project_name: str, name: str, run_name: str, created_at: datetime = datetime.fromtimestamp(0)
 ) -> ChatModel:
     return ChatModel(
+        project_name=project_name,
         name=name,
         created_at=created_at,
         run_name=run_name,
@@ -78,9 +82,12 @@ def make_model(
 
 
 def make_openai_client(
-    repo: BaseProxyRepo, project_name: str, auth_token: Optional[str] = None
+    repo: BaseProxyRepo,
+    auth: BaseProxyAuthProvider,
+    project_name: str,
+    auth_token: str = "token",
 ) -> openai.AsyncOpenAI:
-    _, http_client = make_app_client(repo, auth_token="token")
+    _, http_client = make_app_client(repo, auth)
     return openai.AsyncOpenAI(
         api_key=auth_token,
         base_url=f"http://test-host/proxy/models/{project_name}",
@@ -102,21 +109,23 @@ def mock_chat_client() -> Generator[None, None, None]:
 
 @pytest.mark.asyncio
 async def test_list_models() -> None:
-    repo = ProxyTestRepo(project_to_tokens={"test-proj": {"token"}})
-    await repo.add_project(make_project("test-proj"))
-    await repo.add_service(project_name="test-proj", service=make_service("test-service-1"))
-    await repo.add_service(project_name="test-proj", service=make_service("test-service-2"))
-    await repo.add_model(
-        project_name="test-proj",
-        model=make_model("test-model-1", "test-service-1", created_at=datetime.fromtimestamp(123)),
+    auth = ProxyTestAuthProvider({"test-proj": {"token"}})
+    repo = GatewayProxyRepo()
+    await repo.set_project(make_project("test-proj"))
+    await repo.set_service(make_service("test-proj", "test-service-1"))
+    await repo.set_service(make_service("test-proj", "test-service-2"))
+    await repo.set_model(
+        make_model(
+            "test-proj", "test-model-1", "test-service-1", created_at=datetime.fromtimestamp(123)
+        ),
     )
-    await repo.add_model(
-        project_name="test-proj",
-        model=make_model("test-model-2", "test-service-2", created_at=datetime.fromtimestamp(321)),
+    await repo.set_model(
+        make_model(
+            "test-proj", "test-model-2", "test-service-2", created_at=datetime.fromtimestamp(321)
+        ),
     )
-    _, client = make_app_client(repo, auth_token="token")
 
-    client = make_openai_client(repo, "test-proj", auth_token="token")
+    client = make_openai_client(repo, auth, "test-proj", auth_token="token")
     models = [model async for model in client.models.list()]
 
     assert models[0].id == "test-model-1"
@@ -129,25 +138,26 @@ async def test_list_models() -> None:
 
 @pytest.mark.asyncio
 async def test_list_models_empty() -> None:
-    repo = ProxyTestRepo(project_to_tokens={"test-proj": {"token"}, "test-proj-empty": {"token"}})
-    await repo.add_project(make_project("test-proj"))
-    await repo.add_project(make_project("test-proj-empty"))
-    await repo.add_service(project_name="test-proj", service=make_service("test-service"))
-    await repo.add_model(project_name="test-proj", model=make_model("test-model", "test-service"))
-    _, client = make_app_client(repo, auth_token="token")
+    auth = ProxyTestAuthProvider({"test-proj": {"token"}, "test-proj-empty": {"token"}})
+    repo = GatewayProxyRepo()
+    await repo.set_project(make_project("test-proj"))
+    await repo.set_project(make_project("test-proj-empty"))
+    await repo.set_service(make_service("test-proj", "test-service"))
+    await repo.set_model(make_model("test-proj", "test-model", "test-service"))
 
-    client = make_openai_client(repo, "test-proj-empty", auth_token="token")
+    client = make_openai_client(repo, auth, "test-proj-empty", auth_token="token")
     models = [model async for model in client.models.list()]
     assert not models
 
 
 @pytest.mark.asyncio
 async def test_chat_completions(mock_chat_client) -> None:
-    repo = ProxyTestRepo(project_to_tokens={"test-proj": {"token"}})
-    await repo.add_project(make_project("test-proj"))
-    await repo.add_service(project_name="test-proj", service=make_service("test-service"))
-    await repo.add_model(project_name="test-proj", model=make_model("test-model", "test-service"))
-    client = make_openai_client(repo, "test-proj", auth_token="token")
+    auth = ProxyTestAuthProvider({"test-proj": {"token"}})
+    repo = GatewayProxyRepo()
+    await repo.set_project(make_project("test-proj"))
+    await repo.set_service(make_service("test-proj", "test-service"))
+    await repo.set_model(make_model("test-proj", "test-model", "test-service"))
+    client = make_openai_client(repo, auth, "test-proj", auth_token="token")
     completion = await client.chat.completions.create(
         model="test-model",
         messages=[{"role": "user", "content": "Hi"}],
@@ -157,11 +167,12 @@ async def test_chat_completions(mock_chat_client) -> None:
 
 @pytest.mark.asyncio
 async def test_chat_completions_stream(mock_chat_client) -> None:
-    repo = ProxyTestRepo(project_to_tokens={"test-proj": {"token"}})
-    await repo.add_project(make_project("test-proj"))
-    await repo.add_service(project_name="test-proj", service=make_service("test-service"))
-    await repo.add_model(project_name="test-proj", model=make_model("test-model", "test-service"))
-    client = make_openai_client(repo, "test-proj", auth_token="token")
+    auth = ProxyTestAuthProvider({"test-proj": {"token"}})
+    repo = GatewayProxyRepo()
+    await repo.set_project(make_project("test-proj"))
+    await repo.set_service(make_service("test-proj", "test-service"))
+    await repo.set_model(make_model("test-proj", "test-model", "test-service"))
+    client = make_openai_client(repo, auth, "test-proj", auth_token="token")
     response = await client.chat.completions.create(
         model="test-model",
         messages=[{"role": "user", "content": "Hi"}],
@@ -175,9 +186,10 @@ async def test_chat_completions_stream(mock_chat_client) -> None:
 
 @pytest.mark.asyncio
 async def test_chat_completions_model_not_found() -> None:
-    repo = ProxyTestRepo(project_to_tokens={"test-proj": {"token"}})
-    await repo.add_project(make_project("test-proj"))
-    client = make_openai_client(repo, "test-proj", auth_token="token")
+    auth = ProxyTestAuthProvider({"test-proj": {"token"}})
+    repo = GatewayProxyRepo()
+    await repo.set_project(make_project("test-proj"))
+    client = make_openai_client(repo, auth, "test-proj", auth_token="token")
     with pytest.raises(openai.NotFoundError):
         await client.chat.completions.create(
             model="unknown-model",
@@ -188,9 +200,10 @@ async def test_chat_completions_model_not_found() -> None:
 @pytest.mark.asyncio
 @pytest.mark.parametrize("token", ["wrong-token", ""])
 async def test_unauthorized(token: str) -> None:
-    repo = ProxyTestRepo(project_to_tokens={"test-proj": {"correct-token"}})
-    await repo.add_project(make_project("test-proj"))
-    client = make_openai_client(repo, "test-proj", auth_token=token)
+    auth = ProxyTestAuthProvider({"test-proj": {"correct-token"}})
+    repo = GatewayProxyRepo()
+    await repo.set_project(make_project("test-proj"))
+    client = make_openai_client(repo, auth, "test-proj", auth_token=token)
 
     with pytest.raises(openai.PermissionDeniedError):
         await client.models.list()
@@ -203,9 +216,10 @@ async def test_unauthorized(token: str) -> None:
 
 @pytest.mark.asyncio
 async def test_no_token() -> None:
-    repo = ProxyTestRepo(project_to_tokens={"test-proj": {"correct-token"}})
-    await repo.add_project(make_project("test-proj"))
-    _, client = make_app_client(repo, auth_token=None)
+    auth = ProxyTestAuthProvider({"test-proj": {"correct-token"}})
+    repo = GatewayProxyRepo()
+    await repo.set_project(make_project("test-proj"))
+    _, client = make_app_client(repo, auth, auth_token=None)
 
     resp = await client.get("http://test-host/proxy/models/test-proj/models")
     assert resp.status_code == 403

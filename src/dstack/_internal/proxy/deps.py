@@ -7,6 +7,10 @@ from typing_extensions import Annotated
 
 from dstack._internal.proxy.errors import ProxyError, UnexpectedProxyError
 from dstack._internal.proxy.repos.base import BaseProxyRepo
+from dstack._internal.proxy.repos.gateway import GatewayProxyRepo
+from dstack._internal.proxy.services.auth.base import BaseProxyAuthProvider
+from dstack._internal.proxy.services.nginx import Nginx
+from dstack._internal.proxy.services.stats import StatsCollector
 
 
 class BaseProxyDependencyInjector(ABC):
@@ -23,6 +27,17 @@ class BaseProxyDependencyInjector(ABC):
         if False:
             yield  # show type checkers this is a generator
 
+    @abstractmethod
+    async def get_auth_provider(self) -> AsyncGenerator[BaseProxyAuthProvider, None]:
+        if False:
+            yield  # show type checkers this is a generator
+
+    async def get_nginx(self) -> Optional[Nginx]:
+        return None
+
+    async def get_stats_collector(self) -> Optional[StatsCollector]:
+        return None
+
 
 async def get_injector(request: Request) -> BaseProxyDependencyInjector:
     injector = request.app.state.proxy_dependency_injector
@@ -38,14 +53,47 @@ async def get_proxy_repo(
         yield repo
 
 
+async def get_gateway_proxy_repo(
+    repo: Annotated[BaseProxyRepo, Depends(get_proxy_repo)],
+) -> GatewayProxyRepo:
+    if not isinstance(repo, GatewayProxyRepo):
+        raise UnexpectedProxyError(f"Unexpected gateway repo type: {type(repo)}")
+    return repo
+
+
+async def get_proxy_auth_provider(
+    injector: Annotated[BaseProxyDependencyInjector, Depends(get_injector)],
+) -> AsyncGenerator[BaseProxyRepo, None]:
+    async for provider in injector.get_auth_provider():
+        yield provider
+
+
+async def get_nginx(
+    injector: Annotated[BaseProxyDependencyInjector, Depends(get_injector)],
+) -> Nginx:
+    nginx = await injector.get_nginx()
+    if nginx is None:
+        raise UnexpectedProxyError("Nginx is not available")
+    return nginx
+
+
+async def get_stats_collector(
+    injector: Annotated[BaseProxyDependencyInjector, Depends(get_injector)],
+) -> Nginx:
+    stats_collector = await injector.get_stats_collector()
+    if stats_collector is None:
+        raise UnexpectedProxyError("StatsCollector is not available")
+    return stats_collector
+
+
 class ProxyAuthContext:
-    def __init__(self, project_name: str, token: Optional[str], repo: BaseProxyRepo):
+    def __init__(self, project_name: str, token: Optional[str], provider: BaseProxyAuthProvider):
         self._project_name = project_name
         self._token = token
-        self._repo = repo
+        self._provider = provider
 
     async def enforce(self) -> None:
-        if self._token is None or not await self._repo.is_project_member(
+        if self._token is None or not await self._provider.is_project_member(
             self._project_name, self._token
         ):
             raise ProxyError(
@@ -64,12 +112,12 @@ class ProxyAuth:
         token: Annotated[
             Optional[HTTPAuthorizationCredentials], Security(HTTPBearer(auto_error=False))
         ],
-        repo: Annotated[BaseProxyRepo, Depends(get_proxy_repo)],
+        provider: Annotated[BaseProxyAuthProvider, Depends(get_proxy_auth_provider)],
     ) -> ProxyAuthContext:
         context = ProxyAuthContext(
             project_name=project_name,
             token=token.credentials if token is not None else None,
-            repo=repo,
+            provider=provider,
         )
         if self._auto_enforce:
             await context.enforce()
