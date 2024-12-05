@@ -45,12 +45,12 @@ async def list_runs(
     user: UserModel = Depends(Authenticated()),
 ) -> List[Run]:
     """
-    Returns all runs visible to user sorted by descending submitted_at.
-    A **project_name**, **repo_id**, and **username** can be specified as filters.
-    Specifying **repo_id** without **project_name** returns no runs.
+    Returns all runs visible to user sorted by descending `submitted_at`.
+    `project_name`, `repo_id`, `username`, and `only_active` can be specified as filters.
+    Specifying `repo_id` without `project_name` returns no runs.
 
-    The results are paginated. To get the next page, pass submitted_at and id of
-    the last run from the previous page as **prev_submitted_at** and **prev_run_id**.
+    The results are paginated. To get the next page, pass `submitted_at` and `id` of
+    the last run from the previous page as `prev_submitted_at` and `prev_run_id`.
     """
     return await runs.list_user_runs(
         session=session,
@@ -73,7 +73,7 @@ async def get_run(
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
 ) -> Run:
     """
-    Returns a run given the run name.
+    Returns a run given a run name.
     """
     _, project = user_project
     run = await runs.get_run(
@@ -154,6 +154,9 @@ async def stop_runs(
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
 ):
+    """
+    Stop one or more runs.
+    """
     _, project = user_project
     await runs.stop_runs(
         session=session,
@@ -169,12 +172,15 @@ async def delete_runs(
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
 ):
+    """
+    Delete one or more runs. The runs must be stopped before they can be deleted.
+    """
     _, project = user_project
     await runs.delete_runs(session=session, project=project, runs_names=body.runs_names)
 
 
 # FIXME: get_offers and create_instance semantically belong to pools, not runs
-@project_router.post("/get_offers")
+@project_router.post("/get_offers", deprecated=True)
 async def get_offers(
     body: GetOffersRequest,
     session: AsyncSession = Depends(get_session),
@@ -192,7 +198,7 @@ async def get_offers(
 
 
 # FIXME: get_offers and create_instance semantically belong to pools, not runs
-@project_router.post("/create_instance")
+@project_router.post("/create_instance", deprecated=True)
 async def create_instance(
     body: CreateInstanceRequest,
     session: AsyncSession = Depends(get_session),

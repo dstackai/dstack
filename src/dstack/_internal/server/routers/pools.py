@@ -36,11 +36,11 @@ async def list_pool_instances(
     user: UserModel = Depends(Authenticated()),
 ) -> List[Instance]:
     """
-    Returns all instances visible to user sorted by descending created_at.
-    A **project_name** and **pool_name** can be specified as filters.
+    Returns all instances visible to user sorted by descending `created_at`.
+    `project_name` and `pool_name` can be specified as filters.
 
-    The results are paginated. To get the next page, pass created_at and id of
-    the last run from the previous page as **prev_created_at** and **prev_id**.
+    The results are paginated. To get the next page, pass `created_at` and `id` of
+    the last instance from the previous page as `prev_created_at` and `prev_id`.
     """
     return await pools.list_user_pool_instances(
         session=session,

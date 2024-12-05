@@ -1,4 +1,6 @@
-from typing import List, Optional
+from typing import Annotated, List, Optional
+
+from pydantic import Field
 
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.repos import AnyRepoInfo
@@ -48,7 +50,10 @@ class GetRepoRequest(RepoRequest):
 
 class SaveRepoCredsRequest(RepoRequest):
     repo_info: AnyRepoInfo
-    repo_creds: Optional[RemoteRepoCredsDto]
+    repo_creds: Annotated[
+        Optional[RemoteRepoCredsDto],
+        Field(description="The repo creds for accessing private remote repo"),
+    ]
 
 
 class DeleteReposRequest(CoreModel):

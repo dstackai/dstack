@@ -259,15 +259,42 @@ class Job(CoreModel):
 
 
 class RunSpec(CoreModel):
-    run_name: Optional[str]
-    repo_id: str
+    # TODO: run_name, working_dir are redundant here since they already passed in configuration
+    # TODO: Consider auto-creating virtual repos to make repo fields optional
+    # TODO: Make configuration_path and profile optional
+    run_name: Annotated[
+        Optional[str],
+        Field(description="The run name. If not set, the run name is generated automatically."),
+    ]
+    repo_id: Annotated[
+        str,
+        Field(
+            description=(
+                "Same `repo_id` that is specified when initializing the repo"
+                " by calling the `/api/project/{project_name}/repos/init` endpoint."
+            )
+        ),
+    ]
     repo_data: Annotated[AnyRunRepoData, Field(discriminator="repo_type")]
     repo_code_hash: Optional[str]
     working_dir: str
-    configuration_path: str
+    configuration_path: Annotated[
+        str,
+        Field(
+            description=(
+                "The path to the run configuration YAML file."
+                " It can be set to any value when using the programmatic API."
+            )
+        ),
+    ]
     configuration: Annotated[AnyRunConfiguration, Field(discriminator="type")]
     profile: Profile
-    ssh_key_pub: str
+    ssh_key_pub: Annotated[
+        str,
+        Field(
+            description="The contents of the SSH public key that will be used to connect to the run."
+        ),
+    ]
     # TODO: make merged_profile a computed field after migrating to pydanticV2
     merged_profile: Annotated[Profile, Field(exclude=True)] = None
 
@@ -375,7 +402,15 @@ class RunPlan(CoreModel):
 
 class ApplyRunPlanInput(CoreModel):
     run_spec: RunSpec
-    current_resource: Optional[Run] = None
+    current_resource: Annotated[
+        Optional[Run],
+        Field(
+            description=(
+                "The expected current resource."
+                " If the resource has changed, the apply fails unless `force: true`."
+            )
+        ),
+    ] = None
 
 
 class PoolInstanceOffers(CoreModel):

@@ -164,8 +164,6 @@ def register_routes(app: FastAPI, ui: bool = True):
     app.include_router(projects.router)
     app.include_router(backends.root_router)
     app.include_router(backends.project_router)
-    app.include_router(pools.root_router)
-    app.include_router(pools.router)
     app.include_router(fleets.root_router)
     app.include_router(fleets.project_router)
     app.include_router(repos.router)
@@ -179,6 +177,8 @@ def register_routes(app: FastAPI, ui: bool = True):
     app.include_router(volumes.project_router)
     app.include_router(service_proxy.router, prefix="/proxy/services", tags=["service-proxy"])
     app.include_router(model_proxy.router, prefix="/proxy/models", tags=["model-proxy"])
+    app.include_router(pools.root_router)
+    app.include_router(pools.router)
 
     @app.exception_handler(ForbiddenError)
     async def forbidden_error_handler(request: Request, exc: ForbiddenError):

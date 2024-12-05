@@ -32,7 +32,8 @@ async def list_projects(
     user: UserModel = Depends(Authenticated()),
 ) -> List[Project]:
     """
-    Returns all projects visible to user.
+    Returns all projects visible to user sorted by descending `created_at`.
+
     `members` and `backends` are always empty - call `/api/projects/{project_name}/get` to retrieve them.
     """
     return await projects.list_user_projects(session=session, user=user)
