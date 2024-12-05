@@ -81,7 +81,7 @@ With large prompts and batch sizes, two replicas on 4xMI300x GPUs hit memory sat
 length x batch size) exceed the available memory for the KV cache. This forces the inference engine to compute KV
 tensors on-the-fly or offload them to CPU memory, degrading throughput.
 
-In [Lambda Labs](https://lambdalabs.com/blog/partner-spotlight-evaluating-nvidia-h200-gpus-for-ai-inference-with-baseten)’
+In [Lambda :material-arrow-top-right-thin:{ .external }](https://lambdalabs.com/blog/partner-spotlight-evaluating-nvidia-h200-gpus-for-ai-inference-with-baseten){:target="_blank"}’
 benchmark, an 8xH200 setup processed 3.4 times more tokens per second than an 8xH100. Extrapolating to our
 setup, an 8xH200 would process around 2,186 tokens per second (3.4 × 643), though still lower than 8xMI300x.
 
@@ -184,6 +184,11 @@ cost-efficiency.
 | **Peak Memory Bandwidth** | 5.3TB/s    | 6TB/s      |               | 8TB/s         |
 | **TFLOPS (FP8)**          | 2610       | 2610       |               | 4500          |
 | **Low precision**         | FP8        | FP8        | FP4, FP6, FP8 | FP4, FP6, FP8 |
+
+## Source code
+
+All the source code and findings to help you replicate the results are available in 
+[our GitHub repo :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/benchmarks/tree/main/comparison/h100sxm5_vs_mi300x){:target="_blank"}.
 
 ## Thanks to our friends
 
