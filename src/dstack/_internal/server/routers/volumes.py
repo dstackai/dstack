@@ -15,8 +15,13 @@ from dstack._internal.server.schemas.volumes import (
     ListVolumesRequest,
 )
 from dstack._internal.server.security.permissions import Authenticated, ProjectMember
+from dstack._internal.server.utils.routers import get_base_api_additional_responses
 
-root_router = APIRouter(prefix="/api/volumes", tags=["volumes"])
+root_router = APIRouter(
+    prefix="/api/volumes",
+    tags=["volumes"],
+    responses=get_base_api_additional_responses(),
+)
 project_router = APIRouter(prefix="/api/project/{project_name}/volumes", tags=["volumes"])
 
 

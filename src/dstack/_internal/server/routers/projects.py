@@ -17,8 +17,13 @@ from dstack._internal.server.security.permissions import (
     ProjectMember,
 )
 from dstack._internal.server.services import projects
+from dstack._internal.server.utils.routers import get_base_api_additional_responses
 
-router = APIRouter(prefix="/api/projects", tags=["projects"])
+router = APIRouter(
+    prefix="/api/projects",
+    tags=["projects"],
+    responses=get_base_api_additional_responses(),
+)
 
 
 @router.post("/list")

@@ -24,14 +24,17 @@ from dstack._internal.server.services import fleets, runs
 from dstack._internal.server.services.pools import (
     get_or_create_pool_by_name,
 )
+from dstack._internal.server.utils.routers import get_base_api_additional_responses
 
 root_router = APIRouter(
     prefix="/api/runs",
     tags=["runs"],
+    responses=get_base_api_additional_responses(),
 )
 project_router = APIRouter(
     prefix="/api/project/{project_name}/runs",
     tags=["runs"],
+    responses=get_base_api_additional_responses(),
 )
 
 
@@ -69,6 +72,9 @@ async def get_run(
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
 ) -> Run:
+    """
+    Returns a run given the run name.
+    """
     _, project = user_project
     run = await runs.get_run(
         session=session,
@@ -86,6 +92,10 @@ async def get_plan(
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
 ) -> RunPlan:
+    """
+    Returns a run plan for the given run spec.
+    This is an optional step before calling `/apply`.
+    """
     user, project = user_project
     run_plan = await runs.get_plan(
         session=session,
@@ -107,6 +117,9 @@ async def apply_plan(
     Errors if the expected current resource from the plan does not match the current resource.
     Use `force: true` to apply even if the current resource does not match.
     If the existing run is active and cannot be updated, it must be stopped first.
+
+    Before calling this endpoint, you need to init a repo using
+    the `/api/project/{project_name}/repos/init` endpoint.
     """
     user, project = user_project
     return await runs.apply_plan(

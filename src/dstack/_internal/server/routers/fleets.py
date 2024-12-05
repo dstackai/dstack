@@ -17,9 +17,18 @@ from dstack._internal.server.schemas.fleets import (
     ListFleetsRequest,
 )
 from dstack._internal.server.security.permissions import Authenticated, ProjectMember
+from dstack._internal.server.utils.routers import get_base_api_additional_responses
 
-root_router = APIRouter(prefix="/api/fleets", tags=["fleets"])
-project_router = APIRouter(prefix="/api/project/{project_name}/fleets", tags=["fleets"])
+root_router = APIRouter(
+    prefix="/api/fleets",
+    tags=["fleets"],
+    responses=get_base_api_additional_responses(),
+)
+project_router = APIRouter(
+    prefix="/api/project/{project_name}/fleets",
+    tags=["fleets"],
+    responses=get_base_api_additional_responses(),
+)
 
 
 @root_router.post("/list")

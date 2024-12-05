@@ -13,9 +13,18 @@ from dstack._internal.server.models import ProjectModel, UserModel
 from dstack._internal.server.schemas.pools import ListPoolsRequest
 from dstack._internal.server.schemas.runs import AddRemoteInstanceRequest
 from dstack._internal.server.security.permissions import Authenticated, ProjectMember
+from dstack._internal.server.utils.routers import get_base_api_additional_responses
 
-root_router = APIRouter(prefix="/api/pools", tags=["pool"])
-router = APIRouter(prefix="/api/project/{project_name}/pool", tags=["pool"])
+root_router = APIRouter(
+    prefix="/api/pools",
+    tags=["pool"],
+    responses=get_base_api_additional_responses(),
+)
+router = APIRouter(
+    prefix="/api/project/{project_name}/pool",
+    tags=["pool"],
+    responses=get_base_api_additional_responses(),
+)
 
 
 @root_router.post("/list_instances")

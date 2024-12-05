@@ -4,7 +4,44 @@ from fastapi import HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from packaging import version
 
-from dstack._internal.core.errors import ServerClientError
+from dstack._internal.core.errors import ServerClientError, ServerClientErrorCode
+from dstack._internal.core.models.common import CoreModel
+
+
+class BadRequestDetailsModel(CoreModel):
+    code: Optional[ServerClientErrorCode] = ServerClientErrorCode.UNSPECIFIED_ERROR
+    msg: str
+
+
+class BadRequestErrorModel(CoreModel):
+    detail: BadRequestDetailsModel
+
+
+class AccessDeniedDetailsModel(CoreModel):
+    code: Optional[str] = None
+    msg: str = "Access denied"
+
+
+class AccessDeniedErrorModel(CoreModel):
+    detail: AccessDeniedDetailsModel
+
+
+def get_base_api_additional_responses() -> Dict:
+    """
+    Returns additional responses for the OpenAPI docs relevant to all API endpoints.
+    The endpoints may override responses to make them as specific as possible.
+    E.g. an enpoint may specify which error codes it may return in `code`.
+    """
+    return {
+        400: {
+            "description": "Bad request",
+            "model": BadRequestErrorModel,
+        },
+        403: {
+            "description": "Access denied",
+            "model": AccessDeniedErrorModel,
+        },
+    }
 
 
 def error_detail(msg: str, code: Optional[str] = None, **kwargs) -> Dict:
