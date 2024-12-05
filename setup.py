@@ -42,35 +42,36 @@ BASE_DEPS = [
     "rich-argparse",
     "tqdm",
     "simple-term-menu",
+    "pydantic>=1.10.10,<2.0.0",
+    "pydantic-duality>=1.2.4",
+    "websocket-client",
+    "watchfiles",
+    "python-multipart>=0.0.16",
+    "filelock",
+    "psutil",
+    "gpuhunt>=0.0.16,<0.1.0",
+]
+
+SERVER_DEPS = [
     "fastapi",
     "starlette>=0.26.0",
     "uvicorn",
-    "pydantic>=1.10.10,<2.0.0",
-    "pydantic-duality>=1.2.4",
     "sqlalchemy[asyncio]>=2.0.0",
     "sqlalchemy_utils>=0.40.0",
     "alembic>=1.10.2",
     "apscheduler<4",
     "aiosqlite",
-    "aiohttp",
-    "websocket-client",
-    "watchfiles",
-    "python-multipart>=0.0.16",
-    "filelock",
     "docker>=6.0.0",
     "python-dxf==12.1.0",
-    "cachetools",
-    "dnspython",
-    "grpcio>=1.50",  # indirect
-    "gpuhunt>=0.0.16,<0.1.0",
     "sentry-sdk[fastapi]",
-    "httpx",
-    "aiorwlock",
-    "python-json-logger",
     "alembic-postgresql-enum",
     "asyncpg",
+    "aiorwlock",
+    "cachetools",
+    "httpx",
+    "python-json-logger",
     "jinja2",
-    "psutil",
+    "grpcio>=1.50",  # indirect
 ]
 
 AWS_DEPS = [
@@ -105,7 +106,9 @@ LAMBDA_DEPS = AWS_DEPS
 
 OCI_DEPS = ["oci"]
 
-ALL_DEPS = AWS_DEPS + AZURE_DEPS + GCP_DEPS + DATACRUNCH_DEPS + KUBERNETES_DEPS + OCI_DEPS
+ALL_DEPS = (
+    SERVER_DEPS + AWS_DEPS + AZURE_DEPS + GCP_DEPS + DATACRUNCH_DEPS + KUBERNETES_DEPS + OCI_DEPS
+)
 
 setup(
     name="dstack",
@@ -133,13 +136,14 @@ setup(
     install_requires=BASE_DEPS,
     extras_require={
         "all": ALL_DEPS,
-        "aws": AWS_DEPS,
-        "azure": AZURE_DEPS,
-        "datacrunch": DATACRUNCH_DEPS,
-        "gcp": GCP_DEPS,
-        "kubernetes": KUBERNETES_DEPS,
-        "lambda": LAMBDA_DEPS,
-        "oci": OCI_DEPS,
+        "server": SERVER_DEPS,
+        "aws": SERVER_DEPS + AWS_DEPS,
+        "azure": SERVER_DEPS + AZURE_DEPS,
+        "datacrunch": SERVER_DEPS + DATACRUNCH_DEPS,
+        "gcp": SERVER_DEPS + GCP_DEPS,
+        "kubernetes": SERVER_DEPS + KUBERNETES_DEPS,
+        "lambda": SERVER_DEPS + LAMBDA_DEPS,
+        "oci": SERVER_DEPS + OCI_DEPS,
     },
     classifiers=[
         "Development Status :: 2 - Pre-Alpha",
