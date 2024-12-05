@@ -17,9 +17,9 @@ jobs:
       - name: Install dstack
         run: |
           if [ -n "${{ inputs.release_tag }}" ]; then
-            pip install "dstack==${{ inputs.release_tag }}"
+            pip install "dstack[server]==${{ inputs.release_tag }}"
           else
-            pip install -e .
+            pip install -e .[server]
           fi
       - name: Build
         run: |
