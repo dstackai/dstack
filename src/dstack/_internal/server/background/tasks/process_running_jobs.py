@@ -47,7 +47,6 @@ from dstack._internal.server.services.runs import (
     run_model_to_run,
 )
 from dstack._internal.server.services.storage import get_default_storage
-from dstack._internal.server.utils.common import run_async
 from dstack._internal.utils import common as common_utils
 from dstack._internal.utils.interpolator import VariablesInterpolator
 from dstack._internal.utils.logging import get_logger
@@ -188,7 +187,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
                 if job_provisioning_data.backend == BackendType.LOCAL:
                     # No need to update ~/.ssh/authorized_keys when running shim localy
                     user_ssh_key = ""
-                success = await run_async(
+                success = await common_utils.run_async(
                     _process_provisioning_with_shim,
                     server_ssh_private_key,
                     job_provisioning_data,
@@ -213,7 +212,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
                     repo=repo_model,
                     code_hash=run.run_spec.repo_code_hash,
                 )
-                success = await run_async(
+                success = await common_utils.run_async(
                     _process_provisioning_no_shim,
                     server_ssh_private_key,
                     job_provisioning_data,
@@ -254,7 +253,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
                 repo=repo_model,
                 code_hash=run.run_spec.repo_code_hash,
             )
-            success = await run_async(
+            success = await common_utils.run_async(
                 _process_pulling_with_shim,
                 server_ssh_private_key,
                 job_provisioning_data,
@@ -268,7 +267,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
             )
         elif initial_status == JobStatus.RUNNING:
             logger.debug("%s: process running job, age=%s", fmt(job_model), job_submission.age)
-            success = await run_async(
+            success = await common_utils.run_async(
                 _process_running,
                 server_ssh_private_key,
                 job_provisioning_data,
@@ -601,7 +600,7 @@ async def _get_job_code(
     storage = get_default_storage()
     if storage is None or code_model.blob is not None:
         return code_model.blob
-    blob = await run_async(
+    blob = await common_utils.run_async(
         storage.get_code,
         project.name,
         repo.name,

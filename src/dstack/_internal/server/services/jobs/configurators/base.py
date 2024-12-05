@@ -24,7 +24,7 @@ from dstack._internal.core.models.runs import (
 from dstack._internal.core.services.profiles import get_retry
 from dstack._internal.core.services.ssh.ports import filter_reserved_ports
 from dstack._internal.server.services.docker import ImageConfig, get_image_config
-from dstack._internal.server.utils.common import run_async
+from dstack._internal.utils.common import run_async
 
 
 def get_default_python_verison() -> str:

@@ -89,8 +89,7 @@ from dstack._internal.server.services.pools import (
 from dstack._internal.server.services.runner import client as runner_client
 from dstack._internal.server.services.runner.client import HealthStatus
 from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
-from dstack._internal.server.utils.common import run_async
-from dstack._internal.utils.common import get_current_datetime
+from dstack._internal.utils.common import get_current_datetime, run_async
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.network import get_ip_from_network, is_ip_among_addresses
 from dstack._internal.utils.ssh import (
@@ -262,9 +261,7 @@ async def _add_remote(instance: InstanceModel) -> None:
         authorized_keys.append(instance.project.ssh_public_key.strip())
 
         try:
-            future = asyncio.get_running_loop().run_in_executor(
-                None, _deploy_instance, remote_details, pkeys, authorized_keys
-            )
+            future = run_async(_deploy_instance, remote_details, pkeys, authorized_keys)
             deploy_timeout = 20 * 60  # 20 minutes
             result = await asyncio.wait_for(future, timeout=deploy_timeout)
             health, host_info = result
