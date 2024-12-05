@@ -19,11 +19,13 @@ root_router = APIRouter(
     prefix="/api/pools",
     tags=["pool"],
     responses=get_base_api_additional_responses(),
+    deprecated=True,
 )
 router = APIRouter(
     prefix="/api/project/{project_name}/pool",
     tags=["pool"],
     responses=get_base_api_additional_responses(),
+    deprecated=True,
 )
 
 
