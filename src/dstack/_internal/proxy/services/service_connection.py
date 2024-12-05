@@ -1,4 +1,5 @@
 import asyncio
+import os
 import random
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -15,12 +16,14 @@ from dstack._internal.core.services.ssh.tunnel import (
     UnixSocket,
 )
 from dstack._internal.proxy.errors import UnexpectedProxyError
-from dstack._internal.proxy.repos.base import BaseProxyRepo, Project, Replica, Service
+from dstack._internal.proxy.repos.base import BaseProxyRepo
+from dstack._internal.proxy.repos.models import Project, Replica, Service
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.path import FileContent
 
 logger = get_logger(__name__)
 OPEN_TUNNEL_TIMEOUT = 10
+HTTP_TIMEOUT = 60  # Same as default Nginx proxy timeout
 
 
 class ServiceReplicaClient(httpx.AsyncClient):
@@ -32,7 +35,16 @@ class ServiceReplicaClient(httpx.AsyncClient):
 class ServiceReplicaConnection:
     def __init__(self, project: Project, service: Service, replica: Replica) -> None:
         self._temp_dir = TemporaryDirectory()
-        app_socket_path = (Path(self._temp_dir.name) / "replica.sock").absolute()
+        options = {
+            **SSH_DEFAULT_OPTIONS,
+            "ConnectTimeout": str(OPEN_TUNNEL_TIMEOUT),
+            "ServerAliveInterval": "60",
+        }
+        if service.domain is not None:
+            # expose socket for Nginx
+            os.chmod(self._temp_dir.name, 0o755)
+            options["StreamLocalBindMask"] = "0111"
+        self._app_socket_path = (Path(self._temp_dir.name) / "replica.sock").absolute()
         self._tunnel = SSHTunnel(
             destination=replica.ssh_destination,
             port=replica.ssh_port,
@@ -40,23 +52,24 @@ class ServiceReplicaConnection:
             identity=FileContent(project.ssh_private_key),
             forwarded_sockets=[
                 SocketPair(
-                    remote=IPSocket("localhost", service.app_port),
-                    local=UnixSocket(app_socket_path),
+                    remote=IPSocket("localhost", replica.app_port),
+                    local=UnixSocket(self._app_socket_path),
                 ),
             ],
-            options={
-                **SSH_DEFAULT_OPTIONS,
-                "ConnectTimeout": str(OPEN_TUNNEL_TIMEOUT),
-            },
+            options=options,
         )
         self._client = ServiceReplicaClient(
-            transport=AsyncHTTPTransport(uds=str(app_socket_path)),
+            transport=AsyncHTTPTransport(uds=str(self._app_socket_path)),
             # The hostname in base_url is there for troubleshooting, as it may appear in
             # logs and in the Host header. The actual destination is the Unix socket.
             base_url=f"http://{replica.id}-{service.run_name}/",
-            timeout=60,  # Same as default Nginx proxy timeout
+            timeout=HTTP_TIMEOUT,
         )
         self._is_open = asyncio.locks.Event()
+
+    @property
+    def app_socket_path(self) -> Path:
+        return self._app_socket_path
 
     async def open(self) -> None:
         await self._tunnel.aopen()
@@ -112,19 +125,27 @@ class ServiceReplicaConnectionPool:
                 )
 
 
-async def get_service_replica_client(
-    project_name: str, service: Service, repo: BaseProxyRepo
-) -> ServiceReplicaClient:
+async def get_service_replica_client(service: Service, repo: BaseProxyRepo) -> httpx.AsyncClient:
     """
     `service` must have at least one replica
     """
-    # TODO(#1595): consider trying different replicas if the first one doesn't respond
-    replica = random.choice(service.replicas)
+    if service.domain is not None:
+        # Forward to Nginx so that requests are visible to StatsCollector in the access log
+        return httpx.AsyncClient(
+            base_url="http://localhost",
+            headers={"Host": service.domain},
+            timeout=HTTP_TIMEOUT,
+        )
+    # Nginx not available, forward directly to the tunnel
+    # TODO(#1595): consider trying different replicas, e.g. using HTTPMultiClient
+    replica = random.choice(tuple(service.replicas))
     connection = await service_replica_connection_pool.get(replica.id)
     if connection is None:
-        project = await repo.get_project(project_name)
+        project = await repo.get_project(service.project_name)
         if project is None:
-            raise UnexpectedProxyError(f"Expected to find project {project_name} but could not")
+            raise UnexpectedProxyError(
+                f"Expected to find project {service.project_name} but could not"
+            )
         connection = await service_replica_connection_pool.add(project, service, replica)
     return await connection.client()
 

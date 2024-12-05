@@ -1,0 +1,78 @@
+{% if replicas %}
+upstream {{ run_name }} {
+    {% for replica in replicas %}
+    server unix:{{ replica.socket }};  # replica {{ replica.id }}
+    {% endfor %}
+}
+{% else %}
+
+{% endif %}
+server {
+    server_name {{ domain }};
+
+    access_log {{ access_log_path }} dstack_stat;
+    client_max_body_size {{ client_max_body_size }};
+
+    location / {
+        {% if auth %}
+        auth_request /auth;
+        {% endif %}
+
+        {% if replicas %}
+        try_files /nonexistent @$http_upgrade;
+        {% else %}
+        return 503;
+        {% endif %}
+    }
+
+    {% if replicas %}
+    location @websocket {
+        proxy_pass http://{{ run_name }};
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header Host $host;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "Upgrade";
+        proxy_read_timeout 300s;
+    }
+    location @ {
+        proxy_pass http://{{ run_name }};
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header Host $host;
+        proxy_read_timeout 300s;
+    }
+    {% endif %}
+
+    {% if auth %}
+    location = /auth {
+        internal;
+        if ($remote_addr = 127.0.0.1) {
+            return 200;
+        }
+        proxy_pass http://localhost:{{ proxy_port }}/api/auth/{{ project_name }};
+        proxy_pass_request_body off;
+        proxy_set_header Content-Length "";
+        proxy_set_header X-Original-URI $request_uri;
+        proxy_set_header Authorization $http_authorization;
+    }
+    {% endif %}
+
+    listen 80;
+    {% if https %}
+    listen 443 ssl;
+    ssl_certificate /etc/letsencrypt/live/{{ domain }}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/{{ domain }}/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+    set $force_https 1;
+    if ($scheme = "https") {
+        set $force_https 0;
+    }
+    if ($remote_addr = 127.0.0.1) {
+        set $force_https 0;
+    }
+    if ($force_https) {
+        return 301 https://$host$request_uri;
+    }
+    {% endif %}
+}

@@ -67,6 +67,7 @@ SERVER_DEPS = [
     "alembic-postgresql-enum",
     "asyncpg",
     "aiorwlock",
+    "aiocache",
     "cachetools",
     "httpx",
     "python-json-logger",
@@ -118,6 +119,7 @@ setup(
     package_dir={"": "src"},
     packages=find_packages("src"),
     package_data={
+        "dstack._internal.proxy": ["resources/**/*"],
         "dstack._internal.server": ["statics/**/*"],
     },
     include_package_data=True,

@@ -22,6 +22,8 @@ async def proxy(
     auth: ProxyAuthContext,
     repo: BaseProxyRepo,
 ) -> fastapi.responses.Response:
+    # TODO(#1595): enforce client_max_body_size
+
     if "Upgrade" in request.headers:
         raise ProxyError("Upgrading connections is not supported", status.HTTP_400_BAD_REQUEST)
 
@@ -31,7 +33,7 @@ async def proxy(
     if service.auth:
         await auth.enforce()
 
-    client = await get_service_replica_client(project_name, service, repo)
+    client = await get_service_replica_client(service, repo)
 
     try:
         upstream_request = await build_upstream_request(request, path, client)

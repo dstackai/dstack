@@ -49,7 +49,7 @@ async def post_chat_completions(
             f"Model {model.name} in project {project_name} references run {model.run_name}"
             " that does not exist or has no replicas"
         )
-    http_client = await get_service_replica_client(project_name, service, repo)
+    http_client = await get_service_replica_client(service, repo)
     client = get_chat_client(model, http_client)
     if not body.stream:
         return await client.generate(body)

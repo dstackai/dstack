@@ -38,9 +38,7 @@ from dstack._internal.server.services.config import ServerConfigManager
 from dstack._internal.server.services.gateways import gateway_connections_pool, init_gateways
 from dstack._internal.server.services.locking import advisory_lock_ctx
 from dstack._internal.server.services.projects import get_or_create_default_project
-from dstack._internal.server.services.proxy.deps import (
-    ServerProxyDependencyInjector,
-)
+from dstack._internal.server.services.proxy.injector import ServerProxyDependencyInjector
 from dstack._internal.server.services.storage import init_default_storage
 from dstack._internal.server.services.users import get_or_create_admin_user
 from dstack._internal.server.settings import (
