@@ -32,8 +32,8 @@ def mock_replica_client_httpbin(httpbin) -> Generator[None, None, None]:
 async def test_proxy(mock_replica_client_httpbin, method: str) -> None:
     methods_without_body = "get", "delete"
     repo = ProxyTestRepo()
-    await repo.add_project(make_project("test-proj"))
-    await repo.add_service(project_name="test-proj", service=make_service("httpbin"))
+    await repo.set_project(make_project("test-proj"))
+    await repo.set_service(project_name="test-proj", service=make_service("httpbin"))
     _, client = make_app_client(repo)
     req_body = "." * 20 * 2**20 if method not in methods_without_body else None
     resp = await client.request(
@@ -57,8 +57,8 @@ async def test_proxy(mock_replica_client_httpbin, method: str) -> None:
 @pytest.mark.asyncio
 async def test_proxy_method_head(mock_replica_client_httpbin) -> None:
     repo = ProxyTestRepo()
-    await repo.add_project(make_project("test-proj"))
-    await repo.add_service(project_name="test-proj", service=make_service("httpbin"))
+    await repo.set_project(make_project("test-proj"))
+    await repo.set_service(project_name="test-proj", service=make_service("httpbin"))
     _, client = make_app_client(repo)
     url = "http://test-host/proxy/services/test-proj/httpbin/"
     get_resp = await client.get(url)
@@ -72,8 +72,8 @@ async def test_proxy_method_head(mock_replica_client_httpbin) -> None:
 @pytest.mark.asyncio
 async def test_proxy_method_options(mock_replica_client_httpbin) -> None:
     repo = ProxyTestRepo()
-    await repo.add_project(make_project("test-proj"))
-    await repo.add_service(project_name="test-proj", service=make_service("httpbin"))
+    await repo.set_project(make_project("test-proj"))
+    await repo.set_service(project_name="test-proj", service=make_service("httpbin"))
     _, client = make_app_client(repo)
     resp = await client.options("http://test-host/proxy/services/test-proj/httpbin/get")
     assert resp.status_code == 200
@@ -85,8 +85,8 @@ async def test_proxy_method_options(mock_replica_client_httpbin) -> None:
 @pytest.mark.parametrize("code", [204, 304, 418, 503])
 async def test_proxy_status_codes(mock_replica_client_httpbin, code: int) -> None:
     repo = ProxyTestRepo()
-    await repo.add_project(make_project("test-proj"))
-    await repo.add_service(project_name="test-proj", service=make_service("httpbin"))
+    await repo.set_project(make_project("test-proj"))
+    await repo.set_service(project_name="test-proj", service=make_service("httpbin"))
     _, client = make_app_client(repo)
     resp = await client.get(f"http://test-host/proxy/services/test-proj/httpbin/status/{code}")
     assert resp.status_code == code
@@ -95,8 +95,8 @@ async def test_proxy_status_codes(mock_replica_client_httpbin, code: int) -> Non
 @pytest.mark.asyncio
 async def test_proxy_not_leaks_cookies(mock_replica_client_httpbin) -> None:
     repo = ProxyTestRepo()
-    await repo.add_project(make_project("test-proj"))
-    await repo.add_service(project_name="test-proj", service=make_service("httpbin"))
+    await repo.set_project(make_project("test-proj"))
+    await repo.set_service(project_name="test-proj", service=make_service("httpbin"))
     app = make_app(repo)
     client1 = make_client(app)
     client2 = make_client(app)
@@ -113,8 +113,8 @@ async def test_proxy_not_leaks_cookies(mock_replica_client_httpbin) -> None:
 @pytest.mark.asyncio
 async def test_proxy_gateway_timeout(mock_replica_client_httpbin) -> None:
     repo = ProxyTestRepo()
-    await repo.add_project(make_project("test-proj"))
-    await repo.add_service(project_name="test-proj", service=make_service("httpbin"))
+    await repo.set_project(make_project("test-proj"))
+    await repo.set_service(project_name="test-proj", service=make_service("httpbin"))
     _, client = make_app_client(repo)
     assert MOCK_REPLICA_CLIENT_TIMEOUT < 10
     resp = await client.get("http://test-host/proxy/services/test-proj/httpbin/delay/10")
@@ -125,8 +125,8 @@ async def test_proxy_gateway_timeout(mock_replica_client_httpbin) -> None:
 @pytest.mark.asyncio
 async def test_proxy_run_not_found(mock_replica_client_httpbin) -> None:
     repo = ProxyTestRepo()
-    await repo.add_project(make_project("test-proj"))
-    await repo.add_service(project_name="test-proj", service=make_service("test-run"))
+    await repo.set_project(make_project("test-proj"))
+    await repo.set_service(project_name="test-proj", service=make_service("test-run"))
     _, client = make_app_client(repo)
     resp = await client.get("http://test-host/proxy/services/test-proj/unknown/")
     assert resp.status_code == 404
@@ -144,8 +144,8 @@ async def test_proxy_project_not_found(mock_replica_client_httpbin) -> None:
 @pytest.mark.asyncio
 async def test_redirect_to_service_root(mock_replica_client_httpbin) -> None:
     repo = ProxyTestRepo()
-    await repo.add_project(make_project("test-proj"))
-    await repo.add_service(project_name="test-proj", service=make_service("httpbin"))
+    await repo.set_project(make_project("test-proj"))
+    await repo.set_service(project_name="test-proj", service=make_service("httpbin"))
     _, client = make_app_client(repo)
     url = "http://test-host/proxy/services/test-proj/httpbin"
     resp = await client.get(url, follow_redirects=False)
@@ -162,8 +162,8 @@ async def test_redirect_to_service_root(mock_replica_client_httpbin) -> None:
 )
 async def test_auth(mock_replica_client_httpbin, token: str, status: int) -> None:
     repo = ProxyTestRepo(project_to_tokens={"test-proj": {"correct-token"}})
-    await repo.add_project(make_project("test-proj"))
-    await repo.add_service(project_name="test-proj", service=make_service("httpbin", auth=True))
+    await repo.set_project(make_project("test-proj"))
+    await repo.set_service(project_name="test-proj", service=make_service("httpbin", auth=True))
     _, client = make_app_client(repo, auth_token=token)
     url = "http://test-host/proxy/services/test-proj/httpbin/"
     resp = await client.get(url)

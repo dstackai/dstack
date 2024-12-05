@@ -42,8 +42,9 @@ def make_project(name: str) -> Project:
 
 def make_service(run_name: str, auth: bool = False) -> Service:
     return Service(
-        id="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
         run_name=run_name,
+        domain=None,
+        https=None,
         auth=auth,
         app_port=80,
         replicas=[

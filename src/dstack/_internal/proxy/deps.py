@@ -7,6 +7,7 @@ from typing_extensions import Annotated
 
 from dstack._internal.proxy.errors import ProxyError, UnexpectedProxyError
 from dstack._internal.proxy.repos.base import BaseProxyRepo
+from dstack._internal.proxy.services.nginx import Nginx
 
 
 class BaseProxyDependencyInjector(ABC):
@@ -23,6 +24,9 @@ class BaseProxyDependencyInjector(ABC):
         if False:
             yield  # show type checkers this is a generator
 
+    async def get_nginx(self) -> Optional[Nginx]:
+        return None
+
 
 async def get_injector(request: Request) -> BaseProxyDependencyInjector:
     injector = request.app.state.proxy_dependency_injector
@@ -36,6 +40,15 @@ async def get_proxy_repo(
 ) -> AsyncGenerator[BaseProxyRepo, None]:
     async for repo in injector.get_repo():
         yield repo
+
+
+async def get_nginx(
+    injector: Annotated[BaseProxyDependencyInjector, Depends(get_injector)],
+) -> Nginx:
+    nginx = await injector.get_nginx()
+    if nginx is None:
+        raise UnexpectedProxyError("Nginx is not available")
+    return nginx
 
 
 class ProxyAuthContext:
