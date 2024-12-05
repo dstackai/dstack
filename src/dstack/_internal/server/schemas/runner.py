@@ -120,12 +120,4 @@ class JobResult(CoreModel):
 
 class PullBody(CoreModel):
     state: str
-    executor_error: Optional[str]
-    container_name: Optional[str]
-    status: Optional[str]
-    running: Optional[bool]
-    oom_killed: Optional[bool]
-    dead: Optional[bool]
-    exit_code: Optional[int]
-    error: Optional[str]
     result: Optional[JobResult]
