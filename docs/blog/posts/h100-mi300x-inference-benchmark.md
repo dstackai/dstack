@@ -2,7 +2,7 @@
 title: "Exploring inference memory saturation effect: H100 vs MI300x"
 date: 2024-12-05
 description: "This benchmark explores how GPU memory saturation affects LLM inference performance and cost, comparing NVIDIA H100 and AMD MI300x."
-slug: h100-mi300x-inference-benchmark.md
+slug: h100-mi300x-inference-benchmark
 categories:
   - Benchmarks
   - AMD
@@ -140,9 +140,19 @@ to achieve optimal performance, relying on AMD for quantization.
 
 To maximize inference results on AMD MI300x, we adjusted specific arguments:
 
+<div class="termy">
+
 ```shell
-VLLM_RPC_TIMEOUT=30000 VLLM_USE_TRITON_FLASH_ATTN=0 vllm serve meta-llama/Llama-3.1-405B-FP8 -tp 8 --max-seq-len-to-capture 16384 --served-model-name meta-llama/Llama-3.1-405B-FP8 --enable-chunked-prefill=False --num-scheduler-step 15 --max-num-seqs 1024
+$ VLLM_RPC_TIMEOUT=30000 VLLM_USE_TRITON_FLASH_ATTN=0 vllm serve \
+  meta-llama/Llama-3.1-405B-FP8 -tp 8 \
+  --max-seq-len-to-capture 16384 \ 
+  --served-model-name meta-llama/Llama-3.1-405B-FP8 \ 
+  --enable-chunked-prefill=False \
+  --num-scheduler-step 15 \
+  --max-num-seqs 1024
 ```
+
+</div>
 
 Our benchmark focused on testing inference with tensor parallelism. Integrating tensor and pipeline parallelism could
 provide additional insights.
@@ -180,9 +190,8 @@ your cluster via SSH is seamless and straightforward.
 
 ### Lambda
 
-[Lambda :material-arrow-top-right-thin:{ .external }](https://lambdalabs.com/){:target="_blank"} sponsored this benchmark with credits for on-demand 8x H100 instances. We’re truly
-thankful for their
-support.
+[Lambda :material-arrow-top-right-thin:{ .external }](https://lambdalabs.com/){:target="_blank"} sponsored this benchmark with credits for on-demand 8x H100 instances. 
+We’re truly thankful for their support.
 
-For top-tier cloud compute with NVIDIA GPUs, Lambda Labs is an excellent choice. Once set up, you can easily provision
+For top-tier cloud compute with NVIDIA GPUs, Lambda is an excellent choice. Once set up, you can easily provision
 compute, manage clusters, and orchestrate your AI workloads using `dstack`.
