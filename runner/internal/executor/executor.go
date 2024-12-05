@@ -125,22 +125,6 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 	}
 	defer cleanupCredentials()
 
-	// var gatewayControl *gateway.SSHControl
-	//if ex.run.Configuration.Type == "service" {
-	//	log.Info(ctx, "Forwarding service port to the gateway", "hostname", ex.jobSpec.Gateway.Hostname)
-	//	gatewayControl, err = gateway.NewSSHControl(ex.jobSpec.Gateway.Hostname, ex.jobSpec.Gateway.SSHKey)
-	//	if err != nil {
-	//		ex.SetJobState(ctx, states.Failed)
-	//		return gerrors.Wrap(err)
-	//	}
-	//	defer gatewayControl.Cleanup()
-	//	if err = gatewayControl.Publish(strconv.Itoa(ex.jobSpec.Gateway.ServicePort), ex.jobSpec.Gateway.SockPath); err != nil {
-	//		ex.SetJobState(ctx, states.Failed)
-	//		return gerrors.Wrap(err)
-	//	}
-	//	log.Info(ctx, "SSH tunnel established", "sock_path", ex.jobSpec.Gateway.SockPath, "service_port", ex.jobSpec.Gateway.ServicePort)
-	//}
-
 	ex.SetJobState(ctx, states.Running)
 	timeoutCtx := ctx
 	var cancelTimeout context.CancelFunc

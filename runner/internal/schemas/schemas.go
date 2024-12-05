@@ -45,7 +45,6 @@ type JobSpec struct {
 	Commands       []string          `json:"commands"`
 	Entrypoint     []string          `json:"entrypoint"`
 	Env            map[string]string `json:"env"`
-	Gateway        *Gateway          `json:"gateway"`
 	MaxDuration    int               `json:"max_duration"`
 	WorkingDir     *string           `json:"working_dir"`
 }
@@ -97,16 +96,6 @@ func (u *User) GetGroupname() string {
 		return ""
 	}
 	return *u.Groupname
-}
-
-type Gateway struct {
-	GatewayName string `json:"gateway_name"`
-	ServicePort int    `json:"service_port"`
-	SSHKey      string `json:"ssh_key"`
-	SockPath    string `json:"sock_path"`
-	Hostname    string `json:"hostname"`
-	PublicPort  int    `json:"public_port"`
-	Secure      bool   `json:"secure"`
 }
 
 type HealthcheckResponse struct {
