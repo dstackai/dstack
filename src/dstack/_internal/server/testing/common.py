@@ -514,7 +514,6 @@ async def create_instance(
             project_name="test_proj",
             instance_name="test_instance_name",
             instance_id="test instance id",
-            job_docker_config=None,
             ssh_keys=[],
             user="test_user",
         )

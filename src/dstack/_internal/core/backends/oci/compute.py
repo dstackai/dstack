@@ -93,7 +93,6 @@ class OCICompute(Compute):
             project_name=run.project_name,
             instance_name=get_instance_name(run, job),
             ssh_keys=[SSHKey(public=project_ssh_public_key.strip())],
-            job_docker_config=None,
             user=run.user,
         )
         return self.create_instance(instance_offer, instance_config)

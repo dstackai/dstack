@@ -27,7 +27,6 @@ from dstack._internal.core.models.fleets import (
     SSHParams,
 )
 from dstack._internal.core.models.instances import (
-    DockerConfig,
     InstanceConfiguration,
     InstanceOfferWithAvailability,
     InstanceStatus,
@@ -55,11 +54,6 @@ from dstack._internal.server.models import (
 )
 from dstack._internal.server.services import offers as offers_services
 from dstack._internal.server.services import pools as pools_services
-from dstack._internal.server.services.docker import parse_image_name
-from dstack._internal.server.services.jobs.configurators.base import (
-    get_default_image,
-    get_default_python_verison,
-)
 from dstack._internal.server.services.locking import (
     get_locker,
     string_to_lock_id,
@@ -602,16 +596,11 @@ async def create_instance(
         public=project.ssh_public_key.strip(),
         private=project.ssh_private_key.strip(),
     )
-    dstack_default_image = parse_image_name(get_default_image(get_default_python_verison()))
     instance_config = InstanceConfiguration(
         project_name=project.name,
         instance_name=instance_name,
         instance_id=str(instance.id),
         ssh_keys=[project_ssh_key],
-        job_docker_config=DockerConfig(
-            image=dstack_default_image,
-            registry_auth=None,
-        ),
         user=user.name,
     )
     instance.instance_configuration = instance_config.json()

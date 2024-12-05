@@ -21,7 +21,6 @@ from dstack._internal.core.errors import (
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.instances import (
-    DockerConfig,
     InstanceAvailability,
     InstanceConfiguration,
     InstanceOffer,
@@ -48,11 +47,6 @@ from dstack._internal.server.models import (
     PoolModel,
     ProjectModel,
     UserModel,
-)
-from dstack._internal.server.services.docker import parse_image_name
-from dstack._internal.server.services.jobs.configurators.base import (
-    get_default_image,
-    get_default_python_verison,
 )
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.projects import list_project_models, list_user_project_models
@@ -634,7 +628,6 @@ async def create_instance_model(
         public=project.ssh_public_key.strip(),
         private=project.ssh_private_key.strip(),
     )
-    dstack_default_image = parse_image_name(get_default_image(get_default_python_verison()))
     instance_config = InstanceConfiguration(
         project_name=project.name,
         instance_name=instance_name,
@@ -642,10 +635,6 @@ async def create_instance_model(
         instance_id=str(instance.id),
         ssh_keys=[project_ssh_key],
         placement_group_name=placement_group_name,
-        job_docker_config=DockerConfig(
-            image=dstack_default_image,
-            registry_auth=None,
-        ),
     )
     instance.instance_configuration = instance_config.json()
     return instance
