@@ -53,6 +53,7 @@ class SubmitBody(CoreModel):
                 "replica_num",
                 "job_num",
                 "jobs_per_replica",
+                "user",
                 "commands",
                 "entrypoint",
                 "env",

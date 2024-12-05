@@ -316,11 +316,24 @@ func formatAndMountVolume(volume VolumeInfo) error {
 	if err != nil {
 		return tracerr.Wrap(err)
 	}
-	_, err = initFileSystem(deviceName, !volume.InitFs)
+	fsCreated, err := initFileSystem(deviceName, !volume.InitFs)
 	if err != nil {
 		return tracerr.Wrap(err)
 	}
-	err = mountDisk(deviceName, getVolumeMountPoint(volume.Name))
+	// Make FS root directory world-writable (0777) to give any job user
+	// a permission to create new files
+	// NOTE: mke2fs (that is, mkfs.ext4) supports `-E root_perms=0777` since 1.47.1:
+	// https://e2fsprogs.sourceforge.net/e2fsprogs-release.html#1.47.1
+	// but, as of 2024-12-04, this version is too new to rely on, for example,
+	// Ubuntu 24.04 LTS has only 1.47.0
+	// 0 means "do not chmod root directory"
+	var fsRootPerms os.FileMode = 0
+	// Change permissions only if the FS was created by us, don't mess with
+	// user-formatted volumes
+	if fsCreated {
+		fsRootPerms = 0o777
+	}
+	err = mountDisk(deviceName, getVolumeMountPoint(volume.Name), fsRootPerms)
 	if err != nil {
 		return tracerr.Wrap(err)
 	}
@@ -333,9 +346,17 @@ func getVolumeMountPoint(volumeName string) string {
 }
 
 func prepareInstanceMountPoints(taskConfig TaskConfig) error {
+	// If the instance volume directory doesn't exist, create it with world-writable permissions (0777)
+	// to give any job user a permission to create new files
+	// If the directory already exists, do nothing, don't mess with already set permissions, especially
+	// on SSH fleets where permissions are managed by the host admin
 	for _, mountPoint := range taskConfig.InstanceMounts {
 		if _, err := os.Stat(mountPoint.InstancePath); errors.Is(err, os.ErrNotExist) {
-			if err = os.MkdirAll(mountPoint.InstancePath, 0o777); err != nil {
+			// All missing parent dirs are created with 0755 permissions
+			if err = os.MkdirAll(mountPoint.InstancePath, 0o755); err != nil {
+				return tracerr.Wrap(err)
+			}
+			if err = os.Chmod(mountPoint.InstancePath, 0o777); err != nil {
 				return tracerr.Wrap(err)
 			}
 		} else if err != nil {
@@ -375,7 +396,7 @@ func initFileSystem(deviceName string, errorIfNotExists bool) (bool, error) {
 	return true, nil
 }
 
-func mountDisk(deviceName, mountPoint string) error {
+func mountDisk(deviceName, mountPoint string, fsRootPerms os.FileMode) error {
 	// Create the mount point directory if it doesn't exist
 	if _, err := os.Stat(mountPoint); os.IsNotExist(err) {
 		fmt.Printf("Creating mount point %s...\n", mountPoint)
@@ -389,6 +410,12 @@ func mountDisk(deviceName, mountPoint string) error {
 	cmd := exec.Command("mount", deviceName, mountPoint)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to mount disk: %w, output: %s", err, string(output))
+	}
+
+	if fsRootPerms != 0 {
+		if err := os.Chmod(mountPoint, fsRootPerms); err != nil {
+			return fmt.Errorf("failed to chmod volume root directory %s: %w", mountPoint, err)
+		}
 	}
 
 	log.Println("Disk mounted successfully!")
@@ -608,12 +635,10 @@ func getSSHShellCommands(openSSHPort int, publicSSHKey string) []string {
 		// prohibit password authentication
 		"sed -i \"s/.*PasswordAuthentication.*/PasswordAuthentication no/g\" /etc/ssh/sshd_config",
 		// create ssh dirs and add public key
-		"mkdir -p /run/sshd ~/.ssh",
+		"mkdir -p ~/.ssh",
 		"chmod 700 ~/.ssh",
 		fmt.Sprintf("echo '%s' > ~/.ssh/authorized_keys", publicSSHKey),
 		"chmod 600 ~/.ssh/authorized_keys",
-		// preserve environment variables for SSH clients
-		"env >> ~/.ssh/environment",
 		"sed -ie '1s@^@export PATH=\"'\"$PATH\"':$PATH\"\\n\\n@' ~/.profile",
 		// regenerate host keys
 		"rm -rf /etc/ssh/ssh_host_*",

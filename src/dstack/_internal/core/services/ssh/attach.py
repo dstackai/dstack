@@ -26,7 +26,7 @@ _SSH_TUNNEL_REGEX = re.compile(r"(?:[\w.-]+:)?(?P<local_port>\d+):localhost:(?P<
 class SSHAttach:
     @classmethod
     def get_control_sock_path(cls, run_name: str) -> Path:
-        return ConfigManager().dstack_ssh_dir / f"{run_name}.control.sock"
+        return ConfigManager().dstack_ssh_dir / f"%r@{run_name}.control.sock"
 
     @classmethod
     def reuse_ports_lock(cls, run_name: str) -> Optional[PortsLock]:
