@@ -3,6 +3,7 @@ title: "Exploring inference memory saturation effect: H100 vs MI300x"
 date: 2024-12-05
 description: "This benchmark explores how GPU memory saturation affects LLM inference performance and cost, comparing NVIDIA H100 and AMD MI300x."
 slug: h100-mi300x-inference-benchmark
+image: https://github.com/dstackai/static-assets/blob/main/static-assets/images/h100-mi300x-inference-benchmark-v2.png?raw=true
 categories:
   - Benchmarks
   - AMD
@@ -19,6 +20,13 @@ Additionally, we compare deployment strategies: running two Llama 3.1 405B FP8 r
 replica on 4xMI300x and 8xMI300x
 
 Finally, we extrapolate performance projections for upcoming GPUs like NVIDIA H200, B200, and AMD MI325x, MI350x.
+
+<img src="https://github.com/dstackai/static-assets/blob/main/static-assets/images/h100-mi300x-inference-benchmark-v2.png?raw=true" width="600" />
+
+This benchmark is made possible through the generous support of our friends at
+[Hot Aisle :material-arrow-top-right-thin:{ .external }](https://hotaisle.xyz/){:target="_blank"} and 
+[Lambda :material-arrow-top-right-thin:{ .external }](https://lambdalabs.com/){:target="_blank"},
+who provided high-end hardware.
 
 <!-- more -->
 
@@ -178,8 +186,6 @@ cost-efficiency.
 | **Low precision**         | FP8        | FP8        | FP4, FP6, FP8 | FP4, FP6, FP8 |
 
 ## Thanks to our friends
-
-This benchmark wouldn’t have been possible without the generous support of our friends in the AI research community.
 
 ### Hot Aisle
 
