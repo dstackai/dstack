@@ -19,7 +19,7 @@ class TestIsValidTagKey:
         [
             "Environment",
             "Project123",
-            "special-chars-+/@=:",
+            "special-chars-+/@=:_",
             "a" * 128,
         ],
     )

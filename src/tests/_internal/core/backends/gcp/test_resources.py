@@ -30,14 +30,13 @@ class TestIsValidResourceName:
             "a" * 64,
             "-startswithdash",
             "1startswithdigit",
-            "asd_asd",
             "Uppercase",
         ],
     )
     def test_invalid_name(self, name):
         assert not gcp_resources.is_valid_resource_name(name)
 
-    @pytest.mark.parametrize("name", ["a", "some-name-with-dashes-123"])
+    @pytest.mark.parametrize("name", ["a", "some-name-with-dashes-123", "asd_asd"])
     def test_valid_name(self, name):
         assert gcp_resources.is_valid_resource_name(name)
 
@@ -47,7 +46,6 @@ class TestIsValidLabelValue:
         "name",
         [
             "a" * 64,
-            "asd_asd",
             "Uppercase",
         ],
     )
