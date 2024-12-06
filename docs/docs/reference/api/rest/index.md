@@ -19,18 +19,6 @@ token = os.environ["DSTACK_TOKEN"]
 project = os.environ["DSTACK_PROJECT"]
 ssh_public_key = Path(os.environ["SSH_PUBLIC_KEY_PATH"]).read_text()
 
-print("Initializing repo")
-resp = requests.post(
-    url=f"{url}/api/project/{project}/repos/init",
-    headers={"Authorization": f"Bearer {token}"},
-    json={
-        "repo_id": "my_virtual_repo",
-        "repo_info": {
-            "repo_type": "virtual"
-        }
-    },
-)
-
 print("Submitting task")
 resp = requests.post(
     url=f"{url}/api/project/{project}/runs/apply",
@@ -38,10 +26,6 @@ resp = requests.post(
     json={
         "plan":{
             "run_spec": {
-                "repo_id": "my_virtual_repo",
-                "repo_data": {
-                    "repo_type": "virtual"
-                },
                 "configuration": {
                     "type": "task",
                     "commands": [

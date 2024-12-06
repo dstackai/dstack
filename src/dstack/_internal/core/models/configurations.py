@@ -168,7 +168,7 @@ class BaseRunConfiguration(CoreModel):
         return v
 
     def get_repo(self) -> Repo:
-        return VirtualRepo(repo_id="none")
+        return VirtualRepo()
 
 
 class BaseRunConfigurationWithPorts(BaseRunConfiguration):

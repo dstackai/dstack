@@ -117,9 +117,6 @@ async def apply_plan(
     Errors if the expected current resource from the plan does not match the current resource.
     Use `force: true` to apply even if the current resource does not match.
     If the existing run is active and cannot be updated, it must be stopped first.
-
-    Before calling this endpoint, you need to init a repo using
-    the `/api/project/{project_name}/repos/init` endpoint.
     """
     user, project = user_project
     return await runs.apply_plan(
