@@ -176,6 +176,7 @@ class AWSCompute(Compute):
             ec2_client=ec2_client, instance_type=instance_offer.instance.name
         )
         enable_efa = max_efa_interfaces > 0
+        is_capacity_block = False
         try:
             vpc_id, subnet_ids = get_vpc_id_subnet_id_or_error(
                 ec2_client=ec2_client,
@@ -201,6 +202,9 @@ class AWSCompute(Compute):
                         for k, v in subnet_id_to_az_map.items()
                         if v == reservation["AvailabilityZone"]
                     }
+                    if reservation["ReservationType"] == "capacity-block":
+                        is_capacity_block = True
+
         except botocore.exceptions.ClientError as e:
             logger.warning("Got botocore.exceptions.ClientError: %s", e)
             raise NoCapacityError()
@@ -235,6 +239,7 @@ class AWSCompute(Compute):
                         placement_group_name=instance_config.placement_group_name,
                         enable_efa=enable_efa,
                         reservation_id=instance_config.reservation,
+                        is_capacity_block=is_capacity_block,
                     )
                 )
                 instance = response[0]
@@ -751,11 +756,13 @@ def _supported_instances(offer: InstanceOffer) -> bool:
         "g4dn.",
         "g5.",
         "g6.",
+        "g6e.",
         "gr6.",
         "p3.",
         "p4d.",
         "p4de.",
         "p5.",
+        "p5e",
     ]:
         if offer.instance.name.startswith(family):
             return True

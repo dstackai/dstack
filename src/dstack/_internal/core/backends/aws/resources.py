@@ -140,7 +140,8 @@ def create_instances_struct(
     allocate_public_ip: bool = True,
     placement_group_name: Optional[str] = None,
     enable_efa: bool = False,
-    reservation_id: Optional[str] = None,
+    reservation_id: str = None,
+    is_capacity_block: bool = False,
 ) -> Dict[str, Any]:
     struct: Dict[str, Any] = dict(
         BlockDeviceMappings=[
@@ -174,6 +175,9 @@ def create_instances_struct(
                 "InstanceInterruptionBehavior": "terminate",
             },
         }
+
+    if is_capacity_block:
+        struct["InstanceMarketOptions"] = {"MarketType": "capacity-block"}
     if enable_efa and not subnet_id:
         raise ComputeError("EFA requires subnet")
     # AWS allows specifying either NetworkInterfaces for specific subnet_id
