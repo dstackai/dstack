@@ -261,7 +261,6 @@ class Job(CoreModel):
 class RunSpec(CoreModel):
     # TODO: run_name, working_dir are redundant here since they already passed in configuration
     # TODO: Consider auto-creating virtual repos to make repo fields optional
-    # TODO: Make configuration_path and profile optional
     run_name: Annotated[
         Optional[str],
         Field(description="The run name. If not set, the run name is generated automatically."),
@@ -276,19 +275,28 @@ class RunSpec(CoreModel):
         ),
     ]
     repo_data: Annotated[AnyRunRepoData, Field(discriminator="repo_type")]
-    repo_code_hash: Optional[str]
-    working_dir: str
+    repo_code_hash: Annotated[Optional[str], Field(description="The hash of the repo diff")]
+    working_dir: Annotated[
+        Optional[str],
+        Field(
+            description=(
+                "The path to the working directory inside the container."
+                " It's specified relative to the repository directory (`/workflow`) and should be inside it."
+                ' Defaults to `"."`.'
+            )
+        ),
+    ]
     configuration_path: Annotated[
-        str,
+        Optional[str],
         Field(
             description=(
                 "The path to the run configuration YAML file."
-                " It can be set to any value when using the programmatic API."
+                " It can be omitted when using the programmatic API."
             )
         ),
     ]
     configuration: Annotated[AnyRunConfiguration, Field(discriminator="type")]
-    profile: Profile
+    profile: Annotated[Optional[Profile], Field(description="The profile parameters")]
     ssh_key_pub: Annotated[
         str,
         Field(
@@ -306,11 +314,14 @@ class RunSpec(CoreModel):
 
     @root_validator
     def _merged_profile(cls, values) -> Dict:
-        try:
+        if values.get("profile") is None:
+            merged_profile = Profile(name="default")
+        else:
             merged_profile = Profile.parse_obj(values["profile"])
+        try:
             conf = RunConfiguration.parse_obj(values["configuration"]).__root__
         except KeyError:
-            raise ValueError("Missing profile or configuration")
+            raise ValueError("Missing configuration")
         for key in ProfileParams.__fields__:
             conf_val = getattr(conf, key, None)
             if conf_val is not None:

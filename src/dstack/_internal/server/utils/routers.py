@@ -33,14 +33,22 @@ def get_base_api_additional_responses() -> Dict:
     E.g. an enpoint may specify which error codes it may return in `code`.
     """
     return {
-        400: {
-            "description": "Bad request",
-            "model": BadRequestErrorModel,
-        },
-        403: {
-            "description": "Access denied",
-            "model": AccessDeniedErrorModel,
-        },
+        400: get_bad_request_additional_response(),
+        403: get_access_denied_additional_response(),
+    }
+
+
+def get_bad_request_additional_response() -> Dict:
+    return {
+        "description": "Bad request",
+        "model": BadRequestErrorModel,
+    }
+
+
+def get_access_denied_additional_response() -> Dict:
+    return {
+        "description": "Access denied",
+        "model": AccessDeniedErrorModel,
     }
 
 
