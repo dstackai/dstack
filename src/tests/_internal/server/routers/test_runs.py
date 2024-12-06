@@ -85,6 +85,7 @@ def get_dev_env_run_plan_dict(
                 "ide": "vscode",
                 "version": None,
                 "image": None,
+                "user": None,
                 "privileged": privileged,
                 "init": [],
                 "ports": [],
@@ -151,7 +152,6 @@ def get_dev_env_run_plan_dict(
                         "/bin/bash",
                         "-i",
                         "-c",
-                        "env >> ~/.ssh/environment && "
                         "(echo pip install ipykernel... && "
                         "pip install -q --no-cache-dir "
                         'ipykernel 2> /dev/null) || echo "no '
@@ -168,6 +168,7 @@ def get_dev_env_run_plan_dict(
                     "env": {},
                     "home_dir": "/root",
                     "image_name": "dstackai/base:py3.13-0.6-cuda-12.1",
+                    "user": None,
                     "privileged": privileged,
                     "job_name": f"{run_name}-0-0",
                     "replica_num": 0,
@@ -229,6 +230,7 @@ def get_dev_env_run_dict(
                 "ide": "vscode",
                 "version": None,
                 "image": None,
+                "user": None,
                 "privileged": privileged,
                 "init": [],
                 "ports": [],
@@ -295,7 +297,6 @@ def get_dev_env_run_dict(
                         "/bin/bash",
                         "-i",
                         "-c",
-                        "env >> ~/.ssh/environment && "
                         "(echo pip install ipykernel... && "
                         "pip install -q --no-cache-dir "
                         'ipykernel 2> /dev/null) || echo "no '
@@ -312,6 +313,7 @@ def get_dev_env_run_dict(
                     "env": {},
                     "home_dir": "/root",
                     "image_name": "dstackai/base:py3.13-0.6-cuda-12.1",
+                    "user": None,
                     "privileged": privileged,
                     "job_name": f"{run_name}-0-0",
                     "replica_num": 0,

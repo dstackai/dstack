@@ -235,7 +235,7 @@ The following environment variables are available in any run and are passed by `
 
 By default, the task runs on a single node. However, you can run it on a cluster of nodes.
 
-<div editor-title="train.dstack.yml">
+<div editor-title="examples/fine-tuning/train.dstack.yml">
 
 ```yaml
 type: task
@@ -324,8 +324,8 @@ commands:
   - pip install -r fine-tuning/qlora/requirements.txt
   - python fine-tuning/qlora/train.py
 
-# Use either spot or on-demand instances
-spot_policy: auto
+# Uncomment to leverage spot instances
+#spot_policy: auto
 ```
 
 </div>

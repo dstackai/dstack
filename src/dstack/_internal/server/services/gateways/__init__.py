@@ -66,11 +66,8 @@ from dstack._internal.server.services.locking import (
     string_to_lock_id,
 )
 from dstack._internal.server.services.logging import fmt
-from dstack._internal.server.utils.common import (
-    gather_map_async,
-    run_async,
-)
-from dstack._internal.utils.common import get_current_datetime
+from dstack._internal.server.utils.common import gather_map_async
+from dstack._internal.utils.common import get_current_datetime, run_async
 from dstack._internal.utils.crypto import generate_rsa_key_pair_bytes
 from dstack._internal.utils.logging import get_logger
 

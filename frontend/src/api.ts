@@ -10,6 +10,12 @@ export const API = {
             AUTHORIZE: () => `${API.AUTH.GITHUB.BASE()}/authorize`,
             CALLBACK: () => `${API.AUTH.GITHUB.BASE()}/callback`,
         },
+        OKTA: {
+            BASE: () => `${API.AUTH.BASE()}/okta`,
+            INFO: () => `${API.AUTH.OKTA.BASE()}/info`,
+            AUTHORIZE: () => `${API.AUTH.OKTA.BASE()}/authorize`,
+            CALLBACK: () => `${API.AUTH.OKTA.BASE()}/callback`,
+        },
     },
 
     USERS: {
@@ -68,8 +74,11 @@ export const API = {
         POOLS: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/pool/list`,
         POOL_DETAILS: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/pool/show`,
 
-        // Pools
+        // Fleets
         FLEETS: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/fleets/list`,
+
+        // Fleets
+        VOLUMES_DELETE: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/volumes/delete`,
     },
 
     BACKENDS: {

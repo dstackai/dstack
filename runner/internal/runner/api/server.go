@@ -34,8 +34,12 @@ type Server struct {
 	version string
 }
 
-func NewServer(tempDir string, homeDir string, workingDir string, address string, version string) *Server {
+func NewServer(tempDir string, homeDir string, workingDir string, address string, version string) (*Server, error) {
 	mux := http.NewServeMux()
+	ex, err := executor.NewRunExecutor(tempDir, homeDir, workingDir)
+	if err != nil {
+		return nil, err
+	}
 	s := &Server{
 		srv: &http.Server{
 			Addr:    address,
@@ -52,7 +56,7 @@ func NewServer(tempDir string, homeDir string, workingDir string, address string
 		submitWaitDuration: 2 * time.Minute,
 		logsWaitDuration:   30 * time.Second,
 
-		executor: executor.NewRunExecutor(tempDir, homeDir, workingDir),
+		executor: ex,
 
 		version: version,
 	}
@@ -64,7 +68,7 @@ func NewServer(tempDir string, homeDir string, workingDir string, address string
 	mux.HandleFunc("/api/pull", api.JSONResponseHandler("GET", s.pullGetHandler))
 	mux.HandleFunc("/api/stop", api.JSONResponseHandler("POST", s.stopPostHandler))
 	mux.HandleFunc("/logs_ws", api.JSONResponseHandler("GET", s.logsWsGetHandler))
-	return s
+	return s, nil
 }
 
 func (s *Server) Run() error {

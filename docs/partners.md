@@ -51,9 +51,16 @@ Here are some cloud providers `dstack` integrates with and collaborates:
     </a>
 
     <a href="https://www.runpod.io/" class="feature-cell" target="_blank">
-        <img width="45" src="/assets/images/runpod-logo.svg">
+        <img width="40" src="/assets/images/runpod-logo.svg">
         <h3>
             RunPod
+        </h3>
+    </a>
+
+    <a href="https://www.cudocompute.com/" class="feature-cell">
+        <img width="38" padding="padding: 4px 0" src="/assets/images/cudo-logo.svg">
+        <h3>
+            CUDO Compute
         </h3>
     </a>
 </div>
@@ -63,13 +70,6 @@ Here are some cloud providers `dstack` integrates with and collaborates:
         <img width="36" style="padding: 4px 0" src="/assets/images/vastai-logo.svg">
         <h3>
             Vast.ai
-        </h3>
-    </a>
-
-    <a href="https://www.cudocompute.com/" class="feature-cell">
-        <img width="34" style="padding: 4px 0" src="/assets/images/cudo-logo.svg">
-        <h3>
-            CUDO
         </h3>
     </a>
 
@@ -99,9 +99,9 @@ Here are some cloud providers `dstack` integrates with and collaborates:
 
 Here are some of the bare metal providers `dstack` collaborates with:
 
-<div class="providers tx-landing__highlights_grid featured">
+<div class="providers tx-landing__highlights_grid other">
     <a href="https://hotaisle.xyz/" class="feature-cell" target="_blank">
-        <img width="40" src="/assets/images/hotaisle-logo.svg">
+        <img width="30" src="/assets/images/hotaisle-logo.svg">
         <h3>
             Hot Aisle
         </h3>
@@ -114,5 +114,5 @@ Are you interested in collaborating or integrating with us to become part of the
 
 <a href="https://calendly.com/dstackai/discovery-call" target="_blank"
    class="md-button md-button-secondary external">
-    Contact us
+    Talk to us
 </a>

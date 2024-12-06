@@ -54,11 +54,17 @@ class FleetsAPIClient(APIClientGroup):
 
 def _get_fleet_spec_excludes(fleet_spec: FleetSpec) -> Optional[dict]:
     exclude = {}
-    # Handle old server versions that do not accept configuration_path
     # TODO: Can be removed in 0.19
     if fleet_spec.configuration_path is None:
-        exclude = {"spec": {"configuration_path"}}
-
+        exclude["spec"] = {"configuration_path"}
+    if fleet_spec.configuration.ssh_config is not None:
+        if all(
+            isinstance(h, str) or h.internal_ip is None
+            for h in fleet_spec.configuration.ssh_config.hosts
+        ):
+            exclude["spec"] = {
+                "configuration": {"ssh_config": {"hosts": {"__all__": {"internal_ip"}}}}
+            }
     # client >= 0.18.26 / server <= 0.18.25 compatibility tweak
     if not fleet_spec.configuration.reservation:
         exclude.setdefault("spec", {})

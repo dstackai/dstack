@@ -31,8 +31,14 @@ def convert_nvidia_gpu_name(name: str) -> str:
 
 def convert_amd_gpu_name(name: str) -> str:
     """Convert asic.market_name from amd-smi to short version"""
-    name = name.replace("Instinct ", "")
+    if match := _AMD_INSTINCT_MARKET_NAME_REGEX.search(name):
+        name = match.group("name")
     # https://github.com/ROCm/amdsmi/blob/52b3947/src/amd_smi/amd_smi_utils.cc#L558-L593
     if name == "MI300X-O":
         return "MI300X"
     return name
+
+
+_AMD_INSTINCT_MARKET_NAME_REGEX = re.compile(
+    r"^(?:AMD )?(?:Instinct )?(?P<name>MI\d{1,3}[A-Z]?(?:-\w+)?)(?:\s|$)", flags=re.ASCII | re.I
+)

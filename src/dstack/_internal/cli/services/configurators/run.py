@@ -14,8 +14,12 @@ from dstack._internal.cli.services.configurators.base import (
     BaseApplyConfigurator,
 )
 from dstack._internal.cli.services.profile import apply_profile_args, register_profile_args
-from dstack._internal.cli.utils.common import confirm_ask, console
-from dstack._internal.cli.utils.run import print_run_plan
+from dstack._internal.cli.utils.common import (
+    confirm_ask,
+    console,
+)
+from dstack._internal.cli.utils.rich import MultiItemStatus
+from dstack._internal.cli.utils.run import get_runs_table, print_run_plan
 from dstack._internal.core.errors import (
     CLIError,
     ConfigurationError,
@@ -38,6 +42,7 @@ from dstack._internal.core.models.configurations import (
 from dstack._internal.core.models.runs import JobSubmission, JobTerminationReason, RunStatus
 from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.core.services.diff import diff_models
+from dstack._internal.utils.common import local_time
 from dstack._internal.utils.interpolator import InterpolatorError, VariablesInterpolator
 from dstack._internal.utils.logging import get_logger
 from dstack.api._public.runs import Run
@@ -166,31 +171,32 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
         try:
             # We can attach to run multiple times if it goes from running to pending (retried).
             while True:
-                with console.status(f"Launching [code]{run.name}[/]") as status:
+                with MultiItemStatus(f"Launching [code]{run.name}[/]...", console=console) as live:
                     while run.status in (
                         RunStatus.SUBMITTED,
                         RunStatus.PENDING,
                         RunStatus.PROVISIONING,
+                        RunStatus.TERMINATING,
                     ):
-                        job_statuses = "\n".join(
-                            f"  - {job.job_spec.job_name} [secondary]({job.job_submissions[-1].status.value})[/]"
-                            for job in run._run.jobs
-                        )
-                        status.update(
-                            f"Launching [code]{run.name}[/] [secondary]({run.status.value})[/]\n{job_statuses}"
-                        )
+                        table = get_runs_table([run])
+                        live.update(table)
                         time.sleep(5)
                         run.refresh()
+
                 console.print(
-                    f"[code]{run.name}[/] provisioning completed [secondary]({run.status.value})[/]"
+                    get_runs_table(
+                        [run],
+                        verbose=run.status == RunStatus.FAILED,
+                        format_date=local_time,
+                    )
+                )
+                console.print(
+                    f"\n[code]{run.name}[/] provisioning completed [secondary]({run.status.value})[/]"
                 )
 
                 current_job_submission = run._run.latest_job_submission
                 if run.status in (RunStatus.RUNNING, RunStatus.DONE):
-                    if run._run.run_spec.configuration.type == RunConfigurationType.SERVICE.value:
-                        console.print(
-                            f"Service is published at [link={run.service_url}]{run.service_url}[/]\n"
-                        )
+                    _print_service_urls(run)
                     bind_address: Optional[str] = getattr(
                         configurator_args, _BIND_ADDRESS_ARG, None
                     )
@@ -206,7 +212,7 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
                         run.detach()
 
                 # After reading the logs, the run may not be marked as finished immediately.
-                # Give the run some time to transit into a finished state before exiting.
+                # Give the run some time to transition to a finished state before exiting.
                 reattach = False
                 for _ in range(30):
                     run.refresh()
@@ -477,6 +483,17 @@ def _detect_vscode_version(exe: str = "code") -> Optional[str]:
     if run.returncode == 0:
         return run.stdout.decode().split("\n")[1].strip()
     return None
+
+
+def _print_service_urls(run: Run) -> None:
+    if run._run.run_spec.configuration.type != RunConfigurationType.SERVICE.value:
+        return
+    console.print(f"Service is published at:\n  [link={run.service_url}]{run.service_url}[/]")
+    if model := run.service_model:
+        console.print(
+            f"Model [code]{model.name}[/] is published at:\n  [link={model.url}]{model.url}[/]"
+        )
+    console.print()
 
 
 def _print_finished_message(run: Run):

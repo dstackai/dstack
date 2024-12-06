@@ -16,8 +16,13 @@ from dstack._internal.server.schemas.users import (
 )
 from dstack._internal.server.security.permissions import Authenticated, GlobalAdmin
 from dstack._internal.server.services import users
+from dstack._internal.server.utils.routers import get_base_api_additional_responses
 
-router = APIRouter(prefix="/api/users", tags=["users"])
+router = APIRouter(
+    prefix="/api/users",
+    tags=["users"],
+    responses=get_base_api_additional_responses(),
+)
 
 
 @router.post("/list")

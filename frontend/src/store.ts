@@ -30,7 +30,7 @@ export const store = configureStore({
         [authApi.reducerPath]: authApi.reducer,
         [serverApi.reducerPath]: serverApi.reducer,
         [volumeApi.reducerPath]: volumeApi.reducer,
-        [authApi.reducerPath]: mainApi.reducer,
+        [mainApi.reducerPath]: mainApi.reducer,
     },
 
     middleware: (getDefaultMiddleware) =>

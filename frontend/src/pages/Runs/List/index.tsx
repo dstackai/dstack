@@ -1,14 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
-import { orderBy as _orderBy } from 'lodash';
 
 import { Button, FormField, Header, Pagination, SelectCSD, SpaceBetween, Table, Toggle } from 'components';
 
-import { DEFAULT_TABLE_PAGE_SIZE } from 'consts';
 import { useBreadcrumbs, useCollection } from 'hooks';
 import { ROUTES } from 'routes';
-import { useLazyGetRunsQuery } from 'services/run';
 
 import { useRunListPreferences } from './Preferences/useRunListPreferences';
 import {
@@ -18,6 +15,7 @@ import {
     useDisabledStatesForButtons,
     useEmptyMessages,
     useFilters,
+    useRunsData,
     useStopRuns,
 } from './hooks';
 import { Preferences } from './Preferences';
@@ -28,9 +26,6 @@ export const RunList: React.FC = () => {
     const { t } = useTranslation();
     const [searchParams, setSearchParams] = useSearchParams();
     const [preferences] = useRunListPreferences();
-    const [data, setData] = useState<IRun[]>([]);
-    const [pagesCount, setPagesCount] = useState<number>(1);
-    const [disabledNext, setDisabledNext] = useState(false);
 
     useBreadcrumbs([
         {
@@ -44,26 +39,12 @@ export const RunList: React.FC = () => {
         localStorePrefix: 'administration-run-list-page',
     });
 
-    const [getRuns, { isLoading, isFetching }] = useLazyGetRunsQuery();
+    const { data, isLoading, disabledNext, pagesCount, nextPage, prevPage, refreshList } = useRunsData({
+        project_name: selectedProject?.value,
+        only_active: onlyActive,
+    });
 
-    const isDisabledPagination = isLoading || isFetching || data.length === 0;
-
-    const getRunsRequest = (params?: Partial<TRunsRequestParams>) => {
-        return getRuns({
-            project_name: selectedProject?.value,
-            only_active: onlyActive,
-            limit: DEFAULT_TABLE_PAGE_SIZE,
-            ...params,
-        }).unwrap();
-    };
-
-    useEffect(() => {
-        getRunsRequest().then((result) => {
-            setPagesCount(1);
-            setDisabledNext(false);
-            setData(result);
-        });
-    }, [selectedProject?.value, onlyActive]);
+    const isDisabledPagination = isLoading || data.length === 0;
 
     const isDisabledClearFilter = !selectedProject && !onlyActive;
 
@@ -72,53 +53,6 @@ export const RunList: React.FC = () => {
     const { deleteRuns, isDeleting } = useDeleteRuns();
 
     const { columns } = useColumnsDefinitions();
-
-    const nextPage = async () => {
-        if (data.length === 0 || disabledNext) {
-            return;
-        }
-
-        try {
-            const result = await getRunsRequest({
-                prev_submitted_at: data[data.length - 1].submitted_at,
-                prev_run_id: data[data.length - 1].id,
-            });
-
-            if (result.length > 0) {
-                setPagesCount((count) => count + 1);
-                setData(result);
-            } else {
-                setDisabledNext(true);
-            }
-        } catch (e) {
-            console.log(e);
-        }
-    };
-
-    const prevPage = async () => {
-        if (pagesCount === 1) {
-            return;
-        }
-
-        try {
-            const result = await getRunsRequest({
-                prev_submitted_at: data[0].submitted_at,
-                prev_run_id: data[0].id,
-                ascending: true,
-            });
-
-            setDisabledNext(false);
-
-            if (result.length > 0) {
-                setPagesCount((count) => count - 1);
-                setData(_orderBy(result, ['submitted_at'], ['desc']));
-            } else {
-                setPagesCount(1);
-            }
-        } catch (e) {
-            console.log(e);
-        }
-    };
 
     const clearFilter = () => {
         clearSelected();
@@ -172,7 +106,7 @@ export const RunList: React.FC = () => {
             variant="full-page"
             columnDefinitions={columns}
             items={items}
-            loading={isLoading || isFetching}
+            loading={isLoading}
             loadingText={t('common.loading')}
             selectionType="multi"
             stickyHeader={true}
@@ -194,6 +128,13 @@ export const RunList: React.FC = () => {
                             <Button formAction="none" onClick={deleteClickHandle} disabled={isDisabledDeleteButton}>
                                 {t('common.delete')}
                             </Button>
+
+                            <Button
+                                iconName="refresh"
+                                disabled={isLoading}
+                                ariaLabel={t('common.refresh')}
+                                onClick={refreshList}
+                            />
                         </SpaceBetween>
                     }
                 >

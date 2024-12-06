@@ -15,12 +15,7 @@ import (
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 )
 
-const (
-	DstackRunnerURL        = "https://%s.s3.eu-west-1.amazonaws.com/%s/binaries/dstack-runner-%s-%s"
-	DstackReleaseBucket    = "dstack-runner-downloads"
-	DstackStagingBucket    = "dstack-runner-downloads-stgn"
-	DstackRunnerBinaryName = "/usr/local/bin/dstack-runner"
-)
+const DstackRunnerBinaryName = "/usr/local/bin/dstack-runner"
 
 func (c *CLIArgs) GetDockerCommands() []string {
 	return []string{
@@ -30,9 +25,7 @@ func (c *CLIArgs) GetDockerCommands() []string {
 }
 
 func (c *CLIArgs) DownloadRunner() error {
-	url := makeDownloadRunnerURL(c.Runner.Version, c.Runner.DevChannel)
-
-	runnerBinaryPath, err := downloadRunner(url)
+	runnerBinaryPath, err := downloadRunner(c.Runner.DownloadURL)
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
@@ -51,19 +44,6 @@ func (c *CLIArgs) getRunnerArgs() []string {
 		"--home-dir", c.Runner.HomeDir,
 		"--working-dir", c.Runner.WorkingDir,
 	}
-}
-
-func makeDownloadRunnerURL(version string, staging bool) string {
-	bucket := DstackReleaseBucket
-	if staging {
-		bucket = DstackStagingBucket
-	}
-
-	osName := "linux"
-	archName := "amd64"
-
-	url := fmt.Sprintf(DstackRunnerURL, bucket, version, osName, archName)
-	return url
 }
 
 func downloadRunner(url string) (string, error) {

@@ -46,6 +46,95 @@ class TestListFleets:
     async def test_returns_40x_if_not_authenticated(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
+        response = await client.post("/api/fleets/list")
+        assert response.status_code == 403
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_lists_fleets_across_projects(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session, global_role=GlobalRole.ADMIN)
+        project1 = await create_project(session, name="project1", owner=user)
+        fleet1_spec = get_fleet_spec()
+        fleet1_spec.configuration.name = "fleet1"
+        await create_fleet(
+            session=session,
+            project=project1,
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+            spec=fleet1_spec,
+        )
+        project2 = await create_project(session, name="project2", owner=user)
+        fleet2_spec = get_fleet_spec()
+        fleet2_spec.configuration.name = "fleet2"
+        await create_fleet(
+            session=session,
+            project=project2,
+            created_at=datetime(2023, 1, 2, 3, 5, tzinfo=timezone.utc),
+            spec=fleet2_spec,
+        )
+        response = await client.post(
+            "/api/fleets/list",
+            headers=get_auth_headers(user.token),
+            json={},
+        )
+        response_json = response.json()
+        assert response.status_code == 200, response_json
+        assert len(response_json) == 2
+        assert response_json[0]["name"] == "fleet2"
+        assert response_json[1]["name"] == "fleet1"
+        response = await client.post(
+            "/api/fleets/list",
+            headers=get_auth_headers(user.token),
+            json={"prev_created_at": response_json[0]["created_at"]},
+        )
+        response_json = response.json()
+        assert response.status_code == 200, response_json
+        assert len(response_json) == 1
+        assert response_json[0]["name"] == "fleet1"
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_non_admin_cannot_see_others_projects(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user1 = await create_user(session, name="user1", global_role=GlobalRole.USER)
+        user2 = await create_user(session, name="user2", global_role=GlobalRole.USER)
+        project1 = await create_project(session, name="project1", owner=user1)
+        project2 = await create_project(session, name="project2", owner=user2)
+        await add_project_member(
+            session=session, project=project1, user=user1, project_role=ProjectRole.USER
+        )
+        await add_project_member(
+            session=session, project=project2, user=user2, project_role=ProjectRole.USER
+        )
+        await create_fleet(
+            session=session,
+            project=project1,
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
+        await create_fleet(
+            session=session,
+            project=project2,
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
+        response = await client.post(
+            "/api/fleets/list",
+            headers=get_auth_headers(user1.token),
+            json={},
+        )
+        response_json = response.json()
+        assert response.status_code == 200, response_json
+        assert len(response_json) == 1
+        assert response_json[0]["project_name"] == "project1"
+
+
+class TestListProjectFleets:
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_40x_if_not_authenticated(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         response = await client.post("/api/project/main/fleets/list")
         assert response.status_code == 403
 
@@ -69,6 +158,7 @@ class TestListFleets:
         assert response.status_code == 200
         assert response.json() == [
             {
+                "id": str(fleet.id),
                 "name": fleet.name,
                 "project_name": project.name,
                 "spec": json.loads(fleet.spec),
@@ -109,6 +199,7 @@ class TestGetFleet:
         )
         assert response.status_code == 200
         assert response.json() == {
+            "id": str(fleet.id),
             "name": fleet.name,
             "project_name": project.name,
             "spec": json.loads(fleet.spec),
@@ -164,6 +255,7 @@ class TestCreateFleet:
             )
         assert response.status_code == 200
         assert response.json() == {
+            "id": "1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e",
             "name": spec.configuration.name,
             "project_name": project.name,
             "spec": {
@@ -269,6 +361,7 @@ class TestCreateFleet:
             )
         assert response.status_code == 200, response.json()
         assert response.json() == {
+            "id": "1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e",
             "name": spec.configuration.name,
             "project_name": project.name,
             "spec": {

@@ -1,0 +1,25 @@
+type: service
+name: llama31
+
+image: nvcr.io/nim/meta/llama-3.1-8b-instruct:latest
+env:
+  - NGC_API_KEY
+  - NIM_MAX_MODEL_LEN=4096
+registry_auth:
+  username: $oauthtoken
+  password: ${{ env.NGC_API_KEY }}
+port: 8000
+# Register the model
+model: meta/llama-3.1-8b-instruct
+
+# Uncomment to leverage spot instances
+#spot_policy: auto
+
+# Cache downloaded models
+volumes:
+  - /root/.cache/nim:/opt/nim/.cache
+
+resources:
+  gpu: 24GB
+  # Uncomment if using multiple GPUs
+  #shm_size: 24GB

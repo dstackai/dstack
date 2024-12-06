@@ -2,17 +2,16 @@ import argparse
 import time
 from typing import List
 
-from rich.live import Live
 from rich.table import Table
 
 from dstack._internal.cli.services.configurators.base import BaseApplyConfigurator
 from dstack._internal.cli.utils.common import (
     LIVE_TABLE_PROVISION_INTERVAL_SECS,
-    LIVE_TABLE_REFRESH_RATE_PER_SEC,
     confirm_ask,
     console,
 )
 from dstack._internal.cli.utils.gateway import get_gateways_table
+from dstack._internal.cli.utils.rich import MultiItemStatus
 from dstack._internal.core.errors import ResourceNotExistsError
 from dstack._internal.core.models.configurations import ApplyConfigurationType
 from dstack._internal.core.models.gateways import (
@@ -22,6 +21,7 @@ from dstack._internal.core.models.gateways import (
     GatewaySpec,
     GatewayStatus,
 )
+from dstack._internal.utils.common import local_time
 from dstack.api._public import Client
 
 
@@ -99,13 +99,13 @@ class GatewayConfigurator(BaseApplyConfigurator):
         if command_args.detach:
             console.print("Gateway configuration submitted. Exiting...")
             return
-        console.print()
         try:
-            with Live(console=console, refresh_per_second=LIVE_TABLE_REFRESH_RATE_PER_SEC) as live:
-                while True:
-                    live.update(get_gateways_table([gateway], verbose=True))
-                    if _finished_provisioning(gateway):
-                        break
+            with MultiItemStatus(
+                f"Provisioning [code]{gateway.name}[/]...", console=console
+            ) as live:
+                while not _finished_provisioning(gateway):
+                    table = get_gateways_table([gateway], include_created=True)
+                    live.update(table)
                     time.sleep(LIVE_TABLE_PROVISION_INTERVAL_SECS)
                     gateway = self.api.client.gateways.get(self.api.project, gateway.name)
         except KeyboardInterrupt:
@@ -117,6 +117,19 @@ class GatewayConfigurator(BaseApplyConfigurator):
                     )
             else:
                 console.print("Exiting... Gateway provisioning will continue in the background.")
+            return
+        console.print(
+            get_gateways_table(
+                [gateway],
+                verbose=gateway.status == GatewayStatus.FAILED,
+                include_created=True,
+                format_date=local_time,
+            )
+        )
+        if gateway.status == GatewayStatus.FAILED:
+            console.print(
+                f"\n[error]Provisioning failed. Error: {gateway.status_message or 'unknown'}[/]"
+            )
 
     def delete_configuration(
         self,

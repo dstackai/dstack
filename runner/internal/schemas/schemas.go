@@ -41,10 +41,10 @@ type JobSpec struct {
 	ReplicaNum     int               `json:"replica_num"`
 	JobNum         int               `json:"job_num"`
 	JobsPerReplica int               `json:"jobs_per_replica"`
+	User           *User             `json:"user"`
 	Commands       []string          `json:"commands"`
 	Entrypoint     []string          `json:"entrypoint"`
 	Env            map[string]string `json:"env"`
-	Gateway        *Gateway          `json:"gateway"`
 	MaxDuration    int               `json:"max_duration"`
 	WorkingDir     *string           `json:"working_dir"`
 }
@@ -75,14 +75,27 @@ type Configuration struct {
 	Type string `json:"type"`
 }
 
-type Gateway struct {
-	GatewayName string `json:"gateway_name"`
-	ServicePort int    `json:"service_port"`
-	SSHKey      string `json:"ssh_key"`
-	SockPath    string `json:"sock_path"`
-	Hostname    string `json:"hostname"`
-	PublicPort  int    `json:"public_port"`
-	Secure      bool   `json:"secure"`
+type User struct {
+	Uid       *uint32 `json:"uid"`
+	Username  *string `json:"username"`
+	Gid       *uint32 `json:"gid"`
+	Groupname *string `json:"groupname"`
+	GroupIds  []uint32
+	HomeDir   string
+}
+
+func (u *User) GetUsername() string {
+	if u.Username == nil {
+		return ""
+	}
+	return *u.Username
+}
+
+func (u *User) GetGroupname() string {
+	if u.Groupname == nil {
+		return ""
+	}
+	return *u.Groupname
 }
 
 type HealthcheckResponse struct {

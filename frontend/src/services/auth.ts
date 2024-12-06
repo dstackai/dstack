@@ -1,9 +1,7 @@
 import { API } from 'api';
-import { createApi } from '@reduxjs/toolkit/query/react';
-import { fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 
 import unauthorizedQueryHeaders from 'libs/fetchBaseQueryHeaders';
-
 
 export const authApi = createApi({
     reducerPath: 'authApi',
@@ -28,7 +26,37 @@ export const authApi = createApi({
                 body,
             }),
         }),
+
+        getOktaInfo: builder.query<{ enabled: boolean }, void>({
+            query: () => {
+                return {
+                    url: API.AUTH.OKTA.INFO(),
+                    method: 'POST',
+                };
+            },
+        }),
+
+        oktaAuthorize: builder.mutation<{ authorization_url: string }, void>({
+            query: () => ({
+                url: API.AUTH.OKTA.AUTHORIZE(),
+                method: 'POST',
+            }),
+        }),
+
+        oktaCallback: builder.mutation<IUserWithCreds, { code: string; state: string }>({
+            query: (body) => ({
+                url: API.AUTH.OKTA.CALLBACK(),
+                method: 'POST',
+                body,
+            }),
+        }),
     }),
 });
 
-export const { useGithubAuthorizeMutation, useGithubCallbackMutation } = authApi;
+export const {
+    useGithubAuthorizeMutation,
+    useGithubCallbackMutation,
+    useGetOktaInfoQuery,
+    useOktaAuthorizeMutation,
+    useOktaCallbackMutation,
+} = authApi;

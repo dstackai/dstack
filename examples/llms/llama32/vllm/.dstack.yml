@@ -1,0 +1,27 @@
+type: service
+name: llama32
+
+image: vllm/vllm-openai:latest
+env:
+  - HF_TOKEN
+  - MODEL_ID=meta-llama/Llama-3.2-11B-Vision-Instruct
+  - MAX_MODEL_LEN=4096
+  - MAX_NUM_SEQS=8
+commands:
+  - vllm serve $MODEL_ID
+    --max-model-len $MAX_MODEL_LEN
+    --max-num-seqs $MAX_NUM_SEQS
+    --enforce-eager
+    --disable-log-requests
+    --limit-mm-per-prompt "image=1"
+    --tensor-parallel-size $DSTACK_GPUS_NUM
+port: 8000
+# Register the model
+model: meta-llama/Llama-3.2-11B-Vision-Instruct
+
+# Uncomment to cache downloaded models
+#volumes:
+#  - /root/.cache/huggingface/hub:/root/.cache/huggingface/hub
+
+resources:
+  gpu: 40GB..48GB

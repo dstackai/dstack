@@ -1,0 +1,363 @@
+openapi: 3.1.1
+
+info:
+  title: dstack-shim API
+  version: &shim-version 0.18.29
+
+servers:
+  - url: http://localhost:10998/api
+
+paths:
+  /submit:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TaskConfigBody"
+      responses:
+        "200":
+          description: ""
+          content:
+            text/plain:
+              schema:
+                type: string
+                examples:
+                  - OK
+        "409":
+          description: Another task is already submitted (`RunnerStatus` is not `pending`)
+          content:
+            text/plain:
+              schema:
+                type: string
+                examples:
+                  - Conflict
+
+  /pull:
+    get:
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PullResponse"
+
+  /stop:
+    post:
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StopBody"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StopResponse"
+
+  /healthcheck:
+    get:
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthcheckResponse"
+
+components:
+  schemas:
+    RunnerStatus:
+      title: shim.RunnerStatus
+      type: string
+      enum:
+        - pending
+        - pulling
+        - creating
+        - running
+
+    JobResult:
+      title: shim.JobResult
+      type: object
+      properties:
+        reason:
+          type: string
+          enum:
+            - EXECUTOR_ERROR
+            - CREATING_CONTAINER_ERROR
+            - CONTAINER_EXITED_WITH_ERROR
+            - DONE_BY_RUNNER
+        reason_message:
+          type: string
+          default: ""
+          description: >
+            `State.Error` from Docker API, or shim-generated message (e.g., if the container
+            is OOM killed or failed to prepare volumes), or N last lines from the container logs
+      required:
+        - reason
+        - reason_message
+      additionalProperties: false
+
+    VolumeMountPoint:
+      title: shim.VolumeMountPoint
+      type: object
+      properties:
+        name:
+          type: string
+          default: ""
+          description: >
+            `dstack` volume [name](https://dstack.ai/docs/reference/dstack.yml/volume/#name)
+        path:
+          type: string
+          default: ""
+          description: Mount point inside container
+
+    VolumeInfo:
+      title: shim.VolumeInfo
+      type: object
+      properties:
+        backend:
+          type: string
+          enum: [aws, gcp]
+        name:
+          type: string
+          default: ""
+          description: >
+            `dstack` volume [name](https://dstack.ai/docs/reference/dstack.yml/volume/#name)
+        volume_id:
+          type: string
+          default: ""
+        init_fs:
+          type: boolean
+          default: false
+          description: >
+            Create a filesystem when it doesn't exist if `true`, fail with error if `false`
+
+    InstanceMountPoint:
+      title: shim.InstanceMountPoint
+      type: object
+      properties:
+        instance_name:
+          type: string
+          default: ""
+          description: Instance (host) path
+        path:
+          type: string
+          default: ""
+          description: Mount point inside container
+
+    TaskConfigBody:
+      title: shim.api.TaskConfigBody
+      description: Same as `shim.TaskConfig`
+      type: object
+      properties:
+        username:
+          type: string
+          default: ""
+          description: Private container registry username
+          examples:
+            - registry-user
+        password:
+          type: string
+          default: ""
+          description: Private container registry password
+          examples:
+            - registry-token
+        image_name:
+          type: string
+          default: ""
+          examples:
+            - ubuntu:22.04
+        privileged:
+          type: boolean
+          default: false
+          description: >
+            (since [0.18.18](https://github.com/dstackai/dstack/releases/tag/0.18.18))
+            Start container in privileged mode
+        container_name:
+          type: string
+          default: ""
+          examples:
+            - horrible-mule-1-0-0
+        container_user:
+          type: string
+          default: ""
+          description: >
+            If not set, the default image user is used. As of 0.18.24, `dstack` always uses `root`
+          examples:
+            - root
+        shm_size:
+          type: integer
+          default: 0
+          description: >
+            POSIX shared memory, bytes.
+            If not set or `0`, the Docker's default is used
+          examples:
+            - 1073741824
+        public_keys:
+          type: array
+          items:
+            type: string
+          default: []
+          description: >
+            SSH public keys for `container_user`. As of 0.18.24, `dstack` submits two keys:
+            project key (generated by the server) and user key (either generated by
+            the CLI client or provided by the user)
+          examples:
+            - ["ssh-rsa <BASE64> project@dstack", "ssh-ed25519 <BASE64> me@laptop"]
+        ssh_user:
+          type: string
+          default: ""
+          description: >
+            Instance (host) user for SSH access, either directly (`ssh {run_name}-host`)
+            or for `ProxyJump`ing inside the container. Ignored if `ssh_key` is not set
+          examples:
+            - root
+        ssh_key:
+          type: string
+          default: ""
+          description: >
+            SSH public key for access to the instance (host). If set, the key will be added
+            to the `ssh_users`'s `~/.ssh/authorized_keys` when the run starts and removed
+            when the run exits.
+          examples:
+            - "ssh-ed25519 <BASE64> me@laptop"
+        mounts:
+          type: array
+          items:
+            $ref: "#/components/schemas/VolumeMountPoint"
+          default: []
+        volumes:
+          type: array
+          items:
+            $ref: "#/components/schemas/VolumeInfo"
+          default: []
+        instance_mounts:
+          type: array
+          items:
+            $ref: "#/components/schemas/InstanceMountPoint"
+          default: []
+          description: (since [0.18.21](https://github.com/dstackai/dstack/releases/tag/0.18.21))
+
+    PullResponse:
+      title: shim.api.PullResponse
+      type: object
+      properties:
+        state:
+          allOf:
+            - $ref: "#/components/schemas/RunnerStatus"
+            - examples:
+                - pending
+        executor_error:
+          deprecated: true
+          type: string
+          default: ""
+          description: >
+            A line from the `runner.log` containing `Executor failed` substring (if any).
+            Not used by `dstack` server
+        container_name:
+          deprecated: true
+          type: string
+          examples:
+            - horrible-mule-1-0-0
+        status:
+          deprecated: true
+          type: string
+          examples:
+            - exited
+          description: >
+            `State.Status` from Docker API. Not used by `dstack` server
+        running:
+          deprecated: true
+          type: boolean
+          examples:
+            - false
+          description: >
+            `State.Running` from Docker API. Not used by `dstack` server
+        oom_killed:
+          deprecated: true
+          type: boolean
+          examples:
+            - false
+          description: >
+            `State.OOMKilled` from Docker API. Not used by `dstack` server
+        dead:
+          deprecated: true
+          type: boolean
+          examples:
+            - false
+          description: >
+            `State.Dead` from Docker API. Not used by `dstack` server
+        exit_code:
+          deprecated: true
+          type: integer
+          minimum: 0
+          maximum: 255
+          description: >
+            `State.ExitCode` from Docker API. Not used by `dstack` server
+          examples:
+            - 137
+        error:
+          deprecated: true
+          type: string
+          description: >
+            Either `State.Error` from Docker API or the same as `result.reason_message`.
+            Not used by `dstack` server
+          examples:
+            - ""
+        result:
+          allOf:
+            - $ref: "#/components/schemas/JobResult"
+            - examples:
+                - reason: CONTAINER_EXITED_WITH_ERROR
+                  message: ""
+      required:
+        - state
+        - executor_error
+        - container_name
+        - status
+        - running
+        - oom_killed
+        - dead
+        - exit_code
+        - error
+        - result
+      additionalProperties: false
+
+    StopBody:
+      title: shim.api.StopBody
+      type: object
+      properties:
+        force:
+          type: boolean
+          default: false
+
+    StopResponse:
+      title: shim.api.StopResponse
+      type: object
+      properties:
+        state:
+          $ref: "#/components/schemas/RunnerStatus"
+      required:
+        - state
+      additionalProperties: false
+
+    HealthcheckResponse:
+      title: shim.api.HealthcheckResponse
+      type: object
+      properties:
+        service:
+          const: dstack-shim
+        version:
+          type: string
+          examples:
+            - *shim-version
+      required:
+        - service
+        - version
+      additionalProperties: false

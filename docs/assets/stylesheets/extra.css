@@ -1096,6 +1096,21 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
     background: -webkit-linear-gradient(45deg, rgba(0, 42, 255, 0.1), rgb(0 114 255 / 1%), rgba(0, 42, 255, 0.05)) !important;
 }
 
+.md-typeset .tabbed-labels > label:after {
+        content: "";
+    height: auto;
+    z-index: 1;
+    background: rgba(0,0,0, 0.25);
+    bottom: 0;
+    top: 0;
+    position: absolute;
+    width: 0.5px;
+    margin-left: -18.5px;
+    margin-top: 16px;
+    margin-bottom: 16px;
+}
+
+
 @media screen and (max-width: 44.984375em) {
     [dir=ltr] .md-content__inner>.tabbed-set .tabbed-labels:after {
          padding-right: 0;

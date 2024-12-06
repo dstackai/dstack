@@ -14,6 +14,7 @@ from dstack._internal.core.models.profiles import ProfileParams
 from dstack._internal.core.models.repos.base import Repo
 from dstack._internal.core.models.repos.virtual import VirtualRepo
 from dstack._internal.core.models.resources import Range, ResourcesSpec
+from dstack._internal.core.models.unix import UnixUser
 from dstack._internal.core.models.volumes import MountPoint, VolumeConfiguration, parse_mount_point
 
 CommandsList = List[str]
@@ -89,6 +90,15 @@ class BaseRunConfiguration(CoreModel):
     type: Literal["none"]
     name: Annotated[Optional[str], Field(description="The run name")] = None
     image: Annotated[Optional[str], Field(description="The name of the Docker image to run")]
+    user: Annotated[
+        Optional[str],
+        Field(
+            description=(
+                "The user inside the container, `user_name_or_id[:group_name_or_id]`"
+                " (e.g., `ubuntu`, `1000:1000`). Defaults to the default `image` user"
+            )
+        ),
+    ] = None
     privileged: Annotated[bool, Field(description="Run the container in privileged mode")] = False
     entrypoint: Annotated[Optional[str], Field(description="The Docker entrypoint")]
     working_dir: Annotated[
@@ -148,6 +158,13 @@ class BaseRunConfiguration(CoreModel):
     def convert_volumes(cls, v) -> MountPoint:
         if isinstance(v, str):
             return parse_mount_point(v)
+        return v
+
+    @validator("user")
+    def validate_user(cls, v) -> Optional[str]:
+        if v is None:
+            return None
+        UnixUser.parse(v)
         return v
 
     def get_repo(self) -> Repo:
@@ -222,7 +239,7 @@ class ServiceConfigurationParams(CoreModel):
         Optional[Union[AnyModel, str]],
         Field(
             description=(
-                "Mapping of the model for the model gateway."
+                "Mapping of the model for the OpenAI-compatible endpoint provided by `dstack`."
                 " Can be a full model format definition or just a model name."
                 " If it's a name, the service is expected to expose an OpenAI-compatible"
                 " API at the `/v1` path"

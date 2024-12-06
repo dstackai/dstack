@@ -1,4 +1,4 @@
-import { BaseQueryApi } from '@reduxjs/toolkit/dist/query/baseQueryTypes';
+import type { BaseQueryApi } from '@reduxjs/toolkit/query';
 
 import { RootState } from '../store';
 

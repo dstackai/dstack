@@ -1,7 +1,6 @@
 from datetime import datetime, timedelta
 from enum import Enum
 from typing import Any, Dict, List, Optional, Type
-from urllib.parse import urlparse
 
 from pydantic import UUID4, Field, root_validator
 from typing_extensions import Annotated
@@ -29,8 +28,9 @@ from dstack._internal.core.models.profiles import (
 )
 from dstack._internal.core.models.repos import AnyRunRepoData
 from dstack._internal.core.models.resources import ResourcesSpec
+from dstack._internal.core.models.unix import UnixUser
 from dstack._internal.utils import common as common_utils
-from dstack._internal.utils.common import concat_url_path, format_pretty_duration
+from dstack._internal.utils.common import format_pretty_duration
 
 
 class AppSpec(CoreModel):
@@ -178,6 +178,7 @@ class JobSpec(CoreModel):
     job_name: str
     jobs_per_replica: int = 1  # default value for backward compatibility
     app_specs: Optional[List[AppSpec]]
+    user: Optional[UnixUser] = None  # default value for backward compatibility
     commands: List[str]
     env: Dict[str, str]
     home_dir: Optional[str]
@@ -262,15 +263,50 @@ class Job(CoreModel):
 
 
 class RunSpec(CoreModel):
-    run_name: Optional[str]
-    repo_id: str
+    # TODO: run_name, working_dir are redundant here since they already passed in configuration
+    # TODO: Consider auto-creating virtual repos to make repo fields optional
+    run_name: Annotated[
+        Optional[str],
+        Field(description="The run name. If not set, the run name is generated automatically."),
+    ]
+    repo_id: Annotated[
+        str,
+        Field(
+            description=(
+                "Same `repo_id` that is specified when initializing the repo"
+                " by calling the `/api/project/{project_name}/repos/init` endpoint."
+            )
+        ),
+    ]
     repo_data: Annotated[AnyRunRepoData, Field(discriminator="repo_type")]
-    repo_code_hash: Optional[str]
-    working_dir: str
-    configuration_path: str
+    repo_code_hash: Annotated[Optional[str], Field(description="The hash of the repo diff")]
+    working_dir: Annotated[
+        Optional[str],
+        Field(
+            description=(
+                "The path to the working directory inside the container."
+                " It's specified relative to the repository directory (`/workflow`) and should be inside it."
+                ' Defaults to `"."`.'
+            )
+        ),
+    ]
+    configuration_path: Annotated[
+        Optional[str],
+        Field(
+            description=(
+                "The path to the run configuration YAML file."
+                " It can be omitted when using the programmatic API."
+            )
+        ),
+    ]
     configuration: Annotated[AnyRunConfiguration, Field(discriminator="type")]
-    profile: Profile
-    ssh_key_pub: str
+    profile: Annotated[Optional[Profile], Field(description="The profile parameters")]
+    ssh_key_pub: Annotated[
+        str,
+        Field(
+            description="The contents of the SSH public key that will be used to connect to the run."
+        ),
+    ]
     # TODO: make merged_profile a computed field after migrating to pydanticV2
     merged_profile: Annotated[Profile, Field(exclude=True)] = None
 
@@ -282,11 +318,14 @@ class RunSpec(CoreModel):
 
     @root_validator
     def _merged_profile(cls, values) -> Dict:
-        try:
+        if values.get("profile") is None:
+            merged_profile = Profile(name="default")
+        else:
             merged_profile = Profile.parse_obj(values["profile"])
+        try:
             conf = RunConfiguration.parse_obj(values["configuration"]).__root__
         except KeyError:
-            raise ValueError("Missing profile or configuration")
+            raise ValueError("Missing configuration")
         for key in ProfileParams.__fields__:
             conf_val = getattr(conf, key, None)
             if conf_val is not None:
@@ -303,7 +342,9 @@ class RunSpec(CoreModel):
 
 class ServiceModelSpec(CoreModel):
     name: str
-    base_url: str
+    base_url: Annotated[
+        str, Field(description="Full URL or path relative to dstack-server's base URL")
+    ]
     type: str
 
 
@@ -311,18 +352,6 @@ class ServiceSpec(CoreModel):
     url: Annotated[str, Field(description="Full URL or path relative to dstack-server's base URL")]
     model: Optional[ServiceModelSpec] = None
     options: Dict[str, Any] = {}
-
-    def full_url(self, server_base_url: str) -> str:
-        service_url = urlparse(self.url)
-        if service_url.scheme and service_url.netloc:
-            return self.url
-        server_url = urlparse(server_base_url)
-        service_url = service_url._replace(
-            scheme=server_url.scheme or "http",
-            netloc=server_url.netloc,
-            path=concat_url_path(server_url.path, service_url.path),
-        )
-        return service_url.geturl()
 
 
 class RunStatus(str, Enum):
@@ -388,7 +417,15 @@ class RunPlan(CoreModel):
 
 class ApplyRunPlanInput(CoreModel):
     run_spec: RunSpec
-    current_resource: Optional[Run] = None
+    current_resource: Annotated[
+        Optional[Run],
+        Field(
+            description=(
+                "The expected current resource."
+                " If the resource has changed, the apply fails unless `force: true`."
+            )
+        ),
+    ] = None
 
 
 class PoolInstanceOffers(CoreModel):

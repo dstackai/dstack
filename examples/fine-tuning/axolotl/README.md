@@ -30,7 +30,7 @@ You can modify it as needed.
 The easiest way to run a training script with `dstack` is by creating a task configuration file.
 This file can be found at [`examples/fine-tuning/axolotl/train.dstack.yml` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/axolotl/train.dstack.yml){:target="_blank"}.
 
-<div editor-title="examples/fine-tuning/axolotl/train.dstack.yml">
+<div editor-title="examples/fine-tuning/axolotl/.dstack.yml">
 
 ```yaml
 type: task
@@ -47,8 +47,8 @@ env:
 commands:
   - accelerate launch -m axolotl.cli.train examples/fine-tuning/axolotl/config.yaml
 
-# Use spot or on-demand instances
-spot_policy: auto
+# Uncomment to leverage spot instances
+#spot_policy: auto
 
 resources:
   gpu:
@@ -75,50 +75,7 @@ cloud resources and run the configuration.
 ```shell
 $ HF_TOKEN=...
 $ WANDB_API_KEY=...
-$ dstack apply -f examples/fine-tuning/axolotl/train.dstack.yml
-```
-
-</div>
-
-## Fleets
-
-> By default, `dstack run` reuses `idle` instances from one of the existing [fleets](https://dstack.ai/docs/concepts/fleets).
-> If no `idle` instances meet the requirements, it creates a new fleet using one of the configured backends.
-
-The example folder includes a fleet configuration: 
-[ `examples/fine-tuning/axolotl/fleet.dstack.yml` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/axolotl/fleet.dstack.yml){:target="_blank"}
-(a single node with a `24GB` GPU).
-
-You can update the fleet configuration to change the vRAM size, GPU model, number of GPUs per node, or number of nodes. 
-
-A fleet can be provisioned with `dstack apply`:
-
-<div class="termy">
-
-```shell
-dstack apply -f examples/fine-tuning/axolotl/fleet.dstack.yml
-```
-
-</div>
-
-Once provisioned, the fleet can run dev environments and fine-tuning tasks.
-To delete the fleet, use `dstack fleet delete`.
-
-> To ensure `dstack apply` always reuses an existing fleet,
-> pass `--reuse` to `dstack apply` (or set `creation_policy` to `reuse` in the task configuration).
-> The default policy is `reuse_or_create`.
-
-## Dev environment
-
-If you'd like to play with the example using a dev environment, run
-[`.dstack.yml` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/examples/fine-tuning/axolotl/.dstack.yml){:target="_blank"} via `dstack apply`:
-
-<div class="termy">
-
-```shell
-$ HF_TOKEN=...
-$ WANDB_API_KEY=...
-$ dstack apply -f examples/fine-tuning/axolotl/.dstack.yaml 
+$ dstack apply -f examples/fine-tuning/axolotl/.dstack.yml
 ```
 
 </div>

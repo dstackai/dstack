@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from http import HTTPStatus
 from typing import BinaryIO, Dict, List, Optional, Union
 
 import requests
@@ -154,6 +155,10 @@ class ShimClient:
         volumes: List[Volume],
         instance_mounts: List[InstanceMountPoint],
     ):
+        """
+        Returns `True` if submitted and `False` if the shim already has a job (`409 Conflict`).
+        Other error statuses raise an exception.
+        """
         _shm_size = int(shm_size * 1024 * 1024 * 1024) if shm_size else 0
         volume_infos = [_volume_to_shim_volume_info(v) for v in volumes]
         post_body = TaskConfigBody(
@@ -176,7 +181,10 @@ class ShimClient:
             json=post_body,
             timeout=REQUEST_TIMEOUT,
         )
+        if resp.status_code == HTTPStatus.CONFLICT:
+            return False
         resp.raise_for_status()
+        return True
 
     def stop(self, force: bool = False):
         body = StopBody(force=force)

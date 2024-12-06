@@ -1,0 +1,27 @@
+type: service
+# The name is optional, if not specified, generated randomly
+name: llama31-service-optimum-tpu
+
+# Using a Docker image with a fix instead of the official one
+# More details at https://github.com/huggingface/optimum-tpu/pull/92
+image: dstackai/optimum-tpu:llama31
+# Required environment variables
+env:
+  - HF_TOKEN
+  - MODEL_ID=meta-llama/Meta-Llama-3.1-8B-Instruct
+  - MAX_TOTAL_TOKENS=4096
+  - MAX_BATCH_PREFILL_TOKENS=4095
+commands:
+  - text-generation-launcher --port 8000
+port: 8000
+model:
+  format: tgi
+  type: chat
+  name: meta-llama/Meta-Llama-3.1-8B-Instruct
+
+# Uncomment to leverage spot instances
+#spot_policy: auto
+
+resources:
+  # Required resources
+  gpu: v5litepod-4

@@ -68,10 +68,6 @@ $ dstack delete --help
 
 </div>
 
-!!! info "NOTE:"
-    The `dstack delete` command currently supports only `gateway` configurations.
-    Support for other configuration types is coming soon.
-
 ### dstack ps
 
 This command shows the status of runs.
@@ -189,8 +185,7 @@ $ dstack fleet delete --help
 
 ### dstack gateway
 
-A gateway is required for running services. It handles ingress traffic, authorization, domain mapping, model mapping
-for the OpenAI-compatible endpoint, and so on.
+A gateway allows publishing services at a custom domain with HTTPS.
 
 ##### dstack gateway list
 
@@ -427,10 +422,12 @@ $ dstack pool delete --help
 
 ??? info "Internal environment variables"
      * `DSTACK_SERVER_ROOT_LOG_LEVEL` – (Optional) Sets root logger log level. Defaults to `ERROR`.
-     * `DSTACK_SERVER_LOG_FORMAT` – (Optional) Sets format of log output. Can be `rich`, `standard`, `json`.. Defaults to `rich`.
+     * `DSTACK_SERVER_LOG_FORMAT` – (Optional) Sets format of log output. Can be `rich`, `standard`, `json`. Defaults to `rich`.
      * `DSTACK_SERVER_UVICORN_LOG_LEVEL` – (Optional) Sets uvicorn logger log level. Defaults to `ERROR`.
      * `DSTACK_PROFILE` – (Optional) Has the same effect as `--profile`. Defaults to `None`.
      * `DSTACK_PROJECT` – (Optional) Has the same effect as `--project`. Defaults to `None`.
-     * `DSTACK_RUNNER_VERSION` – (Optional) Sets exact runner version for debug. Defaults to `latest`.
+     * `DSTACK_RUNNER_VERSION` – (Optional) Sets exact runner version for debug. Defaults to `latest`. Ignored if `DSTACK_RUNNER_DOWNLOAD_URL` is set.
+     * `DSTACK_RUNNER_DOWNLOAD_URL` – (Optional) Overrides `dstack-runner` binary download URL.
+     * `DSTACK_SHIM_DOWNLOAD_URL` – (Optional) Overrides `dstack-shim` binary download URL.
      * `DSTACK_DEFAULT_CREDS_DISABLED` – (Optional) Disables default credentials detection if set. Defaults to `None`.
      * `DSTACK_LOCAL_BACKEND_ENABLED` – (Optional) Enables local backend for debug if set. Defaults to `None`.

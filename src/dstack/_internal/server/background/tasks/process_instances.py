@@ -18,7 +18,6 @@ from dstack._internal.core.backends import (
 )
 from dstack._internal.core.backends.base.compute import (
     DSTACK_WORKING_DIR,
-    get_dstack_runner_version,
     get_shim_env,
     get_shim_pre_start_commands,
 )
@@ -90,10 +89,9 @@ from dstack._internal.server.services.pools import (
 from dstack._internal.server.services.runner import client as runner_client
 from dstack._internal.server.services.runner.client import HealthStatus
 from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
-from dstack._internal.server.utils.common import run_async
-from dstack._internal.utils.common import get_current_datetime
+from dstack._internal.utils.common import get_current_datetime, run_async
 from dstack._internal.utils.logging import get_logger
-from dstack._internal.utils.network import get_ip_from_network
+from dstack._internal.utils.network import get_ip_from_network, is_ip_among_addresses
 from dstack._internal.utils.ssh import (
     pkey_from_str,
 )
@@ -159,8 +157,10 @@ async def _process_instance(session: AsyncSession, instance: InstanceModel):
         and instance.termination_policy == TerminationPolicy.DESTROY_AFTER_IDLE
         and instance.job_id is None
     ):
-        await _terminate_idle_instance(instance)
-    elif instance.status == InstanceStatus.PENDING:
+        # terminates the instance and sets instance.status to TERMINATED (along other fields)
+        # if termination_idle_time is reached, noop otherwise
+        await _maybe_terminate_idle_instance(instance)
+    if instance.status == InstanceStatus.PENDING:
         if instance.remote_connection_info is not None:
             await _add_remote(instance)
         else:
@@ -181,7 +181,7 @@ async def _process_instance(session: AsyncSession, instance: InstanceModel):
     await session.commit()
 
 
-async def _terminate_idle_instance(instance: InstanceModel):
+async def _maybe_terminate_idle_instance(instance: InstanceModel):
     current_time = get_current_datetime()
     idle_duration = _get_instance_idle_duration(instance)
     idle_seconds = instance.termination_idle_time
@@ -261,9 +261,7 @@ async def _add_remote(instance: InstanceModel) -> None:
         authorized_keys.append(instance.project.ssh_public_key.strip())
 
         try:
-            future = asyncio.get_running_loop().run_in_executor(
-                None, _deploy_instance, remote_details, pkeys, authorized_keys
-            )
+            future = run_async(_deploy_instance, remote_details, pkeys, authorized_keys)
             deploy_timeout = 20 * 60  # 20 minutes
             result = await asyncio.wait_for(future, timeout=deploy_timeout)
             health, host_info = result
@@ -289,16 +287,20 @@ async def _add_remote(instance: InstanceModel) -> None:
 
     instance_type = host_info_to_instance_type(host_info)
     instance_network = None
+    internal_ip = None
     try:
         default_jpd = JobProvisioningData.__response__.parse_raw(instance.job_provisioning_data)
         instance_network = default_jpd.instance_network
+        internal_ip = default_jpd.internal_ip
     except ValidationError:
         pass
 
-    internal_ip = get_ip_from_network(
-        network=instance_network,
-        addresses=host_info.get("addresses", []),
-    )
+    host_network_addresses = host_info.get("addresses", [])
+    if internal_ip is None:
+        internal_ip = get_ip_from_network(
+            network=instance_network,
+            addresses=host_network_addresses,
+        )
     if instance_network is not None and internal_ip is None:
         instance.status = InstanceStatus.TERMINATED
         instance.termination_reason = "Failed to locate internal IP address on the given network"
@@ -311,6 +313,21 @@ async def _add_remote(instance: InstanceModel) -> None:
             },
         )
         return
+    if internal_ip is not None:
+        if not is_ip_among_addresses(ip_address=internal_ip, addresses=host_network_addresses):
+            instance.status = InstanceStatus.TERMINATED
+            instance.termination_reason = (
+                "Specified internal IP not found among instance interfaces"
+            )
+            logger.warning(
+                "Failed to add instance %s: specified internal IP not found among instance interfaces",
+                instance.name,
+                extra={
+                    "instance_name": instance.name,
+                    "instance_status": InstanceStatus.TERMINATED.value,
+                },
+            )
+            return
 
     region = instance.region
     jpd = JobProvisioningData(
@@ -356,15 +373,13 @@ def _deploy_instance(
     ) as client:
         logger.info(f"Connected to {remote_details.ssh_user} {remote_details.host}")
 
-        runner_build = get_dstack_runner_version()
-
         # Execute pre start commands
-        shim_pre_start_commands = get_shim_pre_start_commands(runner_build)
+        shim_pre_start_commands = get_shim_pre_start_commands()
         run_pre_start_commands(client, shim_pre_start_commands, authorized_keys)
         logger.debug("The script for installing dstack has been executed")
 
         # Upload envs
-        shim_envs = get_shim_env(runner_build, authorized_keys)
+        shim_envs = get_shim_env(authorized_keys)
         try:
             fleet_configuration_envs = remote_details.env.as_dict()
         except ValueError as e:

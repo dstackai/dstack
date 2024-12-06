@@ -22,8 +22,8 @@ nodes: 4
 # Ensure the instances are interconnected
 placement: cluster
 
-# Use either spot or on-demand instances
-spot_policy: auto
+# Uncomment to leverage spot instances
+#spot_policy: auto
 
 resources:
   gpu:

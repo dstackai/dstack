@@ -30,6 +30,7 @@ from dstack._internal.core.models.profiles import (
     DEFAULT_POOL_NAME,
     DEFAULT_POOL_TERMINATION_IDLE_TIME,
     Profile,
+    TerminationPolicy,
 )
 from dstack._internal.core.models.repos.base import RepoType
 from dstack._internal.core.models.repos.local import LocalRunRepoData
@@ -62,6 +63,7 @@ from dstack._internal.server.models import (
     PlacementGroupModel,
     PoolModel,
     ProjectModel,
+    RepoCredsModel,
     RepoModel,
     RunModel,
     UserModel,
@@ -173,6 +175,24 @@ async def create_repo(
             "repo_user_name": "",
             "repo_name": "dstack",
         }
+    repo = RepoModel(
+        project_id=project_id,
+        name=repo_name,
+        type=repo_type,
+        info=json.dumps(info),
+        creds=json.dumps(creds) if creds is not None else None,
+    )
+    session.add(repo)
+    await session.commit()
+    return repo
+
+
+async def create_repo_creds(
+    session: AsyncSession,
+    repo_id: UUID,
+    user_id: UUID,
+    creds: Optional[dict] = None,
+) -> RepoCredsModel:
     if creds is None:
         creds = {
             "protocol": "https",
@@ -180,16 +200,14 @@ async def create_repo(
             "private_key": None,
             "oauth_token": "test_token",
         }
-    repo = RepoModel(
-        project_id=project_id,
-        name=repo_name,
-        type=repo_type,
-        info=json.dumps(info),
-        creds=json.dumps(creds),
+    repo_creds = RepoCredsModel(
+        repo_id=repo_id,
+        user_id=user_id,
+        creds=DecryptedString(plaintext=json.dumps(creds)),
     )
-    session.add(repo)
+    session.add(repo_creds)
     await session.commit()
-    return repo
+    return repo_creds
 
 
 def get_run_spec(
@@ -223,6 +241,7 @@ async def create_run(
     submitted_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
     run_spec: Optional[RunSpec] = None,
     run_id: Optional[UUID] = None,
+    deleted: bool = False,
 ) -> RunModel:
     if run_spec is None:
         run_spec = get_run_spec(
@@ -233,6 +252,7 @@ async def create_run(
         run_id = uuid.uuid4()
     run = RunModel(
         id=run_id,
+        deleted=deleted,
         project_id=project.id,
         repo_id=repo.id,
         user_id=user.id,
@@ -424,6 +444,7 @@ async def create_instance(
     pool: PoolModel,
     fleet: Optional[FleetModel] = None,
     status: InstanceStatus = InstanceStatus.IDLE,
+    unreachable: bool = False,
     created_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
     finished_at: Optional[datetime] = None,
     spot: bool = False,
@@ -434,6 +455,8 @@ async def create_instance(
     job: Optional[JobModel] = None,
     instance_num: int = 0,
     backend: BackendType = BackendType.DATACRUNCH,
+    termination_policy: Optional[TerminationPolicy] = None,
+    termination_idle_time: int = DEFAULT_POOL_TERMINATION_IDLE_TIME,
     region: str = "eu-west",
     remote_connection_info: Optional[RemoteConnectionInfo] = None,
 ) -> InstanceModel:
@@ -491,7 +514,6 @@ async def create_instance(
             project_name="test_proj",
             instance_name="test_instance_name",
             instance_id="test instance id",
-            job_docker_config=None,
             ssh_keys=[],
             user="test_user",
         )
@@ -504,7 +526,7 @@ async def create_instance(
         fleet=fleet,
         project=project,
         status=status,
-        unreachable=False,
+        unreachable=unreachable,
         created_at=created_at,
         started_at=created_at,
         finished_at=finished_at,
@@ -513,7 +535,8 @@ async def create_instance(
         price=1,
         region=region,
         backend=backend,
-        termination_idle_time=DEFAULT_POOL_TERMINATION_IDLE_TIME,
+        termination_policy=termination_policy,
+        termination_idle_time=termination_idle_time,
         profile=profile.json(),
         requirements=requirements.json(),
         instance_configuration=instance_configuration.json(),
