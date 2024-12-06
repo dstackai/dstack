@@ -11,7 +11,6 @@ require (
 	github.com/docker/go-units v0.5.0
 	github.com/go-git/go-git/v5 v5.12.0
 	github.com/golang/gddo v0.0.0-20210115222349-20d68f94ee1f
-	github.com/icza/backscanner v0.0.0-20240328210400-b40c3a86dec5
 	github.com/inhies/go-bytesize v0.0.0-20220417184213-4913239db9cf
 	github.com/shirou/gopsutil/v3 v3.24.3
 	github.com/sirupsen/logrus v1.9.3

@@ -26,9 +26,7 @@ import (
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/docker/go-connections/nat"
 	"github.com/docker/go-units"
-	"github.com/dstackai/dstack/runner/consts"
 	"github.com/dstackai/dstack/runner/internal/shim/backends"
-	"github.com/icza/backscanner"
 	bytesize "github.com/inhies/go-bytesize"
 	"github.com/ztrue/tracerr"
 )
@@ -42,34 +40,21 @@ const (
 	LabelValueTrue = "true"
 )
 
-// Depricated: Remove on next release (0.19)
-type ContainerStatus struct {
-	ContainerID   string
-	ContainerName string
-	Status        string
-	Running       bool
-	OOMKilled     bool
-	Dead          bool
-	ExitCode      int
-	Error         string
-}
-
 type JobResult struct {
 	Reason        string `json:"reason"`
 	ReasonMessage string `json:"reason_message"`
 }
 
 type DockerRunner struct {
-	client           *docker.Client
-	dockerParams     DockerParameters
-	currentContainer string
-	state            RunnerStatus
+	client        *docker.Client
+	dockerParams  DockerParameters
+	containerID   string // ID of the running container, empty if state != Running
+	containerName string // Name of the last created container, for logging only
+	state         RunnerStatus
 
 	cancelPull context.CancelFunc
 
-	containerStatus ContainerStatus // TODO: remove on next release (0.19)
-	executorError   string          // TODO: remove on next release (0.19)
-	jobResult       JobResult
+	jobResult JobResult
 }
 
 func NewDockerRunner(dockerParams DockerParameters) (*DockerRunner, error) {
@@ -94,7 +79,6 @@ func (d *DockerRunner) Run(ctx context.Context, cfg TaskConfig) error {
 		if err := ak.AppendPublicKeys([]string{cfg.SshKey}); err != nil {
 			d.state = Pending
 			errMessage := fmt.Sprintf("ak.AppendPublicKeys error: %s", err.Error())
-			d.containerStatus.Error = errMessage
 			log.Println(errMessage)
 			d.jobResult = JobResult{Reason: "EXECUTOR_ERROR", ReasonMessage: errMessage}
 			return tracerr.Wrap(err)
@@ -116,7 +100,6 @@ func (d *DockerRunner) Run(ctx context.Context, cfg TaskConfig) error {
 	if err != nil {
 		d.state = Pending
 		errMessage := fmt.Sprintf("prepareVolumes error: %s", err.Error())
-		d.containerStatus.Error = errMessage
 		log.Println(errMessage)
 		d.jobResult = JobResult{Reason: "EXECUTOR_ERROR", ReasonMessage: errMessage}
 		return tracerr.Wrap(err)
@@ -125,16 +108,10 @@ func (d *DockerRunner) Run(ctx context.Context, cfg TaskConfig) error {
 	if err != nil {
 		d.state = Pending
 		errMessage := fmt.Sprintf("prepareInstanceMountPoints error: %s", err.Error())
-		d.containerStatus.Error = errMessage
 		log.Println(errMessage)
 		d.jobResult = JobResult{Reason: "EXECUTOR_ERROR", ReasonMessage: errMessage}
 		return tracerr.Wrap(err)
 	}
-
-	d.containerStatus = ContainerStatus{
-		ContainerName: cfg.ContainerName,
-	}
-	d.executorError = ""
 
 	pullCtx, cancel := context.WithTimeout(ctx, ImagePullTimeout)
 	defer cancel()
@@ -145,7 +122,6 @@ func (d *DockerRunner) Run(ctx context.Context, cfg TaskConfig) error {
 	if err = pullImage(pullCtx, d.client, cfg); err != nil {
 		d.state = Pending
 		errMessage := fmt.Sprintf("pullImage error: %s", err.Error())
-		d.containerStatus.Error = errMessage
 		log.Print(errMessage + "\n")
 		d.jobResult = JobResult{Reason: "CREATING_CONTAINER_ERROR", ReasonMessage: errMessage}
 		return tracerr.Wrap(err)
@@ -155,7 +131,6 @@ func (d *DockerRunner) Run(ctx context.Context, cfg TaskConfig) error {
 	if err != nil {
 		d.state = Pending
 		errMessage := fmt.Sprintf("Cannot create dir for runner: %s", err.Error())
-		d.containerStatus.Error = errMessage
 		log.Print(errMessage + "\n")
 		d.jobResult = JobResult{Reason: "CREATING_CONTAINER_ERROR", ReasonMessage: errMessage}
 		return tracerr.Wrap(err)
@@ -167,7 +142,6 @@ func (d *DockerRunner) Run(ctx context.Context, cfg TaskConfig) error {
 	if err != nil {
 		d.state = Pending
 		errMessage := fmt.Sprintf("createContainer error: %s", err.Error())
-		d.containerStatus.Error = errMessage
 		d.jobResult = JobResult{Reason: "CREATING_CONTAINER_ERROR", ReasonMessage: errMessage}
 		log.Print(errMessage + "\n")
 		return tracerr.Wrap(err)
@@ -195,51 +169,37 @@ func (d *DockerRunner) Run(ctx context.Context, cfg TaskConfig) error {
 		}
 	}()
 
-	d.containerStatus, _ = inspectContainer(d.client, containerID)
 	d.state = Running
-	d.currentContainer = containerID
-	d.executorError = ""
-	log.Printf("Running container, name=%s, id=%s\n", d.containerStatus.ContainerName, containerID)
+	d.containerID = containerID
+	d.containerName = cfg.ContainerName
+	log.Printf("Running container, name=%s, id=%s\n", d.containerName, containerID)
 
 	if err = runContainer(ctx, d.client, containerID); err != nil {
 		log.Printf("runContainer error: %s\n", err.Error())
 		d.state = Pending
-		d.containerStatus, _ = inspectContainer(d.client, containerID)
-		d.executorError = FindExecutorError(runnerDir)
-		d.currentContainer = ""
-		var errMessage string = d.containerStatus.Error
-		if d.containerStatus.OOMKilled {
-			errMessage = "Container killed by OOM"
-		}
-		if errMessage == "" {
-			lastLogs, err := getContainerLastLogs(d.client, containerID, 5)
-			if err == nil {
-				errMessage = strings.Join(lastLogs, "\n")
-			} else {
-				log.Printf("getContainerLastLogs error: %s\n", err.Error())
-			}
+		d.containerID = ""
+		var errMessage string
+		if lastLogs, err := getContainerLastLogs(d.client, containerID, 5); err == nil {
+			errMessage = strings.Join(lastLogs, "\n")
+		} else {
+			log.Printf("getContainerLastLogs error: %s\n", err.Error())
+			errMessage = ""
 		}
 		d.jobResult = JobResult{Reason: "CONTAINER_EXITED_WITH_ERROR", ReasonMessage: errMessage}
 		return tracerr.Wrap(err)
 	}
 
-	log.Printf("Container finished successfully, name=%s, id=%s", d.containerStatus.ContainerName, containerID)
-	d.containerStatus, _ = inspectContainer(d.client, containerID)
-	d.executorError = FindExecutorError(runnerDir)
+	log.Printf("Container finished successfully, name=%s, id=%s", d.containerName, containerID)
 	d.state = Pending
-	d.currentContainer = ""
+	d.containerID = ""
 
-	jobResult := JobResult{Reason: "DONE_BY_RUNNER"}
-	if d.containerStatus.ExitCode != 0 {
-		jobResult = JobResult{Reason: "CONTAINER_EXITED_WITH_ERROR", ReasonMessage: d.containerStatus.Error}
-	}
-	d.jobResult = jobResult
+	d.jobResult = JobResult{Reason: "DONE_BY_RUNNER"}
 
 	return nil
 }
 
 func (d *DockerRunner) Stop(force bool) {
-	if d.state == Pulling && d.currentContainer == "" {
+	if d.state == Pulling && d.containerID == "" {
 		d.cancelPull()
 		return
 	}
@@ -250,14 +210,14 @@ func (d *DockerRunner) Stop(force bool) {
 		stopOptions.Timeout = &timeout
 	}
 
-	err := d.client.ContainerStop(context.Background(), d.currentContainer, stopOptions)
+	err := d.client.ContainerStop(context.Background(), d.containerID, stopOptions)
 	if err != nil {
 		log.Printf("Failed to stop container: %s", err)
 	}
 }
 
-func (d *DockerRunner) GetState() (RunnerStatus, ContainerStatus, string, JobResult) {
-	return d.state, d.containerStatus, d.executorError, d.jobResult
+func (d *DockerRunner) GetState() (RunnerStatus, JobResult) {
+	return d.state, d.jobResult
 }
 
 func getBackend(backendType string) (backends.Backend, error) {
@@ -848,55 +808,4 @@ func (c *CLIArgs) MakeRunnerDir() (string, error) {
 		return "", tracerr.Wrap(err)
 	}
 	return runnerTemp, nil
-}
-
-func inspectContainer(client *docker.Client, containerID string) (ContainerStatus, error) {
-	inspection, err := client.ContainerInspect(context.Background(), containerID)
-	if err != nil {
-		s := ContainerStatus{}
-		return s, err
-	}
-	containerStatus := ContainerStatus{
-		ContainerID:   containerID,
-		ContainerName: strings.TrimLeft(inspection.Name, "/"),
-		Status:        inspection.State.Status,
-		Running:       inspection.State.Running,
-		OOMKilled:     inspection.State.OOMKilled,
-		Dead:          inspection.State.Dead,
-		ExitCode:      inspection.State.ExitCode,
-		Error:         inspection.State.Error,
-	}
-	return containerStatus, nil
-}
-
-func FindExecutorError(runnerDir string) string {
-	filename := filepath.Join(runnerDir, consts.RunnerLogFileName)
-	file, err := os.Open(filename)
-	if err != nil {
-		log.Printf("Cannot open file %s: %s\n", filename, err)
-		return ""
-	}
-	defer file.Close()
-
-	fileStatus, err := file.Stat()
-	if err != nil {
-		log.Printf("Cannot stat file %s: %s\n", filename, err)
-		return ""
-	}
-
-	scanner := backscanner.New(file, int(fileStatus.Size()))
-	what := []byte(consts.ExecutorFailedSignature)
-	for {
-		line, _, err := scanner.LineBytes()
-		if err != nil {
-			if errors.Is(err, io.EOF) {
-				return "" // consts.ExecutorFailedSignature is not found in file
-			}
-			log.Printf("FindExecutorError scan error: %s\n", err)
-			return ""
-		}
-		if bytes.Contains(line, what) {
-			return string(line)
-		}
-	}
 }
