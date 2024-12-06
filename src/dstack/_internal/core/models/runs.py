@@ -262,21 +262,27 @@ class Job(CoreModel):
 
 class RunSpec(CoreModel):
     # TODO: run_name, working_dir are redundant here since they already passed in configuration
-    # TODO: Consider auto-creating virtual repos to make repo fields optional
     run_name: Annotated[
         Optional[str],
         Field(description="The run name. If not set, the run name is generated automatically."),
     ]
     repo_id: Annotated[
-        str,
+        Optional[str],
         Field(
             description=(
                 "Same `repo_id` that is specified when initializing the repo"
                 " by calling the `/api/project/{project_name}/repos/init` endpoint."
+                " If not specified, a default virtual repo is used."
             )
         ),
     ]
-    repo_data: Annotated[AnyRunRepoData, Field(discriminator="repo_type")]
+    repo_data: Annotated[
+        Optional[AnyRunRepoData],
+        Field(
+            discriminator="repo_type",
+            description="The repo data such as the current branch and commit.",
+        ),
+    ]
     repo_code_hash: Annotated[Optional[str], Field(description="The hash of the repo diff")]
     working_dir: Annotated[
         Optional[str],
