@@ -115,10 +115,15 @@ class RunsAPIClient(APIClientGroup):
 
 def _get_run_spec_excludes(run_spec: RunSpec) -> Optional[dict]:
     configuration_excludes: set[str] = set()
+    profile_excludes: set[str] = set()
     configuration = run_spec.configuration
     # client >= 0.18.18 / server <= 0.18.17 compatibility tweak
     if not configuration.privileged:
         configuration_excludes.add("privileged")
+    # client >= 0.18.29 / server <= 0.18.28 compatibility tweak
+    if not configuration.reservation:
+        configuration_excludes.add("reservation")
+        profile_excludes.add("reservation")
     # client >= 0.18.23 / server <= 0.18.22 compatibility tweak
     if configuration.type == "service" and configuration.gateway is None:
         configuration_excludes.add("gateway")
@@ -126,5 +131,5 @@ def _get_run_spec_excludes(run_spec: RunSpec) -> Optional[dict]:
     if run_spec.configuration.user is None:
         configuration_excludes.add("user")
     if configuration_excludes:
-        return {"run_spec": {"configuration": configuration_excludes}}
+        return {"run_spec": {"configuration": configuration_excludes, "profile": profile_excludes}}
     return None
