@@ -14,9 +14,16 @@ from dstack._internal.server.schemas.repos import (
 )
 from dstack._internal.server.security.permissions import ProjectMember
 from dstack._internal.server.services import repos
-from dstack._internal.server.utils.routers import request_size_exceeded
+from dstack._internal.server.utils.routers import (
+    get_base_api_additional_responses,
+    request_size_exceeded,
+)
 
-router = APIRouter(prefix="/api/project/{project_name}/repos", tags=["repos"])
+router = APIRouter(
+    prefix="/api/project/{project_name}/repos",
+    tags=["repos"],
+    responses=get_base_api_additional_responses(),
+)
 
 
 @router.post("/list")
@@ -53,6 +60,11 @@ async def init_repo(
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
 ):
+    """
+    Creates or updates a repo with the repo info and repo creds.
+    Runs belong to repos, so this endpoint must be called before applying run configurations.
+    You can create `virtual` repos if you don't use git repos.
+    """
     user, project = user_project
     repo_creds = body.repo_creds.to_remote_repo_creds(body.repo_info) if body.repo_creds else None
     await repos.init_repo(
