@@ -9,10 +9,7 @@ import mkdocs_gen_files
 from dstack._internal.server.main import app
 from dstack._internal.settings import DSTACK_VERSION
 
-app.title = "REST API"
-app.description = (
-    "The REST API enables running tasks, services, and managing runs programmatically."
-)
+app.title = "OpenAPI Spec"
 app.servers = [
     {"url": "http://localhost:3000", "description": "Local server"},
     {"url": "https://sky.dstack.ai", "description": "Managed server"},
