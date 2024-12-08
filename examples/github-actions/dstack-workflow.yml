@@ -1,0 +1,116 @@
+name: Run dstack Task on GPU
+
+env:
+  HF_TOKEN: ${{ secrets.HF_TOKEN }}
+
+on: [push]
+#    push:
+#     branches:
+#       - master
+
+jobs:
+  run-ai-workload:
+    name: dstack-task
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.x"
+
+      # - name : Run Dstack with Docker
+      # container: 
+      #   image: docker://dstackai/dstack:latest
+          
+      - name: Install Dstack
+        run: |
+          pip install "dstack[all]" -U
+          mkdir -p ~/.dstack/server
+          cat backends/K8s_config/K8s_server_config.yml > /home/runner/.dstack/server/config.yml
+          cat ~/.dstack/server/config.yml
+          
+      - name: set up K8s(kind) cluster for Dstack server backend 
+        run: |
+          [ $(uname -m) = x86_64 ] && curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.25.0/kind-$(uname)-amd64
+          chmod +x ./kind
+          sudo mv ./kind /usr/local/bin/kind
+          echo $PATH
+          which kind
+      
+      - name: Configure Dstack server backend with K8s
+        run: |
+          kind create cluster --config backends/K8s_config/kind_backend_config.yml
+
+      - name: Run Dstack server and capture token 
+        run: |
+          # Run dstack server in the background
+          dstack server > dstack_server_output.log 2>&1 &
+          
+          # Wait for the server to start
+          for i in {1..10}; do
+            if grep -q 'The admin token is' dstack_server_output.log; then
+              break
+            fi
+            echo "Waiting for server to start... ($i/10)"
+            sleep 2
+          done
+          
+          # Extract the token
+          TOKEN=$(grep -oP 'The admin token is \K[\w-]+' dstack_server_output.log || echo "")
+          if [ -z "$TOKEN" ]; then
+            echo "Error: Failed to capture DSTACK_TOKEN."
+            echo "Server log:"
+            cat dstack_server_output.log
+            exit 1
+          fi
+
+          # Export the token as an environment variable
+          echo "DSTACK_TOKEN=$TOKEN" >> $GITHUB_ENV
+          echo "Captured DSTACK_TOKEN: $TOKEN"
+          
+      - name: Apply run on dstack 
+        run: |
+          git clone https://github.com/dstackai/dstack
+          cd dstack
+          dstack init
+          dstack apply -f examples/deployment/vllm/.dstack.yml --yes &
+          # echo ${{ github.workspace }}/
+          ls ~/.dstack/server/
+
+      - name: test the task with a cURL Request
+        run: |
+          curl http://127.0.0.1:3000/proxy/models/main/chat/completions \
+            -X POST \
+            -H "Authorization: Bearer $DSTACK_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "model": "meta-llama/Meta-Llama-3.1-8B-Instruct",
+              "messages": [
+                {
+                  "role": "system",
+                  "content": "You are a helpful assistant."
+                },
+                {
+                  "role": "user",
+                  "content": "What is Deep Learning?"
+                }
+              ],
+              "max_tokens": 128
+            }'
+
+      - name: Stop Dstack server
+        run: |
+          ps aux | grep dstack
+          kill $(pgrep -f 'dstack server')  # Stop the server by killing its process
+
+      - name: Delete kind cluster for backend
+        run: |
+          kind delete cluster
+          echo "Dstack task Done!!!"
+
+    
+      

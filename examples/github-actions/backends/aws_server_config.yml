@@ -1,0 +1,6 @@
+projects:
+  - name: main
+    backends:
+      - type: aws
+        creds:
+          type: default

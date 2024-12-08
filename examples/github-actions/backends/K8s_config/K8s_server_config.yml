@@ -1,0 +1,9 @@
+projects:
+  - name: main
+    backends:
+      - type: kubernetes
+        kubeconfig:
+          filename: ~/.kube/config
+        networking:
+          ssh_host: localhost # The external IP address of any node
+          ssh_port: 32000 # Any port accessible outside of the cluster
