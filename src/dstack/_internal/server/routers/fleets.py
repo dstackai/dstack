@@ -14,27 +14,69 @@ from dstack._internal.server.schemas.fleets import (
     DeleteFleetsRequest,
     GetFleetPlanRequest,
     GetFleetRequest,
+    ListFleetsRequest,
 )
-from dstack._internal.server.security.permissions import ProjectMember
+from dstack._internal.server.security.permissions import Authenticated, ProjectMember
+from dstack._internal.server.utils.routers import get_base_api_additional_responses
 
-router = APIRouter(prefix="/api/project/{project_name}/fleets", tags=["fleets"])
+root_router = APIRouter(
+    prefix="/api/fleets",
+    tags=["fleets"],
+    responses=get_base_api_additional_responses(),
+)
+project_router = APIRouter(
+    prefix="/api/project/{project_name}/fleets",
+    tags=["fleets"],
+    responses=get_base_api_additional_responses(),
+)
 
 
-@router.post("/list")
+@root_router.post("/list")
 async def list_fleets(
+    body: ListFleetsRequest,
+    session: AsyncSession = Depends(get_session),
+    user: UserModel = Depends(Authenticated()),
+) -> List[Fleet]:
+    """
+    Returns all fleets and instances within them visible to user sorted by descending `created_at`.
+    `project_name` and `only_active` can be specified as filters.
+
+    The results are paginated. To get the next page, pass `created_at` and `id` of
+    the last fleet from the previous page as `prev_created_at` and `prev_id`.
+    """
+    return await fleets_services.list_fleets(
+        session=session,
+        user=user,
+        project_name=body.project_name,
+        only_active=body.only_active,
+        prev_created_at=body.prev_created_at,
+        prev_id=body.prev_id,
+        limit=body.limit,
+        ascending=body.ascending,
+    )
+
+
+@project_router.post("/list")
+async def list_project_fleets(
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
 ) -> List[Fleet]:
+    """
+    Returns all fleets in the project.
+    """
     _, project = user_project
     return await fleets_services.list_project_fleets(session=session, project=project)
 
 
-@router.post("/get")
+@project_router.post("/get")
 async def get_fleet(
     body: GetFleetRequest,
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
 ) -> Fleet:
+    """
+    Returns a fleet given a fleet name.
+    """
     _, project = user_project
     fleet = await fleets_services.get_fleet_by_name(
         session=session, project=project, name=body.name
@@ -44,12 +86,15 @@ async def get_fleet(
     return fleet
 
 
-@router.post("/get_plan")
+@project_router.post("/get_plan")
 async def get_plan(
     body: GetFleetPlanRequest,
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
 ) -> FleetPlan:
+    """
+    Returns a fleet plan for the given fleet configuration.
+    """
     user, project = user_project
     plan = await fleets_services.get_plan(
         session=session,
@@ -60,12 +105,15 @@ async def get_plan(
     return plan
 
 
-@router.post("/create")
+@project_router.post("/create")
 async def create_fleet(
     body: CreateFleetRequest,
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
 ) -> Fleet:
+    """
+    Creates a fleet given a fleet configuration.
+    """
     user, project = user_project
     return await fleets_services.create_fleet(
         session=session,
@@ -75,12 +123,15 @@ async def create_fleet(
     )
 
 
-@router.post("/delete")
+@project_router.post("/delete")
 async def delete_fleets(
     body: DeleteFleetsRequest,
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
 ):
+    """
+    Deletes one or more fleets.
+    """
     user, project = user_project
     await fleets_services.delete_fleets(
         session=session,
@@ -90,12 +141,15 @@ async def delete_fleets(
     )
 
 
-@router.post("/delete_instances")
+@project_router.post("/delete_instances")
 async def delete_fleet_instances(
     body: DeleteFleetInstancesRequest,
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
 ):
+    """
+    Deletes one or more instances within the fleet.
+    """
     user, project = user_project
     await fleets_services.delete_fleets(
         session=session,

@@ -5,7 +5,8 @@ import { Navigate } from 'react-router-dom';
 
 import App from 'App';
 import { LoginByGithubCallback } from 'App/Login/LoginByGithubCallback';
-import { LoginByTokenForm } from 'App/Login/LoginByTokenForm';
+import { LoginByOktaCallback } from 'App/Login/LoginByOktaCallback';
+import { TokenLogin } from 'App/Login/TokenLogin';
 import { Logout } from 'App/Logout';
 import { FleetDetails, FleetList } from 'pages/Fleets';
 import { ModelsList } from 'pages/Models';
@@ -34,8 +35,12 @@ export const router = createBrowserRouter([
                 element: <LoginByGithubCallback />,
             },
             {
+                path: ROUTES.AUTH.OKTA_CALLBACK,
+                element: <LoginByOktaCallback />,
+            },
+            {
                 path: ROUTES.AUTH.TOKEN,
-                element: <LoginByTokenForm />,
+                element: <TokenLogin />,
             },
             // hubs
             {

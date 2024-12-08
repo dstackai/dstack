@@ -10,8 +10,13 @@ from dstack._internal.core.errors import ResourceNotExistsError
 from dstack._internal.server.db import get_session
 from dstack._internal.server.models import ProjectModel, UserModel
 from dstack._internal.server.security.permissions import ProjectAdmin, ProjectMember
+from dstack._internal.server.utils.routers import get_base_api_additional_responses
 
-router = APIRouter(prefix="/api/project/{project_name}/gateways", tags=["gateways"])
+router = APIRouter(
+    prefix="/api/project/{project_name}/gateways",
+    tags=["gateways"],
+    responses=get_base_api_additional_responses(),
+)
 
 
 @router.post("/list")

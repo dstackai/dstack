@@ -10,7 +10,7 @@ Llama 3.1 70B in FP16 using [TGI :material-arrow-top-right-thin:{ .external }](h
 
 === "TGI"
     
-    <div editor-title="examples/deployment/tgi/amd/service.dstack.yml"> 
+    <div editor-title="examples/deployment/tgi/amd/.dstack.yml"> 
     
     ```yaml
     type: service
@@ -19,27 +19,23 @@ Llama 3.1 70B in FP16 using [TGI :material-arrow-top-right-thin:{ .external }](h
     # Using the official TGI's ROCm Docker image
     image: ghcr.io/huggingface/text-generation-inference:sha-a379d55-rocm
 
-    # Required environment variables
     env:
       - HF_TOKEN
       - MODEL_ID=meta-llama/Meta-Llama-3.1-70B-Instruct
       - TRUST_REMOTE_CODE=true
       - ROCM_USE_FLASH_ATTN_V2_TRITON=true
-    # Commands of the task
     commands:
       - text-generation-launcher --port 8000
-    # Service port
     port: 8000
+    # Register the model
+    model: meta-llama/Meta-Llama-3.1-70B-Instruct
+    
+    # Uncomment to leverage spot instances
+    #spot_policy: auto
     
     resources:
       gpu: MI300X
       disk: 150GB
-    
-    # Use spot or on-demand instances
-    spot_policy: auto
-
-    # Register the model    
-    model: meta-llama/Meta-Llama-3.1-70B-Instruct
     ```
     
     </div>
@@ -47,7 +43,7 @@ Llama 3.1 70B in FP16 using [TGI :material-arrow-top-right-thin:{ .external }](h
 
 === "vLLM"
 
-    <div editor-title="examples/deployment/vllm/amd/service.dstack.yml"> 
+    <div editor-title="examples/deployment/vllm/amd/.dstack.yml"> 
     
     ```yaml
     type: service
@@ -55,7 +51,6 @@ Llama 3.1 70B in FP16 using [TGI :material-arrow-top-right-thin:{ .external }](h
     
     # Using RunPod's ROCm Docker image
     image: runpod/pytorch:2.4.0-py3.10-rocm6.1.0-ubuntu22.04
-    
     # Required environment variables
     env:
       - HF_TOKEN
@@ -86,23 +81,23 @@ Llama 3.1 70B in FP16 using [TGI :material-arrow-top-right-thin:{ .external }](h
       - vllm serve $MODEL_ID --max-model-len $MAX_MODEL_LEN --port 8000
     # Service port
     port: 8000
+    # Register the model
+    model: meta-llama/Meta-Llama-3.1-70B-Instruct
     
-    # Use spot or on-demand instances
-    spot_policy: auto
+    # Uncomment to leverage spot instances
+    #spot_policy: auto
     
     resources:
       gpu: MI300X
       disk: 200GB
-    
-    # Register the model
-    model: meta-llama/Meta-Llama-3.1-70B-Instruct
     ```
     </div>
 
     Note, maximum size of vLLM’s `KV cache` is 126192, consequently we must set `MAX_MODEL_LEN` to 126192. Adding `/opt/conda/envs/py_3.10/bin` to PATH ensures we use the Python 3.10 environment necessary for the pre-built binaries compiled specifically for this version.
     
     > To speed up the `vLLM-ROCm` installation, we use a pre-built binary from S3. 
-    > You can find the task to build and upload the binary in [`examples/fine-tuning/axolotl/amd` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/deployment/vllm/amd){:target="_blank"}.
+    > You can find the task to build and upload the binary in 
+    > [`examples/deployment/vllm/amd/` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/deployment/vllm/amd/){:target="_blank"}.
 
 !!! info "Docker image"
     If you want to use AMD, specifying `image` is currently required. This must be an image that includes
@@ -118,7 +113,7 @@ To request multiple GPUs, specify the quantity after the GPU name, separated by 
     and the [`mlabonne/guanaco-llama2-1k` :material-arrow-top-right-thin:{ .external }](https://huggingface.co/datasets/mlabonne/guanaco-llama2-1k){:target="_blank"}
     dataset.
     
-    <div editor-title="examples/fine-tuning/trl/amd/train.dstack.yml">
+    <div editor-title="examples/fine-tuning/trl/amd/.dstack.yml">
     
     ```yaml
     type: task
@@ -146,8 +141,8 @@ To request multiple GPUs, specify the quantity after the GPU name, separated by 
       - cd ..
       - python examples/fine-tuning/trl/amd/train.py
     
-    # Use spot or on-demand instances
-    spot_policy: auto
+    # Uncomment to leverage spot instances
+    #spot_policy: auto
     
     resources:
       gpu: MI300X
@@ -161,7 +156,7 @@ To request multiple GPUs, specify the quantity after the GPU name, separated by 
     and the [tatsu-lab/alpaca :material-arrow-top-right-thin:{ .external }](https://huggingface.co/datasets/tatsu-lab/alpaca){:target="_blank"}
     dataset.
     
-    <div editor-title="examples/fine-tuning/axolotl/amd/train.dstack.yml">
+    <div editor-title="examples/fine-tuning/axolotl/amd/.dstack.yml">
     
     ```yaml
     type: task
@@ -196,19 +191,20 @@ To request multiple GPUs, specify the quantity after the GPU name, separated by 
       - cd ..
       - accelerate launch -m axolotl.cli.train axolotl/examples/llama-3/fft-8b.yaml
     
-    # Use spot or on-demand instances
-    spot_policy: auto
+    # Uncomment to leverage spot instances
+    #spot_policy: auto
 
     resources:
       gpu: MI300X
       disk: 150GB
     ```
     </div>
-    Note,To support ROCm, we need to checkout to commit `d4f6c65`. You can find the installation instruction in [rocm-blogs :material-arrow-top-right-thin:{ .external }](https://github.com/ROCm/rocm-blogs/blob/release/blogs/artificial-intelligence/axolotl/src/Dockerfile.rocm){:target="_blank"}.
+
+    Note, to support ROCm, we need to checkout to commit `d4f6c65`. You can find the installation instruction in [rocm-blogs :material-arrow-top-right-thin:{ .external }](https://github.com/ROCm/rocm-blogs/blob/release/blogs/artificial-intelligence/axolotl/src/Dockerfile.rocm){:target="_blank"}.
 
     > To speed up installation of `flash-attention` and `xformers `, we use pre-built binaries uploaded to S3. 
     > You can find the tasks that build and upload the binaries
-    > in [examples/fine-tuning/axolotl/amd :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/axolotl/amd){:target="_blank"}.
+    > in [`examples/fine-tuning/axolotl/amd/` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/axolotl/amd/){:target="_blank"}.
 
 ## Running a configuration
 
@@ -219,16 +215,10 @@ cloud resources and run the configuration.
 
 ```shell
 $ HF_TOKEN=...
-$ dstack apply -f examples/deployment/vllm/amd/service.dstack.yml
+$ dstack apply -f examples/deployment/vllm/amd/.dstack.yml
 ```
 
 </div>
-
-## Dev environments
-
-Before running a task or service, it's recommended that you first start with
-a [dev environment](https://dstack.ai/docs/dev-environments). Dev environments
-allow you to run commands interactively.
 
 ## Source code
 

@@ -93,7 +93,23 @@ volumes:
 Once you run this configuration, the contents of the volume will be attached to `/volume_data` inside the dev environment, 
 and its contents will persist across runs.
 
-!!! info "Limitations"
+!!! info "Attaching volumes across regions and backends"
+    If you're unsure in advance which region or backend you'd like to use (or which is available),
+    you can specify multiple volumes for the same path.
+
+    <div editor-title=".dstack.yml">
+
+    ```yaml
+    volumes:
+      - name: [my-aws-eu-west-1-volume, my-aws-us-east-1-volume]
+        path: /volume_data
+    ```
+
+    </div>
+
+    `dstack` will attach one of the volumes based on the region and backend of the run.  
+
+??? info "Limitations"
     When you're running a dev environment, task, or service with `dstack`, it automatically mounts the project folder contents
     to `/workflow` (and sets that as the current working directory). Right now, `dstack` doesn't allow you to 
     attach volumes to `/workflow` or any of its subdirectories.
@@ -213,6 +229,9 @@ data across different backends, you should either use object storage or replicat
 Typically, network volumes are associated with specific regions, so you can't use them in other regions. Often,
 volumes are also linked to availability zones, but some providers support volumes that can be used across different
 availability zones within the same region.
+
+If you don't want to limit a run to one particular region, you can create different volumes for different regions
+and specify them for the same mount point as [documented above](#attach-network-volume).
 
 ##### Can I attach network volumes to multiple runs or instances?
 

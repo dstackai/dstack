@@ -1,0 +1,32 @@
+type: task
+# The name is optional, if not specified, generated randomly
+name: trl-amd-llama31-train
+
+# If `image` is not specified, dstack uses its default image
+image: runpod/pytorch:2.1.2-py3.10-rocm6.1-ubuntu22.04
+
+# Required environment variables
+env:
+  - HF_TOKEN
+
+commands:
+  - export PATH=/opt/conda/envs/py_3.10/bin:$PATH
+  - git clone https://github.com/ROCm/bitsandbytes
+  - cd bitsandbytes
+  - git checkout rocm_enabled
+  - pip install -r requirements-dev.txt
+  - cmake -DBNB_ROCM_ARCH="gfx942" -DCOMPUTE_BACKEND=hip -S  .  # Use  to target specific gpu arch
+  - make
+  - pip install .
+  - pip install trl
+  - pip install peft
+  - pip install transformers datasets huggingface-hub scipy
+  - cd ..
+  - python examples/fine-tuning/trl/amd/train.py
+
+# Uncomment to leverage spot instances
+#spot_policy: auto
+
+resources:
+  gpu: MI300X
+  disk: 150GB

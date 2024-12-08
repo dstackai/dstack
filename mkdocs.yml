@@ -117,6 +117,9 @@ plugins:
         'docs/examples/llms/llama31.md': 'examples/llms/llama31/index.md'
         'docs/examples/llms/llama32.md': 'examples/llms/llama32/index.md'
         'docs/examples/accelerators/amd/index.md': 'examples/accelerators/amd/index.md'
+        'docs/examples/deployment/nim/index.md': 'examples/deployment/nim/index.md'
+        'docs/examples/deployment/vllm/index.md': 'examples/deployment/vllm/index.md'
+        'docs/examples/deployment/tgi/index.md': 'examples/deployment/tgi/index.md'
         'providers.md': 'partners.md'
         'backends.md': 'partners.md'
   - typeset
@@ -184,16 +187,16 @@ extra:
     provider: google
     property: G-JX21114P7B
   social:
+    - icon: /fontawesome/brands/github
+      link: https://github.com/dstackai/dstack
     - icon: /fontawesome/brands/discord
       link: https://discord.gg/u8SmfwPpMd
     - icon: /simple/x
       link: https://twitter.com/dstackai
-    - icon: /fontawesome/brands/github
-      link: https://github.com/dstackai/dstack
-    - icon: /fontawesome/brands/python
-      link: https://pypi.org/project/dstack
-    - icon: /fontawesome/brands/docker
-      link: https://hub.docker.com/r/dstackai/dstack
+#    - icon: /fontawesome/brands/python
+#      link: https://pypi.org/project/dstack
+#    - icon: /fontawesome/brands/docker
+#      link: https://hub.docker.com/r/dstackai/dstack
   status:
     new: Recently added
 # Page tree
@@ -209,8 +212,8 @@ nav:
           - Tasks: docs/tasks.md
           - Services: docs/services.md
           - Fleets: docs/concepts/fleets.md
-          - Gateways: docs/concepts/gateways.md
           - Volumes: docs/concepts/volumes.md
+          - Gateways: docs/concepts/gateways.md
           - Projects: docs/concepts/projects.md
       - Guides:
           - Protips: docs/guides/protips.md
@@ -232,9 +235,12 @@ nav:
               - REST API: docs/reference/api/rest/index.md
   - Examples:
     - examples.md
+    - Deployment:
+        - vLLM: examples/deployment/vllm/index.md
+        - TGI:  examples/deployment/tgi/index.md
+        - NIM: examples/deployment/nim/index.md
     - Fine-tuning:
         - Axolotl: examples/fine-tuning/axolotl/index.md
-        - Alignment Handbook: examples/fine-tuning/alignment-handbook/index.md
         - TRL: examples/fine-tuning/trl/index.md
     - Accelerators:
         - AMD: examples/accelerators/amd/index.md

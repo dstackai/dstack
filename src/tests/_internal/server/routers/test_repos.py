@@ -6,11 +6,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
-from dstack._internal.server.models import CodeModel, RepoModel
+from dstack._internal.server.models import CodeModel, RepoCredsModel, RepoModel
 from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.testing.common import (
     create_project,
     create_repo,
+    create_repo_creds,
     create_user,
     get_auth_headers,
 )
@@ -121,12 +122,18 @@ class TestGetRepo:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_returns_repo_with_creds(
+    async def test_returns_repo_with_legacy_creds(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
-        repo = await create_repo(session=session, project_id=project.id)
+        legacy_creds = {
+            "protocol": "https",
+            "clone_url": "https://github.com/dstackai/dstack.git",
+            "private_key": None,
+            "oauth_token": "test_token",
+        }
+        repo = await create_repo(session=session, project_id=project.id, creds=legacy_creds)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
@@ -139,7 +146,45 @@ class TestGetRepo:
         assert response.json() == {
             "repo_id": repo.name,
             "repo_info": json.loads(repo.info),
-            "repo_creds": json.loads(repo.creds),
+            "repo_creds": legacy_creds,
+        }
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_repo_with_user_creds(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        legacy_creds = {
+            "protocol": "https",
+            "clone_url": "https://github.com/dstackai/dstack.git",
+            "private_key": None,
+            "oauth_token": "legacy_creds",
+        }
+        repo = await create_repo(session=session, project_id=project.id, creds=legacy_creds)
+        user_creds = {
+            "protocol": "https",
+            "clone_url": "https://github.com/dstackai/dstack.git",
+            "private_key": None,
+            "oauth_token": "user_creds",
+        }
+        await create_repo_creds(
+            session=session, repo_id=repo.id, user_id=user.id, creds=user_creds
+        )
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        response = await client.post(
+            f"/api/project/{project.name}/repos/get",
+            headers=get_auth_headers(user.token),
+            json={"repo_id": repo.name, "include_creds": True},
+        )
+        assert response.status_code == 200, response.json()
+        assert response.json() == {
+            "repo_id": repo.name,
+            "repo_info": json.loads(repo.info),
+            "repo_creds": user_creds,
         }
 
 
@@ -188,10 +233,14 @@ class TestInitRepo:
         )
         assert response.status_code == 200, response.json()
         res = await session.execute(select(RepoModel))
-        repo = res.scalar()
+        repo = res.scalar_one()
         assert repo.name == body["repo_id"]
         assert json.loads(repo.info) == body["repo_info"]
-        assert json.loads(repo.creds) == body["repo_creds"]
+        assert repo.creds is None
+        res = await session.execute(select(RepoCredsModel))
+        repo_creds = res.scalar_one()
+        assert repo_creds.creds.plaintext is not None
+        assert json.loads(repo_creds.creds.plaintext) == body["repo_creds"]
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
@@ -246,7 +295,11 @@ class TestInitRepo:
         )
         res = await session.execute(select(RepoModel))
         repo = res.scalar_one()
-        assert json.loads(repo.creds) == body2["repo_creds"]
+        assert repo.creds is None
+        res = await session.execute(select(RepoCredsModel))
+        repo_creds = res.scalar_one()
+        assert repo_creds.creds.plaintext is not None
+        assert json.loads(repo_creds.creds.plaintext) == body2["repo_creds"]
 
 
 class TestDeleteRepos:

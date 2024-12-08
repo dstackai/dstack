@@ -7,8 +7,8 @@ nodes: 2
 # Ensure instances are interconnected
 placement: cluster
 
-# Use either spot or on-demand instances
-spot_policy: auto
+# Uncomment to leverage spot instances
+#spot_policy: auto
 # Terminate instances if not used for one hour
 termination_idle_time: 1h
 

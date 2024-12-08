@@ -43,6 +43,7 @@ class DockerImage(CoreModel):
 
 
 class ImageConfig(CoreModel):
+    user: Annotated[Optional[str], Field(alias="User")] = None
     entrypoint: Annotated[Optional[List[str]], Field(alias="Entrypoint")] = None
     cmd: Annotated[Optional[List[str]], Field(alias="Cmd")] = None
 

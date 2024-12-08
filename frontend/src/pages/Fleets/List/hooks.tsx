@@ -1,13 +1,14 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { format } from 'date-fns';
 
 import { Button, Icon, ListEmptyMessage, StatusIndicator, TableProps } from 'components';
 import { SelectCSDProps } from 'components';
 
-import { DATE_TIME_FORMAT } from 'consts';
+import { DATE_TIME_FORMAT, DEFAULT_TABLE_PAGE_SIZE } from 'consts';
 import { useLocalStorageState } from 'hooks/useLocalStorageState';
 import { getStatusIconType } from 'libs/fleet';
+import { useLazyGetPoolsInstancesQuery } from 'services/pool';
 import { useGetProjectsQuery } from 'services/project';
 
 export const useEmptyMessages = ({
@@ -136,4 +137,87 @@ export const useFilters = () => {
         clearFilters,
         isDisabledClearFilter,
     } as const;
+};
+
+export const useFleetsData = ({ project_name, only_active }: TPoolInstancesRequestParams) => {
+    const [data, setData] = useState<IInstanceListItem[]>([]);
+    const [pagesCount, setPagesCount] = useState<number>(1);
+    const [disabledNext, setDisabledNext] = useState(false);
+    const lastRequestParams = useRef<TPoolInstancesRequestParams | undefined>(undefined);
+
+    const [getPools, { isLoading, isFetching }] = useLazyGetPoolsInstancesQuery();
+
+    const getPoolsRequest = (params?: Partial<TPoolInstancesRequestParams>) => {
+        lastRequestParams.current = params;
+        return getPools({
+            project_name,
+            only_active,
+            limit: DEFAULT_TABLE_PAGE_SIZE,
+            ...params,
+        }).unwrap();
+    };
+
+    const refreshList = () => {
+        getPoolsRequest(lastRequestParams.current).then((result) => {
+            setDisabledNext(false);
+            setData(result);
+        });
+    };
+
+    useEffect(() => {
+        getPoolsRequest().then((result) => {
+            setPagesCount(1);
+            setDisabledNext(false);
+            setData(result);
+        });
+    }, [project_name, only_active]);
+
+    const nextPage = async () => {
+        if (data.length === 0 || disabledNext) {
+            return;
+        }
+
+        try {
+            const result = await getPoolsRequest({
+                prev_created_at: data[data.length - 1].created,
+                prev_id: data[data.length - 1].id,
+            });
+
+            if (result.length > 0) {
+                setPagesCount((count) => count + 1);
+                setData(result);
+            } else {
+                setDisabledNext(true);
+            }
+        } catch (e) {
+            console.log(e);
+        }
+    };
+
+    const prevPage = async () => {
+        if (pagesCount === 1) {
+            return;
+        }
+
+        try {
+            const result = await getPoolsRequest({
+                prev_created_at: data[0].created,
+                prev_id: data[0].id,
+                ascending: true,
+            });
+
+            setDisabledNext(false);
+
+            if (result.length > 0) {
+                setPagesCount((count) => count - 1);
+                setData(result);
+            } else {
+                setPagesCount(1);
+            }
+        } catch (e) {
+            console.log(e);
+        }
+    };
+
+    return { data, pagesCount, disabledNext, isLoading: isLoading || isFetching, nextPage, prevPage, refreshList };
 };

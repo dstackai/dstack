@@ -28,7 +28,7 @@ from dstack._internal.core.models.runs import Requirements
 from dstack._internal.server.models import BackendModel, ProjectModel
 from dstack._internal.server.services.backends.configurators.base import Configurator
 from dstack._internal.server.settings import LOCAL_BACKEND_ENABLED
-from dstack._internal.server.utils.common import run_async
+from dstack._internal.utils.common import run_async
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)

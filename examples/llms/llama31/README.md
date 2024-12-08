@@ -17,22 +17,18 @@ This example walks you through how to deploy and fine-tuning Llama 3.1 with `dst
 
 ## Deployment
 
-### Running as a task
-
-If you'd like to run Llama 3.1 for development purposes, consider using `dstack` tasks. 
-You can use any serving framework, such as vLLM, TGI, or Ollama.
-Below is the configuration file for the task.
+You can use any serving frameworks.
+Here's an example of a service that deploys Llama 3.1 8B using vLLM, TGI, and NIM.
 
 === "vLLM"
 
-    <div editor-title="examples/llms/llama31/vllm/task.dstack.yml"> 
+    <div editor-title="examples/llms/llama31/vllm/.dstack.yml"> 
 
     ```yaml
-    type: task
-    name: llama31-task-vllm
+    type: service
+    name: llama31
     
-    python: "3.10"
-    
+    python: "3.11"
     env:
       - HF_TOKEN
       - MODEL_ID=meta-llama/Meta-Llama-3.1-8B-Instruct
@@ -40,32 +36,36 @@ Below is the configuration file for the task.
     commands:
       - pip install vllm
       - vllm serve $MODEL_ID
-        --tensor-parallel-size $DSTACK_GPUS_NUM
         --max-model-len $MAX_MODEL_LEN
-    ports: [8000]
+        --tensor-parallel-size $DSTACK_GPUS_NUM
+    port: 8000
+    # Register the model
+    model: meta-llama/Meta-Llama-3.1-8B-Instruct
     
-    # Use either spot or on-demand instances
-    spot_policy: auto
+    # Uncomment to leverage spot instances
+    #spot_policy: auto
+
+    # Uncomment to cache downloaded models
+    #volumes:
+    #  - /root/.cache/huggingface/hub:/root/.cache/huggingface/hub
     
     resources:
-      # Required resources
       gpu: 24GB
-      # Shared memory (required by multi-gpu)
-      shm_size: 24GB
+      # Uncomment if using multiple GPUs
+      #shm_size: 24GB
     ```
 
     </div>
 
 === "TGI"
 
-    <div editor-title="examples/llms/llama31/tgi/task.dstack.yml"> 
+    <div editor-title="examples/llms/llama31/tgi/.dstack.yml"> 
 
     ```yaml
-    type: task
-    name: llama31-task-tgi
+    type: service
+    name: llama31
     
     image: ghcr.io/huggingface/text-generation-inference:latest
-    
     env:
       - HF_TOKEN
       - MODEL_ID=meta-llama/Meta-Llama-3.1-8B-Instruct
@@ -73,57 +73,60 @@ Below is the configuration file for the task.
       - MAX_TOTAL_TOKENS=4096
     commands:
       - NUM_SHARD=$DSTACK_GPUS_NUM text-generation-launcher
-    ports: [80]
+    port: 80
+    # Register the model
+    model: meta-llama/Meta-Llama-3.1-8B-Instruct
     
-    # Use either spot or on-demand instances
-    spot_policy: auto
+    # Uncomment to leverage spot instances
+    #spot_policy: auto
+
+    # Uncomment to cache downloaded models  
+    #volumes:
+    #  - /data:/data
     
     resources:
-      # Required resources
       gpu: 24GB
-      # Shared memory (required by multi-gpu)
-      shm_size: 24GB
+      # Uncomment if using multiple GPUs
+      #shm_size: 24GB
     ```
 
     </div>
 
-=== "Ollama"
+=== "NIM"
 
-    <div editor-title="examples/llms/llama31/ollama/task.dstack.yml"> 
+    <div editor-title="examples/llms/llama31/ollama/.dstack.yml"> 
 
     ```yaml
-    type: task
-    name: llama31-task-ollama    
-
-    image: ollama/ollama
-    commands:
-      - ollama serve &
-      - sleep 3
-      - ollama pull llama3.1
-      - fg
-    port: 11434
+    type: service
+    name: llama31
+    
+    image: nvcr.io/nim/meta/llama-3.1-8b-instruct:latest
+    env:
+      - NGC_API_KEY
+      - NIM_MAX_MODEL_LEN=4096
+    registry_auth:
+      username: $oauthtoken
+      password: ${{ env.NGC_API_KEY }}
+    port: 8000
+    # Register the model
+    model: meta/llama-3.1-8b-instruct
+    
+    # Uncomment to leverage spot instances
+    #spot_policy: auto
+    
+    # Cache downloaded models
+    volumes:
+      - /root/.cache/nim:/opt/nim/.cache
     
     resources:
       gpu: 24GB
-
-    # Use either spot or on-demand instances
-    spot_policy: auto
-    
-    # Required resources
-    resources:
-      gpu: 24GB
+      # Uncomment if using multiple GPUs
+      #shm_size: 24GB
     ```
 
     </div>
 
 Note, when using Llama 3.1 8B with a 24GB GPU, we must limit the context size to 4096 tokens to fit the memory.
-
-### Deploying as a service
-
-If you'd like to deploy Llama 3.1 as public auto-scalable and secure endpoint,
-consider using `dstack` [services](https://dstack.ai/docs/services).
-
-[//]: # (TODO: Include an example)
 
 ### Memory requirements
 
@@ -162,15 +165,14 @@ To run a configuration, use the [`dstack apply`](https://dstack.ai/docs/referenc
 
 ```shell
 $ HF_TOKEN=...
-
-$ dstack apply -f examples/llms/llama31/vllm/task.dstack.yml
+$ dstack apply -f examples/llms/llama31/vllm/.dstack.yml
 
  #  BACKEND  REGION    RESOURCES                    SPOT  PRICE
  1  runpod   CA-MTL-1  18xCPU, 100GB, A5000:24GB    yes   $0.12
  2  runpod   EU-SE-1   18xCPU, 100GB, A5000:24GB    yes   $0.12
  3  gcp      us-west4  27xCPU, 150GB, A5000:24GB:2  yes   $0.23
  
-Submit the run llama31-task-vllm? [y/n]: y
+Submit the run llama31? [y/n]: y
 
 Provisioning...
 ---> 100%
@@ -178,16 +180,18 @@ Provisioning...
 
 </div>
 
-If you run a task, `dstack apply` automatically forwards the remote ports to `localhost` for convenient access.
+Once the service is up, the model will be available via the OpenAI-compatible endpoint
+at `<dstack server URL>/proxy/models/<project name>/.
 
 <div class="termy">
 
 ```shell
-$ curl 127.0.0.1:8001/v1/chat/completions \
+$ curl http://127.0.0.1:3000/proxy/models/main/chat/completions \
     -X POST \
+    -H 'Authorization: Bearer &lt;dstack token&gt;' \
     -H 'Content-Type: application/json' \
     -d '{
-      "model": "meta-llama/Meta-Llama-3.1-8B-Instruct",
+      "model": "llama3.1",
       "messages": [
         {
           "role": "system",
@@ -203,6 +207,9 @@ $ curl 127.0.0.1:8001/v1/chat/completions \
 ```
 
 </div>
+
+When a [gateway](https://dstack.ai/docs/concepts/gateways.md) is configured, the OpenAI-compatible endpoint 
+is available at `https://gateway.<gateway domain>/`.
 
 [//]: # (TODO: How to prompting and tool calling)
 
@@ -224,7 +231,6 @@ name: trl-train
 python: "3.10"
 # Ensure nvcc is installed (req. for Flash Attention) 
 nvcc: true
-
 env:
   - HF_TOKEN
   - WANDB_API_KEY

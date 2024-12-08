@@ -11,6 +11,7 @@ from dstack._internal.core.errors import SSHError
 from dstack._internal.core.models.instances import SSHConnectionParams
 from dstack._internal.core.services.ssh import get_ssh_error
 from dstack._internal.core.services.ssh.client import get_ssh_client_info
+from dstack._internal.utils.common import run_async
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.path import FilePath, FilePathOrContent, PathLike
 from dstack._internal.utils.ssh import normalize_path
@@ -200,8 +201,7 @@ class SSHTunnel:
         raise get_ssh_error(stderr)
 
     async def aopen(self) -> None:
-        loop = asyncio.get_event_loop()
-        await loop.run_in_executor(None, self._remove_log_file)
+        await run_async(self._remove_log_file)
         proc = await asyncio.create_subprocess_exec(
             *self.open_command(), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
         )
@@ -214,7 +214,7 @@ class SSHTunnel:
             raise SSHError(msg) from e
         if proc.returncode == 0:
             return
-        stderr = await loop.run_in_executor(None, self._read_log_file)
+        stderr = await run_async(self._read_log_file)
         logger.debug("SSH tunnel failed: %s", stderr)
         raise get_ssh_error(stderr)
 

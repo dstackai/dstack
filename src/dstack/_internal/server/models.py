@@ -246,7 +246,28 @@ class RepoModel(BaseModel):
     type: Mapped[RepoType] = mapped_column(Enum(RepoType))
 
     info: Mapped[str] = mapped_column(Text)
+
+    # `creds` is deprecated, for newly initialized repos per-user `RepoCredsModel` should be used
+    # instead. As of 0.18.25, there is no plan to remove this field, it's used as a fallback when
+    # `RepoCredsModel` associated with the user is not found.
     creds: Mapped[Optional[str]] = mapped_column(String(5000))
+
+
+class RepoCredsModel(BaseModel):
+    __tablename__ = "repo_creds"
+    __table_args__ = (
+        UniqueConstraint("repo_id", "user_id", name="uq_repo_creds_repo_id_user_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUIDType(binary=False), primary_key=True, default=uuid.uuid4
+    )
+    repo_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("repos.id", ondelete="CASCADE"))
+    repo: Mapped["RepoModel"] = relationship()
+    user_id: Mapped["UserModel"] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    user: Mapped["UserModel"] = relationship()
+
+    creds: Mapped[DecryptedString] = mapped_column(EncryptedString(10000))
 
 
 class CodeModel(BaseModel):

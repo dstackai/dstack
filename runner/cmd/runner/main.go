@@ -38,7 +38,10 @@ func start(tempDir string, homeDir string, workingDir string, httpPort int, logL
 	log.DefaultEntry.Logger.SetOutput(io.MultiWriter(os.Stdout, defaultLogFile))
 	log.DefaultEntry.Logger.SetLevel(logrus.Level(logLevel))
 
-	server := api.NewServer(tempDir, homeDir, workingDir, fmt.Sprintf(":%d", httpPort), version)
+	server, err := api.NewServer(tempDir, homeDir, workingDir, fmt.Sprintf(":%d", httpPort), version)
+	if err != nil {
+		return tracerr.Errorf("Failed to create server: %w", err)
+	}
 
 	log.Trace(context.TODO(), "Starting API server", "port", httpPort)
 	if err := server.Run(); err != nil {

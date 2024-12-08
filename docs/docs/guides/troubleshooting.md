@@ -84,8 +84,9 @@ was using spot instances and was interrupted. To address this, you can either se
 
 #### Gateway configuration
 
-The most common reason a service fails to start is either because you haven’t [created a gateway](../concepts/gateways.md) or haven’t set up the
-correct DNS record pointing to the gateway's hostname.
+If all services fail to start with a specific gateway, make sure a
+[correct DNS record](../concepts/gateways.md#update-dns-records)
+pointing to the gateway's hostname is configured.
 
 ### Service endpoint doesn't work 
 
@@ -93,10 +94,6 @@ correct DNS record pointing to the gateway's hostname.
 
 If the service endpoint returns a 403 error, it is likely because the [`Authorization`](../services.md#access-the-endpoint) 
 header with the correct `dstack` token was not provided.
-
-#### SSH fleets
-
-If you attempt to run a service on an SSH fleet, it won't work due to a [known issue :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/1640){:target="_blank"} that is expected to be fixed soon.
 
 [//]: # (#### Other)
 [//]: # (TODO: Explain how to get the gateway logs)

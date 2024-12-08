@@ -279,7 +279,7 @@ class GitRepoURL:
         return f"ssh://{user}@{self.host}{optional_port}{self.path}"
 
     def get_clean_path(self) -> str:
-        return self.path.rstrip("/").rstrip(".git")
+        return self.path.rstrip("/").removesuffix(".git")
 
     def get_repo_name(self) -> str:
         return self.get_clean_path().rsplit("/")[-1] or "unknown"

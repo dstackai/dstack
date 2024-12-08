@@ -7,10 +7,12 @@ from dstack._internal.server.models import ProjectModel, UserModel
 from dstack._internal.server.schemas.logs import PollLogsRequest
 from dstack._internal.server.security.permissions import ProjectMember
 from dstack._internal.server.services import logs
+from dstack._internal.server.utils.routers import get_base_api_additional_responses
 
 router = APIRouter(
     prefix="/api/project/{project_name}/logs",
     tags=["logs"],
+    responses=get_base_api_additional_responses(),
 )
 
 

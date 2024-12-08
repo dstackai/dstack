@@ -18,7 +18,7 @@ spot_policy: auto
 
 resources:
   # Required resources
-  gpu: "NVIDIA:24GB"
+  gpu: "nvidia:24GB"
 
 # Uncomment to persist data
 #volumes:

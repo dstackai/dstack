@@ -1,9 +1,26 @@
-type: dev-environment
-# Launches a dev environment to play with TGI
+type: service
+name: llama31
 
 image: ghcr.io/huggingface/text-generation-inference:latest
+env:
+  - HF_TOKEN
+  - MODEL_ID=meta-llama/Meta-Llama-3.1-8B-Instruct
+  - MAX_INPUT_LENGTH=4000
+  - MAX_TOTAL_TOKENS=4096
+commands:
+  - NUM_SHARD=$DSTACK_GPUS_NUM text-generation-launcher
+port: 80
+# Register the model
+model: meta-llama/Meta-Llama-3.1-8B-Instruct
 
-ide: vscode
+# Uncomment to leverage spot instances
+#spot_policy: auto
 
-resources: 
+# Uncomment to cache downloaded models
+#volumes:
+#  - /data:/data
+
+resources:
   gpu: 24GB
+  # Uncomment if using multiple GPUs
+  #shm_size: 24GB

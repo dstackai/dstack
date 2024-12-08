@@ -21,7 +21,6 @@ from dstack._internal.core.errors import (
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.instances import (
-    DockerConfig,
     InstanceAvailability,
     InstanceConfiguration,
     InstanceOffer,
@@ -48,11 +47,6 @@ from dstack._internal.server.models import (
     PoolModel,
     ProjectModel,
     UserModel,
-)
-from dstack._internal.server.services.docker import parse_image_name
-from dstack._internal.server.services.jobs.configurators.base import (
-    get_default_image,
-    get_default_python_verison,
 )
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.projects import list_project_models, list_user_project_models
@@ -398,21 +392,26 @@ def filter_pool_instances(
     fleet_model: Optional[FleetModel] = None,
     multinode: bool = False,
     master_job_provisioning_data: Optional[JobProvisioningData] = None,
-    volumes: Optional[List[Volume]] = None,
+    volumes: Optional[List[List[Volume]]] = None,
 ) -> List[InstanceModel]:
     instances: List[InstanceModel] = []
     candidates: List[InstanceModel] = []
 
     backend_types = profile.backends
     regions = profile.regions
-    zone = None
+    zones = None
 
     if volumes:
-        volume = volumes[0]
-        backend_types = [volume.configuration.backend]
-        regions = [volume.configuration.region]
-        if volume.provisioning_data is not None:
-            zone = volume.provisioning_data.availability_zone
+        mount_point_volumes = volumes[0]
+        backend_types = [v.configuration.backend for v in mount_point_volumes]
+        regions = [v.configuration.region for v in mount_point_volumes]
+        volume_zones = [
+            v.provisioning_data.availability_zone
+            for v in mount_point_volumes
+            if v.provisioning_data is not None
+        ]
+        if volume_zones:
+            zones = volume_zones
 
     if multinode:
         if not backend_types:
@@ -456,8 +455,8 @@ def filter_pool_instances(
         if (
             jpd is not None
             and jpd.availability_zone is not None
-            and zone is not None
-            and jpd.availability_zone != zone
+            and zones is not None
+            and jpd.availability_zone not in zones
         ):
             continue
 
@@ -629,7 +628,6 @@ async def create_instance_model(
         public=project.ssh_public_key.strip(),
         private=project.ssh_private_key.strip(),
     )
-    dstack_default_image = parse_image_name(get_default_image(get_default_python_verison()))
     instance_config = InstanceConfiguration(
         project_name=project.name,
         instance_name=instance_name,
@@ -637,10 +635,6 @@ async def create_instance_model(
         instance_id=str(instance.id),
         ssh_keys=[project_ssh_key],
         placement_group_name=placement_group_name,
-        job_docker_config=DockerConfig(
-            image=dstack_default_image,
-            registry_auth=None,
-        ),
     )
     instance.instance_configuration = instance_config.json()
     return instance
@@ -651,6 +645,7 @@ async def create_ssh_instance_model(
     pool: PoolModel,
     instance_name: str,
     instance_num: int,
+    internal_ip: Optional[str],
     instance_network: Optional[str],
     region: Optional[str],
     host: str,
@@ -671,7 +666,7 @@ async def create_ssh_instance_model(
         instance_id=instance_name,
         hostname=host,
         region=host_region,
-        internal_ip=None,
+        internal_ip=internal_ip,
         instance_network=instance_network,
         price=0,
         username=ssh_user,

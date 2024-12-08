@@ -18,11 +18,12 @@ You can skip backends configuration if you intend to run containers  only on you
 
 ## Start the server
 
-Once backends are configured, proceed and start the server:
+The server can run on your laptop, a dedicated server, a private cloud VPC, or any location with access to your
+cloud or on-prem clusters.
 
 === "pip"
 
-    > The server can be set up via `pip` on Linux, macOS, and Windows (as long as you use WSL 2).
+    > The server can be set up via `pip` on Linux, macOS, and Windows (via WSL 2).
     > It requires Git and OpenSSH.
 
     <div class="termy">
@@ -56,8 +57,9 @@ Once backends are configured, proceed and start the server:
         
     </div>
 
-> For more details on server configuration options, see the
-> [server deployment guide](../guides/server-deployment.md).
+!!! info "Server deployment"
+    For more details on server deployment options, see the
+    [server deployment](../guides/server-deployment.md) guide.
 
 ## Set up the CLI
 

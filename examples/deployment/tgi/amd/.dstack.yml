@@ -1,15 +1,21 @@
-type: dev-environment
-name: dev-tgi-amd
+type: service
+name: amd-service-tgi
 
 image: ghcr.io/huggingface/text-generation-inference:sha-a379d55-rocm
-
 env:
   - HF_TOKEN
   - ROCM_USE_FLASH_ATTN_V2_TRITON=true
-ide: vscode
+  - TRUST_REMOTE_CODE=true
+  - MODEL_ID=meta-llama/Meta-Llama-3.1-70B-Instruct
+commands:
+  - text-generation-launcher --port 8000
+port: 8000
+# Register the model
+model: meta-llama/Meta-Llama-3.1-70B-Instruct
+
+# Uncomment to leverage spot instances
+#spot_policy: auto
 
 resources:
   gpu: MI300X
   disk: 150GB
-
-spot_policy: auto

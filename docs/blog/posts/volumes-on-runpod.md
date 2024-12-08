@@ -40,13 +40,14 @@ env:
 commands:
   - text-generation-launcher
 port: 80
+# Register the model
+model: meta-llama/Meta-Llama-3.1-8B-Instruct
 
-spot_policy: auto
+# Uncomment to leverage spot instances
+#spot_policy: auto
 
 resources:
   gpu: 24GB
-
-model: meta-llama/Meta-Llama-3.1-8B-Instruct
 ```
 
 </div>
@@ -114,13 +115,14 @@ env:
 commands:
   - text-generation-launcher
 port: 80
+# Register the mdoel
+model: meta-llama/Meta-Llama-3.1-8B-Instruct
 
-spot_policy: auto
+# Uncomment to leverage spot instances
+#spot_policy: auto
 
 resources:
   gpu: 24GB
-  
-model: meta-llama/Meta-Llama-3.1-8B-Instruct
 ```
 
 </div>

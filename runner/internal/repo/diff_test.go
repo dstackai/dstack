@@ -320,7 +320,7 @@ Last line.`
 			if cont == "" {
 				cont = content + cc.contAdd
 			}
-			err = os.WriteFile(path.Join(dir, "original"), []byte(cont), 0660)
+			err = os.WriteFile(path.Join(dir, "original"), []byte(cont), 0o660)
 			assert.NoError(t, err, "write original file")
 			ctx := context.Background()
 			err = ApplyDiff(ctx, dir, cc.diff)

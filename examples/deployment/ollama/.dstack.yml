@@ -1,9 +1,19 @@
-type: dev-environment
-# Launches a dev environment to play with Ollama
+type: service
+name: llama31
 
 image: ollama/ollama
+commands:
+  - ollama serve &
+  - sleep 3
+  - ollama pull llama3.1
+  - fg
+port: 11434
+# Register the model
+model: llama3.1
 
-ide: vscode
+# Uncomment to leverage spot instances
+#spot_policy: auto
 
+# Required resources
 resources:
-  gpu: 48GB..80GB
+  gpu: 24GB

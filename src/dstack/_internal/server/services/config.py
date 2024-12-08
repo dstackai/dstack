@@ -34,7 +34,7 @@ from dstack._internal.server.services.permissions import (
     DefaultPermissions,
     set_default_permissions,
 )
-from dstack._internal.server.utils.common import run_async
+from dstack._internal.utils.common import run_async
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)

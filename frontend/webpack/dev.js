@@ -22,14 +22,14 @@ module.exports = {
             "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, PATCH, OPTIONS",
             "Access-Control-Allow-Headers": "X-Requested-With, content-type, Authorization"
         },
-        proxy: {
-            '/api': {
+        proxy: [
+            {
+                context: ["/api"],
                 changeOrigin: true,
                 target: 'http://127.0.0.1:8000',
                 logLevel: 'debug',
             }
-        }
-
+        ]
     },
     devtool: "cheap-module-source-map",
     plugins: [

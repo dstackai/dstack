@@ -1,22 +1,17 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Button, FormField, Header, Pagination, SelectCSD, Table, Toggle } from 'components';
 
-import { DEFAULT_TABLE_PAGE_SIZE } from 'consts';
 import { useBreadcrumbs, useCollection } from 'hooks';
 import { ROUTES } from 'routes';
-import { useLazyGetPoolsInstancesQuery } from 'services/pool';
 
-import { useColumnsDefinitions, useEmptyMessages, useFilters } from './hooks';
+import { useColumnsDefinitions, useEmptyMessages, useFilters, useFleetsData } from './hooks';
 
 import styles from './styles.module.scss';
 
 export const FleetList: React.FC = () => {
     const { t } = useTranslation();
-    const [data, setData] = useState<IInstanceListItem[]>([]);
-    const [pagesCount, setPagesCount] = useState<number>(1);
-    const [disabledNext, setDisabledNext] = useState(false);
 
     useBreadcrumbs([
         {
@@ -35,75 +30,15 @@ export const FleetList: React.FC = () => {
         setSelectedProject,
     } = useFilters();
 
-    const [getPools, { isLoading, isFetching }] = useLazyGetPoolsInstancesQuery();
-    const isDisabledPagination = isLoading || isFetching || data.length === 0;
+    const { data, pagesCount, disabledNext, isLoading, nextPage, prevPage, refreshList } = useFleetsData({
+        project_name: selectedProject?.value,
+        only_active: onlyActive,
+    });
 
-    const getPoolsRequest = (params?: Partial<TPoolInstancesRequestParams>) => {
-        return getPools({
-            only_active: onlyActive,
-            project_name: selectedProject?.value,
-            limit: DEFAULT_TABLE_PAGE_SIZE,
-            ...params,
-        }).unwrap();
-    };
-
-    useEffect(() => {
-        getPoolsRequest().then((result) => {
-            setPagesCount(1);
-            setDisabledNext(false);
-            setData(result);
-        });
-    }, [onlyActive, selectedProject?.value]);
+    const isDisabledPagination = isLoading || data.length === 0;
 
     const { columns } = useColumnsDefinitions();
     const { renderEmptyMessage, renderNoMatchMessage } = useEmptyMessages({ clearFilters, isDisabledClearFilter });
-
-    const nextPage = async () => {
-        if (data.length === 0 || disabledNext) {
-            return;
-        }
-
-        try {
-            const result = await getPoolsRequest({
-                prev_created_at: data[data.length - 1].created,
-                prev_id: data[data.length - 1].id,
-            });
-
-            if (result.length > 0) {
-                setPagesCount((count) => count + 1);
-                setData(result);
-            } else {
-                setDisabledNext(true);
-            }
-        } catch (e) {
-            console.log(e);
-        }
-    };
-
-    const prevPage = async () => {
-        if (pagesCount === 1) {
-            return;
-        }
-
-        try {
-            const result = await getPoolsRequest({
-                prev_created_at: data[0].created,
-                prev_id: data[0].id,
-                ascending: true,
-            });
-
-            setDisabledNext(false);
-
-            if (result.length > 0) {
-                setPagesCount((count) => count - 1);
-                setData(result);
-            } else {
-                setPagesCount(1);
-            }
-        } catch (e) {
-            console.log(e);
-        }
-    };
 
     const { items, collectionProps } = useCollection<IInstanceListItem>(data, {
         filtering: {
@@ -126,11 +61,17 @@ export const FleetList: React.FC = () => {
             variant="full-page"
             columnDefinitions={columns}
             items={items}
-            loading={isLoading || isFetching}
+            loading={isLoading}
             loadingText={t('common.loading')}
             stickyHeader={true}
             header={
-                <Header variant="awsui-h1-sticky" counter={renderCounter()}>
+                <Header
+                    variant="awsui-h1-sticky"
+                    counter={renderCounter()}
+                    actions={
+                        <Button iconName="refresh" disabled={isLoading} ariaLabel={t('common.refresh')} onClick={refreshList} />
+                    }
+                >
                     {t('navigation.fleets')}
                 </Header>
             }

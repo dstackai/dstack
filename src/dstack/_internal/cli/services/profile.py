@@ -78,6 +78,7 @@ def register_profile_args(parser: argparse.ArgumentParser, pool_add: bool = Fals
         help="The name of the pool. If not set, the default pool will be used",
     )
     pools_group_exc.add_argument(
+        "-R",
         "--reuse",
         dest="creation_policy_reuse",
         action="store_true",

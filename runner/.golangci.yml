@@ -1,0 +1,342 @@
+run:
+  # default concurrency is a available CPU number
+  concurrency: 4
+
+  # timeout for analysis, e.g. 30s, 5m, default is 1m
+  timeout: 1m
+
+  # exit code when at least one issue was found, default is 1
+  issues-exit-code: 1
+
+  # include test files or not, default is true
+  tests: false
+
+# output configuration options
+output:
+  # colored-line-number|line-number|json|tab|checkstyle|code-climate|junit-xml|github-actions
+  # default is "colored-line-number"
+  formats:
+    - format: colored-line-number
+
+# all available settings of specific linters
+linters-settings:
+
+  cyclop:
+    # the maximal code complexity to report
+    max-complexity: 10
+    # the maximal average package complexity. If it's higher than 0.0 (float) the check is enabled (default 0.0)
+    package-average: 0.0
+    # should ignore tests (default false)
+    skip-tests: false
+
+  errcheck:
+    # report about not checking of errors in type assertions: `a := b.(MyStruct)`;
+    # default is false: such cases aren't reported by default.
+    check-type-assertions: false
+
+    # report about assignment of errors to blank identifier: `num, _ := strconv.Atoi(numStr)`;
+    # default is false: such cases aren't reported by default.
+    check-blank: false
+
+  errorlint:
+    # Check whether fmt.Errorf uses the %w verb for formatting errors. See the readme for caveats
+    errorf: true
+    # Check for plain type assertions and type switches
+    asserts: true
+    # Check for plain error comparisons
+    comparison: true
+
+  exhaustive:
+    # check switch statements in generated files also
+    check-generated: false
+    # indicates that switch statements are to be considered exhaustive if a
+    # 'default' case is present, even if all enum members aren't listed in the
+    # switch
+    default-signifies-exhaustive: false
+
+  funlen:
+    lines: 60
+    statements: 40
+
+  gocognit:
+    # minimal code complexity to report, 30 by default (but we recommend 10-20)
+    min-complexity: 10
+
+  nestif:
+    # minimal complexity of if statements to report, 5 by default
+    min-complexity: 4
+
+  goconst:
+    # minimal length of string constant, 3 by default
+    min-len: 3
+    # minimal occurrences count to trigger, 3 by default
+    min-occurrences: 3
+
+  gocritic:
+    # Which checks should be enabled; can't be combined with 'disabled-checks';
+    # See https://go-critic.github.io/overview#checks-overview
+    # To check which checks are enabled run `GL_DEBUG=gocritic golangci-lint run`
+    # By default list of stable checks is used.
+    enabled-checks:
+      - rangeValCopy
+
+    # Which checks should be disabled; can't be combined with 'enabled-checks'; default is empty
+    disabled-checks:
+      - regexpMust
+
+    # Enable multiple checks by tags, run `GL_DEBUG=gocritic golangci-lint run` to see all tags and checks.
+    # Empty list by default. See https://github.com/go-critic/go-critic#usage -> section "Tags".
+    enabled-tags:
+      - performance
+    disabled-tags:
+      - experimental
+
+    # Settings passed to gocritic.
+    # The settings key is the name of a supported gocritic checker.
+    # The list of supported checkers can be find in https://go-critic.github.io/overview.
+    settings:
+      captLocal: # must be valid enabled check name
+        # whether to restrict checker to params only (default true)
+        paramsOnly: true
+      elseif:
+        # whether to skip balanced if-else pairs (default true)
+        skipBalanced: true
+      hugeParam:
+        # size in bytes that makes the warning trigger (default 80)
+        sizeThreshold: 80
+      nestingReduce:
+        # min number of statements inside a branch to trigger a warning (default 5)
+        bodyWidth: 5
+      rangeExprCopy:
+        # size in bytes that makes the warning trigger (default 512)
+        sizeThreshold: 512
+        # whether to check test functions (default true)
+        skipTestFuncs: true
+      rangeValCopy:
+        # size in bytes that makes the warning trigger (default 128)
+        sizeThreshold: 32
+        # whether to check test functions (default true)
+        skipTestFuncs: true
+      truncateCmp:
+        # whether to skip int/uint/uintptr types (default true)
+        skipArchDependent: true
+      underef:
+        # whether to skip (*x).method() calls where x is a pointer receiver (default true)
+        skipRecvDeref: true
+      unnamedResult:
+        # whether to check exported functions
+        checkExported: true
+
+  gocyclo:
+    # minimal code complexity to report, 30 by default (but we recommend 10-20)
+    min-complexity: 10
+
+  gofmt:
+    # simplify code: gofmt with `-s` option, true by default
+    simplify: true
+
+  gofumpt:
+    # Choose whether or not to use the extra rules that are disabled
+    # by default
+    extra-rules: false
+
+  goimports:
+    # put imports beginning with prefix after 3rd-party packages;
+    # it's a comma-separated list of prefixes
+    local-prefixes: github.com/dstackai/dstackai
+
+  gosec:
+    # To select a subset of rules to run.
+    # Available rules: https://github.com/securego/gosec#available-rules
+    includes:
+      - G401
+      - G306
+      - G101
+    # To specify a set of rules to explicitly exclude.
+    # Available rules: https://github.com/securego/gosec#available-rules
+    excludes:
+      - G204
+    # To specify the configuration of rules.
+    # The configuration of rules is not fully documented by gosec:
+    # https://github.com/securego/gosec#configuration
+    # https://github.com/securego/gosec/blob/569328eade2ccbad4ce2d0f21ee158ab5356a5cf/rules/rulelist.go#L60-L102
+    config:
+      G306: "0600"
+      G101:
+        pattern: "(?i)example"
+        ignore_entropy: false
+        entropy_threshold: "80.0"
+        per_char_threshold: "3.0"
+        truncate: "32"
+
+  gosimple:
+    # https://staticcheck.io/docs/options#checks
+    checks: [ "all" ]
+
+  govet:
+    # settings per analyzer
+    settings:
+      printf: # analyzer name, run `go tool vet help` to see all analyzers
+        funcs: # run `go tool vet help printf` to see available settings for `printf` analyzer
+          - (github.com/golangci/golangci-lint/pkg/logutils.Log).Infof
+          - (github.com/golangci/golangci-lint/pkg/logutils.Log).Warnf
+          - (github.com/golangci/golangci-lint/pkg/logutils.Log).Errorf
+          - (github.com/golangci/golangci-lint/pkg/logutils.Log).Fatalf
+
+    # enable or disable analyzers by name
+    # run `go tool vet help` to see all analyzers
+    enable-all: true
+    disable:
+      - shadow
+      - fieldalignment
+
+  importas:
+    # if set to `true`, force to use alias.
+    no-unaliased: true
+    # List of aliases
+    alias:
+      # using `servingv1` alias for `knative.dev/serving/pkg/apis/serving/v1` package
+      - pkg: knative.dev/serving/pkg/apis/serving/v1
+        alias: servingv1
+      # using `autoscalingv1alpha1` alias for `knative.dev/serving/pkg/apis/autoscaling/v1alpha1` package
+      - pkg: knative.dev/serving/pkg/apis/autoscaling/v1alpha1
+        alias: autoscalingv1alpha1
+      # You can specify the package path by regular expression,
+      # and alias by regular expression expansion syntax like below.
+      # see https://github.com/julz/importas#use-regular-expression for details
+      - pkg: knative.dev/serving/pkg/apis/(\w+)/(v[\w\d]+)
+        alias: $1$2
+
+  lll:
+    # max line length, lines longer will be reported. Default is 120.
+    # '\t' is counted as 1 character by default, and can be changed with the tab-width option
+    line-length: 120
+    # tab width in spaces. Default to 1.
+    tab-width: 1
+
+  staticcheck:
+    # https://staticcheck.io/docs/options#checks
+    checks: [ "all" ]
+
+  stylecheck:
+    # https://staticcheck.io/docs/options#checks
+    checks: [ "all", "-ST1000", "-ST1003", "-ST1016", "-ST1020", "-ST1021", "-ST1022" ]
+    # https://staticcheck.io/docs/options#dot_import_whitelist
+    dot-import-whitelist:
+      - fmt
+    # https://staticcheck.io/docs/options#initialisms
+    initialisms: [ "ACL", "API", "ASCII", "CPU", "CSS", "DNS", "EOF", "GUID", "HTML", "HTTP", "HTTPS", "ID", "IP", "JSON", "QPS", "RAM", "RPC", "SLA", "SMTP", "SQL", "SSH", "TCP", "TLS", "TTL", "UDP", "UI", "GID", "UID", "UUID", "URI", "URL", "UTF8", "VM", "XML", "XMPP", "XSRF", "XSS" ]
+    # https://staticcheck.io/docs/options#http_status_code_whitelist
+    http-status-code-whitelist: [ "200", "400", "404", "500" ]
+
+  tagliatelle:
+    # check the struck tag name case
+    case:
+      # use the struct field name to check the name of the struct tag
+      use-field-name: true
+      rules:
+        # any struct tag type can be used.
+        # support string case: `camel`, `pascal`, `kebab`, `snake`, `goCamel`, `goPascal`, `goKebab`, `goSnake`, `upper`, `lower`
+        json: snake
+        yaml: camel
+        xml: camel
+        bson: camel
+        avro: snake
+        mapstructure: kebab
+
+  testpackage:
+    # regexp pattern to skip files
+    skip-regexp: (export|internal)_test\.go
+
+  thelper:
+    # The following configurations enable all checks. It can be omitted because all checks are enabled by default.
+    # You can enable only required checks deleting unnecessary checks.
+    test:
+      first: true
+      name: true
+      begin: true
+    benchmark:
+      first: true
+      name: true
+      begin: true
+    tb:
+      first: true
+      name: true
+      begin: true
+
+  whitespace:
+    multi-if: false   # Enforces newlines (or comments) after every multi-line if statement
+    multi-func: false # Enforces newlines (or comments) after every multi-line function signatur
+
+linters:
+  presets:
+    - bugs
+    - unused
+    - import
+    - module
+    - format
+  disable:
+    - depguard
+    - gomodguard
+    - unparam
+    - contextcheck
+  fast: false
+
+
+issues:
+  # Excluding configuration per-path, per-linter, per-text and per-source
+  exclude-rules:
+    # Exclude some linters from running on tests files.
+    - path: _test\.go
+      linters:
+        - gocyclo
+        - errcheck
+        - dupl
+        - gosec
+
+    # Exclude known linters from partially hard-vendored code,
+    # which is impossible to exclude via "nolint" comments.
+    - path: internal/hmac/
+      text: "weak cryptographic primitive"
+      linters:
+        - gosec
+
+    # Exclude some staticcheck messages
+    - linters:
+        - staticcheck
+      text: "SA9003:"
+
+    # Exclude lll issues for long lines with go:generate
+    - linters:
+        - lll
+      source: "^//go:generate "
+
+  # The list of ids of default excludes to include or disable. By default it's empty.
+  include:
+    - EXC0002 # disable excluding of issues about comments from golint
+
+
+severity:
+  # Default value is empty string.
+  # Set the default severity for issues. If severity rules are defined and the issues
+  # do not match or no severity is provided to the rule this will be the default
+  # severity applied. Severities should match the supported severity names of the
+  # selected out format.
+  # - Code climate: https://docs.codeclimate.com/docs/issues#issue-severity
+  # -   Checkstyle: https://checkstyle.sourceforge.io/property_types.html#severity
+  # -       Github: https://help.github.com/en/actions/reference/workflow-commands-for-github-actions#setting-an-error-message
+  default-severity: error
+
+  # The default value is false.
+  # If set to true severity-rules regular expressions become case sensitive.
+  case-sensitive: false
+
+  # Default value is empty list.
+  # When a list of severity rules are provided, severity information will be added to lint
+  # issues. Severity rules have the same filtering capability as exclude rules except you
+  # are allowed to specify one matcher per severity rule.
+  # Only affects out formats that support setting severity information.
+  rules:
+    - linters:
+        - dupl
+      severity: info

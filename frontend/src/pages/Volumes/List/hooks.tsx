@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { format } from 'date-fns';
 
@@ -6,10 +6,11 @@ import { Button, ListEmptyMessage, StatusIndicator } from 'components';
 import { SelectCSDProps } from 'components';
 
 import { DATE_TIME_FORMAT, DEFAULT_TABLE_PAGE_SIZE } from 'consts';
+import { useNotifications } from 'hooks';
 import { useLocalStorageState } from 'hooks/useLocalStorageState';
 import { getStatusIconType } from 'libs/volumes';
 import { useGetProjectsQuery } from 'services/project';
-import { useLazyGetAllVolumesQuery } from 'services/volume';
+import { useDeleteVolumesMutation, useLazyGetAllVolumesQuery } from 'services/volume';
 
 export const useVolumesTableEmptyMessages = ({
     clearFilters,
@@ -100,10 +101,13 @@ export const useVolumesData = ({ project_name, only_active }: TVolumesListReques
     const [data, setData] = useState<IVolume[]>([]);
     const [pagesCount, setPagesCount] = useState<number>(1);
     const [disabledNext, setDisabledNext] = useState(false);
+    const lastRequestParams = useRef<TVolumesListRequestParams | undefined>(undefined);
 
     const [getVolumes, { isLoading, isFetching }] = useLazyGetAllVolumesQuery();
 
     const getVolumesRequest = (params?: TVolumesListRequestParams) => {
+        lastRequestParams.current = params;
+
         return getVolumes({
             project_name,
             only_active,
@@ -114,6 +118,13 @@ export const useVolumesData = ({ project_name, only_active }: TVolumesListReques
             .then((result) => {
                 return result;
             });
+    };
+
+    const refreshList = () => {
+        getVolumesRequest(lastRequestParams.current).then((result) => {
+            setDisabledNext(false);
+            setData(result);
+        });
     };
 
     useEffect(() => {
@@ -171,7 +182,7 @@ export const useVolumesData = ({ project_name, only_active }: TVolumesListReques
         }
     };
 
-    return { data, pagesCount, disabledNext, isLoading: isLoading || isFetching, nextPage, prevPage };
+    return { data, pagesCount, disabledNext, isLoading: isLoading || isFetching, nextPage, prevPage, refreshList };
 };
 
 export const useFilters = (storagePrefix?: string) => {
@@ -210,4 +221,49 @@ export const useFilters = (storagePrefix?: string) => {
         clearFilters,
         isDisabledClearFilter,
     } as const;
+};
+
+export const useVolumesDelete = () => {
+    const { t } = useTranslation();
+    const [deleteVolumesRequest] = useDeleteVolumesMutation();
+    const [pushNotification] = useNotifications();
+    const [isDeleting, setIsDeleting] = useState(() => false);
+
+    const namesOfVolumesGroupByProjectName = (volumes: IVolume[]) => {
+        return volumes.reduce<Record<string, string[]>>((acc, volume) => {
+            if (acc[volume.project_name]) {
+                acc[volume.project_name].push(volume.name);
+            } else {
+                acc[volume.project_name] = [volume.name];
+            }
+
+            return acc;
+        }, {});
+    };
+
+    const deleteVolumes = (volumes: IVolume[]) => {
+        if (!volumes.length) return Promise.reject('No volumes');
+
+        setIsDeleting(true);
+
+        const groupedVolumes = namesOfVolumesGroupByProjectName(volumes);
+
+        const requests = Object.keys(groupedVolumes).map((projectName) => {
+            return deleteVolumesRequest({
+                project_name: projectName,
+                names: groupedVolumes[projectName],
+            }).unwrap();
+        });
+
+        return Promise.all(requests)
+            .finally(() => setIsDeleting(false))
+            .catch((error) => {
+                pushNotification({
+                    type: 'error',
+                    content: t('common.server_error', { error: error?.error }),
+                });
+            });
+    };
+
+    return { isDeleting, deleteVolumes };
 };

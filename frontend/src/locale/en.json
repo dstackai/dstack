@@ -30,6 +30,7 @@
     "server_error": "Server error: {{error}}",
     "login": "Sign in",
     "login_github": "Sign in with GitHub",
+    "login_okta": "Sign in with Okta",
     "general": "General",
     "test": "Test",
     "local_storage_unavailable": "Local Storage is unavailable",
@@ -43,7 +44,8 @@
     "docs": "Docs",
     "discord": "Discord",
     "danger_zone": "Danger Zone",
-    "control_plane": "Control plane"
+    "control_plane": "Control plane",
+    "refresh": "Refresh"
   },
 
   "auth": {
@@ -53,7 +55,9 @@
     "sign_in_to_dstack": "Welcome to dstack Sky",
     "sign_in_to_dstack_enterprise": "Welcome to dstack",
     "authorization_failed": "Authorization is failed",
-    "try_again": "Please try again"
+    "try_again": "Please try again",
+    "login_by_token": "Sign in via a token",
+    "another_login_methods": "Other sign in options"
   },
 
   "navigation": {
@@ -398,6 +402,7 @@
     "user": "User",
     "repository": "Repository",
     "backend": "Backend",
+    "code": "Code",
     "empty_message_title": "No models",
     "empty_message_text": "No models to display.",
     "nomatch_message_title": "No matches",
@@ -458,6 +463,8 @@
     "empty_message_text": "No volumes to display.",
     "nomatch_message_title": "No matches",
     "nomatch_message_text": "We can't find a match.",
+    "delete_volumes_confirm_title": "Delete volumes",
+    "delete_volumes_confirm_message": "Are you sure you want to delete these volumes?",
     "active_only": "Active volumes",
 
     "name": "Name",

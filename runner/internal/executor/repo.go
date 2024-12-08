@@ -13,7 +13,7 @@ import (
 // setupRepo must be called from Run
 func (ex *RunExecutor) setupRepo(ctx context.Context) error {
 	if _, err := os.Stat(ex.workingDir); err != nil {
-		if err = os.MkdirAll(ex.workingDir, 0777); err != nil {
+		if err = os.MkdirAll(ex.workingDir, 0o777); err != nil {
 			return gerrors.Wrap(err)
 		}
 	}

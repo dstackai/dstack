@@ -27,9 +27,18 @@ from dstack._internal.server.services.config import (
     get_backend_config_yaml,
     update_backend_config_yaml,
 )
+from dstack._internal.server.utils.routers import get_base_api_additional_responses
 
-root_router = APIRouter(prefix="/api/backends", tags=["backends"])
-project_router = APIRouter(prefix="/api/project/{project_name}/backends", tags=["backends"])
+root_router = APIRouter(
+    prefix="/api/backends",
+    tags=["backends"],
+    responses=get_base_api_additional_responses(),
+)
+project_router = APIRouter(
+    prefix="/api/project/{project_name}/backends",
+    tags=["backends"],
+    responses=get_base_api_additional_responses(),
+)
 
 
 @root_router.post("/list_types")

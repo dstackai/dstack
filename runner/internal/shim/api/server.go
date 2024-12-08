@@ -11,7 +11,7 @@ import (
 
 type TaskRunner interface {
 	Run(context.Context, shim.TaskConfig) error
-	GetState() (shim.RunnerStatus, shim.ContainerStatus, string, shim.JobResult)
+	GetState() (shim.RunnerStatus, shim.JobResult)
 	Stop(bool)
 }
 

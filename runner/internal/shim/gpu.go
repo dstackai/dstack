@@ -46,6 +46,8 @@ func GetGpuInfo() []GpuInfo {
 		return getNvidiaGpuInfo()
 	case Amd:
 		return getAmdGpuInfo()
+	case NoVendor:
+		return []GpuInfo{}
 	}
 	return []GpuInfo{}
 }
@@ -79,7 +81,7 @@ func getNvidiaGpuInfo() []GpuInfo {
 	}
 	for {
 		record, err := r.Read()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {

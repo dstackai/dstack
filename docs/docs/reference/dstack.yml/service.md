@@ -108,13 +108,11 @@ If you want, you can specify your own Docker image via `image`.
     All backends except `runpod`, `vastai` and `kubernetes` also allow to use [Docker and Docker Compose](../../guides/protips.md#docker-and-docker-compose) 
     inside `dstack` runs.
 
-### Model gateway { #model-mapping }
-
-By default, if you run a service, its endpoint is accessible at `https://<run name>.<gateway domain>`.
+### Models { #model-mapping }
 
 If you are running a chat model with an OpenAI-compatible interface,
-you can optionally set the [`model`](#model) property to make the model accessible via
-the model gateway provided by `dstack`.
+set the [`model`](#model) property to make the model accessible via
+the OpenAI-compatible endpoint provided by `dstack`.
 
 <div editor-title="service.dstack.yml"> 
 
@@ -138,7 +136,7 @@ resources:
   # Change to what is required
   gpu: 24GB
 
-# Make the model accessible at https://gateway.<gateway domain>
+# Register the model
 model: meta-llama/Meta-Llama-3.1-8B-Instruct
 
 # Alternatively, use this syntax to set more model settings:
@@ -151,8 +149,9 @@ model: meta-llama/Meta-Llama-3.1-8B-Instruct
 
 </div>
 
-With such a configuration, once the service is up, you'll be able to access the model at
-`https://gateway.<gateway domain>` via the OpenAI-compatible interface.
+Once the service is up, the model will be available via the OpenAI-compatible endpoint
+at `<dstack server URL>/proxy/models/<project name>`
+or at `https://gateway.<gateway domain>` if your project has a gateway.
 
 ### Auto-scaling
 
@@ -198,6 +197,11 @@ The [`replicas`](#replicas) property can be a number or a range.
 > case `dstack` adjusts the number of replicas (scales up or down) automatically based on the load. 
 
 Setting the minimum number of replicas to `0` allows the service to scale down to zero when there are no requests.
+
+!!! info "Gateway"
+    Services with a fixed number of replicas are supported both with and without a
+    [gateway](../../concepts/gateways.md).
+    Auto-scaling is currently only supported for services running with a gateway.
 
 ### Resources { #_resources }
 
@@ -328,8 +332,8 @@ commands:
 # The port of the service
 port: 8000
 
-# Use either spot or on-demand instances
-spot_policy: auto
+# Uncomment to leverage spot instances
+#spot_policy: auto
 ```
 
 </div>

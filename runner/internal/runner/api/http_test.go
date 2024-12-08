@@ -12,13 +12,12 @@ import (
 )
 
 type DummyRunner struct {
-	State           shim.RunnerStatus
-	ContainerStatus shim.ContainerStatus
-	JobResult       shim.JobResult
+	State     shim.RunnerStatus
+	JobResult shim.JobResult
 }
 
-func (ds DummyRunner) GetState() (shim.RunnerStatus, shim.ContainerStatus, string, shim.JobResult) {
-	return ds.State, ds.ContainerStatus, "", ds.JobResult
+func (ds DummyRunner) GetState() (shim.RunnerStatus, shim.JobResult) {
+	return ds.State, ds.JobResult
 }
 
 func (ds DummyRunner) Run(context.Context, shim.TaskConfig) error {

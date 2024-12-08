@@ -29,7 +29,6 @@ from dstack._internal.server.services.locking import (
     string_to_lock_id,
 )
 from dstack._internal.server.services.projects import list_project_models, list_user_project_models
-from dstack._internal.server.utils.common import run_async
 from dstack._internal.utils import common, random_names
 from dstack._internal.utils.logging import get_logger
 
@@ -350,7 +349,7 @@ async def _delete_volume(session: AsyncSession, project: ProjectModel, volume_mo
         )
         return
 
-    await run_async(
+    await common.run_async(
         backend.compute().delete_volume,
         volume=volume,
     )

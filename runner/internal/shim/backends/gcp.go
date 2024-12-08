@@ -22,7 +22,7 @@ func (e *GCPBackend) GetRealDeviceName(volumeID string) (string, error) {
 	if err != nil {
 		deviceName, err = os.Readlink(fmt.Sprintf("/dev/disk/by-id/google-pd-%s", volumeID))
 		if err != nil {
-			return "", fmt.Errorf("failed to resolve symlink for volume %s: %v", volumeID, err)
+			return "", fmt.Errorf("failed to resolve symlink for volume %s: %w", volumeID, err)
 		}
 	}
 	deviceName, err = filepath.Abs(filepath.Join("/dev/disk/by-id/", deviceName))

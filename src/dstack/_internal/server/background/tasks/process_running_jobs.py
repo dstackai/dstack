@@ -14,6 +14,7 @@ from dstack._internal.core.models.repos import RemoteRepoCreds
 from dstack._internal.core.models.runs import (
     ClusterInfo,
     Job,
+    JobProvisioningData,
     JobSpec,
     JobStatus,
     JobTerminationReason,
@@ -34,15 +35,18 @@ from dstack._internal.server.services.jobs import (
 )
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.logging import fmt
-from dstack._internal.server.services.repos import get_code_model, repo_model_to_repo_head
+from dstack._internal.server.services.repos import (
+    get_code_model,
+    get_repo_creds,
+    repo_model_to_repo_head_with_creds,
+)
 from dstack._internal.server.services.runner import client
 from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
 from dstack._internal.server.services.runs import (
-    get_run_volumes,
+    get_job_volumes,
     run_model_to_run,
 )
 from dstack._internal.server.services.storage import get_default_storage
-from dstack._internal.server.utils.common import run_async
 from dstack._internal.utils import common as common_utils
 from dstack._internal.utils.interpolator import VariablesInterpolator
 from dstack._internal.utils.logging import get_logger
@@ -121,16 +125,17 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
             await session.commit()
             return
 
-    master_job = find_job(run.jobs, job_model.replica_num, 0)
-    cluster_info = ClusterInfo(
-        master_job_ip=master_job.job_submissions[-1].job_provisioning_data.internal_ip or "",
-        gpus_per_job=len(job_provisioning_data.instance_type.resources.gpus),
+    cluster_info = _get_cluster_info(
+        jobs=run.jobs,
+        replica_num=job.job_spec.replica_num,
+        job_provisioning_data=job_provisioning_data,
     )
 
-    volumes = await get_run_volumes(
+    volumes = await get_job_volumes(
         session=session,
         project=project,
         run_spec=run.run_spec,
+        job_provisioning_data=job_provisioning_data,
     )
 
     server_ssh_private_key = project.ssh_private_key
@@ -147,13 +152,28 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
         server_ssh_private_key = remote_conn_info.ssh_keys[0].private
 
     secrets = {}  # TODO secrets
-    repo_creds = repo_model_to_repo_head(repo_model, include_creds=True).repo_creds
+
+    repo_creds_model = await get_repo_creds(session=session, repo=repo_model, user=run_model.user)
+    repo_creds = repo_model_to_repo_head_with_creds(repo_model, repo_creds_model).repo_creds
 
     initial_status = job_model.status
     if initial_status == JobStatus.PROVISIONING:
         if job_provisioning_data.hostname is None:
             await _wait_for_instance_provisioning_data(job_model=job_model)
         else:
+            # Wait until all other jobs in the replica have IPs assigned.
+            # This is needed to ensure cluster_info has all IPs set.
+            for other_job in run.jobs:
+                if (
+                    other_job.job_spec.replica_num == job.job_spec.replica_num
+                    and other_job.job_submissions[-1].status == JobStatus.PROVISIONING
+                    and other_job.job_submissions[-1].job_provisioning_data is not None
+                    and other_job.job_submissions[-1].job_provisioning_data.hostname is None
+                ):
+                    job_model.last_processed_at = common_utils.get_current_datetime()
+                    await session.commit()
+                    return
+
             # fails are acceptable until timeout is exceeded
             if job_provisioning_data.dockerized:
                 logger.debug(
@@ -167,7 +187,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
                 if job_provisioning_data.backend == BackendType.LOCAL:
                     # No need to update ~/.ssh/authorized_keys when running shim localy
                     user_ssh_key = ""
-                success = await run_async(
+                success = await common_utils.run_async(
                     _process_provisioning_with_shim,
                     server_ssh_private_key,
                     job_provisioning_data,
@@ -192,7 +212,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
                     repo=repo_model,
                     code_hash=run.run_spec.repo_code_hash,
                 )
-                success = await run_async(
+                success = await common_utils.run_async(
                     _process_provisioning_no_shim,
                     server_ssh_private_key,
                     job_provisioning_data,
@@ -233,7 +253,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
                 repo=repo_model,
                 code_hash=run.run_spec.repo_code_hash,
             )
-            success = await run_async(
+            success = await common_utils.run_async(
                 _process_pulling_with_shim,
                 server_ssh_private_key,
                 job_provisioning_data,
@@ -247,7 +267,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
             )
         elif initial_status == JobStatus.RUNNING:
             logger.debug("%s: process running job, age=%s", fmt(job_model), job_submission.age)
-            success = await run_async(
+            success = await common_utils.run_async(
                 _process_running,
                 server_ssh_private_key,
                 job_provisioning_data,
@@ -395,13 +415,18 @@ def _process_provisioning_with_shim(
     instance_mounts: List[InstanceMountPoint] = []
     for mount in run.run_spec.configuration.volumes:
         if is_core_model_instance(mount, VolumeMountPoint):
-            volume_mounts.append(mount)
+            volume_mounts.append(mount.copy())
         elif is_core_model_instance(mount, InstanceMountPoint):
             instance_mounts.append(mount)
         else:
             assert False, f"unexpected mount point: {mount!r}"
 
-    shim_client.submit(
+    # Run configuration may specify list of possible volume names.
+    # We should resolve in to the actual volume attached.
+    for volume, volume_mount in zip(volumes, volume_mounts):
+        volume_mount.name = volume.name
+
+    submitted = shim_client.submit(
         username=username,
         password=password,
         image_name=job_spec.image_name,
@@ -418,6 +443,20 @@ def _process_provisioning_with_shim(
         volumes=volumes,
         instance_mounts=instance_mounts,
     )
+    if not submitted:
+        # This can happen when we lost connection to the runner (e.g., network issues), marked
+        # the job as failed, released the instance (status=BUSY->IDLE, job_id={id}->None),
+        # but the job container is in fact alive, running the previous job. As we force-stop
+        # the container via shim API when cancelling the current job anyway (when either the user
+        # aborts the submission process or the submission deadline is reached), it's safe to kill
+        # the previous job container now, making the shim available (state=running->pending)
+        # for the next try.
+        logger.warning(
+            "%s: failed to sumbit, shim is already running a job, stopping it now, retry later",
+            fmt(job_model),
+        )
+        shim_client.stop(force=True)
+        return False
 
     job_model.status = JobStatus.PULLING
     logger.info("%s: now is %s", fmt(job_model), job_model.status.name)
@@ -530,6 +569,28 @@ def _process_running(
     return True
 
 
+def _get_cluster_info(
+    jobs: List[Job],
+    replica_num: int,
+    job_provisioning_data: JobProvisioningData,
+) -> ClusterInfo:
+    job_ips = []
+    for job in jobs:
+        if job.job_spec.replica_num == replica_num:
+            job_ips.append(
+                common_utils.get_or_error(
+                    job.job_submissions[-1].job_provisioning_data
+                ).internal_ip
+                or ""
+            )
+    cluster_info = ClusterInfo(
+        job_ips=job_ips,
+        master_job_ip=job_ips[0],
+        gpus_per_job=len(job_provisioning_data.instance_type.resources.gpus),
+    )
+    return cluster_info
+
+
 async def _get_job_code(
     session: AsyncSession, project: ProjectModel, repo: RepoModel, code_hash: str
 ) -> bytes:
@@ -539,7 +600,7 @@ async def _get_job_code(
     storage = get_default_storage()
     if storage is None or code_model.blob is not None:
         return code_model.blob
-    blob = await run_async(
+    blob = await common_utils.run_async(
         storage.get_code,
         project.name,
         repo.name,

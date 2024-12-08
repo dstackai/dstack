@@ -23,7 +23,7 @@ func (e *AWSBackend) GetRealDeviceName(volumeID string) (string, error) {
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("failed to list block devices: %v", err)
+		return "", fmt.Errorf("failed to list block devices: %w", err)
 	}
 
 	// Parse the output to find the device that matches the volume ID

@@ -1,0 +1,5 @@
+type: task
+commands:
+  - echo "Running dstack task via Airflow"
+  - sleep 10
+  - echo "Finished"

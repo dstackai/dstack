@@ -54,8 +54,8 @@ func AppendPublicKeys(fileKeys []string, keysToAppend []string) []string {
 }
 
 type AuthorizedKeys struct {
-	user     string
-	lookup   func(username string) (*user.User, error)
+	user   string
+	lookup func(username string) (*user.User, error)
 }
 
 func (ak AuthorizedKeys) AppendPublicKeys(publicKeys []string) error {

@@ -100,7 +100,7 @@ func GetLogger(ctx context.Context) *logrus.Entry {
 }
 
 func CreateAppendFile(path string) (*os.File, error) {
-	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0644)
+	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0o644)
 	if err != nil {
 		return nil, gerrors.Wrap(err)
 	}

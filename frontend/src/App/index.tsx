@@ -7,17 +7,17 @@ import AppLayout from 'layouts/AppLayout';
 import { useAppDispatch, useAppSelector } from 'hooks';
 import { useGetUserDataQuery } from 'services/user';
 
+import { EnterpriseLogin } from './Login/EnterpriseLogin';
 import { LoginByGithub } from './Login/LoginByGithub';
-import { LoginByTokenForm } from './Login/LoginByTokenForm';
 import { ROUTES } from '../routes';
 import { AuthErrorMessage } from './AuthErrorMessage';
 import { selectAuthToken, setUserData } from './slice';
 
 const localStorageIsAvailable = 'localStorage' in window;
 
-const IGNORED_AUTH_PATHS = [ROUTES.AUTH.GITHUB_CALLBACK, ROUTES.AUTH.TOKEN];
+const IGNORED_AUTH_PATHS = [ROUTES.AUTH.GITHUB_CALLBACK, ROUTES.AUTH.OKTA_CALLBACK, ROUTES.AUTH.TOKEN];
 
-const LoginFormComponent = process.env.UI_VERSION === 'enterprise' ? LoginByTokenForm : LoginByGithub;
+const LoginFormComponent = process.env.UI_VERSION === 'enterprise' ? EnterpriseLogin : LoginByGithub;
 
 const App: React.FC = () => {
     const { t } = useTranslation();

@@ -78,8 +78,14 @@
 }
 
 .viewCodeControls {
+    position: relative;
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 20px
+    flex-direction: column;
+    gap: 20px;
+
+    .copyButton {
+        position: absolute;
+        right: 20px;
+        top: 80px;
+    }
 }

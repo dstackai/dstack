@@ -1,0 +1,266 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'CloudFormation template for deploying a dstack server'
+
+Parameters:
+  VpcId:
+    Description: ID of an existing Virtual Private Cloud (VPC).
+    Type: 'AWS::EC2::VPC::Id'
+  PrivateSubnetIds:
+    Description: IDs of existing private subnets within the specified VPC.
+    Type: 'List<AWS::EC2::Subnet::Id>'
+
+  DstackVersion:
+    Type: String
+    Description: The version of dstack server
+    Default: latest
+
+  AdminToken:
+    Type: String
+    Description: The secure token of the admin user. If not specified, it's generated randomly.
+    Default: ''
+
+Resources:
+  LitestreamBucket:
+    Type: 'AWS::S3::Bucket'
+    DeletionPolicy: Retain
+    Properties:
+      BucketName: !Join
+        - '-'
+        - - 'dstack-server-litestream-bucket'
+          - !Select
+            - 0
+            - !Split
+              - '-'
+              - !Select
+                - 2
+                - !Split
+                  - /
+                  - !Ref AWS::StackId
+
+  TaskDefinitionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: !Join [ '-', [ 'dstack-server-task-definition-policy', !Ref 'AWS::StackName' ] ]
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ec2:AttachVolume
+                  - ec2:AuthorizeSecurityGroupEgress
+                  - ec2:AuthorizeSecurityGroupIngress
+                  - ec2:CancelSpotInstanceRequests
+                  - ec2:CreateSecurityGroup
+                  - ec2:CreateTags
+                  - ec2:CreateVolume
+                  - ec2:DeleteVolume
+                  - ec2:DescribeAvailabilityZones
+                  - ec2:DescribeImages
+                  - ec2:DescribeInstances
+                  - ec2:DescribeInstanceAttribute
+                  - ec2:DescribeInstanceTypes
+                  - ec2:DescribeRouteTables
+                  - ec2:DescribeSecurityGroups
+                  - ec2:DescribeSubnets
+                  - ec2:DescribeVpcs
+                  - ec2:DescribeVolumes
+                  - ec2:DetachVolume
+                  - ec2:RunInstances
+                  - ec2:TerminateInstances
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - servicequotas:ListServiceQuotas
+                  - servicequotas:GetServiceQuota
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - elasticloadbalancing:CreateLoadBalancer
+                  - elasticloadbalancing:CreateTargetGroup
+                  - elasticloadbalancing:CreateListener
+                  - elasticloadbalancing:RegisterTargets
+                  - elasticloadbalancing:AddTags
+                  - elasticloadbalancing:DeleteLoadBalancer
+                  - elasticloadbalancing:DeleteTargetGroup
+                  - elasticloadbalancing:DeleteListener
+                  - elasticloadbalancing:DeregisterTargets
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - acm:DescribeCertificate
+                  - acm:ListCertificates
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - s3:*
+                Resource:
+                  - !Sub 'arn:aws:s3:::${LitestreamBucket}'
+                  - !Sub 'arn:aws:s3:::${LitestreamBucket}/*'
+
+  TaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+
+  Cluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Join [ '-', [ 'dstack-server', !Ref 'AWS::StackName' ] ]
+      CapacityProviders:
+        - FARGATE
+      DefaultCapacityProviderStrategy:
+        - CapacityProvider: FARGATE
+          Weight: 1
+      Configuration:
+        ExecuteCommandConfiguration:
+          Logging: DEFAULT
+
+  TaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Join [ '-', [ 'dstack-server-task-definition-family', !Ref 'AWS::StackName' ] ]
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      Cpu: '1024'
+      Memory: '2048'
+      ExecutionRoleArn: !GetAtt TaskExecutionRole.Arn
+      TaskRoleArn: !GetAtt TaskDefinitionRole.Arn
+      ContainerDefinitions:
+        - Name: dstack-server
+          Image: !Join [ ':', [ 'dstackai/dstack', !Ref DstackVersion ] ]
+          PortMappings:
+            - ContainerPort: 8000
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Join [ '-', [ 'dstack-server', !Ref 'AWS::StackName' ] ]
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: dstack-server
+          Environment:
+            - Name: DSTACK_SERVER_PORT
+              Value: '8000'
+            - Name: DSTACK_SERVER_ADMIN_TOKEN
+              Value: !If [ AdminTokenEmpty, !Select [ 2, !Split [ '/', !Ref AWS::StackId ] ], !Ref AdminToken ]
+            - Name: LITESTREAM_REPLICA_URL
+              Value: !Join ['', ['s3://', !Ref LitestreamBucket]]
+            - Name: DSTACK_SERVER_CLOUDWATCH_LOG_GROUP
+              Value: !Join [ '-', [ 'dstack-server-runs', !Ref 'AWS::StackName' ] ]
+            - Name: DSTACK_SERVER_CLOUDWATCH_LOG_REGION
+              Value: !Ref AWS::Region
+
+  LoadBalancerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Access to the public facing load balancer
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - CidrIp: 0.0.0.0/0
+          FromPort: 80
+          ToPort: 80
+          IpProtocol: tcp
+
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Scheme: internal
+      SecurityGroups: [ !Ref 'LoadBalancerSecurityGroup' ]
+      Subnets: !Split [',', !Join [',', !Ref PrivateSubnetIds]]
+      Type: application
+
+  ListenerHTTP:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - TargetGroupArn: !Ref TargetGroup
+          Type: forward
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 80
+      Protocol: HTTP
+
+  ContainerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for container
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 8000
+          ToPort: 8000
+          SourceSecurityGroupId: !Ref LoadBalancerSecurityGroup
+
+  Service:
+    Type: AWS::ECS::Service
+    DependsOn: ListenerHTTP
+    Properties:
+      ServiceName: dstack-server
+      Cluster: !Ref Cluster
+      TaskDefinition: !Ref TaskDefinition
+      DesiredCount: 1
+      DeploymentConfiguration:
+        MinimumHealthyPercent: 0
+        MaximumPercent: 100
+      HealthCheckGracePeriodSeconds: 300
+      LaunchType: FARGATE
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          Subnets: !Split [',', !Join [',', !Ref PrivateSubnetIds]]
+          SecurityGroups:
+            - !Ref ContainerSecurityGroup
+      LoadBalancers:
+        - ContainerName: dstack-server
+          ContainerPort: 8000
+          TargetGroupArn: !Ref TargetGroup
+
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      TargetType: ip
+      Port: 8000
+      Protocol: HTTP
+      VpcId: !Ref VpcId
+      HealthCheckPath: /
+      HealthCheckIntervalSeconds: 30
+      Matcher:
+        HttpCode: '200'
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 3
+
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Join [ '-', [ 'dstack-server', !Ref 'AWS::StackName' ] ]
+      RetentionInDays: 30
+
+  RunsLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Join [ '-', [ 'dstack-server-runs', !Ref 'AWS::StackName' ] ]
+      RetentionInDays: 30
+
+Conditions:
+  AdminTokenEmpty: !Equals [ !Ref AdminToken, '' ]
+
+Outputs:
+  ServerUrl:
+    Description: The URL of the dstack server
+    Value: !GetAtt LoadBalancer.DNSName
+  AdminToken:
+    Description: The token of the admin useer
+    Value: !If [ AdminTokenEmpty, !Select [ 2, !Split [ '/', !Ref AWS::StackId ] ], !Ref AdminToken ]

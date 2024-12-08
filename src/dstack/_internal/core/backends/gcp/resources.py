@@ -337,8 +337,8 @@ def _is_valid_label(key: str, value: str) -> bool:
     return is_valid_resource_name(key) and is_valid_label_value(value)
 
 
-NAME_PATTERN = re.compile(r"^[a-z]([-a-z0-9]*[a-z0-9])?$")
-LABEL_VALUE_PATTERN = re.compile(r"^[-a-z0-9]{0,63}$")
+NAME_PATTERN = re.compile(r"^[a-z][_\-a-z0-9]{0,62}$")
+LABEL_VALUE_PATTERN = re.compile(r"^[_\-a-z0-9]{0,63}$")
 
 
 def is_valid_resource_name(name: str) -> bool:

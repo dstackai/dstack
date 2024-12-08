@@ -2,6 +2,7 @@ package repo
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 
@@ -72,7 +73,7 @@ func (m *Manager) Checkout() error {
 		}
 	}
 	ref, err := git.PlainClone(m.localPath, false, &m.clo)
-	if err != nil && err != git.ErrRepositoryAlreadyExists {
+	if err != nil && !errors.Is(err, git.ErrRepositoryAlreadyExists) {
 		return err
 	}
 	if ref != nil {
@@ -106,7 +107,7 @@ func (m *Manager) Checkout() error {
 func (m *Manager) CheckoutBranch(branch string) error {
 	log.Info(m.ctx, "git checkout", "auth", fmt.Sprintf("%T", (&m.clo).Auth))
 	ref, err := git.PlainClone(m.localPath, false, &m.clo)
-	if err != nil && err != git.ErrRepositoryAlreadyExists {
+	if err != nil && !errors.Is(err, git.ErrRepositoryAlreadyExists) {
 		return err
 	}
 	if ref != nil {

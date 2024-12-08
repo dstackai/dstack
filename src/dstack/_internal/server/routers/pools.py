@@ -13,9 +13,20 @@ from dstack._internal.server.models import ProjectModel, UserModel
 from dstack._internal.server.schemas.pools import ListPoolsRequest
 from dstack._internal.server.schemas.runs import AddRemoteInstanceRequest
 from dstack._internal.server.security.permissions import Authenticated, ProjectMember
+from dstack._internal.server.utils.routers import get_base_api_additional_responses
 
-root_router = APIRouter(prefix="/api/pools", tags=["pool"])
-router = APIRouter(prefix="/api/project/{project_name}/pool", tags=["pool"])
+root_router = APIRouter(
+    prefix="/api/pools",
+    tags=["pool"],
+    responses=get_base_api_additional_responses(),
+    deprecated=True,
+)
+router = APIRouter(
+    prefix="/api/project/{project_name}/pool",
+    tags=["pool"],
+    responses=get_base_api_additional_responses(),
+    deprecated=True,
+)
 
 
 @root_router.post("/list_instances")
@@ -25,11 +36,11 @@ async def list_pool_instances(
     user: UserModel = Depends(Authenticated()),
 ) -> List[Instance]:
     """
-    Returns all instances visible to user sorted by descending created_at.
-    A **project_name** and **pool_name** can be specified as filters.
+    Returns all instances visible to user sorted by descending `created_at`.
+    `project_name` and `pool_name` can be specified as filters.
 
-    The results are paginated. To get the next page, pass created_at and id of
-    the last run from the previous page as **prev_created_at** and **prev_id**.
+    The results are paginated. To get the next page, pass `created_at` and `id` of
+    the last instance from the previous page as `prev_created_at` and `prev_id`.
     """
     return await pools.list_user_pool_instances(
         session=session,

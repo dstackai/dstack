@@ -26,9 +26,14 @@ class TestConvertGpuName:
     @pytest.mark.parametrize(
         ["test_input", "expected"],
         [
+            # The following are asic.market_name collected in the wild
             ("MI300X-O", "MI300X"),
             ("Instinct MI210", "MI210"),
+            ("AMD INSTINCT MI250 (MCM) OAM AC MBA", "MI250"),
+            # The following are made-up examples
             ("MI300A", "MI300A"),
+            ("Instinct MI325X", "MI325X"),
+            ("AMD Radeon PRO W7900", "AMD Radeon PRO W7900"),
         ],
     )
     def test_convert_amd_gpu_name(self, test_input, expected):

@@ -4,6 +4,8 @@ date: 2024-11-05
 description: "To simplify caching across runs and the use of NFS, we introduce a new volume type that persists data on the instance."
 image: https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-instance-volumes.png?raw=true
 slug: instance-volumes
+categories:
+  - Volumes 
 ---
 
 # Introducing instance volumes to persist data on instances

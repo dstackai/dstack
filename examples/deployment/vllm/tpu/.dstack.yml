@@ -1,0 +1,35 @@
+type: service
+# The name is optional, if not specified, generated randomly
+name: llama31-service-vllm-tpu
+
+env:
+  - HF_TOKEN
+  - MODEL_ID=meta-llama/Meta-Llama-3.1-8B-Instruct
+  - DATE=20240828
+  - TORCH_VERSION=2.5.0
+  - VLLM_TARGET_DEVICE=tpu
+  - MAX_MODEL_LEN=4096
+commands:
+  - pip install https://storage.googleapis.com/pytorch-xla-releases/wheels/tpuvm/torch-${TORCH_VERSION}.dev${DATE}-cp311-cp311-linux_x86_64.whl
+  - pip3 install https://storage.googleapis.com/pytorch-xla-releases/wheels/tpuvm/torch_xla-${TORCH_VERSION}.dev${DATE}-cp311-cp311-linux_x86_64.whl
+  - pip install torch_xla[tpu] -f https://storage.googleapis.com/libtpu-releases/index.html
+  - pip install torch_xla[pallas] -f https://storage.googleapis.com/jax-releases/jax_nightly_releases.html -f https://storage.googleapis.com/jax-releases/jaxlib_nightly_releases.html
+  - git clone https://github.com/vllm-project/vllm.git
+  - cd vllm
+  - pip install -r requirements-tpu.txt
+  - apt-get install -y libopenblas-base libopenmpi-dev libomp-dev
+  - python setup.py develop
+  - vllm serve $MODEL_ID 
+      --tensor-parallel-size 4 
+      --max-model-len $MAX_MODEL_LEN
+      --port 8000
+# Expose the vllm server port
+port: 8000
+# Register the model
+model: meta-llama/Meta-Llama-3.1-8B-Instruct
+
+# Uncomment to leverage spot instances
+#spot_policy: auto
+
+resources:
+  gpu: v5litepod-4

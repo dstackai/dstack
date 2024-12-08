@@ -22,8 +22,8 @@ func ApplyDiff(ctx context.Context, dir, patch string) error {
 		return err
 	}
 
-	var output = &bytes.Buffer{}
-	var empty = bytes.NewReader([]byte{})
+	output := &bytes.Buffer{}
+	empty := bytes.NewReader([]byte{})
 
 	for _, fileInfo := range files {
 		log.Trace(ctx, "apply diff file", "file", fileInfo.OldName, "text_fragments_cnt", len(fileInfo.TextFragments))
@@ -54,7 +54,7 @@ func ApplyDiff(ctx context.Context, dir, patch string) error {
 		if !fileInfo.IsDelete {
 			if fileInfo.IsNew || fileInfo.IsRename {
 				dd := path.Dir(path.Join(dir, fileInfo.NewName))
-				err = os.MkdirAll(dd, 0755)
+				err = os.MkdirAll(dd, 0o755)
 				if err != nil {
 					log.Warning(ctx, "diff apply new file mkdir fail",
 						"filename", fileInfo.NewName,
@@ -102,7 +102,7 @@ func fileModeHeuristic(ctx context.Context, dir string, fileInfo *gitdiff.File) 
 		}
 	}
 	if mode == 0 {
-		mode = 0644 // fallback to git no-exec default
+		mode = 0o644 // fallback to git no-exec default
 	}
 	return mode
 }

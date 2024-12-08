@@ -1,12 +1,22 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Button, FormField, Header, Pagination, SelectCSD, Table, Toggle } from 'components';
+import {
+    Button,
+    ButtonWithConfirmation,
+    FormField,
+    Header,
+    Pagination,
+    SelectCSD,
+    SpaceBetween,
+    Table,
+    Toggle,
+} from 'components';
 
 import { useBreadcrumbs, useCollection } from 'hooks';
 import { ROUTES } from 'routes';
 
-import { useColumnsDefinitions, useFilters, useVolumesData, useVolumesTableEmptyMessages } from './hooks';
+import { useColumnsDefinitions, useFilters, useVolumesData, useVolumesDelete, useVolumesTableEmptyMessages } from './hooks';
 
 import styles from './styles.module.scss';
 
@@ -22,12 +32,14 @@ export const VolumeList: React.FC = () => {
         setSelectedProject,
     } = useFilters();
 
+    const { isDeleting, deleteVolumes } = useVolumesDelete();
+
     const { renderEmptyMessage, renderNoMatchMessage } = useVolumesTableEmptyMessages({
         clearFilters,
         isDisabledClearFilter,
     });
 
-    const { data, isLoading, pagesCount, disabledNext, prevPage, nextPage } = useVolumesData({
+    const { data, isLoading, pagesCount, disabledNext, prevPage, nextPage, refreshList } = useVolumesData({
         project_name: selectedProject?.value ?? undefined,
         only_active: onlyActive,
     });
@@ -41,7 +53,7 @@ export const VolumeList: React.FC = () => {
         },
     ]);
 
-    const { items, collectionProps } = useCollection(data, {
+    const { items, collectionProps, actions } = useCollection(data, {
         filtering: {
             empty: renderEmptyMessage(),
             noMatch: renderNoMatchMessage(),
@@ -49,6 +61,21 @@ export const VolumeList: React.FC = () => {
         pagination: { pageSize: 20 },
         selection: {},
     });
+
+    const { selectedItems } = collectionProps;
+
+    const deleteSelectedVolumes = () => {
+        if (!selectedItems?.length) return;
+
+        deleteVolumes([...selectedItems])
+            .finally(() => {
+                refreshList();
+                actions.setSelectedItems([]);
+            })
+            .catch(console.log);
+    };
+
+    const isDisabledDeleteSelected = !selectedItems?.length || isDeleting;
 
     return (
         <Table
@@ -59,7 +86,34 @@ export const VolumeList: React.FC = () => {
             loading={isLoading}
             loadingText={t('common.loading')}
             stickyHeader={true}
-            header={<Header>{t('volume.volumes')}</Header>}
+            header={
+                <Header
+                    variant="awsui-h1-sticky"
+                    actions={
+                        <SpaceBetween size="xs" direction="horizontal">
+                            <ButtonWithConfirmation
+                                disabled={isDisabledDeleteSelected}
+                                formAction="none"
+                                onClick={deleteSelectedVolumes}
+                                confirmTitle={t('volume.delete_volumes_confirm_title')}
+                                confirmContent={t('volume.delete_volumes_confirm_message')}
+                            >
+                                {t('common.delete')}
+                            </ButtonWithConfirmation>
+
+                            <Button
+                                iconName="refresh"
+                                disabled={isLoading}
+                                ariaLabel={t('common.refresh')}
+                                onClick={refreshList}
+                            />
+                        </SpaceBetween>
+                    }
+                >
+                    {t('volume.volumes')}
+                </Header>
+            }
+            selectionType="multi"
             filter={
                 <div className={styles.filters}>
                     <div className={styles.select}>

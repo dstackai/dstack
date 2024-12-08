@@ -15,8 +15,13 @@ from dstack._internal.server.schemas.volumes import (
     ListVolumesRequest,
 )
 from dstack._internal.server.security.permissions import Authenticated, ProjectMember
+from dstack._internal.server.utils.routers import get_base_api_additional_responses
 
-root_router = APIRouter(prefix="/api/volumes", tags=["volumes"])
+root_router = APIRouter(
+    prefix="/api/volumes",
+    tags=["volumes"],
+    responses=get_base_api_additional_responses(),
+)
 project_router = APIRouter(prefix="/api/project/{project_name}/volumes", tags=["volumes"])
 
 
@@ -26,6 +31,13 @@ async def list_volumes(
     session: AsyncSession = Depends(get_session),
     user: UserModel = Depends(Authenticated()),
 ) -> List[Volume]:
+    """
+    Returns all volumes visible to user sorted by descending `created_at`.
+    `project_name` and `only_active` can be specified as filters.
+
+    The results are paginated. To get the next page, pass `created_at` and `id` of
+    the last fleet from the previous page as `prev_created_at` and `prev_id`.
+    """
     return await volumes_services.list_volumes(
         session=session,
         user=user,
@@ -43,6 +55,9 @@ async def list_project_volumes(
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
 ) -> List[Volume]:
+    """
+    Returns all volumes in the project.
+    """
     _, project = user_project
     return await volumes_services.list_project_volumes(session=session, project=project)
 
@@ -53,6 +68,9 @@ async def get_volume(
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
 ) -> Volume:
+    """
+    Returns a volume given a volume name.
+    """
     _, project = user_project
     volume = await volumes_services.get_volume_by_name(
         session=session, project=project, name=body.name
@@ -68,6 +86,9 @@ async def create_volume(
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
 ) -> Volume:
+    """
+    Creates a volume given a volume configuration.
+    """
     user, project = user_project
     return await volumes_services.create_volume(
         session=session,
@@ -83,5 +104,8 @@ async def delete_volumes(
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
 ):
+    """
+    Deletes one or more volumes.
+    """
     _, project = user_project
     await volumes_services.delete_volumes(session=session, project=project, names=body.names)

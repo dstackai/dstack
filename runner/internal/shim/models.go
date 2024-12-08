@@ -25,14 +25,13 @@ type CLIArgs struct {
 	}
 
 	Runner struct {
-		HTTPPort   int
-		LogLevel   int
-		Version    string
-		DevChannel bool
-		BinaryPath string
-		TempDir    string
-		HomeDir    string
-		WorkingDir string
+		HTTPPort    int
+		LogLevel    int
+		DownloadURL string
+		BinaryPath  string
+		TempDir     string
+		HomeDir     string
+		WorkingDir  string
 	}
 
 	Docker struct {

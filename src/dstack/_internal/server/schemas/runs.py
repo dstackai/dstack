@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List, Optional
+from typing import Annotated, List, Optional
 from uuid import UUID
 
 from pydantic import Field
@@ -56,12 +56,17 @@ class SubmitRunRequest(CoreModel):
 
 class ApplyRunPlanRequest(CoreModel):
     plan: ApplyRunPlanInput
-    force: bool
+    force: Annotated[
+        bool,
+        Field(
+            description="Use `force: true` to apply even if the expected resource does not match."
+        ),
+    ]
 
 
 class StopRunsRequest(CoreModel):
     runs_names: List[str]
-    abort: bool
+    abort: Annotated[bool, Field(description="Do not wait for a graceful shutdown.")]
 
 
 class DeleteRunsRequest(CoreModel):

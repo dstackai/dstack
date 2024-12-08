@@ -1,31 +1,25 @@
-type: dev-environment
+type: task
 # The name is optional, if not specified, generated randomly
-name: optimum-tpu-vscode
+name: train-tpu
 
-# If `image` is not specified, dstack uses its default image
 python: "3.11"
 
 # Required environment variables
 env:
   - HF_TOKEN
 
-# Refer to Note section in examples/gpus/tpu/README.md for more information about the optimum-tpu repository.
-# Uncomment if you want the environment to be pre-installed
-#init:
-#  - git clone -b add_llama_31_support https://github.com/dstackai/optimum-tpu.git
-#  - mkdir -p optimum-tpu/examples/custom/
-#  - cp examples/fine-tuning/optimum-tpu/llama31/train.py optimum-tpu/examples/custom/train.py
-#  - cp examples/fine-tuning/optimum-tpu/llama31/config.yaml optimum-tpu/examples/custom/config.yaml
-#  - cd optimum-tpu
-#  - pip install -e . -f https://storage.googleapis.com/libtpu-releases/index.html
-#  - pip install datasets evaluate
-#  - pip install accelerate -U
-#  - pip install peft
-
-ide: vscode
-
-# Use either spot or on-demand instances
-spot_policy: auto
+# Commands of the task
+commands:
+  - git clone -b add_llama_31_support https://github.com/dstackai/optimum-tpu.git
+  - mkdir -p optimum-tpu/examples/custom/
+  - cp examples/fine-tuning/optimum-tpu/llama31/train.py optimum-tpu/examples/custom/train.py
+  - cp examples/fine-tuning/optimum-tpu/llama31/config.yaml optimum-tpu/examples/custom/config.yaml
+  - cd optimum-tpu
+  - pip install -e . -f https://storage.googleapis.com/libtpu-releases/index.html
+  - pip install datasets evaluate
+  - pip install accelerate -U
+  - pip install peft
+  - python examples/custom/train.py examples/custom/config.yaml
 
 resources:
   gpu: v5litepod-8

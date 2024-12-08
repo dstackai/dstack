@@ -22,9 +22,11 @@ for AI workloads both in the cloud and on-prem, speeding up the development, tra
 `dstack` supports the following configurations:
    
 * [Dev environments](dev-environments.md) &mdash; for interactive development using a desktop IDE
-* [Tasks](tasks.md) &mdash; for scheduling jobs (incl. distributed jobs) or running web apps
-* [Services](services.md) &mdash; for deployment of models and web apps (with auto-scaling and authorization)
+* [Tasks](tasks.md) &mdash; for scheduling jobs, incl. distributed ones (or running web apps)
+* [Services](services.md) &mdash; for deploying models (or web apps)
 * [Fleets](concepts/fleets.md) &mdash; for managing cloud and on-prem clusters
+* [Volumes](concepts/volumes.md) &mdash; for managing network volumes (to persist data)
+* [Gateways](concepts/gateways.md) &mdash; for publishing services with a custom domain and HTTPS
 
 Configuration can be defined as YAML files within your repo.
 

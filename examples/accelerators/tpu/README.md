@@ -17,7 +17,7 @@ and [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/vllm-
 
 === "Optimum TPU"
 
-    <div editor-title="examples/deployment/optimum-tpu/service.dstack.yml"> 
+    <div editor-title="examples/deployment/tgi/tpu/.dstack.yml"> 
     
     ```yaml
     type: service
@@ -32,15 +32,11 @@ and [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/vllm-
     commands:
       - text-generation-launcher --port 8000
     port: 8000
+    # Register the model
+    model: meta-llama/Meta-Llama-3.1-8B-Instruct
     
-    spot_policy: auto
     resources:
-      gpu: v5litepod-4 
-    
-    model:
-      format: tgi
-      type: chat
-      name: meta-llama/Meta-Llama-3.1-8B-Instruct
+      gpu: v5litepod-4
     ```
     </div>
 
@@ -49,11 +45,11 @@ and [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/vllm-
     ??? info "Docker image"
         The official Docker image `huggingface/optimum-tpu:latest` doesn’t support Llama 3.1-8B. 
         We’ve created a custom image with the fix: `dstackai/optimum-tpu:llama31`. 
-        Once the [pull request :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/optimum-tpu/pull/87){:target="_blank"} is merged, 
+        Once the [pull request :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/optimum-tpu/pull/92){:target="_blank"} is merged, 
         the official Docker image can be used.
 
 === "vLLM"
-    <div editor-title="examples/deployment/vllm/service-tpu.dstack.yml"> 
+    <div editor-title="examples/deployment/vllm/tpu/.dstack.yml"> 
     
     ```yaml
     type: service
@@ -80,14 +76,15 @@ and [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/vllm-
           --tensor-parallel-size 4 
           --max-model-len $MAX_MODEL_LEN
           --port 8000
-    port:
-      - 8000
-
-    spot_policy: auto
+    port: 8000
+    # Register the model
+    model: meta-llama/Meta-Llama-3.1-8B-Instruct
+    
+    # Uncomment to leverage spot instances
+    #spot_policy: auto
+    
     resources:
       gpu: v5litepod-4
-
-    model: meta-llama/Meta-Llama-3.1-8B-Instruct
     ```
     </div>
 
@@ -120,17 +117,16 @@ cloud resources and run the configuration.
 ## Fine-tuning with Optimum TPU
 
 Below is an example of fine-tuning Llama 3.1 8B using [Optimum TPU :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/optimum-tpu){:target="_blank"} 
-and the [Abirate/english_quotes :material-arrow-top-right-thin:{ .external }](https://huggingface.co/datasets/Abirate/english_quotes){:target="_blank"}
+and the [`Abirate/english_quotes` :material-arrow-top-right-thin:{ .external }](https://huggingface.co/datasets/Abirate/english_quotes){:target="_blank"}
 dataset.
 
-<div editor-title="examples/fine-tuning/optimum-tpu/llama31/train.dstack.yml"> 
+<div editor-title="examples/fine-tuning/optimum-tpu/llama31/.dstack.yml"> 
 
 ```yaml
 type: task
 name: optimum-tpu-llama-train
 
 python: "3.11"
-
 env:
   - HF_TOKEN
 commands:
@@ -144,7 +140,6 @@ commands:
   - pip install accelerate -U
   - pip install peft
   - python examples/custom/train.py examples/custom/config.yaml
-
 
 resources:
   gpu: v5litepod-8
@@ -174,16 +169,11 @@ Note, `v5litepod` is optimized for fine-tuning transformer-based models. Each co
 | **TRL**         | bfloat16     | To fine-tune using TRL, Optimum TPU is recommended. TRL doesn't support Llama 3.1 out of the box. |
 | **Pytorch XLA** | bfloat16     |                                                                                                   |
 
-## Dev environments
-
-Before running a task or service, it's recommended that you first start with
-a [dev environment](https://dstack.ai/docs/dev-environments). Dev environments
-allow you to run commands interactively.
-
 ## Source code
 
 The source-code of this example can be found in 
-[`examples/deployment/optimum-tpu` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/llms/llama31){:target="_blank"}
+[`examples/deployment/tgi/tpu` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/deployment/tgi/tpu){:target="_blank"},
+[`examples/deployment/vllm/tpu` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/deployment/vllm/tpu){:target="_blank"},
 and [`examples/fine-tuning/optimum-tpu` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/trl){:target="_blank"}.
 
 ## What's next?

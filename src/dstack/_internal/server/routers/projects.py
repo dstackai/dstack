@@ -17,8 +17,13 @@ from dstack._internal.server.security.permissions import (
     ProjectMember,
 )
 from dstack._internal.server.services import projects
+from dstack._internal.server.utils.routers import get_base_api_additional_responses
 
-router = APIRouter(prefix="/api/projects", tags=["projects"])
+router = APIRouter(
+    prefix="/api/projects",
+    tags=["projects"],
+    responses=get_base_api_additional_responses(),
+)
 
 
 @router.post("/list")
@@ -27,7 +32,8 @@ async def list_projects(
     user: UserModel = Depends(Authenticated()),
 ) -> List[Project]:
     """
-    Returns all projects visible to user.
+    Returns all projects visible to user sorted by descending `created_at`.
+
     `members` and `backends` are always empty - call `/api/projects/{project_name}/get` to retrieve them.
     """
     return await projects.list_user_projects(session=session, user=user)

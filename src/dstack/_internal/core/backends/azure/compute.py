@@ -197,7 +197,6 @@ class AzureCompute(Compute):
             ssh_keys=[
                 SSHKey(public=project_ssh_public_key.strip()),
             ],
-            job_docker_config=None,
             user=run.user,
         )
         return self.create_instance(instance_offer, instance_config)
