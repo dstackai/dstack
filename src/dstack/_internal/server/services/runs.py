@@ -506,11 +506,17 @@ async def stop_runs(
 
 async def stop_run(session: AsyncSession, run_model: RunModel, abort: bool):
     res = await session.execute(
-        select(RunModel).where(RunModel.id == run_model.id).with_for_update()
+        select(RunModel)
+        .where(RunModel.id == run_model.id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
     )
     run_model = res.scalar_one()
     await session.execute(
-        select(JobModel).where(JobModel.run_id == run_model.id).with_for_update()
+        select(JobModel)
+        .where(JobModel.run_id == run_model.id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
     )
     if run_model.status.is_finished():
         return
