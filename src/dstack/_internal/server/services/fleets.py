@@ -516,7 +516,7 @@ async def generate_fleet_name(session: AsyncSession, project: ProjectModel) -> s
 
 
 def is_fleet_in_use(fleet_model: FleetModel, instance_nums: Optional[List[int]] = None) -> bool:
-    instances_in_use = [i for i in fleet_model.instances if i.job_id is not None]
+    instances_in_use = [i for i in fleet_model.instances if i.job_id is not None and not i.deleted]
     selected_instance_in_use = instances_in_use
     if instance_nums is not None:
         selected_instance_in_use = [i for i in instances_in_use if i.instance_num in instance_nums]

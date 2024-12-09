@@ -588,6 +588,24 @@ async def _create_instance(session: AsyncSession, instance: InstanceModel) -> No
 
 
 async def _check_instance(instance: InstanceModel) -> None:
+    if (
+        instance.status == InstanceStatus.BUSY
+        and instance.job is not None
+        and instance.job.status.is_finished()
+    ):
+        # A busy instance could have no active jobs due to this bug: https://github.com/dstackai/dstack/issues/2068
+        instance.status = InstanceStatus.TERMINATING
+        instance.termination_reason = "Instance job finished"
+        logger.info(
+            "Detected busy instance %s with finished job. Marked as TERMINATING",
+            instance.name,
+            extra={
+                "instance_name": instance.name,
+                "instance_status": instance.status.value,
+            },
+        )
+        return
+
     job_provisioning_data = JobProvisioningData.__response__.parse_raw(
         instance.job_provisioning_data
     )

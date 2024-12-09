@@ -8,6 +8,8 @@ from dstack._internal.core.models.repos.base import BaseRepoInfo, Repo
 from dstack._internal.utils.hash import get_sha256
 from dstack._internal.utils.path import resolve_relative_path
 
+DEFAULT_VIRTUAL_REPO_ID = "none"
+
 
 class VirtualRepoInfo(BaseRepoInfo):
     repo_type: Literal["virtual"] = "virtual"
@@ -41,8 +43,7 @@ class VirtualRepo(Repo):
 
     run_repo_data: VirtualRunRepoData
 
-    # TODO: Make repo_id optional
-    def __init__(self, repo_id: str):
+    def __init__(self, repo_id: str = DEFAULT_VIRTUAL_REPO_ID):
         self.repo_id = repo_id
         self.repo_dir = None
         self.files: Dict[str, bytes] = {}

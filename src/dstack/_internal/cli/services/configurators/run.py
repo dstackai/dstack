@@ -106,10 +106,13 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
         confirm_message = "Submit a new run?"
         stop_run_name = None
         if run_plan.current_resource is not None:
-            diff = diff_models(
-                run_plan.run_spec.configuration, run_plan.current_resource.run_spec.configuration
-            )
-            changed_fields = list(diff.keys())
+            changed_fields = []
+            if run_plan.action == ApplyAction.UPDATE:
+                diff = diff_models(
+                    run_plan.run_spec.configuration,
+                    run_plan.current_resource.run_spec.configuration,
+                )
+                changed_fields = list(diff.keys())
             if run_plan.action == ApplyAction.UPDATE and len(changed_fields) > 0:
                 console.print(
                     f"Active run [code]{conf.name}[/] already exists."
