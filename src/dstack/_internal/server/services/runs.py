@@ -926,7 +926,10 @@ def _can_update_run_spec(current_run_spec: RunSpec, new_run_spec: RunSpec) -> bo
 
 
 def _check_can_update_run_spec(current_run_spec: RunSpec, new_run_spec: RunSpec):
-    if current_run_spec.configuration.type != "service":
+    if (
+        current_run_spec.configuration.type != "service"
+        or new_run_spec.configuration.type != "service"
+    ):
         raise ServerClientError("Can only update service run configuration")
     spec_diff = diff_models(current_run_spec, new_run_spec)
     changed_spec_fields = list(spec_diff.keys())
