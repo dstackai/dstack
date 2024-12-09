@@ -761,7 +761,6 @@ def _supported_instances(offer: InstanceOffer) -> bool:
         "p4d.",
         "p4de.",
         "p5.",
-        "p5e",
     ]:
         if offer.instance.name.startswith(family):
             return True
