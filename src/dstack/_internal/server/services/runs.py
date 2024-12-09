@@ -25,6 +25,7 @@ from dstack._internal.core.models.instances import (
 from dstack._internal.core.models.profiles import (
     CreationPolicy,
 )
+from dstack._internal.core.models.repos.virtual import DEFAULT_VIRTUAL_REPO_ID, VirtualRunRepoData
 from dstack._internal.core.models.runs import (
     ApplyRunPlanInput,
     Job,
@@ -235,7 +236,7 @@ async def get_plan(
     user: UserModel,
     run_spec: RunSpec,
 ) -> RunPlan:
-    _validate_run_spec(run_spec)
+    _validate_run_spec_and_set_defaults(run_spec)
 
     profile = run_spec.merged_profile
     creation_policy = profile.creation_policy
@@ -324,6 +325,7 @@ async def apply_plan(
     plan: ApplyRunPlanInput,
     force: bool,
 ) -> Run:
+    _validate_run_spec_and_set_defaults(plan.run_spec)
     if plan.run_spec.run_name is None:
         return await submit_run(
             session=session,
@@ -378,15 +380,12 @@ async def submit_run(
     project: ProjectModel,
     run_spec: RunSpec,
 ) -> Run:
-    _validate_run_spec(run_spec)
-
-    repo = await repos_services.get_repo_model(
+    _validate_run_spec_and_set_defaults(run_spec)
+    repo = await _get_run_repo_or_error(
         session=session,
         project=project,
-        repo_id=run_spec.repo_id,
+        run_spec=run_spec,
     )
-    if repo is None:
-        raise RepoDoesNotExistError.with_id(run_spec.repo_id)
 
     lock_namespace = f"run_names_{project.name}"
     if get_db().dialect_name == "sqlite":
@@ -850,6 +849,31 @@ def check_run_spec_has_instance_mounts(run_spec: RunSpec) -> bool:
     )
 
 
+async def _get_run_repo_or_error(
+    session: AsyncSession,
+    project: ProjectModel,
+    run_spec: RunSpec,
+) -> RepoModel:
+    # Must be set by _validate_run_spec_and_set_defaults()
+    repo_id = common_utils.get_or_error(run_spec.repo_id)
+    repo_data = common_utils.get_or_error(run_spec.repo_data)
+    if repo_data.repo_type == "virtual":
+        repo = await repos_services.create_or_update_repo(
+            session=session,
+            project=project,
+            repo_id=repo_id,
+            repo_info=repo_data,
+        )
+    repo = await repos_services.get_repo_model(
+        session=session,
+        project=project,
+        repo_id=repo_id,
+    )
+    if repo is None:
+        raise RepoDoesNotExistError.with_id(repo_id)
+    return repo
+
+
 def _get_run_cost(run: Run) -> float:
     run_cost = math.fsum(
         _get_job_submission_cost(submission)
@@ -866,7 +890,7 @@ def _get_job_submission_cost(job_submission: JobSubmission) -> float:
     return job_submission.job_provisioning_data.price * duration_hours
 
 
-def _validate_run_spec(run_spec: RunSpec):
+def _validate_run_spec_and_set_defaults(run_spec: RunSpec):
     if run_spec.run_name is not None:
         validate_dstack_resource_name(run_spec.run_name)
     for mount_point in run_spec.configuration.volumes:
@@ -874,6 +898,16 @@ def _validate_run_spec(run_spec: RunSpec):
             raise ServerClientError(f"Invalid volume mount path: {mount_point.path}")
         if mount_point.path.startswith("/workflow"):
             raise ServerClientError("Mounting volumes inside /workflow is not supported")
+    if run_spec.repo_id is None and run_spec.repo_data is not None:
+        raise ServerClientError("repo_data must not be set if repo_id is not set")
+    if run_spec.repo_id is not None and run_spec.repo_data is None:
+        raise ServerClientError("repo_id must not be set if repo_data is not set")
+    # Some run_spec parameters have to be set here and not in the model defaults since
+    # the client may not pass them or pass null, but they must be always present, e.g. for runner.
+    if run_spec.repo_id is None:
+        run_spec.repo_id = DEFAULT_VIRTUAL_REPO_ID
+    if run_spec.repo_data is None:
+        run_spec.repo_data = VirtualRunRepoData()
 
 
 _UPDATABLE_SPEC_FIELDS = ["repo_code_hash", "configuration"]
