@@ -2,7 +2,8 @@
 title: "Beyond Kubernetes: 2024 recap and what's next for AI infra"
 date: 2024-12-10
 description: "Reflecting on key milestones from 2024, and looking ahead to the next steps in simplifying AI infrastructure orchestration."  
-slug: beyond-kubernetes-2024-recap-and-whatsnext
+slug: beyond-kubernetes-2024-recap-and-whats-ahead
+image: https://github.com/dstackai/static-assets/blob/main/static-assets/images/beyond-kubernetes-2024-recap-and-whats-ahead.png?raw=true
 categories:
   - AMD
   - NVIDIA
@@ -33,13 +34,11 @@ This year, we’re excited to welcome our first partners: [Lambda :material-arro
 and [Hot Aisle :material-arrow-top-right-thin:{ .external }](https://hotaisle.xyz/){:target="_blank"}.
 
 We’d also like to thank [Oracle  :material-arrow-top-right-thin:{ .external }](https://www.oracle.com/cloud/){:target="_blank"} 
-for their collaboration, which helped ensure that `dstack` is fully compatible with Oracle's GPUs.
+for their collaboration, ensuring seamless integration between `dstack` and OCI.
 
 > Special thanks to Lambda and Hot Aisle for providing NVIDIA and AMD hardware, which enabled us to conduct
 [our benchmarks](/blog/category/benchmarks/). These benchmarks are essential for advancing the development of
 > open-source inference and training stacks for all accelerator chips.
-
-As `dstack` continues to build an open standard, we encourage cloud and hardware vendors to contribute to the project. 
 
 ## Community
 
@@ -121,11 +120,20 @@ for model deployment, and we continue to enhance support for NVIDIA’s AI stack
 This year, we’re particularly proud of our expanded support for AMD, which is now available on both on-prem servers 
 (with SSH fleets) and in the cloud.
 
-> Currently, among cloud providers, AMD is supported only through RunPod. In Q1 2025, we plan to extend it to
+> Currently, among cloud providers, [AMD :material-arrow-top-right-thin:{ .external }](https://www.amd.com/en/products/accelerators/instinct.html){:target="_blank"} is supported only through RunPod. In Q1 2025, we plan to extend it to
 [Nscale :material-arrow-top-right-thin:{ .external }](https://www.nscale.com/){:target="_blank"}
 > and potentially other providers open to collaboration.
 
-### Others
+### Intel
 
-As AI infrastructure demand continues to grow, we plan to enhance `dstack`'s support for GCP’s TPU and expand
-integration with additional accelerator chips, including AWS’s Inferentia/Trainium, Intel’s Gaudi, and potentially more.
+In Q1 2025, our roadmap includes extending `dstack`'s integration to new accelerators, including 
+[Intel Gaudi :material-arrow-top-right-thin:{ .external }](https://www.intel.com/content/www/us/en/products/details/processors/ai-accelerators/gaudi-overview.html){:target="_blank"}
+and potentially other chips.
+
+## Join the community
+
+If you're looking to simplify AI infrastructure, both in the cloud and on-prem, 
+consider getting involved as a `dstack` user, open-source contributor, or ambassador.
+
+We also welcome cloud, hardware, and software vendors to contribute to `dstack` and support 
+its evolution as an open standard.
