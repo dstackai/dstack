@@ -39,12 +39,14 @@ from dstack._internal.core.models.configurations import (
     ServiceConfiguration,
     TaskConfiguration,
 )
+from dstack._internal.core.models.repos.base import Repo
 from dstack._internal.core.models.runs import JobSubmission, JobTerminationReason, RunStatus
 from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.core.services.diff import diff_models
 from dstack._internal.utils.common import local_time
 from dstack._internal.utils.interpolator import InterpolatorError, VariablesInterpolator
 from dstack._internal.utils.logging import get_logger
+from dstack.api._public.repos import get_ssh_keypair
 from dstack.api._public.runs import Run
 from dstack.api.utils import load_profile
 
@@ -67,6 +69,7 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
         command_args: argparse.Namespace,
         configurator_args: argparse.Namespace,
         unknown_args: List[str],
+        repo: Optional[Repo] = None,
     ):
         self.apply_args(conf, configurator_args, unknown_args)
         self.validate_gpu_vendor_and_image(conf)
@@ -76,9 +79,17 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
                 " and will be forbidden in a future [code]dstack[/] release."
                 " Please upgrade your configuration to a newer Python version."
             )
-        repo = self.api.repos.load(Path.cwd())
-        repo_config = ConfigManager().get_repo_config_or_error(repo.get_repo_dir_or_error())
-        self.api.ssh_identity_file = repo_config.ssh_key_path
+        if repo is None:
+            repo = self.api.repos.load(Path.cwd())
+        config_manager = ConfigManager()
+        if repo.repo_dir is not None:
+            repo_config = config_manager.get_repo_config_or_error(repo.repo_dir)
+            self.api.ssh_identity_file = repo_config.ssh_key_path
+        else:
+            self.api.ssh_identity_file = get_ssh_keypair(
+                command_args.ssh_identity_file,
+                config_manager.dstack_key_path,
+            )
         profile = load_profile(Path.cwd(), configurator_args.profile)
         with console.status("Getting apply plan..."):
             run_plan = self.api.runs.get_plan(

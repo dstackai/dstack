@@ -12,12 +12,15 @@ from dstack._internal.core.models.config import RepoConfig
 from dstack._internal.core.models.repos import LocalRepo, RemoteRepo, RemoteRepoCreds
 from dstack._internal.core.models.repos.base import RepoProtocol
 from dstack._internal.core.models.repos.remote import GitRepoURL
+from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.path import PathLike
 from dstack._internal.utils.ssh import (
     get_host_config,
     make_ssh_command_for_git,
     try_ssh_key_passphrase,
 )
+
+logger = get_logger(__name__)
 
 gh_config_path = os.path.expanduser("~/.config/gh/hosts.yml")
 default_ssh_key = os.path.expanduser("~/.ssh/id_rsa")
@@ -77,7 +80,7 @@ def get_local_repo_credentials(
             pass
 
     raise InvalidRepoCredentialsError(
-        "No valid default Git credentials found: pass a valid `--token` or `--git-identity` to `dstack init`."
+        "No valid default Git credentials found. Pass valid `--token` or `--git-identity`."
     )
 
 
@@ -125,6 +128,20 @@ def check_remote_repo_credentials_ssh(url: GitRepoURL, identity_file: PathLike) 
         private_key=private_key,
         oauth_token=None,
     )
+
+
+def get_default_branch(remote_url: str) -> Optional[str]:
+    """
+    Get the default branch of a remote Git repository.
+    """
+    try:
+        output = git.cmd.Git().ls_remote("--symref", remote_url, "HEAD")
+        for line in output.splitlines():
+            if line.startswith("ref:"):
+                return line.split()[1].split("/")[-1]
+    except Exception as e:
+        logger.debug("Failed to get remote repo default branch: %s", repr(e))
+    return None
 
 
 def load_repo(config: RepoConfig) -> Union[RemoteRepo, LocalRepo]:

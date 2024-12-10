@@ -1,6 +1,6 @@
 import argparse
 import time
-from typing import List
+from typing import List, Optional
 
 from rich.table import Table
 
@@ -21,6 +21,7 @@ from dstack._internal.core.models.gateways import (
     GatewaySpec,
     GatewayStatus,
 )
+from dstack._internal.core.models.repos.base import Repo
 from dstack._internal.utils.common import local_time
 from dstack.api._public import Client
 
@@ -35,6 +36,7 @@ class GatewayConfigurator(BaseApplyConfigurator):
         command_args: argparse.Namespace,
         configurator_args: argparse.Namespace,
         unknown_args: List[str],
+        repo: Optional[Repo] = None,
     ):
         spec = GatewaySpec(
             configuration=conf,

@@ -7,6 +7,7 @@ from dstack._internal.cli.services.configurators import (
     load_apply_configuration,
 )
 from dstack._internal.cli.services.configurators.base import BaseApplyConfigurator
+from dstack._internal.cli.services.repos import init_repo, register_init_repo_args
 from dstack._internal.core.models.configurations import ApplyConfigurationType
 
 NOTSET = object()
@@ -54,6 +55,23 @@ class ApplyCommand(APIBaseCommand):
             help="Exit immediately after sumbitting configuration",
             action="store_true",
         )
+        repo_group = self._parser.add_argument_group("Repo Options")
+        repo_group.add_argument(
+            "--repo",
+            help="The repo to use for the run",
+            dest="repo",
+        )
+        repo_group.add_argument(
+            "--repo-branch",
+            help="The repo branch to use for the run",
+            dest="repo_branch",
+        )
+        repo_group.add_argument(
+            "--repo-hash",
+            help="The hash of the repo commit to use for the run",
+            dest="repo_hash",
+        )
+        register_init_repo_args(repo_group)
 
     def _command(self, args: argparse.Namespace):
         try:
@@ -69,6 +87,16 @@ class ApplyCommand(APIBaseCommand):
                 return
 
             super()._command(args)
+            repo = init_repo(
+                api=self.api,
+                repo_path=args.repo,
+                repo_branch=args.repo_branch,
+                repo_hash=args.repo_hash,
+                local=args.local,
+                git_identity_file=args.git_identity_file,
+                oauth_token=args.gh_token,
+                ssh_identity_file=args.ssh_identity_file,
+            )
             configuration_path, configuration = load_apply_configuration(args.configuration_file)
             configurator_class = get_apply_configurator_class(configuration.type)
             configurator = configurator_class(api_client=self.api)
@@ -80,6 +108,7 @@ class ApplyCommand(APIBaseCommand):
                 command_args=args,
                 configurator_args=known,
                 unknown_args=unknown,
+                repo=repo,
             )
         except KeyboardInterrupt:
             print("\nOperation interrupted by user. Exiting...")
