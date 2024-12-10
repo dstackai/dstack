@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 import functools
 import json
 from typing import Any, AsyncIterator, Callable, Dict, ParamSpec, TypeVar
@@ -17,10 +18,8 @@ async def run_async(func: Callable[P, R], *args: P.args, **kwargs: P.kwargs) -> 
 
 class AsyncClientWrapper(httpx.AsyncClient):
     def __del__(self):
-        try:
+        with contextlib.suppress(Exception):
             asyncio.get_running_loop().create_task(self.aclose())
-        except Exception:
-            pass
 
     async def stream_sse(self, url: str, **kwargs) -> AsyncIterator[Dict[str, Any]]:
         async with self.stream("POST", url, **kwargs) as resp:
