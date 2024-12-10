@@ -34,7 +34,8 @@ and [Hot Aisle :material-arrow-top-right-thin:{ .external }](https://hotaisle.xy
 We’d also like to thank [Oracle  :material-arrow-top-right-thin:{ .external }](https://www.oracle.com/cloud/){:target="_blank"} 
 for their collaboration, ensuring seamless integration between `dstack` and OCI.
 
-> Special thanks to Lambda and Hot Aisle for providing NVIDIA and AMD hardware, enabling us conducting benchmarks, which
+> Special thanks to [Lambda :material-arrow-top-right-thin:{ .external }](https://lambdalabs.com/){:target="_blank"} and
+> [Hot Aisle :material-arrow-top-right-thin:{ .external }](https://hotaisle.xyz/){:target="_blank"} for providing NVIDIA and AMD hardware, enabling us conducting benchmarks, which
 > are essential to advancing open-source inference and training stacks for all accelerator chips.
 
 ## Community
@@ -112,12 +113,14 @@ for model deployment, and we continue to enhance support for the rest of NVIDIA'
 
 ### AMD
 
-This year, we’re particularly proud of our newly added integration with AMD, which is now supported on
-both with on-prem server and cloud providers.
+This year, we’re particularly proud of our newly added integration with AMD.
 
-> Currently, among cloud providers, [AMD :material-arrow-top-right-thin:{ .external }](https://www.amd.com/en/products/accelerators/instinct.html){:target="_blank"} is supported only through RunPod. In Q1 2025, we plan to extend it to
-[Nscale :material-arrow-top-right-thin:{ .external }](https://www.nscale.com/){:target="_blank"}
-> and potentially other providers open to collaboration.
+`dstack` works seamlessly with any on-prem AMD clusters. For example, you can rent such servers through our partner 
+[Hot Aisle :material-arrow-top-right-thin:{ .external }](https://hotaisle.xyz/){:target="_blank"}.
+
+> Among cloud providers, [AMD :material-arrow-top-right-thin:{ .external }](https://www.amd.com/en/products/accelerators/instinct.html){:target="_blank"} is supported only through RunPod. In Q1 2025, we plan to extend it to
+[Nscale :material-arrow-top-right-thin:{ .external }](https://www.nscale.com/){:target="_blank"},
+> [Hot Aisle :material-arrow-top-right-thin:{ .external }](https://hotaisle.xyz/){:target="_blank"}, and potentially other providers open to collaboration.
 
 ### Intel
 
