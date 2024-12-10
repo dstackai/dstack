@@ -28,18 +28,34 @@ func (s *ShimServer) SubmitPostHandler(w http.ResponseWriter, r *http.Request) (
 		return nil, &api.Error{Status: http.StatusConflict}
 	}
 
-	var body TaskConfigBody
+	var body SubmitBody
 	if err := api.DecodeJSONBody(w, r, &body, true); err != nil {
 		log.Println("Failed to decode submit body", "err", err)
 		return nil, err
 	}
 
+	taskConfig := shim.TaskConfig{
+		ID:               shim.LegacyTaskID,
+		Name:             body.ContainerName,
+		RegistryUsername: body.Username,
+		RegistryPassword: body.Password,
+		ImageName:        body.ImageName,
+		ContainerUser:    body.ContainerUser,
+		Privileged:       body.Privileged,
+		ShmSize:          body.ShmSize,
+		PublicKeys:       body.PublicKeys,
+		SshUser:          body.SshUser,
+		SshKey:           body.SshKey,
+		Volumes:          body.Volumes,
+		VolumeMounts:     body.VolumeMounts,
+		InstanceMounts:   body.InstanceMounts,
+	}
 	go func(taskConfig shim.TaskConfig) {
 		err := s.runner.Run(context.Background(), taskConfig)
 		if err != nil {
 			fmt.Printf("failed Run %v\n", err)
 		}
-	}(body)
+	}(taskConfig)
 
 	return nil, nil
 }

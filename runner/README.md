@@ -85,11 +85,6 @@ These are nonexhaustive lists of external dependencies (executables, libraries) 
 
 ### `dstack-shim`
 
-#### Libraries
-
-* libc
-* ...
-
 #### Executables
 
 * `mount`
@@ -103,11 +98,6 @@ These are nonexhaustive lists of external dependencies (executables, libraries) 
 Debian/Ubuntu packages: `mount` (`mount`, `umount`), `util-linux` (`mountpoint`, `lsblk`), `e2fsprogs` (`mkfs.ext4`)
 
 ### `dstack-runner`
-
-#### Libraries
-
-* libc
-* ...
 
 #### Executables
 

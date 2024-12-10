@@ -33,7 +33,7 @@ func TestDocker_SSHServer(t *testing.T) {
 	defer cancel()
 
 	dockerRunner, _ := NewDockerRunner(params)
-	assert.NoError(t, dockerRunner.Run(ctx, TaskConfig{ImageName: "ubuntu"}))
+	assert.NoError(t, dockerRunner.Run(ctx, TaskConfig{ImageName: "ubuntu", Name: t.Name(), ID: time.Now().String()}))
 }
 
 // TestDocker_SSHServerConnect pulls ubuntu image (without sshd), installs openssh-server and tries to connect via SSH
@@ -64,7 +64,7 @@ func TestDocker_SSHServerConnect(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		assert.NoError(t, dockerRunner.Run(ctx, TaskConfig{ImageName: "ubuntu"}))
+		assert.NoError(t, dockerRunner.Run(ctx, TaskConfig{ImageName: "ubuntu", Name: t.Name(), ID: time.Now().String()}))
 	}()
 
 	for i := 0; i < timeout; i++ {
@@ -101,7 +101,7 @@ func TestDocker_ShmNoexecByDefault(t *testing.T) {
 	defer cancel()
 
 	dockerRunner, _ := NewDockerRunner(params)
-	assert.NoError(t, dockerRunner.Run(ctx, TaskConfig{ImageName: "ubuntu"}))
+	assert.NoError(t, dockerRunner.Run(ctx, TaskConfig{ImageName: "ubuntu", Name: t.Name(), ID: time.Now().String()}))
 }
 
 func TestDocker_ShmExecIfSizeSpecified(t *testing.T) {
@@ -119,7 +119,7 @@ func TestDocker_ShmExecIfSizeSpecified(t *testing.T) {
 	defer cancel()
 
 	dockerRunner, _ := NewDockerRunner(params)
-	assert.NoError(t, dockerRunner.Run(ctx, TaskConfig{ImageName: "ubuntu", ShmSize: 1024 * 1024}))
+	assert.NoError(t, dockerRunner.Run(ctx, TaskConfig{ImageName: "ubuntu", ShmSize: 1024 * 1024, Name: t.Name(), ID: time.Now().String()}))
 }
 
 /* Mocks */

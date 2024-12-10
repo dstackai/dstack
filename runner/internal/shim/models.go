@@ -1,12 +1,7 @@
 package shim
 
 import (
-	"encoding/base64"
-	"encoding/json"
-	"log"
-
 	"github.com/docker/docker/api/types/mount"
-	"github.com/docker/docker/api/types/registry"
 )
 
 type DockerParameters interface {
@@ -60,36 +55,21 @@ type VolumeInfo struct {
 }
 
 type TaskConfig struct {
-	Username       string               `json:"username"`
-	Password       string               `json:"password"`
-	ImageName      string               `json:"image_name"`
-	Privileged     bool                 `json:"privileged"`
-	ContainerName  string               `json:"container_name"`
-	ContainerUser  string               `json:"container_user"`
-	ShmSize        int64                `json:"shm_size"`
-	PublicKeys     []string             `json:"public_keys"`
-	SshUser        string               `json:"ssh_user"`
-	SshKey         string               `json:"ssh_key"`
-	VolumeMounts   []VolumeMountPoint   `json:"mounts"`
-	Volumes        []VolumeInfo         `json:"volumes"`
-	InstanceMounts []InstanceMountPoint `json:"instance_mounts"`
+	ID               string               `json:"id"`
+	Name             string               `json:"name"`
+	RegistryUsername string               `json:"registry_username"`
+	RegistryPassword string               `json:"registry_password"`
+	ImageName        string               `json:"image_name"`
+	ContainerUser    string               `json:"container_user"`
+	Privileged       bool                 `json:"privileged"`
+	ShmSize          int64                `json:"shm_size"`
+	PublicKeys       []string             `json:"public_keys"`
+	SshUser          string               `json:"ssh_user"`
+	SshKey           string               `json:"ssh_key"`
+	Volumes          []VolumeInfo         `json:"volumes"`
+	VolumeMounts     []VolumeMountPoint   `json:"volume_mounts"`
+	InstanceMounts   []InstanceMountPoint `json:"instance_mounts"`
 }
 
-func (ra TaskConfig) EncodeRegistryAuth() (string, error) {
-	if ra.Username == "" && ra.Password == "" {
-		return "", nil
-	}
-
-	authConfig := registry.AuthConfig{
-		Username: ra.Username,
-		Password: ra.Password,
-	}
-
-	encodedConfig, err := json.Marshal(authConfig)
-	if err != nil {
-		log.Println("Failed to encode auth config", "err", err)
-		return "", err
-	}
-
-	return base64.URLEncoding.EncodeToString(encodedConfig), nil
-}
+// a surrogate ID used for tasks submitted via legacy API
+const LegacyTaskID = "00000000-0000-0000-0000-000000000000"
