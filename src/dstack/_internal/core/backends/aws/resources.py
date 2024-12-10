@@ -622,10 +622,17 @@ def get_reservation(
         response = ec2_client.describe_capacity_reservations(
             CapacityReservationIds=[reservation_id], Filters=filters
         )
+    except botocore.exceptions.ParamValidationError as e:
+        logger.error("Skipping reservation %s. Parameter validation error.", e)
+        return None
     except botocore.exceptions.ClientError as e:
-        if e.response.get("Error", {}).get("Code") == "InvalidCapacityReservationId.NotFound":
+        error_code = e.response.get("Error", {}).get("Code")
+        if error_code == "InvalidCapacityReservationId.Malformed":
+            logger.error("Skipping reservation %s. Malformed ID.", reservation_id)
+            return None
+        if error_code == "InvalidCapacityReservationId.NotFound":
             logger.debug(
-                "Skipping reservation %s . Capacity Reservation  not found.", reservation_id
+                "Skipping reservation %s. Capacity Reservation not found.", reservation_id
             )
             return None
         raise
