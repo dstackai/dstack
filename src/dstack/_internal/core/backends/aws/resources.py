@@ -140,7 +140,7 @@ def create_instances_struct(
     allocate_public_ip: bool = True,
     placement_group_name: Optional[str] = None,
     enable_efa: bool = False,
-    reservation_id: str = None,
+    reservation_id: Optional[str] = None,
     is_capacity_block: bool = False,
 ) -> Dict[str, Any]:
     struct: Dict[str, Any] = dict(
@@ -612,7 +612,7 @@ def get_reservation(
     ec2_client: botocore.client.BaseClient,
     reservation_id: str,
     instance_count: int = 0,
-    instance_types: List[str] = None,
+    instance_types: Optional[List[str]] = None,
     is_capacity_block: bool = False,
 ) -> Optional[Dict[str, Any]]:
     filters = [{"Name": "state", "Values": ["active"]}]
@@ -623,12 +623,14 @@ def get_reservation(
             CapacityReservationIds=[reservation_id], Filters=filters
         )
     except botocore.exceptions.ParamValidationError as e:
-        logger.error("Skipping reservation %s. Parameter validation error.", e)
+        logger.debug(
+            "Skipping reservation %s. Parameter validation error: %s", reservation_id, repr(e)
+        )
         return None
     except botocore.exceptions.ClientError as e:
         error_code = e.response.get("Error", {}).get("Code")
         if error_code == "InvalidCapacityReservationId.Malformed":
-            logger.error("Skipping reservation %s. Malformed ID.", reservation_id)
+            logger.debug("Skipping reservation %s. Malformed ID.", reservation_id)
             return None
         if error_code == "InvalidCapacityReservationId.NotFound":
             logger.debug(
