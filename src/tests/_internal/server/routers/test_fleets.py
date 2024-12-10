@@ -282,6 +282,7 @@ class TestCreateFleet:
                     "termination_idle_time": None,
                     "type": "fleet",
                     "name": "test-fleet",
+                    "reservation": None,
                 },
                 "profile": {
                     "backends": None,
@@ -299,6 +300,7 @@ class TestCreateFleet:
                     "termination_idle_time": None,
                     "name": "",
                     "default": False,
+                    "reservation": None,
                 },
                 "autocreated": False,
             },
@@ -393,6 +395,7 @@ class TestCreateFleet:
                     "termination_idle_time": None,
                     "type": "fleet",
                     "name": spec.configuration.name,
+                    "reservation": None,
                 },
                 "profile": {
                     "backends": None,
@@ -410,6 +413,7 @@ class TestCreateFleet:
                     "termination_idle_time": None,
                     "name": "",
                     "default": False,
+                    "reservation": None,
                 },
                 "autocreated": False,
             },

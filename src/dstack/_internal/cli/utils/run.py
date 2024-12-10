@@ -62,6 +62,7 @@ def print_run_plan(run_plan: RunPlan, offers_limit: int = 3):
     props.add_row(th("Creation policy"), creation_policy)
     props.add_row(th("Termination policy"), termination_policy)
     props.add_row(th("Termination idle time"), termination_idle_time)
+    props.add_row(th("Reservation"), run_plan.run_spec.configuration.reservation)
 
     offers = Table(box=None)
     offers.add_column("#")
@@ -121,6 +122,8 @@ def get_runs_table(
     if verbose:
         table.add_column("INSTANCE", no_wrap=True)
     table.add_column("RESOURCES")
+    if verbose:
+        table.add_column("RESERVATION", no_wrap=True)
     table.add_column("PRICE", no_wrap=True)
     table.add_column("STATUS", no_wrap=True)
     table.add_column("SUBMITTED", style="grey58", no_wrap=True)
@@ -154,6 +157,7 @@ def get_runs_table(
                         "BACKEND": f"{jpd.backend.value.replace('remote', 'ssh')} ({jpd.region})",
                         "INSTANCE": jpd.instance_type.name,
                         "RESOURCES": jpd.instance_type.resources.pretty_format(include_spot=True),
+                        "RESERVATION": jpd.reservation,
                         "PRICE": f"${jpd.price:.4}",
                     }
                 )
