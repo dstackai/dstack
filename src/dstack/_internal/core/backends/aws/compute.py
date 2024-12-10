@@ -202,7 +202,10 @@ class AWSCompute(Compute):
                         for k, v in subnet_id_to_az_map.items()
                         if v == reservation["AvailabilityZone"]
                     }
-                    if reservation["ReservationType"] == "capacity-block":
+                    if (
+                        reservation["ReservationType"]
+                        and reservation["ReservationType"] == "capacity-block"
+                    ):
                         is_capacity_block = True
 
         except botocore.exceptions.ClientError as e:
