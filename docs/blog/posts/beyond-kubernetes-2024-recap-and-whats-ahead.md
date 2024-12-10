@@ -95,14 +95,19 @@ ssh_config:
 This transforms your on-prem cluster into a fully managed fleet, ready to run dev environments, tasks, and services,
 with the same simplicity `dstack` offers for cloud fleets.
 
-!!! info "GPU blocks"
-    Currently, if `dstack` runs a job on an instance, it uses all of its GPUs. In the upcoming update, we’ll allow configuring
-    the number of concurrent jobs per instance, enabling jobs to use only a fraction of the available GPUs, improving
-    cost-effective utilization of expensive hardware.
+### GPU blocks
+
+At `dstack`, when running a job on an instance—whether in the cloud or on-prem—uses all available GPUs on that
+instance. In Q1 2025, we’re
+introducing [GPU blocks :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/1780){:target="_blank"},
+enabling instances to allocate GPUs into discrete blocks that can be reused by concurrent jobs.
+
+This feature enables more efficient use of expensive instances, driving improved resource management and 
+cost optimization.
 
 ## Volumes
 
-A key milestone for `dstack` this year has been the introduction of [volumes](/docs/concepts/volumes), addressing a critical need in AI
+Another key milestone for `dstack` this year has been the introduction of [volumes](/docs/concepts/volumes), addressing a critical need in AI
 infrastructure—data storage.
 
 With `dstack`'s volumes, users can now leverage storage in both cloud and on-prem environments in a unified and efficient
