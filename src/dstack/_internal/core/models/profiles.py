@@ -109,6 +109,10 @@ class ProfileParams(CoreModel):
             description="The cloud-specific instance types to consider for provisioning (e.g., `[p3.8xlarge, n1-standard-4]`)"
         ),
     ]
+    reservation: Annotated[
+        Optional[str],
+        Field(description="The existing reservation for the instances"),
+    ]
     spot_policy: Annotated[
         Optional[SpotPolicy],
         Field(

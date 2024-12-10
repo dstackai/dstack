@@ -606,6 +606,7 @@ async def create_instance_model(
     instance_name: str,
     instance_num: int,
     placement_group_name: Optional[str],
+    reservation: Optional[str],
 ) -> InstanceModel:
     instance = InstanceModel(
         id=uuid.uuid4(),
@@ -635,6 +636,7 @@ async def create_instance_model(
         instance_id=str(instance.id),
         ssh_keys=[project_ssh_key],
         placement_group_name=placement_group_name,
+        reservation=reservation,
     )
     instance.instance_configuration = instance_config.json()
     return instance
