@@ -8,7 +8,9 @@ from dstack._internal.cli.services.configurators import (
 )
 from dstack._internal.cli.services.configurators.base import BaseApplyConfigurator
 from dstack._internal.cli.services.repos import init_repo, register_init_repo_args
+from dstack._internal.core.errors import CLIError
 from dstack._internal.core.models.configurations import ApplyConfigurationType
+from dstack._internal.core.models.repos.virtual import VirtualRepo
 
 NOTSET = object()
 
@@ -58,7 +60,7 @@ class ApplyCommand(APIBaseCommand):
         repo_group = self._parser.add_argument_group("Repo Options")
         repo_group.add_argument(
             "--repo",
-            help="The repo to use for the run",
+            help=("The repo to use for the run. Can be a local path or a Git repo URL."),
             dest="repo",
         )
         repo_group.add_argument(
@@ -70,6 +72,12 @@ class ApplyCommand(APIBaseCommand):
             "--repo-hash",
             help="The hash of the repo commit to use for the run",
             dest="repo_hash",
+        )
+        repo_group.add_argument(
+            "--no-repo",
+            help="Do not use any repo for the run",
+            dest="no_repo",
+            action="store_true",
         )
         register_init_repo_args(repo_group)
 
@@ -87,16 +95,22 @@ class ApplyCommand(APIBaseCommand):
                 return
 
             super()._command(args)
-            repo = init_repo(
-                api=self.api,
-                repo_path=args.repo,
-                repo_branch=args.repo_branch,
-                repo_hash=args.repo_hash,
-                local=args.local,
-                git_identity_file=args.git_identity_file,
-                oauth_token=args.gh_token,
-                ssh_identity_file=args.ssh_identity_file,
-            )
+            if args.repo and args.no_repo:
+                raise CLIError("Either --repo or --no-repo can be specified")
+            repo = None
+            if args.repo:
+                repo = init_repo(
+                    api=self.api,
+                    repo_path=args.repo,
+                    repo_branch=args.repo_branch,
+                    repo_hash=args.repo_hash,
+                    local=args.local,
+                    git_identity_file=args.git_identity_file,
+                    oauth_token=args.gh_token,
+                    ssh_identity_file=args.ssh_identity_file,
+                )
+            elif args.no_repo:
+                repo = VirtualRepo()
             configuration_path, configuration = load_apply_configuration(args.configuration_file)
             configurator_class = get_apply_configurator_class(configuration.type)
             configurator = configurator_class(api_client=self.api)
