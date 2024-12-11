@@ -55,6 +55,10 @@ def get_fleets_table(
 
             row = [
                 fleet.name if i == 0 else "",
+            ]
+            if verbose:
+                row.append(fleet.spec.configuration.reservation or "" if i == 0 else "")
+            row += [
                 str(instance.instance_num),
                 backend,
                 resources,
@@ -62,13 +66,6 @@ def get_fleets_table(
                 status,
                 format_date(instance.created),
             ]
-
-            if verbose and i == 0:
-                row.insert(
-                    1,
-                    fleet.spec.configuration.reservation if i == 0 else "",
-                )
-
             if verbose:
                 error = ""
                 if instance.status == InstanceStatus.TERMINATED and instance.termination_reason:
