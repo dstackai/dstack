@@ -59,6 +59,7 @@ class ApplyCommand(APIBaseCommand):
         )
         repo_group = self._parser.add_argument_group("Repo Options")
         repo_group.add_argument(
+            "-P",
             "--repo",
             help=("The repo to use for the run. Can be a local path or a Git repo URL."),
             dest="repo",
