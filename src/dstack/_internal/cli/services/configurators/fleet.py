@@ -144,6 +144,7 @@ class FleetConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
         )
         if _failed_provisioning(fleet):
             console.print("\n[error]Some instances failed. Check the table above for errors.[/]")
+            exit(1)
 
     def delete_configuration(
         self,
