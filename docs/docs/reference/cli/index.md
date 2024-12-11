@@ -19,7 +19,10 @@ $ dstack server --help
 
 ### dstack init
 
-This command must be called inside a folder before you can run `dstack apply`.
+This command initializes the current directory as a `dstack` repo.
+Runs started with `dstack apply` will have all the repo files inside the `/workflow` directory.
+The repo can be a regular local directory or a Git repo directory.
+Using Git repos can be more efficient since `dstack` does not need to transfer all the local files but only a diff of local changes.
 
 **Git credentials**
 
@@ -45,6 +48,9 @@ It is possible to override this key via the `--ssh-identity` argument.
 
 This command applies a given configuration. If a resource does not exist, `dstack apply` creates the resource.
 If a resource exists, `dstack apply` updates the resource in-place or re-creates the resource if the update is not possible.
+
+When applying run configurations, `dstack apply` requires that you run `dstack init` first,
+or specify a repo to work with via `--repo`, or specify `--no-repo` if you don't need any repo for the run.
 
 <div class="termy">
 
