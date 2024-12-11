@@ -81,7 +81,11 @@ func (d *DockerRunner) Run(ctx context.Context, cfg TaskConfig) error {
 		return tracerr.Errorf("task %s is already submitted", task.ID)
 	}
 
-	defer func() { _ = d.tasks.Update(task) }()
+	defer func() {
+		if ok := d.tasks.Update(task); !ok {
+			log.Printf("failed to update task %s", task.ID)
+		}
+	}()
 
 	var err error
 
