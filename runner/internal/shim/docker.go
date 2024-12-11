@@ -212,20 +212,21 @@ func (d *DockerRunner) Stop(force bool) {
 	if !ok {
 		return
 	}
-	if task.Status == TaskStatusPulling {
+	switch task.Status {
+	case TaskStatusPending, TaskStatusCreating, TaskStatusTerminated:
+		// nothing to do
+	case TaskStatusPulling:
 		task.cancelPull()
-		return
-	}
-
-	stopOptions := container.StopOptions{}
-	if force {
-		timeout := int(0)
-		stopOptions.Timeout = &timeout
-	}
-
-	err := d.client.ContainerStop(context.Background(), task.containerID, stopOptions)
-	if err != nil {
-		log.Printf("Failed to stop container: %s", err)
+	case TaskStatusRunning:
+		stopOptions := container.StopOptions{}
+		if force {
+			timeout := int(0)
+			stopOptions.Timeout = &timeout
+		}
+		err := d.client.ContainerStop(context.Background(), task.containerID, stopOptions)
+		if err != nil {
+			log.Printf("Failed to stop container: %s", err)
+		}
 	}
 }
 
