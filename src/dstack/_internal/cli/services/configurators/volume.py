@@ -126,6 +126,7 @@ class VolumeConfigurator(BaseApplyConfigurator):
             console.print(
                 f"\n[error]Provisioning failed. Error: {volume.status_message or 'unknown'}[/]"
             )
+            exit(1)
 
     def delete_configuration(
         self,

@@ -130,6 +130,7 @@ class GatewayConfigurator(BaseApplyConfigurator):
             console.print(
                 f"\n[error]Provisioning failed. Error: {gateway.status_message or 'unknown'}[/]"
             )
+            exit(1)
 
     def delete_configuration(
         self,
