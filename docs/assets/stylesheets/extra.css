@@ -956,8 +956,8 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
 }
 
 [dir=ltr] .md-typeset ol li, [dir=ltr] .md-typeset ul li  {
-    margin-left: 0;
-    padding-left: 1.25rem;
+    margin-left: 5px;
+    padding-left: 1rem;
     position: relative;
 }
 
@@ -1719,4 +1719,39 @@ img.border {
     padding: 4px;
     height: 16px;
     margin: 0 4px;
+}
+
+
+.swagger-ui .json-schema-2020-12 {
+    white-space: nowrap !important;
+    overflow: scroll !important;;
+}
+
+.swagger-ui .json-schema-2020-12:last-of-type {
+    margin: 0 5px !important;
+}
+
+.swagger-ui .json-schema-2020-12--embedded {
+    padding-left: 0 !important;
+}
+
+.swagger-ui .json-schema-2020-12-keyword__name {
+    margin-left: 5px !important;
+}
+
+.swagger-ui .json-schema-2020-12-keyword--description {
+    margin-left: 0 !important;
+}
+
+.swagger-ui .markdown code, .swagger-ui .renderedMarkdown code {
+    font-size: 12px !important;
+}
+
+.swagger-ui .tab li:first-of-type {
+    padding-left: 1rem !important;
+}
+
+.md-typeset .swagger-ui pre > code {
+    font-size: 12px !important;;
+    padding: 30px !important;
 }
