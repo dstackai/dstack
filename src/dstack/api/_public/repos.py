@@ -127,21 +127,23 @@ class RepoCollection:
             repo_config = config.get_repo_config(repo_dir)
             if repo_config is None:
                 raise ConfigurationError(
-                    "The repo is not initialized. Run `dstack init` to initialize the repo."
+                    "The repo is not initialized."
+                    " Run `dstack init` to initialize the current directory as a repo or specify `--repo`."
                 )
             repo = load_repo(repo_config)
             try:
                 self._api_client.repos.get(self._project, repo.repo_id, include_creds=False)
             except ResourceNotExistsError:
                 raise ConfigurationError(
-                    "The repo is not initialized. Run `dstack init` to initialize the repo."
+                    "The repo is not initialized."
+                    " Run `dstack init` to initialize the current directory as a repo or specify `--repo`."
                 )
         else:
             logger.debug("Initializing repo")
             repo = LocalRepo(repo_dir=repo_dir)  # default
             if not local:
                 try:
-                    repo = RemoteRepo(local_repo_dir=repo_dir)
+                    repo = RemoteRepo.from_dir(repo_dir)
                 except InvalidGitRepositoryError:
                     pass  # use default
             self.init(repo, git_identity_file, oauth_token)
