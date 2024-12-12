@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -22,6 +23,7 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/mount"
+	"github.com/docker/docker/api/types/registry"
 	docker "github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/docker/go-connections/nat"
@@ -35,8 +37,10 @@ import (
 const ImagePullTimeout time.Duration = 20 * time.Minute
 
 const (
+	LabelKeyPrefix = "ai.dstack.shim."
 	// Set to "true" on containers spawned by DockerRunner, used for identification.
-	LabelKeyIsRun  = "ai.dstack.shim.is-run"
+	LabelKeyIsTask = LabelKeyPrefix + "is-task"
+	LabelKeyTaskID = LabelKeyPrefix + "task-id"
 	LabelValueTrue = "true"
 )
 
@@ -46,15 +50,9 @@ type JobResult struct {
 }
 
 type DockerRunner struct {
-	client        *docker.Client
-	dockerParams  DockerParameters
-	containerID   string // ID of the running container, empty if state != Running
-	containerName string // Name of the last created container, for logging only
-	state         RunnerStatus
-
-	cancelPull context.CancelFunc
-
-	jobResult JobResult
+	client       *docker.Client
+	dockerParams DockerParameters
+	tasks        TaskStorage
 }
 
 func NewDockerRunner(dockerParams DockerParameters) (*DockerRunner, error) {
@@ -66,21 +64,37 @@ func NewDockerRunner(dockerParams DockerParameters) (*DockerRunner, error) {
 	runner := &DockerRunner{
 		client:       client,
 		dockerParams: dockerParams,
-		state:        Pending,
+		tasks:        NewTaskStorage(),
 	}
 	return runner, nil
 }
 
 func (d *DockerRunner) Run(ctx context.Context, cfg TaskConfig) error {
+	task := NewTask(cfg)
+
+	// For legacy API compatibility, since LegacyTaskID is the same for all tasks
+	if task.ID == LegacyTaskID {
+		d.tasks.Delete(task.ID)
+	}
+
+	if ok := d.tasks.Add(task); !ok {
+		return tracerr.Errorf("task %s is already submitted", task.ID)
+	}
+
+	defer func() {
+		if ok := d.tasks.Update(task); !ok {
+			log.Printf("failed to update task %s", task.ID)
+		}
+	}()
+
 	var err error
 
 	if cfg.SshKey != "" {
 		ak := AuthorizedKeys{user: cfg.SshUser, lookup: user.Lookup}
 		if err := ak.AppendPublicKeys([]string{cfg.SshKey}); err != nil {
-			d.state = Pending
 			errMessage := fmt.Sprintf("ak.AppendPublicKeys error: %s", err.Error())
 			log.Println(errMessage)
-			d.jobResult = JobResult{Reason: "EXECUTOR_ERROR", ReasonMessage: errMessage}
+			task.SetStatusTerminated("EXECUTOR_ERROR", errMessage)
 			return tracerr.Wrap(err)
 		}
 		defer func(cfg TaskConfig) {
@@ -98,59 +112,58 @@ func (d *DockerRunner) Run(ctx context.Context, cfg TaskConfig) error {
 	defer func() { _ = unmountVolumes(cfg) }()
 	err = prepareVolumes(cfg)
 	if err != nil {
-		d.state = Pending
 		errMessage := fmt.Sprintf("prepareVolumes error: %s", err.Error())
 		log.Println(errMessage)
-		d.jobResult = JobResult{Reason: "EXECUTOR_ERROR", ReasonMessage: errMessage}
+		task.SetStatusTerminated("EXECUTOR_ERROR", errMessage)
 		return tracerr.Wrap(err)
 	}
 	err = prepareInstanceMountPoints(cfg)
 	if err != nil {
-		d.state = Pending
 		errMessage := fmt.Sprintf("prepareInstanceMountPoints error: %s", err.Error())
 		log.Println(errMessage)
-		d.jobResult = JobResult{Reason: "EXECUTOR_ERROR", ReasonMessage: errMessage}
+		task.SetStatusTerminated("EXECUTOR_ERROR", errMessage)
 		return tracerr.Wrap(err)
 	}
 
-	pullCtx, cancel := context.WithTimeout(ctx, ImagePullTimeout)
-	defer cancel()
-	d.cancelPull = cancel
-
 	log.Println("Pulling image")
-	d.state = Pulling
+	pullCtx, cancelPull := context.WithTimeout(ctx, ImagePullTimeout)
+	defer cancelPull()
+	task.SetStatusPulling(cancelPull)
+	if !d.tasks.Update(task) {
+		return tracerr.Errorf("failed to update task %s", task.ID)
+	}
 	if err = pullImage(pullCtx, d.client, cfg); err != nil {
-		d.state = Pending
 		errMessage := fmt.Sprintf("pullImage error: %s", err.Error())
 		log.Print(errMessage + "\n")
-		d.jobResult = JobResult{Reason: "CREATING_CONTAINER_ERROR", ReasonMessage: errMessage}
+		task.SetStatusTerminated("CREATING_CONTAINER_ERROR", errMessage)
 		return tracerr.Wrap(err)
 	}
 
 	runnerDir, err := d.dockerParams.MakeRunnerDir()
 	if err != nil {
-		d.state = Pending
 		errMessage := fmt.Sprintf("Cannot create dir for runner: %s", err.Error())
 		log.Print(errMessage + "\n")
-		d.jobResult = JobResult{Reason: "CREATING_CONTAINER_ERROR", ReasonMessage: errMessage}
+		task.SetStatusTerminated("CREATING_CONTAINER_ERROR", errMessage)
 		return tracerr.Wrap(err)
 	}
 
 	log.Println("Creating container")
-	d.state = Creating
-	containerID, err := createContainer(ctx, d.client, runnerDir, d.dockerParams, cfg)
+	task.SetStatusCreating()
+	if !d.tasks.Update(task) {
+		return tracerr.Errorf("failed to update task %s", task.ID)
+	}
+	containerID, err := createContainer(ctx, d.client, runnerDir, d.dockerParams, task)
 	if err != nil {
-		d.state = Pending
 		errMessage := fmt.Sprintf("createContainer error: %s", err.Error())
-		d.jobResult = JobResult{Reason: "CREATING_CONTAINER_ERROR", ReasonMessage: errMessage}
 		log.Print(errMessage + "\n")
+		task.SetStatusTerminated("CREATING_CONTAINER_ERROR", errMessage)
 		return tracerr.Wrap(err)
 	}
 
 	defer func() {
 		log.Println("Deleting old container(s)")
 		listFilters := filters.NewArgs(
-			filters.Arg("label", fmt.Sprintf("%s=%s", LabelKeyIsRun, LabelValueTrue)),
+			filters.Arg("label", fmt.Sprintf("%s=%s", LabelKeyIsTask, LabelValueTrue)),
 			filters.Arg("status", "exited"),
 		)
 		containers, err := d.client.ContainerList(ctx, container.ListOptions{Filters: listFilters})
@@ -169,15 +182,14 @@ func (d *DockerRunner) Run(ctx context.Context, cfg TaskConfig) error {
 		}
 	}()
 
-	d.state = Running
-	d.containerID = containerID
-	d.containerName = cfg.ContainerName
-	log.Printf("Running container, name=%s, id=%s\n", d.containerName, containerID)
+	log.Printf("Running container, name=%s, id=%s\n", task.containerName, containerID)
+	task.SetStatusRunning(containerID)
+	if !d.tasks.Update(task) {
+		return tracerr.Errorf("failed to update task %s", task.ID)
+	}
 
 	if err = runContainer(ctx, d.client, containerID); err != nil {
 		log.Printf("runContainer error: %s\n", err.Error())
-		d.state = Pending
-		d.containerID = ""
 		var errMessage string
 		if lastLogs, err := getContainerLastLogs(d.client, containerID, 5); err == nil {
 			errMessage = strings.Join(lastLogs, "\n")
@@ -185,39 +197,64 @@ func (d *DockerRunner) Run(ctx context.Context, cfg TaskConfig) error {
 			log.Printf("getContainerLastLogs error: %s\n", err.Error())
 			errMessage = ""
 		}
-		d.jobResult = JobResult{Reason: "CONTAINER_EXITED_WITH_ERROR", ReasonMessage: errMessage}
+		task.SetStatusTerminated("CONTAINER_EXITED_WITH_ERROR", errMessage)
 		return tracerr.Wrap(err)
 	}
 
-	log.Printf("Container finished successfully, name=%s, id=%s", d.containerName, containerID)
-	d.state = Pending
-	d.containerID = ""
-
-	d.jobResult = JobResult{Reason: "DONE_BY_RUNNER"}
+	log.Printf("Container finished successfully, name=%s, id=%s", task.containerName, containerID)
+	task.SetStatusTerminated("DONE_BY_RUNNER", "")
 
 	return nil
 }
 
 func (d *DockerRunner) Stop(force bool) {
-	if d.state == Pulling && d.containerID == "" {
-		d.cancelPull()
+	task, ok := d.tasks.Get(LegacyTaskID)
+	if !ok {
 		return
 	}
-
-	stopOptions := container.StopOptions{}
-	if force {
-		timeout := int(0)
-		stopOptions.Timeout = &timeout
-	}
-
-	err := d.client.ContainerStop(context.Background(), d.containerID, stopOptions)
-	if err != nil {
-		log.Printf("Failed to stop container: %s", err)
+	switch task.Status {
+	case TaskStatusPending, TaskStatusCreating, TaskStatusTerminated:
+		// nothing to do
+	case TaskStatusPulling:
+		task.cancelPull()
+	case TaskStatusRunning:
+		stopOptions := container.StopOptions{}
+		if force {
+			timeout := int(0)
+			stopOptions.Timeout = &timeout
+		}
+		err := d.client.ContainerStop(context.Background(), task.containerID, stopOptions)
+		if err != nil {
+			log.Printf("Failed to stop container: %s", err)
+		}
 	}
 }
 
 func (d *DockerRunner) GetState() (RunnerStatus, JobResult) {
-	return d.state, d.jobResult
+	if task, ok := d.tasks.Get(LegacyTaskID); ok {
+		return getLegacyStatus(task), JobResult{
+			Reason:        task.TerminationReason,
+			ReasonMessage: task.TerminationMessage,
+		}
+	}
+	return Pending, JobResult{}
+}
+
+func getLegacyStatus(task Task) RunnerStatus {
+	switch task.Status {
+	case TaskStatusPending:
+		return Pulling
+	case TaskStatusPulling:
+		return Pulling
+	case TaskStatusCreating:
+		return Creating
+	case TaskStatusRunning:
+		return Running
+	case TaskStatusTerminated:
+		return Pending
+	}
+	// should not reach here
+	return ""
 }
 
 func getBackend(backendType string) (backends.Backend, error) {
@@ -399,7 +436,7 @@ func pullImage(ctx context.Context, client docker.APIClient, taskConfig TaskConf
 	}
 
 	opts := image.PullOptions{}
-	regAuth, _ := taskConfig.EncodeRegistryAuth()
+	regAuth, _ := encodeRegistryAuth(taskConfig.RegistryUsername, taskConfig.RegistryPassword)
 	if regAuth != "" {
 		opts.RegistryAuth = regAuth
 	}
@@ -475,18 +512,24 @@ func pullImage(ctx context.Context, client docker.APIClient, taskConfig TaskConf
 	return nil
 }
 
-func createContainer(ctx context.Context, client docker.APIClient, runnerDir string, dockerParams DockerParameters, taskConfig TaskConfig) (string, error) {
-	timeout := int(0)
-	stopOptions := container.StopOptions{Timeout: &timeout}
-	err := client.ContainerStop(ctx, taskConfig.ContainerName, stopOptions)
-	if err != nil {
-		log.Printf("Cleanup routine: Cannot stop container: %s", err)
-	}
+func createContainer(ctx context.Context, client docker.APIClient, runnerDir string, dockerParams DockerParameters, task Task) (string, error) {
+	taskConfig := task.config
 
-	removeOptions := container.RemoveOptions{Force: true, RemoveVolumes: true}
-	err = client.ContainerRemove(ctx, taskConfig.ContainerName, removeOptions)
-	if err != nil {
-		log.Printf("Cleanup routine: Cannot remove container: %s", err)
+	// For legacy API compatibility, since LegacyTaskID is the same for all tasks, containerName is not unique
+	// With new API where task.ID is unique (and, in turn, containerName is unique too), container name clash
+	// is not expected
+	if task.ID == LegacyTaskID {
+		timeout := int(0)
+		stopOptions := container.StopOptions{Timeout: &timeout}
+		err := client.ContainerStop(ctx, task.containerName, stopOptions)
+		if err != nil {
+			log.Printf("Cleanup routine: Cannot stop container: %s", err)
+		}
+		removeOptions := container.RemoveOptions{Force: true, RemoveVolumes: true}
+		err = client.ContainerRemove(ctx, task.containerName, removeOptions)
+		if err != nil {
+			log.Printf("Cleanup routine: Cannot remove container: %s", err)
+		}
 	}
 
 	mounts, err := dockerParams.DockerMounts(runnerDir)
@@ -530,7 +573,8 @@ func createContainer(ctx context.Context, client docker.APIClient, runnerDir str
 		ExposedPorts: exposePorts(dockerParams.DockerPorts()...),
 		Env:          envVars,
 		Labels: map[string]string{
-			LabelKeyIsRun: LabelValueTrue,
+			LabelKeyIsTask: LabelValueTrue,
+			LabelKeyTaskID: task.ID,
 		},
 	}
 	if taskConfig.ContainerUser != "" {
@@ -549,8 +593,8 @@ func createContainer(ctx context.Context, client docker.APIClient, runnerDir str
 	configureGpuIfAvailable(hostConfig)
 	configureHpcNetworkingIfAvailable(hostConfig)
 
-	log.Printf("Creating container %s:\nconfig: %v\nhostConfig:%v", taskConfig.ContainerName, containerConfig, hostConfig)
-	resp, err := client.ContainerCreate(ctx, containerConfig, hostConfig, nil, nil, taskConfig.ContainerName)
+	log.Printf("Creating container %s:\nconfig: %v\nhostConfig:%v", task.containerName, containerConfig, hostConfig)
+	resp, err := client.ContainerCreate(ctx, containerConfig, hostConfig, nil, nil, task.containerName)
 	if err != nil {
 		return "", tracerr.Wrap(err)
 	}
@@ -575,6 +619,25 @@ func runContainer(ctx context.Context, client docker.APIClient, containerID stri
 	}
 
 	return nil
+}
+
+func encodeRegistryAuth(username string, password string) (string, error) {
+	if username == "" && password == "" {
+		return "", nil
+	}
+
+	authConfig := registry.AuthConfig{
+		Username: username,
+		Password: password,
+	}
+
+	encodedConfig, err := json.Marshal(authConfig)
+	if err != nil {
+		log.Println("Failed to encode auth config", "err", err)
+		return "", err
+	}
+
+	return base64.URLEncoding.EncodeToString(encodedConfig), nil
 }
 
 func getSSHShellCommands(openSSHPort int, publicSSHKey string) []string {
