@@ -36,7 +36,7 @@ for their collaboration, ensuring seamless integration between `dstack` and OCI.
 
 > Special thanks to [Lambda :material-arrow-top-right-thin:{ .external }](https://lambdalabs.com/){:target="_blank"} and
 > [Hot Aisle :material-arrow-top-right-thin:{ .external }](https://hotaisle.xyz/){:target="_blank"} for providing NVIDIA and AMD hardware, enabling us conducting 
-> [benchmarks :material-arrow-top-right-thin:{ .external }](/blog/category/benchmarks/){:target="_blank"}, which
+> [benchmarks](/blog/category/benchmarks/), which
 > are essential to advancing open-source inference and training stacks for all accelerator chips.
 
 ## Community
@@ -109,7 +109,7 @@ efficient manner.
 
 ### NVIDIA
 
-NVIDIA remains the top accelerator supported by `dstack`. Recently, we introduced a [NIM example](/examples/nim) 
+NVIDIA remains the top accelerator supported by `dstack`. Recently, we introduced a [NIM example](../../examples/deployment/nim/index.md) 
 for model deployment, and we continue to enhance support for the rest of NVIDIA's ecosystem.
 
 ### AMD
