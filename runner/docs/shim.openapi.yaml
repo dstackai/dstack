@@ -2,7 +2,7 @@ openapi: 3.1.1
 
 info:
   title: dstack-shim API
-  version: &shim-version 0.18.29
+  version: &shim-version 0.18.30
 
 servers:
   - url: http://localhost:10998/api
@@ -253,63 +253,6 @@ components:
             - $ref: "#/components/schemas/RunnerStatus"
             - examples:
                 - pending
-        executor_error:
-          deprecated: true
-          type: string
-          default: ""
-          description: >
-            A line from the `runner.log` containing `Executor failed` substring (if any).
-            Not used by `dstack` server
-        container_name:
-          deprecated: true
-          type: string
-          examples:
-            - horrible-mule-1-0-0
-        status:
-          deprecated: true
-          type: string
-          examples:
-            - exited
-          description: >
-            `State.Status` from Docker API. Not used by `dstack` server
-        running:
-          deprecated: true
-          type: boolean
-          examples:
-            - false
-          description: >
-            `State.Running` from Docker API. Not used by `dstack` server
-        oom_killed:
-          deprecated: true
-          type: boolean
-          examples:
-            - false
-          description: >
-            `State.OOMKilled` from Docker API. Not used by `dstack` server
-        dead:
-          deprecated: true
-          type: boolean
-          examples:
-            - false
-          description: >
-            `State.Dead` from Docker API. Not used by `dstack` server
-        exit_code:
-          deprecated: true
-          type: integer
-          minimum: 0
-          maximum: 255
-          description: >
-            `State.ExitCode` from Docker API. Not used by `dstack` server
-          examples:
-            - 137
-        error:
-          deprecated: true
-          type: string
-          description: >
-            Either `State.Error` from Docker API or the same as `result.reason_message`.
-            Not used by `dstack` server
-          examples:
-            - ""
         result:
           allOf:
             - $ref: "#/components/schemas/JobResult"
