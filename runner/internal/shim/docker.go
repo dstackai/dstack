@@ -796,7 +796,7 @@ func configureGpus(hostConfig *container.HostConfig, vendor host.GpuVendor, ids 
 				CgroupPermissions: "rwm",
 			},
 		)
-		// --device=/dev/renderD<N>
+		// --device=/dev/dri/renderD<N>
 		for _, renderNodePath := range ids {
 			hostConfig.Resources.Devices = append(
 				hostConfig.Resources.Devices,

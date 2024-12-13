@@ -20,7 +20,7 @@ type Resources struct {
 }
 
 type GpuLock struct {
-	// resourceID: locked mapping, where resourceID is vendor-specific:
+	// resource ID: locked mapping, where resource ID is vendor-specific:
 	// NVIDIA: host.GpuInfo.ID
 	// AMD: host.GpuInfo.RenderNodePath
 	lock map[string]bool
@@ -52,8 +52,12 @@ func NewGpuLock(gpus []host.GpuInfo) (*GpuLock, error) {
 	return &GpuLock{lock: lock}, nil
 }
 
+// Acquire returns a requested number of GPU resource IDs, marking them locked (busy)
+// If there are not enough idle GPUs, none is locked and ErrNoCapacity is returned
+// -1 means "all available GPUs", even if none, that is, Acquire(-1) never fails,
+// even on hosts without GPU
+// To release acquired GPUs, pass the returned resource IDs to Release() method
 func (gl *GpuLock) Acquire(count int) ([]string, error) {
-	// -1 means all available, even if none, that is, Acquire(-1) never fails, even on hosts without GPU
 	if count == 0 || count < -1 {
 		return nil, fmt.Errorf("count must be either positive or -1, got %d", count)
 	}
@@ -83,6 +87,8 @@ func (gl *GpuLock) Acquire(count int) ([]string, error) {
 	return ids, nil
 }
 
+// Release marks passed Resource IDs as idle
+// This method never fails, it's safe to release already idle resource or try to release unknown resource
 func (gl *GpuLock) Release(ids []string) {
 	gl.mu.Lock()
 	defer gl.mu.Unlock()
