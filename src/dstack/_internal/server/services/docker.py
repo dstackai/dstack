@@ -47,6 +47,13 @@ class ImageConfig(CoreModel):
     entrypoint: Annotated[Optional[List[str]], Field(alias="Entrypoint")] = None
     cmd: Annotated[Optional[List[str]], Field(alias="Cmd")] = None
 
+    @validator("user")
+    def normalize_user(cls, v: Optional[str]) -> Optional[str]:
+        # If USER is not set, the corresponding field may be missing or set to an empty string
+        if v == "":
+            return None
+        return v
+
 
 class ImageConfigObject(CoreModel):
     config: ImageConfig = ImageConfig()
