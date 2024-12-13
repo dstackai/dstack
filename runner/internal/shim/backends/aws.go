@@ -3,6 +3,7 @@ package backends
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 )
@@ -13,12 +14,16 @@ func NewAWSBackend() *AWSBackend {
 	return &AWSBackend{}
 }
 
-// GetRealDeviceName returns the device name for the given EBS volume ID.
-// The device name on instance can be different from device name specified in block-device mapping
-// (e.g. NVMe block devices built on the Nitro System).
+// GetRealDeviceName returns the device name for the given EBS volume ID and virtual deviceName.
 // If the volume has no partitions, returns the volume device.
 // If the volume has partitions, return the first partition device.
-func (e *AWSBackend) GetRealDeviceName(volumeID string) (string, error) {
+// The device name on the instance can be different from the device name specified in block-device mapping:
+// * Nitro-based instances: /dev/sda => nvme0n1. lsblk returns volume-id in SERIAL.
+// * Xen-based Ubuntu instances: /dev/sda => /dev/xvda.
+// * Red Hat and CentOS: may increment trailing letters in some versions – not supported.
+// * Other legacy systems: /dev/sda => /dev/sda.
+// More: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/device_naming.html
+func (e *AWSBackend) GetRealDeviceName(volumeID, deviceName string) (string, error) {
 	// Run the lsblk command to get block device information
 	// On AWS, SERIAL contains volume id.
 	cmd := exec.Command("lsblk", "-o", "NAME,SERIAL")
@@ -41,6 +46,22 @@ func (e *AWSBackend) GetRealDeviceName(volumeID string) (string, error) {
 			}
 		}
 	}
+
+	// If no match is found, fall back to mapping AWS device name
+	if baseDevice == "" && deviceName != "" {
+		// Try mapping deviceName to possible OS device names
+		mappedDevices := []string{
+			deviceName,
+			strings.Replace(deviceName, "/dev/sd", "/dev/xvd", 1), // sdX => xvdX
+		}
+		for _, dev := range mappedDevices {
+			if _, err := os.Stat(dev); err == nil {
+				baseDevice = dev
+				break
+			}
+		}
+	}
+
 	if baseDevice == "" {
 		return "", fmt.Errorf("volume %s not found among block devices", volumeID)
 	}

@@ -91,6 +91,7 @@ class ShimVolumeInfo(CoreModel):
     name: str
     volume_id: str
     init_fs: bool
+    device_name: Optional[str] = None
 
 
 class TaskConfigBody(CoreModel):
