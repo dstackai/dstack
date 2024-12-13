@@ -217,22 +217,23 @@ nav:
           - Projects: docs/concepts/projects.md
       - Guides:
           - Protips: docs/guides/protips.md
-          - Troubleshooting: docs/guides/troubleshooting.md
           - Server deployment: docs/guides/server-deployment.md
-      - Reference:
+          - Troubleshooting: docs/guides/troubleshooting.md
+  - Reference:
+      - .dstack.yml:
+          - dev-environment: docs/reference/dstack.yml/dev-environment.md
+          - task: docs/reference/dstack.yml/task.md
+          - service: docs/reference/dstack.yml/service.md
+          - fleet: docs/reference/dstack.yml/fleet.md
+          - gateway: docs/reference/dstack.yml/gateway.md
+          - volume: docs/reference/dstack.yml/volume.md
+      - Server:
           - server/config.yml: docs/reference/server/config.yml.md
-          - .dstack.yml:
-              - dev-environment: docs/reference/dstack.yml/dev-environment.md
-              - task: docs/reference/dstack.yml/task.md
-              - service: docs/reference/dstack.yml/service.md
-              - fleet: docs/reference/dstack.yml/fleet.md
-              - gateway: docs/reference/dstack.yml/gateway.md
-              - volume: docs/reference/dstack.yml/volume.md
-#          - profiles.yml: docs/reference/profiles.yml.md
-          - CLI: docs/reference/cli/index.md
-          - API:
-              - Python API: docs/reference/api/python/index.md
-              - REST API: docs/reference/api/rest/index.md
+      - CLI:
+          - dstack: docs/reference/cli/index.md
+      - API:
+          - Python API: docs/reference/api/python/index.md
+          - REST API: docs/reference/api/rest/index.md
   - Examples:
     - examples.md
     - Deployment:
@@ -250,10 +251,10 @@ nav:
         - Llama 3.2: examples/llms/llama32/index.md
     - Misc:
         - Docker Compose: examples/misc/docker-compose/index.md
+  - Partners: partners.md
   - Blog:
       - blog/index.md
-  - Partners: partners.md
+  - Discord: https://discord.gg/u8SmfwPpMd" target="_blank
 #  - Changelog: https://github.com/dstackai/dstack/releases" target="_blank
-#  - Discord: https://discord.gg/u8SmfwPpMd" target="_blank
 #  - GitHub: https://github.com/dstackai/dstack" target="_blank
 #  - Sign in: https://sky.dstack.ai" target="_blank
