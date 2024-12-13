@@ -26,7 +26,7 @@ class Mocks:
 
 
 @pytest.fixture
-def system_mocks() -> Generator[None, None, None]:
+def system_mocks() -> Generator[Mocks, None, None]:
     nginx = "dstack._internal.proxy.services.nginx"
     connection = "dstack._internal.proxy.services.service_connection"
     with (
@@ -112,12 +112,12 @@ class TestRegisterService:
         assert resp.json() == {"status": "ok"}
         conf = (tmp_path / "443-test-run.gtw.test.conf").read_text()
         # general
-        system_mocks.reload_nginx.call_count == 1
+        assert system_mocks.reload_nginx.call_count == 1
         assert "server_name test-run.gtw.test;" in conf
         assert "client_max_body_size 1024;" in conf
         assert "listen 80;" in conf
         # no https
-        system_mocks.run_certbot.call_count == 0
+        assert system_mocks.run_certbot.call_count == 0
         assert "listen 443" not in conf
         # no auth
         assert "auth_request /auth;" not in conf
@@ -137,7 +137,7 @@ class TestRegisterService:
         assert "listen 443 ssl;" in conf
         assert "ssl_certificate /etc/letsencrypt/live/test-run.gtw.test/fullchain.pem;" in conf
         assert "ssl_certificate_key /etc/letsencrypt/live/test-run.gtw.test/privkey.pem;" in conf
-        system_mocks.run_certbot.call_count == 1
+        assert system_mocks.run_certbot.call_count == 1
 
     async def test_register_with_auth(self, tmp_path: Path, system_mocks: Mocks) -> None:
         client = make_client(tmp_path)
@@ -165,7 +165,7 @@ class TestRegisterService:
         assert resp.json() == {"detail": "Service test-proj/test-run is already registered"}
         assert (tmp_path / "443-test-run-1.gtw.test.conf").exists()
         assert not (tmp_path / "443-test-run-2.gtw.test.conf").exists()
-        system_mocks.reload_nginx.call_count == 1
+        assert system_mocks.reload_nginx.call_count == 1
 
     async def test_register_same_name_in_different_projects(
         self, tmp_path: Path, system_mocks
@@ -245,8 +245,8 @@ class TestRegisterReplica:
         assert resp.json() == {
             "detail": "Service test-proj/test-run does not exist, cannot register replica"
         }
-        system_mocks.reload_nginx.call_count == 0
-        system_mocks.open_conn.call_count == 0
+        assert system_mocks.reload_nginx.call_count == 0
+        assert system_mocks.open_conn.call_count == 0
 
 
 @pytest.mark.asyncio
