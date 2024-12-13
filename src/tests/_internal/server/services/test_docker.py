@@ -108,6 +108,26 @@ def test_parse_image_config_object_with_config_null(sample_image_config_object):
     assert config_object.config is not None
 
 
+@pytest.mark.parametrize(
+    ["value", "expected"],
+    [
+        [None, None],
+        ["", None],
+        ["1000:1000", "1000:1000"],
+    ],
+)
+def test_parse_image_config_object_user_field(sample_image_config_object, value, expected):
+    sample_image_config_object["config"]["User"] = value
+    config_object = ImageConfigObject.__response__.parse_obj(sample_image_config_object)
+    assert config_object.config.user == expected
+
+
+def test_parse_image_config_object_user_field_missing(sample_image_config_object):
+    del sample_image_config_object["config"]["User"]
+    config_object = ImageConfigObject.__response__.parse_obj(sample_image_config_object)
+    assert config_object.config.user is None
+
+
 class TestIsValidDockerVolumeTarget:
     @pytest.mark.parametrize(
         "path",
