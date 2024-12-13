@@ -4,7 +4,7 @@ The `~/.dstack/server/config.yml` file is used
 to [configure](../../installation/index.md#1-configure-backends) the `dstack` server cloud accounts
 and other sever-level settings such as encryption.
 
-## Backends
+## Configure backends { #backends }
 
 > The `dstack` server allows you to configure backends for multiple projects.
 > If you don't need multiple projects, use only the `main` project.
@@ -12,7 +12,7 @@ and other sever-level settings such as encryption.
 Each cloud account must be configured under the `backends` property of the respective project.
 See the examples below.
 
-### Cloud providers
+### Cloud providers  { #clouds }
 
 #### AWS
 
@@ -739,11 +739,11 @@ projects:
 
 </div>
 
-### On-prem servers
+### On-prem servers  { #on-prem }
 
 #### SSH fleets
 
-For using `dstack` with on-prem servers, no backend configuration is required.
+> For using `dstack` with on-prem servers, no backend configuration is required.
 See [SSH fleets](../../concepts/fleets.md#ssh-fleets) for more details.
 
 #### Kubernetes
@@ -836,7 +836,7 @@ In case of a self-managed cluster, also specify the IP address of any node in th
 
     [//]: # (TODO: Provide short yet clear instructions. Elaborate on whether it works with Kind.)
 
-## Encryption
+## Enable encryption { #encryption }
 
 By default, `dstack` stores data in plaintext. To enforce encryption, you 
 specify one or more encryption keys.
