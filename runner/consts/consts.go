@@ -11,8 +11,3 @@ const (
 
 // Error-containing messages will be identified by this signature
 const ExecutorFailedSignature = "Executor failed"
-
-const HostInfoFile = "host_info.json"
-
-// GPU constants
-const NVIDIA_RUNTIME = "nvidia"

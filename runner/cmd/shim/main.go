@@ -2,24 +2,18 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
-	"net"
 	"net/http"
 	"os"
 	"path/filepath"
-	"runtime"
 	"time"
 
-	docker "github.com/docker/docker/client"
 	"github.com/dstackai/dstack/runner/consts"
 	"github.com/dstackai/dstack/runner/internal/shim"
 	"github.com/dstackai/dstack/runner/internal/shim/api"
-	"github.com/shirou/gopsutil/v3/mem"
 	"github.com/urfave/cli/v2"
-	"golang.org/x/sys/unix"
 )
 
 // Version is a build-time variable. The value is overridden by ldflags.
@@ -122,10 +116,14 @@ func main() {
 
 					var err error
 
-					// set dstack home path
-					args.Shim.HomeDir, err = getDstackHome(args.Shim.HomeDir)
-					if err != nil {
-						return cli.Exit(err, 1)
+					shimHomeDir := args.Shim.HomeDir
+					if shimHomeDir == "" {
+						home, err := os.UserHomeDir()
+						if err != nil {
+							return cli.Exit(err, 1)
+						}
+						shimHomeDir = filepath.Join(home, consts.DstackDirPath)
+						args.Shim.HomeDir = shimHomeDir
 					}
 					log.Printf("Config Shim: %+v\n", args.Shim)
 					log.Printf("Config Runner: %+v\n", args.Runner)
@@ -146,7 +144,13 @@ func main() {
 					}()
 
 					if serviceMode {
-						writeHostInfo()
+						if err := shim.WriteHostInfo(shimHomeDir, dockerRunner.Resources()); err != nil {
+							if errors.Is(err, os.ErrExist) {
+								log.Println("cannot write host info: file already exists")
+							} else {
+								return cli.Exit(err, 1)
+							}
+						}
 					}
 
 					if err := shimServer.HttpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -162,131 +166,4 @@ func main() {
 	if err := app.Run(os.Args); err != nil {
 		log.Fatal(err)
 	}
-}
-
-func getDstackHome(flag string) (string, error) {
-	if flag != "" {
-		return flag, nil
-	}
-
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(home, consts.DstackDirPath), nil
-}
-
-func writeHostInfo() {
-	// host_info exist
-	if _, err := os.Stat(consts.HostInfoFile); !errors.Is(err, os.ErrNotExist) {
-		return
-	}
-
-	type Message struct {
-		GpuVendor shim.GpuVendor `json:"gpu_vendor"`
-		GpuName   string         `json:"gpu_name"`
-		GpuMemory int            `json:"gpu_memory"` // MiB
-		GpuCount  int            `json:"gpu_count"`
-		Addresses []string       `json:"addresses"`
-		DiskSize  uint64         `json:"disk_size"` // bytes
-		NumCPUs   int            `json:"cpus"`
-		Memory    uint64         `json:"memory"` // bytes
-	}
-
-	gpuVendor := shim.NoVendor
-	gpuCount := 0
-	gpuMemory := 0
-	gpuName := ""
-	gpus := shim.GetGpuInfo()
-	if len(gpus) != 0 {
-		gpuCount = len(gpus)
-		gpuVendor = gpus[0].Vendor
-		gpuMemory = gpus[0].Vram
-		gpuName = gpus[0].Name
-	}
-	m := Message{
-		GpuVendor: gpuVendor,
-		GpuName:   gpuName,
-		GpuMemory: gpuMemory,
-		GpuCount:  gpuCount,
-		Addresses: getInterfaces(),
-		DiskSize:  getDiskSize(),
-		NumCPUs:   runtime.NumCPU(),
-		Memory:    getMemory(),
-	}
-
-	b, err := json.Marshal(m)
-	if err != nil {
-		panic(err)
-	}
-
-	f, err := os.Create(consts.HostInfoFile)
-	if err != nil {
-		panic(err)
-	}
-	defer f.Close()
-
-	_, err = f.Write(b)
-	if err != nil {
-		panic(err)
-	}
-
-	err = f.Sync()
-	if err != nil {
-		panic(err)
-	}
-}
-
-func getInterfaces() []string {
-	var addresses []string
-	ifaces, err := net.Interfaces()
-	if err != nil {
-		panic("cannot get interfaces")
-	}
-
-	for _, i := range ifaces {
-		addrs, err := i.Addrs()
-		if err != nil {
-			panic("cannot get addrs")
-		}
-
-		for _, addr := range addrs {
-			switch v := addr.(type) {
-			case *net.IPNet:
-				if v.IP.IsLoopback() {
-					continue
-				}
-
-				addresses = append(addresses, addr.String())
-			}
-		}
-	}
-	return addresses
-}
-
-func getDiskSize() uint64 {
-	client, err := docker.NewClientWithOpts(docker.FromEnv, docker.WithAPIVersionNegotiation())
-	if err != nil {
-		panic("cannot instantiate Docker client")
-	}
-	defer client.Close()
-	info, err := client.Info(context.TODO())
-	if err != nil {
-		panic("cannot get Docker info")
-	}
-	var stat unix.Statfs_t
-	err = unix.Statfs(info.DockerRootDir, &stat)
-	if err != nil {
-		panic("cannot get disk size")
-	}
-	size := stat.Bavail * uint64(stat.Bsize)
-	return size
-}
-
-func getMemory() uint64 {
-	v, err := mem.VirtualMemory()
-	if err != nil {
-		panic("cannot get emeory")
-	}
-	return v.Total
 }

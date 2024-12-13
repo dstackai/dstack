@@ -26,6 +26,10 @@ func (ds DummyRunner) Run(context.Context, shim.TaskConfig) error {
 
 func (ds DummyRunner) Stop(force bool) {}
 
+func (ds DummyRunner) Resources() shim.Resources {
+	return shim.Resources{}
+}
+
 func TestHealthcheck(t *testing.T) {
 	request := httptest.NewRequest("GET", "/api/healthcheck", nil)
 	responseRecorder := httptest.NewRecorder()
