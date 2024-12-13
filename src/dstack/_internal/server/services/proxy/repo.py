@@ -16,8 +16,7 @@ from dstack._internal.core.models.runs import (
     RunStatus,
     ServiceSpec,
 )
-from dstack._internal.proxy.repos.base import BaseProxyRepo
-from dstack._internal.proxy.repos.models import (
+from dstack._internal.proxy.lib.models import (
     AnyModelFormat,
     ChatModel,
     OpenAIChatModelFormat,
@@ -26,6 +25,7 @@ from dstack._internal.proxy.repos.models import (
     Service,
     TGIChatModelFormat,
 )
+from dstack._internal.proxy.lib.repo import BaseProxyRepo
 from dstack._internal.server.models import JobModel, ProjectModel, RunModel
 from dstack._internal.server.settings import DEFAULT_SERVICE_CLIENT_MAX_BODY_SIZE
 

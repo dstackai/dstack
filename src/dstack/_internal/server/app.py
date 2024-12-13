@@ -14,8 +14,8 @@ from fastapi.staticfiles import StaticFiles
 from dstack._internal.cli.utils.common import console
 from dstack._internal.core.errors import ForbiddenError, ServerClientError
 from dstack._internal.core.services.configs import update_default_project
-from dstack._internal.proxy.routers import model_proxy, service_proxy
-from dstack._internal.proxy.services.service_connection import service_replica_connection_pool
+from dstack._internal.proxy.lib.routers import model_proxy
+from dstack._internal.proxy.lib.services.service_connection import service_replica_connection_pool
 from dstack._internal.server import settings
 from dstack._internal.server.background import start_background_tasks
 from dstack._internal.server.db import get_db, get_session_ctx, migrate
@@ -38,7 +38,8 @@ from dstack._internal.server.services.config import ServerConfigManager
 from dstack._internal.server.services.gateways import gateway_connections_pool, init_gateways
 from dstack._internal.server.services.locking import advisory_lock_ctx
 from dstack._internal.server.services.projects import get_or_create_default_project
-from dstack._internal.server.services.proxy.injector import ServerProxyDependencyInjector
+from dstack._internal.server.services.proxy.deps import ServerProxyDependencyInjector
+from dstack._internal.server.services.proxy.routers import service_proxy
 from dstack._internal.server.services.storage import init_default_storage
 from dstack._internal.server.services.users import get_or_create_admin_user
 from dstack._internal.server.settings import (

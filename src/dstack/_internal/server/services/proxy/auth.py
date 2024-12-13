@@ -1,6 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dstack._internal.proxy.services.auth.base import BaseProxyAuthProvider
+from dstack._internal.proxy.lib.auth import BaseProxyAuthProvider
 from dstack._internal.server.security.permissions import is_project_member
 
 
