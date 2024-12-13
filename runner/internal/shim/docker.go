@@ -309,7 +309,7 @@ func formatAndMountVolume(volume VolumeInfo) error {
 	if err != nil {
 		return tracerr.Wrap(err)
 	}
-	deviceName, err := backend.GetRealDeviceName(volume.VolumeId)
+	deviceName, err := backend.GetRealDeviceName(volume.VolumeId, volume.DeviceName)
 	if err != nil {
 		return tracerr.Wrap(err)
 	}

@@ -211,9 +211,13 @@ def health_response_to_health_status(data: HealthcheckResponse) -> HealthStatus:
 
 
 def _volume_to_shim_volume_info(volume: Volume) -> ShimVolumeInfo:
+    device_name = None
+    if volume.attachment_data is not None:
+        device_name = volume.attachment_data.device_name
     return ShimVolumeInfo(
         backend=volume.configuration.backend.value,
         name=volume.name,
         volume_id=get_or_error(volume.volume_id),
         init_fs=not volume.external,
+        device_name=device_name,
     )
