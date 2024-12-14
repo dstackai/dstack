@@ -138,9 +138,9 @@ longer duration).
 
 ## What's next?
 
-1. Check the [Axolotl](/docs/examples/fine-tuning/axolotl) example
-2. Browse [all examples](/examples)
-3. See [fleets](concepts/fleets.md) on how to manage fleets
+1. Read about [dev environments](dev-environments.md), [services](services.md), and [repos](concepts/repos.md)
+2. Learn how to manage [fleets](concepts/fleets.md)
+3. Check the [Axolotl](/examples/fine-tuning/axolotl) example
 
 !!! info "Reference"
     See [.dstack.yml](reference/dstack.yml/task.md) for all the options supported by

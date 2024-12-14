@@ -211,6 +211,7 @@ nav:
           - Dev environments: docs/dev-environments.md
           - Tasks: docs/tasks.md
           - Services: docs/services.md
+          - Repos: docs/concepts/repos.md
           - Fleets: docs/concepts/fleets.md
           - Volumes: docs/concepts/volumes.md
           - Gateways: docs/concepts/gateways.md

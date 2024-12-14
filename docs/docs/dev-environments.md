@@ -131,9 +131,8 @@ longer duration).
 
 ## What's next?
 
-1. Read about [dev environments](dev-environments.md), [tasks](tasks.md), and 
-    [services](services.md)
-2. See [fleets](concepts/fleets.md) on how to manage fleets
+1. Read about [tasks](tasks.md), [services](services.md), and [repos](concepts/repos.md)
+2. Learn how to manage [fleets](concepts/fleets.md)
 
 !!! info "Reference"
     See [.dstack.yml](reference/dstack.yml/dev-environment.md) for all the options supported by
