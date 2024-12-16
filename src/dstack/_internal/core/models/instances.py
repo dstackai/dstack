@@ -77,6 +77,9 @@ class SSHConnectionParams(CoreModel):
     username: str
     port: int
 
+    class Config:
+        frozen = True
+
 
 class SSHKey(CoreModel):
     public: str
