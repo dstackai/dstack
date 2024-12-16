@@ -7,10 +7,13 @@ from dstack._internal.cli.services.configurators import (
     load_apply_configuration,
 )
 from dstack._internal.cli.services.configurators.base import BaseApplyConfigurator
-from dstack._internal.cli.services.repos import init_repo, register_init_repo_args
+from dstack._internal.cli.services.repos import (
+    init_default_virtual_repo,
+    init_repo,
+    register_init_repo_args,
+)
 from dstack._internal.core.errors import CLIError
 from dstack._internal.core.models.configurations import ApplyConfigurationType
-from dstack._internal.core.models.repos.virtual import VirtualRepo
 
 NOTSET = object()
 
@@ -111,7 +114,7 @@ class ApplyCommand(APIBaseCommand):
                     ssh_identity_file=args.ssh_identity_file,
                 )
             elif args.no_repo:
-                repo = VirtualRepo()
+                repo = init_default_virtual_repo(api=self.api)
             configuration_path, configuration = load_apply_configuration(args.configuration_file)
             configurator_class = get_apply_configurator_class(configuration.type)
             configurator = configurator_class(api_client=self.api)

@@ -5,6 +5,7 @@ from typing import Optional, Union
 from dstack._internal.core.errors import CLIError
 from dstack._internal.core.models.repos.base import Repo, RepoType
 from dstack._internal.core.models.repos.remote import GitRepoURL, RemoteRepo, RepoError
+from dstack._internal.core.models.repos.virtual import VirtualRepo
 from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.core.services.repos import get_default_branch
 from dstack._internal.utils.path import PathLike
@@ -94,4 +95,10 @@ def init_repo(
         )
     else:
         raise CLIError("Invalid repo path")
+    return repo
+
+
+def init_default_virtual_repo(api: Client) -> VirtualRepo:
+    repo = VirtualRepo()
+    api.repos.init(repo)
     return repo
