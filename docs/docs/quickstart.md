@@ -219,7 +219,7 @@ Something not working? See the [troubleshooting](guides/troubleshooting.md) guid
 
 ## What's next?
 
-1. Read about [dev environments](dev-environments.md), [tasks](tasks.md), 
-    [services](services.md), and [fleets](concepts/fleets.md) 
+1. Read about [dev environments](dev-environments.md), [tasks](tasks.md), [services](services.md),
+   and [repos](concepts/repos.md)
 2. Join [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd)
 3. Browse [examples](https://dstack.ai/examples)

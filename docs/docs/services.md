@@ -175,12 +175,12 @@ longer duration).
 
 ## What's next?
 
-1. Check the [TGI :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/deployment/tgi/README.md){:target="_blank"},
-   [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/deployment/vllm/README.md){:target="_blank"}, and 
-   [NIM :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/deployment/nim/README.md){:target="_blank"} examples
-2. See [gateways](concepts/gateways.md) on how to set up a gateway
-3. Browse [examples](/examples)
-4. See [fleets](concepts/fleets.md) on how to manage fleets
+1. Read about [dev environments](dev-environments.md), [tasks](tasks.md), and [repos](concepts/repos.md)
+2. Learn how to manage [fleets](concepts/fleets.md)
+3. See how to set up [gateways](concepts/gateways.md)
+4. Check the [TGI :material-arrow-top-right-thin:{ .external }](/examples/deployment/tgi/){:target="_blank"},
+   [vLLM :material-arrow-top-right-thin:{ .external }](/examples/deployment/vllm/){:target="_blank"}, and 
+   [NIM :material-arrow-top-right-thin:{ .external }](/examples/deployment/nim/){:target="_blank"} examples
 
 !!! info "Reference"
     See [.dstack.yml](reference/dstack.yml/service.md) for all the options supported by
