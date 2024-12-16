@@ -100,7 +100,8 @@ async def _collect_job_metrics(job_model: JobModel) -> Optional[JobMetricsPoint]
         return None
 
     if isinstance(res, bool):
-        logger.error("Failed to connect to job %s to collect metrics", job_model.job_name)
+        # The job may already be terminated when collecting metrics - that's ok.
+        logger.warning("Failed to connect to job %s to collect metrics", job_model.job_name)
         return None
 
     if res is None:
