@@ -60,8 +60,8 @@ To open in VS Code Desktop, use this link:
 
 </div>
 
-`dstack apply` automatically uploads the code from the current repo, including your local uncommitted changes.
-To avoid uploading large files, ensure they are listed in `.gitignore`.
+`dstack apply` automatically provisions an instance, uploads the contents of the repo (incl. your local uncommitted changes),
+and runs the configuration.
 
 ### VS Code
 

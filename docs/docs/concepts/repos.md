@@ -7,7 +7,8 @@ This allows the configuration to access the files from the directory.
 ## Initialize a repo
 
 Before using [`dstack apply`](../reference/cli/index.md#dstack-apply) in a directory, initialize that directory first as a repo by running [`dstack init`](../reference/cli/index.md#dstack-init).
-The repo can be either a normal directory or a cloned Git repo.
+
+The directory can be either a normal directory or a cloned Git repo.
 
 [`dstack init`](../reference/cli/index.md#dstack-init) is not required if you pass `-P` (or `--repo`) to [`dstack apply`](../reference/cli/index.md#dstack-apply) (see below).
 

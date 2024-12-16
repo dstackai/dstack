@@ -4,7 +4,7 @@
     
 ## Initialize a repo
 
-To use `dstack`'s CLI in a folder, first run [`dstack init`](reference/cli/index.md#dstack-init) within that folder.
+Before using `dstack`'s CLI in a directory, initialize the directory as a repo with [`dstack init`](reference/cli/index.md#dstack-init).
 
 <div class="termy">
 
@@ -14,8 +14,6 @@ $ dstack init
 ```
 
 </div>
-
-Your folder can be a regular local folder or a Git repo.
 
 ## Run a configuration
 
@@ -211,7 +209,8 @@ Your folder can be a regular local folder or a Git repo.
         If you're using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"},
         a gateway is pre-configured for you.
 
-`dstack apply` automatically provisions instances, uploads the code from the current repo (incl. your local uncommitted changes).
+`dstack apply` automatically provisions instances, uploads the contents of the repo (incl. your local uncommitted changes),
+and runs the configuration.
 
 ## Troubleshooting
 

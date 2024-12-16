@@ -83,8 +83,8 @@ Model meta-llama/Meta-Llama-3.1-8B-Instruct is published at:
 
 </div>
 
-`dstack apply` automatically uploads the code from the current repo, including your local uncommitted changes.
-To avoid uploading large files, ensure they are listed in `.gitignore`.
+`dstack apply` automatically provisions instances, uploads the contents of the repo (incl. your local uncommitted changes),
+and runs the configuration.
 
 ## Access the endpoint
 
