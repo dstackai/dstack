@@ -156,7 +156,7 @@ def get_dev_env_run_plan_dict(
                         "pip install -q --no-cache-dir "
                         'ipykernel 2> /dev/null) || echo "no '
                         'pip, ipykernel was not installed" '
-                        "&& echo '' && echo To open in VS "
+                        "&& echo To open in VS "
                         "Code Desktop, use link below: && "
                         "echo '' && echo '  "
                         "vscode://vscode-remote/ssh-remote+dry-run/workflow' "
@@ -301,7 +301,7 @@ def get_dev_env_run_dict(
                         "pip install -q --no-cache-dir "
                         'ipykernel 2> /dev/null) || echo "no '
                         'pip, ipykernel was not installed" '
-                        "&& echo '' && echo To open in VS "
+                        "&& echo To open in VS "
                         "Code Desktop, use link below: && "
                         "echo '' && echo '  "
                         "vscode://vscode-remote/ssh-remote+test-run/workflow' "

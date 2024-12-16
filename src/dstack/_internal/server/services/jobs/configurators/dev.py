@@ -26,11 +26,10 @@ class DevEnvironmentJobConfigurator(JobConfigurator):
         super().__init__(run_spec)
 
     def _shell_commands(self) -> List[str]:
+        commands = self.run_spec.configuration.setup
+        commands += self.run_spec.configuration.init
         commands = self.ide.get_install_commands()
         commands.append(INSTALL_IPYKERNEL)
-        commands += self.run_spec.configuration.setup
-        commands.append("echo ''")
-        commands += self.run_spec.configuration.init
         commands += self.ide.get_print_readme_commands()
         commands += [
             f"echo 'To connect via SSH, use: `ssh {self.run_spec.run_name}`'",
