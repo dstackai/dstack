@@ -8,18 +8,20 @@ from dstack._internal.core.models.common import CoreModel
 
 
 class AWSOSImage(CoreModel):
-    name: Annotated[str, Field(description="AMI name")]
+    name: Annotated[str, Field(description="The AMI name")]
     owner: Annotated[
         str,
-        Field(regex=r"^(\d{12}|self)$", description="AMI owner, account ID or `self`"),
+        Field(regex=r"^(\d{12}|self)$", description="The AMI owner, account ID or `self`"),
     ] = "self"
-    user: Annotated[str, Field(description="OS user for provisioning")]
+    user: Annotated[str, Field(description="The OS user for provisioning")]
 
 
 class AWSOSImageConfig(CoreModel):
-    cpu: Annotated[Optional[AWSOSImage], Field(description="AMI used for CPU instances")] = None
+    cpu: Annotated[Optional[AWSOSImage], Field(description="The AMI used for CPU instances")] = (
+        None
+    )
     nvidia: Annotated[
-        Optional[AWSOSImage], Field(description="AMI used for NVIDIA GPU instances")
+        Optional[AWSOSImage], Field(description="The AMI used for NVIDIA GPU instances")
     ] = None
 
 

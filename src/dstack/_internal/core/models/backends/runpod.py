@@ -1,5 +1,6 @@
-from typing import List, Optional
+from typing import Annotated, List, Optional
 
+from pydantic import Field
 from typing_extensions import Literal
 
 from dstack._internal.core.models.backends.base import ConfigMultiElement
@@ -17,7 +18,7 @@ class RunpodStoredConfig(RunpodConfigInfo):
 
 class RunpodAPIKeyCreds(CoreModel):
     type: Literal["api_key"] = "api_key"
-    api_key: str
+    api_key: Annotated[str, Field(description="The API key")]
 
 
 AnyRunpodCreds = RunpodAPIKeyCreds

@@ -1000,23 +1000,6 @@ See the [reference table](#default-permissions) for all configurable permissions
             type:
                 required: true
 
-## `projects[n].backends[type=datacrunch]` { #_datacrunch data-toc-label="backends[type=datacrunch]" }
-
-#SCHEMA# dstack._internal.server.services.config.DataCrunchConfig
-    overrides:
-        show_root_heading: false
-        type:
-            required: true
-        item_id_prefix: datacrunch-
-
-## `projects[n].backends[type=datacrunch].creds` { #_datacrunch-creds data-toc-label="backends[type=datacrunch].creds" }
-
-#SCHEMA# dstack._internal.core.models.backends.datacrunch.DataCrunchAPIKeyCreds
-    overrides:
-        show_root_heading: false
-        type:
-            required: true
-
 ## `projects[n].backends[type=gcp]` { #_gcp data-toc-label="backends[type=gcp]" }
 
 #SCHEMA# dstack._internal.server.services.config.GCPConfig
@@ -1066,6 +1049,57 @@ See the [reference table](#default-permissions) for all configurable permissions
         type:
             required: true
 
+## `projects[n].backends[type=runpod]` { #_runpod data-toc-label="backends[type=runpod]" }
+
+#SCHEMA# dstack._internal.server.services.config.RunpodConfig
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+        item_id_prefix: runpod-
+
+## `projects[n].backends[type=runpod].creds` { #_runpod-creds data-toc-label="backends[type=runpod].creds" }
+
+#SCHEMA# dstack._internal.core.models.backends.runpod.RunpodAPIKeyCreds
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+
+## `projects[n].backends[type=vastai]` { #_vastai data-toc-label="backends[type=vastai]" }
+
+#SCHEMA# dstack._internal.server.services.config.VastAIConfig
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+        item_id_prefix: vastai-
+
+## `projects[n].backends[type=vastai].creds` { #_vastai-creds data-toc-label="backends[type=vastai].creds" }
+
+#SCHEMA# dstack._internal.core.models.backends.vastai.VastAIAPIKeyCreds
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+
+## `projects[n].backends[type=tensordock]` { #_tensordock data-toc-label="backends[type=tensordock]" }
+
+#SCHEMA# dstack._internal.server.services.config.TensorDockConfig
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+        item_id_prefix: tensordock-
+
+## `projects[n].backends[type=tensordock].creds` { #_tensordock-creds data-toc-label="backends[type=tensordock].creds" }
+
+#SCHEMA# dstack._internal.core.models.backends.tensordock.TensorDockAPIKeyCreds
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+
 ## `projects[n].backends[type=oci]` { #_oci data-toc-label="backends[type=oci]" }
 
 #SCHEMA# dstack._internal.server.services.config.OCIConfig
@@ -1091,40 +1125,6 @@ See the [reference table](#default-permissions) for all configurable permissions
             type:
                 required: true
 
-## `projects[n].backends[type=tensordock]` { #_tensordock data-toc-label="backends[type=tensordock]" }
-
-#SCHEMA# dstack._internal.server.services.config.TensorDockConfig
-    overrides:
-        show_root_heading: false
-        type:
-            required: true
-        item_id_prefix: tensordock-
-
-## `projects[n].backends[type=tensordock].creds` { #_tensordock-creds data-toc-label="backends[type=tensordock].creds" }
-
-#SCHEMA# dstack._internal.core.models.backends.tensordock.TensorDockAPIKeyCreds
-    overrides:
-        show_root_heading: false
-        type:
-            required: true
-
-## `projects[n].backends[type=vastai]` { #_vastai data-toc-label="backends[type=vastai]" }
-
-#SCHEMA# dstack._internal.server.services.config.VastAIConfig
-    overrides:
-        show_root_heading: false
-        type:
-            required: true
-        item_id_prefix: vastai-
-
-## `projects[n].backends[type=vastai].creds` { #_vastai-creds data-toc-label="backends[type=vastai].creds" }
-
-#SCHEMA# dstack._internal.core.models.backends.vastai.VastAIAPIKeyCreds
-    overrides:
-        show_root_heading: false
-        type:
-            required: true
-
 ## `projects[n].backends[type=cudo]` { #_cudo data-toc-label="backends[type=cudo]" }
 
 #SCHEMA# dstack._internal.server.services.config.CudoConfig
@@ -1137,6 +1137,23 @@ See the [reference table](#default-permissions) for all configurable permissions
 ## `projects[n].backends[type=cudo].creds` { #_cudo-creds data-toc-label="backends[type=cudo].creds" }
 
 #SCHEMA# dstack._internal.core.models.backends.cudo.CudoAPIKeyCreds
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+
+## `projects[n].backends[type=datacrunch]` { #_datacrunch data-toc-label="backends[type=datacrunch]" }
+
+#SCHEMA# dstack._internal.server.services.config.DataCrunchConfig
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+        item_id_prefix: datacrunch-
+
+## `projects[n].backends[type=datacrunch].creds` { #_datacrunch-creds data-toc-label="backends[type=datacrunch].creds" }
+
+#SCHEMA# dstack._internal.core.models.backends.datacrunch.DataCrunchAPIKeyCreds
     overrides:
         show_root_heading: false
         type:
