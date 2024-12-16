@@ -1276,19 +1276,19 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
         display: none;
     }
 
-    .md-tabs__item:nth-child(7) {
+    .md-tabs__item:nth-child(8) {
         margin-left: auto;
         padding-right: 1.2rem;
     }
 
-    .md-tabs__item:nth-child(n+7) .md-tabs__link {
+    .md-tabs__item:nth-child(n+8) .md-tabs__link {
         visibility: hidden;
         width: 35px;
         display: inline-block;
         margin-top: 10px;
     }
 
-    .md-tabs__item:nth-child(n+7) .md-tabs__link:before {
+    .md-tabs__item:nth-child(n+8) .md-tabs__link:before {
         width: 38px;
         height: 38px;
         margin-top: 4px;
@@ -1311,7 +1311,7 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
         margin-right: -7px;
     }
 
-    .md-tabs__item:nth-child(7) .md-tabs__link:before {
+    .md-tabs__item:nth-child(8) .md-tabs__link:before {
         position: relative;
         content: '';
         width: 40px;
