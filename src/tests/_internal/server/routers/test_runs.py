@@ -57,6 +57,8 @@ from dstack._internal.server.testing.common import (
     get_run_spec,
 )
 
+pytestmark = pytest.mark.usefixtures("image_config_mock")
+
 client = TestClient(app)
 
 

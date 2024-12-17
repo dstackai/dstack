@@ -29,6 +29,8 @@ from dstack._internal.server.testing.common import (
     get_run_spec,
 )
 
+pytestmark = pytest.mark.usefixtures("image_config_mock")
+
 
 async def make_run(
     session: AsyncSession, status: RunStatus = RunStatus.SUBMITTED, replicas: Union[str, int] = 1
