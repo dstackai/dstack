@@ -513,12 +513,15 @@ gcloud projects list --format="json(projectId)"
     
         </div>
 
-        When using a shared VPC, ensure there is a firewall rule allowing `INGRESS` traffic on port `22`.
+        When using a Shared VPC, ensure there is a firewall rule allowing `INGRESS` traffic on port `22`.
         You can limit this rule to `dstack` instances using the `dstack-runner-instance` target tag.
 
-        When using GCP gateways with a shared VPC, also ensure there is a firewall rule allowing `INGRESS` traffic on ports `22`, `80`, `443`.
+        When using GCP gateways with a Shared VPC, also ensure there is a firewall rule allowing `INGRESS` traffic on ports `22`, `80`, `443`.
         You can limit this rule to `dstack` gateway instances using the `dstack-gateway-instance` target tag.
 
+        To use TPUs with a Shared VPC, you need to grant the TPU Service Account in your service project permissions
+        to manage resources in the host project by granting the "TPU Shared VPC Agent" (roles/tpu.xpnAgent) role
+        ([more in the GCP docs](https://cloud.google.com/tpu/docs/shared-vpc-networks#vpc-shared-vpc)).
 
 ??? info "Private subnets"
     By default, `dstack` provisions instances with public IPs and permits inbound SSH traffic.

@@ -195,8 +195,10 @@ class GCPCompute(Compute):
                     authorized_keys=authorized_keys,
                     spot=instance_offer.instance.resources.spot,
                     labels=labels,
+                    network=self.config.vpc_resource_name,
                     subnetwork=subnetwork,
                     allocate_public_ip=allocate_public_ip,
+                    service_account=self.config.vm_service_account,
                 )
                 create_node_request = tpu_v2.CreateNodeRequest(
                     parent=f"projects/{self.config.project_id}/locations/{zone}",
