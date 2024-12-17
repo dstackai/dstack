@@ -38,6 +38,8 @@ If you use this configuration, `dstack` will create a new volume based on the sp
     If you prefer not to create a new volume but to reuse an existing one (e.g., created manually), you can 
     [specify its ID via `volume_id`](../reference/dstack.yml/volume.md#existing-volume). In this case, `dstack` will register the specified volume so that you can use it with dev environments, tasks, and services.
 
+    Note, if you register an external volume, you must ensure it already has a file system.
+
 !!! info "Reference"
     See [.dstack.yml](../reference/dstack.yml/volume.md) for all the options supported by
     volumes, along with multiple examples.
