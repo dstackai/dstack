@@ -37,7 +37,7 @@ A domain name is required to create a gateway.
 
 ## Create or update a gateway
 
-To create or update the gateway, simply call the [`dstack apply`](../reference/cli/index.md#dstack-apply) command:
+To create or update the gateway, simply call the [`dstack apply`](../reference/cli/dstack/apply.md) command:
 
 <div class="termy">
 
@@ -63,11 +63,11 @@ or of type `CNAME` if the hostname is another domain (some private gateways and 
 
 ### List gateways
 
-The [`dstack gateway list`](../reference/cli/index.md#dstack-gateway-list) command lists existing gateways and their status.
+The [`dstack gateway list`](../reference/cli/dstack/gateway.md#dstack-gateway-list) command lists existing gateways and their status.
 
 ### Delete a gateway
 
-To delete a gateway, pass gateway configuration to [`dstack delete`](../reference/cli/index.md#dstack-delete):
+To delete a gateway, pass gateway configuration to [`dstack delete`](../reference/cli/dstack/delete.md):
 
 <div class="termy">
 

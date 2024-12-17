@@ -68,7 +68,7 @@ This excludes memory for the model context and CUDA kernel reservations.
 
 ### Running a configuration
 
-To run a configuration, use the [`dstack apply`](https://dstack.ai/docs/reference/cli/index.md#dstack-apply) command.
+To run a configuration, use the [`dstack apply`](https://dstack.ai/docs/reference/cli/dstack/apply.md) command.
 
 <div class="termy">
 
