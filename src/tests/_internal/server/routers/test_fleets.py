@@ -39,6 +39,8 @@ from dstack._internal.server.testing.common import (
     get_private_key_string,
 )
 
+pytestmark = pytest.mark.usefixtures("image_config_mock")
+
 
 class TestListFleets:
     @pytest.mark.asyncio

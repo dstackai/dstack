@@ -24,6 +24,8 @@ from dstack._internal.server.testing.common import (
     get_volume,
 )
 
+pytestmark = pytest.mark.usefixtures("image_config_mock")
+
 
 async def make_run(
     session: AsyncSession,

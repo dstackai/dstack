@@ -26,6 +26,8 @@ from dstack._internal.server.testing.common import (
     get_job_provisioning_data,
 )
 
+pytestmark = pytest.mark.usefixtures("image_config_mock")
+
 
 class TestCollectMetrics:
     @pytest.mark.asyncio
