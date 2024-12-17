@@ -428,7 +428,7 @@ class GCPCompute(Compute):
             tags=[gcp_resources.DSTACK_GATEWAY_TAG],
             instance_name=configuration.instance_name,
             zone=zone,
-            service_account=None,
+            service_account=self.config.vm_service_account,
             network=self.config.vpc_resource_name,
             subnetwork=subnetwork,
         )
