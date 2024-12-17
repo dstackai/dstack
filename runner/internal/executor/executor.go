@@ -269,21 +269,28 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 
 	// As of 2024-11-29, ex.homeDir is always set to /root
 	if err := writeSSHEnvironment(envMap, -1, -1, ex.homeDir); err != nil {
-		return gerrors.Wrap(err)
+		log.Warning(ctx, "failed to write SSH environment", "path", ex.homeDir, "err", err)
 	}
-	if user != nil && *user.Uid != ex.uid && isHomeDirAccessible(user.HomeDir) {
-		envMap["HOME"] = user.HomeDir
-		if err := writeSSHEnvironment(envMap, int(*user.Uid), int(*user.Gid), user.HomeDir); err != nil {
-			return gerrors.Wrap(err)
-		}
-		akPath, err := joinRelPath(ex.homeDir, ".ssh/authorized_keys")
-		if err != nil {
-			return gerrors.Wrap(err)
-		}
-		if err := copyAuthorizedKeys(akPath, int(*user.Uid), int(*user.Gid), user.HomeDir); err != nil {
-			return gerrors.Wrap(err)
+	if user != nil && *user.Uid != 0 {
+		// non-root user
+		uid := int(*user.Uid)
+		gid := int(*user.Gid)
+		homeDir, isHomeDirAccessible := prepareHomeDir(ctx, uid, gid, user.HomeDir)
+		envMap["HOME"] = homeDir
+		if isHomeDirAccessible {
+			log.Trace(ctx, "provisioning homeDir", "path", homeDir)
+			if err := writeSSHEnvironment(envMap, uid, gid, homeDir); err != nil {
+				log.Warning(ctx, "failed to write SSH environment", "path", homeDir, "err", err)
+			}
+			akPath := filepath.Join(ex.homeDir, ".ssh/authorized_keys")
+			if err := copyAuthorizedKeys(akPath, uid, gid, homeDir); err != nil {
+				log.Warning(ctx, "failed to copy authorized keys", "path", homeDir, "err", err)
+			}
+		} else {
+			log.Trace(ctx, "homeDir is not accessible, skipping provisioning", "path", homeDir)
 		}
 	} else {
+		// root user
 		envMap["HOME"] = ex.homeDir
 	}
 
@@ -485,19 +492,6 @@ func fillUser(user *schemas.User) error {
 	return nil
 }
 
-func isHomeDirAccessible(homeDir string) bool {
-	if homeDir == "" {
-		// User does not exist (no user entry in /etc/passwd)
-		return false
-	}
-	info, err := os.Stat(homeDir)
-	if err != nil {
-		// Directory does not exist or permissions error
-		return false
-	}
-	return info.IsDir()
-}
-
 func parseStringId(stringId string) (uint32, error) {
 	id, err := strconv.ParseInt(stringId, 10, 32)
 	if err != nil {
@@ -550,6 +544,37 @@ func startCommand(cmd *exec.Cmd) (*os.File, error) {
 		return nil, err
 	}
 	return ptm, nil
+}
+
+func prepareHomeDir(ctx context.Context, uid int, gid int, homeDir string) (string, bool) {
+	if homeDir == "" {
+		// user does not exist
+		return "/", false
+	}
+	if info, err := os.Stat(homeDir); errors.Is(err, os.ErrNotExist) {
+		if strings.Contains(homeDir, "nonexistent") {
+			// let `/nonexistent` stay non-existent
+			return homeDir, false
+		}
+		if err = os.MkdirAll(homeDir, 0o755); err != nil {
+			log.Warning(ctx, "failed to create homeDir", "err", err)
+			return homeDir, false
+		}
+		if err = os.Chmod(homeDir, 0o750); err != nil {
+			log.Warning(ctx, "failed to chmod homeDir", "err", err)
+		}
+		if err = os.Chown(homeDir, uid, gid); err != nil {
+			log.Warning(ctx, "failed to chown homeDir", "err", err)
+		}
+		return homeDir, true
+	} else if err != nil {
+		log.Warning(ctx, "homeDir is not accessible", "err", err)
+		return homeDir, false
+	} else if !info.IsDir() {
+		log.Warning(ctx, "HomeDir is not a dir", "path", homeDir)
+		return homeDir, false
+	}
+	return homeDir, true
 }
 
 func writeSSHEnvironment(env map[string]string, uid int, gid int, homeDir string) error {
