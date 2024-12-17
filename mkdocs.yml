@@ -187,10 +187,10 @@ extra:
     provider: google
     property: G-JX21114P7B
   social:
-    - icon: /fontawesome/brands/github
-      link: https://github.com/dstackai/dstack
-    - icon: /fontawesome/brands/discord
-      link: https://discord.gg/u8SmfwPpMd
+#    - icon: /fontawesome/brands/github
+#      link: https://github.com/dstackai/dstack
+#    - icon: /fontawesome/brands/discord
+#      link: https://discord.gg/u8SmfwPpMd
     - icon: /simple/x
       link: https://twitter.com/dstackai
 #    - icon: /fontawesome/brands/python
@@ -252,6 +252,7 @@ nav:
         - Llama 3.2: examples/llms/llama32/index.md
     - Misc:
         - Docker Compose: examples/misc/docker-compose/index.md
+  - Developers: developers.md
   - Partners: partners.md
   - Blog:
       - blog/index.md

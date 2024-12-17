@@ -295,7 +295,7 @@
     border-color: black !important;
 }
 
-.providers a.feature-cell:hover h3:after {
+.providers a.feature-cell/*:hover*/ h3:after {
     content: url('data:image/svg+xml,<svg fill="rgba(0, 0, 0, 0.87)" xmlns="http://www.w3.org/2000/svg" width="18px" height="18px" viewBox="0 0 16 16"><polygon points="5 4.31 5 5.69 9.33 5.69 2.51 12.51 3.49 13.49 10.31 6.67 10.31 11 11.69 11 11.69 4.31 5 4.31" data-v-e1bdab2c=""></polygon></svg>');
     margin-left: 5px;
     position: relative;
@@ -397,7 +397,7 @@
 
 .providers.tx-landing__highlights_grid .feature-cell h3 {
     align-content: center;
-    font-size: 17.5px;
+    font-size: 1.1em;
     font-weight: 600;
     padding-bottom: 0.05em;
     line-height: 25px;
@@ -438,6 +438,10 @@
 
     .tx-landing__highlights_grid .feature-cell {
     }
+}
+
+.tx-landing__highlights_grid .feature-cell {
+    background: -webkit-linear-gradient(45deg, rgba(0, 42, 255, 0.005), rgba(0, 42, 255, 0.005), rgba(225, 101, 254, 0.01));
 }
 
 .tx-landing__highlights_grid .feature-cell:hover {
@@ -529,7 +533,7 @@
 }
 
 .tx-landing__highlights_grid h3 {
-    font-size: 1.1em;
+    font-size: 1.15em;
     font-weight: 700;
     border-bottom: none;
     padding-bottom: 0.3em;
