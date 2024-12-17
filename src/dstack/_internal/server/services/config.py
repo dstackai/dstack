@@ -240,7 +240,7 @@ class GCPConfig(CoreModel):
         ),
     ] = None
     vm_service_account: Annotated[
-        Optional[str], Field(description="The service account associated with provisioned VMs.")
+        Optional[str], Field(description="The service account associated with provisioned VMs")
     ] = None
     tags: Annotated[
         Optional[Dict[str, str]],
@@ -280,7 +280,7 @@ class GCPAPIConfig(CoreModel):
         ),
     ] = None
     vm_service_account: Annotated[
-        Optional[str], Field(description="The service account associated with provisioned VMs.")
+        Optional[str], Field(description="The service account associated with provisioned VMs")
     ] = None
     tags: Annotated[
         Optional[Dict[str, str]],
