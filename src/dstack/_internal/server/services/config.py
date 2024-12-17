@@ -239,6 +239,9 @@ class GCPConfig(CoreModel):
             )
         ),
     ] = None
+    vm_service_account: Annotated[
+        Optional[str], Field(description="The service account associated with provisioned VMs.")
+    ] = None
     tags: Annotated[
         Optional[Dict[str, str]],
         Field(
@@ -275,6 +278,9 @@ class GCPAPIConfig(CoreModel):
                 " Defaults to `true`"
             )
         ),
+    ] = None
+    vm_service_account: Annotated[
+        Optional[str], Field(description="The service account associated with provisioned VMs.")
     ] = None
     tags: Annotated[
         Optional[Dict[str, str]],

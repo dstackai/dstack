@@ -438,6 +438,7 @@ gcloud projects list --format="json(projectId)"
     compute.instances.get
     compute.instances.setLabels
     compute.instances.setMetadata
+    compute.instances.setServiceAccount
     compute.instances.setTags
     compute.networks.get
     compute.networks.updatePolicy
@@ -511,11 +512,13 @@ gcloud projects list --format="json(projectId)"
         ```
     
         </div>
-    
-        To use a shared VPC, that VPC has to be configured with two additional firewall rules:
-    
-        * Allow `INGRESS` traffic on port `22`, with the target tag `dstack-runner-instance`
-        * Allow `INGRESS` traffic on ports `22`, `80`, `443`, with the target tag `dstack-gateway-instance`
+
+        When using a shared VPC, ensure there is a firewall rule allowing `INGRESS` traffic on port `22`.
+        You can limit this rule to `dstack` instances using the `dstack-runner-instance` target tag.
+
+        When using GCP gateways with a shared VPC, also ensure there is a firewall rule allowing `INGRESS` traffic on ports `22`, `80`, `443`.
+        You can limit this rule to `dstack` gateway instances using the `dstack-gateway-instance` target tag.
+
 
 ??? info "Private subnets"
     By default, `dstack` provisions instances with public IPs and permits inbound SSH traffic.

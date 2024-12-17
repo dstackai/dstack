@@ -257,6 +257,7 @@ class GCPCompute(Compute):
                 tags=[gcp_resources.DSTACK_INSTANCE_TAG],
                 instance_name=instance_name,
                 zone=zone,
+                service_account=self.config.vm_service_account,
                 network=self.config.vpc_resource_name,
                 subnetwork=subnetwork,
                 allocate_public_ip=allocate_public_ip,
