@@ -34,22 +34,22 @@ Connect with the `dstack` team and community through Discord or share feedback o
 
 ## Ambassador program
 
-Passionate about AI infrastructure and open-source? Join the `dstack` ambassador program!
+Love AI infrastructure and open-source? Become a `dstack` ambassador!
 
-As an ambassador, you’ll play a key role in growing the `dstack` community by:
+As an ambassador, you’ll play a key role in growing our community by:
 
 * Sharing your expertise through blogs, talks, and tutorials
 * Organizing meetups and community events
 * Advocating for open-source AI container orchestration
 
-<a href="https://calendly.com/dstackai/discovery-call" target="_blank"
+<a href="#" target="_blank"
    class="md-button md-button--primary sky small" 
     data-tally-open="3jGzb9"
     data-tally-overlay="1">
     Get involved
 </a>
 
-Ambassadors receive recognition, content amplification, and cloud GPU credits to support their projects
+> We support ambassadors with recognition, wider exposure, and cloud GPU credits.
 
 ## For contributors
 
@@ -58,7 +58,7 @@ Join the development of `dstack` by contributing bug fixes, new features, and cl
 <div class="providers tx-landing__highlights_grid featured">
     <a href="https://github.com/dstackai/dstack/blob/master/CONTRIBUTING.md" class="feature-cell" target="_blank">
        <h3>
-           How to contribute
+           Contributing
        </h3>
        <p>
             Learn about the codebase and how to contribute.
