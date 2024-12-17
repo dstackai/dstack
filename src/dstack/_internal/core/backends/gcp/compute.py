@@ -195,8 +195,10 @@ class GCPCompute(Compute):
                     authorized_keys=authorized_keys,
                     spot=instance_offer.instance.resources.spot,
                     labels=labels,
+                    network=self.config.vpc_resource_name,
                     subnetwork=subnetwork,
                     allocate_public_ip=allocate_public_ip,
+                    service_account=self.config.vm_service_account,
                 )
                 create_node_request = tpu_v2.CreateNodeRequest(
                     parent=f"projects/{self.config.project_id}/locations/{zone}",
@@ -257,6 +259,7 @@ class GCPCompute(Compute):
                 tags=[gcp_resources.DSTACK_INSTANCE_TAG],
                 instance_name=instance_name,
                 zone=zone,
+                service_account=self.config.vm_service_account,
                 network=self.config.vpc_resource_name,
                 subnetwork=subnetwork,
                 allocate_public_ip=allocate_public_ip,
@@ -425,7 +428,7 @@ class GCPCompute(Compute):
             tags=[gcp_resources.DSTACK_GATEWAY_TAG],
             instance_name=configuration.instance_name,
             zone=zone,
-            service_account=None,
+            service_account=self.config.vm_service_account,
             network=self.config.vpc_resource_name,
             subnetwork=subnetwork,
         )

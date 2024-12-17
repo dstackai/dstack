@@ -365,22 +365,29 @@ def create_tpu_node_struct(
     authorized_keys: List[str],
     spot: bool,
     labels: Dict[str, str],
+    network: str = "global/networks/default",
     subnetwork: Optional[str] = None,
     allocate_public_ip: bool = True,
+    service_account: Optional[str] = None,
 ) -> tpu_v2.Node:
     node = tpu_v2.Node()
     if spot:
         node.scheduling_config = tpu_v2.SchedulingConfig(preemptible=True)
     node.accelerator_type = instance_name
     node.runtime_version = "tpu-ubuntu2204-base"
-    # subnetwork determines the network, so network shouldn't be specified
     node.network_config = tpu_v2.NetworkConfig(
         enable_external_ips=allocate_public_ip,
+        network=network,
         subnetwork=subnetwork,
     )
     ssh_keys = "\n".join(f"ubuntu:{key}" for key in authorized_keys)
     node.metadata = {"ssh-keys": ssh_keys, "startup-script": startup_script}
     node.labels = labels
+    if service_account is not None:
+        node.service_account = tpu_v2.ServiceAccount(
+            email=service_account,
+            scope=["https://www.googleapis.com/auth/cloud-platform"],
+        )
     return node
 
 
