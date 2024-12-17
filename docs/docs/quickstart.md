@@ -4,7 +4,7 @@
     
 ## Initialize a repo
 
-Before using `dstack`'s CLI in a directory, initialize the directory as a repo with [`dstack init`](reference/cli/index.md#dstack-init).
+Before using `dstack`'s CLI in a directory, initialize the directory as a repo with [`dstack init`](reference/cli/dstack/init.md).
 
 <div class="termy">
 
@@ -46,7 +46,7 @@ $ dstack init
 
     ##### Run the configuration
 
-    Run the configuration via [`dstack apply`](reference/cli/index.md#dstack-apply):
+    Run the configuration via [`dstack apply`](reference/cli/dstack/apply.md):
 
     <div class="termy">
 
@@ -112,7 +112,7 @@ $ dstack init
 
     ##### Run the configuration
 
-    Run the configuration via [`dstack apply`](reference/cli/index.md#dstack-apply):
+    Run the configuration via [`dstack apply`](reference/cli/dstack/apply.md):
 
     <div class="termy">
 
@@ -177,7 +177,7 @@ $ dstack init
 
     ##### Run the configuration
 
-    Run the configuration via [`dstack apply`](reference/cli/index.md#dstack-apply):
+    Run the configuration via [`dstack apply`](reference/cli/dstack/apply.md):
 
     <div class="termy">
 

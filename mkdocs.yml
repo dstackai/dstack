@@ -231,10 +231,25 @@ nav:
       - Server:
           - server/config.yml: docs/reference/server/config.yml.md
       - CLI:
-          - dstack: docs/reference/cli/index.md
+          - dstack:
+              - dstack server: docs/reference/cli/dstack/server.md
+              - dstack init: docs/reference/cli/dstack/init.md
+              - dstack apply: docs/reference/cli/dstack/apply.md
+              - dstack delete: docs/reference/cli/dstack/delete.md
+              - dstack ps: docs/reference/cli/dstack/ps.md
+              - dstack stop: docs/reference/cli/dstack/stop.md
+              - dstack attach: docs/reference/cli/dstack/attach.md
+              - dstack logs: docs/reference/cli/dstack/logs.md
+              - dstack stats: docs/reference/cli/dstack/stats.md
+              - dstack config: docs/reference/cli/dstack/config.md
+              - dstack fleet: docs/reference/cli/dstack/fleet.md
+              - dstack volume: docs/reference/cli/dstack/volume.md
+              - dstack gateway: docs/reference/cli/dstack/gateway.md
       - API:
           - Python API: docs/reference/api/python/index.md
           - REST API: docs/reference/api/rest/index.md
+      - Misc:
+          - Environment variables: docs/reference/misc/environment-variables.md
   - Examples:
     - examples.md
     - Deployment:

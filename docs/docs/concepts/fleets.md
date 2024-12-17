@@ -1,7 +1,7 @@
 # Fleets
 
 By default, when you run `dstack apply` with a dev environment, task, or service,
-`dstack` reuses `idle` instances from an existing [fleet](concepts/fleets.md).
+`dstack` reuses `idle` instances from an existing fleet.
 If no `idle` instances matching the requirements, it automatically creates a new fleet 
 using backends.
 
@@ -158,7 +158,7 @@ are both acceptable).
 
 ## Create or update a fleet
 
-To create or update the fleet, simply call the [`dstack apply`](../reference/cli/index.md#dstack-apply) command:
+To create or update the fleet, simply call the [`dstack apply`](../reference/cli/dstack/apply.md) command:
 
 <div class="termy">
 
@@ -209,7 +209,7 @@ you can set the [`termination_idle_time`](../reference/dstack.yml/fleet.md#termi
 
 ### List fleets
 
-The [`dstack fleet`](../reference/cli/index.md#dstack-fleet-list) command lists fleet instances and their status:
+The [`dstack fleet`](../reference/cli/dstack/fleet.md#dstack-fleet-list) command lists fleet instances and their status:
 
 <div class="termy">
 

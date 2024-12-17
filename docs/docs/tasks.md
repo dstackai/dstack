@@ -51,7 +51,7 @@ If you don't specify your Docker image, `dstack` uses the [base](https://hub.doc
 
 ## Run a configuration
 
-To run a configuration, use the [`dstack apply`](reference/cli/index.md#dstack-apply) command.
+To run a configuration, use the [`dstack apply`](reference/cli/dstack/apply.md) command.
 
 <div class="termy">
 
@@ -93,12 +93,12 @@ and runs the configuration.
 
 ### List runs
 
-The [`dstack ps`](reference/cli/index.md#dstack-ps)  command lists all running jobs and their statuses. 
+The [`dstack ps`](reference/cli/dstack/ps.md)  command lists all running jobs and their statuses. 
 Use `--watch` (or `-w`) to monitor the live status of runs.
 
 ### Stop a run
 
-Once the run exceeds the [`max_duration`](reference/dstack.yml/task.md#max_duration), or when you use [`dstack stop`](reference/cli/index.md#dstack-stop), 
+Once the run exceeds the [`max_duration`](reference/dstack.yml/task.md#max_duration), or when you use [`dstack stop`](reference/cli/dstack/stop.md), 
 the dev environment is stopped. Use `--abort` or `-x` to stop the run abruptly. 
 
 [//]: # (TODO: Mention `dstack logs` and `dstack logs -d`)
