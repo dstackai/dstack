@@ -1,13 +1,12 @@
 import asyncio
-import functools
-from asyncio import CancelledError, Lock
-from contextlib import AsyncExitStack
+from asyncio import Lock
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Iterable, Optional
 
 import dstack._internal.proxy.gateway.schemas.registry as schemas
 from dstack._internal.core.models.instances import SSHConnectionParams
+from dstack._internal.proxy.gateway import models as gateway_models
 from dstack._internal.proxy.gateway.repo import GatewayProxyRepo
 from dstack._internal.proxy.gateway.services.nginx import (
     ModelEntrypointConfig,
@@ -17,7 +16,11 @@ from dstack._internal.proxy.gateway.services.nginx import (
 )
 from dstack._internal.proxy.lib import models
 from dstack._internal.proxy.lib.errors import ProxyError, UnexpectedProxyError
-from dstack._internal.proxy.lib.services.service_connection import service_replica_connection_pool
+from dstack._internal.proxy.lib.repo import BaseProxyRepo
+from dstack._internal.proxy.lib.services.service_connection import (
+    ServiceReplicaConnection,
+    service_replica_connection_pool,
+)
 from dstack._internal.utils.logging import get_logger
 
 ACCESS_LOG_PATH = Path("/var/log/nginx/dstack.access.log")
@@ -37,35 +40,31 @@ async def register_service(
     repo: GatewayProxyRepo,
     nginx: Nginx,
 ) -> None:
+    service = models.Service(
+        project_name=project_name,
+        run_name=run_name,
+        domain=domain,
+        https=https,
+        auth=auth,
+        client_max_body_size=client_max_body_size,
+        replicas=(),
+    )
+
     async with lock:
         if await repo.get_service(project_name, run_name) is not None:
-            raise ProxyError(f"Service {project_name}/{run_name} is already registered")
-
-        logger.debug("Registering service %s/%s", project_name, run_name)
+            raise ProxyError(f"Service {service.fmt()} is already registered")
 
         old_project = await repo.get_project(project_name)
         new_project = models.Project(name=project_name, ssh_private_key=ssh_private_key)
         if old_project is not None and old_project.ssh_private_key != new_project.ssh_private_key:
             logger.warning(
-                "SSH key for service %s/%s is different from the previous one",
-                project_name,
-                run_name,
+                "SSH key for service %s is different from the previous one", service.fmt()
             )
         await repo.set_project(new_project)
 
-        service = models.Service(
-            project_name=project_name,
-            run_name=run_name,
-            domain=domain,
-            https=https,
-            auth=auth,
-            client_max_body_size=client_max_body_size,
-            replicas=frozenset(),
-        )
+        logger.debug("Registering service %s", service.fmt())
 
-        await nginx.register(
-            await get_nginx_service_config(service), (await repo.get_config()).acme_settings
-        )
+        await apply_service(service=service, old_service=None, repo=repo, nginx=nginx)
         await repo.set_service(service)
 
         if model is not None:
@@ -79,7 +78,7 @@ async def register_service(
                 ),
             )
 
-    logger.info("Service %s/%s is registered now", project_name, run_name)
+    logger.info("Service %s is registered now", service.fmt())
 
 
 async def unregister_service(
@@ -92,28 +91,14 @@ async def unregister_service(
                 f"Service {project_name}/{run_name} is not registered, cannot unregister"
             )
 
-        logger.debug("Unregistering service %s/%s", project_name, run_name)
+        logger.debug("Unregistering service %s", service.fmt())
 
-        results = await asyncio.gather(
-            # Terminate all SSH tunnels
-            *(service_replica_connection_pool.remove(replica.id) for replica in service.replicas),
-            # Unregister from nginx
-            nginx.unregister(service.domain_safe),
-            return_exceptions=True,
-        )
-        for exc in results:
-            if isinstance(exc, Exception):
-                logger.error(
-                    "Exception during unregistering service %s/%s: %s",
-                    project_name,
-                    run_name,
-                    exc,
-                )
-
+        await stop_replica_connections(r.id for r in service.replicas)
+        await nginx.unregister(service.domain_safe)
         await repo.delete_models_by_run(project_name, run_name)
         await repo.delete_service(project_name, run_name)
 
-    logger.info("Service %s/%s is unregistered now", project_name, run_name)
+    logger.info("Service %s is unregistered now", service.fmt())
 
 
 async def register_replica(
@@ -136,54 +121,29 @@ async def register_replica(
     )
 
     async with lock:
-        service = await repo.get_service(project_name, run_name)
-        if service is None:
+        old_service = await repo.get_service(project_name, run_name)
+        if old_service is None:
             raise ProxyError(
                 f"Service {project_name}/{run_name} does not exist, cannot register replica"
             )
 
-        service = models.Service(
-            project_name=project_name,
-            run_name=service.run_name,
-            domain=service.domain,
-            https=service.https,
-            auth=service.auth,
-            client_max_body_size=service.client_max_body_size,
-            replicas=service.replicas | {replica},
+        if old_service.find_replica(replica_id) is not None:
+            raise ProxyError(f"Replica {replica_id} already exists in service {old_service.fmt()}")
+
+        service = old_service.with_replicas(old_service.replicas + (replica,))
+
+        logger.debug("Registering replica %s in service %s", replica.id, service.fmt())
+        failures = await apply_service(
+            service=service, old_service=old_service, repo=repo, nginx=nginx
         )
-
-        project = await repo.get_project(project_name)
-        if project is None:
-            raise UnexpectedProxyError(f"Project {project_name!r} not found")
-
-        logger.debug(
-            "Registering replica %s for service %s/%s", replica.id, project_name, run_name
-        )
-
-        async with AsyncExitStack() as stack:
-            # Start SSH tunnel
-            await service_replica_connection_pool.add(project, service, replica)
-            stack.push_async_callback(
-                supress_exc_async(service_replica_connection_pool.remove, replica.id)
+        if replica in failures:
+            raise ProxyError(
+                f"Cannot register replica {replica.id}"
+                f" in service {service.fmt()}: {failures[replica]}"
             )
-
-            # Update Nginx config
-            await nginx.register(
-                await get_nginx_service_config(service), (await repo.get_config()).acme_settings
-            )
-            stack.push_async_callback(supress_exc_async(nginx.unregister, service.domain_safe))
-
-            # All fine, remove rollbacks
-            stack.pop_all()
-
         await repo.set_service(service)
 
-    logger.info(
-        "Replica %s for service %s/%s is registered now",
-        replica.id,
-        project_name,
-        run_name,
-    )
+    logger.info("Replica %s in service %s is registered now", replica.id, service.fmt())
 
 
 async def unregister_replica(
@@ -194,63 +154,27 @@ async def unregister_replica(
     nginx: Nginx,
 ) -> None:
     async with lock:
-        service = await repo.get_service(project_name, run_name)
-        if service is None:
+        old_service = await repo.get_service(project_name, run_name)
+        if old_service is None:
             raise ProxyError(
                 f"Service {project_name}/{run_name} does not exist, cannot unregister replica"
             )
 
-        replica = service.find_replica(replica_id)
+        replica = old_service.find_replica(replica_id)
         if replica is None:
             raise ProxyError(
-                f"Replica {replica_id} does not exist in service {project_name}/{run_name},"
+                f"Replica {replica_id} does not exist in service {old_service.fmt()},"
                 " cannot unregister"
             )
 
-        service = models.Service(
-            project_name=project_name,
-            run_name=service.run_name,
-            domain=service.domain,
-            https=service.https,
-            auth=service.auth,
-            client_max_body_size=service.client_max_body_size,
-            replicas=service.replicas - {replica},
-        )
+        service = old_service.with_replicas(tuple(r for r in old_service.replicas if r != replica))
 
-        logger.debug(
-            "Unregistering replica %s for service %s/%s",
-            replica.id,
-            project_name,
-            service.run_name,
-        )
+        logger.debug("Unregistering replica %s in service %s", replica.id, service.fmt())
 
-        results = await asyncio.gather(
-            # Terminate SSH tunnel
-            service_replica_connection_pool.remove(replica.id),
-            # Update Nginx config
-            nginx.register(
-                await get_nginx_service_config(service), (await repo.get_config()).acme_settings
-            ),
-            return_exceptions=True,
-        )
-        for exc in results:
-            if isinstance(exc, Exception):
-                logger.error(
-                    "Exception during unregistering replica %s in service %s/%s: %s",
-                    replica.id,
-                    project_name,
-                    service.run_name,
-                    exc,
-                )
-
+        await apply_service(service=service, old_service=old_service, repo=repo, nginx=nginx)
         await repo.set_service(service)
 
-    logger.info(
-        "Replica %s in service %s/%s is unregistered now",
-        replica_id,
-        project_name,
-        run_name,
-    )
+    logger.info("Replica %s in service %s is unregistered now", replica_id, service.fmt())
 
 
 async def register_model_entrypoint(
@@ -260,19 +184,82 @@ async def register_model_entrypoint(
     repo: GatewayProxyRepo,
     nginx: Nginx,
 ) -> None:
-    config = ModelEntrypointConfig(
+    entrypoint = gateway_models.ModelEntrypoint(
+        project_name=project_name,
         domain=domain,
         https=https,
-        project_name=project_name,
     )
     logger.debug("Registering entrypoint %s in project %s", domain, project_name)
-    await nginx.register(config, (await repo.get_config()).acme_settings)
+    await apply_entrypoint(entrypoint, repo, nginx)
+    await repo.set_entrypoint(entrypoint)
     logger.info("Entrypoint %s is now registered in project %s", domain, project_name)
 
 
-async def get_nginx_service_config(service: models.Service) -> ServiceConfig:
-    replicas = [await get_nginx_replica_config(replica) for replica in service.replicas]
-    replicas.sort(key=lambda replica: replica.id)  # ensures reproducible configs
+async def apply_service(
+    service: models.Service,
+    old_service: Optional[models.Service],
+    repo: GatewayProxyRepo,
+    nginx: Nginx,
+) -> dict[models.Replica, BaseException]:
+    if old_service is not None:
+        if service.domain != old_service.domain:
+            raise UnexpectedProxyError(
+                f"Did not expect service {service.fmt()}"
+                f" domain name to change ({old_service.domain} -> {service.domain})"
+            )
+        await stop_replica_connections(
+            replica.id for replica in old_service.replicas if replica not in service.replicas
+        )
+    replica_conns, replica_failures = await get_or_add_replica_connections(service, repo)
+    replica_configs = [
+        ReplicaConfig(id=replica.id, socket=conn.app_socket_path)
+        for replica, conn in replica_conns.items()
+    ]
+    service_config = await get_nginx_service_config(service, replica_configs)
+    await nginx.register(service_config, (await repo.get_config()).acme_settings)
+    return replica_failures
+
+
+async def get_or_add_replica_connections(
+    service: models.Service, repo: BaseProxyRepo
+) -> tuple[dict[models.Replica, ServiceReplicaConnection], dict[models.Replica, BaseException]]:
+    project = await repo.get_project(service.project_name)
+    if project is None:
+        raise UnexpectedProxyError(
+            f"Project {service.project_name} unexpectedly missing, even though service"
+            f" {service.fmt()} exists."
+        )
+    replica_conns, replica_failures = {}, {}
+    tasks = [
+        service_replica_connection_pool.get_or_add(project, service, replica)
+        for replica in service.replicas
+    ]
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+    for replica, conn_or_err in zip(service.replicas, results):
+        if isinstance(conn_or_err, BaseException):
+            replica_failures[replica] = conn_or_err
+            logger.warning(
+                "Failed starting connection to replica %s in service %s: %s",
+                replica.id,
+                service.fmt(),
+                conn_or_err,
+            )
+        else:
+            replica_conns[replica] = conn_or_err
+    return replica_conns, replica_failures
+
+
+async def stop_replica_connections(ids: Iterable[str]) -> None:
+    tasks = map(service_replica_connection_pool.remove, ids)
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+    for replica_id, exc in zip(ids, results):
+        if isinstance(exc, Exception):
+            logger.error("Error stopping connection to replica %s: %s", replica_id, exc)
+
+
+async def get_nginx_service_config(
+    service: models.Service, replicas: Iterable[ReplicaConfig]
+) -> ServiceConfig:
     return ServiceConfig(
         domain=service.domain_safe,
         https=service.https_safe,
@@ -281,15 +268,34 @@ async def get_nginx_service_config(service: models.Service) -> ServiceConfig:
         auth=service.auth,
         client_max_body_size=service.client_max_body_size,
         access_log_path=ACCESS_LOG_PATH,
-        replicas=replicas,
+        replicas=sorted(replicas, key=lambda r: r.id),  # sort for reproducible configs
     )
 
 
-async def get_nginx_replica_config(replica: models.Replica) -> ReplicaConfig:
-    conn = await service_replica_connection_pool.get(replica.id)
-    if conn is None:
-        raise UnexpectedProxyError(f"Connection to replica {replica.id} not found in pool")
-    return ReplicaConfig(id=replica.id, socket=conn.app_socket_path)
+async def apply_entrypoint(
+    entrypoint: gateway_models.ModelEntrypoint, repo: GatewayProxyRepo, nginx: Nginx
+) -> None:
+    config = ModelEntrypointConfig(
+        domain=entrypoint.domain,
+        https=entrypoint.https,
+        project_name=entrypoint.project_name,
+    )
+    acme = (await repo.get_config()).acme_settings
+    await nginx.register(config, acme)
+
+
+async def apply_all(repo: GatewayProxyRepo, nginx: Nginx) -> None:
+    service_tasks = [
+        apply_service(service=service, old_service=None, repo=repo, nginx=nginx)
+        for service in await repo.list_services()
+    ]
+    entrypoint_tasks = [
+        apply_entrypoint(entrypoint, repo, nginx) for entrypoint in await repo.list_entrypoints()
+    ]
+    results = await asyncio.gather(*service_tasks, *entrypoint_tasks, return_exceptions=True)
+    for exc in results:
+        if isinstance(exc, Exception):
+            logger.error("Exception restoring gateway: %s", exc)
 
 
 def model_schema_to_format_spec(model: schemas.AnyModel) -> models.AnyModelFormat:
@@ -305,15 +311,3 @@ def model_schema_to_format_spec(model: schemas.AnyModel) -> models.AnyModelForma
             raise UnexpectedProxyError(f"Unexpected model format {model.format}")
     else:
         raise UnexpectedProxyError(f"Unexpected model type {model.type}")
-
-
-def supress_exc_async(func, *args, **kwargs):
-    @functools.wraps(func)
-    async def wrapper():
-        try:
-            return await func(*args, **kwargs)
-        except Exception as e:
-            if isinstance(e, CancelledError):
-                raise
-
-    return wrapper

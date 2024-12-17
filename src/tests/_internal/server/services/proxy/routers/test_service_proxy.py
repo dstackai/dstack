@@ -23,7 +23,7 @@ ProxyTestRepo = GatewayProxyRepo
 @pytest.fixture
 def mock_replica_client_httpbin(httpbin) -> Generator[None, None, None]:
     with patch(
-        "dstack._internal.proxy.lib.services.service_connection.ServiceReplicaConnectionPool.add"
+        "dstack._internal.proxy.lib.services.service_connection.ServiceReplicaConnectionPool.get_or_add"
     ) as add_connection_mock:
         add_connection_mock.return_value.client.return_value = ServiceReplicaClient(
             base_url=httpbin.url, timeout=MOCK_REPLICA_CLIENT_TIMEOUT

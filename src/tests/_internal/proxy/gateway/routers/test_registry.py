@@ -1,48 +1,18 @@
 import re
-from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Generator, Optional, Union
-from unittest.mock import AsyncMock, MagicMock, patch
+from typing import Optional
 
 import httpx
 import pytest
 from freezegun import freeze_time
 
+from dstack._internal.core.errors import SSHError
 from dstack._internal.proxy.gateway.app import make_app
 from dstack._internal.proxy.gateway.repo import GatewayProxyRepo
 from dstack._internal.proxy.gateway.services.nginx import Nginx
+from dstack._internal.proxy.gateway.testing.common import Mocks
 from dstack._internal.proxy.lib.models import ChatModel, OpenAIChatModelFormat
-
-AnyMock = Union[MagicMock, AsyncMock]
-
-
-@dataclass
-class Mocks:
-    reload_nginx: AnyMock
-    run_certbot: AnyMock
-    open_conn: AnyMock
-    close_conn: AnyMock
-
-
-@pytest.fixture
-def system_mocks() -> Generator[Mocks, None, None]:
-    nginx = "dstack._internal.proxy.gateway.services.nginx"
-    connection = "dstack._internal.proxy.lib.services.service_connection"
-    with (
-        patch(f"{nginx}.sudo") as sudo,
-        patch(f"{nginx}.Nginx.reload") as reload_nginx,
-        patch(f"{nginx}.Nginx.run_certbot") as run_certbot,
-        patch(f"{connection}.ServiceReplicaConnection.open") as open_conn,
-        patch(f"{connection}.ServiceReplicaConnection.close") as close_conn,
-    ):
-        sudo.return_value = []
-        yield Mocks(
-            reload_nginx=reload_nginx,
-            run_certbot=run_certbot,
-            open_conn=open_conn,
-            close_conn=close_conn,
-        )
 
 
 def make_client(
@@ -247,6 +217,54 @@ class TestRegisterReplica:
         }
         assert system_mocks.reload_nginx.call_count == 0
         assert system_mocks.open_conn.call_count == 0
+
+    async def test_register_twice_error(self, tmp_path: Path, system_mocks: Mocks) -> None:
+        client = make_client(tmp_path)
+        # register service
+        resp = await client.post(
+            "/api/registry/test-proj/services/register",
+            json=register_service_payload(run_name="test-run", domain="test-run.gtw.test"),
+        )
+        assert resp.status_code == 200
+        # register replica
+        resp = await client.post(
+            "/api/registry/test-proj/services/test-run/replicas/register",
+            json=register_replica_payload(job_id="aaa-aaa"),
+        )
+        assert resp.status_code == 200
+        # register the same replica
+        resp = await client.post(
+            "/api/registry/test-proj/services/test-run/replicas/register",
+            json=register_replica_payload(job_id="aaa-aaa"),
+        )
+        assert resp.status_code == 400
+        assert resp.json() == {
+            "detail": "Replica aaa-aaa already exists in service test-proj/test-run"
+        }
+        assert system_mocks.reload_nginx.call_count == 2
+        assert system_mocks.open_conn.call_count == 1
+
+    async def test_register_connection_error(self, tmp_path: Path, system_mocks: Mocks) -> None:
+        client = make_client(tmp_path)
+        # register service
+        resp = await client.post(
+            "/api/registry/test-proj/services/register",
+            json=register_service_payload(run_name="test-run", domain="test-run.gtw.test"),
+        )
+        assert resp.status_code == 200
+        conf_before = (tmp_path / "443-test-run.gtw.test.conf").read_text()
+        # register invalid replica
+        system_mocks.open_conn.side_effect = SSHError("test error")
+        resp = await client.post(
+            "/api/registry/test-proj/services/test-run/replicas/register",
+            json=register_replica_payload(job_id="abc-def"),
+        )
+        assert resp.status_code == 400
+        assert resp.json() == {
+            "detail": "Cannot register replica abc-def in service test-proj/test-run: test error"
+        }
+        conf_after = (tmp_path / "443-test-run.gtw.test.conf").read_text()
+        assert conf_after == conf_before
 
 
 @pytest.mark.asyncio

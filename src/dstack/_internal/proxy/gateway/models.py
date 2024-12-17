@@ -7,6 +7,12 @@ from pydantic import AnyHttpUrl
 from dstack._internal.proxy.lib.models import ImmutableModel
 
 
+class ModelEntrypoint(ImmutableModel):
+    project_name: str
+    domain: str
+    https: bool
+
+
 class ACMESettings(ImmutableModel):
     server: Optional[AnyHttpUrl] = None
     eab_kid: Optional[str] = None
