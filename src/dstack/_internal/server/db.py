@@ -1,9 +1,10 @@
 from contextlib import asynccontextmanager
+from typing import Optional
 
 from alembic import command, config
 from sqlalchemy import event
 from sqlalchemy.engine.interfaces import DBAPIConnection
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import ConnectionPoolEntry
 
@@ -13,9 +14,12 @@ from dstack._internal.server.settings import DATABASE_URL
 
 
 class Database:
-    def __init__(self, url: str):
+    def __init__(self, url: str, engine: Optional[AsyncEngine] = None):
         self.url = url
-        self.engine = create_async_engine(self.url, echo=settings.SQL_ECHO_ENABLED)
+        if engine is not None:
+            self.engine = engine
+        else:
+            self.engine = create_async_engine(self.url, echo=settings.SQL_ECHO_ENABLED)
         self.session_maker = sessionmaker(
             bind=self.engine,
             expire_on_commit=False,
@@ -40,7 +44,16 @@ class Database:
         return self.session_maker()
 
 
-_db = Database(url=DATABASE_URL)
+def get_new_db() -> Database:
+    """
+    Creates a new Database with a new Engine.
+    Use this when you need to access the DB in a new thread instead of calling Database directly
+    since it's easier to monkey-patch.
+    """
+    return Database(url=DATABASE_URL)
+
+
+_db = get_new_db()
 
 
 def get_db() -> Database:

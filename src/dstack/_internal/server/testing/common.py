@@ -459,32 +459,36 @@ async def create_instance(
     termination_idle_time: int = DEFAULT_POOL_TERMINATION_IDLE_TIME,
     region: str = "eu-west",
     remote_connection_info: Optional[RemoteConnectionInfo] = None,
+    job_provisioning_data: Optional[JobProvisioningData] = None,
 ) -> InstanceModel:
     if instance_id is None:
         instance_id = uuid.uuid4()
-    job_provisioning_data = {
-        "backend": backend.value,
-        "instance_type": {
-            "name": "instance",
-            "resources": {
-                "cpus": 1,
-                "memory_mib": 512,
-                "gpus": [],
-                "spot": spot,
-                "disk": {"size_mib": 102400},
-                "description": "",
+    if job_provisioning_data is None:
+        job_provisioning_data_dict = {
+            "backend": backend.value,
+            "instance_type": {
+                "name": "instance",
+                "resources": {
+                    "cpus": 1,
+                    "memory_mib": 512,
+                    "gpus": [],
+                    "spot": spot,
+                    "disk": {"size_mib": 102400},
+                    "description": "",
+                },
             },
-        },
-        "instance_id": "running_instance.id",
-        "ssh_proxy": None,
-        "hostname": "running_instance.ip",
-        "region": region,
-        "price": 0.1,
-        "username": "root",
-        "ssh_port": 22,
-        "dockerized": True,
-        "backend_data": None,
-    }
+            "instance_id": "running_instance.id",
+            "ssh_proxy": None,
+            "hostname": "running_instance.ip",
+            "region": region,
+            "price": 0.1,
+            "username": "root",
+            "ssh_port": 22,
+            "dockerized": True,
+            "backend_data": None,
+        }
+    else:
+        job_provisioning_data_dict = job_provisioning_data.dict()
     offer = {
         "backend": backend.value,
         "instance": {
@@ -530,7 +534,7 @@ async def create_instance(
         created_at=created_at,
         started_at=created_at,
         finished_at=finished_at,
-        job_provisioning_data=json.dumps(job_provisioning_data),
+        job_provisioning_data=json.dumps(job_provisioning_data_dict),
         offer=json.dumps(offer),
         price=1,
         region=region,
