@@ -111,12 +111,8 @@ class BaseRunConfiguration(CoreModel):
             )
         ),
     ] = None
-    home_dir: Annotated[
-        str,
-        Field(
-            description="The absolute path to the home directory inside the container. Defaults to `/root`"
-        ),
-    ] = "/root"
+    # deprecated since 0.18.31; has no effect
+    home_dir: str = "/root"
     registry_auth: Annotated[
         Optional[RegistryAuth], Field(description="Credentials for pulling a private Docker image")
     ]
@@ -134,7 +130,8 @@ class BaseRunConfiguration(CoreModel):
         Env,
         Field(description="The mapping or the list of environment variables"),
     ] = Env()
-    setup: Annotated[CommandsList, Field(description="The bash commands to run on the boot")] = []
+    # deprecated since 0.18.31; task, service -- no effect; dev-environment -- executed right before `init`
+    setup: CommandsList = []
     resources: Annotated[
         ResourcesSpec, Field(description="The resources requirements to run the configuration")
     ] = ResourcesSpec()
