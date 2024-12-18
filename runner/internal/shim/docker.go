@@ -24,11 +24,13 @@ import (
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/registry"
+	dockersystem "github.com/docker/docker/api/types/system"
 	docker "github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/docker/go-connections/nat"
 	"github.com/docker/go-units"
 	"github.com/dstackai/dstack/runner/internal/shim/backends"
+	"github.com/dstackai/dstack/runner/internal/shim/host"
 	bytesize "github.com/inhies/go-bytesize"
 	"github.com/ztrue/tracerr"
 )
@@ -52,6 +54,10 @@ type JobResult struct {
 type DockerRunner struct {
 	client       *docker.Client
 	dockerParams DockerParameters
+	dockerInfo   dockersystem.Info
+	gpus         []host.GpuInfo
+	gpuVendor    host.GpuVendor
+	gpuLock      *GpuLock
 	tasks        TaskStorage
 }
 
@@ -60,13 +66,56 @@ func NewDockerRunner(dockerParams DockerParameters) (*DockerRunner, error) {
 	if err != nil {
 		return nil, tracerr.Wrap(err)
 	}
+	dockerInfo, err := client.Info(context.TODO())
+	if err != nil {
+		return nil, tracerr.Wrap(err)
+	}
+
+	var gpuVendor host.GpuVendor
+	gpus := host.GetGpuInfo()
+	if len(gpus) > 0 {
+		gpuVendor = gpus[0].Vendor
+	} else {
+		gpuVendor = host.GpuVendorNone
+	}
+	gpuLock, err := NewGpuLock(gpus)
+	if err != nil {
+		return nil, tracerr.Wrap(err)
+	}
 
 	runner := &DockerRunner{
 		client:       client,
 		dockerParams: dockerParams,
+		dockerInfo:   dockerInfo,
+		gpus:         gpus,
+		gpuVendor:    gpuVendor,
+		gpuLock:      gpuLock,
 		tasks:        NewTaskStorage(),
 	}
 	return runner, nil
+}
+
+func (d *DockerRunner) Resources() Resources {
+	cpuCount := host.GetCpuCount()
+	totalMemory, err := host.GetTotalMemory()
+	if err != nil {
+		log.Println(err)
+	}
+	netAddresses, err := host.GetNetworkAddresses()
+	if err != nil {
+		log.Println(err)
+	}
+	diskSize, err := host.GetDiskSize(d.dockerInfo.DockerRootDir)
+	if err != nil {
+		log.Println(err)
+	}
+	return Resources{
+		Gpus:         d.gpus,
+		CpuCount:     cpuCount,
+		TotalMemory:  totalMemory,
+		DiskSize:     diskSize,
+		NetAddresses: netAddresses,
+	}
 }
 
 func (d *DockerRunner) Run(ctx context.Context, cfg TaskConfig) error {
@@ -88,6 +137,20 @@ func (d *DockerRunner) Run(ctx context.Context, cfg TaskConfig) error {
 	}()
 
 	var err error
+
+	if cfg.GpuCount != 0 {
+		gpuIDs, err := d.gpuLock.Acquire(cfg.GpuCount)
+		if err != nil {
+			log.Println(err)
+			task.SetStatusTerminated("EXECUTOR_ERROR", err.Error())
+			return tracerr.Wrap(err)
+		}
+		task.gpuIDs = gpuIDs
+
+		defer func() {
+			d.gpuLock.Release(task.gpuIDs)
+		}()
+	}
 
 	if cfg.SshKey != "" {
 		ak := AuthorizedKeys{user: cfg.SshUser, lookup: user.Lookup}
@@ -139,20 +202,12 @@ func (d *DockerRunner) Run(ctx context.Context, cfg TaskConfig) error {
 		return tracerr.Wrap(err)
 	}
 
-	runnerDir, err := d.dockerParams.MakeRunnerDir()
-	if err != nil {
-		errMessage := fmt.Sprintf("Cannot create dir for runner: %s", err.Error())
-		log.Print(errMessage + "\n")
-		task.SetStatusTerminated("CREATING_CONTAINER_ERROR", errMessage)
-		return tracerr.Wrap(err)
-	}
-
 	log.Println("Creating container")
 	task.SetStatusCreating()
 	if !d.tasks.Update(task) {
 		return tracerr.Errorf("failed to update task %s", task.ID)
 	}
-	containerID, err := createContainer(ctx, d.client, runnerDir, d.dockerParams, task)
+	containerID, err := d.createContainer(ctx, task)
 	if err != nil {
 		errMessage := fmt.Sprintf("createContainer error: %s", err.Error())
 		log.Print(errMessage + "\n")
@@ -512,36 +567,38 @@ func pullImage(ctx context.Context, client docker.APIClient, taskConfig TaskConf
 	return nil
 }
 
-func createContainer(ctx context.Context, client docker.APIClient, runnerDir string, dockerParams DockerParameters, task Task) (string, error) {
-	taskConfig := task.config
-
+func (d *DockerRunner) createContainer(ctx context.Context, task Task) (string, error) {
 	// For legacy API compatibility, since LegacyTaskID is the same for all tasks, containerName is not unique
 	// With new API where task.ID is unique (and, in turn, containerName is unique too), container name clash
 	// is not expected
 	if task.ID == LegacyTaskID {
 		timeout := int(0)
 		stopOptions := container.StopOptions{Timeout: &timeout}
-		err := client.ContainerStop(ctx, task.containerName, stopOptions)
+		err := d.client.ContainerStop(ctx, task.containerName, stopOptions)
 		if err != nil {
 			log.Printf("Cleanup routine: Cannot stop container: %s", err)
 		}
 		removeOptions := container.RemoveOptions{Force: true, RemoveVolumes: true}
-		err = client.ContainerRemove(ctx, task.containerName, removeOptions)
+		err = d.client.ContainerRemove(ctx, task.containerName, removeOptions)
 		if err != nil {
 			log.Printf("Cleanup routine: Cannot remove container: %s", err)
 		}
 	}
 
-	mounts, err := dockerParams.DockerMounts(runnerDir)
+	runnerDir, err := d.dockerParams.MakeRunnerDir()
 	if err != nil {
 		return "", tracerr.Wrap(err)
 	}
-	volumeMounts, err := getVolumeMounts(taskConfig.VolumeMounts)
+	mounts, err := d.dockerParams.DockerMounts(runnerDir)
+	if err != nil {
+		return "", tracerr.Wrap(err)
+	}
+	volumeMounts, err := getVolumeMounts(task.config.VolumeMounts)
 	if err != nil {
 		return "", tracerr.Wrap(err)
 	}
 	mounts = append(mounts, volumeMounts...)
-	instanceMounts, err := getInstanceMounts(taskConfig.InstanceMounts)
+	instanceMounts, err := getInstanceMounts(task.config.InstanceMounts)
 	if err != nil {
 		return "", tracerr.Wrap(err)
 	}
@@ -549,8 +606,8 @@ func createContainer(ctx context.Context, client docker.APIClient, runnerDir str
 
 	// Set the environment variables
 	envVars := []string{}
-	if dockerParams.DockerPJRTDevice() != "" {
-		envVars = append(envVars, fmt.Sprintf("PJRT_DEVICE=%s", dockerParams.DockerPJRTDevice()))
+	if d.dockerParams.DockerPJRTDevice() != "" {
+		envVars = append(envVars, fmt.Sprintf("PJRT_DEVICE=%s", d.dockerParams.DockerPJRTDevice()))
 	}
 
 	// Override /dev/shm with tmpfs mount with `exec` option (the default is `noexec`)
@@ -558,43 +615,45 @@ func createContainer(ctx context.Context, client docker.APIClient, runnerDir str
 	// This is required by some workloads, e.g., Oracle Database with Java Stored Procedures,
 	// see https://github.com/moby/moby/issues/6758
 	var tmpfs map[string]string
-	if taskConfig.ShmSize > 0 {
+	if task.config.ShmSize > 0 {
 		// No need to specify all default options (`nosuid`, etc.),
 		// the docker daemon will merge our options with the defaults.
 		tmpfs = map[string]string{
-			"/dev/shm": fmt.Sprintf("exec,size=%d", taskConfig.ShmSize),
+			"/dev/shm": fmt.Sprintf("exec,size=%d", task.config.ShmSize),
 		}
 	}
 
 	containerConfig := &container.Config{
-		Image:        taskConfig.ImageName,
-		Cmd:          []string{strings.Join(dockerParams.DockerShellCommands(taskConfig.PublicKeys), " && ")},
+		Image:        task.config.ImageName,
+		Cmd:          []string{strings.Join(d.dockerParams.DockerShellCommands(task.config.PublicKeys), " && ")},
 		Entrypoint:   []string{"/bin/sh", "-c"},
-		ExposedPorts: exposePorts(dockerParams.DockerPorts()...),
+		ExposedPorts: exposePorts(d.dockerParams.DockerPorts()...),
 		Env:          envVars,
 		Labels: map[string]string{
 			LabelKeyIsTask: LabelValueTrue,
 			LabelKeyTaskID: task.ID,
 		},
 	}
-	if taskConfig.ContainerUser != "" {
-		containerConfig.User = taskConfig.ContainerUser
+	if task.config.ContainerUser != "" {
+		containerConfig.User = task.config.ContainerUser
 	}
 	hostConfig := &container.HostConfig{
-		Privileged:      taskConfig.Privileged || dockerParams.DockerPrivileged(),
+		Privileged:      task.config.Privileged || d.dockerParams.DockerPrivileged(),
 		NetworkMode:     getNetworkMode(),
-		PortBindings:    bindPorts(dockerParams.DockerPorts()...),
+		PortBindings:    bindPorts(d.dockerParams.DockerPorts()...),
 		PublishAllPorts: true,
 		Sysctls:         map[string]string{},
 		Mounts:          mounts,
-		ShmSize:         taskConfig.ShmSize,
+		ShmSize:         task.config.ShmSize,
 		Tmpfs:           tmpfs,
 	}
-	configureGpuIfAvailable(hostConfig)
+	if len(task.gpuIDs) > 0 {
+		configureGpus(hostConfig, d.gpuVendor, task.gpuIDs)
+	}
 	configureHpcNetworkingIfAvailable(hostConfig)
 
 	log.Printf("Creating container %s:\nconfig: %v\nhostConfig:%v", task.containerName, containerConfig, hostConfig)
-	resp, err := client.ContainerCreate(ctx, containerConfig, hostConfig, nil, nil, task.containerName)
+	resp, err := d.client.ContainerCreate(ctx, containerConfig, hostConfig, nil, nil, task.containerName)
 	if err != nil {
 		return "", tracerr.Wrap(err)
 	}
@@ -710,9 +769,11 @@ func getNetworkMode() container.NetworkMode {
 	return "default"
 }
 
-func configureGpuIfAvailable(hostConfig *container.HostConfig) {
-	switch gpuVendor := GetGpuVendor(); gpuVendor {
-	case Nvidia:
+func configureGpus(hostConfig *container.HostConfig, vendor host.GpuVendor, ids []string) {
+	// NVIDIA: ids are identifiers reported by nvidia-smi, GPU-<UUID> strings
+	// AMD: ids are DRI render node paths, e.g., /dev/dri/renderD128
+	switch vendor {
+	case host.GpuVendorNvidia:
 		hostConfig.Resources.DeviceRequests = append(
 			hostConfig.Resources.DeviceRequests,
 			container.DeviceRequest{
@@ -720,13 +781,13 @@ func configureGpuIfAvailable(hostConfig *container.HostConfig) {
 				// Default capabilities: utility, compute.
 				// https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/1.16.0/docker-specialized.html
 				Capabilities: [][]string{{"gpu", "utility", "compute", "graphics", "video", "display", "compat32"}},
-				Count:        -1, // --gpus=all
+				DeviceIDs:    ids,
 			},
 		)
-	case Amd:
+	case host.GpuVendorAmd:
 		// All options are listed here: https://hub.docker.com/r/rocm/pytorch
 		// Only --device are mandatory, other seem to be performance-related.
-		// --device=/dev/kfd --device=/dev/dri
+		// --device=/dev/kfd
 		hostConfig.Resources.Devices = append(
 			hostConfig.Resources.Devices,
 			container.DeviceMapping{
@@ -734,12 +795,18 @@ func configureGpuIfAvailable(hostConfig *container.HostConfig) {
 				PathInContainer:   "/dev/kfd",
 				CgroupPermissions: "rwm",
 			},
-			container.DeviceMapping{
-				PathOnHost:        "/dev/dri",
-				PathInContainer:   "/dev/dri",
-				CgroupPermissions: "rwm",
-			},
 		)
+		// --device=/dev/dri/renderD<N>
+		for _, renderNodePath := range ids {
+			hostConfig.Resources.Devices = append(
+				hostConfig.Resources.Devices,
+				container.DeviceMapping{
+					PathOnHost:        renderNodePath,
+					PathInContainer:   renderNodePath,
+					CgroupPermissions: "rwm",
+				},
+			)
+		}
 		// --ipc=host
 		hostConfig.IpcMode = container.IPCModeHost
 		// --cap-add=SYS_PTRACE
@@ -747,7 +814,7 @@ func configureGpuIfAvailable(hostConfig *container.HostConfig) {
 		// --security-opt=seccomp=unconfined
 		hostConfig.SecurityOpt = append(hostConfig.SecurityOpt, "seccomp=unconfined")
 		// TODO: in addition, for non-root user, --group-add=video, and possibly --group-add=render, are required.
-	case NoVendor:
+	case host.GpuVendorNone:
 		// nothing to do
 	}
 }

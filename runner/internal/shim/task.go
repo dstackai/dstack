@@ -35,6 +35,7 @@ type Task struct {
 	containerName string
 	containerID   string
 	cancelPull    context.CancelFunc
+	gpuIDs        []string
 }
 
 func (t *Task) SetStatusPulling(cancelPull context.CancelFunc) {

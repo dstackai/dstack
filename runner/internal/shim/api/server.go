@@ -13,6 +13,8 @@ type TaskRunner interface {
 	Run(context.Context, shim.TaskConfig) error
 	GetState() (shim.RunnerStatus, shim.JobResult)
 	Stop(bool)
+
+	Resources() shim.Resources
 }
 
 type ShimServer struct {

@@ -42,6 +42,7 @@ func (s *ShimServer) SubmitPostHandler(w http.ResponseWriter, r *http.Request) (
 		ImageName:        body.ImageName,
 		ContainerUser:    body.ContainerUser,
 		Privileged:       body.Privileged,
+		GpuCount:         -1,
 		ShmSize:          body.ShmSize,
 		PublicKeys:       body.PublicKeys,
 		SshUser:          body.SshUser,
