@@ -21,7 +21,7 @@ replica on 4xMI300x and 8xMI300x
 
 Finally, we extrapolate performance projections for upcoming GPUs like NVIDIA H200, B200, and AMD MI325x, MI350x.
 
-<img src="https://github.com/dstackai/static-assets/blob/main/static-assets/images/h100-mi300x-inference-benchmark-v2.png?raw=true" width="600" />
+<img src="https://github.com/dstackai/static-assets/blob/main/static-assets/images/h100-mi300x-inference-benchmark-v2.png?raw=true" width="630"/>
 
 This benchmark is made possible through the generous support of our friends at
 [Hot Aisle :material-arrow-top-right-thin:{ .external }](https://hotaisle.xyz/){:target="_blank"} and 
