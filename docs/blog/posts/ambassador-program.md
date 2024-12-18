@@ -31,14 +31,14 @@ of the `dstack` community, and play a key role in advancing the open AI ecosyste
 
 As an ambassador, you’ll play a vital role in sharing best practices for using containers in AI workflows, advocating
 for open-source tools for AI model training and inference, and helping the community use `dstack` with 
-various cloud providers data centers, and GPU vendors.
+various cloud providers, data centers, and GPU vendors.
 
 Your contributions might include writing technical blog posts, delivering talks, organizing `dstack` meetups, and
 championing the open AI ecosystem within the broader community.
 
 ## Who is the program for?
 
-Whether you’re new to `dstack` or already experienced, the ambassador progeam is open to anyone passionate 
+Whether you’re new to `dstack` or already experienced, the ambassador program is open to anyone passionate 
 about open-source AI, eager to share knowledge, and excited to engage with the AI community.
 
 ## How do we support ambassadors?
@@ -48,7 +48,7 @@ cloud GPU credits to power their projects.
 
 ## How to apply?
 
-If you’re interested in becoming an ambassador, click the link below and fill out a quick form with details about
+If you’re interested in becoming an ambassador, fill out a quick form with details about
 yourself and your experience. We’ll reach out with a starter kit and next steps.
 
 <a href="#" target="_blank"
