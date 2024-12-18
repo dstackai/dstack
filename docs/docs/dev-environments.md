@@ -60,6 +60,10 @@ To open in VS Code Desktop, use this link:
 
 </div>
 
+!!! info "Windows"
+    On Windows, `dstack` works both natively and inside WSL. But, for dev environments, 
+    it's recommended _not to use_ `dstack apply` _inside WSL_ due to a [VS Code issue :material-arrow-top-right-thin:{ .external }](https://github.com/microsoft/vscode-remote-release/issues/937){:target="_blank"}.
+
 `dstack apply` automatically provisions an instance, uploads the contents of the repo (incl. your local uncommitted changes),
 and runs the configuration.
 
