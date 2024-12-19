@@ -92,7 +92,7 @@ class ServerProxyRepo(BaseProxyRepo):
             https=None,
             auth=run_spec.configuration.auth,
             client_max_body_size=DEFAULT_SERVICE_CLIENT_MAX_BODY_SIZE,
-            replicas=frozenset(replicas),
+            replicas=tuple(replicas),
         )
 
     async def list_models(self, project_name: str) -> List[ChatModel]:

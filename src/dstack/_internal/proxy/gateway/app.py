@@ -7,10 +7,14 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from dstack._internal.proxy.gateway.auth import GatewayProxyAuthProvider
-from dstack._internal.proxy.gateway.const import SERVER_CONNECTIONS_DIR_ON_GATEWAY
+from dstack._internal.proxy.gateway.const import (
+    DSTACK_DIR_ON_GATEWAY,
+    SERVER_CONNECTIONS_DIR_ON_GATEWAY,
+)
 from dstack._internal.proxy.gateway.deps import (
     GatewayDependencyInjector,
     get_gateway_injector_from_app,
+    get_gateway_proxy_repo,
 )
 from dstack._internal.proxy.gateway.repo import GatewayProxyRepo
 from dstack._internal.proxy.gateway.routers.auth import router as auth_router
@@ -18,7 +22,7 @@ from dstack._internal.proxy.gateway.routers.config import router as config_route
 from dstack._internal.proxy.gateway.routers.registry import router as registry_router
 from dstack._internal.proxy.gateway.routers.stats import router as stats_router
 from dstack._internal.proxy.gateway.services.nginx import Nginx
-from dstack._internal.proxy.gateway.services.registry import ACCESS_LOG_PATH
+from dstack._internal.proxy.gateway.services.registry import ACCESS_LOG_PATH, apply_all
 from dstack._internal.proxy.gateway.services.server_client import HTTPMultiClient
 from dstack._internal.proxy.gateway.services.stats import StatsCollector
 from dstack._internal.proxy.lib.routers.model_proxy import router as model_proxy_router
@@ -26,12 +30,16 @@ from dstack._internal.proxy.lib.services.service_connection import service_repli
 from dstack._internal.utils.common import run_async
 from dstack.version import __version__
 
+STATE_FILE = DSTACK_DIR_ON_GATEWAY / "state-v2.json"
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     injector = get_gateway_injector_from_app(app)
+    repo = await get_gateway_proxy_repo(await injector.get_repo().__anext__())
     nginx = injector.get_nginx()
     await run_async(nginx.write_global_conf)
+    await apply_all(repo, nginx)
 
     yield
 
@@ -41,7 +49,7 @@ async def lifespan(app: FastAPI):
 def make_app(repo: Optional[GatewayProxyRepo] = None, nginx: Optional[Nginx] = None) -> FastAPI:
     app = FastAPI(lifespan=lifespan)
     app.state.proxy_dependency_injector = GatewayDependencyInjector(
-        repo=repo or GatewayProxyRepo(),
+        repo=repo or GatewayProxyRepo.load(STATE_FILE),
         auth=GatewayProxyAuthProvider(
             server_client=HTTPMultiClient(SERVER_CONNECTIONS_DIR_ON_GATEWAY)
         ),

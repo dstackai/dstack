@@ -87,13 +87,13 @@ class ServiceReplicaConnection:
 
 class ServiceReplicaConnectionPool:
     def __init__(self) -> None:
-        # TODO(#1595): remove connections to stopped replicas
+        # TODO(#1595): remove connections to stopped replicas in-server
         self.connections: Dict[str, ServiceReplicaConnection] = {}
 
     async def get(self, replica_id: str) -> Optional[ServiceReplicaConnection]:
         return self.connections.get(replica_id)
 
-    async def add(
+    async def get_or_add(
         self, project: Project, service: Service, replica: Replica
     ) -> ServiceReplicaConnection:
         connection = self.connections.get(replica.id)
@@ -138,7 +138,7 @@ async def get_service_replica_client(service: Service, repo: BaseProxyRepo) -> h
         )
     # Nginx not available, forward directly to the tunnel
     # TODO(#1595): consider trying different replicas, e.g. using HTTPMultiClient
-    replica = random.choice(tuple(service.replicas))
+    replica = random.choice(service.replicas)
     connection = await service_replica_connection_pool.get(replica.id)
     if connection is None:
         project = await repo.get_project(service.project_name)
@@ -146,8 +146,9 @@ async def get_service_replica_client(service: Service, repo: BaseProxyRepo) -> h
             raise UnexpectedProxyError(
                 f"Expected to find project {service.project_name} but could not"
             )
-        connection = await service_replica_connection_pool.add(project, service, replica)
+        connection = await service_replica_connection_pool.get_or_add(project, service, replica)
     return await connection.client()
 
 
+# TODO(#1595): do not use a global variable, it's shared by tests
 service_replica_connection_pool: ServiceReplicaConnectionPool = ServiceReplicaConnectionPool()

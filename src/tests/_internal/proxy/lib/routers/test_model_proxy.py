@@ -110,7 +110,7 @@ def make_openai_client(
 def mock_chat_client() -> Generator[None, None, None]:
     with (
         patch(
-            "dstack._internal.proxy.lib.services.service_connection.ServiceReplicaConnectionPool.add"
+            "dstack._internal.proxy.lib.services.service_connection.ServiceReplicaConnectionPool.get_or_add"
         ),
         patch("dstack._internal.proxy.lib.routers.model_proxy.get_chat_client") as get_client_mock,
     ):
