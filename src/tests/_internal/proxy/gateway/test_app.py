@@ -4,7 +4,7 @@ import pytest
 
 from dstack._internal.proxy.gateway.app import lifespan, make_app
 from dstack._internal.proxy.gateway.models import ModelEntrypoint
-from dstack._internal.proxy.gateway.repo import GatewayProxyRepo
+from dstack._internal.proxy.gateway.repo.repo import GatewayProxyRepo
 from dstack._internal.proxy.gateway.services.nginx import Nginx
 from dstack._internal.proxy.gateway.testing.common import Mocks
 from dstack._internal.proxy.lib.testing.common import make_project, make_service

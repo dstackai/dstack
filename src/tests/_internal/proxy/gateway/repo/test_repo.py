@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from dstack._internal.proxy.gateway.models import ACMESettings, GlobalProxyConfig, ModelEntrypoint
-from dstack._internal.proxy.gateway.repo import GatewayProxyRepo
+from dstack._internal.proxy.gateway.repo.repo import GatewayProxyRepo
 from dstack._internal.proxy.lib.testing.common import make_project, make_service
 from tests._internal.proxy.lib.routers.test_model_proxy import make_model
 

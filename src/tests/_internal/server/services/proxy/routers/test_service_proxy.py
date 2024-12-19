@@ -5,7 +5,7 @@ import httpx
 import pytest
 from fastapi import FastAPI
 
-from dstack._internal.proxy.gateway.repo import GatewayProxyRepo
+from dstack._internal.proxy.gateway.repo.repo import GatewayProxyRepo
 from dstack._internal.proxy.lib.auth import BaseProxyAuthProvider
 from dstack._internal.proxy.lib.deps import ProxyDependencyInjector
 from dstack._internal.proxy.lib.repo import BaseProxyRepo

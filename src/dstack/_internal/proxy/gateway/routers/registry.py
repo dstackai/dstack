@@ -3,7 +3,7 @@ from typing_extensions import Annotated
 
 import dstack._internal.proxy.gateway.services.registry as registry_services
 from dstack._internal.proxy.gateway.deps import get_gateway_proxy_repo, get_nginx
-from dstack._internal.proxy.gateway.repo import GatewayProxyRepo
+from dstack._internal.proxy.gateway.repo.repo import GatewayProxyRepo
 from dstack._internal.proxy.gateway.schemas.common import OkResponse
 from dstack._internal.proxy.gateway.schemas.registry import (
     RegisterEntrypointRequest,

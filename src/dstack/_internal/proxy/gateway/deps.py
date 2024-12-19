@@ -2,7 +2,7 @@ from typing import Annotated
 
 from fastapi import Depends, FastAPI, Request
 
-from dstack._internal.proxy.gateway.repo import GatewayProxyRepo
+from dstack._internal.proxy.gateway.repo.repo import GatewayProxyRepo
 from dstack._internal.proxy.gateway.services.nginx import Nginx
 from dstack._internal.proxy.gateway.services.stats import StatsCollector
 from dstack._internal.proxy.lib.auth import BaseProxyAuthProvider

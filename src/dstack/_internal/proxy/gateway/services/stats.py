@@ -9,7 +9,7 @@ from typing import Iterable, Optional, TextIO
 
 from pydantic import BaseModel
 
-from dstack._internal.proxy.gateway.repo import GatewayProxyRepo
+from dstack._internal.proxy.gateway.repo.repo import GatewayProxyRepo
 from dstack._internal.proxy.gateway.schemas.stats import PerWindowStats, ServiceStats, Stat
 from dstack._internal.utils.common import run_async
 
