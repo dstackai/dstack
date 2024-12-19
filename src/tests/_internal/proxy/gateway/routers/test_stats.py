@@ -5,7 +5,7 @@ import httpx
 import pytest
 
 from dstack._internal.proxy.gateway.app import make_app
-from dstack._internal.proxy.gateway.repo import GatewayProxyRepo
+from dstack._internal.proxy.gateway.repo.repo import GatewayProxyRepo
 from dstack._internal.proxy.lib.models import Service
 from dstack._internal.proxy.lib.testing.common import make_project, make_service
 
