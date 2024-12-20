@@ -1,0 +1,56 @@
+name: Run dstack Task # Name of the GitHub Actions workflow
+
+on:
+  push:
+    branches: [ main, master ] # Trigger on pushes to main or master branches
+  pull_request: 
+    branches: [ main, master ] # Trigger on pull requests to main or master branches
+
+jobs:
+  run-ai-workload:
+    name: dstack-task  # Name of the job in the workflow
+    runs-on: ubuntu-latest  # The type of machine to run the job on
+
+    steps:
+      - name: Connect to your server where Dstack is running with SSH
+        run: |
+          # Create an SSH private key file with secure permissions
+          install -m 600 -D /dev/null ~/.ssh/github-actions
+          # Add the SSH private key from GitHub secrets to the file
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/github-actions
+          
+          # Configure SSH settings for the connection
+          cat >> ~/.ssh/config <<END
+          Host github-actions
+            HostName ${{ secrets.SSH_HOST }} # The SSH host, provided as a secret
+            User ${{ secrets.SSH_USER }} # The SSH user, provided as a secret
+            IdentityFile ~/.ssh/github-actions # Path to the private key file
+            Port 22 # SSH port (default is 22)
+            StrictHostKeyChecking no # Disable host key checking for simplicity
+          END
+
+ 
+      - name: Pull new changes of the repo with AI workload code into your server and run task with dstack
+        run: |
+          ssh github-actions '
+            DEFAULT_BRANCH=$(git ls-remote --symref https://github.com/dstackai/dstack HEAD | grep "^ref" | awk "{print \$2}" | sed "s#refs/heads/##")
+            if [ -d "dstack/.git" ]; then
+              cd dstack && git pull origin $DEFAULT_BRANCH
+            else
+              rm -rf dstack && git clone -b $DEFAULT_BRANCH https://github.com/dstackai/dstack
+            fi
+          '
+    
+      - name: Initialize dstack on the server and run the AI task with dstack
+        run: |
+          ssh github-actions << 'EOF'
+            # Set environment variables for authentication tokens
+            export HF_TOKEN=${{ secrets.HF_TOKEN }}  # Hugging Face token for API access
+            export WANDB_API_KEY=${{ secrets.WANDB_API_KEY }}  # Weights & Biases API key
+            
+            # Activate the Python environment, initialize dstack, and apply the task configuration
+            source dstack-env/bin/activate
+            cd dstack
+            dstack init
+            dstack apply -f examples/fine-tuning/axolotl/.dstack.yaml --yes &
+          EOF
