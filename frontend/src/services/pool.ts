@@ -48,7 +48,26 @@ export const poolApi = createApi({
 
             providesTags: (result) => (result ? [{ type: 'Pools' as const, id: result.name }] : []),
         }),
+
+        deletePoolInstance: builder.mutation<
+            void,
+            { projectName: IProject['project_name']; pool_name: string; instance_name: string; force: boolean }
+        >({
+            query: ({ projectName, ...body }) => ({
+                url: API.PROJECTS.DELETE_POOL_INSTANCE(projectName),
+                method: 'POST',
+                body,
+            }),
+
+            invalidatesTags: () => ['Pools'],
+        }),
     }),
 });
 
-export const { useGetPoolsQuery, useGetPoolsInstancesQuery, useLazyGetPoolsInstancesQuery, useGetPoolDetailsQuery } = poolApi;
+export const {
+    useGetPoolsQuery,
+    useGetPoolsInstancesQuery,
+    useLazyGetPoolsInstancesQuery,
+    useGetPoolDetailsQuery,
+    useDeletePoolInstanceMutation,
+} = poolApi;

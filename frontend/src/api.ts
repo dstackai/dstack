@@ -73,6 +73,7 @@ export const API = {
         // Pools
         POOLS: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/pool/list`,
         POOL_DETAILS: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/pool/show`,
+        DELETE_POOL_INSTANCE: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/pool/remove`,
 
         // Fleets
         FLEETS: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/fleets/list`,

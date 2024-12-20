@@ -1,12 +1,13 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Button, FormField, Header, Pagination, SelectCSD, Table, Toggle } from 'components';
+import { Button, FormField, Header, Pagination, SelectCSD, SpaceBetween, Table, Toggle } from 'components';
 
 import { useBreadcrumbs, useCollection } from 'hooks';
 import { ROUTES } from 'routes';
 
 import { useColumnsDefinitions, useEmptyMessages, useFilters, useFleetsData } from './hooks';
+import { useDeletePoolInstances } from './useDeletePoolInstance';
 
 import styles from './styles.module.scss';
 
@@ -38,6 +39,7 @@ export const FleetList: React.FC = () => {
     const isDisabledPagination = isLoading || data.length === 0;
 
     const { columns } = useColumnsDefinitions();
+    const { deleteInstances, isDeleting } = useDeletePoolInstances();
     const { renderEmptyMessage, renderNoMatchMessage } = useEmptyMessages({ clearFilters, isDisabledClearFilter });
 
     const { items, collectionProps } = useCollection<IInstanceListItem>(data, {
@@ -48,6 +50,16 @@ export const FleetList: React.FC = () => {
         pagination: { pageSize: 20 },
         selection: {},
     });
+
+    const { selectedItems } = collectionProps;
+
+    const isDisabledDeleteButton = !selectedItems?.length || isDeleting;
+
+    const deleteClickHandle = () => {
+        if (!selectedItems?.length) return;
+
+        deleteInstances([...selectedItems]).catch(console.log);
+    };
 
     const renderCounter = () => {
         if (!data?.length) return '';
@@ -64,12 +76,24 @@ export const FleetList: React.FC = () => {
             loading={isLoading}
             loadingText={t('common.loading')}
             stickyHeader={true}
+            selectionType="multi"
             header={
                 <Header
                     variant="awsui-h1-sticky"
                     counter={renderCounter()}
                     actions={
-                        <Button iconName="refresh" disabled={isLoading} ariaLabel={t('common.refresh')} onClick={refreshList} />
+                        <SpaceBetween size="xs" direction="horizontal">
+                            <Button formAction="none" onClick={deleteClickHandle} disabled={isDisabledDeleteButton}>
+                                {t('common.delete')}
+                            </Button>
+
+                            <Button
+                                iconName="refresh"
+                                disabled={isLoading}
+                                ariaLabel={t('common.refresh')}
+                                onClick={refreshList}
+                            />
+                        </SpaceBetween>
                     }
                 >
                     {t('navigation.fleets')}
