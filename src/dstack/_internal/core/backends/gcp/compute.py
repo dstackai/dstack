@@ -710,17 +710,17 @@ def _is_pod(instance_name: str) -> bool:
     parts = instance_name.split("-")
     if len(parts) != 2:
         raise ValueError(f"Invalid tpu type: {instance_name}")
-    version, tensor_cores = parts
+    tpu_version, tensor_cores = parts
     try:
         tensor_cores = int(tensor_cores)
     except ValueError:
         raise ValueError(f"Invalid number in tpu tensor cores: {tensor_cores}")
-    if version in ["v2", "v3", "v5p", "v5litepod"]:
+    if tpu_version in ["v2", "v3", "v5p", "v5litepod", "v6e"]:
         return tensor_cores > 8
-    elif version == "v4":
+    elif tpu_version == "v4":
         return True
     else:
-        raise ValueError(f"Unknown TPU version: {version}")
+        raise ValueError(f"Unknown TPU version: {tpu_version}")
 
 
 def _get_volume_price(size: int) -> float:
