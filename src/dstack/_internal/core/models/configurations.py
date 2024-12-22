@@ -14,6 +14,7 @@ from dstack._internal.core.models.profiles import ProfileParams
 from dstack._internal.core.models.repos.base import Repo
 from dstack._internal.core.models.repos.virtual import VirtualRepo
 from dstack._internal.core.models.resources import Range, ResourcesSpec
+from dstack._internal.core.models.unix import UnixUser
 from dstack._internal.core.models.volumes import MountPoint, VolumeConfiguration, parse_mount_point
 
 CommandsList = List[str]
@@ -89,6 +90,15 @@ class BaseRunConfiguration(CoreModel):
     type: Literal["none"]
     name: Annotated[Optional[str], Field(description="The run name")] = None
     image: Annotated[Optional[str], Field(description="The name of the Docker image to run")]
+    user: Annotated[
+        Optional[str],
+        Field(
+            description=(
+                "The user inside the container, `user_name_or_id[:group_name_or_id]`"
+                " (e.g., `ubuntu`, `1000:1000`). Defaults to the default `image` user"
+            )
+        ),
+    ] = None
     privileged: Annotated[bool, Field(description="Run the container in privileged mode")] = False
     entrypoint: Annotated[Optional[str], Field(description="The Docker entrypoint")]
     working_dir: Annotated[
@@ -101,12 +111,8 @@ class BaseRunConfiguration(CoreModel):
             )
         ),
     ] = None
-    home_dir: Annotated[
-        str,
-        Field(
-            description="The absolute path to the home directory inside the container. Defaults to `/root`"
-        ),
-    ] = "/root"
+    # deprecated since 0.18.31; has no effect
+    home_dir: str = "/root"
     registry_auth: Annotated[
         Optional[RegistryAuth], Field(description="Credentials for pulling a private Docker image")
     ]
@@ -124,7 +130,8 @@ class BaseRunConfiguration(CoreModel):
         Env,
         Field(description="The mapping or the list of environment variables"),
     ] = Env()
-    setup: Annotated[CommandsList, Field(description="The bash commands to run on the boot")] = []
+    # deprecated since 0.18.31; task, service -- no effect; dev-environment -- executed right before `init`
+    setup: CommandsList = []
     resources: Annotated[
         ResourcesSpec, Field(description="The resources requirements to run the configuration")
     ] = ResourcesSpec()
@@ -150,8 +157,15 @@ class BaseRunConfiguration(CoreModel):
             return parse_mount_point(v)
         return v
 
+    @validator("user")
+    def validate_user(cls, v) -> Optional[str]:
+        if v is None:
+            return None
+        UnixUser.parse(v)
+        return v
+
     def get_repo(self) -> Repo:
-        return VirtualRepo(repo_id="none")
+        return VirtualRepo()
 
 
 class BaseRunConfigurationWithPorts(BaseRunConfiguration):

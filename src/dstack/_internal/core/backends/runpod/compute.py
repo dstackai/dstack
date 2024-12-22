@@ -72,7 +72,6 @@ class RunpodCompute(Compute):
                 SSHKey(public=run.run_spec.ssh_key_pub.strip()),
                 SSHKey(public=project_ssh_public_key.strip()),
             ],
-            job_docker_config=None,
             user=run.user,
         )
 

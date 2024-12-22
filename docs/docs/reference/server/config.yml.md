@@ -4,7 +4,7 @@ The `~/.dstack/server/config.yml` file is used
 to [configure](../../installation/index.md#1-configure-backends) the `dstack` server cloud accounts
 and other sever-level settings such as encryption.
 
-## Backends
+## Configure backends { #backends }
 
 > The `dstack` server allows you to configure backends for multiple projects.
 > If you don't need multiple projects, use only the `main` project.
@@ -12,7 +12,7 @@ and other sever-level settings such as encryption.
 Each cloud account must be configured under the `backends` property of the respective project.
 See the examples below.
 
-### Cloud providers
+### Cloud providers  { #clouds }
 
 #### AWS
 
@@ -69,12 +69,15 @@ There are two ways to configure AWS: using an access key or using the default cr
                     "ec2:AttachVolume",
                     "ec2:AuthorizeSecurityGroupEgress",
                     "ec2:AuthorizeSecurityGroupIngress",
+                    "ec2:CreatePlacementGroup",
                     "ec2:CancelSpotInstanceRequests",
                     "ec2:CreateSecurityGroup",
                     "ec2:CreateTags",
                     "ec2:CreateVolume",
+                    "ec2:DeletePlacementGroup",
                     "ec2:DeleteVolume",
                     "ec2:DescribeAvailabilityZones",
+                    "ec2:DescribeCapacityReservations"
                     "ec2:DescribeImages",
                     "ec2:DescribeInstances",
                     "ec2:DescribeInstanceAttribute",
@@ -435,6 +438,7 @@ gcloud projects list --format="json(projectId)"
     compute.instances.get
     compute.instances.setLabels
     compute.instances.setMetadata
+    compute.instances.setServiceAccount
     compute.instances.setTags
     compute.networks.get
     compute.networks.updatePolicy
@@ -508,11 +512,16 @@ gcloud projects list --format="json(projectId)"
         ```
     
         </div>
-    
-        To use a shared VPC, that VPC has to be configured with two additional firewall rules:
-    
-        * Allow `INGRESS` traffic on port `22`, with the target tag `dstack-runner-instance`
-        * Allow `INGRESS` traffic on ports `22`, `80`, `443`, with the target tag `dstack-gateway-instance`
+
+        When using a Shared VPC, ensure there is a firewall rule allowing `INGRESS` traffic on port `22`.
+        You can limit this rule to `dstack` instances using the `dstack-runner-instance` target tag.
+
+        When using GCP gateways with a Shared VPC, also ensure there is a firewall rule allowing `INGRESS` traffic on ports `22`, `80`, `443`.
+        You can limit this rule to `dstack` gateway instances using the `dstack-gateway-instance` target tag.
+
+        To use TPUs with a Shared VPC, you need to grant the TPU Service Account in your service project permissions
+        to manage resources in the host project by granting the "TPU Shared VPC Agent" (roles/tpu.xpnAgent) role
+        ([more in the GCP docs](https://cloud.google.com/tpu/docs/shared-vpc-networks#vpc-shared-vpc)).
 
 ??? info "Private subnets"
     By default, `dstack` provisions instances with public IPs and permits inbound SSH traffic.
@@ -736,11 +745,11 @@ projects:
 
 </div>
 
-### On-prem servers
+### On-prem servers  { #on-prem }
 
 #### SSH fleets
 
-For using `dstack` with on-prem servers, no backend configuration is required.
+> For using `dstack` with on-prem servers, no backend configuration is required.
 See [SSH fleets](../../concepts/fleets.md#ssh-fleets) for more details.
 
 #### Kubernetes
@@ -833,7 +842,7 @@ In case of a self-managed cluster, also specify the IP address of any node in th
 
     [//]: # (TODO: Provide short yet clear instructions. Elaborate on whether it works with Kind.)
 
-## Encryption
+## Enable encryption { #encryption }
 
 By default, `dstack` stores data in plaintext. To enforce encryption, you 
 specify one or more encryption keys.
@@ -997,23 +1006,6 @@ See the [reference table](#default-permissions) for all configurable permissions
             type:
                 required: true
 
-## `projects[n].backends[type=datacrunch]` { #_datacrunch data-toc-label="backends[type=datacrunch]" }
-
-#SCHEMA# dstack._internal.server.services.config.DataCrunchConfig
-    overrides:
-        show_root_heading: false
-        type:
-            required: true
-        item_id_prefix: datacrunch-
-
-## `projects[n].backends[type=datacrunch].creds` { #_datacrunch-creds data-toc-label="backends[type=datacrunch].creds" }
-
-#SCHEMA# dstack._internal.core.models.backends.datacrunch.DataCrunchAPIKeyCreds
-    overrides:
-        show_root_heading: false
-        type:
-            required: true
-
 ## `projects[n].backends[type=gcp]` { #_gcp data-toc-label="backends[type=gcp]" }
 
 #SCHEMA# dstack._internal.server.services.config.GCPConfig
@@ -1063,6 +1055,57 @@ See the [reference table](#default-permissions) for all configurable permissions
         type:
             required: true
 
+## `projects[n].backends[type=runpod]` { #_runpod data-toc-label="backends[type=runpod]" }
+
+#SCHEMA# dstack._internal.server.services.config.RunpodConfig
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+        item_id_prefix: runpod-
+
+## `projects[n].backends[type=runpod].creds` { #_runpod-creds data-toc-label="backends[type=runpod].creds" }
+
+#SCHEMA# dstack._internal.core.models.backends.runpod.RunpodAPIKeyCreds
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+
+## `projects[n].backends[type=vastai]` { #_vastai data-toc-label="backends[type=vastai]" }
+
+#SCHEMA# dstack._internal.server.services.config.VastAIConfig
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+        item_id_prefix: vastai-
+
+## `projects[n].backends[type=vastai].creds` { #_vastai-creds data-toc-label="backends[type=vastai].creds" }
+
+#SCHEMA# dstack._internal.core.models.backends.vastai.VastAIAPIKeyCreds
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+
+## `projects[n].backends[type=tensordock]` { #_tensordock data-toc-label="backends[type=tensordock]" }
+
+#SCHEMA# dstack._internal.server.services.config.TensorDockConfig
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+        item_id_prefix: tensordock-
+
+## `projects[n].backends[type=tensordock].creds` { #_tensordock-creds data-toc-label="backends[type=tensordock].creds" }
+
+#SCHEMA# dstack._internal.core.models.backends.tensordock.TensorDockAPIKeyCreds
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+
 ## `projects[n].backends[type=oci]` { #_oci data-toc-label="backends[type=oci]" }
 
 #SCHEMA# dstack._internal.server.services.config.OCIConfig
@@ -1088,40 +1131,6 @@ See the [reference table](#default-permissions) for all configurable permissions
             type:
                 required: true
 
-## `projects[n].backends[type=tensordock]` { #_tensordock data-toc-label="backends[type=tensordock]" }
-
-#SCHEMA# dstack._internal.server.services.config.TensorDockConfig
-    overrides:
-        show_root_heading: false
-        type:
-            required: true
-        item_id_prefix: tensordock-
-
-## `projects[n].backends[type=tensordock].creds` { #_tensordock-creds data-toc-label="backends[type=tensordock].creds" }
-
-#SCHEMA# dstack._internal.core.models.backends.tensordock.TensorDockAPIKeyCreds
-    overrides:
-        show_root_heading: false
-        type:
-            required: true
-
-## `projects[n].backends[type=vastai]` { #_vastai data-toc-label="backends[type=vastai]" }
-
-#SCHEMA# dstack._internal.server.services.config.VastAIConfig
-    overrides:
-        show_root_heading: false
-        type:
-            required: true
-        item_id_prefix: vastai-
-
-## `projects[n].backends[type=vastai].creds` { #_vastai-creds data-toc-label="backends[type=vastai].creds" }
-
-#SCHEMA# dstack._internal.core.models.backends.vastai.VastAIAPIKeyCreds
-    overrides:
-        show_root_heading: false
-        type:
-            required: true
-
 ## `projects[n].backends[type=cudo]` { #_cudo data-toc-label="backends[type=cudo]" }
 
 #SCHEMA# dstack._internal.server.services.config.CudoConfig
@@ -1134,6 +1143,23 @@ See the [reference table](#default-permissions) for all configurable permissions
 ## `projects[n].backends[type=cudo].creds` { #_cudo-creds data-toc-label="backends[type=cudo].creds" }
 
 #SCHEMA# dstack._internal.core.models.backends.cudo.CudoAPIKeyCreds
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+
+## `projects[n].backends[type=datacrunch]` { #_datacrunch data-toc-label="backends[type=datacrunch]" }
+
+#SCHEMA# dstack._internal.server.services.config.DataCrunchConfig
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+        item_id_prefix: datacrunch-
+
+## `projects[n].backends[type=datacrunch].creds` { #_datacrunch-creds data-toc-label="backends[type=datacrunch].creds" }
+
+#SCHEMA# dstack._internal.core.models.backends.datacrunch.DataCrunchAPIKeyCreds
     overrides:
         show_root_heading: false
         type:

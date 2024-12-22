@@ -117,23 +117,23 @@ def include_ssh_config(path: PathLike, ssh_config_path: PathLike = default_ssh_c
     path = normalize_path(path, collapse_user=True)
     include = f"Include {path}\n"
     content = ""
-    with FileLock(str(ssh_config_path) + ".lock"):
-        if os.path.exists(ssh_config_path):
-            with open(ssh_config_path, "r") as f:
-                content = f.read()
-        if include not in content:
-            try:
+    try:
+        with FileLock(str(ssh_config_path) + ".lock"):
+            if os.path.exists(ssh_config_path):
+                with open(ssh_config_path, "r") as f:
+                    content = f.read()
+            if include not in content:
                 with open(ssh_config_path, "w") as f:
                     f.write(include + content)
-            except PermissionError:
-                logger.warning(
-                    f"Couldn't update `{ssh_config_path}` due to a permissions problem.\n\n"
-                    f"The `vscode://vscode-remote/ssh-remote+<run name>/workflow` link and "
-                    f"the `ssh <run name>` command won't work.\n\n"
-                    f"To fix this, make sure `{ssh_config_path}` is writable, or add "
-                    f"`Include {path}` to the top of `{ssh_config_path}` manually.",
-                    extra={"markup": True},
-                )
+    except PermissionError:
+        logger.warning(
+            f"Couldn't update `{ssh_config_path}` due to a permissions problem.\n"
+            f"The `vscode://vscode-remote/ssh-remote+<run name>/workflow` link and "
+            f"the `ssh <run name>` command won't work.\n"
+            f"To fix this, make sure `{ssh_config_path}` is writable, or add "
+            f"`Include {path}` to the top of `{ssh_config_path}` manually.",
+            extra={"markup": True},
+        )
 
 
 def get_ssh_config(path: PathLike, host: str) -> Optional[Dict[str, str]]:

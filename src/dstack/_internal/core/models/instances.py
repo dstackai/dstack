@@ -5,9 +5,8 @@ import gpuhunt
 from pydantic import root_validator
 
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.common import CoreModel, RegistryAuth
+from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.envs import Env
-from dstack._internal.server.services.docker import DockerImage
 from dstack._internal.utils.common import pretty_resources
 
 
@@ -78,6 +77,9 @@ class SSHConnectionParams(CoreModel):
     username: str
     port: int
 
+    class Config:
+        frozen = True
+
 
 class SSHKey(CoreModel):
     public: str
@@ -92,11 +94,6 @@ class RemoteConnectionInfo(CoreModel):
     env: Env = Env()
 
 
-class DockerConfig(CoreModel):
-    registry_auth: Optional[RegistryAuth]
-    image: Optional[DockerImage]
-
-
 class InstanceConfiguration(CoreModel):
     project_name: str
     instance_name: str
@@ -105,7 +102,7 @@ class InstanceConfiguration(CoreModel):
     instance_id: Optional[str] = None
     availability_zone: Optional[str] = None
     placement_group_name: Optional[str] = None
-    job_docker_config: Optional[DockerConfig]  # FIXME: cannot find any usages – remove?
+    reservation: Optional[str] = None
 
     def get_public_keys(self) -> List[str]:
         return [ssh_key.public.strip() for ssh_key in self.ssh_keys]

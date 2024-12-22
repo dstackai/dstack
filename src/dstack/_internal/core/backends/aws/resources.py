@@ -140,6 +140,8 @@ def create_instances_struct(
     allocate_public_ip: bool = True,
     placement_group_name: Optional[str] = None,
     enable_efa: bool = False,
+    reservation_id: Optional[str] = None,
+    is_capacity_block: bool = False,
 ) -> Dict[str, Any]:
     struct: Dict[str, Any] = dict(
         BlockDeviceMappings=[
@@ -173,6 +175,9 @@ def create_instances_struct(
                 "InstanceInterruptionBehavior": "terminate",
             },
         }
+
+    if is_capacity_block:
+        struct["InstanceMarketOptions"] = {"MarketType": "capacity-block"}
     if enable_efa and not subnet_id:
         raise ComputeError("EFA requires subnet")
     # AWS allows specifying either NetworkInterfaces for specific subnet_id
@@ -203,6 +208,11 @@ def create_instances_struct(
     if placement_group_name is not None:
         struct["Placement"] = {
             "GroupName": placement_group_name,
+        }
+
+    if reservation_id is not None:
+        struct["CapacityReservationSpecification"] = {
+            "CapacityReservationTarget": {"CapacityReservationId": reservation_id}
         }
 
     return struct
@@ -596,3 +606,44 @@ def _is_private_subnet_with_internet_egress(
                     return True
 
     return False
+
+
+def get_reservation(
+    ec2_client: botocore.client.BaseClient,
+    reservation_id: str,
+    instance_count: int = 0,
+    instance_types: Optional[List[str]] = None,
+    is_capacity_block: bool = False,
+) -> Optional[Dict[str, Any]]:
+    filters = [{"Name": "state", "Values": ["active"]}]
+    if instance_types:
+        filters.append({"Name": "instance-type", "Values": instance_types})
+    try:
+        response = ec2_client.describe_capacity_reservations(
+            CapacityReservationIds=[reservation_id], Filters=filters
+        )
+    except botocore.exceptions.ParamValidationError as e:
+        logger.debug(
+            "Skipping reservation %s. Parameter validation error: %s", reservation_id, repr(e)
+        )
+        return None
+    except botocore.exceptions.ClientError as e:
+        error_code = e.response.get("Error", {}).get("Code")
+        if error_code == "InvalidCapacityReservationId.Malformed":
+            logger.debug("Skipping reservation %s. Malformed ID.", reservation_id)
+            return None
+        if error_code == "InvalidCapacityReservationId.NotFound":
+            logger.debug(
+                "Skipping reservation %s. Capacity Reservation not found.", reservation_id
+            )
+            return None
+        raise
+    reservation = response["CapacityReservations"][0]
+
+    if instance_count > 0 and reservation["AvailableInstanceCount"] < instance_count:
+        return None
+
+    if is_capacity_block and reservation["ReservationType"] != "capacity-block":
+        return None
+
+    return reservation

@@ -51,7 +51,7 @@ If you don't specify your Docker image, `dstack` uses the [base](https://hub.doc
 
 ## Run a configuration
 
-To run a configuration, use the [`dstack apply`](reference/cli/index.md#dstack-apply) command.
+To run a configuration, use the [`dstack apply`](reference/cli/dstack/apply.md) command.
 
 <div class="termy">
 
@@ -77,8 +77,8 @@ Launching `axolotl-train`...
 
 </div>
 
-`dstack apply` automatically uploads the code from the current repo, including your local uncommitted changes.
-To avoid uploading large files, ensure they are listed in `.gitignore`.
+`dstack apply` automatically provisions instances, uploads the contents of the repo (incl. your local uncommitted changes),
+and runs the configuration.
 
 !!! info "Ports"
     If the task specifies [`ports`](reference/dstack.yml/task.md#_ports), `dstack run` automatically forwards them to your
@@ -93,12 +93,12 @@ To avoid uploading large files, ensure they are listed in `.gitignore`.
 
 ### List runs
 
-The [`dstack ps`](reference/cli/index.md#dstack-ps)  command lists all running jobs and their statuses. 
+The [`dstack ps`](reference/cli/dstack/ps.md)  command lists all running jobs and their statuses. 
 Use `--watch` (or `-w`) to monitor the live status of runs.
 
 ### Stop a run
 
-Once the run exceeds the [`max_duration`](reference/dstack.yml/task.md#max_duration), or when you use [`dstack stop`](reference/cli/index.md#dstack-stop), 
+Once the run exceeds the [`max_duration`](reference/dstack.yml/task.md#max_duration), or when you use [`dstack stop`](reference/cli/dstack/stop.md), 
 the dev environment is stopped. Use `--abort` or `-x` to stop the run abruptly. 
 
 [//]: # (TODO: Mention `dstack logs` and `dstack logs -d`)
@@ -138,9 +138,9 @@ longer duration).
 
 ## What's next?
 
-1. Check the [Axolotl](/docs/examples/fine-tuning/axolotl) example
-2. Browse [all examples](/examples)
-3. See [fleets](concepts/fleets.md) on how to manage fleets
+1. Read about [dev environments](dev-environments.md), [services](services.md), and [repos](concepts/repos.md)
+2. Learn how to manage [fleets](concepts/fleets.md)
+3. Check the [Axolotl](/examples/fine-tuning/axolotl) example
 
 !!! info "Reference"
     See [.dstack.yml](reference/dstack.yml/task.md) for all the options supported by

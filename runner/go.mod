@@ -5,21 +5,20 @@ go 1.23
 require (
 	github.com/alexellis/go-execute/v2 v2.2.1
 	github.com/bluekeyes/go-gitdiff v0.7.2
-	github.com/creack/pty v1.1.21
+	github.com/creack/pty v1.1.24
 	github.com/docker/docker v26.0.0+incompatible
 	github.com/docker/go-connections v0.5.0
 	github.com/docker/go-units v0.5.0
 	github.com/go-git/go-git/v5 v5.12.0
 	github.com/golang/gddo v0.0.0-20210115222349-20d68f94ee1f
-	github.com/icza/backscanner v0.0.0-20240328210400-b40c3a86dec5
 	github.com/inhies/go-bytesize v0.0.0-20220417184213-4913239db9cf
-	github.com/shirou/gopsutil/v3 v3.24.3
+	github.com/shirou/gopsutil/v4 v4.24.11
 	github.com/sirupsen/logrus v1.9.3
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.10.0
 	github.com/urfave/cli/v2 v2.27.1
 	github.com/ztrue/tracerr v0.4.0
 	golang.org/x/crypto v0.22.0
-	golang.org/x/sys v0.19.0
+	golang.org/x/sys v0.26.0
 )
 
 require (
@@ -32,6 +31,7 @@ require (
 	github.com/cyphar/filepath-securejoin v0.2.4 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/distribution/reference v0.6.0 // indirect
+	github.com/ebitengine/purego v0.8.1 // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/go-git/gcfg v1.5.1-0.20230307220236-3a3c6141e376 // indirect

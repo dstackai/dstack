@@ -57,7 +57,7 @@ Note, the `model` property is optional and not needed when deploying a non-OpenA
 
 ## Run a service
 
-To run a configuration, use the [`dstack apply`](reference/cli/index.md#dstack-apply) command.
+To run a configuration, use the [`dstack apply`](reference/cli/dstack/apply.md) command.
 
 <div class="termy">
 
@@ -83,8 +83,8 @@ Model meta-llama/Meta-Llama-3.1-8B-Instruct is published at:
 
 </div>
 
-`dstack apply` automatically uploads the code from the current repo, including your local uncommitted changes.
-To avoid uploading large files, ensure they are listed in `.gitignore`.
+`dstack apply` automatically provisions instances, uploads the contents of the repo (incl. your local uncommitted changes),
+and runs the configuration.
 
 ## Access the endpoint
 
@@ -130,12 +130,12 @@ When a [gateway](concepts/gateways.md) is configured, the OpenAI-compatible endp
 
 ### List runs
 
-The [`dstack ps`](reference/cli/index.md#dstack-ps)  command lists all running jobs and their statuses. 
+The [`dstack ps`](reference/cli/dstack/ps.md)  command lists all running jobs and their statuses. 
 Use `--watch` (or `-w`) to monitor the live status of runs.
 
 ### Stop a run
 
-Once the run exceeds the [`max_duration`](reference/dstack.yml/task.md#max_duration), or when you use [`dstack stop`](reference/cli/index.md#dstack-stop), 
+Once the run exceeds the [`max_duration`](reference/dstack.yml/task.md#max_duration), or when you use [`dstack stop`](reference/cli/dstack/stop.md), 
 the dev environment is stopped. Use `--abort` or `-x` to stop the run abruptly. 
 
 [//]: # (TODO: Mention `dstack logs` and `dstack logs -d`)
@@ -175,12 +175,12 @@ longer duration).
 
 ## What's next?
 
-1. Check the [TGI :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/deployment/tgi/README.md){:target="_blank"},
-   [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/deployment/vllm/README.md){:target="_blank"}, and 
-   [NIM :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/deployment/nim/README.md){:target="_blank"} examples
-2. See [gateways](concepts/gateways.md) on how to set up a gateway
-3. Browse [examples](/examples)
-4. See [fleets](concepts/fleets.md) on how to manage fleets
+1. Read about [dev environments](dev-environments.md), [tasks](tasks.md), and [repos](concepts/repos.md)
+2. Learn how to manage [fleets](concepts/fleets.md)
+3. See how to set up [gateways](concepts/gateways.md)
+4. Check the [TGI :material-arrow-top-right-thin:{ .external }](/examples/deployment/tgi/){:target="_blank"},
+   [vLLM :material-arrow-top-right-thin:{ .external }](/examples/deployment/vllm/){:target="_blank"}, and 
+   [NIM :material-arrow-top-right-thin:{ .external }](/examples/deployment/nim/){:target="_blank"} examples
 
 !!! info "Reference"
     See [.dstack.yml](reference/dstack.yml/service.md) for all the options supported by

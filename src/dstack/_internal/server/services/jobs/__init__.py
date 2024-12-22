@@ -39,8 +39,7 @@ from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.runner import client
 from dstack._internal.server.services.runner.ssh import get_runner_ports, runner_ssh_tunnel
 from dstack._internal.server.services.volumes import volume_model_to_volume
-from dstack._internal.server.utils.common import run_async
-from dstack._internal.utils.common import get_current_datetime
+from dstack._internal.utils.common import get_current_datetime, run_async
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.path import FileContent
 

@@ -1,0 +1,27 @@
+server {
+    server_name {{ domain }};
+    location / {
+        proxy_pass http://localhost:{{ proxy_port }}/api/models/{{ project_name }}/;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header Host $host;
+        proxy_read_timeout 300s;
+    }
+    listen 80;
+    {% if https %}
+    listen 443 ssl;
+    ssl_certificate /etc/letsencrypt/live/{{ domain }}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/{{ domain }}/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+    set $force_https 1;
+    if ($scheme = "https") {
+        set $force_https 0;
+    }
+    if ($remote_addr = 127.0.0.1) {
+        set $force_https 0;
+    }
+    if ($force_https) {
+        return 301 https://$host$request_uri;
+    }
+    {% endif %}
+}

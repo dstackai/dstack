@@ -37,7 +37,7 @@ If you don't specify your Docker image, `dstack` uses the [base](https://hub.doc
 
 ## Run a configuration
 
-To run a configuration, use the [`dstack apply`](reference/cli/index.md#dstack-apply) command.
+To run a configuration, use the [`dstack apply`](reference/cli/dstack/apply.md) command.
 
 <div class="termy">
 
@@ -60,8 +60,12 @@ To open in VS Code Desktop, use this link:
 
 </div>
 
-`dstack apply` automatically uploads the code from the current repo, including your local uncommitted changes.
-To avoid uploading large files, ensure they are listed in `.gitignore`.
+!!! info "Windows"
+    On Windows, `dstack` works both natively and inside WSL. But, for dev environments, 
+    it's recommended _not to use_ `dstack apply` _inside WSL_ due to a [VS Code issue :material-arrow-top-right-thin:{ .external }](https://github.com/microsoft/vscode-remote-release/issues/937){:target="_blank"}.
+
+`dstack apply` automatically provisions an instance, uploads the contents of the repo (incl. your local uncommitted changes),
+and runs the configuration.
 
 ### VS Code
 
@@ -86,12 +90,12 @@ $ ssh fast-moth-1
 
 ### List runs
 
-The [`dstack ps`](reference/cli/index.md#dstack-ps)  command lists all running jobs and their statuses. 
+The [`dstack ps`](reference/cli/dstack/ps.md)  command lists all running jobs and their statuses. 
 Use `--watch` (or `-w`) to monitor the live status of runs.
 
 ### Stop a run
 
-Once the run exceeds the [`max_duration`](reference/dstack.yml/dev-environment.md#max_duration), or when you use [`dstack stop`](reference/cli/index.md#dstack-stop), 
+Once the run exceeds the [`max_duration`](reference/dstack.yml/dev-environment.md#max_duration), or when you use [`dstack stop`](reference/cli/dstack/stop.md), 
 the dev environment is stopped. Use `--abort` or `-x` to stop the run abruptly. 
 
 [//]: # (TODO: Mention `dstack logs` and `dstack logs -d`)
@@ -131,9 +135,8 @@ longer duration).
 
 ## What's next?
 
-1. Read about [dev environments](dev-environments.md), [tasks](tasks.md), and 
-    [services](services.md)
-2. See [fleets](concepts/fleets.md) on how to manage fleets
+1. Read about [tasks](tasks.md), [services](services.md), and [repos](concepts/repos.md)
+2. Learn how to manage [fleets](concepts/fleets.md)
 
 !!! info "Reference"
     See [.dstack.yml](reference/dstack.yml/dev-environment.md) for all the options supported by

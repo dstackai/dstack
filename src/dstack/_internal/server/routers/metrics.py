@@ -8,10 +8,12 @@ from dstack._internal.server.db import get_session
 from dstack._internal.server.models import ProjectModel, UserModel
 from dstack._internal.server.security.permissions import ProjectMember
 from dstack._internal.server.services import metrics
+from dstack._internal.server.utils.routers import get_base_api_additional_responses
 
 router = APIRouter(
     prefix="/api/project/{project_name}/metrics",
     tags=["metrics"],
+    responses=get_base_api_additional_responses(),
 )
 
 

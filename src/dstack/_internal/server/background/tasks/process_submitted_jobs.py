@@ -66,7 +66,6 @@ from dstack._internal.server.services.runs import (
 from dstack._internal.server.services.volumes import (
     volume_model_to_volume,
 )
-from dstack._internal.server.utils.common import run_async
 from dstack._internal.utils import common as common_utils
 from dstack._internal.utils.logging import get_logger
 
@@ -406,7 +405,7 @@ async def _run_job_on_new_instance(
         )
         offer_volumes = get_offer_volumes(volumes, offer)
         try:
-            job_provisioning_data = await run_async(
+            job_provisioning_data = await common_utils.run_async(
                 backend.compute().run_job,
                 run,
                 job,
@@ -452,6 +451,7 @@ def _get_or_create_fleet_model_for_job(
         configuration=FleetConfiguration(
             name=run.run_spec.run_name,
             placement=placement,
+            reservation=run.run_spec.configuration.reservation,
         ),
         profile=run.run_spec.merged_profile,
         autocreated=True,
@@ -587,7 +587,7 @@ async def _attach_volume(
     if volume_model.deleted:
         raise ServerClientError("Cannot attach a deleted volume")
     volume = volume_model_to_volume(volume_model)
-    attachment_data = await run_async(
+    attachment_data = await common_utils.run_async(
         backend.compute().attach_volume,
         volume=volume,
         instance_id=instance_id,

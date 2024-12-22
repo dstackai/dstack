@@ -1,1 +1,0 @@
-"""dstack-proxy web endpoints"""

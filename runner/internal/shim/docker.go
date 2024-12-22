@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -22,13 +23,14 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/mount"
+	"github.com/docker/docker/api/types/registry"
+	dockersystem "github.com/docker/docker/api/types/system"
 	docker "github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/docker/go-connections/nat"
 	"github.com/docker/go-units"
-	"github.com/dstackai/dstack/runner/consts"
 	"github.com/dstackai/dstack/runner/internal/shim/backends"
-	"github.com/icza/backscanner"
+	"github.com/dstackai/dstack/runner/internal/shim/host"
 	bytesize "github.com/inhies/go-bytesize"
 	"github.com/ztrue/tracerr"
 )
@@ -37,22 +39,12 @@ import (
 const ImagePullTimeout time.Duration = 20 * time.Minute
 
 const (
+	LabelKeyPrefix = "ai.dstack.shim."
 	// Set to "true" on containers spawned by DockerRunner, used for identification.
-	LabelKeyIsRun  = "ai.dstack.shim.is-run"
+	LabelKeyIsTask = LabelKeyPrefix + "is-task"
+	LabelKeyTaskID = LabelKeyPrefix + "task-id"
 	LabelValueTrue = "true"
 )
-
-// Depricated: Remove on next release (0.19)
-type ContainerStatus struct {
-	ContainerID   string
-	ContainerName string
-	Status        string
-	Running       bool
-	OOMKilled     bool
-	Dead          bool
-	ExitCode      int
-	Error         string
-}
 
 type JobResult struct {
 	Reason        string `json:"reason"`
@@ -60,16 +52,13 @@ type JobResult struct {
 }
 
 type DockerRunner struct {
-	client           *docker.Client
-	dockerParams     DockerParameters
-	currentContainer string
-	state            RunnerStatus
-
-	cancelPull context.CancelFunc
-
-	containerStatus ContainerStatus // TODO: remove on next release (0.19)
-	executorError   string          // TODO: remove on next release (0.19)
-	jobResult       JobResult
+	client       *docker.Client
+	dockerParams DockerParameters
+	dockerInfo   dockersystem.Info
+	gpus         []host.GpuInfo
+	gpuVendor    host.GpuVendor
+	gpuLock      *GpuLock
+	tasks        TaskStorage
 }
 
 func NewDockerRunner(dockerParams DockerParameters) (*DockerRunner, error) {
@@ -77,26 +66,98 @@ func NewDockerRunner(dockerParams DockerParameters) (*DockerRunner, error) {
 	if err != nil {
 		return nil, tracerr.Wrap(err)
 	}
+	dockerInfo, err := client.Info(context.TODO())
+	if err != nil {
+		return nil, tracerr.Wrap(err)
+	}
+
+	var gpuVendor host.GpuVendor
+	gpus := host.GetGpuInfo()
+	if len(gpus) > 0 {
+		gpuVendor = gpus[0].Vendor
+	} else {
+		gpuVendor = host.GpuVendorNone
+	}
+	gpuLock, err := NewGpuLock(gpus)
+	if err != nil {
+		return nil, tracerr.Wrap(err)
+	}
 
 	runner := &DockerRunner{
 		client:       client,
 		dockerParams: dockerParams,
-		state:        Pending,
+		dockerInfo:   dockerInfo,
+		gpus:         gpus,
+		gpuVendor:    gpuVendor,
+		gpuLock:      gpuLock,
+		tasks:        NewTaskStorage(),
 	}
 	return runner, nil
 }
 
+func (d *DockerRunner) Resources() Resources {
+	cpuCount := host.GetCpuCount()
+	totalMemory, err := host.GetTotalMemory()
+	if err != nil {
+		log.Println(err)
+	}
+	netAddresses, err := host.GetNetworkAddresses()
+	if err != nil {
+		log.Println(err)
+	}
+	diskSize, err := host.GetDiskSize(d.dockerInfo.DockerRootDir)
+	if err != nil {
+		log.Println(err)
+	}
+	return Resources{
+		Gpus:         d.gpus,
+		CpuCount:     cpuCount,
+		TotalMemory:  totalMemory,
+		DiskSize:     diskSize,
+		NetAddresses: netAddresses,
+	}
+}
+
 func (d *DockerRunner) Run(ctx context.Context, cfg TaskConfig) error {
+	task := NewTask(cfg)
+
+	// For legacy API compatibility, since LegacyTaskID is the same for all tasks
+	if task.ID == LegacyTaskID {
+		d.tasks.Delete(task.ID)
+	}
+
+	if ok := d.tasks.Add(task); !ok {
+		return tracerr.Errorf("task %s is already submitted", task.ID)
+	}
+
+	defer func() {
+		if ok := d.tasks.Update(task); !ok {
+			log.Printf("failed to update task %s", task.ID)
+		}
+	}()
+
 	var err error
+
+	if cfg.GpuCount != 0 {
+		gpuIDs, err := d.gpuLock.Acquire(cfg.GpuCount)
+		if err != nil {
+			log.Println(err)
+			task.SetStatusTerminated("EXECUTOR_ERROR", err.Error())
+			return tracerr.Wrap(err)
+		}
+		task.gpuIDs = gpuIDs
+
+		defer func() {
+			d.gpuLock.Release(task.gpuIDs)
+		}()
+	}
 
 	if cfg.SshKey != "" {
 		ak := AuthorizedKeys{user: cfg.SshUser, lookup: user.Lookup}
 		if err := ak.AppendPublicKeys([]string{cfg.SshKey}); err != nil {
-			d.state = Pending
 			errMessage := fmt.Sprintf("ak.AppendPublicKeys error: %s", err.Error())
-			d.containerStatus.Error = errMessage
 			log.Println(errMessage)
-			d.jobResult = JobResult{Reason: "EXECUTOR_ERROR", ReasonMessage: errMessage}
+			task.SetStatusTerminated("EXECUTOR_ERROR", errMessage)
 			return tracerr.Wrap(err)
 		}
 		defer func(cfg TaskConfig) {
@@ -114,69 +175,50 @@ func (d *DockerRunner) Run(ctx context.Context, cfg TaskConfig) error {
 	defer func() { _ = unmountVolumes(cfg) }()
 	err = prepareVolumes(cfg)
 	if err != nil {
-		d.state = Pending
 		errMessage := fmt.Sprintf("prepareVolumes error: %s", err.Error())
-		d.containerStatus.Error = errMessage
 		log.Println(errMessage)
-		d.jobResult = JobResult{Reason: "EXECUTOR_ERROR", ReasonMessage: errMessage}
+		task.SetStatusTerminated("EXECUTOR_ERROR", errMessage)
 		return tracerr.Wrap(err)
 	}
 	err = prepareInstanceMountPoints(cfg)
 	if err != nil {
-		d.state = Pending
 		errMessage := fmt.Sprintf("prepareInstanceMountPoints error: %s", err.Error())
-		d.containerStatus.Error = errMessage
 		log.Println(errMessage)
-		d.jobResult = JobResult{Reason: "EXECUTOR_ERROR", ReasonMessage: errMessage}
+		task.SetStatusTerminated("EXECUTOR_ERROR", errMessage)
 		return tracerr.Wrap(err)
 	}
-
-	d.containerStatus = ContainerStatus{
-		ContainerName: cfg.ContainerName,
-	}
-	d.executorError = ""
-
-	pullCtx, cancel := context.WithTimeout(ctx, ImagePullTimeout)
-	defer cancel()
-	d.cancelPull = cancel
 
 	log.Println("Pulling image")
-	d.state = Pulling
-	if err = pullImage(pullCtx, d.client, cfg); err != nil {
-		d.state = Pending
-		errMessage := fmt.Sprintf("pullImage error: %s", err.Error())
-		d.containerStatus.Error = errMessage
-		log.Print(errMessage + "\n")
-		d.jobResult = JobResult{Reason: "CREATING_CONTAINER_ERROR", ReasonMessage: errMessage}
-		return tracerr.Wrap(err)
+	pullCtx, cancelPull := context.WithTimeout(ctx, ImagePullTimeout)
+	defer cancelPull()
+	task.SetStatusPulling(cancelPull)
+	if !d.tasks.Update(task) {
+		return tracerr.Errorf("failed to update task %s", task.ID)
 	}
-
-	runnerDir, err := d.dockerParams.MakeRunnerDir()
-	if err != nil {
-		d.state = Pending
-		errMessage := fmt.Sprintf("Cannot create dir for runner: %s", err.Error())
-		d.containerStatus.Error = errMessage
+	if err = pullImage(pullCtx, d.client, cfg); err != nil {
+		errMessage := fmt.Sprintf("pullImage error: %s", err.Error())
 		log.Print(errMessage + "\n")
-		d.jobResult = JobResult{Reason: "CREATING_CONTAINER_ERROR", ReasonMessage: errMessage}
+		task.SetStatusTerminated("CREATING_CONTAINER_ERROR", errMessage)
 		return tracerr.Wrap(err)
 	}
 
 	log.Println("Creating container")
-	d.state = Creating
-	containerID, err := createContainer(ctx, d.client, runnerDir, d.dockerParams, cfg)
+	task.SetStatusCreating()
+	if !d.tasks.Update(task) {
+		return tracerr.Errorf("failed to update task %s", task.ID)
+	}
+	containerID, err := d.createContainer(ctx, task)
 	if err != nil {
-		d.state = Pending
 		errMessage := fmt.Sprintf("createContainer error: %s", err.Error())
-		d.containerStatus.Error = errMessage
-		d.jobResult = JobResult{Reason: "CREATING_CONTAINER_ERROR", ReasonMessage: errMessage}
 		log.Print(errMessage + "\n")
+		task.SetStatusTerminated("CREATING_CONTAINER_ERROR", errMessage)
 		return tracerr.Wrap(err)
 	}
 
 	defer func() {
 		log.Println("Deleting old container(s)")
 		listFilters := filters.NewArgs(
-			filters.Arg("label", fmt.Sprintf("%s=%s", LabelKeyIsRun, LabelValueTrue)),
+			filters.Arg("label", fmt.Sprintf("%s=%s", LabelKeyIsTask, LabelValueTrue)),
 			filters.Arg("status", "exited"),
 		)
 		containers, err := d.client.ContainerList(ctx, container.ListOptions{Filters: listFilters})
@@ -195,69 +237,79 @@ func (d *DockerRunner) Run(ctx context.Context, cfg TaskConfig) error {
 		}
 	}()
 
-	d.containerStatus, _ = inspectContainer(d.client, containerID)
-	d.state = Running
-	d.currentContainer = containerID
-	d.executorError = ""
-	log.Printf("Running container, name=%s, id=%s\n", d.containerStatus.ContainerName, containerID)
+	log.Printf("Running container, name=%s, id=%s\n", task.containerName, containerID)
+	task.SetStatusRunning(containerID)
+	if !d.tasks.Update(task) {
+		return tracerr.Errorf("failed to update task %s", task.ID)
+	}
 
 	if err = runContainer(ctx, d.client, containerID); err != nil {
 		log.Printf("runContainer error: %s\n", err.Error())
-		d.state = Pending
-		d.containerStatus, _ = inspectContainer(d.client, containerID)
-		d.executorError = FindExecutorError(runnerDir)
-		d.currentContainer = ""
-		var errMessage string = d.containerStatus.Error
-		if d.containerStatus.OOMKilled {
-			errMessage = "Container killed by OOM"
+		var errMessage string
+		if lastLogs, err := getContainerLastLogs(d.client, containerID, 5); err == nil {
+			errMessage = strings.Join(lastLogs, "\n")
+		} else {
+			log.Printf("getContainerLastLogs error: %s\n", err.Error())
+			errMessage = ""
 		}
-		if errMessage == "" {
-			lastLogs, err := getContainerLastLogs(d.client, containerID, 5)
-			if err == nil {
-				errMessage = strings.Join(lastLogs, "\n")
-			} else {
-				log.Printf("getContainerLastLogs error: %s\n", err.Error())
-			}
-		}
-		d.jobResult = JobResult{Reason: "CONTAINER_EXITED_WITH_ERROR", ReasonMessage: errMessage}
+		task.SetStatusTerminated("CONTAINER_EXITED_WITH_ERROR", errMessage)
 		return tracerr.Wrap(err)
 	}
 
-	log.Printf("Container finished successfully, name=%s, id=%s", d.containerStatus.ContainerName, containerID)
-	d.containerStatus, _ = inspectContainer(d.client, containerID)
-	d.executorError = FindExecutorError(runnerDir)
-	d.state = Pending
-	d.currentContainer = ""
-
-	jobResult := JobResult{Reason: "DONE_BY_RUNNER"}
-	if d.containerStatus.ExitCode != 0 {
-		jobResult = JobResult{Reason: "CONTAINER_EXITED_WITH_ERROR", ReasonMessage: d.containerStatus.Error}
-	}
-	d.jobResult = jobResult
+	log.Printf("Container finished successfully, name=%s, id=%s", task.containerName, containerID)
+	task.SetStatusTerminated("DONE_BY_RUNNER", "")
 
 	return nil
 }
 
 func (d *DockerRunner) Stop(force bool) {
-	if d.state == Pulling && d.currentContainer == "" {
-		d.cancelPull()
+	task, ok := d.tasks.Get(LegacyTaskID)
+	if !ok {
 		return
 	}
-
-	stopOptions := container.StopOptions{}
-	if force {
-		timeout := int(0)
-		stopOptions.Timeout = &timeout
-	}
-
-	err := d.client.ContainerStop(context.Background(), d.currentContainer, stopOptions)
-	if err != nil {
-		log.Printf("Failed to stop container: %s", err)
+	switch task.Status {
+	case TaskStatusPending, TaskStatusCreating, TaskStatusTerminated:
+		// nothing to do
+	case TaskStatusPulling:
+		task.cancelPull()
+	case TaskStatusRunning:
+		stopOptions := container.StopOptions{}
+		if force {
+			timeout := int(0)
+			stopOptions.Timeout = &timeout
+		}
+		err := d.client.ContainerStop(context.Background(), task.containerID, stopOptions)
+		if err != nil {
+			log.Printf("Failed to stop container: %s", err)
+		}
 	}
 }
 
-func (d *DockerRunner) GetState() (RunnerStatus, ContainerStatus, string, JobResult) {
-	return d.state, d.containerStatus, d.executorError, d.jobResult
+func (d *DockerRunner) GetState() (RunnerStatus, JobResult) {
+	if task, ok := d.tasks.Get(LegacyTaskID); ok {
+		return getLegacyStatus(task), JobResult{
+			Reason:        task.TerminationReason,
+			ReasonMessage: task.TerminationMessage,
+		}
+	}
+	return Pending, JobResult{}
+}
+
+func getLegacyStatus(task Task) RunnerStatus {
+	switch task.Status {
+	case TaskStatusPending:
+		return Pulling
+	case TaskStatusPulling:
+		return Pulling
+	case TaskStatusCreating:
+		return Creating
+	case TaskStatusRunning:
+		return Running
+	case TaskStatusTerminated:
+		return Pending
+	}
+	// should not reach here
+	return ""
 }
 
 func getBackend(backendType string) (backends.Backend, error) {
@@ -312,15 +364,28 @@ func formatAndMountVolume(volume VolumeInfo) error {
 	if err != nil {
 		return tracerr.Wrap(err)
 	}
-	deviceName, err := backend.GetRealDeviceName(volume.VolumeId)
+	deviceName, err := backend.GetRealDeviceName(volume.VolumeId, volume.DeviceName)
 	if err != nil {
 		return tracerr.Wrap(err)
 	}
-	_, err = initFileSystem(deviceName, !volume.InitFs)
+	fsCreated, err := initFileSystem(deviceName, !volume.InitFs)
 	if err != nil {
 		return tracerr.Wrap(err)
 	}
-	err = mountDisk(deviceName, getVolumeMountPoint(volume.Name))
+	// Make FS root directory world-writable (0777) to give any job user
+	// a permission to create new files
+	// NOTE: mke2fs (that is, mkfs.ext4) supports `-E root_perms=0777` since 1.47.1:
+	// https://e2fsprogs.sourceforge.net/e2fsprogs-release.html#1.47.1
+	// but, as of 2024-12-04, this version is too new to rely on, for example,
+	// Ubuntu 24.04 LTS has only 1.47.0
+	// 0 means "do not chmod root directory"
+	var fsRootPerms os.FileMode = 0
+	// Change permissions only if the FS was created by us, don't mess with
+	// user-formatted volumes
+	if fsCreated {
+		fsRootPerms = 0o777
+	}
+	err = mountDisk(deviceName, getVolumeMountPoint(volume.Name), fsRootPerms)
 	if err != nil {
 		return tracerr.Wrap(err)
 	}
@@ -333,9 +398,17 @@ func getVolumeMountPoint(volumeName string) string {
 }
 
 func prepareInstanceMountPoints(taskConfig TaskConfig) error {
+	// If the instance volume directory doesn't exist, create it with world-writable permissions (0777)
+	// to give any job user a permission to create new files
+	// If the directory already exists, do nothing, don't mess with already set permissions, especially
+	// on SSH fleets where permissions are managed by the host admin
 	for _, mountPoint := range taskConfig.InstanceMounts {
 		if _, err := os.Stat(mountPoint.InstancePath); errors.Is(err, os.ErrNotExist) {
-			if err = os.MkdirAll(mountPoint.InstancePath, 0o777); err != nil {
+			// All missing parent dirs are created with 0755 permissions
+			if err = os.MkdirAll(mountPoint.InstancePath, 0o755); err != nil {
+				return tracerr.Wrap(err)
+			}
+			if err = os.Chmod(mountPoint.InstancePath, 0o777); err != nil {
 				return tracerr.Wrap(err)
 			}
 		} else if err != nil {
@@ -375,7 +448,7 @@ func initFileSystem(deviceName string, errorIfNotExists bool) (bool, error) {
 	return true, nil
 }
 
-func mountDisk(deviceName, mountPoint string) error {
+func mountDisk(deviceName, mountPoint string, fsRootPerms os.FileMode) error {
 	// Create the mount point directory if it doesn't exist
 	if _, err := os.Stat(mountPoint); os.IsNotExist(err) {
 		fmt.Printf("Creating mount point %s...\n", mountPoint)
@@ -389,6 +462,12 @@ func mountDisk(deviceName, mountPoint string) error {
 	cmd := exec.Command("mount", deviceName, mountPoint)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to mount disk: %w, output: %s", err, string(output))
+	}
+
+	if fsRootPerms != 0 {
+		if err := os.Chmod(mountPoint, fsRootPerms); err != nil {
+			return fmt.Errorf("failed to chmod volume root directory %s: %w", mountPoint, err)
+		}
 	}
 
 	log.Println("Disk mounted successfully!")
@@ -412,7 +491,7 @@ func pullImage(ctx context.Context, client docker.APIClient, taskConfig TaskConf
 	}
 
 	opts := image.PullOptions{}
-	regAuth, _ := taskConfig.EncodeRegistryAuth()
+	regAuth, _ := encodeRegistryAuth(taskConfig.RegistryUsername, taskConfig.RegistryPassword)
 	if regAuth != "" {
 		opts.RegistryAuth = regAuth
 	}
@@ -488,30 +567,38 @@ func pullImage(ctx context.Context, client docker.APIClient, taskConfig TaskConf
 	return nil
 }
 
-func createContainer(ctx context.Context, client docker.APIClient, runnerDir string, dockerParams DockerParameters, taskConfig TaskConfig) (string, error) {
-	timeout := int(0)
-	stopOptions := container.StopOptions{Timeout: &timeout}
-	err := client.ContainerStop(ctx, taskConfig.ContainerName, stopOptions)
-	if err != nil {
-		log.Printf("Cleanup routine: Cannot stop container: %s", err)
+func (d *DockerRunner) createContainer(ctx context.Context, task Task) (string, error) {
+	// For legacy API compatibility, since LegacyTaskID is the same for all tasks, containerName is not unique
+	// With new API where task.ID is unique (and, in turn, containerName is unique too), container name clash
+	// is not expected
+	if task.ID == LegacyTaskID {
+		timeout := int(0)
+		stopOptions := container.StopOptions{Timeout: &timeout}
+		err := d.client.ContainerStop(ctx, task.containerName, stopOptions)
+		if err != nil {
+			log.Printf("Cleanup routine: Cannot stop container: %s", err)
+		}
+		removeOptions := container.RemoveOptions{Force: true, RemoveVolumes: true}
+		err = d.client.ContainerRemove(ctx, task.containerName, removeOptions)
+		if err != nil {
+			log.Printf("Cleanup routine: Cannot remove container: %s", err)
+		}
 	}
 
-	removeOptions := container.RemoveOptions{Force: true, RemoveVolumes: true}
-	err = client.ContainerRemove(ctx, taskConfig.ContainerName, removeOptions)
-	if err != nil {
-		log.Printf("Cleanup routine: Cannot remove container: %s", err)
-	}
-
-	mounts, err := dockerParams.DockerMounts(runnerDir)
+	runnerDir, err := d.dockerParams.MakeRunnerDir()
 	if err != nil {
 		return "", tracerr.Wrap(err)
 	}
-	volumeMounts, err := getVolumeMounts(taskConfig.VolumeMounts)
+	mounts, err := d.dockerParams.DockerMounts(runnerDir)
+	if err != nil {
+		return "", tracerr.Wrap(err)
+	}
+	volumeMounts, err := getVolumeMounts(task.config.VolumeMounts)
 	if err != nil {
 		return "", tracerr.Wrap(err)
 	}
 	mounts = append(mounts, volumeMounts...)
-	instanceMounts, err := getInstanceMounts(taskConfig.InstanceMounts)
+	instanceMounts, err := getInstanceMounts(task.config.InstanceMounts)
 	if err != nil {
 		return "", tracerr.Wrap(err)
 	}
@@ -519,8 +606,8 @@ func createContainer(ctx context.Context, client docker.APIClient, runnerDir str
 
 	// Set the environment variables
 	envVars := []string{}
-	if dockerParams.DockerPJRTDevice() != "" {
-		envVars = append(envVars, fmt.Sprintf("PJRT_DEVICE=%s", dockerParams.DockerPJRTDevice()))
+	if d.dockerParams.DockerPJRTDevice() != "" {
+		envVars = append(envVars, fmt.Sprintf("PJRT_DEVICE=%s", d.dockerParams.DockerPJRTDevice()))
 	}
 
 	// Override /dev/shm with tmpfs mount with `exec` option (the default is `noexec`)
@@ -528,42 +615,45 @@ func createContainer(ctx context.Context, client docker.APIClient, runnerDir str
 	// This is required by some workloads, e.g., Oracle Database with Java Stored Procedures,
 	// see https://github.com/moby/moby/issues/6758
 	var tmpfs map[string]string
-	if taskConfig.ShmSize > 0 {
+	if task.config.ShmSize > 0 {
 		// No need to specify all default options (`nosuid`, etc.),
 		// the docker daemon will merge our options with the defaults.
 		tmpfs = map[string]string{
-			"/dev/shm": fmt.Sprintf("exec,size=%d", taskConfig.ShmSize),
+			"/dev/shm": fmt.Sprintf("exec,size=%d", task.config.ShmSize),
 		}
 	}
 
 	containerConfig := &container.Config{
-		Image:        taskConfig.ImageName,
-		Cmd:          []string{strings.Join(dockerParams.DockerShellCommands(taskConfig.PublicKeys), " && ")},
+		Image:        task.config.ImageName,
+		Cmd:          []string{strings.Join(d.dockerParams.DockerShellCommands(task.config.PublicKeys), " && ")},
 		Entrypoint:   []string{"/bin/sh", "-c"},
-		ExposedPorts: exposePorts(dockerParams.DockerPorts()...),
+		ExposedPorts: exposePorts(d.dockerParams.DockerPorts()...),
 		Env:          envVars,
 		Labels: map[string]string{
-			LabelKeyIsRun: LabelValueTrue,
+			LabelKeyIsTask: LabelValueTrue,
+			LabelKeyTaskID: task.ID,
 		},
 	}
-	if taskConfig.ContainerUser != "" {
-		containerConfig.User = taskConfig.ContainerUser
+	if task.config.ContainerUser != "" {
+		containerConfig.User = task.config.ContainerUser
 	}
 	hostConfig := &container.HostConfig{
-		Privileged:      taskConfig.Privileged || dockerParams.DockerPrivileged(),
+		Privileged:      task.config.Privileged || d.dockerParams.DockerPrivileged(),
 		NetworkMode:     getNetworkMode(),
-		PortBindings:    bindPorts(dockerParams.DockerPorts()...),
+		PortBindings:    bindPorts(d.dockerParams.DockerPorts()...),
 		PublishAllPorts: true,
 		Sysctls:         map[string]string{},
 		Mounts:          mounts,
-		ShmSize:         taskConfig.ShmSize,
+		ShmSize:         task.config.ShmSize,
 		Tmpfs:           tmpfs,
 	}
-	configureGpuIfAvailable(hostConfig)
+	if len(task.gpuIDs) > 0 {
+		configureGpus(hostConfig, d.gpuVendor, task.gpuIDs)
+	}
 	configureHpcNetworkingIfAvailable(hostConfig)
 
-	log.Printf("Creating container %s:\nconfig: %v\nhostConfig:%v", taskConfig.ContainerName, containerConfig, hostConfig)
-	resp, err := client.ContainerCreate(ctx, containerConfig, hostConfig, nil, nil, taskConfig.ContainerName)
+	log.Printf("Creating container %s:\nconfig: %v\nhostConfig:%v", task.containerName, containerConfig, hostConfig)
+	resp, err := d.client.ContainerCreate(ctx, containerConfig, hostConfig, nil, nil, task.containerName)
 	if err != nil {
 		return "", tracerr.Wrap(err)
 	}
@@ -590,6 +680,25 @@ func runContainer(ctx context.Context, client docker.APIClient, containerID stri
 	return nil
 }
 
+func encodeRegistryAuth(username string, password string) (string, error) {
+	if username == "" && password == "" {
+		return "", nil
+	}
+
+	authConfig := registry.AuthConfig{
+		Username: username,
+		Password: password,
+	}
+
+	encodedConfig, err := json.Marshal(authConfig)
+	if err != nil {
+		log.Println("Failed to encode auth config", "err", err)
+		return "", err
+	}
+
+	return base64.URLEncoding.EncodeToString(encodedConfig), nil
+}
+
 func getSSHShellCommands(openSSHPort int, publicSSHKey string) []string {
 	return []string{
 		// save and unset ld.so variables
@@ -608,12 +717,10 @@ func getSSHShellCommands(openSSHPort int, publicSSHKey string) []string {
 		// prohibit password authentication
 		"sed -i \"s/.*PasswordAuthentication.*/PasswordAuthentication no/g\" /etc/ssh/sshd_config",
 		// create ssh dirs and add public key
-		"mkdir -p /run/sshd ~/.ssh",
+		"mkdir -p ~/.ssh",
 		"chmod 700 ~/.ssh",
 		fmt.Sprintf("echo '%s' > ~/.ssh/authorized_keys", publicSSHKey),
 		"chmod 600 ~/.ssh/authorized_keys",
-		// preserve environment variables for SSH clients
-		"env >> ~/.ssh/environment",
 		"sed -ie '1s@^@export PATH=\"'\"$PATH\"':$PATH\"\\n\\n@' ~/.profile",
 		// regenerate host keys
 		"rm -rf /etc/ssh/ssh_host_*",
@@ -662,9 +769,11 @@ func getNetworkMode() container.NetworkMode {
 	return "default"
 }
 
-func configureGpuIfAvailable(hostConfig *container.HostConfig) {
-	switch gpuVendor := GetGpuVendor(); gpuVendor {
-	case Nvidia:
+func configureGpus(hostConfig *container.HostConfig, vendor host.GpuVendor, ids []string) {
+	// NVIDIA: ids are identifiers reported by nvidia-smi, GPU-<UUID> strings
+	// AMD: ids are DRI render node paths, e.g., /dev/dri/renderD128
+	switch vendor {
+	case host.GpuVendorNvidia:
 		hostConfig.Resources.DeviceRequests = append(
 			hostConfig.Resources.DeviceRequests,
 			container.DeviceRequest{
@@ -672,13 +781,13 @@ func configureGpuIfAvailable(hostConfig *container.HostConfig) {
 				// Default capabilities: utility, compute.
 				// https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/1.16.0/docker-specialized.html
 				Capabilities: [][]string{{"gpu", "utility", "compute", "graphics", "video", "display", "compat32"}},
-				Count:        -1, // --gpus=all
+				DeviceIDs:    ids,
 			},
 		)
-	case Amd:
+	case host.GpuVendorAmd:
 		// All options are listed here: https://hub.docker.com/r/rocm/pytorch
 		// Only --device are mandatory, other seem to be performance-related.
-		// --device=/dev/kfd --device=/dev/dri
+		// --device=/dev/kfd
 		hostConfig.Resources.Devices = append(
 			hostConfig.Resources.Devices,
 			container.DeviceMapping{
@@ -686,12 +795,18 @@ func configureGpuIfAvailable(hostConfig *container.HostConfig) {
 				PathInContainer:   "/dev/kfd",
 				CgroupPermissions: "rwm",
 			},
-			container.DeviceMapping{
-				PathOnHost:        "/dev/dri",
-				PathInContainer:   "/dev/dri",
-				CgroupPermissions: "rwm",
-			},
 		)
+		// --device=/dev/dri/renderD<N>
+		for _, renderNodePath := range ids {
+			hostConfig.Resources.Devices = append(
+				hostConfig.Resources.Devices,
+				container.DeviceMapping{
+					PathOnHost:        renderNodePath,
+					PathInContainer:   renderNodePath,
+					CgroupPermissions: "rwm",
+				},
+			)
+		}
 		// --ipc=host
 		hostConfig.IpcMode = container.IPCModeHost
 		// --cap-add=SYS_PTRACE
@@ -699,7 +814,7 @@ func configureGpuIfAvailable(hostConfig *container.HostConfig) {
 		// --security-opt=seccomp=unconfined
 		hostConfig.SecurityOpt = append(hostConfig.SecurityOpt, "seccomp=unconfined")
 		// TODO: in addition, for non-root user, --group-add=video, and possibly --group-add=render, are required.
-	case NoVendor:
+	case host.GpuVendorNone:
 		// nothing to do
 	}
 }
@@ -823,55 +938,4 @@ func (c *CLIArgs) MakeRunnerDir() (string, error) {
 		return "", tracerr.Wrap(err)
 	}
 	return runnerTemp, nil
-}
-
-func inspectContainer(client *docker.Client, containerID string) (ContainerStatus, error) {
-	inspection, err := client.ContainerInspect(context.Background(), containerID)
-	if err != nil {
-		s := ContainerStatus{}
-		return s, err
-	}
-	containerStatus := ContainerStatus{
-		ContainerID:   containerID,
-		ContainerName: strings.TrimLeft(inspection.Name, "/"),
-		Status:        inspection.State.Status,
-		Running:       inspection.State.Running,
-		OOMKilled:     inspection.State.OOMKilled,
-		Dead:          inspection.State.Dead,
-		ExitCode:      inspection.State.ExitCode,
-		Error:         inspection.State.Error,
-	}
-	return containerStatus, nil
-}
-
-func FindExecutorError(runnerDir string) string {
-	filename := filepath.Join(runnerDir, consts.RunnerLogFileName)
-	file, err := os.Open(filename)
-	if err != nil {
-		log.Printf("Cannot open file %s: %s\n", filename, err)
-		return ""
-	}
-	defer file.Close()
-
-	fileStatus, err := file.Stat()
-	if err != nil {
-		log.Printf("Cannot stat file %s: %s\n", filename, err)
-		return ""
-	}
-
-	scanner := backscanner.New(file, int(fileStatus.Size()))
-	what := []byte(consts.ExecutorFailedSignature)
-	for {
-		line, _, err := scanner.LineBytes()
-		if err != nil {
-			if errors.Is(err, io.EOF) {
-				return "" // consts.ExecutorFailedSignature is not found in file
-			}
-			log.Printf("FindExecutorError scan error: %s\n", err)
-			return ""
-		}
-		if bytes.Contains(line, what) {
-			return string(line)
-		}
-	}
 }

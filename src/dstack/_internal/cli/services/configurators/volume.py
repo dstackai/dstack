@@ -1,20 +1,20 @@
 import argparse
 import time
-from typing import List
+from typing import List, Optional
 
-from rich.live import Live
 from rich.table import Table
 
 from dstack._internal.cli.services.configurators.base import BaseApplyConfigurator
 from dstack._internal.cli.utils.common import (
     LIVE_TABLE_PROVISION_INTERVAL_SECS,
-    LIVE_TABLE_REFRESH_RATE_PER_SEC,
     confirm_ask,
     console,
 )
+from dstack._internal.cli.utils.rich import MultiItemStatus
 from dstack._internal.cli.utils.volume import get_volumes_table
 from dstack._internal.core.errors import ResourceNotExistsError
 from dstack._internal.core.models.configurations import ApplyConfigurationType
+from dstack._internal.core.models.repos.base import Repo
 from dstack._internal.core.models.volumes import (
     Volume,
     VolumeConfiguration,
@@ -22,6 +22,7 @@ from dstack._internal.core.models.volumes import (
     VolumeSpec,
     VolumeStatus,
 )
+from dstack._internal.utils.common import local_time
 from dstack.api._public import Client
 
 
@@ -35,6 +36,7 @@ class VolumeConfigurator(BaseApplyConfigurator):
         command_args: argparse.Namespace,
         configurator_args: argparse.Namespace,
         unknown_args: List[str],
+        repo: Optional[Repo] = None,
     ):
         spec = VolumeSpec(
             configuration=conf,
@@ -97,13 +99,13 @@ class VolumeConfigurator(BaseApplyConfigurator):
         if command_args.detach:
             console.print("Volume configuration submitted. Exiting...")
             return
-        console.print()
         try:
-            with Live(console=console, refresh_per_second=LIVE_TABLE_REFRESH_RATE_PER_SEC) as live:
-                while True:
-                    live.update(get_volumes_table([volume], verbose=True))
-                    if _finished_provisioning(volume):
-                        break
+            with MultiItemStatus(
+                f"Provisioning [code]{volume.name}[/]...", console=console
+            ) as live:
+                while not _finished_provisioning(volume):
+                    table = get_volumes_table([volume])
+                    live.update(table)
                     time.sleep(LIVE_TABLE_PROVISION_INTERVAL_SECS)
                     volume = self.api.client.volumes.get(self.api.project, volume.name)
         except KeyboardInterrupt:
@@ -114,6 +116,19 @@ class VolumeConfigurator(BaseApplyConfigurator):
                     )
             else:
                 console.print("Exiting... Volume provisioning will continue in the background.")
+            return
+        console.print(
+            get_volumes_table(
+                [volume],
+                verbose=volume.status == VolumeStatus.FAILED,
+                format_date=local_time,
+            )
+        )
+        if volume.status == VolumeStatus.FAILED:
+            console.print(
+                f"\n[error]Provisioning failed. Error: {volume.status_message or 'unknown'}[/]"
+            )
+            exit(1)
 
     def delete_configuration(
         self,

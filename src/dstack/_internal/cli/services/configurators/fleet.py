@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import List, Optional
 
 import requests
-from rich.live import Live
 from rich.table import Table
 
 from dstack._internal.cli.services.configurators.base import (
@@ -13,11 +12,11 @@ from dstack._internal.cli.services.configurators.base import (
 )
 from dstack._internal.cli.utils.common import (
     LIVE_TABLE_PROVISION_INTERVAL_SECS,
-    LIVE_TABLE_REFRESH_RATE_PER_SEC,
     confirm_ask,
     console,
 )
 from dstack._internal.cli.utils.fleet import get_fleets_table
+from dstack._internal.cli.utils.rich import MultiItemStatus
 from dstack._internal.core.errors import ConfigurationError, ResourceNotExistsError
 from dstack._internal.core.models.configurations import ApplyConfigurationType
 from dstack._internal.core.models.fleets import (
@@ -28,6 +27,8 @@ from dstack._internal.core.models.fleets import (
     InstanceGroupPlacement,
 )
 from dstack._internal.core.models.instances import InstanceAvailability, InstanceStatus, SSHKey
+from dstack._internal.core.models.repos.base import Repo
+from dstack._internal.utils.common import local_time
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.ssh import convert_ssh_key_to_pem, generate_public_key, pkey_from_str
 from dstack.api._public import Client
@@ -50,6 +51,7 @@ class FleetConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
         command_args: argparse.Namespace,
         configurator_args: argparse.Namespace,
         unknown_args: List[str],
+        repo: Optional[Repo] = None,
     ):
         self.apply_args(conf, configurator_args, unknown_args)
         profile = load_profile(Path.cwd(), None)
@@ -117,13 +119,13 @@ class FleetConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
         if command_args.detach:
             console.print("Fleet configuration submitted. Exiting...")
             return
-        console.print()
         try:
-            with Live(console=console, refresh_per_second=LIVE_TABLE_REFRESH_RATE_PER_SEC) as live:
-                while True:
-                    live.update(get_fleets_table([fleet], verbose=True))
-                    if _finished_provisioning(fleet):
-                        break
+            with MultiItemStatus(
+                f"Provisioning [code]{fleet.name}[/]...", console=console
+            ) as live:
+                while not _finished_provisioning(fleet):
+                    table = get_fleets_table([fleet])
+                    live.update(table)
                     time.sleep(LIVE_TABLE_PROVISION_INTERVAL_SECS)
                     fleet = self.api.client.fleets.get(self.api.project, fleet.name)
         except KeyboardInterrupt:
@@ -134,6 +136,17 @@ class FleetConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
                     )
             else:
                 console.print("Exiting... Fleet provisioning will continue in the background.")
+            return
+        console.print(
+            get_fleets_table(
+                [fleet],
+                verbose=_failed_provisioning(fleet),
+                format_date=local_time,
+            )
+        )
+        if _failed_provisioning(fleet):
+            console.print("\n[error]Some instances failed. Check the table above for errors.[/]")
+            exit(1)
 
     def delete_configuration(
         self,
@@ -260,6 +273,7 @@ def _print_plan_header(plan: FleetPlan):
     fleet_type = "cloud"
     nodes = plan.spec.configuration.nodes or "-"
     placement = plan.spec.configuration.placement or InstanceGroupPlacement.ANY
+    reservation = plan.spec.configuration.reservation
     backends = None
     if plan.spec.configuration.backends is not None:
         backends = ", ".join(b.value for b in plan.spec.configuration.backends)
@@ -287,6 +301,8 @@ def _print_plan_header(plan: FleetPlan):
         configuration_table.add_row(th("Resources"), resources)
     if spot_policy is not None:
         configuration_table.add_row(th("Spot policy"), spot_policy)
+    if reservation is not None:
+        configuration_table.add_row(th("Reservation"), reservation)
 
     offers_table = Table(box=None)
     offers_table.add_column("#")
@@ -339,6 +355,17 @@ def _print_plan_header(plan: FleetPlan):
 
 def _finished_provisioning(fleet: Fleet) -> bool:
     for instance in fleet.instances:
-        if instance.status in [InstanceStatus.PENDING, InstanceStatus.PROVISIONING]:
+        if instance.status in [
+            InstanceStatus.PENDING,
+            InstanceStatus.PROVISIONING,
+            InstanceStatus.TERMINATING,
+        ]:
             return False
     return True
+
+
+def _failed_provisioning(fleet: Fleet) -> bool:
+    for instance in fleet.instances:
+        if instance.status == InstanceStatus.TERMINATED:
+            return True
+    return False

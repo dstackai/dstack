@@ -21,10 +21,11 @@ from dstack._internal.core.models.runs import (
     Retry,
     RunSpec,
 )
+from dstack._internal.core.models.unix import UnixUser
 from dstack._internal.core.services.profiles import get_retry
 from dstack._internal.core.services.ssh.ports import filter_reserved_ports
 from dstack._internal.server.services.docker import ImageConfig, get_image_config
-from dstack._internal.server.utils.common import run_async
+from dstack._internal.utils.common import run_async
 
 
 def get_default_python_verison() -> str:
@@ -49,6 +50,8 @@ def get_default_image(python_version: str, nvcc: bool = False) -> str:
 class JobConfigurator(ABC):
     TYPE: RunConfigurationType
 
+    _image_config: Optional[ImageConfig] = None
+
     def __init__(self, run_spec: RunSpec):
         self.run_spec = run_spec
 
@@ -72,6 +75,17 @@ class JobConfigurator(ABC):
     def _ports(self) -> List[PortMapping]:
         pass
 
+    async def _get_image_config(self) -> ImageConfig:
+        if self._image_config is not None:
+            return self._image_config
+        image_config = await run_async(
+            _get_image_config,
+            self._image_name(),
+            self.run_spec.configuration.registry_auth,
+        )
+        self._image_config = image_config
+        return image_config
+
     async def _get_job_spec(
         self,
         replica_num: int,
@@ -88,6 +102,7 @@ class JobConfigurator(ABC):
             env=self._env(),
             home_dir=self._home_dir(),
             image_name=self._image_name(),
+            user=await self._user(),
             privileged=self._privileged(),
             max_duration=self._max_duration(),
             registry_auth=self._registry_auth(),
@@ -108,11 +123,7 @@ class JobConfigurator(ABC):
             entrypoint = ["/bin/sh", "-i", "-c"]
             commands = [_join_shell_commands(self._shell_commands())]
         else:  # custom docker image without commands
-            image_config = await run_async(
-                _get_image_config,
-                self.run_spec.configuration.image,
-                self.run_spec.configuration.registry_auth,
-            )
+            image_config = await self._get_image_config()
             entrypoint = image_config.entrypoint or []
             commands = image_config.cmd or []
 
@@ -148,6 +159,15 @@ class JobConfigurator(ABC):
             return self.run_spec.configuration.image
         return get_default_image(self._python(), nvcc=bool(self.run_spec.configuration.nvcc))
 
+    async def _user(self) -> Optional[UnixUser]:
+        user = self.run_spec.configuration.user
+        if user is None:
+            image_config = await self._get_image_config()
+            user = image_config.user
+        if user is None:
+            return None
+        return UnixUser.parse(user)
+
     def _privileged(self) -> bool:
         return self.run_spec.configuration.privileged
 
@@ -167,6 +187,7 @@ class JobConfigurator(ABC):
             resources=self.run_spec.configuration.resources,
             max_price=self.run_spec.merged_profile.max_price,
             spot=None if spot_policy == SpotPolicy.AUTO else (spot_policy == SpotPolicy.SPOT),
+            reservation=self.run_spec.merged_profile.reservation,
         )
 
     def _retry(self) -> Optional[Retry]:
@@ -184,10 +205,7 @@ class JobConfigurator(ABC):
         return get_default_python_verison()
 
 
-def _join_shell_commands(commands: List[str], env: Optional[Dict[str, str]] = None) -> str:
-    if env is None:
-        env = {}
-    commands = [f"export {k}={v}" for k, v in env.items()] + commands
+def _join_shell_commands(commands: List[str]) -> str:
     for i, cmd in enumerate(commands):
         cmd = cmd.strip()
         if cmd.endswith("&"):  # escape background command

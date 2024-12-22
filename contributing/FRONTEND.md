@@ -49,8 +49,8 @@ For frontend development, run a `webpack` dev server:
 npm run start
 ```
 
-The `webpack` dev server expects the API to be running on `http://127.0.0.1:3001`. So ensure to run the API on port `3001`:
+The `webpack` dev server expects the API to be running on `http://127.0.0.1:8000`. So ensure to run the API on port `8000`:
 
 ```shell
-dstack server --port 3001
+dstack server --port 8000
 ```

@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -36,6 +36,9 @@ from dstack._internal.server.testing.common import (
     get_run_spec,
     get_volume_configuration,
 )
+from dstack._internal.utils.common import get_current_datetime
+
+pytestmark = pytest.mark.usefixtures("image_config_mock")
 
 
 def get_job_provisioning_data(dockerized: bool) -> JobProvisioningData:
@@ -371,3 +374,52 @@ class TestProcessRunningJobs:
         assert job.status == JobStatus.TERMINATING
         assert job.termination_reason == JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY
         assert job.remove_at is None
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_provisioning_shim_force_stop_if_already_running(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        test_db,
+        session: AsyncSession,
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run_spec = get_run_spec(run_name="test-run", repo_id=repo.name)
+        run_spec.configuration.image = "debian"
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_name="test-run",
+            run_spec=run_spec,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.PROVISIONING,
+            job_provisioning_data=get_job_provisioning_data(dockerized=True),
+            submitted_at=get_current_datetime(),
+        )
+        monkeypatch.setattr(
+            "dstack._internal.server.services.runner.ssh.SSHTunnel", Mock(return_value=MagicMock())
+        )
+        shim_client_mock = Mock()
+        monkeypatch.setattr(
+            "dstack._internal.server.services.runner.client.ShimClient",
+            Mock(return_value=shim_client_mock),
+        )
+        shim_client_mock.healthcheck.return_value = HealthcheckResponse(
+            service="dstack-shim", version="0.0.1.dev2"
+        )
+        shim_client_mock.submit.return_value = False
+
+        await process_running_jobs()
+
+        shim_client_mock.healthcheck.assert_called_once()
+        shim_client_mock.submit.assert_called_once()
+        shim_client_mock.stop.assert_called_once_with(force=True)
+        await session.refresh(job)
+        assert job.status == JobStatus.PROVISIONING

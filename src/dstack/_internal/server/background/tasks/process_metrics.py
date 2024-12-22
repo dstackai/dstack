@@ -13,8 +13,7 @@ from dstack._internal.server.schemas.runner import MetricsResponse
 from dstack._internal.server.services.jobs import get_job_provisioning_data
 from dstack._internal.server.services.runner import client
 from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
-from dstack._internal.server.utils.common import run_async
-from dstack._internal.utils.common import batched, get_current_datetime
+from dstack._internal.utils.common import batched, get_current_datetime, run_async
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -101,7 +100,8 @@ async def _collect_job_metrics(job_model: JobModel) -> Optional[JobMetricsPoint]
         return None
 
     if isinstance(res, bool):
-        logger.error("Failed to connect to job %s to collect metrics", job_model.job_name)
+        # The job may already be terminated when collecting metrics - that's ok.
+        logger.warning("Failed to connect to job %s to collect metrics", job_model.job_name)
         return None
 
     if res is None:

@@ -16,9 +16,8 @@ from dstack._internal.core.models.runs import (
     RunStatus,
     ServiceSpec,
 )
-from dstack._internal.proxy.repos.base import (
+from dstack._internal.proxy.lib.models import (
     AnyModelFormat,
-    BaseProxyRepo,
     ChatModel,
     OpenAIChatModelFormat,
     Project,
@@ -26,16 +25,15 @@ from dstack._internal.proxy.repos.base import (
     Service,
     TGIChatModelFormat,
 )
+from dstack._internal.proxy.lib.repo import BaseProxyRepo
 from dstack._internal.server.models import JobModel, ProjectModel, RunModel
-from dstack._internal.server.security.permissions import is_project_member
+from dstack._internal.server.settings import DEFAULT_SERVICE_CLIENT_MAX_BODY_SIZE
 
 
-class DBProxyRepo(BaseProxyRepo):
+class ServerProxyRepo(BaseProxyRepo):
     """
     A repo implementation used by dstack-proxy running within dstack-server.
-    Retrieves data from dstack-server's database. Since the database is
-    populated by dstack-server, all or most writer methods in this
-    implementation are expected to be empty.
+    Retrieves data from dstack-server's database.
     """
 
     def __init__(self, session: AsyncSession) -> None:
@@ -81,21 +79,21 @@ class DBProxyRepo(BaseProxyRepo):
                 )
             replica = Replica(
                 id=job.id.hex,
+                app_port=run_spec.configuration.port.container_port,
                 ssh_destination=ssh_destination,
                 ssh_port=ssh_port,
                 ssh_proxy=ssh_proxy,
             )
             replicas.append(replica)
         return Service(
-            id=run.id.hex,
+            project_name=project_name,
             run_name=run.run_name,
+            domain=None,
+            https=None,
             auth=run_spec.configuration.auth,
-            app_port=run_spec.configuration.port.container_port,
-            replicas=replicas,
+            client_max_body_size=DEFAULT_SERVICE_CLIENT_MAX_BODY_SIZE,
+            replicas=tuple(replicas),
         )
-
-    async def add_service(self, project_name: str, service: Service) -> None:
-        pass
 
     async def list_models(self, project_name: str) -> List[ChatModel]:
         res = await self.session.execute(
@@ -117,6 +115,7 @@ class DBProxyRepo(BaseProxyRepo):
                 continue
             model_options = pydantic.parse_obj_as(AnyModel, model_options_obj)
             model = ChatModel(
+                project_name=project_name,
                 name=model_spec.name,
                 created_at=run.submitted_at,
                 run_name=run.run_name,
@@ -133,9 +132,6 @@ class DBProxyRepo(BaseProxyRepo):
         # If there are many models with the same name, choose the most recent
         return max(models, key=lambda m: m.created_at)
 
-    async def add_model(self, project_name: str, model: ChatModel) -> None:
-        pass
-
     async def get_project(self, name: str) -> Optional[Project]:
         res = await self.session.execute(select(ProjectModel).where(ProjectModel.name == name))
         project = res.scalar_one_or_none()
@@ -146,23 +142,13 @@ class DBProxyRepo(BaseProxyRepo):
             ssh_private_key=project.ssh_private_key,
         )
 
-    async def add_project(self, project: Project) -> None:
-        pass
-
-    async def is_project_member(self, project_name: str, token: str) -> bool:
-        return await is_project_member(self.session, project_name, token)
-
 
 def _model_options_to_format_spec(model: AnyModel) -> AnyModelFormat:
     if model.type == "chat":
         if model.format == "openai":
-            return OpenAIChatModelFormat(
-                format="openai",
-                prefix=model.prefix,
-            )
+            return OpenAIChatModelFormat(prefix=model.prefix)
         elif model.format == "tgi":
             return TGIChatModelFormat(
-                format="tgi",
                 chat_template=model.chat_template,
                 eos_token=model.eos_token,
             )

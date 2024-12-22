@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	osuser "os/user"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -27,6 +28,7 @@ type RunExecutor struct {
 	tempDir    string
 	homeDir    string
 	workingDir string
+	uid        uint32
 
 	run             schemas.RunSpec
 	jobSpec         schemas.JobSpec
@@ -45,13 +47,22 @@ type RunExecutor struct {
 	killDelay time.Duration
 }
 
-func NewRunExecutor(tempDir string, homeDir string, workingDir string) *RunExecutor {
+func NewRunExecutor(tempDir string, homeDir string, workingDir string) (*RunExecutor, error) {
 	mu := &sync.RWMutex{}
 	timestamp := NewMonotonicTimestamp()
+	user, err := osuser.Current()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get current user: %w", err)
+	}
+	uid, err := parseStringId(user.Uid)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse current user uid: %w", err)
+	}
 	return &RunExecutor{
 		tempDir:    tempDir,
 		homeDir:    homeDir,
 		workingDir: workingDir,
+		uid:        uid,
 
 		mu:              mu,
 		state:           WaitSubmit,
@@ -61,7 +72,7 @@ func NewRunExecutor(tempDir string, homeDir string, workingDir string) *RunExecu
 		timestamp:       timestamp,
 
 		killDelay: 10 * time.Second,
-	}
+	}, nil
 }
 
 // Run must be called after SetJob and SetCodePath
@@ -113,22 +124,6 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 		return gerrors.Wrap(err)
 	}
 	defer cleanupCredentials()
-
-	// var gatewayControl *gateway.SSHControl
-	//if ex.run.Configuration.Type == "service" {
-	//	log.Info(ctx, "Forwarding service port to the gateway", "hostname", ex.jobSpec.Gateway.Hostname)
-	//	gatewayControl, err = gateway.NewSSHControl(ex.jobSpec.Gateway.Hostname, ex.jobSpec.Gateway.SSHKey)
-	//	if err != nil {
-	//		ex.SetJobState(ctx, states.Failed)
-	//		return gerrors.Wrap(err)
-	//	}
-	//	defer gatewayControl.Cleanup()
-	//	if err = gatewayControl.Publish(strconv.Itoa(ex.jobSpec.Gateway.ServicePort), ex.jobSpec.Gateway.SockPath); err != nil {
-	//		ex.SetJobState(ctx, states.Failed)
-	//		return gerrors.Wrap(err)
-	//	}
-	//	log.Info(ctx, "SSH tunnel established", "sock_path", ex.jobSpec.Gateway.SockPath, "service_port", ex.jobSpec.Gateway.ServicePort)
-	//}
 
 	ex.SetJobState(ctx, states.Running)
 	timeoutCtx := ctx
@@ -214,11 +209,10 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 		log.Info(ctx, "Continuing without updating LD_LIBRARY_PATH")
 	} else {
 		jobEnvs["LD_LIBRARY_PATH"] = newLDPath
-		log.Info(ctx, "New LD_LIBRARY_PATH set", newLDPath)
+		log.Info(ctx, "New LD_LIBRARY_PATH set", "LD_LIBRARY_PATH", newLDPath)
 	}
 
 	cmd := exec.CommandContext(ctx, ex.jobSpec.Commands[0], ex.jobSpec.Commands[1:]...)
-	cmd.Env = makeEnv(ex.homeDir, jobEnvs, ex.jobSpec.Env, ex.secrets)
 	cmd.Cancel = func() error {
 		// returns error on Windows
 		return gerrors.Wrap(cmd.Process.Signal(os.Interrupt))
@@ -233,17 +227,86 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 		cmd.Dir = workingDir
 	}
 
+	user := ex.jobSpec.User
+	if user != nil {
+		if err := fillUser(user); err != nil {
+			return gerrors.Wrap(err)
+		}
+		log.Trace(
+			ctx, "Using credentials",
+			"uid", *user.Uid, "gid", *user.Gid, "groups", user.GroupIds,
+			"username", user.GetUsername(), "groupname", user.GetGroupname(),
+			"home", user.HomeDir,
+		)
+		log.Trace(ctx, "Current user", "uid", ex.uid)
+
+		// 1. Ideally, We should check uid, gid, and supplementary groups mismatches,
+		// but, for the sake of simplicity, we only check uid. Unprivileged runner
+		// should not receive job requests where user credentials do not match the
+		// current user's ones in the first place (it should be handled by the server)
+		// 2. Strictly speaking, we need CAP_SETUID and CAP_GUID (for Cmd.Start()->
+		// Cmd.SysProcAttr.Credential) and CAP_CHOWN (for startCommand()->os.Chown()),
+		// but for the sake of simplicity we instead check if we are root or not
+		if *user.Uid != ex.uid && ex.uid != 0 {
+			return gerrors.Newf("cannot start job as %d, current uid is %d", *user.Uid, ex.uid)
+		}
+
+		if cmd.SysProcAttr == nil {
+			cmd.SysProcAttr = &syscall.SysProcAttr{}
+		}
+		// It's safe to setuid(2)/setgid(2)/setgroups(2) as unprivileged user if we use
+		// user's own credentials (basically, it's noop)
+		cmd.SysProcAttr.Credential = &syscall.Credential{
+			Uid:    *user.Uid,
+			Gid:    *user.Gid,
+			Groups: user.GroupIds,
+		}
+	}
+
+	envMap := NewEnvMap(ParseEnvList(os.Environ()), jobEnvs, ex.secrets)
+	// `env` interpolation feature is postponed to some future release
+	envMap.Update(ex.jobSpec.Env, false)
+
+	// As of 2024-11-29, ex.homeDir is always set to /root
+	if err := writeSSHEnvironment(envMap, -1, -1, ex.homeDir); err != nil {
+		log.Warning(ctx, "failed to write SSH environment", "path", ex.homeDir, "err", err)
+	}
+	if user != nil && *user.Uid != 0 {
+		// non-root user
+		uid := int(*user.Uid)
+		gid := int(*user.Gid)
+		homeDir, isHomeDirAccessible := prepareHomeDir(ctx, uid, gid, user.HomeDir)
+		envMap["HOME"] = homeDir
+		if isHomeDirAccessible {
+			log.Trace(ctx, "provisioning homeDir", "path", homeDir)
+			if err := writeSSHEnvironment(envMap, uid, gid, homeDir); err != nil {
+				log.Warning(ctx, "failed to write SSH environment", "path", homeDir, "err", err)
+			}
+			akPath := filepath.Join(ex.homeDir, ".ssh/authorized_keys")
+			if err := copyAuthorizedKeys(akPath, uid, gid, homeDir); err != nil {
+				log.Warning(ctx, "failed to copy authorized keys", "path", homeDir, "err", err)
+			}
+		} else {
+			log.Trace(ctx, "homeDir is not accessible, skipping provisioning", "path", homeDir)
+		}
+	} else {
+		// root user
+		envMap["HOME"] = ex.homeDir
+	}
+
+	cmd.Env = envMap.Render()
+
 	log.Trace(ctx, "Starting exec", "cmd", cmd.String(), "working_dir", cmd.Dir, "env", cmd.Env)
 
-	ptmx, err := pty.Start(cmd)
+	ptm, err := startCommand(cmd)
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
-	defer func() { _ = ptmx.Close() }()
+	defer func() { _ = ptm.Close() }()
 	defer func() { _ = cmd.Wait() }() // release resources if copy fails
 
 	logger := io.MultiWriter(jobLogFile, ex.jobLogs)
-	_, err = io.Copy(logger, ptmx)
+	_, err = io.Copy(logger, ptm)
 	if err != nil && !isPtyError(err) {
 		return gerrors.Wrap(err)
 	}
@@ -340,4 +403,327 @@ func buildLDLibraryPathEnv() (string, error) {
 	}
 
 	return currentLDPath, nil
+}
+
+// fillUser fills missing User fields
+// Since normally only one kind of identifier is set (either id or name), we don't check
+// (id, name) pair consistency -- id has higher priority and overwites name with a real
+// name, ignoring the already set name value (if any)
+// HomeDir and SupplementaryGroupIds are always set unconditionally, as they are not
+// provided by the dstack server
+func fillUser(user *schemas.User) error {
+	if user.Uid == nil && user.Username == nil {
+		return errors.New("neither Uid nor Username is set")
+	}
+
+	if user.Gid == nil && user.Groupname != nil {
+		osGroup, err := osuser.LookupGroup(*user.Groupname)
+		if err != nil {
+			return fmt.Errorf("failed to look up group by Groupname: %w", err)
+		}
+		gid, err := parseStringId(osGroup.Gid)
+		if err != nil {
+			return fmt.Errorf("failed to parse group Gid: %w", err)
+		}
+		user.Gid = &gid
+	}
+
+	var osUser *osuser.User
+
+	if user.Uid == nil {
+		var err error
+		osUser, err = osuser.Lookup(*user.Username)
+		if err != nil {
+			return fmt.Errorf("failed to look up user by Username: %w", err)
+		}
+		uid, err := parseStringId(osUser.Uid)
+		if err != nil {
+			return fmt.Errorf("failed to parse Uid: %w", err)
+		}
+		user.Uid = &uid
+	} else {
+		var err error
+		osUser, err = osuser.LookupId(strconv.Itoa(int(*user.Uid)))
+		if err != nil {
+			var notFoundErr osuser.UnknownUserIdError
+			if !errors.As(err, &notFoundErr) {
+				return fmt.Errorf("failed to look up user by Uid: %w", err)
+			}
+		}
+	}
+
+	if osUser != nil {
+		user.Username = &osUser.Username
+		user.HomeDir = osUser.HomeDir
+	} else {
+		user.Username = nil
+		user.HomeDir = ""
+	}
+
+	// If Gid is not set, either directly or via Groupname, use user's primary group
+	// and supplementary groups, see https://docs.docker.com/reference/dockerfile/#user
+	// If user doesn't exist, set Gid to 0 and supplementary groups to an empty list
+	if user.Gid == nil {
+		if osUser != nil {
+			gid, err := parseStringId(osUser.Gid)
+			if err != nil {
+				return fmt.Errorf("failed to parse primary Gid: %w", err)
+			}
+			user.Gid = &gid
+			groupStringIds, err := osUser.GroupIds()
+			if err != nil {
+				return fmt.Errorf("failed to get supplementary groups: %w", err)
+			}
+			var groupIds []uint32
+			for _, groupStringId := range groupStringIds {
+				groupId, err := parseStringId(groupStringId)
+				if err != nil {
+					return fmt.Errorf("failed to parse supplementary group id: %w", err)
+				}
+				groupIds = append(groupIds, groupId)
+			}
+			user.GroupIds = groupIds
+		} else {
+			var fallbackGid uint32 = 0
+			user.Gid = &fallbackGid
+			user.GroupIds = []uint32{}
+		}
+	}
+	return nil
+}
+
+func parseStringId(stringId string) (uint32, error) {
+	id, err := strconv.ParseInt(stringId, 10, 32)
+	if err != nil {
+		return 0, err
+	}
+	if id < 0 {
+		return 0, fmt.Errorf("negative value: %d", id)
+	}
+	return uint32(id), nil
+}
+
+// A simplified copypasta of creack/pty Start->StartWithSize->StartWithAttrs
+// with two additions:
+// * controlling terminal is properly set (cmd.Extrafiles, Cmd.SysProcAttr.Ctty)
+// * owner of slave pty is changed to the child process uid
+func startCommand(cmd *exec.Cmd) (*os.File, error) {
+	ptm, pts, err := pty.Open()
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = pts.Close() }()
+
+	cmd.Stdout = pts
+	cmd.Stderr = pts
+	cmd.Stdin = pts
+	cmd.ExtraFiles = []*os.File{pts}
+	if cmd.SysProcAttr == nil {
+		cmd.SysProcAttr = &syscall.SysProcAttr{}
+	}
+	// see https://github.com/creack/pty/issues/96#issuecomment-624372400
+	cmd.SysProcAttr.Ctty = 3 // cmd.ExtraFiles[0]
+	cmd.SysProcAttr.Setctty = true
+	cmd.SysProcAttr.Setsid = true
+
+	if cmd.SysProcAttr.Credential != nil {
+		// Initially, /dev/pts/N is owned by the user who open()'ed /dev/ptmx (runner_uid)
+		// If the runner started by root, we can chown to any user
+		// If the runner started by non-root, we can chown only to the same user (noop)
+		// In the latter case, the situation when runner_uid != 0 and
+		// runner_uid != job_uid should be already handled outside this function
+		uid := cmd.SysProcAttr.Credential.Uid
+		if err := os.Chown(pts.Name(), int(uid), -1); err != nil {
+			_ = ptm.Close()
+			return nil, err
+		}
+	}
+
+	if err := cmd.Start(); err != nil {
+		_ = ptm.Close()
+		return nil, err
+	}
+	return ptm, nil
+}
+
+func prepareHomeDir(ctx context.Context, uid int, gid int, homeDir string) (string, bool) {
+	if homeDir == "" {
+		// user does not exist
+		return "/", false
+	}
+	if info, err := os.Stat(homeDir); errors.Is(err, os.ErrNotExist) {
+		if strings.Contains(homeDir, "nonexistent") {
+			// let `/nonexistent` stay non-existent
+			return homeDir, false
+		}
+		if err = os.MkdirAll(homeDir, 0o755); err != nil {
+			log.Warning(ctx, "failed to create homeDir", "err", err)
+			return homeDir, false
+		}
+		if err = os.Chmod(homeDir, 0o750); err != nil {
+			log.Warning(ctx, "failed to chmod homeDir", "err", err)
+		}
+		if err = os.Chown(homeDir, uid, gid); err != nil {
+			log.Warning(ctx, "failed to chown homeDir", "err", err)
+		}
+		return homeDir, true
+	} else if err != nil {
+		log.Warning(ctx, "homeDir is not accessible", "err", err)
+		return homeDir, false
+	} else if !info.IsDir() {
+		log.Warning(ctx, "HomeDir is not a dir", "path", homeDir)
+		return homeDir, false
+	}
+	return homeDir, true
+}
+
+func writeSSHEnvironment(env map[string]string, uid int, gid int, homeDir string) error {
+	sshDir, err := joinRelPath(homeDir, ".ssh")
+	if err != nil {
+		return err
+	}
+	info, err := os.Stat(sshDir)
+	if err == nil {
+		if !info.IsDir() {
+			return fmt.Errorf("not a directory: %s", sshDir)
+		}
+		if err = os.Chmod(sshDir, 0o700); err != nil {
+			return err
+		}
+	} else if errors.Is(err, os.ErrNotExist) {
+		if err = os.MkdirAll(sshDir, 0o700); err != nil {
+			return err
+		}
+	} else {
+		return err
+	}
+	if err = os.Chown(sshDir, uid, gid); err != nil {
+		return err
+	}
+
+	envPath, err := joinRelPath(sshDir, "environment")
+	if err != nil {
+		return err
+	}
+	info, err = os.Stat(envPath)
+	if err == nil {
+		if info.IsDir() {
+			return fmt.Errorf("is a directory: %s", envPath)
+		}
+		if err = os.Chmod(envPath, 0o600); err != nil {
+			return err
+		}
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+
+	envFile, err := os.OpenFile(envPath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0o600)
+	if err != nil {
+		return err
+	}
+	defer envFile.Close()
+	for key, value := range env {
+		switch key {
+		case "USER", "HOME", "SHELL", "PWD", "_":
+			continue
+		}
+		// sshd doesn't support multiline variable values in .ssh/environment:
+		// VAR1=line1
+		// line2
+		// line3
+		// VAR2=singleline
+		// leads to:
+		// Bad line 2 in /root/.ssh/environment
+		// Bad line 3 in /root/.ssh/environment
+		// Assuming a single trailing newline is not a big deal
+		value := strings.TrimSuffix(value, "\n")
+		// If there is any non-trailing newline, or more than one
+		// trailing newline, skip the variable
+		if strings.Contains(value, "\n") {
+			continue
+		}
+		line := fmt.Sprintf("%s=%s\n", key, value)
+		if _, err = envFile.WriteString(line); err != nil {
+			return err
+		}
+	}
+	if err = os.Chown(envPath, uid, gid); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// A makeshift solution to deliver authorized_keys to a non-root user
+// without modifying the existing API/bootstrap process
+// TODO: implement key delivery properly, i.e. sumbit keys to and write by the runner,
+// not the outer sh script that launches sshd and runner
+func copyAuthorizedKeys(src string, uid int, gid int, homeDir string) error {
+	srcFile, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer srcFile.Close()
+
+	sshDir, err := joinRelPath(homeDir, ".ssh")
+	if err != nil {
+		return err
+	}
+	info, err := os.Stat(sshDir)
+	if err == nil {
+		if !info.IsDir() {
+			return fmt.Errorf("not a directory: %s", sshDir)
+		}
+		if err = os.Chmod(sshDir, 0o700); err != nil {
+			return err
+		}
+	} else if errors.Is(err, os.ErrNotExist) {
+		if err = os.MkdirAll(sshDir, 0o700); err != nil {
+			return err
+		}
+	} else {
+		return err
+	}
+	if err = os.Chown(sshDir, uid, gid); err != nil {
+		return err
+	}
+
+	dstExists := false
+	dstPath, err := joinRelPath(sshDir, "authorized_keys")
+	if err != nil {
+		return err
+	}
+	info, err = os.Stat(dstPath)
+	if err == nil {
+		dstExists = true
+		if info.IsDir() {
+			return fmt.Errorf("is a directory: %s", dstPath)
+		}
+		if err = os.Chmod(dstPath, 0o600); err != nil {
+			return err
+		}
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+
+	dstFile, err := os.OpenFile(dstPath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0o600)
+	if err != nil {
+		return err
+	}
+	defer dstFile.Close()
+
+	if dstExists {
+		// visually separate our keys from existing ones
+		if _, err := dstFile.WriteString("\n\n"); err != nil {
+			return err
+		}
+	}
+	if _, err := io.Copy(dstFile, srcFile); err != nil {
+		return err
+	}
+	if err = os.Chown(dstPath, uid, gid); err != nil {
+		return err
+	}
+
+	return nil
 }

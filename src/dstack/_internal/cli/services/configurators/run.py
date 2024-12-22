@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
 
 import gpuhunt
-from rich.live import Live
 
 import dstack._internal.core.models.resources as resources
 from dstack._internal.cli.services.args import disk_spec, gpu_spec, port_mapping
@@ -16,10 +15,10 @@ from dstack._internal.cli.services.configurators.base import (
 )
 from dstack._internal.cli.services.profile import apply_profile_args, register_profile_args
 from dstack._internal.cli.utils.common import (
-    LIVE_TABLE_REFRESH_RATE_PER_SEC,
     confirm_ask,
     console,
 )
+from dstack._internal.cli.utils.rich import MultiItemStatus
 from dstack._internal.cli.utils.run import get_runs_table, print_run_plan
 from dstack._internal.core.errors import (
     CLIError,
@@ -40,11 +39,14 @@ from dstack._internal.core.models.configurations import (
     ServiceConfiguration,
     TaskConfiguration,
 )
+from dstack._internal.core.models.repos.base import Repo
 from dstack._internal.core.models.runs import JobSubmission, JobTerminationReason, RunStatus
 from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.core.services.diff import diff_models
+from dstack._internal.utils.common import local_time
 from dstack._internal.utils.interpolator import InterpolatorError, VariablesInterpolator
 from dstack._internal.utils.logging import get_logger
+from dstack.api._public.repos import get_ssh_keypair
 from dstack.api._public.runs import Run
 from dstack.api.utils import load_profile
 
@@ -67,6 +69,7 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
         command_args: argparse.Namespace,
         configurator_args: argparse.Namespace,
         unknown_args: List[str],
+        repo: Optional[Repo] = None,
     ):
         self.apply_args(conf, configurator_args, unknown_args)
         self.validate_gpu_vendor_and_image(conf)
@@ -76,9 +79,17 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
                 " and will be forbidden in a future [code]dstack[/] release."
                 " Please upgrade your configuration to a newer Python version."
             )
-        repo = self.api.repos.load(Path.cwd())
-        repo_config = ConfigManager().get_repo_config_or_error(repo.get_repo_dir_or_error())
-        self.api.ssh_identity_file = repo_config.ssh_key_path
+        if repo is None:
+            repo = self.api.repos.load(Path.cwd())
+        config_manager = ConfigManager()
+        if repo.repo_dir is not None:
+            repo_config = config_manager.get_repo_config_or_error(repo.repo_dir)
+            self.api.ssh_identity_file = repo_config.ssh_key_path
+        else:
+            self.api.ssh_identity_file = get_ssh_keypair(
+                command_args.ssh_identity_file,
+                config_manager.dstack_key_path,
+            )
         profile = load_profile(Path.cwd(), configurator_args.profile)
         with console.status("Getting apply plan..."):
             run_plan = self.api.runs.get_plan(
@@ -106,10 +117,13 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
         confirm_message = "Submit a new run?"
         stop_run_name = None
         if run_plan.current_resource is not None:
-            diff = diff_models(
-                run_plan.run_spec.configuration, run_plan.current_resource.run_spec.configuration
-            )
-            changed_fields = list(diff.keys())
+            changed_fields = []
+            if run_plan.action == ApplyAction.UPDATE:
+                diff = diff_models(
+                    run_plan.run_spec.configuration,
+                    run_plan.current_resource.run_spec.configuration,
+                )
+                changed_fields = list(diff.keys())
             if run_plan.action == ApplyAction.UPDATE and len(changed_fields) > 0:
                 console.print(
                     f"Active run [code]{conf.name}[/] already exists."
@@ -171,22 +185,25 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
         try:
             # We can attach to run multiple times if it goes from running to pending (retried).
             while True:
-                console.print()
-                with Live(
-                    console=console, refresh_per_second=LIVE_TABLE_REFRESH_RATE_PER_SEC
-                ) as live:
-                    while True:
-                        live.update(get_runs_table([run], verbose=True))
-                        if run.status not in (
-                            RunStatus.SUBMITTED,
-                            RunStatus.PENDING,
-                            RunStatus.PROVISIONING,
-                            RunStatus.TERMINATING,
-                        ):
-                            break
+                with MultiItemStatus(f"Launching [code]{run.name}[/]...", console=console) as live:
+                    while run.status in (
+                        RunStatus.SUBMITTED,
+                        RunStatus.PENDING,
+                        RunStatus.PROVISIONING,
+                        RunStatus.TERMINATING,
+                    ):
+                        table = get_runs_table([run])
+                        live.update(table)
                         time.sleep(5)
                         run.refresh()
 
+                console.print(
+                    get_runs_table(
+                        [run],
+                        verbose=run.status == RunStatus.FAILED,
+                        format_date=local_time,
+                    )
+                )
                 console.print(
                     f"\n[code]{run.name}[/] provisioning completed [secondary]({run.status.value})[/]"
                 )

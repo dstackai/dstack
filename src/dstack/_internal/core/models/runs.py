@@ -28,6 +28,7 @@ from dstack._internal.core.models.profiles import (
 )
 from dstack._internal.core.models.repos import AnyRunRepoData
 from dstack._internal.core.models.resources import ResourcesSpec
+from dstack._internal.core.models.unix import UnixUser
 from dstack._internal.utils import common as common_utils
 from dstack._internal.utils.common import format_pretty_duration
 
@@ -148,6 +149,7 @@ class Requirements(CoreModel):
     resources: ResourcesSpec
     max_price: Optional[float]
     spot: Optional[bool]
+    reservation: Optional[str]
 
     def pretty_format(self, resources_only: bool = False):
         res = self.resources.pretty_format()
@@ -176,6 +178,7 @@ class JobSpec(CoreModel):
     job_name: str
     jobs_per_replica: int = 1  # default value for backward compatibility
     app_specs: Optional[List[AppSpec]]
+    user: Optional[UnixUser] = None  # default value for backward compatibility
     commands: List[str]
     env: Dict[str, str]
     home_dir: Optional[str]
@@ -209,6 +212,7 @@ class JobProvisioningData(CoreModel):
     instance_network: Optional[str] = None
     region: str
     availability_zone: Optional[str] = None
+    reservation: Optional[str] = None
     price: float
     username: str
     # ssh_port be different from 22 for some backends.
@@ -259,15 +263,56 @@ class Job(CoreModel):
 
 
 class RunSpec(CoreModel):
-    run_name: Optional[str]
-    repo_id: str
-    repo_data: Annotated[AnyRunRepoData, Field(discriminator="repo_type")]
-    repo_code_hash: Optional[str]
-    working_dir: str
-    configuration_path: str
+    # TODO: run_name, working_dir are redundant here since they already passed in configuration
+    run_name: Annotated[
+        Optional[str],
+        Field(description="The run name. If not set, the run name is generated automatically."),
+    ]
+    repo_id: Annotated[
+        Optional[str],
+        Field(
+            description=(
+                "Same `repo_id` that is specified when initializing the repo"
+                " by calling the `/api/project/{project_name}/repos/init` endpoint."
+                " If not specified, a default virtual repo is used."
+            )
+        ),
+    ]
+    repo_data: Annotated[
+        Optional[AnyRunRepoData],
+        Field(
+            discriminator="repo_type",
+            description="The repo data such as the current branch and commit.",
+        ),
+    ]
+    repo_code_hash: Annotated[Optional[str], Field(description="The hash of the repo diff")]
+    working_dir: Annotated[
+        Optional[str],
+        Field(
+            description=(
+                "The path to the working directory inside the container."
+                " It's specified relative to the repository directory (`/workflow`) and should be inside it."
+                ' Defaults to `"."`.'
+            )
+        ),
+    ]
+    configuration_path: Annotated[
+        Optional[str],
+        Field(
+            description=(
+                "The path to the run configuration YAML file."
+                " It can be omitted when using the programmatic API."
+            )
+        ),
+    ]
     configuration: Annotated[AnyRunConfiguration, Field(discriminator="type")]
-    profile: Profile
-    ssh_key_pub: str
+    profile: Annotated[Optional[Profile], Field(description="The profile parameters")]
+    ssh_key_pub: Annotated[
+        str,
+        Field(
+            description="The contents of the SSH public key that will be used to connect to the run."
+        ),
+    ]
     # TODO: make merged_profile a computed field after migrating to pydanticV2
     merged_profile: Annotated[Profile, Field(exclude=True)] = None
 
@@ -279,11 +324,14 @@ class RunSpec(CoreModel):
 
     @root_validator
     def _merged_profile(cls, values) -> Dict:
-        try:
+        if values.get("profile") is None:
+            merged_profile = Profile(name="default")
+        else:
             merged_profile = Profile.parse_obj(values["profile"])
+        try:
             conf = RunConfiguration.parse_obj(values["configuration"]).__root__
         except KeyError:
-            raise ValueError("Missing profile or configuration")
+            raise ValueError("Missing configuration")
         for key in ProfileParams.__fields__:
             conf_val = getattr(conf, key, None)
             if conf_val is not None:
@@ -375,7 +423,15 @@ class RunPlan(CoreModel):
 
 class ApplyRunPlanInput(CoreModel):
     run_spec: RunSpec
-    current_resource: Optional[Run] = None
+    current_resource: Annotated[
+        Optional[Run],
+        Field(
+            description=(
+                "The expected current resource."
+                " If the resource has changed, the apply fails unless `force: true`."
+            )
+        ),
+    ] = None
 
 
 class PoolInstanceOffers(CoreModel):

@@ -34,7 +34,7 @@ from dstack._internal.server.services.permissions import (
     DefaultPermissions,
     set_default_permissions,
 )
-from dstack._internal.server.utils.common import run_async
+from dstack._internal.utils.common import run_async
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -63,7 +63,9 @@ yaml.add_representer(list, seq_representer)
 
 class AWSConfig(CoreModel):
     type: Annotated[Literal["aws"], Field(description="The type of the backend")] = "aws"
-    regions: Annotated[Optional[List[str]], Field(description="The list of AWS regions")] = None
+    regions: Annotated[
+        Optional[List[str]], Field(description="The list of AWS regions. Omit to use all regions")
+    ] = None
     vpc_name: Annotated[
         Optional[str],
         Field(
@@ -122,7 +124,7 @@ class AzureConfig(CoreModel):
     subscription_id: Annotated[str, Field(description="The subscription ID")]
     regions: Annotated[
         Optional[List[str]],
-        Field(description="The list of Azure regions (locations)"),
+        Field(description="The list of Azure regions (locations). Omit to use all regions"),
     ] = None
     vpc_ids: Annotated[
         Optional[Dict[str, str]],
@@ -154,14 +156,19 @@ class AzureConfig(CoreModel):
 
 class CudoConfig(CoreModel):
     type: Annotated[Literal["cudo"], Field(description="The type of backend")] = "cudo"
-    regions: Optional[List[str]] = None
+    regions: Annotated[
+        Optional[List[str]], Field(description="The list of Cudo regions. Omit to use all regions")
+    ] = None
     project_id: Annotated[str, Field(description="The project ID")]
     creds: Annotated[AnyCudoCreds, Field(description="The credentials")]
 
 
 class DataCrunchConfig(CoreModel):
     type: Annotated[Literal["datacrunch"], Field(description="The type of backend")] = "datacrunch"
-    regions: Optional[List[str]] = None
+    regions: Annotated[
+        Optional[List[str]],
+        Field(description="The list of DataCrunch regions. Omit to use all regions"),
+    ] = None
     creds: Annotated[AnyDataCrunchCreds, Field(description="The credentials")]
 
 
@@ -207,7 +214,9 @@ AnyGCPAPICreds = Union[GCPServiceAccountAPICreds, GCPDefaultCreds]
 class GCPConfig(CoreModel):
     type: Annotated[Literal["gcp"], Field(description="The type of backend")] = "gcp"
     project_id: Annotated[str, Field(description="The project ID")]
-    regions: Optional[List[str]] = None
+    regions: Annotated[
+        Optional[List[str]], Field(description="The list of GCP regions. Omit to use all regions")
+    ] = None
     vpc_name: Annotated[Optional[str], Field(description="The name of a custom VPC")] = None
     vpc_project_id: Annotated[
         Optional[str],
@@ -229,6 +238,9 @@ class GCPConfig(CoreModel):
                 " Defaults to `true`"
             )
         ),
+    ] = None
+    vm_service_account: Annotated[
+        Optional[str], Field(description="The service account associated with provisioned VMs")
     ] = None
     tags: Annotated[
         Optional[Dict[str, str]],
@@ -242,7 +254,9 @@ class GCPConfig(CoreModel):
 class GCPAPIConfig(CoreModel):
     type: Annotated[Literal["gcp"], Field(description="The type of backend")] = "gcp"
     project_id: Annotated[str, Field(description="The project ID")]
-    regions: Optional[List[str]] = None
+    regions: Annotated[
+        Optional[List[str]], Field(description="The list of GCP regions. Omit to use all regions")
+    ] = None
     vpc_name: Annotated[Optional[str], Field(description="The name of a custom VPC")] = None
     vpc_project_id: Annotated[
         Optional[str],
@@ -264,6 +278,9 @@ class GCPAPIConfig(CoreModel):
                 " Defaults to `true`"
             )
         ),
+    ] = None
+    vm_service_account: Annotated[
+        Optional[str], Field(description="The service account associated with provisioned VMs")
     ] = None
     tags: Annotated[
         Optional[Dict[str, str]],
@@ -315,7 +332,10 @@ class KubernetesAPIConfig(CoreModel):
 
 class LambdaConfig(CoreModel):
     type: Annotated[Literal["lambda"], Field(description="The type of backend")] = "lambda"
-    regions: Optional[List[str]] = None
+    regions: Annotated[
+        Optional[List[str]],
+        Field(description="The list of Lambda regions. Omit to use all regions"),
+    ] = None
     creds: Annotated[AnyLambdaCreds, Field(description="The credentials")]
 
 
@@ -368,9 +388,7 @@ class OCIConfig(CoreModel):
     creds: Annotated[AnyOCICreds, Field(description="The credentials", discriminator="type")]
     regions: Annotated[
         Optional[List[str]],
-        Field(
-            description="List of region names for running `dstack` jobs. Omit to use all regions"
-        ),
+        Field(description="The list of OCI regions. Omit to use all regions"),
     ] = None
     compartment_id: Annotated[
         Optional[str],
@@ -385,19 +403,28 @@ class OCIConfig(CoreModel):
 
 class RunpodConfig(CoreModel):
     type: Literal["runpod"] = "runpod"
-    regions: Optional[List[str]] = None
-    creds: AnyRunpodCreds
+    regions: Annotated[
+        Optional[List[str]],
+        Field(description="The list of RunPod regions. Omit to use all regions"),
+    ] = None
+    creds: Annotated[AnyRunpodCreds, Field(description="The credentials")]
 
 
 class TensorDockConfig(CoreModel):
     type: Annotated[Literal["tensordock"], Field(description="The type of backend")] = "tensordock"
-    regions: Optional[List[str]] = None
+    regions: Annotated[
+        Optional[List[str]],
+        Field(description="The list of TensorDock regions. Omit to use all regions"),
+    ] = None
     creds: Annotated[AnyTensorDockCreds, Field(description="The credentials")]
 
 
 class VastAIConfig(CoreModel):
     type: Annotated[Literal["vastai"], Field(description="The type of backend")] = "vastai"
-    regions: Optional[List[str]] = None
+    regions: Annotated[
+        Optional[List[str]],
+        Field(description="The list of VastAI regions. Omit to use all regions"),
+    ] = None
     creds: Annotated[AnyVastAICreds, Field(description="The credentials")]
 
 

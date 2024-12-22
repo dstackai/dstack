@@ -47,7 +47,6 @@ from dstack._internal.server.services.runs import (
     run_model_to_run,
 )
 from dstack._internal.server.services.storage import get_default_storage
-from dstack._internal.server.utils.common import run_async
 from dstack._internal.utils import common as common_utils
 from dstack._internal.utils.interpolator import VariablesInterpolator
 from dstack._internal.utils.logging import get_logger
@@ -188,7 +187,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
                 if job_provisioning_data.backend == BackendType.LOCAL:
                     # No need to update ~/.ssh/authorized_keys when running shim localy
                     user_ssh_key = ""
-                success = await run_async(
+                success = await common_utils.run_async(
                     _process_provisioning_with_shim,
                     server_ssh_private_key,
                     job_provisioning_data,
@@ -213,7 +212,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
                     repo=repo_model,
                     code_hash=run.run_spec.repo_code_hash,
                 )
-                success = await run_async(
+                success = await common_utils.run_async(
                     _process_provisioning_no_shim,
                     server_ssh_private_key,
                     job_provisioning_data,
@@ -254,7 +253,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
                 repo=repo_model,
                 code_hash=run.run_spec.repo_code_hash,
             )
-            success = await run_async(
+            success = await common_utils.run_async(
                 _process_pulling_with_shim,
                 server_ssh_private_key,
                 job_provisioning_data,
@@ -268,7 +267,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
             )
         elif initial_status == JobStatus.RUNNING:
             logger.debug("%s: process running job, age=%s", fmt(job_model), job_submission.age)
-            success = await run_async(
+            success = await common_utils.run_async(
                 _process_running,
                 server_ssh_private_key,
                 job_provisioning_data,
@@ -427,7 +426,7 @@ def _process_provisioning_with_shim(
     for volume, volume_mount in zip(volumes, volume_mounts):
         volume_mount.name = volume.name
 
-    shim_client.submit(
+    submitted = shim_client.submit(
         username=username,
         password=password,
         image_name=job_spec.image_name,
@@ -444,6 +443,20 @@ def _process_provisioning_with_shim(
         volumes=volumes,
         instance_mounts=instance_mounts,
     )
+    if not submitted:
+        # This can happen when we lost connection to the runner (e.g., network issues), marked
+        # the job as failed, released the instance (status=BUSY->IDLE, job_id={id}->None),
+        # but the job container is in fact alive, running the previous job. As we force-stop
+        # the container via shim API when cancelling the current job anyway (when either the user
+        # aborts the submission process or the submission deadline is reached), it's safe to kill
+        # the previous job container now, making the shim available (state=running->pending)
+        # for the next try.
+        logger.warning(
+            "%s: failed to sumbit, shim is already running a job, stopping it now, retry later",
+            fmt(job_model),
+        )
+        shim_client.stop(force=True)
+        return False
 
     job_model.status = JobStatus.PULLING
     logger.info("%s: now is %s", fmt(job_model), job_model.status.name)
@@ -587,7 +600,7 @@ async def _get_job_code(
     storage = get_default_storage()
     if storage is None or code_model.blob is not None:
         return code_model.blob
-    blob = await run_async(
+    blob = await common_utils.run_async(
         storage.get_code,
         project.name,
         repo.name,

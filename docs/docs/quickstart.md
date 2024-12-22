@@ -4,7 +4,7 @@
     
 ## Initialize a repo
 
-To use `dstack`'s CLI in a folder, first run [`dstack init`](reference/cli/index.md#dstack-init) within that folder.
+Before using `dstack`'s CLI in a directory, initialize the directory as a repo with [`dstack init`](reference/cli/dstack/init.md).
 
 <div class="termy">
 
@@ -14,8 +14,6 @@ $ dstack init
 ```
 
 </div>
-
-Your folder can be a regular local folder or a Git repo.
 
 ## Run a configuration
 
@@ -48,7 +46,7 @@ Your folder can be a regular local folder or a Git repo.
 
     ##### Run the configuration
 
-    Run the configuration via [`dstack apply`](reference/cli/index.md#dstack-apply):
+    Run the configuration via [`dstack apply`](reference/cli/dstack/apply.md):
 
     <div class="termy">
 
@@ -114,7 +112,7 @@ Your folder can be a regular local folder or a Git repo.
 
     ##### Run the configuration
 
-    Run the configuration via [`dstack apply`](reference/cli/index.md#dstack-apply):
+    Run the configuration via [`dstack apply`](reference/cli/dstack/apply.md):
 
     <div class="termy">
 
@@ -179,7 +177,7 @@ Your folder can be a regular local folder or a Git repo.
 
     ##### Run the configuration
 
-    Run the configuration via [`dstack apply`](reference/cli/index.md#dstack-apply):
+    Run the configuration via [`dstack apply`](reference/cli/dstack/apply.md):
 
     <div class="termy">
 
@@ -211,7 +209,8 @@ Your folder can be a regular local folder or a Git repo.
         If you're using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"},
         a gateway is pre-configured for you.
 
-`dstack apply` automatically provisions instances, uploads the code from the current repo (incl. your local uncommitted changes).
+`dstack apply` automatically provisions instances, uploads the contents of the repo (incl. your local uncommitted changes),
+and runs the configuration.
 
 ## Troubleshooting
 
@@ -219,7 +218,7 @@ Something not working? See the [troubleshooting](guides/troubleshooting.md) guid
 
 ## What's next?
 
-1. Read about [dev environments](dev-environments.md), [tasks](tasks.md), 
-    [services](services.md), and [fleets](concepts/fleets.md) 
+1. Read about [dev environments](dev-environments.md), [tasks](tasks.md), [services](services.md),
+   and [repos](concepts/repos.md)
 2. Join [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd)
 3. Browse [examples](https://dstack.ai/examples)

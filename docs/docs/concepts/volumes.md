@@ -38,6 +38,8 @@ If you use this configuration, `dstack` will create a new volume based on the sp
     If you prefer not to create a new volume but to reuse an existing one (e.g., created manually), you can 
     [specify its ID via `volume_id`](../reference/dstack.yml/volume.md#existing-volume). In this case, `dstack` will register the specified volume so that you can use it with dev environments, tasks, and services.
 
+    Note, if you register an external volume, you must ensure it already has a file system.
+
 !!! info "Reference"
     See [.dstack.yml](../reference/dstack.yml/volume.md) for all the options supported by
     volumes, along with multiple examples.
@@ -118,7 +120,7 @@ and its contents will persist across runs.
 
 #### List volumes
 
-The [`dstack volume list`](../reference/cli/index.md#dstack-volume-list) command lists created and registered volumes:
+The [`dstack volume list`](../reference/cli/dstack/volume.md-list) command lists created and registered volumes:
 
 ```
 $ dstack volume list
@@ -152,7 +154,7 @@ is executed on the same exact instance, and there is no other runs in between.
 ### Manage volumes { #manage-instance-volumes }
 
 You don't need to create or delete instance volumes, and they are not displayed in the
-[`dstack volume list`](../reference/cli/index.md#dstack-volume-list) command output.
+[`dstack volume list`](../reference/cli/dstack/volume.md#dstack-volume-list) command output.
 
 ### Attach a volume { #attach-instance-volume }
 

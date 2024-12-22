@@ -10,7 +10,7 @@ from dstack._internal.core.models.runs import (
     Job,
     RunPlan,
 )
-from dstack._internal.utils.common import format_pretty_duration, pretty_date
+from dstack._internal.utils.common import DateFormatter, format_pretty_duration, pretty_date
 from dstack.api import Run
 
 
@@ -62,6 +62,7 @@ def print_run_plan(run_plan: RunPlan, offers_limit: int = 3):
     props.add_row(th("Creation policy"), creation_policy)
     props.add_row(th("Termination policy"), termination_policy)
     props.add_row(th("Termination idle time"), termination_idle_time)
+    props.add_row(th("Reservation"), run_plan.run_spec.configuration.reservation)
 
     offers = Table(box=None)
     offers.add_column("#")
@@ -113,18 +114,16 @@ def print_run_plan(run_plan: RunPlan, offers_limit: int = 3):
 
 
 def get_runs_table(
-    runs: List[Run], include_configuration: bool = False, verbose: bool = False
+    runs: List[Run], verbose: bool = False, format_date: DateFormatter = pretty_date
 ) -> Table:
     table = Table(box=None)
     table.add_column("NAME", style="bold", no_wrap=True)
-    if include_configuration:
-        table.add_column("CONFIGURATION", style="grey58")
-    table.add_column("BACKEND", style="grey58", no_wrap=True, max_width=16)
-    table.add_column("REGION", style="grey58")
+    table.add_column("BACKEND", style="grey58")
     if verbose:
         table.add_column("INSTANCE", no_wrap=True)
     table.add_column("RESOURCES")
-    table.add_column("SPOT")
+    if verbose:
+        table.add_column("RESERVATION", no_wrap=True)
     table.add_column("PRICE", no_wrap=True)
     table.add_column("STATUS", no_wrap=True)
     table.add_column("SUBMITTED", style="grey58", no_wrap=True)
@@ -137,30 +136,28 @@ def get_runs_table(
 
         run_row: Dict[Union[str, int], Any] = {
             "NAME": run.run_spec.run_name,
-            "CONFIGURATION": run.run_spec.configuration_path,
-            "STATUS": run.status,
-            "SUBMITTED": pretty_date(run.submitted_at),
+            "SUBMITTED": format_date(run.submitted_at),
             "ERROR": run_error,
         }
         if len(run.jobs) != 1:
+            run_row["STATUS"] = run.status
             add_row_from_dict(table, run_row)
 
         for job in run.jobs:
             job_row: Dict[Union[str, int], Any] = {
-                "NAME": f"  replica {job.job_spec.replica_num}\n  job_num {job.job_spec.job_num}",
+                "NAME": f"  replica={job.job_spec.replica_num} job={job.job_spec.job_num}",
                 "STATUS": job.job_submissions[-1].status,
-                "SUBMITTED": pretty_date(job.job_submissions[-1].submitted_at),
+                "SUBMITTED": format_date(job.job_submissions[-1].submitted_at),
                 "ERROR": _get_job_error(job),
             }
             jpd = job.job_submissions[-1].job_provisioning_data
             if jpd is not None:
                 job_row.update(
                     {
-                        "BACKEND": jpd.backend.value.replace("remote", "ssh"),
-                        "REGION": jpd.region,
+                        "BACKEND": f"{jpd.backend.value.replace('remote', 'ssh')} ({jpd.region})",
                         "INSTANCE": jpd.instance_type.name,
-                        "RESOURCES": jpd.instance_type.resources.pretty_format(),
-                        "SPOT": "yes" if jpd.instance_type.resources.spot else "no",
+                        "RESOURCES": jpd.instance_type.resources.pretty_format(include_spot=True),
+                        "RESERVATION": jpd.reservation,
                         "PRICE": f"${jpd.price:.4}",
                     }
                 )

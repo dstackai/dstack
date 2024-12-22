@@ -169,7 +169,7 @@ func makeTestExecutor(t *testing.T) *RunExecutor {
 	_ = os.Mkdir(home, 0o700)
 	repo := filepath.Join(baseDir, "repo")
 	_ = os.Mkdir(repo, 0o700)
-	ex := NewRunExecutor(temp, home, repo)
+	ex, _ := NewRunExecutor(temp, home, repo)
 	ex.SetJob(body)
 	ex.SetCodePath(filepath.Join(baseDir, "code")) // note: create file before run
 	return ex
@@ -182,7 +182,7 @@ func makeCodeTar(t *testing.T, path string) {
 	defer func() { _ = file.Close() }()
 	tw := tar.NewWriter(file)
 
-	var files = []struct{ name, body string }{
+	files := []struct{ name, body string }{
 		{"foo", "bar\n"},
 	}
 

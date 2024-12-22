@@ -53,6 +53,7 @@ class SubmitBody(CoreModel):
                 "replica_num",
                 "job_num",
                 "jobs_per_replica",
+                "user",
                 "commands",
                 "entrypoint",
                 "env",
@@ -90,6 +91,7 @@ class ShimVolumeInfo(CoreModel):
     name: str
     volume_id: str
     init_fs: bool
+    device_name: Optional[str] = None
 
 
 class TaskConfigBody(CoreModel):
@@ -119,12 +121,4 @@ class JobResult(CoreModel):
 
 class PullBody(CoreModel):
     state: str
-    executor_error: Optional[str]
-    container_name: Optional[str]
-    status: Optional[str]
-    running: Optional[bool]
-    oom_killed: Optional[bool]
-    dead: Optional[bool]
-    exit_code: Optional[int]
-    error: Optional[str]
     result: Optional[JobResult]

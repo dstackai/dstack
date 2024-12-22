@@ -72,12 +72,40 @@ class AWSCompute(Compute):
     def get_offers(
         self, requirements: Optional[Requirements] = None
     ) -> List[InstanceOfferWithAvailability]:
+        filter = _supported_instances
+        if requirements and requirements.reservation:
+            region_to_reservation = {}
+            for region in self.config.regions:
+                reservation = aws_resources.get_reservation(
+                    ec2_client=self.session.client("ec2", region_name=region),
+                    reservation_id=requirements.reservation,
+                    instance_count=1,
+                )
+                if reservation is not None:
+                    region_to_reservation[region] = reservation
+
+            def _supported_instances_with_reservation(offer: InstanceOffer) -> bool:
+                # Filter: only instance types supported by dstack
+                if not _supported_instances(offer):
+                    return False
+                # Filter: Spot instances can't be used with reservations
+                if offer.instance.resources.spot:
+                    return False
+                region = offer.region
+                reservation = region_to_reservation.get(region)
+                # Filter: only instance types matching the capacity reservation
+                if not bool(reservation and offer.instance.name == reservation["InstanceType"]):
+                    return False
+                return True
+
+            filter = _supported_instances_with_reservation
+
         offers = get_catalog_offers(
             backend=BackendType.AWS,
             locations=self.config.regions,
             requirements=requirements,
             configurable_disk_size=CONFIGURABLE_DISK_SIZE,
-            extra_filter=_supported_instances,
+            extra_filter=filter,
         )
         regions = set(i.region for i in offers)
 
@@ -148,6 +176,7 @@ class AWSCompute(Compute):
             ec2_client=ec2_client, instance_type=instance_offer.instance.name
         )
         enable_efa = max_efa_interfaces > 0
+        is_capacity_block = False
         try:
             vpc_id, subnet_ids = get_vpc_id_subnet_id_or_error(
                 ec2_client=ec2_client,
@@ -160,6 +189,22 @@ class AWSCompute(Compute):
                 ec2_client=ec2_client,
                 subnet_ids=subnet_ids,
             )
+            if instance_config.reservation:
+                reservation = aws_resources.get_reservation(
+                    ec2_client=ec2_client,
+                    reservation_id=instance_config.reservation,
+                    instance_count=1,
+                )
+                if reservation is not None:
+                    # Filter out az different from capacity reservation
+                    subnet_id_to_az_map = {
+                        k: v
+                        for k, v in subnet_id_to_az_map.items()
+                        if v == reservation["AvailabilityZone"]
+                    }
+                    if reservation.get("ReservationType") == "capacity-block":
+                        is_capacity_block = True
+
         except botocore.exceptions.ClientError as e:
             logger.warning("Got botocore.exceptions.ClientError: %s", e)
             raise NoCapacityError()
@@ -193,6 +238,8 @@ class AWSCompute(Compute):
                         allocate_public_ip=allocate_public_ip,
                         placement_group_name=instance_config.placement_group_name,
                         enable_efa=enable_efa,
+                        reservation_id=instance_config.reservation,
+                        is_capacity_block=is_capacity_block,
                     )
                 )
                 instance = response[0]
@@ -212,6 +259,7 @@ class AWSCompute(Compute):
                     internal_ip=instance.private_ip_address,
                     region=instance_offer.region,
                     availability_zone=az,
+                    reservation=instance.capacity_reservation_id,
                     price=instance_offer.price,
                     username=username,
                     ssh_port=22,
@@ -239,8 +287,8 @@ class AWSCompute(Compute):
             ssh_keys=[
                 SSHKey(public=project_ssh_public_key.strip()),
             ],
-            job_docker_config=None,
             user=run.user,
+            reservation=run.run_spec.configuration.reservation,
         )
         if len(volumes) > 0:
             volume = volumes[0]
@@ -707,6 +755,7 @@ def _supported_instances(offer: InstanceOffer) -> bool:
         "g4dn.",
         "g5.",
         "g6.",
+        "g6e.",
         "gr6.",
         "p3.",
         "p4d.",

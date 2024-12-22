@@ -30,6 +30,7 @@ from dstack._internal.core.models.profiles import (
     DEFAULT_POOL_NAME,
     DEFAULT_POOL_TERMINATION_IDLE_TIME,
     Profile,
+    TerminationPolicy,
 )
 from dstack._internal.core.models.repos.base import RepoType
 from dstack._internal.core.models.repos.local import LocalRunRepoData
@@ -443,6 +444,7 @@ async def create_instance(
     pool: PoolModel,
     fleet: Optional[FleetModel] = None,
     status: InstanceStatus = InstanceStatus.IDLE,
+    unreachable: bool = False,
     created_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
     finished_at: Optional[datetime] = None,
     spot: bool = False,
@@ -453,34 +455,40 @@ async def create_instance(
     job: Optional[JobModel] = None,
     instance_num: int = 0,
     backend: BackendType = BackendType.DATACRUNCH,
+    termination_policy: Optional[TerminationPolicy] = None,
+    termination_idle_time: int = DEFAULT_POOL_TERMINATION_IDLE_TIME,
     region: str = "eu-west",
     remote_connection_info: Optional[RemoteConnectionInfo] = None,
+    job_provisioning_data: Optional[JobProvisioningData] = None,
 ) -> InstanceModel:
     if instance_id is None:
         instance_id = uuid.uuid4()
-    job_provisioning_data = {
-        "backend": backend.value,
-        "instance_type": {
-            "name": "instance",
-            "resources": {
-                "cpus": 1,
-                "memory_mib": 512,
-                "gpus": [],
-                "spot": spot,
-                "disk": {"size_mib": 102400},
-                "description": "",
+    if job_provisioning_data is None:
+        job_provisioning_data_dict = {
+            "backend": backend.value,
+            "instance_type": {
+                "name": "instance",
+                "resources": {
+                    "cpus": 1,
+                    "memory_mib": 512,
+                    "gpus": [],
+                    "spot": spot,
+                    "disk": {"size_mib": 102400},
+                    "description": "",
+                },
             },
-        },
-        "instance_id": "running_instance.id",
-        "ssh_proxy": None,
-        "hostname": "running_instance.ip",
-        "region": region,
-        "price": 0.1,
-        "username": "root",
-        "ssh_port": 22,
-        "dockerized": True,
-        "backend_data": None,
-    }
+            "instance_id": "running_instance.id",
+            "ssh_proxy": None,
+            "hostname": "running_instance.ip",
+            "region": region,
+            "price": 0.1,
+            "username": "root",
+            "ssh_port": 22,
+            "dockerized": True,
+            "backend_data": None,
+        }
+    else:
+        job_provisioning_data_dict = job_provisioning_data.dict()
     offer = {
         "backend": backend.value,
         "instance": {
@@ -510,7 +518,6 @@ async def create_instance(
             project_name="test_proj",
             instance_name="test_instance_name",
             instance_id="test instance id",
-            job_docker_config=None,
             ssh_keys=[],
             user="test_user",
         )
@@ -523,16 +530,17 @@ async def create_instance(
         fleet=fleet,
         project=project,
         status=status,
-        unreachable=False,
+        unreachable=unreachable,
         created_at=created_at,
         started_at=created_at,
         finished_at=finished_at,
-        job_provisioning_data=json.dumps(job_provisioning_data),
+        job_provisioning_data=json.dumps(job_provisioning_data_dict),
         offer=json.dumps(offer),
         price=1,
         region=region,
         backend=backend,
-        termination_idle_time=DEFAULT_POOL_TERMINATION_IDLE_TIME,
+        termination_policy=termination_policy,
+        termination_idle_time=termination_idle_time,
         profile=profile.json(),
         requirements=requirements.json(),
         instance_configuration=instance_configuration.json(),

@@ -57,6 +57,8 @@ from dstack._internal.server.testing.common import (
     get_run_spec,
 )
 
+pytestmark = pytest.mark.usefixtures("image_config_mock")
+
 client = TestClient(app)
 
 
@@ -85,6 +87,7 @@ def get_dev_env_run_plan_dict(
                 "ide": "vscode",
                 "version": None,
                 "image": None,
+                "user": None,
                 "privileged": privileged,
                 "init": [],
                 "ports": [],
@@ -115,6 +118,7 @@ def get_dev_env_run_plan_dict(
                 "spot_policy": "spot",
                 "termination_idle_time": 300,
                 "termination_policy": None,
+                "reservation": None,
             },
             "configuration_path": "dstack.yaml",
             "profile": {
@@ -133,6 +137,7 @@ def get_dev_env_run_plan_dict(
                 "spot_policy": "spot",
                 "termination_idle_time": 300,
                 "termination_policy": None,
+                "reservation": None,
             },
             "repo_code_hash": None,
             "repo_data": {"repo_dir": "/repo", "repo_type": "local"},
@@ -149,7 +154,6 @@ def get_dev_env_run_plan_dict(
                         "/bin/bash",
                         "-i",
                         "-c",
-                        "env >> ~/.ssh/environment && "
                         "(echo pip install ipykernel... && "
                         "pip install -q --no-cache-dir "
                         'ipykernel 2> /dev/null) || echo "no '
@@ -166,6 +170,7 @@ def get_dev_env_run_plan_dict(
                     "env": {},
                     "home_dir": "/root",
                     "image_name": "dstackai/base:py3.13-0.6-cuda-12.1",
+                    "user": None,
                     "privileged": privileged,
                     "job_name": f"{run_name}-0-0",
                     "replica_num": 0,
@@ -183,6 +188,7 @@ def get_dev_env_run_plan_dict(
                         },
                         "max_price": None,
                         "spot": True,
+                        "reservation": None,
                     },
                     "retry": None,
                     "retry_policy": {"retry": False, "duration": None},
@@ -226,6 +232,7 @@ def get_dev_env_run_dict(
                 "ide": "vscode",
                 "version": None,
                 "image": None,
+                "user": None,
                 "privileged": privileged,
                 "init": [],
                 "ports": [],
@@ -256,6 +263,7 @@ def get_dev_env_run_dict(
                 "spot_policy": "spot",
                 "termination_idle_time": 300,
                 "termination_policy": None,
+                "reservation": None,
             },
             "configuration_path": "dstack.yaml",
             "profile": {
@@ -274,6 +282,7 @@ def get_dev_env_run_dict(
                 "spot_policy": "spot",
                 "termination_idle_time": 300,
                 "termination_policy": None,
+                "reservation": None,
             },
             "repo_code_hash": None,
             "repo_data": {"repo_dir": "/repo", "repo_type": "local"},
@@ -290,7 +299,6 @@ def get_dev_env_run_dict(
                         "/bin/bash",
                         "-i",
                         "-c",
-                        "env >> ~/.ssh/environment && "
                         "(echo pip install ipykernel... && "
                         "pip install -q --no-cache-dir "
                         'ipykernel 2> /dev/null) || echo "no '
@@ -307,6 +315,7 @@ def get_dev_env_run_dict(
                     "env": {},
                     "home_dir": "/root",
                     "image_name": "dstackai/base:py3.13-0.6-cuda-12.1",
+                    "user": None,
                     "privileged": privileged,
                     "job_name": f"{run_name}-0-0",
                     "replica_num": 0,
@@ -324,6 +333,7 @@ def get_dev_env_run_dict(
                         },
                         "max_price": None,
                         "spot": True,
+                        "reservation": None,
                     },
                     "retry": None,
                     "retry_policy": {"retry": False, "duration": None},
