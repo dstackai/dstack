@@ -12,7 +12,20 @@ export const fleetApi = createApi({
     tagTypes: ['Fleet', 'Fleets'],
 
     endpoints: (builder) => ({
-        getFleets: builder.query<IFleet[], { projectName: IProject['project_name'] }>({
+        getFleets: builder.query<IFleet[], TFleetListRequestParams>({
+            query: (body) => {
+                return {
+                    url: API.FLEETS.LIST(),
+                    method: 'POST',
+                    body,
+                };
+            },
+
+            providesTags: (result) =>
+                result ? [...result.map(({ name }) => ({ type: 'Fleet' as const, id: name })), 'Fleets'] : ['Fleets'],
+        }),
+
+        getProjectFleets: builder.query<IFleet[], { projectName: IProject['project_name'] }>({
             query: ({ projectName }) => {
                 return {
                     url: API.PROJECTS.FLEETS(projectName),
@@ -23,7 +36,33 @@ export const fleetApi = createApi({
             providesTags: (result) =>
                 result ? [...result.map(({ name }) => ({ type: 'Fleet' as const, id: name })), 'Fleets'] : ['Fleets'],
         }),
+
+        getFleetDetails: builder.query<IFleet, { projectName: IProject['project_name']; fleetName: IFleet['name'] }>({
+            query: ({ projectName, fleetName }) => {
+                return {
+                    url: API.PROJECTS.FLEETS_DETAILS(projectName),
+                    method: 'POST',
+                    body: {
+                        name: fleetName,
+                    },
+                };
+            },
+
+            providesTags: (result) => (result ? [{ type: 'Fleet' as const, id: result.name }] : []),
+        }),
+
+        deleteFleet: builder.mutation<IFleet[], { projectName: IProject['project_name']; fleetNames: string[] }>({
+            query: ({ projectName, fleetNames }) => {
+                return {
+                    url: API.PROJECTS.FLEETS_DELETE(projectName),
+                    method: 'POST',
+                    body: { names: fleetNames },
+                };
+            },
+
+            invalidatesTags: ['Fleets'],
+        }),
     }),
 });
 
-export const { useGetFleetsQuery } = fleetApi;
+export const { useLazyGetFleetsQuery, useDeleteFleetMutation, useGetFleetDetailsQuery } = fleetApi;

@@ -19,8 +19,8 @@ export const Instances: React.FC<Props> = ({ data }) => {
     const renderEmptyMessage = (): React.ReactNode => {
         return (
             <ListEmptyMessage
-                title={t('pools.instances.empty_message_title')}
-                message={t('pools.instances.empty_message_text')}
+                title={t('fleets.instances.empty_message_title')}
+                message={t('fleets.instances.empty_message_text')}
             />
         );
     };
@@ -46,7 +46,7 @@ export const Instances: React.FC<Props> = ({ data }) => {
             items={items}
             // selectionType="multi"
             stickyHeader={true}
-            header={<Header counter={renderCounter()}>{t('pools.instances.title')}</Header>}
+            header={<Header counter={renderCounter()}>{t('fleets.instances.title')}</Header>}
         />
     );
 };

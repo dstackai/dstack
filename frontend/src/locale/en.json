@@ -426,13 +426,19 @@
     "fleet_placeholder": "Filtering by fleet",
     "fleet_name": "Fleet name",
     "total_instances": "Number of instances",
-    "default": "Default pool",
     "empty_message_title": "No fleets",
     "empty_message_text": "No fleets to display.",
     "nomatch_message_title": "No matches",
     "nomatch_message_text": "We can't find a match.",
     "nomatch_message_button_label": "Clear filter",
     "active_only": "Active instances",
+    "statuses": {
+      "active": "Active",
+      "submitted": "Submitted",
+      "failed": "Failed",
+      "terminating": "Terminating",
+      "terminated": "Terminated"
+    },
     "instances": {
       "title": "Instances",
       "empty_message_title": "No instances",

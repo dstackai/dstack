@@ -92,10 +92,10 @@
   },
   "dependencies": {
     "@cloudscape-design/chat-components": "^1.0.19",
-    "@cloudscape-design/collection-hooks": "^1.0.55",
-    "@cloudscape-design/components": "^3.0.839",
+    "@cloudscape-design/collection-hooks": "^1.0.56",
+    "@cloudscape-design/components": "^3.0.856",
     "@cloudscape-design/design-tokens": "^3.0.51",
-    "@cloudscape-design/global-styles": "^1.0.32",
+    "@cloudscape-design/global-styles": "^1.0.33",
     "@hookform/resolvers": "^2.9.10",
     "@reduxjs/toolkit": "^1.9.1",
     "@xterm/addon-fit": "^0.10.0",

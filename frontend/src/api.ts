@@ -70,12 +70,10 @@ export const API = {
         // Logs
         ARTIFACTS: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/artifacts/list`,
 
-        // Pools
-        POOLS: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/pool/list`,
-        POOL_DETAILS: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/pool/show`,
-
         // Fleets
         FLEETS: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/fleets/list`,
+        FLEETS_DETAILS: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/fleets/get`,
+        FLEETS_DELETE: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/fleets/delete`,
 
         // Fleets
         VOLUMES_DELETE: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/volumes/delete`,
@@ -120,10 +118,9 @@ export const API = {
         LIST: () => `${API.RUNS.BASE()}/list`,
     },
 
-    POOLS: {
-        BASE: () => `${API.BASE()}/pools`,
-        LIST: () => `${API.POOLS.BASE()}/list`,
-        INSTANCES_LIST: () => `${API.POOLS.BASE()}/list_instances`,
+    FLEETS: {
+        BASE: () => `${API.BASE()}/fleets`,
+        LIST: () => `${API.FLEETS.BASE()}/list`,
     },
 
     SERVER: {

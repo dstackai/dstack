@@ -1,5 +1,41 @@
 declare type TSpotPolicy = "spot" | "on-demand" | "auto";
 
+declare type TInstanceStatus =
+    | 'pending'
+    | 'creating'
+    | 'starting'
+    | 'provisioning'
+    | 'idle'
+    | 'busy'
+    | 'terminating'
+    | 'terminated';
+
+declare interface IInstance {
+    backend: TBackendType,
+    instance_type: {
+        name: string,
+        resources: IResources
+    },
+    name: string,
+    job_name: string | null,
+    project_name: string | null,
+    job_status: TJobStatus | null,
+    hostname: string,
+    status: TInstanceStatus,
+    created: string,
+    region: string,
+    price: number | null
+}
+
+declare type TFleetListRequestParams = {
+    project_name?: string,
+    only_active?: boolean,
+    prev_created_at?: string,
+    prev_id?: string,
+    limit?: number,
+    ascending?: boolean,
+}
+
 declare interface ISSHHostParamsRequest {
     hostname: string;
     port?: number;
@@ -21,7 +57,15 @@ declare interface ISSHConfig {
     };
     hosts: (ISSHHostParamsRequest | string)[];
     network?: string;
-};
+}
+
+declare interface IFleetConfigurationResource {
+    cpu: string;
+    memory: string;
+    shm_size: number;
+    gpu: string;
+    disk: string;
+}
 
 declare interface IFleetConfigurationRequest {
     type?: "fleet";
@@ -32,7 +76,7 @@ declare interface IFleetConfigurationRequest {
         max?: number;
     };
     placement?: "any" | "cluster";
-    resources?: components["schemas"]["ResourcesSpecRequest"];
+    resources?: IFleetConfigurationResource[];
     backends?: TBackendType[];
     regions?: string[];
     instance_types?: string[];
@@ -74,6 +118,7 @@ declare interface IFleetSpec {
 }
 
 declare interface IFleet {
+    id: string,
     created_at: string
     instances: IInstance[];
     name: string;

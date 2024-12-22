@@ -7,8 +7,8 @@ import { SelectCSDProps } from 'components';
 
 import { DATE_TIME_FORMAT, DEFAULT_TABLE_PAGE_SIZE } from 'consts';
 import { useLocalStorageState } from 'hooks/useLocalStorageState';
-import { getStatusIconType } from 'libs/fleet';
-import { useLazyGetPoolsInstancesQuery } from 'services/pool';
+import { getFleetStatusIconType } from 'libs/fleet';
+import { useLazyGetFleetsQuery } from 'services/fleet';
 import { useGetProjectsQuery } from 'services/project';
 
 export const useEmptyMessages = ({
@@ -46,7 +46,7 @@ export const useEmptyMessages = ({
 export const useColumnsDefinitions = () => {
     const { t } = useTranslation();
 
-    const columns: TableProps.ColumnDefinition<IInstanceListItem>[] = [
+    const columns: TableProps.ColumnDefinition<IFleet>[] = [
         {
             id: 'instance_name',
             header: t('fleets.instances.instance_name'),
@@ -56,8 +56,8 @@ export const useColumnsDefinitions = () => {
             id: 'status',
             header: t('fleets.instances.status'),
             cell: (item) => (
-                <StatusIndicator type={getStatusIconType(item.status)}>
-                    {t(`fleets.instances.statuses.${item.status}`)}
+                <StatusIndicator type={getFleetStatusIconType(item.status)}>
+                    {t(`fleets.statuses.${item.status}`)}
                 </StatusIndicator>
             ),
         },
@@ -66,35 +66,35 @@ export const useColumnsDefinitions = () => {
             header: t('fleets.instances.project'),
             cell: (item) => item.project_name,
         },
-        {
-            id: 'resources',
-            header: t('fleets.instances.resources'),
-            cell: (item) => item.instance_type?.resources.description,
-        },
+        // {
+        //     id: 'resources',
+        //     header: t('fleets.instances.resources'),
+        //     cell: (item) => item.instance_type?.resources.description,
+        // },
         {
             id: 'backend',
             header: t('fleets.instances.backend'),
-            cell: (item) => item.backend,
+            cell: (item) => item.spec.configuration?.backends?.join(', '),
         },
         {
             id: 'region',
             header: t('fleets.instances.region'),
-            cell: (item) => item.region,
+            cell: (item) => item.spec.configuration.regions?.join(', '),
         },
         {
             id: 'spot',
             header: t('fleets.instances.spot'),
-            cell: (item) => item.instance_type?.resources.spot && <Icon name={'check'} />,
+            cell: (item) => item.spec.configuration?.spot_policy === 'spot' && <Icon name={'check'} />,
         },
         {
             id: 'started',
             header: t('fleets.instances.started'),
-            cell: (item) => format(new Date(item.created), DATE_TIME_FORMAT),
+            cell: (item) => format(new Date(item.created_at), DATE_TIME_FORMAT),
         },
         {
             id: 'price',
             header: t('fleets.instances.price'),
-            cell: (item) => item.price && `$${item.price}`,
+            cell: (item) => item.spec.configuration?.max_price && `$${item.spec.configuration?.max_price}`,
         },
     ];
 
@@ -118,13 +118,6 @@ export const useFilters = () => {
         setSelectedProject(null);
     };
 
-    const filteringFunction = useCallback<(pool: IPoolListItem) => boolean>(
-        (pool: IPoolListItem) => {
-            return !(onlyActive && pool.total_instances === 0);
-        },
-        [onlyActive],
-    );
-
     const isDisabledClearFilter = !selectedProject && !onlyActive;
 
     return {
@@ -133,23 +126,22 @@ export const useFilters = () => {
         setSelectedProject,
         onlyActive,
         setOnlyActive,
-        filteringFunction,
         clearFilters,
         isDisabledClearFilter,
     } as const;
 };
 
-export const useFleetsData = ({ project_name, only_active }: TPoolInstancesRequestParams) => {
-    const [data, setData] = useState<IInstanceListItem[]>([]);
+export const useFleetsData = ({ project_name, only_active }: TFleetListRequestParams) => {
+    const [data, setData] = useState<IFleet[]>([]);
     const [pagesCount, setPagesCount] = useState<number>(1);
     const [disabledNext, setDisabledNext] = useState(false);
-    const lastRequestParams = useRef<TPoolInstancesRequestParams | undefined>(undefined);
+    const lastRequestParams = useRef<TFleetListRequestParams | undefined>(undefined);
 
-    const [getPools, { isLoading, isFetching }] = useLazyGetPoolsInstancesQuery();
+    const [getFleets, { isLoading, isFetching }] = useLazyGetFleetsQuery();
 
-    const getPoolsRequest = (params?: Partial<TPoolInstancesRequestParams>) => {
+    const getFleetsRequest = (params?: TFleetListRequestParams) => {
         lastRequestParams.current = params;
-        return getPools({
+        return getFleets({
             project_name,
             only_active,
             limit: DEFAULT_TABLE_PAGE_SIZE,
@@ -158,14 +150,14 @@ export const useFleetsData = ({ project_name, only_active }: TPoolInstancesReque
     };
 
     const refreshList = () => {
-        getPoolsRequest(lastRequestParams.current).then((result) => {
+        getFleetsRequest(lastRequestParams.current).then((result) => {
             setDisabledNext(false);
             setData(result);
         });
     };
 
     useEffect(() => {
-        getPoolsRequest().then((result) => {
+        getFleetsRequest().then((result) => {
             setPagesCount(1);
             setDisabledNext(false);
             setData(result);
@@ -178,8 +170,8 @@ export const useFleetsData = ({ project_name, only_active }: TPoolInstancesReque
         }
 
         try {
-            const result = await getPoolsRequest({
-                prev_created_at: data[data.length - 1].created,
+            const result = await getFleetsRequest({
+                prev_created_at: data[data.length - 1].created_at,
                 prev_id: data[data.length - 1].id,
             });
 
@@ -200,8 +192,8 @@ export const useFleetsData = ({ project_name, only_active }: TPoolInstancesReque
         }
 
         try {
-            const result = await getPoolsRequest({
-                prev_created_at: data[0].created,
+            const result = await getFleetsRequest({
+                prev_created_at: data[0].created_at,
                 prev_id: data[0].id,
                 ascending: true,
             });
