@@ -1,5 +1,32 @@
 declare type TSpotPolicy = "spot" | "on-demand" | "auto";
 
+declare type TInstanceStatus =
+    | 'pending'
+    | 'creating'
+    | 'starting'
+    | 'provisioning'
+    | 'idle'
+    | 'busy'
+    | 'terminating'
+    | 'terminated';
+
+declare interface IInstance {
+    backend: TBackendType,
+    instance_type: {
+        name: string,
+        resources: IResources
+    },
+    name: string,
+    job_name: string | null,
+    project_name: string | null,
+    job_status: TJobStatus | null,
+    hostname: string,
+    status: TInstanceStatus,
+    created: string,
+    region: string,
+    price: number | null
+}
+
 declare type TFleetListRequestParams = {
     project_name?: string,
     only_active?: boolean,

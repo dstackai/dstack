@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { format } from 'date-fns';
 
@@ -202,13 +202,6 @@ export const useFilters = (storagePrefix?: string) => {
         setSelectedProject(null);
     };
 
-    const filteringFunction = useCallback<(pool: IPoolListItem) => boolean>(
-        (pool: IPoolListItem) => {
-            return !(onlyActive && pool.total_instances === 0);
-        },
-        [onlyActive],
-    );
-
     const isDisabledClearFilter = !selectedProject && !onlyActive;
 
     return {
@@ -217,7 +210,6 @@ export const useFilters = (storagePrefix?: string) => {
         setSelectedProject,
         onlyActive,
         setOnlyActive,
-        filteringFunction,
         clearFilters,
         isDisabledClearFilter,
     } as const;

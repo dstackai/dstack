@@ -70,13 +70,9 @@ export const API = {
         // Logs
         ARTIFACTS: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/artifacts/list`,
 
-        // Pools
-        POOLS: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/pool/list`,
-        POOL_DETAILS: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/pool/show`,
-        DELETE_POOL_INSTANCE: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/pool/remove`,
-
         // Fleets
         FLEETS: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/fleets/list`,
+        FLEETS_DETAILS: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/fleets/get`,
         FLEETS_DELETE: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/fleets/delete`,
 
         // Fleets
@@ -125,12 +121,6 @@ export const API = {
     FLEETS: {
         BASE: () => `${API.BASE()}/fleets`,
         LIST: () => `${API.FLEETS.BASE()}/list`,
-    },
-
-    POOLS: {
-        BASE: () => `${API.BASE()}/pools`,
-        LIST: () => `${API.POOLS.BASE()}/list`,
-        INSTANCES_LIST: () => `${API.POOLS.BASE()}/list_instances`,
     },
 
     SERVER: {

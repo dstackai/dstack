@@ -37,6 +37,20 @@ export const fleetApi = createApi({
                 result ? [...result.map(({ name }) => ({ type: 'Fleet' as const, id: name })), 'Fleets'] : ['Fleets'],
         }),
 
+        getFleetDetails: builder.query<IFleet, { projectName: IProject['project_name']; fleetName: IFleet['name'] }>({
+            query: ({ projectName, fleetName }) => {
+                return {
+                    url: API.PROJECTS.FLEETS_DETAILS(projectName),
+                    method: 'POST',
+                    body: {
+                        name: fleetName,
+                    },
+                };
+            },
+
+            providesTags: (result) => (result ? [{ type: 'Fleet' as const, id: result.name }] : []),
+        }),
+
         deleteFleet: builder.mutation<IFleet[], { projectName: IProject['project_name']; fleetNames: string[] }>({
             query: ({ projectName, fleetNames }) => {
                 return {
@@ -51,4 +65,4 @@ export const fleetApi = createApi({
     }),
 });
 
-export const { useLazyGetFleetsQuery, useDeleteFleetMutation } = fleetApi;
+export const { useLazyGetFleetsQuery, useDeleteFleetMutation, useGetFleetDetailsQuery } = fleetApi;

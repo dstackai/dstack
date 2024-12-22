@@ -6,19 +6,19 @@ import { Container, ContentLayout, DetailsHeader, Loader } from 'components';
 
 import { useBreadcrumbs } from 'hooks';
 import { ROUTES } from 'routes';
-import { useGetPoolDetailsQuery } from 'services/pool';
+import { useGetFleetDetailsQuery } from 'services/fleet';
 
 import { Instances } from './Instances';
 
 export const FleetDetails: React.FC = () => {
     const { t } = useTranslation();
     const params = useParams();
-    const paramPoolName = params.poolName ?? '';
+    const paramFleetName = params.fleetName ?? '';
     const paramProjectName = params.projectName ?? '';
 
-    const { data, isLoading } = useGetPoolDetailsQuery({
+    const { data, isLoading } = useGetFleetDetailsQuery({
         projectName: paramProjectName,
-        poolName: paramPoolName,
+        fleetName: paramFleetName,
     });
 
     useBreadcrumbs([
@@ -35,13 +35,13 @@ export const FleetDetails: React.FC = () => {
             href: ROUTES.FLEETS.LIST,
         },
         {
-            text: paramPoolName,
-            href: ROUTES.FLEETS.DETAILS.FORMAT(paramProjectName, paramPoolName),
+            text: paramFleetName,
+            href: ROUTES.FLEETS.DETAILS.FORMAT(paramProjectName, paramFleetName),
         },
     ]);
 
     return (
-        <ContentLayout header={<DetailsHeader title={paramPoolName} />}>
+        <ContentLayout header={<DetailsHeader title={paramFleetName} />}>
             {isLoading && (
                 <Container>
                     <Loader />
