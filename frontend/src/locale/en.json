@@ -433,6 +433,13 @@
     "nomatch_message_text": "We can't find a match.",
     "nomatch_message_button_label": "Clear filter",
     "active_only": "Active instances",
+    "statuses": {
+      "active": "Active",
+      "submitted": "Submitted",
+      "failed": "Failed",
+      "terminating": "Terminating",
+      "terminated": "Terminated"
+    },
     "instances": {
       "title": "Instances",
       "empty_message_title": "No instances",

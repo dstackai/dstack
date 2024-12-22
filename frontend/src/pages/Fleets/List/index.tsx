@@ -7,7 +7,7 @@ import { useBreadcrumbs, useCollection } from 'hooks';
 import { ROUTES } from 'routes';
 
 import { useColumnsDefinitions, useEmptyMessages, useFilters, useFleetsData } from './hooks';
-import { useDeletePoolInstances } from './useDeletePoolInstance';
+import { useDeleteFleet } from './useDeletePoolInstance';
 
 import styles from './styles.module.scss';
 
@@ -39,10 +39,10 @@ export const FleetList: React.FC = () => {
     const isDisabledPagination = isLoading || data.length === 0;
 
     const { columns } = useColumnsDefinitions();
-    const { deleteInstances, isDeleting } = useDeletePoolInstances();
+    const { deleteFleets, isDeleting } = useDeleteFleet();
     const { renderEmptyMessage, renderNoMatchMessage } = useEmptyMessages({ clearFilters, isDisabledClearFilter });
 
-    const { items, collectionProps } = useCollection<IInstanceListItem>(data, {
+    const { items, collectionProps } = useCollection<IFleet>(data, {
         filtering: {
             empty: renderEmptyMessage(),
             noMatch: renderNoMatchMessage(),
@@ -58,7 +58,7 @@ export const FleetList: React.FC = () => {
     const deleteClickHandle = () => {
         if (!selectedItems?.length) return;
 
-        deleteInstances([...selectedItems]).catch(console.log);
+        deleteFleets([...selectedItems]).catch(console.log);
     };
 
     const renderCounter = () => {

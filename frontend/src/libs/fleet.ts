@@ -18,3 +18,19 @@ export const getStatusIconType = (status: IInstance['status']): StatusIndicatorP
             console.error(new Error('Undefined fleet status'));
     }
 };
+
+export const getFleetStatusIconType = (status: IFleet['status']): StatusIndicatorProps['type'] => {
+    switch (status) {
+        case 'submitted':
+            return 'pending';
+        case 'failed':
+        case 'terminated':
+            return 'stopped';
+        case 'terminating':
+            return 'in-progress';
+        case 'active':
+            return 'success';
+        default:
+            console.error(new Error('Undefined fleet status'));
+    }
+};

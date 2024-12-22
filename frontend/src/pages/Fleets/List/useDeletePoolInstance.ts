@@ -1,37 +1,50 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useNotifications } from 'hooks';
-import { useDeletePoolInstanceMutation } from 'services/pool';
+import { useDeleteFleetMutation } from 'services/fleet';
 
-export const useDeletePoolInstances = () => {
+export const useDeleteFleet = () => {
     const { t } = useTranslation();
-    const [deleteInstance, { isLoading: isDeleting }] = useDeletePoolInstanceMutation();
+    const [deleteFleet] = useDeleteFleetMutation();
     const [pushNotification] = useNotifications();
+    const [isDeleting, setIsDeleting] = useState(() => false);
 
-    const deleteInstances = useCallback((instances: IInstanceListItem[]) => {
-        const request = Promise.all(
-            instances.map((instance) => {
-                if (!instance.project_name) return Promise.resolve();
+    const namesOfFleetsGroupByProjectName = (volumes: IFleet[]) => {
+        return volumes.reduce<Record<string, string[]>>((acc, fleet) => {
+            if (acc[fleet.project_name]) {
+                acc[fleet.project_name].push(fleet.name);
+            } else {
+                acc[fleet.project_name] = [fleet.name];
+            }
 
-                return deleteInstance({
-                    projectName: instance.project_name,
-                    pool_name: instance.pool_name,
-                    instance_name: instance.name,
-                    force: true,
-                }).unwrap();
-            }),
-        );
+            return acc;
+        }, {});
+    };
 
-        request.catch((error) => {
-            pushNotification({
-                type: 'error',
-                content: t('common.server_error', { error: error?.error }),
-            });
+    const deleteFleets = useCallback(async (fleets: IFleet[]) => {
+        if (!fleets.length) return Promise.reject('No fleets');
+
+        setIsDeleting(true);
+
+        const groupedFleets = namesOfFleetsGroupByProjectName(fleets);
+
+        const requests = Object.keys(groupedFleets).map((projectName) => {
+            return deleteFleet({
+                projectName: projectName,
+                fleetNames: groupedFleets[projectName],
+            }).unwrap();
         });
 
-        return request;
+        return Promise.all(requests)
+            .finally(() => setIsDeleting(false))
+            .catch((error) => {
+                pushNotification({
+                    type: 'error',
+                    content: t('common.server_error', { error: error?.error }),
+                });
+            });
     }, []);
 
-    return { deleteInstances: deleteInstances, isDeleting } as const;
+    return { deleteFleets, isDeleting } as const;
 };
