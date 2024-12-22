@@ -17,7 +17,7 @@ import { AddGateway, EditGateway } from 'pages/Project/Gateways';
 import { RunDetails, RunList } from 'pages/Runs';
 import { JobDetails } from 'pages/Runs/Details/Jobs/Details';
 import { CreditsHistoryAdd, UserAdd, UserDetails, UserEdit, UserList } from 'pages/User';
-import { UserBilling, UserSettings } from 'pages/User/Details';
+import { UserBilling, UserProjects, UserSettings } from 'pages/User/Details';
 
 import { AuthErrorMessage } from './App/AuthErrorMessage';
 import { VolumeList } from './pages/Volumes';
@@ -143,6 +143,10 @@ export const router = createBrowserRouter([
                     {
                         index: true,
                         element: <UserSettings />,
+                    },
+                    {
+                        path: ROUTES.USER.PROJECTS.TEMPLATE,
+                        element: <UserProjects />,
                     },
                     process.env.UI_VERSION === 'sky' && {
                         path: ROUTES.USER.BILLING.LIST.TEMPLATE,

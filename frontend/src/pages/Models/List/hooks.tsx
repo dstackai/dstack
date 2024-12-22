@@ -67,7 +67,7 @@ export const useColumnsDefinitions = () => {
         {
             id: 'user',
             header: `${t('models.user')}`,
-            cell: (item) => item.user,
+            cell: (item) => <NavigateLink href={ROUTES.USER.DETAILS.FORMAT(item.user)}>{item.user}</NavigateLink>,
         },
         {
             id: 'repository',

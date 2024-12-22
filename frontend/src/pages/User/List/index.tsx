@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
+import { format } from 'date-fns';
 
 import {
     Button,
@@ -19,6 +20,8 @@ import { ROUTES } from 'routes';
 import { useDeleteUsersMutation, useGetUserListQuery } from 'services/user';
 
 import { selectUserData } from 'App/slice';
+
+import { DATE_TIME_FORMAT } from '../../../consts';
 
 export const UserList: React.FC = () => {
     const { t } = useTranslation();
@@ -53,7 +56,7 @@ export const UserList: React.FC = () => {
                 <NavigateLink href={ROUTES.USER.DETAILS.FORMAT(item.username)}>{item.username}</NavigateLink>
             ),
         },
-        process.env.UI_VERSION !== 'enterprise' && {
+        process.env.UI_VERSION === 'sky' && {
             id: 'email',
             header: t('users.email'),
             cell: (item: IUser) => item.email ?? '-',
@@ -62,6 +65,11 @@ export const UserList: React.FC = () => {
             id: 'global_role',
             header: t('users.global_role'),
             cell: (item: IUser) => t(`roles.${item.global_role}`),
+        },
+        process.env.UI_VERSION === 'sky' && {
+            id: 'created_at',
+            header: t('users.created_at'),
+            cell: (item: IUser) => format(new Date(item.created_at), DATE_TIME_FORMAT),
         },
     ].filter(Boolean);
 

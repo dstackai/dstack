@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next';
 import { format } from 'date-fns';
 
-import { Button, Icon, ListEmptyMessage, StatusIndicator, TableProps } from 'components';
+import { Button, Icon, ListEmptyMessage, NavigateLink, StatusIndicator, TableProps } from 'components';
 import { SelectCSDProps } from 'components';
 
 import { DATE_TIME_FORMAT, DEFAULT_TABLE_PAGE_SIZE } from 'consts';
@@ -10,6 +10,8 @@ import { useLocalStorageState } from 'hooks/useLocalStorageState';
 import { getFleetStatusIconType } from 'libs/fleet';
 import { useLazyGetFleetsQuery } from 'services/fleet';
 import { useGetProjectsQuery } from 'services/project';
+
+import { ROUTES } from '../../../routes';
 
 export const useEmptyMessages = ({
     clearFilters,
@@ -49,7 +51,7 @@ export const useColumnsDefinitions = () => {
     const columns: TableProps.ColumnDefinition<IFleet>[] = [
         {
             id: 'instance_name',
-            header: t('fleets.instances.instance_name'),
+            header: t('fleets.fleet'),
             cell: (item) => item.name,
         },
         {
@@ -64,7 +66,9 @@ export const useColumnsDefinitions = () => {
         {
             id: 'project',
             header: t('fleets.instances.project'),
-            cell: (item) => item.project_name,
+            cell: (item) => (
+                <NavigateLink href={ROUTES.PROJECT.DETAILS.FORMAT(item.project_name)}>{item.project_name}</NavigateLink>
+            ),
         },
         // {
         //     id: 'resources',

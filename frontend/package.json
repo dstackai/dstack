@@ -8,6 +8,7 @@
   "private": true,
   "scripts": {
     "start": "cross-env NODE_ENV=development webpack serve --config webpack.config.js",
+    "start-sky": "cross-env NODE_ENV=development UI_VERSION=sky webpack serve --config webpack.config.js",
     "build": "cross-env NODE_ENV=production webpack build --config webpack.config.js",
     "build-sky": "cross-env NODE_ENV=production UI_VERSION=sky webpack build --config webpack.config.js",
     "eslint": "eslint ./src --ext .js,.jsx,.ts,.tsx",
