@@ -15,6 +15,7 @@ import { UserDetailsTabTypeEnum } from './types';
 
 export { Settings as UserSettings } from './Settings';
 export { Billing as UserBilling } from './Billing';
+export { UserProjectList as UserProjects } from './Projects';
 
 export const UserDetails: React.FC = () => {
     const { t } = useTranslation();
@@ -62,6 +63,11 @@ export const UserDetails: React.FC = () => {
             label: t('users.settings'),
             id: UserDetailsTabTypeEnum.SETTINGS,
             href: ROUTES.USER.DETAILS.FORMAT(paramUserName),
+        },
+        {
+            label: t('users.projects'),
+            id: UserDetailsTabTypeEnum.PROJECTS,
+            href: ROUTES.USER.PROJECTS.FORMAT(paramUserName),
         },
     ];
 

@@ -504,9 +504,11 @@
     "token_description": "Specify use your personal access token",
     "global_role": "Global role",
     "email": "Email",
+    "created_at": "Created at",
     "account": "User",
     "account_settings": "User settings",
     "settings": "Settings",
+    "projects": "Projects",
     "create": {
       "page_title": "Create user",
       "error_notification": "Create user error",

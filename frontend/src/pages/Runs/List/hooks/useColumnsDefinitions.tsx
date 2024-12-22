@@ -42,7 +42,9 @@ export const useColumnsDefinitions = () => {
         {
             id: 'project',
             header: `${t('projects.run.project')}`,
-            cell: (item: IRun) => item.project_name,
+            cell: (item: IRun) => (
+                <NavigateLink href={ROUTES.PROJECT.DETAILS.FORMAT(item.project_name)}>{item.project_name}</NavigateLink>
+            ),
         },
         {
             id: 'repo',
@@ -52,7 +54,7 @@ export const useColumnsDefinitions = () => {
         {
             id: 'hub_user_name',
             header: `${t('projects.run.hub_user_name')}`,
-            cell: (item: IRun) => item.user,
+            cell: (item: IRun) => <NavigateLink href={ROUTES.USER.DETAILS.FORMAT(item.user)}>{item.user}</NavigateLink>,
         },
         {
             id: 'submitted_at',

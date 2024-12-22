@@ -101,6 +101,10 @@ export const ROUTES = {
             TEMPLATE: `/users/:userName/edit`,
             FORMAT: (userName: string) => buildRoute(ROUTES.USER.EDIT.TEMPLATE, { userName }),
         },
+        PROJECTS: {
+            TEMPLATE: `/users/:userName/projects`,
+            FORMAT: (userName: string) => buildRoute(ROUTES.USER.PROJECTS.TEMPLATE, { userName }),
+        },
         BILLING: {
             LIST: {
                 TEMPLATE: `/users/:userName/billing`,

@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { format } from 'date-fns';
 
-import { Button, ListEmptyMessage, StatusIndicator } from 'components';
+import { Button, ListEmptyMessage, NavigateLink, StatusIndicator } from 'components';
 import { SelectCSDProps } from 'components';
 
 import { DATE_TIME_FORMAT, DEFAULT_TABLE_PAGE_SIZE } from 'consts';
@@ -11,6 +11,8 @@ import { useLocalStorageState } from 'hooks/useLocalStorageState';
 import { getStatusIconType } from 'libs/volumes';
 import { useGetProjectsQuery } from 'services/project';
 import { useDeleteVolumesMutation, useLazyGetAllVolumesQuery } from 'services/volume';
+
+import { ROUTES } from '../../../routes';
 
 export const useVolumesTableEmptyMessages = ({
     clearFilters,
@@ -56,7 +58,9 @@ export const useColumnsDefinitions = () => {
         {
             id: 'project',
             header: `${t('volume.project')}`,
-            cell: (item: IVolume) => item.project_name,
+            cell: (item: IVolume) => (
+                <NavigateLink href={ROUTES.PROJECT.DETAILS.FORMAT(item.project_name)}>{item.project_name}</NavigateLink>
+            ),
         },
         {
             id: 'backend',
