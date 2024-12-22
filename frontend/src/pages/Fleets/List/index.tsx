@@ -7,7 +7,7 @@ import { useBreadcrumbs, useCollection } from 'hooks';
 import { ROUTES } from 'routes';
 
 import { useColumnsDefinitions, useEmptyMessages, useFilters, useFleetsData } from './hooks';
-import { useDeleteFleet } from './useDeletePoolInstance';
+import { useDeleteFleet } from './useDeleteFleet';
 
 import styles from './styles.module.scss';
 
