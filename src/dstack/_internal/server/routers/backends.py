@@ -21,6 +21,7 @@ from dstack._internal.server.schemas.backends import (
 )
 from dstack._internal.server.security.permissions import Authenticated, ProjectAdmin
 from dstack._internal.server.services import backends
+from dstack._internal.server.services.backends import handlers as backends_handlers
 from dstack._internal.server.services.config import (
     ServerConfigManager,
     create_backend_config_yaml,
@@ -87,8 +88,8 @@ async def delete_backends(
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
 ):
     _, project = user_project
-    await backends.delete_backends(
-        session=session, project=project, backends_types=body.backends_names
+    await backends_handlers.delete_backends_safe(
+        session=session, project=project, backends_types=body.backends_names, error=True
     )
     if settings.SERVER_CONFIG_ENABLED:
         await ServerConfigManager().sync_config(session=session)

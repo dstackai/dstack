@@ -154,3 +154,10 @@ class InstanceStatus(str, Enum):
             self.IDLE,
             self.BUSY,
         )
+
+    def is_active(self) -> bool:
+        return self not in self.finished_statuses()
+
+    @classmethod
+    def finished_statuses(cls) -> List["InstanceStatus"]:
+        return [cls.TERMINATING, cls.TERMINATED]
