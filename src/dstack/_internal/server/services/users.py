@@ -146,6 +146,7 @@ async def delete_users(
 ):
     await session.execute(delete(UserModel).where(UserModel.name.in_(usernames)))
     await session.commit()
+    logger.info("Deleted users %s by user %s", usernames, user.name)
 
 
 async def get_user_model_by_name(

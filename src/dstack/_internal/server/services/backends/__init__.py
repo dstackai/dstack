@@ -1,6 +1,6 @@
 import asyncio
 import heapq
-from typing import Callable, Coroutine, Dict, Iterable, List, Optional, Tuple, Type, Union
+from typing import Callable, Coroutine, Dict, List, Optional, Tuple, Type, Union
 from uuid import UUID
 
 from sqlalchemy import delete, update
@@ -229,15 +229,24 @@ async def get_config_info(
 async def delete_backends(
     session: AsyncSession,
     project: ProjectModel,
-    backends_types: Iterable[BackendType],
+    backends_types: List[BackendType],
 ):
     if BackendType.DSTACK in backends_types:
         raise ServerClientError("Cannot delete dstack backend")
+    current_backends_types = set(b.type for b in project.backends)
+    deleted_backends_types = current_backends_types.intersection(backends_types)
+    if len(deleted_backends_types) == 0:
+        return
     await session.execute(
         delete(BackendModel).where(
-            BackendModel.type.in_(backends_types),
+            BackendModel.type.in_(deleted_backends_types),
             BackendModel.project_id == project.id,
         )
+    )
+    logger.info(
+        "Deleted backends %s in project %s",
+        [b.value for b in deleted_backends_types],
+        project.name,
     )
 
 

@@ -19,6 +19,13 @@ class VolumeStatus(str, Enum):
     ACTIVE = "active"
     FAILED = "failed"
 
+    def is_active(self) -> bool:
+        return self not in self.finished_statuses()
+
+    @classmethod
+    def finished_statuses(cls) -> List["VolumeStatus"]:
+        return [cls.FAILED]
+
 
 class VolumeConfiguration(CoreModel):
     type: Literal["volume"] = "volume"

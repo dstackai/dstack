@@ -29,6 +29,7 @@ from dstack._internal.server.models import ProjectModel, UserModel
 from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services import encryption as encryption_services
 from dstack._internal.server.services import projects as projects_services
+from dstack._internal.server.services.backends.handlers import delete_backends_safe
 from dstack._internal.server.services.encryption import AnyEncryptionKeyConfig
 from dstack._internal.server.services.permissions import (
     DefaultPermissions,
@@ -595,8 +596,11 @@ class ServerConfigManager:
                     )
             except Exception as e:
                 logger.warning("Failed to configure backend %s: %s", config_info.type, e)
-        await backends_services.delete_backends(
-            session=session, project=project, backends_types=backends_to_delete
+        await delete_backends_safe(
+            session=session,
+            project=project,
+            backends_types=list(backends_to_delete),
+            error=False,
         )
 
     async def _init_config(
