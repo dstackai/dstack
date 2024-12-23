@@ -173,7 +173,7 @@ async def delete_repos(
         delete(RepoModel).where(RepoModel.project_id == project.id, RepoModel.name.in_(repos_ids))
     )
     await session.commit()
-    logger.info("Deleted repos %s in project", repos_ids, project.name)
+    logger.info("Deleted repos %s in project %s", repos_ids, project.name)
 
 
 async def get_repo_creds(
