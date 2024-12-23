@@ -87,12 +87,12 @@ async def _check_active_volumes(
         ):
             if error:
                 msg = (
-                    f"Backend {volume_model.provisioning_data.backend} has active volumes."
+                    f"Backend {volume_model.provisioning_data.backend.value} has active volumes."
                     " Delete volumes before deleting the backend."
                 )
             else:
                 msg = (
-                    f"Backend {volume_model.provisioning_data.backend} has active volumes."
+                    f"Backend {volume_model.provisioning_data.backend.value} has active volumes."
                     " The backend will be deleted but volumes may be left hanging."
                 )
             raise ServerClientError(msg)

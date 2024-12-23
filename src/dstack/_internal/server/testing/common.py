@@ -578,6 +578,7 @@ async def create_volume(
         else None,
         instances=[],
         deleted_at=deleted_at,
+        deleted=True if deleted_at else False,
     )
     session.add(vm)
     await session.commit()
@@ -641,8 +642,10 @@ def get_volume_provisioning_data(
     size_gb: int = 100,
     availability_zone: Optional[str] = None,
     backend_data: Optional[str] = None,
+    backend: Optional[BackendType] = None,
 ) -> VolumeProvisioningData:
     return VolumeProvisioningData(
+        backend=backend,
         volume_id=volume_id,
         size_gb=size_gb,
         availability_zone=availability_zone,

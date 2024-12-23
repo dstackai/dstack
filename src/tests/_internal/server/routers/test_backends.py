@@ -1,4 +1,5 @@
 import json
+from datetime import datetime, timezone
 from operator import itemgetter
 from unittest.mock import Mock, patch
 
@@ -11,14 +12,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from dstack._internal.core.backends.oci import region as oci_region
 from dstack._internal.core.errors import BackendAuthError
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.instances import InstanceStatus
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
+from dstack._internal.core.models.volumes import VolumeStatus
 from dstack._internal.server.models import BackendModel
 from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.testing.common import (
     create_backend,
+    create_fleet,
+    create_instance,
+    create_pool,
     create_project,
     create_user,
+    create_volume,
     get_auth_headers,
+    get_volume_provisioning_data,
 )
 
 FAKE_OCI_CLIENT_CREDS = {
@@ -1186,6 +1194,103 @@ class TestDeleteBackends:
             json={"backends_names": [backend.type.value]},
         )
         assert response.status_code == 200, response.json()
+        res = await session.execute(select(BackendModel))
+        assert len(res.scalars().all()) == 0
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_400_if_backend_has_active_instances(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
+        )
+        backend = await create_backend(session=session, project_id=project.id)
+        pool = await create_pool(session=session, project=project)
+        fleet = await create_fleet(session=session, project=project)
+        instance1 = await create_instance(
+            session=session,
+            project=project,
+            pool=pool,
+            status=InstanceStatus.TERMINATED,
+            backend=backend.type,
+        )
+        instance2 = await create_instance(
+            session=session,
+            project=project,
+            pool=pool,
+            status=InstanceStatus.IDLE,
+            backend=backend.type,
+        )
+        fleet.instances.append(instance1)
+        fleet.instances.append(instance2)
+        await session.commit()
+        response = await client.post(
+            f"/api/project/{project.name}/backends/delete",
+            headers=get_auth_headers(user.token),
+            json={"backends_names": [backend.type.value]},
+        )
+        assert response.status_code == 400
+        res = await session.execute(select(BackendModel))
+        assert len(res.scalars().all()) == 1
+        fleet.instances.pop()
+        await session.commit()
+        response = await client.post(
+            f"/api/project/{project.name}/backends/delete",
+            headers=get_auth_headers(user.token),
+            json={"backends_names": [backend.type.value]},
+        )
+        assert response.status_code == 200
+        res = await session.execute(select(BackendModel))
+        assert len(res.scalars().all()) == 0
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_400_if_backend_has_active_volumes(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
+        )
+        backend = await create_backend(session=session, project_id=project.id)
+        await create_volume(
+            session=session,
+            project=project,
+            user=user,
+            backend=backend.type,
+            volume_provisioning_data=get_volume_provisioning_data(backend=backend.type),
+            status=VolumeStatus.ACTIVE,
+            deleted_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
+        volume2 = await create_volume(
+            session=session,
+            project=project,
+            user=user,
+            backend=backend.type,
+            volume_provisioning_data=get_volume_provisioning_data(backend=backend.type),
+            status=VolumeStatus.ACTIVE,
+        )
+        await session.commit()
+        response = await client.post(
+            f"/api/project/{project.name}/backends/delete",
+            headers=get_auth_headers(user.token),
+            json={"backends_names": [backend.type.value]},
+        )
+        assert response.status_code == 400
+        res = await session.execute(select(BackendModel))
+        assert len(res.scalars().all()) == 1
+        await session.delete(volume2)
+        await session.commit()
+        response = await client.post(
+            f"/api/project/{project.name}/backends/delete",
+            headers=get_auth_headers(user.token),
+            json={"backends_names": [backend.type.value]},
+        )
+        assert response.status_code == 200
         res = await session.execute(select(BackendModel))
         assert len(res.scalars().all()) == 0
 
