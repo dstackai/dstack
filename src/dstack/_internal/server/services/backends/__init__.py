@@ -239,6 +239,9 @@ async def delete_backends(
             BackendModel.project_id == project.id,
         )
     )
+    logger.info(
+        "Deleted backends %s in project %s", [b.value for b in backends_types], project.name
+    )
 
 
 BackendTuple = Tuple[BackendModel, Backend]

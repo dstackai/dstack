@@ -29,6 +29,9 @@ from dstack._internal.server.models import (
 )
 from dstack._internal.server.services.storage import get_default_storage
 from dstack._internal.utils.common import run_async
+from dstack._internal.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 async def list_repos(
@@ -170,6 +173,7 @@ async def delete_repos(
         delete(RepoModel).where(RepoModel.project_id == project.id, RepoModel.name.in_(repos_ids))
     )
     await session.commit()
+    logger.info("Deleted repos %s in project", repos_ids, project.name)
 
 
 async def get_repo_creds(
@@ -263,6 +267,7 @@ async def delete_repo_creds(
         )
     )
     await session.commit()
+    logger.info("Deleted repo creds for repo %s user %s", repo.name, user.name)
 
 
 async def upload_code(
