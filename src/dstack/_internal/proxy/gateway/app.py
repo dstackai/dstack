@@ -1,6 +1,7 @@
 """FastAPI app running on a gateway."""
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI
@@ -16,7 +17,8 @@ from dstack._internal.proxy.gateway.deps import (
     get_gateway_injector_from_app,
     get_gateway_proxy_repo,
 )
-from dstack._internal.proxy.gateway.repo import GatewayProxyRepo
+from dstack._internal.proxy.gateway.repo.repo import GatewayProxyRepo
+from dstack._internal.proxy.gateway.repo.state_v1 import migrate_from_state_v1
 from dstack._internal.proxy.gateway.routers.auth import router as auth_router
 from dstack._internal.proxy.gateway.routers.config import router as config_router
 from dstack._internal.proxy.gateway.routers.registry import router as registry_router
@@ -31,6 +33,8 @@ from dstack._internal.utils.common import run_async
 from dstack.version import __version__
 
 STATE_FILE = DSTACK_DIR_ON_GATEWAY / "state-v2.json"
+LEGACY_STATE_FILE = DSTACK_DIR_ON_GATEWAY / "state.json"
+LEGACY_KEYS_DIR = Path("~/.ssh/projects").expanduser().resolve()
 
 
 @asynccontextmanager
@@ -47,9 +51,15 @@ async def lifespan(app: FastAPI):
 
 
 def make_app(repo: Optional[GatewayProxyRepo] = None, nginx: Optional[Nginx] = None) -> FastAPI:
+    if repo is None:
+        migrate_from_state_v1(
+            v1_file=LEGACY_STATE_FILE, v2_file=STATE_FILE, keys_dir=LEGACY_KEYS_DIR
+        )
+        repo = GatewayProxyRepo.load(STATE_FILE)
+
     app = FastAPI(lifespan=lifespan)
     app.state.proxy_dependency_injector = GatewayDependencyInjector(
-        repo=repo or GatewayProxyRepo.load(STATE_FILE),
+        repo=repo,
         auth=GatewayProxyAuthProvider(
             server_client=HTTPMultiClient(SERVER_CONNECTIONS_DIR_ON_GATEWAY)
         ),

@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends
 
 from dstack._internal.proxy.gateway.deps import get_gateway_proxy_repo
 from dstack._internal.proxy.gateway.models import ACMESettings, GlobalProxyConfig
-from dstack._internal.proxy.gateway.repo import GatewayProxyRepo
+from dstack._internal.proxy.gateway.repo.repo import GatewayProxyRepo
 from dstack._internal.proxy.gateway.schemas.common import OkResponse
 from dstack._internal.proxy.gateway.schemas.config import ConfigRequest
 
