@@ -432,7 +432,10 @@ class VastAIConfig(CoreModel):
 
 class VultrConfig(CoreModel):
     type: Annotated[Literal["vultr"], Field(description="The type of backend")] = "vultr"
-    regions: Optional[List[str]] = None
+    regions: Annotated[
+        Optional[List[str]],
+        Field(description="The list of Vultr regions. Omit to use all regions"),
+    ] = None
     project_id: Annotated[str, Field(description="The project ID")]
     creds: Annotated[AnyVultrCreds, Field(description="The credentials")]
 
