@@ -137,7 +137,7 @@ async def _process_pending_run(session: AsyncSession, run_model: RunModel):
         stats = None
         if run_model.gateway_id is not None:
             conn = await gateways.get_or_add_gateway_connection(session, run_model.gateway_id)
-            stats = await conn.get_stats(run_model.id)
+            stats = await conn.get_stats(run_model.project.name, run_model.run_name)
         # replicas info doesn't matter for now
         replicas = scaler.scale([], stats)
     if replicas == 0:
@@ -318,7 +318,7 @@ async def _process_active_run(session: AsyncSession, run_model: RunModel):
             stats = None
             if run_model.gateway_id is not None:
                 conn = await gateways.get_or_add_gateway_connection(session, run_model.gateway_id)
-                stats = await conn.get_stats(run_model.id)
+                stats = await conn.get_stats(run_model.project.name, run_model.run_name)
             # use replicas_info from before retrying
             replicas_diff = scaler.scale(replicas_info, stats)
             if replicas_diff != 0:

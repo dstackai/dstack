@@ -3,7 +3,7 @@ import shutil
 import uuid
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import AsyncIterator, Dict, Optional, Tuple
+from typing import AsyncIterator, Optional, Tuple
 
 import aiorwlock
 
@@ -14,18 +14,18 @@ from dstack._internal.core.services.ssh.tunnel import (
     SSHTunnel,
     UnixSocket,
 )
-from dstack._internal.server.services.gateways.client import (
-    GATEWAY_MANAGEMENT_PORT,
-    GatewayClient,
-    Stat,
+from dstack._internal.proxy.gateway.const import (
+    PROXY_PORT_ON_GATEWAY,
+    SERVER_CONNECTIONS_DIR_ON_GATEWAY,
 )
+from dstack._internal.proxy.gateway.schemas.stats import PerWindowStats
+from dstack._internal.server.services.gateways.client import GatewayClient
 from dstack._internal.server.settings import SERVER_DIR_PATH
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.path import FileContent
 
 logger = get_logger(__name__)
 CONNECTIONS_DIR = SERVER_DIR_PATH / "gateway-connections"
-CONNECTIONS_DIR_ON_GATEWAY = "/home/ubuntu/dstack/server-connections"
 
 
 class GatewayConnection:
@@ -39,7 +39,7 @@ class GatewayConnection:
 
     def __init__(self, ip_address: str, id_rsa: str, server_port: int):
         self._lock = aiorwlock.RWLock()
-        self.stats: Dict[str, Dict[int, Stat]] = {}
+        self.stats: dict[tuple[str, str], PerWindowStats] = {}
         self.ip_address = ip_address
         self.server_port = server_port
         # a persistent connection_dir is needed to discover and close leftover connections
@@ -61,7 +61,7 @@ class GatewayConnection:
             forwarded_sockets=[
                 SocketPair(
                     local=UnixSocket(path=self.gateway_socket_path),
-                    remote=IPSocket(host="localhost", port=GATEWAY_MANAGEMENT_PORT),
+                    remote=IPSocket(host="localhost", port=PROXY_PORT_ON_GATEWAY),
                 ),
             ],
             # reverse_forwarded_sockets are added later in .open()
@@ -94,12 +94,12 @@ class GatewayConnection:
 
     async def _open_tunnel(self) -> None:
         self.connection_dir.mkdir(parents=True, exist_ok=True)
-        remote_socket_path = f"{CONNECTIONS_DIR_ON_GATEWAY}/{self.tunnel_id}.sock"
+        remote_socket_path = f"{SERVER_CONNECTIONS_DIR_ON_GATEWAY}/{self.tunnel_id}.sock"
 
         # open w/o reverse forwarding and make sure reverse forwarding will be possible
         self.tunnel.reverse_forwarded_sockets = []
         await self.tunnel.aopen()
-        await self.tunnel.aexec(f"mkdir -p {CONNECTIONS_DIR_ON_GATEWAY}")
+        await self.tunnel.aexec(f"mkdir -p {SERVER_CONNECTIONS_DIR_ON_GATEWAY}")
         await self.tunnel.aexec(f"rm -f {remote_socket_path}")
 
         # add reverse forwarding
@@ -121,13 +121,17 @@ class GatewayConnection:
             return
 
         async with self._lock.writer_lock:
-            self.stats = await self._client.collect_stats()
-            for service_id, stats in self.stats.items():
-                logger.debug("%s stats: %s", service_id, stats)
+            stats = {}
+            for service in await self._client.collect_stats():
+                logger.debug(
+                    "%s/%s stats: %s", service.project_name, service.run_name, service.stats
+                )
+                stats[(service.project_name, service.run_name)] = service.stats
+            self.stats = stats
 
-    async def get_stats(self, service_id: uuid.UUID) -> Optional[Dict[int, Stat]]:
+    async def get_stats(self, project_name: str, run_name: str) -> Optional[PerWindowStats]:
         async with self._lock.reader_lock:
-            return self.stats.get(service_id.hex)
+            return self.stats.get((project_name, run_name))
 
     @contextlib.asynccontextmanager
     async def client(self) -> AsyncIterator[GatewayClient]:
