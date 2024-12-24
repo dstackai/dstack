@@ -83,7 +83,6 @@ def upgrade() -> None:
                 "NEBIUS",
                 "TENSORDOCK",
                 "VASTAI",
-                "VULTR",
                 name="backendtype",
             ),
             nullable=False,

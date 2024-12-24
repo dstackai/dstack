@@ -111,7 +111,6 @@ def upgrade() -> None:
             "RUNPOD",
             "TENSORDOCK",
             "VASTAI",
-            "VULTR",
         ],
         [
             TableReference(table_schema="public", table_name="instances", column_name="backend"),
