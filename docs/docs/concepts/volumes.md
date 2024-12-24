@@ -123,7 +123,7 @@ and its contents will persist across runs.
 
 #### List volumes
 
-The [`dstack volume list`](../reference/cli/dstack/volume.md-list) command lists created and registered volumes:
+The [`dstack volume list`](../reference/cli/dstack/volume.md#dstack-volume-list) command lists created and registered volumes:
 
 ```
 $ dstack volume list

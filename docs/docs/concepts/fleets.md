@@ -151,7 +151,7 @@ The filename must end with `.dstack.yml` (e.g. `.dstack.yml` or `fleet.dstack.ym
 
     !!! info "Network"
         Set `placement` to `cluster` if the hosts are interconnected
-        (e.g. if you'd like to use them for [multi-node tasks](reference/dstack.yml/task.md#distributed-tasks)).
+        (e.g. if you'd like to use them for [multi-node tasks](../reference/dstack.yml/task.md#distributed-tasks)).
         In that case, by default, `dstack` will automatically detect the private network. 
         You can specify the [`network`](../reference/dstack.yml/fleet.md#network) parameter manually.
 

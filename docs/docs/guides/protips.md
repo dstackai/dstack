@@ -7,7 +7,7 @@ Below are tips and tricks to use `dstack` more efficiently.
 ### Creation policy
 
 By default, when you run `dstack apply` with a dev environment, task, or service,
-`dstack` reuses `idle` instances from an existing [fleet](concepts/fleets.md).
+`dstack` reuses `idle` instances from an existing [fleet](../concepts/fleets.md).
 If no `idle` instances match the requirements, `dstack` automatically creates a new fleet 
 using configured backends.
 
@@ -271,7 +271,7 @@ This means it streams the logs as they come in and, in the case of a task, forwa
 
 To run in detached mode, use `-d` with `dstack apply`.
 
-> If you detached the CLI, you can always re-attach to a run via [`dstack attach`](../reference/cli#dstack-attach).
+> If you detached the CLI, you can always re-attach to a run via [`dstack attach`](../reference/cli/dstack/attach.md).
 
 ## GPU
 

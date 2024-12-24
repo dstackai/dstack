@@ -4,7 +4,7 @@ The `service` configuration type allows running [services](../../services.md).
 
 > Configuration files must be inside the project repo, and their names must end with `.dstack.yml` 
 > (e.g. `.dstack.yml` or `serve.dstack.yml` are both acceptable).
-> Any configuration can be run via [`dstack apply`](../cli/index.md#dstack-apply).
+> Any configuration can be run via [`dstack apply`](../cli/dstack/apply.md).
 
 ## Examples
 

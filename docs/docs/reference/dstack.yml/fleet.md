@@ -4,7 +4,7 @@ The `fleet` configuration type allows creating and updating fleets.
 
 > Configuration files must be inside the project repo, and their names must end with `.dstack.yml` 
 > (e.g. `.dstack.yml` or `fleet.dstack.yml` are both acceptable).
-> Any configuration can be run via [`dstack apply`](../cli/index.md#dstack-apply).
+> Any configuration can be run via [`dstack apply`](../cli/dstack/apply.md).
 
 ## Examples
 
