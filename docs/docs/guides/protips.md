@@ -122,7 +122,7 @@ This allows you to access the remote `8501` port on `localhost:8501` while the C
     
     This will forward the remote `8501` port to `localhost:3000`.
 
-!!! info "Tasks vs Services"
+!!! info "Tasks vs. services"
     [Services](../services.md) provide external access, `https`, replicas with autoscaling, OpenAI-compatible endpoint
     and other service features. If you don't need them, you can use [tasks](../tasks.md) for running apps.
 

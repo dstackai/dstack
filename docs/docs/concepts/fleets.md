@@ -55,12 +55,17 @@ The filename must end with `.dstack.yml` (e.g. `.dstack.yml` or `fleet.dstack.ym
     When you apply this configuration, `dstack` will create cloud instances using the configured backends according 
     to the specified parameters.
 
-    !!! info "Network"
+    !!! info "Cluster placement"
         To ensure the nodes of the fleet are interconnected (e.g., if you'd like to use them for
         [multi-node tasks](../reference/dstack.yml/task.md#distributed-tasks)), 
         set `placement` to `cluster`. 
+        
         In this case, `dstack` will provision all nodes in the same backend and region and configure optimal 
         inter-node connectivity.
+
+        !!! info "Backends"
+            The `cluster` value of the `placement` property is supported only by the `aws`, `azure`, `gcp`, and `oci`
+            backends.
 
         ??? info "AWS"
             `dstack` automatically enables [Elastic Fabric Adapter :material-arrow-top-right-thin:{ .external }](https://aws.amazon.com/hpc/efa/){:target="_blank"}
@@ -73,8 +78,7 @@ The filename must end with `.dstack.yml` (e.g. `.dstack.yml` or `fleet.dstack.ym
             This limitation will be lifted once [this issue :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/1804){:target="_blank"} is fixed.
 
     !!! info "Backends"
-        Cloud fleets are supported for all backends except `kubernetes`, `vastai`, and `runpod`. Cloud fleets with `placement: cluster` are supported for `aws`, `azure`, `gcp`, and `oci`.
-
+        Cloud fleets are supported for all backends except `kubernetes`, `vastai`, and `runpod`.
 
 === "SSH fleets"
 
@@ -149,11 +153,14 @@ The filename must end with `.dstack.yml` (e.g. `.dstack.yml` or `fleet.dstack.ym
             - 3.255.177.52
         ```
 
-    !!! info "Network"
+    !!! info "Cluster placement"
         Set `placement` to `cluster` if the hosts are interconnected
         (e.g. if you'd like to use them for [multi-node tasks](../reference/dstack.yml/task.md#distributed-tasks)).
-        In that case, by default, `dstack` will automatically detect the private network. 
-        You can specify the [`network`](../reference/dstack.yml/fleet.md#network) parameter manually.
+        
+        !!! info "Network"
+            By default, `dstack` automatically detects the private network for the specified hosts. 
+            However, it's possible to configure it explicitelly via 
+            the [`network`](../reference/dstack.yml/fleet.md#network) property.
 
     !!! info "Backends"
         To use SSH fleets, you don't need to configure any backends at all.
@@ -169,7 +176,7 @@ To create or update the fleet, pass the fleet configuration to [`dstack apply`](
 <div class="termy">
 
 ```shell
-$ dstack apply -f examples/fine-tuning/alignment-handbook/fleet-distributed.dstack.yml
+$ dstack apply -f examples/misc/fleets/distrib.dstack.yml
 ```
 
 </div>

@@ -172,20 +172,23 @@ By default, `dstack` stores data in plaintext.
 If you want backend credentials and user tokens to be encrypted, set up encryption keys via
 [`~/.dstack/server/config.yml`](../reference/server/config.yml.md#encryption).
 
-## Versioning policy
+## Backward compatibility
 
-`dstack` follows semver versioning scheme ({major}.{minor}.{patch}) with the following principles:
+!!! info "Versioning scheme"
+    `dstack` follows the `{major}.{minor}.{patch}` versioning scheme based on these principles:
 
-* The server backward compatibility is maintained across all minor and patch releases. The specific features can be removed but the removal is preceded with deprecation warnings for several minor releases. This means you can use older client versions with newer server versions.
-* The client backward compatibility is maintained across patch releases. A new minor release indicates that the release breaks client backward compatibility. This means you don't need to update the server when you update the client to a new patch release. Still, upgrading a client to a new minor version requires upgrading the server too.
+=== "Server"
+    The server backward compatibility is maintained across all minor and patch releases. The specific features can be removed but the removal is preceded with deprecation warnings for several minor releases. This means you can use older client versions with newer server versions.
+
+=== "Client"
+    The client backward compatibility is maintained across patch releases. A new minor release indicates that the release breaks client backward compatibility. This means you don't need to update the server when you update the client to a new patch release. Still, upgrading a client to a new minor version requires upgrading the server too.
 
 ## FAQ
 
-### Can I run multiple replicas of the dstack server?
+##### Can I run multiple replicas of the dstack server?
 
-You can! But you need to configure `dstack` to use [PostgreSQL](#postgresql) and [AWS CloudWatch](#aws-cloudwatch).
+Yes, you can if you configure `dstack` to use [PostgreSQL](#postgresql) and [AWS CloudWatch](#aws-cloudwatch).
 
-### Does the dstack server support blue-green/rolling deployments?
+##### Does the dstack server support blue-green or rolling deployments?
 
-Blue-green and rolling deployments can be performed if you configure
-[PostgreSQL](#postgresql) and [AWS CloudWatch](#aws-cloudwatch) for multi-replica server.
+Yes, it does if you configure `dstack` to use [PostgreSQL](#postgresql) and [AWS CloudWatch](#aws-cloudwatch).
