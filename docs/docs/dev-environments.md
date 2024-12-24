@@ -4,8 +4,8 @@ A dev environment lets you provision an instance and access it with your desktop
 
 ## Define a configuration
 
-First, create a YAML file in your project repo. Its name must end with `.dstack.yml` (e.g. `.dstack.yml` or `dev.dstack.yml` are
-both acceptable).
+First, define a dev environment configuration as a YAML file in your project folder.
+The filename must end with `.dstack.yml` (e.g. `.dstack.yml` or `dev.dstack.yml` are both acceptable).
 
 <div editor-title="examples/.dstack.yml"> 
 
@@ -28,8 +28,9 @@ resources:
 
 </div>
 
-If you don't specify your Docker image, `dstack` uses the [base](https://hub.docker.com/r/dstackai/base/tags) image
-(pre-configured with Python, Conda, and essential CUDA drivers).
+!!! info "Docker image"
+    If you don't specify your Docker image, `dstack` uses the [base](https://hub.docker.com/r/dstackai/base/tags) image
+    pre-configured with Python, Conda, and essential CUDA drivers.
 
 !!! info "Reference"
     See [.dstack.yml](reference/dstack.yml/dev-environment.md) for all the options supported by
@@ -37,7 +38,7 @@ If you don't specify your Docker image, `dstack` uses the [base](https://hub.doc
 
 ## Run a configuration
 
-To run a configuration, use the [`dstack apply`](reference/cli/dstack/apply.md) command.
+To run a dev environment, pass the configuration to [`dstack apply`](reference/cli/dstack/apply.md):
 
 <div class="termy">
 
@@ -60,12 +61,12 @@ To open in VS Code Desktop, use this link:
 
 </div>
 
+`dstack apply` automatically provisions an instance, uploads the contents of the repo (incl. your local uncommitted changes),
+and set ups an IDE on the instance.
+
 !!! info "Windows"
     On Windows, `dstack` works both natively and inside WSL. But, for dev environments, 
     it's recommended _not to use_ `dstack apply` _inside WSL_ due to a [VS Code issue :material-arrow-top-right-thin:{ .external }](https://github.com/microsoft/vscode-remote-release/issues/937){:target="_blank"}.
-
-`dstack apply` automatically provisions an instance, uploads the contents of the repo (incl. your local uncommitted changes),
-and runs the configuration.
 
 ### VS Code
 
@@ -95,19 +96,32 @@ Use `--watch` (or `-w`) to monitor the live status of runs.
 
 ### Stop a run
 
-Once the run exceeds the [`max_duration`](reference/dstack.yml/dev-environment.md#max_duration), or when you use [`dstack stop`](reference/cli/dstack/stop.md), 
-the dev environment is stopped. Use `--abort` or `-x` to stop the run abruptly. 
+A dev environment runs until you stop it or its lifetime exceeds [`max_duration`](reference/dstack.yml/dev-environment.md#max_duration).
+To gracefully stop a dev environment, use [`dstack stop`](reference/cli/dstack/stop.md).
+Pass `--abort` or `-x` to stop without waiting for a graceful shutdown.
 
-[//]: # (TODO: Mention `dstack logs` and `dstack logs -d`)
+### Attach to a run
+
+By default, `dstack apply` runs in attached mode – it establishes the SSH tunnel to the run, forwards ports, and shows real-time logs.
+If you detached from a run, you can reattach to it using [`dstack attach`](reference/cli/dstack/attach.md).
+
+### See run logs
+
+To see the logs of a run without attaching, use [`dstack logs`](reference/cli/dstack/logs.md). 
+Pass `--diagnose`/`-d` to `dstack logs` to see the diagnostics logs. It may be useful if a run fails.
+For more information on debugging failed runs, see the [troubleshooting](guides/troubleshooting.md) guide.
 
 ## Manage fleets
+
+Fleets are groups of cloud instances or SSH machines that you use to run dev environments, tasks, and services.
+You can let `dstack apply` provision fleets or [create and manage them directly](concepts/fleets.md).
 
 ### Creation policy
 
 By default, when you run `dstack apply` with a dev environment, task, or service,
 `dstack` reuses `idle` instances from an existing [fleet](concepts/fleets.md).
-If no `idle` instances matching the requirements, it automatically creates a new fleet 
-using backends.
+If no `idle` instances match the requirements, `dstack` automatically creates a new fleet 
+using configured backends.
 
 To ensure `dstack apply` doesn't create a new fleet but reuses an existing one,
 pass `-R` (or `--reuse`) to `dstack apply`.

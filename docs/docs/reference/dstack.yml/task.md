@@ -126,8 +126,7 @@ commands:
     ```
 
 !!! info "Docker and Docker Compose"
-    All backends except `runpod`, `vastai` and `kubernetes` also allow to use [Docker and Docker Compose](../../guides/protips.md#docker-and-docker-compose) 
-    inside `dstack` runs.
+    All backends except `runpod`, `vastai`, and `kubernetes` also allow using [Docker and Docker Compose](../../guides/protips.md#docker-and-docker-compose) inside `dstack` runs.
 
 ### Resources { #_resources }
 
@@ -212,14 +211,13 @@ commands:
 
 </div>
 
-> If you don't assign a value to an environment variable (see `HF_TOKEN` above), 
+If you don't assign a value to an environment variable (see `HF_TOKEN` above), 
 `dstack` will require the value to be passed via the CLI or set in the current process.
-
 For instance, you can define environment variables in a `.envrc` file and utilize tools like `direnv`.
 
 ##### System environment variables
 
-The following environment variables are available in any run and are passed by `dstack` by default:
+The following environment variables are available in any run by default:
 
 | Name                    | Description                                                      |
 |-------------------------|------------------------------------------------------------------|
@@ -234,7 +232,7 @@ The following environment variables are available in any run and are passed by `
 
 ### Distributed tasks
 
-By default, the task runs on a single node. However, you can run it on a cluster of nodes.
+By default, a task runs on a single node. However, you can run it on a cluster of nodes by specifying `nodes`:
 
 <div editor-title="examples/fine-tuning/train.dstack.yml">
 
@@ -520,3 +518,9 @@ The `task` configuration type supports many other options. See below.
 
     * `volume-name:/container/path` for network volumes
     * `/instance/path:/container/path` for instance volumes
+
+## `retry`
+
+#SCHEMA# dstack._internal.core.models.profiles.ProfileRetry
+    overrides:
+      show_root_heading: false

@@ -333,7 +333,7 @@ class DiskSpecSchema(CoreModel):
     size: Annotated[
         MemoryRangeLike,
         Field(
-            description="The disk size. Can be a string (e.g., `100GB` or `100GB..`) or an object"
+            description="The disk size. Can be set to a range (e.g., `100GB..` or `100GB..200GB`)"
         ),
     ]
 

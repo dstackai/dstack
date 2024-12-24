@@ -6,9 +6,8 @@ When running models, services provide access through the unified OpenAI-compatib
 
 ## Define a configuration
 
-First, create a YAML file in your project folder. Its name must end with `.dstack.yml` (e.g. `.dstack.yml` or
-`service.dstack.yml`
-are both acceptable).
+First, define a service configuration as a YAML file in your project folder.
+The filename must end with `.dstack.yml` (e.g. `.dstack.yml` or `dev.dstack.yml` are both acceptable).
 
 <div editor-title="service.dstack.yml"> 
 
@@ -40,10 +39,11 @@ resources:
 
 </div>
 
-If you don't specify your Docker image, `dstack` uses the [base](https://hub.docker.com/r/dstackai/base/tags) image
-(pre-configured with Python, Conda, and essential CUDA drivers).
-
 Note, the `model` property is optional and not needed when deploying a non-OpenAI-compatible model or a regular web app.
+
+!!! info "Docker image"
+    If you don't specify your Docker image, `dstack` uses the [base](https://hub.docker.com/r/dstackai/base/tags) image
+    pre-configured with Python, Conda, and essential CUDA drivers.
 
 !!! info "Gateway"
     To enable [auto-scaling](reference/dstack.yml/service.md#auto-scaling), or use a custom domain with HTTPS, 
@@ -57,7 +57,7 @@ Note, the `model` property is optional and not needed when deploying a non-OpenA
 
 ## Run a service
 
-To run a configuration, use the [`dstack apply`](reference/cli/dstack/apply.md) command.
+To run a service, pass the configuration to [`dstack apply`](reference/cli/dstack/apply.md):
 
 <div class="termy">
 
@@ -84,14 +84,16 @@ Model meta-llama/Meta-Llama-3.1-8B-Instruct is published at:
 </div>
 
 `dstack apply` automatically provisions instances, uploads the contents of the repo (incl. your local uncommitted changes),
-and runs the configuration.
+and runs the service.
 
 ## Access the endpoint
 
 ### Service
 
-If no gateway is created, the service’s endpoint will be accessible at
+If a [gateway](concepts/gateways.md) is not configured, the service’s endpoint will be accessible at
 `<dstack server URL>/proxy/services/<project name>/<run name>/`.
+If a [gateway](concepts/gateways.md) is configured, the service endpoint will be accessible at
+`https://<run name>.<gateway domain>`.
 
 <div class="termy">
 
@@ -112,11 +114,10 @@ $ curl http://localhost:3000/proxy/services/main/llama31/v1/chat/completions \
 
 </div>
 
-When a [gateway](concepts/gateways.md) is configured, the service endpoint will be accessible at `https://<run name>.<gateway domain>`.
-
-By default, the service endpoint requires the `Authorization` header with `Bearer <dstack token>`.
-Authorization can be disabled by setting [`auth`](reference/dstack.yml/service.md#authorization) to `false` in the
-service configuration file.
+!!! info "Auth"
+    By default, the service endpoint requires the `Authorization` header with `Bearer <dstack token>`.
+    Authorization can be disabled by setting [`auth`](reference/dstack.yml/service.md#authorization) to `false` in the
+    service configuration file.
 
 ### Model
 
@@ -135,18 +136,31 @@ Use `--watch` (or `-w`) to monitor the live status of runs.
 
 ### Stop a run
 
-Once the run exceeds the [`max_duration`](reference/dstack.yml/task.md#max_duration), or when you use [`dstack stop`](reference/cli/dstack/stop.md), 
-the dev environment is stopped. Use `--abort` or `-x` to stop the run abruptly. 
+A service runs until you stop it or its lifetime exceeds [`max_duration`](reference/dstack.yml/dev-environment.md#max_duration).
+To gracefully stop a service, use [`dstack stop`](reference/cli/dstack/stop.md).
+Pass `--abort` or `-x` to stop without waiting for a graceful shutdown.
 
-[//]: # (TODO: Mention `dstack logs` and `dstack logs -d`)
+### Attach to a run
+
+By default, `dstack apply` runs in attached mode – it establishes the SSH tunnel to the run, forwards ports, and shows real-time logs.
+If you detached from a run, you can reattach to it using [`dstack attach`](reference/cli/dstack/attach.md).
+
+### See run logs
+
+To see the logs of a run without attaching, use [`dstack logs`](reference/cli/dstack/logs.md).
+Pass `--diagnose`/`-d` to `dstack logs` to see the diagnostics logs. It may be useful if a run fails.
+For more information on debugging failed runs, see the [troubleshooting](guides/troubleshooting.md) guide.
 
 ## Manage fleets
+
+Fleets are groups of cloud instances or SSH machines that you use to run dev environments, tasks, and services.
+You can let `dstack apply` provision fleets or [create and manage them directly](concepts/fleets.md).
 
 ### Creation policy
 
 By default, when you run `dstack apply` with a dev environment, task, or service,
 `dstack` reuses `idle` instances from an existing [fleet](concepts/fleets.md).
-If no `idle` instances matching the requirements, it automatically creates a new fleet 
+If no `idle` instances match the requirements, it automatically creates a new fleet 
 using backends.
 
 To ensure `dstack apply` doesn't create a new fleet but reuses an existing one,

@@ -85,12 +85,12 @@ ide: vscode
     ```
 
 !!! info "Docker and Docker Compose"
-    All backends except `runpod`, `vastai` and `kubernetes` also allow to use [Docker and Docker Compose](../../guides/protips.md#docker-and-docker-compose) 
-    inside `dstack` runs.
+    All backends except `runpod`, `vastai`, and `kubernetes` also allow using [Docker and Docker Compose](../../guides/protips.md#docker-and-docker-compose) inside `dstack` runs.
 
 ### Resources { #_resources }
 
-If you specify memory size, you can either specify an explicit size (e.g. `24GB`) or a 
+When you specify a resource value like `cpu` or `memory`,
+you can either use an exact value (e.g. `24GB`) or a 
 range (e.g. `24GB..`, or `24GB..80GB`, or `..80GB`).
 
 <div editor-title=".dstack.yml"> 
@@ -159,14 +159,13 @@ ide: vscode
 
 </div>
 
-> If you don't assign a value to an environment variable (see `HF_TOKEN` above), 
+If you don't assign a value to an environment variable (see `HF_TOKEN` above), 
 `dstack` will require the value to be passed via the CLI or set in the current process.
-
 For instance, you can define environment variables in a `.envrc` file and utilize tools like `direnv`.
 
 #### System environment variables
 
-The following environment variables are available in any run and are passed by `dstack` by default:
+The following environment variables are available in any run by default:
 
 | Name                    | Description                             |
 |-------------------------|-----------------------------------------|
@@ -334,3 +333,9 @@ The `dev-environment` configuration type supports many other options. See below.
 
     * `volume-name:/container/path` for network volumes
     * `/instance/path:/container/path` for instance volumes
+
+## `retry`
+
+#SCHEMA# dstack._internal.core.models.profiles.ProfileRetry
+    overrides:
+      show_root_heading: false

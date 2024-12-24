@@ -1,6 +1,6 @@
 # volume
 
-The `volume` configuration type allows creating, registering, and updating volumes.
+The `volume` configuration type allows creating, registering, and updating [volumes](../../concepts/volumes.md).
 
 > Configuration files must be inside the project repo, and their names must end with `.dstack.yml` 
 > (e.g. `.dstack.yml` or `fleet.dstack.yml` are both acceptable).

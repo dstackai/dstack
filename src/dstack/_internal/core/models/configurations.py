@@ -88,7 +88,10 @@ class ScalingSpec(CoreModel):
 
 class BaseRunConfiguration(CoreModel):
     type: Literal["none"]
-    name: Annotated[Optional[str], Field(description="The run name")] = None
+    name: Annotated[
+        Optional[str],
+        Field(description="The run name. If not specified, a random name is generated"),
+    ] = None
     image: Annotated[Optional[str], Field(description="The name of the Docker image to run")]
     user: Annotated[
         Optional[str],

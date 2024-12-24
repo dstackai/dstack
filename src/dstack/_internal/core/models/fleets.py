@@ -130,7 +130,12 @@ class InstanceGroupParams(CoreModel):
     ] = None
     reservation: Annotated[
         Optional[str],
-        Field(description="The existing reservation for the instances"),
+        Field(
+            description=(
+                "The existing reservation to use for instance provisioning."
+                " Supports AWS Capacity Reservations and Capacity Blocks"
+            )
+        ),
     ] = None
     resources: Annotated[
         Optional[ResourcesSpec],

@@ -1,17 +1,19 @@
 # Fleets
 
-By default, when you run `dstack apply` with a dev environment, task, or service,
-`dstack` reuses `idle` instances from an existing fleet.
-If no `idle` instances matching the requirements, it automatically creates a new fleet 
-using backends.
+Fleets are groups of cloud instances or SSH machines that you use to run dev environments, tasks, and services.
 
-For more control over configuration and lifecycle management, or to set up fleets out of on-prem servers, use fleets
-directly.
+By default, when you run `dstack apply` to start a new dev environment, task, or service,
+`dstack` reuses `idle` instances from an existing fleet.
+If no `idle` instances match the requirements, `dstack` automatically creates a new fleet 
+using configured backends.
+
+If you need more control over instance configuration and lifecycle, or if you want to use on-prem servers,
+`dstack` also offers you a way to create and manage fleets directly.
 
 ## Define a configuration
 
-To create a fleet, create a YAML file in your project folder. Its name must end with `.dstack.yml` (e.g. `.dstack.yml` or `fleet.dstack.yml`
-are both acceptable).
+To create a fleet, define its configuration as a YAML file in your project folder.
+The filename must end with `.dstack.yml` (e.g. `.dstack.yml` or `fleet.dstack.yml` are both acceptable).
 
 === "Cloud fleets"
 
@@ -70,7 +72,9 @@ are both acceptable).
             Currently, only one EFA interface is enabled regardless of the maximum number of interfaces supported by the instance type.
             This limitation will be lifted once [this issue :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/1804){:target="_blank"} is fixed.
 
-    Note that cloud fleets aren't supported for the `kubernetes`, `vastai`, and `runpod` backends.
+    !!! info "Backends"
+        Cloud fleets are supported for all backends except `kubernetes`, `vastai`, and `runpod`. Cloud fleets with `placement: cluster` are supported for `aws`, `azure`, `gcp`, and `oci`.
+
 
 === "SSH fleets"
 
@@ -151,14 +155,16 @@ are both acceptable).
         In that case, by default, `dstack` will automatically detect the private network. 
         You can specify the [`network`](../reference/dstack.yml/fleet.md#network) parameter manually.
 
-    Note that to use SSH fleets, you don't need any backends at all.
+    !!! info "Backends"
+        To use SSH fleets, you don't need to configure any backends at all.
 
-> See [`.dstack.yml`](../reference/dstack.yml/fleet.md) for all the options supported by
-> the fleet configuration.
+!!! info "Reference"
+    See [`.dstack.yml`](../reference/dstack.yml/fleet.md) for all the options supported by
+    the fleet configuration.
 
 ## Create or update a fleet
 
-To create or update the fleet, simply call the [`dstack apply`](../reference/cli/dstack/apply.md) command:
+To create or update the fleet, pass the fleet configuration to [`dstack apply`](../reference/cli/dstack/apply.md):
 
 <div class="termy">
 
@@ -186,6 +192,12 @@ $ dstack fleet
 
 Once the status of instances changes to `idle`, they can be used by dev environments, tasks, and services.
 
+!!! info "Termination policy"
+    If you want a fleet to be automatically deleted after a certain idle time,
+    you can set the [`termination_idle_time`](../reference/dstack.yml/fleet.md#termination_idle_time) property.
+
+[//]: # (Add Idle time example to the reference page)
+
 ### Troubleshooting SSH fleets
 
 !!! info "Resources"
@@ -197,13 +209,6 @@ the hosts meet the requirements (see above).
 
 If the requirements are met but the fleet still fails to be created, check `/root/.dstack/shim.log` for logs 
 on the hosts specified in `ssh_config`.
-
-## Termination policy
-
-If you want a fleet to be automatically deleted after a certain idle time,
-you can set the [`termination_idle_time`](../reference/dstack.yml/fleet.md#termination_idle_time) property.
-
-[//]: # (Add Idle time example to the reference page)
 
 ## Manage fleets
 
@@ -225,7 +230,7 @@ $ dstack fleet
 
 ### Delete fleets
 
-When a fleet isn't used by run, you can delete it via `dstack delete`:
+When a fleet isn't used by a run, you can delete it by passing the fleet configuration to `dstack delete`:
 
 <div class="termy">
 
@@ -237,8 +242,7 @@ Fleet my-gcp-fleet deleted
 
 </div>
 
-You can pass either the path to the configuration file or the fleet name directly.
-
+Alternatively, you can delete a fleet by passing the fleet name  to `dstack fleet delete`.
 To terminate and delete specific instances from a fleet, pass `-i INSTANCE_NUM`.
 
 ## What's next?

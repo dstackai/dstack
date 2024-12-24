@@ -8,8 +8,8 @@ Below are tips and tricks to use `dstack` more efficiently.
 
 By default, when you run `dstack apply` with a dev environment, task, or service,
 `dstack` reuses `idle` instances from an existing [fleet](concepts/fleets.md).
-If no `idle` instances matching the requirements, it automatically creates a new fleet 
-using backends.
+If no `idle` instances match the requirements, `dstack` automatically creates a new fleet 
+using configured backends.
 
 To ensure `dstack apply` doesn't create a new fleet but reuses an existing one,
 pass `-R` (or `--reuse`) to `dstack apply`.
@@ -122,12 +122,13 @@ This allows you to access the remote `8501` port on `localhost:8501` while the C
     
     This will forward the remote `8501` port to `localhost:3000`.
 
-> Use [tasks](../tasks.md) when you don't need multiple replicas or external access to the endpoint. For other cases,
-> use [services](../services.md).
+!!! info "Tasks vs Services"
+    [Services](../services.md) provide external access, `https`, replicas with autoscaling, OpenAI-compatible endpoint
+    and other service features. If you don't need them, you can use [tasks](../tasks.md) for running apps.
 
 ## Docker and Docker Compose
 
-All backends except `runpod`, `vastai` and `kubernetes` allow to use Docker and Docker Compose 
+All backends except `runpod`, `vastai`, and `kubernetes` allow using Docker and Docker Compose 
 inside `dstack` runs. To do that, additional configuration steps are required:
 
 1. Set the `privileged` property to `true`.

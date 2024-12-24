@@ -8,7 +8,7 @@ The `fleet` configuration type allows creating and updating fleets.
 
 ## Examples
 
-### Cloud
+### Cloud fleet
 
 <div editor-title="fleet-distrib.dstack.yml"> 
 
@@ -35,7 +35,7 @@ resources:
 
 </div>
 
-### SSH
+### SSH fleet
 
 <div editor-title="fleet-ssh.dstack.yml"> 
     
