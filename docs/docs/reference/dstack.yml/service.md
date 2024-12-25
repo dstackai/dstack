@@ -495,6 +495,12 @@ so models served by TGI can be defined with `format: openai` too.
       type:
         required: true
 
+## `retry`
+
+#SCHEMA# dstack._internal.core.models.profiles.ProfileRetry
+    overrides:
+      show_root_heading: false
+
 ## `resources`
 
 #SCHEMA# dstack._internal.core.models.resources.ResourcesSpecSchema
@@ -552,9 +558,3 @@ so models served by TGI can be defined with `format: openai` too.
 
     * `volume-name:/container/path` for network volumes
     * `/instance/path:/container/path` for instance volumes
-
-## `retry`
-
-#SCHEMA# dstack._internal.core.models.profiles.ProfileRetry
-    overrides:
-      show_root_heading: false

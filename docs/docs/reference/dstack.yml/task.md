@@ -459,7 +459,6 @@ The `task` configuration type supports many other options. See below.
       show_root_heading: false
       type:
         required: true
-      item_id_prefix: retry-
 
 ## `resources`
 
@@ -518,9 +517,3 @@ The `task` configuration type supports many other options. See below.
 
     * `volume-name:/container/path` for network volumes
     * `/instance/path:/container/path` for instance volumes
-
-## `retry`
-
-#SCHEMA# dstack._internal.core.models.profiles.ProfileRetry
-    overrides:
-      show_root_heading: false

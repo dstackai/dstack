@@ -276,6 +276,14 @@ The `dev-environment` configuration type supports many other options. See below.
       type:
         required: true
 
+## `retry`
+
+#SCHEMA# dstack._internal.core.models.profiles.ProfileRetry
+    overrides:
+      show_root_heading: false
+      type:
+        required: true
+
 ## `resources`
 
 #SCHEMA# dstack._internal.core.models.resources.ResourcesSpecSchema
@@ -333,9 +341,3 @@ The `dev-environment` configuration type supports many other options. See below.
 
     * `volume-name:/container/path` for network volumes
     * `/instance/path:/container/path` for instance volumes
-
-## `retry`
-
-#SCHEMA# dstack._internal.core.models.profiles.ProfileRetry
-    overrides:
-      show_root_heading: false
