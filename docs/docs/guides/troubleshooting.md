@@ -31,18 +31,18 @@ wet-mangust-1 provisioning completed (failed)
 All provisioning attempts failed. This is likely due to cloud providers not having enough capacity. Check CLI and server logs for more details.
 ```
 
-#### Cause 1: Backend configuration
+#### Cause 1: Backend misconfiguration
 
 If runs consistently fail to provision due to insufficient capacity, it’s likely there is a backend configuration issue.
 Ensure that your backends are configured correctly and check the server logs for any errors.
 
-#### Cause 2: Service quotas
+#### Cause 2: Insufficient service quotas
 
 If some runs fail to provision, it may be due to an insufficient service quota. For cloud providers like AWS, GCP,
 Azure, and OCI, you often need to request an increased [service quota](protips.md#service-quotas) before you can use
 specific instances.
 
-#### Cause 3: Resources
+#### Cause 3: Resources mismatch
 
 Another possible cause of the insufficient capacity error is that `dstack` cannot find an instance that meets the
 requirements specified in `resources`.
@@ -84,7 +84,7 @@ was using spot instances and was interrupted. To address this, you can either se
 
 ### Services fail to start
 
-####  Cause 1: Gateway configuration
+#### Cause 1: Gateway misconfiguration
 
 If all services fail to start with a specific gateway, make sure a
 [correct DNS record](../concepts/gateways.md#update-dns-records)
@@ -92,7 +92,7 @@ pointing to the gateway's hostname is configured.
 
 ### Service endpoint doesn't work 
 
-#### Cause 1: Authorization
+#### Cause 1: Bad Authorization
 
 If the service endpoint returns a 403 error, it is likely because the [`Authorization`](../services.md#access-the-endpoint) 
 header with the correct `dstack` token was not provided.
