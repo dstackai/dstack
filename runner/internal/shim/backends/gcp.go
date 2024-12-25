@@ -15,12 +15,11 @@ func NewGCPBackend() *GCPBackend {
 }
 
 // GetRealDeviceName resolves device names according to https://cloud.google.com/compute/docs/disks/disk-symlinks
-// The server registers device name as pd-{volumeID}
 func (e *GCPBackend) GetRealDeviceName(volumeID, deviceName string) (string, error) {
 	// Try resolving first partition or external volumes
-	realDeviceName, err := os.Readlink(fmt.Sprintf("/dev/disk/by-id/google-pd-%s-part1", volumeID))
+	realDeviceName, err := os.Readlink(fmt.Sprintf("/dev/disk/by-id/google-%s-part1", deviceName))
 	if err != nil {
-		realDeviceName, err = os.Readlink(fmt.Sprintf("/dev/disk/by-id/google-pd-%s", volumeID))
+		realDeviceName, err = os.Readlink(fmt.Sprintf("/dev/disk/by-id/google-%s", deviceName))
 		if err != nil {
 			return "", fmt.Errorf("failed to resolve symlink for volume %s: %w", volumeID, err)
 		}
