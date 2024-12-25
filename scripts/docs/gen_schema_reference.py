@@ -148,10 +148,9 @@ def sub_schema_reference(match: re.Match) -> str:
     )
 
 
-file: File
-for file in mkdocs_gen_files.files:
+def process_file(file: File):
     if not fnmatch(file.src_uri, FILE_PATTERN):
-        continue
+        return
     logger.debug("Looking for schema references in `%s`", file.src_uri)
     with mkdocs_gen_files.open(file.src_uri, "r") as f:
         text = f.read()
@@ -167,3 +166,12 @@ for file in mkdocs_gen_files.files:
     )
     with mkdocs_gen_files.open(file.src_uri, "w") as f:
         f.write(text)
+
+
+def main():
+    # Processing sequentially since there is no speed up with concurrent processing
+    for file in mkdocs_gen_files.files:
+        process_file(file)
+
+
+main()
