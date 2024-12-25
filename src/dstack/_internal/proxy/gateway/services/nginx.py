@@ -14,7 +14,8 @@ from dstack._internal.proxy.lib.errors import ProxyError, UnexpectedProxyError
 from dstack._internal.utils.common import run_async
 from dstack._internal.utils.logging import get_logger
 
-CERTBOT_TIMEOUT = 30
+CERTBOT_TIMEOUT = 40
+CERTBOT_2ND_TIMEOUT = 5
 CONFIGS_DIR = Path("/etc/nginx/sites-enabled")
 logger = get_logger(__name__)
 
@@ -108,7 +109,8 @@ class Nginx:
     def run_certbot(domain: str, acme: ACMESettings) -> None:
         logger.info("Running certbot for %s", domain)
 
-        cmd = ["sudo", "certbot", "certonly"]
+        cmd = ["sudo", "timeout", "--kill-after", str(CERTBOT_2ND_TIMEOUT), str(CERTBOT_TIMEOUT)]
+        cmd += ["certbot", "certonly"]
         cmd += ["--non-interactive", "--agree-tos", "--register-unsafely-without-email"]
         cmd += ["--keep", "--nginx", "--domain", domain]
 
@@ -119,13 +121,16 @@ class Nginx:
             cmd += ["--eab-kid", acme.eab_kid]
             cmd += ["--eab-hmac-key", acme.eab_hmac_key]
 
-        try:
-            r = subprocess.run(cmd, capture_output=True, timeout=CERTBOT_TIMEOUT)
-        except subprocess.TimeoutExpired as e:
+        r = subprocess.run(
+            cmd,
+            capture_output=True,
+            timeout=CERTBOT_TIMEOUT + CERTBOT_2ND_TIMEOUT + 1,  # shouldn't happen
+        )
+        if r.returncode == 124:
             raise ProxyError(
                 f"Could not obtain {domain} TLS certificate in {CERTBOT_TIMEOUT}s."
                 " Make sure DNS records are configured for this gateway."
-            ) from e
+            )
         if r.returncode != 0:
             raise ProxyError(f"Error obtaining {domain} TLS certificate:\n{r.stderr.decode()}")
 
