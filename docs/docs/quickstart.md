@@ -21,7 +21,7 @@ $ dstack init
 
     A dev environment lets you provision an instance and access it with your desktop IDE.
 
-    ##### Define a configuration
+    #### Define a configuration
 
     Create the following configuration file inside the repo:
 
@@ -44,7 +44,7 @@ $ dstack init
 
     </div>
 
-    ##### Run the configuration
+    #### Run the configuration
 
     Run the configuration via [`dstack apply`](reference/cli/dstack/apply.md):
 
@@ -77,7 +77,7 @@ $ dstack init
 
     A task allows you to schedule a job or run a web app. Tasks can be distributed and can forward ports.
 
-    ##### Define a configuration
+    #### Define a configuration
 
     Create the following configuration file inside the repo:
 
@@ -110,7 +110,7 @@ $ dstack init
     [`nodes`](reference/dstack.yml/task.md#distributed-tasks), 
     and `dstack` will run it on a cluster.
 
-    ##### Run the configuration
+    #### Run the configuration
 
     Run the configuration via [`dstack apply`](reference/cli/dstack/apply.md):
 
@@ -142,7 +142,7 @@ $ dstack init
 
     A service allows you to deploy a model or any web app as an endpoint.
 
-    ##### Define a configuration
+    #### Define a configuration
 
     Create the following configuration file inside the repo:
 
@@ -175,7 +175,7 @@ $ dstack init
 
     </div>
 
-    ##### Run the configuration
+    #### Run the configuration
 
     Run the configuration via [`dstack apply`](reference/cli/dstack/apply.md):
 

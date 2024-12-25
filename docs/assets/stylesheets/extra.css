@@ -647,15 +647,15 @@ code .md-code__nav:hover .md-code__button {
 }
 
 .md-typeset h4  {
-    font-size: 20px;
+    font-size: 19.5px;
 }
 
 .md-typeset h5  {
-    font-size: 18px;
+    font-size: 17px;
 }
 
 .md-typeset h3 {
-    font-size: 23px;
+    font-size: 21.5px;
     margin-block-end: 0;
     padding-bottom: 0.7em;
     border-bottom: 1px solid rgba(243, 244, 246, 1);
@@ -1514,8 +1514,8 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
 
 .md-typeset.md-banner__inner a {
     color: var(--md-default-bg-color);
-    /*border-bottom: 1.5px dotted;
-    font-weight: 600;*/
+    border-bottom: 1.5px dotted;
+    font-weight: 600;
 }
 
 .md-typeset.md-banner__inner .md-banner__button svg {
