@@ -7,13 +7,14 @@ and [instance volumes](#instance-volumes).
 
 `dstack` allows to create and attach network volumes to dev environments, tasks, and services.
 
-> Network volumes are currently supported with the `aws`, `gcp`, and `runpod` backends.
-Support for other backends and SSH fleets is coming soon.
+!!! info "Backends"
+    Network volumes are currently supported for the `aws`, `gcp`, and `runpod` backends.
+    Support for other backends is on the roadmap.
 
 ### Define a configuration
 
-First, create a YAML file in your project folder. Its name must end with `.dstack.yml` (e.g. `.dstack.yml` or `vol.dstack.yml`
-are both acceptable).
+First, define a volume configuration as a YAML file in your project folder.
+The filename must end with `.dstack.yml` (e.g. `.dstack.yml` or `vol.dstack.yml` are both acceptable).
 
 <div editor-title="vol.dstack.yml"> 
 
@@ -38,7 +39,8 @@ If you use this configuration, `dstack` will create a new volume based on the sp
     If you prefer not to create a new volume but to reuse an existing one (e.g., created manually), you can 
     [specify its ID via `volume_id`](../reference/dstack.yml/volume.md#existing-volume). In this case, `dstack` will register the specified volume so that you can use it with dev environments, tasks, and services.
 
-    Note, if you register an external volume, you must ensure it already has a file system.
+    !!! info "Filesystem"
+        If you register an existing volume, you must ensure the volume already has a filesystem.
 
 !!! info "Reference"
     See [.dstack.yml](../reference/dstack.yml/volume.md) for all the options supported by
@@ -46,7 +48,7 @@ If you use this configuration, `dstack` will create a new volume based on the sp
 
 ### Create, register, or update a volume
 
-To create or register the volume, simply call the `dstack apply` command:
+To create or register the volume, pass the volume configuration to `dstack apply`:
 
 <div class="termy">
 
@@ -61,9 +63,11 @@ Volume my-new-volume does not exist yet. Create the volume? [y/n]: y
 
 </div>
 
-> When creating the volume `dstack` automatically creates an `ext4` file system on it.
 
-Once created, the volume can be attached with dev environments, tasks, and services.
+Once created, the volume can be attached to dev environments, tasks, and services.
+
+!!! info "Filesystem"
+    When creating a network volume, `dstack` automatically creates an `ext4` filesystem on it.
 
 ### Attach a volume { #attach-network-volume }
 
@@ -120,7 +124,7 @@ and its contents will persist across runs.
 
 #### List volumes
 
-The [`dstack volume list`](../reference/cli/dstack/volume.md-list) command lists created and registered volumes:
+The [`dstack volume list`](../reference/cli/dstack/volume.md#dstack-volume-list) command lists created and registered volumes:
 
 ```
 $ dstack volume list
@@ -130,18 +134,20 @@ NAME            BACKEND  REGION        STATUS  CREATED
 
 #### Delete volumes
 
-When the volume isn't attached to any active dev environment, task, or service, you can delete it using `dstack delete`:
+When the volume isn't attached to any active dev environment, task, or service,
+you can delete it by passing the volume configuration to `dstack delete`:
 
 ```shell
 $ dstack delete -f vol.dstack.yaml
 ```
 
+Alternatively, you can delete a volume by passing the volume name  to `dstack volume delete`.
+
 If the volume was created using `dstack`, it will be physically destroyed along with the data.
 If you've registered an existing volume, it will be de-registered with `dstack` but will keep the data.
 
-## Instance volumes
 
-> Instance volumes are currently supported on all backends except `runpod`, `vastai` and `kubernetes`.
+## Instance volumes
 
 Unlike [network volumes](#network-volumes), which are persistent external resources mounted over network,
 instance volumes are part of the instance storage. Basically, the instance volume is a filesystem path
@@ -150,6 +156,9 @@ instance volumes are part of the instance storage. Basically, the instance volum
 As a consequence, the contents of the instance volume are specific to the instance
 where the run is executed, and data persistence, integrity, and even existence are guaranteed only if the subsequent run
 is executed on the same exact instance, and there is no other runs in between.
+
+!!! info "Backends"
+    Instance volumes are currently supported for all backends except `runpod`, `vastai` and `kubernetes`.
 
 ### Manage volumes { #manage-instance-volumes }
 

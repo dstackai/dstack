@@ -2,10 +2,12 @@
 
 ## Reporting issues
 
-When you encounter a problem and need help, it's essential to report it as
+When you encounter a problem, please report it as
 a [GitHub issue :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/new/choose){:target="_blank"}.
 
-> When bringing up issues on Discord, please include the steps to reproduce.
+If you have a question or need help, feel free to ask it in our [Discord server](https://discord.gg/u8SmfwPpMd).
+
+> When bringing up issues, always include the steps to reproduce.
 
 ### Steps to reproduce
 
@@ -29,18 +31,18 @@ wet-mangust-1 provisioning completed (failed)
 All provisioning attempts failed. This is likely due to cloud providers not having enough capacity. Check CLI and server logs for more details.
 ```
 
-#### Backend configuration
+#### Cause 1: Backend misconfiguration
 
 If runs consistently fail to provision due to insufficient capacity, it’s likely there is a backend configuration issue.
 Ensure that your backends are configured correctly and check the server logs for any errors.
 
-#### Service quotas
+#### Cause 2: Insufficient service quotas
 
 If some runs fail to provision, it may be due to an insufficient service quota. For cloud providers like AWS, GCP,
 Azure, and OCI, you often need to request an increased [service quota](protips.md#service-quotas) before you can use
 specific instances.
 
-#### Resources
+#### Cause 3: Resources mismatch
 
 Another possible cause of the insufficient capacity error is that `dstack` cannot find an instance that meets the
 requirements specified in `resources`.
@@ -58,7 +60,7 @@ requirements specified in `resources`.
     Use range syntax to specify a range, such as `50GB..100GB` (from fifty GBs to one hundred GBs) or `50GB..` 
     (fifty GBs or more).
 
-### Run fails
+### Run starts but fails
 
 There could be several reasons for a run failing after successful provisioning. 
 
@@ -66,11 +68,11 @@ There could be several reasons for a run failing after successful provisioning.
     To find out why a run terminated, use `--verbose` (or `-v`) with `dstack ps`.
     This will show the run's status and any failure reasons.
 
-??? info "Diagnostic logs"
+!!! info "Diagnostic logs"
     You can get more information on why a run fails with diagnostic logs.
     Pass `--diagnose` (or `-d`) to `dstack logs` and you'll see logs of the run executor.
 
-#### Spot interruption
+#### Cause 1: Spot interruption
 
 If a run fails after provisioning with the termination reason `INTERRUPTED_BY_NO_CAPACITY`, it is likely that the run
 was using spot instances and was interrupted. To address this, you can either set the
@@ -80,9 +82,9 @@ was using spot instances and was interrupted. To address this, you can either se
 [//]: # (#### Other)
 [//]: # (TODO: Explain how to get the shim logs)
 
-### Can't run a service
+### Services fail to start
 
-#### Gateway configuration
+#### Cause 1: Gateway misconfiguration
 
 If all services fail to start with a specific gateway, make sure a
 [correct DNS record](../concepts/gateways.md#update-dns-records)
@@ -90,7 +92,7 @@ pointing to the gateway's hostname is configured.
 
 ### Service endpoint doesn't work 
 
-#### Authorization
+#### Cause 1: Bad Authorization
 
 If the service endpoint returns a 403 error, it is likely because the [`Authorization`](../services.md#access-the-endpoint) 
 header with the correct `dstack` token was not provided.
@@ -98,18 +100,20 @@ header with the correct `dstack` token was not provided.
 [//]: # (#### Other)
 [//]: # (TODO: Explain how to get the gateway logs)
 
-### Cannot access a dev environment or a task's ports
+### Cannot access dev environment or task ports
+
+#### Cause 1: Detached from run
 
 When running a dev environment or task with configured ports, `dstack apply` 
 automatically forwards remote ports to `localhost` via SSH for easy and secure access.
 If you interrupt the command, the port forwarding will be disconnected. To reattach, use `dstack attach <run name`.
 
-#### Windows
+#### Cause 2: Windows
 
 If you're using the CLI on Windows, make sure to run it through WSL by following [these instructions:material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/1644#issuecomment-2321559265){:target="_blank"}. 
 Native support will be available soon.
 
-### An SSH fleet doesn't provision
+### SSH fleet fails to provision
 
 If you set up an SSH fleet and it fails to provision after a long wait, first check the server logs. 
 Also, review the  `/root/.dstack/shim.log` file on each host used to create the fleet.

@@ -257,3 +257,21 @@ jobs:
           WHEEL=dstack_gateway-${{ env.VERSION }}-py3-none-any.whl
           aws s3 cp dist/$WHEEL "s3://dstack-gateway-downloads/stgn/$WHEEL"
           echo "${{ env.VERSION }}" | aws s3 cp - "s3://dstack-gateway-downloads/stgn/latest-version"
+  
+  docs-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: 3.11
+      - name: Install dstack
+        run: |
+          pip install -e .[server]
+      - name: Build
+        run: |
+          pip install pillow cairosvg
+          sudo apt-get install -y libcairo2-dev libfreetype6-dev libffi-dev libjpeg-dev libpng-dev libz-dev
+          pip install mkdocs-material "mkdocs-material[imaging]" mkdocs-material-extensions mkdocs-redirects mkdocs-gen-files "mkdocstrings[python]" mkdocs-render-swagger-plugin --upgrade
+          pip install git+https://${{ secrets.GH_TOKEN }}@github.com/squidfunk/mkdocs-material-insiders.git
+          mkdocs build -s

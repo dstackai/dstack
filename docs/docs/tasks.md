@@ -1,11 +1,13 @@
 # Tasks
 
-A task allows you to schedule a job or run a web app. Tasks can be distributed and can forward ports.
+A task allows you to run arbitrary commands on one or more nodes.
+They are best suited for one-off jobs like training or batch processing,
+but can also be used for serving apps if features supported by [services](`services.md`) are not required.
 
 ## Define a configuration
 
-First, create a YAML file in your project folder. Its name must end with `.dstack.yml` (e.g. `.dstack.yml` or `train.dstack.yml`
-are both acceptable).
+First, define a task configuration as a YAML file in your project folder.
+The filename must end with `.dstack.yml` (e.g. `.dstack.yml` or `dev.dstack.yml` are both acceptable).
 
 [//]: # (TODO: Make tabs - single machine & distributed tasks & web app)
 
@@ -37,13 +39,14 @@ resources:
 
 </div>
 
-If you don't specify your Docker image, `dstack` uses the [base](https://hub.docker.com/r/dstackai/base/tags) image
-(pre-configured with Python, Conda, and essential CUDA drivers).
+!!! info "Docker image"
+    If you don't specify your Docker image, `dstack` uses the [base](https://hub.docker.com/r/dstackai/base/tags) image
+    pre-configured with Python, Conda, and essential CUDA drivers.
 
 !!! info "Distributed tasks"
     By default, tasks run on a single instance. However, you can specify
     the [number of nodes](reference/dstack.yml/task.md#distributed-tasks).
-    In this case, the task will run a cluster of instances.
+    In this case, the task will run on a cluster of instances.
 
 !!! info "Reference"
     See [.dstack.yml](reference/dstack.yml/task.md) for all the options supported by
@@ -51,7 +54,7 @@ If you don't specify your Docker image, `dstack` uses the [base](https://hub.doc
 
 ## Run a configuration
 
-To run a configuration, use the [`dstack apply`](reference/cli/dstack/apply.md) command.
+To run a task, pass the configuration to [`dstack apply`](reference/cli/dstack/apply.md):
 
 <div class="termy">
 
@@ -78,10 +81,10 @@ Launching `axolotl-train`...
 </div>
 
 `dstack apply` automatically provisions instances, uploads the contents of the repo (incl. your local uncommitted changes),
-and runs the configuration.
+and runs the commands.
 
 !!! info "Ports"
-    If the task specifies [`ports`](reference/dstack.yml/task.md#_ports), `dstack run` automatically forwards them to your
+    If the task specifies [`ports`](reference/dstack.yml/task.md#_ports), `dstack apply` automatically forwards them to your
     local machine for convenient and secure access.
 
 !!! info "Queueing tasks"
@@ -98,19 +101,32 @@ Use `--watch` (or `-w`) to monitor the live status of runs.
 
 ### Stop a run
 
-Once the run exceeds the [`max_duration`](reference/dstack.yml/task.md#max_duration), or when you use [`dstack stop`](reference/cli/dstack/stop.md), 
-the dev environment is stopped. Use `--abort` or `-x` to stop the run abruptly. 
+A task runs until it's completed or its lifetime exceeds [`max_duration`](reference/dstack.yml/dev-environment.md#max_duration).
+You can also gracefully stop a task using [`dstack stop`](reference/cli/dstack/stop.md).
+Pass `--abort` or `-x` to stop without waiting for a graceful shutdown.
 
-[//]: # (TODO: Mention `dstack logs` and `dstack logs -d`)
+### Attach to a run
+
+By default, `dstack apply` runs in attached mode – it establishes the SSH tunnel to the run, forwards ports, and shows real-time logs.
+If you detached from a run, you can reattach to it using [`dstack attach`](reference/cli/dstack/attach.md).
+
+### See run logs
+
+To see the logs of a run without attaching, use [`dstack logs`](reference/cli/dstack/logs.md).
+Pass `--diagnose`/`-d` to `dstack logs` to see the diagnostics logs. It may be useful if a run fails.
+For more information on debugging failed runs, see the [troubleshooting](guides/troubleshooting.md) guide.
 
 ## Manage fleets
+
+Fleets are groups of cloud instances or SSH machines that you use to run dev environments, tasks, and services.
+You can let `dstack apply` provision fleets or [create and manage them directly](concepts/fleets.md).
 
 ### Creation policy
 
 By default, when you run `dstack apply` with a dev environment, task, or service,
 `dstack` reuses `idle` instances from an existing [fleet](concepts/fleets.md).
-If no `idle` instances matching the requirements, it automatically creates a new fleet 
-using backends.
+If no `idle` instances match the requirements, `dstack` automatically creates a new fleet 
+using configured backends.
 
 To ensure `dstack apply` doesn't create a new fleet but reuses an existing one,
 pass `-R` (or `--reuse`) to `dstack apply`.

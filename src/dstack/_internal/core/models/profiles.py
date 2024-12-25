@@ -111,7 +111,12 @@ class ProfileParams(CoreModel):
     ]
     reservation: Annotated[
         Optional[str],
-        Field(description="The existing reservation for the instances"),
+        Field(
+            description=(
+                "The existing reservation to use for instance provisioning."
+                " Supports AWS Capacity Reservations and Capacity Blocks"
+            )
+        ),
     ]
     spot_policy: Annotated[
         Optional[SpotPolicy],
@@ -123,10 +128,6 @@ class ProfileParams(CoreModel):
         Optional[Union[ProfileRetry, bool]],
         Field(description="The policy for resubmitting the run. Defaults to `false`"),
     ]
-    retry_policy: Annotated[
-        Optional[ProfileRetryPolicy],
-        Field(description="The policy for resubmitting the run. Deprecated in favor of `retry`"),
-    ]
     max_duration: Annotated[
         Optional[Union[Literal["off"], str, int]],
         Field(
@@ -137,11 +138,6 @@ class ProfileParams(CoreModel):
         Optional[float],
         Field(description="The maximum instance price per hour, in dollars", gt=0.0),
     ]
-    pool_name: Annotated[
-        Optional[str],
-        Field(description="The name of the pool. If not set, dstack will use the default name"),
-    ]
-    instance_name: Annotated[Optional[str], Field(description="The name of the instance")]
     creation_policy: Annotated[
         Optional[CreationPolicy],
         Field(
@@ -158,6 +154,13 @@ class ProfileParams(CoreModel):
             description="Time to wait before destroying the idle instance. Defaults to `5m` for `dstack run` and to `3d` for `dstack pool add`"
         ),
     ]
+    # Deprecated:
+    # The name of the pool. If not set, dstack will use the default name
+    pool_name: Optional[str]
+    # The name of the instance
+    instance_name: Optional[str]
+    # The policy for resubmitting the run. Deprecated in favor of `retry`
+    retry_policy: Optional[ProfileRetryPolicy]
 
     _validate_max_duration = validator("max_duration", pre=True, allow_reuse=True)(
         parse_max_duration

@@ -104,7 +104,7 @@ By default, the `dstack` server stores its state locally in `~/.dstack/server` u
 
 ### PostgreSQL
 
-To store the state externally, use the `DSTACK_DATABASE_URL` and `DSTACK_SERVER_CLOUDWATCH_LOG_GROUP` environment variables.
+To store the state externally, set the `DSTACK_DATABASE_URL` and `DSTACK_SERVER_CLOUDWATCH_LOG_GROUP` environment variables.
 
 ??? info "Migrate from SQLite to PostgreSQL"
     You can migrate the existing state from SQLite to PostgreSQL using `pgloader`:
@@ -166,12 +166,29 @@ The log group must be created beforehand, `dstack` won't try to create it.
     }
     ```
 
-## Running multiple replicas of the server
-
-If you'd like to run multiple server replicas, make sure to configure `dstack` to use [PostgreSQL](#postgresql)
-and [AWS CloudWatch](#aws-cloudwatch).
-
 ## Enabling encryption
 
-If you want backend credentials and user tokens to be encrypted, you can set up encryption keys via
-[`~/.dstack/server/config.yml`](../reference/server/config.yml.md#encryption_1).
+By default, `dstack` stores data in plaintext.
+If you want backend credentials and user tokens to be encrypted, set up encryption keys via
+[`~/.dstack/server/config.yml`](../reference/server/config.yml.md#encryption).
+
+## Backward compatibility
+
+!!! info "Versioning scheme"
+    `dstack` follows the `{major}.{minor}.{patch}` versioning scheme based on these principles:
+
+=== "Server"
+    The server backward compatibility is maintained across all minor and patch releases. The specific features can be removed but the removal is preceded with deprecation warnings for several minor releases. This means you can use older client versions with newer server versions.
+
+=== "Client"
+    The client backward compatibility is maintained across patch releases. A new minor release indicates that the release breaks client backward compatibility. This means you don't need to update the server when you update the client to a new patch release. Still, upgrading a client to a new minor version requires upgrading the server too.
+
+## FAQ
+
+##### Can I run multiple replicas of the dstack server?
+
+Yes, you can if you configure `dstack` to use [PostgreSQL](#postgresql) and [AWS CloudWatch](#aws-cloudwatch).
+
+##### Does the dstack server support blue-green or rolling deployments?
+
+Yes, it does if you configure `dstack` to use [PostgreSQL](#postgresql) and [AWS CloudWatch](#aws-cloudwatch).

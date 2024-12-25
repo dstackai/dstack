@@ -9,8 +9,8 @@ handling authentication, load distribution, and auto-scaling.
 
 ## Define a configuration
 
-First, create a YAML file in your project folder. Its name must end with `.dstack.yml` (e.g. `.dstack.yml` or `gateway.dstack.yml`
-are both acceptable).
+First, define a gateway configuration as a YAML file in your project folder.
+The filename must end with `.dstack.yml` (e.g. `.dstack.yml` or `gateway.dstack.yml` are both acceptable).
 
 <div editor-title="gateway.dstack.yml"> 
 
@@ -67,7 +67,7 @@ The [`dstack gateway list`](../reference/cli/dstack/gateway.md#dstack-gateway-li
 
 ### Delete a gateway
 
-To delete a gateway, pass gateway configuration to [`dstack delete`](../reference/cli/dstack/delete.md):
+To delete a gateway, pass the gateway configuration to [`dstack delete`](../reference/cli/dstack/delete.md):
 
 <div class="termy">
 
@@ -76,6 +76,8 @@ $ dstack delete -f examples/deployment/gateway.dstack.yml
 ```
 
 </div>
+
+Alternatively, you can delete a gateway by passing the gateway name  to `dstack gateway delete`.
 
 [//]: # (TODO: Elaborate on default)
 

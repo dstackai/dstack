@@ -4,7 +4,7 @@ The `service` configuration type allows running [services](../../services.md).
 
 > Configuration files must be inside the project repo, and their names must end with `.dstack.yml` 
 > (e.g. `.dstack.yml` or `serve.dstack.yml` are both acceptable).
-> Any configuration can be run via [`dstack apply`](../cli/index.md#dstack-apply).
+> Any configuration can be run via [`dstack apply`](../cli/dstack/apply.md).
 
 ## Examples
 
@@ -105,8 +105,7 @@ If you want, you can specify your own Docker image via `image`.
     ```
 
 !!! info "Docker and Docker Compose"
-    All backends except `runpod`, `vastai` and `kubernetes` also allow to use [Docker and Docker Compose](../../guides/protips.md#docker-and-docker-compose) 
-    inside `dstack` runs.
+    All backends except `runpod`, `vastai`, and `kubernetes` also allow using [Docker and Docker Compose](../../guides/protips.md#docker-and-docker-compose) inside `dstack` runs.
 
 ### Models { #model-mapping }
 
@@ -301,14 +300,13 @@ resources:
 
 </div>
 
-If you don't assign a value to an environment variable (see `HF_TOKEN` above),
+> If you don't assign a value to an environment variable (see `HF_TOKEN` above),
 `dstack` will require the value to be passed via the CLI or set in the current process.
-
 For instance, you can define environment variables in a `.envrc` file and utilize tools like `direnv`.
 
 #### System environment variables
 
-The following environment variables are available in any run and are passed by `dstack` by default:
+The following environment variables are available in any run by default:
 
 | Name                    | Description                             |
 |-------------------------|-----------------------------------------|
@@ -496,6 +494,12 @@ so models served by TGI can be defined with `format: openai` too.
       show_root_heading: false
       type:
         required: true
+
+## `retry`
+
+#SCHEMA# dstack._internal.core.models.profiles.ProfileRetry
+    overrides:
+      show_root_heading: false
 
 ## `resources`
 
