@@ -26,9 +26,11 @@ import (
 	"github.com/docker/docker/api/types/registry"
 	dockersystem "github.com/docker/docker/api/types/system"
 	docker "github.com/docker/docker/client"
+	"github.com/docker/docker/errdefs"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/docker/go-connections/nat"
 	"github.com/docker/go-units"
+	"github.com/dstackai/dstack/runner/consts"
 	"github.com/dstackai/dstack/runner/internal/shim/backends"
 	"github.com/dstackai/dstack/runner/internal/shim/host"
 	bytesize "github.com/inhies/go-bytesize"
@@ -62,11 +64,12 @@ type DockerRunner struct {
 }
 
 func NewDockerRunner(dockerParams DockerParameters) (*DockerRunner, error) {
+	ctx := context.TODO()
 	client, err := docker.NewClientWithOpts(docker.FromEnv, docker.WithAPIVersionNegotiation())
 	if err != nil {
 		return nil, tracerr.Wrap(err)
 	}
-	dockerInfo, err := client.Info(context.TODO())
+	dockerInfo, err := client.Info(ctx)
 	if err != nil {
 		return nil, tracerr.Wrap(err)
 	}
@@ -92,7 +95,85 @@ func NewDockerRunner(dockerParams DockerParameters) (*DockerRunner, error) {
 		gpuLock:      gpuLock,
 		tasks:        NewTaskStorage(),
 	}
+
+	if err := runner.restoreStateFromContainers(ctx); err != nil {
+		return nil, tracerr.Errorf("failed to restore state from containers: %w", err)
+	}
+
 	return runner, nil
+}
+
+// restoreStateFromContainers regenerates TaskStorage and GpuLock inspecting containers
+// Used to restore shim state on restarts
+func (d *DockerRunner) restoreStateFromContainers(ctx context.Context) error {
+	listOptions := container.ListOptions{
+		All:     true,
+		Filters: filters.NewArgs(filters.Arg("label", fmt.Sprintf("%s=%s", LabelKeyIsTask, LabelValueTrue))),
+	}
+	containers, err := d.client.ContainerList(ctx, listOptions)
+	if err != nil {
+		return fmt.Errorf("failed to get container list: %w", err)
+	}
+	for _, containerShort := range containers {
+		containerID := containerShort.ID
+		taskID := containerShort.Labels[LabelKeyTaskID]
+		if taskID == "" {
+			log.Printf("container %s has no %s label", containerID, LabelKeyTaskID)
+			continue
+		}
+		var status TaskStatus
+		if containerShort.State == "exited" {
+			status = TaskStatusTerminated
+		} else {
+			status = TaskStatusRunning
+		}
+		var containerName string
+		if len(containerShort.Names) > 0 {
+			// "Names are prefixed with their parent and / == the docker daemon"
+			// https://github.com/moby/moby/issues/6705
+			containerName = strings.TrimLeft(containerShort.Names[0], "/")
+		}
+		var gpuIDs []string
+		if d.gpuVendor != host.GpuVendorNone {
+			if containerFull, err := d.client.ContainerInspect(ctx, containerID); err != nil {
+				log.Printf("failed to inspect container=%s task=%s", containerID, taskID)
+			} else if d.gpuVendor == host.GpuVendorNvidia {
+				deviceRequests := containerFull.HostConfig.Resources.DeviceRequests
+				if len(deviceRequests) == 1 {
+					gpuIDs = deviceRequests[0].DeviceIDs
+				} else if len(deviceRequests) != 0 {
+					log.Printf(
+						"cannot extract GPU IDs container=%s task=%s: more than one DeviceRequest",
+						containerID, taskID,
+					)
+				}
+			} else {
+				for _, device := range containerFull.HostConfig.Resources.Devices {
+					if host.IsRenderNodePath(device.PathOnHost) {
+						gpuIDs = append(gpuIDs, device.PathOnHost)
+					}
+				}
+			}
+		}
+		var runnerDir string
+		for _, mount := range containerShort.Mounts {
+			if mount.Destination == consts.RunnerDir {
+				runnerDir = mount.Source
+				break
+			}
+		}
+		task := NewTask(taskID, status, containerName, containerID, gpuIDs, runnerDir)
+		if !d.tasks.Add(task) {
+			log.Printf("duplicate restored task %s", taskID)
+		} else {
+			log.Printf("restored task ID=%s, status=%s, gpuIDs=%v", taskID, status, gpuIDs)
+		}
+		if status == TaskStatusRunning && len(gpuIDs) > 0 {
+			lockedGpuIDs := d.gpuLock.Lock(gpuIDs)
+			log.Printf("locked GPU(s) due to running task gpuIDs=%v task=%s", lockedGpuIDs, taskID)
+		}
+	}
+	return nil
 }
 
 func (d *DockerRunner) Resources() Resources {
@@ -118,50 +199,111 @@ func (d *DockerRunner) Resources() Resources {
 	}
 }
 
-func (d *DockerRunner) Run(ctx context.Context, cfg TaskConfig) error {
-	task := NewTask(cfg)
+func (d *DockerRunner) TaskIDs() []string {
+	return d.tasks.IDs()
+}
 
+func (d *DockerRunner) TaskInfo(taskID string) TaskInfo {
+	task, ok := d.tasks.Get(taskID)
+	if !ok {
+		return TaskInfo{}
+	}
+	taskInfo := TaskInfo{
+		ID:                 task.ID,
+		Status:             task.Status,
+		TerminationReason:  task.TerminationReason,
+		TerminationMessage: task.TerminationMessage,
+		ContainerName:      task.containerName,
+		ContainerID:        task.containerID,
+		GpuIDs:             task.gpuIDs,
+	}
+	if taskInfo.GpuIDs == nil {
+		taskInfo.GpuIDs = []string{}
+	}
+	return taskInfo
+}
+
+func (d *DockerRunner) Submit(ctx context.Context, cfg TaskConfig) error {
+	if cfg.ID == "" {
+		return tracerr.Errorf("%w: empty task ID", ErrRequest)
+	}
+	if cfg.Name == "" {
+		return tracerr.Errorf("%w: empty task Name", ErrRequest)
+	}
+	task := NewTaskFromConfig(cfg)
 	// For legacy API compatibility, since LegacyTaskID is the same for all tasks
 	if task.ID == LegacyTaskID {
-		d.tasks.Delete(task.ID)
+		if currentTask, ok := d.tasks.Get(LegacyTaskID); ok {
+			if currentTask.Status != TaskStatusTerminated {
+				if err := d.Terminate(ctx, LegacyTaskID, 0, "", ""); err != nil {
+					log.Printf("failed to terminate task: %v", err)
+				}
+			}
+			if err := d.Remove(ctx, LegacyTaskID); err != nil {
+				log.Printf("failed to remove task: %v", err)
+			}
+		}
+	}
+	if ok := d.tasks.Add(task); !ok {
+		return tracerr.Errorf("%w: task %s is already submitted", ErrRequest, task.ID)
+	}
+	return nil
+}
+
+func (d *DockerRunner) Run(ctx context.Context, taskID string) error {
+	task, ok := d.tasks.Get(taskID)
+	if !ok {
+		log.Printf("cannot run task %s: not found", taskID)
+		return fmt.Errorf("task %s: %w", taskID, ErrNotFound)
 	}
 
-	if ok := d.tasks.Add(task); !ok {
-		return tracerr.Errorf("task %s is already submitted", task.ID)
+	if task.Status != TaskStatusPending {
+		return fmt.Errorf("%w: cannot run task %s with %s status", ErrRequest, task.ID, task.Status)
 	}
 
 	defer func() {
-		if ok := d.tasks.Update(task); !ok {
-			log.Printf("failed to update task %s", task.ID)
+		if err := d.tasks.Update(task); err != nil {
+			if currentTask, ok := d.tasks.Get(LegacyTaskID); ok && currentTask.Status != task.Status {
+				// ignore error if task is gone or status has not changed, e.g., terminated -> terminated
+				log.Printf("failed to update task %s: %v", task.ID, err)
+			}
 		}
 	}()
 
+	task.SetStatusPreparing()
+	if err := d.tasks.Update(task); err != nil {
+		return tracerr.Errorf("%w: failed to update task %s: %w", ErrInternal, task.ID, err)
+	}
+
+	cfg := task.config
 	var err error
 
-	if cfg.GpuCount != 0 {
-		gpuIDs, err := d.gpuLock.Acquire(cfg.GpuCount)
+	if cfg.GPU != 0 {
+		gpuIDs, err := d.gpuLock.Acquire(cfg.GPU)
 		if err != nil {
 			log.Println(err)
 			task.SetStatusTerminated("EXECUTOR_ERROR", err.Error())
 			return tracerr.Wrap(err)
 		}
 		task.gpuIDs = gpuIDs
+		log.Printf("acquired GPU(s) gpuIDs=%v task=%s", gpuIDs, task.ID)
 
 		defer func() {
-			d.gpuLock.Release(task.gpuIDs)
+			releasedGpuIDs := d.gpuLock.Release(task.gpuIDs)
+			log.Printf("released GPU(s) gpuIDs=%v task=%s", releasedGpuIDs, task.ID)
 		}()
 	}
 
-	if cfg.SshKey != "" {
-		ak := AuthorizedKeys{user: cfg.SshUser, lookup: user.Lookup}
-		if err := ak.AppendPublicKeys([]string{cfg.SshKey}); err != nil {
+	if len(cfg.HostSshKeys) > 0 {
+		ak := AuthorizedKeys{user: cfg.HostSshUser, lookup: user.Lookup}
+		if err := ak.AppendPublicKeys(cfg.HostSshKeys); err != nil {
 			errMessage := fmt.Sprintf("ak.AppendPublicKeys error: %s", err.Error())
 			log.Println(errMessage)
 			task.SetStatusTerminated("EXECUTOR_ERROR", errMessage)
 			return tracerr.Wrap(err)
 		}
 		defer func(cfg TaskConfig) {
-			err := ak.RemovePublicKeys([]string{cfg.SshKey})
+			err := ak.RemovePublicKeys(cfg.HostSshKeys)
 			if err != nil {
 				log.Printf("Error RemovePublicKeys: %s\n", err.Error())
 			}
@@ -192,8 +334,8 @@ func (d *DockerRunner) Run(ctx context.Context, cfg TaskConfig) error {
 	pullCtx, cancelPull := context.WithTimeout(ctx, ImagePullTimeout)
 	defer cancelPull()
 	task.SetStatusPulling(cancelPull)
-	if !d.tasks.Update(task) {
-		return tracerr.Errorf("failed to update task %s", task.ID)
+	if err := d.tasks.Update(task); err != nil {
+		return tracerr.Errorf("%w: failed to update task %s: %w", ErrInternal, task.ID, err)
 	}
 	if err = pullImage(pullCtx, d.client, cfg); err != nil {
 		errMessage := fmt.Sprintf("pullImage error: %s", err.Error())
@@ -202,48 +344,25 @@ func (d *DockerRunner) Run(ctx context.Context, cfg TaskConfig) error {
 		return tracerr.Wrap(err)
 	}
 
-	log.Println("Creating container")
+	log.Printf("Creating container name=%s task=%s", task.containerName, task.ID)
 	task.SetStatusCreating()
-	if !d.tasks.Update(task) {
-		return tracerr.Errorf("failed to update task %s", task.ID)
+	if err := d.tasks.Update(task); err != nil {
+		return tracerr.Errorf("%w: failed to update task %s: %w", ErrInternal, task.ID, err)
 	}
-	containerID, err := d.createContainer(ctx, task)
+	containerID, err := d.createContainer(ctx, &task)
 	if err != nil {
 		errMessage := fmt.Sprintf("createContainer error: %s", err.Error())
-		log.Print(errMessage + "\n")
+		log.Println(errMessage)
 		task.SetStatusTerminated("CREATING_CONTAINER_ERROR", errMessage)
 		return tracerr.Wrap(err)
 	}
 
-	defer func() {
-		log.Println("Deleting old container(s)")
-		listFilters := filters.NewArgs(
-			filters.Arg("label", fmt.Sprintf("%s=%s", LabelKeyIsTask, LabelValueTrue)),
-			filters.Arg("status", "exited"),
-		)
-		containers, err := d.client.ContainerList(ctx, container.ListOptions{Filters: listFilters})
-		if err != nil {
-			log.Printf("ContainerList error: %s\n", err.Error())
-			return
-		}
-		for _, container_ := range containers {
-			if container_.ID == containerID {
-				continue
-			}
-			err := d.client.ContainerRemove(ctx, container_.ID, container.RemoveOptions{Force: true, RemoveVolumes: true})
-			if err != nil {
-				log.Printf("ContainerRemove error: %s\n", err.Error())
-			}
-		}
-	}()
-
-	log.Printf("Running container, name=%s, id=%s\n", task.containerName, containerID)
+	log.Printf("Running container name=%s task=%s", task.containerName, task.ID)
 	task.SetStatusRunning(containerID)
-	if !d.tasks.Update(task) {
-		return tracerr.Errorf("failed to update task %s", task.ID)
+	if err := d.tasks.Update(task); err != nil {
+		return tracerr.Errorf("%w: failed to update task %s: %w", ErrInternal, task.ID, err)
 	}
-
-	if err = runContainer(ctx, d.client, containerID); err != nil {
+	if err = d.runContainer(ctx, &task); err != nil {
 		log.Printf("runContainer error: %s\n", err.Error())
 		var errMessage string
 		if lastLogs, err := getContainerLastLogs(d.client, containerID, 5); err == nil {
@@ -262,27 +381,110 @@ func (d *DockerRunner) Run(ctx context.Context, cfg TaskConfig) error {
 	return nil
 }
 
-func (d *DockerRunner) Stop(force bool) {
-	task, ok := d.tasks.Get(LegacyTaskID)
+// Terminate aborts running operations (pulling an image, running a container) and sets task status to terminated
+// Associated resources (container, logs, etc.) are not destroyed, use Remove() for cleanup
+func (d *DockerRunner) Terminate(ctx context.Context, taskID string, timeout uint, reason string, message string) (err error) {
+	task, ok := d.tasks.Get(taskID)
 	if !ok {
-		return
+		log.Printf("cannot terminate task %s: not found", taskID)
+		return fmt.Errorf("task %s: %w", taskID, ErrNotFound)
+	}
+	task.Lock()
+	defer task.Release()
+	defer func() {
+		if err := d.tasks.Update(task); err != nil {
+			log.Printf("failed to update task %s: %v", task.ID, err)
+		}
+	}()
+	return d.terminate(ctx, &task, timeout, reason, message)
+}
+
+func (d *DockerRunner) terminate(ctx context.Context, task *Task, timeout uint, reason string, message string) (err error) {
+	log.Printf("terminating task %s", task.ID)
+	defer func() {
+		if err != nil {
+			log.Printf("cannot terminate task %s: %v", task.ID, err)
+		}
+	}()
+	if !task.IsTransitionAllowed(TaskStatusTerminated) {
+		return fmt.Errorf("%w: cannot terminate task %s with %s status", ErrRequest, task.ID, task.Status)
 	}
 	switch task.Status {
-	case TaskStatusPending, TaskStatusCreating, TaskStatusTerminated:
+	case TaskStatusPending, TaskStatusPreparing, TaskStatusCreating, TaskStatusTerminated:
 		// nothing to do
 	case TaskStatusPulling:
 		task.cancelPull()
 	case TaskStatusRunning:
 		stopOptions := container.StopOptions{}
-		if force {
-			timeout := int(0)
-			stopOptions.Timeout = &timeout
+		timeout := int(timeout)
+		stopOptions.Timeout = &timeout
+		if err := d.client.ContainerStop(ctx, task.containerID, stopOptions); err != nil {
+			return fmt.Errorf("%w: failed to stop container: %w", ErrInternal, err)
 		}
-		err := d.client.ContainerStop(context.Background(), task.containerID, stopOptions)
+	default:
+		return fmt.Errorf("%w: should not reach here", ErrInternal)
+	}
+	if len(task.gpuIDs) > 0 {
+		releasedGpuIDs := d.gpuLock.Release(task.gpuIDs)
+		log.Printf("released GPU(s) gpuIDs=%v task=%s", releasedGpuIDs, task.ID)
+	}
+	task.SetStatusTerminated(reason, message)
+	log.Printf("task %s terminated", task.ID)
+	return nil
+}
+
+// Remove destroys resources associated with task (container, logs, etc.), if any
+// On success, it also removes the task from TaskStorage
+func (d *DockerRunner) Remove(ctx context.Context, taskID string) error {
+	task, ok := d.tasks.Get(taskID)
+	if !ok {
+		log.Printf("cannot remove task %s: not found", taskID)
+		return fmt.Errorf("task %s: %w", taskID, ErrNotFound)
+	}
+	task.Lock()
+	defer task.Release()
+	err := d.remove(ctx, &task)
+	if err == nil {
+		d.tasks.Delete(taskID)
+	}
+	return err
+}
+
+func (d *DockerRunner) remove(ctx context.Context, task *Task) (err error) {
+	log.Printf("removing task %s", task.ID)
+	defer func() {
 		if err != nil {
-			log.Printf("Failed to stop container: %s", err)
+			log.Printf("cannot remove task %s: %v", task.ID, err)
+		}
+	}()
+	if task.Status != TaskStatusTerminated {
+		return fmt.Errorf("%w: cannot remove task %s with %s status", ErrRequest, task.ID, task.Status)
+	}
+	removeOptions := container.RemoveOptions{Force: true, RemoveVolumes: true}
+	// Normally, it should not be empty
+	if task.containerID != "" {
+		err := d.client.ContainerRemove(ctx, task.containerID, removeOptions)
+		if err != nil {
+			if errdefs.IsNotFound(err) {
+				log.Printf("cannot remove container task=%s: not found", task.ID)
+			} else {
+				return fmt.Errorf("%w: failed to remove container task=%s: %w", ErrInternal, task.ID, err)
+			}
 		}
 	}
+	// Normally, it should not be empty
+	if task.runnerDir != "" {
+		// Failed attempts to remove or rename runner dir are considered non-fatal
+		if err := os.RemoveAll(task.runnerDir); err != nil {
+			log.Printf("failed to remove runner directory %s: %v", task.runnerDir, err)
+			trashName := fmt.Sprintf(".trash-%s-%d", task.runnerDir, time.Now().UnixMicro())
+			if err := os.Rename(task.runnerDir, trashName); err != nil {
+				log.Printf("failed to rename runner directory %s: %v", task.runnerDir, err)
+			}
+		}
+	}
+	log.Printf("task %s removed", task.ID)
+	return nil
 }
 
 func (d *DockerRunner) GetState() (RunnerStatus, JobResult) {
@@ -298,6 +500,8 @@ func (d *DockerRunner) GetState() (RunnerStatus, JobResult) {
 func getLegacyStatus(task Task) RunnerStatus {
 	switch task.Status {
 	case TaskStatusPending:
+		return Pulling
+	case TaskStatusPreparing:
 		return Pulling
 	case TaskStatusPulling:
 		return Pulling
@@ -567,28 +771,12 @@ func pullImage(ctx context.Context, client docker.APIClient, taskConfig TaskConf
 	return nil
 }
 
-func (d *DockerRunner) createContainer(ctx context.Context, task Task) (string, error) {
-	// For legacy API compatibility, since LegacyTaskID is the same for all tasks, containerName is not unique
-	// With new API where task.ID is unique (and, in turn, containerName is unique too), container name clash
-	// is not expected
-	if task.ID == LegacyTaskID {
-		timeout := int(0)
-		stopOptions := container.StopOptions{Timeout: &timeout}
-		err := d.client.ContainerStop(ctx, task.containerName, stopOptions)
-		if err != nil {
-			log.Printf("Cleanup routine: Cannot stop container: %s", err)
-		}
-		removeOptions := container.RemoveOptions{Force: true, RemoveVolumes: true}
-		err = d.client.ContainerRemove(ctx, task.containerName, removeOptions)
-		if err != nil {
-			log.Printf("Cleanup routine: Cannot remove container: %s", err)
-		}
-	}
-
-	runnerDir, err := d.dockerParams.MakeRunnerDir()
+func (d *DockerRunner) createContainer(ctx context.Context, task *Task) (string, error) {
+	runnerDir, err := d.dockerParams.MakeRunnerDir(task.containerName)
 	if err != nil {
 		return "", tracerr.Wrap(err)
 	}
+	task.runnerDir = runnerDir
 	mounts, err := d.dockerParams.DockerMounts(runnerDir)
 	if err != nil {
 		return "", tracerr.Wrap(err)
@@ -625,7 +813,7 @@ func (d *DockerRunner) createContainer(ctx context.Context, task Task) (string, 
 
 	containerConfig := &container.Config{
 		Image:        task.config.ImageName,
-		Cmd:          []string{strings.Join(d.dockerParams.DockerShellCommands(task.config.PublicKeys), " && ")},
+		Cmd:          []string{strings.Join(d.dockerParams.DockerShellCommands(task.config.ContainerSshKeys), " && ")},
 		Entrypoint:   []string{"/bin/sh", "-c"},
 		ExposedPorts: exposePorts(d.dockerParams.DockerPorts()...),
 		Env:          envVars,
@@ -647,12 +835,13 @@ func (d *DockerRunner) createContainer(ctx context.Context, task Task) (string, 
 		ShmSize:         task.config.ShmSize,
 		Tmpfs:           tmpfs,
 	}
+	hostConfig.Resources.NanoCPUs = int64(task.config.CPU * 1000000000)
+	hostConfig.Resources.Memory = task.config.Memory
 	if len(task.gpuIDs) > 0 {
 		configureGpus(hostConfig, d.gpuVendor, task.gpuIDs)
 	}
 	configureHpcNetworkingIfAvailable(hostConfig)
 
-	log.Printf("Creating container %s:\nconfig: %v\nhostConfig:%v", task.containerName, containerConfig, hostConfig)
 	resp, err := d.client.ContainerCreate(ctx, containerConfig, hostConfig, nil, nil, task.containerName)
 	if err != nil {
 		return "", tracerr.Wrap(err)
@@ -660,12 +849,12 @@ func (d *DockerRunner) createContainer(ctx context.Context, task Task) (string, 
 	return resp.ID, nil
 }
 
-func runContainer(ctx context.Context, client docker.APIClient, containerID string) error {
-	if err := client.ContainerStart(ctx, containerID, container.StartOptions{}); err != nil {
+func (d *DockerRunner) runContainer(ctx context.Context, task *Task) error {
+	if err := d.client.ContainerStart(ctx, task.containerID, container.StartOptions{}); err != nil {
 		return tracerr.Wrap(err)
 	}
 
-	waitCh, errorCh := client.ContainerWait(ctx, containerID, "")
+	waitCh, errorCh := d.client.ContainerWait(ctx, task.containerID, "")
 	select {
 	case waitResp := <-waitCh:
 		{
@@ -918,7 +1107,7 @@ func (c *CLIArgs) DockerMounts(hostRunnerDir string) ([]mount.Mount, error) {
 		{
 			Type:   mount.TypeBind,
 			Source: hostRunnerDir,
-			Target: c.Runner.TempDir,
+			Target: consts.RunnerDir,
 		},
 		{
 			Type:   mount.TypeBind,
@@ -932,8 +1121,8 @@ func (c *CLIArgs) DockerPorts() []int {
 	return []int{c.Runner.HTTPPort, c.Docker.SSHPort}
 }
 
-func (c *CLIArgs) MakeRunnerDir() (string, error) {
-	runnerTemp := filepath.Join(c.Shim.HomeDir, "runners", time.Now().Format("20060102-150405"))
+func (c *CLIArgs) MakeRunnerDir(name string) (string, error) {
+	runnerTemp := filepath.Join(c.Shim.HomeDir, "runners", name)
 	if err := os.MkdirAll(runnerTemp, 0o755); err != nil {
 		return "", tracerr.Wrap(err)
 	}

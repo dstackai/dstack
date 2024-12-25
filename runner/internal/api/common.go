@@ -19,7 +19,25 @@ type Error struct {
 }
 
 func (e *Error) Error() string {
-	return e.Err.Error()
+	if e.Msg != "" {
+		return e.Msg
+	}
+	if e.Err != nil {
+		return e.Err.Error()
+	}
+	return http.StatusText(e.Status)
+}
+
+type Router struct {
+	*http.ServeMux
+}
+
+func (r *Router) AddHandler(method string, pattern string, handler func(http.ResponseWriter, *http.Request) (interface{}, error)) {
+	r.HandleFunc(fmt.Sprintf("%s %s", method, pattern), JSONResponseHandler(handler))
+}
+
+func NewRouter() Router {
+	return Router{http.NewServeMux()}
 }
 
 func DecodeJSONBody(w http.ResponseWriter, r *http.Request, dst interface{}, allowUnknown bool) error {
@@ -84,25 +102,17 @@ func DecodeJSONBody(w http.ResponseWriter, r *http.Request, dst interface{}, all
 	return nil
 }
 
-func JSONResponseHandler(method string, handler func(http.ResponseWriter, *http.Request) (interface{}, error)) func(http.ResponseWriter, *http.Request) {
+func JSONResponseHandler(handler func(http.ResponseWriter, *http.Request) (interface{}, error)) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		status := 200
 		msg := ""
-		var body interface{}
-		var err error
 		var apiErr *Error
 
-		if r.Method == method {
-			body, err = handler(w, r)
-		} else {
-			body = nil
-			err = &Error{Status: http.StatusMethodNotAllowed, Err: nil}
-		}
-
+		body, err := handler(w, r)
 		if err != nil {
 			if errors.As(err, &apiErr) {
 				status = apiErr.Status
-				msg = apiErr.Msg
+				msg = apiErr.Error()
 				log.Warning(r.Context(), "API error", "err", apiErr.Err)
 			} else {
 				status = http.StatusInternalServerError
@@ -115,9 +125,6 @@ func JSONResponseHandler(method string, handler func(http.ResponseWriter, *http.
 			w.WriteHeader(status)
 			_ = json.NewEncoder(w).Encode(body)
 		} else {
-			if msg == "" {
-				msg = http.StatusText(status)
-			}
 			http.Error(w, msg, status)
 		}
 

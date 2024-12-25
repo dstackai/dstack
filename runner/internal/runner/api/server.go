@@ -35,7 +35,7 @@ type Server struct {
 }
 
 func NewServer(tempDir string, homeDir string, workingDir string, address string, version string) (*Server, error) {
-	mux := http.NewServeMux()
+	r := api.NewRouter()
 	ex, err := executor.NewRunExecutor(tempDir, homeDir, workingDir)
 	if err != nil {
 		return nil, err
@@ -43,7 +43,7 @@ func NewServer(tempDir string, homeDir string, workingDir string, address string
 	s := &Server{
 		srv: &http.Server{
 			Addr:    address,
-			Handler: mux,
+			Handler: r,
 		},
 		tempDir:    tempDir,
 		workingDir: workingDir,
@@ -60,14 +60,14 @@ func NewServer(tempDir string, homeDir string, workingDir string, address string
 
 		version: version,
 	}
-	mux.HandleFunc("/api/healthcheck", api.JSONResponseHandler("GET", s.healthcheckGetHandler))
-	mux.HandleFunc("/api/metrics", api.JSONResponseHandler("GET", s.metricsGetHandler))
-	mux.HandleFunc("/api/submit", api.JSONResponseHandler("POST", s.submitPostHandler))
-	mux.HandleFunc("/api/upload_code", api.JSONResponseHandler("POST", s.uploadCodePostHandler))
-	mux.HandleFunc("/api/run", api.JSONResponseHandler("POST", s.runPostHandler))
-	mux.HandleFunc("/api/pull", api.JSONResponseHandler("GET", s.pullGetHandler))
-	mux.HandleFunc("/api/stop", api.JSONResponseHandler("POST", s.stopPostHandler))
-	mux.HandleFunc("/logs_ws", api.JSONResponseHandler("GET", s.logsWsGetHandler))
+	r.AddHandler("GET", "/api/healthcheck", s.healthcheckGetHandler)
+	r.AddHandler("GET", "/api/metrics", s.metricsGetHandler)
+	r.AddHandler("POST", "/api/submit", s.submitPostHandler)
+	r.AddHandler("POST", "/api/upload_code", s.uploadCodePostHandler)
+	r.AddHandler("POST", "/api/run", s.runPostHandler)
+	r.AddHandler("GET", "/api/pull", s.pullGetHandler)
+	r.AddHandler("POST", "/api/stop", s.stopPostHandler)
+	r.AddHandler("GET", "/logs_ws", s.logsWsGetHandler)
 	return s, nil
 }
 

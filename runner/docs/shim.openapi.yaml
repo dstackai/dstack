@@ -2,20 +2,165 @@ openapi: 3.1.1
 
 info:
   title: dstack-shim API
-  version: &shim-version 0.18.30
+  version: &api-version 0.18.31
+  x-logo:
+    url: https://avatars.githubusercontent.com/u/54146142?s=260
 
 servers:
   - url: http://localhost:10998/api
 
+tags:
+  - name: &stable-api Stable API
+    description: >
+      Stable API should always stay backward (or future, depending on which point of view we are
+      talking about) compatible, meaning that newer versions of dstack server should be able
+      to use Stable API of older versions of shim without additional API version negotiation
+  - name: &future-api Future API
+    description: >
+      As of the current version of API, Future API is an upcoming "task-oriented" API, able to
+      handle more than one task at a time managing machine resources. It is not yet supported
+      by dstack server
+  - name: &legacy-api Legacy API
+    description: >
+      As of the current version of API, Legacy API is the only API (apart from Stable one) used by
+      dstack server. It can only process one task at a time and cannot manage (that is, limit)
+      machine resources consumed by the task
+
 paths:
-  /submit:
-    post:
+  /healthcheck:
+    get:
+      tags:
+        - *stable-api
+      summary: Ping and API version negotiation
+      description: >
+        Serves two roles:
+
+        * as the path implies, it's a healthcheck, although there is no field in the response that
+        indicate if shim is healthy. Basically, it not is a proper healthcheck but
+          a basic "ping" method
+        * API version negotiation. Server inspects `version` field to figure out which API features
+          it should use
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthcheckResponse"
+
+  /tasks:
+    get:
+      tags:
+        - *future-api
+      summary: Get task list
+      description: Returns a list of all tasks known to shim, including terminated ones
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskListResponse"
+    put:
+      tags:
+        - *future-api
+      summary: Submit and run new task
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/TaskConfigBody"
+              $ref: "#/components/schemas/TaskSubmitRequest"
+      responses:
+        "200":
+          description: Pending task info
+          $ref: "#/components/responses/TaskInfo"
+        "409":
+          description: Task with the same ID already submitted
+          $ref: "#/components/responses/PlainTextConflict"
+        "500":
+          description: Internal error
+          $ref: "#/components/responses/PlainTextInternalError"
+
+  /tasks/{id}:
+    get:
+      tags:
+        - *future-api
+      summary: Get task info
+      parameters:
+        - $ref: "#/parameters/taskId"
+      responses:
+        "200":
+          $ref: "#/components/responses/TaskInfo"
+
+    delete:
+      tags:
+        - *future-api
+      summary: Remove task
+      description: >
+        Removes the task from in-memory storage and destroys its associated
+        resources: a container, logs, etc.
+      parameters:
+        - $ref: "#/parameters/taskId"
+      responses:
+        "200":
+          description: Task removed
+          $ref: "#/components/responses/PlainTextOk"
+        "404":
+          description: Task not found
+          $ref: "#/components/responses/PlainTextNotFound"
+        "409":
+          description: Task is not terminated, cannot remove
+          $ref: "#/components/responses/PlainTextConflict"
+        "500":
+          description: Internal error, e.g., failed to remove a container
+          $ref: "#/components/responses/PlainTextInternalError"
+
+  /tasks/{id}/terminate:
+    post:
+      tags:
+        - *future-api
+      summary: Terminate task
+      description: >
+        Stops the task, that is, cancels image pulling if in progress,
+        stops the container if running, and sets the status to `terminated`.
+        No-op if the task is already terminated
+      parameters:
+        - in: path
+          name: id
+          schema:
+            $ref: "#/components/schemas/TaskID"
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TaskTerminateRequest"
+      responses:
+        "200":
+          description: Updated task info
+          $ref: "#/components/responses/TaskInfo"
+        "404":
+          description: Task not found
+          $ref: "#/components/responses/PlainTextNotFound"
+        "409":
+          description: Task is not terminated, cannot remove
+          $ref: "#/components/responses/PlainTextConflict"
+        "500":
+          description: Internal error, e.g., failed to remove a container
+          $ref: "#/components/responses/PlainTextInternalError"
+
+  /submit:
+    post:
+      tags:
+        - *legacy-api
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LegacySubmitBody"
       responses:
         "200":
           description: ""
@@ -36,42 +181,71 @@ paths:
 
   /pull:
     get:
+      tags:
+        - *legacy-api
       responses:
         "200":
           description: ""
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PullResponse"
+                $ref: "#/components/schemas/LegacyPullResponse"
 
   /stop:
     post:
+      tags:
+        - *legacy-api
       requestBody:
         required: false
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/StopBody"
+              $ref: "#/components/schemas/LegacyStopBody"
       responses:
         "200":
           description: ""
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/StopResponse"
+                $ref: "#/components/schemas/LegacyStopResponse"
 
-  /healthcheck:
-    get:
-      responses:
-        "200":
-          description: ""
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/HealthcheckResponse"
+parameters:
+  taskId:
+    name: id
+    in: path
+    schema:
+      $ref: "#/components/schemas/TaskID"
+    required: true
 
 components:
   schemas:
+    TaskID:
+      description: Unique task ID assigned by dstack server
+      type: string
+      examples:
+        - 23a2c7a0-6c88-48ee-8028-b9ad9f6f5c24
+
+    TaskStatus:
+      title: shim.TaskStatus
+      type: string
+      enum:
+        - pending
+        - preparing
+        - pulling
+        - creating
+        - running
+        - terminated
+
+    TerminationReason:
+      type: string
+      enum:
+        - EXECUTOR_ERROR
+        - CREATING_CONTAINER_ERROR
+        - CONTAINER_EXITED_WITH_ERROR
+        - DONE_BY_RUNNER
+        - TERMINATED_BY_USER
+        - TERMINATED_BY_SERVER
+
     RunnerStatus:
       title: shim.RunnerStatus
       type: string
@@ -86,12 +260,7 @@ components:
       type: object
       properties:
         reason:
-          type: string
-          enum:
-            - EXECUTOR_ERROR
-            - CREATING_CONTAINER_ERROR
-            - CONTAINER_EXITED_WITH_ERROR
-            - DONE_BY_RUNNER
+          $ref: "#/components/schemas/TerminationReason"
         reason_message:
           type: string
           default: ""
@@ -103,19 +272,16 @@ components:
         - reason_message
       additionalProperties: false
 
-    VolumeMountPoint:
-      title: shim.VolumeMountPoint
-      type: object
-      properties:
-        name:
-          type: string
-          default: ""
-          description: >
-            `dstack` volume [name](https://dstack.ai/docs/reference/dstack.yml/volume/#name)
-        path:
-          type: string
-          default: ""
-          description: Mount point inside container
+    GpuID:
+      description: >
+        A vendor-specific unique identifier of GPU:
+          * NVIDIA: "globally unique immutable alphanumeric identifier of the GPU",
+            in the form of `GPU-<UUID>`
+          * AMD: `/dev/dri/renderD<N>` path
+      type: string
+      examples:
+        - GPU-2b79666e-d81f-f3f8-fd47-9903f118c3f5
+        - /dev/dri/renderD128
 
     VolumeInfo:
       title: shim.VolumeInfo
@@ -138,6 +304,20 @@ components:
           description: >
             Create a filesystem when it doesn't exist if `true`, fail with error if `false`
 
+    VolumeMountPoint:
+      title: shim.VolumeMountPoint
+      type: object
+      properties:
+        name:
+          type: string
+          default: ""
+          description: >
+            `dstack` volume [name](https://dstack.ai/docs/reference/dstack.yml/volume/#name)
+        path:
+          type: string
+          default: ""
+          description: Mount point inside container
+
     InstanceMountPoint:
       title: shim.InstanceMountPoint
       type: object
@@ -151,9 +331,211 @@ components:
           default: ""
           description: Mount point inside container
 
-    TaskConfigBody:
-      title: shim.api.TaskConfigBody
+    HealthcheckResponse:
+      title: shim.api.HealthcheckResponse
+      type: object
+      properties:
+        service:
+          const: dstack-shim
+        version:
+          type: string
+          examples:
+            - *api-version
+      required:
+        - service
+        - version
+      additionalProperties: false
+
+    TaskListResponse:
+      title: shim.api.TaskListResponse
+      type: object
+      properties:
+        ids:
+          type: array
+          items:
+            $ref: "#/components/schemas/TaskID"
+          description: A list of all task IDs tracked by shim
+      required:
+        - ids
+      additionalProperties: false
+
+    TaskInfoResponse:
+      title: shim.api.TaskInfoResponse
+      description: Same as `shim.TaskInfo`
+      type: object
+      properties:
+        id:
+          $ref: "#/components/schemas/TaskID"
+        status:
+          allOf:
+            - $ref: "#/components/schemas/TaskStatus"
+            - examples:
+                - terminated
+        termination_reason:
+          $ref: "#/components/schemas/TerminationReason"
+        termination_message:
+          type: string
+          description: A shim-generated message or N last lines from the container logs
+        container_name:
+          type: string
+          examples:
+            - horrible-mule-1-0-0-44f7cb95
+        container_id:
+          type: string
+          examples:
+            - a6bb8d4bb8af8ec72482ecd194ff92fac9974521aa5ad8a46abfc4f0ba858775
+        gpu_ids:
+          type: array
+          items:
+            $ref: "#/components/schemas/GpuID"
+      required:
+        - id
+        - status
+        - termination_reason
+        - termination_message
+        - container_name
+        - container_id
+        - gpu_ids
+      additionalProperties: false
+
+    TaskSubmitRequest:
+      title: shim.api.TaskSubmitRequest
       description: Same as `shim.TaskConfig`
+      type: object
+      properties:
+        id:
+          $ref: "#/components/schemas/TaskID"
+        name:
+          type: string
+          description: Task name. Used to construct unique container name
+          examples:
+            - horrible-mule-1-0-0
+        registry_username:
+          type: string
+          default: ""
+          description: Private container registry username
+          examples:
+            - registry-user
+        registry_password:
+          type: string
+          default: ""
+          description: Private container registry password
+          examples:
+            - registry-token
+        image_name:
+          type: string
+          default: ""
+          examples:
+            - ubuntu:22.04
+        container_user:
+          type: string
+          default: ""
+          description: >
+            If not set, the default image user is used. As of 0.18.24, `dstack` always uses `root`
+          examples:
+            - root
+        privileged:
+          type: boolean
+          default: false
+          description: Start container in privileged mode
+        gpu:
+          type: integer
+          minimum: -1
+          default: 0
+          description: >
+            Number of GPUs allocated for the container. A special value `-1` means "all available,
+            even if none", `0` means "zero GPUs"
+        cpu:
+          type: number
+          minimum: 0
+          default: 0
+          description: >
+            Amount of CPU resources available to the container. A special value `0` means "all".
+            Fractional values are allowed, e.g., `1.5` — one and a half CPUs
+        memory:
+          type: number
+          minimum: 0
+          default: 0
+          description: >
+            Amount of memory available to the container, in bytes. A special value `0` means "all"
+        shm_size:
+          type: integer
+          minimum: 0
+          default: 0
+          description: >
+            POSIX shared memory, bytes. A special value `0` means "use the default value (64MiB)".
+            If > 0, tmpfs is mounted with the `exec` option, unlike the default mount options
+          examples:
+            - 1073741824
+        volumes:
+          type: array
+          items:
+            $ref: "#/components/schemas/VolumeInfo"
+          default: []
+        volume_mounts:
+          type: array
+          items:
+            $ref: "#/components/schemas/VolumeMountPoint"
+          default: []
+        instance_mounts:
+          type: array
+          items:
+            $ref: "#/components/schemas/InstanceMountPoint"
+          default: []
+        host_ssh_user:
+          type: string
+          default: ""
+          description: >
+            Instance (host) user for SSH access, either directly (`ssh {run_name}-host`)
+            or for `ProxyJump`ing inside the container. Ignored if `host_ssh_keys` is not set
+          examples:
+            - root
+        host_ssh_keys:
+          type: array
+          items:
+            type: string
+          default: []
+          description: >
+            SSH public keys for access to the instance (host). If set, the keys will be added
+            to the `host_ssh_user`'s `~/.ssh/authorized_keys` when the run starts and removed
+            when the run exits.
+          examples:
+            - "ssh-ed25519 <BASE64> me@laptop"
+        container_ssh_keys:
+          type: array
+          items:
+            type: string
+          default: []
+          description: >
+            SSH public keys for `container_user`. As of 0.18.24, `dstack` submits two keys:
+            project key (generated by the server) and user key (either generated by
+            the CLI client or provided by the user)
+          examples:
+            - ["ssh-rsa <BASE64> project@dstack", "ssh-ed25519 <BASE64> me@laptop"]
+
+    TaskTerminateRequest:
+      title: shim.api.TaskTerminateRequest
+      type: object
+      properties:
+        termination_reason:
+          allOf:
+            - $ref: "#/components/schemas/TerminationReason"
+            - examples:
+              - TERMINATED_BY_USER
+              - TERMINATED_BY_SERVER
+          default: ""
+        termination_message:
+          type: string
+          default: ""
+        timeout:
+          type: boolean
+          default: 0
+          description: >
+            Seconds to wait before killing the container. If zero, kill
+            the container immediately (no graceful shutdown)
+
+    LegacySubmitBody:
+      title: shim.api.LegacySubmitBody
       type: object
       properties:
         username:
@@ -244,8 +626,8 @@ components:
           default: []
           description: (since [0.18.21](https://github.com/dstackai/dstack/releases/tag/0.18.21))
 
-    PullResponse:
-      title: shim.api.PullResponse
+    LegacyPullResponse:
+      title: shim.api.LegacyPullResponse
       type: object
       properties:
         state:
@@ -272,16 +654,16 @@ components:
         - result
       additionalProperties: false
 
-    StopBody:
-      title: shim.api.StopBody
+    LegacyStopBody:
+      title: shim.api.LegacyStopBody
       type: object
       properties:
         force:
           type: boolean
           default: false
 
-    StopResponse:
-      title: shim.api.StopResponse
+    LegacyStopResponse:
+      title: shim.api.LegacyStopResponse
       type: object
       properties:
         state:
@@ -290,17 +672,46 @@ components:
         - state
       additionalProperties: false
 
-    HealthcheckResponse:
-      title: shim.api.HealthcheckResponse
-      type: object
-      properties:
-        service:
-          const: dstack-shim
-        version:
-          type: string
-          examples:
-            - *shim-version
-      required:
-        - service
-        - version
-      additionalProperties: false
+  responses:
+    TaskInfo:
+      description: Task info
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/TaskInfoResponse"
+
+    PlainTextOk:
+      description: ""
+      content:
+        text/plain:
+          schema:
+            type: string
+            examples:
+              - OK
+
+    PlainTextNotFound:
+      description: ""
+      content:
+        text/plain:
+          schema:
+            type: string
+            examples:
+              - not found
+
+    PlainTextConflict:
+      description: ""
+      content:
+        text/plain:
+          schema:
+            type: string
+            examples:
+              - conflict
+
+    PlainTextInternalError:
+      description: ""
+      content:
+        text/plain:
+          schema:
+            type: string
+            examples:
+              - internal error

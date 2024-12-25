@@ -9,7 +9,7 @@ type DockerParameters interface {
 	DockerShellCommands([]string) []string
 	DockerMounts(string) ([]mount.Mount, error)
 	DockerPorts() []int
-	MakeRunnerDir() (string, error)
+	MakeRunnerDir(name string) (string, error)
 	DockerPJRTDevice() string
 }
 
@@ -24,7 +24,6 @@ type CLIArgs struct {
 		LogLevel    int
 		DownloadURL string
 		BinaryPath  string
-		TempDir     string
 		HomeDir     string
 		WorkingDir  string
 	}
@@ -63,14 +62,27 @@ type TaskConfig struct {
 	ImageName        string               `json:"image_name"`
 	ContainerUser    string               `json:"container_user"`
 	Privileged       bool                 `json:"privileged"`
-	GpuCount         int                  `json:"gpu_count"`
-	ShmSize          int64                `json:"shm_size"`
-	PublicKeys       []string             `json:"public_keys"`
-	SshUser          string               `json:"ssh_user"`
-	SshKey           string               `json:"ssh_key"`
+	GPU              int                  `json:"gpu"`      // -1 = all available, even if zero; 0 = zero, ...
+	CPU              float64              `json:"cpu"`      // 0.0 = all available; 0.5 = a half of CPU, ...
+	Memory           int64                `json:"memory"`   // bytes; 0 = all avaliable
+	ShmSize          int64                `json:"shm_size"` // bytes; 0 = default (64MiB)
 	Volumes          []VolumeInfo         `json:"volumes"`
 	VolumeMounts     []VolumeMountPoint   `json:"volume_mounts"`
 	InstanceMounts   []InstanceMountPoint `json:"instance_mounts"`
+	HostSshUser      string               `json:"host_ssh_user"`
+	HostSshKeys      []string             `json:"host_ssh_keys"`
+	// TODO: submit keys to runner, not to shim
+	ContainerSshKeys []string `json:"container_ssh_keys"`
+}
+
+type TaskInfo struct {
+	ID                 string
+	Status             TaskStatus
+	TerminationReason  string
+	TerminationMessage string
+	ContainerName      string
+	ContainerID        string
+	GpuIDs             []string
 }
 
 // a surrogate ID used for tasks submitted via legacy API

@@ -11,3 +11,6 @@ const (
 
 // Error-containing messages will be identified by this signature
 const ExecutorFailedSignature = "Executor failed"
+
+// A directory inside the container where runner stores its files (logs, etc.)
+const RunnerDir = "/tmp/runner"

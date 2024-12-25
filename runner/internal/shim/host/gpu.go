@@ -192,3 +192,7 @@ func getAmdRenderNodePath(bdf string) (string, error) {
 	}
 	return path, nil
 }
+
+func IsRenderNodePath(path string) bool {
+	return strings.HasPrefix(path, "/dev/dri/renderD")
+}

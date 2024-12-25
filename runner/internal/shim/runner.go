@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dstackai/dstack/runner/consts"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 )
 
@@ -40,7 +41,7 @@ func (c *CLIArgs) getRunnerArgs() []string {
 		"--log-level", strconv.Itoa(c.Runner.LogLevel),
 		"start",
 		"--http-port", strconv.Itoa(c.Runner.HTTPPort),
-		"--temp-dir", c.Runner.TempDir,
+		"--temp-dir", consts.RunnerDir,
 		"--home-dir", c.Runner.HomeDir,
 		"--working-dir", c.Runner.WorkingDir,
 	}
