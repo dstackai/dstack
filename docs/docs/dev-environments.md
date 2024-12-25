@@ -62,7 +62,7 @@ To open in VS Code Desktop, use this link:
 </div>
 
 `dstack apply` automatically provisions an instance, uploads the contents of the repo (incl. your local uncommitted changes),
-and set ups an IDE on the instance.
+and sets up an IDE on the instance.
 
 !!! info "Windows"
     On Windows, `dstack` works both natively and inside WSL. But, for dev environments, 
