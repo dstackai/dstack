@@ -625,8 +625,8 @@ def _supported_instances_and_zones(
         # strip zone
         if offer.region[:-2] not in regions:
             return False
-        # remove TPU Pod for initial release
-        if _is_tpu(offer.instance.name) and _is_pod(offer.instance.name):
+        # remove multi-host TPUs for initial release
+        if _is_tpu(offer.instance.name) and not _is_single_host_tpu(offer.instance.name):
             return False
         for family in [
             "e2-medium",
@@ -699,28 +699,30 @@ def _get_tpu_startup_script(authorized_keys: List[str]) -> str:
 def _is_tpu(name: str) -> bool:
     parts = name.split("-")
     if len(parts) == 2:
-        version = f"{parts[0]}-{parts[1]}"
         version, cores = parts
         if version in TPU_VERSIONS and cores.isdigit():
             return True
     return False
 
 
-def _is_pod(instance_name: str) -> bool:
+def _is_single_host_tpu(instance_name: str) -> bool:
     parts = instance_name.split("-")
     if len(parts) != 2:
-        raise ValueError(f"Invalid tpu type: {instance_name}")
+        logger.info("Skipping unknown TPU: %s", instance_name)
+        return False
     tpu_version, tensor_cores = parts
     try:
         tensor_cores = int(tensor_cores)
     except ValueError:
-        raise ValueError(f"Invalid number in tpu tensor cores: {tensor_cores}")
+        logger.info("Skipping TPU due to invalid number of tensor cores: %s", tensor_cores)
+        return False
     if tpu_version in ["v2", "v3", "v5p", "v5litepod", "v6e"]:
-        return tensor_cores > 8
+        return tensor_cores <= 8
     elif tpu_version == "v4":
-        return True
+        return False
     else:
-        raise ValueError(f"Unknown TPU version: {tpu_version}")
+        logger.info("Skipping unknown TPU: %s", instance_name)
+        return False
 
 
 def _get_volume_price(size: int) -> float:
