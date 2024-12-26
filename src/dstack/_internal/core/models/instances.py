@@ -7,6 +7,7 @@ from pydantic import root_validator
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.envs import Env
+from dstack._internal.core.models.volumes import Volume
 from dstack._internal.utils.common import pretty_resources
 
 
@@ -103,6 +104,7 @@ class InstanceConfiguration(CoreModel):
     availability_zone: Optional[str] = None
     placement_group_name: Optional[str] = None
     reservation: Optional[str] = None
+    volumes: Optional[List[Volume]] = None
 
     def get_public_keys(self) -> List[str]:
         return [ssh_key.public.strip() for ssh_key in self.ssh_keys]

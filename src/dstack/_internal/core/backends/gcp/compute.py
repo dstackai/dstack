@@ -81,11 +81,12 @@ class GCPCompute(Compute):
     def get_offers(
         self, requirements: Optional[Requirements] = None
     ) -> List[InstanceOfferWithAvailability]:
+        regions = get_or_error(self.config.regions)
         offers = get_catalog_offers(
             backend=BackendType.GCP,
             requirements=requirements,
             configurable_disk_size=CONFIGURABLE_DISK_SIZE,
-            extra_filter=_supported_instances_and_zones(self.config.regions),
+            extra_filter=_supported_instances_and_zones(regions),
         )
         quotas: Dict[str, Dict[str, float]] = defaultdict(dict)
         for region in self.regions_client.list(project=self.config.project_id):
@@ -180,14 +181,17 @@ class GCPCompute(Compute):
         }
         labels = {k: v for k, v in labels.items() if gcp_resources.is_valid_label_value(v)}
         labels = merge_tags(tags=labels, backend_tags=self.config.tags)
-        tpu = (
+        is_tpu = (
             _is_tpu(instance_offer.instance.resources.gpus[0].name)
             if instance_offer.instance.resources.gpus
             else False
         )
-        if tpu:
+        if is_tpu:
             instance_id = f"tpu-{instance_config.instance_name}"
             startup_script = _get_tpu_startup_script(authorized_keys)
+            # GCP does not allow attaching disks while TPUs is creating,
+            # so we need to attach the disks on creation.
+            data_disks = _get_tpu_data_disks(self.config.project_id, instance_config.volumes)
             for zone in zones:
                 tpu_node = gcp_resources.create_tpu_node_struct(
                     instance_name=instance_offer.instance.name,
@@ -199,6 +203,7 @@ class GCPCompute(Compute):
                     subnetwork=subnetwork,
                     allocate_public_ip=allocate_public_ip,
                     service_account=self.config.vm_service_account,
+                    data_disks=data_disks,
                 )
                 create_node_request = tpu_v2.CreateNodeRequest(
                     parent=f"projects/{self.config.project_id}/locations/{zone}",
@@ -233,7 +238,7 @@ class GCPCompute(Compute):
                     username="ubuntu",
                     ssh_proxy=None,
                     dockerized=True,
-                    backend_data=json.dumps({"is_tpu": tpu, "zone": zone}),
+                    backend_data=json.dumps({"is_tpu": is_tpu, "zone": zone}),
                 )
             raise NoCapacityError()
 
@@ -371,6 +376,7 @@ class GCPCompute(Compute):
                 SSHKey(public=project_ssh_public_key.strip()),
             ],
             user=run.user,
+            volumes=volumes,
         )
         if len(volumes) > 0:
             volume = volumes[0]
@@ -588,19 +594,30 @@ class GCPCompute(Compute):
                 source_disk = (
                     f"projects/{self.config.project_id}/zones/{zone}/disks/{volume.volume_id}"
                 )
+                # create_instance() has already attached the disks
+                # if the TPU is provisioned on the run submission via run_job()
+                for i, disk in enumerate(tpu_node.data_disks, start=1):
+                    if disk.source_disk == source_disk:
+                        device_name = f"persistent-disk-{i}"
+                        logger.debug(
+                            "Persistent disk for volume %s is already attached to instance %s",
+                            volume.volume_id,
+                            instance_id,
+                        )
+                        return VolumeAttachmentData(device_name=device_name)
                 attached_disk = tpu_v2.AttachedDisk(
                     source_disk=source_disk,
                     mode=tpu_v2.AttachedDisk.DiskMode.READ_WRITE,
                 )
+                tpu_node.data_disks.append(attached_disk)
                 # Cannot set device name for TPUs, so use default naming
                 device_name = f"persistent-disk-{len(tpu_node.data_disks)}"
-                tpu_node.data_disks.append(attached_disk)
                 update_node_request = tpu_v2.UpdateNodeRequest(
                     node=tpu_node,
                     update_mask="dataDisks",
                 )
                 operation = self.tpu_client.update_node(update_node_request)
-                gcp_resources.wait_for_operation(operation)
+                gcp_resources.wait_for_operation(operation, "persistent disk attachment")
             else:
                 attached_disk = compute_v1.AttachedDisk()
                 attached_disk.source = disk_url
@@ -620,9 +637,7 @@ class GCPCompute(Compute):
         logger.debug(
             "Attached persistent disk for volume %s to instance %s", volume.volume_id, instance_id
         )
-        return VolumeAttachmentData(
-            device_name=device_name,
-        )
+        return VolumeAttachmentData(device_name=device_name)
 
     def detach_volume(self, volume: Volume, instance_id: str):
         logger.debug(
@@ -653,7 +668,7 @@ class GCPCompute(Compute):
                 update_mask="dataDisks",
             )
             operation = self.tpu_client.update_node(update_node_request)
-            gcp_resources.wait_for_operation(operation)
+            gcp_resources.wait_for_operation(operation, "persistent disk detachment")
         else:
             operation = self.instances_client.detach_disk(
                 project=self.config.project_id,
@@ -795,3 +810,21 @@ def _get_volume_price(size: int) -> float:
     # https://cloud.google.com/compute/disks-image-pricing#persistentdisk
     # The price is different in different regions. Take max across supported regions.
     return size * 0.12
+
+
+def _get_tpu_data_disks(
+    project_id: str, volumes: Optional[List[Volume]]
+) -> List[tpu_v2.AttachedDisk]:
+    if volumes is None:
+        return []
+    return [_get_tpu_data_disk_for_volume(project_id, volume) for volume in volumes]
+
+
+def _get_tpu_data_disk_for_volume(project_id: str, volume: Volume) -> tpu_v2.AttachedDisk:
+    zone = get_or_error(volume.provisioning_data).availability_zone
+    source_disk = f"projects/{project_id}/zones/{zone}/disks/{volume.volume_id}"
+    attached_disk = tpu_v2.AttachedDisk(
+        source_disk=source_disk,
+        mode=tpu_v2.AttachedDisk.DiskMode.READ_WRITE,
+    )
+    return attached_disk
