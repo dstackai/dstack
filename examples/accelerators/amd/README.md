@@ -1,11 +1,12 @@
 # AMD
 
-If you're using the `runpod` backend or have set up an [SSH fleets](https://dstack.ai/docs/concepts/fleets#ssh-fleets) 
-with on-prem AMD GPUs, you can use AMD GPUs.
+`dstack` supports running dev environments, tasks, and services on AMD GPUs.
+You can do that by setting up an [SSH fleet](https://dstack.ai/docs/concepts/fleets#ssh-fleets) 
+with on-prem AMD GPUs or configuring a backend that offers AMD GPUs such as the `runpod` backend.
 
 ## Deployment
 
-You can use any serving framework, such as TGI and vLLM. Here's an example of a [service](https://dstack.ai/docs/services) that deploys 
+Most serving frameworks including vLLM and TGI have AMD support. Here's an example of a [service](https://dstack.ai/docs/services) that deploys 
 Llama 3.1 70B in FP16 using [TGI :material-arrow-top-right-thin:{ .external }](https://huggingface.co/docs/text-generation-inference/en/installation_amd){:target="_blank"} and [vLLM :material-arrow-top-right-thin:{ .external }](https://docs.vllm.ai/en/latest/getting_started/amd-installation.html){:target="_blank"}.
 
 === "TGI"
