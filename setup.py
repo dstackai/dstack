@@ -51,10 +51,17 @@ BASE_DEPS = [
     "gpuhunt>=0.0.17,<0.1.0",
 ]
 
-SERVER_DEPS = [
+GATEWAY_AND_SERVER_COMMON_DEPS = [
     "fastapi",
     "starlette>=0.26.0",
     "uvicorn",
+    "aiorwlock",
+    "aiocache",
+    "httpx",
+    "jinja2",
+]
+
+SERVER_DEPS = GATEWAY_AND_SERVER_COMMON_DEPS + [
     "watchfiles",
     "sqlalchemy[asyncio]>=2.0.0",
     "sqlalchemy_utils>=0.40.0",
@@ -66,12 +73,8 @@ SERVER_DEPS = [
     "sentry-sdk[fastapi]",
     "alembic-postgresql-enum",
     "asyncpg",
-    "aiorwlock",
-    "aiocache",
     "cachetools",
-    "httpx",
     "python-json-logger",
-    "jinja2",
     "grpcio>=1.50",  # indirect
 ]
 
@@ -138,6 +141,7 @@ setup(
     install_requires=BASE_DEPS,
     extras_require={
         "all": ALL_DEPS,
+        "gateway": GATEWAY_AND_SERVER_COMMON_DEPS,
         "server": SERVER_DEPS,
         "aws": SERVER_DEPS + AWS_DEPS,
         "azure": SERVER_DEPS + AZURE_DEPS,
