@@ -132,7 +132,7 @@ async def get_service_replica_client(service: Service, repo: BaseProxyRepo) -> h
     if service.domain is not None:
         # Forward to Nginx so that requests are visible to StatsCollector in the access log
         return httpx.AsyncClient(
-            base_url="http://localhost",
+            base_url="http://127.0.0.1",
             headers={"Host": service.domain},
             timeout=HTTP_TIMEOUT,
         )
