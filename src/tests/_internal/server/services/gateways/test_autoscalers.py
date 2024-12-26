@@ -1,11 +1,10 @@
 import datetime
-from typing import Dict
 from unittest.mock import patch
 
 import pytest
 
+from dstack._internal.proxy.gateway.schemas.stats import PerWindowStats, Stat
 from dstack._internal.server.services.gateways.autoscalers import ReplicaInfo, RPSAutoscaler
-from dstack._internal.server.services.gateways.client import Stat
 
 
 @pytest.fixture
@@ -21,7 +20,7 @@ def time():
         yield dt
 
 
-def stats(rps: float) -> Dict[int, Stat]:
+def stats(rps: float) -> PerWindowStats:
     return {60: Stat(requests=int(rps * 60), request_time=0.1)}
 
 

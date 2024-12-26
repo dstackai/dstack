@@ -1,23 +1,15 @@
 import asyncio
 import uuid
-from typing import Dict, Optional
+from typing import Optional
 
 import httpx
-from pydantic import BaseModel, parse_obj_as
+from pydantic import parse_obj_as
 
 from dstack._internal.core.errors import GatewayError
+from dstack._internal.core.models.instances import SSHConnectionParams
 from dstack._internal.core.models.runs import JobSubmission, Run
+from dstack._internal.proxy.gateway.schemas.stats import ServiceStats
 from dstack._internal.server import settings
-
-GATEWAY_MANAGEMENT_PORT = 8000
-
-
-class Stat(BaseModel):
-    requests: int
-    request_time: float
-
-
-StatsCollectResponse = Dict[str, Dict[int, Stat]]
 
 
 class GatewayClient:
@@ -42,7 +34,7 @@ class GatewayClient:
     async def register_service(
         self,
         project: str,
-        run_id: uuid.UUID,
+        run_name: str,
         domain: str,
         service_https: bool,
         gateway_https: bool,
@@ -56,7 +48,7 @@ class GatewayClient:
             await self.register_openai_entrypoint(project, entrypoint, gateway_https)
 
         payload = {
-            "run_id": run_id.hex,
+            "run_name": run_name,
             "domain": domain,
             "https": service_https,
             "auth": auth,
@@ -72,9 +64,9 @@ class GatewayClient:
         resp.raise_for_status()
         self.is_server_ready = True
 
-    async def unregister_service(self, project: str, run_id: uuid.UUID):
+    async def unregister_service(self, project: str, run_name: str):
         resp = await self._client.post(
-            self._url(f"/api/registry/{project}/services/{run_id.hex}/unregister")
+            self._url(f"/api/registry/{project}/services/{run_name}/unregister")
         )
         if resp.status_code == 400:
             raise gateway_error(resp.json())
@@ -92,27 +84,25 @@ class GatewayClient:
                 {
                     "ssh_port": jpd.ssh_port,
                     "ssh_host": f"{jpd.username}@{jpd.hostname}",
+                    "ssh_proxy": jpd.ssh_proxy.dict() if jpd.ssh_proxy is not None else None,
                 }
             )
-            if jpd.ssh_proxy is not None:
-                payload.update(
-                    {
-                        "ssh_jump_port": jpd.ssh_proxy.port,
-                        "ssh_jump_host": f"{jpd.ssh_proxy.username}@{jpd.ssh_proxy.hostname}",
-                    }
-                )
         else:
             payload.update(
                 {
                     "ssh_port": 10022,
                     "ssh_host": "root@localhost",
-                    "ssh_jump_port": jpd.ssh_port,
-                    "ssh_jump_host": f"{jpd.username}@{jpd.hostname}",
+                    "ssh_proxy": SSHConnectionParams(
+                        hostname=jpd.hostname,
+                        username=jpd.username,
+                        port=jpd.ssh_port,
+                    ).dict(),
                 }
             )
-
         resp = await self._client.post(
-            self._url(f"/api/registry/{run.project_name}/services/{run.id.hex}/replicas/register"),
+            self._url(
+                f"/api/registry/{run.project_name}/services/{run.run_spec.run_name}/replicas/register"
+            ),
             json=payload,
         )
         if resp.status_code == 400:
@@ -120,10 +110,10 @@ class GatewayClient:
         resp.raise_for_status()
         self.is_server_ready = True
 
-    async def unregister_replica(self, project: str, run_id: uuid.UUID, job_id: uuid.UUID):
+    async def unregister_replica(self, project: str, run_name: str, job_id: uuid.UUID):
         resp = await self._client.post(
             self._url(
-                f"/api/registry/{project}/services/{run_id.hex}/replicas/{job_id.hex}/unregister"
+                f"/api/registry/{project}/services/{run_name}/replicas/{job_id.hex}/unregister"
             )
         )
         if resp.status_code == 400:
@@ -135,7 +125,6 @@ class GatewayClient:
         resp = await self._client.post(
             self._url(f"/api/registry/{project}/entrypoints/register"),
             json={
-                "module": "openai",
                 "domain": domain,
                 "https": https,
             },
@@ -167,20 +156,25 @@ class GatewayClient:
         self.is_server_ready = True
         return resp.json()
 
-    async def collect_stats(self) -> StatsCollectResponse:
+    async def collect_stats(self) -> list[ServiceStats]:
         resp = await self._client.get(self._url("/api/stats/collect"))
         if resp.status_code == 400:
             raise gateway_error(resp.json())
         resp.raise_for_status()
         self.is_server_ready = True
-        return parse_obj_as(StatsCollectResponse, resp.json())
+        resp_data = resp.json()
+        if isinstance(resp_data, dict):
+            # Avoid errors if gateway is updated to new format and current server replica isn't.
+            # TODO: remove after a few releases
+            return []
+        return parse_obj_as(list[ServiceStats], resp_data)
 
     def _url(self, path: str) -> str:
         return f"{self.base_url}/{path.lstrip('/')}"
 
 
 def gateway_error(data: dict) -> GatewayError:
-    return GatewayError(msg=f"{data['error']}: {data['message']}")
+    return GatewayError(msg=data["detail"])
 
 
 class AsyncClientWrapper(httpx.AsyncClient):

@@ -31,7 +31,8 @@ else
   version="blue"
 fi
 
-"$root/$version/bin/pip" uninstall -y dstack-gateway
+"$root/$version/bin/pip" uninstall -y dstack-gateway dstack
+"$root/$version/bin/pip" cache remove dstack
 "$root/$version/bin/pip" install "$1"
 sudo "$root/$version/bin/python" -m dstack.gateway.systemd install
 echo "$version" > "$root/version"

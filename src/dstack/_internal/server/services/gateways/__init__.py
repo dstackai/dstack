@@ -417,7 +417,7 @@ async def _register_service_in_gateway(
         async with conn.client() as client:
             await client.register_service(
                 project=run_model.project.name,
-                run_id=run_model.id,
+                run_name=run_model.run_name,
                 domain=urlparse(service_spec.url).hostname,
                 service_https=service_https,
                 gateway_https=gateway_https,
@@ -503,7 +503,7 @@ async def unregister_service(session: AsyncSession, run_model: RunModel):
         async with conn.client() as client:
             await client.unregister_service(
                 project=project.name,
-                run_id=run_model.id,
+                run_name=run_model.run_name,
             )
         logger.debug("%s: service is unregistered", fmt(run_model))
     except GatewayError as e:
@@ -533,7 +533,7 @@ async def unregister_replica(session: AsyncSession, job_model: JobModel):
         async with conn.client() as client:
             await client.unregister_replica(
                 project=run_model.project.name,
-                run_id=run_model.id,
+                run_name=run_model.run_name,
                 job_id=job_model.id,
             )
         logger.info(
@@ -633,9 +633,13 @@ async def _update_gateway(gateway_compute_model: GatewayComputeModel, build: str
         gateway_compute_model.ssh_private_key,
     )
     logger.debug("Updating gateway %s", connection.ip_address)
-    stdout = await connection.tunnel.aexec(
-        f"/bin/sh dstack/update.sh {get_dstack_gateway_wheel(build)} {build}"
-    )
+    commands = [
+        # prevent update.sh from overwriting itself during execution
+        "cp dstack/update.sh dstack/_update.sh",
+        f"sh dstack/_update.sh {get_dstack_gateway_wheel(build)} {build}",
+        "rm dstack/_update.sh",
+    ]
+    stdout = await connection.tunnel.aexec("/bin/sh -c '" + " && ".join(commands) + "'")
     if "Update successfully completed" in stdout:
         logger.info("Gateway %s updated", connection.ip_address)
         return True

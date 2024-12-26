@@ -1,13 +1,13 @@
 import datetime
 import math
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 from pydantic import BaseModel
 
 import dstack._internal.utils.common as common_utils
 from dstack._internal.core.models.configurations import ServiceConfiguration
-from dstack._internal.server.services.gateways.client import Stat
+from dstack._internal.proxy.gateway.schemas.stats import PerWindowStats
 
 
 class ReplicaInfo(BaseModel):
@@ -23,11 +23,11 @@ class ReplicaInfo(BaseModel):
 
 class BaseServiceScaler(ABC):
     @abstractmethod
-    def scale(self, replicas: List[ReplicaInfo], stats: Optional[Dict[int, Stat]]) -> int:
+    def scale(self, replicas: List[ReplicaInfo], stats: Optional[PerWindowStats]) -> int:
         """
         Args:
             replicas: list of all replicas
-            stats: service stats from the gateway
+            stats: service usage stats
 
         Returns:
             diff: number of replicas to add or remove
@@ -49,7 +49,7 @@ class ManualScaler(BaseServiceScaler):
         self.min_replicas = min_replicas
         self.max_replicas = max_replicas
 
-    def scale(self, replicas: List[ReplicaInfo], stats: Optional[Dict[int, Stat]]) -> int:
+    def scale(self, replicas: List[ReplicaInfo], stats: Optional[PerWindowStats]) -> int:
         active_replicas = [r for r in replicas if r.active]
         target_replicas = len(active_replicas)
         # clip the target replicas to the min and max values
@@ -72,7 +72,7 @@ class RPSAutoscaler(BaseServiceScaler):
         self.scale_up_delay = scale_up_delay
         self.scale_down_delay = scale_down_delay
 
-    def scale(self, replicas: List[ReplicaInfo], stats: Optional[Dict[int, Stat]]) -> int:
+    def scale(self, replicas: List[ReplicaInfo], stats: Optional[PerWindowStats]) -> int:
         if not stats:
             return 0
 

@@ -10,17 +10,12 @@ authors = [
 requires-python = ">=3.10"
 dynamic = ["version"]
 dependencies = [
-    "fastapi",
-    "pydantic >=2.0.0",
-    "httpx",
-    "jinja2",
-    "uvicorn",
-    "aiocache",
+    # release builds of dstack-gateway depend on a PyPI version of dstack instead
+    "dstack[server] @ https://github.com/dstackai/dstack/archive/refs/heads/master.zip",
 ]
 
 [tool.setuptools.package-data]
 "dstack.gateway" = [
-    "resources/nginx/*",
     "resources/systemd/*",
 ]
 

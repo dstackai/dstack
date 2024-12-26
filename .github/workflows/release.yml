@@ -163,6 +163,11 @@ jobs:
       - name: Build package
         run: |
           echo "__version__ = \"${{ env.VERSION }}\"" > src/dstack/gateway/version.py
+          sed \
+            -i.old \
+            "s|@ https://github.com/dstackai/dstack/archive/refs/heads/master.zip|== ${{ env.VERSION }}|" \
+            pyproject.toml
+          diff pyproject.toml pyproject.toml.old > /dev/null && echo "Could not set version" && exit 1
           python -m build .
       - name: Upload to S3
         env:
