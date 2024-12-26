@@ -492,7 +492,7 @@ class GCPCompute(Compute):
                         disk_type=gcp_resources.full_resource_name_to_name(disk.type_),
                     ).json(),
                 )
-        raise ComputeError("Persistent disk %s not found", volume.configuration.volume_id)
+        raise ComputeError(f"Persistent disk {volume.configuration.volume_id} not found")
 
     def create_volume(self, volume: Volume) -> VolumeProvisioningData:
         zone = gcp_resources.get_availability_zone(
