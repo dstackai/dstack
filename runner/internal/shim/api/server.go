@@ -51,9 +51,9 @@ func NewShimServer(address string, runner TaskRunner, version string) *ShimServe
 	// Future API
 	r.AddHandler("GET", "/api/tasks", s.TaskListHandler)
 	r.AddHandler("GET", "/api/tasks/{id}", s.TaskInfoHandler)
-	r.AddHandler("PUT", "/api/tasks", s.TaskSubmitHandler)
+	r.AddHandler("POST", "/api/tasks", s.TaskSubmitHandler)
 	r.AddHandler("POST", "/api/tasks/{id}/terminate", s.TaskTerminateHandler)
-	r.AddHandler("DELETE", "/api/tasks/{id}", s.TaskRemoveHandler)
+	r.AddHandler("POST", "/api/tasks/{id}/remove", s.TaskRemoveHandler)
 
 	// Legacy API
 	r.AddHandler("POST", "/api/submit", s.LegacySubmitPostHandler)

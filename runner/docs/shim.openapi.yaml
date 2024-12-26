@@ -61,7 +61,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/TaskListResponse"
-    put:
+    post:
       tags:
         - *future-api
       summary: Submit and run new task
@@ -93,29 +93,6 @@ paths:
         "200":
           $ref: "#/components/responses/TaskInfo"
 
-    delete:
-      tags:
-        - *future-api
-      summary: Remove task
-      description: >
-        Removes the task from in-memory storage and destroys its associated
-        resources: a container, logs, etc.
-      parameters:
-        - $ref: "#/parameters/taskId"
-      responses:
-        "200":
-          description: Task removed
-          $ref: "#/components/responses/PlainTextOk"
-        "404":
-          description: Task not found
-          $ref: "#/components/responses/PlainTextNotFound"
-        "409":
-          description: Task is not terminated, cannot remove
-          $ref: "#/components/responses/PlainTextConflict"
-        "500":
-          description: Internal error, e.g., failed to remove a container
-          $ref: "#/components/responses/PlainTextInternalError"
-
   /tasks/{id}/terminate:
     post:
       tags:
@@ -141,6 +118,30 @@ paths:
         "200":
           description: Updated task info
           $ref: "#/components/responses/TaskInfo"
+        "404":
+          description: Task not found
+          $ref: "#/components/responses/PlainTextNotFound"
+        "409":
+          description: Task is not terminated, cannot remove
+          $ref: "#/components/responses/PlainTextConflict"
+        "500":
+          description: Internal error, e.g., failed to remove a container
+          $ref: "#/components/responses/PlainTextInternalError"
+
+  /tasks/{id}/remove:
+    post:
+      tags:
+        - *future-api
+      summary: Remove task
+      description: >
+        Removes the task from in-memory storage and destroys its associated
+        resources: a container, logs, etc.
+      parameters:
+        - $ref: "#/parameters/taskId"
+      responses:
+        "200":
+          description: Task removed
+          $ref: "#/components/responses/PlainTextOk"
         "404":
           description: Task not found
           $ref: "#/components/responses/PlainTextNotFound"
