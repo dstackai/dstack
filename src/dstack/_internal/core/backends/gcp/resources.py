@@ -369,6 +369,7 @@ def create_tpu_node_struct(
     subnetwork: Optional[str] = None,
     allocate_public_ip: bool = True,
     service_account: Optional[str] = None,
+    data_disks: Optional[List[tpu_v2.AttachedDisk]] = None,
 ) -> tpu_v2.Node:
     node = tpu_v2.Node()
     if spot:
@@ -388,6 +389,9 @@ def create_tpu_node_struct(
             email=service_account,
             scope=["https://www.googleapis.com/auth/cloud-platform"],
         )
+    if data_disks is not None:
+        for disk in data_disks:
+            node.data_disks.append(disk)
     return node
 
 

@@ -1,17 +1,24 @@
 # TPU
 
-If you're using the `gcp` backend, you can use TPUs. Just specify the TPU version and the number of cores 
-(separated by a dash), in the `gpu` property under `resources`. 
-
-> Currently, maximum 8 TPU cores can be specified, so the maximum supported values are `v2-8`, `v3-8`, `v4-8`, `v5litepod-8`, 
-> and `v5e-8`. Multi-host TPU support, allowing for larger numbers of cores, is coming soon.
+If you've configured the `gcp` backend in `dstack`, you can run dev environments, tasks, and services on [TPUs](https://cloud.google.com/tpu/docs/intro-to-tpu).
+Choose a TPU instance by specifying the TPU version and the number of cores (e.g. `v5litepod-8`) in the `gpu` property under `resources`,
+or request TPUs by specifying `tpu` as `vendor` ([see examples](https://dstack.ai/docs/guides/protips/#gpu)).
 
 Below are a few examples on using TPUs for deployment and fine-tuning.
 
+!!! info "Multi-host TPUs"
+    Currently, `dstack` supports only single-host TPUs, which means that 
+    the maximum supported number of cores is `8` (e.g. `v2-8`, `v3-8`, `v5litepod-8`, `v5p-8`, `v6e-8`). 
+    Multi-host TPU support is on the roadmap.
+
+!!! info "TPU storage"
+    By default, each TPU VM contains a 100GB boot disk and its size cannot be changed.
+    If you need more storage, attach additional disks using [Volumes](https://dstack.ai/docs/concepts/volumes/).
+
 ## Deployment
 
-You can use any serving framework, such as vLLM, TGI. Here's an example of a [service](https://dstack.ai/docs/services) that deploys
-Llama 3.1 8B using 
+Many serving frameworks including vLLM and TGI have TPU support.
+Here's an example of a [service](https://dstack.ai/docs/services) that deploys Llama 3.1 8B using 
 [Optimum TPU :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/optimum-tpu){:target="_blank"}
 and [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/vllm-project/vllm){:target="_blank"}.
 
@@ -40,7 +47,7 @@ and [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/vllm-
     ```
     </div>
 
-    Note, for `Optimum TPU` by default `MAX_INPUT_TOKEN` is set to 4095, consequently we must set `MAX_BATCH_PREFILL_TOKENS` to 4095.
+    Note that for Optimum TPU `MAX_INPUT_TOKEN` is set to 4095 by default. We must also set `MAX_BATCH_PREFILL_TOKENS` to 4095.
 
     ??? info "Docker image"
         The official Docker image `huggingface/optimum-tpu:latest` doesn’t support Llama 3.1-8B. 
@@ -92,7 +99,7 @@ and [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/vllm-
 
 ### Memory requirements
 
-Below are the approximate memory requirements for serving LLMs with their corresponding TPUs. 
+Below are the approximate memory requirements for serving LLMs with the minimal required TPU configuration:
 
 | Model size | bfloat16 | TPU          | int8  | TPU            |
 |------------|----------|--------------|-------|----------------|
@@ -152,7 +159,7 @@ resources:
 
 ### Memory requirements
 
-Below are the approximate memory requirements for fine-tuning LLMs with their corresponding TPUs.
+Below are the approximate memory requirements for fine-tuning LLMs with the minimal required TPU configuration:
 
 | Model size | LoRA  | TPU          |
 |------------|-------|--------------|
