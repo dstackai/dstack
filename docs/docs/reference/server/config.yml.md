@@ -455,8 +455,9 @@ gcloud projects list --format="json(projectId)"
 
     ```
     tpu.nodes.create
-    tpu.nodes.delete
     tpu.nodes.get
+    tpu.nodes.update
+    tpu.nodes.delete
     tpu.operations.get
     tpu.operations.list
     ```
