@@ -712,6 +712,7 @@ func getSSHShellCommands(openSSHPort int, publicSSHKey string) []string {
 		`_install() { NAME=Distribution; test -f /etc/os-release && . /etc/os-release; echo $NAME not supported; exit 11; }`,
 		`if _exists apt-get; then _install() { apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y "$1"; }; fi`,
 		`if _exists yum; then _install() { yum install -y "$1"; }; fi`,
+		`if _exists apk; then _install() { apk add -U "$1"; }; fi`,
 		// check in sshd is here, install if not
 		`if ! _exists sshd; then _install openssh-server; fi`,
 		// prohibit password authentication
@@ -721,7 +722,7 @@ func getSSHShellCommands(openSSHPort int, publicSSHKey string) []string {
 		"chmod 700 ~/.ssh",
 		fmt.Sprintf("echo '%s' > ~/.ssh/authorized_keys", publicSSHKey),
 		"chmod 600 ~/.ssh/authorized_keys",
-		"sed -ie '1s@^@export PATH=\"'\"$PATH\"':$PATH\"\\n\\n@' ~/.profile",
+		`if [ -f ~/.profile ]; then sed -ie '1s@^@export PATH="'"$PATH"':$PATH"\n\n@' ~/.profile; fi`,
 		// regenerate host keys
 		"rm -rf /etc/ssh/ssh_host_*",
 		"ssh-keygen -A > /dev/null",
@@ -733,7 +734,7 @@ func getSSHShellCommands(openSSHPort int, publicSSHKey string) []string {
 		"rm -rf /run/sshd && mkdir -p /run/sshd && chown root:root /run/sshd",
 		"rm -rf /var/empty && mkdir -p /var/empty && chown root:root /var/empty",
 		// start sshd
-		fmt.Sprintf("/usr/sbin/sshd -p %d -o PermitUserEnvironment=yes", openSSHPort),
+		fmt.Sprintf("/usr/sbin/sshd -p %d -o AllowTcpForwarding=yes -o PermitUserEnvironment=yes", openSSHPort),
 		// restore ld.so variables
 		`if [ -n "$_LD_LIBRARY_PATH" ]; then export LD_LIBRARY_PATH="$_LD_LIBRARY_PATH"; fi`,
 		`if [ -n "$_LD_PRELOAD" ]; then export LD_PRELOAD="$_LD_PRELOAD"; fi`,
