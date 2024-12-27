@@ -199,6 +199,7 @@ class GCPCompute(Compute):
                     authorized_keys=authorized_keys,
                     spot=instance_offer.instance.resources.spot,
                     labels=labels,
+                    runtime_version=_get_tpu_runtime_version(instance_offer.instance.name),
                     network=self.config.vpc_resource_name,
                     subnetwork=subnetwork,
                     allocate_public_ip=allocate_public_ip,
@@ -777,13 +778,24 @@ def _get_tpu_startup_script(authorized_keys: List[str]) -> str:
     return startup_script
 
 
-def _is_tpu(name: str) -> bool:
-    parts = name.split("-")
+def _is_tpu(instance_name: str) -> bool:
+    parts = instance_name.split("-")
     if len(parts) == 2:
         version, cores = parts
         if version in TPU_VERSIONS and cores.isdigit():
             return True
     return False
+
+
+def _get_tpu_runtime_version(instance_name: str) -> str:
+    tpu_version = _get_tpu_version(instance_name)
+    if tpu_version == "v6e":
+        return "v2-alpha-tpuv6e"
+    return "tpu-ubuntu2204-base"
+
+
+def _get_tpu_version(instance_name: str) -> str:
+    return instance_name.split("-")[0]
 
 
 def _is_single_host_tpu(instance_name: str) -> bool:

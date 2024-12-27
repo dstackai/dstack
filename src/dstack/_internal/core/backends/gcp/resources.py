@@ -365,6 +365,7 @@ def create_tpu_node_struct(
     authorized_keys: List[str],
     spot: bool,
     labels: Dict[str, str],
+    runtime_version: str = "tpu-ubuntu2204-base",
     network: str = "global/networks/default",
     subnetwork: Optional[str] = None,
     allocate_public_ip: bool = True,
@@ -375,7 +376,7 @@ def create_tpu_node_struct(
     if spot:
         node.scheduling_config = tpu_v2.SchedulingConfig(preemptible=True)
     node.accelerator_type = instance_name
-    node.runtime_version = "tpu-ubuntu2204-base"
+    node.runtime_version = runtime_version
     node.network_config = tpu_v2.NetworkConfig(
         enable_external_ips=allocate_public_ip,
         network=network,
