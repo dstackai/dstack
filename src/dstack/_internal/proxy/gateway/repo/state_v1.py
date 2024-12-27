@@ -6,7 +6,7 @@ state-v2.json file of dstack-proxy.
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, Optional
 
 from dstack._internal.core.models.instances import SSHConnectionParams
 from dstack._internal.proxy.gateway.models import ACMESettings, GlobalProxyConfig, ModelEntrypoint
@@ -75,7 +75,8 @@ def get_services_models(
             parsed_model = parse_model(
                 project_name, parsed_service.run_name, model, state_v1["openai"]["index"]
             )
-            models.setdefault(project_name, {})[parsed_model.name] = parsed_model
+            if parsed_model is not None:
+                models.setdefault(project_name, {})[parsed_model.name] = parsed_model
 
     return services, models
 
@@ -100,8 +101,15 @@ def parse_replica(replica: dict) -> Replica:
     )
 
 
-def parse_model(project_name: str, run_name: str, model: dict, openai_index: dict) -> ChatModel:
-    created_ts = openai_index[project_name]["chat"][model["name"]]["created"]
+def parse_model(
+    project_name: str, run_name: str, model: dict, openai_index: dict
+) -> Optional[ChatModel]:
+    created_ts = (
+        openai_index.get(project_name, {}).get("chat", {}).get(model["name"], {}).get("created")
+    )
+    if created_ts is None:
+        # some models can be missing in the index, most likely due to a bug
+        return None
     format_spec: AnyModelFormat
     if model["format"] == "tgi":
         format_spec = TGIChatModelFormat(
