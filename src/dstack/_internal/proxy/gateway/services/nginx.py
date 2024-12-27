@@ -105,8 +105,11 @@ class Nginx:
                 sudo_rm(conf_path)
             raise
 
-    @staticmethod
-    def run_certbot(domain: str, acme: ACMESettings) -> None:
+    @classmethod
+    def run_certbot(cls, domain: str, acme: ACMESettings) -> None:
+        if cls.certificate_exists(domain):
+            return
+
         logger.info("Running certbot for %s", domain)
 
         cmd = ["sudo", "timeout", "--kill-after", str(CERTBOT_2ND_TIMEOUT), str(CERTBOT_TIMEOUT)]
@@ -133,6 +136,11 @@ class Nginx:
             )
         if r.returncode != 0:
             raise ProxyError(f"Error obtaining {domain} TLS certificate:\n{r.stderr.decode()}")
+
+    @staticmethod
+    def certificate_exists(domain: str) -> bool:
+        cmd = ["sudo", "test", "-e", f"/etc/letsencrypt/live/{domain}/fullchain.pem"]
+        return subprocess.run(cmd, timeout=2).returncode == 0
 
     @staticmethod
     def get_config_name(domain: str) -> str:
