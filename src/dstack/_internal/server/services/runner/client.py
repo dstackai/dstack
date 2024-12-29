@@ -1,10 +1,12 @@
 from dataclasses import dataclass
 from http import HTTPStatus
-from typing import BinaryIO, Dict, List, Optional, Union
+from typing import BinaryIO, Dict, List, Optional, TypeVar, Union
 
+import packaging.version
 import requests
 import requests.exceptions
 
+from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.repos.remote import RemoteRepoCreds
 from dstack._internal.core.models.resources import Memory
@@ -12,19 +14,27 @@ from dstack._internal.core.models.runs import ClusterInfo, JobSpec, RunSpec
 from dstack._internal.core.models.volumes import InstanceMountPoint, Volume, VolumeMountPoint
 from dstack._internal.server.schemas.runner import (
     HealthcheckResponse,
+    JobResult,
+    LegacyPullResponse,
+    LegacyStopBody,
+    LegacySubmitBody,
     MetricsResponse,
-    PullBody,
     PullResponse,
     ShimVolumeInfo,
-    StopBody,
     SubmitBody,
-    TaskConfigBody,
+    TaskInfoResponse,
+    TaskStatus,
+    TaskSubmitRequest,
+    TaskTerminateRequest,
 )
 from dstack._internal.utils.common import get_or_error
+from dstack._internal.utils.logging import get_logger
 
 REMOTE_SHIM_PORT = 10998
 REMOTE_RUNNER_PORT = 10999
 REQUEST_TIMEOUT = 15
+
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -120,24 +130,33 @@ class RunnerClient:
 
 
 class ShimClient:
+    # API v2 (a.k.a. Future API) — `/api/tasks/[:id[/{terminate,remove}]]`
+    # API v1 (a.k.a. Legacy API) — `/api/{submit,pull,stop}`
+    _API_V2_MIN_SHIM_VERSION = (0, 18, 34)
+
+    # A surrogate task ID for API-v1-over-v2 emulation (`_v2_compat_*` methods)
+    _LEGACY_TASK_ID = "00000000-0000-0000-0000-000000000000"
+
+    _shim_version: Optional["_Version"]
+    _api_version: int
+    _negotiated: bool = False
+
     def __init__(
         self,
         port: int,
         hostname: str = "localhost",
     ):
-        self.secure = False
-        self.hostname = hostname
-        self.port = port
+        self._session = requests.Session()
+        self._base_url = f"http://{hostname}:{port}"
 
     def healthcheck(self, unmask_exeptions: bool = False) -> Optional[HealthcheckResponse]:
         try:
-            resp = requests.get(self._url("/api/healthcheck"), timeout=REQUEST_TIMEOUT)
-            resp.raise_for_status()
-            return HealthcheckResponse.__response__.parse_obj(resp.json())
+            resp = self._request("GET", "/api/healthcheck", raise_for_status=True)
         except requests.exceptions.RequestException:
             if unmask_exeptions:
                 raise
             return None
+        return self._response(HealthcheckResponse, resp)
 
     def submit(
         self,
@@ -146,7 +165,7 @@ class ShimClient:
         image_name: str,
         privileged: bool,
         container_name: str,
-        container_user: Optional[str],
+        container_user: str,
         shm_size: Optional[Memory],
         public_keys: List[str],
         ssh_user: str,
@@ -154,50 +173,190 @@ class ShimClient:
         mounts: List[VolumeMountPoint],
         volumes: List[Volume],
         instance_mounts: List[InstanceMountPoint],
-    ):
+    ) -> bool:
         """
         Returns `True` if submitted and `False` if the shim already has a job (`409 Conflict`).
         Other error statuses raise an exception.
         """
-        _shm_size = int(shm_size * 1024 * 1024 * 1024) if shm_size else 0
-        volume_infos = [_volume_to_shim_volume_info(v) for v in volumes]
-        post_body = TaskConfigBody(
+        if self._is_api_v2_supported():
+            return self._v2_compat_submit(
+                username=username,
+                password=password,
+                image_name=image_name,
+                privileged=privileged,
+                container_name=container_name,
+                container_user=container_user,
+                shm_size=shm_size,
+                public_keys=public_keys,
+                ssh_user=ssh_user,
+                ssh_key=ssh_key,
+                mounts=mounts,
+                volumes=volumes,
+                instance_mounts=instance_mounts,
+            )
+        body = LegacySubmitBody(
             username=username,
             password=password,
             image_name=image_name,
             privileged=privileged,
             container_name=container_name,
             container_user=container_user,
-            shm_size=_shm_size,
+            shm_size=int(shm_size * 1024**3) if shm_size else 0,
             public_keys=public_keys,
             ssh_user=ssh_user,
             ssh_key=ssh_key,
             mounts=mounts,
-            volumes=volume_infos,
+            volumes=[_volume_to_shim_volume_info(v) for v in volumes],
             instance_mounts=instance_mounts,
-        ).dict()
-        resp = requests.post(
-            self._url("/api/submit"),
-            json=post_body,
-            timeout=REQUEST_TIMEOUT,
         )
+        resp = self._request("POST", "/api/submit", body)
         if resp.status_code == HTTPStatus.CONFLICT:
             return False
         resp.raise_for_status()
         return True
 
-    def stop(self, force: bool = False):
-        body = StopBody(force=force)
-        resp = requests.post(self._url("/api/stop"), json=body.dict(), timeout=REQUEST_TIMEOUT)
+    def stop(self, force: bool = False) -> None:
+        if self._is_api_v2_supported():
+            return self._v2_compat_stop(force)
+        body = LegacyStopBody(force=force)
+        self._request("POST", "/api/stop", body, raise_for_status=True)
+
+    def pull(self) -> LegacyPullResponse:
+        if self._is_api_v2_supported():
+            return self._v2_compat_pull()
+        resp = self._request("GET", "/api/pull", raise_for_status=True)
+        return self._response(LegacyPullResponse, resp)
+
+    def _v2_compat_submit(
+        self,
+        username: str,
+        password: str,
+        image_name: str,
+        privileged: bool,
+        container_name: str,
+        container_user: str,
+        shm_size: Optional[Memory],
+        public_keys: list[str],
+        ssh_user: str,
+        ssh_key: str,
+        mounts: list[VolumeMountPoint],
+        volumes: list[Volume],
+        instance_mounts: List[InstanceMountPoint],
+    ) -> bool:
+        task_id = self._LEGACY_TASK_ID
+        resp = self._request("GET", f"/api/tasks/{task_id}")
+        if resp.status_code != HTTPStatus.NOT_FOUND:
+            resp.raise_for_status()
+            task = self._response(TaskInfoResponse, resp)
+            if task.status != TaskStatus.TERMINATED:
+                return False
+            self._request("POST", f"/api/tasks/{task_id}/remove", raise_for_status=True)
+        body = TaskSubmitRequest(
+            id=task_id,
+            name=container_name,
+            registry_username=username,
+            registry_password=password,
+            image_name=image_name,
+            container_user=container_user,
+            privileged=privileged,
+            gpu=-1,
+            cpu=0,
+            memory=0,
+            shm_size=int(shm_size * 1024**3) if shm_size else 0,
+            volumes=[_volume_to_shim_volume_info(v) for v in volumes],
+            volume_mounts=mounts,
+            instance_mounts=instance_mounts,
+            host_ssh_user=ssh_user,
+            host_ssh_keys=[ssh_key],
+            container_ssh_keys=public_keys,
+        )
+        resp = self._request("POST", "/api/tasks", body, raise_for_status=True)
+        return True
+
+    def _v2_compat_stop(self, force: bool = False) -> None:
+        task_id = self._LEGACY_TASK_ID
+        body = TaskTerminateRequest(
+            termination_reason="",
+            termination_message="",
+            timeout=0 if force else 10,
+        )
+        resp = self._request("POST", f"/api/tasks/{task_id}/terminate", body)
+        if resp.status_code == HTTPStatus.NOT_FOUND:
+            return
         resp.raise_for_status()
 
-    def pull(self) -> PullBody:
-        resp = requests.get(self._url("/api/pull"), timeout=REQUEST_TIMEOUT)
+    def _v2_compat_pull(self) -> LegacyPullResponse:
+        task_id = self._LEGACY_TASK_ID
+        resp = self._request("GET", f"/api/tasks/{task_id}")
+        if resp.status_code == HTTPStatus.NOT_FOUND:
+            return LegacyPullResponse(
+                state="pending",
+                result=JobResult(reason="", reason_message=""),
+            )
         resp.raise_for_status()
-        return PullBody.__response__.parse_obj(resp.json())
+        task = self._response(TaskInfoResponse, resp)
+        if task.status in [TaskStatus.PENDING, TaskStatus.PREPARING, TaskStatus.PULLING]:
+            state = "pulling"
+        elif task.status == TaskStatus.CREATING:
+            state = "creating"
+        elif task.status == TaskStatus.RUNNING:
+            state = "running"
+        elif task.status == TaskStatus.TERMINATED:
+            state = "pending"
+        else:
+            assert False, f"should not reach here: {task.status}"
+        return LegacyPullResponse(
+            state=state,
+            result=JobResult(
+                reason=task.termination_reason, reason_message=task.termination_message
+            ),
+        )
 
-    def _url(self, path: str) -> str:
-        return f"{'https' if self.secure else 'http'}://{self.hostname}:{self.port}/{path.lstrip('/')}"
+    def _request(
+        self,
+        method: str,
+        path: str,
+        body: Optional[CoreModel] = None,
+        *,
+        raise_for_status: bool = False,
+    ) -> requests.Response:
+        url = f"{self._base_url}/{path.lstrip('/')}"
+        if body is not None:
+            json = body.dict()
+        else:
+            json = None
+        resp = self._session.request(method, url, json=json, timeout=REQUEST_TIMEOUT)
+        if raise_for_status:
+            resp.raise_for_status()
+        return resp
+
+    _M = TypeVar("_M", bound=CoreModel)
+
+    def _response(self, model_cls: type[_M], response: requests.Response) -> _M:
+        return model_cls.__response__.parse_obj(response.json())
+
+    def _is_api_v2_supported(self) -> bool:
+        if not self._negotiated:
+            self._negotiate()
+        return self._api_version >= 2
+
+    def _negotiate(self) -> None:
+        resp = self._request("GET", "/api/healthcheck", raise_for_status=True)
+        raw_version = self._response(HealthcheckResponse, resp).version
+        version = _parse_version(raw_version)
+        if version is None or version >= self._API_V2_MIN_SHIM_VERSION:
+            api_version = 2
+        else:
+            api_version = 1
+        logger.debug(
+            "shim version: %s %s (API v%s)",
+            raw_version,
+            version or "(latest)",
+            api_version,
+        )
+        self._shim_version = version
+        self._api_version = api_version
+        self._negotiated = True
 
 
 def health_response_to_health_status(data: HealthcheckResponse) -> HealthStatus:
@@ -221,3 +380,30 @@ def _volume_to_shim_volume_info(volume: Volume) -> ShimVolumeInfo:
         init_fs=not volume.external,
         device_name=device_name,
     )
+
+
+_Version = tuple[int, int, int]
+
+
+def _parse_version(version_string: str) -> Optional[_Version]:
+    """
+    Returns a (major, minor, micro) tuple if the version if final.
+    Returns `None`, which means "latest", if:
+    * the version is prerelease or dev build -- assuming that in most cases it's a build based on
+    the latest final release
+    * the version consists of only major part or not valid at all, e.g., staging builds have
+    GitHub run number (e.g., 1234) instead of the version -- assuming that it's a "bleeding edge",
+    not yet released version
+    """
+    try:
+        version = packaging.version.parse(version_string)
+    except packaging.version.InvalidVersion:
+        return None
+    if version.is_prerelease or version.is_devrelease:
+        return None
+    release = version.release
+    if len(release) <= 1:
+        return None
+    if len(release) == 2:
+        return (*release, 0)
+    return release[:3]

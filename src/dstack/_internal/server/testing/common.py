@@ -599,11 +599,15 @@ def get_volume(
     volume_id: Optional[str] = None,
     provisioning_data: Optional[VolumeProvisioningData] = None,
     attachment_data: Optional[VolumeAttachmentData] = None,
+    device_name: Optional[str] = None,
 ) -> Volume:
     if id_ is None:
         id_ = uuid.uuid4()
     if configuration is None:
         configuration = get_volume_configuration()
+    if device_name is not None:
+        assert attachment_data is None, "attachment_data and device_name are mutually exclusive"
+        attachment_data = VolumeAttachmentData(device_name=device_name)
     return Volume(
         id=id_,
         name=name,
