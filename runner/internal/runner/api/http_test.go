@@ -20,11 +20,29 @@ func (ds DummyRunner) GetState() (shim.RunnerStatus, shim.JobResult) {
 	return ds.State, ds.JobResult
 }
 
-func (ds DummyRunner) Run(context.Context, shim.TaskConfig) error {
+func (ds DummyRunner) Submit(context.Context, shim.TaskConfig) error {
 	return nil
 }
 
-func (ds DummyRunner) Stop(force bool) {}
+func (ds DummyRunner) Run(context.Context, string) error {
+	return nil
+}
+
+func (ds DummyRunner) Terminate(context.Context, string, uint, string, string) error {
+	return nil
+}
+
+func (ds DummyRunner) Remove(context.Context, string) error {
+	return nil
+}
+
+func (ds DummyRunner) TaskIDs() []string {
+	return []string{}
+}
+
+func (ds DummyRunner) TaskInfo(taskID string) shim.TaskInfo {
+	return shim.TaskInfo{}
+}
 
 func (ds DummyRunner) Resources() shim.Resources {
 	return shim.Resources{}
@@ -36,7 +54,7 @@ func TestHealthcheck(t *testing.T) {
 
 	server := api.NewShimServer(":12345", DummyRunner{}, "0.0.1.dev2")
 
-	f := common.JSONResponseHandler("GET", server.HealthcheckGetHandler)
+	f := common.JSONResponseHandler(server.HealthcheckHandler)
 	f(responseRecorder, request)
 
 	if responseRecorder.Code != 200 {

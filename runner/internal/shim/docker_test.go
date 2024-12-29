@@ -2,6 +2,8 @@ package shim
 
 import (
 	"context"
+	"encoding/hex"
+	"math/rand"
 	"os"
 	"os/exec"
 	"strconv"
@@ -33,7 +35,11 @@ func TestDocker_SSHServer(t *testing.T) {
 	defer cancel()
 
 	dockerRunner, _ := NewDockerRunner(params)
-	assert.NoError(t, dockerRunner.Run(ctx, TaskConfig{ImageName: "ubuntu", Name: t.Name(), ID: time.Now().String()}))
+	taskConfig := createTaskConfig(t)
+	defer dockerRunner.Remove(context.Background(), taskConfig.ID)
+
+	assert.NoError(t, dockerRunner.Submit(ctx, taskConfig))
+	assert.NoError(t, dockerRunner.Run(ctx, taskConfig.ID))
 }
 
 // TestDocker_SSHServerConnect pulls ubuntu image (without sshd), installs openssh-server and tries to connect via SSH
@@ -64,7 +70,11 @@ func TestDocker_SSHServerConnect(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		assert.NoError(t, dockerRunner.Run(ctx, TaskConfig{ImageName: "ubuntu", Name: t.Name(), ID: time.Now().String()}))
+		taskConfig := createTaskConfig(t)
+		defer dockerRunner.Remove(context.Background(), taskConfig.ID)
+
+		assert.NoError(t, dockerRunner.Submit(ctx, taskConfig))
+		assert.NoError(t, dockerRunner.Run(ctx, taskConfig.ID))
 	}()
 
 	for i := 0; i < timeout; i++ {
@@ -101,7 +111,11 @@ func TestDocker_ShmNoexecByDefault(t *testing.T) {
 	defer cancel()
 
 	dockerRunner, _ := NewDockerRunner(params)
-	assert.NoError(t, dockerRunner.Run(ctx, TaskConfig{ImageName: "ubuntu", Name: t.Name(), ID: time.Now().String()}))
+	taskConfig := createTaskConfig(t)
+	defer dockerRunner.Remove(context.Background(), taskConfig.ID)
+
+	assert.NoError(t, dockerRunner.Submit(ctx, taskConfig))
+	assert.NoError(t, dockerRunner.Run(ctx, taskConfig.ID))
 }
 
 func TestDocker_ShmExecIfSizeSpecified(t *testing.T) {
@@ -119,7 +133,12 @@ func TestDocker_ShmExecIfSizeSpecified(t *testing.T) {
 	defer cancel()
 
 	dockerRunner, _ := NewDockerRunner(params)
-	assert.NoError(t, dockerRunner.Run(ctx, TaskConfig{ImageName: "ubuntu", ShmSize: 1024 * 1024, Name: t.Name(), ID: time.Now().String()}))
+	taskConfig := createTaskConfig(t)
+	taskConfig.ShmSize = 1024 * 1024
+	defer dockerRunner.Remove(context.Background(), taskConfig.ID)
+
+	assert.NoError(t, dockerRunner.Submit(ctx, taskConfig))
+	assert.NoError(t, dockerRunner.Run(ctx, taskConfig.ID))
 }
 
 /* Mocks */
@@ -164,7 +183,7 @@ func (c *dockerParametersMock) DockerMounts(string) ([]mount.Mount, error) {
 	return nil, nil
 }
 
-func (c *dockerParametersMock) MakeRunnerDir() (string, error) {
+func (c *dockerParametersMock) MakeRunnerDir(string) (string, error) {
 	return "", nil
 }
 
@@ -174,4 +193,27 @@ var portNumber int32 = 10000
 
 func nextPort() int {
 	return int(atomic.AddInt32(&portNumber, 1))
+}
+
+var (
+	randSrc = rand.New(rand.NewSource(time.Now().UnixNano()))
+	randMu  = sync.Mutex{}
+)
+
+func generateID(t *testing.T) string {
+	const idLen = 16
+	b := make([]byte, idLen/2)
+	randMu.Lock()
+	defer randMu.Unlock()
+	_, err := randSrc.Read(b)
+	require.Nil(t, err)
+	return hex.EncodeToString(b)[:idLen]
+}
+
+func createTaskConfig(t *testing.T) TaskConfig {
+	return TaskConfig{
+		ID:        generateID(t),
+		Name:      t.Name(),
+		ImageName: "ubuntu",
+	}
 }

@@ -10,11 +10,16 @@ import (
 )
 
 type TaskRunner interface {
-	Run(context.Context, shim.TaskConfig) error
-	GetState() (shim.RunnerStatus, shim.JobResult)
-	Stop(bool)
+	Submit(context.Context, shim.TaskConfig) error
+	Run(ctx context.Context, taskID string) error
+	Terminate(ctx context.Context, taskID string, timeout uint, reason string, message string) error
+	Remove(ctx context.Context, taskID string) error
 
 	Resources() shim.Resources
+	TaskIDs() []string
+	TaskInfo(taskID string) shim.TaskInfo
+
+	GetState() (shim.RunnerStatus, shim.JobResult)
 }
 
 type ShimServer struct {
@@ -27,25 +32,33 @@ type ShimServer struct {
 }
 
 func NewShimServer(address string, runner TaskRunner, version string) *ShimServer {
-	mux := http.NewServeMux()
+	r := api.NewRouter()
 	s := &ShimServer{
 		HttpServer: &http.Server{
 			Addr:    address,
-			Handler: mux,
+			Handler: r,
 		},
 
 		runner: runner,
 
 		version: version,
 	}
+
+	// Stable API
 	// The healthcheck endpoint should stay backward compatible, as it is used for negotiation
-	mux.HandleFunc("/api/healthcheck", api.JSONResponseHandler("GET", s.HealthcheckGetHandler))
-	// The following endpoints constitute a so-called legacy API, where shim has one global state
-	// and is able to process only one task at a time
-	// NOTE: as of 2024-12-10, there is _only_ legacy API, but the "legacy" label is used to
-	// distinguish the "old" API from the upcoming new one
-	mux.HandleFunc("/api/submit", api.JSONResponseHandler("POST", s.SubmitPostHandler))
-	mux.HandleFunc("/api/pull", api.JSONResponseHandler("GET", s.PullGetHandler))
-	mux.HandleFunc("/api/stop", api.JSONResponseHandler("POST", s.StopPostHandler))
+	r.AddHandler("GET", "/api/healthcheck", s.HealthcheckHandler)
+
+	// Future API
+	r.AddHandler("GET", "/api/tasks", s.TaskListHandler)
+	r.AddHandler("GET", "/api/tasks/{id}", s.TaskInfoHandler)
+	r.AddHandler("POST", "/api/tasks", s.TaskSubmitHandler)
+	r.AddHandler("POST", "/api/tasks/{id}/terminate", s.TaskTerminateHandler)
+	r.AddHandler("POST", "/api/tasks/{id}/remove", s.TaskRemoveHandler)
+
+	// Legacy API
+	r.AddHandler("POST", "/api/submit", s.LegacySubmitPostHandler)
+	r.AddHandler("GET", "/api/pull", s.LegacyPullGetHandler)
+	r.AddHandler("POST", "/api/stop", s.LegacyStopPostHandler)
+
 	return s
 }

@@ -87,11 +87,33 @@ func (gl *GpuLock) Acquire(count int) ([]string, error) {
 	return ids, nil
 }
 
-// Release marks passed Resource IDs as idle
-// This method never fails, it's safe to release already idle resource or try to release unknown resource
-func (gl *GpuLock) Release(ids []string) {
+// Lock marks passed Resource IDs as locked (busy)
+// This method never fails, it's safe to lock already locked resource or try to lock unknown resource
+// The returned slice contains only actually locked resource IDs
+func (gl *GpuLock) Lock(ids []string) []string {
 	gl.mu.Lock()
 	defer gl.mu.Unlock()
+	lockedIDs := make([]string, 0, len(ids))
+	for _, id := range ids {
+		if locked, ok := gl.lock[id]; !ok {
+			log.Printf("skipping %s: unknown GPU resource", id)
+		} else if locked {
+			log.Printf("skipping %s: already locked", id)
+		} else {
+			gl.lock[id] = true
+			lockedIDs = append(lockedIDs, id)
+		}
+	}
+	return lockedIDs
+}
+
+// Release marks passed Resource IDs as idle
+// This method never fails, it's safe to release already idle resource or try to release unknown resource
+// The returned slice contains only actually released resource IDs
+func (gl *GpuLock) Release(ids []string) []string {
+	gl.mu.Lock()
+	defer gl.mu.Unlock()
+	releasedIDs := make([]string, 0, len(ids))
 	for _, id := range ids {
 		if locked, ok := gl.lock[id]; !ok {
 			log.Printf("skipping %s: unknown GPU resource", id)
@@ -99,6 +121,8 @@ func (gl *GpuLock) Release(ids []string) {
 			log.Printf("skipping %s: not locked", id)
 		} else {
 			gl.lock[id] = false
+			releasedIDs = append(releasedIDs, id)
 		}
 	}
+	return releasedIDs
 }

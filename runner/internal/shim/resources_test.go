@@ -138,7 +138,7 @@ func TestGpuLock_Acquire_Count_ErrNoCapacity(t *testing.T) {
 	assert.True(t, gl.lock["GPU-f00d"], "GPU-f00d")
 }
 
-func TestGpuLock_Acquire_Release(t *testing.T) {
+func TestGpuLock_Lock(t *testing.T) {
 	gpus := []host.GpuInfo{
 		{Vendor: host.GpuVendorNvidia, ID: "GPU-beef"},
 		{Vendor: host.GpuVendorNvidia, ID: "GPU-f00d"},
@@ -147,17 +147,18 @@ func TestGpuLock_Acquire_Release(t *testing.T) {
 	gl, _ := NewGpuLock(gpus)
 	gl.lock["GPU-beef"] = true
 	gl.lock["GPU-f00d"] = true
-	gl.Release([]string{
-		"GPU-beef", // locked
+	locked := gl.Lock([]string{
+		"GPU-beef", // already locked
 		"GPU-dead", // unknown
 		"GPU-c0de", // not locked
 	})
-	assert.False(t, gl.lock["GPU-beef"], "GPU-beef") // has been unlocked
-	assert.True(t, gl.lock["GPU-f00d"], "GPU-f00d")  // still locked
-	assert.False(t, gl.lock["GPU-c0de"], "GPU-c0de") // was already unlocked
+	assert.Equal(t, []string{"GPU-c0de"}, locked)
+	assert.True(t, gl.lock["GPU-beef"], "GPU-beef") // was already locked
+	assert.True(t, gl.lock["GPU-f00d"], "GPU-f00d") // was already locked
+	assert.True(t, gl.lock["GPU-c0de"], "GPU-c0de") // has been locked
 }
 
-func TestGpuLock_Acquire_Release_Nil(t *testing.T) {
+func TestGpuLock_Lock_Nil(t *testing.T) {
 	gpus := []host.GpuInfo{
 		{Vendor: host.GpuVendorNvidia, ID: "GPU-beef"},
 		{Vendor: host.GpuVendorNvidia, ID: "GPU-f00d"},
@@ -165,7 +166,42 @@ func TestGpuLock_Acquire_Release_Nil(t *testing.T) {
 	gl, _ := NewGpuLock(gpus)
 	gl.lock["GPU-beef"] = true
 	var ids []string
-	gl.Release(ids)
+	locked := gl.Lock(ids)
+	assert.Equal(t, []string{}, locked)
+	assert.True(t, gl.lock["GPU-beef"], "GPU-beef")
+	assert.False(t, gl.lock["GPU-f00d"], "GPU-f00d")
+}
+
+func TestGpuLock_Release(t *testing.T) {
+	gpus := []host.GpuInfo{
+		{Vendor: host.GpuVendorNvidia, ID: "GPU-beef"},
+		{Vendor: host.GpuVendorNvidia, ID: "GPU-f00d"},
+		{Vendor: host.GpuVendorNvidia, ID: "GPU-c0de"},
+	}
+	gl, _ := NewGpuLock(gpus)
+	gl.lock["GPU-beef"] = true
+	gl.lock["GPU-f00d"] = true
+	released := gl.Release([]string{
+		"GPU-beef", // locked
+		"GPU-dead", // unknown
+		"GPU-c0de", // not locked
+	})
+	assert.Equal(t, []string{"GPU-beef"}, released)
+	assert.False(t, gl.lock["GPU-beef"], "GPU-beef") // has been unlocked
+	assert.True(t, gl.lock["GPU-f00d"], "GPU-f00d")  // still locked
+	assert.False(t, gl.lock["GPU-c0de"], "GPU-c0de") // was already unlocked
+}
+
+func TestGpuLock_Release_Nil(t *testing.T) {
+	gpus := []host.GpuInfo{
+		{Vendor: host.GpuVendorNvidia, ID: "GPU-beef"},
+		{Vendor: host.GpuVendorNvidia, ID: "GPU-f00d"},
+	}
+	gl, _ := NewGpuLock(gpus)
+	gl.lock["GPU-beef"] = true
+	var ids []string
+	released := gl.Release(ids)
+	assert.Equal(t, []string{}, released)
 	assert.True(t, gl.lock["GPU-beef"], "GPU-beef")
 	assert.False(t, gl.lock["GPU-f00d"], "GPU-f00d")
 }

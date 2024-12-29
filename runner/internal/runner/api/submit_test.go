@@ -21,7 +21,7 @@ func TestSubmit(t *testing.T) {
 
 	server := api.NewShimServer(":12340", &dummyRunner, "0.0.1.dev2")
 
-	firstSubmitPost := common.JSONResponseHandler("POST", server.SubmitPostHandler)
+	firstSubmitPost := common.JSONResponseHandler(server.LegacySubmitPostHandler)
 	firstSubmitPost(responseRecorder, request)
 
 	if responseRecorder.Code != 200 {
@@ -35,7 +35,7 @@ func TestSubmit(t *testing.T) {
 	request = httptest.NewRequest("POST", "/api/submit", strings.NewReader("{\"image_name\":\"ubuntu\"}"))
 	responseRecorder = httptest.NewRecorder()
 
-	secondSubmitPost := common.JSONResponseHandler("POST", server.SubmitPostHandler)
+	secondSubmitPost := common.JSONResponseHandler(server.LegacySubmitPostHandler)
 	secondSubmitPost(responseRecorder, request)
 
 	t.Logf("%v", responseRecorder.Result())

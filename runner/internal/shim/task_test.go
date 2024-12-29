@@ -1,6 +1,7 @@
 package shim
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -48,17 +49,29 @@ func TestTaskStorage_Update_OK(t *testing.T) {
 	storage.tasks["1"] = storedTask
 	updatedTask := Task{ID: "1", Status: TaskStatusTerminated}
 
-	ok := storage.Update(updatedTask)
-	assert.True(t, ok)
+	err := storage.Update(updatedTask)
+	assert.Nil(t, err)
 	assert.Equal(t, updatedTask, storage.tasks["1"])
 }
 
 func TestTaskStorage_Update_DoesNotExist(t *testing.T) {
 	storage := NewTaskStorage()
 
-	ok := storage.Update(Task{ID: "1", Status: TaskStatusPending})
-	assert.False(t, ok)
+	err := storage.Update(Task{ID: "1", Status: TaskStatusPending})
+	assert.ErrorIs(t, err, ErrNotFound)
 	assert.Equal(t, 0, len(storage.tasks))
+}
+
+func TestTaskStorage_Update_TransitionNotAllowed(t *testing.T) {
+	storage := NewTaskStorage()
+	storedTask := Task{ID: "1", Status: TaskStatusPending}
+	storage.tasks["1"] = storedTask
+	updatedTask := Task{ID: "1", Status: TaskStatusRunning}
+
+	err := storage.Update(updatedTask)
+	assert.ErrorIs(t, err, ErrRequest)
+	assert.ErrorContains(t, err, fmt.Sprintf("%s -> %s", storedTask.Status, updatedTask.Status))
+	assert.Equal(t, storedTask, storage.tasks["1"])
 }
 
 func TestTaskStorage_Delete(t *testing.T) {
@@ -72,12 +85,48 @@ func TestTaskStorage_Delete(t *testing.T) {
 	assert.Equal(t, 0, len(storage.tasks))
 }
 
-func TestNewTask(t *testing.T) {
+func TestTask_IsTransitionAllowed_true(t *testing.T) {
+	testCases := []struct {
+		oldStatus, newStatus TaskStatus
+	}{
+		{TaskStatusPending, TaskStatusPreparing},
+		{TaskStatusPending, TaskStatusTerminated},
+		{TaskStatusPreparing, TaskStatusPulling},
+		{TaskStatusPreparing, TaskStatusTerminated},
+		{TaskStatusPulling, TaskStatusCreating},
+		{TaskStatusPulling, TaskStatusTerminated},
+		{TaskStatusCreating, TaskStatusRunning},
+		{TaskStatusCreating, TaskStatusTerminated},
+		{TaskStatusRunning, TaskStatusTerminated},
+	}
+	for _, tc := range testCases {
+		task := Task{ID: "1", Status: tc.oldStatus}
+		assert.True(t, task.IsTransitionAllowed(tc.newStatus), "%s -> %s", tc.oldStatus, tc.newStatus)
+	}
+}
+
+func TestTask_IsTransitionAllowed_false(t *testing.T) {
+	testCases := []struct {
+		oldStatus, newStatus TaskStatus
+	}{
+		// non-exhaustive list of impossible transitions
+		{TaskStatusPending, TaskStatusPending},
+		{TaskStatusPending, TaskStatusRunning},
+		{TaskStatusPulling, TaskStatusPending},
+		{TaskStatusTerminated, TaskStatusTerminated},
+	}
+	for _, tc := range testCases {
+		task := Task{ID: "1", Status: tc.oldStatus}
+		assert.False(t, task.IsTransitionAllowed(tc.newStatus), "%s -> %s", tc.oldStatus, tc.newStatus)
+	}
+}
+
+func TestNewTaskFromConfig(t *testing.T) {
 	cfg := TaskConfig{
 		ID:   "66a886db-86db-4cf9-8c06-8984ad15dde2",
 		Name: "vllm-0-0",
 	}
-	task := NewTask(cfg)
+	task := NewTaskFromConfig(cfg)
 
 	assert.Equal(t, "66a886db-86db-4cf9-8c06-8984ad15dde2", task.ID)
 	assert.Equal(t, "vllm-0-0-cff1b8da", task.containerName)
