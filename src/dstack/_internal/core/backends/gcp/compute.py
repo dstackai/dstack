@@ -791,6 +791,8 @@ def _get_tpu_runtime_version(instance_name: str) -> str:
     tpu_version = _get_tpu_version(instance_name)
     if tpu_version == "v6e":
         return "v2-alpha-tpuv6e"
+    elif tpu_version == "v5litepod":
+        return "v2-alpha-tpuv5-lite"
     return "tpu-ubuntu2204-base"
 
 
