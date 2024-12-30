@@ -128,7 +128,7 @@ class TaskSubmitRequest(CoreModel):
     instance_mounts: list[InstanceMountPoint]
     host_ssh_user: str
     host_ssh_keys: list[str]
-    container_ssh_keys: List[str]
+    container_ssh_keys: list[str]
 
 
 class TaskTerminateRequest(CoreModel):
