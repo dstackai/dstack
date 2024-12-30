@@ -1453,7 +1453,6 @@ class TestCreateInstance:
             profile=Profile(name="test_profile"),
             requirements=Requirements(resources=ResourcesSpec(cpu=1)),
         )
-        print(str(request))
         instance_id = UUID("1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e")
         with (
             patch(
