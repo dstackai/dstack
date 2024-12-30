@@ -2,44 +2,46 @@ openapi: 3.1.1
 
 info:
   title: dstack-shim API
-  version: &api-version 0.18.31
+  version: v2/0.18.34
   x-logo:
     url: https://avatars.githubusercontent.com/u/54146142?s=260
+  description: >
+    ## Versioning
+
+    `dstack-shim` versioning and release cycles are tied to those of `dstack`, meaning that we
+    cannot use shim version to express shim API versioning. To get around this limitation, we use
+    two version schemes:
+
+    * shim binary version, the same as the server version, in the form of `MAJOR.MINOR.MICRO`, e.g,
+      `0.18.33`. This version is exposed via the `/healthcheck` endpoint. Used to discriminate
+      different API versions (`if shim_version >= x.y.z then api_version = 2 else api_version = 1`)
+      and detect features within one API version (`if shim_version >= x.y.z then has_x_feature = true`)
+
+    * shim API version (you can think of it as a “generation”), in the form or `vN`, e.g., `v2`.
+      Diferrent API versions represent _totally different_ APIs. When two such API versions coexist
+      in the same shim binary (naturally, they should coexist for some time to ensure seamless migration),
+      we call the older one “Legacy API” and the newer one “Future API”. These versions are not exposed
+      via API, clients should figure out them via shim binary version
 
 servers:
   - url: http://localhost:10998/api
 
-tags:
-  - name: &stable-api Stable API
-    description: >
-      Stable API should always stay backward (or future, depending on which point of view we are
-      talking about) compatible, meaning that newer versions of dstack server should be able
-      to use Stable API of older versions of shim without additional API version negotiation
-  - name: &future-api Future API
-    description: >
-      As of the current version of API, Future API is an upcoming "task-oriented" API, able to
-      handle more than one task at a time managing machine resources. It is not yet supported
-      by dstack server
-  - name: &legacy-api Legacy API
-    description: >
-      As of the current version of API, Legacy API is the only API (apart from Stable one) used by
-      dstack server. It can only process one task at a time and cannot manage (that is, limit)
-      machine resources consumed by the task
-
 paths:
   /healthcheck:
     get:
-      tags:
-        - *stable-api
       summary: Ping and API version negotiation
       description: >
         Serves two roles:
 
         * as the path implies, it's a healthcheck, although there is no field in the response that
-        indicate if shim is healthy. Basically, it not is a proper healthcheck but
+          indicate if shim is healthy. Basically, it not is a proper healthcheck but
           a basic "ping" method
         * API version negotiation. Server inspects `version` field to figure out which API features
           it should use
+
+        **Important**: Since this endpoint is used for negotiation, it should always stay
+        backward/future compatible, specifically the `version` field
+
       responses:
         "200":
           description: ""
@@ -50,8 +52,6 @@ paths:
 
   /tasks:
     get:
-      tags:
-        - *future-api
       summary: Get task list
       description: Returns a list of all tasks known to shim, including terminated ones
       responses:
@@ -62,8 +62,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/TaskListResponse"
     post:
-      tags:
-        - *future-api
       summary: Submit and run new task
       requestBody:
         required: true
@@ -84,8 +82,6 @@ paths:
 
   /tasks/{id}:
     get:
-      tags:
-        - *future-api
       summary: Get task info
       parameters:
         - $ref: "#/parameters/taskId"
@@ -95,8 +91,6 @@ paths:
 
   /tasks/{id}/terminate:
     post:
-      tags:
-        - *future-api
       summary: Terminate task
       description: >
         Stops the task, that is, cancels image pulling if in progress,
@@ -130,8 +124,6 @@ paths:
 
   /tasks/{id}/remove:
     post:
-      tags:
-        - *future-api
       summary: Remove task
       description: >
         Removes the task from in-memory storage and destroys its associated
@@ -151,64 +143,6 @@ paths:
         "500":
           description: Internal error, e.g., failed to remove a container
           $ref: "#/components/responses/PlainTextInternalError"
-
-  /submit:
-    post:
-      tags:
-        - *legacy-api
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/LegacySubmitBody"
-      responses:
-        "200":
-          description: ""
-          content:
-            text/plain:
-              schema:
-                type: string
-                examples:
-                  - OK
-        "409":
-          description: Another task is already submitted (`RunnerStatus` is not `pending`)
-          content:
-            text/plain:
-              schema:
-                type: string
-                examples:
-                  - Conflict
-
-  /pull:
-    get:
-      tags:
-        - *legacy-api
-      responses:
-        "200":
-          description: ""
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/LegacyPullResponse"
-
-  /stop:
-    post:
-      tags:
-        - *legacy-api
-      requestBody:
-        required: false
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/LegacyStopBody"
-      responses:
-        "200":
-          description: ""
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/LegacyStopResponse"
 
 parameters:
   taskId:
@@ -341,7 +275,7 @@ components:
         version:
           type: string
           examples:
-            - *api-version
+            - 0.18.34
       required:
         - service
         - version
@@ -534,144 +468,6 @@ components:
           description: >
             Seconds to wait before killing the container. If zero, kill
             the container immediately (no graceful shutdown)
-
-    LegacySubmitBody:
-      title: shim.api.LegacySubmitBody
-      type: object
-      properties:
-        username:
-          type: string
-          default: ""
-          description: Private container registry username
-          examples:
-            - registry-user
-        password:
-          type: string
-          default: ""
-          description: Private container registry password
-          examples:
-            - registry-token
-        image_name:
-          type: string
-          default: ""
-          examples:
-            - ubuntu:22.04
-        privileged:
-          type: boolean
-          default: false
-          description: >
-            (since [0.18.18](https://github.com/dstackai/dstack/releases/tag/0.18.18))
-            Start container in privileged mode
-        container_name:
-          type: string
-          default: ""
-          examples:
-            - horrible-mule-1-0-0
-        container_user:
-          type: string
-          default: ""
-          description: >
-            If not set, the default image user is used. As of 0.18.24, `dstack` always uses `root`
-          examples:
-            - root
-        shm_size:
-          type: integer
-          default: 0
-          description: >
-            POSIX shared memory, bytes.
-            If not set or `0`, the Docker's default is used
-          examples:
-            - 1073741824
-        public_keys:
-          type: array
-          items:
-            type: string
-          default: []
-          description: >
-            SSH public keys for `container_user`. As of 0.18.24, `dstack` submits two keys:
-            project key (generated by the server) and user key (either generated by
-            the CLI client or provided by the user)
-          examples:
-            - ["ssh-rsa <BASE64> project@dstack", "ssh-ed25519 <BASE64> me@laptop"]
-        ssh_user:
-          type: string
-          default: ""
-          description: >
-            Instance (host) user for SSH access, either directly (`ssh {run_name}-host`)
-            or for `ProxyJump`ing inside the container. Ignored if `ssh_key` is not set
-          examples:
-            - root
-        ssh_key:
-          type: string
-          default: ""
-          description: >
-            SSH public key for access to the instance (host). If set, the key will be added
-            to the `ssh_users`'s `~/.ssh/authorized_keys` when the run starts and removed
-            when the run exits.
-          examples:
-            - "ssh-ed25519 <BASE64> me@laptop"
-        mounts:
-          type: array
-          items:
-            $ref: "#/components/schemas/VolumeMountPoint"
-          default: []
-        volumes:
-          type: array
-          items:
-            $ref: "#/components/schemas/VolumeInfo"
-          default: []
-        instance_mounts:
-          type: array
-          items:
-            $ref: "#/components/schemas/InstanceMountPoint"
-          default: []
-          description: (since [0.18.21](https://github.com/dstackai/dstack/releases/tag/0.18.21))
-
-    LegacyPullResponse:
-      title: shim.api.LegacyPullResponse
-      type: object
-      properties:
-        state:
-          allOf:
-            - $ref: "#/components/schemas/RunnerStatus"
-            - examples:
-                - pending
-        result:
-          allOf:
-            - $ref: "#/components/schemas/JobResult"
-            - examples:
-                - reason: CONTAINER_EXITED_WITH_ERROR
-                  message: ""
-      required:
-        - state
-        - executor_error
-        - container_name
-        - status
-        - running
-        - oom_killed
-        - dead
-        - exit_code
-        - error
-        - result
-      additionalProperties: false
-
-    LegacyStopBody:
-      title: shim.api.LegacyStopBody
-      type: object
-      properties:
-        force:
-          type: boolean
-          default: false
-
-    LegacyStopResponse:
-      title: shim.api.LegacyStopResponse
-      type: object
-      properties:
-        state:
-          $ref: "#/components/schemas/RunnerStatus"
-      required:
-        - state
-      additionalProperties: false
 
   responses:
     TaskInfo:
