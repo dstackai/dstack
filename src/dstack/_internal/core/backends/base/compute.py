@@ -303,6 +303,7 @@ def get_docker_commands(
         "_install() { NAME=Distribution; test -f /etc/os-release && . /etc/os-release; echo $NAME not supported; exit 11; }",
         'if _exists apt-get; then _install() { apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y "$1"; }; fi',
         'if _exists yum; then _install() { yum install -y "$1"; }; fi',
+        'if _exists apk; then _install() { apk add -U "$1"; }; fi',
         # check in sshd is here, install if not
         "if ! _exists sshd; then _install openssh-server; fi",
         # install curl if necessary
@@ -314,7 +315,7 @@ def get_docker_commands(
         "chmod 700 ~/.ssh",
         f"echo '{authorized_keys_content}' > ~/.ssh/authorized_keys",
         "chmod 600 ~/.ssh/authorized_keys",
-        "sed -ie '1s@^@export PATH=\"'\"$PATH\"':$PATH\"\\n\\n@' ~/.profile"
+        r"""if [ -f ~/.profile ]; then sed -ie '1s@^@export PATH="'"$PATH"':$PATH"\n\n@' ~/.profile; fi"""
         if fix_path_in_dot_profile
         else ":",
         # regenerate host keys
@@ -328,7 +329,7 @@ def get_docker_commands(
         "rm -rf /run/sshd && mkdir -p /run/sshd && chown root:root /run/sshd",
         "rm -rf /var/empty && mkdir -p /var/empty && chown root:root /var/empty",
         # start sshd
-        "/usr/sbin/sshd -p 10022 -o PermitUserEnvironment=yes",
+        "/usr/sbin/sshd -p 10022 -o AllowTcpForwarding=yes -o PermitUserEnvironment=yes",
         # restore ld.so variables
         'if [ -n "$_LD_LIBRARY_PATH" ]; then export LD_LIBRARY_PATH="$_LD_LIBRARY_PATH"; fi',
         'if [ -n "$_LD_PRELOAD" ]; then export LD_PRELOAD="$_LD_PRELOAD"; fi',
