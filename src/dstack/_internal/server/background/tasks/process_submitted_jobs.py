@@ -19,6 +19,7 @@ from dstack._internal.core.models.instances import (
 )
 from dstack._internal.core.models.profiles import (
     DEFAULT_POOL_NAME,
+    DEFAULT_RUN_TERMINATION_IDLE_TIME,
     CreationPolicy,
     TerminationPolicy,
 )
@@ -31,6 +32,7 @@ from dstack._internal.core.models.runs import (
     RunSpec,
 )
 from dstack._internal.core.models.volumes import Volume
+from dstack._internal.core.services.profiles import get_termination
 from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import (
     FleetModel,
@@ -499,12 +501,14 @@ def _create_instance_model_for_job(
     instance_num: int,
 ) -> InstanceModel:
     profile = run_spec.merged_profile
-    termination_policy = profile.termination_policy
-    termination_idle_time = profile.termination_idle_time
     if not job_provisioning_data.dockerized:
         # terminate vastai/k8s instances immediately
         termination_policy = TerminationPolicy.DESTROY_AFTER_IDLE
         termination_idle_time = 0
+    else:
+        termination_policy, termination_idle_time = get_termination(
+            profile, DEFAULT_RUN_TERMINATION_IDLE_TIME
+        )
     instance = InstanceModel(
         id=uuid.uuid4(),
         name=f"{fleet_model.name}-{instance_num}",

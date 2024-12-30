@@ -303,6 +303,7 @@ def _print_plan_header(plan: FleetPlan):
         configuration_table.add_row(th("Spot policy"), spot_policy)
     if reservation is not None:
         configuration_table.add_row(th("Reservation"), reservation)
+    # TODO: [Andrey] Display "Idle duration"
 
     offers_table = Table(box=None)
     offers_table.add_column("#")

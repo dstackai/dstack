@@ -39,8 +39,15 @@ def parse_duration(v: Optional[Union[int, str]]) -> Optional[int]:
 
 
 def parse_max_duration(v: Optional[Union[int, str]]) -> Optional[Union[str, int]]:
+    # TODO: [Andrey] Not sure this works (see `parse_idle_duration`)
     if v == "off":
         return v
+    return parse_duration(v)
+
+
+def parse_idle_duration(v: Optional[Union[int, str]]) -> Optional[Union[str, int]]:
+    if v is False:
+        return -1
     return parse_duration(v)
 
 
@@ -144,17 +151,25 @@ class ProfileParams(CoreModel):
             description="The policy for using instances from the pool. Defaults to `reuse-or-create`"
         ),
     ]
+    idle_duration: Annotated[
+        Optional[Union[Literal["off"], str, int]],
+        Field(
+            description="Time to wait before terminating idle instances. Defaults to `5m` for runs and `3d` for fleets. Use `off` for unlimited duration"
+        ),
+    ]
+    # Deprecated:
     termination_policy: Annotated[
         Optional[TerminationPolicy],
-        Field(description="The policy for instance termination. Defaults to `destroy-after-idle`"),
+        Field(
+            description="Deprecated in favor of `idle_duration`",
+        ),
     ]
     termination_idle_time: Annotated[
         Optional[Union[str, int]],
         Field(
-            description="Time to wait before destroying the idle instance. Defaults to `5m` for `dstack run` and to `3d` for `dstack pool add`"
+            description="Deprecated in favor of `idle_duration`",
         ),
     ]
-    # Deprecated:
     # The name of the pool. If not set, dstack will use the default name
     pool_name: Optional[str]
     # The name of the instance
@@ -168,6 +183,9 @@ class ProfileParams(CoreModel):
     _validate_termination_idle_time = validator(
         "termination_idle_time", pre=True, allow_reuse=True
     )(parse_duration)
+    _validate_idle_duration = validator("idle_duration", pre=True, allow_reuse=True)(
+        parse_idle_duration
+    )
 
 
 class ProfileProps(CoreModel):

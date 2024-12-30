@@ -132,6 +132,9 @@ def _get_run_spec_excludes(run_spec: RunSpec) -> Optional[dict]:
     if not configuration.reservation:
         configuration_excludes.add("reservation")
         profile_excludes.add("reservation")
+    if not configuration.idle_duration:
+        configuration_excludes.add("idle_duration")
+        profile_excludes.add("idle_duration")
 
     if configuration_excludes:
         spec_excludes["configuration"] = configuration_excludes

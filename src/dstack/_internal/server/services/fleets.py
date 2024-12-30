@@ -38,12 +38,12 @@ from dstack._internal.core.models.profiles import (
     DEFAULT_POOL_TERMINATION_IDLE_TIME,
     Profile,
     SpotPolicy,
-    TerminationPolicy,
 )
 from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import Requirements, get_policy_map
 from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.core.services import validate_dstack_resource_name
+from dstack._internal.core.services.profiles import get_termination
 from dstack._internal.server.db import get_db
 from dstack._internal.server.models import (
     FleetModel,
@@ -564,11 +564,9 @@ async def create_instance(
         pool_name=pool.name,
     )
 
-    termination_policy = profile.termination_policy or TerminationPolicy.DESTROY_AFTER_IDLE
-    termination_idle_time = profile.termination_idle_time
-    if termination_idle_time is None:
-        termination_idle_time = DEFAULT_POOL_TERMINATION_IDLE_TIME
-
+    termination_policy, termination_idle_time = get_termination(
+        profile, DEFAULT_POOL_TERMINATION_IDLE_TIME
+    )
     instance = InstanceModel(
         id=uuid.uuid4(),
         name=instance_name,

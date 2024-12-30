@@ -116,6 +116,7 @@ def get_dev_env_run_plan_dict(
                 "retry": None,
                 "retry_policy": None,
                 "spot_policy": "spot",
+                "idle_duration": None,
                 "termination_idle_time": 300,
                 "termination_policy": None,
                 "reservation": None,
@@ -135,6 +136,7 @@ def get_dev_env_run_plan_dict(
                 "retry": None,
                 "retry_policy": None,
                 "spot_policy": "spot",
+                "idle_duration": None,
                 "termination_idle_time": 300,
                 "termination_policy": None,
                 "reservation": None,
@@ -262,6 +264,7 @@ def get_dev_env_run_dict(
                 "retry": None,
                 "retry_policy": None,
                 "spot_policy": "spot",
+                "idle_duration": None,
                 "termination_idle_time": 300,
                 "termination_policy": None,
                 "reservation": None,
@@ -281,6 +284,7 @@ def get_dev_env_run_dict(
                 "retry": None,
                 "retry_policy": None,
                 "spot_policy": "spot",
+                "idle_duration": None,
                 "termination_idle_time": 300,
                 "termination_policy": None,
                 "reservation": None,
@@ -1449,6 +1453,7 @@ class TestCreateInstance:
             profile=Profile(name="test_profile"),
             requirements=Requirements(resources=ResourcesSpec(cpu=1)),
         )
+        print(str(request))
         instance_id = UUID("1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e")
         with (
             patch(

@@ -17,14 +17,12 @@ from dstack._internal.core.models.instances import (
     SSHConnectionParams,
 )
 from dstack._internal.core.models.profiles import (
-    DEFAULT_RUN_TERMINATION_IDLE_TIME,
     CreationPolicy,
     Profile,
     ProfileParams,
     ProfileRetryPolicy,
     RetryEvent,
     SpotPolicy,
-    TerminationPolicy,
 )
 from dstack._internal.core.models.repos import AnyRunRepoData
 from dstack._internal.core.models.resources import ResourcesSpec
@@ -338,10 +336,6 @@ class RunSpec(CoreModel):
                 setattr(merged_profile, key, conf_val)
         if merged_profile.creation_policy is None:
             merged_profile.creation_policy = CreationPolicy.REUSE_OR_CREATE
-        if merged_profile.termination_policy is None:
-            merged_profile.termination_policy = TerminationPolicy.DESTROY_AFTER_IDLE
-        if merged_profile.termination_idle_time is None:
-            merged_profile.termination_idle_time = DEFAULT_RUN_TERMINATION_IDLE_TIME
         values["merged_profile"] = merged_profile
         return values
 
