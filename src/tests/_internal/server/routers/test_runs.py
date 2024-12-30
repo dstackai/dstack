@@ -572,6 +572,85 @@ class TestListRuns:
         assert response2_json[0]["id"] == str(run2.id)
 
 
+class TestGetRun:
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_403_if_not_project_member(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        response = await client.post(
+            f"/api/project/{project.name}/runs/get",
+            headers=get_auth_headers(user.token),
+            json={"run_name": "myrun"},
+        )
+        assert response.status_code == 403
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_run_given_name(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        repo = await create_repo(
+            session=session,
+            project_id=project.id,
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+        )
+        response = await client.post(
+            f"/api/project/{project.name}/runs/get",
+            headers=get_auth_headers(user.token),
+            json={"run_name": "nonexistent_run_name"},
+        )
+        assert response.status_code == 400
+        response = await client.post(
+            f"/api/project/{project.name}/runs/get",
+            headers=get_auth_headers(user.token),
+            json={"run_name": run.run_name},
+        )
+        assert response.status_code == 200, response.json()
+        assert response.json()["id"] == str(run.id)
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_deleted_run_given_id(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        repo = await create_repo(
+            session=session,
+            project_id=project.id,
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            deleted=True,
+        )
+        response = await client.post(
+            f"/api/project/{project.name}/runs/get",
+            headers=get_auth_headers(user.token),
+            json={"id": str(run.id)},
+        )
+        assert response.status_code == 200, response.json()
+        assert response.json()["id"] == str(run.id)
+
+
 class TestGetRunPlan:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
