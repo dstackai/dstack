@@ -73,13 +73,16 @@ async def get_run(
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
 ) -> Run:
     """
-    Returns a run given a run name.
+    Returns a run given `run_name` or `id`.
+    If given `run_name`, does not return deleted runs.
+    If given `id`, returns deleted runs.
     """
     _, project = user_project
     run = await runs.get_run(
         session=session,
         project=project,
         run_name=body.run_name,
+        run_id=body.id,
     )
     if run is None:
         raise ResourceNotExistsError("Run not found")
