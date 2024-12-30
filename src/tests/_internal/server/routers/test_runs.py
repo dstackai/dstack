@@ -215,6 +215,7 @@ def get_dev_env_run_dict(
     last_processed_at: str = "2023-01-02T03:04:00+00:00",
     finished_at: Optional[str] = "2023-01-02T03:04:00+00:00",
     privileged: bool = False,
+    deleted: bool = False,
 ) -> Dict:
     return {
         "id": run_id,
@@ -369,6 +370,7 @@ def get_dev_env_run_dict(
         "service": None,
         "termination_reason": None,
         "error": "",
+        "deleted": deleted,
     }
 
 
@@ -492,6 +494,7 @@ class TestListRuns:
                 "service": None,
                 "termination_reason": None,
                 "error": "",
+                "deleted": False,
             },
             {
                 "id": str(run2.id),
@@ -507,6 +510,7 @@ class TestListRuns:
                 "service": None,
                 "termination_reason": None,
                 "error": "",
+                "deleted": False,
             },
         ]
 

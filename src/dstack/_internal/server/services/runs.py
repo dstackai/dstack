@@ -661,6 +661,7 @@ def run_model_to_run(
         jobs=jobs,
         latest_job_submission=latest_job_submission,
         service=service_spec,
+        deleted=run_model.deleted,
     )
     run.cost = _get_run_cost(run)
     return run
