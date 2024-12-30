@@ -1,4 +1,5 @@
 from base64 import b64decode
+from enum import Enum
 from typing import Dict, List, Optional, Union
 
 from pydantic import Field, validator
@@ -94,13 +95,55 @@ class ShimVolumeInfo(CoreModel):
     device_name: Optional[str] = None
 
 
-class TaskConfigBody(CoreModel):
+class TaskStatus(str, Enum):
+    PENDING = "pending"
+    PREPARING = "preparing"
+    PULLING = "pulling"
+    CREATING = "creating"
+    RUNNING = "running"
+    TERMINATED = "terminated"
+
+
+class TaskInfoResponse(CoreModel):
+    id: str
+    status: TaskStatus
+    termination_reason: str
+    termination_message: str
+
+
+class TaskSubmitRequest(CoreModel):
+    id: str
+    name: str
+    registry_username: str
+    registry_password: str
+    image_name: str
+    container_user: str
+    privileged: bool
+    gpu: int
+    cpu: float
+    memory: int
+    shm_size: int
+    volumes: list[ShimVolumeInfo]
+    volume_mounts: list[VolumeMountPoint]
+    instance_mounts: list[InstanceMountPoint]
+    host_ssh_user: str
+    host_ssh_keys: list[str]
+    container_ssh_keys: list[str]
+
+
+class TaskTerminateRequest(CoreModel):
+    termination_reason: str
+    termination_message: str
+    timeout: int
+
+
+class LegacySubmitBody(CoreModel):
     username: str
     password: str
     image_name: str
     privileged: bool
     container_name: str
-    container_user: Optional[str]
+    container_user: str
     shm_size: int
     public_keys: List[str]
     ssh_user: str
@@ -110,7 +153,7 @@ class TaskConfigBody(CoreModel):
     instance_mounts: List[InstanceMountPoint]
 
 
-class StopBody(CoreModel):
+class LegacyStopBody(CoreModel):
     force: bool = False
 
 
@@ -119,6 +162,6 @@ class JobResult(CoreModel):
     reason_message: str
 
 
-class PullBody(CoreModel):
+class LegacyPullResponse(CoreModel):
     state: str
     result: Optional[JobResult]

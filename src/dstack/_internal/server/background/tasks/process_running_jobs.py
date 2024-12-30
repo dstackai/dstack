@@ -452,7 +452,7 @@ def _process_provisioning_with_shim(
         # the previous job container now, making the shim available (state=running->pending)
         # for the next try.
         logger.warning(
-            "%s: failed to sumbit, shim is already running a job, stopping it now, retry later",
+            "%s: failed to submit, shim is already running a job, stopping it now, retry later",
             fmt(job_model),
         )
         shim_client.stop(force=True)
