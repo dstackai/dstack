@@ -259,6 +259,8 @@ jobs:
           echo "${{ env.VERSION }}" | aws s3 cp - "s3://dstack-gateway-downloads/stgn/latest-version"
   
   docs-build:
+    # Skip for PRs from forks since mkdocs-material-insiders is not available in forks
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
