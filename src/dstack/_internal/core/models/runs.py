@@ -393,6 +393,7 @@ class Run(CoreModel):
     service: Optional[ServiceSpec] = None
     # TODO: make error a computed field after migrating to pydanticV2
     error: Optional[str] = None
+    deleted: Optional[bool] = None
 
     @root_validator
     def _error(cls, values) -> Dict:

@@ -213,6 +213,27 @@ async def list_projects_run_models(
 async def get_run(
     session: AsyncSession,
     project: ProjectModel,
+    run_name: Optional[str] = None,
+    run_id: Optional[uuid.UUID] = None,
+) -> Optional[Run]:
+    if run_id is not None:
+        return await get_run_by_id(
+            session=session,
+            project=project,
+            run_id=run_id,
+        )
+    elif run_name is not None:
+        return await get_run_by_name(
+            session=session,
+            project=project,
+            run_name=run_name,
+        )
+    raise ServerClientError("run_name or id must be specified")
+
+
+async def get_run_by_name(
+    session: AsyncSession,
+    project: ProjectModel,
     run_name: str,
 ) -> Optional[Run]:
     res = await session.execute(
@@ -221,6 +242,25 @@ async def get_run(
             RunModel.project_id == project.id,
             RunModel.run_name == run_name,
             RunModel.deleted == False,
+        )
+        .options(joinedload(RunModel.user))
+    )
+    run_model = res.scalar()
+    if run_model is None:
+        return None
+    return run_model_to_run(run_model, return_in_api=True)
+
+
+async def get_run_by_id(
+    session: AsyncSession,
+    project: ProjectModel,
+    run_id: uuid.UUID,
+) -> Optional[Run]:
+    res = await session.execute(
+        select(RunModel)
+        .where(
+            RunModel.project_id == project.id,
+            RunModel.id == run_id,
         )
         .options(joinedload(RunModel.user))
     )
@@ -244,7 +284,7 @@ async def get_plan(
     current_resource = None
     action = ApplyAction.CREATE
     if run_spec.run_name is not None:
-        current_resource = await get_run(
+        current_resource = await get_run_by_name(
             session=session,
             project=project,
             run_name=run_spec.run_name,
@@ -333,7 +373,7 @@ async def apply_plan(
             project=project,
             run_spec=plan.run_spec,
         )
-    current_resource = await get_run(
+    current_resource = await get_run_by_name(
         session=session,
         project=project,
         run_name=plan.run_spec.run_name,
@@ -366,7 +406,7 @@ async def apply_plan(
         .where(RunModel.id == current_resource.id)
         .values(run_spec=plan.run_spec.json())
     )
-    run = await get_run(
+    run = await get_run_by_name(
         session=session,
         project=project,
         run_name=plan.run_spec.run_name,
@@ -621,6 +661,7 @@ def run_model_to_run(
         jobs=jobs,
         latest_job_submission=latest_job_submission,
         service=service_spec,
+        deleted=run_model.deleted,
     )
     run.cost = _get_run_cost(run)
     return run

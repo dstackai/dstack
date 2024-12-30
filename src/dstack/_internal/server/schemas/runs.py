@@ -22,7 +22,8 @@ class ListRunsRequest(CoreModel):
 
 
 class GetRunRequest(CoreModel):
-    run_name: str
+    run_name: Optional[str] = None
+    id: Optional[UUID] = None
 
 
 class GetRunPlanRequest(CoreModel):
