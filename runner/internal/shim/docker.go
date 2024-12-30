@@ -48,11 +48,6 @@ const (
 	LabelValueTrue = "true"
 )
 
-type JobResult struct {
-	Reason        string `json:"reason"`
-	ReasonMessage string `json:"reason_message"`
-}
-
 type DockerRunner struct {
 	client       *docker.Client
 	dockerParams DockerParameters
@@ -231,19 +226,6 @@ func (d *DockerRunner) Submit(ctx context.Context, cfg TaskConfig) error {
 		return tracerr.Errorf("%w: empty task Name", ErrRequest)
 	}
 	task := NewTaskFromConfig(cfg)
-	// For legacy API compatibility, since LegacyTaskID is the same for all tasks
-	if task.ID == LegacyTaskID {
-		if currentTask, ok := d.tasks.Get(LegacyTaskID); ok {
-			if currentTask.Status != TaskStatusTerminated {
-				if err := d.Terminate(ctx, LegacyTaskID, 0, "", ""); err != nil {
-					log.Printf("failed to terminate task: %v", err)
-				}
-			}
-			if err := d.Remove(ctx, LegacyTaskID); err != nil {
-				log.Printf("failed to remove task: %v", err)
-			}
-		}
-	}
 	if ok := d.tasks.Add(task); !ok {
 		return tracerr.Errorf("%w: task %s is already submitted", ErrRequest, task.ID)
 	}
@@ -263,7 +245,7 @@ func (d *DockerRunner) Run(ctx context.Context, taskID string) error {
 
 	defer func() {
 		if err := d.tasks.Update(task); err != nil {
-			if currentTask, ok := d.tasks.Get(LegacyTaskID); ok && currentTask.Status != task.Status {
+			if currentTask, ok := d.tasks.Get(task.ID); ok && currentTask.Status != task.Status {
 				// ignore error if task is gone or status has not changed, e.g., terminated -> terminated
 				log.Printf("failed to update task %s: %v", task.ID, err)
 			}
@@ -485,35 +467,6 @@ func (d *DockerRunner) remove(ctx context.Context, task *Task) (err error) {
 	}
 	log.Printf("task %s removed", task.ID)
 	return nil
-}
-
-func (d *DockerRunner) GetState() (RunnerStatus, JobResult) {
-	if task, ok := d.tasks.Get(LegacyTaskID); ok {
-		return getLegacyStatus(task), JobResult{
-			Reason:        task.TerminationReason,
-			ReasonMessage: task.TerminationMessage,
-		}
-	}
-	return Pending, JobResult{}
-}
-
-func getLegacyStatus(task Task) RunnerStatus {
-	switch task.Status {
-	case TaskStatusPending:
-		return Pulling
-	case TaskStatusPreparing:
-		return Pulling
-	case TaskStatusPulling:
-		return Pulling
-	case TaskStatusCreating:
-		return Creating
-	case TaskStatusRunning:
-		return Running
-	case TaskStatusTerminated:
-		return Pending
-	}
-	// should not reach here
-	return ""
 }
 
 func getBackend(backendType string) (backends.Backend, error) {

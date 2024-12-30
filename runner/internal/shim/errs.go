@@ -30,6 +30,4 @@ var (
 	ErrRequest = errors.New("request error")
 	// referenced object does not exist
 	ErrNotFound = errors.New("not found")
-	// object already exists (conflict)
-	ErrAlreadyExists = errors.New("already exists")
 )

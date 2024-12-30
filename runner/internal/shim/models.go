@@ -84,6 +84,3 @@ type TaskInfo struct {
 	ContainerID        string
 	GpuIDs             []string
 }
-
-// a surrogate ID used for tasks submitted via legacy API
-const LegacyTaskID = "00000000-0000-0000-0000-000000000000"

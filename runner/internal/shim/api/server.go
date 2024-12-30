@@ -18,8 +18,6 @@ type TaskRunner interface {
 	Resources() shim.Resources
 	TaskIDs() []string
 	TaskInfo(taskID string) shim.TaskInfo
-
-	GetState() (shim.RunnerStatus, shim.JobResult)
 }
 
 type ShimServer struct {
@@ -44,21 +42,13 @@ func NewShimServer(address string, runner TaskRunner, version string) *ShimServe
 		version: version,
 	}
 
-	// Stable API
 	// The healthcheck endpoint should stay backward compatible, as it is used for negotiation
 	r.AddHandler("GET", "/api/healthcheck", s.HealthcheckHandler)
-
-	// Future API
 	r.AddHandler("GET", "/api/tasks", s.TaskListHandler)
 	r.AddHandler("GET", "/api/tasks/{id}", s.TaskInfoHandler)
 	r.AddHandler("POST", "/api/tasks", s.TaskSubmitHandler)
 	r.AddHandler("POST", "/api/tasks/{id}/terminate", s.TaskTerminateHandler)
 	r.AddHandler("POST", "/api/tasks/{id}/remove", s.TaskRemoveHandler)
-
-	// Legacy API
-	r.AddHandler("POST", "/api/submit", s.LegacySubmitPostHandler)
-	r.AddHandler("GET", "/api/pull", s.LegacyPullGetHandler)
-	r.AddHandler("POST", "/api/stop", s.LegacyStopPostHandler)
 
 	return s
 }

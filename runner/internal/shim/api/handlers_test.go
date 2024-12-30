@@ -1,0 +1,49 @@
+package api
+
+import (
+	"net/http/httptest"
+	"strings"
+	"testing"
+
+	common "github.com/dstackai/dstack/runner/internal/api"
+)
+
+func TestHealthcheck(t *testing.T) {
+	request := httptest.NewRequest("GET", "/api/healthcheck", nil)
+	responseRecorder := httptest.NewRecorder()
+
+	server := NewShimServer(":12345", NewDummyRunner(), "0.0.1.dev2")
+
+	f := common.JSONResponseHandler(server.HealthcheckHandler)
+	f(responseRecorder, request)
+
+	if responseRecorder.Code != 200 {
+		t.Errorf("Want status '%d', got '%d'", 200, responseRecorder.Code)
+	}
+
+	expected := "{\"service\":\"dstack-shim\",\"version\":\"0.0.1.dev2\"}"
+
+	if strings.TrimSpace(responseRecorder.Body.String()) != expected {
+		t.Errorf("Want '%s', got '%s'", expected, responseRecorder.Body.String())
+	}
+}
+
+func TestTaskSubmit(t *testing.T) {
+	server := NewShimServer(":12340", NewDummyRunner(), "0.0.1.dev2")
+
+	request := httptest.NewRequest("POST", "/api/tasks", strings.NewReader(`{"image_name":"ubuntu"}`))
+	responseRecorder := httptest.NewRecorder()
+	firstSubmitPost := common.JSONResponseHandler(server.TaskSubmitHandler)
+	firstSubmitPost(responseRecorder, request)
+	if responseRecorder.Code != 200 {
+		t.Errorf("Want status '%d', got '%d'", 200, responseRecorder.Code)
+	}
+
+	request = httptest.NewRequest("POST", "/api/tasks", strings.NewReader(`{"image_name":"ubuntu"}`))
+	responseRecorder = httptest.NewRecorder()
+	secondSubmitPost := common.JSONResponseHandler(server.TaskSubmitHandler)
+	secondSubmitPost(responseRecorder, request)
+	if responseRecorder.Code != 409 {
+		t.Errorf("Want status '%d', got '%d'", 409, responseRecorder.Code)
+	}
+}
