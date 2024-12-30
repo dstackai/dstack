@@ -18,6 +18,7 @@ class BackendType(str, enum.Enum):
         RUNPOD (BackendType): Runpod Cloud
         TENSORDOCK (BackendType): TensorDock Marketplace
         VASTAI (BackendType): Vast.ai Marketplace
+        VULTR (BackendType): Vultr
     """
 
     AWS = "aws"
@@ -35,6 +36,7 @@ class BackendType(str, enum.Enum):
     RUNPOD = "runpod"
     TENSORDOCK = "tensordock"
     VASTAI = "vastai"
+    VULTR = "vultr"
 
 
 class ConfigElementValue(CoreModel):
