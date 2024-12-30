@@ -34,12 +34,14 @@ from dstack._internal.core.models.instances import (
 from dstack._internal.core.models.pools import Instance, Pool, PoolInstances
 from dstack._internal.core.models.profiles import (
     DEFAULT_POOL_NAME,
+    DEFAULT_POOL_TERMINATION_IDLE_TIME,
     Profile,
     TerminationPolicy,
 )
 from dstack._internal.core.models.runs import JobProvisioningData, Requirements
 from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.core.models.volumes import Volume
+from dstack._internal.core.services.profiles import get_termination
 from dstack._internal.server import settings
 from dstack._internal.server.models import (
     FleetModel,
@@ -608,6 +610,9 @@ async def create_instance_model(
     placement_group_name: Optional[str],
     reservation: Optional[str],
 ) -> InstanceModel:
+    termination_policy, termination_idle_time = get_termination(
+        profile, DEFAULT_POOL_TERMINATION_IDLE_TIME
+    )
     instance = InstanceModel(
         id=uuid.uuid4(),
         name=instance_name,
@@ -620,8 +625,8 @@ async def create_instance_model(
         profile=profile.json(),
         requirements=requirements.json(),
         instance_configuration=None,
-        termination_policy=profile.termination_policy,
-        termination_idle_time=profile.termination_idle_time,
+        termination_policy=termination_policy,
+        termination_idle_time=termination_idle_time,
     )
     session.add(instance)
     await session.flush()

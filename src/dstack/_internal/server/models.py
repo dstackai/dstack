@@ -513,6 +513,7 @@ class InstanceModel(BaseModel):
 
     # temination policy
     termination_policy: Mapped[Optional[TerminationPolicy]] = mapped_column(String(100))
+    # TODO: Suggestion: do not assign DEFAULT_POOL_TERMINATION_IDLE_TIME as the default here (make Optional instead; also instead of -1)
     termination_idle_time: Mapped[int] = mapped_column(
         Integer, default=DEFAULT_POOL_TERMINATION_IDLE_TIME
     )
