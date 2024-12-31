@@ -11,10 +11,10 @@ To use the open-source version of `dstack` with your own cloud accounts or on-pr
 
 ### (Optional) Configure backends
 
-To use `dstack` with your own cloud accounts, create the `~/.dstack/server/config.yml` file and 
-[configure backends](../reference/server/config.yml.md). Alternatively, you can configure backends via the control plane UI after you start the server.
+To use `dstack` with specific providers, configure [backends](../concepts/backends.md).
 
-You can skip backends configuration if you intend to run containers  only on your on-prem servers. Use [SSH fleets](../concepts/fleets.md#ssh-fleets) for that.
+> To use `dstack` with on-prem servers, 
+no backend configuration is needed. Use [SSH fleets](../concepts/fleets.md#ssh-fleets) for that.
 
 ## Start the server
 

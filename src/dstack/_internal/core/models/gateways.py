@@ -132,7 +132,9 @@ class TGIChatModel(BaseChatModel):
         eos_token (Optional[str]): The custom end of sentence token. If not specified, the default end of sentence token from the HuggingFace Hub configuration will be used.
     """
 
-    format: Annotated[Literal["tgi"], Field(description="The serving format")]
+    format: Annotated[
+        Literal["tgi"], Field(description="The serving format. Must be set to `tgi`")
+    ]
     chat_template: Annotated[
         Optional[str],
         Field(
@@ -166,7 +168,9 @@ class OpenAIChatModel(BaseChatModel):
         prefix (str): The `base_url` prefix: `http://hostname/{prefix}/chat/completions`. Defaults to `/v1`.
     """
 
-    format: Annotated[Literal["openai"], Field(description="The serving format")]
+    format: Annotated[
+        Literal["openai"], Field(description="The serving format. Must be set to `openai`")
+    ]
     prefix: Annotated[str, Field(description="The `base_url` prefix (after hostname)")] = "/v1"
 
 

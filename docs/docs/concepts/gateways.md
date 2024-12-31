@@ -1,6 +1,6 @@
 # Gateways
 
-Gateways manage the ingress traffic of running [services](../services.md)
+Gateways manage the ingress traffic of running [services](services.md)
 and provide them with an HTTPS endpoint mapped to your domain,
 handling authentication, load distribution, and auto-scaling.
 
@@ -85,7 +85,7 @@ Alternatively, you can delete a gateway by passing the gateway name  to `dstack 
 
 ## What's next?
 
-1. See [services](../services.md) on how to run services
+1. See [services](services.md) on how to run services
 
 !!! info "Reference"
     See [.dstack.yml](../reference/dstack.yml/gateway.md) for all the options supported by

@@ -1,10 +1,32 @@
-# gateway
+# `gateway`
 
 The `gateway` configuration type allows creating and updating [gateways](../../concepts/gateways.md).
 
-> Configuration files must be inside the project repo, and their names must end with `.dstack.yml` 
-> (e.g. `.dstack.yml` or `gateway.dstack.yml` are both acceptable).
-> Any configuration can be run via [`dstack apply`](../cli/dstack/apply.md).
+## Root reference
+
+#SCHEMA# dstack._internal.core.models.gateways.GatewayConfiguration
+    overrides:
+      show_root_heading: false
+      type:
+        required: true
+
+### `certificate`
+
+=== "Let's encrypt"
+
+    #SCHEMA# dstack._internal.core.models.gateways.LetsEncryptGatewayCertificate
+        overrides:
+          show_root_heading: false
+          type:
+            required: true
+
+=== "ACM" 
+
+    #SCHEMA# dstack._internal.core.models.gateways.ACMGatewayCertificate
+        overrides:
+          show_root_heading: false
+          type:
+            required: true
 
 ## Examples
 
@@ -27,28 +49,4 @@ domain: example.com
 
 </div>
 
-[//]: # (TODO: other examples, e.g. private gateways)
-
-## Root reference
-
-#SCHEMA# dstack._internal.core.models.gateways.GatewayConfiguration
-    overrides:
-      show_root_heading: false
-      type:
-        required: true
-
-## `certificate[type=lets-encrypt]`
-
-#SCHEMA# dstack._internal.core.models.gateways.LetsEncryptGatewayCertificate
-    overrides:
-      show_root_heading: false
-      type:
-        required: true
-
-## `certificate[type=acm]`
-
-#SCHEMA# dstack._internal.core.models.gateways.ACMGatewayCertificate
-    overrides:
-      show_root_heading: false
-      type:
-        required: true
+[//]: # (TODO: other examples, e.g. private 
