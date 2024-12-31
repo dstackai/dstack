@@ -445,7 +445,7 @@
     color: rgba(0,0,0,0.87);
 }
 
-.md-typeset :not(pre) :is(h1, h2, h3, h4) > code {
+.md-typeset :not(pre) :is(h1, h2, h3, h4, h5, h6) > code {
     color: inherit;
     background: inherit;
     padding: 0;
@@ -455,7 +455,7 @@ h4.doc-heading {
     font-size: inherit;
 }
 
-.md-typeset :not(pre, h1, h2, h3, h4) > code {
+.md-typeset :not(pre, h1, h2, h3, h4, h5, h6) > code {
     background-color: rgba(163, 68, 215, 0.05);
     /*border: 1px solid #dce0e6;*/
     border-radius: 2px;
@@ -467,27 +467,27 @@ h4.doc-heading {
     margin: 0 4px;
 }
 
-.md-typeset :is(h1, h2, h3, h4) > code {
+.md-typeset :is(h1, h2, h3, h4, h5, h6) > code {
     background-color: inherit;
     color: inherit;
     /*padding: 0;
     margin: 0;*/
 }
-.md-typeset :is(h1, h2, h3, h4) > a > code {
+.md-typeset :is(h1, h2, h3, h4, h5, h6) > a > code {
     font-size: inherit;
     color: inherit;
 }
 
 
-.md-typeset :is(table) :not(pre, h1, h2, h3, h4) > code {
+.md-typeset :is(table) :not(pre, h1, h2, h3, h4, h5, h6) > code {
     font-size: .85em;
 }
 
-.md-typeset :not(pre, h1, h2, h3, h4) > code {
+.md-typeset :not(pre, h1, h2, h3, h4, h5, h6) > code {
     font-size: 0.65rem;
 }
 
-.md-typeset :not(pre, h1, h2, h3, h4) > a code {
+.md-typeset :not(pre, h1, h2, h3, h4, h5, h6) > a code {
     color: #ce00ff;
 }
 
@@ -639,7 +639,7 @@ code .md-code__nav:hover .md-code__button {
     /*letter-spacing: 0;*/
 }
 
-.md-typeset h1, .md-typeset h2, .md-typeset h3, .md-typeset h4, .md-typeset h5 {
+.md-typeset h1, .md-typeset h2, .md-typeset h3, .md-typeset h4, .md-typeset h5, .md-typeset h6 {
     font-weight: 800;
     letter-spacing: -1px;
     color: rgb(0, 0, 0);
@@ -652,6 +652,10 @@ code .md-code__nav:hover .md-code__button {
 
 .md-typeset h5  {
     font-size: 17px;
+}
+
+.md-typeset h6  {
+    font-size: 15px;
 }
 
 .md-typeset h3 {
@@ -1198,7 +1202,7 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
         margin: 1em .8rem;
     }
 
-    .md-typeset .tabbed-block :is(h1, h2, h3, h4, h5) {
+    .md-typeset .tabbed-block :is(h1, h2, h3, h4, h5, h6) {
         margin-left: .8rem;
     }
 

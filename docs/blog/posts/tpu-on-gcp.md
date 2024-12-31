@@ -211,8 +211,8 @@ Note, `v5litepod` is optimized for fine-tuning transformer-based models. Each co
 1. Browse [Optimum TPU :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/optimum-tpu){:target="_blank"},
    [Optimum TPU TGI :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/optimum-tpu/tree/main/text-generation-inference){:target="_blank"} and
    [vLLM :material-arrow-top-right-thin:{ .external }](https://docs.vllm.ai/en/latest/getting_started/tpu-installation.html){:target="_blank"}.
-2. Check [dev environments](../../docs/dev-environments.md), [tasks](https://dstack.ai/docs/tasks), 
-   [services](../../docs/services.md), and [fleets](../../docs/concepts/fleets.md).
+2. Check [dev environments](../../docs/concepts/dev-environments.md), [tasks](https://dstack.ai/docs/tasks), 
+   [services](../../docs/concepts/services.md), and [fleets](../../docs/concepts/fleets.md).
 
 !!! info "Multi-host TPUs"
     If you’d like to use `dstack` with more than eight TPU cores, upvote the corresponding

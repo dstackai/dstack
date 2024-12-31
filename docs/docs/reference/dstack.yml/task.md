@@ -1,10 +1,80 @@
-# task
+# `task`
 
-The `task` configuration type allows running [tasks](../../tasks.md).
+The `task` configuration type allows running [tasks](../../concepts/tasks.md).
 
-> Configuration files must be inside the project repo, and their names must end with `.dstack.yml` 
-> (e.g. `.dstack.yml` or `train.dstack.yml` are both acceptable).
-> Any configuration can be run via [`dstack apply`](../cli/dstack/apply.md).
+## Root reference
+
+#SCHEMA# dstack._internal.core.models.configurations.TaskConfiguration
+    overrides:
+      show_root_heading: false
+      type:
+        required: true
+
+### `retry`
+
+#SCHEMA# dstack._internal.core.models.profiles.ProfileRetry
+    overrides:
+      show_root_heading: false
+      type:
+        required: true
+
+### `resources`
+
+#SCHEMA# dstack._internal.core.models.resources.ResourcesSpecSchema
+    overrides:
+      show_root_heading: false
+      type:
+        required: true
+      item_id_prefix: resources-
+
+#### `resouces.gpu` { #resources-gpu data-toc-label="gpu" }
+
+#SCHEMA# dstack._internal.core.models.resources.GPUSpecSchema
+    overrides:
+      show_root_heading: false
+      type:
+        required: true
+
+#### `resouces.disk` { #resources-disk data-toc-label="disk" }
+
+#SCHEMA# dstack._internal.core.models.resources.DiskSpecSchema
+    overrides:
+      show_root_heading: false
+      type:
+        required: true
+
+### `registry_auth`
+
+#SCHEMA# dstack._internal.core.models.configurations.RegistryAuth
+    overrides:
+      show_root_heading: false
+      type:
+        required: true
+
+### `volumes[n]` { #_volumes data-toc-label="volumes" }
+
+=== "Network volumes"
+
+    #SCHEMA# dstack._internal.core.models.volumes.VolumeMountPoint
+        overrides:
+          show_root_heading: false
+          type:
+            required: true
+
+=== "Instance volumes"
+
+    #SCHEMA# dstack._internal.core.models.volumes.InstanceMountPoint
+        overrides:
+          show_root_heading: false
+          type:
+            required: true
+
+??? info "Short syntax"
+
+    The short syntax for volumes is a colon-separated string in the form of `source:destination`
+
+    * `volume-name:/container/path` for network volumes
+    * `/instance/path:/container/path` for instance volumes
 
 ## Examples
 
@@ -128,7 +198,7 @@ commands:
 !!! info "Docker and Docker Compose"
     All backends except `runpod`, `vastai`, and `kubernetes` also allow using [Docker and Docker Compose](../../guides/protips.md#docker-and-docker-compose) inside `dstack` runs.
 
-### Resources { #_resources }
+### Resources { #resources_ }
 
 If you specify memory size, you can either specify an explicit size (e.g. `24GB`) or a 
 range (e.g. `24GB..`, or `24GB..80GB`, or `..80GB`).
@@ -215,20 +285,19 @@ If you don't assign a value to an environment variable (see `HF_TOKEN` above),
 `dstack` will require the value to be passed via the CLI or set in the current process.
 For instance, you can define environment variables in a `.envrc` file and utilize tools like `direnv`.
 
-##### System environment variables
-
-The following environment variables are available in any run by default:
-
-| Name                    | Description                                                      |
-|-------------------------|------------------------------------------------------------------|
-| `DSTACK_RUN_NAME`       | The name of the run                                              |
-| `DSTACK_REPO_ID`        | The ID of the repo                                               |
-| `DSTACK_GPUS_NUM`       | The total number of GPUs in the run                              |
-| `DSTACK_NODES_NUM`      | The number of nodes in the run                                   |
-| `DSTACK_GPUS_PER_NODE`  | The number of GPUs per node                                      |
-| `DSTACK_NODE_RANK`      | The rank of the node                                             |
-| `DSTACK_MASTER_NODE_IP` | The internal IP address the master node                          |
-| `DSTACK_NODES_IPS`      | The list of internal IP addresses of all nodes delimited by "\n" |
+??? info "System environment variables"
+    The following environment variables are available in any run by default:
+    
+    | Name                    | Description                                                      |
+    |-------------------------|------------------------------------------------------------------|
+    | `DSTACK_RUN_NAME`       | The name of the run                                              |
+    | `DSTACK_REPO_ID`        | The ID of the repo                                               |
+    | `DSTACK_GPUS_NUM`       | The total number of GPUs in the run                              |
+    | `DSTACK_NODES_NUM`      | The number of nodes in the run                                   |
+    | `DSTACK_GPUS_PER_NODE`  | The number of GPUs per node                                      |
+    | `DSTACK_NODE_RANK`      | The rank of the node                                             |
+    | `DSTACK_MASTER_NODE_IP` | The internal IP address the master node                          |
+    | `DSTACK_NODES_IPS`      | The list of internal IP addresses of all nodes delimited by "\n" |
 
 ### Distributed tasks
 
@@ -443,77 +512,3 @@ and its contents will persist across runs.
     attach volumes to `/workflow` or any of its subdirectories.
 
 The `task` configuration type supports many other options. See below.
-
-## Root reference
-
-#SCHEMA# dstack._internal.core.models.configurations.TaskConfiguration
-    overrides:
-      show_root_heading: false
-      type:
-        required: true
-
-## `retry`
-
-#SCHEMA# dstack._internal.core.models.profiles.ProfileRetry
-    overrides:
-      show_root_heading: false
-      type:
-        required: true
-
-## `resources`
-
-#SCHEMA# dstack._internal.core.models.resources.ResourcesSpecSchema
-    overrides:
-      show_root_heading: false
-      type:
-        required: true
-      item_id_prefix: resources-
-
-## `resouces.gpu` { #resources-gpu data-toc-label="resources.gpu" }
-
-#SCHEMA# dstack._internal.core.models.resources.GPUSpecSchema
-    overrides:
-      show_root_heading: false
-      type:
-        required: true
-
-## `resouces.disk` { #resources-disk data-toc-label="resources.disk" }
-
-#SCHEMA# dstack._internal.core.models.resources.DiskSpecSchema
-    overrides:
-      show_root_heading: false
-      type:
-        required: true
-
-## `registry_auth`
-
-#SCHEMA# dstack._internal.core.models.configurations.RegistryAuth
-    overrides:
-      show_root_heading: false
-      type:
-        required: true
-
-## `volumes[n]` { #_volumes data-toc-label="volumes" }
-
-=== "Network volumes"
-
-    #SCHEMA# dstack._internal.core.models.volumes.VolumeMountPoint
-        overrides:
-          show_root_heading: false
-          type:
-            required: true
-
-=== "Instance volumes"
-
-    #SCHEMA# dstack._internal.core.models.volumes.InstanceMountPoint
-        overrides:
-          show_root_heading: false
-          type:
-            required: true
-
-??? info "Short syntax"
-
-    The short syntax for volumes is a colon-separated string in the form of `source:destination`
-
-    * `volume-name:/container/path` for network volumes
-    * `/instance/path:/container/path` for instance volumes

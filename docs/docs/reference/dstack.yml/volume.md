@@ -1,10 +1,14 @@
-# volume
+# `volume`
 
 The `volume` configuration type allows creating, registering, and updating [volumes](../../concepts/volumes.md).
 
-> Configuration files must be inside the project repo, and their names must end with `.dstack.yml` 
-> (e.g. `.dstack.yml` or `fleet.dstack.yml` are both acceptable).
-> Any configuration can be run via [`dstack apply`](../cli/dstack/apply.md).
+## Root reference
+
+#SCHEMA# dstack._internal.core.models.volumes.VolumeConfiguration
+    overrides:
+      show_root_heading: false
+      type:
+        required: true
 
 ## Examples
 
@@ -30,7 +34,7 @@ size: 100GB
 ### Registering an existing volume { #existing-volume }
 
 <div editor-title="vol-exist.dstack.yml"> 
-    
+
 ```yaml
 type: volume
 # The name of the volume
@@ -45,12 +49,3 @@ volume_id: vol1235
 ```
 
 </div>
-
-
-## Root reference
-
-#SCHEMA# dstack._internal.core.models.volumes.VolumeConfiguration
-    overrides:
-      show_root_heading: false
-      type:
-        required: true

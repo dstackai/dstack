@@ -45,16 +45,16 @@ resources:
 
 !!! info "Distributed tasks"
     By default, tasks run on a single instance. However, you can specify
-    the [number of nodes](reference/dstack.yml/task.md#distributed-tasks).
+    the [number of nodes](../reference/dstack.yml/task.md#distributed-tasks).
     In this case, the task will run on a cluster of instances.
 
 !!! info "Reference"
-    See [.dstack.yml](reference/dstack.yml/task.md) for all the options supported by
+    See [.dstack.yml](../reference/dstack.yml/task.md) for all the options supported by
     tasks, along with multiple examples.
 
 ## Run a configuration
 
-To run a task, pass the configuration to [`dstack apply`](reference/cli/dstack/apply.md):
+To run a task, pass the configuration to [`dstack apply`](../reference/cli/dstack/apply.md):
 
 <div class="termy">
 
@@ -84,47 +84,47 @@ Launching `axolotl-train`...
 and runs the commands.
 
 !!! info "Ports"
-    If the task specifies [`ports`](reference/dstack.yml/task.md#_ports), `dstack apply` automatically forwards them to your
+    If the task specifies [`ports`](../reference/dstack.yml/task.md#_ports), `dstack apply` automatically forwards them to your
     local machine for convenient and secure access.
 
 !!! info "Queueing tasks"
     By default, if `dstack apply` cannot find capacity, the task fails. 
-    To queue the task and wait for capacity, specify the [`retry`](reference/dstack.yml/task.md#queueing-tasks) 
+    To queue the task and wait for capacity, specify the [`retry`](../reference/dstack.yml/task.md#queueing-tasks) 
     property in the task configuration.
 
 ## Manage runs
 
 ### List runs
 
-The [`dstack ps`](reference/cli/dstack/ps.md)  command lists all running jobs and their statuses. 
+The [`dstack ps`](../reference/cli/dstack/ps.md)  command lists all running jobs and their statuses. 
 Use `--watch` (or `-w`) to monitor the live status of runs.
 
 ### Stop a run
 
-A task runs until it's completed or its lifetime exceeds [`max_duration`](reference/dstack.yml/dev-environment.md#max_duration).
-You can also gracefully stop a task using [`dstack stop`](reference/cli/dstack/stop.md).
+A task runs until it's completed or its lifetime exceeds [`max_duration`](../reference/dstack.yml/dev-environment.md#max_duration).
+You can also gracefully stop a task using [`dstack stop`](../reference/cli/dstack/stop.md).
 Pass `--abort` or `-x` to stop without waiting for a graceful shutdown.
 
 ### Attach to a run
 
 By default, `dstack apply` runs in attached mode – it establishes the SSH tunnel to the run, forwards ports, and shows real-time logs.
-If you detached from a run, you can reattach to it using [`dstack attach`](reference/cli/dstack/attach.md).
+If you detached from a run, you can reattach to it using [`dstack attach`](../reference/cli/dstack/attach.md).
 
 ### See run logs
 
-To see the logs of a run without attaching, use [`dstack logs`](reference/cli/dstack/logs.md).
+To see the logs of a run without attaching, use [`dstack logs`](../reference/cli/dstack/logs.md).
 Pass `--diagnose`/`-d` to `dstack logs` to see the diagnostics logs. It may be useful if a run fails.
-For more information on debugging failed runs, see the [troubleshooting](guides/troubleshooting.md) guide.
+For more information on debugging failed runs, see the [troubleshooting](../guides/troubleshooting.md) guide.
 
 ## Manage fleets
 
 Fleets are groups of cloud instances or SSH machines that you use to run dev environments, tasks, and services.
-You can let `dstack apply` provision fleets or [create and manage them directly](concepts/fleets.md).
+You can let `dstack apply` provision fleets or [create and manage them directly](fleets.md).
 
 ### Creation policy
 
 By default, when you run `dstack apply` with a dev environment, task, or service,
-`dstack` reuses `idle` instances from an existing [fleet](concepts/fleets.md).
+`dstack` reuses `idle` instances from an existing [fleet](fleets.md).
 If no `idle` instances match the requirements, `dstack` automatically creates a new fleet 
 using configured backends.
 
@@ -139,25 +139,25 @@ $ dstack apply -R -f examples/.dstack.yml
 
 </div>
 
-Alternatively, set [`creation_policy`](reference/dstack.yml/dev-environment.md#creation_policy) to `reuse` in the run configuration.
+Alternatively, set [`creation_policy`](../reference/dstack.yml/dev-environment.md#creation_policy) to `reuse` in the run configuration.
 
 ### Termination policy
 
 If a fleet is created automatically, it remains `idle` for 5 minutes and can be reused within that time.
 To change the default idle duration, set
-[`termination_idle_time`](reference/dstack.yml/fleet.md#termination_idle_time) in the run configuration (e.g., to 0 or a
+[`termination_idle_time`](../reference/dstack.yml/fleet.md#termination_idle_time) in the run configuration (e.g., to 0 or a
 longer duration).
 
 !!! info "Fleets"
     For greater control over fleet provisioning, configuration, and lifecycle management, it is recommended to use
-    [fleets](concepts/fleets.md) directly.
+    [fleets](fleets.md) directly.
 
 ## What's next?
 
-1. Read about [dev environments](dev-environments.md), [services](services.md), and [repos](concepts/repos.md)
-2. Learn how to manage [fleets](concepts/fleets.md)
+1. Read about [dev environments](dev-environments.md), [services](services.md), and [repos](repos.md)
+2. Learn how to manage [fleets](fleets.md)
 3. Check the [Axolotl](/examples/fine-tuning/axolotl) example
 
 !!! info "Reference"
-    See [.dstack.yml](reference/dstack.yml/task.md) for all the options supported by
+    See [.dstack.yml](../reference/dstack.yml/task.md) for all the options supported by
     tasks, along with multiple examples.
