@@ -55,7 +55,9 @@ class RunsAPIClient(APIClientGroup):
 
     def get(self, project_name: str, run_name: str) -> Run:
         body = GetRunRequest(run_name=run_name)
-        resp = self._request(f"/api/project/{project_name}/runs/get", body=body.json())
+        # dstack versions prior to 0.18.34 don't support id field, and we don't use it here either
+        json_body = body.json(exclude={"id"})
+        resp = self._request(f"/api/project/{project_name}/runs/get", body=json_body)
         return parse_obj_as(Run.__response__, resp.json())
 
     def get_plan(self, project_name: str, run_spec: RunSpec) -> RunPlan:
