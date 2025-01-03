@@ -546,7 +546,7 @@ async def _attach_volumes(
             volume = volume_model_to_volume(volume_model)
             try:
                 if (
-                    job_provisioning_data.backend != volume.configuration.backend
+                    job_provisioning_data.get_base_backend() != volume.configuration.backend
                     or job_provisioning_data.region != volume.configuration.region
                 ):
                     continue
