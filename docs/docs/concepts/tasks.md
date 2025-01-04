@@ -1,8 +1,7 @@
 # Tasks
 
 A task allows you to run arbitrary commands on one or more nodes.
-They are best suited for one-off jobs like training or batch processing,
-but can also be used for serving apps if features supported by [services](`services.md`) are not required.
+They are best suited for jobs like training or batch processing.
 
 ## Define a configuration
 
@@ -39,18 +38,286 @@ resources:
 
 </div>
 
-!!! info "Docker image"
-    If you don't specify your Docker image, `dstack` uses the [base](https://hub.docker.com/r/dstackai/base/tags) image
-    pre-configured with Python, Conda, and essential CUDA drivers.
+### Ports
 
-!!! info "Distributed tasks"
-    By default, tasks run on a single instance. However, you can specify
-    the [number of nodes](../reference/dstack.yml/task.md#distributed-tasks).
-    In this case, the task will run on a cluster of instances.
+A task can configure ports. In this case, if the task is running an application on a port, `dstack apply` 
+will securely allow you to access this port from your local machine through port forwarding.
+
+<div editor-title="train.dstack.yml"> 
+
+```yaml
+type: task
+# The name is optional, if not specified, generated randomly
+name: streamlit-hello
+
+python: "3.10"
+
+# Commands of the task
+commands:
+  - pip3 install streamlit
+  - streamlit hello
+# Expose the port to access the web app
+ports: 
+  - 8501
+```
+
+</div>
+
+When running it, `dstack apply` forwards `8501` port to `localhost:8501`, enabling secure access to the running
+application.
+
+### Distributed tasks
+
+By default, a task runs on a single node.
+However, you can run it on a cluster of nodes by specifying `nodes`.
+
+<div editor-title="examples/fine-tuning/train.dstack.yml">
+
+```yaml
+type: task
+# The name is optional, if not specified, generated randomly
+name: train-distrib
+
+# The size of the cluster
+nodes: 2
+
+python: "3.10"
+
+# Commands of the task
+commands:
+  - pip install -r requirements.txt
+  - torchrun
+    --nproc_per_node=$DSTACK_GPUS_PER_NODE
+    --node_rank=$DSTACK_NODE_RANK
+    --nnodes=$DSTACK_NODES_NUM
+    --master_addr=$DSTACK_MASTER_NODE_IP
+    --master_port=8008 resnet_ddp.py
+    --num_epochs 20
+
+resources:
+  gpu: 24GB
+```
+
+</div>
+
+All you need to do is pass the corresponding environment variables such as 
+`DSTACK_GPUS_PER_NODE`, `DSTACK_NODE_RANK`, `DSTACK_NODES_NUM`,
+`DSTACK_MASTER_NODE_IP`, and `DSTACK_GPUS_NUM` (see [System environment variables](#system-environment-variables)).
+
+!!! info "Fleets"
+    To ensure all nodes are provisioned into a cluster placement group and to enable the highest level of inter-node 
+    connectivity (incl. support for [EFA :material-arrow-top-right-thin:{ .external }](https://aws.amazon.com/hpc/efa/){:target="_blank"}),
+    create a [fleet](fleets.md) via a configuration before running a disstributed task.
+
+`dstack` is easy to use with `accelerate`, `torchrun`, Ray, Spark, and any other distributed frameworks.
+
+### Resources
+
+When you specify a resource value like `cpu` or `memory`,
+you can either use an exact value (e.g. `24GB`) or a 
+range (e.g. `24GB..`, or `24GB..80GB`, or `..80GB`).
+
+<div editor-title=".dstack.yml"> 
+
+```yaml
+type: task
+# The name is optional, if not specified, generated randomly
+name: train    
+
+# Commands of the task
+commands:
+  - pip install -r fine-tuning/qlora/requirements.txt
+  - python fine-tuning/qlora/train.py
+  
+resources:
+  # 200GB or more RAM
+  memory: 200GB..
+  # 4 GPUs from 40GB to 80GB
+  gpu: 40GB..80GB:4
+  # Shared memory (required by multi-gpu)
+  shm_size: 16GB
+  # Disk size
+  disk: 500GB
+```
+
+</div>
+
+The `gpu` property allows specifying not only memory size but also GPU vendor, names
+and their quantity. Examples: `nvidia` (one NVIDIA GPU), `A100` (one A100), `A10G,A100` (either A10G or A100),
+`A100:80GB` (one A100 of 80GB), `A100:2` (two A100), `24GB..40GB:2` (two GPUs between 24GB and 40GB),
+`A100:40GB:2` (two A100 GPUs of 40GB).
+
+??? info "Google Cloud TPU"
+    To use TPUs, specify its architecture via the `gpu` property.
+
+    ```yaml
+    type: task
+    # The name is optional, if not specified, generated randomly
+    name: train    
+    
+    python: "3.10"
+    
+    # Commands of the task
+    commands:
+      - pip install -r fine-tuning/qlora/requirements.txt
+      - python fine-tuning/qlora/train.py
+    
+    resources:
+      gpu: v2-8
+    ```
+
+    Currently, only 8 TPU cores can be specified, supporting single TPU device workloads. Multi-TPU support is coming soon.
+
+??? info "Shared memory"
+    If you are using parallel communicating processes (e.g., dataloaders in PyTorch), you may need to configure 
+    `shm_size`, e.g. set it to `16GB`.
+
+### Python version
+
+If you don't specify `image`, `dstack` uses its base Docker image pre-configured with 
+`python`, `pip`, `conda` (Miniforge), and essential CUDA drivers. 
+The `python` property determines which default Docker image is used.
+
+<div editor-title="train.dstack.yml"> 
+
+```yaml
+type: task
+# The name is optional, if not specified, generated randomly
+name: train    
+
+# If `image` is not specified, dstack uses its base image
+python: "3.10"
+
+# Commands of the task
+commands:
+  - pip install -r fine-tuning/qlora/requirements.txt
+  - python fine-tuning/qlora/train.py
+```
+
+</div>
+
+??? info "nvcc"
+    By default, the base Docker image doesn’t include `nvcc`, which is required for building custom CUDA kernels. 
+    If you need `nvcc`, set the corresponding property to true.
+
+
+    ```yaml
+    type: task
+    # The name is optional, if not specified, generated randomly
+    name: train    
+
+    # If `image` is not specified, dstack uses its base image
+    python: "3.10"
+    # Ensure nvcc is installed (req. for Flash Attention) 
+    nvcc: true
+    
+    commands:
+      - pip install -r fine-tuning/qlora/requirements.txt
+      - python fine-tuning/qlora/train.py
+    ```
+
+### Docker
+
+If you want, you can specify your own Docker image via `image`.
+
+<div editor-title=".dstack.yml"> 
+
+```yaml
+type: task
+# The name is optional, if not specified, generated randomly
+name: train    
+
+# Any custom Docker image
+image: dstackai/base:py3.13-0.6-cuda-12.1
+
+# Commands of the task
+commands:
+  - pip install -r fine-tuning/qlora/requirements.txt
+  - python fine-tuning/qlora/train.py
+```
+
+</div>
+
+??? info "Private registry"
+    Use the `registry_auth` property to provide credentials for a private Docker registry.
+
+    ```yaml
+    type: dev-environment
+    # The name is optional, if not specified, generated randomly
+    name: train
+    
+    # Any private Docker image
+    image: dstackai/base:py3.13-0.6-cuda-12.1
+    # Credentials of the private Docker registry
+    registry_auth:
+      username: peterschmidt85
+      password: ghp_e49HcZ9oYwBzUbcSk2080gXZOU2hiT9AeSR5
+    
+    # Commands of the task
+    commands:
+      - pip install -r fine-tuning/qlora/requirements.txt
+      - python fine-tuning/qlora/train.py
+    ```
+
+??? info "Privileged mode"
+    All backends except `runpod`, `vastai`, and `kubernetes` support running containers in privileged mode.
+    This mode enables features like using [Docker and Docker Compose](../guides/protips.md#docker-and-docker-compose) 
+    inside `dstack` runs.
+
+### Environment variables
+
+<div editor-title="train.dstack.yml"> 
+
+```yaml
+type: task
+# The name is optional, if not specified, generated randomly
+name: train
+
+python: "3.10"
+
+# Environment variables
+env:
+  - HF_TOKEN
+  - HF_HUB_ENABLE_HF_TRANSFER=1
+
+# Commands of the task
+commands:
+  - pip install -r fine-tuning/qlora/requirements.txt
+  - python fine-tuning/qlora/train.py
+```
+
+</div>
+
+If you don't assign a value to an environment variable (see `HF_TOKEN` above), 
+`dstack` will require the value to be passed via the CLI or set in the current process.
+
+<span id="system-environment-variables"></span>
+??? info "System environment variables"
+    The following environment variables are available in any run by default:
+    
+    | Name                    | Description                                                      |
+    |-------------------------|------------------------------------------------------------------|
+    | `DSTACK_RUN_NAME`       | The name of the run                                              |
+    | `DSTACK_REPO_ID`        | The ID of the repo                                               |
+    | `DSTACK_GPUS_NUM`       | The total number of GPUs in the run                              |
+    | `DSTACK_NODES_NUM`      | The number of nodes in the run                                   |
+    | `DSTACK_GPUS_PER_NODE`  | The number of GPUs per node                                      |
+    | `DSTACK_NODE_RANK`      | The rank of the node                                             |
+    | `DSTACK_MASTER_NODE_IP` | The internal IP address the master node                          |
+    | `DSTACK_NODES_IPS`      | The list of internal IP addresses of all nodes delimited by "\n" |
+
+### Spot policy
+
+By default, `dstack` uses on-demand instances. However, you can change that
+via the [`spot_policy`](../reference/dstack.yml/dev-environment.md#spot_policy) property. It accepts `spot`, `on-demand`, and `auto`.
 
 !!! info "Reference"
-    See [.dstack.yml](../reference/dstack.yml/task.md) for all the options supported by
-    tasks, along with multiple examples.
+    Tasks support many more configuration options,
+    incl. [`backends`](../reference/dstack.yml/task.md#backends), 
+    [`regions`](../reference/dstack.yml/task.md#regions), 
+    [`max_price`](../reference/dstack.yml/task.md#max_price), and
+    [`max_duration`](../reference/dstack.yml/task.md#max_duration), 
+    among [others](../reference/dstack.yml/task.md).
 
 ## Run a configuration
 
@@ -83,81 +350,43 @@ Launching `axolotl-train`...
 `dstack apply` automatically provisions instances, uploads the contents of the repo (incl. your local uncommitted changes),
 and runs the commands.
 
-!!! info "Ports"
-    If the task specifies [`ports`](../reference/dstack.yml/task.md#_ports), `dstack apply` automatically forwards them to your
-    local machine for convenient and secure access.
+### Retry policy
 
-!!! info "Queueing tasks"
-    By default, if `dstack apply` cannot find capacity, the task fails. 
-    To queue the task and wait for capacity, specify the [`retry`](../reference/dstack.yml/task.md#queueing-tasks) 
-    property in the task configuration.
+By default, if `dstack` can't find capacity, the task exits with an error, or the instance is interrupted, 
+the run will fail.
 
-## Manage runs
+If you'd like `dstack` to automatically retry, configure the 
+[retry](../reference/dstack.yml/task.md#retry) property accordingly:
 
-### List runs
+<div editor-title=".dstack.yml">
 
-The [`dstack ps`](../reference/cli/dstack/ps.md)  command lists all running jobs and their statuses. 
-Use `--watch` (or `-w`) to monitor the live status of runs.
+```yaml
+type: task
+# The name is optional, if not specified, generated randomly
+name: train    
 
-### Stop a run
+python: "3.10"
 
-A task runs until it's completed or its lifetime exceeds [`max_duration`](../reference/dstack.yml/dev-environment.md#max_duration).
-You can also gracefully stop a task using [`dstack stop`](../reference/cli/dstack/stop.md).
-Pass `--abort` or `-x` to stop without waiting for a graceful shutdown.
+# Commands of the task
+commands:
+  - pip install -r fine-tuning/qlora/requirements.txt
+  - python fine-tuning/qlora/train.py
 
-### Attach to a run
-
-By default, `dstack apply` runs in attached mode – it establishes the SSH tunnel to the run, forwards ports, and shows real-time logs.
-If you detached from a run, you can reattach to it using [`dstack attach`](../reference/cli/dstack/attach.md).
-
-### See run logs
-
-To see the logs of a run without attaching, use [`dstack logs`](../reference/cli/dstack/logs.md).
-Pass `--diagnose`/`-d` to `dstack logs` to see the diagnostics logs. It may be useful if a run fails.
-For more information on debugging failed runs, see the [troubleshooting](../guides/troubleshooting.md) guide.
-
-## Manage fleets
-
-Fleets are groups of cloud instances or SSH machines that you use to run dev environments, tasks, and services.
-You can let `dstack apply` provision fleets or [create and manage them directly](fleets.md).
-
-### Creation policy
-
-By default, when you run `dstack apply` with a dev environment, task, or service,
-`dstack` reuses `idle` instances from an existing [fleet](fleets.md).
-If no `idle` instances match the requirements, `dstack` automatically creates a new fleet 
-using configured backends.
-
-To ensure `dstack apply` doesn't create a new fleet but reuses an existing one,
-pass `-R` (or `--reuse`) to `dstack apply`.
-
-<div class="termy">
-
-```shell
-$ dstack apply -R -f examples/.dstack.yml
+retry:
+  # Retry on specific events
+  on_events: [no-capacity, error, interruption]
+  # Retry for up to 1 hour
+  duration: 1h
 ```
 
 </div>
 
-Alternatively, set [`creation_policy`](../reference/dstack.yml/dev-environment.md#creation_policy) to `reuse` in the run configuration.
+--8<-- "docs/concepts/snippets/manage-fleets.ext"
 
-### Termination policy
+--8<-- "docs/concepts/snippets/manage-runs.ext"
 
-If a fleet is created automatically, it remains `idle` for 5 minutes and can be reused within that time.
-To change the default idle duration, set
-[`termination_idle_time`](../reference/dstack.yml/fleet.md#termination_idle_time) in the run configuration (e.g., to 0 or a
-longer duration).
-
-!!! info "Fleets"
-    For greater control over fleet provisioning, configuration, and lifecycle management, it is recommended to use
-    [fleets](fleets.md) directly.
-
-## What's next?
+!!! info "What's next?"
 
 1. Read about [dev environments](dev-environments.md), [services](services.md), and [repos](repos.md)
 2. Learn how to manage [fleets](fleets.md)
 3. Check the [Axolotl](/examples/fine-tuning/axolotl) example
-
-!!! info "Reference"
-    See [.dstack.yml](../reference/dstack.yml/task.md) for all the options supported by
-    tasks, along with multiple examples.

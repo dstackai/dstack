@@ -41,7 +41,7 @@ for AI workloads both in the cloud and on-prem, speeding up the development, tra
 To use `dstack` with your own cloud accounts, create the `~/.dstack/server/config.yml` file and 
 [configure backends](https://dstack.ai/docs/reference/server/config.yml). Alternatively, you can configure backends via the control plane UI after you start the server.
 
-You can skip backends configuration if you intend to run containers  only on your on-prem servers. Use [SSH fleets](https://dstack.ai/docs/concepts/fleets#ssh-fleets) for that.
+You can skip backends configuration if you intend to run containers  only on your on-prem servers. Use [SSH fleets](https://dstack.ai/docs/concepts/fleets#ssh) for that.
 
 ### Start the server
 

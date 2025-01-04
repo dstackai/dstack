@@ -1,8 +1,6 @@
 # Services
 
-Services allow you to deploy models or any web app as a secure and scalable endpoint.
-
-When running models, services provide access through the unified OpenAI-compatible endpoint.
+Services allow you to deploy models or web apps as secure and scalable endpoints.
 
 ## Define a configuration
 
@@ -27,7 +25,7 @@ commands:
     --max-model-len $MAX_MODEL_LEN
     --tensor-parallel-size $DSTACK_GPUS_NUM
 port: 8000
-# Register the model
+# (Optional) Register the model
 model: meta-llama/Meta-Llama-3.1-8B-Instruct
 
 # Uncomment to leverage spot instances
@@ -39,23 +37,297 @@ resources:
 
 </div>
 
-Note, the `model` property is optional and not needed when deploying a non-OpenAI-compatible model or a regular web app.
+### Replicas and scaling
 
-!!! info "Docker image"
-    If you don't specify your Docker image, `dstack` uses the [base](https://hub.docker.com/r/dstackai/base/tags) image
-    pre-configured with Python, Conda, and essential CUDA drivers.
+By default, `dstack` runs a single replica of the service.
+You can configure the number of replicas as well as the auto-scaling rules.
 
-!!! info "Gateway"
-    To enable [auto-scaling](../reference/dstack.yml/service.md#auto-scaling), or use a custom domain with HTTPS, 
-    set up a [gateway](gateways.md) before running the service.
-    If you're using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"},
-    a gateway is pre-configured for you.
+<div editor-title="service.dstack.yml"> 
+
+```yaml
+type: service
+# The name is optional, if not specified, generated randomly
+name: llama31-service
+
+python: "3.10"
+
+# Required environment variables
+env:
+  - HF_TOKEN
+commands:
+  - pip install vllm
+  - vllm serve meta-llama/Meta-Llama-3.1-8B-Instruct --max-model-len 4096
+# Expose the port of the service
+port: 8000
+
+resources:
+  # Change to what is required
+  gpu: 24GB
+
+# Minimum and maximum number of replicas
+replicas: 1..4
+scaling:
+  # Requests per seconds
+  metric: rps
+  # Target metric value
+  target: 10
+```
+
+</div>
+
+The [`replicas`](#replicas) property can be a number or a range.
+
+The [`metric`](#metric) property of [`scaling`](#scaling) only supports the `rps` metric (requests per second). In this 
+case `dstack` adjusts the number of replicas (scales up or down) automatically based on the load. 
+
+Setting the minimum number of replicas to `0` allows the service to scale down to zero when there are no requests.
+
+!!! info "Gateways"
+    The `scaling` property currently requires creating a [gateway](#manage-gateways).
+    This requirement is expected to be removed soon.
+
+### Authorization
+
+By default, the service enables authorization, meaning the service endpoint requires a `dstack` user token.
+This can be disabled by setting `auth` to `false`.
+
+<div editor-title="examples/misc/http.server/service.dstack.yml"> 
+
+```yaml
+type: service
+# The name is optional, if not specified, generated randomly
+name: http-server-service
+
+# Disable authorization
+auth: false
+
+python: "3.10"
+
+# Commands of the service
+commands:
+  - python3 -m http.server
+# The port of the service
+port: 8000
+```
+
+</div>
+
+### Model
+
+If the service is running a chat model with an OpenAI-compatible interface,
+set the [`model`](#model) property to make the model accessible via `dstack`'s 
+global the OpenAI-compatible endpoint, and also accessible via `dstack`'s UI.
+
+### Resources
+
+If you specify memory size, you can either specify an explicit size (e.g. `24GB`) or a 
+range (e.g. `24GB..`, or `24GB..80GB`, or `..80GB`).
+
+<div editor-title="examples/llms/mixtral/vllm.dstack.yml"> 
+
+```yaml
+type: service
+# The name is optional, if not specified, generated randomly
+name: http-server-service
+
+python: "3.10"
+
+# Commands of the service
+commands:
+  - pip install vllm
+  - python -m vllm.entrypoints.openai.api_server
+    --model mistralai/Mixtral-8X7B-Instruct-v0.1
+    --host 0.0.0.0
+    --tensor-parallel-size $DSTACK_GPUS_NUM
+# Expose the port of the service
+port: 8000
+
+resources:
+  # 2 GPUs of 80GB
+  gpu: 80GB:2
+
+  # Minimum disk size
+  disk: 200GB
+```
+
+</div>
+
+The `gpu` property allows specifying not only memory size but also GPU vendor, names
+and their quantity. Examples: `nvidia` (one NVIDIA GPU), `A100` (one A100), `A10G,A100` (either A10G or A100),
+`A100:80GB` (one A100 of 80GB), `A100:2` (two A100), `24GB..40GB:2` (two GPUs between 24GB and 40GB),
+`A100:40GB:2` (two A100 GPUs of 40GB).
+
+??? info "Shared memory"
+    If you are using parallel communicating processes (e.g., dataloaders in PyTorch), you may need to configure 
+    `shm_size`, e.g. set it to `16GB`.
+
+### Python version
+
+If you don't specify `image`, `dstack` uses its base Docker image pre-configured with 
+`python`, `pip`, `conda` (Miniforge), and essential CUDA drivers. 
+The `python` property determines which default Docker image is used.
+
+<div editor-title="service.dstack.yml"> 
+
+```yaml
+type: service
+# The name is optional, if not specified, generated randomly
+name: http-server-service    
+
+# If `image` is not specified, dstack uses its base image
+python: "3.10"
+
+# Commands of the service
+commands:
+  - python3 -m http.server
+# The port of the service
+port: 8000
+```
+
+</div>
+
+??? info "nvcc"
+    By default, the base Docker image doesn’t include `nvcc`, which is required for building custom CUDA kernels. 
+    If you need `nvcc`, set the corresponding property to true.
+
+    <div editor-title="service.dstack.yml"> 
+
+    ```yaml
+    type: service
+    # The name is optional, if not specified, generated randomly
+    name: http-server-service    
+    
+    # If `image` is not specified, dstack uses its base image
+    python: "3.10"
+    # Ensure nvcc is installed (req. for Flash Attention) 
+    nvcc: true
+
+     # Commands of the service
+    commands:
+      - python3 -m http.server
+    # The port of the service
+    port: 8000
+    ```
+    
+    </div>
+
+### Docker
+
+If you want, you can specify your own Docker image via `image`.
+
+<div editor-title="service.dstack.yml">
+
+    ```yaml
+    type: service
+    # The name is optional, if not specified, generated randomly
+    name: http-server-service
+
+    # Any custom Docker image
+    image: dstackai/base:py3.13-0.6-cuda-12.1
+    
+    # Commands of the service
+    commands:
+      - python3 -m http.server
+    # The port of the service
+    port: 8000
+    ```
+
+</div>
+
+??? info "Private registry"
+    
+    Use the `registry_auth` property to provide credentials for a private Docker registry.
+
+    ```yaml
+    type: service
+    # The name is optional, if not specified, generated randomly
+    name: http-server-service
+    
+    # Any private Docker iamge
+    image: dstackai/base:py3.13-0.6-cuda-12.1
+    # Credentials of the private registry
+    registry_auth:
+      username: peterschmidt85
+      password: ghp_e49HcZ9oYwBzUbcSk2080gXZOU2hiT9AeSR5
+    
+    # Commands of the service  
+    commands:
+      - python3 -m http.server
+    # The port of the service
+    port: 8000
+    ```
+
+??? info "Privileged mode"
+    All backends except `runpod`, `vastai`, and `kubernetes` support running containers in privileged mode.
+    This mode enables features like using [Docker and Docker Compose](../guides/protips.md#docker-and-docker-compose) 
+    inside `dstack` runs.
+
+### Environment variables
+
+<div editor-title="service.dstack.yml">
+
+```yaml
+type: service
+# The name is optional, if not specified, generated randomly
+name: llama-2-7b-service
+
+python: "3.10"
+
+# Environment variables
+env:
+  - HF_TOKEN
+  - MODEL=NousResearch/Llama-2-7b-chat-hf
+# Commands of the service
+commands:
+  - pip install vllm
+  - python -m vllm.entrypoints.openai.api_server --model $MODEL --port 8000
+# The port of the service
+port: 8000
+
+resources:
+  # Required GPU vRAM
+  gpu: 24GB
+```
+
+</div>
+
+> If you don't assign a value to an environment variable (see `HF_TOKEN` above),
+`dstack` will require the value to be passed via the CLI or set in the current process.
+
+??? info "System environment variables"
+    The following environment variables are available in any run by default:
+    
+    | Name                    | Description                             |
+    |-------------------------|-----------------------------------------|
+    | `DSTACK_RUN_NAME`       | The name of the run                     |
+    | `DSTACK_REPO_ID`        | The ID of the repo                      |
+    | `DSTACK_GPUS_NUM`       | The total number of GPUs in the run     |
+
+### Spot policy
+
+By default, `dstack` uses on-demand instances. However, you can change that
+via the [`spot_policy`](../reference/dstack.yml/task.md#spot_policy) property. It accepts `spot`, `on-demand`, and `auto`.
 
 !!! info "Reference"
-    See [.dstack.yml](../reference/dstack.yml/service.md) for all the options supported by
-    services, along with multiple examples.
+    Services support many more configuration options,
+    incl. [`backends`](../reference/dstack.yml/service.md#backends), 
+    [`regions`](../reference/dstack.yml/service.md#regions), 
+    [`max_price`](../reference/dstack.yml/service.md#max_price), and
+    among [others](../reference/dstack.yml/service.md).
 
-## Run a service
+## (Optional) Set up a gateway
+
+Running services doesn't require [gateways](gateways.md) unless you need to enable auto-scaling or want the endpoint to
+use HTTPS and map it to your domain.
+
+!!! info "Websockets and base path"
+    A [gateways](gateways.md) may also be required if the service needs Websockets or cannot be used with 
+    a base path.
+
+> If you're using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"},
+> a gateway is already pre-configured for you.
+
+## Run a configuration
 
 To run a service, pass the configuration to [`dstack apply`](../reference/cli/dstack/apply.md):
 
@@ -86,14 +358,10 @@ Model meta-llama/Meta-Llama-3.1-8B-Instruct is published at:
 `dstack apply` automatically provisions instances, uploads the contents of the repo (incl. your local uncommitted changes),
 and runs the service.
 
-## Access the endpoint
-
-### Service
+### Service endpoint
 
 If a [gateway](gateways.md) is not configured, the service’s endpoint will be accessible at
 `<dstack server URL>/proxy/services/<project name>/<run name>/`.
-If a [gateway](gateways.md) is configured, the service endpoint will be accessible at
-`https://<run name>.<gateway domain>`.
 
 <div class="termy">
 
@@ -114,88 +382,25 @@ $ curl http://localhost:3000/proxy/services/main/llama31/v1/chat/completions \
 
 </div>
 
-!!! info "Auth"
-    By default, the service endpoint requires the `Authorization` header with `Bearer <dstack token>`.
-    Authorization can be disabled by setting [`auth`](../reference/dstack.yml/service.md#authorization) to `false` in the
-    service configuration file.
-
-### Model
-
 If the service defines the `model` property, the model can be accessed with
-the OpenAI-compatible endpoint at `<dstack server URL>/proxy/models/<project name>/`,
-or via the control plane UI's playground.
+the global OpenAI-compatible endpoint at `<dstack server URL>/proxy/models/<project name>/`,
+or via `dstack` UI.
 
-When a [gateway](gateways.md) is configured, the OpenAI-compatible endpoint is available at `https://gateway.<gateway domain>/`.
+??? info "Gateway"
+    If a [gateway](gateways.md) is configured, the service endpoint will be accessible at
+    `https://<run name>.<gateway domain>/`.
 
-## Manage runs
+    If the service defines the `model` property, the model will be available via the global OpenAI-compatible endpoint 
+    at `https://gateway.<gateway domain>/`.
 
-### List runs
+[//]: # (By default, the service endpoint requires the `Authorization` header with `Bearer <dstack token>`.)
+[//]: # (Authorization can be disabled by setting [`auth`]&#40;../reference/dstack.yml/service.md#authorization&#41; to `false` in the)
+[//]: # (service configuration file.)
 
-The [`dstack ps`](../reference/cli/dstack/ps.md)  command lists all running jobs and their statuses. 
-Use `--watch` (or `-w`) to monitor the live status of runs.
-
-### Stop a run
-
-A service runs until you stop it or its lifetime exceeds [`max_duration`](../reference/dstack.yml/dev-environment.md#max_duration).
-To gracefully stop a service, use [`dstack stop`](../reference/cli/dstack/stop.md).
-Pass `--abort` or `-x` to stop without waiting for a graceful shutdown.
-
-### Attach to a run
-
-By default, `dstack apply` runs in attached mode – it establishes the SSH tunnel to the run, forwards ports, and shows real-time logs.
-If you detached from a run, you can reattach to it using [`dstack attach`](../reference/cli/dstack/attach.md).
-
-### See run logs
-
-To see the logs of a run without attaching, use [`dstack logs`](../reference/cli/dstack/logs.md).
-Pass `--diagnose`/`-d` to `dstack logs` to see the diagnostics logs. It may be useful if a run fails.
-For more information on debugging failed runs, see the [troubleshooting](../guides/troubleshooting.md) guide.
-
-## Manage fleets
-
-Fleets are groups of cloud instances or SSH machines that you use to run dev environments, tasks, and services.
-You can let `dstack apply` provision fleets or [create and manage them directly](fleets.md).
-
-### Creation policy
-
-By default, when you run `dstack apply` with a dev environment, task, or service,
-`dstack` reuses `idle` instances from an existing [fleet](fleets.md).
-If no `idle` instances match the requirements, it automatically creates a new fleet 
-using backends.
-
-To ensure `dstack apply` doesn't create a new fleet but reuses an existing one,
-pass `-R` (or `--reuse`) to `dstack apply`.
-
-<div class="termy">
-
-```shell
-$ dstack apply -R -f examples/.dstack.yml
-```
-
-</div>
-
-Alternatively, set [`creation_policy`](../reference/dstack.yml/dev-environment.md#creation_policy) to `reuse` in the run configuration.
-
-### Termination policy
-
-If a fleet is created automatically, it remains `idle` for 5 minutes and can be reused within that time.
-To change the default idle duration, set
-[`termination_idle_time`](../reference/dstack.yml/fleet.md#termination_idle_time) in the run configuration (e.g., to 0 or a
-longer duration).
-
-!!! info "Fleets"
-    For greater control over fleet provisioning, configuration, and lifecycle management, it is recommended to use
-    [fleets](fleets.md) directly.
-
-## What's next?
-
-1. Read about [dev environments](dev-environments.md), [tasks](tasks.md), and [repos](repos.md)
-2. Learn how to manage [fleets](fleets.md)
-3. See how to set up [gateways](gateways.md)
-4. Check the [TGI :material-arrow-top-right-thin:{ .external }](../../examples/deployment/tgi/index.md){:target="_blank"},
-   [vLLM :material-arrow-top-right-thin:{ .external }](../../examples/deployment/vllm/index.md){:target="_blank"}, and 
-   [NIM :material-arrow-top-right-thin:{ .external }](../../examples/deployment/nim/index.md){:target="_blank"} examples
-
-!!! info "Reference"
-    See [.dstack.yml](../reference/dstack.yml/service.md) for all the options supported by
-    services, along with multiple examples.
+!!! info "What's next?"
+    1. Read about [dev environments](dev-environments.md), [tasks](tasks.md), and [repos](repos.md)
+    2. Learn how to manage [fleets](fleets.md)
+    3. See how to set up [gateways](gateways.md)
+    4. Check the [TGI :material-arrow-top-right-thin:{ .external }](../../examples/deployment/tgi/index.md){:target="_blank"},
+       [vLLM :material-arrow-top-right-thin:{ .external }](../../examples/deployment/vllm/index.md){:target="_blank"}, and 
+       [NIM :material-arrow-top-right-thin:{ .external }](../../examples/deployment/nim/index.md){:target="_blank"} examples

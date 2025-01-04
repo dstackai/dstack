@@ -1,8 +1,8 @@
 # Gateways
 
 Gateways manage the ingress traffic of running [services](services.md)
-and provide them with an HTTPS endpoint mapped to your domain,
-handling authentication, load distribution, and auto-scaling.
+provide an HTTPS endpoint mapped to your domain,
+and handling auto-scaling.
 
 > If you're using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"},
 > the gateway is already set up for you.
@@ -32,8 +32,7 @@ domain: example.com
 A domain name is required to create a gateway.
 
 !!! info "Reference"
-    See [.dstack.yml](../reference/dstack.yml/gateway.md) for all the options supported by
-    gateways, along with multiple examples.
+    For all gateway configuration options, refer to the [reference](../reference/dstack.yml/gateway.md).
 
 ## Create or update a gateway
 
@@ -83,10 +82,5 @@ Alternatively, you can delete a gateway by passing the gateway name  to `dstack 
 
 [//]: # (TODO: ## Accessing endpoints)
 
-## What's next?
-
-1. See [services](services.md) on how to run services
-
-!!! info "Reference"
-    See [.dstack.yml](../reference/dstack.yml/gateway.md) for all the options supported by
-    gateways, along with multiple examples.
+!!! info "What's next?"
+    1. See [services](services.md) on how to run services

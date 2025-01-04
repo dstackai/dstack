@@ -11,10 +11,9 @@ To use the open-source version of `dstack` with your own cloud accounts or on-pr
 
 ### (Optional) Configure backends
 
-To use `dstack` with specific providers, configure [backends](../concepts/backends.md).
+To use `dstack` with cloud providers, configure the appropriate [backends](../concepts/backends.md).
 
-> To use `dstack` with on-prem servers, 
-no backend configuration is needed. Use [SSH fleets](../concepts/fleets.md#ssh-fleets) for that.
+> For using `dstack` with on-prem servers, create [SSH fleets](../concepts/fleets.md#ssh) instead.
 
 ## Start the server
 
@@ -95,10 +94,9 @@ Configuration is updated at ~/.dstack/config.yml
 
 This configuration is stored in `~/.dstack/config.yml`.
 
-## What's next?
-
-1. Check the [server/config.yml reference](../reference/server/config.yml.md) on how to configure backends
-2. Check [SSH fleets](../concepts/fleets.md#ssh-fleets) to learn about running on your on-prem servers
-3. Follow [quickstart](../quickstart.md)
-4. Browse [examples](/examples)
-5. Join the community via [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd)
+!!! info "What's next?"
+    1. Check the [server/config.yml reference](../reference/server/config.yml.md) on how to configure backends
+    2. Check [SSH fleets](../concepts/fleets.md#ssh) to learn about running on your on-prem servers
+    3. Follow [quickstart](../quickstart.md)
+    4. Browse [examples](/examples)
+    5. Join the community via [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd)

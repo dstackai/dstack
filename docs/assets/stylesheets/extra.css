@@ -23,6 +23,11 @@
         font-size: 0.75rem;
     }
 }
+
+[dir=ltr] .md-typeset :is(.admonition,details) pre, [dir=ltr] .md-typeset :is(.admonition,details) :is(.admonition,details) {
+    margin-left: 32px;
+}
+
 @media screen and (max-width: 76.1875em) {
     .md-header {
         background-color: rgb(255, 255, 255);
@@ -160,7 +165,7 @@
     background-color: var(--md-default-fg-color);
 }
 
-[dir=ltr] .md-typeset :is(.admonition,details) {
+[dir=ltr] .md-typeset :is(details) {
     border-style: solid;
     /*border-width: 1px;*/
     border-width: 0;
@@ -168,6 +173,16 @@
     box-shadow: none;
     padding: .6rem .8rem;
     background: -webkit-linear-gradient(45deg, rgba(0, 42, 255, 0.1), rgb(0 114 255 / 1%), rgba(0, 42, 255, 0.05));
+}
+
+[dir=ltr] .md-typeset :is(.admonition) {
+    border-style: solid;
+    border-color: rgba(0, 0, 0, 0.87);
+    border-width: 1px;
+    border-radius: 6px;
+    box-shadow: none;
+    padding: .6rem .8rem;
+    /*background: -webkit-linear-gradient(45deg, rgba(0, 42, 255, 0.1), rgb(0 114 255 / 1%), rgba(0, 42, 255, 0.05));*/
 }
 
 .md-typeset iframe {
@@ -178,7 +193,7 @@
     margin-left: 32px;
 }
 
-[dir=ltr] .md-typeset :is(.admonition,details):not(blockquote) > :is(.highlight,.termy,.md-typeset__scrollwrap,p,h4,h3,.tabbed-set):not(.admonition-title) {
+[dir=ltr] .md-typeset :is(.admonition,details):not(blockquote) > :is(.md-typeset__scrollwrap,p,h4,h3,.tabbed-set):not(.admonition-title) {
     padding-left: 32px;
 }
 
@@ -1091,7 +1106,7 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
     background: none;
     z-index: 1;
     padding: 5px;
-    border-radius: 12px;
+    border-radius: 6px;
     border: 1px solid black;
     bottom: -0.7px;
     top: -0.7px;
@@ -1128,7 +1143,7 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
     height: 100%;
     background: -webkit-linear-gradient(45deg, rgba(0, 42, 255, 0.025), rgb(0 114 255 / 0.25%), rgba(0, 42, 255, 0.0125));
     z-index: 1;
-    border-radius: 12px;
+    border-radius: 6px;
     border: 0.5px solid rgba(0,0,0, 0.5);
     overflow: unset;
 }

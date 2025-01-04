@@ -1,12 +1,9 @@
 # Backends
 
-`dstack` can provision and manage compute across a variety of providers. 
+To use `dstack` with cloud providers, configure the appropriate backends.
+This can be done either through `~/.dstack/server/config.yml` before starting the server, or via UI after the server is up.
 
-To use `dstack` with specific providers, configure backends in the 
-`~/.dstack/server/config.yml` file before starting the server.
-Alternatively, you can configure them via the control plane UI once the server is up.
-
-Below are examples of how to configure backends for each provider.
+Below are examples of how to configure them via `~/.dstack/server/config.yml`. 
 
 ## Cloud providers
 
@@ -747,7 +744,7 @@ projects:
 ### SSH fleets
 
 > For using `dstack` with on-prem servers, no backend configuration is required.
-> See [SSH fleets](fleets.md#ssh-fleets) for more details. 
+> See [SSH fleets](fleets.md#ssh) for more details. 
 
 ### Kubernetes
 

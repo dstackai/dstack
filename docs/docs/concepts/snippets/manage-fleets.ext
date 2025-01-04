@@ -1,0 +1,30 @@
+### Creation policy
+
+By default, when you run `dstack apply` with a dev environment, task, or service,
+if no `idle` instances from the available fleets meet the requirements, `dstack` creates a new fleet 
+using configured backends.
+
+To ensure `dstack apply` doesn't create a new fleet but reuses an existing one,
+pass `-R` (or `--reuse`) to `dstack apply`.
+
+<div class="termy">
+
+```shell
+$ dstack apply -R -f examples/.dstack.yml
+```
+
+</div>
+
+Or, set [`creation_policy`](../reference/dstack.yml/dev-environment.md#creation_policy) to `reuse` in the run configuration.
+
+### Termination policy
+
+If a fleet is created automatically, once the run is finished, by default, it remains `idle` for 5 minutes 
+and can be reused by other runs.
+To change the default idle duration, set
+[`termination_idle_time`](../reference/dstack.yml/fleet.md#termination_idle_time) in the run configuration (e.g., to `0` or a
+longer duration).
+
+!!! info "Fleets"
+    For greater control over fleet provisioning, it is recommended to create
+    [fleets](fleets.md) explicitly.

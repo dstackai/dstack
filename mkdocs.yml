@@ -157,6 +157,8 @@ markdown_extensions:
   - pymdownx.highlight
   - pymdownx.details
   - pymdownx.superfences
+  - pymdownx.snippets:
+      base_path: ["docs"]
   - pymdownx.tabbed:
       alternate_style: true
       slugify: !!python/object/apply:pymdownx.slugs.slugify
@@ -213,15 +215,15 @@ nav:
           - Dev environments: docs/concepts/dev-environments.md
           - Tasks: docs/concepts/tasks.md
           - Services: docs/concepts/services.md
-          - Repos: docs/concepts/repos.md
           - Fleets: docs/concepts/fleets.md
           - Volumes: docs/concepts/volumes.md
           - Gateways: docs/concepts/gateways.md
+          - Repos: docs/concepts/repos.md
       - Guides:
           - Protips: docs/guides/protips.md
-          - Administration: docs/guides/administration.md
           - Server deployment: docs/guides/server-deployment.md
           - Troubleshooting: docs/guides/troubleshooting.md
+          - Administration: docs/guides/administration.md
   - Reference:
       - .dstack.yml:
           - dev-environment: docs/reference/dstack.yml/dev-environment.md

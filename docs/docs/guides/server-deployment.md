@@ -64,7 +64,7 @@ The server loads this file on startup.
 Alternatively, you can configure backends on the [project settings page](../guides/projects/#project-backends) via the control plane's UI.
 
 > For using `dstack` with on-prem servers, no backend configuration is required.
-> See [SSH fleets](../concepts/fleets.md#ssh-fleets) for more details.
+> See [SSH fleets](../concepts/fleets.md#ssh) for more details.
 
 ## State persistence
 
