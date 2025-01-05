@@ -11,7 +11,7 @@ To use the open-source version of `dstack` with your own cloud accounts or on-pr
 
 ### (Optional) Configure backends
 
-To use `dstack` with cloud providers, configure the appropriate [backends](../concepts/backends.md).
+To use `dstack` with cloud providers, configure [backends](../concepts/backends.md).
 
 > For using `dstack` with on-prem servers, create [SSH fleets](../concepts/fleets.md#ssh) instead.
 

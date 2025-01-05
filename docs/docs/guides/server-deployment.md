@@ -38,8 +38,7 @@ You can run the server either through `pip` or using Docker.
         
     </div>
 
-=== "AWS CloudFormation"
-
+??? info "AWS CloudFormation"
     If you'd like to deploy the server to a private AWS VPC, you can use 
     our CloudFormation [template :material-arrow-top-right-thin:{ .external }](https://console.aws.amazon.com/cloudformation/home#/stacks/quickcreate?templateURL=https://get-dstack.s3.eu-west-1.amazonaws.com/cloudformation/template.yaml){:target="_blank"}.
 
@@ -57,14 +56,14 @@ You can run the server either through `pip` or using Docker.
 
 ## Backend configuration
 
-To use `dstack` with your own cloud accounts, create the `~/.dstack/server/config.yml` file and 
-[configure backends](../reference/server/config.yml.md).
+To use `dstack` with cloud providers, configure [backends](../concepts/backends.md) 
+via the `~/.dstack/server/config.yml` file.
 The server loads this file on startup. 
 
-Alternatively, you can configure backends on the [project settings page](../guides/projects/#project-backends) via the control plane's UI.
+Alternatively, you can configure backends on the [project settings page](../guides/administration.md#backends) via UI.
 
 > For using `dstack` with on-prem servers, no backend configuration is required.
-> See [SSH fleets](../concepts/fleets.md#ssh) for more details.
+> Use [SSH fleets](../concepts/fleets.md#ssh) instead.
 
 ## State persistence
 
@@ -183,12 +182,12 @@ If you want backend credentials and user tokens to be encrypted, set up encrypti
 === "Client"
     The client backward compatibility is maintained across patch releases. A new minor release indicates that the release breaks client backward compatibility. This means you don't need to update the server when you update the client to a new patch release. Still, upgrading a client to a new minor version requires upgrading the server too.
 
-## FAQ
+## FAQs
 
-##### Can I run multiple replicas of the dstack server?
+??? info "Can I run multiple replicas of dstack server?"
 
-Yes, you can if you configure `dstack` to use [PostgreSQL](#postgresql) and [AWS CloudWatch](#aws-cloudwatch).
+    Yes, you can if you configure `dstack` to use [PostgreSQL](#postgresql) and [AWS CloudWatch](#aws-cloudwatch).
 
-##### Does the dstack server support blue-green or rolling deployments?
+??? info "Does dstack server support blue-green or rolling deployments?"
 
-Yes, it does if you configure `dstack` to use [PostgreSQL](#postgresql) and [AWS CloudWatch](#aws-cloudwatch).
+    Yes, it does if you configure `dstack` to use [PostgreSQL](#postgresql) and [AWS CloudWatch](#aws-cloudwatch).

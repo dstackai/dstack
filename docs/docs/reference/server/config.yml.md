@@ -1,8 +1,7 @@
 # ~/.dstack/server/config.yml
 
 The `~/.dstack/server/config.yml` file is used
-to [configure](../../installation/index.md#1-configure-backends) the `dstack` server cloud accounts
-and other sever-level settings such as encryption.
+to configure [backends](../../concepts/backends.md) and other [sever-level settings](../../guides/server-deployment.md).
 
 ## Root reference
 
