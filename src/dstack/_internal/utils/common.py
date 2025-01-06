@@ -158,6 +158,8 @@ def parse_pretty_duration(duration: str) -> int:
 
 
 def format_pretty_duration(seconds: int) -> str:
+    if seconds == 0:
+        return "0s"
     if seconds < 0:
         raise ValueError("Seconds cannot be negative")
     units = [

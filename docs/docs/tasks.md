@@ -141,12 +141,13 @@ $ dstack apply -R -f examples/.dstack.yml
 
 Alternatively, set [`creation_policy`](reference/dstack.yml/dev-environment.md#creation_policy) to `reuse` in the run configuration.
 
-### Termination policy
+### Idle duration
 
-If a fleet is created automatically, it remains `idle` for 5 minutes and can be reused within that time.
+If a fleet is created automatically, it stays `idle` for 5 minutes by default and can be reused within that time.
+If the fleet is not reused within this period, it is automatically terminated.
 To change the default idle duration, set
-[`termination_idle_time`](reference/dstack.yml/fleet.md#termination_idle_time) in the run configuration (e.g., to 0 or a
-longer duration).
+[`idle_duration`](reference/dstack.yml/fleet.md#idle_duration) in the run configuration (e.g., `0s`, `1m`, or `off` for
+unlimited).
 
 !!! info "Fleets"
     For greater control over fleet provisioning, configuration, and lifecycle management, it is recommended to use

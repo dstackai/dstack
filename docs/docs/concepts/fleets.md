@@ -40,7 +40,7 @@ The filename must end with `.dstack.yml` (e.g. `.dstack.yml` or `fleet.dstack.ym
     placement: cluster
     
     # Terminate if idle for 3 days
-    termination_idle_time: 3d 
+    idle_duration: 3d 
 
     resources:
       gpu:
@@ -199,9 +199,10 @@ $ dstack fleet
 
 Once the status of instances changes to `idle`, they can be used by dev environments, tasks, and services.
 
-!!! info "Termination policy"
+!!! info "Idle duration"
     If you want a fleet to be automatically deleted after a certain idle time,
-    you can set the [`termination_idle_time`](../reference/dstack.yml/fleet.md#termination_idle_time) property.
+    you can set the [`idle_duration`](../reference/dstack.yml/fleet.md#idle_duration) property.
+    By default, it's set to `3d`.
 
 [//]: # (Add Idle time example to the reference page)
 
