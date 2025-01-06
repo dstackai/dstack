@@ -143,8 +143,6 @@ class APIClient:
                     code = kwargs.pop("code")
                     raise _server_client_errors[code](**kwargs)
             if resp.status_code == 422:
-                print(path)
-                print(body)
                 formatted_error = pprint.pformat(resp.json())
                 raise ClientError(f"Server validation error: \n{formatted_error}")
             resp.raise_for_status()
