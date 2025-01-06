@@ -104,11 +104,11 @@ and their quantity. Examples: `nvidia` (one NVIDIA GPU), `A100` (one A100), `A10
 
     Currently, only 8 TPU cores can be specified, supporting single TPU device workloads. Multi-TPU support is coming soon.
 
-#### Termination policy
+#### Idle duration
 
 By default, fleet instances remain active until the fleet is explicitly deleted via `dstack fleet delete`.
 
-To automatically terminate `idle` instances after a certain period, configure `termination_idle_time`.
+To automatically terminate `idle` instances after a certain period, configure `idle_duration`.
 
 <div editor-title="examples/misc/fleets/.dstack.yml">
     
@@ -120,7 +120,7 @@ To automatically terminate `idle` instances after a certain period, configure `t
     nodes: 2
 
     # Terminate instances idle for more than 1 hour
-    termination_idle_time: 1h
+    idle_duration: 1h
     
     resources:
       gpu: 24GB
