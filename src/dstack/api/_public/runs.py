@@ -457,6 +457,7 @@ class RunCollection:
     def create_instance(self, profile: Profile, requirements: Requirements) -> Instance:
         return self._api_client.runs.create_instance(self._project, profile, requirements)
 
+    # TODO: [Andrey] I guess we need to drop profile-related fields (currently retry is not reflected there)
     def get_plan(
         self,
         configuration: AnyRunConfiguration,
@@ -505,6 +506,7 @@ class RunCollection:
             configuration = configuration.copy(deep=True)
             configuration.resources = resources
 
+        # TODO: [Andrey] "(python") looks as a hack
         profile = Profile(
             name="(python)",
             backends=backends,

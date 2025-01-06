@@ -86,8 +86,7 @@ declare interface IFleetConfigurationRequest {
         duration?: number | string;
     } | boolean;
     max_price?: number;
-    termination_policy?: "dont-destroy" | "destroy-after-idle";
-    termination_idle_time?: number | string;
+    idle_duration?: number | string;
 }
 
 declare interface IProfileRequest {
@@ -105,8 +104,7 @@ declare interface IProfileRequest {
     pool_name?: string;
     instance_name?: string;
     creation_policy?: "reuse" | "reuse-or-create";
-    termination_policy?: "dont-destroy" | "destroy-after-idle";
-    termination_idle_time?: number | string;
+    idle_duration?: number | string;
     name: string;
     default?: boolean;
 }

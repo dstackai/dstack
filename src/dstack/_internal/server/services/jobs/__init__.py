@@ -95,6 +95,8 @@ def job_model_to_job_submission(job_model: JobModel) -> JobSubmission:
         job_provisioning_data.instance_type.resources.description = (
             job_provisioning_data.instance_type.resources.pretty_format()
         )
+        # TODO do we really still need this magic? See https://github.com/dstackai/dstack/pull/1682
+        # i.e., replacing `jpd.backend` with `jpd.get_base_backend()` should give the same result
         if (
             job_provisioning_data.backend == BackendType.DSTACK
             and job_provisioning_data.backend_data is not None
