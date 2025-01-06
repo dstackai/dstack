@@ -4,8 +4,9 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
-	"log"
 	"sync"
+
+	"github.com/dstackai/dstack/runner/internal/log"
 )
 
 type TaskStatus string
@@ -45,19 +46,19 @@ type Task struct {
 
 // Lock is used for exclusive operations, e.g, stopping a container,
 // removing task data, etc.
-func (t *Task) Lock() {
+func (t *Task) Lock(ctx context.Context) {
 	if !t.mu.TryLock() {
-		log.Fatalf("task %s already locked!", t.ID)
+		log.Fatal(ctx, "already locked!", "task", t.ID)
 	}
-	log.Printf("task %s locked", t.ID)
+	log.Debug(ctx, "locked", "task", t.ID)
 }
 
 // Release should be called Unlock, but this name triggers govet copylocks check,
 // since "thanks" to Go implicit interfaces, a struct with Lock/Unlock method pair
 // looks like lock: https://github.com/golang/go/issues/18451
-func (t *Task) Release() {
+func (t *Task) Release(ctx context.Context) {
 	t.mu.Unlock()
-	log.Printf("task %s unlocked", t.ID)
+	log.Debug(ctx, "unlocked", "task", t.ID)
 }
 
 func (t *Task) IsTransitionAllowed(toStatus TaskStatus) bool {
