@@ -844,7 +844,7 @@ def get_job_mount_point_volume(
     """
     for volume in volumes:
         if (
-            volume.configuration.backend != job_provisioning_data.backend
+            volume.configuration.backend != job_provisioning_data.get_base_backend()
             or volume.configuration.region != job_provisioning_data.region
         ):
             continue
