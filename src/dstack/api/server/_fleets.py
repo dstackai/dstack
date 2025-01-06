@@ -73,7 +73,7 @@ def _get_fleet_spec_excludes(fleet_spec: FleetSpec) -> Optional[_ExcludeDict]:
     if not fleet_spec.configuration.reservation:
         configuration_excludes["reservation"] = True
         profile_excludes.add("reservation")
-    if not fleet_spec.configuration.idle_duration:
+    if fleet_spec.configuration.idle_duration is None:
         configuration_excludes["idle_duration"] = True
         profile_excludes.add("idle_duration")
 
