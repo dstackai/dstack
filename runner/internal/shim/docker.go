@@ -857,8 +857,6 @@ func getSSHShellCommands(openSSHPort int, publicSSHKey string) []string {
 		`if _exists apk; then _install() { apk add -U "$1"; }; fi`,
 		// check in sshd is here, install if not
 		`if ! _exists sshd; then _install openssh-server; fi`,
-		// prohibit password authentication
-		"sed -i \"s/.*PasswordAuthentication.*/PasswordAuthentication no/g\" /etc/ssh/sshd_config",
 		// create ssh dirs and add public key
 		"mkdir -p ~/.ssh",
 		"chmod 700 ~/.ssh",
@@ -876,7 +874,7 @@ func getSSHShellCommands(openSSHPort int, publicSSHKey string) []string {
 		"rm -rf /run/sshd && mkdir -p /run/sshd && chown root:root /run/sshd",
 		"rm -rf /var/empty && mkdir -p /var/empty && chown root:root /var/empty",
 		// start sshd
-		fmt.Sprintf("/usr/sbin/sshd -p %d -o AllowTcpForwarding=yes -o PermitUserEnvironment=yes", openSSHPort),
+		fmt.Sprintf("/usr/sbin/sshd -p %d -o PidFile=none -o PasswordAuthentication=no -o AllowTcpForwarding=yes -o PermitUserEnvironment=yes", openSSHPort),
 		// restore ld.so variables
 		`if [ -n "$_LD_LIBRARY_PATH" ]; then export LD_LIBRARY_PATH="$_LD_LIBRARY_PATH"; fi`,
 		`if [ -n "$_LD_PRELOAD" ]; then export LD_PRELOAD="$_LD_PRELOAD"; fi`,

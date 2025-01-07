@@ -308,8 +308,6 @@ def get_docker_commands(
         "if ! _exists sshd; then _install openssh-server; fi",
         # install curl if necessary
         "if ! _exists curl; then _install curl; fi",
-        # prohibit password authentication
-        'sed -i "s/.*PasswordAuthentication.*/PasswordAuthentication no/g" /etc/ssh/sshd_config',
         # create ssh dirs and add public key
         "mkdir -p ~/.ssh",
         "chmod 700 ~/.ssh",
@@ -329,7 +327,7 @@ def get_docker_commands(
         "rm -rf /run/sshd && mkdir -p /run/sshd && chown root:root /run/sshd",
         "rm -rf /var/empty && mkdir -p /var/empty && chown root:root /var/empty",
         # start sshd
-        "/usr/sbin/sshd -p 10022 -o AllowTcpForwarding=yes -o PermitUserEnvironment=yes",
+        "/usr/sbin/sshd -p 10022 -o PidFile=none -o PasswordAuthentication=no -o AllowTcpForwarding=yes -o PermitUserEnvironment=yes",
         # restore ld.so variables
         'if [ -n "$_LD_LIBRARY_PATH" ]; then export LD_LIBRARY_PATH="$_LD_LIBRARY_PATH"; fi',
         'if [ -n "$_LD_PRELOAD" ]; then export LD_PRELOAD="$_LD_PRELOAD"; fi',
