@@ -75,9 +75,9 @@ scaling:
 
 </div>
 
-The [`replicas`](#replicas) property can be a number or a range.
+The [`replicas`](../reference/dstack.yml/service.md#replicas) property can be a number or a range.
 
-The [`metric`](#metric) property of [`scaling`](#scaling) only supports the `rps` metric (requests per second). In this 
+The [`metric`](../reference/dstack.yml/service.md#metric) property of [`scaling`](../reference/dstack.yml/service.md#scaling) only supports the `rps` metric (requests per second). In this 
 case `dstack` adjusts the number of replicas (scales up or down) automatically based on the load. 
 
 Setting the minimum number of replicas to `0` allows the service to scale down to zero when there are no requests.
