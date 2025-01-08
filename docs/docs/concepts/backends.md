@@ -1,6 +1,6 @@
 # Backends
 
-To use `dstack` with cloud providers, configure [backends](../concepts/backends.md) 
+To use `dstack` with cloud providers, configure backends
 via the `~/.dstack/server/config.yml` file.
 The server loads this file on startup. 
 
