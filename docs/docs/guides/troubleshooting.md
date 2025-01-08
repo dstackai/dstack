@@ -94,7 +94,7 @@ pointing to the gateway's hostname is configured.
 
 #### Cause 1: Bad Authorization
 
-If the service endpoint returns a 403 error, it is likely because the [`Authorization`](../concepts/services.md#service-endpoint) 
+If the service endpoint returns a 403 error, it is likely because the [`Authorization`](../concepts/services.md#access-the-endpoint) 
 header with the correct `dstack` token was not provided.
 
 [//]: # (#### Other)

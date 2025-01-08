@@ -1,7 +1,7 @@
 # Backends
 
 To use `dstack` with cloud providers, configure backends
-via the `~/.dstack/server/config.yml` file.
+via the [`~/.dstack/server/config.yml`](../reference/server/config.yml.md) file.
 The server loads this file on startup. 
 
 Alternatively, you can configure backends on the [project settings page](../guides/administration.md#backends) via UI.
@@ -9,7 +9,7 @@ Alternatively, you can configure backends on the [project settings page](../guid
 > For using `dstack` with on-prem servers, no backend configuration is required.
 > Use [SSH fleets](../concepts/fleets.md#ssh) instead.
 
-Below are examples of how to configure backends via `~/.dstack/server/config.yml`. 
+Below are examples of how to configure backends via [`~/.dstack/server/config.yml`](../reference/server/config.yml.md). 
 
 ## Cloud providers
 

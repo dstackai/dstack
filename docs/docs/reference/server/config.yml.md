@@ -275,7 +275,7 @@ to configure [backends](../../concepts/backends.md) and other [sever-level setti
     cat my-service-account-file.json | jq -c | jq -R
     ```
 
-###### `projects[n].backends[type=kubernetes].networking` { #kuberentes-networking data-toc-label="networking" }
+###### `projects[n].backends[type=kubernetes].networking` { #kubernetes-networking data-toc-label="networking" }
 
 ##SCHEMA# dstack._internal.core.models.backends.kubernetes.KubernetesNetworkingConfig
     overrides:
@@ -310,92 +310,3 @@ to configure [backends](../../concepts/backends.md) and other [sever-level setti
 #SCHEMA# dstack._internal.server.services.permissions.DefaultPermissions
     overrides:
         show_root_heading: false
-
-## Examples
-
-> The `dstack` server allows you to configure backends for multiple projects.
-> If you don't need multiple projects, use only the `main` project.
-
-### Encryption keys { #examples-encryption }
-
-By default, `dstack` stores data in plaintext. To enforce encryption, you 
-specify one or more encryption keys.
-
-`dstack` currently supports AES and identity (plaintext) encryption keys.
-Support for external providers like HashiCorp Vault and AWS KMS is planned.
-
-=== "AES"
-    The `aes` encryption key encrypts data using [AES-256](https://en.wikipedia.org/wiki/Advanced_Encryption_Standard) in GCM mode.
-    To configure the `aes` encryption, generate a random 32-byte key:
-
-    <div class="termy">
-    
-    ```shell
-    $ head -c 32 /dev/urandom | base64
-    
-    opmx+r5xGJNVZeErnR0+n+ElF9ajzde37uggELxL
-    ```
-
-    </div>
-    
-    And specify it as `secret`:
-    
-    ```yaml
-    encryption:
-      keys:
-        - type: aes
-          name: key1
-          secret: opmx+r5xGJNVZeErnR0+n+ElF9ajzde37uggELxL
-    ```
-
-=== "Identity"
-    The `identity` encryption performs no encryption and stores data in plaintext.
-    You can specify an `identity` encryption key explicitly if you want to decrypt the data:
-    
-    ```yaml
-    encryption:
-      keys:
-      - type: identity
-      - type: aes
-        name: key1
-        secret: opmx+r5xGJNVZeErnR0+n+ElF9ajzde37uggELxL
-    ```
-    
-    With this configuration, the `aes` key will still be used to decrypt the old data,
-    but new writes will store the data in plaintext.
-
-??? info "Key rotation"
-    If multiple keys are specified, the first is used for encryption, and all are tried for decryption. This enables key
-    rotation by specifying a new encryption key.
-    
-    ```yaml
-    encryption:
-      keys:
-      - type: aes
-        name: key2
-        secret: cR2r1JmkPyL6edBQeHKz6ZBjCfS2oWk87Gc2G3wHVoA=
-
-      - type: aes
-        name: key1
-        secret: E5yzN6V3XvBq/f085ISWFCdgnOGED0kuFaAkASlmmO4=
-    ```
-    
-    Old keys may be deleted once all existing records have been updated to re-encrypt sensitive data. 
-    Encrypted values are prefixed with key names, allowing DB admins to identify the keys used for encryption.
-
-[//]: # (## Default permissions)
-
-[//]: # (`dstack` supports changing default permissions. For example, by default all users)
-[//]: # (can create and manage their own projects. You can specify `default_permissions`)
-[//]: # (so that only global admins can create and manage projects:)
-
-[//]: # (<div editor-title="~/.dstack/server/config.yml">)
-
-[//]: # (```yaml)
-[//]: # (default_permissions:)
-[//]: # (  allow_non_admins_create_projects: false)
-[//]: # (```)
-
-[//]: # (</div>)
-
-See the [reference table](#default-permissions) for all configurable permissions.

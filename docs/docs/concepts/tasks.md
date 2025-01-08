@@ -386,7 +386,6 @@ retry:
 --8<-- "docs/concepts/snippets/manage-runs.ext"
 
 !!! info "What's next?"
-
-1. Read about [dev environments](dev-environments.md), [services](services.md), and [repos](repos.md)
-2. Learn how to manage [fleets](fleets.md)
-3. Check the [Axolotl](/examples/fine-tuning/axolotl) example
+    1. Read about [dev environments](dev-environments.md), [services](services.md), and [repos](repos.md)
+    2. Learn how to manage [fleets](fleets.md)
+    3. Check the [Axolotl](/examples/fine-tuning/axolotl) example

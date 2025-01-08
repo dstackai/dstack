@@ -101,8 +101,7 @@ $ dstack init
     </div>
 
     By default, tasks run on a single instance. To run a distributed task, specify 
-    [`nodes`](reference/dstack.yml/task.md#distributed-tasks), 
-    and `dstack` will run it on a cluster.
+    [`nodes`](concepts/tasks.md#distributed-tasks), and `dstack` will run it on a cluster.
 
     Run the configuration via [`dstack apply`](reference/cli/dstack/apply.md):
 
@@ -192,7 +191,7 @@ $ dstack init
     </div>
 
     !!! info "Gateway"
-        To enable [auto-scaling](reference/dstack.yml/service.md#auto-scaling), or use a custom domain with HTTPS, 
+        To enable [auto-scaling](concepts/services.md#replicas-and-scaling), or use a custom domain with HTTPS, 
         set up a [gateway](concepts/gateways.md) before running the service.
         If you're using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"},
         a gateway is pre-configured for you.

@@ -92,12 +92,12 @@ and their quantity. Examples: `nvidia` (one NVIDIA GPU), `A100` (one A100), `A10
     To use TPUs, specify its architecture via the `gpu` property.
 
     ```yaml
-    type: dev-environment
+    type: fleet
     # The name is optional, if not specified, generated randomly
-    name: vscode    
+    name: my-fleet
     
-    ide: vscode
-    
+    nodes: 2
+
     resources:
       gpu: v2-8
     ```
@@ -106,9 +106,12 @@ and their quantity. Examples: `nvidia` (one NVIDIA GPU), `A100` (one A100), `A10
 
 #### Idle duration
 
-By default, fleet instances remain active until the fleet is explicitly deleted via `dstack fleet delete`.
+By default, fleet instances stay `idle` for 3 days and can be reused within that time.
+If the fleet is not reused within this period, it is automatically terminated.
 
-To automatically terminate `idle` instances after a certain period, configure `idle_duration`.
+To change the default idle duration, set
+[`idle_duration`](../reference/dstack.yml/fleet.md#idle_duration) in the run configuration (e.g., `0s`, `1m`, or `off` for
+unlimited).
 
 <div editor-title="examples/misc/fleets/.dstack.yml">
     
@@ -131,14 +134,14 @@ To automatically terminate `idle` instances after a certain period, configure `i
 #### Spot policy
 
 By default, `dstack` uses on-demand instances. However, you can change that
-via the [`spot_policy`](../reference/dstack.yml/dev-environment.md#spot_policy) property. It accepts `spot`, `on-demand`, and `auto`.
+via the [`spot_policy`](../reference/dstack.yml/fleet.md#spot_policy) property. It accepts `spot`, `on-demand`, and `auto`.
 
 #### Retry policy
 
 By default, if `dstack` fails to provision an instance or an instance is interrupted, no retry is attempted.
 
 If you'd like `dstack` to do it, configure the 
-[retry](../reference/dstack.yml/dev-environment.md#retry) property accordingly:
+[retry](../reference/dstack.yml/fleet.md#retry) property accordingly:
 
 <div editor-title=".dstack.yml">
 
@@ -308,6 +311,9 @@ $ dstack fleet
 ```
 
 </div>
+
+When you apply this configuration, `dstack` will connect to the specified hosts using the provided SSH credentials, 
+install the dependencies, and configure these servers as a fleet.
 
 Once the status of instances changes to `idle`, they can be used by dev environments, tasks, and services.
 

@@ -116,7 +116,7 @@ port: 8000
 
 If the service is running a chat model with an OpenAI-compatible interface,
 set the [`model`](#model) property to make the model accessible via `dstack`'s 
-global the OpenAI-compatible endpoint, and also accessible via `dstack`'s UI.
+global OpenAI-compatible endpoint, and also accessible via `dstack`'s UI.
 
 ### Resources
 
@@ -128,7 +128,7 @@ range (e.g. `24GB..`, or `24GB..80GB`, or `..80GB`).
 ```yaml
 type: service
 # The name is optional, if not specified, generated randomly
-name: http-server-service
+name: llama31-service
 
 python: "3.10"
 
@@ -156,6 +156,31 @@ The `gpu` property allows specifying not only memory size but also GPU vendor, n
 and their quantity. Examples: `nvidia` (one NVIDIA GPU), `A100` (one A100), `A10G,A100` (either A10G or A100),
 `A100:80GB` (one A100 of 80GB), `A100:2` (two A100), `24GB..40GB:2` (two GPUs between 24GB and 40GB),
 `A100:40GB:2` (two A100 GPUs of 40GB).
+
+??? info "Google Cloud TPU"
+    To use TPUs, specify its architecture via the `gpu` property.
+
+    ```yaml
+    type: service
+    name: llama31-service-optimum-tpu
+    
+    image: dstackai/optimum-tpu:llama31
+    env:
+      - HF_TOKEN
+      - MODEL_ID=meta-llama/Meta-Llama-3.1-8B-Instruct
+      - MAX_TOTAL_TOKENS=4096
+      - MAX_BATCH_PREFILL_TOKENS=4095
+    commands:
+      - text-generation-launcher --port 8000
+    port: 8000
+    # Register the model
+    model: meta-llama/Meta-Llama-3.1-8B-Instruct
+    
+    resources:
+      gpu: v5litepod-4
+    ```
+
+    Currently, only 8 TPU cores can be specified, supporting single TPU device workloads. Multi-TPU support is coming soon.
 
 ??? info "Shared memory"
     If you are using parallel communicating processes (e.g., dataloaders in PyTorch), you may need to configure 
@@ -321,7 +346,7 @@ Running services doesn't require [gateways](gateways.md) unless you need to enab
 use HTTPS and map it to your domain.
 
 !!! info "Websockets and base path"
-    A [gateways](gateways.md) may also be required if the service needs Websockets or cannot be used with 
+    A [gateway](gateways.md) may also be required if the service needs Websockets or cannot be used with 
     a base path.
 
 > If you're using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"},
@@ -358,7 +383,15 @@ Model meta-llama/Meta-Llama-3.1-8B-Instruct is published at:
 `dstack apply` automatically provisions instances, uploads the contents of the repo (incl. your local uncommitted changes),
 and runs the service.
 
-### Service endpoint
+### Retry policy
+
+By default, if `dstack` can't find capacity, the task exits with an error, or the instance is interrupted, 
+the run will fail.
+
+If you'd like `dstack` to automatically retry, configure the 
+[retry](../reference/dstack.yml/service.md#retry) property accordingly:
+
+## Access the endpoint
 
 If a [gateway](gateways.md) is not configured, the service’s endpoint will be accessible at
 `<dstack server URL>/proxy/services/<project name>/<run name>/`.
@@ -393,9 +426,8 @@ or via `dstack` UI.
     If the service defines the `model` property, the model will be available via the global OpenAI-compatible endpoint 
     at `https://gateway.<gateway domain>/`.
 
-[//]: # (By default, the service endpoint requires the `Authorization` header with `Bearer <dstack token>`.)
-[//]: # (Authorization can be disabled by setting [`auth`]&#40;../reference/dstack.yml/service.md#authorization&#41; to `false` in the)
-[//]: # (service configuration file.)
+If [authorization](#authorization) is not disabled, the service endpoint requires the `Authorization` header with
+`Bearer <dstack token>`.
 
 !!! info "What's next?"
     1. Read about [dev environments](dev-environments.md), [tasks](tasks.md), and [repos](repos.md)
