@@ -1,6 +1,6 @@
 # Gateways
 
-Gateways manage the ingress traffic of running [services](services.md)
+Gateways manage the ingress traffic of running [services](services.md),
 provide an HTTPS endpoint mapped to your domain,
 and handle auto-scaling.
 
