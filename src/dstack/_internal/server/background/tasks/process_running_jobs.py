@@ -656,6 +656,6 @@ def _get_runner_timeout_interval(backend_type: BackendType, instance_type_name: 
         return timedelta(seconds=1200)
     if backend_type == BackendType.OCI and instance_type_name.startswith("BM."):
         return timedelta(seconds=1200)
-    if backend_type == BackendType.VULTR:
-        return timedelta(seconds=1800)
+    if backend_type == BackendType.VULTR and instance_type_name.startswith("vbm"):
+        return timedelta(seconds=3300)
     return timedelta(seconds=600)

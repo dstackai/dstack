@@ -436,7 +436,6 @@ class VultrConfig(CoreModel):
         Optional[List[str]],
         Field(description="The list of Vultr regions. Omit to use all regions"),
     ] = None
-    project_id: Annotated[str, Field(description="The project ID")]
     creds: Annotated[AnyVultrCreds, Field(description="The credentials")]
 
 

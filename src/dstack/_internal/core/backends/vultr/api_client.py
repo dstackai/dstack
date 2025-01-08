@@ -1,10 +1,10 @@
 import base64
-from typing import Any, List
+from typing import Any
 
 import requests
 from requests import Response
 
-from dstack._internal.core.errors import BackendInvalidCredentialsError
+from dstack._internal.core.errors import BackendError, BackendInvalidCredentialsError
 
 API_URL = "https://api.vultr.com/v2"
 
@@ -28,13 +28,7 @@ class VultrApiClient:
             response = self._make_request("GET", f"/instances/{instance_id}")
             return response.json()["instance"]
 
-    def launch_instance(
-        self, region: str, plan: str, label: str, startup_script: str, public_keys: List[str]
-    ):
-        # Fetch or create startup script ID
-        script_id: str = self.get_startup_script_id(startup_script)
-        # Fetch or create SSH key IDs
-        sshkey_ids: List[str] = self.get_sshkey_id(public_keys)
+    def launch_instance(self, region: str, plan: str, label: str, user_data: str):
         # For Bare-metals
         if "vbm" in plan:
             # "Docker on Ubuntu 22.04" is required for bare-metals.
@@ -43,8 +37,7 @@ class VultrApiClient:
                 "plan": plan,
                 "label": label,
                 "image_id": "docker",
-                "script_id": script_id,
-                "sshkey_id": sshkey_ids,
+                "user_data": base64.b64encode(user_data.encode()).decode(),
             }
             resp = self._make_request("POST", "/bare-metals", data)
             return resp.json()["bare_metal"]["id"]
@@ -56,8 +49,7 @@ class VultrApiClient:
                 "plan": plan,
                 "label": label,
                 "os_id": 1743,
-                "script_id": script_id,
-                "sshkey_id": sshkey_ids,
+                "user_data": base64.b64encode(user_data.encode()).decode(),
             }
             resp = self._make_request("POST", "/instances", data)
             return resp.json()["instance"]["id"]
@@ -67,63 +59,10 @@ class VultrApiClient:
                 "plan": plan,
                 "label": label,
                 "image_id": "docker",
-                "script_id": script_id,
-                "sshkey_id": sshkey_ids,
+                "user_data": base64.b64encode(user_data.encode()).decode(),
             }
             resp = self._make_request("POST", "/instances", data)
             return resp.json()["instance"]["id"]
-
-    def get_startup_script_id(self, startup_script: str) -> str:
-        script_name = "dstack-shim-script"
-        encoded_script = base64.b64encode(startup_script.encode()).decode()
-
-        # Get the list of startup scripts
-        response = self._make_request("GET", "/startup-scripts")
-        scripts = response.json()["startup_scripts"]
-
-        # Find the script by name
-        existing_script = next((s for s in scripts if s["name"] == script_name), None)
-
-        if existing_script:
-            # Update the existing script
-            startup_id = existing_script["id"]
-            update_payload = {
-                "name": script_name,
-                "script": encoded_script,
-            }
-            self._make_request("PATCH", f"/startup-scripts/{startup_id}", update_payload)
-        else:
-            # Create a new script
-            create_payload = {
-                "name": script_name,
-                "type": "boot",
-                "script": encoded_script,
-            }
-            create_response = self._make_request("POST", "/startup-scripts", create_payload)
-            startup_id = create_response.json()["startup_script"]["id"]
-
-        return startup_id
-
-    def get_sshkey_id(self, ssh_ids: List[str]) -> List[str]:
-        # Fetch existing SSH keys
-        response = self._make_request("GET", "/ssh-keys")
-        ssh_keys = response.json()["ssh_keys"]
-
-        ssh_key_ids = []
-        existing_keys = {key["ssh_key"]: key["id"] for key in ssh_keys}
-
-        for ssh_key in ssh_ids:
-            if ssh_key in existing_keys:
-                # SSH key already exists, add its id to the list
-                ssh_key_ids.append(existing_keys[ssh_key])
-            else:
-                # Create new SSH key
-                create_payload = {"name": "dstack-ssh-key", "ssh_key": ssh_key}
-                create_response = self._make_request("POST", "/ssh-keys", create_payload)
-                new_ssh_key_id = create_response.json()["ssh_key"]["id"]
-                ssh_key_ids.append(new_ssh_key_id)
-
-        return ssh_key_ids
 
     def terminate_instance(self, instance_id: str, plan_type: str):
         if plan_type == "bare-metal":
@@ -151,4 +90,10 @@ class VultrApiClient:
                 requests.codes.unauthorized,
             ):
                 raise BackendInvalidCredentialsError(e.response.text)
+            if e.response is not None and e.response.status_code in (
+                requests.codes.bad_request,
+                requests.codes.internal_server_error,
+                requests.codes.not_found,
+            ):
+                raise BackendError(e.response.text)
             raise

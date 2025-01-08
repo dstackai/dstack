@@ -24,16 +24,7 @@ from dstack._internal.server.services.backends.configurators.base import (
     raise_invalid_credentials_error,
 )
 
-REGIONS = [
-    "no-luster-1",
-    "se-smedjebacken-1",
-    "gb-london-1",
-    "se-stockholm-1",
-    "us-newyork-1",
-    "us-santaclara-1",
-]
-
-DEFAULT_REGION = "no-luster-1"
+REGIONS = []
 
 
 class VultrConfigurator(Configurator):
@@ -44,9 +35,7 @@ class VultrConfigurator(Configurator):
         if config.creds is None:
             return config_values
         self._validate_vultr_api_key(config.creds.api_key)
-        config_values.regions = self._get_regions_element(
-            selected=config.regions or [DEFAULT_REGION]
-        )
+        config_values.regions = self._get_regions_element(selected=config.regions or [])
         return config_values
 
     def create_backend(

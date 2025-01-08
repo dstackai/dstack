@@ -1,4 +1,5 @@
 import json
+import re
 from typing import List, Optional
 
 import requests
@@ -6,7 +7,7 @@ import requests
 from dstack._internal.core.backends.base import Compute
 from dstack._internal.core.backends.base.compute import (
     get_instance_name,
-    get_shim_commands,
+    get_user_data,
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.vultr.api_client import VultrApiClient
@@ -16,6 +17,7 @@ from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceConfiguration,
+    InstanceOffer,
     InstanceOfferWithAvailability,
     SSHKey,
 )
@@ -37,6 +39,8 @@ class VultrCompute(Compute):
         offers = get_catalog_offers(
             backend=BackendType.VULTR,
             requirements=requirements,
+            locations=self.config.regions or None,
+            extra_filter=_supported_instances,
         )
         offers = [
             InstanceOfferWithAvailability(
@@ -66,19 +70,12 @@ class VultrCompute(Compute):
     def create_instance(
         self, instance_offer: InstanceOfferWithAvailability, instance_config: InstanceConfiguration
     ) -> JobProvisioningData:
-        public_keys = instance_config.get_public_keys()
-        commands = get_shim_commands(authorized_keys=public_keys)
-        shim_commands = "#!/bin/sh\n" + " ".join([" && ".join(commands)])
-        try:
-            instance_id = self.api_client.launch_instance(
-                region=instance_offer.region,
-                label=instance_config.instance_name,
-                plan=instance_offer.instance.name,
-                startup_script=shim_commands,
-                public_keys=public_keys,
-            )
-        except KeyError as e:
-            raise BackendError(e)
+        instance_id = self.api_client.launch_instance(
+            region=instance_offer.region,
+            label=instance_config.instance_name,
+            plan=instance_offer.instance.name,
+            user_data=get_user_data(authorized_keys=instance_config.get_public_keys()),
+        )
 
         launched_instance = JobProvisioningData(
             backend=instance_offer.backend,
@@ -126,3 +123,29 @@ class VultrCompute(Compute):
             provisioning_data.hostname = instance_main_ip
         if instance_status == "failed":
             raise ProvisioningError("VM entered FAILED state")
+
+
+def _supported_instances(offer: InstanceOffer) -> bool:
+    if offer.instance.resources.spot:
+        return False
+    for family in [
+        # Bare Metal - GPU
+        r"vbm-\d+c-\d+gb-\d+-(a100|h100|l40|mi300x)-gpu",
+        # Bare Metal - AMD CPU
+        r"vbm-\d+c-\d+gb-amd",
+        # Bare Metal - Intel CPU
+        r"vbm-\d+c-\d+gb(-v\d+)?",
+        # Cloud GPU
+        r"vcg-(a16|a40|l40s|a100)-\d+c-\d+g-\d+vram",
+        # Cloud Compute - Regular Performance
+        r"vc2-\d+c-\d+gb(-sc1)?",
+        # Cloud Compute - High Frequency
+        r"vhf-\d+c-\d+gb(-sc1)?",
+        # Cloud Compute - High Performance
+        r"vhp-\d+c-\d+gb-(intel|amd)(-sc1)?",
+        # Optimized Cloud Compute
+        r"voc-[cgms]-\d+c-\d+gb-\d+s-amd(-sc1)?",
+    ]:
+        if re.fullmatch(family, offer.instance.name):
+            return True
+    return False

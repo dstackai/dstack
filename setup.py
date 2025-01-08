@@ -48,7 +48,7 @@ BASE_DEPS = [
     "python-multipart>=0.0.16",
     "filelock",
     "psutil",
-    "gpuhunt>=0.0.17,<0.1.0",
+    "gpuhunt>=0.0.18,<0.1.0",
 ]
 
 GATEWAY_AND_SERVER_COMMON_DEPS = [
