@@ -306,7 +306,7 @@ resources:
 ### Spot policy
 
 By default, `dstack` uses on-demand instances. However, you can change that
-via the [`spot_policy`](../reference/dstack.yml/task.md#spot_policy) property. It accepts `spot`, `on-demand`, and `auto`.
+via the [`spot_policy`](../reference/dstack.yml/service.md#spot_policy) property. It accepts `spot`, `on-demand`, and `auto`.
 
 !!! info "Reference"
     Services support many more configuration options,
