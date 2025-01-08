@@ -1,5 +1,4 @@
 import json
-import time
 from typing import List, Optional
 
 import requests
@@ -70,7 +69,6 @@ class VultrCompute(Compute):
         public_keys = instance_config.get_public_keys()
         commands = get_shim_commands(authorized_keys=public_keys)
         shim_commands = "#!/bin/sh\n" + " ".join([" && ".join(commands)])
-        plan_type = "bare-metal" if "vbm" in instance_offer.instance.name else "vm_instance"
         try:
             instance_id = self.api_client.launch_instance(
                 region=instance_offer.region,
@@ -79,30 +77,8 @@ class VultrCompute(Compute):
                 startup_script=shim_commands,
                 public_keys=public_keys,
             )
-        except Exception:
-            raise
-        # Create VPC
-        # Vultr provides "enable_vpc" option during instance creation,
-        # but if instance creation fails due to no-capacity, the created VPC does not
-        # terminate automatically.
-        vpc_id = self.api_client.get_vpc_for_region(instance_offer.region)
-        if not vpc_id:
-            vpc_id = self.api_client.create_vpc(instance_offer.region)
-
-        while not self.api_client.get_vpc_id(instance_id, plan_type) and vpc_id is not None:
-            time.sleep(1)
-            # Vultr's limitation is that we cannot attach VPC without multiple attempts.
-            logger.info("Attempting to attach instance to VPC")
-            try:
-                self.api_client.attach_vpc(vpc_id, instance_id, plan_type)
-            except BackendError as e:
-                if "plan does not support private networking" in str(e):
-                    logger.warning("Plan does not support private networking.")
-                    # delete created vpc
-                    self.api_client.delete_vpc(vpc_id=vpc_id)
-                    vpc_id = None
-                else:
-                    raise
+        except KeyError as e:
+            raise BackendError(e)
 
         launched_instance = JobProvisioningData(
             backend=instance_offer.backend,
@@ -118,8 +94,9 @@ class VultrCompute(Compute):
             dockerized=True,
             backend_data=json.dumps(
                 {
-                    "plan_type": plan_type,
-                    "vpc_id": vpc_id,
+                    "plan_type": "bare-metal"
+                    if "vbm" in instance_offer.instance.name
+                    else "vm_instance"
                 }
             ),
         )
@@ -129,18 +106,8 @@ class VultrCompute(Compute):
         self, instance_id: str, region: str, backend_data: Optional[str] = None
     ) -> None:
         plan_type = json.loads(backend_data)["plan_type"]
-        vpc_id = json.loads(backend_data)["vpc_id"]
         try:
             self.api_client.terminate_instance(instance_id=instance_id, plan_type=plan_type)
-            if vpc_id:
-                while self.api_client.get_vpc_id(instance_id=instance_id, plan_type=plan_type):
-                    time.sleep(1)
-                    # Vultr provides /vpcs/detach endpoint, but is not reliable.
-                    # The reliable solution is to terminate the instance and wait
-                    # till the VPC gets released. Once the VPC gets released, delete the VPC.
-                    logger.info("Waiting to release VPC")
-                # VPC cannot be deleted without being released by the instance.
-                self.api_client.delete_vpc(vpc_id=vpc_id)
         except requests.HTTPError as e:
             raise BackendError(e.response.text)
 

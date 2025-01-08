@@ -1,13 +1,10 @@
 import base64
-from typing import Any, List, Optional
+from typing import Any, List
 
 import requests
 from requests import Response
 
-from dstack._internal.core.errors import BackendError, BackendInvalidCredentialsError
-from dstack._internal.utils.logging import get_logger
-
-logger = get_logger(__name__)
+from dstack._internal.core.errors import BackendInvalidCredentialsError
 
 API_URL = "https://api.vultr.com/v2"
 
@@ -30,75 +27,6 @@ class VultrApiClient:
         else:
             response = self._make_request("GET", f"/instances/{instance_id}")
             return response.json()["instance"]
-
-    def get_vpc_for_region(self, region: str) -> Optional[str]:
-        response = self._make_request("GET", "/vpcs?per_page=500")
-        vpcs = response.json().get("vpcs", [])
-        if vpcs:
-            for vpc in vpcs:
-                if vpc["region"] == region:
-                    return vpc["id"]
-        return None
-
-    def create_vpc(self, region: str):
-        data = {"region": region, "description": f"dstack-vpc-{region}"}
-        response = self._make_request("POST", "/vpcs", data=data)
-        return response.json()["vpc"]["id"]
-
-    def attach_vpc(self, vpc_id: str, instance_id: str, plan_type: str):
-        data = {"vpc_id": vpc_id}
-        try:
-            if plan_type == "bare-metal":
-                self._make_request("POST", f"/bare-metals/{instance_id}/vpcs/attach", data=data)
-            else:
-                self._make_request("POST", f"/instances/{instance_id}/vpcs/attach", data=data)
-        except BackendError as e:
-            # Sometimes instance is unable to attach VPC and throws 500 error.
-            if "Unable to attach VPC" in str(e):
-                logger.info("Unable to attach VPC")
-            else:
-                raise
-
-    def get_vpc_id(self, instance_id: str, plan_type: str) -> Optional[str]:
-        try:
-            if plan_type == "bare-metal":
-                response = self._make_request("GET", f"/bare-metals/{instance_id}/vpcs")
-            else:
-                response = self._make_request("GET", f"/instances/{instance_id}/vpcs")
-
-            vpcs = response.json().get("vpcs", [])
-            if vpcs:
-                return vpcs[0].get("id")
-            return None
-        except BackendError as e:
-            # The above endpoints throws 404, when instance is not available.
-            # Propagating this error blocks the execution, therefore need to handle here.
-            if "Invalid instance-id" in str(e):
-                logger.info(f"Instance {instance_id} not found.")
-                return None
-            else:
-                raise
-
-    def get_vpc(self, vpc_id: str) -> dict:
-        response = self._make_request("GET", f"/vpcs/{vpc_id}")
-        return response.json()["vpc"]
-
-    def detach_vpc_from_instance(self, instance_id: str, vpc_id: str, plan_type: str):
-        data = {"vpc_id": vpc_id}
-        if plan_type == "bare-metal":
-            self._make_request("POST", f"/bare-metals/{instance_id}/vpcs/detach", data)
-        else:
-            self._make_request("POST", f"/instances/{instance_id}/vpcs/detach", data)
-
-    def delete_vpc(self, vpc_id: str):
-        try:
-            self._make_request("DELETE", f"/vpcs/{vpc_id}")
-        except BackendError as e:
-            if "The following servers are attached to this VPC network" in str(e):
-                logger.info(f"Instance is connected to VPC {vpc_id}. Unable to delete VPC.")
-                return None
-            else:
-                raise
 
     def launch_instance(
         self, region: str, plan: str, label: str, startup_script: str, public_keys: List[str]
@@ -204,8 +132,7 @@ class VultrApiClient:
         else:
             # Terminate virtual machine instance
             endpoint = f"/instances/{instance_id}"
-        response = self._make_request("DELETE", endpoint)
-        return response.status_code
+        self._make_request("DELETE", endpoint)
 
     def _make_request(self, method: str, path: str, data: Any = None) -> Response:
         try:
@@ -224,10 +151,4 @@ class VultrApiClient:
                 requests.codes.unauthorized,
             ):
                 raise BackendInvalidCredentialsError(e.response.text)
-            if e.response is not None and e.response.status_code in (
-                requests.codes.bad_request,
-                requests.codes.internal_server_error,
-                requests.codes.not_found,
-            ):
-                raise BackendError(e.response.text)
             raise
