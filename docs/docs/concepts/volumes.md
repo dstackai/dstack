@@ -74,7 +74,7 @@ To create or register the volume, pass the volume configuration to `dstack apply
 $ dstack apply -f volume.dstack.yml
 Volume my-volume does not exist yet. Create the volume? [y/n]: y
 
- NAME           BACKEND  REGION        STATUS     CREATED 
+ NAME       BACKEND  REGION        STATUS     CREATED 
  my-volume  aws      eu-central-1  submitted  now     
 
 ```
