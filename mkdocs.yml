@@ -109,9 +109,10 @@ plugins:
         'changelog/0.16.1.md': 'https://github.com/dstackai/dstack/releases/0.16.1'
         'changelog/0.17.0.md': 'https://github.com/dstackai/dstack/releases/0.17.0'
         'changelog/0.18.0.md': 'https://github.com/dstackai/dstack/releases/0.18.0'
-        'docs/concepts/dev-environments.md': 'docs/dev-environments.md'
-        'docs/concepts/tasks.md': 'docs/tasks.md'
-        'docs/concepts/services.md': 'docs/services.md'
+        'docs/concepts/projects.md': 'docs/guides/administration.md'
+        'docs/dev-environments.md': 'docs/concepts/dev-environments.md'
+        'docs/tasks.md': 'docs/concepts/tasks.md'
+        'docs/services.md': 'docs/concepts/services.md'
         'docs/fleets.md': 'docs/concepts/fleets.md'
         'docs/examples/index.md': 'examples.md'
         'docs/examples/llms/llama31.md': 'examples/llms/llama31/index.md'
@@ -156,6 +157,8 @@ markdown_extensions:
   - pymdownx.highlight
   - pymdownx.details
   - pymdownx.superfences
+  - pymdownx.snippets:
+      base_path: ["docs"]
   - pymdownx.tabbed:
       alternate_style: true
       slugify: !!python/object/apply:pymdownx.slugs.slugify
@@ -164,7 +167,7 @@ markdown_extensions:
   - pymdownx.tasklist:
       custom_checkbox: true
   - toc:
-      toc_depth: 3
+      toc_depth: 5
       permalink: true
   - attr_list
   - md_in_html
@@ -208,18 +211,19 @@ nav:
           - Installation: docs/installation/index.md
           - Quickstart: docs/quickstart.md
       - Concepts:
-          - Dev environments: docs/dev-environments.md
-          - Tasks: docs/tasks.md
-          - Services: docs/services.md
-          - Repos: docs/concepts/repos.md
+          - Backends: docs/concepts/backends.md
+          - Dev environments: docs/concepts/dev-environments.md
+          - Tasks: docs/concepts/tasks.md
+          - Services: docs/concepts/services.md
           - Fleets: docs/concepts/fleets.md
           - Volumes: docs/concepts/volumes.md
           - Gateways: docs/concepts/gateways.md
-          - Projects: docs/concepts/projects.md
+          - Repos: docs/concepts/repos.md
       - Guides:
           - Protips: docs/guides/protips.md
           - Server deployment: docs/guides/server-deployment.md
           - Troubleshooting: docs/guides/troubleshooting.md
+          - Administration: docs/guides/administration.md
   - Reference:
       - .dstack.yml:
           - dev-environment: docs/reference/dstack.yml/dev-environment.md

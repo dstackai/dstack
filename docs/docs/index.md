@@ -21,9 +21,9 @@ for AI workloads both in the cloud and on-prem, speeding up the development, tra
 
 `dstack` supports the following configurations:
    
-* [Dev environments](dev-environments.md) &mdash; for interactive development using a desktop IDE
-* [Tasks](tasks.md) &mdash; for scheduling jobs, incl. distributed ones (or running web apps)
-* [Services](services.md) &mdash; for deploying models (or web apps)
+* [Dev environments](concepts/dev-environments.md) &mdash; for interactive development using a desktop IDE
+* [Tasks](concepts/tasks.md) &mdash; for scheduling jobs, incl. distributed ones (or running web apps)
+* [Services](concepts/services.md) &mdash; for deploying models (or web apps)
 * [Fleets](concepts/fleets.md) &mdash; for managing cloud and on-prem clusters
 * [Volumes](concepts/volumes.md) &mdash; for managing network volumes (to persist data)
 * [Gateways](concepts/gateways.md) &mdash; for publishing services with a custom domain and HTTPS
@@ -48,28 +48,16 @@ cloud platforms or on-premise servers.
 
 ## How does it compare to other tools?
 
-??? info "Kubernetes"
-    #### How does dstack compare to Kubernetes? 
-    
-    `dstack` and Kubernetes are both container orchestrators for cloud and on-premises environments.
-
-    However, `dstack` is more lightweight, and is designed specifically for AI, enabling AI engineers to handle development, training, and 
+??? info "How does dstack compare to Kubernetes?"
+    `dstack` is more lightweight, and is designed specifically for AI, enabling AI engineers to handle development, training, and 
     deployment without needing extra tools or Ops support. 
 
     With `dstack`, you don't need Kubeflow or other ML platforms on top—everything is available out of the box.
 
-    Additionally, `dstack` is much easier to use for on-premises servers—just provide hostnames and SSH credentials, 
+    Additionally, `dstack` is much easier to use with on-prem servers—just provide hostnames and SSH credentials, 
     and `dstack` will automatically create a fleet ready for use with development environments, tasks, and services.
 
-    #### How does dstack compare to KubeFlow? 
-    `dstack` can be used entirely instead of Kubeflow. It covers everything that Kubeflow does, and much more on top, 
-    including development environments, services, and additional features.
-
-    `dstack` is easier to set up with on-premises servers, doesn't require Kubernetes, and works with multiple cloud 
-    providers out of the box.
-
-    #### Can dstack and Kubernetes be used together?
-
+??? info "Can dstack and Kubernetes be used together?"
     For AI development, it’s more efficient to use `dstack` directly with your cloud accounts or on-prem servers&mdash;without Kubernetes.
 
     However, if you prefer, you can set up the `dstack` server with a Kubernetes backend to provision through Kubernetes.
@@ -77,17 +65,22 @@ cloud platforms or on-premise servers.
     Does your Ops team insist on using Kubernetes for production-grade deployment? You can use `dstack` and
     Kubernetes side by side; `dstack` for development and Kubernetes for production-grade deployment.
 
-??? info "Slurm"
-    #### How does dstack compare to Slurm?
+??? info "How does dstack compare to KubeFlow?" 
+    `dstack` can be used entirely instead of Kubeflow. It covers everything that Kubeflow does, and much more on top, 
+    including development environments, services, and additional features.
+
+    `dstack` is easier to set up with on-premises servers, doesn't require Kubernetes, and works with multiple cloud 
+    providers out of the box.
+
+??? info "How does dstack compare to Slurm?"
     `dstack` can be used entirely instead of Slurm. It covers everything that Slurm does, and a lot more on top, including
     dev environments, services, out-of-the-box cloud support, easier setup with on-premises servers, and much more.
 
 [//]: # (??? info "Cloud platforms")
 [//]: # (    TBA)
 
-## Where do I start?
-
-1. Proceed to [installation](installation/index.md)
-2. See [quickstart](quickstart.md)
-3. Browse [examples](/examples)
-4. Join [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd){:target="_blank"}
+!!! info "Where do I start?"
+    1. Proceed to [installation](installation/index.md)
+    2. See [quickstart](quickstart.md)
+    3. Browse [examples](/examples)
+    4. Join [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd){:target="_blank"}

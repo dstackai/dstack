@@ -21,8 +21,6 @@ $ dstack init
 
     A dev environment lets you provision an instance and access it with your desktop IDE.
 
-    #### Define a configuration
-
     Create the following configuration file inside the repo:
 
     <div editor-title=".dstack.yml"> 
@@ -43,8 +41,6 @@ $ dstack init
     ```
 
     </div>
-
-    #### Run the configuration
 
     Run the configuration via [`dstack apply`](reference/cli/dstack/apply.md):
 
@@ -77,8 +73,6 @@ $ dstack init
 
     A task allows you to schedule a job or run a web app. Tasks can be distributed and can forward ports.
 
-    #### Define a configuration
-
     Create the following configuration file inside the repo:
 
     <div editor-title="task.dstack.yml"> 
@@ -110,8 +104,6 @@ $ dstack init
     [`nodes`](reference/dstack.yml/task.md#distributed-tasks), 
     and `dstack` will run it on a cluster.
 
-    #### Run the configuration
-
     Run the configuration via [`dstack apply`](reference/cli/dstack/apply.md):
 
     <div class="termy">
@@ -141,8 +133,6 @@ $ dstack init
 === "Service"
 
     A service allows you to deploy a model or any web app as an endpoint.
-
-    #### Define a configuration
 
     Create the following configuration file inside the repo:
 
@@ -174,8 +164,6 @@ $ dstack init
     ```
 
     </div>
-
-    #### Run the configuration
 
     Run the configuration via [`dstack apply`](reference/cli/dstack/apply.md):
 
@@ -216,9 +204,7 @@ and runs the configuration.
 
 Something not working? See the [troubleshooting](guides/troubleshooting.md) guide.
 
-## What's next?
-
-1. Read about [dev environments](dev-environments.md), [tasks](tasks.md), [services](services.md),
-   and [repos](concepts/repos.md)
-2. Join [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd)
-3. Browse [examples](https://dstack.ai/examples)
+!!! info "What's next?"
+    1. Read about [backends](concepts/backends.md),  [dev environments](concepts/dev-environments.md), [tasks](concepts/tasks.md), and [services](concepts/services.md)
+    2. Join [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd)
+    3. Browse [examples](https://dstack.ai/examples)

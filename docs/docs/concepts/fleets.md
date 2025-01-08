@@ -1,189 +1,188 @@
 # Fleets
 
-Fleets are groups of cloud instances or SSH machines that you use to run dev environments, tasks, and services.
+Fleets are groups of instances used to run dev environments, tasks, and services.
+Depending on the fleet configuration, instances can be interconnected clusters or standalone instances.
 
-By default, when you run `dstack apply` to start a new dev environment, task, or service,
-`dstack` reuses `idle` instances from an existing fleet.
-If no `idle` instances match the requirements, `dstack` automatically creates a new fleet 
-using configured backends.
+`dstack` supports two kinds of fleets: 
 
-If you need more control over instance configuration and lifecycle, or if you want to use on-prem servers,
-`dstack` also offers you a way to create and manage fleets directly.
+* [Cloud fleets](#cloud) – dynamically provisioned through configured backends
+* [SSH fleets](#ssh) – created using on-prem servers
 
-## Define a configuration
+## Cloud fleets { #cloud }
 
-To create a fleet, define its configuration as a YAML file in your project folder.
-The filename must end with `.dstack.yml` (e.g. `.dstack.yml` or `fleet.dstack.yml` are both acceptable).
+When you call `dstack apply` to run a dev environment, task, or service, `dstack` reuses `idle` instances 
+from an existing fleet. If none match the requirements, `dstack` creates a new cloud fleet.
 
-=== "Cloud fleets"
+For greater control over cloud fleet provisioning, create fleets explicitly using configuration files. 
 
-    !!! info "What is a cloud fleet?"
-        By default, when running dev environments, tasks, and services, `dstack` 
-        reuses `idle` instances from existing fleets or creates a new cloud fleet on the fly.
-        
-        If you want more control over the lifecycle of cloud instances, you can create a cloud fleet manually. 
-        This allows you to reuse a fleet over a longer period and across multiple runs. You can also delete the fleet only when needed.
+### Define a configuration
 
-    To create a cloud fleet, specify `resources`, `nodes`, 
-    and other optional parameters.
-    
-    <div editor-title="examples/misc/fleets/distrib.dstack.yml">
+Define a fleet configuration as a YAML file in your project directory. The file must have a
+`.dstack.yml` extension (e.g. `.dstack.yml` or `fleet.dstack.yml`).
+
+<div editor-title="examples/misc/fleets/.dstack.yml">
     
     ```yaml
     type: fleet
     # The name is optional, if not specified, generated randomly
-    name: fleet-distrib
+    name: my-fleet
     
-    # Number of instances
+    # Specify the number of instances
     nodes: 2
-    # Ensure instances are inter-connected
-    placement: cluster
+    # Uncomment to ensure instances are inter-connected
+    #placement: cluster
     
-    # Terminate if idle for 3 days
-    idle_duration: 3d 
-
     resources:
-      gpu:
-        # 24GB or more vRAM
-        memory: 24GB..
-        # Two or more GPUs
-        count: 2..
+      gpu: 24GB
     ```
     
-    </div>
+</div>
+
+#### Placement
+
+To ensure instances are interconnected (e.g., for
+[distributed tasks](tasks.md#distributed-tasks)), set `placement` to `cluster`. 
+This ensures all instances are provisioned in the same backend and region with optimal inter-node connectivity
+
+??? info "AWS"
+    `dstack` automatically enables [Elastic Fabric Adapter :material-arrow-top-right-thin:{ .external }](https://aws.amazon.com/hpc/efa/){:target="_blank"}
+    for the instance types that support it:
+    `p5.48xlarge`, `p4d.24xlarge`, `g4dn.12xlarge`, `g4dn.16xlarge`, `g4dn.8xlarge`, `g4dn.metal`,
+    `g5.12xlarge`, `g5.16xlarge`, `g5.24xlarge`, `g5.48xlarge`, `g5.8xlarge`, `g6.12xlarge`,
+    `g6.16xlarge`, `g6.24xlarge`, `g6.48xlarge`, `g6.8xlarge`, and `gr6.8xlarge`.
+
+    Currently, only one EFA interface is enabled per instance, regardless of its maximum capacity.
+    This will change once [this issue :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/1804){:target="_blank"} is resolved.
+
+> The `cluster` placement is supported only for `aws`, `azure`, `gcp`, and `oci`
+> backends.
+
+#### Resources
+
+When you specify a resource value like `cpu` or `memory`,
+you can either use an exact value (e.g. `24GB`) or a 
+range (e.g. `24GB..`, or `24GB..80GB`, or `..80GB`).
+
+<div editor-title=".dstack.yml"> 
+
+```yaml
+type: fleet
+# The name is optional, if not specified, generated randomly
+name: my-fleet
+
+nodes: 2
+
+resources:
+  # 200GB or more RAM
+  memory: 200GB..
+  # 4 GPUs from 40GB to 80GB
+  gpu: 40GB..80GB:4
+  # Disk size
+  disk: 500GB
+```
+
+</div>
+
+The `gpu` property allows specifying not only memory size but also GPU vendor, names
+and their quantity. Examples: `nvidia` (one NVIDIA GPU), `A100` (one A100), `A10G,A100` (either A10G or A100),
+`A100:80GB` (one A100 of 80GB), `A100:2` (two A100), `24GB..40GB:2` (two GPUs between 24GB and 40GB),
+`A100:40GB:2` (two A100 GPUs of 40GB).
+
+??? info "Google Cloud TPU"
+    To use TPUs, specify its architecture via the `gpu` property.
+
+    ```yaml
+    type: dev-environment
+    # The name is optional, if not specified, generated randomly
+    name: vscode    
     
-    When you apply this configuration, `dstack` will create cloud instances using the configured backends according 
-    to the specified parameters.
+    ide: vscode
+    
+    resources:
+      gpu: v2-8
+    ```
 
-    !!! info "Cluster placement"
-        To ensure the nodes of the fleet are interconnected (e.g., if you'd like to use them for
-        [multi-node tasks](../reference/dstack.yml/task.md#distributed-tasks)), 
-        set `placement` to `cluster`. 
-        
-        In this case, `dstack` will provision all nodes in the same backend and region and configure optimal 
-        inter-node connectivity.
+    Currently, only 8 TPU cores can be specified, supporting single TPU device workloads. Multi-TPU support is coming soon.
 
-        !!! info "Backends"
-            The `cluster` value of the `placement` property is supported only by the `aws`, `azure`, `gcp`, and `oci`
-            backends.
+#### Idle duration
 
-        ??? info "AWS"
-            `dstack` automatically enables [Elastic Fabric Adapter :material-arrow-top-right-thin:{ .external }](https://aws.amazon.com/hpc/efa/){:target="_blank"}
-            for instance types that support it. The following instance types with EFA are supported:
-            `p5.48xlarge`, `p4d.24xlarge`, `g4dn.12xlarge`, `g4dn.16xlarge`, `g4dn.8xlarge`, `g4dn.metal`,
-            `g5.12xlarge`, `g5.16xlarge`, `g5.24xlarge`, `g5.48xlarge`, `g5.8xlarge`, `g6.12xlarge`,
-            `g6.16xlarge`, `g6.24xlarge`, `g6.48xlarge`, `g6.8xlarge`, `gr6.8xlarge`
+By default, fleet instances remain active until the fleet is explicitly deleted via `dstack fleet delete`.
 
-            Currently, only one EFA interface is enabled regardless of the maximum number of interfaces supported by the instance type.
-            This limitation will be lifted once [this issue :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/1804){:target="_blank"} is fixed.
+To automatically terminate `idle` instances after a certain period, configure `idle_duration`.
 
-    !!! info "Backends"
-        Cloud fleets are supported for all backends except `kubernetes`, `vastai`, and `runpod`.
-
-=== "SSH fleets"
-
-    !!! info "What is an SSH fleet?"
-        If you’d like to run dev environments, tasks, and services on arbitrary on-prem servers via `dstack`, you can 
-        create an SSH fleet.
-
-    To create an SSH fleet, specify `ssh_config` to allow the `dstack` server to connect to these servers
-    via SSH.
-
-    <div editor-title="examples/misc/fleets/distrib-ssh.dstack.yml"> 
+<div editor-title="examples/misc/fleets/.dstack.yml">
     
     ```yaml
     type: fleet
     # The name is optional, if not specified, generated randomly
-    name: fleet-distrib-ssh
+    name: my-fleet
+    
+    nodes: 2
 
-    # Ensure instances are inter-connected
-    placement: cluster
-
-    # The user, private SSH key, and hostnames of the on-prem servers
-    ssh_config:
-      user: ubuntu
-      identity_file: ~/.ssh/id_rsa
-      hosts:
-        - 3.255.177.51
-        - 3.255.177.52
+    # Terminate instances idle for more than 1 hour
+    idle_duration: 1h
+    
+    resources:
+      gpu: 24GB
     ```
     
-    </div>
+</div>
 
-    When you apply this configuration, `dstack` will connect to the specified hosts using the provided SSH credentials, 
-    install the dependencies, and configure these servers as a fleet.
+#### Spot policy
 
-    !!! info "Requirements" 
-        Hosts should be pre-installed with Docker.
+By default, `dstack` uses on-demand instances. However, you can change that
+via the [`spot_policy`](../reference/dstack.yml/dev-environment.md#spot_policy) property. It accepts `spot`, `on-demand`, and `auto`.
 
-        === "NVIDIA"
-            Systems with NVIDIA GPUs should also be pre-installed with CUDA 12.1 and
-            [NVIDIA Container Toolkit :material-arrow-top-right-thin:{ .external }](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html).
+#### Retry policy
 
-        === "AMD"
-            Systems with AMD GPUs should also be pre-installed with AMDGPU-DKMS kernel driver (e.g. via
-            [native package manager :material-arrow-top-right-thin:{ .external }](https://rocm.docs.amd.com/projects/install-on-linux/en/latest/install/native-install/index.html)
-            or [AMDGPU installer :material-arrow-top-right-thin:{ .external }](https://rocm.docs.amd.com/projects/install-on-linux/en/latest/install/amdgpu-install.html).)
+By default, if `dstack` fails to provision an instance or an instance is interrupted, no retry is attempted.
 
-        The user should have passwordless `sudo` access.
+If you'd like `dstack` to do it, configure the 
+[retry](../reference/dstack.yml/dev-environment.md#retry) property accordingly:
 
-    ??? info "Environment variables"
-        For SSH fleets, it's possible to pre-configure environment variables. 
-        These variables will be used when installing the `dstack-shim` service on hosts 
-        and running containers.
+<div editor-title=".dstack.yml">
 
-        For example, these variables can be used to configure a proxy:
+```yaml
+type: fleet
+# The name is optional, if not specified, generated randomly
+name: my-fleet
 
-        ```yaml
-        type: fleet
-        name: my-fleet
-        
-        placement: cluster
-        
-        env:
-          - HTTP_PROXY=http://proxy.example.com:80
-          - HTTPS_PROXY=http://proxy.example.com:80
-          - NO_PROXY=localhost,127.0.0.1
-        
-        ssh_config:
-          user: ubuntu
-          identity_file: ~/.ssh/id_rsa
-          hosts:
-            - 3.255.177.51
-            - 3.255.177.52
-        ```
+nodes: 1
 
-    !!! info "Cluster placement"
-        Set `placement` to `cluster` if the hosts are interconnected
-        (e.g. if you'd like to use them for [multi-node tasks](../reference/dstack.yml/task.md#distributed-tasks)).
-        
-        !!! info "Network"
-            By default, `dstack` automatically detects the private network for the specified hosts. 
-            However, it's possible to configure it explicitelly via 
-            the [`network`](../reference/dstack.yml/fleet.md#network) property.
+resources:
+  gpu: 24GB
 
-    !!! info "Backends"
-        To use SSH fleets, you don't need to configure any backends at all.
+retry:
+  # Retry on specific events
+  on_events: [no-capacity, interruption]
+  # Retry for up to 1 hour
+  duration: 1h
+```
+
+</div>
+
+> Cloud fleets are supported by all backends except `kubernetes`, `vastai`, and `runpod`.
 
 !!! info "Reference"
-    See [`.dstack.yml`](../reference/dstack.yml/fleet.md) for all the options supported by
-    the fleet configuration.
+    Cloud fleets support many more configuration options,
+    incl. [`backends`](../reference/dstack.yml/fleet.md#backends), 
+    [`regions`](../reference/dstack.yml/fleet.md#regions), 
+    [`max_price`](../reference/dstack.yml/fleet.md#max_price), and
+    among [others](../reference/dstack.yml/fleet.md).
 
-## Create or update a fleet
+### Create or update a fleet
 
 To create or update the fleet, pass the fleet configuration to [`dstack apply`](../reference/cli/dstack/apply.md):
 
 <div class="termy">
 
 ```shell
-$ dstack apply -f examples/misc/fleets/distrib.dstack.yml
+$ dstack apply -f examples/misc/fleets/.dstack.yml
 ```
 
 </div>
 
-### Ensure the fleet is created
-
-To ensure the fleet is created, use the `dstack fleet` command:
+To ensure the fleet is created, you can use the `dstack fleet` command:
 
 <div class="termy">
 
@@ -199,24 +198,129 @@ $ dstack fleet
 
 Once the status of instances changes to `idle`, they can be used by dev environments, tasks, and services.
 
-!!! info "Idle duration"
-    If you want a fleet to be automatically deleted after a certain idle time,
-    you can set the [`idle_duration`](../reference/dstack.yml/fleet.md#idle_duration) property.
-    By default, it's set to `3d`.
+## SSH fleets { #ssh }
 
-[//]: # (Add Idle time example to the reference page)
+If you have a group of on-prem servers accessible via SSH, you can create an SSH fleet.
 
-### Troubleshooting SSH fleets
+### Define a configuration
+
+Define a fleet configuration as a YAML file in your project directory. The file must have a
+`.dstack.yml` extension (e.g. `.dstack.yml` or `fleet.dstack.yml`).
+
+<div editor-title="examples/misc/fleets/.dstack.yml"> 
+    
+    ```yaml
+    type: fleet
+    # The name is optional, if not specified, generated randomly
+    name: my-fleet
+
+    # Uncomment if instances are interconnected
+    #placement: cluster
+
+    # SSH credentials for the on-prem servers
+    ssh_config:
+      user: ubuntu
+      identity_file: ~/.ssh/id_rsa
+      hosts:
+        - 3.255.177.51
+        - 3.255.177.52
+    ```
+    
+</div>
+
+??? info "Requirements" 
+    1.&nbsp;Hosts should be pre-installed with Docker.
+
+    === "NVIDIA"
+        2.&nbsp;Hosts with NVIDIA GPUs should also be pre-installed with CUDA 12.1 and
+        [NVIDIA Container Toolkit :material-arrow-top-right-thin:{ .external }](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html).
+
+    === "AMD"
+        2.&nbsp;Hosts with AMD GPUs should also be pre-installed with AMDGPU-DKMS kernel driver (e.g. via
+        [native package manager :material-arrow-top-right-thin:{ .external }](https://rocm.docs.amd.com/projects/install-on-linux/en/latest/install/native-install/index.html)
+        or [AMDGPU installer :material-arrow-top-right-thin:{ .external }](https://rocm.docs.amd.com/projects/install-on-linux/en/latest/install/amdgpu-install.html).)
+
+    3.&nbsp;The user specified should have passwordless `sudo` access.
+
+#### Placement
+
+If the hosts are interconnected (i.e. share the same network), set `placement` to `cluster`. 
+This is required if you'd like to use the fleet for [distributed tasks](tasks.md#distributed-tasks).
+
+##### Network
+    
+By default, `dstack` automatically detects the network shared by the hosts. 
+However, it's possible to configure it explicitly via 
+the [`network`](../reference/dstack.yml/fleet.md#network) property.
+
+[//]: # (TODO: Provide an example and more detail)
+
+#### Environment variables
+
+If needed, you can specify environment variables that will be used by `dstack-shim` and passed to containers.
+
+[//]: # (TODO: Explain what dstack-shim is)
+
+For example, these variables can be used to configure a proxy:
+
+```yaml
+type: fleet
+name: my-fleet
+
+env:
+  - HTTP_PROXY=http://proxy.example.com:80
+  - HTTPS_PROXY=http://proxy.example.com:80
+  - NO_PROXY=localhost,127.0.0.1
+
+ssh_config:
+  user: ubuntu
+  identity_file: ~/.ssh/id_rsa
+  hosts:
+    - 3.255.177.51
+    - 3.255.177.52
+```
+
+!!! info "Reference"
+    For all SSH fleet configuration options, refer to the [reference](../reference/dstack.yml/fleet.md).
+
+### Create or update a fleet
+
+To create or update the fleet, pass the fleet configuration to [`dstack apply`](../reference/cli/dstack/apply.md):
+
+<div class="termy">
+
+```shell
+$ dstack apply -f examples/misc/fleets/.dstack.yml
+```
+
+</div>
+
+To ensure the fleet is created, you can use the `dstack fleet` command:
+
+<div class="termy">
+
+```shell
+$ dstack fleet
+
+ FLEET     INSTANCE  GPU             PRICE  STATUS  CREATED 
+ my-fleet  0         L4:24GB (spot)  $0     idle    3 mins ago      
+           1         L4:24GB (spot)  $0     idle    3 mins ago    
+```
+
+</div>
+
+Once the status of instances changes to `idle`, they can be used by dev environments, tasks, and services.
+
+#### Troubleshooting
 
 !!! info "Resources"
-    If you're creating an SSH fleet, ensure that the GPU, memory, and disk size are detected properly.
-    If GPU isn't detected, ensure that the hosts meet the requirements (see above).
+    Once the fleet is created, double-check that the GPU, memory, and disk are detected correctly.
 
-If the status doesn't change to `idle` after a few minutes, ensure that 
-the hosts meet the requirements (see above).
+If the status does not change to `idle` after a few minutes or the resources are not displayed correctly, ensure that
+all host requirements are satisfied.
 
-If the requirements are met but the fleet still fails to be created, check `/root/.dstack/shim.log` for logs 
-on the hosts specified in `ssh_config`.
+If the requirements are met but the fleet still fails to be created correctly, check the logs at
+`/root/.dstack/shim.log` on the hosts for error details.
 
 ## Manage fleets
 
@@ -253,12 +357,6 @@ Fleet my-gcp-fleet deleted
 Alternatively, you can delete a fleet by passing the fleet name  to `dstack fleet delete`.
 To terminate and delete specific instances from a fleet, pass `-i INSTANCE_NUM`.
 
-## What's next?
-
-1. Read about [dev environments](../dev-environments.md), [tasks](../tasks.md), and 
-    [services](../services.md) 
-2. Join the community via [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd)
-
-!!! info "Reference"
-    See [.dstack.yml](../reference/dstack.yml/fleet.md) for all the options supported by
-    fleets, along with multiple examples.
+!!! info "What's next?"
+    1. Read about [dev environments](dev-environments.md), [tasks](tasks.md), and
+    [services](services.md)

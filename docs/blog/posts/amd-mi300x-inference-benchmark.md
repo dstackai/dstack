@@ -11,7 +11,7 @@ categories:
 
 # Benchmarking Llama 3.1 405B on 8x AMD MI300X GPUs
 
-At `dstack`, we've been adding support for AMD GPUs with [SSH fleets](../../docs/concepts/fleets.md#ssh-fleets), 
+At `dstack`, we've been adding support for AMD GPUs with [SSH fleets](../../docs/concepts/fleets.md#ssh), 
 so we saw this as a great chance to test our integration by benchmarking AMD GPUs. Our friends at 
 [Hot Aisle :material-arrow-top-right-thin:{ .external }](https://hotaisle.xyz/){:target="_blank"}, who build top-tier 
 bare metal compute for AMD GPUs, kindly provided the hardware for the benchmark.
@@ -35,7 +35,7 @@ Here is the spec of the bare metal machine we got:
 ??? info "Set up an SSH fleet"
 
     Hot Aisle provided us with SSH access to the machine. To make it accessible via `dstack`,
-    we created an [SSH fleet](../../docs/concepts/fleets.md#ssh-fleets) using the following configuration:
+    we created an [SSH fleet](../../docs/concepts/fleets.md#ssh) using the following configuration:
 
     <div editor-title="hotaisle.dstack.yml"> 
 
@@ -216,7 +216,7 @@ If you have questions, feedback, or want to help improve the benchmark, please r
 is the primary sponsor of this benchmark, and we are sincerely grateful for their hardware and support.  
 
 If you'd like to use top-tier bare metal compute with AMD GPUs, we recommend going
-with Hot Aisle. Once you gain access to a cluster, it can be easily accessed via `dstack`'s [SSH fleet](../../docs/concepts/fleets.md#ssh-fleets) easily.
+with Hot Aisle. Once you gain access to a cluster, it can be easily accessed via `dstack`'s [SSH fleet](../../docs/concepts/fleets.md#ssh) easily.
 
 ### RunPod
 If you’d like to use on-demand compute with AMD GPUs at affordable prices, you can configure `dstack` to

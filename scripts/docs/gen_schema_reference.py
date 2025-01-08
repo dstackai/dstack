@@ -77,11 +77,11 @@ def generate_schema_reference(
             if field_type:
                 if field.annotation.__name__ == "Annotated":
                     if field_type.__name__ == "Optional":
-                        field_type = get_args(get_args(field.annotation)[0])[0]
+                        field_type = get_args(field_type)[0]
                     if field_type.__name__ == "List":
-                        field_type = get_args(get_args(field.annotation)[0])[0]
+                        field_type = get_args(field_type)[0]
                     if field_type.__name__ == "Union":
-                        field_type = get_args(get_args(field.annotation)[0])[0]
+                        field_type = get_args(field_type)[0]
                 base_model = (
                     inspect.isclass(field_type)
                     and issubclass(field_type, BaseModel)
@@ -122,7 +122,7 @@ def generate_schema_reference(
                 prefix
                 + " ".join(
                     [
-                        f"#### {item_header}",
+                        f"###### {item_header}",
                         "-",
                         item_optional_marker,
                         item_description,

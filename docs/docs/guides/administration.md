@@ -1,12 +1,12 @@
-# Projects
+# Administration
 
 Projects enable the isolation of different teams and their resources. Each project can configure its own backends and
 control which users have access to it.
 
-> While project backends can be configured via [`~/.dstack/server/config.yml`](../reference/server/config.yml.md), use the control plane UI to fully manage
-> projects, users, and user permissions.
+> While project backends can be configured via [`~/.dstack/server/config.yml`](../reference/server/config.yml.md), 
+> use the UI to fully manage projects, users, and user permissions.
 
-## Project backends
+## Project backends { #backends }
 
 In addition to [`~/.dstack/server/config.yml`](../reference/server/config.yml.md), 
 a global admin or a project admin can configure backends on the project settings page.

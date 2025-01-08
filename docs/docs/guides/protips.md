@@ -41,7 +41,7 @@ To persist data across runs, it is recommended to use volumes.
 (for persisting data even if the instance is interrupted)
 and [instance](../concepts/volumes.md#instance-volumes) (useful for persisting cached data across runs while the instance remains active).
 
-> If you use [SSH fleets](../concepts/fleets.md#ssh-fleets), you can mount network storage (e.g., NFS or SMB) to the hosts and access it in runs via instance volumes.
+> If you use [SSH fleets](../concepts/fleets.md#ssh), you can mount network storage (e.g., NFS or SMB) to the hosts and access it in runs via instance volumes.
 
 ## Dev environments
 
@@ -124,8 +124,8 @@ This allows you to access the remote `8501` port on `localhost:8501` while the C
     This will forward the remote `8501` port to `localhost:3000`.
 
 !!! info "Tasks vs. services"
-    [Services](../services.md) provide external access, `https`, replicas with autoscaling, OpenAI-compatible endpoint
-    and other service features. If you don't need them, you can use [tasks](../tasks.md) for running apps.
+    [Services](../concepts/services.md) provide external access, `https`, replicas with autoscaling, OpenAI-compatible endpoint
+    and other service features. If you don't need them, you can use [tasks](../concepts/tasks.md) for running apps.
 
 ## Docker and Docker Compose
 
