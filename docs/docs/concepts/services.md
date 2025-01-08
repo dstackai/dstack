@@ -83,7 +83,7 @@ case `dstack` adjusts the number of replicas (scales up or down) automatically b
 Setting the minimum number of replicas to `0` allows the service to scale down to zero when there are no requests.
 
 !!! info "Gateways"
-    The `scaling` property currently requires creating a [gateway](#manage-gateways).
+    The `scaling` property currently requires creating a [gateway](gateways.md).
     This requirement is expected to be removed soon.
 
 ### Authorization
