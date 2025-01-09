@@ -3,10 +3,10 @@ package api
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
 
 	"github.com/dstackai/dstack/runner/internal/api"
+	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/dstackai/dstack/runner/internal/shim"
 )
 
@@ -38,36 +38,49 @@ func (s *ShimServer) TaskSubmitHandler(w http.ResponseWriter, r *http.Request) (
 	if err := api.DecodeJSONBody(w, r, &req, true); err != nil {
 		return nil, err
 	}
+	ctx := r.Context()
 	taskConfig := shim.TaskConfig(req)
-	if err := s.runner.Submit(r.Context(), taskConfig); err != nil {
+	if err := s.runner.Submit(ctx, taskConfig); err != nil {
 		if errors.Is(err, shim.ErrRequest) {
+			log.Info(ctx, "already submitted", "task", taskConfig.ID, "err", err)
 			return nil, &api.Error{Status: http.StatusConflict, Err: err}
 		}
+		log.Error(ctx, "conflict", "task", taskConfig.ID, "err", err)
 		return nil, &api.Error{Status: http.StatusInternalServerError, Err: err}
 	}
-	go func(taskID string) {
-		if err := s.runner.Run(context.Background(), taskID); err != nil {
-			fmt.Printf("failed task %v", err)
+	log.Info(ctx, "submitted", "task", taskConfig.ID)
+
+	ctx = log.WithLogger(context.Background(), log.GetLogger(ctx))
+	go func() {
+		if err := s.runner.Run(ctx, taskConfig.ID); err != nil {
+			log.Error(ctx, "failed to run", "task", taskConfig.ID, "err", err)
 		}
-	}(taskConfig.ID)
+	}()
+
 	return s.runner.TaskInfo(taskConfig.ID), nil
 }
 
 func (s *ShimServer) TaskTerminateHandler(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+	ctx := r.Context()
 	taskID := r.PathValue("id")
 	var req TaskTerminateRequest
 	if err := api.DecodeJSONBody(w, r, &req, true); err != nil {
 		return nil, err
 	}
-	if err := s.runner.Terminate(r.Context(), taskID, req.Timeout, req.TerminationReason, req.TerminationMessage); err != nil {
+	if err := s.runner.Terminate(ctx, taskID, req.Timeout, req.TerminationReason, req.TerminationMessage); err != nil {
 		if errors.Is(err, shim.ErrNotFound) {
+			log.Info(ctx, "not found", "task", taskID, "err", err)
 			return nil, &api.Error{Status: http.StatusNotFound, Err: err}
 		}
 		if errors.Is(err, shim.ErrRequest) {
+			log.Info(ctx, "conflict", "task", taskID, "err", err)
 			return nil, &api.Error{Status: http.StatusConflict, Err: err}
 		}
+		log.Error(ctx, "failed to terminate", "task", taskID, "err", err)
 		return nil, &api.Error{Status: http.StatusInternalServerError, Err: err}
 	}
+	log.Info(ctx, "terminated", "task", taskID)
+
 	taskInfo := s.runner.TaskInfo(taskID)
 	if taskInfo.ID == "" {
 		return nil, &api.Error{Status: http.StatusNotFound}
@@ -76,14 +89,20 @@ func (s *ShimServer) TaskTerminateHandler(w http.ResponseWriter, r *http.Request
 }
 
 func (s *ShimServer) TaskRemoveHandler(w http.ResponseWriter, r *http.Request) (interface{}, error) {
-	if err := s.runner.Remove(r.Context(), r.PathValue("id")); err != nil {
+	ctx := r.Context()
+	taskID := r.PathValue("id")
+	if err := s.runner.Remove(ctx, taskID); err != nil {
 		if errors.Is(err, shim.ErrNotFound) {
+			log.Info(ctx, "not found", "task", taskID, "err", err)
 			return nil, &api.Error{Status: http.StatusNotFound, Err: err}
 		}
 		if errors.Is(err, shim.ErrRequest) {
+			log.Info(ctx, "not terminated", "task", taskID, "err", err)
 			return nil, &api.Error{Status: http.StatusConflict, Err: err}
 		}
+		log.Error(ctx, "failed to remove", "task", taskID, "err", err)
 		return nil, &api.Error{Status: http.StatusInternalServerError, Err: err}
 	}
+	log.Info(ctx, "removed", "task", taskID)
 	return nil, nil
 }

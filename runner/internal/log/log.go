@@ -28,6 +28,11 @@ func NewEntry(out io.Writer, level int) *logrus.Entry {
 
 var DefaultEntry = NewEntry(os.Stderr, int(logrus.InfoLevel))
 
+func Fatal(ctx context.Context, msg string, args ...interface{}) {
+	logger := AppendArgs(GetLogger(ctx), args...)
+	logger.Fatal(msg)
+}
+
 func Error(ctx context.Context, msg string, args ...interface{}) {
 	logger := AppendArgs(GetLogger(ctx), args...)
 	logger.Error(msg)

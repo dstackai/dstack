@@ -190,10 +190,11 @@ def get_user_data(
 
 def get_shim_env(authorized_keys: List[str]) -> Dict[str, str]:
     envs = {
-        "DSTACK_RUNNER_LOG_LEVEL": "6",
+        "DSTACK_SHIM_HOME": DSTACK_WORKING_DIR,
+        "DSTACK_SHIM_LOG_LEVEL": "6",
         "DSTACK_RUNNER_DOWNLOAD_URL": get_dstack_runner_download_url(),
+        "DSTACK_RUNNER_LOG_LEVEL": "6",
         "DSTACK_PUBLIC_SSH_KEY": "\n".join(authorized_keys),
-        "DSTACK_HOME": DSTACK_WORKING_DIR,
     }
     return envs
 
@@ -261,7 +262,7 @@ def get_run_shim_script(is_privileged: bool, pjrt_device: Optional[str]) -> List
     pjrt_device_env = f"--pjrt-device={pjrt_device}" if pjrt_device else ""
 
     return [
-        f"nohup dstack-shim docker {privileged_flag} {pjrt_device_env} >{DSTACK_WORKING_DIR}/shim.log 2>&1 &",
+        f"nohup dstack-shim {privileged_flag} {pjrt_device_env} &",
     ]
 
 

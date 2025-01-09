@@ -42,7 +42,7 @@ func (ds *DummyRunner) TaskInfo(taskID string) shim.TaskInfo {
 	return shim.TaskInfo{}
 }
 
-func (ds *DummyRunner) Resources() shim.Resources {
+func (ds *DummyRunner) Resources(context.Context) shim.Resources {
 	return shim.Resources{}
 }
 

@@ -263,7 +263,7 @@ class AWSCompute(Compute):
                     price=instance_offer.price,
                     username=username,
                     ssh_port=22,
-                    dockerized=True,  # because `dstack-shim docker` is used
+                    dockerized=True,  # because `dstack-shim` is used
                     ssh_proxy=None,
                     backend_data=None,
                 )

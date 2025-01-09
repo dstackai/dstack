@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"net"
 	"net/http"
 	"sync"
 
@@ -15,7 +16,7 @@ type TaskRunner interface {
 	Terminate(ctx context.Context, taskID string, timeout uint, reason string, message string) error
 	Remove(ctx context.Context, taskID string) error
 
-	Resources() shim.Resources
+	Resources(context.Context) shim.Resources
 	TaskIDs() []string
 	TaskInfo(taskID string) shim.TaskInfo
 }
@@ -29,12 +30,13 @@ type ShimServer struct {
 	version string
 }
 
-func NewShimServer(address string, runner TaskRunner, version string) *ShimServer {
+func NewShimServer(ctx context.Context, address string, runner TaskRunner, version string) *ShimServer {
 	r := api.NewRouter()
 	s := &ShimServer{
 		HttpServer: &http.Server{
-			Addr:    address,
-			Handler: r,
+			Addr:        address,
+			Handler:     r,
+			BaseContext: func(l net.Listener) context.Context { return ctx },
 		},
 
 		runner: runner,

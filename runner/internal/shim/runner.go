@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"strconv"
@@ -14,6 +13,7 @@ import (
 
 	"github.com/dstackai/dstack/runner/consts"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
+	"github.com/dstackai/dstack/runner/internal/log"
 )
 
 const DstackRunnerBinaryName = "/usr/local/bin/dstack-runner"
@@ -25,8 +25,8 @@ func (c *CLIArgs) GetDockerCommands() []string {
 	}
 }
 
-func (c *CLIArgs) DownloadRunner() error {
-	runnerBinaryPath, err := downloadRunner(c.Runner.DownloadURL)
+func (c *CLIArgs) DownloadRunner(ctx context.Context) error {
+	runnerBinaryPath, err := downloadRunner(ctx, c.Runner.DownloadURL)
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
@@ -41,13 +41,13 @@ func (c *CLIArgs) getRunnerArgs() []string {
 		"--log-level", strconv.Itoa(c.Runner.LogLevel),
 		"start",
 		"--http-port", strconv.Itoa(c.Runner.HTTPPort),
-		"--temp-dir", consts.RunnerDir,
-		"--home-dir", c.Runner.HomeDir,
-		"--working-dir", c.Runner.WorkingDir,
+		"--temp-dir", consts.RunnerTempDir,
+		"--home-dir", consts.RunnerHomeDir,
+		"--working-dir", consts.RunnerWorkingDir,
 	}
 }
 
-func downloadRunner(url string) (string, error) {
+func downloadRunner(ctx context.Context, url string) (string, error) {
 	tempFile, err := os.CreateTemp("", "dstack-runner")
 	if err != nil {
 		return "", gerrors.Wrap(err)
@@ -55,12 +55,12 @@ func downloadRunner(url string) (string, error) {
 	defer func() {
 		err := tempFile.Close()
 		if err != nil {
-			log.Printf("close file error: %s\n", err)
+			log.Error(ctx, "close file error", "err", err)
 		}
 	}()
 
-	log.Printf("Downloading runner from %s\n", url)
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	log.Debug(ctx, "downloading runner", "url", url)
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -75,7 +75,7 @@ func downloadRunner(url string) (string, error) {
 	defer func() {
 		err := resp.Body.Close()
 		if err != nil {
-			log.Printf("downloadRunner: close body error: %s\n", err)
+			log.Error(ctx, "downloadRunner: close body error", "err", err)
 		}
 	}()
 
@@ -92,11 +92,11 @@ func downloadRunner(url string) (string, error) {
 	case <-ctx.Done():
 		err := ctx.Err()
 		if errors.Is(err, context.DeadlineExceeded) {
-			fmt.Printf("downloadRunner: %s, %d bytes out of %d bytes were downloaded", err, written, resp.ContentLength)
+			log.Error(ctx, "downloadRunner error", "err", err, "bytes", written, "total", resp.ContentLength)
 			return "", gerrors.Newf("Cannot download runner %w", err)
 		}
 	default:
-		log.Printf("The runner was downloaded successfully (%d bytes)", written)
+		log.Debug(ctx, "the runner was downloaded successfully", "bytes", written)
 	}
 
 	if err := tempFile.Chmod(0o755); err != nil {

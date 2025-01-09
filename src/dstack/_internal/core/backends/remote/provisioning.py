@@ -23,7 +23,7 @@ logger = get_logger(__name__)
 
 SSH_CONNECT_TIMEOUT = 10
 
-DSTACK_SHIM_ENV_FILE = "dstack-shim.env"
+DSTACK_SHIM_ENV_FILE = "shim.env"
 
 HOST_INFO_FILE = "host_info.json"
 
@@ -98,11 +98,10 @@ def run_shim_as_systemd_service(client: paramiko.SSHClient, working_dir: str, de
     Type=simple
     User=root
     Restart=always
+    RestartSec=10
     WorkingDirectory={working_dir}
     EnvironmentFile={working_dir}/{DSTACK_SHIM_ENV_FILE}
-    ExecStart=/usr/local/bin/dstack-shim docker
-    StandardOutput=append:/root/.dstack/shim.log
-    StandardError=append:/root/.dstack/shim.log
+    ExecStart=/usr/local/bin/dstack-shim
 
     [Install]
     WantedBy=multi-user.target

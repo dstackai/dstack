@@ -7,13 +7,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 
 	execute "github.com/alexellis/go-execute/v2"
+	"github.com/dstackai/dstack/runner/internal/log"
 )
 
 const amdSmiImage = "un1def/amd-smi:6.2.2-0"
@@ -49,19 +49,19 @@ func GetGpuVendor() GpuVendor {
 	return GpuVendorNone
 }
 
-func GetGpuInfo() []GpuInfo {
+func GetGpuInfo(ctx context.Context) []GpuInfo {
 	switch gpuVendor := GetGpuVendor(); gpuVendor {
 	case GpuVendorNvidia:
-		return getNvidiaGpuInfo()
+		return getNvidiaGpuInfo(ctx)
 	case GpuVendorAmd:
-		return getAmdGpuInfo()
+		return getAmdGpuInfo(ctx)
 	case GpuVendorNone:
 		return []GpuInfo{}
 	}
 	return []GpuInfo{}
 }
 
-func getNvidiaGpuInfo() []GpuInfo {
+func getNvidiaGpuInfo(ctx context.Context) []GpuInfo {
 	gpus := []GpuInfo{}
 
 	cmd := execute.ExecTask{
@@ -69,15 +69,15 @@ func getNvidiaGpuInfo() []GpuInfo {
 		Args:        []string{"--query-gpu=name,memory.total,uuid", "--format=csv,noheader,nounits"},
 		StreamStdio: false,
 	}
-	res, err := cmd.Execute(context.Background())
+	res, err := cmd.Execute(ctx)
 	if err != nil {
-		log.Printf("failed to execute nvidia-smi: %s", err)
+		log.Error(ctx, "failed to execute nvidia-smi", "err", err)
 		return gpus
 	}
 	if res.ExitCode != 0 {
-		log.Printf(
-			"failed to execute nvidia-smi: exit code: %d: stdout: %s; stderr: %s",
-			res.ExitCode, res.Stdout, res.Stderr,
+		log.Error(
+			ctx, "failed to execute nvidia-smi",
+			"exitcode", res.ExitCode, "stdout", res.Stdout, "stderr", res.Stderr,
 		)
 		return gpus
 	}
@@ -89,16 +89,16 @@ func getNvidiaGpuInfo() []GpuInfo {
 			break
 		}
 		if err != nil {
-			log.Printf("cannot read csv: %s", err)
+			log.Error(ctx, "cannot read csv", "err", err)
 			return gpus
 		}
 		if len(record) != 3 {
-			log.Printf("3 csv fields expected, got: %d", len(record))
+			log.Error(ctx, "3 csv fields expected", "len", len(record))
 			return gpus
 		}
 		vram, err := strconv.Atoi(strings.TrimSpace(record[1]))
 		if err != nil {
-			log.Printf("invalid VRAM value: %s", record[1])
+			log.Error(ctx, "invalid VRAM value", "value", record[1])
 			vram = 0
 		}
 		gpus = append(gpus, GpuInfo{
@@ -133,7 +133,7 @@ type amdBus struct {
 	BDF string `json:"bdf"` // PCIe Domain:Bus:Device.Function notation
 }
 
-func getAmdGpuInfo() []GpuInfo {
+func getAmdGpuInfo(ctx context.Context) []GpuInfo {
 	gpus := []GpuInfo{}
 
 	cmd := execute.ExecTask{
@@ -148,28 +148,28 @@ func getAmdGpuInfo() []GpuInfo {
 		},
 		StreamStdio: false,
 	}
-	res, err := cmd.Execute(context.Background())
+	res, err := cmd.Execute(ctx)
 	if err != nil {
-		log.Printf("failed to execute amd-smi: %s", err)
+		log.Error(ctx, "failed to execute amd-smi", "err", err)
 		return gpus
 	}
 	if res.ExitCode != 0 {
-		log.Printf(
-			"failed to execute amd-smi: exit code: %d: stdout: %s; stderr: %s",
-			res.ExitCode, res.Stdout, res.Stderr,
+		log.Error(
+			ctx, "failed to execute amd-smi",
+			"exitcode", res.ExitCode, "stdout", res.Stdout, "stderr", res.Stderr,
 		)
 		return gpus
 	}
 
 	var amdGpus []amdGpu
 	if err := json.Unmarshal([]byte(res.Stdout), &amdGpus); err != nil {
-		log.Printf("cannot read json: %s", err)
+		log.Error(ctx, "cannot read json", "err", err)
 		return gpus
 	}
 	for _, amdGpu := range amdGpus {
 		renderNodePath, err := getAmdRenderNodePath(amdGpu.Bus.BDF)
 		if err != nil {
-			log.Printf("failed to resolve render node path %s: %v", amdGpu.Bus.BDF, err)
+			log.Error(ctx, "failed to resolve render node path", "bdf", amdGpu.Bus.BDF, "err", err)
 			continue
 		}
 		gpus = append(gpus, GpuInfo{

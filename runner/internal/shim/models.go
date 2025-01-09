@@ -17,15 +17,14 @@ type CLIArgs struct {
 	Shim struct {
 		HTTPPort int
 		HomeDir  string
+		LogLevel int
 	}
 
 	Runner struct {
 		HTTPPort    int
-		LogLevel    int
 		DownloadURL string
 		BinaryPath  string
-		HomeDir     string
-		WorkingDir  string
+		LogLevel    int
 	}
 
 	Docker struct {

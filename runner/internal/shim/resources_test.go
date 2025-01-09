@@ -1,6 +1,7 @@
 package shim
 
 import (
+	"context"
 	"testing"
 
 	"github.com/dstackai/dstack/runner/internal/shim/host"
@@ -55,11 +56,11 @@ func TestNewGpuLock_ErrorMultipleVendors(t *testing.T) {
 func TestGpuLock_Acquire_ErrorBadCount(t *testing.T) {
 	gl, _ := NewGpuLock([]host.GpuInfo{})
 
-	ids, err := gl.Acquire(0)
+	ids, err := gl.Acquire(context.Background(), 0)
 	assert.ErrorContains(t, err, "count must be either positive or -1, got 0")
 	assert.Equal(t, 0, len(ids))
 
-	ids, err = gl.Acquire(-2)
+	ids, err = gl.Acquire(context.Background(), -2)
 	assert.ErrorContains(t, err, "count must be either positive or -1, got -2")
 	assert.Equal(t, 0, len(ids))
 }
@@ -72,7 +73,7 @@ func TestGpuLock_Acquire_All_Available(t *testing.T) {
 	}
 	gl, _ := NewGpuLock(gpus)
 	gl.lock["GPU-f00d"] = true
-	ids, err := gl.Acquire(-1)
+	ids, err := gl.Acquire(context.Background(), -1)
 	assert.Nil(t, err)
 	assert.ElementsMatch(t, []string{"GPU-beef", "GPU-c0de"}, ids)
 	assert.True(t, gl.lock["GPU-beef"], "GPU-beef")
@@ -88,14 +89,14 @@ func TestGpuLock_Acquire_All_NoneAvailable(t *testing.T) {
 	gl, _ := NewGpuLock(gpus)
 	gl.lock["GPU-beef"] = true
 	gl.lock["GPU-f00d"] = true
-	ids, err := gl.Acquire(-1)
+	ids, err := gl.Acquire(context.Background(), -1)
 	assert.Nil(t, err)
 	assert.Equal(t, 0, len(ids))
 }
 
 func TestGpuLock_Acquire_All_NoGpus(t *testing.T) {
 	gl, _ := NewGpuLock([]host.GpuInfo{})
-	ids, err := gl.Acquire(-1)
+	ids, err := gl.Acquire(context.Background(), -1)
 	assert.Nil(t, err)
 	assert.Equal(t, 0, len(ids))
 }
@@ -109,7 +110,7 @@ func TestGpuLock_Acquire_Count_OK(t *testing.T) {
 	}
 	gl, _ := NewGpuLock(gpus)
 	gl.lock["GPU-f00d"] = true
-	ids, err := gl.Acquire(2)
+	ids, err := gl.Acquire(context.Background(), 2)
 	assert.Nil(t, err)
 	assert.Equal(t, 2, len(ids))
 	assert.NotEqual(t, ids[0], ids[1])
@@ -131,7 +132,7 @@ func TestGpuLock_Acquire_Count_ErrNoCapacity(t *testing.T) {
 	}
 	gl, _ := NewGpuLock(gpus)
 	gl.lock["GPU-f00d"] = true
-	ids, err := gl.Acquire(2)
+	ids, err := gl.Acquire(context.Background(), 2)
 	assert.ErrorContains(t, err, "2 GPUs requested, 1 available")
 	assert.Equal(t, 0, len(ids))
 	assert.False(t, gl.lock["GPU-beef"], "GPU-beef")
@@ -147,7 +148,7 @@ func TestGpuLock_Lock(t *testing.T) {
 	gl, _ := NewGpuLock(gpus)
 	gl.lock["GPU-beef"] = true
 	gl.lock["GPU-f00d"] = true
-	locked := gl.Lock([]string{
+	locked := gl.Lock(context.Background(), []string{
 		"GPU-beef", // already locked
 		"GPU-dead", // unknown
 		"GPU-c0de", // not locked
@@ -166,7 +167,7 @@ func TestGpuLock_Lock_Nil(t *testing.T) {
 	gl, _ := NewGpuLock(gpus)
 	gl.lock["GPU-beef"] = true
 	var ids []string
-	locked := gl.Lock(ids)
+	locked := gl.Lock(context.Background(), ids)
 	assert.Equal(t, []string{}, locked)
 	assert.True(t, gl.lock["GPU-beef"], "GPU-beef")
 	assert.False(t, gl.lock["GPU-f00d"], "GPU-f00d")
@@ -181,7 +182,7 @@ func TestGpuLock_Release(t *testing.T) {
 	gl, _ := NewGpuLock(gpus)
 	gl.lock["GPU-beef"] = true
 	gl.lock["GPU-f00d"] = true
-	released := gl.Release([]string{
+	released := gl.Release(context.Background(), []string{
 		"GPU-beef", // locked
 		"GPU-dead", // unknown
 		"GPU-c0de", // not locked
@@ -200,7 +201,7 @@ func TestGpuLock_Release_Nil(t *testing.T) {
 	gl, _ := NewGpuLock(gpus)
 	gl.lock["GPU-beef"] = true
 	var ids []string
-	released := gl.Release(ids)
+	released := gl.Release(context.Background(), ids)
 	assert.Equal(t, []string{}, released)
 	assert.True(t, gl.lock["GPU-beef"], "GPU-beef")
 	assert.False(t, gl.lock["GPU-f00d"], "GPU-f00d")
