@@ -9,6 +9,10 @@ const (
 	RunnerLogFileName        = "runner.log"
 )
 
+// 1. A fixed path inside the container
+// 2. A default path on the host unless overridden via shim CLI
+const RunnerBinaryPath = "/usr/local/bin/dstack-runner"
+
 // Error-containing messages will be identified by this signature
 const ExecutorFailedSignature = "Executor failed"
 

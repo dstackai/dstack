@@ -1052,7 +1052,7 @@ func (c *CLIArgs) DockerShellCommands(publicKeys []string) []string {
 		concatinatedPublicKeys = strings.Join(publicKeys, "\n")
 	}
 	commands := getSSHShellCommands(c.Docker.SSHPort, concatinatedPublicKeys)
-	commands = append(commands, fmt.Sprintf("%s %s", DstackRunnerBinaryName, strings.Join(c.getRunnerArgs(), " ")))
+	commands = append(commands, fmt.Sprintf("%s %s", consts.RunnerBinaryPath, strings.Join(c.getRunnerArgs(), " ")))
 	return commands
 }
 
@@ -1066,7 +1066,7 @@ func (c *CLIArgs) DockerMounts(hostRunnerDir string) ([]mount.Mount, error) {
 		{
 			Type:   mount.TypeBind,
 			Source: c.Runner.BinaryPath,
-			Target: DstackRunnerBinaryName,
+			Target: consts.RunnerBinaryPath,
 		},
 	}, nil
 }
