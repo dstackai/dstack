@@ -72,6 +72,7 @@ func main() {
 			&cli.PathFlag{
 				Name:        "runner-binary-path",
 				Usage:       "Path to runner's binary",
+				Value:       consts.RunnerBinaryPath,
 				Destination: &args.Runner.BinaryPath,
 				EnvVars:     []string{"DSTACK_RUNNER_BINARY_PATH"},
 			},
@@ -160,10 +161,8 @@ func start(ctx context.Context, args shim.CLIArgs, serviceMode bool) (err error)
 		}
 	}()
 
-	if args.Runner.BinaryPath == "" {
-		if err := args.DownloadRunner(ctx); err != nil {
-			return err
-		}
+	if err := args.DownloadRunner(ctx); err != nil {
+		return err
 	}
 
 	log.Debug(ctx, "Shim", "args", args.Shim)

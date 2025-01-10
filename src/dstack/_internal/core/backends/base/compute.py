@@ -29,6 +29,10 @@ from dstack._internal.utils.logging import get_logger
 logger = get_logger(__name__)
 
 DSTACK_WORKING_DIR = "/root/.dstack"
+DSTACK_SHIM_BINARY_NAME = "dstack-shim"
+DSTACK_SHIM_BINARY_PATH = f"/usr/local/bin/{DSTACK_SHIM_BINARY_NAME}"
+DSTACK_RUNNER_BINARY_NAME = "dstack-runner"
+DSTACK_RUNNER_BINARY_PATH = f"/usr/local/bin/{DSTACK_RUNNER_BINARY_NAME}"
 
 
 class Compute(ABC):
@@ -193,6 +197,7 @@ def get_shim_env(authorized_keys: List[str]) -> Dict[str, str]:
         "DSTACK_SHIM_HOME": DSTACK_WORKING_DIR,
         "DSTACK_SHIM_LOG_LEVEL": "6",
         "DSTACK_RUNNER_DOWNLOAD_URL": get_dstack_runner_download_url(),
+        "DSTACK_RUNNER_BINARY_PATH": DSTACK_RUNNER_BINARY_PATH,
         "DSTACK_RUNNER_LOG_LEVEL": "6",
         "DSTACK_PUBLIC_SSH_KEY": "\n".join(authorized_keys),
     }
@@ -244,15 +249,13 @@ def get_dstack_shim_download_url() -> str:
 
 def get_shim_pre_start_commands() -> List[str]:
     url = get_dstack_shim_download_url()
-    dstack_shim_binary_name = "dstack-shim"
-    dstack_shim_binary_path = f"/usr/local/bin/{dstack_shim_binary_name}"
 
     return [
-        f"dlpath=$(sudo mktemp -t {dstack_shim_binary_name}.XXXXXXXXXX)",
+        f"dlpath=$(sudo mktemp -t {DSTACK_SHIM_BINARY_NAME}.XXXXXXXXXX)",
         # -sS -- disable progress meter and warnings, but still show errors (unlike bare -s)
         f'sudo curl -sS --compressed --connect-timeout 60 --max-time 240 --retry 1 --output "$dlpath" "{url}"',
-        f'sudo mv "$dlpath" {dstack_shim_binary_path}',
-        f"sudo chmod +x {dstack_shim_binary_path}",
+        f'sudo mv "$dlpath" {DSTACK_SHIM_BINARY_PATH}',
+        f"sudo chmod +x {DSTACK_SHIM_BINARY_PATH}",
         f"sudo mkdir {DSTACK_WORKING_DIR} -p",
     ]
 
@@ -334,12 +337,11 @@ def get_docker_commands(
         'if [ -n "$_LD_PRELOAD" ]; then export LD_PRELOAD="$_LD_PRELOAD"; fi',
     ]
 
-    runner = "/usr/local/bin/dstack-runner"
     url = get_dstack_runner_download_url()
     commands += [
-        f"curl --connect-timeout 60 --max-time 240 --retry 1 --output {runner} {url}",
-        f"chmod +x {runner}",
-        f"{runner} --log-level 6 start --http-port 10999 --temp-dir /tmp/runner --home-dir /root --working-dir /workflow",
+        f"curl --connect-timeout 60 --max-time 240 --retry 1 --output {DSTACK_RUNNER_BINARY_PATH} {url}",
+        f"chmod +x {DSTACK_RUNNER_BINARY_PATH}",
+        f"{DSTACK_RUNNER_BINARY_PATH} --log-level 6 start --http-port 10999 --temp-dir /tmp/runner --home-dir /root --working-dir /workflow",
     ]
 
     return commands

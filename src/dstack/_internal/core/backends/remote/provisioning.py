@@ -2,6 +2,7 @@ import io
 import json
 import time
 from contextlib import contextmanager
+from textwrap import dedent
 from typing import Any, Dict, Generator, List
 
 import paramiko
@@ -88,27 +89,28 @@ def run_pre_start_commands(
         raise ProvisioningError(f"run_pre-start_commands failed: {e}") from e
 
 
-def run_shim_as_systemd_service(client: paramiko.SSHClient, working_dir: str, dev: bool) -> None:
-    shim_service = f"""\
-    [Unit]
-    Description=dstack-shim
-    After=network-online.target
+def run_shim_as_systemd_service(
+    client: paramiko.SSHClient, binary_path: str, working_dir: str, dev: bool
+) -> None:
+    shim_service = dedent(f"""\
+        [Unit]
+        Description=dstack-shim
+        After=network-online.target
 
-    [Service]
-    Type=simple
-    User=root
-    Restart=always
-    RestartSec=10
-    WorkingDirectory={working_dir}
-    EnvironmentFile={working_dir}/{DSTACK_SHIM_ENV_FILE}
-    ExecStart=/usr/local/bin/dstack-shim
+        [Service]
+        Type=simple
+        User=root
+        Restart=always
+        RestartSec=10
+        WorkingDirectory={working_dir}
+        EnvironmentFile={working_dir}/{DSTACK_SHIM_ENV_FILE}
+        ExecStart={binary_path}
 
-    [Install]
-    WantedBy=multi-user.target
-    """
+        [Install]
+        WantedBy=multi-user.target
+    """)
 
-    stripped_shim_service = "\n".join(line.strip() for line in shim_service.splitlines())
-    sftp_upload(client, "/tmp/dstack-shim.service", stripped_shim_service)
+    sftp_upload(client, "/tmp/dstack-shim.service", shim_service)
 
     try:
         cmd = """\
@@ -152,6 +154,16 @@ def remove_host_info_if_exists(client: paramiko.SSHClient, working_dir: str) -> 
             logger.debug(f"{HOST_INFO_FILE} hasn't been removed: %s", err)
     except (paramiko.SSHException, OSError) as e:
         raise ProvisioningError(f"remove_host_info_if_exists failed: {e}")
+
+
+def remove_dstack_runner_if_exists(client: paramiko.SSHClient, path: str) -> None:
+    try:
+        _, _, stderr = client.exec_command(f"sudo test -e {path} && sudo rm {path}", timeout=10)
+        err = stderr.read().decode().strip()
+        if err:
+            logger.debug(f"{path} hasn't been removed: %s", err)
+    except (paramiko.SSHException, OSError) as e:
+        raise ProvisioningError(f"remove_dstack_runner_if_exists failed: {e}")
 
 
 def get_host_info(client: paramiko.SSHClient, working_dir: str) -> Dict[str, Any]:

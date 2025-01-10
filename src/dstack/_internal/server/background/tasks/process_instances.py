@@ -17,6 +17,8 @@ from dstack._internal.core.backends import (
     BACKENDS_WITH_PLACEMENT_GROUPS_SUPPORT,
 )
 from dstack._internal.core.backends.base.compute import (
+    DSTACK_RUNNER_BINARY_PATH,
+    DSTACK_SHIM_BINARY_PATH,
     DSTACK_WORKING_DIR,
     get_shim_env,
     get_shim_pre_start_commands,
@@ -26,6 +28,7 @@ from dstack._internal.core.backends.remote.provisioning import (
     get_paramiko_connection,
     get_shim_healthcheck,
     host_info_to_instance_type,
+    remove_dstack_runner_if_exists,
     remove_host_info_if_exists,
     run_pre_start_commands,
     run_shim_as_systemd_service,
@@ -388,12 +391,14 @@ def _deploy_instance(
         upload_envs(client, DSTACK_WORKING_DIR, shim_envs)
         logger.debug("The dstack-shim environment variables have been installed")
 
-        # Ensure host info file does not exist
+        # Ensure we have fresh versions of host info.json and dstack-runner
         remove_host_info_if_exists(client, DSTACK_WORKING_DIR)
+        remove_dstack_runner_if_exists(client, DSTACK_RUNNER_BINARY_PATH)
 
         # Run dstack-shim as a systemd service
         run_shim_as_systemd_service(
             client=client,
+            binary_path=DSTACK_SHIM_BINARY_PATH,
             working_dir=DSTACK_WORKING_DIR,
             dev=settings.DSTACK_VERSION is None,
         )
