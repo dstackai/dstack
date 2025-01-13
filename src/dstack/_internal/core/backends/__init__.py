@@ -17,6 +17,7 @@ BACKENDS_WITH_CREATE_INSTANCE_SUPPORT = [
     BackendType.LAMBDA,
     BackendType.OCI,
     BackendType.TENSORDOCK,
+    BackendType.VULTR,
 ]
 BACKENDS_WITH_PLACEMENT_GROUPS_SUPPORT = [
     BackendType.AWS,
