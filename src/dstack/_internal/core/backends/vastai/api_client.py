@@ -67,6 +67,7 @@ class VastAIAPIClient:
             "env": {
                 "-p 10022:10022": "1",
             },
+            "user": "root",
             "onstart": "/bin/sh",
             "args": ["-c", onstart],
             "runtype": "args",

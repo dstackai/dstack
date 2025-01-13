@@ -114,7 +114,7 @@ The source-code of this example can be found in
 [`examples/deployment/nim` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/deployment/nim){:target="_blank"}.
 
 ??? warning "Limitations"
-    NIM isn't working yet with `runpod` and `vastai` backends. 
+    NIM doesn't work yet with the `runpod` backend. 
     Track the [issue :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/1535){:target="_blank"} for progress.
 
 ## What's next?
