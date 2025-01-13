@@ -281,6 +281,23 @@ to configure [backends](../../concepts/backends.md) and other [sever-level setti
     overrides:
         show_root_heading: false
 
+##### `projects[n].backends[type=vultr]` { #vultr data-toc-label="vultr" }
+
+#SCHEMA# dstack._internal.server.services.config.VultrConfig
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+        item_id_prefix: vultr-
+
+###### `projects[n].backends[type=vultr].creds` { #vultr-creds data-toc-label="creds" }
+
+#SCHEMA# dstack._internal.core.models.backends.vultr.VultrAPIKeyCreds
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+
 ### `encryption` { #encryption data-toc-label="encryption" }
 
 #SCHEMA# dstack._internal.server.services.config.EncryptionConfig

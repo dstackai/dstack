@@ -745,6 +745,26 @@ projects:
 
 </div>
 
+### Vultr
+
+Log into your [Vultr :material-arrow-top-right-thin:{ .external }](https://www.vultr.com/) account, click `Account` in the sidebar, select `API`, find `Personal Access Token` panel and click `Enable API` button.
+
+Then, go ahead and configure the backend:
+
+<div editor-title="~/.dstack/server/config.yml">
+
+```yaml
+projects:
+  - name: main
+    backends:
+      - type: vultr
+        creds:
+          type: api_key
+          api_key: B57487240a466624b48de22865589
+```
+
+</div>
+
 ## On-prem servers
 
 ### SSH fleets
