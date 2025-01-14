@@ -57,10 +57,10 @@ Here are some cloud providers `dstack` integrates with and collaborates:
         </h3>
     </a>
 
-    <a href="https://www.cudocompute.com/" class="feature-cell">
-        <img width="38" padding="padding: 4px 0" src="/assets/images/cudo-logo.svg">
+    <a href="https://www.vultr.com/" class="feature-cell" target="_blank">
+        <img width="45" padding="padding: 4px 0" src="/assets/images/vultr-logo.svg">
         <h3>
-            CUDO Compute
+            Vultr
         </h3>
     </a>
 </div>
@@ -80,6 +80,13 @@ Here are some cloud providers `dstack` integrates with and collaborates:
         </h3>
     </a>
 
+    <a href="https://www.cudocompute.com/" class="feature-cell" target="_blank">
+        <img width="41" style="padding: 4px 0 2px" src="/assets/images/cudo-logo.svg">
+        <h3>
+            CUDO
+        </h3>
+    </a>    
+
     <a href="https://tensordock.com/" class="feature-cell" target="_blank">
         <img width="34" style="padding: 4px 0" src="/assets/images/tensordock-logo.svg">
         <h3>
@@ -88,7 +95,7 @@ Here are some cloud providers `dstack` integrates with and collaborates:
     </a>
 
     <a href="https://datacrunch.io/" class="feature-cell" target="_blank">
-        <img width="45" style="padding: 8px 0 2px; margin-left: -4px;" src="/assets/images/datacrunch-logo.svg">
+        <img width="34" style="padding: 8px 0 2px; margin-left: -4px;" src="/assets/images/datacrunch-logo.svg">
         <h3>
             DataCrunch
         </h3>
