@@ -322,6 +322,8 @@ async def _process_active_run(session: AsyncSession, run_model: RunModel):
             # use replicas_info from before retrying
             replicas_diff = scaler.scale(replicas_info, stats)
             if replicas_diff != 0:
+                # FIXME: potentially long write transaction
+                # Why do we flush here?
                 await session.flush()
                 await session.refresh(run_model)
                 await scale_run_replicas(session, run_model, replicas_diff)

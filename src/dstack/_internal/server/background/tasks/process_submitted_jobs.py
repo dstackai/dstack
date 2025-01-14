@@ -289,7 +289,6 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         )
         session.add(instance)
         session.add(fleet_model)
-        await session.flush()  # to get im.id
         job_model.used_instance_id = instance.id
 
     volumes_ids = sorted([v.id for vs in volume_models for v in vs])

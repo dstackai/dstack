@@ -613,8 +613,22 @@ async def create_instance_model(
     termination_policy, termination_idle_time = get_termination(
         profile, DEFAULT_POOL_TERMINATION_IDLE_TIME
     )
+    instance_id = uuid.uuid4()
+    project_ssh_key = SSHKey(
+        public=project.ssh_public_key.strip(),
+        private=project.ssh_private_key.strip(),
+    )
+    instance_config = InstanceConfiguration(
+        project_name=project.name,
+        instance_name=instance_name,
+        user=user.name,
+        instance_id=str(instance_id),
+        ssh_keys=[project_ssh_key],
+        placement_group_name=placement_group_name,
+        reservation=reservation,
+    )
     instance = InstanceModel(
-        id=uuid.uuid4(),
+        id=instance_id,
         name=instance_name,
         instance_num=instance_num,
         project=project,
@@ -624,26 +638,11 @@ async def create_instance_model(
         unreachable=False,
         profile=profile.json(),
         requirements=requirements.json(),
-        instance_configuration=None,
+        instance_configuration=instance_config.json(),
         termination_policy=termination_policy,
         termination_idle_time=termination_idle_time,
     )
     session.add(instance)
-    await session.flush()
-    project_ssh_key = SSHKey(
-        public=project.ssh_public_key.strip(),
-        private=project.ssh_private_key.strip(),
-    )
-    instance_config = InstanceConfiguration(
-        project_name=project.name,
-        instance_name=instance_name,
-        user=user.name,
-        instance_id=str(instance.id),
-        ssh_keys=[project_ssh_key],
-        placement_group_name=placement_group_name,
-        reservation=reservation,
-    )
-    instance.instance_configuration = instance_config.json()
     return instance
 
 
