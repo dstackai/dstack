@@ -299,10 +299,7 @@ class TestTerminateIdleTime:
         instance.termination_policy = TerminationPolicy.DESTROY_AFTER_IDLE
         instance.last_job_processed_at = get_current_datetime() + dt.timedelta(minutes=-19)
         await session.commit()
-        with patch(
-            "dstack._internal.server.background.tasks.process_instances.terminate_job_provisioning_data_instance"
-        ):
-            await process_instances()
+        await process_instances()
         await session.refresh(instance)
         assert instance is not None
         assert instance.status == InstanceStatus.TERMINATED

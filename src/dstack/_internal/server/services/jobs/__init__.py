@@ -126,28 +126,6 @@ def get_job_provisioning_data(job_model: JobModel) -> Optional[JobProvisioningDa
     return JobProvisioningData.__response__.parse_raw(job_model.job_provisioning_data)
 
 
-async def terminate_job_provisioning_data_instance(
-    project: ProjectModel, job_provisioning_data: JobProvisioningData
-):
-    backend = await get_project_backend_by_type(
-        project=project,
-        backend_type=job_provisioning_data.backend,
-    )
-    if backend is None:
-        logger.error(
-            "Failed to terminate the instance. "
-            f"Backend {job_provisioning_data.backend} is not configured in project {project.name}."
-        )
-        return
-    logger.debug("Terminating runner instance %s", job_provisioning_data.hostname)
-    await run_async(
-        backend.compute().terminate_instance,
-        job_provisioning_data.instance_id,
-        job_provisioning_data.region,
-        job_provisioning_data.backend_data,
-    )
-
-
 def delay_job_instance_termination(job_model: JobModel):
     job_model.remove_at = get_current_datetime() + datetime.timedelta(seconds=15)
 
