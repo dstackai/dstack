@@ -1,18 +1,28 @@
+import uuid
 from collections.abc import Generator
 from typing import Optional
 
 import pytest
 import requests_mock
 
+from dstack._internal.core.consts import DSTACK_SHIM_HTTP_PORT
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.common import NetworkMode
 from dstack._internal.core.models.resources import Memory
 from dstack._internal.core.models.volumes import InstanceMountPoint, VolumeMountPoint
 from dstack._internal.server.schemas.runner import (
     HealthcheckResponse,
     JobResult,
     LegacyPullResponse,
+    PortMapping,
+    TaskInfoResponse,
+    TaskStatus,
 )
-from dstack._internal.server.services.runner.client import ShimClient, _parse_version
+from dstack._internal.server.services.runner.client import (
+    ShimClient,
+    ShimHTTPError,
+    _parse_version,
+)
 from dstack._internal.server.testing.common import get_volume, get_volume_configuration
 
 
@@ -30,7 +40,7 @@ class BaseShimClientTest:
         if shim_version_marker is not None:
             healthcheck_resp = {"service": "dstack-shim", "version": shim_version_marker.args[0]}
             adapter.register_uri("GET", "/api/healthcheck", json=healthcheck_resp)
-        return ShimClient(port=10998, hostname="localhost")
+        return ShimClient(port=DSTACK_SHIM_HTTP_PORT, hostname="localhost")
 
     def assert_request(
         self,
@@ -89,6 +99,21 @@ class TestShimClientNegotiate(BaseShimClientTest):
         self.assert_request(adapter, 0, "GET", "/api/healthcheck")
 
 
+class TestShimClientRaiseForStatus(BaseShimClientTest):
+    def test(self, client: ShimClient, adapter: requests_mock.Adapter):
+        adapter.register_uri("GET", "/test/path", status_code=502, reason="Bad Gateway")
+        response = client._request("GET", "/test/path")
+
+        with pytest.raises(ShimHTTPError) as excinfo:
+            client._raise_for_status(response)
+
+        exc = excinfo.value
+        assert exc.status_code == 502
+        assert exc.message.startswith("502 Server Error: Bad Gateway")
+        assert str(exc).startswith("502 Server Error: Bad Gateway")
+        assert repr(exc) == "ShimHTTPError(502)"
+
+
 @pytest.mark.shim_version("0.18.30")
 class TestShimClientV1(BaseShimClientTest):
     def test_healthcheck(self, client: ShimClient, adapter: requests_mock.Adapter):
@@ -97,6 +122,9 @@ class TestShimClientV1(BaseShimClientTest):
         assert resp == HealthcheckResponse(service="dstack-shim", version="0.18.30")
         assert adapter.call_count == 1
         self.assert_request(adapter, 0, "GET", "/api/healthcheck")
+        # healthcheck() method also performs negotiation to save API calls
+        assert client._shim_version == (0, 18, 30)
+        assert client._api_version == 1
 
     def test_submit(self, client: ShimClient, adapter: requests_mock.Adapter):
         adapter.register_uri("POST", "/api/submit", json={"state": "pulling"})
@@ -125,8 +153,7 @@ class TestShimClientV1(BaseShimClientTest):
         )
 
         assert submitted is True
-        assert adapter.call_count == 2
-        self.assert_request(adapter, 0, "GET", "/api/healthcheck")
+        assert adapter.call_count == 1
         expected_request = {
             "username": "",
             "password": "",
@@ -150,7 +177,7 @@ class TestShimClientV1(BaseShimClientTest):
             ],
             "instance_mounts": [{"instance_path": "/mnt/nfs/home", "path": "/home"}],
         }
-        self.assert_request(adapter, 1, "POST", "/api/submit", expected_request)
+        self.assert_request(adapter, 0, "POST", "/api/submit", expected_request)
 
     def test_submit_conflict(self, client: ShimClient, adapter: requests_mock.Adapter):
         adapter.register_uri("POST", "/api/submit", status_code=409)
@@ -172,27 +199,24 @@ class TestShimClientV1(BaseShimClientTest):
         )
 
         assert submitted is False
-        assert adapter.call_count == 2
-        self.assert_request(adapter, 0, "GET", "/api/healthcheck")
-        self.assert_request(adapter, 1, "POST", "/api/submit")
+        assert adapter.call_count == 1
+        self.assert_request(adapter, 0, "POST", "/api/submit")
 
     def test_stop(self, client: ShimClient, adapter: requests_mock.Adapter):
         adapter.register_uri("POST", "/api/stop", json={"state": "pending"})
 
         client.stop()
 
-        assert adapter.call_count == 2
-        self.assert_request(adapter, 0, "GET", "/api/healthcheck")
-        self.assert_request(adapter, 1, "POST", "/api/stop", {"force": False})
+        assert adapter.call_count == 1
+        self.assert_request(adapter, 0, "POST", "/api/stop", {"force": False})
 
     def test_stop_force(self, client: ShimClient, adapter: requests_mock.Adapter):
         adapter.register_uri("POST", "/api/stop", json={"state": "pending"})
 
         client.stop(force=True)
 
-        assert adapter.call_count == 2
-        self.assert_request(adapter, 0, "GET", "/api/healthcheck")
-        self.assert_request(adapter, 1, "POST", "/api/stop", {"force": True})
+        assert adapter.call_count == 1
+        self.assert_request(adapter, 0, "POST", "/api/stop", {"force": True})
 
     def test_pull(self, client: ShimClient, adapter: requests_mock.Adapter):
         adapter.register_uri(
@@ -210,37 +234,59 @@ class TestShimClientV1(BaseShimClientTest):
             state="pending",
             result=JobResult(reason="CONTAINER_EXITED_WITH_ERROR", reason_message="killed"),
         )
-        assert adapter.call_count == 2
-        self.assert_request(adapter, 0, "GET", "/api/healthcheck")
-        self.assert_request(adapter, 1, "GET", "/api/pull")
+        assert adapter.call_count == 1
+        self.assert_request(adapter, 0, "GET", "/api/pull")
 
 
 @pytest.mark.shim_version("0.18.40")
-class TestShimClientV2Compat(BaseShimClientTest):
+class TestShimClientV2(BaseShimClientTest):
     def test_healthcheck(self, client: ShimClient, adapter: requests_mock.Adapter):
         resp = client.healthcheck()
 
         assert resp == HealthcheckResponse(service="dstack-shim", version="0.18.40")
         assert adapter.call_count == 1
         self.assert_request(adapter, 0, "GET", "/api/healthcheck")
+        # healthcheck() method also performs negotiation to save API calls
+        assert client._shim_version == (0, 18, 40)
+        assert client._api_version == 2
 
-    def test_submit(self, client: ShimClient, adapter: requests_mock.Adapter):
-        tasks_url = "/api/tasks"
-        legacy_task_url = f"{tasks_url}/00000000-0000-0000-0000-000000000000"
-        remove_legacy_task_url = f"{legacy_task_url}/remove"
+    def test_get_task(self, client: ShimClient, adapter: requests_mock.Adapter):
+        task_id = "d35b6e24-b556-4d6e-81e3-5982d2c34449"
+        url = f"/api/tasks/{task_id}"
         adapter.register_uri(
             "GET",
-            legacy_task_url,
+            url,
             json={
-                "id": "00000000-0000-0000-0000-000000000000",
+                "id": task_id,
                 "status": "terminated",
                 "termination_reason": "CONTAINER_EXITED_WITH_ERROR",
                 "termination_message": "killed",
+                "ports": [
+                    {"host": 34770, "container": 10022},
+                    {"host": 34771, "container": 10999},
+                ],
                 "container_name": "horrible-mule-1-0-0-44f7cb95",  # ignored
             },
         )
-        adapter.register_uri("POST", remove_legacy_task_url)
-        adapter.register_uri("POST", tasks_url)
+
+        resp = client.get_task(uuid.UUID(task_id))
+
+        assert resp == TaskInfoResponse(
+            id=task_id,
+            status=TaskStatus.TERMINATED,
+            termination_reason="CONTAINER_EXITED_WITH_ERROR",
+            termination_message="killed",
+            ports=[
+                PortMapping(host=34770, container=10022),
+                PortMapping(host=34771, container=10999),
+            ],
+        )
+        assert adapter.call_count == 2
+        self.assert_request(adapter, 0, "GET", "/api/healthcheck")
+        self.assert_request(adapter, 1, "GET", url)
+
+    def test_submit_task(self, client: ShimClient, adapter: requests_mock.Adapter):
+        adapter.register_uri("POST", "/api/tasks", status_code=200)
         volume = get_volume(
             name="vol",
             volume_id="vol-id",
@@ -249,39 +295,42 @@ class TestShimClientV2Compat(BaseShimClientTest):
             device_name="/dev/sdv",
         )
 
-        submitted = client.submit(
-            username="user",
-            password="pass",
+        client.submit_task(
+            task_id=uuid.UUID("c514f4ee-dfe7-472c-99a3-047178aafb5b"),
+            name="test-0-0",
+            registry_username="user",
+            registry_password="pass",
             image_name="debian",
-            privileged=True,
-            container_name="test-0-0",
             container_user="root",
-            shm_size=Memory.parse("512MB"),
-            public_keys=["project_key", "user_key"],
-            ssh_user="dstack",
-            ssh_key="host_key",
-            mounts=[VolumeMountPoint(name="vol", path="/vol")],
+            privileged=True,
+            gpu=1,
+            cpu=4.0,
+            memory=Memory.parse("16GB"),
+            shm_size=Memory.parse("1GB"),
+            network_mode=NetworkMode.BRIDGE,
             volumes=[volume],
+            volume_mounts=[VolumeMountPoint(name="vol", path="/vol")],
             instance_mounts=[InstanceMountPoint(instance_path="/mnt/nfs/home", path="/home")],
+            host_ssh_user="dstack",
+            host_ssh_keys=["host_key"],
+            container_ssh_keys=["project_key", "user_key"],
         )
 
-        assert submitted is True
-        assert adapter.call_count == 4
+        assert adapter.call_count == 2
         self.assert_request(adapter, 0, "GET", "/api/healthcheck")
-        self.assert_request(adapter, 1, "GET", legacy_task_url)
-        self.assert_request(adapter, 2, "POST", remove_legacy_task_url)
         expected_request = {
-            "id": "00000000-0000-0000-0000-000000000000",
+            "id": "c514f4ee-dfe7-472c-99a3-047178aafb5b",
             "name": "test-0-0",
             "registry_username": "user",
             "registry_password": "pass",
             "image_name": "debian",
             "container_user": "root",
             "privileged": True,
-            "gpu": -1,
-            "cpu": 0,
-            "memory": 0,
-            "shm_size": 536870912,
+            "gpu": 1,
+            "cpu": 4.0,
+            "memory": 17179869184,
+            "shm_size": 1073741824,
+            "network_mode": "bridge",
             "volumes": [
                 {
                     "backend": "gcp",
@@ -297,203 +346,52 @@ class TestShimClientV2Compat(BaseShimClientTest):
             "host_ssh_keys": ["host_key"],
             "container_ssh_keys": ["project_key", "user_key"],
         }
-        self.assert_request(adapter, 3, "POST", tasks_url, expected_request)
+        self.assert_request(adapter, 1, "POST", "/api/tasks", expected_request)
 
-    def test_submit_no_task(self, client: ShimClient, adapter: requests_mock.Adapter):
-        tasks_url = "/api/tasks"
-        legacy_task_url = f"{tasks_url}/00000000-0000-0000-0000-000000000000"
-        adapter.register_uri("GET", legacy_task_url, status_code=404)
-        adapter.register_uri("POST", tasks_url)
-        volume = get_volume(
-            name="vol",
-            volume_id="vol-id",
-            configuration=get_volume_configuration(backend=BackendType.GCP),
-            external=False,
-            device_name="/dev/sdv",
-        )
+    def test_terminate_task(self, client: ShimClient, adapter: requests_mock.Adapter):
+        task_id = "c514f4ee-dfe7-472c-99a3-047178aafb5b"
+        url = f"/api/tasks/{task_id}/terminate"
+        adapter.register_uri("POST", url, status_code=200)
 
-        submitted = client.submit(
-            username="user",
-            password="pass",
-            image_name="debian",
-            privileged=True,
-            container_name="test-0-0",
-            container_user="root",
-            shm_size=Memory.parse("512MB"),
-            public_keys=["project_key", "user_key"],
-            ssh_user="dstack",
-            ssh_key="host_key",
-            mounts=[VolumeMountPoint(name="vol", path="/vol")],
-            volumes=[volume],
-            instance_mounts=[InstanceMountPoint(instance_path="/mnt/nfs/home", path="/home")],
-        )
+        client.terminate_task(uuid.UUID(task_id), "TEST_REASON", "test message", timeout=5)
 
-        assert submitted is True
-        assert adapter.call_count == 3
+        assert adapter.call_count == 2
         self.assert_request(adapter, 0, "GET", "/api/healthcheck")
-        self.assert_request(adapter, 1, "GET", legacy_task_url)
         expected_request = {
-            "id": "00000000-0000-0000-0000-000000000000",
-            "name": "test-0-0",
-            "registry_username": "user",
-            "registry_password": "pass",
-            "image_name": "debian",
-            "container_user": "root",
-            "privileged": True,
-            "gpu": -1,
-            "cpu": 0,
-            "memory": 0,
-            "shm_size": 536870912,
-            "volumes": [
-                {
-                    "backend": "gcp",
-                    "name": "vol",
-                    "volume_id": "vol-id",
-                    "init_fs": True,
-                    "device_name": "/dev/sdv",
-                }
-            ],
-            "volume_mounts": [{"name": "vol", "path": "/vol"}],
-            "instance_mounts": [{"instance_path": "/mnt/nfs/home", "path": "/home"}],
-            "host_ssh_user": "dstack",
-            "host_ssh_keys": ["host_key"],
-            "container_ssh_keys": ["project_key", "user_key"],
+            "termination_reason": "TEST_REASON",
+            "termination_message": "test message",
+            "timeout": 5,
         }
-        self.assert_request(adapter, 2, "POST", tasks_url, expected_request)
-
-    def test_submit_conflict(self, client: ShimClient, adapter: requests_mock.Adapter):
-        tasks_url = "/api/tasks"
-        legacy_task_url = f"{tasks_url}/00000000-0000-0000-0000-000000000000"
-        adapter.register_uri(
-            "GET",
-            legacy_task_url,
-            json={
-                "id": "00000000-0000-0000-0000-000000000000",
-                "status": "running",
-                "termination_reason": "",
-                "termination_message": "",
-            },
-        )
-        adapter.register_uri("POST", tasks_url)
-        volume = get_volume(
-            name="vol",
-            volume_id="vol-id",
-            configuration=get_volume_configuration(backend=BackendType.GCP),
-            external=False,
-            device_name="/dev/sdv",
-        )
-
-        submitted = client.submit(
-            username="user",
-            password="pass",
-            image_name="debian",
-            privileged=True,
-            container_name="test-0-0",
-            container_user="root",
-            shm_size=Memory.parse("512MB"),
-            public_keys=["project_key", "user_key"],
-            ssh_user="dstack",
-            ssh_key="host_key",
-            mounts=[VolumeMountPoint(name="vol", path="/vol")],
-            volumes=[volume],
-            instance_mounts=[InstanceMountPoint(instance_path="/mnt/nfs/home", path="/home")],
-        )
-
-        assert submitted is False
-        assert adapter.call_count == 2
-        self.assert_request(adapter, 0, "GET", "/api/healthcheck")
-        self.assert_request(adapter, 1, "GET", legacy_task_url)
-
-    def test_stop(self, client: ShimClient, adapter: requests_mock.Adapter):
-        url = "/api/tasks/00000000-0000-0000-0000-000000000000/terminate"
-        adapter.register_uri(
-            "POST",
-            url,
-            json={
-                "id": "00000000-0000-0000-0000-000000000000",
-                "status": "terminated",
-                "termination_reason": "",
-                "termination_message": "",
-            },
-        )
-
-        client.stop()
-
-        assert adapter.call_count == 2
-        self.assert_request(adapter, 0, "GET", "/api/healthcheck")
-        expected_request = {"termination_reason": "", "termination_message": "", "timeout": 10}
         self.assert_request(adapter, 1, "POST", url, expected_request)
 
-    def test_stop_no_task(self, client: ShimClient, adapter: requests_mock.Adapter):
-        url = "/api/tasks/00000000-0000-0000-0000-000000000000/terminate"
-        adapter.register_uri("POST", url, status_code=404)
+    def test_terminate_task_default_params(
+        self, client: ShimClient, adapter: requests_mock.Adapter
+    ):
+        task_id = uuid.UUID("c514f4ee-dfe7-472c-99a3-047178aafb5b")
+        url = f"/api/tasks/{task_id}/terminate"
+        adapter.register_uri("POST", url, status_code=200)
 
-        client.stop()
+        client.terminate_task(task_id)
 
         assert adapter.call_count == 2
         self.assert_request(adapter, 0, "GET", "/api/healthcheck")
-        expected_request = {"termination_reason": "", "termination_message": "", "timeout": 10}
+        expected_request = {
+            "termination_reason": "",
+            "termination_message": "",
+            "timeout": 10,
+        }
         self.assert_request(adapter, 1, "POST", url, expected_request)
 
-    def test_stop_force(self, client: ShimClient, adapter: requests_mock.Adapter):
-        url = "/api/tasks/00000000-0000-0000-0000-000000000000/terminate"
-        adapter.register_uri(
-            "POST",
-            url,
-            json={
-                "id": "00000000-0000-0000-0000-000000000000",
-                "status": "terminated",
-                "termination_reason": "",
-                "termination_message": "",
-            },
-        )
+    def test_remove_task(self, client: ShimClient, adapter: requests_mock.Adapter):
+        task_id = "c514f4ee-dfe7-472c-99a3-047178aafb5b"
+        url = f"/api/tasks/{task_id}/remove"
+        adapter.register_uri("POST", url, status_code=200)
 
-        client.stop(force=True)
+        client.remove_task(uuid.UUID(task_id))
 
         assert adapter.call_count == 2
         self.assert_request(adapter, 0, "GET", "/api/healthcheck")
-        expected_request = {"termination_reason": "", "termination_message": "", "timeout": 0}
-        self.assert_request(adapter, 1, "POST", url, expected_request)
-
-    def test_pull(self, client: ShimClient, adapter: requests_mock.Adapter):
-        adapter.register_uri(
-            "GET",
-            "/api/tasks/00000000-0000-0000-0000-000000000000",
-            json={
-                "id": "00000000-0000-0000-0000-000000000000",
-                "status": "terminated",
-                "termination_reason": "CONTAINER_EXITED_WITH_ERROR",
-                "termination_message": "killed",
-                "container_name": "horrible-mule-1-0-0-44f7cb95",  # ignored
-            },
-        )
-
-        resp = client.pull()
-
-        assert resp == LegacyPullResponse(
-            state="pending",
-            result=JobResult(reason="CONTAINER_EXITED_WITH_ERROR", reason_message="killed"),
-        )
-        assert adapter.call_count == 2
-        self.assert_request(adapter, 0, "GET", "/api/healthcheck")
-        self.assert_request(adapter, 1, "GET", "/api/tasks/00000000-0000-0000-0000-000000000000")
-
-    def test_pull_no_task(self, client: ShimClient, adapter: requests_mock.Adapter):
-        adapter.register_uri(
-            "GET",
-            "/api/tasks/00000000-0000-0000-0000-000000000000",
-            status_code=404,
-        )
-
-        resp = client.pull()
-
-        assert resp == LegacyPullResponse(
-            state="pending",
-            result=JobResult(reason="", reason_message=""),
-        )
-        assert adapter.call_count == 2
-        self.assert_request(adapter, 0, "GET", "/api/healthcheck")
-        self.assert_request(adapter, 1, "GET", "/api/tasks/00000000-0000-0000-0000-000000000000")
+        self.assert_request(adapter, 1, "POST", url)
 
 
 class TestParseVersion:

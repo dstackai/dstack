@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
+from dstack._internal.core.consts import DSTACK_RUNNER_SSH_PORT
 from dstack._internal.core.models.common import is_core_model_instance
 from dstack._internal.core.models.configurations import ServiceConfiguration
 from dstack._internal.core.models.gateways import AnyModel
@@ -71,7 +72,7 @@ class ServerProxyRepo(BaseProxyRepo):
                 ssh_proxy = jpd.ssh_proxy
             else:
                 ssh_destination = "root@localhost"  # TODO(#1535): support non-root images properly
-                ssh_port = 10022
+                ssh_port = DSTACK_RUNNER_SSH_PORT
                 ssh_proxy = SSHConnectionParams(
                     hostname=jpd.hostname,
                     username=jpd.username,

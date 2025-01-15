@@ -7,6 +7,7 @@ from typing import Optional
 from dstack._internal.cli.commands import APIBaseCommand
 from dstack._internal.cli.services.args import port_mapping
 from dstack._internal.cli.utils.common import console
+from dstack._internal.core.consts import DSTACK_RUNNER_HTTP_PORT
 from dstack._internal.core.errors import CLIError
 from dstack._internal.utils.common import get_or_error
 from dstack.api._public.runs import Run
@@ -100,7 +101,7 @@ class AttachCommand(APIBaseCommand):
             run.detach()
 
 
-_IGNORED_PORTS = [10999]
+_IGNORED_PORTS = [DSTACK_RUNNER_HTTP_PORT]
 
 
 def _print_attached_message(

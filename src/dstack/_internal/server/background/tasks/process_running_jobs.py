@@ -6,9 +6,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 import dstack._internal.server.services.gateways as gateways
+from dstack._internal.core.consts import DSTACK_RUNNER_HTTP_PORT, DSTACK_SHIM_HTTP_PORT
 from dstack._internal.core.errors import GatewayError
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.common import RegistryAuth, is_core_model_instance
+from dstack._internal.core.models.common import NetworkMode, RegistryAuth, is_core_model_instance
 from dstack._internal.core.models.instances import InstanceStatus, RemoteConnectionInfo
 from dstack._internal.core.models.repos import RemoteRepoCreds
 from dstack._internal.core.models.runs import (
@@ -28,9 +29,11 @@ from dstack._internal.server.models import (
     RepoModel,
     RunModel,
 )
+from dstack._internal.server.schemas.runner import TaskStatus
 from dstack._internal.server.services import logs as logs_services
 from dstack._internal.server.services.jobs import (
     find_job,
+    get_job_runtime_data,
     job_model_to_job_submission,
 )
 from dstack._internal.server.services.locking import get_locker
@@ -191,6 +194,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
                     _process_provisioning_with_shim,
                     server_ssh_private_key,
                     job_provisioning_data,
+                    None,
                     run,
                     job_model,
                     volumes,
@@ -213,9 +217,10 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
                     code_hash=run.run_spec.repo_code_hash,
                 )
                 success = await common_utils.run_async(
-                    _process_provisioning_no_shim,
+                    _submit_job_to_runner,
                     server_ssh_private_key,
                     job_provisioning_data,
+                    None,
                     run,
                     job_model,
                     job,
@@ -257,6 +262,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
                 _process_pulling_with_shim,
                 server_ssh_private_key,
                 job_provisioning_data,
+                None,
                 run,
                 job_model,
                 job,
@@ -264,6 +270,8 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
                 code,
                 secrets,
                 repo_creds,
+                server_ssh_private_key,
+                job_provisioning_data,
             )
         elif initial_status == JobStatus.RUNNING:
             logger.debug("%s: process running job, age=%s", fmt(job_model), job_submission.age)
@@ -271,6 +279,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
                 _process_running,
                 server_ssh_private_key,
                 job_provisioning_data,
+                job_submission.job_runtime_data,
                 run_model,
                 job_model,
             )
@@ -337,44 +346,7 @@ async def _wait_for_instance_provisioning_data(job_model: JobModel):
     job_model.job_provisioning_data = job_model.instance.job_provisioning_data
 
 
-@runner_ssh_tunnel(ports=[client.REMOTE_RUNNER_PORT], retries=1)
-def _process_provisioning_no_shim(
-    ports: Dict[int, int],
-    run: Run,
-    job_model: JobModel,
-    job: Job,
-    cluster_info: ClusterInfo,
-    code: bytes,
-    secrets: Dict[str, str],
-    repo_credentials: Optional[RemoteRepoCreds],
-) -> bool:
-    """
-    Possible next states:
-    - JobStatus.RUNNING if runner is available
-    - JobStatus.TERMINATING if timeout is exceeded
-
-    Returns:
-        is successful
-    """
-
-    runner_client = client.RunnerClient(port=ports[client.REMOTE_RUNNER_PORT])
-    resp = runner_client.healthcheck()
-    if resp is None:
-        return False  # runner is not available yet
-    _submit_job_to_runner(
-        runner_client=runner_client,
-        run=run,
-        job_model=job_model,
-        job=job,
-        cluster_info=cluster_info,
-        code=code,
-        secrets=secrets,
-        repo_credentials=repo_credentials,
-    )
-    return True
-
-
-@runner_ssh_tunnel(ports=[client.REMOTE_SHIM_PORT], retries=1)
+@runner_ssh_tunnel(ports=[DSTACK_SHIM_HTTP_PORT], retries=1)
 def _process_provisioning_with_shim(
     ports: Dict[int, int],
     run: Run,
@@ -396,20 +368,20 @@ def _process_provisioning_with_shim(
     """
     job_spec = JobSpec.__response__.parse_raw(job_model.job_spec_data)
 
-    shim_client = client.ShimClient(port=ports[client.REMOTE_SHIM_PORT])
+    shim_client = client.ShimClient(port=ports[DSTACK_SHIM_HTTP_PORT])
 
     resp = shim_client.healthcheck()
     if resp is None:
         logger.debug("%s: shim is not available yet", fmt(job_model))
         return False  # shim is not available yet
 
-    username = ""
-    password = ""
+    registry_username = ""
+    registry_password = ""
     if registry_auth is not None:
         logger.debug("%s: authenticating to the registry...", fmt(job_model))
         interpolate = VariablesInterpolator({"secrets": secrets}).interpolate
-        username = interpolate(registry_auth.username)
-        password = interpolate(registry_auth.password)
+        registry_username = interpolate(registry_auth.username)
+        registry_password = interpolate(registry_auth.password)
 
     volume_mounts: List[VolumeMountPoint] = []
     instance_mounts: List[InstanceMountPoint] = []
@@ -426,44 +398,80 @@ def _process_provisioning_with_shim(
     for volume, volume_mount in zip(volumes, volume_mounts):
         volume_mount.name = volume.name
 
-    submitted = shim_client.submit(
-        username=username,
-        password=password,
-        image_name=job_spec.image_name,
-        privileged=job_spec.privileged,
-        container_name=job_model.job_name,
-        # Images may use non-root users but dstack requires root, so force it.
-        # TODO(#1535): support non-root images properly
-        container_user="root",
-        shm_size=job_spec.requirements.resources.shm_size,
-        public_keys=public_keys,
-        ssh_user=ssh_user,
-        ssh_key=ssh_key,
-        mounts=volume_mounts,
-        volumes=volumes,
-        instance_mounts=instance_mounts,
-    )
-    if not submitted:
-        # This can happen when we lost connection to the runner (e.g., network issues), marked
-        # the job as failed, released the instance (status=BUSY->IDLE, job_id={id}->None),
-        # but the job container is in fact alive, running the previous job. As we force-stop
-        # the container via shim API when cancelling the current job anyway (when either the user
-        # aborts the submission process or the submission deadline is reached), it's safe to kill
-        # the previous job container now, making the shim available (state=running->pending)
-        # for the next try.
-        logger.warning(
-            "%s: failed to submit, shim is already running a job, stopping it now, retry later",
-            fmt(job_model),
+    container_user = "root"
+
+    job_runtime_data = get_job_runtime_data(job_model)
+    # should check for None, as there may be older jobs submitted before
+    # JobRuntimeData was introduced
+    if job_runtime_data is not None:
+        gpu = job_runtime_data.gpu
+        cpu = job_runtime_data.cpu
+        memory = job_runtime_data.memory
+        network_mode = job_runtime_data.network_mode
+    else:
+        gpu = None
+        cpu = None
+        memory = None
+        network_mode = NetworkMode.HOST
+
+    if shim_client.is_api_v2_supported():
+        shim_client.submit_task(
+            task_id=job_model.id,
+            name=job_model.job_name,
+            registry_username=registry_username,
+            registry_password=registry_password,
+            image_name=job_spec.image_name,
+            container_user=container_user,
+            privileged=job_spec.privileged,
+            gpu=gpu,
+            cpu=cpu,
+            memory=memory,
+            shm_size=job_spec.requirements.resources.shm_size,
+            network_mode=network_mode,
+            volumes=volumes,
+            volume_mounts=volume_mounts,
+            instance_mounts=instance_mounts,
+            host_ssh_user=ssh_user,
+            host_ssh_keys=[ssh_key],
+            container_ssh_keys=public_keys,
         )
-        shim_client.stop(force=True)
-        return False
+    else:
+        submitted = shim_client.submit(
+            username=registry_username,
+            password=registry_password,
+            image_name=job_spec.image_name,
+            privileged=job_spec.privileged,
+            container_name=job_model.job_name,
+            container_user=container_user,
+            shm_size=job_spec.requirements.resources.shm_size,
+            public_keys=public_keys,
+            ssh_user=ssh_user,
+            ssh_key=ssh_key,
+            mounts=volume_mounts,
+            volumes=volumes,
+            instance_mounts=instance_mounts,
+        )
+        if not submitted:
+            # This can happen when we lost connection to the runner (e.g., network issues), marked
+            # the job as failed, released the instance (status=BUSY->IDLE, job_id={id}->None),
+            # but the job container is in fact alive, running the previous job. As we force-stop
+            # the container via shim API when cancelling the current job anyway (when either the
+            # user aborts the submission process or the submission deadline is reached), it's safe
+            # to kill the previous job container now, making the shim available
+            # (state=running->pending) for the next try.
+            logger.warning(
+                "%s: failed to submit, shim is already running a job, stopping it now, retry later",
+                fmt(job_model),
+            )
+            shim_client.stop(force=True)
+            return False
 
     job_model.status = JobStatus.PULLING
     logger.info("%s: now is %s", fmt(job_model), job_model.status.name)
     return True
 
 
-@runner_ssh_tunnel(ports=[client.REMOTE_SHIM_PORT, client.REMOTE_RUNNER_PORT])
+@runner_ssh_tunnel(ports=[DSTACK_SHIM_HTTP_PORT])
 def _process_pulling_with_shim(
     ports: Dict[int, int],
     run: Run,
@@ -473,6 +481,8 @@ def _process_pulling_with_shim(
     code: bytes,
     secrets: Dict[str, str],
     repo_credentials: Optional[RemoteRepoCreds],
+    server_ssh_private_key: str,
+    job_provisioning_data: JobProvisioningData,
 ) -> bool:
     """
     Possible next states:
@@ -482,37 +492,63 @@ def _process_pulling_with_shim(
     Returns:
         is successful
     """
-    shim_client = client.ShimClient(port=ports[client.REMOTE_SHIM_PORT])
-    shim_status = shim_client.pull()  # raises error if shim is down, causes retry
+    shim_client = client.ShimClient(port=ports[DSTACK_SHIM_HTTP_PORT])
+    if shim_client.is_api_v2_supported():  # raises error if shim is down, causes retry
+        task = shim_client.get_task(job_model.id)
 
-    # If shim goes to pending before the job is submitted to runner, then an error occured
-    if (
-        shim_status.state == "pending"
-        and shim_status.result is not None
-        and shim_status.result.reason != ""
-    ):
-        logger.warning(
-            "shim failed to execute job %s: %s (%s)",
-            job_model.job_name,
-            shim_status.result.reason,
-            shim_status.result.reason_message,
-        )
-        logger.debug("shim status: %s", shim_status.dict())
-        job_model.termination_reason = JobTerminationReason[shim_status.result.reason.upper()]
-        job_model.termination_reason_message = shim_status.result.reason_message
-        return False
+        # If task goes to terminated before the job is submitted to runner, then an error occured
+        if task.status == TaskStatus.TERMINATED:
+            logger.warning(
+                "shim failed to execute job %s: %s (%s)",
+                job_model.job_name,
+                task.termination_reason,
+                task.termination_message,
+            )
+            logger.debug("task status: %s", task.dict())
+            job_model.termination_reason = JobTerminationReason[task.termination_reason.upper()]
+            job_model.termination_reason_message = task.termination_message
+            return False
 
-    if shim_status.state in ("pulling", "creating"):
-        return True
+        if task.status != TaskStatus.RUNNING:
+            return True
 
-    runner_client = client.RunnerClient(port=ports[client.REMOTE_RUNNER_PORT])
-    resp = runner_client.healthcheck()
-    if resp is None:
-        return True  # runner is not available yet
+        job_runtime_data = get_job_runtime_data(job_model)
+        # should check for None, as there may be older jobs submitted before
+        # JobRuntimeData was introduced
+        if job_runtime_data is not None:
+            # port mapping is not yet available, waiting
+            if task.ports is None:
+                return True
+            job_runtime_data.ports = {pm.container: pm.host for pm in task.ports}
+            job_model.job_runtime_data = job_runtime_data.json()
 
-    # Expect shim_status.state == "running"
-    _submit_job_to_runner(
-        runner_client=runner_client,
+    else:
+        shim_status = shim_client.pull()  # raises error if shim is down, causes retry
+
+        # If shim goes to pending before the job is submitted to runner, then an error occured
+        if (
+            shim_status.state == "pending"
+            and shim_status.result is not None
+            and shim_status.result.reason != ""
+        ):
+            logger.warning(
+                "shim failed to execute job %s: %s (%s)",
+                job_model.job_name,
+                shim_status.result.reason,
+                shim_status.result.reason_message,
+            )
+            logger.debug("shim status: %s", shim_status.dict())
+            job_model.termination_reason = JobTerminationReason[shim_status.result.reason.upper()]
+            job_model.termination_reason_message = shim_status.result.reason_message
+            return False
+
+        if shim_status.state in ("pulling", "creating"):
+            return True
+
+    return _submit_job_to_runner(
+        server_ssh_private_key,
+        job_provisioning_data,
+        job_runtime_data,
         run=run,
         job_model=job_model,
         job=job,
@@ -521,10 +557,9 @@ def _process_pulling_with_shim(
         secrets=secrets,
         repo_credentials=repo_credentials,
     )
-    return True
 
 
-@runner_ssh_tunnel(ports=[client.REMOTE_RUNNER_PORT])
+@runner_ssh_tunnel(ports=[DSTACK_RUNNER_HTTP_PORT])
 def _process_running(
     ports: Dict[int, int],
     run_model: RunModel,
@@ -538,7 +573,7 @@ def _process_running(
     Returns:
         is successful
     """
-    runner_client = client.RunnerClient(port=ports[client.REMOTE_RUNNER_PORT])
+    runner_client = client.RunnerClient(port=ports[DSTACK_RUNNER_HTTP_PORT])
     timestamp = 0
     if job_model.runner_timestamp is not None:
         timestamp = job_model.runner_timestamp
@@ -609,8 +644,9 @@ async def _get_job_code(
     return blob
 
 
+@runner_ssh_tunnel(ports=[DSTACK_RUNNER_HTTP_PORT], retries=1)
 def _submit_job_to_runner(
-    runner_client: client.RunnerClient,
+    ports: Dict[int, int],
     run: Run,
     job_model: JobModel,
     job: Job,
@@ -618,7 +654,15 @@ def _submit_job_to_runner(
     code: bytes,
     secrets: Dict[str, str],
     repo_credentials: Optional[RemoteRepoCreds],
-):
+) -> bool:
+    """
+    Possible next states:
+    - JobStatus.RUNNING if runner is available
+    - JobStatus.TERMINATING if timeout is exceeded
+
+    Returns:
+        is successful
+    """
     logger.debug("%s: submitting job spec", fmt(job_model))
     logger.debug(
         "%s: repo clone URL is %s",
@@ -631,6 +675,12 @@ def _submit_job_to_runner(
         instance_env = remote_info.env
     else:
         instance_env = None
+
+    runner_client = client.RunnerClient(port=ports[DSTACK_RUNNER_HTTP_PORT])
+    resp = runner_client.healthcheck()
+    if resp is None:
+        return True  # runner is not available yet
+
     runner_client.submit_job(
         run_spec=run.run_spec,
         job_spec=job.job_spec,
@@ -646,6 +696,8 @@ def _submit_job_to_runner(
 
     job_model.status = JobStatus.RUNNING
     # do not log here, because the runner will send a new status
+
+    return True
 
 
 def _get_runner_timeout_interval(backend_type: BackendType, instance_type_name: str) -> timedelta:

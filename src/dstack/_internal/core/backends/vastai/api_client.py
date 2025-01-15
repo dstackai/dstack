@@ -6,6 +6,7 @@ import requests
 from requests.adapters import HTTPAdapter, Retry
 
 import dstack._internal.server.services.docker as docker
+from dstack._internal.core.consts import DSTACK_RUNNER_SSH_PORT
 from dstack._internal.core.errors import NoCapacityError
 from dstack._internal.core.models.common import RegistryAuth
 
@@ -65,7 +66,7 @@ class VastAIAPIClient:
             "disk": disk_size,
             "label": instance_name,
             "env": {
-                "-p 10022:10022": "1",
+                f"-p {DSTACK_RUNNER_SSH_PORT}:{DSTACK_RUNNER_SSH_PORT}": "1",
             },
             "user": "root",
             "onstart": "/bin/sh",

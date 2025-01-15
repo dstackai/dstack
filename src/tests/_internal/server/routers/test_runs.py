@@ -355,6 +355,7 @@ def get_dev_env_run_dict(
                         "termination_reason": None,
                         "termination_reason_message": None,
                         "job_provisioning_data": None,
+                        "job_runtime_data": None,
                     }
                 ],
             }
@@ -369,6 +370,7 @@ def get_dev_env_run_dict(
             "termination_reason": None,
             "termination_reason_message": None,
             "job_provisioning_data": None,
+            "job_runtime_data": None,
         },
         "cost": 0.0,
         "service": None,
@@ -479,6 +481,7 @@ class TestListRuns:
                                 "termination_reason": None,
                                 "termination_reason_message": None,
                                 "job_provisioning_data": None,
+                                "job_runtime_data": None,
                             }
                         ],
                     }
@@ -493,6 +496,7 @@ class TestListRuns:
                     "termination_reason_message": None,
                     "termination_reason": None,
                     "job_provisioning_data": None,
+                    "job_runtime_data": None,
                 },
                 "cost": 0,
                 "service": None,

@@ -8,6 +8,7 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.common import NetworkMode
 from dstack._internal.core.models.configurations import (
     AnyRunConfiguration,
     DevEnvironmentConfiguration,
@@ -37,6 +38,7 @@ from dstack._internal.core.models.repos.local import LocalRunRepoData
 from dstack._internal.core.models.resources import Memory, Range, ResourcesSpec
 from dstack._internal.core.models.runs import (
     JobProvisioningData,
+    JobRuntimeData,
     JobStatus,
     JobTerminationReason,
     Requirements,
@@ -277,6 +279,7 @@ async def create_job(
     last_processed_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
     termination_reason: Optional[JobTerminationReason] = None,
     job_provisioning_data: Optional[JobProvisioningData] = None,
+    job_runtime_data: Optional[JobRuntimeData] = None,
     instance: Optional[InstanceModel] = None,
     job_num: int = 0,
     replica_num: int = 0,
@@ -298,6 +301,7 @@ async def create_job(
         termination_reason=termination_reason,
         job_spec_data=job_spec.json(),
         job_provisioning_data=job_provisioning_data.json() if job_provisioning_data else None,
+        job_runtime_data=job_runtime_data.json() if job_runtime_data else None,
         instance=instance,
         instance_assigned=instance_assigned,
         used_instance_id=instance.id if instance is not None else None,
@@ -307,7 +311,7 @@ async def create_job(
     return job
 
 
-def get_job_provisioning_data() -> JobProvisioningData:
+def get_job_provisioning_data(dockerized: bool = False) -> JobProvisioningData:
     return JobProvisioningData(
         backend=BackendType.AWS,
         instance_type=InstanceType(
@@ -321,9 +325,25 @@ def get_job_provisioning_data() -> JobProvisioningData:
         price=10.5,
         username="ubuntu",
         ssh_port=22,
-        dockerized=False,
+        dockerized=dockerized,
         backend_data=None,
         ssh_proxy=None,
+    )
+
+
+def get_job_runtime_data(
+    network_mode: str = NetworkMode.HOST,
+    cpu: Optional[float] = None,
+    gpu: Optional[int] = None,
+    memory: Optional[float] = None,
+    ports: Optional[dict[int, int]] = None,
+) -> JobRuntimeData:
+    return JobRuntimeData(
+        network_mode=NetworkMode(network_mode),
+        cpu=cpu,
+        gpu=gpu,
+        memory=Memory(memory) if memory is not None else None,
+        ports=ports,
     )
 
 

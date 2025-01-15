@@ -54,6 +54,7 @@ class SSHAttach:
         self,
         hostname: str,
         ssh_port: int,
+        container_ssh_port: int,
         user: str,
         id_rsa_path: PathLike,
         ports_lock: PortsLock,
@@ -109,7 +110,7 @@ class SSHAttach:
         if dockerized and not local_backend:
             self.container_config = {
                 "HostName": "localhost",
-                "Port": 10022,
+                "Port": container_ssh_port,
                 "User": "root",  # TODO(#1535): support non-root images properly
                 "IdentityFile": self.identity_file,
                 "IdentitiesOnly": "yes",

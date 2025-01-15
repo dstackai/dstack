@@ -8,6 +8,7 @@ from dstack._internal.core.backends.base.compute import get_docker_commands, get
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.vastai.api_client import VastAIAPIClient
 from dstack._internal.core.backends.vastai.config import VastAIConfig
+from dstack._internal.core.consts import DSTACK_RUNNER_SSH_PORT
 from dstack._internal.core.errors import ProvisioningError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
@@ -110,7 +111,9 @@ class VastAICompute(Compute):
         if resp is not None:
             if resp["actual_status"] == "running":
                 provisioning_data.hostname = resp["public_ipaddr"].strip()
-                provisioning_data.ssh_port = int(resp["ports"]["10022/tcp"][0]["HostPort"])
+                provisioning_data.ssh_port = int(
+                    resp["ports"][f"{DSTACK_RUNNER_SSH_PORT}/tcp"][0]["HostPort"]
+                )
             if (
                 resp["actual_status"] == "created"
                 and ": OCI runtime create failed:" in resp["status_msg"]

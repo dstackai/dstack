@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 import dstack._internal.server.services.gateways as gateways
+from dstack._internal.core.consts import DSTACK_RUNNER_HTTP_PORT, DSTACK_SHIM_HTTP_PORT
 from dstack._internal.core.errors import BackendError, ResourceNotExistsError, SSHError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import RunConfigurationType
@@ -16,12 +17,12 @@ from dstack._internal.core.models.instances import InstanceStatus, RemoteConnect
 from dstack._internal.core.models.runs import (
     Job,
     JobProvisioningData,
+    JobRuntimeData,
     JobSpec,
     JobStatus,
     JobSubmission,
     RunSpec,
 )
-from dstack._internal.core.services.ssh.tunnel import SSHTunnel, ports_to_forwarded_sockets
 from dstack._internal.server.models import (
     InstanceModel,
     JobModel,
@@ -37,11 +38,10 @@ from dstack._internal.server.services.jobs.configurators.task import TaskJobConf
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.runner import client
-from dstack._internal.server.services.runner.ssh import get_runner_ports, runner_ssh_tunnel
+from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
 from dstack._internal.server.services.volumes import volume_model_to_volume
 from dstack._internal.utils.common import get_current_datetime, run_async
 from dstack._internal.utils.logging import get_logger
-from dstack._internal.utils.path import FileContent
 
 logger = get_logger(__name__)
 
@@ -117,6 +117,7 @@ def job_model_to_job_submission(job_model: JobModel) -> JobSubmission:
         termination_reason=job_model.termination_reason,
         termination_reason_message=job_model.termination_reason_message,
         job_provisioning_data=job_provisioning_data,
+        job_runtime_data=get_job_runtime_data(job_model),
     )
 
 
@@ -124,6 +125,12 @@ def get_job_provisioning_data(job_model: JobModel) -> Optional[JobProvisioningDa
     if job_model.job_provisioning_data is None:
         return None
     return JobProvisioningData.__response__.parse_raw(job_model.job_provisioning_data)
+
+
+def get_job_runtime_data(job_model: JobModel) -> Optional[JobRuntimeData]:
+    if job_model.job_runtime_data is None:
+        return None
+    return JobRuntimeData.__response__.parse_raw(job_model.job_runtime_data)
 
 
 def delay_job_instance_termination(job_model: JobModel):
@@ -165,30 +172,23 @@ async def stop_runner(session: AsyncSession, job_model: JobModel):
         )
         ssh_private_key = remote_conn_info.ssh_keys[0].private
     try:
-        await run_async(_stop_runner, job_model, ssh_private_key)
+        jpd = get_job_provisioning_data(job_model)
+        if jpd is not None:
+            jrd = get_job_runtime_data(job_model)
+            await run_async(_stop_runner, ssh_private_key, jpd, jrd, job_model)
         delay_job_instance_termination(job_model)
     except SSHError:
         logger.debug("%s: failed to stop runner", fmt(job_model))
 
 
+@runner_ssh_tunnel(ports=[DSTACK_RUNNER_HTTP_PORT])
 def _stop_runner(
+    ports: dict[int, int],
     job_model: JobModel,
-    server_ssh_private_key: str,
 ):
-    jpd = get_job_provisioning_data(job_model)
-    if jpd is None:
-        return
-    logger.debug("%s: stopping runner %s", fmt(job_model), jpd.hostname)
-    ports = get_runner_ports()
-    with SSHTunnel(
-        destination=f"{jpd.username}@{jpd.hostname}",
-        port=jpd.ssh_port,
-        forwarded_sockets=ports_to_forwarded_sockets(ports),
-        identity=FileContent(server_ssh_private_key),
-        ssh_proxy=jpd.ssh_proxy,
-    ):
-        runner_client = client.RunnerClient(port=ports[client.REMOTE_RUNNER_PORT])
-        runner_client.stop()
+    logger.debug("%s: stopping runner", fmt(job_model))
+    runner_client = client.RunnerClient(port=ports[DSTACK_RUNNER_HTTP_PORT])
+    runner_client.stop()
 
 
 async def process_terminating_job(session: AsyncSession, job_model: JobModel):
@@ -287,21 +287,36 @@ async def stop_container(
             _shim_submit_stop,
             ssh_private_key,
             job_provisioning_data,
+            None,
             job_model,
         )
 
 
-@runner_ssh_tunnel(ports=[client.REMOTE_SHIM_PORT])
+@runner_ssh_tunnel(ports=[DSTACK_SHIM_HTTP_PORT])
 def _shim_submit_stop(ports: Dict[int, int], job_model: JobModel):
-    shim_client = client.ShimClient(port=ports[client.REMOTE_SHIM_PORT])
+    shim_client = client.ShimClient(port=ports[DSTACK_SHIM_HTTP_PORT])
 
     resp = shim_client.healthcheck()
     if resp is None:
         logger.debug("%s: can't stop container, shim is not available yet", fmt(job_model))
         return False  # shim is not available yet
 
-    # we force container deletion because the runner had time to gracefully stop the job
-    shim_client.stop(force=True)
+    # we force-kill container because the runner had time to gracefully stop the job
+    if shim_client.is_api_v2_supported():
+        if job_model.termination_reason is None:
+            reason = None
+        else:
+            reason = job_model.termination_reason.name
+        shim_client.terminate_task(
+            task_id=job_model.id,
+            reason=reason,
+            message=job_model.termination_reason_message,
+            timeout=0,
+        )
+        # maybe somehow postpone removing old tasks to allow inspecting failed jobs?
+        shim_client.remove_task(task_id=job_model.id)
+    else:
+        shim_client.stop(force=True)
 
 
 def group_jobs_by_replica_latest(jobs: List[JobModel]) -> Iterable[Tuple[int, List[JobModel]]]:

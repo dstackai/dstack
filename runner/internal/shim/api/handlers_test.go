@@ -31,8 +31,13 @@ func TestHealthcheck(t *testing.T) {
 
 func TestTaskSubmit(t *testing.T) {
 	server := NewShimServer(context.Background(), ":12340", NewDummyRunner(), "0.0.1.dev2")
+	requestBody := `{
+		"id": "dummy-id",
+		"name": "dummy-name",
+		"image_name": "ubuntu"
+	}`
 
-	request := httptest.NewRequest("POST", "/api/tasks", strings.NewReader(`{"image_name":"ubuntu"}`))
+	request := httptest.NewRequest("POST", "/api/tasks", strings.NewReader(requestBody))
 	responseRecorder := httptest.NewRecorder()
 	firstSubmitPost := common.JSONResponseHandler(server.TaskSubmitHandler)
 	firstSubmitPost(responseRecorder, request)
@@ -40,7 +45,7 @@ func TestTaskSubmit(t *testing.T) {
 		t.Errorf("Want status '%d', got '%d'", 200, responseRecorder.Code)
 	}
 
-	request = httptest.NewRequest("POST", "/api/tasks", strings.NewReader(`{"image_name":"ubuntu"}`))
+	request = httptest.NewRequest("POST", "/api/tasks", strings.NewReader(requestBody))
 	responseRecorder = httptest.NewRecorder()
 	secondSubmitPost := common.JSONResponseHandler(server.TaskSubmitHandler)
 	secondSubmitPost(responseRecorder, request)

@@ -128,10 +128,11 @@ func (d *DockerRunner) restoreStateFromContainers(ctx context.Context) error {
 			containerName = strings.TrimLeft(containerShort.Names[0], "/")
 		}
 		var gpuIDs []string
-		if d.gpuVendor != host.GpuVendorNone {
-			if containerFull, err := d.client.ContainerInspect(ctx, containerID); err != nil {
-				log.Error(ctx, "failed to inspect container", "id", containerID, "task", taskID)
-			} else if d.gpuVendor == host.GpuVendorNvidia {
+		var ports []PortMapping
+		if containerFull, err := d.client.ContainerInspect(ctx, containerID); err != nil {
+			log.Error(ctx, "failed to inspect container", "id", containerID, "task", taskID)
+		} else {
+			if d.gpuVendor == host.GpuVendorNvidia {
 				deviceRequests := containerFull.HostConfig.Resources.DeviceRequests
 				if len(deviceRequests) == 1 {
 					gpuIDs = deviceRequests[0].DeviceIDs
@@ -142,13 +143,16 @@ func (d *DockerRunner) restoreStateFromContainers(ctx context.Context) error {
 						"id", containerID, "task", taskID,
 					)
 				}
-			} else {
+			} else if d.gpuVendor == host.GpuVendorAmd {
 				for _, device := range containerFull.HostConfig.Resources.Devices {
 					if host.IsRenderNodePath(device.PathOnHost) {
 						gpuIDs = append(gpuIDs, device.PathOnHost)
 					}
 				}
+			} else {
+				gpuIDs = []string{}
 			}
+			ports = extractPorts(ctx, containerFull.NetworkSettings.Ports)
 		}
 		var runnerDir string
 		for _, mount := range containerShort.Mounts {
@@ -157,7 +161,7 @@ func (d *DockerRunner) restoreStateFromContainers(ctx context.Context) error {
 				break
 			}
 		}
-		task := NewTask(taskID, status, containerName, containerID, gpuIDs, runnerDir)
+		task := NewTask(taskID, status, containerName, containerID, gpuIDs, ports, runnerDir)
 		if !d.tasks.Add(task) {
 			log.Error(ctx, "duplicate restored task", "task", taskID)
 		} else {
@@ -203,28 +207,19 @@ func (d *DockerRunner) TaskInfo(taskID string) TaskInfo {
 	if !ok {
 		return TaskInfo{}
 	}
-	taskInfo := TaskInfo{
+	return TaskInfo{
 		ID:                 task.ID,
 		Status:             task.Status,
 		TerminationReason:  task.TerminationReason,
 		TerminationMessage: task.TerminationMessage,
+		Ports:              task.ports,
 		ContainerName:      task.containerName,
 		ContainerID:        task.containerID,
 		GpuIDs:             task.gpuIDs,
 	}
-	if taskInfo.GpuIDs == nil {
-		taskInfo.GpuIDs = []string{}
-	}
-	return taskInfo
 }
 
 func (d *DockerRunner) Submit(ctx context.Context, cfg TaskConfig) error {
-	if cfg.ID == "" {
-		return tracerr.Errorf("%w: empty task ID", ErrRequest)
-	}
-	if cfg.Name == "" {
-		return tracerr.Errorf("%w: empty task Name", ErrRequest)
-	}
 	task := NewTaskFromConfig(cfg)
 	if ok := d.tasks.Add(task); !ok {
 		return tracerr.Errorf("%w: task %s is already submitted", ErrRequest, task.ID)
@@ -275,6 +270,8 @@ func (d *DockerRunner) Run(ctx context.Context, taskID string) error {
 			releasedGpuIDs := d.gpuLock.Release(ctx, task.gpuIDs)
 			log.Debug(ctx, "released GPU(s)", "task", task.ID, "gpus", releasedGpuIDs)
 		}()
+	} else {
+		task.gpuIDs = []string{}
 	}
 
 	if len(cfg.HostSshKeys) > 0 {
@@ -332,8 +329,7 @@ func (d *DockerRunner) Run(ctx context.Context, taskID string) error {
 	if err := d.tasks.Update(task); err != nil {
 		return tracerr.Errorf("%w: failed to update task %s: %w", ErrInternal, task.ID, err)
 	}
-	containerID, err := d.createContainer(ctx, &task)
-	if err != nil {
+	if err := d.createContainer(ctx, &task); err != nil {
 		errMessage := fmt.Sprintf("createContainer error: %s", err.Error())
 		log.Error(ctx, errMessage)
 		task.SetStatusTerminated("CREATING_CONTAINER_ERROR", errMessage)
@@ -341,14 +337,22 @@ func (d *DockerRunner) Run(ctx context.Context, taskID string) error {
 	}
 
 	log.Debug(ctx, "Running container", "task", task.ID, "name", task.containerName)
-	task.SetStatusRunning(containerID)
+	task.SetStatusRunning()
 	if err := d.tasks.Update(task); err != nil {
 		return tracerr.Errorf("%w: failed to update task %s: %w", ErrInternal, task.ID, err)
 	}
-	if err = d.runContainer(ctx, &task); err != nil {
-		log.Error(ctx, "runContainer error", "err", err)
+	err = d.startContainer(ctx, &task)
+	if err == nil {
+		// startContainer sets `ports` field, committing update
+		if err := d.tasks.Update(task); err != nil {
+			return tracerr.Errorf("%w: failed to update task %s: %w", ErrInternal, task.ID, err)
+		}
+		err = d.waitContainer(ctx, &task)
+	}
+	if err != nil {
+		log.Error(ctx, "failed to run container", "err", err)
 		var errMessage string
-		if lastLogs, err := getContainerLastLogs(ctx, d.client, containerID, 5); err == nil {
+		if lastLogs, err := getContainerLastLogs(ctx, d.client, task.containerID, 5); err == nil {
 			errMessage = strings.Join(lastLogs, "\n")
 		} else {
 			log.Error(ctx, "getContainerLastLogs error", "err", err)
@@ -728,26 +732,29 @@ func pullImage(ctx context.Context, client docker.APIClient, taskConfig TaskConf
 	return nil
 }
 
-func (d *DockerRunner) createContainer(ctx context.Context, task *Task) (string, error) {
+func (d *DockerRunner) createContainer(ctx context.Context, task *Task) error {
 	runnerDir, err := d.dockerParams.MakeRunnerDir(task.containerName)
 	if err != nil {
-		return "", tracerr.Wrap(err)
+		return tracerr.Wrap(err)
 	}
 	task.runnerDir = runnerDir
+
 	mounts, err := d.dockerParams.DockerMounts(runnerDir)
 	if err != nil {
-		return "", tracerr.Wrap(err)
+		return tracerr.Wrap(err)
 	}
 	volumeMounts, err := getVolumeMounts(task.config.VolumeMounts)
 	if err != nil {
-		return "", tracerr.Wrap(err)
+		return tracerr.Wrap(err)
 	}
 	mounts = append(mounts, volumeMounts...)
 	instanceMounts, err := getInstanceMounts(task.config.InstanceMounts)
 	if err != nil {
-		return "", tracerr.Wrap(err)
+		return tracerr.Wrap(err)
 	}
 	mounts = append(mounts, instanceMounts...)
+
+	ports := d.dockerParams.DockerPorts()
 
 	// Set the environment variables
 	envVars := []string{}
@@ -772,7 +779,7 @@ func (d *DockerRunner) createContainer(ctx context.Context, task *Task) (string,
 		Image:        task.config.ImageName,
 		Cmd:          []string{strings.Join(d.dockerParams.DockerShellCommands(task.config.ContainerSshKeys), " && ")},
 		Entrypoint:   []string{"/bin/sh", "-c"},
-		ExposedPorts: exposePorts(d.dockerParams.DockerPorts()...),
+		ExposedPorts: exposePorts(ports),
 		Env:          envVars,
 		Labels: map[string]string{
 			LabelKeyIsTask: LabelValueTrue,
@@ -783,14 +790,12 @@ func (d *DockerRunner) createContainer(ctx context.Context, task *Task) (string,
 		containerConfig.User = task.config.ContainerUser
 	}
 	hostConfig := &container.HostConfig{
-		Privileged:      task.config.Privileged || d.dockerParams.DockerPrivileged(),
-		NetworkMode:     getNetworkMode(),
-		PortBindings:    bindPorts(d.dockerParams.DockerPorts()...),
-		PublishAllPorts: true,
-		Sysctls:         map[string]string{},
-		Mounts:          mounts,
-		ShmSize:         task.config.ShmSize,
-		Tmpfs:           tmpfs,
+		Privileged:   task.config.Privileged || d.dockerParams.DockerPrivileged(),
+		NetworkMode:  getNetworkMode(task.config.NetworkMode),
+		PortBindings: bindPorts(ports),
+		Mounts:       mounts,
+		ShmSize:      task.config.ShmSize,
+		Tmpfs:        tmpfs,
 	}
 	hostConfig.Resources.NanoCPUs = int64(task.config.CPU * 1000000000)
 	hostConfig.Resources.Memory = task.config.Memory
@@ -801,16 +806,29 @@ func (d *DockerRunner) createContainer(ctx context.Context, task *Task) (string,
 
 	resp, err := d.client.ContainerCreate(ctx, containerConfig, hostConfig, nil, nil, task.containerName)
 	if err != nil {
-		return "", tracerr.Wrap(err)
+		return tracerr.Wrap(err)
 	}
-	return resp.ID, nil
+	task.containerID = resp.ID
+	return nil
 }
 
-func (d *DockerRunner) runContainer(ctx context.Context, task *Task) error {
+func (d *DockerRunner) startContainer(ctx context.Context, task *Task) error {
 	if err := d.client.ContainerStart(ctx, task.containerID, container.StartOptions{}); err != nil {
 		return tracerr.Wrap(err)
 	}
+	if getNetworkMode(task.config.NetworkMode).IsHost() {
+		task.ports = []PortMapping{}
+		return nil
+	}
+	container_, err := d.client.ContainerInspect(ctx, task.containerID)
+	if err != nil {
+		return tracerr.Wrap(err)
+	}
+	task.ports = extractPorts(ctx, container_.NetworkSettings.Ports)
+	return nil
+}
 
+func (d *DockerRunner) waitContainer(ctx context.Context, task *Task) error {
 	waitCh, errorCh := d.client.ContainerWait(ctx, task.containerID, "")
 	select {
 	case waitResp := <-waitCh:
@@ -822,7 +840,6 @@ func (d *DockerRunner) runContainer(ctx context.Context, task *Task) error {
 	case err := <-errorCh:
 		return tracerr.Wrap(err)
 	}
-
 	return nil
 }
 
@@ -884,7 +901,7 @@ func getSSHShellCommands(openSSHPort int, publicSSHKey string) []string {
 	}
 }
 
-func exposePorts(ports ...int) nat.PortSet {
+func exposePorts(ports []int) nat.PortSet {
 	portSet := make(nat.PortSet)
 	for _, port := range ports {
 		portSet[nat.Port(fmt.Sprintf("%d/tcp", port))] = struct{}{}
@@ -893,22 +910,58 @@ func exposePorts(ports ...int) nat.PortSet {
 }
 
 // bindPorts does identity mapping only
-func bindPorts(ports ...int) nat.PortMap {
+func bindPorts(ports []int) nat.PortMap {
 	portMap := make(nat.PortMap)
 	for _, port := range ports {
 		portMap[nat.Port(fmt.Sprintf("%d/tcp", port))] = []nat.PortBinding{
 			{
 				HostIP:   "0.0.0.0",
-				HostPort: strconv.Itoa(port),
+				HostPort: "", // use ephemeral port from ip_local_port_range
 			},
 		}
 	}
 	return portMap
 }
 
-func getNetworkMode() container.NetworkMode {
+func extractPorts(ctx context.Context, portMap nat.PortMap) []PortMapping {
+	ports := make([]PortMapping, 0, len(portMap))
+	for containerPortWithProto, bindings := range portMap {
+		// 8080/tcp -> ["8080", "tcp"]
+		containerPortParts := strings.Split(string(containerPortWithProto), "/")
+		if len(containerPortParts) != 2 {
+			log.Error(ctx, "unexpected container port format", "port", containerPortWithProto)
+			continue
+		}
+		if containerPortParts[1] != "tcp" {
+			continue
+		}
+		containerPort, err := strconv.Atoi(containerPortParts[0])
+		if err != nil {
+			log.Error(ctx, "failed to parse container port", "port", containerPortWithProto)
+			continue
+		}
+		for _, binding := range bindings {
+			// skip IPv6
+			if strings.Contains(binding.HostIP, ":") {
+				continue
+			}
+			hostPort, err := strconv.Atoi(binding.HostPort)
+			if err != nil {
+				log.Error(ctx, "failed to parse host port", "port", binding.HostPort)
+				continue
+			}
+			ports = append(ports, PortMapping{
+				Host:      hostPort,
+				Container: containerPort,
+			})
+		}
+	}
+	return ports
+}
+
+func getNetworkMode(networkMode NetworkMode) container.NetworkMode {
 	if rt.GOOS == "linux" {
-		return "host"
+		return container.NetworkMode(networkMode)
 	}
 	return "default"
 }
@@ -1051,7 +1104,7 @@ func (c *CLIArgs) DockerShellCommands(publicKeys []string) []string {
 	if len(publicKeys) > 0 {
 		concatinatedPublicKeys = strings.Join(publicKeys, "\n")
 	}
-	commands := getSSHShellCommands(c.Docker.SSHPort, concatinatedPublicKeys)
+	commands := getSSHShellCommands(c.Runner.SSHPort, concatinatedPublicKeys)
 	commands = append(commands, fmt.Sprintf("%s %s", consts.RunnerBinaryPath, strings.Join(c.getRunnerArgs(), " ")))
 	return commands
 }
@@ -1072,7 +1125,7 @@ func (c *CLIArgs) DockerMounts(hostRunnerDir string) ([]mount.Mount, error) {
 }
 
 func (c *CLIArgs) DockerPorts() []int {
-	return []int{c.Runner.HTTPPort, c.Docker.SSHPort}
+	return []int{c.Runner.HTTPPort, c.Runner.SSHPort}
 }
 
 func (c *CLIArgs) MakeRunnerDir(name string) (string, error) {
