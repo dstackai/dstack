@@ -525,6 +525,8 @@ class InstanceModel(BaseModel):
     termination_deadline: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
     termination_reason: Mapped[Optional[str]] = mapped_column(String(4000))
     health_status: Mapped[Optional[str]] = mapped_column(String(4000))
+    first_termination_retry_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
+    last_termination_retry_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
 
     # backend
     backend: Mapped[Optional[BackendType]] = mapped_column(Enum(BackendType))

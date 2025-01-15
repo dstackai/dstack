@@ -1,9 +1,13 @@
 import datetime as dt
+from contextlib import contextmanager
+from typing import Optional
 from unittest.mock import Mock, patch
 
 import pytest
+from freezegun import freeze_time
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from dstack._internal.core.errors import BackendError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
@@ -330,6 +334,20 @@ class TestOnPremInstanceTerminateProvisionTimeoutExpired:
 
 
 class TestTerminate:
+    @staticmethod
+    @contextmanager
+    def mock_terminate_in_backend(error: Optional[Exception] = None):
+        backend = Mock()
+        backend.TYPE = BackendType.DATACRUNCH
+        terminate_instance = backend.compute.return_value.terminate_instance
+        if error is not None:
+            terminate_instance.side_effect = error
+        with patch(
+            "dstack._internal.server.background.tasks.process_instances.backends_services.get_project_backend_by_type"
+        ) as get_backend:
+            get_backend.return_value = backend
+            yield terminate_instance
+
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_terminate(self, test_db, session: AsyncSession):
@@ -343,14 +361,9 @@ class TestTerminate:
         instance.last_job_processed_at = get_current_datetime() + dt.timedelta(minutes=-19)
         await session.commit()
 
-        with patch(
-            "dstack._internal.server.background.tasks.process_instances.backends_services.get_project_backends"
-        ) as get_backends:
-            backend = Mock()
-            backend.TYPE = BackendType.DATACRUNCH
-            backend.compute.return_value.terminate_instance.return_value = Mock()
-            get_backends.return_value = [backend]
+        with self.mock_terminate_in_backend() as mock:
             await process_instances()
+            mock.assert_called_once()
 
         await session.refresh(instance)
 
@@ -360,6 +373,100 @@ class TestTerminate:
         assert instance.deleted == True
         assert instance.deleted_at is not None
         assert instance.finished_at is not None
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.parametrize("error", [BackendError("err"), RuntimeError("err")])
+    async def test_terminate_retry(self, test_db, session: AsyncSession, error: Exception):
+        project = await create_project(session=session)
+        pool = await create_pool(session, project)
+        instance = await create_instance(session, project, pool, status=InstanceStatus.TERMINATING)
+        instance.termination_reason = "some reason"
+        initial_time = dt.datetime(2025, 1, 1, tzinfo=dt.timezone.utc)
+        instance.last_job_processed_at = initial_time
+        await session.commit()
+
+        # First attempt fails
+        with (
+            freeze_time(initial_time + dt.timedelta(minutes=1)),
+            self.mock_terminate_in_backend(error=error) as mock,
+        ):
+            await process_instances()
+            mock.assert_called_once()
+        await session.refresh(instance)
+        assert instance.status == InstanceStatus.TERMINATING
+
+        # Second attempt succeeds
+        with (
+            freeze_time(initial_time + dt.timedelta(minutes=2)),
+            self.mock_terminate_in_backend(error=None) as mock,
+        ):
+            await process_instances()
+            mock.assert_called_once()
+        await session.refresh(instance)
+        assert instance.status == InstanceStatus.TERMINATED
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_terminate_not_retries_if_too_early(self, test_db, session: AsyncSession):
+        project = await create_project(session=session)
+        pool = await create_pool(session, project)
+        instance = await create_instance(session, project, pool, status=InstanceStatus.TERMINATING)
+        instance.termination_reason = "some reason"
+        initial_time = dt.datetime(2025, 1, 1, tzinfo=dt.timezone.utc)
+        instance.last_job_processed_at = initial_time
+        await session.commit()
+
+        # First attempt fails
+        with (
+            freeze_time(initial_time + dt.timedelta(minutes=1)),
+            self.mock_terminate_in_backend(error=BackendError("err")) as mock,
+        ):
+            await process_instances()
+            mock.assert_called_once()
+        await session.refresh(instance)
+        assert instance.status == InstanceStatus.TERMINATING
+
+        # 3 seconds later - too early for the second attempt, nothing happens
+        with (
+            freeze_time(initial_time + dt.timedelta(minutes=1, seconds=3)),
+            self.mock_terminate_in_backend(error=None) as mock,
+        ):
+            await process_instances()
+            mock.assert_not_called()
+        await session.refresh(instance)
+        assert instance.status == InstanceStatus.TERMINATING
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_terminate_on_termination_deadline(self, test_db, session: AsyncSession):
+        project = await create_project(session=session)
+        pool = await create_pool(session, project)
+        instance = await create_instance(session, project, pool, status=InstanceStatus.TERMINATING)
+        instance.termination_reason = "some reason"
+        initial_time = dt.datetime(2025, 1, 1, tzinfo=dt.timezone.utc)
+        instance.last_job_processed_at = initial_time
+        await session.commit()
+
+        # First attempt fails
+        with (
+            freeze_time(initial_time + dt.timedelta(minutes=1)),
+            self.mock_terminate_in_backend(error=BackendError("err")) as mock,
+        ):
+            await process_instances()
+            mock.assert_called_once()
+        await session.refresh(instance)
+        assert instance.status == InstanceStatus.TERMINATING
+
+        # Second attempt fails too, but it's the last attempt because the deadline is close
+        with (
+            freeze_time(initial_time + dt.timedelta(minutes=15, seconds=55)),
+            self.mock_terminate_in_backend(error=None) as mock,
+        ):
+            await process_instances()
+            mock.assert_called_once()
+        await session.refresh(instance)
+        assert instance.status == InstanceStatus.TERMINATED
 
 
 class TestCreateInstance:
