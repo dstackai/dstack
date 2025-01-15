@@ -1,3 +1,4 @@
+import asyncio
 import importlib.resources
 import os
 import time
@@ -141,6 +142,9 @@ async def lifespan(app: FastAPI):
     scheduler.shutdown()
     await gateway_connections_pool.remove_all()
     await service_replica_connection_pool.remove_all()
+    await get_db().engine.dispose()
+    # Let checked-out DB connections close as dispose() only closes checked-in connections
+    await asyncio.sleep(3)
 
 
 _ON_STARTUP_HOOKS = []

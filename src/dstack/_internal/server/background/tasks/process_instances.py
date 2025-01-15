@@ -106,7 +106,14 @@ PROVISIONING_TIMEOUT_SECONDS = 10 * 60  # 10 minutes in seconds
 logger = get_logger(__name__)
 
 
-async def process_instances() -> None:
+async def process_instances(batch_size: int = 1):
+    tasks = []
+    for _ in range(batch_size):
+        tasks.append(_process_next_instance())
+    await asyncio.gather(*tasks)
+
+
+async def _process_next_instance():
     lock, lockset = get_locker().get_lockset(InstanceModel.__tablename__)
     async with get_session_ctx() as session:
         async with lock:
