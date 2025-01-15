@@ -99,7 +99,8 @@ from dstack._internal.utils.ssh import (
 PENDING_JOB_RETRY_INTERVAL = timedelta(seconds=60)
 
 TERMINATION_DEADLINE_OFFSET = timedelta(minutes=20)
-
+TERMINATION_RETRY_TIMEOUT = timedelta(seconds=30)
+TERMINATION_RETRY_MAX_DURATION = timedelta(minutes=15)
 PROVISIONING_TIMEOUT_SECONDS = 10 * 60  # 10 minutes in seconds
 
 
@@ -765,6 +766,11 @@ def _instance_healthcheck(ports: Dict[int, int]) -> HealthStatus:
 
 
 async def _terminate(instance: InstanceModel) -> None:
+    if (
+        instance.last_termination_retry_at is not None
+        and _next_termination_retry_at(instance) > get_current_datetime()
+    ):
+        return
     jpd = get_instance_provisioning_data(instance)
     if jpd is not None:
         if jpd.backend != BackendType.REMOTE:
@@ -786,16 +792,25 @@ async def _terminate(instance: InstanceModel) -> None:
                         jpd.region,
                         jpd.backend_data,
                     )
-                except BackendError as e:
+                except Exception as e:
+                    if instance.first_termination_retry_at is None:
+                        instance.first_termination_retry_at = get_current_datetime()
+                    instance.last_termination_retry_at = get_current_datetime()
+                    if _next_termination_retry_at(instance) < _get_termination_deadline(instance):
+                        logger.warning(
+                            "Failed to terminate instance %s. Will retry. Error: %r",
+                            instance.name,
+                            e,
+                            exc_info=not isinstance(e, BackendError),
+                        )
+                        return
                     logger.error(
-                        "Failed to terminate instance %s: %s",
+                        "Failed all attempts to terminate instance %s."
+                        " Please terminate the instance manually to avoid unexpected charges."
+                        " Error: %r",
                         instance.name,
-                        repr(e),
-                    )
-                except Exception:
-                    logger.exception(
-                        "Got exception when terminating instance %s",
-                        instance.name,
+                        e,
+                        exc_info=not isinstance(e, BackendError),
                     )
 
     instance.deleted = True
@@ -809,6 +824,22 @@ async def _terminate(instance: InstanceModel) -> None:
             "instance_name": instance.name,
             "instance_status": InstanceStatus.TERMINATED.value,
         },
+    )
+
+
+def _next_termination_retry_at(instance: InstanceModel) -> datetime.datetime:
+    assert instance.last_termination_retry_at is not None
+    return (
+        instance.last_termination_retry_at.replace(tzinfo=datetime.timezone.utc)
+        + TERMINATION_RETRY_TIMEOUT
+    )
+
+
+def _get_termination_deadline(instance: InstanceModel) -> datetime.datetime:
+    assert instance.first_termination_retry_at is not None
+    return (
+        instance.first_termination_retry_at.replace(tzinfo=datetime.timezone.utc)
+        + TERMINATION_RETRY_MAX_DURATION
     )
 
 

@@ -11,7 +11,7 @@ from dstack._internal.server import settings
 
 class AsyncioCancelledErrorFilter(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
-        if record.exc_info is None:
+        if not record.exc_info:
             return True
         if isinstance(record.exc_info[1], asyncio.CancelledError):
             return False
