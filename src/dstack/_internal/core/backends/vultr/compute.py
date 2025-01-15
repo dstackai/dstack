@@ -70,11 +70,27 @@ class VultrCompute(Compute):
     def create_instance(
         self, instance_offer: InstanceOfferWithAvailability, instance_config: InstanceConfiguration
     ) -> JobProvisioningData:
+        # create vpc
+        vpc = self.api_client.get_vpc_for_region(instance_offer.region)
+        if not vpc:
+            vpc = self.api_client.create_vpc(instance_offer.region)
+
+        subnet = vpc["v4_subnet"]
+        subnet_mask = vpc["v4_subnet_mask"]
+
+        setup_commands = [
+            f"sudo ufw allow from {subnet}/{subnet_mask}",
+            "sudo ufw reload",
+        ]
         instance_id = self.api_client.launch_instance(
             region=instance_offer.region,
             label=instance_config.instance_name,
             plan=instance_offer.instance.name,
-            user_data=get_user_data(authorized_keys=instance_config.get_public_keys()),
+            user_data=get_user_data(
+                authorized_keys=instance_config.get_public_keys(),
+                backend_specific_commands=setup_commands,
+            ),
+            vpc_id=vpc["id"],
         )
 
         launched_instance = JobProvisioningData(
@@ -119,13 +135,18 @@ class VultrCompute(Compute):
         # Access specific fields
         instance_status = instance_data["status"]
         instance_main_ip = instance_data["main_ip"]
+        instance_internal_ip = instance_data["internal_ip"]
         if instance_status == "active":
             provisioning_data.hostname = instance_main_ip
+            provisioning_data.internal_ip = instance_internal_ip
         if instance_status == "failed":
             raise ProvisioningError("VM entered FAILED state")
 
 
 def _supported_instances(offer: InstanceOffer) -> bool:
+    # The vbm-4c-32gb plan does not support VPC, so it is excluded.
+    if offer.instance.name == "vbm-4c-32gb":
+        return False
     if offer.instance.resources.spot:
         return False
     for family in [

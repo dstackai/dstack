@@ -6,6 +6,7 @@ BACKENDS_WITH_MULTINODE_SUPPORT = [
     BackendType.GCP,
     BackendType.REMOTE,
     BackendType.OCI,
+    BackendType.VULTR,
 ]
 BACKENDS_WITH_CREATE_INSTANCE_SUPPORT = [
     BackendType.AWS,
