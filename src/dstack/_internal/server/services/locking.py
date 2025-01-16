@@ -70,8 +70,12 @@ async def _wait_to_lock_many(
     left_to_lock = keys.copy()
     while len(left_to_lock) > 0:
         async with lock:
+            locked_now_num = 0
             for key in left_to_lock:
-                if key not in locked:
-                    locked.add(key)
-                    left_to_lock.remove(key)
+                if key in locked:
+                    # Someone already aquired the lock, wait
+                    break
+                locked.add(key)
+                locked_now_num += 1
+            left_to_lock = left_to_lock[locked_now_num:]
         await asyncio.sleep(delay)

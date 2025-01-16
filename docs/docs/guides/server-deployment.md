@@ -20,6 +20,7 @@ You can run the server either through `pip` or using Docker.
 
     > The server can be set up via `pip` on Linux, macOS, and Windows (via WSL 2).
     > It requires Git and OpenSSH.
+    > The minimum hardware requirements are 1 CPU and 1GB of RAM.
 
 === "Docker"
 
@@ -67,10 +68,14 @@ Alternatively, you can configure backends on the [project settings page](../guid
 
 ## State persistence
 
-By default, the `dstack` server stores its state locally in `~/.dstack/server` using SQLite.
+The `dstack` server can store its internal state in SQLite or Postgres.
+By default, it stores the state locally in `~/.dstack/server` using SQLite.
+With SQLite, you can run at most one server replica.
+Postgres has no such limitation and is recommended for production deployment.
 
-??? info "Replicate state to cloud storage"
-    If you’d like, you can configure automatic replication of your SQLite state to cloud object storage using Litestream.
+??? info "Replicate SQLite to cloud storage"
+    You can configure automatic replication of your SQLite state to a cloud object storage using Litestream.
+    This allows persisting the server state across re-deployments when using SQLite.
 
     To enable Litestream replication, set the following environment variables:
     
@@ -103,7 +108,7 @@ By default, the `dstack` server stores its state locally in `~/.dstack/server` u
 
 ### PostgreSQL
 
-To store the state externally, set the `DSTACK_DATABASE_URL` and `DSTACK_SERVER_CLOUDWATCH_LOG_GROUP` environment variables.
+To store the server state in Postgres, set the `DSTACK_DATABASE_URL` environment variable.
 
 ??? info "Migrate from SQLite to PostgreSQL"
     You can migrate the existing state from SQLite to PostgreSQL using `pgloader`:
@@ -132,7 +137,8 @@ To store the state externally, set the `DSTACK_DATABASE_URL` and `DSTACK_SERVER_
 
 ## Logs storage
 
-By default, `dstack` stores workload logs in `~/.dstack/server/projects/<project_name>/logs`.
+By default, `dstack` stores workload logs locally in `~/.dstack/server/projects/<project_name>/logs`.
+For multi-replica server deployments, it's required to store logs externally, e.g. in AWS CloudWatch.
 
 ### AWS CloudWatch
 
@@ -264,14 +270,22 @@ default_permissions:
 
 ## Backward compatibility
 
-!!! info "Versioning scheme"
-    `dstack` follows the `{major}.{minor}.{patch}` versioning scheme based on these principles:
+`dstack` follows the `{major}.{minor}.{patch}` versioning scheme.
+Backward compatibility is maintained based on these principles:
 
-=== "Server"
-    The server backward compatibility is maintained across all minor and patch releases. The specific features can be removed but the removal is preceded with deprecation warnings for several minor releases. This means you can use older client versions with newer server versions.
+* The server backward compatibility is maintained across all minor and patch releases. The specific features can be removed but the removal is preceded with deprecation warnings for several minor releases. This means you can use older client versions with newer server versions.
+* The client backward compatibility is maintained across patch releases. A new minor release indicates that the release breaks client backward compatibility. This means you don't need to update the server when you update the client to a new patch release. Still, upgrading a client to a new minor version requires upgrading the server too.
 
-=== "Client"
-    The client backward compatibility is maintained across patch releases. A new minor release indicates that the release breaks client backward compatibility. This means you don't need to update the server when you update the client to a new patch release. Still, upgrading a client to a new minor version requires upgrading the server too.
+## Server limits
+
+A single `dstack` server replica can support:
+
+* Up to 150 active runs.
+* Up to 150 active jobs.
+* Up to 150 active instances.
+
+Having more active resources can affect server performance.
+If you hit these limits, consider using Postgres with multiple server replicas.
 
 ## FAQs
 

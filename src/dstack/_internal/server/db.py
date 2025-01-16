@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 from typing import Optional
 
 from alembic import command, config
-from sqlalchemy import event
+from sqlalchemy import AsyncAdaptedQueuePool, event
 from sqlalchemy.engine.interfaces import DBAPIConnection
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
@@ -19,7 +19,11 @@ class Database:
         if engine is not None:
             self.engine = engine
         else:
-            self.engine = create_async_engine(self.url, echo=settings.SQL_ECHO_ENABLED)
+            self.engine = create_async_engine(
+                self.url,
+                echo=settings.SQL_ECHO_ENABLED,
+                poolclass=AsyncAdaptedQueuePool,
+            )
         self.session_maker = sessionmaker(
             bind=self.engine,
             expire_on_commit=False,
@@ -33,7 +37,8 @@ class Database:
                 cursor = dbapi_connection.cursor()
                 cursor.execute("PRAGMA journal_mode=WAL;")
                 cursor.execute("PRAGMA foreign_keys=ON;")
-                cursor.execute("PRAGMA busy_timeout=10000;")
+                cursor.execute("PRAGMA synchronous=NORMAL;")
+                cursor.execute("PRAGMA busy_timeout=30000;")
                 cursor.close()
 
     @property

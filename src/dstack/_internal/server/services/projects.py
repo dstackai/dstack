@@ -173,6 +173,8 @@ async def set_project_members(
         }
         if new_admins_members != current_admins_members:
             raise ForbiddenError("Access denied: changing project admins")
+    # FIXME: potentially long write transaction
+    # clear_project_members() issues DELETE without commit
     await clear_project_members(session=session, project=project)
     usernames = [m.username for m in members]
     res = await session.execute(select(UserModel).where(UserModel.name.in_(usernames)))

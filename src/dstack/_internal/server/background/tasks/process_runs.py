@@ -1,3 +1,4 @@
+import asyncio
 import datetime
 import itertools
 from typing import List, Optional, Set, Tuple
@@ -42,7 +43,14 @@ logger = get_logger(__name__)
 RETRY_DELAY = datetime.timedelta(seconds=15)
 
 
-async def process_runs():
+async def process_runs(batch_size: int = 1):
+    tasks = []
+    for _ in range(batch_size):
+        tasks.append(_process_next_run())
+    await asyncio.gather(*tasks)
+
+
+async def _process_next_run():
     run_lock, run_lockset = get_locker().get_lockset(RunModel.__tablename__)
     job_lock, job_lockset = get_locker().get_lockset(JobModel.__tablename__)
     async with get_session_ctx() as session:
@@ -322,6 +330,8 @@ async def _process_active_run(session: AsyncSession, run_model: RunModel):
             # use replicas_info from before retrying
             replicas_diff = scaler.scale(replicas_info, stats)
             if replicas_diff != 0:
+                # FIXME: potentially long write transaction
+                # Why do we flush here?
                 await session.flush()
                 await session.refresh(run_model)
                 await scale_run_replicas(session, run_model, replicas_diff)

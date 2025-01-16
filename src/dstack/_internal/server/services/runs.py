@@ -401,6 +401,8 @@ async def apply_plan(
             raise ServerClientError(
                 "Failed to apply plan. Resource has been changed. Try again or use force apply."
             )
+    # FIXME: potentially long write transaction
+    # Avoid getting run_model after update
     await session.execute(
         update(RunModel)
         .where(RunModel.id == current_resource.id)

@@ -1,3 +1,4 @@
+import asyncio
 from datetime import timedelta
 from typing import Dict, List, Optional
 
@@ -54,7 +55,14 @@ from dstack._internal.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
-async def process_running_jobs():
+async def process_running_jobs(batch_size: int = 1):
+    tasks = []
+    for _ in range(batch_size):
+        tasks.append(_process_next_running_job())
+    await asyncio.gather(*tasks)
+
+
+async def _process_next_running_job():
     lock, lockset = get_locker().get_lockset(JobModel.__tablename__)
     async with get_session_ctx() as session:
         async with lock:

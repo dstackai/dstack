@@ -200,6 +200,7 @@ async def update_backend(
         raise ServerClientError("Backend does not exist")
     await run_async(configurator.get_config_values, config)
     backend = await run_async(configurator.create_backend, project=project, config=config)
+    # FIXME: potentially long write transaction
     await session.execute(
         update(BackendModel)
         .where(
@@ -244,6 +245,8 @@ async def delete_backends(
     deleted_backends_types = current_backends_types.intersection(backends_types)
     if len(deleted_backends_types) == 0:
         return
+    # FIXME: potentially long write transaction
+    # Not urgent since backend deletion is a rare operation
     await session.execute(
         delete(BackendModel).where(
             BackendModel.type.in_(deleted_backends_types),

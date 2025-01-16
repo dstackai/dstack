@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 from typing import List, Optional, Tuple
 
@@ -74,7 +75,14 @@ from dstack._internal.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
-async def process_submitted_jobs():
+async def process_submitted_jobs(batch_size: int = 1):
+    tasks = []
+    for _ in range(batch_size):
+        tasks.append(_process_next_submitted_job())
+    await asyncio.gather(*tasks)
+
+
+async def _process_next_submitted_job():
     lock, lockset = get_locker().get_lockset(JobModel.__tablename__)
     async with get_session_ctx() as session:
         async with lock:
@@ -196,7 +204,11 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         async with get_locker().lock_ctx(InstanceModel.__tablename__, instances_ids):
             # Refetch after lock
             res = await session.execute(
-                select(InstanceModel).where(InstanceModel.id.in_(instances_ids))
+                select(InstanceModel).where(
+                    InstanceModel.id.in_(instances_ids),
+                    InstanceModel.deleted == False,
+                    InstanceModel.job_id.is_(None),
+                )
             )
             pool_instances = list(res.scalars().all())
             instance = await _assign_job_to_pool_instance(
@@ -289,7 +301,6 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         )
         session.add(instance)
         session.add(fleet_model)
-        await session.flush()  # to get im.id
         job_model.used_instance_id = instance.id
 
     volumes_ids = sorted([v.id for vs in volume_models for v in vs])
