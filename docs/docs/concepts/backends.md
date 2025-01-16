@@ -9,7 +9,7 @@ Alternatively, you can configure backends on the [project settings page](../guid
 > For using `dstack` with on-prem servers, no backend configuration is required.
 > Use [SSH fleets](../concepts/fleets.md#ssh) instead.
 
-Below are examples of how to configure backends via [`~/.dstack/server/config.yml`](../reference/server/config.yml.md). 
+Below examples of how to configure backends via `~/.dstack/server/config.yml`.
 
 ## Cloud providers
 
@@ -583,6 +583,26 @@ projects:
 
 </div>
 
+### Vultr
+
+Log into your [Vultr :material-arrow-top-right-thin:{ .external }](https://www.vultr.com/) account, click `Account` in the sidebar, select `API`, find the `Personal Access Token` panel and click the `Enable API` button. In the `Access Control` panel, allow API requests from all addresses or from the subnet where your `dstack` server is deployed.
+
+Then, go ahead and configure the backend:
+
+<div editor-title="~/.dstack/server/config.yml">
+
+```yaml
+projects:
+  - name: main
+    backends:
+      - type: vultr
+        creds:
+          type: api_key
+          api_key: B57487240a466624b48de22865589
+```
+
+</div>
+
 ### Vast.ai
 
 Log into your [Vast.ai :material-arrow-top-right-thin:{ .external }](https://cloud.vast.ai/) account, click Account in the sidebar, and copy your
@@ -741,26 +761,6 @@ projects:
           type: api_key
           client_id: xfaHBqYEsArqhKWX-e52x3HH7w8T
           client_secret: B5ZU5Qx9Nt8oGMlmMhNI3iglK8bjMhagTbylZy4WzncZe39995f7Vxh8
-```
-
-</div>
-
-### Vultr
-
-Log into your [Vultr :material-arrow-top-right-thin:{ .external }](https://www.vultr.com/) account, click `Account` in the sidebar, select `API`, find the `Personal Access Token` panel and click the `Enable API` button. In the `Access Control` panel, allow API requests from all addresses or from the subnet where your `dstack` server is deployed.
-
-Then, go ahead and configure the backend:
-
-<div editor-title="~/.dstack/server/config.yml">
-
-```yaml
-projects:
-  - name: main
-    backends:
-      - type: vultr
-        creds:
-          type: api_key
-          api_key: B57487240a466624b48de22865589
 ```
 
 </div>

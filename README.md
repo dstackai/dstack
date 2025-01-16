@@ -25,12 +25,13 @@ for AI workloads both in the cloud and on-prem, speeding up the development, tra
 
 ## Major news ✨
 
-- [2024/10] [dstack 0.18.17: on-prem AMD GPUs, AWS EFA, and more](https://github.com/dstackai/dstack/releases/tag/0.18.17)
-- [2024/08] [dstack 0.18.11: AMD, encryption, and more](https://github.com/dstackai/dstack/releases/tag/0.18.11)
-- [2024/08] [dstack 0.18.10: Control plane UI](https://github.com/dstackai/dstack/releases/tag/0.18.10)
-- [2024/07] [dstack 0.18.7: Fleets, RunPod volumes, dstack apply, and more](https://github.com/dstackai/dstack/releases/tag/0.18.7)
-- [2024/05] [dstack 0.18.4: Google Cloud TPU, and more](https://github.com/dstackai/dstack/releases/tag/0.18.4)
-- [2024/05] [dstack 0.18.2: On-prem clusters, private subnets, and more](https://github.com/dstackai/dstack/releases/tag/0.18.2)
+- [2025/01] [dstack 0.18.35: Vultr backend](https://github.com/dstackai/dstack/releases/tag/0.18.35)
+- [2024/12] [dstack 0.18.33: TPU v6e support](https://github.com/dstackai/dstack/releases/tag/0.18.33)
+- [2024/12] [dstack 0.18.30: AWS Capacity Reservations and Capacity Blocks](https://github.com/dstackai/dstack/releases/tag/0.18.30)
+- [2024/11] [dstack 0.18.23: Gateway is optional](https://github.com/dstackai/dstack/releases/tag/0.18.23)
+- [2024/10] [dstack 0.18.21: Instance volumes](https://github.com/dstackai/dstack/releases/tag/0.18.21)
+- [2024/10] [dstack 0.18.18: Hardware metrics](https://github.com/dstackai/dstack/releases/tag/0.18.18)
+- [2024/10] [dstack 0.18.17: AMD support with SSH fleets, AWS EFA](https://github.com/dstackai/dstack/releases/tag/0.18.17)
 
 ## Installation
 
@@ -38,10 +39,9 @@ for AI workloads both in the cloud and on-prem, speeding up the development, tra
 
 ### (Optional) Configure backends
 
-To use `dstack` with your own cloud accounts, create the `~/.dstack/server/config.yml` file and 
-[configure backends](https://dstack.ai/docs/reference/server/config.yml). Alternatively, you can configure backends via the control plane UI after you start the server.
+To use `dstack` with cloud providers, configure [backends](https://dstack.ai/docs/concepts/backends).
 
-You can skip backends configuration if you intend to run containers  only on your on-prem servers. Use [SSH fleets](https://dstack.ai/docs/concepts/fleets#ssh) for that.
+For using `dstack` with on-prem servers, create [SSH fleets](https://dstack.ai/docs/concepts/fleets#ssh) instead.
 
 ### Start the server
 
