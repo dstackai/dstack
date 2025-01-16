@@ -204,7 +204,11 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         async with get_locker().lock_ctx(InstanceModel.__tablename__, instances_ids):
             # Refetch after lock
             res = await session.execute(
-                select(InstanceModel).where(InstanceModel.id.in_(instances_ids))
+                select(InstanceModel).where(
+                    InstanceModel.id.in_(instances_ids),
+                    InstanceModel.deleted == False,
+                    InstanceModel.job_id.is_(None),
+                )
             )
             pool_instances = list(res.scalars().all())
             instance = await _assign_job_to_pool_instance(
