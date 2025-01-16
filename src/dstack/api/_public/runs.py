@@ -13,6 +13,7 @@ from urllib.parse import urlparse
 from websocket import WebSocketApp
 
 import dstack.api as api
+from dstack._internal.core.consts import DSTACK_RUNNER_HTTP_PORT, DSTACK_RUNNER_SSH_PORT
 from dstack._internal.core.errors import ClientError, ConfigurationError, ResourceNotExistsError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import ApplyAction
@@ -135,7 +136,7 @@ class Run(ABC):
                 q.put(_done)
 
         ws = WebSocketApp(
-            f"ws://localhost:{self.ports[10999]}/logs_ws",
+            f"ws://localhost:{self.ports[DSTACK_RUNNER_HTTP_PORT]}/logs_ws",
             on_open=lambda _: logger.debug("WebSocket logs are connected to %s", self.name),
             on_close=lambda _, status_code, msg: logger.debug(
                 "WebSocket logs are disconnected. status_code: %s; message: %s",
@@ -293,7 +294,8 @@ class Run(ABC):
 
             # Reload job
             job = get_or_error(self._find_job(replica_num=replica_num, job_num=job_num))
-            provisioning_data = job.job_submissions[-1].job_provisioning_data
+            latest_job_submission = job.job_submissions[-1]
+            provisioning_data = latest_job_submission.job_provisioning_data
             if provisioning_data is None:
                 raise ClientError("Failed to attach. The run is not provisioned yet.")
 
@@ -317,9 +319,15 @@ class Run(ABC):
                     self._ports_lock.dict(),
                 )
 
+            container_ssh_port = DSTACK_RUNNER_SSH_PORT
+            runtime_data = latest_job_submission.job_runtime_data
+            if runtime_data is not None and runtime_data.ports is not None:
+                container_ssh_port = runtime_data.ports.get(container_ssh_port, container_ssh_port)
+
             self._ssh_attach = SSHAttach(
                 hostname=provisioning_data.hostname,
                 ssh_port=provisioning_data.ssh_port,
+                container_ssh_port=container_ssh_port,
                 user=provisioning_data.username,
                 id_rsa_path=ssh_identity_file,
                 ports_lock=self._ports_lock,
@@ -647,7 +655,7 @@ def _reserve_ports(
 ) -> PortsLock:
     if ports_overrides is None:
         ports_overrides = []
-    ports = {10999: 0}  # Runner API
+    ports = {DSTACK_RUNNER_HTTP_PORT: 0}
     if job_spec.app_specs:
         for app in job_spec.app_specs:
             ports[app.port] = app.map_to_port or 0

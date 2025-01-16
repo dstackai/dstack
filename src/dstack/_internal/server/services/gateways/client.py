@@ -5,6 +5,7 @@ from typing import Optional
 import httpx
 from pydantic import parse_obj_as
 
+from dstack._internal.core.consts import DSTACK_RUNNER_SSH_PORT
 from dstack._internal.core.errors import GatewayError
 from dstack._internal.core.models.instances import SSHConnectionParams
 from dstack._internal.core.models.runs import JobSubmission, Run
@@ -88,9 +89,13 @@ class GatewayClient:
                 }
             )
         else:
+            ssh_port = DSTACK_RUNNER_SSH_PORT
+            jrd = job_submission.job_runtime_data
+            if jrd is not None and jrd.ports is not None:
+                ssh_port = jrd.ports.get(ssh_port, ssh_port)
             payload.update(
                 {
-                    "ssh_port": 10022,
+                    "ssh_port": ssh_port,
                     "ssh_host": "root@localhost",
                     "ssh_proxy": SSHConnectionParams(
                         hostname=jpd.hostname,

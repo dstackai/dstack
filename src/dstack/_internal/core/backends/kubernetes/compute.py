@@ -19,6 +19,7 @@ from dstack._internal.core.backends.kubernetes.utils import (
     get_api_from_config_data,
     get_cluster_public_ip,
 )
+from dstack._internal.core.consts import DSTACK_RUNNER_SSH_PORT
 from dstack._internal.core.errors import ComputeError
 from dstack._internal.core.models.backends.base import BackendType
 
@@ -44,7 +45,6 @@ from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
-RUNNER_SSH_PORT = 10022
 JUMP_POD_SSH_PORT = 22
 DEFAULT_NAMESPACE = "default"
 
@@ -149,7 +149,7 @@ class KubernetesCompute(Compute):
                             args=["-c", " && ".join(commands)],
                             ports=[
                                 client.V1ContainerPort(
-                                    container_port=RUNNER_SSH_PORT,
+                                    container_port=DSTACK_RUNNER_SSH_PORT,
                                 )
                             ],
                             security_context=client.V1SecurityContext(
@@ -173,7 +173,7 @@ class KubernetesCompute(Compute):
                 spec=client.V1ServiceSpec(
                     type="ClusterIP",
                     selector={"app.kubernetes.io/name": instance_name},
-                    ports=[client.V1ServicePort(port=RUNNER_SSH_PORT)],
+                    ports=[client.V1ServicePort(port=DSTACK_RUNNER_SSH_PORT)],
                 ),
             ),
         )
@@ -187,7 +187,7 @@ class KubernetesCompute(Compute):
             region="local",
             price=instance_offer.price,
             username="root",
-            ssh_port=RUNNER_SSH_PORT,
+            ssh_port=DSTACK_RUNNER_SSH_PORT,
             dockerized=False,
             ssh_proxy=SSHConnectionParams(
                 hostname=jump_pod_hostname,

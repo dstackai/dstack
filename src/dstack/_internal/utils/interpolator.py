@@ -1,5 +1,5 @@
 import string
-from typing import Dict, Iterable, List, Optional, Tuple, Union
+from typing import Dict, Iterable, List, Literal, Optional, Tuple, Union, overload
 
 
 class Pattern:
@@ -22,6 +22,12 @@ class VariablesInterpolator:
     ):
         self.skip = set(skip) if skip is not None else set()
         self.variables = {f"{ns}.{k}": v for ns in namespaces for k, v in namespaces[ns].items()}
+
+    @overload
+    def interpolate(self, s: str, return_missing: Literal[False] = False) -> str: ...
+
+    @overload
+    def interpolate(self, s: str, return_missing: Literal[True]) -> Tuple[str, List[str]]: ...
 
     def interpolate(
         self, s: str, return_missing: bool = False

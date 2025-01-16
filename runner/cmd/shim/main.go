@@ -24,7 +24,6 @@ var Version string
 
 func main() {
 	var args shim.CLIArgs
-	args.Docker.SSHPort = 10022
 	var serviceMode bool
 
 	const defaultLogLevel = int(logrus.InfoLevel)
@@ -82,6 +81,13 @@ func main() {
 				Value:       10999,
 				Destination: &args.Runner.HTTPPort,
 				EnvVars:     []string{"DSTACK_RUNNER_HTTP_PORT"},
+			},
+			&cli.IntFlag{
+				Name:        "runner-ssh-port",
+				Usage:       "Set runner's ssh port",
+				Value:       10022,
+				Destination: &args.Runner.SSHPort,
+				EnvVars:     []string{"DSTACK_RUNNER_SSH_PORT"},
 			},
 			&cli.IntFlag{
 				Name:        "runner-log-level",

@@ -73,6 +73,9 @@ paths:
         "200":
           description: Pending task info
           $ref: "#/components/responses/TaskInfo"
+        "400":
+          description: Malformed JSON body or validation error
+          $ref: "#/components/responses/PlainTextBadRequest"
         "409":
           description: Task with the same ID already submitted
           $ref: "#/components/responses/PlainTextConflict"
@@ -88,6 +91,9 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/TaskInfo"
+        "404":
+          description: Task not found
+          $ref: "#/components/responses/PlainTextNotFound"
 
   /tasks/{id}/terminate:
     post:
@@ -115,9 +121,6 @@ paths:
         "404":
           description: Task not found
           $ref: "#/components/responses/PlainTextNotFound"
-        "409":
-          description: Task is not terminated, cannot remove
-          $ref: "#/components/responses/PlainTextConflict"
         "500":
           description: Internal error, e.g., failed to remove a container
           $ref: "#/components/responses/PlainTextInternalError"
@@ -181,32 +184,6 @@ components:
         - TERMINATED_BY_USER
         - TERMINATED_BY_SERVER
 
-    RunnerStatus:
-      title: shim.RunnerStatus
-      type: string
-      enum:
-        - pending
-        - pulling
-        - creating
-        - running
-
-    JobResult:
-      title: shim.JobResult
-      type: object
-      properties:
-        reason:
-          $ref: "#/components/schemas/TerminationReason"
-        reason_message:
-          type: string
-          default: ""
-          description: >
-            `State.Error` from Docker API, or shim-generated message (e.g., if the container
-            is OOM killed or failed to prepare volumes), or N last lines from the container logs
-      required:
-        - reason
-        - reason_message
-      additionalProperties: false
-
     GpuID:
       description: >
         A vendor-specific unique identifier of GPU:
@@ -217,6 +194,33 @@ components:
       examples:
         - GPU-2b79666e-d81f-f3f8-fd47-9903f118c3f5
         - /dev/dri/renderD128
+
+    NetworkMode:
+      title: shim.NetworkMode
+      type: string
+      enum:
+        - host
+        - bridge
+
+    PortMapping:
+      title: shim.PortMapping
+      description: Task host:container port mapping pair
+      type: object
+      properties:
+        host:
+          type: integer
+          description: host port
+          examples:
+            - 32770
+        container:
+          type: integer
+          description: container port
+          examples:
+            - 80
+      required:
+        - host
+        - container
+      additionalProperties: false
 
     VolumeInfo:
       title: shim.VolumeInfo
@@ -311,6 +315,15 @@ components:
         termination_message:
           type: string
           description: A shim-generated message or N last lines from the container logs
+        ports:
+          oneOf:
+            - type: array
+              items:
+                $ref: "#/components/schemas/PortMapping"
+            - type: "null"
+          description: >
+            A host:container port mapping or `null` if this information is not yet available.
+            In the `host` network mode the array is empty (or `null` if is not ready yet, see above).
         container_name:
           type: string
           examples:
@@ -320,14 +333,19 @@ components:
           examples:
             - a6bb8d4bb8af8ec72482ecd194ff92fac9974521aa5ad8a46abfc4f0ba858775
         gpu_ids:
-          type: array
-          items:
-            $ref: "#/components/schemas/GpuID"
+          oneOf:
+            - type: array
+              items:
+                $ref: "#/components/schemas/GpuID"
+            - type: "null"
+          description: >
+            An array of GPU identifiers or `null` if this information is not yet available
       required:
         - id
         - status
         - termination_reason
         - termination_message
+        - ports
         - container_name
         - container_id
         - gpu_ids
@@ -359,12 +377,11 @@ components:
             - registry-token
         image_name:
           type: string
-          default: ""
           examples:
             - ubuntu:22.04
         container_user:
           type: string
-          default: ""
+          default: root
           description: >
             If not set, the default image user is used. As of 0.18.24, `dstack` always uses `root`
           examples:
@@ -402,6 +419,9 @@ components:
             If > 0, tmpfs is mounted with the `exec` option, unlike the default mount options
           examples:
             - 1073741824
+        network_mode:
+          $ref: "#/components/schemas/NetworkMode"
+          default: host
         volumes:
           type: array
           items:
@@ -447,6 +467,10 @@ components:
             the CLI client or provided by the user)
           examples:
             - ["ssh-rsa <BASE64> project@dstack", "ssh-ed25519 <BASE64> me@laptop"]
+      required:
+        - id
+        - name
+        - image_name
 
     TaskTerminateRequest:
       title: shim.api.TaskTerminateRequest
@@ -485,6 +509,15 @@ components:
             type: string
             examples:
               - OK
+
+    PlainTextBadRequest:
+      description: ""
+      content:
+        text/plain:
+          schema:
+            type: string
+            examples:
+              - bad request
 
     PlainTextNotFound:
       description: ""

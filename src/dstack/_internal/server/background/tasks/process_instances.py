@@ -34,6 +34,7 @@ from dstack._internal.core.backends.remote.provisioning import (
     run_shim_as_systemd_service,
     upload_envs,
 )
+from dstack._internal.core.consts import DSTACK_SHIM_HTTP_PORT
 
 # FIXME: ProvisioningError is a subclass of ComputeError and should not be used outside of Compute
 from dstack._internal.core.errors import BackendError, ProvisioningError
@@ -627,7 +628,7 @@ async def _check_instance(instance: InstanceModel) -> None:
 
     # May return False if fails to establish ssh connection
     health_status_response = await run_async(
-        _instance_healthcheck, ssh_private_key, job_provisioning_data
+        _instance_healthcheck, ssh_private_key, job_provisioning_data, None
     )
     if isinstance(health_status_response, bool) or health_status_response is None:
         health_status = HealthStatus(healthy=False, reason="SSH or tunnel error")
@@ -755,9 +756,9 @@ async def _wait_for_instance_provisioning_data(
         )
 
 
-@runner_ssh_tunnel(ports=[runner_client.REMOTE_SHIM_PORT], retries=1)
+@runner_ssh_tunnel(ports=[DSTACK_SHIM_HTTP_PORT], retries=1)
 def _instance_healthcheck(ports: Dict[int, int]) -> HealthStatus:
-    shim_client = runner_client.ShimClient(port=ports[runner_client.REMOTE_SHIM_PORT])
+    shim_client = runner_client.ShimClient(port=ports[DSTACK_SHIM_HTTP_PORT])
     try:
         resp = shim_client.healthcheck(unmask_exeptions=True)
         if resp is None:

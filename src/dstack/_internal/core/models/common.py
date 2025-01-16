@@ -71,6 +71,11 @@ class ApplyAction(str, Enum):
     UPDATE = "update"  # resource is to be updated in-place
 
 
+class NetworkMode(str, Enum):
+    HOST = "host"
+    BRIDGE = "bridge"
+
+
 _CM = TypeVar("_CM", bound=CoreModel)
 
 

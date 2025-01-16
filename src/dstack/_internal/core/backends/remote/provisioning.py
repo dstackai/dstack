@@ -8,6 +8,8 @@ from typing import Any, Dict, Generator, List
 import paramiko
 from gpuhunt import AcceleratorVendor, correct_gpu_memory_gib
 
+from dstack._internal.core.consts import DSTACK_SHIM_HTTP_PORT
+
 # FIXME: ProvisioningError is a subclass of ComputeError and should not be used outside of Compute
 from dstack._internal.core.errors import ProvisioningError
 from dstack._internal.core.models.instances import (
@@ -202,7 +204,7 @@ def get_shim_healthcheck(client: paramiko.SSHClient) -> str:
     for _ in range(retries):
         try:
             _, stdout, stderr = client.exec_command(
-                "curl -s http://localhost:10998/api/healthcheck", timeout=15
+                f"curl -s http://localhost:{DSTACK_SHIM_HTTP_PORT}/api/healthcheck", timeout=15
             )
             out = stdout.read().strip().decode()
             err = stderr.read().strip().decode()

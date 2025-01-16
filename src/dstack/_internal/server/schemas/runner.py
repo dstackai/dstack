@@ -5,7 +5,7 @@ from typing import Dict, List, Optional, Union
 from pydantic import Field, validator
 from typing_extensions import Annotated
 
-from dstack._internal.core.models.common import CoreModel
+from dstack._internal.core.models.common import CoreModel, NetworkMode
 from dstack._internal.core.models.repos.remote import RemoteRepoCreds
 from dstack._internal.core.models.runs import ClusterInfo, JobSpec, JobStatus, RunSpec
 from dstack._internal.core.models.volumes import InstanceMountPoint, VolumeMountPoint
@@ -95,6 +95,11 @@ class ShimVolumeInfo(CoreModel):
     device_name: Optional[str] = None
 
 
+class PortMapping(CoreModel):
+    host: int
+    container: int
+
+
 class TaskStatus(str, Enum):
     PENDING = "pending"
     PREPARING = "preparing"
@@ -109,6 +114,8 @@ class TaskInfoResponse(CoreModel):
     status: TaskStatus
     termination_reason: str
     termination_message: str
+    # default value for backward compatibility with 0.18.34, could be removed after a few releases
+    ports: Optional[list[PortMapping]] = []
 
 
 class TaskSubmitRequest(CoreModel):
@@ -123,6 +130,7 @@ class TaskSubmitRequest(CoreModel):
     cpu: float
     memory: int
     shm_size: int
+    network_mode: NetworkMode
     volumes: list[ShimVolumeInfo]
     volume_mounts: list[VolumeMountPoint]
     instance_mounts: list[InstanceMountPoint]

@@ -22,18 +22,25 @@ type CLIArgs struct {
 
 	Runner struct {
 		HTTPPort    int
+		SSHPort     int
 		DownloadURL string
 		BinaryPath  string
 		LogLevel    int
 	}
 
 	Docker struct {
-		SSHPort                   int
 		ConcatinatedPublicSSHKeys string
 		Privileged                bool
 		PJRTDevice                string
 	}
 }
+
+type NetworkMode string
+
+const (
+	NetworkModeHost   = "host"
+	NetworkModeBridge = "bridge"
+)
 
 type VolumeMountPoint struct {
 	Name string `json:"name"`
@@ -53,6 +60,11 @@ type VolumeInfo struct {
 	DeviceName string `json:"device_name"`
 }
 
+type PortMapping struct {
+	Host      int `json:"host"`
+	Container int `json:"container"`
+}
+
 type TaskConfig struct {
 	ID               string               `json:"id"`
 	Name             string               `json:"name"`
@@ -65,6 +77,7 @@ type TaskConfig struct {
 	CPU              float64              `json:"cpu"`      // 0.0 = all available; 0.5 = a half of CPU, ...
 	Memory           int64                `json:"memory"`   // bytes; 0 = all avaliable
 	ShmSize          int64                `json:"shm_size"` // bytes; 0 = default (64MiB)
+	NetworkMode      NetworkMode          `json:"network_mode"`
 	Volumes          []VolumeInfo         `json:"volumes"`
 	VolumeMounts     []VolumeMountPoint   `json:"volume_mounts"`
 	InstanceMounts   []InstanceMountPoint `json:"instance_mounts"`
@@ -79,6 +92,7 @@ type TaskInfo struct {
 	Status             TaskStatus
 	TerminationReason  string
 	TerminationMessage string
+	Ports              []PortMapping
 	ContainerName      string
 	ContainerID        string
 	GpuIDs             []string

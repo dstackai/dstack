@@ -359,6 +359,7 @@ class JobModel(BaseModel):
     instance: Mapped[Optional["InstanceModel"]] = relationship(back_populates="job")
     used_instance_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUIDType(binary=False))
     replica_num: Mapped[int] = mapped_column(Integer)
+    job_runtime_data: Mapped[Optional[str]] = mapped_column(Text)
 
 
 class GatewayModel(BaseModel):

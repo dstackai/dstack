@@ -8,6 +8,7 @@ from sqlalchemy.orm import joinedload, lazyload, selectinload
 
 from dstack._internal.core.backends.base import Backend
 from dstack._internal.core.errors import BackendError, ServerClientError
+from dstack._internal.core.models.common import NetworkMode
 from dstack._internal.core.models.fleets import (
     FleetConfiguration,
     FleetSpec,
@@ -27,6 +28,7 @@ from dstack._internal.core.models.profiles import (
 from dstack._internal.core.models.runs import (
     Job,
     JobProvisioningData,
+    JobRuntimeData,
     JobStatus,
     JobTerminationReason,
     Run,
@@ -222,6 +224,8 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
                 volumes=volumes,
             )
             job_model.instance_assigned = True
+            if instance is not None:
+                job_model.job_runtime_data = _prepare_job_runtime_data(job, instance).json()
             job_model.last_processed_at = common_utils.get_current_datetime()
             await session.commit()
             return
@@ -289,6 +293,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
             offer=offer,
             instance_num=instance_num,
         )
+        job_model.job_runtime_data = _prepare_job_runtime_data(job, instance).json()
         instance.fleet_id = fleet_model.id
         logger.info(
             "The job %s created the new instance %s",
@@ -541,6 +546,22 @@ def _create_instance_model_for_job(
         volumes=[],
     )
     return instance
+
+
+def _prepare_job_runtime_data(job: Job, instance: InstanceModel) -> JobRuntimeData:
+    if job.job_spec.jobs_per_replica > 1:
+        # multi-node runs require host network mode for inter-node communication and occupy
+        # the entire instance
+        return JobRuntimeData(network_mode=NetworkMode.HOST)
+
+    # TODO: replace with a real computed value depending on the instance
+    is_shared_instance = True
+
+    if not is_shared_instance:
+        return JobRuntimeData(network_mode=NetworkMode.HOST)
+
+    # TODO: slice CPU/GPU/Memory resources depending on the instance
+    return JobRuntimeData(network_mode=NetworkMode.BRIDGE)
 
 
 async def _attach_volumes(

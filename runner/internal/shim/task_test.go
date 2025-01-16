@@ -97,7 +97,9 @@ func TestTask_IsTransitionAllowed_true(t *testing.T) {
 		{TaskStatusPulling, TaskStatusTerminated},
 		{TaskStatusCreating, TaskStatusRunning},
 		{TaskStatusCreating, TaskStatusTerminated},
+		{TaskStatusRunning, TaskStatusRunning},
 		{TaskStatusRunning, TaskStatusTerminated},
+		{TaskStatusTerminated, TaskStatusTerminated},
 	}
 	for _, tc := range testCases {
 		task := Task{ID: "1", Status: tc.oldStatus}
@@ -113,7 +115,6 @@ func TestTask_IsTransitionAllowed_false(t *testing.T) {
 		{TaskStatusPending, TaskStatusPending},
 		{TaskStatusPending, TaskStatusRunning},
 		{TaskStatusPulling, TaskStatusPending},
-		{TaskStatusTerminated, TaskStatusTerminated},
 	}
 	for _, tc := range testCases {
 		task := Task{ID: "1", Status: tc.oldStatus}

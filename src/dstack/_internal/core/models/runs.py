@@ -6,7 +6,7 @@ from pydantic import UUID4, Field, root_validator
 from typing_extensions import Annotated
 
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.common import ApplyAction, CoreModel, RegistryAuth
+from dstack._internal.core.models.common import ApplyAction, CoreModel, NetworkMode, RegistryAuth
 from dstack._internal.core.models.configurations import (
     AnyRunConfiguration,
     RunConfiguration,
@@ -25,7 +25,7 @@ from dstack._internal.core.models.profiles import (
     SpotPolicy,
 )
 from dstack._internal.core.models.repos import AnyRunRepoData
-from dstack._internal.core.models.resources import ResourcesSpec
+from dstack._internal.core.models.resources import Memory, ResourcesSpec
 from dstack._internal.core.models.unix import UnixUser
 from dstack._internal.utils import common as common_utils
 from dstack._internal.utils.common import format_pretty_duration
@@ -226,6 +226,18 @@ class JobProvisioningData(CoreModel):
         return self.backend
 
 
+class JobRuntimeData(CoreModel):
+    network_mode: NetworkMode
+    # GPU, CPU, memory resource shares. None means all available (no limit)
+    gpu: Optional[int] = None
+    cpu: Optional[float] = None
+    memory: Optional[Memory] = None
+    # container:host port mapping reported by shim. Empty dict if network_mode == NetworkMode.HOST
+    # None if data is not yet available (on vm-based backends and ssh instances)
+    # or not applicable (container-based backends)
+    ports: Optional[dict[int, int]] = None
+
+
 class ClusterInfo(CoreModel):
     job_ips: List[str]
     master_job_ip: str
@@ -242,6 +254,7 @@ class JobSubmission(CoreModel):
     termination_reason: Optional[JobTerminationReason]
     termination_reason_message: Optional[str]
     job_provisioning_data: Optional[JobProvisioningData]
+    job_runtime_data: Optional[JobRuntimeData]
 
     @property
     def age(self) -> timedelta:

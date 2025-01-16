@@ -1,6 +1,7 @@
 from typing import List, Optional
 
 from dstack._internal.core.backends.base.compute import Compute
+from dstack._internal.core.consts import DSTACK_RUNNER_SSH_PORT
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
@@ -54,7 +55,7 @@ class LocalCompute(Compute):
             region="",
             price=instance_offer.price,
             username="root",
-            ssh_port=10022,
+            ssh_port=DSTACK_RUNNER_SSH_PORT,
             ssh_proxy=None,
             dockerized=True,
             backend_data=None,
@@ -78,7 +79,7 @@ class LocalCompute(Compute):
             region="",
             price=instance_offer.price,
             username="root",
-            ssh_port=10022,
+            ssh_port=DSTACK_RUNNER_SSH_PORT,
             ssh_proxy=None,
             dockerized=True,
             backend_data=None,

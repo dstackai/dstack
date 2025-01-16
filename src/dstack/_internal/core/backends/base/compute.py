@@ -9,6 +9,11 @@ import requests
 import yaml
 
 from dstack._internal import settings
+from dstack._internal.core.consts import (
+    DSTACK_RUNNER_HTTP_PORT,
+    DSTACK_RUNNER_SSH_PORT,
+    DSTACK_SHIM_HTTP_PORT,
+)
 from dstack._internal.core.models.gateways import (
     GatewayComputeConfiguration,
     GatewayProvisioningData,
@@ -193,12 +198,16 @@ def get_user_data(
 
 
 def get_shim_env(authorized_keys: List[str]) -> Dict[str, str]:
+    log_level = "6"  # Trace
     envs = {
         "DSTACK_SHIM_HOME": DSTACK_WORKING_DIR,
-        "DSTACK_SHIM_LOG_LEVEL": "6",
+        "DSTACK_SHIM_HTTP_PORT": str(DSTACK_SHIM_HTTP_PORT),
+        "DSTACK_SHIM_LOG_LEVEL": log_level,
         "DSTACK_RUNNER_DOWNLOAD_URL": get_dstack_runner_download_url(),
         "DSTACK_RUNNER_BINARY_PATH": DSTACK_RUNNER_BINARY_PATH,
-        "DSTACK_RUNNER_LOG_LEVEL": "6",
+        "DSTACK_RUNNER_HTTP_PORT": str(DSTACK_RUNNER_HTTP_PORT),
+        "DSTACK_RUNNER_SSH_PORT": str(DSTACK_RUNNER_SSH_PORT),
+        "DSTACK_RUNNER_LOG_LEVEL": log_level,
         "DSTACK_PUBLIC_SSH_KEY": "\n".join(authorized_keys),
     }
     return envs
@@ -331,7 +340,7 @@ def get_docker_commands(
         "rm -rf /run/sshd && mkdir -p /run/sshd && chown root:root /run/sshd",
         "rm -rf /var/empty && mkdir -p /var/empty && chown root:root /var/empty",
         # start sshd
-        "/usr/sbin/sshd -p 10022 -o PidFile=none -o PasswordAuthentication=no -o AllowTcpForwarding=yes -o PermitUserEnvironment=yes",
+        f"/usr/sbin/sshd -p {DSTACK_RUNNER_SSH_PORT} -o PidFile=none -o PasswordAuthentication=no -o AllowTcpForwarding=yes -o PermitUserEnvironment=yes",
         # restore ld.so variables
         'if [ -n "$_LD_LIBRARY_PATH" ]; then export LD_LIBRARY_PATH="$_LD_LIBRARY_PATH"; fi',
         'if [ -n "$_LD_PRELOAD" ]; then export LD_PRELOAD="$_LD_PRELOAD"; fi',
@@ -341,7 +350,7 @@ def get_docker_commands(
     commands += [
         f"curl --connect-timeout 60 --max-time 240 --retry 1 --output {DSTACK_RUNNER_BINARY_PATH} {url}",
         f"chmod +x {DSTACK_RUNNER_BINARY_PATH}",
-        f"{DSTACK_RUNNER_BINARY_PATH} --log-level 6 start --http-port 10999 --temp-dir /tmp/runner --home-dir /root --working-dir /workflow",
+        f"{DSTACK_RUNNER_BINARY_PATH} --log-level 6 start --http-port {DSTACK_RUNNER_HTTP_PORT} --temp-dir /tmp/runner --home-dir /root --working-dir /workflow",
     ]
 
     return commands

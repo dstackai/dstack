@@ -38,6 +38,21 @@ func (s *ShimServer) TaskSubmitHandler(w http.ResponseWriter, r *http.Request) (
 	if err := api.DecodeJSONBody(w, r, &req, true); err != nil {
 		return nil, err
 	}
+	if req.ID == "" {
+		return nil, &api.Error{Status: http.StatusBadRequest, Msg: "empty id"}
+	}
+	if req.Name == "" {
+		return nil, &api.Error{Status: http.StatusBadRequest, Msg: "empty name"}
+	}
+	if req.ImageName == "" {
+		return nil, &api.Error{Status: http.StatusBadRequest, Msg: "empty image_name"}
+	}
+	if req.ContainerUser == "" {
+		req.ContainerUser = "root"
+	}
+	if req.NetworkMode == "" {
+		req.NetworkMode = shim.NetworkModeHost
+	}
 	ctx := r.Context()
 	taskConfig := shim.TaskConfig(req)
 	if err := s.runner.Submit(ctx, taskConfig); err != nil {
