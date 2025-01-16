@@ -228,6 +228,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
                     code,
                     secrets,
                     repo_creds,
+                    success_if_not_available=False,
                 )
 
             if not success:
@@ -556,6 +557,7 @@ def _process_pulling_with_shim(
         code=code,
         secrets=secrets,
         repo_credentials=repo_credentials,
+        success_if_not_available=True,
     )
 
 
@@ -654,6 +656,7 @@ def _submit_job_to_runner(
     code: bytes,
     secrets: Dict[str, str],
     repo_credentials: Optional[RemoteRepoCreds],
+    success_if_not_available: bool,
 ) -> bool:
     """
     Possible next states:
@@ -679,7 +682,8 @@ def _submit_job_to_runner(
     runner_client = client.RunnerClient(port=ports[DSTACK_RUNNER_HTTP_PORT])
     resp = runner_client.healthcheck()
     if resp is None:
-        return True  # runner is not available yet
+        # runner is not available yet
+        return success_if_not_available
 
     runner_client.submit_job(
         run_spec=run.run_spec,
