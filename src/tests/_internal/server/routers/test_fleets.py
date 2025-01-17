@@ -773,13 +773,13 @@ class TestGetPlan:
             backend_mock = Mock()
             m.return_value = [backend_mock]
             backend_mock.TYPE = BackendType.AWS
-            backend_mock.compute.return_value.get_offers.return_value = offers
+            backend_mock.compute.return_value.get_offers_cached.return_value = offers
             response = await client.post(
                 f"/api/project/{project.name}/fleets/get_plan",
                 headers=get_auth_headers(user.token),
                 json={"spec": spec.dict()},
             )
-            backend_mock.compute.return_value.get_offers.assert_called_once()
+            backend_mock.compute.return_value.get_offers_cached.assert_called_once()
 
         assert response.status_code == 200
         assert response.json() == {
