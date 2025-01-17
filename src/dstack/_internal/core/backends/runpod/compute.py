@@ -38,6 +38,7 @@ class RunpodCompute(Compute):
     _last_cleanup_time = None
 
     def __init__(self, config: RunpodConfig):
+        super().__init__()
         self.config = config
         self.api_client = RunpodApiClient(config.creds.api_key)
 

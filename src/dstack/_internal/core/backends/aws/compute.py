@@ -60,6 +60,7 @@ class AWSVolumeBackendData(CoreModel):
 
 class AWSCompute(Compute):
     def __init__(self, config: AWSConfig):
+        super().__init__()
         self.config = config
         if is_core_model_instance(config.creds, AWSAccessKeyCreds):
             self.session = boto3.Session(

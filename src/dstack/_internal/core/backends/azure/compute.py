@@ -1,6 +1,7 @@
 import base64
 import enum
 import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, List, Optional, Tuple
 
 from azure.core.credentials import TokenCredential
@@ -70,6 +71,7 @@ CONFIGURABLE_DISK_SIZE = Range[Memory](min=Memory.parse("30GB"), max=Memory.pars
 
 class AzureCompute(Compute):
     def __init__(self, config: AzureConfig, credential: TokenCredential):
+        super().__init__()
         self.config = config
         self.credential = credential
         self._compute_client = compute_mgmt.ComputeManagementClient(
@@ -391,13 +393,22 @@ def _get_offers_with_availability(
     offers = [offer for offer in offers if offer.region in config_locations]
     locations = set(offer.region for offer in offers)
 
-    has_quota = set()
-    for location in locations:
+    def get_location_quotas(location: str) -> List[str]:
+        quotas = []
         resources = compute_client.resource_skus.list(filter=f"location eq '{location}'")
         for resource in resources:
             if resource.resource_type != "virtualMachines" or not _vm_type_available(resource):
                 continue
-            has_quota.add((resource.name, location))
+            quotas.append((resource.name, location))
+        return quotas
+
+    has_quota = set()
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        futures = []
+        for location in locations:
+            futures.append(executor.submit(get_location_quotas, location))
+        for future in as_completed(futures):
+            has_quota.update(future.result())
 
     offers_with_availability = []
     for offer in offers:

@@ -43,6 +43,7 @@ CONFIGURABLE_DISK_SIZE = Range[Memory](min=Memory.parse("50GB"), max=Memory.pars
 
 class OCICompute(Compute):
     def __init__(self, config: OCIConfig):
+        super().__init__()
         self.config = config
         self.regions = make_region_clients_map(config.regions or [], config.creds)
 

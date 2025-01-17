@@ -421,7 +421,7 @@ async def get_instance_offers(
     Returns list of instances satisfying minimal resource requirements sorted by price
     """
     logger.info("Requesting instance offers from backends: %s", [b.TYPE.value for b in backends])
-    tasks = [run_async(backend.compute().get_offers, requirements) for backend in backends]
+    tasks = [run_async(backend.compute().get_offers_cached, requirements) for backend in backends]
     offers_by_backend = []
     for backend, result in zip(backends, await asyncio.gather(*tasks, return_exceptions=True)):
         if isinstance(result, BackendError):

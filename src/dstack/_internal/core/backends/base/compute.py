@@ -1,5 +1,7 @@
+import json
 import os
 import re
+import threading
 from abc import ABC, abstractmethod
 from functools import lru_cache
 from typing import Dict, List, Optional
@@ -7,6 +9,7 @@ from typing import Dict, List, Optional
 import git
 import requests
 import yaml
+from cachetools import TTLCache, cachedmethod
 
 from dstack._internal import settings
 from dstack._internal.core.consts import (
@@ -41,6 +44,10 @@ DSTACK_RUNNER_BINARY_PATH = f"/usr/local/bin/{DSTACK_RUNNER_BINARY_NAME}"
 
 
 class Compute(ABC):
+    def __init__(self):
+        self._offers_cache_lock = threading.Lock()
+        self._offers_cache = TTLCache(maxsize=5, ttl=30)
+
     @abstractmethod
     def get_offers(
         self, requirements: Optional[Requirements] = None
@@ -176,6 +183,22 @@ class Compute(ABC):
         Detaches a volume from the instance.
         """
         raise NotImplementedError()
+
+    def _get_offers_cached_key(self, requirements: Optional[Requirements] = None) -> int:
+        # Requirements is not hashable, so we use a hack to get arguments hash
+        if requirements is None:
+            return hash(None)
+        return hash(json.dumps(requirements.dict(), sort_keys=True))
+
+    @cachedmethod(
+        cache=lambda self: self._offers_cache,
+        key=_get_offers_cached_key,
+        lock=lambda self: self._offers_cache_lock,
+    )
+    def get_offers_cached(
+        self, requirements: Optional[Requirements] = None
+    ) -> List[InstanceOfferWithAvailability]:
+        return self.get_offers(requirements)
 
 
 def get_instance_name(run: Run, job: Job) -> str:

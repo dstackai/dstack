@@ -25,6 +25,7 @@ logger = get_logger(__name__)
 
 class TensorDockCompute(Compute):
     def __init__(self, config: TensorDockConfig):
+        super().__init__()
         self.config = config
         self.api_client = TensorDockAPIClient(config.creds.api_key, config.creds.api_token)
 
