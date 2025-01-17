@@ -26,6 +26,10 @@ LOG_FORMAT = os.getenv("DSTACK_SERVER_LOG_FORMAT", "rich").lower()
 ALEMBIC_MIGRATIONS_LOCATION = os.getenv(
     "DSTACK_ALEMBIC_MIGRATIONS_LOCATION", "dstack._internal.server:migrations"
 )
+# Users may want to increase pool size to support more concurrent resources
+# if their db supports many connections
+DB_POOL_SIZE = int(os.getenv("DSTACK_DB_POOL_SIZE", 10))
+DB_MAX_OVERFLOW = int(os.getenv("DSTACK_DB_MAX_OVERFLOW", 10))
 
 SERVER_CONFIG_DISABLED = os.getenv("DSTACK_SERVER_CONFIG_DISABLED") is not None
 SERVER_CONFIG_ENABLED = not SERVER_CONFIG_DISABLED
