@@ -12,7 +12,7 @@ hide:
 }
 </style>
 
-## User community
+## Help and feedback
 
 Connect with the `dstack` team and community through Discord or share feedback on GitHub.
 
@@ -20,14 +20,14 @@ Connect with the `dstack` team and community through Discord or share feedback o
     <a href="https://discord.gg/u8SmfwPpMd" class="feature-cell" target="_blank">
         <img width="40" src="/assets/images/discord-logo.svg">
         <h3>
-            Join Discord
+            Discord chat
         </h3>
     </a>
 
     <a href="https://github.com/dstackai/dstack/issues" class="feature-cell" target="_blank">
         <img width="40" src="/assets/images/github-logo.svg">
         <h3>
-            Explore issues
+            Issue tracker
         </h3>
     </a>
 </div>
@@ -51,25 +51,23 @@ As an ambassador, you’ll play a key role in growing our community by:
 
 > We support ambassadors with recognition, wider exposure, and cloud GPU credits.
 
-## For contributors
+## Contributing to dstack
 
-Join the development of `dstack` by contributing bug fixes, new features, and cloud integrations.
+Join the development of `dstack` by contributing bug fixes, 
+new features, and cloud integrations via custom backends.
 
 <div class="providers tx-landing__highlights_grid featured">
     <a href="https://github.com/dstackai/dstack/blob/master/CONTRIBUTING.md" class="feature-cell" target="_blank">
-       <h3>
-           Contributing
-       </h3>
-       <p>
-            Learn about the codebase and how to contribute.
-        </p>
+        <img width="40" src="/assets/images/github-logo.svg">
+        <h3>
+            Contributing <br>guide
+        </h3>
     </a>
+
     <a href="https://github.com/dstackai/dstack/blob/master/contributing/BACKENDS.md" class="feature-cell" target="_blank">
-       <h3>
-           Backends
-       </h3>
-       <p>
-            Learn how to integrate <code>dstack</code> with cloud providers.
-        </p>
+        <img width="40" src="/assets/images/github-logo.svg">
+        <h3>
+            Adding new backends
+        </h3>
     </a>
 </div>
