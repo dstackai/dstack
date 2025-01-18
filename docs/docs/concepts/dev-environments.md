@@ -28,6 +28,29 @@ resources:
 
 </div>
 
+### Initialization
+
+If you want to pre-configure the dev environment, specify the [`init`](../reference/dstack.yml/dev-environment.md#init)
+property with a list of commands to run at startup:
+
+<div editor-title="examples/.dstack.yml"> 
+
+```yaml
+type: dev-environment
+# The name is optional, if not specified, generated randomly
+name: vscode
+
+python: "3.11"
+ide: vscode
+
+# Commands to run on startup
+init:
+  - pip install wandb
+```
+
+</div>
+
+
 ### Resources
 
 When you specify a resource value like `cpu` or `memory`,
