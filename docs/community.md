@@ -1,5 +1,4 @@
 ---
-title: AI container orchestration for everyone
 hide:
    - navigation
 #   - toc

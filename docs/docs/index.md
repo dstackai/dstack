@@ -11,7 +11,7 @@ for AI workloads both in the cloud and on-prem, speeding up the development, tra
 
 ## How does it work?
 
-![](https://raw.githubusercontent.com/dstackai/static-assets/refs/heads/main/static-assets/images/dstack-architecture-diagram.svg)
+![](https://raw.githubusercontent.com/dstackai/static-assets/refs/heads/main/static-assets/images/dstack-architecture-diagram-v4.svg)
 
 #### 1. Set up the server
 
