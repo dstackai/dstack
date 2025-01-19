@@ -45,7 +45,8 @@ async def list_pool_instances(
     return await pools.list_user_pool_instances(
         session=session,
         user=user,
-        project_name=body.project_name,
+        project_names=[body.project_name] if body.project_name is not None else None,
+        fleet_ids=None,
         pool_name=body.pool_name,
         only_active=body.only_active,
         prev_created_at=body.prev_created_at,
