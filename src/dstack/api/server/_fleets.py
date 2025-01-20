@@ -20,7 +20,10 @@ class FleetsAPIClient(APIClientGroup):
 
     def get(self, project_name: str, name: str) -> Fleet:
         body = GetFleetRequest(name=name)
-        resp = self._request(f"/api/project/{project_name}/fleets/get", body=body.json())
+        resp = self._request(
+            f"/api/project/{project_name}/fleets/get",
+            body=body.json(exclude={"id"}),  # `id` is not supported in pre-0.18.36 servers
+        )
         return parse_obj_as(Fleet.__response__, resp.json())
 
     def get_plan(
