@@ -2,7 +2,7 @@ import asyncio
 import logging
 import sys
 
-from pythonjsonlogger import jsonlogger
+from pythonjsonlogger.json import JsonFormatter
 
 from dstack._internal.cli.utils.common import console
 from dstack._internal.cli.utils.rich import DstackRichHandler
@@ -25,7 +25,7 @@ def configure_logging():
             fmt="%(levelname)s %(asctime)s.%(msecs)03d %(name)s %(message)s",
             datefmt="%Y-%m-%dT%H:%M:%S",
         ),
-        "json": jsonlogger.JsonFormatter(
+        "json": JsonFormatter(
             "%(asctime)s %(name)s %(levelname)s %(message)s",
             json_ensure_ascii=False,
             rename_fields={"name": "logger", "asctime": "timestamp", "levelname": "level"},
