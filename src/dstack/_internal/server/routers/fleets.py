@@ -81,7 +81,7 @@ async def get_fleet(
     """
     _, project = user_project
     fleet = await fleets_services.get_fleet(
-        session=session, project=project, name=body.name, id=body.id
+        session=session, project=project, name=body.name, fleet_id=body.id
     )
     if fleet is None:
         raise ResourceNotExistsError()

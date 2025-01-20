@@ -180,10 +180,15 @@ async def list_project_fleet_models(
 
 
 async def get_fleet(
-    session: AsyncSession, project: ProjectModel, name: Optional[str], id: Optional[uuid.UUID]
+    session: AsyncSession,
+    project: ProjectModel,
+    name: Optional[str],
+    fleet_id: Optional[uuid.UUID],
 ) -> Optional[Fleet]:
-    if id is not None:
-        fleet_model = await get_project_fleet_model_by_id(session=session, project=project, id=id)
+    if fleet_id is not None:
+        fleet_model = await get_project_fleet_model_by_id(
+            session=session, project=project, fleet_id=fleet_id
+        )
     elif name is not None:
         fleet_model = await get_project_fleet_model_by_name(
             session=session, project=project, name=name
@@ -198,10 +203,10 @@ async def get_fleet(
 async def get_project_fleet_model_by_id(
     session: AsyncSession,
     project: ProjectModel,
-    id: uuid.UUID,
+    fleet_id: uuid.UUID,
 ) -> Optional[FleetModel]:
     filters = [
-        FleetModel.id == id,
+        FleetModel.id == fleet_id,
         FleetModel.project_id == project.id,
     ]
     res = await session.execute(
