@@ -75,11 +75,13 @@ async def get_fleet(
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
 ) -> Fleet:
     """
-    Returns a fleet given a fleet name.
+    Returns a fleet given `name` or `id`.
+    If given `name`, does not return deleted fleets.
+    If given `id`, returns deleted fleets.
     """
     _, project = user_project
-    fleet = await fleets_services.get_fleet_by_name(
-        session=session, project=project, name=body.name
+    fleet = await fleets_services.get_fleet(
+        session=session, project=project, name=body.name, id=body.id
     )
     if fleet is None:
         raise ResourceNotExistsError()

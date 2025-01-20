@@ -179,15 +179,35 @@ async def list_project_fleet_models(
     return list(res.unique().scalars().all())
 
 
-async def get_fleet_by_name(
-    session: AsyncSession, project: ProjectModel, name: str
+async def get_fleet(
+    session: AsyncSession, project: ProjectModel, name: Optional[str], id: Optional[uuid.UUID]
 ) -> Optional[Fleet]:
-    fleet_model = await get_project_fleet_model_by_name(
-        session=session, project=project, name=name
-    )
+    if id is not None:
+        fleet_model = await get_project_fleet_model_by_id(session=session, project=project, id=id)
+    elif name is not None:
+        fleet_model = await get_project_fleet_model_by_name(
+            session=session, project=project, name=name
+        )
+    else:
+        raise ServerClientError("name or id must be specified")
     if fleet_model is None:
         return None
     return fleet_model_to_fleet(fleet_model)
+
+
+async def get_project_fleet_model_by_id(
+    session: AsyncSession,
+    project: ProjectModel,
+    id: uuid.UUID,
+) -> Optional[FleetModel]:
+    filters = [
+        FleetModel.id == id,
+        FleetModel.project_id == project.id,
+    ]
+    res = await session.execute(
+        select(FleetModel).where(*filters).options(joinedload(FleetModel.instances))
+    )
+    return res.unique().scalar_one_or_none()
 
 
 async def get_project_fleet_model_by_name(

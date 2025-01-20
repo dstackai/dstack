@@ -18,7 +18,8 @@ class ListFleetsRequest(CoreModel):
 
 
 class GetFleetRequest(CoreModel):
-    name: str
+    name: Optional[str]
+    id: Optional[UUID] = None
 
 
 class GetFleetPlanRequest(CoreModel):

@@ -1,7 +1,7 @@
 import json
 from datetime import datetime, timezone
 from unittest.mock import Mock, patch
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 from freezegun import freeze_time
@@ -183,7 +183,10 @@ class TestGetFleet:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_returns_fleet(self, test_db, session: AsyncSession, client: AsyncClient):
+    @pytest.mark.parametrize("deleted", [False, True])
+    async def test_returns_fleet_by_id(
+        self, test_db, session: AsyncSession, client: AsyncClient, deleted: bool
+    ):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
         await add_project_member(
@@ -193,11 +196,12 @@ class TestGetFleet:
             session=session,
             project=project,
             created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+            deleted=deleted,
         )
         response = await client.post(
             f"/api/project/{project.name}/fleets/get",
             headers=get_auth_headers(user.token),
-            json={"name": fleet.name},
+            json={"id": str(fleet.id)},
         )
         assert response.status_code == 200
         assert response.json() == {
@@ -213,7 +217,67 @@ class TestGetFleet:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_returns_400_if_fleet_does_not_exist(
+    async def test_returns_not_deleted_fleet_by_name(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session, global_role=GlobalRole.USER)
+        project = await create_project(session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        active_fleet = await create_fleet(
+            session=session,
+            project=project,
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+            fleet_id=uuid4(),
+        )
+        deleted_fleet = await create_fleet(
+            session=session,
+            project=project,
+            created_at=datetime(2023, 1, 2, 3, 5, tzinfo=timezone.utc),
+            fleet_id=uuid4(),
+            deleted=True,
+        )
+        assert active_fleet.name == deleted_fleet.name
+        assert active_fleet.id != deleted_fleet.id
+        response = await client.post(
+            f"/api/project/{project.name}/fleets/get",
+            headers=get_auth_headers(user.token),
+            json={"name": active_fleet.name},
+        )
+        assert response.status_code == 200
+        assert response.json() == {
+            "id": str(active_fleet.id),
+            "name": active_fleet.name,
+            "project_name": project.name,
+            "spec": json.loads(active_fleet.spec),
+            "created_at": "2023-01-02T03:04:00+00:00",
+            "status": active_fleet.status.value,
+            "status_message": None,
+            "instances": [],
+        }
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_not_returns_by_name_if_fleet_deleted(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session, global_role=GlobalRole.USER)
+        project = await create_project(session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        fleet = await create_fleet(session=session, project=project, deleted=True)
+        response = await client.post(
+            f"/api/project/{project.name}/fleets/get",
+            headers=get_auth_headers(user.token),
+            json={"name": fleet.name},
+        )
+        assert response.status_code == 400
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_not_returns_by_name_if_fleet_does_not_exist(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
         user = await create_user(session, global_role=GlobalRole.USER)

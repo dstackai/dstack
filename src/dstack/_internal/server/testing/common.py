@@ -418,6 +418,7 @@ async def create_fleet(
     spec: Optional[FleetSpec] = None,
     fleet_id: Optional[UUID] = None,
     status: FleetStatus = FleetStatus.ACTIVE,
+    deleted: bool = False,
 ) -> FleetModel:
     if fleet_id is None:
         fleet_id = uuid.uuid4()
@@ -426,6 +427,7 @@ async def create_fleet(
     fm = FleetModel(
         id=fleet_id,
         project=project,
+        deleted=deleted,
         name=spec.configuration.name,
         status=status,
         created_at=created_at,
