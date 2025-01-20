@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/dstackai/dstack/runner/internal/log"
+	"github.com/dstackai/dstack/runner/internal/types"
 )
 
 type TaskStatus string
@@ -31,7 +32,7 @@ const (
 type Task struct {
 	ID                 string
 	Status             TaskStatus
-	TerminationReason  string // TODO: enum
+	TerminationReason  types.TerminationReason
 	TerminationMessage string
 
 	config        TaskConfig
@@ -112,7 +113,7 @@ func (t *Task) SetStatusRunning() {
 	t.Status = TaskStatusRunning
 }
 
-func (t *Task) SetStatusTerminated(reason string, message string) {
+func (t *Task) SetStatusTerminated(reason types.TerminationReason, message string) {
 	t.Status = TaskStatusTerminated
 	t.TerminationReason = reason
 	t.TerminationMessage = message

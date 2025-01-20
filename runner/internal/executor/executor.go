@@ -18,10 +18,10 @@ import (
 
 	"github.com/creack/pty"
 	"github.com/dstackai/dstack/runner/consts"
-	"github.com/dstackai/dstack/runner/consts/states"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/dstackai/dstack/runner/internal/schemas"
+	"github.com/dstackai/dstack/runner/internal/types"
 )
 
 type RunExecutor struct {
@@ -79,14 +79,14 @@ func NewRunExecutor(tempDir string, homeDir string, workingDir string) (*RunExec
 func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 	runnerLogFile, err := log.CreateAppendFile(filepath.Join(ex.tempDir, consts.RunnerLogFileName))
 	if err != nil {
-		ex.SetJobState(ctx, states.Failed)
+		ex.SetJobState(ctx, types.JobStateFailed)
 		return gerrors.Wrap(err)
 	}
 	defer func() { _ = runnerLogFile.Close() }()
 
 	jobLogFile, err := log.CreateAppendFile(filepath.Join(ex.tempDir, consts.RunnerJobLogFileName))
 	if err != nil {
-		ex.SetJobState(ctx, states.Failed)
+		ex.SetJobState(ctx, types.JobStateFailed)
 		return gerrors.Wrap(err)
 	}
 	defer func() { _ = jobLogFile.Close() }()
@@ -95,7 +95,7 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 		// recover goes after runnerLogFile.Close() to keep the log
 		if r := recover(); r != nil {
 			log.Error(ctx, "Executor PANIC", "err", r)
-			ex.SetJobState(ctx, states.Failed)
+			ex.SetJobState(ctx, types.JobStateFailed)
 			err = gerrors.Newf("recovered: %v", r)
 		}
 		// no more logs will be written after this
@@ -115,17 +115,17 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 	log.Info(ctx, "Run job", "log_level", log.GetLogger(ctx).Logger.Level.String())
 
 	if err := ex.setupRepo(ctx); err != nil {
-		ex.SetJobState(ctx, states.Failed)
+		ex.SetJobState(ctx, types.JobStateFailed)
 		return gerrors.Wrap(err)
 	}
 	cleanupCredentials, err := ex.setupCredentials(ctx)
 	if err != nil {
-		ex.SetJobState(ctx, states.Failed)
+		ex.SetJobState(ctx, types.JobStateFailed)
 		return gerrors.Wrap(err)
 	}
 	defer cleanupCredentials()
 
-	ex.SetJobState(ctx, states.Running)
+	ex.SetJobState(ctx, types.JobStateRunning)
 	timeoutCtx := ctx
 	var cancelTimeout context.CancelFunc
 	if ex.jobSpec.MaxDuration != 0 {
@@ -136,7 +136,7 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 		select {
 		case <-ctx.Done():
 			log.Error(ctx, "Job canceled")
-			ex.SetJobState(ctx, states.Terminated)
+			ex.SetJobState(ctx, types.JobStateTerminated)
 			return gerrors.Wrap(err)
 		default:
 		}
@@ -144,18 +144,18 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 		select {
 		case <-timeoutCtx.Done():
 			log.Error(ctx, "Max duration exceeded", "max_duration", ex.jobSpec.MaxDuration)
-			ex.SetJobState(ctx, states.Terminated)
+			ex.SetJobState(ctx, types.JobStateTerminated)
 			return gerrors.Wrap(err)
 		default:
 		}
 
 		// todo fail reason?
 		log.Error(ctx, "Exec failed", "err", err)
-		ex.SetJobState(ctx, states.Failed)
+		ex.SetJobState(ctx, types.JobStateFailed)
 		return gerrors.Wrap(err)
 	}
 
-	ex.SetJobState(ctx, states.Done)
+	ex.SetJobState(ctx, types.JobStateDone)
 	return nil
 }
 
@@ -173,9 +173,23 @@ func (ex *RunExecutor) SetCodePath(codePath string) {
 	ex.state = WaitRun
 }
 
-func (ex *RunExecutor) SetJobState(ctx context.Context, state string) {
+func (ex *RunExecutor) SetJobState(ctx context.Context, state types.JobState) {
+	ex.SetJobStateWithTerminationReason(ctx, state, "", "")
+}
+
+func (ex *RunExecutor) SetJobStateWithTerminationReason(
+	ctx context.Context, state types.JobState, termination_reason types.TerminationReason, termination_message string,
+) {
 	ex.mu.Lock()
-	ex.jobStateHistory = append(ex.jobStateHistory, schemas.JobStateEvent{State: state, Timestamp: ex.timestamp.Next()})
+	ex.jobStateHistory = append(
+		ex.jobStateHistory,
+		schemas.JobStateEvent{
+			State:              state,
+			Timestamp:          ex.timestamp.Next(),
+			TerminationReason:  termination_reason,
+			TerminationMessage: termination_message,
+		},
+	)
 	ex.mu.Unlock()
 	log.Info(ctx, "Job state changed", "new", state)
 }

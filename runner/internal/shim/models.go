@@ -2,6 +2,7 @@ package shim
 
 import (
 	"github.com/docker/docker/api/types/mount"
+	"github.com/dstackai/dstack/runner/internal/types"
 )
 
 type DockerParameters interface {
@@ -90,7 +91,7 @@ type TaskConfig struct {
 type TaskInfo struct {
 	ID                 string
 	Status             TaskStatus
-	TerminationReason  string
+	TerminationReason  types.TerminationReason
 	TerminationMessage string
 	Ports              []PortMapping
 	ContainerName      string

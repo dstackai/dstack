@@ -33,6 +33,7 @@ import (
 	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/dstackai/dstack/runner/internal/shim/backends"
 	"github.com/dstackai/dstack/runner/internal/shim/host"
+	"github.com/dstackai/dstack/runner/internal/types"
 	bytesize "github.com/inhies/go-bytesize"
 	"github.com/ztrue/tracerr"
 )
@@ -260,7 +261,7 @@ func (d *DockerRunner) Run(ctx context.Context, taskID string) error {
 		gpuIDs, err := d.gpuLock.Acquire(ctx, cfg.GPU)
 		if err != nil {
 			log.Error(ctx, err.Error())
-			task.SetStatusTerminated("EXECUTOR_ERROR", err.Error())
+			task.SetStatusTerminated(types.TerminationReasonExecutorError, err.Error())
 			return tracerr.Wrap(err)
 		}
 		task.gpuIDs = gpuIDs
@@ -279,7 +280,7 @@ func (d *DockerRunner) Run(ctx context.Context, taskID string) error {
 		if err := ak.AppendPublicKeys(cfg.HostSshKeys); err != nil {
 			errMessage := fmt.Sprintf("ak.AppendPublicKeys error: %s", err.Error())
 			log.Error(ctx, errMessage)
-			task.SetStatusTerminated("EXECUTOR_ERROR", errMessage)
+			task.SetStatusTerminated(types.TerminationReasonExecutorError, errMessage)
 			return tracerr.Wrap(err)
 		}
 		defer func(cfg TaskConfig) {
@@ -299,14 +300,14 @@ func (d *DockerRunner) Run(ctx context.Context, taskID string) error {
 	if err != nil {
 		errMessage := fmt.Sprintf("prepareVolumes error: %s", err.Error())
 		log.Error(ctx, errMessage)
-		task.SetStatusTerminated("EXECUTOR_ERROR", errMessage)
+		task.SetStatusTerminated(types.TerminationReasonExecutorError, errMessage)
 		return tracerr.Wrap(err)
 	}
 	err = prepareInstanceMountPoints(cfg)
 	if err != nil {
 		errMessage := fmt.Sprintf("prepareInstanceMountPoints error: %s", err.Error())
 		log.Error(ctx, errMessage)
-		task.SetStatusTerminated("EXECUTOR_ERROR", errMessage)
+		task.SetStatusTerminated(types.TerminationReasonExecutorError, errMessage)
 		return tracerr.Wrap(err)
 	}
 
@@ -320,7 +321,7 @@ func (d *DockerRunner) Run(ctx context.Context, taskID string) error {
 	if err = pullImage(pullCtx, d.client, cfg); err != nil {
 		errMessage := fmt.Sprintf("pullImage error: %s", err.Error())
 		log.Error(ctx, errMessage)
-		task.SetStatusTerminated("CREATING_CONTAINER_ERROR", errMessage)
+		task.SetStatusTerminated(types.TerminationReasonCreatingContainerError, errMessage)
 		return tracerr.Wrap(err)
 	}
 
@@ -332,7 +333,7 @@ func (d *DockerRunner) Run(ctx context.Context, taskID string) error {
 	if err := d.createContainer(ctx, &task); err != nil {
 		errMessage := fmt.Sprintf("createContainer error: %s", err.Error())
 		log.Error(ctx, errMessage)
-		task.SetStatusTerminated("CREATING_CONTAINER_ERROR", errMessage)
+		task.SetStatusTerminated(types.TerminationReasonCreatingContainerError, errMessage)
 		return tracerr.Wrap(err)
 	}
 
@@ -358,12 +359,12 @@ func (d *DockerRunner) Run(ctx context.Context, taskID string) error {
 			log.Error(ctx, "getContainerLastLogs error", "err", err)
 			errMessage = ""
 		}
-		task.SetStatusTerminated("CONTAINER_EXITED_WITH_ERROR", errMessage)
+		task.SetStatusTerminated(types.TerminationReasonContainerExitedWithError, errMessage)
 		return tracerr.Wrap(err)
 	}
 
 	log.Debug(ctx, "Container finished successfully", "task", task.ID, "name", task.containerName)
-	task.SetStatusTerminated("DONE_BY_RUNNER", "")
+	task.SetStatusTerminated(types.TerminationReasonDoneByRunner, "")
 
 	return nil
 }
