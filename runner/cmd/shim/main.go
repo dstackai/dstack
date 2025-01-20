@@ -65,7 +65,6 @@ func main() {
 				Name:        "runner-download-url",
 				Usage:       "Set runner's download URL",
 				Destination: &args.Runner.DownloadURL,
-				Required:    true,
 				EnvVars:     []string{"DSTACK_RUNNER_DOWNLOAD_URL"},
 			},
 			&cli.PathFlag{
@@ -106,7 +105,6 @@ func main() {
 			&cli.StringFlag{
 				Name:        "ssh-key",
 				Usage:       "Public SSH key",
-				Required:    true,
 				Destination: &args.Docker.ConcatinatedPublicSSHKeys,
 				EnvVars:     []string{"DSTACK_PUBLIC_SSH_KEY"},
 			},
