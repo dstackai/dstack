@@ -441,7 +441,7 @@ def _process_provisioning_with_shim(
             volume_mounts=volume_mounts,
             instance_mounts=instance_mounts,
             host_ssh_user=ssh_user,
-            host_ssh_keys=[ssh_key],
+            host_ssh_keys=[ssh_key] if ssh_key else [],
             container_ssh_keys=public_keys,
         )
     else:

@@ -42,16 +42,14 @@ def runner_ssh_tunnel(
             Returns:
                 is successful
             """
-
-            if job_provisioning_data.backend == BackendType.LOCAL:
-                # without SSH
-                port_map = {p: p for p in ports}
-                return func(port_map, *args, **kwargs)
-
             # container:host mapping
             container_ports_map = {port: port for port in ports}
             if job_runtime_data is not None and job_runtime_data.ports is not None:
                 container_ports_map.update(job_runtime_data.ports)
+
+            if job_provisioning_data.backend == BackendType.LOCAL:
+                # without SSH
+                return func(container_ports_map, *args, **kwargs)
 
             for attempt in range(retries):
                 last = attempt == retries - 1

@@ -16,6 +16,9 @@ import (
 )
 
 func (c *CLIArgs) DownloadRunner(ctx context.Context) error {
+	if c.Runner.DownloadURL == "" {
+		return nil
+	}
 	err := downloadRunner(ctx, c.Runner.DownloadURL, c.Runner.BinaryPath, false)
 	if err != nil {
 		return gerrors.Wrap(err)

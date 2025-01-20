@@ -131,6 +131,17 @@ class SSHAttach:
             }
         else:
             self.container_config = None
+        if local_backend:
+            self.container_config = None
+            self.host_config = {
+                "HostName": hostname,
+                "Port": container_ssh_port,
+                "User": "root",  # TODO(#1535): support non-root images properly
+                "IdentityFile": self.identity_file,
+                "IdentitiesOnly": "yes",
+                "StrictHostKeyChecking": "no",
+                "UserKnownHostsFile": "/dev/null",
+            }
         if self.container_config is not None and get_ssh_client_info().supports_multiplexing:
             self.container_config.update(
                 {
