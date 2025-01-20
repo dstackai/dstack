@@ -35,6 +35,7 @@ CONFIGURABLE_DISK_SIZE = Range[Memory](min=Memory.parse("50GB"), max=Memory.pars
 
 class NebiusCompute(Compute):
     def __init__(self, config: NebiusConfig):
+        super().__init__()
         self.config = config
         self.api_client = NebiusAPIClient(json.loads(self.config.creds.data))
 

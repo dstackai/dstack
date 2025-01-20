@@ -68,6 +68,7 @@ class GCPVolumeDiskBackendData(CoreModel):
 
 class GCPCompute(Compute):
     def __init__(self, config: GCPConfig):
+        super().__init__()
         self.config = config
         self.credentials, self.project_id = auth.authenticate(config.creds)
         self.instances_client = compute_v1.InstancesClient(credentials=self.credentials)

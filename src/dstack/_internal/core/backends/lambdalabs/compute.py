@@ -26,6 +26,7 @@ from dstack._internal.core.models.volumes import Volume
 
 class LambdaCompute(Compute):
     def __init__(self, config: LambdaConfig):
+        super().__init__()
         self.config = config
         self.api_client = LambdaAPIClient(config.creds.api_key)
 

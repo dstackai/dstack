@@ -54,6 +54,7 @@ NVIDIA_GPU_NAMES = NVIDIA_GPU_NAME_TO_GPU_INFO.keys()
 
 class KubernetesCompute(Compute):
     def __init__(self, config: KubernetesConfig):
+        super().__init__()
         self.config = config
         self.api = get_api_from_config_data(config.kubeconfig.data)
 

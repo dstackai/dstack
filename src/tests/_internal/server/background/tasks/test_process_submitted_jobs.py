@@ -126,7 +126,7 @@ class TestProcessSubmittedJobs:
             backend_mock = Mock()
             m.return_value = [backend_mock]
             backend_mock.TYPE = backend
-            backend_mock.compute.return_value.get_offers.return_value = [offer]
+            backend_mock.compute.return_value.get_offers_cached.return_value = [offer]
             backend_mock.compute.return_value.run_job.return_value = JobProvisioningData(
                 backend=offer.backend,
                 instance_type=offer.instance,
@@ -143,7 +143,7 @@ class TestProcessSubmittedJobs:
             )
             await process_submitted_jobs()
             m.assert_called_once()
-            backend_mock.compute.return_value.get_offers.assert_called_once()
+            backend_mock.compute.return_value.get_offers_cached.assert_called_once()
             backend_mock.compute.return_value.run_job.assert_called_once()
 
         await session.refresh(job)
@@ -199,7 +199,7 @@ class TestProcessSubmittedJobs:
             backend_mock = Mock()
             m.return_value = [backend_mock]
             backend_mock.TYPE = BackendType.RUNPOD
-            backend_mock.compute.return_value.get_offers.return_value = [offer]
+            backend_mock.compute.return_value.get_offers_cached.return_value = [offer]
             backend_mock.compute.return_value.run_job.return_value = JobProvisioningData(
                 backend=offer.backend,
                 instance_type=offer.instance,
@@ -218,7 +218,7 @@ class TestProcessSubmittedJobs:
                 datetime_mock.return_value = datetime(2023, 1, 2, 3, 30, 0, tzinfo=timezone.utc)
                 await process_submitted_jobs()
             m.assert_called_once()
-            backend_mock.compute.return_value.get_offers.assert_not_called()
+            backend_mock.compute.return_value.get_offers_cached.assert_not_called()
             backend_mock.compute.return_value.run_job.assert_not_called()
 
         await session.refresh(job)
@@ -272,7 +272,7 @@ class TestProcessSubmittedJobs:
             backend_mock = Mock()
             m.return_value = [backend_mock]
             backend_mock.TYPE = BackendType.RUNPOD
-            backend_mock.compute.return_value.get_offers.return_value = [offer]
+            backend_mock.compute.return_value.get_offers_cached.return_value = [offer]
             backend_mock.compute.return_value.run_job.return_value = JobProvisioningData(
                 backend=offer.backend,
                 instance_type=offer.instance,
@@ -291,7 +291,7 @@ class TestProcessSubmittedJobs:
                 datetime_mock.return_value = datetime(2023, 1, 2, 3, 30, 0, tzinfo=timezone.utc)
                 await process_submitted_jobs()
             m.assert_called_once()
-            backend_mock.compute.return_value.get_offers.assert_not_called()
+            backend_mock.compute.return_value.get_offers_cached.assert_not_called()
             backend_mock.compute.return_value.run_job.assert_not_called()
 
         await session.refresh(job)
@@ -494,7 +494,7 @@ class TestProcessSubmittedJobs:
             backend_mock = Mock()
             m.return_value = [backend_mock]
             backend_mock.TYPE = BackendType.AWS
-            backend_mock.compute.return_value.get_offers.return_value = [offer]
+            backend_mock.compute.return_value.get_offers_cached.return_value = [offer]
             backend_mock.compute.return_value.run_job.return_value = JobProvisioningData(
                 backend=offer.backend,
                 instance_type=offer.instance,
@@ -511,7 +511,7 @@ class TestProcessSubmittedJobs:
             )
             await process_submitted_jobs()
             m.assert_called_once()
-            backend_mock.compute.return_value.get_offers.assert_called_once()
+            backend_mock.compute.return_value.get_offers_cached.assert_called_once()
             backend_mock.compute.return_value.run_job.assert_called_once()
 
         await session.refresh(job)

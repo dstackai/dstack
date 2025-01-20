@@ -30,6 +30,7 @@ logger = get_logger(__name__)
 
 class VultrCompute(Compute):
     def __init__(self, config: VultrConfig):
+        super().__init__()
         self.config = config
         self.api_client = VultrApiClient(config.creds.api_key)
 

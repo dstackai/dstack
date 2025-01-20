@@ -23,6 +23,8 @@ class Database:
                 self.url,
                 echo=settings.SQL_ECHO_ENABLED,
                 poolclass=AsyncAdaptedQueuePool,
+                pool_size=settings.DB_POOL_SIZE,
+                max_overflow=settings.DB_MAX_OVERFLOW,
             )
         self.session_maker = sessionmaker(
             bind=self.engine,

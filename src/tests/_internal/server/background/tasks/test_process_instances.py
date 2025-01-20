@@ -492,7 +492,7 @@ class TestCreateInstance:
 
             backend_mock = Mock()
             backend_mock.TYPE = BackendType.AWS
-            backend_mock.compute.return_value.get_offers.return_value = [offer]
+            backend_mock.compute.return_value.get_offers_cached.return_value = [offer]
             backend_mock.compute.return_value.create_instance.return_value = JobProvisioningData(
                 backend=offer.backend,
                 instance_type=offer.instance,

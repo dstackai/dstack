@@ -27,6 +27,7 @@ logger = get_logger(__name__)
 
 class CudoCompute(Compute):
     def __init__(self, config: CudoConfig):
+        super().__init__()
         self.config = config
         self.api_client = CudoApiClient(config.creds.api_key)
 
