@@ -74,7 +74,7 @@ SERVER_DEPS = GATEWAY_AND_SERVER_COMMON_DEPS + [
     "alembic-postgresql-enum",
     "asyncpg",
     "cachetools",
-    "python-json-logger",
+    "python-json-logger>=3.1.0",
     "grpcio>=1.50",  # indirect
 ]
 
