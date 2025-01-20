@@ -1512,6 +1512,8 @@ class TestCreateInstance:
                 "backend": None,
                 "instance_type": None,
                 "name": result["name"],
+                "fleet_id": None,
+                "fleet_name": None,
                 "instance_num": 0,
                 "job_name": None,
                 "hostname": None,

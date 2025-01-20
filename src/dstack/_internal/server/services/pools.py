@@ -1,5 +1,6 @@
 import ipaddress
 import uuid
+from collections.abc import Container, Iterable
 from datetime import datetime, timezone
 from typing import List, Optional
 
@@ -69,7 +70,11 @@ async def list_project_pools(session: AsyncSession, project: ProjectModel) -> Li
 
 
 async def get_pool(
-    session: AsyncSession, project: ProjectModel, pool_name: str, select_deleted: bool = False
+    session: AsyncSession,
+    project: ProjectModel,
+    pool_name: str,
+    select_deleted: bool = False,
+    load_instance_fleets: bool = False,
 ) -> Optional[PoolModel]:
     filters = [
         PoolModel.name == pool_name,
@@ -77,29 +82,42 @@ async def get_pool(
     ]
     if not select_deleted:
         filters.append(PoolModel.deleted == False)
-    res = await session.scalars(select(PoolModel).where(*filters))
+    query = select(PoolModel).where(*filters)
+    if load_instance_fleets:
+        query = query.options(joinedload(PoolModel.instances, InstanceModel.fleet))
+    res = await session.scalars(query)
     return res.one_or_none()
 
 
 async def get_or_create_pool_by_name(
-    session: AsyncSession, project: ProjectModel, pool_name: Optional[str]
+    session: AsyncSession,
+    project: ProjectModel,
+    pool_name: Optional[str],
+    load_instance_fleets: bool = False,
 ) -> PoolModel:
     if pool_name is None:
         if project.default_pool_id is not None:
-            return await get_default_pool_or_error(session, project)
-        default_pool = await get_pool(session, project, DEFAULT_POOL_NAME)
+            return await get_default_pool_or_error(session, project, load_instance_fleets)
+        default_pool = await get_pool(
+            session, project, DEFAULT_POOL_NAME, load_instance_fleets=load_instance_fleets
+        )
         if default_pool is not None:
             await set_default_pool(session, project, DEFAULT_POOL_NAME)
             return default_pool
         return await create_pool(session, project, DEFAULT_POOL_NAME)
-    pool = await get_pool(session, project, pool_name)
+    pool = await get_pool(session, project, pool_name, load_instance_fleets=load_instance_fleets)
     if pool is not None:
         return pool
     return await create_pool(session, project, pool_name)
 
 
-async def get_default_pool_or_error(session: AsyncSession, project: ProjectModel) -> PoolModel:
-    res = await session.execute(select(PoolModel).where(PoolModel.id == project.default_pool_id))
+async def get_default_pool_or_error(
+    session: AsyncSession, project: ProjectModel, load_instance_fleets: bool = False
+) -> PoolModel:
+    query = select(PoolModel).where(PoolModel.id == project.default_pool_id)
+    if load_instance_fleets:
+        query = query.options(joinedload(PoolModel.instances, InstanceModel.fleet))
+    res = await session.execute(query)
     return res.scalar_one()
 
 
@@ -201,11 +219,13 @@ async def show_pool_instances(
     session: AsyncSession, project: ProjectModel, pool_name: Optional[str]
 ) -> PoolInstances:
     if pool_name is not None:
-        pool = await get_pool(session, project, pool_name)
+        pool = await get_pool(session, project, pool_name, load_instance_fleets=True)
         if pool is None:
             raise ResourceNotExistsError("Pool not found")
     else:
-        pool = await get_or_create_pool_by_name(session, project, pool_name)
+        pool = await get_or_create_pool_by_name(
+            session, project, pool_name, load_instance_fleets=True
+        )
     pool_instances = get_pool_instances(pool)
     instances = list(map(instance_model_to_instance, pool_instances))
     return PoolInstances(
@@ -223,6 +243,8 @@ def instance_model_to_instance(instance_model: InstanceModel) -> Instance:
         id=instance_model.id,
         project_name=instance_model.project.name,
         name=instance_model.name,
+        fleet_id=instance_model.fleet_id,
+        fleet_name=instance_model.fleet.name if instance_model.fleet else None,
         instance_num=instance_model.instance_num,
         status=instance_model.status,
         unreachable=instance_model.unreachable,
@@ -478,6 +500,7 @@ def filter_pool_instances(
 async def list_pools_instance_models(
     session: AsyncSession,
     projects: List[ProjectModel],
+    fleet_ids: Optional[Iterable[uuid.UUID]],
     pool: Optional[PoolModel],
     only_active: bool,
     prev_created_at: Optional[datetime],
@@ -488,6 +511,8 @@ async def list_pools_instance_models(
     filters: List = [
         InstanceModel.project_id.in_(p.id for p in projects),
     ]
+    if fleet_ids is not None:
+        filters.append(InstanceModel.fleet_id.in_(fleet_ids))
     if pool is not None:
         filters.append(InstanceModel.pool_id == pool.id)
     if only_active:
@@ -533,7 +558,7 @@ async def list_pools_instance_models(
         .where(*filters)
         .order_by(*order_by)
         .limit(limit)
-        .options(joinedload(InstanceModel.pool))
+        .options(joinedload(InstanceModel.pool), joinedload(InstanceModel.fleet))
     )
     instance_models = list(res.scalars().all())
     return instance_models
@@ -542,7 +567,8 @@ async def list_pools_instance_models(
 async def list_user_pool_instances(
     session: AsyncSession,
     user: UserModel,
-    project_name: Optional[str],
+    project_names: Optional[Container[str]],
+    fleet_ids: Optional[Iterable[uuid.UUID]],
     pool_name: Optional[str],
     only_active: bool,
     prev_created_at: Optional[datetime],
@@ -558,8 +584,8 @@ async def list_user_pool_instances(
         return []
 
     pool = None
-    if project_name is not None:
-        projects = [proj for proj in projects if proj.name == project_name]
+    if project_names is not None:
+        projects = [proj for proj in projects if proj.name in project_names]
         if len(projects) == 0:
             return []
         if pool_name is not None:
@@ -573,6 +599,7 @@ async def list_user_pool_instances(
     instance_models = await list_pools_instance_models(
         session=session,
         projects=projects,
+        fleet_ids=fleet_ids,
         pool=pool,
         only_active=only_active,
         prev_created_at=prev_created_at,

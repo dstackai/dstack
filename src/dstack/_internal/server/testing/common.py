@@ -480,6 +480,7 @@ async def create_instance(
     region: str = "eu-west",
     remote_connection_info: Optional[RemoteConnectionInfo] = None,
     job_provisioning_data: Optional[JobProvisioningData] = None,
+    name: str = "test_instance",
 ) -> InstanceModel:
     if instance_id is None:
         instance_id = uuid.uuid4()
@@ -544,7 +545,7 @@ async def create_instance(
 
     im = InstanceModel(
         id=instance_id,
-        name="test_instance",
+        name=name,
         instance_num=instance_num,
         pool=pool,
         fleet=fleet,

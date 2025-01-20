@@ -21,6 +21,8 @@ class Instance(CoreModel):
     backend: Optional[BackendType] = None
     instance_type: Optional[InstanceType] = None
     name: str
+    fleet_id: Optional[UUID] = None
+    fleet_name: Optional[str] = None
     instance_num: int
     pool_name: Optional[str] = None
     job_name: Optional[str] = None
