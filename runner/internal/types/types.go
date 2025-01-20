@@ -3,12 +3,12 @@ package types
 type TerminationReason string
 
 const (
-	TerminationReasonExecutorError            TerminationReason = "EXECUTOR_ERROR"
-	TerminationReasonCreatingContainerError   TerminationReason = "CREATING_CONTAINER_ERROR"
-	TerminationReasonContainerExitedWithError TerminationReason = "CONTAINER_EXITED_WITH_ERROR"
-	TerminationReasonDoneByRunner             TerminationReason = "DONE_BY_RUNNER"
-	TerminationReasonTerminatedByUser         TerminationReason = "TERMINATED_BY_USER"
-	TerminationReasonTerminatedByServer       TerminationReason = "TERMINATED_BY_SERVER"
+	TerminationReasonExecutorError            TerminationReason = "executor_error"
+	TerminationReasonCreatingContainerError   TerminationReason = "creating_container_error"
+	TerminationReasonContainerExitedWithError TerminationReason = "container_exited_with_error"
+	TerminationReasonDoneByRunner             TerminationReason = "done_by_runner"
+	TerminationReasonTerminatedByUser         TerminationReason = "terminated_by_user"
+	TerminationReasonTerminatedByServer       TerminationReason = "terminated_by_server"
 )
 
 type JobState string

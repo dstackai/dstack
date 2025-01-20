@@ -14,6 +14,8 @@ from dstack._internal.core.models.volumes import InstanceMountPoint, VolumeMount
 class JobStateEvent(CoreModel):
     timestamp: int
     state: JobStatus
+    termination_reason: Optional[str] = None
+    termination_message: Optional[str] = None
 
 
 class LogEvent(CoreModel):
