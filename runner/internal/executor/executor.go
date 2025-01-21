@@ -115,7 +115,12 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 	log.Info(ctx, "Run job", "log_level", log.GetLogger(ctx).Logger.Level.String())
 
 	if err := ex.setupRepo(ctx); err != nil {
-		ex.SetJobState(ctx, types.JobStateFailed)
+		ex.SetJobStateWithTerminationReason(
+			ctx,
+			types.JobStateFailed,
+			types.TerminationReasonContainerExitedWithError,
+			fmt.Sprintf("Failed to set up the repo (%s)", err),
+		)
 		return gerrors.Wrap(err)
 	}
 	cleanupCredentials, err := ex.setupCredentials(ctx)
