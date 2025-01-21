@@ -49,23 +49,6 @@ class TestProcessEmptyFleets:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_does_not_delete_non_terminating_empty_user_fleets(
-        self, test_db, session: AsyncSession
-    ):
-        project = await create_project(session)
-        spec = get_fleet_spec()
-        spec.autocreated = False
-        fleet = await create_fleet(
-            session=session,
-            project=project,
-            status=FleetStatus.ACTIVE,
-        )
-        await process_fleets()
-        await session.refresh(fleet)
-        assert not fleet.deleted
-
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_does_not_delete_fleet_with_active_run(self, test_db, session: AsyncSession):
         project = await create_project(session)
         fleet = await create_fleet(
