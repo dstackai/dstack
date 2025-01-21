@@ -514,7 +514,7 @@ def _process_pulling_with_shim(
                 task.termination_message,
             )
             logger.debug("task status: %s", task.dict())
-            job_model.termination_reason = JobTerminationReason[task.termination_reason.upper()]
+            job_model.termination_reason = JobTerminationReason(task.termination_reason.lower())
             job_model.termination_reason_message = task.termination_message
             return False
 
@@ -547,7 +547,7 @@ def _process_pulling_with_shim(
                 shim_status.result.reason_message,
             )
             logger.debug("shim status: %s", shim_status.dict())
-            job_model.termination_reason = JobTerminationReason[shim_status.result.reason.upper()]
+            job_model.termination_reason = JobTerminationReason(shim_status.result.reason.lower())
             job_model.termination_reason_message = shim_status.result.reason_message
             return False
 
@@ -598,18 +598,20 @@ def _process_running(
         job_logs=resp.job_logs,
     )
     if len(resp.job_states) > 0:
-        latest_status = resp.job_states[-1].state
-        # TODO(egor-s): refactor dstack-runner to return compatible statuses and reasons
+        latest_state_event = resp.job_states[-1]
+        latest_status = latest_state_event.state
         if latest_status == JobStatus.DONE:
             job_model.status = JobStatus.TERMINATING
             job_model.termination_reason = JobTerminationReason.DONE_BY_RUNNER
-            # let the CLI pull logs?
-            # delay_job_instance_termination(job_model)
-        elif latest_status in {JobStatus.FAILED, JobStatus.ABORTED, JobStatus.TERMINATED}:
+        elif latest_status in {JobStatus.FAILED, JobStatus.TERMINATED}:
             job_model.status = JobStatus.TERMINATING
             job_model.termination_reason = JobTerminationReason.CONTAINER_EXITED_WITH_ERROR
-            # let the CLI pull logs?
-            # delay_job_instance_termination(job_model)
+            if latest_state_event.termination_reason:
+                job_model.termination_reason = JobTerminationReason(
+                    latest_state_event.termination_reason.lower()
+                )
+            if latest_state_event.termination_message:
+                job_model.termination_reason_message = latest_state_event.termination_message
         logger.info("%s: now is %s", fmt(job_model), job_model.status.name)
     return True
 

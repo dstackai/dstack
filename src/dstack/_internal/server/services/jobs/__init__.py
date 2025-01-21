@@ -4,6 +4,7 @@ import json
 from datetime import timezone
 from typing import Dict, Iterable, List, Optional, Tuple
 
+import requests
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -188,7 +189,10 @@ def _stop_runner(
 ):
     logger.debug("%s: stopping runner", fmt(job_model))
     runner_client = client.RunnerClient(port=ports[DSTACK_RUNNER_HTTP_PORT])
-    runner_client.stop()
+    try:
+        runner_client.stop()
+    except requests.RequestException:
+        logger.exception("%s: failed to stop runner gracefully", fmt(job_model))
 
 
 async def process_terminating_job(session: AsyncSession, job_model: JobModel):
@@ -306,7 +310,7 @@ def _shim_submit_stop(ports: Dict[int, int], job_model: JobModel):
         if job_model.termination_reason is None:
             reason = None
         else:
-            reason = job_model.termination_reason.name
+            reason = job_model.termination_reason.value
         shim_client.terminate_task(
             task_id=job_model.id,
             reason=reason,

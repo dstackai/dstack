@@ -177,12 +177,13 @@ components:
     TerminationReason:
       type: string
       enum:
-        - EXECUTOR_ERROR
-        - CREATING_CONTAINER_ERROR
-        - CONTAINER_EXITED_WITH_ERROR
-        - DONE_BY_RUNNER
-        - TERMINATED_BY_USER
-        - TERMINATED_BY_SERVER
+        - executor_error
+        - creating_container_error
+        - container_exited_with_error
+        - done_by_runner
+        - terminated_by_user
+        - terminated_by_server
+        - max_duration_exceeded
 
     GpuID:
       description: >

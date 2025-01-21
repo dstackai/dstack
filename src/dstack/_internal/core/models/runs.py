@@ -117,6 +117,7 @@ class JobTerminationReason(str, Enum):
     PORTS_BINDING_FAILED = "ports_binding_failed"
     CREATING_CONTAINER_ERROR = "creating_container_error"
     EXECUTOR_ERROR = "executor_error"
+    MAX_DURATION_EXCEEDED = "max_duration_exceeded"
 
     def to_status(self) -> JobStatus:
         mapping = {
@@ -135,6 +136,7 @@ class JobTerminationReason(str, Enum):
             self.PORTS_BINDING_FAILED: JobStatus.FAILED,
             self.CREATING_CONTAINER_ERROR: JobStatus.FAILED,
             self.EXECUTOR_ERROR: JobStatus.FAILED,
+            self.MAX_DURATION_EXCEEDED: JobStatus.TERMINATED,
         }
         return mapping[self]
 

@@ -31,7 +31,7 @@ const (
 type Task struct {
 	ID                 string
 	Status             TaskStatus
-	TerminationReason  string // TODO: enum
+	TerminationReason  string
 	TerminationMessage string
 
 	config        TaskConfig
