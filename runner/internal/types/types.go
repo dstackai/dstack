@@ -9,6 +9,7 @@ const (
 	TerminationReasonDoneByRunner             TerminationReason = "done_by_runner"
 	TerminationReasonTerminatedByUser         TerminationReason = "terminated_by_user"
 	TerminationReasonTerminatedByServer       TerminationReason = "terminated_by_server"
+	TerminationReasonMaxDurationExceeded      TerminationReason = "max_duration_exceeded"
 )
 
 type JobState string
