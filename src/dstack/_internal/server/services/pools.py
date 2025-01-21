@@ -43,7 +43,6 @@ from dstack._internal.core.models.runs import JobProvisioningData, Requirements
 from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.core.models.volumes import Volume
 from dstack._internal.core.services.profiles import get_termination
-from dstack._internal.server import settings
 from dstack._internal.server.models import (
     FleetModel,
     InstanceModel,
@@ -463,16 +462,11 @@ def filter_pool_instances(
             continue
         if status is not None and instance.status != status:
             continue
-
-        # TODO: remove on prod
-        if settings.LOCAL_BACKEND_ENABLED and instance.backend == BackendType.LOCAL:
-            instances.append(instance)
-            continue
-
         if backend_types is not None and instance.backend not in backend_types:
             continue
-
         if regions is not None and instance.region not in regions:
+            continue
+        if profile.instance_types is not None and instance.name not in profile.instance_types:
             continue
 
         jpd = get_instance_provisioning_data(instance)
