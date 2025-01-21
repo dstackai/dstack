@@ -310,7 +310,7 @@ def _shim_submit_stop(ports: Dict[int, int], job_model: JobModel):
         if job_model.termination_reason is None:
             reason = None
         else:
-            reason = job_model.termination_reason.name
+            reason = job_model.termination_reason.value
         shim_client.terminate_task(
             task_id=job_model.id,
             reason=reason,
