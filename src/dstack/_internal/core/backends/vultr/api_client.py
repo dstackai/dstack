@@ -1,5 +1,5 @@
 import base64
-from typing import Any
+from typing import Any, Optional
 
 import requests
 from requests import Response
@@ -28,7 +28,21 @@ class VultrApiClient:
             response = self._make_request("GET", f"/instances/{instance_id}")
             return response.json()["instance"]
 
-    def launch_instance(self, region: str, plan: str, label: str, user_data: str):
+    def get_vpc_for_region(self, region: str) -> Optional[str]:
+        response = self._make_request("GET", "/vpcs?per_page=500")
+        vpcs = response.json().get("vpcs", [])
+        if vpcs:
+            for vpc in vpcs:
+                if vpc["description"] == f"dstack-vpc-{region}":
+                    return vpc
+        return None
+
+    def create_vpc(self, region: str):
+        data = {"region": region, "description": f"dstack-vpc-{region}"}
+        response = self._make_request("POST", "/vpcs", data=data)
+        return response.json()["vpc"]
+
+    def launch_instance(self, region: str, plan: str, label: str, user_data: str, vpc_id: str):
         # For Bare-metals
         if "vbm" in plan:
             # "Docker on Ubuntu 22.04" is required for bare-metals.
@@ -38,6 +52,7 @@ class VultrApiClient:
                 "label": label,
                 "image_id": "docker",
                 "user_data": base64.b64encode(user_data.encode()).decode(),
+                "attach_vpc": [vpc_id],
             }
             resp = self._make_request("POST", "/bare-metals", data)
             return resp.json()["bare_metal"]["id"]
@@ -50,6 +65,7 @@ class VultrApiClient:
                 "label": label,
                 "os_id": 1743,
                 "user_data": base64.b64encode(user_data.encode()).decode(),
+                "attach_vpc": [vpc_id],
             }
             resp = self._make_request("POST", "/instances", data)
             return resp.json()["instance"]["id"]
@@ -60,6 +76,7 @@ class VultrApiClient:
                 "label": label,
                 "image_id": "docker",
                 "user_data": base64.b64encode(user_data.encode()).decode(),
+                "attach_vpc": [vpc_id],
             }
             resp = self._make_request("POST", "/instances", data)
             return resp.json()["instance"]["id"]
