@@ -45,31 +45,33 @@ tasks, and services:
 - `DSTACK_NODES_NUM`{ #DSTACK_NODES_NUM } – The number of nodes in the run
 - `DSTACK_GPUS_PER_NODE`{ #DSTACK_GPUS_PER_NODE } – The number of GPUs per node
 - `DSTACK_NODE_RANK`{ #DSTACK_NODE_RANK } – The rank of the node
-- `DSTACK_NODE_RANK`{ #DSTACK_NODE_RANK } – The internal IP address the master node.
+- `DSTACK_MASTER_NODE_IP`{ #DSTACK_NODE_RANK } – The internal IP address the master node.
 
-     Below is an example of using `DSTACK_NODES_NUM`, `DSTACK_GPUS_PER_NODE`, `DSTACK_NODE_RANK`, and `DSTACK_NODE_RANK`
+     Below is an example of using `DSTACK_NODES_NUM`, `DSTACK_GPUS_PER_NODE`, `DSTACK_NODE_RANK`, and `DSTACK_MASTER_NODE_IP`
      for distributed training:
      
      ```yaml
-     type: task
-     name: train-distrib
-     
-     # The number of instances in the cluster
-     nodes: 2
-     
-     python: "3.10"
-     commands:
-       - pip install -r requirements.txt
-       - torchrun
-         --nproc_per_node=$DSTACK_GPUS_PER_NODE
-         --node_rank=$DSTACK_NODE_RANK
-         --nnodes=$DSTACK_NODES_NUM
-         --master_addr=$DSTACK_MASTER_NODE_IP
-         --master_port=8008 
-         resnet_ddp.py --num_epochs 20
-     
-     resources:
-       gpu: 24GB
+      type: task
+      name: train-distrib
+
+      nodes: 2
+      python: "3.12"
+
+      commands:
+        - git clone https://github.com/pytorch/examples.git
+        - cd examples/distributed/ddp-tutorial-series
+        - pip install -r requirements.txt
+        - torchrun
+          --nproc-per-node=$DSTACK_GPUS_PER_NODE
+          --node-rank=$DSTACK_NODE_RANK
+          --nnodes=$DSTACK_NODES_NUM
+          --master-addr=$DSTACK_MASTER_NODE_IP
+          --master-port=12345
+          multinode.py 50 10
+
+      resources:
+        gpu: 24GB
+        shm_size: 24GB
      ```
 
 - `DSTACK_NODES_IPS`{ #DSTACK_NODES_IPS } – The list of internal IP addresses of all nodes delimited by `"\n"`.

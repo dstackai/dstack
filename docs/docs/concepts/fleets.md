@@ -38,23 +38,19 @@ Define a fleet configuration as a YAML file in your project directory. The file 
     
 </div>
 
-#### Placement
+#### Placement { #cloud-placement }
 
 To ensure instances are interconnected (e.g., for
 [distributed tasks](tasks.md#distributed-tasks)), set `placement` to `cluster`. 
 This ensures all instances are provisioned in the same backend and region with optimal inter-node connectivity
 
 ??? info "AWS"
-    `dstack` automatically enables [Elastic Fabric Adapter :material-arrow-top-right-thin:{ .external }](https://aws.amazon.com/hpc/efa/){:target="_blank"}
-    for the instance types that support it:
-    `p5.48xlarge`, `p4d.24xlarge`, `g4dn.12xlarge`, `g4dn.16xlarge`, `g4dn.8xlarge`, `g4dn.metal`,
-    `g5.12xlarge`, `g5.16xlarge`, `g5.24xlarge`, `g5.48xlarge`, `g5.8xlarge`, `g6.12xlarge`,
-    `g6.16xlarge`, `g6.24xlarge`, `g6.48xlarge`, `g6.8xlarge`, and `gr6.8xlarge`.
-
+    `dstack` automatically enables the Elastic Fabric Adapter for all
+    [EFA-capable instance types :material-arrow-top-right-thin:{ .external }](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/efa.html#efa-instance-types){:target="_blank"}.
     Currently, only one EFA interface is enabled per instance, regardless of its maximum capacity.
     This will change once [this issue :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/1804){:target="_blank"} is resolved.
 
-> The `cluster` placement is supported only for `aws`, `azure`, `gcp`, and `oci`
+> The `cluster` placement is supported only for `aws`, `azure`, `gcp`, `oci`, and `vultr`
 > backends.
 
 #### Resources
@@ -245,7 +241,7 @@ Define a fleet configuration as a YAML file in your project directory. The file 
 
     3.&nbsp;The user specified should have passwordless `sudo` access.
 
-#### Placement
+#### Placement { #ssh-placement }
 
 If the hosts are interconnected (i.e. share the same network), set `placement` to `cluster`. 
 This is required if you'd like to use the fleet for [distributed tasks](tasks.md#distributed-tasks).
