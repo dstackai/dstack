@@ -466,10 +466,13 @@ def filter_pool_instances(
             continue
         if regions is not None and instance.region not in regions:
             continue
-        if profile.instance_types is not None and instance.name not in profile.instance_types:
-            continue
-
         jpd = get_instance_provisioning_data(instance)
+        if (
+            jpd is not None
+            and profile.instance_types is not None
+            and jpd.instance_type.name not in profile.instance_types
+        ):
+            continue
         if (
             jpd is not None
             and jpd.availability_zone is not None
