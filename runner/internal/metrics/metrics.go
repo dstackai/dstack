@@ -152,40 +152,21 @@ func (s *MetricsCollector) GetGPUMetrics() ([]schemas.GPUMetrics, error) {
 	if err == nil {
 		return metrics, nil
 	}
+	metrics, err = s.GetIntelAcceleratorMetrics()
+	if err == nil {
+		return metrics, nil
+	}
 	return []schemas.GPUMetrics{}, err
 }
 
 func (s *MetricsCollector) GetNVIDIAGPUMetrics() ([]schemas.GPUMetrics, error) {
-	metrics := []schemas.GPUMetrics{}
-
 	cmd := exec.Command("nvidia-smi", "--query-gpu=memory.used,utilization.gpu", "--format=csv,noheader,nounits")
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	if err := cmd.Run(); err != nil {
-		return metrics, fmt.Errorf("failed to execute nvidia-smi: %w", err)
+		return []schemas.GPUMetrics{}, fmt.Errorf("failed to execute nvidia-smi: %w", err)
 	}
-
-	lines := strings.Split(strings.TrimSpace(out.String()), "\n")
-	for _, line := range lines {
-		parts := strings.Split(line, ", ")
-		if len(parts) != 2 {
-			continue
-		}
-		memUsed, err := strconv.ParseUint(strings.TrimSpace(parts[0]), 10, 64)
-		if err != nil {
-			return metrics, fmt.Errorf("failed to parse memory used: %w", err)
-		}
-		utilization, err := strconv.ParseUint(strings.TrimSpace(strings.TrimSuffix(parts[1], "%")), 10, 64)
-		if err != nil {
-			return metrics, fmt.Errorf("failed to parse GPU utilization: %w", err)
-		}
-		metrics = append(metrics, schemas.GPUMetrics{
-			GPUMemoryUsage: memUsed * 1024 * 1024, // Convert MiB to bytes
-			GPUUtil:        utilization,
-		})
-	}
-
-	return metrics, nil
+	return parseNVIDIASMILikeMetrics(out.String())
 }
 
 func (s *MetricsCollector) GetAMDGPUMetrics() ([]schemas.GPUMetrics, error) {
@@ -221,6 +202,16 @@ func (s *MetricsCollector) GetAMDGPUMetrics() ([]schemas.GPUMetrics, error) {
 	return metrics, nil
 }
 
+func (s *MetricsCollector) GetIntelAcceleratorMetrics() ([]schemas.GPUMetrics, error) {
+	cmd := exec.Command("hl-smi", "--query-aip=memory.used,utilization.aip", "--format=csv,noheader,nounits")
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	if err := cmd.Run(); err != nil {
+		return []schemas.GPUMetrics{}, fmt.Errorf("failed to execute hl-smi: %w", err)
+	}
+	return parseNVIDIASMILikeMetrics(out.String())
+}
+
 func getCgroupVersion() (int, error) {
 	data, err := os.ReadFile("/proc/self/mountinfo")
 	if err != nil {
@@ -236,4 +227,30 @@ func getCgroupVersion() (int, error) {
 	}
 
 	return 0, fmt.Errorf("could not determine cgroup version")
+}
+
+func parseNVIDIASMILikeMetrics(output string) ([]schemas.GPUMetrics, error) {
+	metrics := []schemas.GPUMetrics{}
+
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	for _, line := range lines {
+		parts := strings.Split(line, ", ")
+		if len(parts) != 2 {
+			continue
+		}
+		memUsed, err := strconv.ParseUint(strings.TrimSpace(parts[0]), 10, 64)
+		if err != nil {
+			return metrics, fmt.Errorf("failed to parse memory used: %w", err)
+		}
+		utilization, err := strconv.ParseUint(strings.TrimSpace(strings.TrimSuffix(parts[1], "%")), 10, 64)
+		if err != nil {
+			return metrics, fmt.Errorf("failed to parse accelerator utilization: %w", err)
+		}
+		metrics = append(metrics, schemas.GPUMetrics{
+			GPUMemoryUsage: memUsed * 1024 * 1024, // Convert MiB to bytes
+			GPUUtil:        utilization,
+		})
+	}
+
+	return metrics, nil
 }

@@ -39,6 +39,21 @@ def convert_amd_gpu_name(name: str) -> str:
     return name
 
 
+def convert_intel_accelerator_name(name: str) -> str:
+    """Convert name from hl-smi to market name"""
+    for model_name, market_name in _INTEL_GAUDI_MODELS.items():
+        if name.startswith(model_name):
+            return market_name
+    return name
+
+
 _AMD_INSTINCT_MARKET_NAME_REGEX = re.compile(
     r"^(?:AMD )?(?:Instinct )?(?P<name>MI\d{1,3}[A-Z]?(?:-\w+)?)(?:\s|$)", flags=re.ASCII | re.I
 )
+
+_INTEL_GAUDI_MODELS = {
+    "HL-205": "Gaudi",
+    "HL-225": "Gaudi2",
+    "HL-325": "Gaudi3",  # OAM
+    "HL-338": "Gaudi3",  # PCIe
+}

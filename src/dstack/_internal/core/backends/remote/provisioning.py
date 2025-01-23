@@ -18,7 +18,11 @@ from dstack._internal.core.models.instances import (
     InstanceType,
     Resources,
 )
-from dstack._internal.utils.gpu import convert_amd_gpu_name, convert_nvidia_gpu_name
+from dstack._internal.utils.gpu import (
+    convert_amd_gpu_name,
+    convert_intel_accelerator_name,
+    convert_nvidia_gpu_name,
+)
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -230,6 +234,8 @@ def host_info_to_instance_type(host_info: Dict[str, Any]) -> InstanceType:
             gpu_name = convert_nvidia_gpu_name(gpu_name)
         elif gpu_vendor == AcceleratorVendor.AMD:
             gpu_name = convert_amd_gpu_name(gpu_name)
+        elif gpu_vendor == AcceleratorVendor.INTEL:
+            gpu_name = convert_intel_accelerator_name(gpu_name)
         gpu_memory_mib = host_info["gpu_memory"]
         if isinstance(gpu_memory_mib, str):
             # older shim versions report gpu_memory as a string
