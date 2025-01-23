@@ -133,6 +133,10 @@ setup(
     url="https://dstack.ai",
     project_urls={
         "Source": "https://github.com/dstackai/dstack",
+        "Docs": "https://dstack.ai/docs",
+        "Issues": "https://github.com/dstackai/dstack/issues",
+        "Changelog": "https://github.com/dstackai/dstack/releases",
+        "Discord": "https://discord.gg/u8SmfwPpMd",
     },
     description="dstack is an open-source orchestration engine for running AI workloads on any cloud or on-premises.",
     long_description=get_long_description(),
