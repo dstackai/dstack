@@ -1,4 +1,3 @@
-import json
 import os
 import re
 import threading
@@ -188,7 +187,7 @@ class Compute(ABC):
         # Requirements is not hashable, so we use a hack to get arguments hash
         if requirements is None:
             return hash(None)
-        return hash(json.dumps(requirements.dict(), sort_keys=True))
+        return hash(requirements.json())
 
     @cachedmethod(
         cache=lambda self: self._offers_cache,
