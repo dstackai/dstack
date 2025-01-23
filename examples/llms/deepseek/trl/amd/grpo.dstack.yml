@@ -1,0 +1,32 @@
+type: task
+# The name is optional, if not specified, generated randomly
+name: trl-train-grpo
+
+image: rocm/pytorch:rocm6.2.3_ubuntu22.04_py3.10_pytorch_release_2.3.0
+
+# Required environment variables
+env:
+  - WANDB_API_KEY
+  - WANDB_PROJECT
+  - MODEL_ID=deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B
+# Commands of the task
+commands:
+  - pip install trl
+  - pip install datasets
+  # numpy version less than 2 is required for the scipy installation with AMD.
+  - pip install "numpy<2"
+  - mkdir -p grpo_example
+  - cp examples/llms/deepseek/trl/amd/grpo_train.py grpo_example/grpo_train.py
+  - cd grpo_example
+  - python grpo_train.py
+    --model_name_or_path $MODEL_ID
+    --dataset_name trl-lib/tldr
+    --per_device_train_batch_size 2
+    --logging_steps 25
+    --output_dir Deepseek-Distill-Qwen-1.5B-GRPO
+    --trust_remote_code
+
+# GRPO fine-tuning of DeepSeek-R1-Distill-Qwen-1.5B consumes 70% of VRAM
+resources:
+  gpu: MI300X
+  disk: 150GB

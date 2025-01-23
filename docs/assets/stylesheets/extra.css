@@ -24,7 +24,8 @@
     }
 }
 
-[dir=ltr] .md-typeset :is(.admonition,details) pre, [dir=ltr] .md-typeset :is(.admonition,details) :is(.admonition,details) {
+[dir=ltr] .md-typeset :is(.admonition,details) pre,
+[dir=ltr] .md-typeset :is(.admonition,details) :is(.admonition,details, .termy) {
     margin-left: 32px;
 }
 

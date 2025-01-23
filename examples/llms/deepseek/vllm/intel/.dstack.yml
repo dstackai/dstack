@@ -1,0 +1,31 @@
+type: service
+name: deepseek-r1-gaudi
+
+image: vault.habana.ai/gaudi-docker/1.19.0/ubuntu22.04/habanalabs/pytorch-installer-2.5.1:latest
+
+env:
+  - MODEL_ID=deepseek-ai/DeepSeek-R1-Distill-Llama-70B
+  - HABANA_VISIBLE_DEVICES=all
+  - OMPI_MCA_btl_vader_single_copy_mechanism=none
+
+commands:
+  - git clone https://github.com/HabanaAI/vllm-fork.git
+  - cd vllm-fork
+  - git checkout habana_main
+  - pip install -r requirements-hpu.txt
+  - python setup.py develop
+  - vllm serve $MODEL_ID
+    --tensor-parallel-size 8
+    --trust-remote-code
+    --download-dir /data
+
+port: 8000
+
+model: deepseek-ai/DeepSeek-R1-Distill-Llama-70B
+
+resources:
+  gpu: gaudi2:8
+
+# Uncomment to cache downloaded models
+#volumes:
+#  - /root/.cache/huggingface/hub:/root/.cache/huggingface/hub
