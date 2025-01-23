@@ -83,6 +83,18 @@ hide:
         </p>
     </a>
 
+    <a href="/examples/accelerators/intel"
+       class="feature-cell sky">
+        <h3>
+            INTEL
+        </h3>
+
+        <p>
+            Deploy and fine-tune LLMs on AMD
+        </p>
+    </a>
+
+
     <a href="/examples/accelerators/tpu"
        class="feature-cell sky">
         <h3>
@@ -98,6 +110,16 @@ hide:
 ## LLMs
 
 <div class="tx-landing__highlights_grid">
+    <a href="/examples/llms/deepseek"
+       class="feature-cell sky">
+        <h3>
+            Deepseek
+        </h3>
+
+        <p>
+            Deploy Deepseek models
+        </p>
+    </a>
     <a href="/examples/llms/llama31"
        class="feature-cell sky">
         <h3>

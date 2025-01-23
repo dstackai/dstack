@@ -1,0 +1,38 @@
+type: task
+# The name is optional, if not specified, generated randomly
+name: trl-train
+
+python: "3.10"
+
+# Required environment variables
+env:
+  - WANDB_API_KEY
+  - WANDB_PROJECT
+  - MODEL_ID=deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B
+# Commands of the task
+commands:
+  - git clone https://github.com/huggingface/trl.git
+  - pip install trl
+  - pip install peft
+  - pip install wandb
+  - cd trl/trl/scripts
+  - python sft.py
+    --model_name_or_path $MODEL_ID
+    --dataset_name trl-lib/Capybara
+    --learning_rate 2.0e-4
+    --num_train_epochs 1
+    --packing
+    --per_device_train_batch_size 2
+    --gradient_accumulation_steps 8
+    --gradient_checkpointing
+    --logging_steps 25
+    --eval_strategy steps
+    --eval_steps 100
+    --use_peft
+    --lora_r 32
+    --lora_alpha 16
+    --report_to wandb
+    --output_dir DeepSeek-R1-Distill-Qwen-1.5B-SFT
+
+resources:
+  gpu: 24GB
