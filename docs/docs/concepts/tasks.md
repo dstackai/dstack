@@ -329,7 +329,7 @@ If you don't assign a value to an environment variable (see `HF_TOKEN` above),
     | `DSTACK_NODES_NUM`      | The number of nodes in the run                                   |
     | `DSTACK_GPUS_PER_NODE`  | The number of GPUs per node                                      |
     | `DSTACK_NODE_RANK`      | The rank of the node                                             |
-    | `DSTACK_MASTER_NODE_IP` | The internal IP address the master node                          |
+    | `DSTACK_MASTER_NODE_IP` | The internal IP address of the master node                          |
     | `DSTACK_NODES_IPS`      | The list of internal IP addresses of all nodes delimited by "\n" |
 
 ### Spot policy

@@ -45,7 +45,7 @@ tasks, and services:
 - `DSTACK_NODES_NUM`{ #DSTACK_NODES_NUM } – The number of nodes in the run
 - `DSTACK_GPUS_PER_NODE`{ #DSTACK_GPUS_PER_NODE } – The number of GPUs per node
 - `DSTACK_NODE_RANK`{ #DSTACK_NODE_RANK } – The rank of the node
-- `DSTACK_MASTER_NODE_IP`{ #DSTACK_NODE_RANK } – The internal IP address the master node.
+- `DSTACK_MASTER_NODE_IP`{ #DSTACK_NODE_RANK } – The internal IP address of the master node.
 
      Below is an example of using `DSTACK_NODES_NUM`, `DSTACK_GPUS_PER_NODE`, `DSTACK_NODE_RANK`, and `DSTACK_MASTER_NODE_IP`
      for distributed training:
