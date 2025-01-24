@@ -9,7 +9,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-import dstack._internal.server.services.gateways as gateways
 from dstack._internal.core.consts import DSTACK_RUNNER_HTTP_PORT, DSTACK_SHIM_HTTP_PORT
 from dstack._internal.core.errors import BackendError, ResourceNotExistsError, SSHError
 from dstack._internal.core.models.backends.base import BackendType
@@ -31,6 +30,7 @@ from dstack._internal.server.models import (
     RunModel,
     VolumeModel,
 )
+from dstack._internal.server.services import services
 from dstack._internal.server.services.backends import get_project_backend_by_type
 from dstack._internal.server.services.jobs.configurators.base import JobConfigurator
 from dstack._internal.server.services.jobs.configurators.dev import DevEnvironmentJobConfigurator
@@ -264,7 +264,7 @@ async def process_terminating_job(session: AsyncSession, job_model: JobModel):
                 instance.name,
                 instance.status.name,
             )
-            await gateways.unregister_replica(
+            await services.unregister_replica(
                 session, job_model
             )  # TODO(egor-s) ensure always runs
 

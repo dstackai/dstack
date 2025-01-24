@@ -6,7 +6,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
-import dstack._internal.server.services.gateways as gateways
 from dstack._internal.core.consts import DSTACK_RUNNER_HTTP_PORT, DSTACK_SHIM_HTTP_PORT
 from dstack._internal.core.errors import GatewayError
 from dstack._internal.core.models.backends.base import BackendType
@@ -32,6 +31,7 @@ from dstack._internal.server.models import (
 )
 from dstack._internal.server.schemas.runner import TaskStatus
 from dstack._internal.server.services import logs as logs_services
+from dstack._internal.server.services import services
 from dstack._internal.server.services.jobs import (
     find_job,
     get_job_runtime_data,
@@ -313,7 +313,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
         and run.run_spec.configuration.type == "service"
     ):
         try:
-            await gateways.register_replica(session, run_model.gateway_id, run, job_model)
+            await services.register_replica(session, run_model.gateway_id, run, job_model)
         except GatewayError as e:
             logger.warning(
                 "%s: failed to register service replica: %s, age=%s",
