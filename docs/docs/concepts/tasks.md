@@ -71,7 +71,7 @@ application.
 By default, a task runs on a single node.
 However, you can run it on a cluster of nodes by specifying `nodes`.
 
-<div editor-title="examples/fine-tuning/train.dstack.yml">
+<div editor-title="train.dstack.yml">
 
 ```yaml
 type: task
@@ -81,33 +81,59 @@ name: train-distrib
 # The size of the cluster
 nodes: 2
 
-python: "3.10"
+python: "3.12"
 
-# Commands of the task
+# Commands to run on each node
 commands:
+  - git clone https://github.com/pytorch/examples.git
+  - cd examples/distributed/ddp-tutorial-series
   - pip install -r requirements.txt
   - torchrun
-    --nproc_per_node=$DSTACK_GPUS_PER_NODE
-    --node_rank=$DSTACK_NODE_RANK
+    --nproc-per-node=$DSTACK_GPUS_PER_NODE
+    --node-rank=$DSTACK_NODE_RANK
     --nnodes=$DSTACK_NODES_NUM
-    --master_addr=$DSTACK_MASTER_NODE_IP
-    --master_port=8008 resnet_ddp.py
-    --num_epochs 20
+    --master-addr=$DSTACK_MASTER_NODE_IP
+    --master-port=12345
+    multinode.py 50 10
 
 resources:
   gpu: 24GB
+  # Uncomment if using multiple GPUs
+  #shm_size: 24GB
 ```
 
 </div>
 
-All you need to do is pass the corresponding environment variables such as 
-`DSTACK_GPUS_PER_NODE`, `DSTACK_NODE_RANK`, `DSTACK_NODES_NUM`,
-`DSTACK_MASTER_NODE_IP`, and `DSTACK_GPUS_NUM` (see [System environment variables](#system-environment-variables)).
+Nodes can communicate using their private IP addresses.
+Use `DSTACK_MASTER_NODE_IP`, `$DSTACK_NODE_RANK`, and other
+[System environment variables](#system-environment-variables)
+to discover IP addresses and other details.
+
+??? info "Network interface"
+    Distributed frameworks usually detect the correct network interface automatically,
+    but sometimes you need to specify it explicitly.
+
+    For example, with PyTorch and the NCCL backend, you may need
+    to add these commands to tell NCCL to use the private interface:
+
+    ```yaml
+    commands:
+      - apt-get install -y iproute2
+      - >
+        if [[ $DSTACK_NODE_RANK == 0 ]]; then
+          export NCCL_SOCKET_IFNAME=$(ip -4 -o addr show | fgrep $DSTACK_MASTER_NODE_IP | awk '{print $2}')
+        else
+          export NCCL_SOCKET_IFNAME=$(ip route get $DSTACK_MASTER_NODE_IP | sed -E 's/.*?dev (\S+) .*/\1/;t;d')
+        fi
+      # ... The rest of the commands
+    ```
 
 !!! info "Fleets"
-    To ensure all nodes are provisioned into a cluster placement group and to enable the highest level of inter-node 
-    connectivity (incl. support for [EFA :material-arrow-top-right-thin:{ .external }](https://aws.amazon.com/hpc/efa/){:target="_blank"}),
-    create a [fleet](fleets.md) via a configuration before running a disstributed task.
+    Distributed tasks can only run on fleets with
+    [cluster placement](fleets.md#cloud-placement).
+    While `dstack` can provision such fleets automatically, it is
+    recommended to create them via a fleet configuration
+    to ensure the highest level of inter-node connectivity.
 
 `dstack` is easy to use with `accelerate`, `torchrun`, Ray, Spark, and any other distributed frameworks.
 
@@ -303,7 +329,7 @@ If you don't assign a value to an environment variable (see `HF_TOKEN` above),
     | `DSTACK_NODES_NUM`      | The number of nodes in the run                                   |
     | `DSTACK_GPUS_PER_NODE`  | The number of GPUs per node                                      |
     | `DSTACK_NODE_RANK`      | The rank of the node                                             |
-    | `DSTACK_MASTER_NODE_IP` | The internal IP address the master node                          |
+    | `DSTACK_MASTER_NODE_IP` | The internal IP address of the master node                          |
     | `DSTACK_NODES_IPS`      | The list of internal IP addresses of all nodes delimited by "\n" |
 
 ### Spot policy
