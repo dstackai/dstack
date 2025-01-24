@@ -9,7 +9,6 @@ import dstack._internal.server.services.jobs as jobs_services
 from dstack._internal.core.consts import DSTACK_RUNNER_SSH_PORT
 from dstack._internal.core.models.common import is_core_model_instance
 from dstack._internal.core.models.configurations import ServiceConfiguration
-from dstack._internal.core.models.gateways import AnyModel
 from dstack._internal.core.models.instances import SSHConnectionParams
 from dstack._internal.core.models.runs import (
     JobProvisioningData,
@@ -18,6 +17,7 @@ from dstack._internal.core.models.runs import (
     RunStatus,
     ServiceSpec,
 )
+from dstack._internal.core.models.services import AnyModel
 from dstack._internal.proxy.lib.models import (
     AnyModelFormat,
     ChatModel,

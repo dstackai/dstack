@@ -4,7 +4,7 @@ import requests
 
 from dstack._internal.core.errors import ServerClientError
 from dstack._internal.core.models.configurations import ServiceConfiguration
-from dstack._internal.core.models.gateways import AnyModel
+from dstack._internal.core.models.services import AnyModel
 
 
 def complete_service_model(model_info: AnyModel, env: Dict[str, str]):
