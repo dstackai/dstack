@@ -131,7 +131,7 @@ class GPUSpec(CoreModel):
     vendor: Annotated[
         Optional[gpuhunt.AcceleratorVendor],
         Field(
-            description="The vendor of the GPU/accelerator, one of: `nvidia`, `amd`, `google` (alias: `tpu`)"
+            description="The vendor of the GPU/accelerator, one of: `nvidia`, `amd`, `google` (alias: `tpu`), `intel`"
         ),
     ] = None
     name: Annotated[
@@ -304,7 +304,7 @@ class GPUSpecSchema(CoreModel):
     vendor: Annotated[
         Optional[gpuhunt.AcceleratorVendor],
         Field(
-            description="The vendor of the GPU/accelerator, one of: `nvidia`, `amd`, `google` (alias: `tpu`)"
+            description="The vendor of the GPU/accelerator, one of: `nvidia`, `amd`, `google` (alias: `tpu`), `intel`"
         ),
     ] = None
     name: Annotated[

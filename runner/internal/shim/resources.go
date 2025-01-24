@@ -42,6 +42,8 @@ func NewGpuLock(gpus []host.GpuInfo) (*GpuLock, error) {
 				resourceID = gpu.ID
 			case host.GpuVendorAmd:
 				resourceID = gpu.RenderNodePath
+			case host.GpuVendorIntel:
+				resourceID = gpu.Index
 			case host.GpuVendorNone:
 				return nil, fmt.Errorf("unexpected GPU vendor %s", vendor)
 			default:

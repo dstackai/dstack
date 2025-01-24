@@ -133,7 +133,8 @@ func (d *DockerRunner) restoreStateFromContainers(ctx context.Context) error {
 		if containerFull, err := d.client.ContainerInspect(ctx, containerID); err != nil {
 			log.Error(ctx, "failed to inspect container", "id", containerID, "task", taskID)
 		} else {
-			if d.gpuVendor == host.GpuVendorNvidia {
+			switch d.gpuVendor {
+			case host.GpuVendorNvidia:
 				deviceRequests := containerFull.HostConfig.Resources.DeviceRequests
 				if len(deviceRequests) == 1 {
 					gpuIDs = deviceRequests[0].DeviceIDs
@@ -144,13 +145,20 @@ func (d *DockerRunner) restoreStateFromContainers(ctx context.Context) error {
 						"id", containerID, "task", taskID,
 					)
 				}
-			} else if d.gpuVendor == host.GpuVendorAmd {
+			case host.GpuVendorAmd:
 				for _, device := range containerFull.HostConfig.Resources.Devices {
 					if host.IsRenderNodePath(device.PathOnHost) {
 						gpuIDs = append(gpuIDs, device.PathOnHost)
 					}
 				}
-			} else {
+			case host.GpuVendorIntel:
+				for _, envVar := range containerFull.Config.Env {
+					if indices, found := strings.CutPrefix(envVar, "HABANA_VISIBLE_DEVICES="); found {
+						gpuIDs = strings.Split(indices, ",")
+						break
+					}
+				}
+			case host.GpuVendorNone:
 				gpuIDs = []string{}
 			}
 			ports = extractPorts(ctx, containerFull.NetworkSettings.Ports)
@@ -801,7 +809,7 @@ func (d *DockerRunner) createContainer(ctx context.Context, task *Task) error {
 	hostConfig.Resources.NanoCPUs = int64(task.config.CPU * 1000000000)
 	hostConfig.Resources.Memory = task.config.Memory
 	if len(task.gpuIDs) > 0 {
-		configureGpus(hostConfig, d.gpuVendor, task.gpuIDs)
+		configureGpus(containerConfig, hostConfig, d.gpuVendor, task.gpuIDs)
 	}
 	configureHpcNetworkingIfAvailable(hostConfig)
 
@@ -967,7 +975,7 @@ func getNetworkMode(networkMode NetworkMode) container.NetworkMode {
 	return "default"
 }
 
-func configureGpus(hostConfig *container.HostConfig, vendor host.GpuVendor, ids []string) {
+func configureGpus(config *container.Config, hostConfig *container.HostConfig, vendor host.GpuVendor, ids []string) {
 	// NVIDIA: ids are identifiers reported by nvidia-smi, GPU-<UUID> strings
 	// AMD: ids are DRI render node paths, e.g., /dev/dri/renderD128
 	switch vendor {
@@ -1012,6 +1020,17 @@ func configureGpus(hostConfig *container.HostConfig, vendor host.GpuVendor, ids 
 		// --security-opt=seccomp=unconfined
 		hostConfig.SecurityOpt = append(hostConfig.SecurityOpt, "seccomp=unconfined")
 		// TODO: in addition, for non-root user, --group-add=video, and possibly --group-add=render, are required.
+	case host.GpuVendorIntel:
+		// All options are listed here:
+		// https://docs.habana.ai/en/latest/Installation_Guide/Additional_Installation/Docker_Installation.html
+		// --runtime=habana
+		hostConfig.Runtime = "habana"
+		// --ipc=host
+		hostConfig.IpcMode = container.IPCModeHost
+		// --cap-add=SYS_NICE
+		hostConfig.CapAdd = append(hostConfig.CapAdd, "SYS_NICE")
+		// -e HABANA_VISIBLE_DEVICES=0,1,...
+		config.Env = append(config.Env, fmt.Sprintf("HABANA_VISIBLE_DEVICES=%s", strings.Join(ids, ",")))
 	case host.GpuVendorNone:
 		// nothing to do
 	}
