@@ -14,7 +14,7 @@ The `service` configuration type allows running [services](../../concepts/servic
 
 === "OpenAI"
 
-    #SCHEMA# dstack._internal.core.models.gateways.OpenAIChatModel
+    #SCHEMA# dstack.api.OpenAIChatModel
         overrides:
           show_root_heading: false
           type:
@@ -25,7 +25,7 @@ The `service` configuration type allows running [services](../../concepts/servic
     > TGI provides an OpenAI-compatible API starting with version 1.4.0,
     so models served by TGI can be defined with `format: openai` too.
     
-    #SCHEMA# dstack._internal.core.models.gateways.TGIChatModel
+    #SCHEMA# dstack.api.TGIChatModel
         overrides:
           show_root_heading: false
           type:
