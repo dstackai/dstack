@@ -6,6 +6,7 @@ import { artifactApi } from 'services/artifact';
 import { authApi } from 'services/auth';
 import { fleetApi } from 'services/fleet';
 import { gatewayApi } from 'services/gateway';
+import { instanceApi } from 'services/instance';
 import { mainApi } from 'services/mainApi';
 import { projectApi } from 'services/project';
 import { runApi } from 'services/run';
@@ -23,6 +24,7 @@ export const store = configureStore({
         [runApi.reducerPath]: runApi.reducer,
         [artifactApi.reducerPath]: artifactApi.reducer,
         [fleetApi.reducerPath]: fleetApi.reducer,
+        [instanceApi.reducerPath]: instanceApi.reducer,
         [userApi.reducerPath]: userApi.reducer,
         [gatewayApi.reducerPath]: gatewayApi.reducer,
         [authApi.reducerPath]: authApi.reducer,
@@ -39,6 +41,7 @@ export const store = configureStore({
             .concat(runApi.middleware)
             .concat(artifactApi.middleware)
             .concat(fleetApi.middleware)
+            .concat(instanceApi.middleware)
             .concat(gatewayApi.middleware)
             .concat(userApi.middleware)
             .concat(authApi.middleware)

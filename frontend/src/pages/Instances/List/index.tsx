@@ -1,25 +1,31 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Button, FormField, Header, Pagination, SelectCSD, SpaceBetween, Table, Toggle } from 'components';
 
-import { useBreadcrumbs, useCollection } from 'hooks';
+import { useBreadcrumbs } from 'hooks';
+import { useCollection } from 'hooks';
 import { ROUTES } from 'routes';
 
-import { useColumnsDefinitions, useEmptyMessages, useFilters, useFleetsData } from './hooks';
-import { useDeleteFleet } from './useDeleteFleet';
+import { useActions } from './hooks/useActions';
+import { useColumnsDefinitions } from './hooks/useColumnDefinitions';
+import { useEmptyMessages } from './hooks/useEmptyMessage';
+import { useFilters } from './hooks/useFilters';
+import { useInstanceListData } from './hooks/useInstanceListData';
 
 import styles from './styles.module.scss';
 
-export const FleetList: React.FC = () => {
+export const List: React.FC = () => {
     const { t } = useTranslation();
 
     useBreadcrumbs([
         {
-            text: t('navigation.fleets'),
-            href: ROUTES.FLEETS.LIST,
+            text: t('navigation.instances'),
+            href: ROUTES.INSTANCES.LIST,
         },
     ]);
+
+    const { columns } = useColumnsDefinitions();
 
     const {
         onlyActive,
@@ -29,20 +35,26 @@ export const FleetList: React.FC = () => {
         projectOptions,
         selectedProject,
         setSelectedProject,
+        selectedFleet,
     } = useFilters();
 
-    const { data, pagesCount, disabledNext, isLoading, nextPage, prevPage, refreshList } = useFleetsData({
-        project_name: selectedProject?.value,
-        only_active: onlyActive,
-    });
+    const params = useMemo<TInstanceListRequestParams>(() => {
+        return {
+            project_names: selectedProject?.value ? [selectedProject.value] : undefined,
+            only_active: onlyActive,
+            fleet_ids: selectedFleet?.value ? [selectedFleet.value] : undefined,
+        };
+    }, [selectedProject, selectedFleet, onlyActive]);
+
+    const { data, pagesCount, disabledNext, isLoading, nextPage, prevPage, refreshList } = useInstanceListData(params);
 
     const isDisabledPagination = isLoading || data.length === 0;
 
-    const { columns } = useColumnsDefinitions();
-    const { deleteFleets, isDeleting } = useDeleteFleet();
+    const { deleteFleets, isDeleting } = useActions();
+
     const { renderEmptyMessage, renderNoMatchMessage } = useEmptyMessages({ clearFilters, isDisabledClearFilter });
 
-    const { items, collectionProps } = useCollection<IFleet>(data, {
+    const { items, collectionProps } = useCollection<IInstance>(data, {
         filtering: {
             empty: renderEmptyMessage(),
             noMatch: renderNoMatchMessage(),
@@ -89,7 +101,7 @@ export const FleetList: React.FC = () => {
                         </SpaceBetween>
                     }
                 >
-                    {t('navigation.fleets')}
+                    {t('navigation.instances')}
                 </Header>
             }
             filter={
@@ -110,11 +122,24 @@ export const FleetList: React.FC = () => {
                         </FormField>
                     </div>
 
-                    {/*<div className={styles.activeOnly}>*/}
-                    {/*    <Toggle onChange={({ detail }) => setOnlyActive(detail.checked)} checked={onlyActive}>*/}
-                    {/*        {t('fleets.active_only')}*/}
-                    {/*    </Toggle>*/}
-                    {/*</div>*/}
+                    <div className={styles.select}>
+                        <FormField label={t('fleets.fleet')}>
+                            <SelectCSD
+                                disabled
+                                options={[...(selectedFleet ? [selectedFleet] : [])]}
+                                selectedOption={selectedFleet}
+                                placeholder={t('fleets.fleet_placeholder')}
+                                expandToViewport={true}
+                                filteringType="auto"
+                            />
+                        </FormField>
+                    </div>
+
+                    <div className={styles.activeOnly}>
+                        <Toggle onChange={({ detail }) => setOnlyActive(detail.checked)} checked={onlyActive}>
+                            {t('fleets.active_only')}
+                        </Toggle>
+                    </div>
 
                     <div className={styles.clear}>
                         <Button formAction="none" onClick={clearFilters} disabled={isDisabledClearFilter}>

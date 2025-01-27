@@ -8,10 +8,9 @@ import { SelectCSDProps } from 'components';
 import { DATE_TIME_FORMAT, DEFAULT_TABLE_PAGE_SIZE } from 'consts';
 import { useLocalStorageState } from 'hooks/useLocalStorageState';
 import { getFleetStatusIconType } from 'libs/fleet';
+import { ROUTES } from 'routes';
 import { useLazyGetFleetsQuery } from 'services/fleet';
 import { useGetProjectsQuery } from 'services/project';
-
-import { ROUTES } from '../../../routes';
 
 export const useEmptyMessages = ({
     clearFilters,
@@ -50,9 +49,11 @@ export const useColumnsDefinitions = () => {
 
     const columns: TableProps.ColumnDefinition<IFleet>[] = [
         {
-            id: 'instance_name',
+            id: 'fleet_name',
             header: t('fleets.fleet'),
-            cell: (item) => item.name,
+            cell: (item) => (
+                <NavigateLink href={ROUTES.FLEETS.DETAILS.FORMAT(item.project_name, item.name)}>{item.name}</NavigateLink>
+            ),
         },
         {
             id: 'status',
@@ -106,7 +107,8 @@ export const useColumnsDefinitions = () => {
 };
 
 export const useFilters = () => {
-    const [onlyActive, setOnlyActive] = useLocalStorageState<boolean>('administration-fleet-list-is-active', false);
+    // const [onlyActive, setOnlyActive] = useLocalStorageState<boolean>('fleet-list-is-active', false);
+    const [onlyActive, setOnlyActive] = useState<boolean>(true);
     const [selectedProject, setSelectedProject] = useState<SelectCSDProps.Option | null>(null);
 
     const { data: projectsData } = useGetProjectsQuery();
@@ -118,11 +120,12 @@ export const useFilters = () => {
     }, [projectsData]);
 
     const clearFilters = () => {
-        setOnlyActive(false);
+        // setOnlyActive(false);
         setSelectedProject(null);
     };
 
-    const isDisabledClearFilter = !selectedProject && !onlyActive;
+    // const isDisabledClearFilter = !selectedProject && !onlyActive;
+    const isDisabledClearFilter = !selectedProject;
 
     return {
         projectOptions,

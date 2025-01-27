@@ -74,6 +74,8 @@ export const API = {
         FLEETS: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/fleets/list`,
         FLEETS_DETAILS: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/fleets/get`,
         FLEETS_DELETE: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/fleets/delete`,
+        FLEET_INSTANCES_DELETE: (projectName: IProject['project_name']) =>
+            `${API.BASE()}/project/${projectName}/fleets/delete_instances`,
 
         // Fleets
         VOLUMES_DELETE: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/volumes/delete`,
@@ -121,6 +123,11 @@ export const API = {
     FLEETS: {
         BASE: () => `${API.BASE()}/fleets`,
         LIST: () => `${API.FLEETS.BASE()}/list`,
+    },
+
+    INSTANCES: {
+        BASE: () => `${API.BASE()}/instances`,
+        LIST: () => `${API.INSTANCES.BASE()}/list`,
     },
 
     SERVER: {

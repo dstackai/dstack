@@ -9,6 +9,7 @@ import { LoginByOktaCallback } from 'App/Login/LoginByOktaCallback';
 import { TokenLogin } from 'App/Login/TokenLogin';
 import { Logout } from 'App/Logout';
 import { FleetDetails, FleetList } from 'pages/Fleets';
+import { InstanceList } from 'pages/Instances';
 import { ModelsList } from 'pages/Models';
 import { ModelDetails } from 'pages/Models/Details';
 import { ProjectAdd, ProjectDetails, ProjectList, ProjectSettings } from 'pages/Project';
@@ -119,6 +120,12 @@ export const router = createBrowserRouter([
             {
                 path: ROUTES.FLEETS.DETAILS.TEMPLATE,
                 element: <FleetDetails />,
+            },
+
+            // Instances
+            {
+                path: ROUTES.INSTANCES.LIST,
+                element: <InstanceList />,
             },
 
             // Volumes

@@ -12,23 +12,24 @@ export const useColumnsDefinitions = () => {
 
     const columns: TableProps.ColumnDefinition<IInstance>[] = [
         {
-            id: 'instance_name',
-            header: t('fleets.instances.instance_name'),
-            cell: (item) => item.name,
+            id: 'fleet_name',
+            header: t('fleets.fleet'),
+            cell: (item) => item.fleet_name ?? '-',
         },
         {
-            id: 'status',
-            header: t('fleets.instances.status'),
-            cell: (item) => (
-                <StatusIndicator type={getStatusIconType(item.status)}>
-                    {t(`fleets.instances.statuses.${item.status}`)}
-                </StatusIndicator>
-            ),
+            id: 'instance_num',
+            header: t('fleets.instances.instance_num'),
+            cell: (item) => item.instance_num,
         },
         {
-            id: 'resources',
-            header: t('fleets.instances.resources'),
-            cell: (item) => item.instance_type.resources.description,
+            id: 'project_name',
+            header: t('fleets.instances.project'),
+            cell: (item) => item.project_name,
+        },
+        {
+            id: 'hostname',
+            header: t('fleets.instances.hostname'),
+            cell: (item) => item.hostname,
         },
         {
             id: 'backend',
@@ -41,9 +42,28 @@ export const useColumnsDefinitions = () => {
             cell: (item) => item.region,
         },
         {
+            id: 'instance_type',
+            header: t('fleets.instances.instance_type'),
+            cell: (item) => item.instance_type.name,
+        },
+        {
+            id: 'resources',
+            header: t('fleets.instances.resources'),
+            cell: (item) => item.instance_type.resources.description,
+        },
+        {
             id: 'spot',
             header: t('fleets.instances.spot'),
             cell: (item) => item.instance_type.resources.spot && <Icon name={'check'} />,
+        },
+        {
+            id: 'status',
+            header: t('fleets.instances.status'),
+            cell: (item) => (
+                <StatusIndicator type={getStatusIconType(item.status)}>
+                    {t(`fleets.instances.statuses.${item.status}`)}
+                </StatusIndicator>
+            ),
         },
         {
             id: 'started',

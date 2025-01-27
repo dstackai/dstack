@@ -86,6 +86,10 @@ export const ROUTES = {
         },
     },
 
+    INSTANCES: {
+        LIST: '/instances',
+    },
+
     VOLUMES: {
         LIST: '/volumes',
     },

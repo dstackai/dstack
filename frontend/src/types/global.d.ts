@@ -9,6 +9,13 @@ declare type AddedEmptyString<Type> = {
 
 declare type DateTime = string
 
+declare interface IBaseRequestListParams {
+    prev_created_at?: string,
+    prev_id?: string,
+    limit?: number,
+    ascending?: boolean,
+}
+
 declare interface HashMap<T = any> {
     [key: string]: T;
 }
