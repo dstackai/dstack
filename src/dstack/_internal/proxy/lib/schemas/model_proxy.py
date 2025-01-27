@@ -2,8 +2,6 @@ from typing import Any, Dict, List, Literal, Optional, Union
 
 from dstack._internal.core.models.common import CoreModel
 
-FinishReason = Literal["stop", "length", "tool_calls", "eos_token"]
-
 
 class ChatMessage(CoreModel):
     role: str  # TODO(egor-s) types
@@ -30,7 +28,7 @@ class ChatCompletionsRequest(CoreModel):
 
 
 class ChatCompletionsChoice(CoreModel):
-    finish_reason: FinishReason
+    finish_reason: str
     index: int
     message: ChatMessage
 
@@ -38,7 +36,7 @@ class ChatCompletionsChoice(CoreModel):
 class ChatCompletionsChunkChoice(CoreModel):
     delta: object
     logprobs: object = {}
-    finish_reason: Optional[FinishReason]
+    finish_reason: Optional[str]
     index: int
 
 
