@@ -7,11 +7,14 @@ from fastapi import FastAPI
 
 from dstack._internal.proxy.gateway.repo.repo import GatewayProxyRepo
 from dstack._internal.proxy.lib.auth import BaseProxyAuthProvider
-from dstack._internal.proxy.lib.deps import ProxyDependencyInjector
 from dstack._internal.proxy.lib.repo import BaseProxyRepo
-from dstack._internal.proxy.lib.services.service_connection import ServiceReplicaClient
+from dstack._internal.proxy.lib.services.service_connection import ServiceClient
 from dstack._internal.proxy.lib.testing.auth import ProxyTestAuthProvider
-from dstack._internal.proxy.lib.testing.common import make_project, make_service
+from dstack._internal.proxy.lib.testing.common import (
+    ProxyTestDependencyInjector,
+    make_project,
+    make_service,
+)
 from dstack._internal.server.services.proxy.routers.service_proxy import router
 
 MOCK_REPLICA_CLIENT_TIMEOUT = 8
@@ -23,9 +26,9 @@ ProxyTestRepo = GatewayProxyRepo
 @pytest.fixture
 def mock_replica_client_httpbin(httpbin) -> Generator[None, None, None]:
     with patch(
-        "dstack._internal.proxy.lib.services.service_connection.ServiceReplicaConnectionPool.get_or_add"
+        "dstack._internal.proxy.lib.services.service_connection.ServiceConnectionPool.get_or_add"
     ) as add_connection_mock:
-        add_connection_mock.return_value.client.return_value = ServiceReplicaClient(
+        add_connection_mock.return_value.client.return_value = ServiceClient(
             base_url=httpbin.url, timeout=MOCK_REPLICA_CLIENT_TIMEOUT
         )
         yield
@@ -35,7 +38,7 @@ def make_app(
     repo: BaseProxyRepo, auth: BaseProxyAuthProvider = ProxyTestAuthProvider()
 ) -> FastAPI:
     app = FastAPI()
-    app.state.proxy_dependency_injector = ProxyDependencyInjector(repo=repo, auth=auth)
+    app.state.proxy_dependency_injector = ProxyTestDependencyInjector(repo=repo, auth=auth)
     app.include_router(router, prefix="/proxy/services")
     return app
 
