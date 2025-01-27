@@ -160,4 +160,3 @@ declare interface IRun {
     cost: number,
     service: IRunService | null;
 }
-

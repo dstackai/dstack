@@ -13,3 +13,7 @@ repos:
         language_version: 1.23.0  # Should match runner/go.mod
         entry: bash -c 'cd runner && golangci-lint run'
         stages: [manual]
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: end-of-file-fixer

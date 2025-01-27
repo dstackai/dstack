@@ -31,5 +31,3 @@ export enum UserPermission {
 export const userPermissionMap: Record<TUserPermissionKeys, UserPermission> = {
     'can_create_projects': UserPermission.CAN_CREATE_PROJECTS
 }
-
-
