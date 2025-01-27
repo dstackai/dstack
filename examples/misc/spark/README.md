@@ -60,4 +60,3 @@ export SPARK_CLUSTER_IP=
 
 dstack apply -f task.dstack.yaml
 ```
-
