@@ -15,8 +15,8 @@ from fastapi.staticfiles import StaticFiles
 from dstack._internal.cli.utils.common import console
 from dstack._internal.core.errors import ForbiddenError, ServerClientError
 from dstack._internal.core.services.configs import update_default_project
+from dstack._internal.proxy.lib.deps import get_injector_from_app
 from dstack._internal.proxy.lib.routers import model_proxy
-from dstack._internal.proxy.lib.services.service_connection import service_replica_connection_pool
 from dstack._internal.server import settings
 from dstack._internal.server.background import start_background_tasks
 from dstack._internal.server.db import get_db, get_session_ctx, migrate
@@ -142,7 +142,8 @@ async def lifespan(app: FastAPI):
     yield
     scheduler.shutdown()
     await gateway_connections_pool.remove_all()
-    await service_replica_connection_pool.remove_all()
+    service_conn_pool = await get_injector_from_app(app).get_service_connection_pool()
+    await service_conn_pool.remove_all()
     await get_db().engine.dispose()
     # Let checked-out DB connections close as dispose() only closes checked-in connections
     await asyncio.sleep(3)

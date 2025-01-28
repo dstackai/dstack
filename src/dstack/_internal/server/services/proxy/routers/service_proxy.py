@@ -3,8 +3,14 @@ from fastapi.datastructures import URL
 from fastapi.responses import RedirectResponse, Response
 from typing_extensions import Annotated
 
-from dstack._internal.proxy.lib.deps import ProxyAuth, ProxyAuthContext, get_proxy_repo
+from dstack._internal.proxy.lib.deps import (
+    ProxyAuth,
+    ProxyAuthContext,
+    get_proxy_repo,
+    get_service_connection_pool,
+)
 from dstack._internal.proxy.lib.repo import BaseProxyRepo
+from dstack._internal.proxy.lib.services.service_connection import ServiceConnectionPool
 from dstack._internal.server.services.proxy.services import service_proxy
 
 REDIRECTED_HTTP_METHODS = ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD"]
@@ -29,8 +35,11 @@ async def service_reverse_proxy(
     request: Request,
     auth: Annotated[ProxyAuthContext, Depends(ProxyAuth(auto_enforce=False))],
     repo: Annotated[BaseProxyRepo, Depends(get_proxy_repo)],
+    service_conn_pool: Annotated[ServiceConnectionPool, Depends(get_service_connection_pool)],
 ) -> Response:
-    return await service_proxy.proxy(project_name, run_name, path, request, auth, repo)
+    return await service_proxy.proxy(
+        project_name, run_name, path, request, auth, repo, service_conn_pool
+    )
 
 
 # TODO(#1595): support websockets

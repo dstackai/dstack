@@ -26,13 +26,13 @@ OPEN_TUNNEL_TIMEOUT = 10
 HTTP_TIMEOUT = 60  # Same as default Nginx proxy timeout
 
 
-class ServiceReplicaClient(httpx.AsyncClient):
+class ServiceClient(httpx.AsyncClient):
     def build_request(self, *args, **kwargs) -> httpx.Request:
         self.cookies.clear()  # the client is shared by all users, don't leak cookies
         return super().build_request(*args, **kwargs)
 
 
-class ServiceReplicaConnection:
+class ServiceConnection:
     def __init__(self, project: Project, service: Service, replica: Replica) -> None:
         self._temp_dir = TemporaryDirectory()
         options = {
@@ -58,7 +58,7 @@ class ServiceReplicaConnection:
             ],
             options=options,
         )
-        self._client = ServiceReplicaClient(
+        self._client = ServiceClient(
             transport=AsyncHTTPTransport(uds=str(self._app_socket_path)),
             # The hostname in base_url is there for troubleshooting, as it may appear in
             # logs and in the Host header. The actual destination is the Unix socket.
@@ -80,26 +80,26 @@ class ServiceReplicaConnection:
         await self._client.aclose()
         await self._tunnel.aclose()
 
-    async def client(self) -> ServiceReplicaClient:
+    async def client(self) -> ServiceClient:
         await asyncio.wait_for(self._is_open.wait(), timeout=OPEN_TUNNEL_TIMEOUT)
         return self._client
 
 
-class ServiceReplicaConnectionPool:
+class ServiceConnectionPool:
     def __init__(self) -> None:
         # TODO(#1595): remove connections to stopped replicas in-server
-        self.connections: Dict[str, ServiceReplicaConnection] = {}
+        self.connections: Dict[str, ServiceConnection] = {}
 
-    async def get(self, replica_id: str) -> Optional[ServiceReplicaConnection]:
+    async def get(self, replica_id: str) -> Optional[ServiceConnection]:
         return self.connections.get(replica_id)
 
     async def get_or_add(
         self, project: Project, service: Service, replica: Replica
-    ) -> ServiceReplicaConnection:
+    ) -> ServiceConnection:
         connection = self.connections.get(replica.id)
         if connection is not None:
             return connection
-        connection = ServiceReplicaConnection(project, service, replica)
+        connection = ServiceConnection(project, service, replica)
         self.connections[replica.id] = connection
         try:
             await connection.open()
@@ -125,7 +125,9 @@ class ServiceReplicaConnectionPool:
                 )
 
 
-async def get_service_replica_client(service: Service, repo: BaseProxyRepo) -> httpx.AsyncClient:
+async def get_service_replica_client(
+    service: Service, repo: BaseProxyRepo, service_conn_pool: ServiceConnectionPool
+) -> httpx.AsyncClient:
     """
     `service` must have at least one replica
     """
@@ -139,16 +141,12 @@ async def get_service_replica_client(service: Service, repo: BaseProxyRepo) -> h
     # Nginx not available, forward directly to the tunnel
     # TODO(#1595): consider trying different replicas, e.g. using HTTPMultiClient
     replica = random.choice(service.replicas)
-    connection = await service_replica_connection_pool.get(replica.id)
+    connection = await service_conn_pool.get(replica.id)
     if connection is None:
         project = await repo.get_project(service.project_name)
         if project is None:
             raise UnexpectedProxyError(
                 f"Expected to find project {service.project_name} but could not"
             )
-        connection = await service_replica_connection_pool.get_or_add(project, service, replica)
+        connection = await service_conn_pool.get_or_add(project, service, replica)
     return await connection.client()
-
-
-# TODO(#1595): do not use a global variable, it's shared by tests
-service_replica_connection_pool: ServiceReplicaConnectionPool = ServiceReplicaConnectionPool()

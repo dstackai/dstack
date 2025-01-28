@@ -18,8 +18,8 @@ from dstack._internal.proxy.lib import models
 from dstack._internal.proxy.lib.errors import ProxyError, UnexpectedProxyError
 from dstack._internal.proxy.lib.repo import BaseProxyRepo
 from dstack._internal.proxy.lib.services.service_connection import (
-    ServiceReplicaConnection,
-    service_replica_connection_pool,
+    ServiceConnection,
+    ServiceConnectionPool,
 )
 from dstack._internal.utils.logging import get_logger
 
@@ -39,6 +39,7 @@ async def register_service(
     ssh_private_key: str,
     repo: GatewayProxyRepo,
     nginx: Nginx,
+    service_conn_pool: ServiceConnectionPool,
 ) -> None:
     service = models.Service(
         project_name=project_name,
@@ -64,7 +65,13 @@ async def register_service(
 
         logger.debug("Registering service %s", service.fmt())
 
-        await apply_service(service=service, old_service=None, repo=repo, nginx=nginx)
+        await apply_service(
+            service=service,
+            old_service=None,
+            repo=repo,
+            nginx=nginx,
+            service_conn_pool=service_conn_pool,
+        )
         await repo.set_service(service)
 
         if model is not None:
@@ -82,7 +89,11 @@ async def register_service(
 
 
 async def unregister_service(
-    project_name: str, run_name: str, repo: GatewayProxyRepo, nginx: Nginx
+    project_name: str,
+    run_name: str,
+    repo: GatewayProxyRepo,
+    nginx: Nginx,
+    service_conn_pool: ServiceConnectionPool,
 ) -> None:
     async with lock:
         service = await repo.get_service(project_name, run_name)
@@ -93,7 +104,10 @@ async def unregister_service(
 
         logger.debug("Unregistering service %s", service.fmt())
 
-        await stop_replica_connections(r.id for r in service.replicas)
+        await stop_replica_connections(
+            ids=(r.id for r in service.replicas),
+            service_conn_pool=service_conn_pool,
+        )
         await nginx.unregister(service.domain_safe)
         await repo.delete_models_by_run(project_name, run_name)
         await repo.delete_service(project_name, run_name)
@@ -111,6 +125,7 @@ async def register_replica(
     ssh_proxy: Optional[SSHConnectionParams],
     repo: GatewayProxyRepo,
     nginx: Nginx,
+    service_conn_pool: ServiceConnectionPool,
 ) -> None:
     replica = models.Replica(
         id=replica_id,
@@ -134,7 +149,11 @@ async def register_replica(
 
         logger.debug("Registering replica %s in service %s", replica.id, service.fmt())
         failures = await apply_service(
-            service=service, old_service=old_service, repo=repo, nginx=nginx
+            service=service,
+            old_service=old_service,
+            repo=repo,
+            nginx=nginx,
+            service_conn_pool=service_conn_pool,
         )
         if replica in failures:
             raise ProxyError(
@@ -152,6 +171,7 @@ async def unregister_replica(
     replica_id: str,
     repo: GatewayProxyRepo,
     nginx: Nginx,
+    service_conn_pool: ServiceConnectionPool,
 ) -> None:
     async with lock:
         old_service = await repo.get_service(project_name, run_name)
@@ -171,7 +191,13 @@ async def unregister_replica(
 
         logger.debug("Unregistering replica %s in service %s", replica.id, service.fmt())
 
-        await apply_service(service=service, old_service=old_service, repo=repo, nginx=nginx)
+        await apply_service(
+            service=service,
+            old_service=old_service,
+            repo=repo,
+            nginx=nginx,
+            service_conn_pool=service_conn_pool,
+        )
         await repo.set_service(service)
 
     logger.info("Replica %s in service %s is unregistered now", replica_id, service.fmt())
@@ -200,6 +226,7 @@ async def apply_service(
     old_service: Optional[models.Service],
     repo: GatewayProxyRepo,
     nginx: Nginx,
+    service_conn_pool: ServiceConnectionPool,
 ) -> dict[models.Replica, BaseException]:
     if old_service is not None:
         if service.domain != old_service.domain:
@@ -208,9 +235,14 @@ async def apply_service(
                 f" domain name to change ({old_service.domain} -> {service.domain})"
             )
         await stop_replica_connections(
-            replica.id for replica in old_service.replicas if replica not in service.replicas
+            ids=(
+                replica.id for replica in old_service.replicas if replica not in service.replicas
+            ),
+            service_conn_pool=service_conn_pool,
         )
-    replica_conns, replica_failures = await get_or_add_replica_connections(service, repo)
+    replica_conns, replica_failures = await get_or_add_replica_connections(
+        service, repo, service_conn_pool
+    )
     replica_configs = [
         ReplicaConfig(id=replica.id, socket=conn.app_socket_path)
         for replica, conn in replica_conns.items()
@@ -221,8 +253,8 @@ async def apply_service(
 
 
 async def get_or_add_replica_connections(
-    service: models.Service, repo: BaseProxyRepo
-) -> tuple[dict[models.Replica, ServiceReplicaConnection], dict[models.Replica, BaseException]]:
+    service: models.Service, repo: BaseProxyRepo, service_conn_pool: ServiceConnectionPool
+) -> tuple[dict[models.Replica, ServiceConnection], dict[models.Replica, BaseException]]:
     project = await repo.get_project(service.project_name)
     if project is None:
         raise UnexpectedProxyError(
@@ -231,8 +263,7 @@ async def get_or_add_replica_connections(
         )
     replica_conns, replica_failures = {}, {}
     tasks = [
-        service_replica_connection_pool.get_or_add(project, service, replica)
-        for replica in service.replicas
+        service_conn_pool.get_or_add(project, service, replica) for replica in service.replicas
     ]
     results = await asyncio.gather(*tasks, return_exceptions=True)
     for replica, conn_or_err in zip(service.replicas, results):
@@ -249,8 +280,10 @@ async def get_or_add_replica_connections(
     return replica_conns, replica_failures
 
 
-async def stop_replica_connections(ids: Iterable[str]) -> None:
-    tasks = map(service_replica_connection_pool.remove, ids)
+async def stop_replica_connections(
+    ids: Iterable[str], service_conn_pool: ServiceConnectionPool
+) -> None:
+    tasks = map(service_conn_pool.remove, ids)
     results = await asyncio.gather(*tasks, return_exceptions=True)
     for replica_id, exc in zip(ids, results):
         if isinstance(exc, Exception):
@@ -284,9 +317,17 @@ async def apply_entrypoint(
     await nginx.register(config, acme)
 
 
-async def apply_all(repo: GatewayProxyRepo, nginx: Nginx) -> None:
+async def apply_all(
+    repo: GatewayProxyRepo, nginx: Nginx, service_conn_pool: ServiceConnectionPool
+) -> None:
     service_tasks = [
-        apply_service(service=service, old_service=None, repo=repo, nginx=nginx)
+        apply_service(
+            service=service,
+            old_service=None,
+            repo=repo,
+            nginx=nginx,
+            service_conn_pool=service_conn_pool,
+        )
         for service in await repo.list_services()
     ]
     entrypoint_tasks = [

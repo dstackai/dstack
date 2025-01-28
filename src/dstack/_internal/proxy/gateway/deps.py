@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, AsyncGenerator
 
 from fastapi import Depends, FastAPI, Request
 
@@ -23,9 +23,17 @@ class GatewayDependencyInjector(ProxyDependencyInjector):
         nginx: Nginx,
         stats_collector: StatsCollector,
     ) -> None:
-        super().__init__(repo=repo, auth=auth)
+        super().__init__()
+        self._repo = repo
+        self._auth = auth
         self._nginx = nginx
         self._stats_collector = stats_collector
+
+    async def get_repo(self) -> AsyncGenerator[BaseProxyRepo, None]:
+        yield self._repo
+
+    async def get_auth_provider(self) -> AsyncGenerator[BaseProxyAuthProvider, None]:
+        yield self._auth
 
     def get_nginx(self) -> Nginx:
         return self._nginx

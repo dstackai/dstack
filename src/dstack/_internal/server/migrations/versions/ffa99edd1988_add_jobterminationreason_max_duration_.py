@@ -1,10 +1,10 @@
-# """Add JobTerminationReason.MAX_DURATION_EXCEEDED
+"""Add JobTerminationReason.MAX_DURATION_EXCEEDED
 
-# Revision ID: ffa99edd1988
-# Revises: 803c7e9ed85d
-# Create Date: 2025-01-21 10:53:22.338540
+Revision ID: ffa99edd1988
+Revises: 803c7e9ed85d
+Create Date: 2025-01-21 10:53:22.338540
 
-# """
+"""
 
 from alembic import op
 from alembic_postgresql_enum import TableReference

@@ -4,7 +4,7 @@ from unittest.mock import patch
 import pytest
 
 from dstack._internal.proxy.gateway.schemas.stats import PerWindowStats, Stat
-from dstack._internal.server.services.gateways.autoscalers import ReplicaInfo, RPSAutoscaler
+from dstack._internal.server.services.services.autoscalers import ReplicaInfo, RPSAutoscaler
 
 
 @pytest.fixture
