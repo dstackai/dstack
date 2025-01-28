@@ -40,6 +40,3 @@ async def service_reverse_proxy(
     return await service_proxy.proxy(
         project_name, run_name, path, request, auth, repo, service_conn_pool
     )
-
-
-# TODO(#1595): support websockets
