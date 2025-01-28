@@ -1266,10 +1266,10 @@ class TestStopRuns:
         )
         assert response.status_code == 200
         await session.refresh(run)
-        assert run.status == RunStatus.TERMINATED
+        assert run.status == RunStatus.TERMINATING
         assert run.termination_reason == RunTerminationReason.STOPPED_BY_USER
         await session.refresh(job)
-        assert job.status == JobStatus.TERMINATED
+        assert job.status == JobStatus.TERMINATING
         assert job.termination_reason == JobTerminationReason.TERMINATED_BY_USER
 
     @pytest.mark.asyncio
