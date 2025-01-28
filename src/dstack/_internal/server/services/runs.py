@@ -9,7 +9,6 @@ from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
-import dstack._internal.server.services.gateways as gateways
 import dstack._internal.utils.common as common_utils
 from dstack._internal.core.errors import (
     RepoDoesNotExistError,
@@ -62,6 +61,7 @@ from dstack._internal.server.models import (
     VolumeModel,
 )
 from dstack._internal.server.services import repos as repos_services
+from dstack._internal.server.services import services
 from dstack._internal.server.services import volumes as volumes_services
 from dstack._internal.server.services.docker import is_valid_docker_volume_target
 from dstack._internal.server.services.jobs import (
@@ -473,7 +473,7 @@ async def submit_run(
         replicas = 1
         if run_spec.configuration.type == "service":
             replicas = run_spec.configuration.replicas.min
-            await gateways.register_service(session, run_model, run_spec)
+            await services.register_service(session, run_model, run_spec)
 
         for replica_num in range(replicas):
             jobs = await get_jobs_from_run_spec(run_spec, replica_num=replica_num)
@@ -1031,7 +1031,7 @@ async def process_terminating_run(session: AsyncSession, run: RunModel):
     if unfinished_jobs_count == 0:
         if run.service_spec is not None:
             try:
-                await gateways.unregister_service(session, run)
+                await services.unregister_service(session, run)
             except Exception as e:
                 logger.warning("%s: failed to unregister service: %s", fmt(run), repr(e))
         run.status = run.termination_reason.to_status()

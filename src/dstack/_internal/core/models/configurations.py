@@ -9,11 +9,12 @@ from dstack._internal.core.errors import ConfigurationError
 from dstack._internal.core.models.common import CoreModel, Duration, RegistryAuth
 from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.fleets import FleetConfiguration
-from dstack._internal.core.models.gateways import AnyModel, GatewayConfiguration, OpenAIChatModel
+from dstack._internal.core.models.gateways import GatewayConfiguration
 from dstack._internal.core.models.profiles import ProfileParams
 from dstack._internal.core.models.repos.base import Repo
 from dstack._internal.core.models.repos.virtual import VirtualRepo
 from dstack._internal.core.models.resources import Range, ResourcesSpec
+from dstack._internal.core.models.services import AnyModel, OpenAIChatModel
 from dstack._internal.core.models.unix import UnixUser
 from dstack._internal.core.models.volumes import MountPoint, VolumeConfiguration, parse_mount_point
 

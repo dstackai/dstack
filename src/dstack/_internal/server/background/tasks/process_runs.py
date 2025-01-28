@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
 import dstack._internal.server.services.gateways as gateways
-import dstack._internal.server.services.gateways.autoscalers as autoscalers
+import dstack._internal.server.services.services.autoscalers as autoscalers
 from dstack._internal.core.errors import ServerError
 from dstack._internal.core.models.profiles import RetryEvent
 from dstack._internal.core.models.runs import (
