@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, status
 from fastapi.responses import StreamingResponse
 from typing_extensions import Annotated
 
-from dstack._internal.proxy.lib.deps import ProxyAuth, get_proxy_repo
+from dstack._internal.proxy.lib.deps import ProxyAuth, get_proxy_repo, get_service_connection_pool
 from dstack._internal.proxy.lib.errors import ProxyError, UnexpectedProxyError
 from dstack._internal.proxy.lib.repo import BaseProxyRepo
 from dstack._internal.proxy.lib.schemas.model_proxy import (
@@ -15,7 +15,10 @@ from dstack._internal.proxy.lib.schemas.model_proxy import (
     ModelsResponse,
 )
 from dstack._internal.proxy.lib.services.model_proxy.model_proxy import get_chat_client
-from dstack._internal.proxy.lib.services.service_connection import get_service_replica_client
+from dstack._internal.proxy.lib.services.service_connection import (
+    ServiceConnectionPool,
+    get_service_replica_client,
+)
 
 router = APIRouter(dependencies=[Depends(ProxyAuth(auto_enforce=True))])
 
@@ -37,6 +40,7 @@ async def post_chat_completions(
     project_name: str,
     body: ChatCompletionsRequest,
     repo: Annotated[BaseProxyRepo, Depends(get_proxy_repo)],
+    service_conn_pool: Annotated[ServiceConnectionPool, Depends(get_service_connection_pool)],
 ):
     model = await repo.get_model(project_name, body.model)
     if model is None:
@@ -49,7 +53,7 @@ async def post_chat_completions(
             f"Model {model.name} in project {project_name} references run {model.run_name}"
             " that does not exist or has no replicas"
         )
-    http_client = await get_service_replica_client(service, repo)
+    http_client = await get_service_replica_client(service, repo, service_conn_pool)
     client = get_chat_client(model, http_client)
     if not body.stream:
         return await client.generate(body)

@@ -11,6 +11,8 @@ from dstack._internal.proxy.gateway.schemas.registry import (
     RegisterServiceRequest,
 )
 from dstack._internal.proxy.gateway.services.nginx import Nginx
+from dstack._internal.proxy.lib.deps import get_service_connection_pool
+from dstack._internal.proxy.lib.services.service_connection import ServiceConnectionPool
 
 router = APIRouter(prefix="/{project_name}")
 
@@ -21,6 +23,7 @@ async def register_service(
     body: RegisterServiceRequest,
     repo: Annotated[GatewayProxyRepo, Depends(get_gateway_proxy_repo)],
     nginx: Annotated[Nginx, Depends(get_nginx)],
+    service_conn_pool: Annotated[ServiceConnectionPool, Depends(get_service_connection_pool)],
 ) -> OkResponse:
     await registry_services.register_service(
         project_name=project_name.lower(),
@@ -33,6 +36,7 @@ async def register_service(
         ssh_private_key=body.ssh_private_key,
         repo=repo,
         nginx=nginx,
+        service_conn_pool=service_conn_pool,
     )
     return OkResponse()
 
@@ -43,12 +47,14 @@ async def unregister_service(
     run_name: str,
     repo: Annotated[GatewayProxyRepo, Depends(get_gateway_proxy_repo)],
     nginx: Annotated[Nginx, Depends(get_nginx)],
+    service_conn_pool: Annotated[ServiceConnectionPool, Depends(get_service_connection_pool)],
 ) -> OkResponse:
     await registry_services.unregister_service(
         project_name=project_name.lower(),
         run_name=run_name.lower(),
         repo=repo,
         nginx=nginx,
+        service_conn_pool=service_conn_pool,
     )
     return OkResponse()
 
@@ -60,6 +66,7 @@ async def register_replica(
     body: RegisterReplicaRequest,
     repo: Annotated[GatewayProxyRepo, Depends(get_gateway_proxy_repo)],
     nginx: Annotated[Nginx, Depends(get_nginx)],
+    service_conn_pool: Annotated[ServiceConnectionPool, Depends(get_service_connection_pool)],
 ) -> OkResponse:
     await registry_services.register_replica(
         project_name=project_name.lower(),
@@ -71,6 +78,7 @@ async def register_replica(
         ssh_proxy=body.ssh_proxy,
         repo=repo,
         nginx=nginx,
+        service_conn_pool=service_conn_pool,
     )
     return OkResponse()
 
@@ -82,6 +90,7 @@ async def unregister_replica(
     job_id: str,
     repo: Annotated[GatewayProxyRepo, Depends(get_gateway_proxy_repo)],
     nginx: Annotated[Nginx, Depends(get_nginx)],
+    service_conn_pool: Annotated[ServiceConnectionPool, Depends(get_service_connection_pool)],
 ) -> OkResponse:
     await registry_services.unregister_replica(
         project_name=project_name.lower(),
@@ -89,6 +98,7 @@ async def unregister_replica(
         replica_id=job_id,
         repo=repo,
         nginx=nginx,
+        service_conn_pool=service_conn_pool,
     )
     return OkResponse()
 

@@ -8,7 +8,10 @@ from starlette.requests import ClientDisconnect
 from dstack._internal.proxy.lib.deps import ProxyAuthContext
 from dstack._internal.proxy.lib.errors import ProxyError
 from dstack._internal.proxy.lib.repo import BaseProxyRepo
-from dstack._internal.proxy.lib.services.service_connection import get_service_replica_client
+from dstack._internal.proxy.lib.services.service_connection import (
+    ServiceConnectionPool,
+    get_service_replica_client,
+)
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -21,6 +24,7 @@ async def proxy(
     request: fastapi.Request,
     auth: ProxyAuthContext,
     repo: BaseProxyRepo,
+    service_conn_pool: ServiceConnectionPool,
 ) -> fastapi.responses.Response:
     # TODO(#1595): enforce client_max_body_size
 
@@ -33,7 +37,7 @@ async def proxy(
     if service.auth:
         await auth.enforce()
 
-    client = await get_service_replica_client(service, repo)
+    client = await get_service_replica_client(service, repo, service_conn_pool)
 
     try:
         upstream_request = await build_upstream_request(request, path, client)
