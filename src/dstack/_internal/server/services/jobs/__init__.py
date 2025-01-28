@@ -177,7 +177,6 @@ async def stop_runner(session: AsyncSession, job_model: JobModel):
         if jpd is not None:
             jrd = get_job_runtime_data(job_model)
             await run_async(_stop_runner, ssh_private_key, jpd, jrd, job_model)
-        delay_job_instance_termination(job_model)
     except SSHError:
         logger.debug("%s: failed to stop runner", fmt(job_model))
 

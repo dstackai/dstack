@@ -65,6 +65,7 @@ from dstack._internal.server.services import repos as repos_services
 from dstack._internal.server.services import volumes as volumes_services
 from dstack._internal.server.services.docker import is_valid_docker_volume_target
 from dstack._internal.server.services.jobs import (
+    delay_job_instance_termination,
     get_jobs_from_run_spec,
     group_jobs_by_replica_latest,
     job_model_to_job_submission,
@@ -1002,6 +1003,10 @@ async def process_terminating_run(session: AsyncSession, run: RunModel):
     """
     Used by both `process_runs` and `stop_run` to process a run that is TERMINATING.
     Caller must acquire the lock on run.
+    It marks the jobs as TERMINATING and, if possible, terminates them, i.e. marks as FAILED/TERMINATED.
+    RUNNING jobs and already TERMINATING jobs are terminated by `process_terminating_jobs`
+    since they may need some time to terminate (e.g. waiting graceful stop).
+    The run is terminated only if all the jobs are terminated.
     """
     assert run.termination_reason is not None
     job_termination_reason = run.termination_reason.to_job_termination_reason()
@@ -1012,15 +1017,15 @@ async def process_terminating_run(session: AsyncSession, run: RunModel):
             continue
         unfinished_jobs_count += 1
         if job.status == JobStatus.TERMINATING:
-            # `process_terminating_jobs` will abort frozen jobs
             continue
 
         if job.status == JobStatus.RUNNING and job_termination_reason not in {
             JobTerminationReason.ABORTED_BY_USER,
             JobTerminationReason.DONE_BY_RUNNER,
         }:
-            # send a signal to stop the job gracefully
+            # Send a signal to stop the job gracefully
             await stop_runner(session, job)
+            delay_job_instance_termination(job)
         job.status = JobStatus.TERMINATING
         job.termination_reason = job_termination_reason
         await process_terminating_job(session, job)

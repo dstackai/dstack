@@ -580,6 +580,8 @@ class VolumeModel(BaseModel):
 
     configuration: Mapped[str] = mapped_column(Text)
     volume_provisioning_data: Mapped[Optional[str]] = mapped_column(Text)
+    # FIXME: volume_attachment_data should be in "volumes_attachments"
+    # to support multi-attach volumes
     volume_attachment_data: Mapped[Optional[str]] = mapped_column(Text)
 
     # instances the volume is attached to

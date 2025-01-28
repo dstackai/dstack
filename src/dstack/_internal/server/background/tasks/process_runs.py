@@ -249,6 +249,11 @@ async def _process_active_run(session: AsyncSession, run_model: RunModel):
                 JobStatus.TERMINATED,
                 JobStatus.ABORTED,
             }:
+                # FIXME: This code does not expect JobStatus.TERMINATED status,
+                # so if a job transitions from RUNNING to TERMINATED,
+                # the run will transition to PENDING instead of TERMINATING.
+                # This may not be observed because process_runs is invoked more frequently
+                # than process_terminating_jobs and because most jobs usually transition to FAILED.
                 pass  # unexpected, but let's ignore it
             else:
                 raise ValueError(f"Unexpected job status {job_model.status}")
