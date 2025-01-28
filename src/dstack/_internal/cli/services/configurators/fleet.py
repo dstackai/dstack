@@ -12,6 +12,7 @@ from dstack._internal.cli.services.configurators.base import (
 )
 from dstack._internal.cli.utils.common import (
     LIVE_TABLE_PROVISION_INTERVAL_SECS,
+    NO_OFFERS_WARNING,
     confirm_ask,
     console,
 )
@@ -352,6 +353,8 @@ def _print_plan_header(plan: FleetPlan):
                 f"${plan.max_offer_price:g} max[/]"
             )
         console.print()
+    else:
+        console.print(NO_OFFERS_WARNING)
 
 
 def _finished_provisioning(fleet: Fleet) -> bool:
