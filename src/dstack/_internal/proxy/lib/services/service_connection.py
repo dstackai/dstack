@@ -87,7 +87,7 @@ class ServiceConnection:
 
 class ServiceConnectionPool:
     def __init__(self) -> None:
-        # TODO(#1595): remove connections to stopped replicas in-server
+        # TODO(#2238): remove connections to stopped replicas in-server
         self.connections: Dict[str, ServiceConnection] = {}
 
     async def get(self, replica_id: str) -> Optional[ServiceConnection]:
@@ -139,7 +139,6 @@ async def get_service_replica_client(
             timeout=HTTP_TIMEOUT,
         )
     # Nginx not available, forward directly to the tunnel
-    # TODO(#1595): consider trying different replicas, e.g. using HTTPMultiClient
     replica = random.choice(service.replicas)
     connection = await service_conn_pool.get(replica.id)
     if connection is None:

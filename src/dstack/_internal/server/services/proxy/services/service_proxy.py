@@ -26,8 +26,6 @@ async def proxy(
     repo: BaseProxyRepo,
     service_conn_pool: ServiceConnectionPool,
 ) -> fastapi.responses.Response:
-    # TODO(#1595): enforce client_max_body_size
-
     if "Upgrade" in request.headers:
         raise ProxyError("Upgrading connections is not supported", status.HTTP_400_BAD_REQUEST)
 
@@ -95,7 +93,7 @@ async def build_upstream_request(
     ).get_stream()
     client.cookies.clear()  # the client is shared by all users, don't leak cookies
 
-    # TODO(#1595): add common proxy headers
+    # TODO(#2237): add common proxy headers
     return client.build_request(
         downstream_request.method, url, headers=downstream_request.headers, content=request_stream
     )
