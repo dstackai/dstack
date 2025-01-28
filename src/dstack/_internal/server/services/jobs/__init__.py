@@ -7,7 +7,6 @@ from typing import Dict, Iterable, List, Optional, Tuple
 import requests
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 import dstack._internal.server.services.gateways as gateways
 from dstack._internal.core.consts import DSTACK_RUNNER_HTTP_PORT, DSTACK_SHIM_HTTP_PORT
@@ -29,14 +28,12 @@ from dstack._internal.server.models import (
     JobModel,
     ProjectModel,
     RunModel,
-    VolumeModel,
 )
 from dstack._internal.server.services.backends import get_project_backend_by_type
 from dstack._internal.server.services.jobs.configurators.base import JobConfigurator
 from dstack._internal.server.services.jobs.configurators.dev import DevEnvironmentJobConfigurator
 from dstack._internal.server.services.jobs.configurators.service import ServiceJobConfigurator
 from dstack._internal.server.services.jobs.configurators.task import TaskJobConfigurator
-from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.runner import client
 from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
@@ -196,8 +193,10 @@ def _stop_runner(
 
 async def process_terminating_job(session: AsyncSession, job_model: JobModel):
     """
-    Used by both process_terminating_jobs and process_terminating_run.
-    Caller must acquire the lock on the job.
+    Stops the job: tells shim to stop the container, detaches the job from the instance,
+    and detaches volumes from the instance.
+    Graceful stop should already be done by `process_terminating_run`.
+    Caller must acquire the locks on the job and the job's instance.
     """
     if (
         job_model.remove_at is not None
@@ -206,78 +205,68 @@ async def process_terminating_job(session: AsyncSession, job_model: JobModel):
         # it's too early to terminate the instance
         return
 
-    # FIXME: The caller should take instance lock since unlock must be after commit
-    async with get_locker().lock_ctx(InstanceModel.__tablename__, [job_model.used_instance_id]):
-        res = await session.execute(
-            select(InstanceModel)
-            .where(InstanceModel.id == job_model.used_instance_id)
-            .options(
-                selectinload(InstanceModel.project).joinedload(ProjectModel.backends),
-                selectinload(InstanceModel.volumes).joinedload(VolumeModel.user),
-                selectinload(InstanceModel.job),
-            )
-            .with_for_update()
-        )
-        instance = res.unique().scalar()
-        if instance is not None:
-            jpd = None
-            if job_model.job_provisioning_data is not None:
-                jpd = JobProvisioningData.__response__.parse_raw(job_model.job_provisioning_data)
-                logger.debug("%s: stopping container", fmt(job_model))
-                ssh_private_key = instance.project.ssh_private_key
-                # TODO: Drop this logic and always use project key once it's safe to assume that
-                # most on-prem fleets are (re)created after this change:
-                # https://github.com/dstackai/dstack/pull/1716
-                if instance and instance.remote_connection_info is not None:
-                    remote_conn_info: RemoteConnectionInfo = (
-                        RemoteConnectionInfo.__response__.parse_raw(
-                            instance.remote_connection_info
-                        )
+    instance_model = job_model.instance
+    if instance_model is None:
+        logger.error("%s: terminating job has no instance", fmt(job_model))
+    else:
+        jpd = None
+        if job_model.job_provisioning_data is not None:
+            jpd = JobProvisioningData.__response__.parse_raw(job_model.job_provisioning_data)
+            logger.debug("%s: stopping container", fmt(job_model))
+            ssh_private_key = instance_model.project.ssh_private_key
+            # TODO: Drop this logic and always use project key once it's safe to assume that
+            # most on-prem fleets are (re)created after this change:
+            # https://github.com/dstackai/dstack/pull/1716
+            if instance_model and instance_model.remote_connection_info is not None:
+                remote_conn_info: RemoteConnectionInfo = (
+                    RemoteConnectionInfo.__response__.parse_raw(
+                        instance_model.remote_connection_info
                     )
-                    ssh_private_key = remote_conn_info.ssh_keys[0].private
-                await stop_container(job_model, jpd, ssh_private_key)
-                if len(instance.volumes) > 0:
-                    logger.info("Detaching volumes: %s", [v.name for v in instance.volumes])
-                    await detach_volumes_from_instance(
-                        project=instance.project,
-                        instance=instance,
-                        jpd=jpd,
-                    )
+                )
+                ssh_private_key = remote_conn_info.ssh_keys[0].private
+            await stop_container(job_model, jpd, ssh_private_key)
+            if len(instance_model.volumes) > 0:
+                logger.info("Detaching volumes: %s", [v.name for v in instance_model.volumes])
+                await detach_volumes_from_instance(
+                    project=instance_model.project,
+                    instance=instance_model,
+                    jpd=jpd,
+                )
 
-            if instance.status == InstanceStatus.BUSY:
-                instance.status = InstanceStatus.IDLE
-            elif instance.status != InstanceStatus.TERMINATED:
-                # instance was PROVISIONING (specially for the job)
-                # schedule for termination
-                instance.status = InstanceStatus.TERMINATING
+        if instance_model.status == InstanceStatus.BUSY:
+            instance_model.status = InstanceStatus.IDLE
+        elif instance_model.status != InstanceStatus.TERMINATED:
+            # instance was PROVISIONING (specially for the job)
+            # schedule for termination
+            instance_model.status = InstanceStatus.TERMINATING
 
-            if jpd is None or not jpd.dockerized:
-                # do not reuse vastai/k8s instances
-                instance.status = InstanceStatus.TERMINATING
+        if jpd is None or not jpd.dockerized:
+            # do not reuse vastai/k8s instances
+            instance_model.status = InstanceStatus.TERMINATING
 
-            instance.job_id = None
-            instance.last_job_processed_at = get_current_datetime()
-            logger.info(
-                "%s: instance '%s' has been released, new status is %s",
-                fmt(job_model),
-                instance.name,
-                instance.status.name,
-            )
-            await gateways.unregister_replica(
-                session, job_model
-            )  # TODO(egor-s) ensure always runs
-
-        if job_model.termination_reason is not None:
-            job_model.status = job_model.termination_reason.to_status()
-        else:
-            job_model.status = JobStatus.FAILED
-            logger.warning("%s: job termination reason is not set", fmt(job_model))
+        instance_model.job_id = None
+        instance_model.last_job_processed_at = get_current_datetime()
         logger.info(
-            "%s: job status is %s, reason: %s",
+            "%s: instance '%s' has been released, new status is %s",
             fmt(job_model),
-            job_model.status.name,
-            job_model.termination_reason.name,
+            instance_model.name,
+            instance_model.status.name,
         )
+
+    await gateways.unregister_replica(session, job_model)
+
+    if job_model.termination_reason is not None:
+        job_model.status = job_model.termination_reason.to_status()
+        termination_reason_name = job_model.termination_reason.name
+    else:
+        job_model.status = JobStatus.FAILED
+        termination_reason_name = None
+    logger.info(
+        "%s: job status is %s, reason: %s",
+        fmt(job_model),
+        job_model.status.name,
+        termination_reason_name,
+    )
 
 
 async def stop_container(
@@ -381,5 +370,7 @@ async def detach_volumes_from_instance(
                 instance.name,
             )
 
+    # FIXME: If volume fails to detach, the job will terminate,
+    # but the instance will still have the volume with no way to detach it.
     detached_volumes_ids = {v.id for v in detached_volumes}
     instance.volumes = [v for v in instance.volumes if v.id not in detached_volumes_ids]

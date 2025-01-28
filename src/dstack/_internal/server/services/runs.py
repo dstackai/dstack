@@ -69,7 +69,6 @@ from dstack._internal.server.services.jobs import (
     get_jobs_from_run_spec,
     group_jobs_by_replica_latest,
     job_model_to_job_submission,
-    process_terminating_job,
     stop_runner,
 )
 from dstack._internal.server.services.locking import get_locker, string_to_lock_id
@@ -1001,12 +1000,11 @@ def _check_can_update_run_spec(current_run_spec: RunSpec, new_run_spec: RunSpec)
 
 async def process_terminating_run(session: AsyncSession, run: RunModel):
     """
-    Used by both `process_runs` and `stop_run` to process a run that is TERMINATING.
+    Used by both `process_runs` and `stop_run` to process a TERMINATING run.
+    Stops the jobs gracefully and marks them as TERMINATING.
+    Jobs should be terminated by `process_terminating_jobs`.
+    When all jobs are terminated, assigns a finished status to the run.
     Caller must acquire the lock on run.
-    It marks the jobs as TERMINATING and, if possible, terminates them, i.e. marks as FAILED/TERMINATED.
-    RUNNING jobs and already TERMINATING jobs are terminated by `process_terminating_jobs`
-    since they may need some time to terminate (e.g. waiting graceful stop).
-    The run is terminated only if all the jobs are terminated.
     """
     assert run.termination_reason is not None
     job_termination_reason = run.termination_reason.to_job_termination_reason()
@@ -1028,9 +1026,6 @@ async def process_terminating_run(session: AsyncSession, run: RunModel):
             delay_job_instance_termination(job)
         job.status = JobStatus.TERMINATING
         job.termination_reason = job_termination_reason
-        await process_terminating_job(session, job)
-        if job.status.is_finished():
-            unfinished_jobs_count -= 1
         job.last_processed_at = common_utils.get_current_datetime()
 
     if unfinished_jobs_count == 0:
