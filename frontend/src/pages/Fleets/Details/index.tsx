@@ -1,10 +1,11 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { format } from 'date-fns';
 
 import {
     Box,
+    Button,
     ColumnLayout,
     Container,
     ContentLayout,
@@ -18,19 +19,24 @@ import {
 
 import { DATE_TIME_FORMAT } from 'consts';
 import { useBreadcrumbs } from 'hooks';
-import { getFleetStatusIconType } from 'libs/fleet';
+import { getFleetInstancesLinkText, getFleetPrice, getFleetStatusIconType } from 'libs/fleet';
 import { ROUTES } from 'routes';
 import { useGetFleetDetailsQuery } from 'services/fleet';
+
+import { useDeleteFleet } from '../List/useDeleteFleet';
 
 export const FleetDetails: React.FC = () => {
     const { t } = useTranslation();
     const params = useParams();
-    const paramFleetName = params.fleetName ?? '';
+    const paramFleetId = params.fleetId ?? '';
     const paramProjectName = params.projectName ?? '';
+    const navigate = useNavigate();
+
+    const { deleteFleets, isDeleting } = useDeleteFleet();
 
     const { data, isLoading } = useGetFleetDetailsQuery({
         projectName: paramProjectName,
-        fleetName: paramFleetName,
+        fleetId: paramFleetId,
     });
 
     useBreadcrumbs([
@@ -47,13 +53,46 @@ export const FleetDetails: React.FC = () => {
             href: ROUTES.FLEETS.LIST,
         },
         {
-            text: paramFleetName,
-            href: ROUTES.FLEETS.DETAILS.FORMAT(paramProjectName, paramFleetName),
+            text: data?.name ?? '',
+            href: ROUTES.FLEETS.DETAILS.FORMAT(paramProjectName, paramFleetId),
         },
     ]);
 
+    const deleteClickHandle = () => {
+        if (!data) return;
+
+        deleteFleets([data])
+            .then(() => {
+                navigate(ROUTES.FLEETS.LIST);
+            })
+            .catch(console.log);
+    };
+
+    const renderPrice = (fleet: IFleet) => {
+        const price = getFleetPrice(fleet);
+
+        if (typeof price === 'number') return `$${price}`;
+
+        return '-';
+    };
+
+    const isDisabledDeleteButton = !data || isDeleting;
+
     return (
-        <ContentLayout header={<DetailsHeader title={paramFleetName} />}>
+        <ContentLayout
+            header={
+                <DetailsHeader
+                    title={data?.name}
+                    actionButtons={
+                        <>
+                            <Button onClick={deleteClickHandle} disabled={isDisabledDeleteButton}>
+                                {t('common.delete')}
+                            </Button>
+                        </>
+                    }
+                />
+            }
+        >
             {isLoading && (
                 <Container>
                     <Loader />
@@ -89,18 +128,13 @@ export const FleetDetails: React.FC = () => {
                         </div>
 
                         <div>
-                            <Box variant="awsui-key-label">{t('fleets.instances.backend')}</Box>
-                            <div>{data.spec.configuration?.backends?.join(', ')}</div>
-                        </div>
+                            <Box variant="awsui-key-label">{t('fleets.instances.title')}</Box>
 
-                        <div>
-                            <Box variant="awsui-key-label">{t('fleets.instances.region')}</Box>
-                            <div>{data.spec.configuration.regions?.join(', ')}</div>
-                        </div>
-
-                        <div>
-                            <Box variant="awsui-key-label">{t('fleets.instances.region')}</Box>
-                            <div>{data.spec.configuration?.spot_policy === 'spot' && <Icon name={'check'} />}</div>
+                            <div>
+                                <NavigateLink href={ROUTES.INSTANCES.LIST + `?fleetId=${data.id}`}>
+                                    {getFleetInstancesLinkText(data)}
+                                </NavigateLink>
+                            </div>
                         </div>
 
                         <div>
@@ -110,17 +144,7 @@ export const FleetDetails: React.FC = () => {
 
                         <div>
                             <Box variant="awsui-key-label">{t('fleets.instances.price')}</Box>
-                            <div>{data.spec.configuration?.max_price && `$${data.spec.configuration?.max_price}`}</div>
-                        </div>
-
-                        <div>
-                            <Box variant="awsui-key-label">{t('fleets.instances.title')}</Box>
-
-                            <div>
-                                <NavigateLink href={ROUTES.INSTANCES.LIST + `?fleetId=${data.id}`}>
-                                    Show fleet's instances
-                                </NavigateLink>
-                            </div>
+                            <div>{renderPrice(data)}</div>
                         </div>
                     </ColumnLayout>
                 </Container>

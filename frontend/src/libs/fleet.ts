@@ -55,10 +55,13 @@ const getInstanceFields = (instance: IInstance) => ({
     spot: instance.instance_type?.resources.spot,
 });
 
-export const getFleetInstancesLinkText = (fleet: IFleet): string | null => {
+export const getFleetInstancesLinkText = (fleet: IFleet): string => {
     const instances = fleet.instances.filter((i) => i.status !== 'terminated');
+    const hasPending = instances.some((i) => i.status !== 'pending');
 
-    if (!instances.length) return null;
+    if (!instances.length) return '0 instances';
+
+    if (hasPending) return `${instances.length} instances`;
 
     const isSameInstances = instances.every((i) => isEqual(getInstanceFields(instances[0]), getInstanceFields(i)));
 

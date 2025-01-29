@@ -18,7 +18,7 @@ export const useColumnsDefinitions = () => {
             header: t('fleets.fleet'),
             cell: (item) =>
                 item.fleet_name && item.project_name ? (
-                    <NavigateLink href={ROUTES.FLEETS.DETAILS.FORMAT(item.project_name, item.fleet_name)}>
+                    <NavigateLink href={ROUTES.FLEETS.DETAILS.FORMAT(item.project_name, item.fleet_id)}>
                         {item.fleet_name}
                     </NavigateLink>
                 ) : (

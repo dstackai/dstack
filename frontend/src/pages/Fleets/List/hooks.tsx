@@ -52,7 +52,7 @@ export const useColumnsDefinitions = () => {
             id: 'fleet_name',
             header: t('fleets.fleet'),
             cell: (item) => (
-                <NavigateLink href={ROUTES.FLEETS.DETAILS.FORMAT(item.project_name, item.name)}>{item.name}</NavigateLink>
+                <NavigateLink href={ROUTES.FLEETS.DETAILS.FORMAT(item.project_name, item.id)}>{item.name}</NavigateLink>
             ),
         },
         {
@@ -74,14 +74,11 @@ export const useColumnsDefinitions = () => {
         {
             id: 'instances',
             header: t('fleets.instances.title'),
-            cell: (item) => {
-                const linkText = getFleetInstancesLinkText(item);
-
-                if (linkText)
-                    return <NavigateLink href={ROUTES.INSTANCES.LIST + `?fleetId=${item.id}`}>{linkText}</NavigateLink>;
-
-                return '-';
-            },
+            cell: (item) => (
+                <NavigateLink href={ROUTES.INSTANCES.LIST + `?fleetId=${item.id}`}>
+                    {getFleetInstancesLinkText(item)}
+                </NavigateLink>
+            ),
         },
         {
             id: 'started',
@@ -205,7 +202,8 @@ export const useFleetsData = ({ project_name, only_active }: TFleetListRequestPa
 
             if (result.length > 0) {
                 setPagesCount((count) => count - 1);
-                setData(result);
+                const reversedData = [...result].reverse();
+                setData(reversedData);
             } else {
                 setPagesCount(1);
             }

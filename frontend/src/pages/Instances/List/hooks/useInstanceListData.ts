@@ -76,7 +76,8 @@ export const useInstanceListData = ({ project_names, only_active, fleet_ids }: T
 
             if (result.length > 0) {
                 setPagesCount((count) => count - 1);
-                setData(result);
+                const reversedData = [...result].reverse();
+                setData(reversedData);
             } else {
                 setPagesCount(1);
             }
