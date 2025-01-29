@@ -641,7 +641,7 @@ class GCPCompute(Compute):
         )
         return VolumeAttachmentData(device_name=device_name)
 
-    def detach_volume(self, volume: Volume, instance_id: str):
+    def detach_volume(self, volume: Volume, instance_id: str, force: bool = False):
         logger.debug(
             "Detaching persistent disk for volume %s from instance %s",
             volume.volume_id,

@@ -40,6 +40,7 @@ from dstack._internal.core.models.volumes import (
     VolumeAttachmentData,
     VolumeProvisioningData,
 )
+from dstack._internal.utils.common import get_or_error
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -630,16 +631,37 @@ class AWSCompute(Compute):
         logger.debug("Attached EBS volume %s to instance %s", volume.volume_id, instance_id)
         return VolumeAttachmentData(device_name=device_name)
 
-    def detach_volume(self, volume: Volume, instance_id: str):
+    def detach_volume(self, volume: Volume, instance_id: str, force: bool = False):
         ec2_client = self.session.client("ec2", region_name=volume.configuration.region)
 
         logger.debug("Detaching EBS volume %s from instance %s", volume.volume_id, instance_id)
         ec2_client.detach_volume(
             VolumeId=volume.volume_id,
             InstanceId=instance_id,
-            Device=volume.attachment_data.device_name,
+            Device=get_or_error(volume.attachment_data).device_name,
+            Force=force,
         )
         logger.debug("Detached EBS volume %s from instance %s", volume.volume_id, instance_id)
+
+    def is_volume_detached(self, volume: Volume, instance_id: str) -> bool:
+        ec2_client = self.session.client("ec2", region_name=volume.configuration.region)
+
+        logger.debug("Getting EBS volume %s status", volume.volume_id)
+        response = ec2_client.describe_volumes(VolumeIds=[volume.volume_id])
+        volumes_infos = response.get("Volumes")
+        if len(volumes_infos) == 0:
+            logger.debug(
+                "Failed to check EBS volume %s status. Volume not found.", volume.volume_id
+            )
+            return True
+        volume_info = volumes_infos[0]
+        for attachment in volume_info["Attachments"]:
+            if attachment["InstanceId"] != instance_id:
+                continue
+            if attachment["State"] != "detached":
+                return False
+            return True
+        return True
 
 
 def get_maximum_efa_interfaces(ec2_client: botocore.client.BaseClient, instance_type: str) -> int:

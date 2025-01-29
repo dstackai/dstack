@@ -9,10 +9,11 @@ from dstack._internal.server.db import get_session_ctx
 from dstack._internal.server.models import InstanceModel, JobModel, ProjectModel, VolumeModel
 from dstack._internal.server.services.jobs import (
     process_terminating_job,
+    process_volumes_detaching,
 )
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.logging import fmt
-from dstack._internal.utils.common import get_current_datetime
+from dstack._internal.utils.common import get_current_datetime, get_or_error
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -57,8 +58,8 @@ async def _process_next_terminating_job():
                 if instance_model is None:
                     # InstanceModel is locked
                     return
+                instance_lockset.add(instance_model.id)
             job_lockset.add(job_model.id)
-            instance_lockset.add(instance_model.id)
         try:
             job_model_id = job_model.id
             instance_model_id = job_model.used_instance_id
@@ -73,20 +74,23 @@ async def _process_next_terminating_job():
 
 async def _process_job(session: AsyncSession, job_model: JobModel):
     logger.debug("%s: terminating job", fmt(job_model))
-    # Refetch to load related attributes
     res = await session.execute(
-        select(JobModel)
-        .where(JobModel.id == job_model.id)
+        select(JobModel).where(JobModel.id == job_model.id).options(joinedload(JobModel.run))
+    )
+    job_model = res.scalar_one()
+    res = await session.execute(
+        select(InstanceModel)
+        .where(InstanceModel.id == job_model.used_instance_id)
         .options(
-            joinedload(JobModel.instance)
-            .joinedload(InstanceModel.project)
-            .joinedload(ProjectModel.backends),
-            joinedload(JobModel.instance)
-            .joinedload(InstanceModel.volumes)
-            .joinedload(VolumeModel.user),
+            joinedload(InstanceModel.project).joinedload(ProjectModel.backends),
+            joinedload(InstanceModel.volumes).joinedload(VolumeModel.user),
         )
     )
-    job_model = res.unique().scalar_one()
-    await process_terminating_job(session, job_model)
+    instance_model = res.unique().scalar()
+    if job_model.volumes_detached_at is None:
+        await process_terminating_job(session, job_model, instance_model)
+    else:
+        instance_model = get_or_error(instance_model)
+        await process_volumes_detaching(session, job_model, instance_model)
     job_model.last_processed_at = get_current_datetime()
     await session.commit()

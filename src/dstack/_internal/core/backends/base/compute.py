@@ -177,11 +177,20 @@ class Compute(ABC):
         """
         raise NotImplementedError()
 
-    def detach_volume(self, volume: Volume, instance_id: str):
+    def detach_volume(self, volume: Volume, instance_id: str, force: bool = False):
         """
         Detaches a volume from the instance.
         """
         raise NotImplementedError()
+
+    def is_volume_detached(self, volume: Volume, instance_id: str) -> bool:
+        """
+        Checks if a volume was detached from the instance.
+        If `detach_volume()` may fail to detach volume,
+        this method should be overridden to check the volume status.
+        The caller will trigger force detach if the volume gets stuck detaching.
+        """
+        return True
 
     def _get_offers_cached_key(self, requirements: Optional[Requirements] = None) -> int:
         # Requirements is not hashable, so we use a hack to get arguments hash

@@ -1,3 +1,4 @@
+from datetime import timedelta
 from typing import Optional, Tuple
 
 from dstack._internal.core.models.profiles import (
@@ -53,3 +54,9 @@ def get_termination(
     if termination_policy == TerminationPolicy.DONT_DESTROY:
         termination_idle_time = -1
     return termination_policy, int(termination_idle_time)
+
+
+def get_stop_duration(profile: Profile) -> timedelta:
+    if profile.stop_duration is None:
+        return timedelta(minutes=5)
+    return timedelta(seconds=profile.stop_duration)

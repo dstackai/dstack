@@ -39,7 +39,14 @@ def parse_duration(v: Optional[Union[int, str]]) -> Optional[int]:
 
 
 def parse_max_duration(v: Optional[Union[int, str]]) -> Optional[Union[str, int]]:
-    # TODO: [Andrey] Not sure this works (see `parse_idle_duration`)
+    return parse_off_duration(v)
+
+
+def parse_stop_duration(v: Optional[Union[int, str]]) -> Optional[Union[str, int]]:
+    return parse_off_duration(v)
+
+
+def parse_off_duration(v: Optional[Union[int, str]]) -> Optional[Union[str, int]]:
     if v == "off":
         return v
     return parse_duration(v)
@@ -138,7 +145,22 @@ class ProfileParams(CoreModel):
     max_duration: Annotated[
         Optional[Union[Literal["off"], str, int]],
         Field(
-            description="The maximum duration of a run (e.g., `2h`, `1d`, etc). After it elapses, the run is forced to stop. Defaults to `off`"
+            description=(
+                "The maximum duration of a run (e.g., `2h`, `1d`, etc)."
+                " After it elapses, the run is automatically stopped."
+                " Use `off` for unlimited duration. Defaults to `off`"
+            )
+        ),
+    ]
+    stop_duration: Annotated[
+        Optional[Union[Literal["off"], str, int]],
+        Field(
+            description=(
+                "The maximum duration of a run gracefull stopping."
+                " After it elapses, the run is automatically forced stopped."
+                " This includes force detaching volumes used by the run."
+                " Use `off` for unlimited duration. Defaults to `5m`"
+            )
         ),
     ]
     max_price: Annotated[
@@ -154,7 +176,10 @@ class ProfileParams(CoreModel):
     idle_duration: Annotated[
         Optional[Union[Literal["off"], str, int]],
         Field(
-            description="Time to wait before terminating idle instances. Defaults to `5m` for runs and `3d` for fleets. Use `off` for unlimited duration"
+            description=(
+                "Time to wait before terminating idle instances."
+                " Defaults to `5m` for runs and `3d` for fleets. Use `off` for unlimited duration"
+            )
         ),
     ]
     # Deprecated:
@@ -179,6 +204,9 @@ class ProfileParams(CoreModel):
 
     _validate_max_duration = validator("max_duration", pre=True, allow_reuse=True)(
         parse_max_duration
+    )
+    _validate_stop_duration = validator("stop_duration", pre=True, allow_reuse=True)(
+        parse_stop_duration
     )
     _validate_termination_idle_time = validator(
         "termination_idle_time", pre=True, allow_reuse=True
