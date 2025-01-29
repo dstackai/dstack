@@ -1,35 +1,15 @@
-type: service
-name: llama31
+type: dev-environment
+# The name is optional, if not specified, generated randomly
+name: vscode
 
-python: "3.11"
-env:
-  - HF_TOKEN
-  - MODEL_ID=meta-llama/Llama-3.2-1B
-  - MAX_MODEL_LEN=4096
-commands:
-  - pip install vllm
-  - curl -o simple_chat_template.jinja https://github.com/Bihan/vllm/blob/main/examples/simple_chat_template.jinja
-  - vllm serve $MODEL_ID
-    --max-model-len $MAX_MODEL_LEN
-    --chat-template simple_chat_template.jinja
+#python: "3.11"
+# Uncomment to use a custom Docker image
+image: dstackai/base:py3.13-0.6-cuda-12.1
 
-auth: false
+ide: vscode
 
-port: 8000
-# Register the model
-model:
-  name: meta-llama/Llama-3.2-1B
-  type: chat
-  format: openai
-
-# Uncomment to leverage spot instances
-#spot_policy: auto
-
-# Uncomment to cache downloaded models
-#volumes:
-#  - /root/.cache/huggingface/hub:/root/.cache/huggingface/hub
+# Use either spot or on-demand instances
+spot_policy: auto
 
 resources:
   gpu: 24GB
-  # Uncomment if using multiple GPUs
-  #shm_size: 24GB

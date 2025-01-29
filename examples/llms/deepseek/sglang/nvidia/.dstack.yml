@@ -12,11 +12,7 @@ commands:
 
 port: 8000
 
-model:
-  name: deepseek-ai/DeepSeek-R1-Distill-Llama-8B
-  type: chat
-  format: openai
-
+model: deepseek-ai/DeepSeek-R1-Distill-Llama-8B
 
 resources:
     gpu: 24GB

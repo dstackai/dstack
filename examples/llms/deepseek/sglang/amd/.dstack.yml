@@ -11,10 +11,7 @@ commands:
     --trust-remote-code
 
 port: 8000
-model:
-  name: deepseek-ai/DeepSeek-R1-Distill-Llama-70B
-  type: chat
-  format: openai
+model: deepseek-ai/DeepSeek-R1-Distill-Llama-70B
 
 resources:
     gpu: mi300x
