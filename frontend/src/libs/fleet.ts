@@ -57,7 +57,7 @@ const getInstanceFields = (instance: IInstance) => ({
 
 export const getFleetInstancesLinkText = (fleet: IFleet): string => {
     const instances = fleet.instances.filter((i) => i.status !== 'terminated');
-    const hasPending = instances.some((i) => i.status !== 'pending');
+    const hasPending = instances.some((i) => i.status === 'pending');
 
     if (!instances.length) return '0 instances';
 
