@@ -2,12 +2,12 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next';
 import { format } from 'date-fns';
 
-import { Button, Icon, ListEmptyMessage, NavigateLink, StatusIndicator, TableProps } from 'components';
+import { Button, ListEmptyMessage, NavigateLink, StatusIndicator, TableProps } from 'components';
 import { SelectCSDProps } from 'components';
 
 import { DATE_TIME_FORMAT, DEFAULT_TABLE_PAGE_SIZE } from 'consts';
 import { useLocalStorageState } from 'hooks/useLocalStorageState';
-import { getFleetStatusIconType } from 'libs/fleet';
+import { getFleetInstancesLinkText, getFleetPrice, getFleetStatusIconType } from 'libs/fleet';
 import { ROUTES } from 'routes';
 import { useLazyGetFleetsQuery } from 'services/fleet';
 import { useGetProjectsQuery } from 'services/project';
@@ -71,25 +71,17 @@ export const useColumnsDefinitions = () => {
                 <NavigateLink href={ROUTES.PROJECT.DETAILS.FORMAT(item.project_name)}>{item.project_name}</NavigateLink>
             ),
         },
-        // {
-        //     id: 'resources',
-        //     header: t('fleets.instances.resources'),
-        //     cell: (item) => item.instance_type?.resources.description,
-        // },
         {
-            id: 'backend',
-            header: t('fleets.instances.backend'),
-            cell: (item) => item.spec.configuration?.backends?.join(', '),
-        },
-        {
-            id: 'region',
-            header: t('fleets.instances.region'),
-            cell: (item) => item.spec.configuration.regions?.join(', '),
-        },
-        {
-            id: 'spot',
-            header: t('fleets.instances.spot'),
-            cell: (item) => item.spec.configuration?.spot_policy === 'spot' && <Icon name={'check'} />,
+            id: 'instances',
+            header: t('fleets.instances.title'),
+            cell: (item) => {
+                const linkText = getFleetInstancesLinkText(item);
+
+                if (linkText)
+                    return <NavigateLink href={ROUTES.INSTANCES.LIST + `?fleetId=${item.id}`}>{linkText}</NavigateLink>;
+
+                return '-';
+            },
         },
         {
             id: 'started',
@@ -99,7 +91,13 @@ export const useColumnsDefinitions = () => {
         {
             id: 'price',
             header: t('fleets.instances.price'),
-            cell: (item) => item.spec.configuration?.max_price && `$${item.spec.configuration?.max_price}`,
+            cell: (item) => {
+                const price = getFleetPrice(item);
+
+                if (typeof price === 'number') return `$${price}`;
+
+                return '-';
+            },
         },
     ];
 
@@ -107,8 +105,7 @@ export const useColumnsDefinitions = () => {
 };
 
 export const useFilters = () => {
-    // const [onlyActive, setOnlyActive] = useLocalStorageState<boolean>('fleet-list-is-active', false);
-    const [onlyActive, setOnlyActive] = useState<boolean>(true);
+    const [onlyActive, setOnlyActive] = useLocalStorageState<boolean>('fleet-list-is-active', true);
     const [selectedProject, setSelectedProject] = useState<SelectCSDProps.Option | null>(null);
 
     const { data: projectsData } = useGetProjectsQuery();
@@ -120,12 +117,11 @@ export const useFilters = () => {
     }, [projectsData]);
 
     const clearFilters = () => {
-        // setOnlyActive(false);
+        setOnlyActive(false);
         setSelectedProject(null);
     };
 
-    // const isDisabledClearFilter = !selectedProject && !onlyActive;
-    const isDisabledClearFilter = !selectedProject;
+    const isDisabledClearFilter = !selectedProject && !onlyActive;
 
     return {
         projectOptions,

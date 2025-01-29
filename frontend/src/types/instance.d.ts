@@ -23,7 +23,7 @@ declare interface IInstance {
     instance_type: {
         name: string,
         resources: IResources
-    },
+    } | null,
     name: string,
     job_name: string | null,
     project_name: string | null,

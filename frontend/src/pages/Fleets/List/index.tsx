@@ -110,11 +110,11 @@ export const FleetList: React.FC = () => {
                         </FormField>
                     </div>
 
-                    {/*<div className={styles.activeOnly}>*/}
-                    {/*    <Toggle onChange={({ detail }) => setOnlyActive(detail.checked)} checked={onlyActive}>*/}
-                    {/*        {t('fleets.active_only')}*/}
-                    {/*    </Toggle>*/}
-                    {/*</div>*/}
+                    <div className={styles.activeOnly}>
+                        <Toggle onChange={({ detail }) => setOnlyActive(detail.checked)} checked={onlyActive}>
+                            {t('fleets.active_only')}
+                        </Toggle>
+                    </div>
 
                     <div className={styles.clear}>
                         <Button formAction="none" onClick={clearFilters} disabled={isDisabledClearFilter}>

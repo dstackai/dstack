@@ -137,7 +137,7 @@ export const List: React.FC = () => {
 
                     <div className={styles.activeOnly}>
                         <Toggle onChange={({ detail }) => setOnlyActive(detail.checked)} checked={onlyActive}>
-                            {t('fleets.active_only')}
+                            {t('fleets.instances.active_only')}
                         </Toggle>
                     </div>
 
