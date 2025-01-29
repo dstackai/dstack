@@ -11,7 +11,6 @@ import {
     ContentLayout,
     DetailsHeader,
     Header,
-    Icon,
     Loader,
     NavigateLink,
     StatusIndicator,
