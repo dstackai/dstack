@@ -25,8 +25,6 @@ def print_run_plan(run_plan: RunPlan, offers_limit: int = 3):
     props.add_column(no_wrap=True)  # key
     props.add_column()  # value
 
-    print(job_plan.job_spec.stop_duration)
-
     req = job_plan.job_spec.requirements
     pretty_req = req.pretty_format(resources_only=True)
     max_price = f"${req.max_price:g}" if req.max_price else "-"

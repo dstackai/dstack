@@ -66,6 +66,7 @@ from dstack._internal.server.services import volumes as volumes_services
 from dstack._internal.server.services.docker import is_valid_docker_volume_target
 from dstack._internal.server.services.jobs import (
     delay_job_instance_termination,
+    get_instances_ids_with_detaching_volumes,
     get_jobs_from_run_spec,
     group_jobs_by_replica_latest,
     job_model_to_job_submission,
@@ -308,7 +309,8 @@ async def get_plan(
     pool = await get_or_create_pool_by_name(
         session=session, project=project, pool_name=profile.pool_name
     )
-    pool_offers = _get_pool_offers(
+    pool_offers = await _get_pool_offers(
+        session=session,
         pool=pool,
         run_spec=run_spec,
         job=jobs[0],
@@ -669,14 +671,17 @@ def run_model_to_run(
     return run
 
 
-def _get_pool_offers(
+async def _get_pool_offers(
+    session: AsyncSession,
     pool: PoolModel,
     run_spec: RunSpec,
     job: Job,
     volumes: List[List[Volume]],
 ) -> List[InstanceOfferWithAvailability]:
+    detaching_instances_ids = await get_instances_ids_with_detaching_volumes(session)
+    pool_instances = [i for i in get_pool_instances(pool) if i.id not in detaching_instances_ids]
     pool_filtered_instances = filter_pool_instances(
-        pool_instances=get_pool_instances(pool),
+        pool_instances=pool_instances,
         profile=run_spec.merged_profile,
         requirements=job.job_spec.requirements,
         multinode=job.job_spec.jobs_per_replica > 1,
@@ -1015,6 +1020,10 @@ async def process_terminating_run(session: AsyncSession, run: RunModel):
             continue
         unfinished_jobs_count += 1
         if job.status == JobStatus.TERMINATING:
+            if job_termination_reason == JobTerminationReason.ABORTED_BY_USER:
+                # Override termination reason so that
+                # abort actions such as volume force detach are triggered
+                job.termination_reason = job_termination_reason
             continue
 
         if job.status == JobStatus.RUNNING and job_termination_reason not in {

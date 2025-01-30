@@ -2,7 +2,7 @@ import asyncio
 
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, lazyload
 
 from dstack._internal.core.models.runs import JobStatus
 from dstack._internal.server.db import get_session_ctx
@@ -52,6 +52,7 @@ async def _process_next_terminating_job():
                         InstanceModel.id == job_model.used_instance_id,
                         InstanceModel.id.not_in(instance_lockset),
                     )
+                    .options(lazyload(InstanceModel.job))
                     .with_for_update(skip_locked=True)
                 )
                 instance_model = res.scalar()

@@ -635,12 +635,20 @@ class AWSCompute(Compute):
         ec2_client = self.session.client("ec2", region_name=volume.configuration.region)
 
         logger.debug("Detaching EBS volume %s from instance %s", volume.volume_id, instance_id)
-        ec2_client.detach_volume(
-            VolumeId=volume.volume_id,
-            InstanceId=instance_id,
-            Device=get_or_error(volume.attachment_data).device_name,
-            Force=force,
-        )
+        try:
+            ec2_client.detach_volume(
+                VolumeId=volume.volume_id,
+                InstanceId=instance_id,
+                Device=get_or_error(volume.attachment_data).device_name,
+                Force=force,
+            )
+        except botocore.exceptions.ClientError as e:
+            if e.response["Error"]["Code"] == "IncorrectState":
+                logger.info(
+                    "Skipping EBS volume %s detach since it's already detached", volume.volume_id
+                )
+                return
+            raise e
         logger.debug("Detached EBS volume %s from instance %s", volume.volume_id, instance_id)
 
     def is_volume_detached(self, volume: Volume, instance_id: str) -> bool:
