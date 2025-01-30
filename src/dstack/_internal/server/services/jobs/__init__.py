@@ -24,7 +24,6 @@ from dstack._internal.core.models.runs import (
     JobTerminationReason,
     RunSpec,
 )
-from dstack._internal.core.services.profiles import get_stop_duration
 from dstack._internal.server.models import (
     InstanceModel,
     JobModel,
@@ -379,7 +378,7 @@ async def _detach_volumes_from_job_instance(
     jpd: JobProvisioningData,
     instance_model: InstanceModel,
 ):
-    run_spec = RunSpec.__response__.parse_raw(job_model.run.run_spec)
+    job_spec = JobSpec.__response__.parse_raw(job_model.job_spec_data)
     backend = await backends_services.get_project_backend_by_type(
         project=project,
         backend_type=jpd.backend,
@@ -397,7 +396,7 @@ async def _detach_volumes_from_job_instance(
             backend=backend,
             job_model=job_model,
             jpd=jpd,
-            run_spec=run_spec,
+            job_spec=job_spec,
             instance_model=instance_model,
             volume_model=volume_model,
         )
@@ -416,13 +415,12 @@ async def _detach_volume_from_job_instance(
     backend: Backend,
     job_model: JobModel,
     jpd: JobProvisioningData,
-    run_spec: RunSpec,
+    job_spec: JobSpec,
     instance_model: InstanceModel,
     volume_model: VolumeModel,
 ) -> bool:
     detached = True
     volume = volume_model_to_volume(volume_model)
-    stop_duration = get_stop_duration(run_spec.merged_profile)
     if volume.provisioning_data is None or not volume.provisioning_data.detachable:
         # Backends without `detach_volume` detach volumes automatically
         return detached
@@ -447,7 +445,7 @@ async def _detach_volume_from_job_instance(
                 volume=volume,
                 instance_id=jpd.instance_id,
             )
-            if not detached and _should_force_detach_volume(job_model, stop_duration):
+            if not detached and _should_force_detach_volume(job_model, job_spec.stop_duration):
                 logger.info(
                     "Force detaching volume %s from %s",
                     volume_model.name,
@@ -479,14 +477,16 @@ async def _detach_volume_from_job_instance(
 MIN_FORCE_DETACH_WAIT_PERIOD = timedelta(seconds=60)
 
 
-def _should_force_detach_volume(job_model: JobModel, stop_duration: timedelta) -> bool:
+def _should_force_detach_volume(job_model: JobModel, stop_duration: Optional[int]) -> bool:
     return (
         job_model.volumes_detached_at is not None
         and common.get_current_datetime()
         > job_model.volumes_detached_at.replace(tzinfo=timezone.utc) + MIN_FORCE_DETACH_WAIT_PERIOD
         and (
             job_model.termination_reason == JobTerminationReason.ABORTED_BY_USER
-            or common.get_current_datetime()
-            > job_model.volumes_detached_at.replace(tzinfo=timezone.utc) + stop_duration
+            or stop_duration is not None
+            and common.get_current_datetime()
+            > job_model.volumes_detached_at.replace(tzinfo=timezone.utc)
+            + timedelta(seconds=stop_duration)
         )
     )

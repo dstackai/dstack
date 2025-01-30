@@ -75,10 +75,6 @@ async def _process_next_terminating_job():
 async def _process_job(session: AsyncSession, job_model: JobModel):
     logger.debug("%s: terminating job", fmt(job_model))
     res = await session.execute(
-        select(JobModel).where(JobModel.id == job_model.id).options(joinedload(JobModel.run))
-    )
-    job_model = res.scalar_one()
-    res = await session.execute(
         select(InstanceModel)
         .where(InstanceModel.id == job_model.used_instance_id)
         .options(

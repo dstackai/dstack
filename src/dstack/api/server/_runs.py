@@ -120,6 +120,7 @@ def _get_run_spec_excludes(run_spec: RunSpec) -> Optional[dict]:
     configuration_excludes: set[str] = set()
     profile_excludes: set[str] = set()
     configuration = run_spec.configuration
+    profile = run_spec.profile
 
     # client >= 0.18.18 / server <= 0.18.17 compatibility tweak
     if not configuration.privileged:
@@ -131,13 +132,19 @@ def _get_run_spec_excludes(run_spec: RunSpec) -> Optional[dict]:
     if run_spec.configuration.user is None:
         configuration_excludes.add("user")
     # client >= 0.18.30 / server <= 0.18.29 compatibility tweak
-    if not configuration.reservation:
+    if configuration.reservation is None:
         configuration_excludes.add("reservation")
+    if profile is not None and profile.reservation is None:
         profile_excludes.add("reservation")
     if configuration.idle_duration is None:
         configuration_excludes.add("idle_duration")
+    if profile is not None and profile.idle_duration is None:
         profile_excludes.add("idle_duration")
-
+    # client >= 0.18.38 / server <= 0.18.37 compatibility tweak
+    if configuration.stop_duration is None:
+        configuration_excludes.add("stop_duration")
+    if profile is not None and profile.stop_duration is None:
+        profile_excludes.add("stop_duration")
     if configuration_excludes:
         spec_excludes["configuration"] = configuration_excludes
     if profile_excludes:

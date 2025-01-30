@@ -185,6 +185,7 @@ class JobSpec(CoreModel):
     image_name: str
     privileged: bool = False
     max_duration: Optional[int]
+    stop_duration: Optional[int] = None
     registry_auth: Optional[RegistryAuth]
     requirements: Requirements
     retry: Optional[Retry]

@@ -13,7 +13,7 @@ from dstack._internal.core.models.configurations import (
     PythonVersion,
     RunConfigurationType,
 )
-from dstack._internal.core.models.profiles import SpotPolicy
+from dstack._internal.core.models.profiles import DEFAULT_STOP_DURATION, SpotPolicy
 from dstack._internal.core.models.runs import (
     AppSpec,
     JobSpec,
@@ -105,6 +105,7 @@ class JobConfigurator(ABC):
             user=await self._user(),
             privileged=self._privileged(),
             max_duration=self._max_duration(),
+            stop_duration=self._stop_duration(),
             registry_auth=self._registry_auth(),
             requirements=self._requirements(),
             retry=self._retry(),
@@ -172,11 +173,20 @@ class JobConfigurator(ABC):
         return self.run_spec.configuration.privileged
 
     def _max_duration(self) -> Optional[int]:
-        if self.run_spec.merged_profile.max_duration is None:
+        if self.run_spec.merged_profile.max_duration in [None, True]:
             return self._default_max_duration()
-        if self.run_spec.merged_profile.max_duration == "off":
+        if self.run_spec.merged_profile.max_duration in ["off", False]:
             return None
+        # pydantic validator ensures this is int
         return self.run_spec.merged_profile.max_duration
+
+    def _stop_duration(self) -> Optional[int]:
+        if self.run_spec.merged_profile.stop_duration in [None, True]:
+            return DEFAULT_STOP_DURATION
+        if self.run_spec.merged_profile.stop_duration in ["off", False]:
+            return None
+        # pydantic validator ensures this is int
+        return self.run_spec.merged_profile.stop_duration
 
     def _registry_auth(self) -> Optional[RegistryAuth]:
         return self.run_spec.configuration.registry_auth

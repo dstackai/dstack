@@ -486,6 +486,9 @@ class RunCollection:
         creation_policy: Optional[CreationPolicy] = None,
         termination_policy: Optional[TerminationPolicy] = None,
         termination_policy_idle: Optional[Union[str, int]] = None,
+        reservation: Optional[str] = None,
+        idle_duration: Optional[Union[str, int]] = None,
+        stop_duration: Optional[Union[str, int]] = None,
     ) -> RunPlan:
         # """
         # Get run plan. Same arguments as `submit`
@@ -520,14 +523,17 @@ class RunCollection:
             backends=backends,
             regions=regions,
             instance_types=instance_types,
+            reservation=reservation,
             spot_policy=spot_policy,
             retry=None,
             retry_policy=retry_policy,
             max_duration=max_duration,
+            stop_duration=stop_duration,
             max_price=max_price,
             pool_name=pool_name,
             instance_name=instance_name,
             creation_policy=creation_policy,
+            idle_duration=idle_duration,
             termination_policy=termination_policy,
             termination_idle_time=termination_policy_idle,
         )

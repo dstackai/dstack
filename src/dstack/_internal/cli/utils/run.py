@@ -25,6 +25,8 @@ def print_run_plan(run_plan: RunPlan, offers_limit: int = 3):
     props.add_column(no_wrap=True)  # key
     props.add_column()  # value
 
+    print(job_plan.job_spec.stop_duration)
+
     req = job_plan.job_spec.requirements
     pretty_req = req.pretty_format(resources_only=True)
     max_price = f"${req.max_price:g}" if req.max_price else "-"
@@ -40,6 +42,8 @@ def print_run_plan(run_plan: RunPlan, offers_limit: int = 3):
 
     profile = run_plan.run_spec.merged_profile
     creation_policy = profile.creation_policy
+    # FIXME: This assumes the default idle_duration is the same for client and server.
+    # If the server changes idle_duration, old clients will see incorrect value.
     termination_policy, termination_idle_time = get_termination(
         profile, DEFAULT_RUN_TERMINATION_IDLE_TIME
     )

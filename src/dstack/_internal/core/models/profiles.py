@@ -15,6 +15,8 @@ DEFAULT_POOL_TERMINATION_IDLE_TIME = 72 * 60 * 60  # 3 days
 
 DEFAULT_INSTANCE_RETRY_DURATION = 60 * 60 * 24  # 24h
 
+DEFAULT_STOP_DURATION = 300
+
 
 class SpotPolicy(str, Enum):
     SPOT = "spot"
@@ -38,23 +40,27 @@ def parse_duration(v: Optional[Union[int, str]]) -> Optional[int]:
     return Duration.parse(v)
 
 
-def parse_max_duration(v: Optional[Union[int, str]]) -> Optional[Union[str, int]]:
+def parse_max_duration(v: Optional[Union[int, str, bool]]) -> Optional[Union[str, int, bool]]:
     return parse_off_duration(v)
 
 
-def parse_stop_duration(v: Optional[Union[int, str]]) -> Optional[Union[str, int]]:
+def parse_stop_duration(v: Optional[Union[int, str, bool]]) -> Optional[Union[str, int, bool]]:
     return parse_off_duration(v)
 
 
-def parse_off_duration(v: Optional[Union[int, str]]) -> Optional[Union[str, int]]:
-    if v == "off":
-        return v
+def parse_off_duration(v: Optional[Union[int, str, bool]]) -> Optional[Union[str, int, bool]]:
+    if v == "off" or v is False:
+        return "off"
+    if v is True:
+        return None
     return parse_duration(v)
 
 
-def parse_idle_duration(v: Optional[Union[int, str]]) -> Optional[Union[str, int]]:
+def parse_idle_duration(v: Optional[Union[int, str, bool]]) -> Optional[Union[str, int, bool]]:
     if v is False:
         return -1
+    if v is True:
+        return None
     return parse_duration(v)
 
 
@@ -143,7 +149,7 @@ class ProfileParams(CoreModel):
         Field(description="The policy for resubmitting the run. Defaults to `false`"),
     ]
     max_duration: Annotated[
-        Optional[Union[Literal["off"], str, int]],
+        Optional[Union[Literal["off"], str, int, bool]],
         Field(
             description=(
                 "The maximum duration of a run (e.g., `2h`, `1d`, etc)."
@@ -153,7 +159,7 @@ class ProfileParams(CoreModel):
         ),
     ]
     stop_duration: Annotated[
-        Optional[Union[Literal["off"], str, int]],
+        Optional[Union[Literal["off"], str, int, bool]],
         Field(
             description=(
                 "The maximum duration of a run gracefull stopping."
@@ -174,7 +180,7 @@ class ProfileParams(CoreModel):
         ),
     ]
     idle_duration: Annotated[
-        Optional[Union[Literal["off"], str, int]],
+        Optional[Union[Literal["off"], str, int, bool]],
         Field(
             description=(
                 "Time to wait before terminating idle instances."
