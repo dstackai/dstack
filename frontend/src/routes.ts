@@ -80,10 +80,14 @@ export const ROUTES = {
     FLEETS: {
         LIST: '/fleets',
         DETAILS: {
-            TEMPLATE: `/projects/:projectName/fleets/:fleetName`,
-            FORMAT: (projectName: string, fleetName: string) =>
-                buildRoute(ROUTES.FLEETS.DETAILS.TEMPLATE, { projectName, fleetName }),
+            TEMPLATE: `/projects/:projectName/fleets/:fleetId`,
+            FORMAT: (projectName: string, fleetId: string) =>
+                buildRoute(ROUTES.FLEETS.DETAILS.TEMPLATE, { projectName, fleetId }),
         },
+    },
+
+    INSTANCES: {
+        LIST: '/instances',
     },
 
     VOLUMES: {

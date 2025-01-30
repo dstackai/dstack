@@ -2,16 +2,15 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next';
 import { format } from 'date-fns';
 
-import { Button, Icon, ListEmptyMessage, NavigateLink, StatusIndicator, TableProps } from 'components';
+import { Button, ListEmptyMessage, NavigateLink, StatusIndicator, TableProps } from 'components';
 import { SelectCSDProps } from 'components';
 
 import { DATE_TIME_FORMAT, DEFAULT_TABLE_PAGE_SIZE } from 'consts';
 import { useLocalStorageState } from 'hooks/useLocalStorageState';
-import { getFleetStatusIconType } from 'libs/fleet';
+import { getFleetInstancesLinkText, getFleetPrice, getFleetStatusIconType } from 'libs/fleet';
+import { ROUTES } from 'routes';
 import { useLazyGetFleetsQuery } from 'services/fleet';
 import { useGetProjectsQuery } from 'services/project';
-
-import { ROUTES } from '../../../routes';
 
 export const useEmptyMessages = ({
     clearFilters,
@@ -50,9 +49,11 @@ export const useColumnsDefinitions = () => {
 
     const columns: TableProps.ColumnDefinition<IFleet>[] = [
         {
-            id: 'instance_name',
+            id: 'fleet_name',
             header: t('fleets.fleet'),
-            cell: (item) => item.name,
+            cell: (item) => (
+                <NavigateLink href={ROUTES.FLEETS.DETAILS.FORMAT(item.project_name, item.id)}>{item.name}</NavigateLink>
+            ),
         },
         {
             id: 'status',
@@ -70,25 +71,14 @@ export const useColumnsDefinitions = () => {
                 <NavigateLink href={ROUTES.PROJECT.DETAILS.FORMAT(item.project_name)}>{item.project_name}</NavigateLink>
             ),
         },
-        // {
-        //     id: 'resources',
-        //     header: t('fleets.instances.resources'),
-        //     cell: (item) => item.instance_type?.resources.description,
-        // },
         {
-            id: 'backend',
-            header: t('fleets.instances.backend'),
-            cell: (item) => item.spec.configuration?.backends?.join(', '),
-        },
-        {
-            id: 'region',
-            header: t('fleets.instances.region'),
-            cell: (item) => item.spec.configuration.regions?.join(', '),
-        },
-        {
-            id: 'spot',
-            header: t('fleets.instances.spot'),
-            cell: (item) => item.spec.configuration?.spot_policy === 'spot' && <Icon name={'check'} />,
+            id: 'instances',
+            header: t('fleets.instances.title'),
+            cell: (item) => (
+                <NavigateLink href={ROUTES.INSTANCES.LIST + `?fleetId=${item.id}`}>
+                    {getFleetInstancesLinkText(item)}
+                </NavigateLink>
+            ),
         },
         {
             id: 'started',
@@ -98,7 +88,13 @@ export const useColumnsDefinitions = () => {
         {
             id: 'price',
             header: t('fleets.instances.price'),
-            cell: (item) => item.spec.configuration?.max_price && `$${item.spec.configuration?.max_price}`,
+            cell: (item) => {
+                const price = getFleetPrice(item);
+
+                if (typeof price === 'number') return `$${price}`;
+
+                return '-';
+            },
         },
     ];
 
@@ -106,7 +102,7 @@ export const useColumnsDefinitions = () => {
 };
 
 export const useFilters = () => {
-    const [onlyActive, setOnlyActive] = useLocalStorageState<boolean>('administration-fleet-list-is-active', false);
+    const [onlyActive, setOnlyActive] = useLocalStorageState<boolean>('fleet-list-is-active', true);
     const [selectedProject, setSelectedProject] = useState<SelectCSDProps.Option | null>(null);
 
     const { data: projectsData } = useGetProjectsQuery();
@@ -206,7 +202,8 @@ export const useFleetsData = ({ project_name, only_active }: TFleetListRequestPa
 
             if (result.length > 0) {
                 setPagesCount((count) => count - 1);
-                setData(result);
+                const reversedData = [...result].reverse();
+                setData(reversedData);
             } else {
                 setPagesCount(1);
             }

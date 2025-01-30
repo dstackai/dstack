@@ -37,13 +37,17 @@ export const fleetApi = createApi({
                 result ? [...result.map(({ name }) => ({ type: 'Fleet' as const, id: name })), 'Fleets'] : ['Fleets'],
         }),
 
-        getFleetDetails: builder.query<IFleet, { projectName: IProject['project_name']; fleetName: IFleet['name'] }>({
-            query: ({ projectName, fleetName }) => {
+        getFleetDetails: builder.query<
+            IFleet,
+            { projectName: IProject['project_name']; fleetName?: IFleet['name']; fleetId?: IFleet['id'] }
+        >({
+            query: ({ projectName, fleetName, fleetId }) => {
                 return {
                     url: API.PROJECTS.FLEETS_DETAILS(projectName),
                     method: 'POST',
                     body: {
                         name: fleetName,
+                        id: fleetId,
                     },
                 };
             },
