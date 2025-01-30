@@ -239,6 +239,10 @@ Define a fleet configuration as a YAML file in your project directory. The file 
         [native package manager :material-arrow-top-right-thin:{ .external }](https://rocm.docs.amd.com/projects/install-on-linux/en/latest/install/native-install/index.html)
         or [AMDGPU installer :material-arrow-top-right-thin:{ .external }](https://rocm.docs.amd.com/projects/install-on-linux/en/latest/install/amdgpu-install.html).)
 
+    === "Intel Gaudi"
+        2.&nbsp;Hosts with Intel Gaudi accelerators should be pre-installed with [Gaudi software and drivers](https://docs.habana.ai/en/latest/Installation_Guide/Driver_Installation.html#driver-installation).
+        This should include the drivers, `hl-smi`, and Habana Container Runtime.
+
     3.&nbsp;The user specified should have passwordless `sudo` access.
 
 #### Placement { #ssh-placement }

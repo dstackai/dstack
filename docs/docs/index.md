@@ -7,11 +7,11 @@ for AI workloads both in the cloud and on-prem, speeding up the development, tra
 
 #### Accelerators
 
-`dstack` supports `NVIDIA GPU`, `AMD GPU`, and `Google Cloud TPU` out of the box.
+`dstack` supports `NVIDIA`, `AMD`, `Google TPU`, and `Intel Gaudi` accelerators out of the box.
 
 ## How does it work?
 
-![](https://raw.githubusercontent.com/dstackai/static-assets/refs/heads/main/static-assets/images/dstack-architecture-diagram-v4.svg)
+![](https://raw.githubusercontent.com/dstackai/static-assets/refs/heads/main/static-assets/images/dstack-architecture-diagram-v6.svg)
 
 #### 1. Set up the server
 

@@ -21,17 +21,16 @@ for AI workloads both in the cloud and on-prem, speeding up the development, tra
 
 #### Accelerators
 
-`dstack` supports `NVIDIA GPU`, `AMD GPU`, and `Google Cloud TPU` out of the box.
+`dstack` supports `NVIDIA`, `AMD`, `Google TPU`, and `Intel Gaudi` accelerators out of the box.
 
 ## Major news ✨
 
-- [2025/01] [dstack 0.18.35: Vultr backend](https://github.com/dstackai/dstack/releases/tag/0.18.35)
-- [2024/12] [dstack 0.18.33: TPU v6e support](https://github.com/dstackai/dstack/releases/tag/0.18.33)
+- [2025/01] [dstack 0.18.38: Intel Gaudi](https://github.com/dstackai/dstack/releases/tag/0.18.38)
+- [2025/01] [dstack 0.18.35: Vultr](https://github.com/dstackai/dstack/releases/tag/0.18.35)
+- [2024/12] [dstack 0.18.32: TPU v6e](https://github.com/dstackai/dstack/releases/tag/0.18.32)
 - [2024/12] [dstack 0.18.30: AWS Capacity Reservations and Capacity Blocks](https://github.com/dstackai/dstack/releases/tag/0.18.30)
-- [2024/11] [dstack 0.18.23: Gateway is optional](https://github.com/dstackai/dstack/releases/tag/0.18.23)
 - [2024/10] [dstack 0.18.21: Instance volumes](https://github.com/dstackai/dstack/releases/tag/0.18.21)
-- [2024/10] [dstack 0.18.18: Hardware metrics](https://github.com/dstackai/dstack/releases/tag/0.18.18)
-- [2024/10] [dstack 0.18.17: AMD support with SSH fleets, AWS EFA](https://github.com/dstackai/dstack/releases/tag/0.18.17)
+- [2024/10] [dstack 0.18.18: Hardware metrics monitoring](https://github.com/dstackai/dstack/releases/tag/0.18.18)
 
 ## Installation
 
