@@ -5,6 +5,8 @@ import { get } from 'lodash';
 import { useNotifications } from 'hooks';
 import { useDeleteFleetMutation } from 'services/fleet';
 
+import { isRequestFormErrors2 } from '../../../libs';
+
 export const useDeleteFleet = () => {
     const { t } = useTranslation();
     const [deleteFleet] = useDeleteFleetMutation();
@@ -40,9 +42,19 @@ export const useDeleteFleet = () => {
         return Promise.all(requests)
             .finally(() => setIsDeleting(false))
             .catch((error) => {
+                let errorText = error?.error;
+
+                const errorData = error.data;
+
+                if (isRequestFormErrors2(errorData)) {
+                    const errorDetail = errorData.detail;
+
+                    errorText = errorDetail.flatMap(({ msg }) => msg).join(', ');
+                }
+
                 pushNotification({
                     type: 'error',
-                    content: t('common.server_error', { error: get(error, `data.[0].detail.msg`) ?? error?.error }),
+                    content: t('common.server_error', { error: errorText }),
                 });
             });
     }, []);
