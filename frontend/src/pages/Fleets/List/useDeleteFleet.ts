@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { get } from 'lodash';
 
 import { useNotifications } from 'hooks';
 import { useDeleteFleetMutation } from 'services/fleet';
@@ -41,7 +42,7 @@ export const useDeleteFleet = () => {
             .catch((error) => {
                 pushNotification({
                     type: 'error',
-                    content: t('common.server_error', { error: error?.error }),
+                    content: t('common.server_error', { error: get(error, `data.[0].detail.msg`) ?? error?.error }),
                 });
             });
     }, []);
