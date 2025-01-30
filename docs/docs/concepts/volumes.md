@@ -84,7 +84,8 @@ Volume my-volume does not exist yet. Create the volume? [y/n]: y
 
 Once created, the volume can be attached to dev environments, tasks, and services.
 
-> When creating a network volume, `dstack` automatically creates an `ext4` filesystem on it.
+!!! info "Filesystem"
+    When creating a new network volume, `dstack` automatically creates an `ext4` filesystem on it.
 
 ### Attach a volume { #attach-network-volume }
 
@@ -136,6 +137,17 @@ and its contents will persist across runs.
     When you're running a dev environment, task, or service with `dstack`, it automatically mounts the project folder contents
     to `/workflow` (and sets that as the current working directory). Right now, `dstack` doesn't allow you to 
     attach volumes to `/workflow` or any of its subdirectories.
+
+### Detach a volume { #detach-network-volume }
+
+`dstack` automatically detaches volumes from instances when a run stops.
+
+!!! info "Force detach"
+    In some clouds such as AWS a volume may stuck in the detaching state.
+    To fix this, you can abort the run, and `dstack` will force detach the volume.
+    `dstack` will also force detach the stuck volume automatically after `stop_duration`.
+    Note that force detaching a volume is a last resort measure and may corrupt the file system.
+    Contact your cloud support if you're experience volumes stuck in the detaching state.
 
 ### Manage volumes { #manage-network-volumes }
 

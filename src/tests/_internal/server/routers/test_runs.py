@@ -111,6 +111,7 @@ def get_dev_env_run_plan_dict(
                 "creation_policy": None,
                 "instance_name": None,
                 "max_duration": "off",
+                "stop_duration": None,
                 "max_price": None,
                 "pool_name": DEFAULT_POOL_NAME,
                 "retry": None,
@@ -130,6 +131,7 @@ def get_dev_env_run_plan_dict(
                 "default": False,
                 "instance_name": None,
                 "max_duration": "off",
+                "stop_duration": None,
                 "max_price": None,
                 "name": "string",
                 "pool_name": DEFAULT_POOL_NAME,
@@ -179,6 +181,7 @@ def get_dev_env_run_plan_dict(
                     "job_num": 0,
                     "jobs_per_replica": 1,
                     "max_duration": None,
+                    "stop_duration": 300,
                     "registry_auth": None,
                     "requirements": {
                         "resources": {
@@ -259,6 +262,7 @@ def get_dev_env_run_dict(
                 "creation_policy": None,
                 "instance_name": None,
                 "max_duration": "off",
+                "stop_duration": None,
                 "max_price": None,
                 "pool_name": DEFAULT_POOL_NAME,
                 "retry": None,
@@ -278,6 +282,7 @@ def get_dev_env_run_dict(
                 "default": False,
                 "instance_name": None,
                 "max_duration": "off",
+                "stop_duration": None,
                 "max_price": None,
                 "name": "string",
                 "pool_name": DEFAULT_POOL_NAME,
@@ -327,6 +332,7 @@ def get_dev_env_run_dict(
                     "job_num": 0,
                     "jobs_per_replica": 1,
                     "max_duration": None,
+                    "stop_duration": 300,
                     "registry_auth": None,
                     "requirements": {
                         "resources": {
@@ -1266,10 +1272,10 @@ class TestStopRuns:
         )
         assert response.status_code == 200
         await session.refresh(run)
-        assert run.status == RunStatus.TERMINATED
+        assert run.status == RunStatus.TERMINATING
         assert run.termination_reason == RunTerminationReason.STOPPED_BY_USER
         await session.refresh(job)
-        assert job.status == JobStatus.TERMINATED
+        assert job.status == JobStatus.TERMINATING
         assert job.termination_reason == JobTerminationReason.TERMINATED_BY_USER
 
     @pytest.mark.asyncio

@@ -23,6 +23,7 @@ from dstack._internal.core.models.profiles import (
     DEFAULT_POOL_NAME,
     DEFAULT_RUN_TERMINATION_IDLE_TIME,
     CreationPolicy,
+    Profile,
     TerminationPolicy,
 )
 from dstack._internal.core.models.runs import (
@@ -52,6 +53,7 @@ from dstack._internal.server.services.fleets import (
 )
 from dstack._internal.server.services.jobs import (
     find_job,
+    get_instances_ids_with_detaching_volumes,
 )
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.logging import fmt
@@ -171,16 +173,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         await session.commit()
         return
 
-    res = await session.execute(
-        select(PoolModel)
-        .where(
-            PoolModel.project_id == project.id,
-            PoolModel.name == (profile.pool_name or DEFAULT_POOL_NAME),
-            PoolModel.deleted == False,
-        )
-        .options(lazyload(PoolModel.instances))
-    )
-    pool = res.scalar_one()
+    pool = await _get_pool(session=session, project=project, profile=profile)
 
     # Submitted jobs processing happens in two steps (transactions).
     # First, the jobs gets an instance assigned (or no instance).
@@ -204,9 +197,13 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
             # Start new transaction to see commited changes after lock
             await session.commit()
         async with get_locker().lock_ctx(InstanceModel.__tablename__, instances_ids):
+            # If another job freed the instance but is still trying to detach volumes,
+            # do not provision on it to prevent attaching volumes that are currently detaching.
+            detaching_instances_ids = await get_instances_ids_with_detaching_volumes(session)
             # Refetch after lock
             res = await session.execute(
                 select(InstanceModel).where(
+                    InstanceModel.id.not_in(detaching_instances_ids),
                     InstanceModel.id.in_(instances_ids),
                     InstanceModel.deleted == False,
                     InstanceModel.job_id.is_(None),
@@ -329,6 +326,19 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
             )
         job_model.last_processed_at = common_utils.get_current_datetime()
         await session.commit()
+
+
+async def _get_pool(session: AsyncSession, project: ProjectModel, profile: Profile) -> PoolModel:
+    res = await session.execute(
+        select(PoolModel)
+        .where(
+            PoolModel.project_id == project.id,
+            PoolModel.name == (profile.pool_name or DEFAULT_POOL_NAME),
+            PoolModel.deleted == False,
+        )
+        .options(lazyload(PoolModel.instances))
+    )
+    return res.scalar_one()
 
 
 async def _assign_job_to_pool_instance(

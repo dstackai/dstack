@@ -40,6 +40,8 @@ def print_run_plan(run_plan: RunPlan, offers_limit: int = 3):
 
     profile = run_plan.run_spec.merged_profile
     creation_policy = profile.creation_policy
+    # FIXME: This assumes the default idle_duration is the same for client and server.
+    # If the server changes idle_duration, old clients will see incorrect value.
     termination_policy, termination_idle_time = get_termination(
         profile, DEFAULT_RUN_TERMINATION_IDLE_TIME
     )

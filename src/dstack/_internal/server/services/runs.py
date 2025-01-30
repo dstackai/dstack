@@ -65,10 +65,11 @@ from dstack._internal.server.services import services
 from dstack._internal.server.services import volumes as volumes_services
 from dstack._internal.server.services.docker import is_valid_docker_volume_target
 from dstack._internal.server.services.jobs import (
+    delay_job_instance_termination,
+    get_instances_ids_with_detaching_volumes,
     get_jobs_from_run_spec,
     group_jobs_by_replica_latest,
     job_model_to_job_submission,
-    process_terminating_job,
     stop_runner,
 )
 from dstack._internal.server.services.locking import get_locker, string_to_lock_id
@@ -308,7 +309,8 @@ async def get_plan(
     pool = await get_or_create_pool_by_name(
         session=session, project=project, pool_name=profile.pool_name
     )
-    pool_offers = _get_pool_offers(
+    pool_offers = await _get_pool_offers(
+        session=session,
         pool=pool,
         run_spec=run_spec,
         job=jobs[0],
@@ -669,14 +671,17 @@ def run_model_to_run(
     return run
 
 
-def _get_pool_offers(
+async def _get_pool_offers(
+    session: AsyncSession,
     pool: PoolModel,
     run_spec: RunSpec,
     job: Job,
     volumes: List[List[Volume]],
 ) -> List[InstanceOfferWithAvailability]:
+    detaching_instances_ids = await get_instances_ids_with_detaching_volumes(session)
+    pool_instances = [i for i in get_pool_instances(pool) if i.id not in detaching_instances_ids]
     pool_filtered_instances = filter_pool_instances(
-        pool_instances=get_pool_instances(pool),
+        pool_instances=pool_instances,
         profile=run_spec.merged_profile,
         requirements=job.job_spec.requirements,
         multinode=job.job_spec.jobs_per_replica > 1,
@@ -1000,7 +1005,10 @@ def _check_can_update_run_spec(current_run_spec: RunSpec, new_run_spec: RunSpec)
 
 async def process_terminating_run(session: AsyncSession, run: RunModel):
     """
-    Used by both `process_runs` and `stop_run` to process a run that is TERMINATING.
+    Used by both `process_runs` and `stop_run` to process a TERMINATING run.
+    Stops the jobs gracefully and marks them as TERMINATING.
+    Jobs should be terminated by `process_terminating_jobs`.
+    When all jobs are terminated, assigns a finished status to the run.
     Caller must acquire the lock on run.
     """
     assert run.termination_reason is not None
@@ -1012,20 +1020,21 @@ async def process_terminating_run(session: AsyncSession, run: RunModel):
             continue
         unfinished_jobs_count += 1
         if job.status == JobStatus.TERMINATING:
-            # `process_terminating_jobs` will abort frozen jobs
+            if job_termination_reason == JobTerminationReason.ABORTED_BY_USER:
+                # Override termination reason so that
+                # abort actions such as volume force detach are triggered
+                job.termination_reason = job_termination_reason
             continue
 
         if job.status == JobStatus.RUNNING and job_termination_reason not in {
             JobTerminationReason.ABORTED_BY_USER,
             JobTerminationReason.DONE_BY_RUNNER,
         }:
-            # send a signal to stop the job gracefully
+            # Send a signal to stop the job gracefully
             await stop_runner(session, job)
+            delay_job_instance_termination(job)
         job.status = JobStatus.TERMINATING
         job.termination_reason = job_termination_reason
-        await process_terminating_job(session, job)
-        if job.status.is_finished():
-            unfinished_jobs_count -= 1
         job.last_processed_at = common_utils.get_current_datetime()
 
     if unfinished_jobs_count == 0:

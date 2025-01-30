@@ -97,5 +97,5 @@ class LocalCompute(Compute):
     def attach_volume(self, volume: Volume, instance_id: str):
         pass
 
-    def detach_volume(self, volume: Volume, instance_id: str):
+    def detach_volume(self, volume: Volume, instance_id: str, force: bool = False):
         pass

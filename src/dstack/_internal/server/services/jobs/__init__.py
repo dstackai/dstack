@@ -1,14 +1,15 @@
-import datetime
 import itertools
 import json
-from datetime import timezone
+from datetime import timedelta, timezone
 from typing import Dict, Iterable, List, Optional, Tuple
+from uuid import UUID
 
 import requests
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
+import dstack._internal.server.services.backends as backends_services
+from dstack._internal.core.backends.base import Backend
 from dstack._internal.core.consts import DSTACK_RUNNER_HTTP_PORT, DSTACK_SHIM_HTTP_PORT
 from dstack._internal.core.errors import BackendError, ResourceNotExistsError, SSHError
 from dstack._internal.core.models.backends.base import BackendType
@@ -21,6 +22,7 @@ from dstack._internal.core.models.runs import (
     JobSpec,
     JobStatus,
     JobSubmission,
+    JobTerminationReason,
     RunSpec,
 )
 from dstack._internal.server.models import (
@@ -31,17 +33,16 @@ from dstack._internal.server.models import (
     VolumeModel,
 )
 from dstack._internal.server.services import services
-from dstack._internal.server.services.backends import get_project_backend_by_type
 from dstack._internal.server.services.jobs.configurators.base import JobConfigurator
 from dstack._internal.server.services.jobs.configurators.dev import DevEnvironmentJobConfigurator
 from dstack._internal.server.services.jobs.configurators.service import ServiceJobConfigurator
 from dstack._internal.server.services.jobs.configurators.task import TaskJobConfigurator
-from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.runner import client
 from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
 from dstack._internal.server.services.volumes import volume_model_to_volume
-from dstack._internal.utils.common import get_current_datetime, run_async
+from dstack._internal.utils import common
+from dstack._internal.utils.common import get_or_error, run_async
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -135,7 +136,7 @@ def get_job_runtime_data(job_model: JobModel) -> Optional[JobRuntimeData]:
 
 
 def delay_job_instance_termination(job_model: JobModel):
-    job_model.remove_at = get_current_datetime() + datetime.timedelta(seconds=15)
+    job_model.remove_at = common.get_current_datetime() + timedelta(seconds=15)
 
 
 def _get_job_configurator(run_spec: RunSpec) -> JobConfigurator:
@@ -177,7 +178,6 @@ async def stop_runner(session: AsyncSession, job_model: JobModel):
         if jpd is not None:
             jrd = get_job_runtime_data(job_model)
             await run_async(_stop_runner, ssh_private_key, jpd, jrd, job_model)
-        delay_job_instance_termination(job_model)
     except SSHError:
         logger.debug("%s: failed to stop runner", fmt(job_model))
 
@@ -195,90 +195,119 @@ def _stop_runner(
         logger.exception("%s: failed to stop runner gracefully", fmt(job_model))
 
 
-async def process_terminating_job(session: AsyncSession, job_model: JobModel):
+async def process_terminating_job(
+    session: AsyncSession,
+    job_model: JobModel,
+    instance_model: Optional[InstanceModel],
+):
     """
-    Used by both process_terminating_jobs and process_terminating_run.
-    Caller must acquire the lock on the job.
+    Stops the job: tells shim to stop the container, detaches the job from the instance,
+    and detaches volumes from the instance.
+    Graceful stop should already be done by `process_terminating_run`.
+    Caller must acquire the locks on the job and the job's instance.
     """
     if (
         job_model.remove_at is not None
-        and job_model.remove_at.replace(tzinfo=datetime.timezone.utc) > get_current_datetime()
+        and job_model.remove_at.replace(tzinfo=timezone.utc) > common.get_current_datetime()
     ):
         # it's too early to terminate the instance
         return
 
-    # FIXME: The caller should take instance lock since unlock must be after commit
-    async with get_locker().lock_ctx(InstanceModel.__tablename__, [job_model.used_instance_id]):
-        res = await session.execute(
-            select(InstanceModel)
-            .where(InstanceModel.id == job_model.used_instance_id)
-            .options(
-                selectinload(InstanceModel.project).joinedload(ProjectModel.backends),
-                selectinload(InstanceModel.volumes).joinedload(VolumeModel.user),
-                selectinload(InstanceModel.job),
+    if instance_model is None:
+        # Possible if the job hasn't been assigned an instance yet
+        await services.unregister_replica(session, job_model)
+        _set_job_termination_status(job_model)
+        return
+
+    jpd = get_job_provisioning_data(job_model)
+    if jpd is not None:
+        logger.debug("%s: stopping container", fmt(job_model))
+        ssh_private_key = instance_model.project.ssh_private_key
+        # TODO: Drop this logic and always use project key once it's safe to assume that
+        # most on-prem fleets are (re)created after this change:
+        # https://github.com/dstackai/dstack/pull/1716
+        if instance_model and instance_model.remote_connection_info is not None:
+            remote_conn_info: RemoteConnectionInfo = RemoteConnectionInfo.__response__.parse_raw(
+                instance_model.remote_connection_info
             )
-            .with_for_update()
-        )
-        instance = res.unique().scalar()
-        if instance is not None:
-            jpd = None
-            if job_model.job_provisioning_data is not None:
-                jpd = JobProvisioningData.__response__.parse_raw(job_model.job_provisioning_data)
-                logger.debug("%s: stopping container", fmt(job_model))
-                ssh_private_key = instance.project.ssh_private_key
-                # TODO: Drop this logic and always use project key once it's safe to assume that
-                # most on-prem fleets are (re)created after this change:
-                # https://github.com/dstackai/dstack/pull/1716
-                if instance and instance.remote_connection_info is not None:
-                    remote_conn_info: RemoteConnectionInfo = (
-                        RemoteConnectionInfo.__response__.parse_raw(
-                            instance.remote_connection_info
-                        )
-                    )
-                    ssh_private_key = remote_conn_info.ssh_keys[0].private
-                await stop_container(job_model, jpd, ssh_private_key)
-                if len(instance.volumes) > 0:
-                    logger.info("Detaching volumes: %s", [v.name for v in instance.volumes])
-                    await detach_volumes_from_instance(
-                        project=instance.project,
-                        instance=instance,
-                        jpd=jpd,
-                    )
-
-            if instance.status == InstanceStatus.BUSY:
-                instance.status = InstanceStatus.IDLE
-            elif instance.status != InstanceStatus.TERMINATED:
-                # instance was PROVISIONING (specially for the job)
-                # schedule for termination
-                instance.status = InstanceStatus.TERMINATING
-
-            if jpd is None or not jpd.dockerized:
-                # do not reuse vastai/k8s instances
-                instance.status = InstanceStatus.TERMINATING
-
-            instance.job_id = None
-            instance.last_job_processed_at = get_current_datetime()
-            logger.info(
-                "%s: instance '%s' has been released, new status is %s",
-                fmt(job_model),
-                instance.name,
-                instance.status.name,
+            ssh_private_key = remote_conn_info.ssh_keys[0].private
+        await stop_container(job_model, jpd, ssh_private_key)
+        if len(instance_model.volumes) > 0:
+            logger.info("Detaching volumes: %s", [v.name for v in instance_model.volumes])
+            await _detach_volumes_from_job_instance(
+                project=instance_model.project,
+                job_model=job_model,
+                jpd=jpd,
+                instance_model=instance_model,
             )
-            await services.unregister_replica(
-                session, job_model
-            )  # TODO(egor-s) ensure always runs
 
-        if job_model.termination_reason is not None:
-            job_model.status = job_model.termination_reason.to_status()
-        else:
-            job_model.status = JobStatus.FAILED
-            logger.warning("%s: job termination reason is not set", fmt(job_model))
-        logger.info(
-            "%s: job status is %s, reason: %s",
-            fmt(job_model),
-            job_model.status.name,
-            job_model.termination_reason.name,
-        )
+    if instance_model.status == InstanceStatus.BUSY:
+        instance_model.status = InstanceStatus.IDLE
+    elif instance_model.status != InstanceStatus.TERMINATED:
+        # instance was PROVISIONING (specially for the job)
+        # schedule for termination
+        instance_model.status = InstanceStatus.TERMINATING
+
+    if jpd is None or not jpd.dockerized:
+        # do not reuse vastai/k8s instances
+        instance_model.status = InstanceStatus.TERMINATING
+
+    # The instance should be released even if detach fails
+    # so that stuck volumes don't prevent the instance from terminating.
+    instance_model.job_id = None
+    instance_model.last_job_processed_at = common.get_current_datetime()
+    logger.info(
+        "%s: instance '%s' has been released, new status is %s",
+        fmt(job_model),
+        instance_model.name,
+        instance_model.status.name,
+    )
+    await services.unregister_replica(session, job_model)
+    if len(instance_model.volumes) == 0:
+        # Do not terminate while some volumes are not detached.
+        # TODO: In case of multiple jobs per instance, don't consider volumes from other jobs.
+        _set_job_termination_status(job_model)
+
+
+async def process_volumes_detaching(
+    session: AsyncSession,
+    job_model: JobModel,
+    instance_model: InstanceModel,
+):
+    """
+    Called after job's volumes have been soft detached to check if they are detached.
+    Terminates the job when all the volumes are detached.
+    If the volumes fail to detach, force detaches them.
+    """
+    jpd = get_or_error(get_job_provisioning_data(job_model))
+    logger.info("Detaching volumes: %s", [v.name for v in instance_model.volumes])
+    await _detach_volumes_from_job_instance(
+        project=instance_model.project,
+        job_model=job_model,
+        jpd=jpd,
+        instance_model=instance_model,
+    )
+    if len(instance_model.volumes) == 0:
+        # Do not terminate the job while some volumes are not detached.
+        # If force detach never succeeds, the job will be stuck terminating.
+        # The job releases the instance when soft detaching, so the instance won't be stuck.
+        # TODO: In case of multiple jobs per instance, don't consider volumes from other jobs.
+        _set_job_termination_status(job_model)
+
+
+def _set_job_termination_status(job_model: JobModel):
+    if job_model.termination_reason is not None:
+        job_model.status = job_model.termination_reason.to_status()
+        termination_reason_name = job_model.termination_reason.name
+    else:
+        job_model.status = JobStatus.FAILED
+        termination_reason_name = None
+    logger.info(
+        "%s: job status is %s, reason: %s",
+        fmt(job_model),
+        job_model.status.name,
+        termination_reason_name,
+    )
 
 
 async def stop_container(
@@ -344,43 +373,133 @@ def group_jobs_by_replica_latest(jobs: List[JobModel]) -> Iterable[Tuple[int, Li
         yield replica_num, replica_jobs
 
 
-async def detach_volumes_from_instance(
+async def _detach_volumes_from_job_instance(
     project: ProjectModel,
-    instance: InstanceModel,
+    job_model: JobModel,
     jpd: JobProvisioningData,
+    instance_model: InstanceModel,
 ):
-    backend = await get_project_backend_by_type(
+    job_spec = JobSpec.__response__.parse_raw(job_model.job_spec_data)
+    backend = await backends_services.get_project_backend_by_type(
         project=project,
         backend_type=jpd.backend,
     )
     if backend is None:
-        logger.error("Failed to detach volumes from %s. Backend not available.", instance.name)
+        logger.error(
+            "Failed to detach volumes from %s. Backend not available.", instance_model.name
+        )
         return
 
+    # TODO: In case of multiple jobs per instance, detach only volumes used by this job
     detached_volumes = []
-    for volume_model in instance.volumes:
-        volume = volume_model_to_volume(volume_model)
-        try:
-            if volume.provisioning_data is not None and volume.provisioning_data.detachable:
+    for volume_model in instance_model.volumes:
+        detached = await _detach_volume_from_job_instance(
+            backend=backend,
+            job_model=job_model,
+            jpd=jpd,
+            job_spec=job_spec,
+            instance_model=instance_model,
+            volume_model=volume_model,
+        )
+        if detached:
+            detached_volumes.append(volume_model)
+
+    if job_model.volumes_detached_at is None:
+        job_model.volumes_detached_at = common.get_current_datetime()
+    detached_volumes_ids = {v.id for v in detached_volumes}
+    instance_model.volumes = [
+        v for v in instance_model.volumes if v.id not in detached_volumes_ids
+    ]
+
+
+async def _detach_volume_from_job_instance(
+    backend: Backend,
+    job_model: JobModel,
+    jpd: JobProvisioningData,
+    job_spec: JobSpec,
+    instance_model: InstanceModel,
+    volume_model: VolumeModel,
+) -> bool:
+    detached = True
+    volume = volume_model_to_volume(volume_model)
+    if volume.provisioning_data is None or not volume.provisioning_data.detachable:
+        # Backends without `detach_volume` detach volumes automatically
+        return detached
+    try:
+        if job_model.volumes_detached_at is None:
+            # We haven't tried detaching volumes yet, try soft detach first
+            await run_async(
+                backend.compute().detach_volume,
+                volume=volume,
+                instance_id=jpd.instance_id,
+                force=False,
+            )
+            # For some backends, the volume may be detached immediately
+            detached = await run_async(
+                backend.compute().is_volume_detached,
+                volume=volume,
+                instance_id=jpd.instance_id,
+            )
+        else:
+            detached = await run_async(
+                backend.compute().is_volume_detached,
+                volume=volume,
+                instance_id=jpd.instance_id,
+            )
+            if not detached and _should_force_detach_volume(job_model, job_spec.stop_duration):
+                logger.info(
+                    "Force detaching volume %s from %s",
+                    volume_model.name,
+                    instance_model.name,
+                )
                 await run_async(
                     backend.compute().detach_volume,
                     volume=volume,
                     instance_id=jpd.instance_id,
+                    force=True,
                 )
-            detached_volumes.append(volume_model)
-        except BackendError as e:
-            logger.error(
-                "Failed to detach volume %s from %s: %s",
-                volume_model.name,
-                instance.name,
-                repr(e),
-            )
-        except Exception:
-            logger.exception(
-                "Got exception when detaching volume %s from instance %s",
-                volume_model.name,
-                instance.name,
-            )
+                # Let the next iteration check if force detach worked
+    except BackendError as e:
+        logger.error(
+            "Failed to detach volume %s from %s: %s",
+            volume_model.name,
+            instance_model.name,
+            repr(e),
+        )
+    except Exception:
+        logger.exception(
+            "Got exception when detaching volume %s from instance %s",
+            volume_model.name,
+            instance_model.name,
+        )
+    return detached
 
-    detached_volumes_ids = {v.id for v in detached_volumes}
-    instance.volumes = [v for v in instance.volumes if v.id not in detached_volumes_ids]
+
+MIN_FORCE_DETACH_WAIT_PERIOD = timedelta(seconds=60)
+
+
+def _should_force_detach_volume(job_model: JobModel, stop_duration: Optional[int]) -> bool:
+    return (
+        job_model.volumes_detached_at is not None
+        and common.get_current_datetime()
+        > job_model.volumes_detached_at.replace(tzinfo=timezone.utc) + MIN_FORCE_DETACH_WAIT_PERIOD
+        and (
+            job_model.termination_reason == JobTerminationReason.ABORTED_BY_USER
+            or stop_duration is not None
+            and common.get_current_datetime()
+            > job_model.volumes_detached_at.replace(tzinfo=timezone.utc)
+            + timedelta(seconds=stop_duration)
+        )
+    )
+
+
+async def get_instances_ids_with_detaching_volumes(session: AsyncSession) -> List[UUID]:
+    res = await session.execute(
+        select(JobModel).where(
+            JobModel.status == JobStatus.TERMINATING,
+            JobModel.used_instance_id.is_not(None),
+            JobModel.volumes_detached_at.is_not(None),
+        )
+    )
+    job_models = res.scalars().all()
+    return [jm.used_instance_id for jm in job_models if jm.used_instance_id]

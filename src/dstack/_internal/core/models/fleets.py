@@ -178,7 +178,7 @@ class InstanceGroupParams(CoreModel):
         Field(
             description="Time to wait before terminating idle instances. Defaults to `5m` for runs and `3d` for fleets. Use `off` for unlimited duration"
         ),
-    ]
+    ] = None
     # Deprecated:
     termination_policy: Annotated[
         Optional[TerminationPolicy],

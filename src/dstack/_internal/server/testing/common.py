@@ -483,6 +483,7 @@ async def create_instance(
     remote_connection_info: Optional[RemoteConnectionInfo] = None,
     job_provisioning_data: Optional[JobProvisioningData] = None,
     name: str = "test_instance",
+    volumes: Optional[List[VolumeModel]] = None,
 ) -> InstanceModel:
     if instance_id is None:
         instance_id = uuid.uuid4()
@@ -545,6 +546,9 @@ async def create_instance(
             user="test_user",
         )
 
+    if volumes is None:
+        volumes = []
+
     im = InstanceModel(
         id=instance_id,
         name=name,
@@ -569,6 +573,7 @@ async def create_instance(
         instance_configuration=instance_configuration.json(),
         remote_connection_info=remote_connection_info.json() if remote_connection_info else None,
         job=job,
+        volumes=volumes,
     )
     session.add(im)
     await session.commit()

@@ -353,6 +353,7 @@ class JobModel(BaseModel):
     runner_timestamp: Mapped[Optional[int]] = mapped_column(BigInteger)
     # `removed` is used to ensure that the instance is killed after the job is finished
     remove_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
+    volumes_detached_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
     # `instance_assigned` means instance assignment was done.
     # if `instance_assigned` is True and `instance` is None, no instance was assiged.
     instance_assigned: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -580,6 +581,8 @@ class VolumeModel(BaseModel):
 
     configuration: Mapped[str] = mapped_column(Text)
     volume_provisioning_data: Mapped[Optional[str]] = mapped_column(Text)
+    # FIXME: volume_attachment_data should be in "volumes_attachments"
+    # to support multi-attach volumes
     volume_attachment_data: Mapped[Optional[str]] = mapped_column(Text)
 
     # instances the volume is attached to

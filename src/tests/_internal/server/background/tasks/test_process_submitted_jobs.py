@@ -438,6 +438,7 @@ class TestProcessSubmittedJobs:
             await process_submitted_jobs()
 
         await session.refresh(job)
+        await session.refresh(instance)
         res = await session.execute(
             select(JobModel).options(
                 joinedload(JobModel.instance).selectinload(InstanceModel.volumes)
