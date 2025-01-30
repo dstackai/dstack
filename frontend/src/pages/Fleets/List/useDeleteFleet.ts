@@ -1,11 +1,9 @@
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { get } from 'lodash';
 
 import { useNotifications } from 'hooks';
+import { isRequestFormErrors2 } from 'libs';
 import { useDeleteFleetMutation } from 'services/fleet';
-
-import { isRequestFormErrors2 } from '../../../libs';
 
 export const useDeleteFleet = () => {
     const { t } = useTranslation();
