@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Union
 from rich.markup import escape
 from rich.table import Table
 
-from dstack._internal.cli.utils.common import add_row_from_dict, console
+from dstack._internal.cli.utils.common import NO_OFFERS_WARNING, add_row_from_dict, console
 from dstack._internal.core.models.instances import InstanceAvailability
 from dstack._internal.core.models.profiles import (
     DEFAULT_RUN_TERMINATION_IDLE_TIME,
@@ -118,6 +118,8 @@ def print_run_plan(run_plan: RunPlan, offers_limit: int = 3):
                 f"${job_plan.max_price:g} max[/]"
             )
         console.print()
+    else:
+        console.print(NO_OFFERS_WARNING)
 
 
 def get_runs_table(
