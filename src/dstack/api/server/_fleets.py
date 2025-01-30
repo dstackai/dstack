@@ -73,12 +73,17 @@ def _get_fleet_spec_excludes(fleet_spec: FleetSpec) -> Optional[_ExcludeDict]:
         ):
             configuration_excludes["ssh_config"] = {"hosts": {"__all__": {"internal_ip"}}}
     # client >= 0.18.30 / server <= 0.18.29 compatibility tweak
-    if not fleet_spec.configuration.reservation:
+    if fleet_spec.configuration.reservation is None:
         configuration_excludes["reservation"] = True
+    if fleet_spec.profile is not None and fleet_spec.profile.reservation is None:
         profile_excludes.add("reservation")
     if fleet_spec.configuration.idle_duration is None:
         configuration_excludes["idle_duration"] = True
+    if fleet_spec.profile is not None and fleet_spec.profile.idle_duration is None:
         profile_excludes.add("idle_duration")
+    # client >= 0.18.38 / server <= 0.18.37 compatibility tweak
+    if fleet_spec.profile is not None and fleet_spec.profile.stop_duration is None:
+        profile_excludes.add("stop_duration")
 
     if configuration_excludes:
         spec_excludes["configuration"] = configuration_excludes
