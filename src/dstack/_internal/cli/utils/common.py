@@ -25,8 +25,7 @@ LIVE_TABLE_REFRESH_RATE_PER_SEC = 1
 LIVE_TABLE_PROVISION_INTERVAL_SECS = 2
 NO_OFFERS_WARNING = (
     "[warning]"
-    "Could not find instance offers that match your requirements."
-    " Please check the requirements table above or visit the troubleshooting guide:"
+    "No matching instance offers available. Possible reasons:"
     " https://dstack.ai/docs/guides/troubleshooting/#no-offers"
     "[/]\n"
 )
