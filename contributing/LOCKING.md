@@ -8,14 +8,9 @@ with two implementations of resource locking to handle concurrent access:
 
 ## SQLite locking
 
-SQLite is missing efficient mechanisms to handle concurrent writes (e.g. select for update),
-so `dstack` implements in-memory resource-level locking.
-In-memory locking works correctly under the assumption that there is only one server instance (process),
-which is a `dstack` limitation when using SQLite.
+SQLite is missing efficient mechanisms to handle concurrent writes (e.g. select for update), so `dstack` implements in-memory resource-level locking. In-memory locking works correctly under the assumption that there is only one server instance (process), which is a `dstack` limitation when using SQLite.
 
-The in-memory locking is implemented via locksets.
-Locksets are Python sets that store IDs of locked resources.
-Concurrent access to locksets is guarded with asyncio locks:
+The in-memory locking is implemented via locksets. Locksets are Python sets that store IDs of locked resources. Concurrent access to locksets is guarded with asyncio locks:
 
 ```python
 lock, lockset = get_lockset("my_table")
@@ -28,8 +23,7 @@ finally:
     lockset.remove(resource.id)
 ```
 
-Locksets are an optimization. One can think of them as per-resource-id locks that
-allow independent locking of different resources.
+Locksets are an optimization. One can think of them as per-resource-id locks that allow independent locking of different resources.
 
 ## Postgres locking
 
@@ -80,8 +74,7 @@ await session.commit()
 unlock resources
 ```
 
-If a transaction releases a lock before committing changes,
-the changes may not be visible to another transaction that acquired the lock and relies upon seeing all committed changes.
+If a transaction releases a lock before committing changes, the changes may not be visible to another transaction that acquired the lock and relies upon seeing all committed changes.
 
 **Don't use joinedload when selecting .with_for_update()**
 
