@@ -353,7 +353,7 @@ def _print_plan_header(plan: FleetPlan):
                 f"${plan.max_offer_price:g} max[/]"
             )
         console.print()
-    else:
+    elif fleet_type == "cloud":
         console.print(NO_OFFERS_WARNING)
 
 
