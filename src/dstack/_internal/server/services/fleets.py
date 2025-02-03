@@ -239,7 +239,6 @@ async def get_plan(
     user: UserModel,
     spec: FleetSpec,
 ) -> FleetPlan:
-    # TODO: refactor offers logic into a separate module to avoid depending on runs
     current_fleet: Optional[Fleet] = None
     current_fleet_id: Optional[uuid.UUID] = None
     if spec.configuration.name is not None:
@@ -259,6 +258,7 @@ async def get_plan(
             requirements=_get_fleet_requirements(spec),
         )
         offers = [offer for _, offer in offers_with_backends]
+    _remove_fleet_spec_sensitive_info(spec)
     plan = FleetPlan(
         project_name=project.name,
         user=user.name,
