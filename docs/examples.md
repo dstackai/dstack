@@ -82,7 +82,16 @@ hide:
             Deploy and fine-tune LLMs on AMD
         </p>
     </a>
+    <a href="/examples/accelerators/intel"
+       class="feature-cell sky">
+        <h3>
+            INTEL
+        </h3>
 
+        <p>
+            Deploy and fine-tune LLMs on Intel
+        </p>
+    </a>
     <a href="/examples/accelerators/tpu"
        class="feature-cell sky">
         <h3>
