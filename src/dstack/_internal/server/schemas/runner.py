@@ -61,6 +61,7 @@ class SubmitBody(CoreModel):
                 "entrypoint",
                 "env",
                 "gateway",
+                "single_branch",
                 "max_duration",
                 "working_dir",
             }

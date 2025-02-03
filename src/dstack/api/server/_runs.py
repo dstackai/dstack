@@ -145,6 +145,10 @@ def _get_run_spec_excludes(run_spec: RunSpec) -> Optional[dict]:
         configuration_excludes.add("stop_duration")
     if profile is not None and profile.stop_duration is None:
         profile_excludes.add("stop_duration")
+    # client >= 0.18.40 / server <= 0.18.39 compatibility tweak
+    if configuration.single_branch is None:
+        configuration_excludes.add("single_branch")
+
     if configuration_excludes:
         spec_excludes["configuration"] = configuration_excludes
     if profile_excludes:

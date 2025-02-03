@@ -64,6 +64,10 @@ class JobConfigurator(ABC):
         pass
 
     @abstractmethod
+    def _default_single_branch(self) -> bool:
+        pass
+
+    @abstractmethod
     def _default_max_duration(self) -> Optional[int]:
         pass
 
@@ -104,6 +108,7 @@ class JobConfigurator(ABC):
             image_name=self._image_name(),
             user=await self._user(),
             privileged=self._privileged(),
+            single_branch=self._single_branch(),
             max_duration=self._max_duration(),
             stop_duration=self._stop_duration(),
             registry_auth=self._registry_auth(),
@@ -171,6 +176,11 @@ class JobConfigurator(ABC):
 
     def _privileged(self) -> bool:
         return self.run_spec.configuration.privileged
+
+    def _single_branch(self) -> bool:
+        if self.run_spec.configuration.single_branch is None:
+            return self._default_single_branch()
+        return self.run_spec.configuration.single_branch
 
     def _max_duration(self) -> Optional[int]:
         if self.run_spec.merged_profile.max_duration in [None, True]:

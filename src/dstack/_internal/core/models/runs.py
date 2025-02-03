@@ -184,6 +184,7 @@ class JobSpec(CoreModel):
     home_dir: Optional[str]
     image_name: str
     privileged: bool = False
+    single_branch: Optional[bool] = None
     max_duration: Optional[int]
     stop_duration: Optional[int] = None
     registry_auth: Optional[RegistryAuth]
