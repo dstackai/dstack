@@ -35,7 +35,13 @@ func (ex *RunExecutor) setupRepo(ctx context.Context) error {
 }
 
 func (ex *RunExecutor) prepareGit(ctx context.Context) error {
-	repoManager := repo.NewManager(ctx, ex.repoCredentials.CloneURL, ex.run.RepoData.RepoBranch, ex.run.RepoData.RepoHash).WithLocalPath(ex.workingDir)
+	repoManager := repo.NewManager(
+		ctx,
+		ex.repoCredentials.CloneURL,
+		ex.run.RepoData.RepoBranch,
+		ex.run.RepoData.RepoHash,
+		ex.jobSpec.SingleBranch,
+	).WithLocalPath(ex.workingDir)
 	if ex.repoCredentials != nil {
 		log.Trace(ctx, "Credentials is not empty")
 		switch ex.repoCredentials.GetProtocol() {
@@ -51,7 +57,6 @@ func (ex *RunExecutor) prepareGit(ctx context.Context) error {
 			if ex.repoCredentials.PrivateKey == nil {
 				return gerrors.Newf("private key is empty")
 			}
-			repoManager = repo.NewManager(ctx, ex.repoCredentials.CloneURL, ex.run.RepoData.RepoBranch, ex.run.RepoData.RepoHash).WithLocalPath(ex.workingDir)
 			repoManager.WithSSHAuth(*ex.repoCredentials.PrivateKey, "") // we don't support passphrase
 		default:
 			return gerrors.Newf("unsupported remote repo protocol: %s", ex.repoCredentials.GetProtocol())

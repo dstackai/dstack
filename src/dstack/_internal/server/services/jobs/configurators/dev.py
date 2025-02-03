@@ -40,6 +40,9 @@ class DevEnvironmentJobConfigurator(JobConfigurator):
         commands += ["tail -f /dev/null"]  # idle
         return commands
 
+    def _default_single_branch(self) -> bool:
+        return False
+
     def _default_max_duration(self) -> Optional[int]:
         return DEFAULT_MAX_DURATION_SECONDS
 

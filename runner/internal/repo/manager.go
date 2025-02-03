@@ -22,7 +22,7 @@ type Manager struct {
 	hash      string
 }
 
-func NewManager(ctx context.Context, url, branch, hash string) *Manager {
+func NewManager(ctx context.Context, url, branch, hash string, singleBranch bool) *Manager {
 	ctx = log.AppendArgsCtx(ctx, "url", url, "branch", branch, "hash", hash)
 	m := &Manager{
 		ctx: ctx,
@@ -30,7 +30,7 @@ func NewManager(ctx context.Context, url, branch, hash string) *Manager {
 			URL:               url,
 			RecurseSubmodules: git.DefaultSubmoduleRecursionDepth,
 			ReferenceName:     plumbing.NewBranchReferenceName(branch),
-			SingleBranch:      true,
+			SingleBranch:      singleBranch,
 		},
 		hash: hash,
 	}

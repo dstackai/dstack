@@ -51,6 +51,7 @@ type JobSpec struct {
 	Commands       []string          `json:"commands"`
 	Entrypoint     []string          `json:"entrypoint"`
 	Env            map[string]string `json:"env"`
+	SingleBranch   bool              `json:"single_branch"`
 	MaxDuration    int               `json:"max_duration"`
 	WorkingDir     *string           `json:"working_dir"`
 }
