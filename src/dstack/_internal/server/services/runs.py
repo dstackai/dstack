@@ -330,7 +330,7 @@ async def get_plan(
             multinode=jobs[0].job_spec.jobs_per_replica > 1,
             volumes=volumes,
             privileged=jobs[0].job_spec.privileged,
-            instance_mounts=check_run_spec_has_instance_mounts(run_spec),
+            instance_mounts=check_run_spec_requires_instance_mounts(run_spec),
         )
 
     job_plans = []
@@ -897,9 +897,10 @@ def get_offer_mount_point_volume(
     raise ServerClientError("Failed to find an eligible volume for the mount point")
 
 
-def check_run_spec_has_instance_mounts(run_spec: RunSpec) -> bool:
+def check_run_spec_requires_instance_mounts(run_spec: RunSpec) -> bool:
     return any(
-        is_core_model_instance(mp, InstanceMountPoint) for mp in run_spec.configuration.volumes
+        is_core_model_instance(mp, InstanceMountPoint) and not mp.optional
+        for mp in run_spec.configuration.volumes
     )
 
 
