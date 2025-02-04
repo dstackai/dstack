@@ -15,11 +15,7 @@ from dstack._internal.core.models.fleets import (
     FleetStatus,
     InstanceGroupPlacement,
 )
-from dstack._internal.core.models.instances import (
-    InstanceOfferWithAvailability,
-    InstanceSharedOffer,
-    InstanceStatus,
-)
+from dstack._internal.core.models.instances import InstanceOfferWithAvailability, InstanceStatus
 from dstack._internal.core.models.profiles import (
     DEFAULT_POOL_NAME,
     DEFAULT_RUN_TERMINATION_IDLE_TIME,
@@ -360,7 +356,7 @@ async def _assign_job_to_pool_instance(
     master_job_provisioning_data: Optional[JobProvisioningData] = None,
     volumes: Optional[List[List[Volume]]] = None,
 ) -> Optional[InstanceModel]:
-    instances_with_offers: list[tuple[InstanceModel, Optional[InstanceSharedOffer]]]
+    instances_with_offers: list[tuple[InstanceModel, Optional[InstanceOfferWithAvailability]]]
     profile = run_spec.merged_profile
     multinode = job.job_spec.jobs_per_replica > 1
     nonshared_instances = filter_pool_instances(
@@ -591,7 +587,7 @@ def _create_instance_model_for_job(
 
 
 def _prepare_job_runtime_data(
-    shared_offer: Optional[InstanceSharedOffer] = None,
+    shared_offer: Optional[InstanceOfferWithAvailability] = None,
 ) -> JobRuntimeData:
     if shared_offer is None:
         return JobRuntimeData(network_mode=NetworkMode.HOST)

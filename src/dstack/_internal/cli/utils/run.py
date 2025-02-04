@@ -4,7 +4,7 @@ from rich.markup import escape
 from rich.table import Table
 
 from dstack._internal.cli.utils.common import NO_OFFERS_WARNING, add_row_from_dict, console
-from dstack._internal.core.models.instances import InstanceAvailability, InstanceSharedOffer
+from dstack._internal.core.models.instances import InstanceAvailability
 from dstack._internal.core.models.profiles import (
     DEFAULT_RUN_TERMINATION_IDLE_TIME,
     TerminationPolicy,
@@ -97,7 +97,7 @@ def print_run_plan(run_plan: RunPlan, offers_limit: int = 3):
         }:
             availability = offer.availability.value.replace("_", " ").lower()
         instance = offer.instance.name
-        if isinstance(offer, InstanceSharedOffer):
+        if offer.total_blocks > 1:
             instance += f" ({offer.blocks}/{offer.total_blocks})"
         offers.add_row(
             f"{i}",

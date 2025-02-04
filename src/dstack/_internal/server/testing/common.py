@@ -24,7 +24,6 @@ from dstack._internal.core.models.instances import (
     InstanceConfiguration,
     InstanceOfferWithAvailability,
     InstanceSharedInfo,
-    InstanceSharedOffer,
     InstanceStatus,
     InstanceType,
     RemoteConnectionInfo,
@@ -359,7 +358,7 @@ def get_job_runtime_data(
     gpu: Optional[int] = None,
     memory: Optional[float] = None,
     ports: Optional[dict[int, int]] = None,
-    offer: Optional[InstanceSharedOffer] = None,
+    offer: Optional[InstanceOfferWithAvailability] = None,
     volume_names: Optional[list[str]] = None,
 ) -> JobRuntimeData:
     return JobRuntimeData(
@@ -585,40 +584,11 @@ def get_instance_offer_with_availability(
     memory_gib: float = 12,
     disk_gib: float = 100.0,
     spot: bool = False,
+    blocks: int = 1,
+    total_blocks: int = 1,
 ):
     gpus = [Gpu(name="T4", memory_mib=16384, vendor=gpuhunt.AcceleratorVendor.NVIDIA)] * gpu_count
     return InstanceOfferWithAvailability(
-        backend=backend,
-        instance=InstanceType(
-            name="instance",
-            resources=Resources(
-                cpus=cpu_count,
-                memory_mib=int(memory_gib * 1024),
-                gpus=gpus,
-                spot=spot,
-                disk=Disk(size_mib=int(disk_gib * 1024)),
-                description="",
-            ),
-        ),
-        region=region,
-        price=1,
-        availability=InstanceAvailability.AVAILABLE,
-    )
-
-
-def get_instance_shared_offer(
-    blocks: int,
-    total_blocks: int,
-    backend: BackendType = BackendType.AWS,
-    region: str = "eu-west",
-    gpu_count: int = 0,
-    cpu_count: int = 2,
-    memory_gib: float = 12,
-    disk_gib: float = 100.0,
-    spot: bool = False,
-):
-    gpus = [Gpu(name="T4", memory_mib=16384, vendor=gpuhunt.AcceleratorVendor.NVIDIA)] * gpu_count
-    return InstanceSharedOffer(
         backend=backend,
         instance=InstanceType(
             name="instance",

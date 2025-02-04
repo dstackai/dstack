@@ -11,7 +11,6 @@ from dstack._internal.core.backends.base import Backend
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
-    InstanceSharedOffer,
     InstanceType,
     Resources,
 )
@@ -123,7 +122,9 @@ async def get_offers_by_requirements(
     return shareable_offers
 
 
-def generate_shared_offer(offer: InstanceOfferWithAvailability, blocks: int, total_blocks: int):
+def generate_shared_offer(
+    offer: InstanceOfferWithAvailability, blocks: int, total_blocks: int
+) -> InstanceOfferWithAvailability:
     full_resources = offer.instance.resources
     resources = Resources(
         cpus=full_resources.cpus // total_blocks * blocks,
@@ -133,7 +134,7 @@ def generate_shared_offer(offer: InstanceOfferWithAvailability, blocks: int, tot
         disk=full_resources.disk,
         description=full_resources.description,
     )
-    return InstanceSharedOffer(
+    return InstanceOfferWithAvailability(
         backend=offer.backend,
         instance=InstanceType(
             name=offer.instance.name,

@@ -27,7 +27,7 @@ from dstack._internal.server.testing.common import (
     create_run,
     create_user,
     create_volume,
-    get_instance_shared_offer,
+    get_instance_offer_with_availability,
     get_job_provisioning_data,
     get_job_runtime_data,
     get_volume_configuration,
@@ -245,7 +245,7 @@ class TestProcessTerminatingJobs:
             repo=repo,
             user=user,
         )
-        shared_offer = get_instance_shared_offer(blocks=2, total_blocks=4)
+        shared_offer = get_instance_offer_with_availability(blocks=2, total_blocks=4)
         jrd = get_job_runtime_data(offer=shared_offer)
         job = await create_job(
             session=session,

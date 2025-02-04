@@ -2,7 +2,7 @@ import itertools
 import math
 import uuid
 from datetime import datetime, timezone
-from typing import List, Optional, Union
+from typing import List, Optional
 
 import pydantic
 from sqlalchemy import and_, func, or_, select, update
@@ -19,7 +19,6 @@ from dstack._internal.core.models.common import ApplyAction, is_core_model_insta
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceOfferWithAvailability,
-    InstanceSharedOffer,
     InstanceStatus,
 )
 from dstack._internal.core.models.profiles import (
@@ -679,8 +678,8 @@ async def _get_pool_offers(
     run_spec: RunSpec,
     job: Job,
     volumes: List[List[Volume]],
-) -> list[Union[InstanceSharedOffer, InstanceOfferWithAvailability]]:
-    pool_offers: list[Union[InstanceSharedOffer, InstanceOfferWithAvailability]] = []
+) -> list[InstanceOfferWithAvailability]:
+    pool_offers: list[InstanceOfferWithAvailability] = []
 
     detaching_instances_ids = await get_instances_ids_with_detaching_volumes(session)
     pool_instances = [i for i in get_pool_instances(pool) if i.id not in detaching_instances_ids]

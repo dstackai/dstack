@@ -27,7 +27,6 @@ from dstack._internal.core.models.instances import (
     InstanceOffer,
     InstanceOfferWithAvailability,
     InstanceSharedInfo,
-    InstanceSharedOffer,
     InstanceStatus,
     InstanceType,
     RemoteConnectionInfo,
@@ -519,8 +518,8 @@ def get_shared_pool_instances_with_offers(
     idle_only: bool = False,
     fleet_model: Optional[FleetModel] = None,
     volumes: Optional[List[List[Volume]]] = None,
-) -> list[tuple[InstanceModel, InstanceSharedOffer]]:
-    instances_with_offers: list[tuple[InstanceModel, InstanceSharedOffer]] = []
+) -> list[tuple[InstanceModel, InstanceOfferWithAvailability]]:
+    instances_with_offers: list[tuple[InstanceModel, InstanceOfferWithAvailability]] = []
     query_filter = requirements_to_query_filter(requirements)
     filtered_instances = filter_pool_instances(
         pool_instances=pool_instances,
