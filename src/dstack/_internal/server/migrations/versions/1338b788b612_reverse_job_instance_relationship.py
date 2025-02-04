@@ -48,7 +48,9 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     with op.batch_alter_table("instances", schema=None) as batch_op:
-        batch_op.add_column(sa.Column("job_id", sa.UUID(), autoincrement=False, nullable=True))
+        batch_op.add_column(
+            sa.Column("job_id", sqlalchemy_utils.types.uuid.UUIDType(binary=False), nullable=True)
+        )
         batch_op.create_foreign_key("fk_instances_job_id_jobs", "jobs", ["job_id"], ["id"])
 
     # This migration is not fully reversible - we cannot assign multiple jobs to a single instance,
