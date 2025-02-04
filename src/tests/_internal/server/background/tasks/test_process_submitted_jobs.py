@@ -304,6 +304,78 @@ class TestProcessSubmittedJobs:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_provisions_job_with_optional_instance_volume_not_attached(
+        self,
+        test_db,
+        session: AsyncSession,
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        pool = await create_pool(session=session, project=project)
+        repo = await create_repo(
+            session=session,
+            project_id=project.id,
+        )
+        run_spec = get_run_spec(run_name="test-run", repo_id=repo.name)
+        run_spec.configuration.volumes = [
+            InstanceMountPoint(instance_path="/root/.cache", path="/cache", optional=True)
+        ]
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_name="test-run",
+            run_spec=run_spec,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            instance_assigned=True,
+        )
+        offer = InstanceOfferWithAvailability(
+            backend=BackendType.RUNPOD,
+            instance=InstanceType(
+                name="instance",
+                resources=Resources(cpus=1, memory_mib=512, spot=False, gpus=[]),
+            ),
+            region="us",
+            price=1.0,
+            availability=InstanceAvailability.AVAILABLE,
+        )
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            backend_mock = Mock()
+            m.return_value = [backend_mock]
+            backend_mock.TYPE = BackendType.RUNPOD
+            backend_mock.compute.return_value.get_offers_cached.return_value = [offer]
+            backend_mock.compute.return_value.run_job.return_value = JobProvisioningData(
+                backend=offer.backend,
+                instance_type=offer.instance,
+                instance_id="instance_id",
+                hostname="1.1.1.1",
+                internal_ip=None,
+                region=offer.region,
+                price=offer.price,
+                username="ubuntu",
+                ssh_port=22,
+                ssh_proxy=None,
+                dockerized=False,
+                backend_data=None,
+            )
+            await process_submitted_jobs()
+
+        await session.refresh(job)
+        assert job is not None
+        assert job.status == JobStatus.PROVISIONING
+
+        await session.refresh(pool)
+        instance_offer = InstanceOfferWithAvailability.parse_raw(pool.instances[0].offer)
+        assert offer == instance_offer
+        pool_job_provisioning_data = pool.instances[0].job_provisioning_data
+        assert pool_job_provisioning_data == job.job_provisioning_data
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_fails_job_when_no_capacity(self, test_db, session: AsyncSession):
         project = await create_project(session=session)
         user = await create_user(session=session)
@@ -412,7 +484,8 @@ class TestProcessSubmittedJobs:
         run_spec = get_run_spec(run_name="test-run", repo_id=repo.name)
         run_spec.configuration.volumes = [
             VolumeMountPoint(name=volume.name, path="/volume"),
-            InstanceMountPoint(instance_path="/root/.cache", path="/cache"),
+            InstanceMountPoint(instance_path="/root/.data", path="/data"),
+            InstanceMountPoint(instance_path="/root/.cache", path="/cache", optional=True),
         ]
         run = await create_run(
             session=session,

@@ -236,8 +236,27 @@ volumes:
 Since persistence isn't guaranteed (instances may be interrupted or runs may occur on different instances), use instance
 volumes only for caching or with directories manually mounted to network storage.
 
-> Instance volumes are currently supported for all backends except `runpod`, `vastai` and `kubernetes`,
-> and can also be used with [SSH fleets](fleets.md#ssh). 
+!!! info "Backends"
+    Instance volumes are currently supported for all backends except `runpod`, `vastai` and `kubernetes`, and can also be used with [SSH fleets](fleets.md#ssh).
+
+??? info "Optional volumes"
+    If the volume is not critical for your workload, you can mark it as `optional`.
+
+    <div editor-title=".dstack.yml">
+
+    ```yaml
+    type: task
+
+    volumes:
+      - instance_path: /dstack-cache
+        path: /root/.cache/
+        optional: true
+    ```
+
+    Configurations with optional volumes can run in any backend, but the volume is only mounted
+    if the selected backend supports it.
+
+    </div>
 
 ### Use instance volumes for caching
 

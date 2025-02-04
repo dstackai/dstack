@@ -175,7 +175,9 @@ class TestShimClientV1(BaseShimClientTest):
                     "device_name": "/dev/sdv",
                 }
             ],
-            "instance_mounts": [{"instance_path": "/mnt/nfs/home", "path": "/home"}],
+            "instance_mounts": [
+                {"instance_path": "/mnt/nfs/home", "path": "/home", "optional": False}
+            ],
         }
         self.assert_request(adapter, 0, "POST", "/api/submit", expected_request)
 
@@ -341,7 +343,9 @@ class TestShimClientV2(BaseShimClientTest):
                 }
             ],
             "volume_mounts": [{"name": "vol", "path": "/vol"}],
-            "instance_mounts": [{"instance_path": "/mnt/nfs/home", "path": "/home"}],
+            "instance_mounts": [
+                {"instance_path": "/mnt/nfs/home", "path": "/home", "optional": False}
+            ],
             "host_ssh_user": "dstack",
             "host_ssh_keys": ["host_key"],
             "container_ssh_keys": ["project_key", "user_key"],

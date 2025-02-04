@@ -136,6 +136,15 @@ class VolumeMountPoint(CoreModel):
 class InstanceMountPoint(CoreModel):
     instance_path: Annotated[str, Field(description="The absolute path on the instance (host)")]
     path: Annotated[str, Field(description="The absolute path in the container")]
+    optional: Annotated[
+        bool,
+        Field(
+            description=(
+                "Allow running without this volume"
+                " in backends that do not support instance volumes"
+            ),
+        ),
+    ] = False
 
     _validate_instance_path = validator("instance_path", allow_reuse=True)(
         _validate_mount_point_path
