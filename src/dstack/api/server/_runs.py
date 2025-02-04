@@ -4,6 +4,11 @@ from uuid import UUID
 
 from pydantic import parse_obj_as
 
+from dstack._internal.core.models.common import is_core_model_instance
+from dstack._internal.core.models.configurations import (
+    STRIP_PREFIX_DEFAULT,
+    ServiceConfiguration,
+)
 from dstack._internal.core.models.pools import Instance
 from dstack._internal.core.models.profiles import Profile
 from dstack._internal.core.models.runs import (
@@ -146,6 +151,11 @@ def _get_run_spec_excludes(run_spec: RunSpec) -> Optional[dict]:
     if profile is not None and profile.stop_duration is None:
         profile_excludes.add("stop_duration")
     # client >= 0.18.40 / server <= 0.18.39 compatibility tweak
+    if (
+        is_core_model_instance(configuration, ServiceConfiguration)
+        and configuration.strip_prefix == STRIP_PREFIX_DEFAULT
+    ):
+        configuration_excludes.add("strip_prefix")
     if configuration.single_branch is None:
         configuration_excludes.add("single_branch")
 
