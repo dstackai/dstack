@@ -326,8 +326,9 @@ class Run(ABC):
 
             # TODO: get login name from runner in case it's not specified in the run configuration
             # (i.e. the default image user is used, and it is not root)
-            container_user = self._run.run_spec.configuration.user
-            if container_user is None:
+            if job.job_spec.user is not None and job.job_spec.user.username is not None:
+                container_user = job.job_spec.user.username
+            else:
                 container_user = "root"
 
             self._ssh_attach = SSHAttach(
