@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Awaitable, Callable, List
 
 import sentry_sdk
-from fastapi import FastAPI, Request, status
+from fastapi import FastAPI, Request, Response, status
 from fastapi.datastructures import URL
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -215,10 +215,14 @@ def register_routes(app: FastAPI, ui: bool = True):
     @app.middleware("http")
     async def log_request(request: Request, call_next):
         start_time = time.time()
-        response = await call_next(request)
+        response: Response = await call_next(request)
         process_time = time.time() - start_time
         logger.debug(
-            "Processed request %s %s in %s", request.method, request.url, f"{process_time:0.6f}s"
+            "Processed request %s %s in %s. Status: %s",
+            request.method,
+            request.url,
+            f"{process_time:0.6f}s",
+            response.status_code,
         )
         return response
 

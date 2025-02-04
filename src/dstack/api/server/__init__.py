@@ -133,9 +133,16 @@ class APIClient:
         else:
             raise ClientError(f"Failed to connect to dstack server {self._base_url}")
 
+        if 400 <= resp.status_code < 600:
+            logger.debug(
+                "Error requesting %s. Status: %s. Headers: %s. Body: %s",
+                resp.request.url,
+                resp.status_code,
+                resp.headers,
+                resp.content,
+            )
+
         if raise_for_status:
-            if resp.status_code == 500:
-                raise ClientError("Unexpected dstack server error")
             if resp.status_code == 400:  # raise ServerClientError
                 detail: List[Dict] = resp.json()["detail"]
                 if len(detail) == 1 and detail[0]["code"] in _server_client_errors:
@@ -145,7 +152,16 @@ class APIClient:
             if resp.status_code == 422:
                 formatted_error = pprint.pformat(resp.json())
                 raise ClientError(f"Server validation error: \n{formatted_error}")
-            resp.raise_for_status()
+            if resp.status_code == 403:
+                raise ClientError(
+                    f"Access to {resp.request.url} is denied. Please check your access token"
+                )
+            if 400 <= resp.status_code < 600:
+                raise ClientError(
+                    f"Unexpected error: status code {resp.status_code}"
+                    f" when requesting {resp.request.url}."
+                    " Check server logs or run with DSTACK_CLI_LOG_LEVEL=DEBUG to see more details"
+                )
         return resp
 
 
