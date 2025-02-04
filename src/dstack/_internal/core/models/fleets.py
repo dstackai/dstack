@@ -65,8 +65,10 @@ class SSHHostParams(CoreModel):
         Union[Literal["auto"], int],
         Field(
             description=(
-                "The amount of blocks to split the instance into, a number or `auto` (e.g., `4`)."
-                " Defaults to `1` (do not split)"
+                "The amount of blocks to split the instance into, a number or `auto`."
+                " `auto` means as many as possible."
+                " The number of GPUs and CPUs must be divisible by the number of blocks."
+                " Defaults to `1`, i.e. do not split"
             ),
             ge=1,
         ),
@@ -157,8 +159,10 @@ class InstanceGroupParams(CoreModel):
         Union[Literal["auto"], int],
         Field(
             description=(
-                "The amount of blocks to split the instance into, a number or `auto` (e.g., `4`)."
-                " Defaults to `1` (do not split)"
+                "The amount of blocks to split the instance into, a number or `auto`."
+                " `auto` means as many as possible."
+                " The number of GPUs and CPUs must be divisible by the number of blocks."
+                " Defaults to `1`, i.e. do not split"
             ),
             ge=1,
         ),
