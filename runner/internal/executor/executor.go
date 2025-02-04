@@ -756,13 +756,13 @@ func backupFile(ctx context.Context, path string) func(context.Context) {
 		if !existed {
 			err := os.Remove(path)
 			if err != nil && !errors.Is(err, os.ErrNotExist) {
-				log.Warning(ctx, "failed to remove", "path", path)
+				log.Error(ctx, "failed to remove", "path", path, "err", err)
 			}
 			return
 		}
 		err := os.Rename(backupPath, path)
 		if err != nil && !errors.Is(err, os.ErrNotExist) {
-			log.Warning(ctx, "failed to restore", "path", path)
+			log.Error(ctx, "failed to restore", "path", path, "err", err)
 		}
 	}
 
@@ -773,23 +773,25 @@ func backupFile(ctx context.Context, path string) func(context.Context) {
 	}
 	existed = true
 	if err != nil {
-		log.Warning(ctx, "failed to back up", "path", path)
+		log.Error(ctx, "failed to back up", "path", path, "err", err)
 		return restoreFunc
 	}
 
 	src, err := os.Open(backupPath)
 	if err != nil {
+		log.Error(ctx, "failed to open backup src", "path", backupPath, "err", err)
 		return restoreFunc
 	}
 	defer src.Close()
 	dst, err := os.Create(path)
 	if err != nil {
+		log.Error(ctx, "failed to open backup dest", "path", path, "err", err)
 		return restoreFunc
 	}
 	defer dst.Close()
 	_, err = io.Copy(dst, src)
 	if err != nil {
-		log.Warning(ctx, "failed to copy backup", "path", path)
+		log.Error(ctx, "failed to copy backup", "path", backupPath, "err", err)
 	}
 	return restoreFunc
 }
