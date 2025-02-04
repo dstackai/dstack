@@ -131,6 +131,16 @@ class BaseRunConfiguration(CoreModel):
             description="Use image with NVIDIA CUDA Compiler (NVCC) included. Mutually exclusive with `image`"
         ),
     ]
+    single_branch: Annotated[
+        Optional[bool],
+        Field(
+            description=(
+                "Whether to clone and track only the current branch or all remote branches."
+                " Relevant only when using remote Git repos."
+                " Defaults to `false` for dev environments and to `true` for tasks and services"
+            )
+        ),
+    ] = None
     env: Annotated[
         Env,
         Field(description="The mapping or the list of environment variables"),

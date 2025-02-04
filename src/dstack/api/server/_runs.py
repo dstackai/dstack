@@ -156,6 +156,8 @@ def _get_run_spec_excludes(run_spec: RunSpec) -> Optional[dict]:
         and configuration.strip_prefix == STRIP_PREFIX_DEFAULT
     ):
         configuration_excludes.add("strip_prefix")
+    if configuration.single_branch is None:
+        configuration_excludes.add("single_branch")
 
     if configuration_excludes:
         spec_excludes["configuration"] = configuration_excludes
