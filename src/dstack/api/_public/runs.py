@@ -324,11 +324,19 @@ class Run(ABC):
             if runtime_data is not None and runtime_data.ports is not None:
                 container_ssh_port = runtime_data.ports.get(container_ssh_port, container_ssh_port)
 
+            # TODO: get login name from runner in case it's not specified in the run configuration
+            # (i.e. the default image user is used, and it is not root)
+            if job.job_spec.user is not None and job.job_spec.user.username is not None:
+                container_user = job.job_spec.user.username
+            else:
+                container_user = "root"
+
             self._ssh_attach = SSHAttach(
                 hostname=provisioning_data.hostname,
                 ssh_port=provisioning_data.ssh_port,
                 container_ssh_port=container_ssh_port,
                 user=provisioning_data.username,
+                container_user=container_user,
                 id_rsa_path=ssh_identity_file,
                 ports_lock=self._ports_lock,
                 run_name=name,
