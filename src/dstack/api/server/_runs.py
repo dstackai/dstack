@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List, Optional, Union
+from typing import Any, List, Optional, Union
 from uuid import UUID
 
 from pydantic import parse_obj_as
@@ -19,6 +19,7 @@ from dstack._internal.core.models.runs import (
     RunPlan,
     RunSpec,
 )
+from dstack._internal.core.models.volumes import InstanceMountPoint
 from dstack._internal.server.schemas.runs import (
     ApplyRunPlanRequest,
     CreateInstanceRequest,
@@ -131,33 +132,33 @@ def _get_apply_plan_excludes(plan: ApplyRunPlanInput) -> Optional[dict]:
 
 
 def _get_run_spec_excludes(run_spec: RunSpec) -> Optional[dict]:
-    spec_excludes: dict[str, set[str]] = {}
-    configuration_excludes: set[str] = set()
+    spec_excludes: dict[str, Any] = {}
+    configuration_excludes: dict[str, Any] = {}
     profile_excludes: set[str] = set()
     configuration = run_spec.configuration
     profile = run_spec.profile
 
     # client >= 0.18.18 / server <= 0.18.17 compatibility tweak
     if not configuration.privileged:
-        configuration_excludes.add("privileged")
+        configuration_excludes["privileged"] = True
     # client >= 0.18.23 / server <= 0.18.22 compatibility tweak
     if configuration.type == "service" and configuration.gateway is None:
-        configuration_excludes.add("gateway")
+        configuration_excludes["gateway"] = True
     # client >= 0.18.30 / server <= 0.18.29 compatibility tweak
     if run_spec.configuration.user is None:
-        configuration_excludes.add("user")
+        configuration_excludes["user"] = True
     # client >= 0.18.30 / server <= 0.18.29 compatibility tweak
     if configuration.reservation is None:
-        configuration_excludes.add("reservation")
+        configuration_excludes["reservation"] = True
     if profile is not None and profile.reservation is None:
         profile_excludes.add("reservation")
     if configuration.idle_duration is None:
-        configuration_excludes.add("idle_duration")
+        configuration_excludes["idle_duration"] = True
     if profile is not None and profile.idle_duration is None:
         profile_excludes.add("idle_duration")
     # client >= 0.18.38 / server <= 0.18.37 compatibility tweak
     if configuration.stop_duration is None:
-        configuration_excludes.add("stop_duration")
+        configuration_excludes["stop_duration"] = True
     if profile is not None and profile.stop_duration is None:
         profile_excludes.add("stop_duration")
     # client >= 0.18.40 / server <= 0.18.39 compatibility tweak
@@ -165,12 +166,17 @@ def _get_run_spec_excludes(run_spec: RunSpec) -> Optional[dict]:
         is_core_model_instance(configuration, ServiceConfiguration)
         and configuration.strip_prefix == STRIP_PREFIX_DEFAULT
     ):
-        configuration_excludes.add("strip_prefix")
+        configuration_excludes["strip_prefix"] = True
     if configuration.single_branch is None:
-        configuration_excludes.add("single_branch")
+        configuration_excludes["single_branch"] = True
+    if all(
+        not is_core_model_instance(v, InstanceMountPoint) or not v.optional
+        for v in configuration.volumes
+    ):
+        configuration_excludes["volumes"] = {"__all__": {"optional"}}
     # client >= 0.18.41 / server <= 0.18.40 compatibility tweak
     if configuration.availability_zones is None:
-        configuration_excludes.add("availability_zones")
+        configuration_excludes["availability_zones"] = True
     if profile is not None and profile.availability_zones is None:
         profile_excludes.add("availability_zones")
 
