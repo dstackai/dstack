@@ -332,6 +332,7 @@ class TestShowPool:
                     "created": "2023-01-02T03:04:00+00:00",
                     "pool_name": None,
                     "region": "en",
+                    "availability_zone": None,
                     "price": 1,
                 }
             ],
@@ -503,6 +504,7 @@ class TestRemoveInstance:
                     "created": "2023-01-02T03:04:00+00:00",
                     "pool_name": None,
                     "region": "en",
+                    "availability_zone": None,
                     "price": 1,
                 }
             ],

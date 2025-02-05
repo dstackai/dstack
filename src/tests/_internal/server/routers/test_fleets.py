@@ -395,6 +395,7 @@ class TestCreateFleet:
                     "pool_name": None,
                     "backend": None,
                     "region": None,
+                    "availability_zone": None,
                     "instance_type": None,
                     "price": None,
                 }
@@ -526,6 +527,7 @@ class TestCreateFleet:
                     "termination_reason": None,
                     "created": "2023-01-02T03:04:00+00:00",
                     "region": "remote",
+                    "availability_zone": None,
                     "price": 0.0,
                 }
             ],

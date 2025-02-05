@@ -1537,6 +1537,7 @@ class TestCreateInstance:
                 "created": result["created"],
                 "pool_name": None,
                 "region": None,
+                "availability_zone": None,
                 "price": None,
             }
             assert result == expected
