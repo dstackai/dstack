@@ -646,9 +646,10 @@ async def create_instance_model(
         project_name=project.name,
         instance_name=instance_name,
         user=user.name,
-        instance_id=str(instance_id),
         ssh_keys=[project_ssh_key],
+        instance_id=str(instance_id),
         placement_group_name=placement_group_name,
+        availability_zones=profile.availability_zones,
         reservation=reservation,
     )
     instance = InstanceModel(

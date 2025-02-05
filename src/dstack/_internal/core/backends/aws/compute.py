@@ -161,10 +161,8 @@ class AWSCompute(Compute):
         ec2_resource = self.session.resource("ec2", region_name=instance_offer.region)
         ec2_client = self.session.client("ec2", region_name=instance_offer.region)
         allocate_public_ip = self.config.allocate_public_ips
-        availability_zones = None
-        if instance_config.availability_zone is not None:
-            availability_zones = [instance_config.availability_zone]
-
+        availability_zones = instance_config.get_availability_zones()
+        # TODO: filter out unknown zones for other backends/regions
         tags = {
             "Name": instance_config.instance_name,
             "owner": "dstack",
@@ -283,6 +281,7 @@ class AWSCompute(Compute):
         project_ssh_private_key: str,
         volumes: List[Volume],
     ) -> JobProvisioningData:
+        # TODO: run_job is the same for vm-based backends, refactor
         instance_config = InstanceConfiguration(
             project_name=run.project_name,
             instance_name=get_instance_name(run, job),  # TODO: generate name
@@ -292,13 +291,22 @@ class AWSCompute(Compute):
             user=run.user,
             reservation=run.run_spec.configuration.reservation,
         )
+        instance_config.availability_zones = run.run_spec.merged_profile.availability_zones
         if len(volumes) > 0:
             volume = volumes[0]
             if (
                 volume.provisioning_data is not None
                 and volume.provisioning_data.availability_zone is not None
             ):
-                instance_config.availability_zone = volume.provisioning_data.availability_zone
+                if instance_config.availability_zones is None:
+                    instance_config.availability_zones = [
+                        volume.provisioning_data.availability_zone
+                    ]
+                instance_config.availability_zones = [
+                    az
+                    for az in instance_config.availability_zones
+                    if az == volume.provisioning_data.availability_zone
+                ]
         return self.create_instance(instance_offer, instance_config)
 
     def create_placement_group(

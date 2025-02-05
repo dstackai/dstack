@@ -157,8 +157,10 @@ class GCPCompute(Compute):
         authorized_keys = instance_config.get_public_keys()
 
         zones = _get_instance_zones(instance_offer)
-        if instance_config.availability_zone:
-            zones = [z for z in zones if z == instance_config.availability_zone]
+        instance_config_zones = instance_config.get_availability_zones()
+        # TODO: filter out unknown zones for other backends/regions
+        if instance_config_zones is not None:
+            zones = [z for z in zones if z in instance_config_zones]
 
         # If a shared VPC is not used, we can create firewall rules for user
         if self.config.vpc_project_id is None:
@@ -380,13 +382,22 @@ class GCPCompute(Compute):
             user=run.user,
             volumes=volumes,
         )
+        instance_config.availability_zones = run.run_spec.merged_profile.availability_zones
         if len(volumes) > 0:
             volume = volumes[0]
             if (
                 volume.provisioning_data is not None
                 and volume.provisioning_data.availability_zone is not None
             ):
-                instance_config.availability_zone = volume.provisioning_data.availability_zone
+                if instance_config.availability_zones is None:
+                    instance_config.availability_zones = [
+                        volume.provisioning_data.availability_zone
+                    ]
+                instance_config.availability_zones = [
+                    az
+                    for az in instance_config.availability_zones
+                    if az == volume.provisioning_data.availability_zone
+                ]
         return self.create_instance(instance_offer, instance_config)
 
     def create_gateway(

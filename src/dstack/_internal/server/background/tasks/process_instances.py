@@ -880,8 +880,11 @@ def _patch_instance_configuration(instance: InstanceModel) -> InstanceConfigurat
     if (
         fleet.spec.configuration.placement == InstanceGroupPlacement.CLUSTER
         and master_job_provisioning_data is not None
+        and master_job_provisioning_data.availability_zone is not None
     ):
-        instance_configuration.availability_zone = master_job_provisioning_data.availability_zone
+        instance_configuration.availability_zones = [
+            master_job_provisioning_data.availability_zone
+        ]
 
     return instance_configuration
 
