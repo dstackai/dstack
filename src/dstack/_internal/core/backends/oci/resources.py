@@ -269,23 +269,22 @@ def get_shapes_availability(
     return result
 
 
-def choose_available_domain(
+def get_available_domains(
     shape_name: str, shapes_quota: ShapesQuota, region: OCIRegionClient, compartment_id: str
-) -> Optional[str]:
+) -> List[str]:
     """
-    Returns the name of any availability domain within `region` in which
-    `shape_name` is available. None if the shape is unavailable or not within
-    `shapes_quota` in all domains.
+    Returns the names of all availability domains in `region` in which
+    `shape_name` is available and within `shapes_quota`.
     """
-
+    domains = []
     for domain in region.availability_domains:
         if shapes_quota.is_within_domain_quota(
             shape_name, domain.name
         ) and check_availability_in_domain(
             {shape_name}, domain.name, region.compute_client, compartment_id
         ):
-            return domain.name
-    return None
+            domains.append(domain.name)
+    return domains
 
 
 def get_instance_vnic(

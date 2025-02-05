@@ -9,7 +9,7 @@ from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.oci import resources
 from dstack._internal.core.backends.oci.config import OCIConfig
 from dstack._internal.core.backends.oci.region import make_region_clients_map
-from dstack._internal.core.errors import NoCapacityError
+from dstack._internal.core.errors import ComputeError, NoCapacityError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
@@ -111,11 +111,13 @@ class OCICompute(Compute):
     ) -> JobProvisioningData:
         region = self.regions[instance_offer.region]
 
-        availability_domain = resources.choose_available_domain(
+        available_domains = resources.get_available_domains(
             instance_offer.instance.name, self.shapes_quota, region, self.config.compartment_id
         )
-        if availability_domain is None:
-            raise NoCapacityError("Shape unavailable in all availability domains")
+        availability_domain = _get_availability_domain_or_error(
+            availabile_domains=available_domains,
+            requested_domains=instance_config.get_availability_zones(),
+        )
 
         listing, package = resources.get_marketplace_listing_and_package(
             cuda=len(instance_offer.instance.resources.gpus) > 0,
@@ -170,6 +172,7 @@ class OCICompute(Compute):
             hostname=None,
             internal_ip=None,
             region=instance_offer.region,
+            availability_zone=availability_domain,
             price=instance_offer.price,
             username="ubuntu",
             ssh_port=22,
@@ -197,3 +200,22 @@ def _supported_instances(offer: InstanceOffer) -> bool:
     if "Flex" in offer.instance.name:
         return False
     return any(map(offer.instance.name.startswith, SUPPORTED_SHAPE_FAMILIES))
+
+
+def _get_availability_domain_or_error(
+    availabile_domains: List[str],
+    requested_domains: Optional[List[str]],
+) -> str:
+    domains = availabile_domains
+    if requested_domains is not None:
+        domains = [
+            ad
+            for ad in availabile_domains
+            # Allow specifying domains with or without prefix
+            if ad in requested_domains or ad.split(":")[1] in requested_domains
+        ]
+        if len(availabile_domains) > 0 and len(domains) == 0:
+            raise ComputeError(f"No valid availability domains: {requested_domains}")
+    if len(domains) == 0:
+        raise NoCapacityError("Shape unavailable in all availability domains")
+    return domains[0]
