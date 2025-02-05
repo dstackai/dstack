@@ -27,9 +27,20 @@ class VolumesAPIClient(APIClientGroup):
         configuration: VolumeConfiguration,
     ) -> Volume:
         body = CreateVolumeRequest(configuration=configuration)
-        resp = self._request(f"/api/project/{project_name}/volumes/create", body=body.json())
+        resp = self._request(
+            f"/api/project/{project_name}/volumes/create",
+            body=body.json(exclude=_get_volume_configuration_excludes(configuration)),
+        )
         return parse_obj_as(Volume.__response__, resp.json())
 
     def delete(self, project_name: str, names: List[str]) -> None:
         body = DeleteVolumesRequest(names=names)
         self._request(f"/api/project/{project_name}/volumes/delete", body=body.json())
+
+
+def _get_volume_configuration_excludes(configuration: VolumeConfiguration) -> dict:
+    configuration_excludes = {}
+    # client >= 0.18.41 / server <= 0.18.40 compatibility tweak
+    if configuration.availability_zone is None:
+        configuration_excludes["availability_zone"] = True
+    return {"configuration": configuration_excludes}

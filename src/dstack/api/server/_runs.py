@@ -81,7 +81,10 @@ class RunsAPIClient(APIClientGroup):
     ) -> Run:
         plan_input: ApplyRunPlanInput = ApplyRunPlanInput.__response__.parse_obj(plan)
         body = ApplyRunPlanRequest(plan=plan_input, force=force)
-        resp = self._request(f"/api/project/{project_name}/runs/apply", body=body.json())
+        resp = self._request(
+            f"/api/project/{project_name}/runs/apply",
+            body=body.json(exclude=_get_apply_plan_excludes(plan_input)),
+        )
         return parse_obj_as(Run.__response__, resp.json())
 
     def submit(self, project_name: str, run_spec: RunSpec) -> Run:
@@ -118,6 +121,13 @@ class RunsAPIClient(APIClientGroup):
         body = CreateInstanceRequest(profile=profile, requirements=requirements)
         resp = self._request(f"/api/project/{project_name}/runs/create_instance", body=body.json())
         return parse_obj_as(Instance.__response__, resp.json())
+
+
+def _get_apply_plan_excludes(plan: ApplyRunPlanInput) -> Optional[dict]:
+    run_spec_excludes = _get_run_spec_excludes(plan.run_spec)
+    if run_spec_excludes is not None:
+        return {"plan": run_spec_excludes}
+    return None
 
 
 def _get_run_spec_excludes(run_spec: RunSpec) -> Optional[dict]:
@@ -158,6 +168,11 @@ def _get_run_spec_excludes(run_spec: RunSpec) -> Optional[dict]:
         configuration_excludes.add("strip_prefix")
     if configuration.single_branch is None:
         configuration_excludes.add("single_branch")
+    # client >= 0.18.41 / server <= 0.18.40 compatibility tweak
+    if configuration.availability_zones is None:
+        configuration_excludes.add("availability_zones")
+    if profile is not None and profile.availability_zones is None:
+        profile_excludes.add("availability_zones")
 
     if configuration_excludes:
         spec_excludes["configuration"] = configuration_excludes
