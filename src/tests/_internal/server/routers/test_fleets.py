@@ -340,6 +340,7 @@ class TestCreateFleet:
                     },
                     "backends": None,
                     "regions": None,
+                    "availability_zones": None,
                     "instance_types": None,
                     "spot_policy": None,
                     "retry": None,
@@ -354,6 +355,7 @@ class TestCreateFleet:
                 "profile": {
                     "backends": None,
                     "regions": None,
+                    "availability_zones": None,
                     "instance_types": None,
                     "spot_policy": None,
                     "retry": None,
@@ -458,6 +460,7 @@ class TestCreateFleet:
                     },
                     "backends": None,
                     "regions": None,
+                    "availability_zones": None,
                     "instance_types": None,
                     "spot_policy": None,
                     "retry": None,
@@ -472,6 +475,7 @@ class TestCreateFleet:
                 "profile": {
                     "backends": None,
                     "regions": None,
+                    "availability_zones": None,
                     "instance_types": None,
                     "spot_policy": None,
                     "retry": None,
