@@ -75,6 +75,7 @@ from dstack._internal.server.services.volumes import (
     volume_model_to_volume,
 )
 from dstack._internal.utils import common as common_utils
+from dstack._internal.utils import env as env_utils
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -583,8 +584,12 @@ def _create_instance_model_for_job(
 
 def _prepare_job_runtime_data(offer: InstanceOfferWithAvailability) -> JobRuntimeData:
     if offer.total_blocks == 1:
+        if env_utils.get_bool("DSTACK_FORCE_BRIDGE_NETWORK"):
+            network_mode = NetworkMode.BRIDGE
+        else:
+            network_mode = NetworkMode.HOST
         return JobRuntimeData(
-            network_mode=NetworkMode.HOST,
+            network_mode=network_mode,
             offer=offer,
         )
     return JobRuntimeData(
