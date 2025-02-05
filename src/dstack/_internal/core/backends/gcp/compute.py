@@ -158,10 +158,10 @@ class GCPCompute(Compute):
 
         zones = _get_instance_zones(instance_offer)
         instance_config_zones = instance_config.get_availability_zones()
-        # TODO: filter out unknown zones for other backends/regions
         if instance_config_zones is not None:
             zones = [z for z in zones if z in instance_config_zones]
-
+            if len(zones) == 0:
+                raise ComputeError(f"No valid availability zones: {instance_config_zones}")
         # If a shared VPC is not used, we can create firewall rules for user
         if self.config.vpc_project_id is None:
             gcp_resources.create_runner_firewall_rules(

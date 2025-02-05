@@ -161,8 +161,12 @@ class AWSCompute(Compute):
         ec2_resource = self.session.resource("ec2", region_name=instance_offer.region)
         ec2_client = self.session.client("ec2", region_name=instance_offer.region)
         allocate_public_ip = self.config.allocate_public_ips
-        availability_zones = instance_config.get_availability_zones()
-        # TODO: filter out unknown zones for other backends/regions
+        zones = aws_resources.get_availability_zones(ec2_client, instance_offer.region)
+        instance_config_zones = instance_config.get_availability_zones()
+        if instance_config_zones is not None:
+            zones = [z for z in zones if z in instance_config_zones]
+            if len(zones) == 0:
+                raise ComputeError(f"No valid availability zones: {instance_config_zones}")
         tags = {
             "Name": instance_config.instance_name,
             "owner": "dstack",
@@ -183,7 +187,7 @@ class AWSCompute(Compute):
                 config=self.config,
                 region=instance_offer.region,
                 allocate_public_ip=allocate_public_ip,
-                availability_zones=availability_zones,
+                availability_zones=zones,
             )
             subnet_id_to_az_map = aws_resources.get_subnets_availability_zones(
                 ec2_client=ec2_client,
@@ -208,11 +212,11 @@ class AWSCompute(Compute):
         except botocore.exceptions.ClientError as e:
             logger.warning("Got botocore.exceptions.ClientError: %s", e)
             raise NoCapacityError()
-        tried_availability_zones = set()
+        tried_zones = set()
         for subnet_id, az in subnet_id_to_az_map.items():
-            if az in tried_availability_zones:
+            if az in tried_zones:
                 continue
-            tried_availability_zones.add(az)
+            tried_zones.add(az)
             try:
                 logger.debug("Trying provisioning %s in %s", instance_offer.instance.name, az)
                 image_id, username = aws_resources.get_image_id_and_username(
