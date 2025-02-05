@@ -261,6 +261,7 @@ def instance_model_to_instance(instance_model: InstanceModel) -> Instance:
     if jpd is not None:
         instance.instance_type = jpd.instance_type
         instance.hostname = jpd.hostname
+        instance.availability_zone = jpd.availability_zone
 
     if instance_model.job is not None:
         instance.job_name = instance_model.job.job_name

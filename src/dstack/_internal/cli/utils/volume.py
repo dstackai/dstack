@@ -27,18 +27,16 @@ def get_volumes_table(
         table.add_column("ERROR")
 
     for volume in volumes:
+        backend = f"{volume.configuration.backend.value} ({volume.configuration.region})"
+        region = volume.configuration.region
         if verbose:
-            backend = f"{volume.configuration.backend.value}"
-            region = f"{volume.configuration.region}"
+            backend = volume.configuration.backend.value
             if (
                 verbose
                 and volume.provisioning_data is not None
                 and volume.provisioning_data.availability_zone is not None
             ):
                 region += f" ({volume.provisioning_data.availability_zone})"
-        else:
-            backend = f"{volume.configuration.backend.value} ({volume.configuration.region})"
-            region = f"{volume.configuration.region}"
         renderables = [
             volume.name,
             backend,

@@ -23,6 +23,8 @@ def get_fleets_table(
         table.add_column("RESERVATION")
     table.add_column("INSTANCE")
     table.add_column("BACKEND")
+    if verbose:
+        table.add_column("REGION")
     table.add_column("RESOURCES")
     table.add_column("PRICE")
     table.add_column("STATUS")
@@ -51,8 +53,12 @@ def get_fleets_table(
             if backend == "remote":
                 backend = "ssh"
             if instance.region:
-                backend += f" ({instance.region})"
-
+                region = f"{instance.region}"
+                if verbose:
+                    if instance.availability_zone:
+                        region += f" ({instance.availability_zone})"
+                else:
+                    backend += f" ({instance.region})"
             row = [
                 fleet.name if i == 0 else "",
             ]
@@ -61,6 +67,10 @@ def get_fleets_table(
             row += [
                 str(instance.instance_num),
                 backend,
+            ]
+            if verbose:
+                row.append(region)
+            row += [
                 resources,
                 f"${instance.price:.4}" if instance.price is not None else "",
                 status,
