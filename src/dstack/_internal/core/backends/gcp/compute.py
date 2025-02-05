@@ -508,15 +508,18 @@ class GCPCompute(Compute):
         raise ComputeError(f"Persistent disk {volume.configuration.volume_id} not found")
 
     def create_volume(self, volume: Volume) -> VolumeProvisioningData:
-        zone = gcp_resources.get_availability_zone(
+        zones = gcp_resources.get_availability_zones(
             regions_client=self.regions_client,
             project_id=self.config.project_id,
             region=volume.configuration.region,
         )
-        if zone is None:
+        if volume.configuration.availability_zone is not None:
+            zones = [z for z in zones if z == volume.configuration.availability_zone]
+        if len(zones) == 0:
             raise ComputeError(
                 f"Failed to find availability zone in region {volume.configuration.region}"
             )
+        zone = zones[0]
 
         labels = {
             "owner": "dstack",

@@ -32,6 +32,9 @@ class VolumeConfiguration(CoreModel):
     name: Annotated[Optional[str], Field(description="The volume name")] = None
     backend: Annotated[BackendType, Field(description="The volume backend")]
     region: Annotated[str, Field(description="The volume region")]
+    availability_zone: Annotated[
+        Optional[str], Field(description="The volume availability zone")
+    ] = None
     size: Annotated[
         Optional[Memory],
         Field(description="The volume size. Must be specified when creating new volumes"),

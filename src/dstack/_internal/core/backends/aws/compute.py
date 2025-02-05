@@ -552,14 +552,16 @@ class AWSCompute(Compute):
         }
         tags = merge_tags(tags=tags, backend_tags=self.config.tags)
 
-        zone = aws_resources.get_availability_zone(
+        zones = aws_resources.get_availability_zones(
             ec2_client=ec2_client, region=volume.configuration.region
         )
-        if zone is None:
+        if volume.configuration.availability_zone is not None:
+            zones = [z for z in zones if z == volume.configuration.availability_zone]
+        if len(zones) == 0:
             raise ComputeError(
                 f"Failed to find availability zone in region {volume.configuration.region}"
             )
-
+        zone = zones[0]
         volume_type = "gp3"
 
         logger.debug("Creating EBS volume %s", volume.configuration.name)
@@ -578,7 +580,6 @@ class AWSCompute(Compute):
 
         size = response["Size"]
         iops = response["Iops"]
-
         return VolumeProvisioningData(
             backend=BackendType.AWS,
             volume_id=response["VolumeId"],

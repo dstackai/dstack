@@ -31,7 +31,7 @@ supported_accelerators = [
 ]
 
 
-def get_availability_zone(
+def get_any_availability_zone(
     regions_client: compute_v1.RegionsClient,
     project_id: str,
     region: str,
