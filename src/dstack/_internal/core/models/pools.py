@@ -34,7 +34,7 @@ class Instance(CoreModel):
     region: Optional[str] = None
     price: Optional[float] = None
     total_blocks: Optional[int] = None
-    busy_blocks: Optional[int] = None
+    busy_blocks: int = 0
 
 
 class PoolInstances(CoreModel):

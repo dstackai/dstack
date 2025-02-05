@@ -7,10 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.instances import (
-    InstanceSharedInfo,
-    InstanceStatus,
-)
+from dstack._internal.core.models.instances import InstanceStatus
 from dstack._internal.core.models.runs import JobStatus, JobTerminationReason
 from dstack._internal.core.models.volumes import VolumeStatus
 from dstack._internal.server.background.tasks.process_terminating_jobs import (
@@ -236,7 +233,8 @@ class TestProcessTerminatingJobs:
             project=project,
             pool=pool,
             status=InstanceStatus.BUSY,
-            shared_info=InstanceSharedInfo(total_blocks=4, busy_blocks=3),
+            total_blocks=4,
+            busy_blocks=3,
         )
         await session.refresh(pool)
         run = await create_run(
@@ -266,9 +264,8 @@ class TestProcessTerminatingJobs:
         assert job.status == JobStatus.TERMINATED
         assert job.instance_assigned
         assert job.instance is None
-        assert InstanceSharedInfo.__response__.parse_raw(
-            instance.shared_info
-        ) == InstanceSharedInfo(total_blocks=4, busy_blocks=1)
+        assert instance.total_blocks == 4
+        assert instance.busy_blocks == 1
 
     async def test_detaches_job_volumes_on_shared_instance(self, session: AsyncSession):
         project = await create_project(session=session)

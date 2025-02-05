@@ -546,8 +546,9 @@ class InstanceModel(BaseModel):
 
     remote_connection_info: Mapped[Optional[str]] = mapped_column(Text)
 
-    # If NULL, the instance is not shareable (i.e., cannot be split into blocks)
-    shared_info: Mapped[Optional[str]] = mapped_column(Text)
+    # NULL means `auto` (only during provisioning, when ready it's not NULL)
+    total_blocks: Mapped[Optional[int]] = mapped_column(Integer)
+    busy_blocks: Mapped[int] = mapped_column(Integer, default=0)
 
     jobs: Mapped[list["JobModel"]] = relationship(back_populates="instance", lazy="joined")
     last_job_processed_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)

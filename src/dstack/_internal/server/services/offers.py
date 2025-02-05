@@ -31,7 +31,7 @@ async def get_offers_by_requirements(
     volumes: Optional[List[List[Volume]]] = None,
     privileged: bool = False,
     instance_mounts: bool = False,
-    blocks: Optional[Union[Literal["auto"], int]] = None,
+    blocks: Union[int, Literal["auto"]] = 1,
 ) -> List[Tuple[Backend, InstanceOfferWithAvailability]]:
     backends: List[Backend] = await backends_services.get_project_backends(project=project)
 
@@ -99,27 +99,41 @@ async def get_offers_by_requirements(
     if profile.instance_types is not None:
         offers = [(b, o) for b, o in offers if o.instance.name in profile.instance_types]
 
-    if blocks is None or blocks == 1:
+    if blocks == 1:
         return offers
 
     shareable_offers = []
     for backend, offer in offers:
         resources = offer.instance.resources
-        gpus = resources.gpus
-        if not gpus:
+        cpu_count = resources.cpus
+        gpu_count = len(resources.gpus)
+        if gpu_count > 0 and resources.gpus[0].vendor == gpuhunt.AcceleratorVendor.GOOGLE:
+            # TPUs cannot be shared
+            gpu_count = 1
+        divisible, _blocks = is_divisible_into_blocks(cpu_count, gpu_count, blocks)
+        if not divisible:
             continue
-        if gpus[0].vendor == gpuhunt.AcceleratorVendor.GOOGLE:
-            # TPU instances cannot be shared
-            continue
-        if blocks == "auto":
-            divisor = len(gpus)
-        else:
-            divisor = blocks
-        if len(gpus) % divisor or resources.cpus % divisor:
-            # gpus or cpus are not divisible by blocks
-            continue
+        offer.total_blocks = _blocks
         shareable_offers.append((backend, offer))
     return shareable_offers
+
+
+def is_divisible_into_blocks(
+    cpu_count: int, gpu_count: int, blocks: Union[int, Literal["auto"]]
+) -> tuple[bool, int]:
+    """
+    Returns `True` and number of blocks the instance can be split into or `False` and `0` if
+    is not divisible.
+    Requested number of blocks can be `auto`, which means as many as possible.
+    """
+    if blocks == "auto":
+        if gpu_count == 0:
+            blocks = cpu_count
+        else:
+            blocks = min(cpu_count, gpu_count)
+    if blocks < 1 or cpu_count % blocks or gpu_count % blocks:
+        return False, 0
+    return True, blocks
 
 
 def generate_shared_offer(

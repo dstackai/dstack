@@ -2,7 +2,7 @@ import asyncio
 import uuid
 from typing import List, Optional, Tuple
 
-from sqlalchemy import or_, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, lazyload, selectinload
 
@@ -59,8 +59,8 @@ from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.offers import get_offers_by_requirements
 from dstack._internal.server.services.pools import (
     filter_pool_instances,
+    get_instance_offer,
     get_instance_provisioning_data,
-    get_instance_shared_info,
     get_shared_pool_instances_with_offers,
 )
 from dstack._internal.server.services.runs import (
@@ -187,10 +187,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
             .where(
                 InstanceModel.pool_id == pool.id,
                 InstanceModel.deleted == False,
-                or_(
-                    ~InstanceModel.jobs.any(),
-                    InstanceModel.shared_info.is_not(None),
-                ),
+                InstanceModel.total_blocks > InstanceModel.busy_blocks,
             )
             .options(lazyload(InstanceModel.jobs))
             .with_for_update()
@@ -210,10 +207,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
                     InstanceModel.id.not_in(detaching_instances_ids),
                     InstanceModel.id.in_(instances_ids),
                     InstanceModel.deleted == False,
-                    or_(
-                        ~InstanceModel.jobs.any(),
-                        InstanceModel.shared_info.is_not(None),
-                    ),
+                    InstanceModel.total_blocks > InstanceModel.busy_blocks,
                 )
             )
             pool_instances = list(res.unique().scalars().all())
@@ -295,7 +289,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
             offer=offer,
             instance_num=instance_num,
         )
-        job_model.job_runtime_data = _prepare_job_runtime_data().json()
+        job_model.job_runtime_data = _prepare_job_runtime_data(offer).json()
         instance.fleet_id = fleet_model.id
         logger.info(
             "The job %s created the new instance %s",
@@ -356,7 +350,7 @@ async def _assign_job_to_pool_instance(
     master_job_provisioning_data: Optional[JobProvisioningData] = None,
     volumes: Optional[List[List[Volume]]] = None,
 ) -> Optional[InstanceModel]:
-    instances_with_offers: list[tuple[InstanceModel, Optional[InstanceOfferWithAvailability]]]
+    instances_with_offers: list[tuple[InstanceModel, InstanceOfferWithAvailability]]
     profile = run_spec.merged_profile
     multinode = job.job_spec.jobs_per_replica > 1
     nonshared_instances = filter_pool_instances(
@@ -370,7 +364,10 @@ async def _assign_job_to_pool_instance(
         volumes=volumes,
         shared=False,
     )
-    instances_with_offers = [(instance, None) for instance in nonshared_instances]
+    instances_with_offers = [
+        (instance, common_utils.get_or_error(get_instance_offer(instance)))
+        for instance in nonshared_instances
+    ]
     if not multinode:
         shared_instances_with_offers = get_shared_pool_instances_with_offers(
             pool_instances=pool_instances,
@@ -395,11 +392,7 @@ async def _assign_job_to_pool_instance(
     )
     instance = res.unique().scalar_one()
     instance.status = InstanceStatus.BUSY
-    if offer is not None:
-        # instance is shared (split into blocks)
-        shared_info = common_utils.get_or_error(get_instance_shared_info(instance))
-        shared_info.busy_blocks += offer.blocks
-        instance.shared_info = shared_info.json()
+    instance.busy_blocks += offer.blocks
 
     logger.info(
         "The job %s switched instance %s status to BUSY",
@@ -582,21 +575,24 @@ def _create_instance_model_for_job(
         price=offer.price,
         region=offer.region,
         volumes=[],
+        total_blocks=1,
+        busy_blocks=1,
     )
     return instance
 
 
-def _prepare_job_runtime_data(
-    shared_offer: Optional[InstanceOfferWithAvailability] = None,
-) -> JobRuntimeData:
-    if shared_offer is None:
-        return JobRuntimeData(network_mode=NetworkMode.HOST)
+def _prepare_job_runtime_data(offer: InstanceOfferWithAvailability) -> JobRuntimeData:
+    if offer.total_blocks == 1:
+        return JobRuntimeData(
+            network_mode=NetworkMode.HOST,
+            offer=offer,
+        )
     return JobRuntimeData(
         network_mode=NetworkMode.BRIDGE,
-        offer=shared_offer,
-        cpu=shared_offer.instance.resources.cpus,
-        gpu=len(shared_offer.instance.resources.gpus),
-        memory=Memory(shared_offer.instance.resources.memory_mib / 1024),
+        offer=offer,
+        cpu=offer.instance.resources.cpus,
+        gpu=len(offer.instance.resources.gpus),
+        memory=Memory(offer.instance.resources.memory_mib / 1024),
     )
 
 

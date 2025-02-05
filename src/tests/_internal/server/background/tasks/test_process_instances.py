@@ -14,7 +14,6 @@ from dstack._internal.core.models.instances import (
     Gpu,
     InstanceAvailability,
     InstanceOfferWithAvailability,
-    InstanceSharedInfo,
     InstanceStatus,
     InstanceType,
     Resources,
@@ -479,81 +478,59 @@ class TestTerminate:
 @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
 @pytest.mark.usefixtures("test_db")
 class TestCreateInstance:
-    async def test_creates_instance_no_blocks(self, session: AsyncSession):
-        project = await create_project(session=session)
-        pool = await create_pool(session, project)
-        instance = await create_instance(session, project, pool, status=InstanceStatus.PENDING)
-        with patch(
-            "dstack._internal.server.background.tasks.process_instances.get_create_instance_offers"
-        ) as get_create_instance_offers:
-            offer = InstanceOfferWithAvailability(
-                backend=BackendType.AWS,
-                instance=InstanceType(
-                    name="instance",
-                    resources=Resources(cpus=1, memory_mib=512, spot=False, gpus=[]),
-                ),
-                region="us",
-                price=1.0,
-                availability=InstanceAvailability.AVAILABLE,
-            )
-
-            backend_mock = Mock()
-            backend_mock.TYPE = BackendType.AWS
-            backend_mock.compute.return_value.get_offers_cached.return_value = [offer]
-            backend_mock.compute.return_value.create_instance.return_value = JobProvisioningData(
-                backend=offer.backend,
-                instance_type=offer.instance,
-                instance_id="instance_id",
-                hostname="1.1.1.1",
-                internal_ip=None,
-                region=offer.region,
-                price=offer.price,
-                username="ubuntu",
-                ssh_port=22,
-                ssh_proxy=None,
-                dockerized=True,
-                backend_data=None,
-            )
-            get_create_instance_offers.return_value = [(backend_mock, offer)]
-            await process_instances()
-
-        await session.refresh(instance)
-        assert instance.status == InstanceStatus.PROVISIONING
-        assert instance.shared_info is None
-
     @pytest.mark.parametrize(
-        ["blocks", "expected_blocks"],
+        # requested_blocks = None means `auto` (as many as possible)
+        ["cpus", "gpus", "requested_blocks", "expected_blocks"],
         [
-            [4, 4],
-            ["auto", 8],
+            # GPU instances
+            pytest.param(32, 8, 1, 1, id="gpu-instance-no-blocks"),
+            pytest.param(32, 8, 2, 2, id="gpu-instance-four-gpu-per-block"),
+            pytest.param(32, 8, 4, 4, id="gpu-instance-two-gpus-per-block"),
+            pytest.param(32, 8, None, 8, id="gpu-instance-auto-max-gpu"),
+            pytest.param(4, 8, None, 4, id="gpu-instance-auto-max-cpu"),
+            pytest.param(8, 8, None, 8, id="gpu-instance-auto-max-cpu-and-gpu"),
+            # CPU instances
+            pytest.param(32, 0, 1, 1, id="cpu-instance-no-blocks"),
+            pytest.param(32, 0, 2, 2, id="cpu-instance-four-cpu-per-block"),
+            pytest.param(32, 0, 4, 4, id="cpu-instance-two-cpus-per-block"),
+            pytest.param(32, 0, None, 32, id="gpu-instance-auto-max-cpu"),
         ],
     )
-    async def test_creates_instance_with_blocks(
-        self, session: AsyncSession, blocks, expected_blocks
+    async def test_creates_instance(
+        self,
+        session: AsyncSession,
+        cpus: int,
+        gpus: int,
+        requested_blocks: Optional[int],
+        expected_blocks: int,
     ):
         project = await create_project(session=session)
         pool = await create_pool(session, project)
-        shared_info = InstanceSharedInfo(total_blocks=blocks)
         instance = await create_instance(
-            session, project, pool, status=InstanceStatus.PENDING, shared_info=shared_info
+            session,
+            project,
+            pool,
+            status=InstanceStatus.PENDING,
+            total_blocks=requested_blocks,
+            busy_blocks=0,
         )
-        with patch(
-            "dstack._internal.server.background.tasks.process_instances.get_create_instance_offers"
-        ) as get_create_instance_offers:
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            backend_mock = Mock()
+            m.return_value = [backend_mock]
+            backend_mock.TYPE = BackendType.AWS
             gpu = Gpu(name="T4", memory_mib=16384, vendor=gpuhunt.AcceleratorVendor.NVIDIA)
             offer = InstanceOfferWithAvailability(
                 backend=BackendType.AWS,
                 instance=InstanceType(
                     name="instance",
-                    resources=Resources(cpus=32, memory_mib=131072, spot=False, gpus=[gpu] * 8),
+                    resources=Resources(
+                        cpus=cpus, memory_mib=131072, spot=False, gpus=[gpu] * gpus
+                    ),
                 ),
                 region="us",
                 price=1.0,
                 availability=InstanceAvailability.AVAILABLE,
             )
-
-            backend_mock = Mock()
-            backend_mock.TYPE = BackendType.AWS
             backend_mock.compute.return_value.get_offers_cached.return_value = [offer]
             backend_mock.compute.return_value.create_instance.return_value = JobProvisioningData(
                 backend=offer.backend,
@@ -569,14 +546,13 @@ class TestCreateInstance:
                 dockerized=True,
                 backend_data=None,
             )
-            get_create_instance_offers.return_value = [(backend_mock, offer)]
+
             await process_instances()
 
         await session.refresh(instance)
         assert instance.status == InstanceStatus.PROVISIONING
-        assert InstanceSharedInfo.parse_raw(instance.shared_info) == InstanceSharedInfo(
-            total_blocks=expected_blocks, busy_blocks=0
-        )
+        assert instance.total_blocks == expected_blocks
+        assert instance.busy_blocks == 0
 
 
 @pytest.mark.asyncio
@@ -604,90 +580,36 @@ class TestAddSSHInstance:
         )
         return mock
 
-    async def test_adds_ssh_instance_no_blocks_requested(
-        self, session: AsyncSession, host_info: dict
-    ):
-        host_info["gpu_count"] = 8
-        project = await create_project(session=session)
-        pool = await create_pool(session, project)
-        instance = await create_instance(
-            session,
-            project,
-            pool,
-            status=InstanceStatus.PENDING,
-            created_at=get_current_datetime(),
-            remote_connection_info=get_remote_connection_info(),
-            shared_info=None,
-        )
-        await session.commit()
-
-        await process_instances()
-
-        await session.refresh(instance)
-        assert instance.status == InstanceStatus.IDLE
-        assert instance.shared_info is None
-
     @pytest.mark.parametrize(
-        ["gpu_count", "total_blocks"],
+        # requested_blocks = None means `auto` (as many as possible)
+        ["cpus", "gpus", "requested_blocks", "expected_blocks"],
         [
-            [0, "auto"],
-            [1, "auto"],
-            [1, 1],
+            # GPU instances
+            pytest.param(32, 8, 1, 1, id="gpu-instance-no-blocks"),
+            pytest.param(32, 8, 2, 2, id="gpu-instance-four-gpu-per-block"),
+            pytest.param(32, 8, 4, 4, id="gpu-instance-two-gpus-per-block"),
+            pytest.param(32, 8, None, 8, id="gpu-instance-auto-max-gpu"),
+            pytest.param(4, 8, None, 4, id="gpu-instance-auto-max-cpu"),
+            pytest.param(8, 8, None, 8, id="gpu-instance-auto-max-cpu-and-gpu"),
+            # CPU instances
+            pytest.param(32, 0, 1, 1, id="cpu-instance-no-blocks"),
+            pytest.param(32, 0, 2, 2, id="cpu-instance-four-cpu-per-block"),
+            pytest.param(32, 0, 4, 4, id="cpu-instance-two-cpus-per-block"),
+            pytest.param(32, 0, None, 32, id="gpu-instance-auto-max-cpu"),
         ],
     )
-    async def test_adds_ssh_instance_no_blocks_zero_or_one_gpu(
-        self, session: AsyncSession, host_info: dict, gpu_count, total_blocks
-    ):
-        host_info["gpu_count"] = gpu_count
-        project = await create_project(session=session)
-        pool = await create_pool(session, project)
-        if total_blocks is None:
-            shared_info = None
-        else:
-            shared_info = InstanceSharedInfo(total_blocks=total_blocks)
-        instance = await create_instance(
-            session,
-            project,
-            pool,
-            status=InstanceStatus.PENDING,
-            created_at=get_current_datetime(),
-            remote_connection_info=get_remote_connection_info(),
-            shared_info=shared_info,
-        )
-        await session.commit()
-
-        await process_instances()
-
-        await session.refresh(instance)
-        assert instance.status == InstanceStatus.IDLE
-        assert instance.shared_info is None
-
-    async def test_adds_ssh_instance_number_blocks(self, session: AsyncSession, host_info: dict):
-        host_info["gpu_count"] = 8
-        project = await create_project(session=session)
-        pool = await create_pool(session, project)
-        instance = await create_instance(
-            session,
-            project,
-            pool,
-            status=InstanceStatus.PENDING,
-            created_at=get_current_datetime(),
-            remote_connection_info=get_remote_connection_info(),
-            shared_info=InstanceSharedInfo(total_blocks=4),
-        )
-        await session.commit()
-
-        await process_instances()
-
-        await session.refresh(instance)
-        assert instance.status == InstanceStatus.IDLE
-        assert InstanceSharedInfo.parse_raw(instance.shared_info) == InstanceSharedInfo(
-            total_blocks=4, busy_blocks=0
-        )
-
     @pytest.mark.usefixtures("deploy_instance_mock")
-    async def test_adds_ssh_instance_auto_blocks(self, session: AsyncSession, host_info: dict):
-        host_info["gpu_count"] = 8
+    async def test_adds_ssh_instance(
+        self,
+        session: AsyncSession,
+        host_info: dict,
+        cpus: int,
+        gpus: int,
+        requested_blocks: Optional[int],
+        expected_blocks: int,
+    ):
+        host_info["cpus"] = cpus
+        host_info["gpu_count"] = gpus
         project = await create_project(session=session)
         pool = await create_pool(session, project)
         instance = await create_instance(
@@ -697,7 +619,8 @@ class TestAddSSHInstance:
             status=InstanceStatus.PENDING,
             created_at=get_current_datetime(),
             remote_connection_info=get_remote_connection_info(),
-            shared_info=InstanceSharedInfo(total_blocks="auto"),
+            total_blocks=requested_blocks,
+            busy_blocks=0,
         )
         await session.commit()
 
@@ -705,6 +628,5 @@ class TestAddSSHInstance:
 
         await session.refresh(instance)
         assert instance.status == InstanceStatus.IDLE
-        assert InstanceSharedInfo.parse_raw(instance.shared_info) == InstanceSharedInfo(
-            total_blocks=8, busy_blocks=0
-        )
+        assert instance.total_blocks == expected_blocks
+        assert instance.busy_blocks == 0

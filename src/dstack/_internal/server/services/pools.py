@@ -26,7 +26,6 @@ from dstack._internal.core.models.instances import (
     InstanceConfiguration,
     InstanceOffer,
     InstanceOfferWithAvailability,
-    InstanceSharedInfo,
     InstanceStatus,
     InstanceType,
     RemoteConnectionInfo,
@@ -251,6 +250,8 @@ def instance_model_to_instance(instance_model: InstanceModel) -> Instance:
         unreachable=instance_model.unreachable,
         termination_reason=instance_model.termination_reason,
         created=instance_model.created_at.replace(tzinfo=timezone.utc),
+        total_blocks=instance_model.total_blocks,
+        busy_blocks=instance_model.busy_blocks,
     )
 
     offer = get_instance_offer(instance_model)
@@ -263,11 +264,6 @@ def instance_model_to_instance(instance_model: InstanceModel) -> Instance:
     if jpd is not None:
         instance.instance_type = jpd.instance_type
         instance.hostname = jpd.hostname
-
-    shared_info = get_instance_shared_info(instance_model)
-    if shared_info is not None and isinstance(shared_info.total_blocks, int):
-        instance.total_blocks = shared_info.total_blocks
-        instance.busy_blocks = shared_info.busy_blocks
 
     return instance
 
@@ -294,12 +290,6 @@ def get_instance_profile(instance_model: InstanceModel) -> Profile:
 
 def get_instance_requirements(instance_model: InstanceModel) -> Requirements:
     return Requirements.__response__.parse_raw(instance_model.requirements)
-
-
-def get_instance_shared_info(instance_model: InstanceModel) -> Optional[InstanceSharedInfo]:
-    if instance_model.shared_info is None:
-        return None
-    return InstanceSharedInfo.__response__.parse_raw(instance_model.shared_info)
 
 
 async def generate_instance_name(
@@ -491,7 +481,10 @@ def filter_pool_instances(
             and jpd.availability_zone not in zones
         ):
             continue
-        if (instance.shared_info is not None) != shared:
+        if instance.total_blocks is None:
+            # Still provisioning, we don't know yet if it shared or not
+            continue
+        if (instance.total_blocks > 1) != shared:
             continue
 
         candidates.append(instance)
@@ -535,14 +528,8 @@ def get_shared_pool_instances_with_offers(
         offer = get_instance_offer(instance)
         if offer is None:
             continue
-        shared_info = get_instance_shared_info(instance)
-        if shared_info is None:
-            continue
-        total_blocks = shared_info.total_blocks
-        if total_blocks == "auto":
-            # provisioning in progress
-            continue
-        idle_blocks = total_blocks - shared_info.busy_blocks
+        total_blocks = common_utils.get_or_error(instance.total_blocks)
+        idle_blocks = total_blocks - instance.busy_blocks
         for blocks in range(1, total_blocks + 1):
             shared_offer = generate_shared_offer(offer, blocks, total_blocks)
             catalog_item = offer_to_catalog_item(shared_offer)
@@ -696,7 +683,7 @@ async def create_instance_model(
     instance_num: int,
     placement_group_name: Optional[str],
     reservation: Optional[str],
-    blocks: Optional[Union[Literal["auto"], int]] = None,
+    blocks: Union[Literal["auto"], int],
 ) -> InstanceModel:
     termination_policy, termination_idle_time = get_termination(
         profile, DEFAULT_POOL_TERMINATION_IDLE_TIME
@@ -715,10 +702,6 @@ async def create_instance_model(
         placement_group_name=placement_group_name,
         reservation=reservation,
     )
-    if blocks is not None:
-        shared_info = InstanceSharedInfo(total_blocks=blocks)
-    else:
-        shared_info = None
     instance = InstanceModel(
         id=instance_id,
         name=instance_name,
@@ -733,7 +716,8 @@ async def create_instance_model(
         instance_configuration=instance_config.json(),
         termination_policy=termination_policy,
         termination_idle_time=termination_idle_time,
-        shared_info=shared_info.json() if shared_info is not None else None,
+        total_blocks=None if blocks == "auto" else blocks,
+        busy_blocks=0,
     )
     session.add(instance)
     return instance
@@ -752,7 +736,7 @@ async def create_ssh_instance_model(
     ssh_user: str,
     ssh_keys: List[SSHKey],
     env: Env,
-    blocks: Optional[Union[Literal["auto"], int]] = None,
+    blocks: Union[Literal["auto"], int],
 ) -> InstanceModel:
     # TODO: doc - will overwrite after remote connected
     instance_resource = Resources(cpus=2, memory_mib=8, gpus=[], spot=False)
@@ -789,10 +773,6 @@ async def create_ssh_instance_model(
         ssh_keys=ssh_keys,
         env=env,
     )
-    if blocks is not None:
-        shared_info = InstanceSharedInfo(total_blocks=blocks)
-    else:
-        shared_info = None
     im = InstanceModel(
         id=uuid.uuid4(),
         name=instance_name,
@@ -811,6 +791,7 @@ async def create_ssh_instance_model(
         price=offer.price,
         termination_policy=TerminationPolicy.DONT_DESTROY,
         termination_idle_time=0,
-        shared_info=shared_info.json() if shared_info is not None else None,
+        total_blocks=None if blocks == "auto" else blocks,
+        busy_blocks=0,
     )
     return im

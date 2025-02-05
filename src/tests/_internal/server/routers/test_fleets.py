@@ -396,8 +396,8 @@ class TestCreateFleet:
                     "region": None,
                     "instance_type": None,
                     "price": None,
-                    "total_blocks": None,
-                    "busy_blocks": None,
+                    "total_blocks": 1,
+                    "busy_blocks": 0,
                 }
             ],
         }
@@ -527,8 +527,8 @@ class TestCreateFleet:
                     "created": "2023-01-02T03:04:00+00:00",
                     "region": "remote",
                     "price": 0.0,
-                    "total_blocks": None,
-                    "busy_blocks": None,
+                    "total_blocks": 1,
+                    "busy_blocks": 0,
                 }
             ],
         }

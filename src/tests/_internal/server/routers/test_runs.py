@@ -1530,8 +1530,8 @@ class TestCreateInstance:
                 "pool_name": None,
                 "region": None,
                 "price": None,
-                "total_blocks": None,
-                "busy_blocks": None,
+                "total_blocks": 1,
+                "busy_blocks": 0,
             }
             assert result == expected
 

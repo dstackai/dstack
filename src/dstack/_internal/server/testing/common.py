@@ -23,7 +23,6 @@ from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceConfiguration,
     InstanceOfferWithAvailability,
-    InstanceSharedInfo,
     InstanceStatus,
     InstanceType,
     RemoteConnectionInfo,
@@ -508,7 +507,8 @@ async def create_instance(
     remote_connection_info: Optional[RemoteConnectionInfo] = None,
     offer: Optional[InstanceOfferWithAvailability] = None,
     job_provisioning_data: Optional[JobProvisioningData] = None,
-    shared_info: Optional[InstanceSharedInfo] = None,
+    total_blocks: Optional[int] = 1,
+    busy_blocks: int = 0,
     name: str = "test_instance",
     volumes: Optional[List[VolumeModel]] = None,
 ) -> InstanceModel:
@@ -567,7 +567,8 @@ async def create_instance(
         instance_configuration=instance_configuration.json(),
         remote_connection_info=remote_connection_info.json() if remote_connection_info else None,
         volumes=volumes,
-        shared_info=shared_info.json() if shared_info else None,
+        total_blocks=total_blocks,
+        busy_blocks=busy_blocks,
     )
     if job:
         im.jobs.append(job)

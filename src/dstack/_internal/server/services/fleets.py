@@ -278,7 +278,7 @@ async def get_create_instance_offers(
     requirements: Requirements,
     exclude_not_available=False,
     fleet_model: Optional[FleetModel] = None,
-    blocks: Optional[Union[Literal["auto"], int]] = None,
+    blocks: Union[int, Literal["auto"]] = 1,
 ) -> List[Tuple[Backend, InstanceOfferWithAvailability]]:
     multinode = False
     master_job_provisioning_data = None
@@ -398,9 +398,6 @@ async def create_fleet_instance_model(
 ) -> InstanceModel:
     profile = spec.merged_profile
     requirements = _get_fleet_requirements(spec)
-    blocks: Optional[Union[Literal["auto"], int]] = spec.configuration.blocks
-    if isinstance(blocks, int) and blocks < 2:
-        blocks = None
     instance_model = await pools_services.create_instance_model(
         session=session,
         project=project,
@@ -412,7 +409,7 @@ async def create_fleet_instance_model(
         instance_num=instance_num,
         placement_group_name=placement_group_name,
         reservation=reservation,
-        blocks=blocks,
+        blocks=spec.configuration.blocks,
     )
     return instance_model
 
@@ -432,7 +429,7 @@ async def create_fleet_ssh_instance_model(
         ssh_key = ssh_params.ssh_key
         port = ssh_params.port
         internal_ip = None
-        blocks = None
+        blocks = 1
     else:
         hostname = host.hostname
         ssh_user = host.user or ssh_params.user
@@ -444,9 +441,6 @@ async def create_fleet_ssh_instance_model(
     if ssh_user is None or ssh_key is None:
         # This should not be reachable but checked by fleet spec validation
         raise ServerClientError("ssh key or user not specified")
-
-    if isinstance(blocks, int) and blocks < 2:
-        blocks = None
 
     instance_model = await pools_services.create_ssh_instance_model(
         project=project,
@@ -619,6 +613,8 @@ async def create_instance(
         instance_configuration=None,
         termination_policy=termination_policy,
         termination_idle_time=termination_idle_time,
+        total_blocks=1,
+        busy_blocks=0,
     )
     logger.info(
         "Added a new instance %s",

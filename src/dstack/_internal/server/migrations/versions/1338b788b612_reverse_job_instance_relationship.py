@@ -1,7 +1,7 @@
 """Reverse Job-Instance relationship
 
 Revision ID: 1338b788b612
-Revises: da574e93fee0
+Revises: 51d45659d574
 Create Date: 2025-01-16 14:59:19.113534
 
 """
@@ -12,7 +12,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "1338b788b612"
-down_revision = "da574e93fee0"
+down_revision = "51d45659d574"
 branch_labels = None
 depends_on = None
 

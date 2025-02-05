@@ -66,6 +66,8 @@ class TestInstanceModelToInstance:
             created=created,
             region="eu-west-1",
             price=1.0,
+            total_blocks=1,
+            busy_blocks=0,
         )
         im = InstanceModel(
             id=instance_id,
@@ -78,6 +80,8 @@ class TestInstanceModelToInstance:
             pool=None,
             job_provisioning_data='{"ssh_proxy":null, "backend":"local","hostname":"hostname_test","region":"eu-west","price":1.0,"username":"user1","ssh_port":12345,"dockerized":false,"instance_id":"test_instance","instance_type": {"name": "instance", "resources": {"cpus": 1, "memory_mib": 512, "gpus": [], "spot": false, "disk": {"size_mib": 102400}, "description":""}}}',
             offer='{"price":"LOCAL", "price":1.0, "backend":"local", "region":"eu-west-1", "availability":"available","instance": {"name": "instance", "resources": {"cpus": 1, "memory_mib": 512, "gpus": [], "spot": false, "disk": {"size_mib": 102400}, "description":""}}}',
+            total_blocks=1,
+            busy_blocks=0,
         )
         instance = services_pools.instance_model_to_instance(im)
         assert instance == expected_instance

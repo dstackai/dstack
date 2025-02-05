@@ -172,7 +172,8 @@ def get_runs_table(
                 jrd = latest_job_submission.job_runtime_data
                 if jrd is not None and jrd.offer is not None:
                     resources = jrd.offer.instance.resources
-                    instance += f" ({jrd.offer.blocks}/{jrd.offer.total_blocks})"
+                    if jrd.offer.total_blocks > 1:
+                        instance += f" ({jrd.offer.blocks}/{jrd.offer.total_blocks})"
                 job_row.update(
                     {
                         "BACKEND": f"{jpd.backend.value.replace('remote', 'ssh')} ({jpd.region})",

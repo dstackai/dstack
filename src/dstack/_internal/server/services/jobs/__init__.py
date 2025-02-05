@@ -38,7 +38,6 @@ from dstack._internal.server.services.jobs.configurators.dev import DevEnvironme
 from dstack._internal.server.services.jobs.configurators.service import ServiceJobConfigurator
 from dstack._internal.server.services.jobs.configurators.task import TaskJobConfigurator
 from dstack._internal.server.services.logging import fmt
-from dstack._internal.server.services.pools import get_instance_shared_info
 from dstack._internal.server.services.runner import client
 from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
 from dstack._internal.server.services.volumes import (
@@ -255,15 +254,17 @@ async def process_terminating_job(
                 volume_models=volume_models,
             )
 
+    if jrd is not None and jrd.offer is not None:
+        blocks = jrd.offer.blocks
+    else:
+        # Old job submitted before jrd or blocks were introduced
+        blocks = 1
+    instance_model.busy_blocks -= blocks
+
     if instance_model.status == InstanceStatus.BUSY:
         # no other jobs besides this one
         if not [j for j in instance_model.jobs if j.id != job_model.id]:
             instance_model.status = InstanceStatus.IDLE
-        if jrd is not None and jrd.offer is not None:
-            shared_info = get_instance_shared_info(instance_model)
-            if shared_info is not None:
-                shared_info.busy_blocks -= jrd.offer.blocks
-                instance_model.shared_info = shared_info.json()
     elif instance_model.status != InstanceStatus.TERMINATED:
         # instance was PROVISIONING (specially for the job)
         # schedule for termination

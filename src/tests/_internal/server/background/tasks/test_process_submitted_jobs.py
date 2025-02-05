@@ -10,7 +10,6 @@ from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceOfferWithAvailability,
-    InstanceSharedInfo,
     InstanceStatus,
     InstanceType,
     Resources,
@@ -470,7 +469,8 @@ class TestProcessSubmittedJobs:
             pool=pool,
             status=InstanceStatus.IDLE,
             offer=offer,
-            shared_info=InstanceSharedInfo(total_blocks=4, busy_blocks=1),
+            total_blocks=4,
+            busy_blocks=1,
         )
         await session.refresh(pool)
         run = await create_run(
@@ -493,9 +493,8 @@ class TestProcessSubmittedJobs:
         assert (
             job.instance_assigned and job.instance is not None and job.instance.id == instance.id
         )
-        assert InstanceSharedInfo.__response__.parse_raw(
-            instance.shared_info
-        ) == InstanceSharedInfo(total_blocks=4, busy_blocks=2)
+        assert instance.total_blocks == 4
+        assert instance.busy_blocks == 2
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)

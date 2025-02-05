@@ -77,6 +77,7 @@ from dstack._internal.server.services.fleets import (
     get_create_instance_offers,
 )
 from dstack._internal.server.services.locking import get_locker
+from dstack._internal.server.services.offers import is_divisible_into_blocks
 from dstack._internal.server.services.placement import (
     get_fleet_placement_groups,
     placement_group_model_to_placement_group,
@@ -86,7 +87,6 @@ from dstack._internal.server.services.pools import (
     get_instance_profile,
     get_instance_provisioning_data,
     get_instance_requirements,
-    get_instance_shared_info,
 )
 from dstack._internal.server.services.runner import client as runner_client
 from dstack._internal.server.services.runner.client import HealthStatus
@@ -323,29 +323,25 @@ async def _add_remote(instance: InstanceModel) -> None:
             )
             return
 
-    shared_info = get_instance_shared_info(instance)
-    if shared_info is not None:
-        resources = instance_type.resources
-        blocks = shared_info.total_blocks
-        if blocks == "auto":
-            blocks = len(resources.gpus)
-        if blocks > 1:
-            if len(resources.gpus) % blocks or resources.cpus % blocks:
-                instance.status = InstanceStatus.TERMINATED
-                instance.termination_reason = "Cannot split into blocks"
-                logger.warning(
-                    "Failed to add instance %s: cannot split into blocks",
-                    instance.name,
-                    extra={
-                        "instance_name": instance.name,
-                        "instance_status": InstanceStatus.TERMINATED.value,
-                    },
-                )
-                return
-            shared_info.total_blocks = blocks
-            instance.shared_info = shared_info.json()
-        else:
-            instance.shared_info = None
+    divisible, blocks = is_divisible_into_blocks(
+        cpu_count=instance_type.resources.cpus,
+        gpu_count=len(instance_type.resources.gpus),
+        blocks="auto" if instance.total_blocks is None else instance.total_blocks,
+    )
+    if divisible:
+        instance.total_blocks = blocks
+    else:
+        instance.status = InstanceStatus.TERMINATED
+        instance.termination_reason = "Cannot split into blocks"
+        logger.warning(
+            "Failed to add instance %s: cannot split into blocks",
+            instance.name,
+            extra={
+                "instance_name": instance.name,
+                "instance_status": InstanceStatus.TERMINATED.value,
+            },
+        )
+        return
 
     region = instance.region
     jpd = JobProvisioningData(
@@ -464,11 +460,10 @@ async def _create_instance(session: AsyncSession, instance: InstanceModel) -> No
         instance_configuration = get_instance_configuration(instance)
         profile = get_instance_profile(instance)
         requirements = get_instance_requirements(instance)
-        shared_info = get_instance_shared_info(instance)
     except ValidationError as e:
         instance.status = InstanceStatus.TERMINATED
         instance.termination_reason = (
-            f"Error to parse profile, requirements, shared_info or instance_configuration: {e}"
+            f"Error to parse profile, requirements or instance_configuration: {e}"
         )
         instance.last_retry_at = get_current_datetime()
         logger.warning(
@@ -499,18 +494,13 @@ async def _create_instance(session: AsyncSession, instance: InstanceModel) -> No
             )
             return
 
-    if shared_info is None:
-        blocks = None
-    else:
-        blocks = shared_info.total_blocks
-
     offers = await get_create_instance_offers(
         project=instance.project,
         profile=profile,
         requirements=requirements,
         exclude_not_available=True,
         fleet_model=instance.fleet,
-        blocks=blocks,
+        blocks="auto" if instance.total_blocks is None else instance.total_blocks,
     )
 
     if not offers and should_retry:
@@ -586,20 +576,9 @@ async def _create_instance(session: AsyncSession, instance: InstanceModel) -> No
         instance.instance_configuration = instance_configuration.json()
         instance.job_provisioning_data = job_provisioning_data.json()
         instance.offer = instance_offer.json()
+        instance.total_blocks = instance_offer.total_blocks
         instance.started_at = get_current_datetime()
         instance.last_retry_at = get_current_datetime()
-
-        if shared_info is not None:
-            if blocks == "auto":
-                blocks = len(instance_offer.instance.resources.gpus)
-                if blocks > 1:
-                    shared_info.total_blocks = blocks
-                else:
-                    shared_info = None
-            if shared_info is not None:
-                instance.shared_info = shared_info.json()
-            else:
-                instance.shared_info = None
 
         logger.info(
             "Created instance %s",
