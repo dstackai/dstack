@@ -230,6 +230,17 @@ class JobProvisioningData(CoreModel):
 
 
 class JobRuntimeData(CoreModel):
+    """
+    Holds various information only available after the job is submitted, such as:
+        * offer (depends on the instance)
+        * volumes used by the job
+        * resource constraints for container (depend on the instance)
+        * port mapping (reported by the shim only after the container is started)
+
+    Some fields are mutable, for example, `ports` only available when the shim starts
+    the container.
+    """
+
     network_mode: NetworkMode
     # GPU, CPU, memory resource shares. None means all available (no limit)
     gpu: Optional[int] = None
