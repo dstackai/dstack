@@ -7,7 +7,7 @@ import { FormInput, FormMultiselect, FormMultiselectOptions, InfoLink, SpaceBetw
 
 import { useHelpPanel, useNotifications } from 'hooks';
 import useIsMounted from 'hooks/useIsMounted';
-import { isRequestFormErrors2, isRequestFormFieldError } from 'libs';
+import { isResponseServerError, isResponseServerFormFieldError } from 'libs';
 import { useBackendValuesMutation } from 'services/backend';
 
 import { API_KEY_HELP, FIELD_NAMES, REGIONS_HELP } from './constants';
@@ -66,9 +66,9 @@ export const LambdaBackend: React.FC<IProps> = ({ loading }) => {
             // @ts-ignore
             const errorRequestData = errorResponse?.data;
 
-            if (isRequestFormErrors2(errorRequestData)) {
+            if (isResponseServerError(errorRequestData)) {
                 errorRequestData.detail.forEach((error) => {
-                    if (isRequestFormFieldError(error)) {
+                    if (isResponseServerFormFieldError(error)) {
                         setError(error.loc.join('.'), { type: 'custom', message: error.msg });
                     } else {
                         pushNotification({

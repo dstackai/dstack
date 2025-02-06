@@ -7,7 +7,7 @@ import { FormInput, FormMultiselect, FormMultiselectOptions, FormSelect, InfoLin
 
 import { useHelpPanel, useNotifications } from 'hooks';
 import useIsMounted from 'hooks/useIsMounted';
-import { isRequestFormErrors2, isRequestFormFieldError } from 'libs';
+import { isResponseServerError, isResponseServerFormFieldError } from 'libs';
 import { useBackendValuesMutation } from 'services/backend';
 import { AWSCredentialTypeEnum } from 'types';
 
@@ -94,9 +94,9 @@ export const AWSBackend: React.FC<IProps> = ({ loading }) => {
             // @ts-ignore
             const errorRequestData = errorResponse?.data;
 
-            if (isRequestFormErrors2(errorRequestData)) {
+            if (isResponseServerError(errorRequestData)) {
                 errorRequestData.detail.forEach((error) => {
-                    if (isRequestFormFieldError(error)) {
+                    if (isResponseServerFormFieldError(error)) {
                         setError(error.loc.join('.'), { type: 'custom', message: error.msg });
                     } else {
                         pushNotification({

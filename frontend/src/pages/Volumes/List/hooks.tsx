@@ -8,11 +8,11 @@ import { SelectCSDProps } from 'components';
 import { DATE_TIME_FORMAT, DEFAULT_TABLE_PAGE_SIZE } from 'consts';
 import { useNotifications } from 'hooks';
 import { useLocalStorageState } from 'hooks/useLocalStorageState';
+import { getServerError } from 'libs';
 import { getStatusIconType } from 'libs/volumes';
+import { ROUTES } from 'routes';
 import { useGetProjectsQuery } from 'services/project';
 import { useDeleteVolumesMutation, useLazyGetAllVolumesQuery } from 'services/volume';
-
-import { ROUTES } from '../../../routes';
 
 export const useVolumesTableEmptyMessages = ({
     clearFilters,
@@ -256,7 +256,7 @@ export const useVolumesDelete = () => {
             .catch((error) => {
                 pushNotification({
                     type: 'error',
-                    content: t('common.server_error', { error: error?.error }),
+                    content: t('common.server_error', { error: getServerError(error) }),
                 });
             });
     };

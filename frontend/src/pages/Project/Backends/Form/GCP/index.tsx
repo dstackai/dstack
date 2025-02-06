@@ -15,7 +15,7 @@ import {
 
 import { useHelpPanel, useNotifications } from 'hooks';
 import useIsMounted from 'hooks/useIsMounted';
-import { isRequestFormErrors2, isRequestFormFieldError } from 'libs';
+import { isResponseServerError, isResponseServerFormFieldError } from 'libs';
 import { useBackendValuesMutation } from 'services/backend';
 import { GCPCredentialTypeEnum } from 'types';
 
@@ -115,9 +115,9 @@ export const GCPBackend: React.FC<IProps> = ({ loading }) => {
             // @ts-ignore
             const errorRequestData = errorResponse?.data;
 
-            if (isRequestFormErrors2(errorRequestData)) {
+            if (isResponseServerError(errorRequestData)) {
                 errorRequestData.detail.forEach((error) => {
-                    if (isRequestFormFieldError(error)) {
+                    if (isResponseServerFormFieldError(error)) {
                         if (error.loc.length === 1 && error.loc[0] === 'credentials') {
                             setError(FIELD_NAMES.CREDENTIALS.TYPE, { type: 'custom', message: error.msg });
                         } else {
