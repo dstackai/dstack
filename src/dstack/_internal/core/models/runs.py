@@ -252,8 +252,8 @@ class JobRuntimeData(CoreModel):
     ports: Optional[dict[int, int]] = None
     # List of volumes used by the job
     volume_names: Optional[list[str]] = None  # None for backward compalibility
-    # Virtual shared offer. None if the instance is not shared.
-    offer: Optional[InstanceOfferWithAvailability] = None
+    # Virtual shared offer
+    offer: Optional[InstanceOfferWithAvailability] = None  # None for backward compalibility
 
 
 class ClusterInfo(CoreModel):
