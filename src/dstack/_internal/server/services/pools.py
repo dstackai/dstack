@@ -2,7 +2,7 @@ import ipaddress
 import uuid
 from collections.abc import Container, Iterable
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import List, Literal, Optional, Union
 
 import gpuhunt
 from sqlalchemy import and_, or_, select
@@ -51,6 +51,7 @@ from dstack._internal.server.models import (
     UserModel,
 )
 from dstack._internal.server.services.locking import get_locker
+from dstack._internal.server.services.offers import generate_shared_offer
 from dstack._internal.server.services.projects import list_project_models, list_user_project_models
 from dstack._internal.utils import common as common_utils
 from dstack._internal.utils import random_names
@@ -206,7 +207,7 @@ async def remove_instance(
     terminated = False
     for instance in pool.instances:
         if instance.name == instance_name:
-            if force or instance.job_id is None:
+            if force or not instance.jobs:
                 instance.status = InstanceStatus.TERMINATING
                 terminated = True
     await session.commit()
@@ -249,6 +250,8 @@ def instance_model_to_instance(instance_model: InstanceModel) -> Instance:
         unreachable=instance_model.unreachable,
         termination_reason=instance_model.termination_reason,
         created=instance_model.created_at.replace(tzinfo=timezone.utc),
+        total_blocks=instance_model.total_blocks,
+        busy_blocks=instance_model.busy_blocks,
     )
 
     offer = get_instance_offer(instance_model)
@@ -262,9 +265,6 @@ def instance_model_to_instance(instance_model: InstanceModel) -> Instance:
         instance.instance_type = jpd.instance_type
         instance.hostname = jpd.hostname
         instance.availability_zone = jpd.availability_zone
-
-    if instance_model.job is not None:
-        instance.job_name = instance_model.job.job_name
 
     return instance
 
@@ -410,13 +410,14 @@ async def add_remote(
 def filter_pool_instances(
     pool_instances: List[InstanceModel],
     profile: Profile,
-    requirements: Requirements,
     *,
+    requirements: Optional[Requirements] = None,
     status: Optional[InstanceStatus] = None,
     fleet_model: Optional[FleetModel] = None,
     multinode: bool = False,
     master_job_provisioning_data: Optional[JobProvisioningData] = None,
     volumes: Optional[List[List[Volume]]] = None,
+    shared: bool = False,
 ) -> List[InstanceModel]:
     instances: List[InstanceModel] = []
     candidates: List[InstanceModel] = []
@@ -481,8 +482,16 @@ def filter_pool_instances(
             and jpd.availability_zone not in zones
         ):
             continue
+        if instance.total_blocks is None:
+            # Still provisioning, we don't know yet if it shared or not
+            continue
+        if (instance.total_blocks > 1) != shared:
+            continue
 
         candidates.append(instance)
+
+    if requirements is None:
+        return candidates
 
     query_filter = requirements_to_query_filter(requirements)
     for instance in candidates:
@@ -493,6 +502,47 @@ def filter_pool_instances(
         if gpuhunt.matches(catalog_item, query_filter):
             instances.append(instance)
     return instances
+
+
+def get_shared_pool_instances_with_offers(
+    pool_instances: List[InstanceModel],
+    profile: Profile,
+    requirements: Requirements,
+    *,
+    idle_only: bool = False,
+    fleet_model: Optional[FleetModel] = None,
+    volumes: Optional[List[List[Volume]]] = None,
+) -> list[tuple[InstanceModel, InstanceOfferWithAvailability]]:
+    instances_with_offers: list[tuple[InstanceModel, InstanceOfferWithAvailability]] = []
+    query_filter = requirements_to_query_filter(requirements)
+    filtered_instances = filter_pool_instances(
+        pool_instances=pool_instances,
+        profile=profile,
+        fleet_model=fleet_model,
+        multinode=False,
+        volumes=volumes,
+        shared=True,
+    )
+    for instance in filtered_instances:
+        if idle_only and instance.status not in [InstanceStatus.IDLE, InstanceStatus.BUSY]:
+            continue
+        offer = get_instance_offer(instance)
+        if offer is None:
+            continue
+        total_blocks = common_utils.get_or_error(instance.total_blocks)
+        idle_blocks = total_blocks - instance.busy_blocks
+        for blocks in range(1, total_blocks + 1):
+            shared_offer = generate_shared_offer(offer, blocks, total_blocks)
+            catalog_item = offer_to_catalog_item(shared_offer)
+            if gpuhunt.matches(catalog_item, query_filter):
+                if blocks <= idle_blocks:
+                    shared_offer.availability = InstanceAvailability.IDLE
+                else:
+                    shared_offer.availability = InstanceAvailability.BUSY
+                if shared_offer.availability == InstanceAvailability.IDLE or not idle_only:
+                    instances_with_offers.append((instance, shared_offer))
+                break
+    return instances_with_offers
 
 
 async def list_pools_instance_models(
@@ -558,7 +608,7 @@ async def list_pools_instance_models(
         .limit(limit)
         .options(joinedload(InstanceModel.pool), joinedload(InstanceModel.fleet))
     )
-    instance_models = list(res.scalars().all())
+    instance_models = list(res.unique().scalars().all())
     return instance_models
 
 
@@ -619,7 +669,7 @@ async def list_active_remote_instances(
     res = await session.execute(
         select(InstanceModel).where(*filters).order_by(InstanceModel.created_at.asc())
     )
-    instance_models = list(res.scalars().all())
+    instance_models = list(res.unique().scalars().all())
     return instance_models
 
 
@@ -634,6 +684,7 @@ async def create_instance_model(
     instance_num: int,
     placement_group_name: Optional[str],
     reservation: Optional[str],
+    blocks: Union[Literal["auto"], int],
 ) -> InstanceModel:
     termination_policy, termination_idle_time = get_termination(
         profile, DEFAULT_POOL_TERMINATION_IDLE_TIME
@@ -667,6 +718,8 @@ async def create_instance_model(
         instance_configuration=instance_config.json(),
         termination_policy=termination_policy,
         termination_idle_time=termination_idle_time,
+        total_blocks=None if blocks == "auto" else blocks,
+        busy_blocks=0,
     )
     session.add(instance)
     return instance
@@ -685,6 +738,7 @@ async def create_ssh_instance_model(
     ssh_user: str,
     ssh_keys: List[SSHKey],
     env: Env,
+    blocks: Union[Literal["auto"], int],
 ) -> InstanceModel:
     # TODO: doc - will overwrite after remote connected
     instance_resource = Resources(cpus=2, memory_mib=8, gpus=[], spot=False)
@@ -739,5 +793,7 @@ async def create_ssh_instance_model(
         price=offer.price,
         termination_policy=TerminationPolicy.DONT_DESTROY,
         termination_idle_time=0,
+        total_blocks=None if blocks == "auto" else blocks,
+        busy_blocks=0,
     )
     return im

@@ -77,6 +77,7 @@ from dstack._internal.server.services.fleets import (
     get_create_instance_offers,
 )
 from dstack._internal.server.services.locking import get_locker
+from dstack._internal.server.services.offers import is_divisible_into_blocks
 from dstack._internal.server.services.placement import (
     get_fleet_placement_groups,
     placement_group_model_to_placement_group,
@@ -133,7 +134,7 @@ async def _process_next_instance():
                     ),
                     InstanceModel.id.not_in(lockset),
                 )
-                .options(lazyload(InstanceModel.job))
+                .options(lazyload(InstanceModel.jobs))
                 .order_by(InstanceModel.last_processed_at.asc())
                 .limit(1)
                 .with_for_update(skip_locked=True)
@@ -156,7 +157,7 @@ async def _process_instance(session: AsyncSession, instance: InstanceModel):
         select(InstanceModel)
         .where(InstanceModel.id == instance.id)
         .options(joinedload(InstanceModel.project).joinedload(ProjectModel.backends))
-        .options(joinedload(InstanceModel.job))
+        .options(joinedload(InstanceModel.jobs))
         .options(joinedload(InstanceModel.fleet).joinedload(FleetModel.instances))
         .execution_options(populate_existing=True)
     )
@@ -164,7 +165,7 @@ async def _process_instance(session: AsyncSession, instance: InstanceModel):
     if (
         instance.status == InstanceStatus.IDLE
         and instance.termination_policy == TerminationPolicy.DESTROY_AFTER_IDLE
-        and instance.job_id is None
+        and not instance.jobs
     ):
         await _mark_terminating_if_idle_duration_expired(instance)
     if instance.status == InstanceStatus.PENDING:
@@ -321,6 +322,26 @@ async def _add_remote(instance: InstanceModel) -> None:
                 },
             )
             return
+
+    divisible, blocks = is_divisible_into_blocks(
+        cpu_count=instance_type.resources.cpus,
+        gpu_count=len(instance_type.resources.gpus),
+        blocks="auto" if instance.total_blocks is None else instance.total_blocks,
+    )
+    if divisible:
+        instance.total_blocks = blocks
+    else:
+        instance.status = InstanceStatus.TERMINATED
+        instance.termination_reason = "Cannot split into blocks"
+        logger.warning(
+            "Failed to add instance %s: cannot split into blocks",
+            instance.name,
+            extra={
+                "instance_name": instance.name,
+                "instance_status": InstanceStatus.TERMINATED.value,
+            },
+        )
+        return
 
     region = instance.region
     jpd = JobProvisioningData(
@@ -479,6 +500,7 @@ async def _create_instance(session: AsyncSession, instance: InstanceModel) -> No
         requirements=requirements,
         exclude_not_available=True,
         fleet_model=instance.fleet,
+        blocks="auto" if instance.total_blocks is None else instance.total_blocks,
     )
 
     if not offers and should_retry:
@@ -554,6 +576,7 @@ async def _create_instance(session: AsyncSession, instance: InstanceModel) -> No
         instance.instance_configuration = instance_configuration.json()
         instance.job_provisioning_data = job_provisioning_data.json()
         instance.offer = instance_offer.json()
+        instance.total_blocks = instance_offer.total_blocks
         instance.started_at = get_current_datetime()
         instance.last_retry_at = get_current_datetime()
 
@@ -585,8 +608,8 @@ async def _create_instance(session: AsyncSession, instance: InstanceModel) -> No
 async def _check_instance(instance: InstanceModel) -> None:
     if (
         instance.status == InstanceStatus.BUSY
-        and instance.job is not None
-        and instance.job.status.is_finished()
+        and instance.jobs
+        and all(job.status.is_finished() for job in instance.jobs)
     ):
         # A busy instance could have no active jobs due to this bug: https://github.com/dstackai/dstack/issues/2068
         instance.status = InstanceStatus.TERMINATING
@@ -648,9 +671,7 @@ async def _check_instance(instance: InstanceModel) -> None:
         instance.unreachable = False
 
         if instance.status == InstanceStatus.PROVISIONING:
-            instance.status = (
-                InstanceStatus.IDLE if instance.job_id is None else InstanceStatus.BUSY
-            )
+            instance.status = InstanceStatus.IDLE if not instance.jobs else InstanceStatus.BUSY
             logger.info(
                 "Instance %s has switched to %s status",
                 instance.name,

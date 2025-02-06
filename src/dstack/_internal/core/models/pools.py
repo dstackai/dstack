@@ -25,7 +25,7 @@ class Instance(CoreModel):
     fleet_name: Optional[str] = None
     instance_num: int
     pool_name: Optional[str] = None
-    job_name: Optional[str] = None
+    job_name: Optional[str] = None  # deprecated, always None (instance can have more than one job)
     hostname: Optional[str] = None
     status: InstanceStatus
     unreachable: bool = False
@@ -34,6 +34,8 @@ class Instance(CoreModel):
     region: Optional[str] = None
     availability_zone: Optional[str] = None
     price: Optional[float] = None
+    total_blocks: Optional[int] = None
+    busy_blocks: int = 0
 
 
 class PoolInstances(CoreModel):

@@ -357,7 +357,10 @@ class JobModel(BaseModel):
     # `instance_assigned` means instance assignment was done.
     # if `instance_assigned` is True and `instance` is None, no instance was assiged.
     instance_assigned: Mapped[bool] = mapped_column(Boolean, default=False)
-    instance: Mapped[Optional["InstanceModel"]] = relationship(back_populates="job")
+    instance_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("instances.id", ondelete="CASCADE")
+    )
+    instance: Mapped[Optional["InstanceModel"]] = relationship(back_populates="jobs")
     used_instance_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUIDType(binary=False))
     replica_num: Mapped[int] = mapped_column(Integer)
     job_runtime_data: Mapped[Optional[str]] = mapped_column(Text)
@@ -543,9 +546,11 @@ class InstanceModel(BaseModel):
 
     remote_connection_info: Mapped[Optional[str]] = mapped_column(Text)
 
-    # current job
-    job_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("jobs.id"))
-    job: Mapped[Optional["JobModel"]] = relationship(back_populates="instance", lazy="joined")
+    # NULL means `auto` (only during provisioning, when ready it's not NULL)
+    total_blocks: Mapped[Optional[int]] = mapped_column(Integer)
+    busy_blocks: Mapped[int] = mapped_column(Integer, default=0)
+
+    jobs: Mapped[list["JobModel"]] = relationship(back_populates="instance", lazy="joined")
     last_job_processed_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
 
     # volumes attached to the instance

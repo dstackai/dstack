@@ -334,6 +334,8 @@ class TestShowPool:
                     "region": "en",
                     "availability_zone": None,
                     "price": 1,
+                    "total_blocks": 1,
+                    "busy_blocks": 0,
                 }
             ],
         }
@@ -506,6 +508,8 @@ class TestRemoveInstance:
                     "region": "en",
                     "availability_zone": None,
                     "price": 1,
+                    "total_blocks": 1,
+                    "busy_blocks": 0,
                 }
             ],
         }

@@ -351,6 +351,7 @@ class TestCreateFleet:
                     "type": "fleet",
                     "name": "test-fleet",
                     "reservation": None,
+                    "blocks": 1,
                 },
                 "profile": {
                     "backends": None,
@@ -398,13 +399,15 @@ class TestCreateFleet:
                     "availability_zone": None,
                     "instance_type": None,
                     "price": None,
+                    "total_blocks": 1,
+                    "busy_blocks": 0,
                 }
             ],
         }
         res = await session.execute(select(FleetModel))
         assert res.scalar_one()
         res = await session.execute(select(InstanceModel))
-        assert res.scalar_one()
+        assert res.unique().scalar_one()
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
@@ -472,6 +475,7 @@ class TestCreateFleet:
                     "type": "fleet",
                     "name": spec.configuration.name,
                     "reservation": None,
+                    "blocks": 1,
                 },
                 "profile": {
                     "backends": None,
@@ -529,13 +533,15 @@ class TestCreateFleet:
                     "region": "remote",
                     "availability_zone": None,
                     "price": 0.0,
+                    "total_blocks": 1,
+                    "busy_blocks": 0,
                 }
             ],
         }
         res = await session.execute(select(FleetModel))
         assert res.scalar_one()
         res = await session.execute(select(InstanceModel))
-        instance = res.scalar_one()
+        instance = res.unique().scalar_one()
         assert instance.remote_connection_info is not None
 
     @pytest.mark.asyncio

@@ -96,11 +96,14 @@ def print_run_plan(run_plan: RunPlan, offers_limit: int = 3):
             InstanceAvailability.BUSY,
         }:
             availability = offer.availability.value.replace("_", " ").lower()
+        instance = offer.instance.name
+        if offer.total_blocks > 1:
+            instance += f" ({offer.blocks}/{offer.total_blocks})"
         offers.add_row(
             f"{i}",
             offer.backend.replace("remote", "ssh"),
             offer.region,
-            offer.instance.name,
+            instance,
             r.pretty_format(),
             "yes" if r.spot else "no",
             f"${offer.price:g}",
@@ -161,13 +164,21 @@ def get_runs_table(
                 "SUBMITTED": format_date(job.job_submissions[-1].submitted_at),
                 "ERROR": _get_job_error(job),
             }
-            jpd = job.job_submissions[-1].job_provisioning_data
+            latest_job_submission = job.job_submissions[-1]
+            jpd = latest_job_submission.job_provisioning_data
             if jpd is not None:
+                resources = jpd.instance_type.resources
+                instance = jpd.instance_type.name
+                jrd = latest_job_submission.job_runtime_data
+                if jrd is not None and jrd.offer is not None:
+                    resources = jrd.offer.instance.resources
+                    if jrd.offer.total_blocks > 1:
+                        instance += f" ({jrd.offer.blocks}/{jrd.offer.total_blocks})"
                 job_row.update(
                     {
                         "BACKEND": f"{jpd.backend.value.replace('remote', 'ssh')} ({jpd.region})",
-                        "INSTANCE": jpd.instance_type.name,
-                        "RESOURCES": jpd.instance_type.resources.pretty_format(include_spot=True),
+                        "INSTANCE": instance,
+                        "RESOURCES": resources.pretty_format(include_spot=True),
                         "RESERVATION": jpd.reservation,
                         "PRICE": f"${jpd.price:.4}",
                     }

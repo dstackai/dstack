@@ -61,6 +61,19 @@ class SSHHostParams(CoreModel):
     ] = None
     ssh_key: Optional[SSHKey] = None
 
+    blocks: Annotated[
+        Union[Literal["auto"], int],
+        Field(
+            description=(
+                "The amount of blocks to split the instance into, a number or `auto`."
+                " `auto` means as many as possible."
+                " The number of GPUs and CPUs must be divisible by the number of blocks."
+                " Defaults to `1`, i.e. do not split"
+            ),
+            ge=1,
+        ),
+    ] = 1
+
     @validator("internal_ip")
     def validate_internal_ip(cls, value):
         if value is None:
@@ -141,6 +154,19 @@ class InstanceGroupParams(CoreModel):
         Optional[ResourcesSpec],
         Field(description="The resources requirements"),
     ] = ResourcesSpec()
+
+    blocks: Annotated[
+        Union[Literal["auto"], int],
+        Field(
+            description=(
+                "The amount of blocks to split the instance into, a number or `auto`."
+                " `auto` means as many as possible."
+                " The number of GPUs and CPUs must be divisible by the number of blocks."
+                " Defaults to `1`, i.e. do not split"
+            ),
+            ge=1,
+        ),
+    ] = 1
 
     backends: Annotated[
         Optional[List[BackendType]],

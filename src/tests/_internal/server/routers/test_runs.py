@@ -1539,6 +1539,8 @@ class TestCreateInstance:
                 "region": None,
                 "availability_zone": None,
                 "price": None,
+                "total_blocks": 1,
+                "busy_blocks": 0,
             }
             assert result == expected
 
