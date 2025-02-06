@@ -140,6 +140,7 @@ def create_instances_struct(
     allocate_public_ip: bool = True,
     placement_group_name: Optional[str] = None,
     enable_efa: bool = False,
+    max_efa_interfaces: int = 0,
     reservation_id: Optional[str] = None,
     is_capacity_block: bool = False,
 ) -> Dict[str, Any]:
@@ -199,9 +200,44 @@ def create_instances_struct(
                 "DeviceIndex": 0,
                 "SubnetId": subnet_id,
                 "Groups": [security_group_id],
-                "InterfaceType": "efa" if enable_efa else "interface",
+                "InterfaceType": "efa" if max_efa_interfaces > 0 else "interface",
             },
         ]
+
+        if max_efa_interfaces > 1 and allocate_public_ip is False:
+            if instance_type == "p5.48xlarge":
+                # EFA configuration for P5 instances: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/efa-acc-inst-types.html#efa-for-p5
+                p5d_interfaces = [
+                    {
+                        "NetworkCardIndex": i,
+                        "DeviceIndex": 1,
+                        "InterfaceType": "efa" if i % 4 == 0 else "efa-only",
+                    }
+                    for i in range(1, 32)
+                ]
+                for interface in p5d_interfaces:
+                    struct["NetworkInterfaces"].append(
+                        {
+                            "AssociatePublicIpAddress": allocate_public_ip,
+                            "NetworkCardIndex": interface["NetworkCardIndex"],
+                            "DeviceIndex": interface["DeviceIndex"],
+                            "SubnetId": subnet_id,
+                            "Groups": [security_group_id],
+                            "InterfaceType": interface["InterfaceType"],
+                        }
+                    )
+            else:
+                for i in range(1, max_efa_interfaces):
+                    struct["NetworkInterfaces"].append(
+                        {
+                            "AssociatePublicIpAddress": allocate_public_ip,
+                            "NetworkCardIndex": i,
+                            "DeviceIndex": 1,
+                            "SubnetId": subnet_id,
+                            "Groups": [security_group_id],
+                            "InterfaceType": "efa-only",  # Set specifically to efa-only to keep the interfaces exclusively for GPU-to-GPU communications and not mix with IP traffic
+                        }
+                    )
     else:
         struct["SecurityGroupIds"] = [security_group_id]
 
