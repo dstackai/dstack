@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useNotifications } from 'hooks';
+import { getServerError } from 'libs';
 import { useStopRunsMutation } from 'services/run';
 
 import { getGroupedRunsByProjectAndRepoID } from '../helpers';
@@ -30,7 +31,7 @@ export const useStopRuns = (isAborting?: boolean) => {
             request.catch((error) => {
                 pushNotification({
                     type: 'error',
-                    content: t('common.server_error', { error: error?.error }),
+                    content: t('common.server_error', { error: getServerError(error) }),
                 });
             });
 

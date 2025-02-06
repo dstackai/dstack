@@ -2,9 +2,8 @@ import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useNotifications } from 'hooks';
+import { getServerError } from 'libs';
 import { useDeleteInstancesMutation } from 'services/instance';
-
-import { isRequestFormErrors2 } from '../../../../libs';
 
 export const useActions = () => {
     const { t } = useTranslation();
@@ -46,19 +45,9 @@ export const useActions = () => {
         return Promise.all(requests)
             .finally(() => setIsDeleting(false))
             .catch((error) => {
-                let errorText = error?.error;
-
-                const errorData = error.data;
-
-                if (isRequestFormErrors2(errorData)) {
-                    const errorDetail = errorData.detail;
-
-                    errorText = errorDetail.flatMap(({ msg }) => msg).join(', ');
-                }
-
                 pushNotification({
                     type: 'error',
-                    content: t('common.server_error', { error: errorText }),
+                    content: t('common.server_error', { error: getServerError(error) }),
                 });
             });
     }, []);

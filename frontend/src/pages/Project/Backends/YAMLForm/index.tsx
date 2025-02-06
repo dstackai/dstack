@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Button, FormCodeEditor, FormUI, InfoLink, SpaceBetween } from 'components';
 
 import { useHelpPanel, useNotifications } from 'hooks';
-import { isRequestFormErrors2, isRequestFormFieldError } from 'libs';
+import { isResponseServerError, isResponseServerFormFieldError } from 'libs';
 
 import { CONFIG_YAML_HELP_ENTERPRISE, CONFIG_YAML_HELP_SKY } from './constants';
 
@@ -47,9 +47,9 @@ export const YAMLForm: React.FC<IProps> = ({
             .catch((errorResponse) => {
                 const errorRequestData = errorResponse?.data;
 
-                if (isRequestFormErrors2(errorRequestData)) {
+                if (isResponseServerError(errorRequestData)) {
                     errorRequestData.detail.forEach((error) => {
-                        if (isRequestFormFieldError(error)) {
+                        if (isResponseServerFormFieldError(error)) {
                             setError(error.loc.join('.') as FieldPath<IBackendConfigYaml>, {
                                 type: 'custom',
                                 message: error.msg,

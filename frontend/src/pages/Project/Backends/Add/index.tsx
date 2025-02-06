@@ -5,6 +5,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Container, Header } from 'components';
 
 import { useBreadcrumbs, useNotifications } from 'hooks';
+import { getServerError } from 'libs';
 import { ROUTES } from 'routes';
 import {
     // useCreateBackendMutation,
@@ -85,8 +86,11 @@ export const BackendAdd: React.FC = () => {
 
                 navigate(ROUTES.PROJECT.DETAILS.SETTINGS.FORMAT(paramProjectName));
             })
-            .catch((error: never) => {
-                console.log(error);
+            .catch((error) => {
+                pushNotification({
+                    type: 'error',
+                    content: t('common.server_error', { error: getServerError(error) }),
+                });
             });
 
         return request;

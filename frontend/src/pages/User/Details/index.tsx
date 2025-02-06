@@ -6,7 +6,7 @@ import { ConfirmationDialog, ContentLayout, SpaceBetween, Tabs } from 'component
 import { DetailsHeader } from 'components';
 
 import { useNotifications, usePermissionGuard } from 'hooks';
-import { riseRouterException } from 'libs';
+import { getServerError, riseRouterException } from 'libs';
 import { ROUTES } from 'routes';
 import { useDeleteUsersMutation, useGetUserQuery } from 'services/user';
 
@@ -47,7 +47,7 @@ export const UserDetails: React.FC = () => {
             .catch((error) => {
                 pushNotification({
                     type: 'error',
-                    content: t('common.server_error', { error: error?.error }),
+                    content: t('common.server_error', { error: getServerError(error) }),
                 });
             });
 

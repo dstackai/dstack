@@ -9,7 +9,7 @@ import { Box, ColumnLayout, Container, ContentLayout, DetailsHeader, Header, Loa
 
 import { DATE_TIME_FORMAT } from 'consts';
 import { useBreadcrumbs, useNotifications } from 'hooks';
-import { riseRouterException } from 'libs';
+import { getServerError, riseRouterException } from 'libs';
 import { getStatusIconType } from 'libs/run';
 import { ROUTES } from 'routes';
 import { useDeleteRunsMutation, useGetRunQuery, useStopRunsMutation } from 'services/run';
@@ -86,7 +86,7 @@ export const RunDetails: React.FC = () => {
             .catch((error) => {
                 pushNotification({
                     type: 'error',
-                    content: t('common.server_error', { error: error?.error }),
+                    content: t('common.server_error', { error: getServerError(error) }),
                 });
             });
     };
@@ -101,7 +101,7 @@ export const RunDetails: React.FC = () => {
             .catch((error) => {
                 pushNotification({
                     type: 'error',
-                    content: t('common.server_error', { error: error?.error }),
+                    content: t('common.server_error', { error: getServerError(error) }),
                 });
             });
     };
@@ -118,7 +118,7 @@ export const RunDetails: React.FC = () => {
             .catch((error) => {
                 pushNotification({
                     type: 'error',
-                    content: t('common.server_error', { error: error?.error }),
+                    content: t('common.server_error', { error: getServerError(error) }),
                 });
             });
     };

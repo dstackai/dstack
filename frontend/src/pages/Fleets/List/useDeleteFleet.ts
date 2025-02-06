@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useNotifications } from 'hooks';
-import { isRequestFormErrors2 } from 'libs';
+import { getServerError } from 'libs';
 import { useDeleteFleetMutation } from 'services/fleet';
 
 export const useDeleteFleet = () => {
@@ -40,19 +40,9 @@ export const useDeleteFleet = () => {
         return Promise.all(requests)
             .finally(() => setIsDeleting(false))
             .catch((error) => {
-                let errorText = error?.error;
-
-                const errorData = error.data;
-
-                if (isRequestFormErrors2(errorData)) {
-                    const errorDetail = errorData.detail;
-
-                    errorText = errorDetail.flatMap(({ msg }) => msg).join(', ');
-                }
-
                 pushNotification({
                     type: 'error',
-                    content: t('common.server_error', { error: errorText }),
+                    content: t('common.server_error', { error: getServerError(error) }),
                 });
             });
     }, []);

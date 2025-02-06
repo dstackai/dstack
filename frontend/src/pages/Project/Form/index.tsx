@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Button, Container, FormInput, FormUI, Header, SpaceBetween } from 'components';
 
 import { useNotifications } from 'hooks';
-import { isRequestFormErrors2, isRequestFormFieldError } from 'libs';
+import { isResponseServerError, isResponseServerFormFieldError } from 'libs';
 
 import { IProps } from './types';
 import { FieldPath } from 'react-hook-form/dist/types/path';
@@ -28,9 +28,9 @@ export const ProjectForm: React.FC<IProps> = ({ initialValues, onCancel, loading
         onSubmitProp(data).catch((errorResponse) => {
             const errorRequestData = errorResponse?.data;
 
-            if (isRequestFormErrors2(errorRequestData)) {
+            if (isResponseServerError(errorRequestData)) {
                 errorRequestData.detail.forEach((error) => {
-                    if (isRequestFormFieldError(error)) {
+                    if (isResponseServerFormFieldError(error)) {
                         setError(error.loc.join('.') as FieldPath<IProject>, { type: 'custom', message: error.msg });
                     } else {
                         pushNotification({
