@@ -38,6 +38,7 @@ from dstack._internal.server.testing.common import (
     create_run,
     create_user,
     create_volume,
+    get_instance_offer_with_availability,
     get_run_spec,
     get_volume_provisioning_data,
 )
@@ -447,7 +448,7 @@ class TestProcessSubmittedJobs:
         await process_submitted_jobs()
         await session.refresh(job)
         res = await session.execute(select(JobModel).options(joinedload(JobModel.instance)))
-        job = res.scalar_one()
+        job = res.unique().scalar_one()
         assert job.status == JobStatus.SUBMITTED
         assert (
             job.instance_assigned and job.instance is not None and job.instance.id == instance.id
@@ -517,12 +518,56 @@ class TestProcessSubmittedJobs:
                 joinedload(JobModel.instance).selectinload(InstanceModel.volumes)
             )
         )
-        job = res.scalar_one()
+        job = res.unique().scalar_one()
         assert job.status == JobStatus.PROVISIONING
         assert (
             job.instance_assigned and job.instance is not None and job.instance.id == instance.id
         )
         assert job.instance.volumes == [volume]
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_assigns_job_to_shared_instance(self, test_db, session: AsyncSession):
+        project = await create_project(session)
+        user = await create_user(session)
+        pool = await create_pool(session=session, project=project)
+        repo = await create_repo(
+            session=session,
+            project_id=project.id,
+        )
+        offer = get_instance_offer_with_availability(gpu_count=8, cpu_count=64, memory_gib=128)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            pool=pool,
+            status=InstanceStatus.IDLE,
+            offer=offer,
+            total_blocks=4,
+            busy_blocks=1,
+        )
+        await session.refresh(pool)
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            instance_assigned=False,
+        )
+        await process_submitted_jobs()
+        await session.refresh(job)
+        await session.refresh(instance)
+        res = await session.execute(select(JobModel).options(joinedload(JobModel.instance)))
+        job = res.unique().scalar_one()
+        assert job.status == JobStatus.SUBMITTED
+        assert (
+            job.instance_assigned and job.instance is not None and job.instance.id == instance.id
+        )
+        assert instance.total_blocks == 4
+        assert instance.busy_blocks == 2
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
@@ -590,7 +635,7 @@ class TestProcessSubmittedJobs:
 
         await session.refresh(job)
         res = await session.execute(select(JobModel).options(joinedload(JobModel.instance)))
-        job = res.scalar_one()
+        job = res.unique().scalar_one()
         assert job.status == JobStatus.PROVISIONING
         assert job.instance is not None
         assert job.instance.instance_num == 1

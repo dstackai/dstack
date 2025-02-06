@@ -2,7 +2,7 @@ import random
 import string
 import uuid
 from datetime import datetime, timezone
-from typing import List, Optional, Tuple, Union, cast
+from typing import List, Literal, Optional, Tuple, Union, cast
 
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -256,6 +256,7 @@ async def get_plan(
             project=project,
             profile=spec.merged_profile,
             requirements=_get_fleet_requirements(spec),
+            blocks=spec.configuration.blocks,
         )
         offers = [offer for _, offer in offers_with_backends]
     _remove_fleet_spec_sensitive_info(spec)
@@ -277,6 +278,7 @@ async def get_create_instance_offers(
     requirements: Requirements,
     exclude_not_available=False,
     fleet_model: Optional[FleetModel] = None,
+    blocks: Union[int, Literal["auto"]] = 1,
 ) -> List[Tuple[Backend, InstanceOfferWithAvailability]]:
     multinode = False
     master_job_provisioning_data = None
@@ -296,6 +298,7 @@ async def get_create_instance_offers(
         exclude_not_available=exclude_not_available,
         multinode=multinode,
         master_job_provisioning_data=master_job_provisioning_data,
+        blocks=blocks,
     )
     offers = [
         (backend, offer)
@@ -406,6 +409,7 @@ async def create_fleet_instance_model(
         instance_num=instance_num,
         placement_group_name=placement_group_name,
         reservation=reservation,
+        blocks=spec.configuration.blocks,
     )
     return instance_model
 
@@ -425,12 +429,14 @@ async def create_fleet_ssh_instance_model(
         ssh_key = ssh_params.ssh_key
         port = ssh_params.port
         internal_ip = None
+        blocks = 1
     else:
         hostname = host.hostname
         ssh_user = host.user or ssh_params.user
         ssh_key = host.ssh_key or ssh_params.ssh_key
         port = host.port or ssh_params.port
         internal_ip = host.internal_ip
+        blocks = host.blocks
 
     if ssh_user is None or ssh_key is None:
         # This should not be reachable but checked by fleet spec validation
@@ -449,6 +455,7 @@ async def create_fleet_ssh_instance_model(
         internal_ip=internal_ip,
         instance_network=ssh_params.network,
         port=port or 22,
+        blocks=blocks,
     )
     return instance_model
 
@@ -544,7 +551,7 @@ async def generate_fleet_name(session: AsyncSession, project: ProjectModel) -> s
 
 
 def is_fleet_in_use(fleet_model: FleetModel, instance_nums: Optional[List[int]] = None) -> bool:
-    instances_in_use = [i for i in fleet_model.instances if i.job_id is not None and not i.deleted]
+    instances_in_use = [i for i in fleet_model.instances if i.jobs and not i.deleted]
     selected_instance_in_use = instances_in_use
     if instance_nums is not None:
         selected_instance_in_use = [i for i in instances_in_use if i.instance_num in instance_nums]
@@ -606,6 +613,8 @@ async def create_instance(
         instance_configuration=None,
         termination_policy=termination_policy,
         termination_idle_time=termination_idle_time,
+        total_blocks=1,
+        busy_blocks=0,
     )
     logger.info(
         "Added a new instance %s",

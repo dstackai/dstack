@@ -333,6 +333,8 @@ class TestShowPool:
                     "pool_name": None,
                     "region": "en",
                     "price": 1,
+                    "total_blocks": 1,
+                    "busy_blocks": 0,
                 }
             ],
         }
@@ -504,6 +506,8 @@ class TestRemoveInstance:
                     "pool_name": None,
                     "region": "en",
                     "price": 1,
+                    "total_blocks": 1,
+                    "busy_blocks": 0,
                 }
             ],
         }

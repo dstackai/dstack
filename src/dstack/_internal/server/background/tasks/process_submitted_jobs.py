@@ -15,10 +15,7 @@ from dstack._internal.core.models.fleets import (
     FleetStatus,
     InstanceGroupPlacement,
 )
-from dstack._internal.core.models.instances import (
-    InstanceOfferWithAvailability,
-    InstanceStatus,
-)
+from dstack._internal.core.models.instances import InstanceOfferWithAvailability, InstanceStatus
 from dstack._internal.core.models.profiles import (
     DEFAULT_POOL_NAME,
     DEFAULT_RUN_TERMINATION_IDLE_TIME,
@@ -26,6 +23,7 @@ from dstack._internal.core.models.profiles import (
     Profile,
     TerminationPolicy,
 )
+from dstack._internal.core.models.resources import Memory
 from dstack._internal.core.models.runs import (
     Job,
     JobProvisioningData,
@@ -54,13 +52,16 @@ from dstack._internal.server.services.fleets import (
 from dstack._internal.server.services.jobs import (
     find_job,
     get_instances_ids_with_detaching_volumes,
+    get_job_runtime_data,
 )
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.offers import get_offers_by_requirements
 from dstack._internal.server.services.pools import (
     filter_pool_instances,
+    get_instance_offer,
     get_instance_provisioning_data,
+    get_shared_pool_instances_with_offers,
 )
 from dstack._internal.server.services.runs import (
     check_can_attach_run_volumes,
@@ -74,6 +75,7 @@ from dstack._internal.server.services.volumes import (
     volume_model_to_volume,
 )
 from dstack._internal.utils import common as common_utils
+from dstack._internal.utils import env as env_utils
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -186,12 +188,12 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
             .where(
                 InstanceModel.pool_id == pool.id,
                 InstanceModel.deleted == False,
-                InstanceModel.job_id.is_(None),
+                InstanceModel.total_blocks > InstanceModel.busy_blocks,
             )
-            .options(lazyload(InstanceModel.job))
+            .options(lazyload(InstanceModel.jobs))
             .with_for_update()
         )
-        pool_instances = list(res.scalars().all())
+        pool_instances = list(res.unique().scalars().all())
         instances_ids = sorted([i.id for i in pool_instances])
         if get_db().dialect_name == "sqlite":
             # Start new transaction to see commited changes after lock
@@ -206,10 +208,10 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
                     InstanceModel.id.not_in(detaching_instances_ids),
                     InstanceModel.id.in_(instances_ids),
                     InstanceModel.deleted == False,
-                    InstanceModel.job_id.is_(None),
+                    InstanceModel.total_blocks > InstanceModel.busy_blocks,
                 )
             )
-            pool_instances = list(res.scalars().all())
+            pool_instances = list(res.unique().scalars().all())
             instance = await _assign_job_to_pool_instance(
                 session=session,
                 pool_instances=pool_instances,
@@ -221,8 +223,6 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
                 volumes=volumes,
             )
             job_model.instance_assigned = True
-            if instance is not None:
-                job_model.job_runtime_data = _prepare_job_runtime_data(job, instance).json()
             job_model.last_processed_at = common_utils.get_current_datetime()
             await session.commit()
             return
@@ -234,7 +234,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
             .options(selectinload(InstanceModel.volumes))
             .execution_options(populate_existing=True)
         )
-        instance = res.scalar_one()
+        instance = res.unique().scalar_one()
         job_model.status = JobStatus.PROVISIONING
     else:
         # Assigned no instance, create a new one
@@ -290,7 +290,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
             offer=offer,
             instance_num=instance_num,
         )
-        job_model.job_runtime_data = _prepare_job_runtime_data(job, instance).json()
+        job_model.job_runtime_data = _prepare_job_runtime_data(offer).json()
         instance.fleet_id = fleet_model.id
         logger.info(
             "The job %s created the new instance %s",
@@ -351,21 +351,40 @@ async def _assign_job_to_pool_instance(
     master_job_provisioning_data: Optional[JobProvisioningData] = None,
     volumes: Optional[List[List[Volume]]] = None,
 ) -> Optional[InstanceModel]:
+    instances_with_offers: list[tuple[InstanceModel, InstanceOfferWithAvailability]]
     profile = run_spec.merged_profile
-    relevant_instances = filter_pool_instances(
+    multinode = job.job_spec.jobs_per_replica > 1
+    nonshared_instances = filter_pool_instances(
         pool_instances=pool_instances,
         profile=profile,
         requirements=job.job_spec.requirements,
         status=InstanceStatus.IDLE,
         fleet_model=fleet_model,
-        multinode=job.job_spec.jobs_per_replica > 1,
+        multinode=multinode,
         master_job_provisioning_data=master_job_provisioning_data,
         volumes=volumes,
+        shared=False,
     )
-    if len(relevant_instances) == 0:
+    instances_with_offers = [
+        (instance, common_utils.get_or_error(get_instance_offer(instance)))
+        for instance in nonshared_instances
+    ]
+    if not multinode:
+        shared_instances_with_offers = get_shared_pool_instances_with_offers(
+            pool_instances=pool_instances,
+            profile=profile,
+            requirements=job.job_spec.requirements,
+            idle_only=True,
+            fleet_model=fleet_model,
+            volumes=volumes,
+        )
+        instances_with_offers.extend(shared_instances_with_offers)
+
+    if len(instances_with_offers) == 0:
         return None
-    sorted_instances = sorted(relevant_instances, key=lambda instance: instance.price)
-    instance = sorted_instances[0]
+
+    instances_with_offers.sort(key=lambda instance_with_offer: instance_with_offer[0].price or 0)
+    instance, offer = instances_with_offers[0]
     # Reload InstanceModel with volumes
     res = await session.execute(
         select(InstanceModel)
@@ -374,7 +393,8 @@ async def _assign_job_to_pool_instance(
     )
     instance = res.unique().scalar_one()
     instance.status = InstanceStatus.BUSY
-    instance.job = job_model
+    instance.busy_blocks += offer.blocks
+
     logger.info(
         "The job %s switched instance %s status to BUSY",
         job_model.job_name,
@@ -385,8 +405,10 @@ async def _assign_job_to_pool_instance(
         },
     )
     logger.info("%s: now is provisioning on '%s'", fmt(job_model), instance.name)
-    job_model.job_provisioning_data = instance.job_provisioning_data
+    job_model.instance = instance
     job_model.used_instance_id = instance.id
+    job_model.job_provisioning_data = instance.job_provisioning_data
+    job_model.job_runtime_data = _prepare_job_runtime_data(offer).json()
     return instance
 
 
@@ -549,29 +571,34 @@ def _create_instance_model_for_job(
         offer=offer.json(),
         termination_policy=termination_policy,
         termination_idle_time=termination_idle_time,
-        job=job_model,
+        jobs=[job_model],
         backend=offer.backend,
         price=offer.price,
         region=offer.region,
         volumes=[],
+        total_blocks=1,
+        busy_blocks=1,
     )
     return instance
 
 
-def _prepare_job_runtime_data(job: Job, instance: InstanceModel) -> JobRuntimeData:
-    if job.job_spec.jobs_per_replica > 1:
-        # multi-node runs require host network mode for inter-node communication and occupy
-        # the entire instance
-        return JobRuntimeData(network_mode=NetworkMode.HOST)
-
-    # TODO: replace with a real computed value depending on the instance
-    is_shared_instance = True
-
-    if not is_shared_instance:
-        return JobRuntimeData(network_mode=NetworkMode.HOST)
-
-    # TODO: slice CPU/GPU/Memory resources depending on the instance
-    return JobRuntimeData(network_mode=NetworkMode.BRIDGE)
+def _prepare_job_runtime_data(offer: InstanceOfferWithAvailability) -> JobRuntimeData:
+    if offer.total_blocks == 1:
+        if env_utils.get_bool("DSTACK_FORCE_BRIDGE_NETWORK"):
+            network_mode = NetworkMode.BRIDGE
+        else:
+            network_mode = NetworkMode.HOST
+        return JobRuntimeData(
+            network_mode=network_mode,
+            offer=offer,
+        )
+    return JobRuntimeData(
+        network_mode=NetworkMode.BRIDGE,
+        offer=offer,
+        cpu=offer.instance.resources.cpus,
+        gpu=len(offer.instance.resources.gpus),
+        memory=Memory(offer.instance.resources.memory_mib / 1024),
+    )
 
 
 async def _attach_volumes(
@@ -586,6 +613,8 @@ async def _attach_volumes(
         project=project,
         backend_type=job_provisioning_data.backend,
     )
+    job_runtime_data = common_utils.get_or_error(get_job_runtime_data(job_model))
+    job_runtime_data.volume_names = []
     logger.info("Attaching volumes: %s", [[v.name for v in vs] for vs in volume_models])
     for mount_point_volume_models in volume_models:
         for volume_model in mount_point_volume_models:
@@ -604,6 +633,7 @@ async def _attach_volumes(
                         instance=instance,
                         instance_id=job_provisioning_data.instance_id,
                     )
+                    job_runtime_data.volume_names.append(volume.name)
                     break  # attach next mount point
             except (ServerClientError, BackendError) as e:
                 logger.warning("%s: failed to attached volume: %s", fmt(job_model), repr(e))
@@ -620,6 +650,8 @@ async def _attach_volumes(
                 # TODO: Replace with JobTerminationReason.VOLUME_ERROR in 0.19
                 job_model.termination_reason = JobTerminationReason.TERMINATED_BY_SERVER
                 job_model.termination_reason_message = "Failed to attach volume"
+            finally:
+                job_model.job_runtime_data = job_runtime_data.json()
 
 
 async def _attach_volume(
