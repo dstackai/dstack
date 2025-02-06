@@ -41,10 +41,6 @@ logger = get_logger(__name__)
 class FleetConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
     TYPE: ApplyConfigurationType = ApplyConfigurationType.FLEET
 
-    @classmethod
-    def register_args(cls, parser: argparse.ArgumentParser):
-        cls.register_env_args(parser)
-
     def apply_configuration(
         self,
         conf: FleetConfiguration,
@@ -185,7 +181,20 @@ class FleetConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
 
         console.print(f"Fleet [code]{conf.name}[/] deleted")
 
+    @classmethod
+    def register_args(cls, parser: argparse.ArgumentParser):
+        configuration_group = parser.add_argument_group(f"{cls.TYPE.value} Options")
+        configuration_group.add_argument(
+            "-n",
+            "--name",
+            dest="name",
+            help="The fleet name",
+        )
+        cls.register_env_args(configuration_group)
+
     def apply_args(self, conf: FleetConfiguration, args: argparse.Namespace, unknown: List[str]):
+        if args.name:
+            conf.name = args.name
         self.apply_env_vars(conf.env, args)
         if conf.ssh_config is None and conf.env:
             raise ConfigurationError("`env` is currently supported for SSH fleets only")

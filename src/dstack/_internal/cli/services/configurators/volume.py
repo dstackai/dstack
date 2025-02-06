@@ -38,6 +38,7 @@ class VolumeConfigurator(BaseApplyConfigurator):
         unknown_args: List[str],
         repo: Optional[Repo] = None,
     ):
+        self.apply_args(conf, configurator_args, unknown_args)
         spec = VolumeSpec(
             configuration=conf,
             configuration_path=configuration_path,
@@ -157,6 +158,20 @@ class VolumeConfigurator(BaseApplyConfigurator):
             self.api.client.volumes.delete(project_name=self.api.project, names=[conf.name])
 
         console.print(f"Volume [code]{conf.name}[/] deleted")
+
+    @classmethod
+    def register_args(cls, parser: argparse.ArgumentParser):
+        configuration_group = parser.add_argument_group(f"{cls.TYPE.value} Options")
+        configuration_group.add_argument(
+            "-n",
+            "--name",
+            dest="name",
+            help="The volume name",
+        )
+
+    def apply_args(self, conf: VolumeConfiguration, args: argparse.Namespace, unknown: List[str]):
+        if args.name:
+            conf.name = args.name
 
 
 def _get_plan(api: Client, spec: VolumeSpec) -> VolumePlan:

@@ -298,20 +298,21 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
 
     @classmethod
     def register_args(cls, parser: argparse.ArgumentParser):
-        parser.add_argument(
+        configuration_group = parser.add_argument_group(f"{cls.TYPE.value} Options")
+        configuration_group.add_argument(
             "-n",
             "--name",
             dest="run_name",
             help="The name of the run. If not specified, a random name is assigned",
         )
-        parser.add_argument(
+        configuration_group.add_argument(
             "--max-offers",
             help="Number of offers to show in the run plan",
             type=int,
             default=3,
         )
-        cls.register_env_args(parser)
-        parser.add_argument(
+        cls.register_env_args(configuration_group)
+        configuration_group.add_argument(
             "--gpu",
             type=gpu_spec,
             help="Request GPU for the run. "
@@ -319,7 +320,7 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
             dest="gpu_spec",
             metavar="SPEC",
         )
-        parser.add_argument(
+        configuration_group.add_argument(
             "--disk",
             type=disk_spec,
             help="Request the size range of disk for the run. Example [code]--disk 100GB..[/].",

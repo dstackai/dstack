@@ -1,7 +1,7 @@
 import argparse
 import os
 from abc import ABC, abstractmethod
-from typing import List, Optional, cast
+from typing import List, Optional, Union, cast
 
 from dstack._internal.cli.services.args import env_var
 from dstack._internal.core.errors import ConfigurationError
@@ -13,6 +13,8 @@ from dstack._internal.core.models.configurations import (
 from dstack._internal.core.models.envs import Env, EnvSentinel, EnvVarTuple
 from dstack._internal.core.models.repos.base import Repo
 from dstack.api._public import Client
+
+ArgsParser = Union[argparse._ArgumentGroup, argparse.ArgumentParser]
 
 
 class BaseApplyConfigurator(ABC):
@@ -82,7 +84,7 @@ class BaseApplyConfigurator(ABC):
 
 class ApplyEnvVarsConfiguratorMixin:
     @classmethod
-    def register_env_args(cls, parser: argparse.ArgumentParser):
+    def register_env_args(cls, parser: ArgsParser):
         parser.add_argument(
             "-e",
             "--env",
