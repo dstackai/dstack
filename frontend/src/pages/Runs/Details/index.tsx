@@ -34,7 +34,7 @@ export const RunDetails: React.FC = () => {
     const navigate = useNavigate();
     const params = useParams();
     const paramProjectName = params.projectName ?? '';
-    const paramRunName = params.runName ?? '';
+    const paramRunId = params.runId ?? '';
     const [pushNotification] = useNotifications();
 
     const {
@@ -43,7 +43,7 @@ export const RunDetails: React.FC = () => {
         error: runError,
     } = useGetRunQuery({
         project_name: paramProjectName,
-        run_name: paramRunName,
+        id: paramRunId,
     });
 
     useEffect(() => {
@@ -71,15 +71,15 @@ export const RunDetails: React.FC = () => {
             href: ROUTES.RUNS.LIST,
         },
         {
-            text: paramRunName,
-            href: ROUTES.PROJECT.DETAILS.RUNS.DETAILS.FORMAT(paramProjectName, paramRunName),
+            text: runData?.run_spec?.run_name ?? '',
+            href: ROUTES.PROJECT.DETAILS.RUNS.DETAILS.FORMAT(paramProjectName, paramRunId),
         },
     ]);
 
     const abortClickHandle = () => {
         stopRun({
             project_name: paramProjectName,
-            runs_names: [paramRunName],
+            runs_names: [paramRunId],
             abort: true,
         })
             .unwrap()
@@ -94,7 +94,7 @@ export const RunDetails: React.FC = () => {
     const stopClickHandle = () => {
         stopRun({
             project_name: paramProjectName,
-            runs_names: [paramRunName],
+            runs_names: [paramRunId],
             abort: false,
         })
             .unwrap()
@@ -109,7 +109,7 @@ export const RunDetails: React.FC = () => {
     const deleteClickHandle = () => {
         deleteRun({
             project_name: paramProjectName,
-            runs_names: [paramRunName],
+            runs_names: [paramRunId],
         })
             .unwrap()
             .then(() => {
@@ -132,7 +132,7 @@ export const RunDetails: React.FC = () => {
             <ContentLayout
                 header={
                     <DetailsHeader
-                        title={paramRunName}
+                        title={runData?.run_spec?.run_name ?? ''}
                         actionButtons={
                             <>
                                 <Button onClick={abortClickHandle} disabled={isDisabledAbortButton}>
@@ -143,9 +143,9 @@ export const RunDetails: React.FC = () => {
                                     {t('common.stop')}
                                 </Button>
 
-                                <Button onClick={deleteClickHandle} disabled={isDisabledDeleteButton}>
-                                    {t('common.delete')}
-                                </Button>
+                                {/*<Button onClick={deleteClickHandle} disabled={isDisabledDeleteButton}>*/}
+                                {/*    {t('common.delete')}*/}
+                                {/*</Button>*/}
                             </>
                         }
                     />
@@ -254,14 +254,14 @@ export const RunDetails: React.FC = () => {
                         {runData.jobs.length === 1 && (
                             <Logs
                                 projectName={paramProjectName}
-                                runName={paramRunName}
+                                runName={runData?.run_spec?.run_name ?? ''}
                                 jobSubmissionId={getJobSubmissionId(runData)}
                                 className={styles.logs}
                             />
                         )}
 
                         {runData.jobs.length > 1 && (
-                            <JobList projectName={paramProjectName} runName={paramRunName} jobs={runData.jobs} />
+                            <JobList projectName={paramProjectName} runId={paramRunId} jobs={runData.jobs} />
                         )}
                     </>
                 )}

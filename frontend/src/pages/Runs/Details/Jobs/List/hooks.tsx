@@ -17,7 +17,7 @@ import {
     getJobSubmittedAt,
 } from './helpers';
 
-export const useColumnsDefinitions = ({ projectName, runName }: { projectName: string; runName: string }) => {
+export const useColumnsDefinitions = ({ projectName, runId }: { projectName: string; runId: string }) => {
     const { t } = useTranslation();
 
     const columns = [
@@ -26,7 +26,7 @@ export const useColumnsDefinitions = ({ projectName, runName }: { projectName: s
             header: t('projects.run.job_name'),
             cell: (item: IJob) => (
                 <NavigateLink
-                    href={ROUTES.PROJECT.DETAILS.RUNS.DETAILS.JOBS.DETAILS.FORMAT(projectName, runName, item.job_spec.job_name)}
+                    href={ROUTES.PROJECT.DETAILS.RUNS.DETAILS.JOBS.DETAILS.FORMAT(projectName, runId, item.job_spec.job_name)}
                 >
                     {item.job_spec.job_name}
                 </NavigateLink>

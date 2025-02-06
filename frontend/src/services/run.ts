@@ -39,7 +39,7 @@ export const runApi = createApi({
                 result ? [...result.map(({ id }) => ({ type: 'Runs' as const, id: id })), 'Runs'] : ['Runs'],
         }),
 
-        getRun: builder.query<IRun | undefined, { project_name: string; run_name: string }>({
+        getRun: builder.query<IRun | undefined, { project_name: string; id: string }>({
             query: ({ project_name, ...body }) => {
                 return {
                     url: API.PROJECTS.RUN_DETAILS(project_name ?? ''),
