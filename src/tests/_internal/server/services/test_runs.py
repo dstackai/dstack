@@ -10,9 +10,9 @@ from dstack._internal.core.models.configurations import ScalingSpec, ServiceConf
 from dstack._internal.core.models.profiles import Profile
 from dstack._internal.core.models.resources import Range
 from dstack._internal.core.models.runs import JobStatus, JobTerminationReason, RunStatus
-from dstack._internal.core.models.volumes import VolumeMountPoint
 from dstack._internal.server.models import RunModel
-from dstack._internal.server.services.runs import check_can_attach_run_volumes, scale_run_replicas
+from dstack._internal.server.services.jobs import check_can_attach_job_volumes
+from dstack._internal.server.services.runs import scale_run_replicas
 from dstack._internal.server.testing.common import (
     create_job,
     create_pool,
@@ -241,19 +241,7 @@ class TestCanAttachRunVolumes:
         vol22.configuration.backend = BackendType.AWS
         vol22.configuration.region = "eu-west-2"
         volumes = [[vol11, vol12], [vol21, vol22]]
-        run_spec = get_run_spec(
-            run_name="test_run",
-            repo_id="test_repo",
-            configuration=ServiceConfiguration(
-                port=80,
-                commands=[""],
-                volumes=[
-                    VolumeMountPoint(name=["vol11", "vol12"], path="/vol1"),
-                    VolumeMountPoint(name=["vol21", "vol22"], path="/vol2"),
-                ],
-            ),
-        )
-        check_can_attach_run_volumes(run_spec, volumes)
+        check_can_attach_job_volumes(volumes)
 
     @pytest.mark.asyncio
     async def test_cannot_attach_different_mount_points_with_different_backends_regions(self):
@@ -264,20 +252,8 @@ class TestCanAttachRunVolumes:
         vol2.configuration.backend = BackendType.AWS
         vol2.configuration.region = "eu-west-2"
         volumes = [[vol1], [vol2]]
-        run_spec = get_run_spec(
-            run_name="test_run",
-            repo_id="test_repo",
-            configuration=ServiceConfiguration(
-                port=80,
-                commands=[""],
-                volumes=[
-                    VolumeMountPoint(name=["vol1"], path="/vol1"),
-                    VolumeMountPoint(name=["vol2"], path="/vol2"),
-                ],
-            ),
-        )
         with pytest.raises(ServerClientError):
-            check_can_attach_run_volumes(run_spec, volumes)
+            check_can_attach_job_volumes(volumes)
 
     @pytest.mark.asyncio
     async def test_cannot_attach_same_volume_at_different_mount_points(self):
@@ -285,17 +261,5 @@ class TestCanAttachRunVolumes:
         vol1.configuration.backend = BackendType.AWS
         vol1.configuration.region = "eu-west-1"
         volumes = [[vol1], [vol1]]
-        run_spec = get_run_spec(
-            run_name="test_run",
-            repo_id="test_repo",
-            configuration=ServiceConfiguration(
-                port=80,
-                commands=[""],
-                volumes=[
-                    VolumeMountPoint(name=["vol1"], path="/vol1"),
-                    VolumeMountPoint(name=["vol1"], path="/vol2"),
-                ],
-            ),
-        )
         with pytest.raises(ServerClientError):
-            check_can_attach_run_volumes(run_spec, volumes)
+            check_can_attach_job_volumes(volumes)
