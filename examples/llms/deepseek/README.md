@@ -144,9 +144,6 @@ This excludes memory for the model context and CUDA/ROCm kernel reservations.
 For example, the FP16 version of Deepseek-r1 671B would fit into single node of `Mi300x` with eight 192GB GPUs or 
 two nodes of `H200` with eight 141GB GPUs.
 
-Note: Currently, DeepSeek does not provide official FP8 or INT4 quantized versions.
-
-
 
 
 ### Running a configuration
