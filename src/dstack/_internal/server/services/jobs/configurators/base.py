@@ -1,13 +1,13 @@
 import shlex
 import sys
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 
 from cachetools import TTLCache, cached
 
 import dstack.version as version
 from dstack._internal.core.errors import DockerRegistryError, ServerClientError
-from dstack._internal.core.models.common import RegistryAuth
+from dstack._internal.core.models.common import RegistryAuth, is_core_model_instance
 from dstack._internal.core.models.configurations import (
     PortMapping,
     PythonVersion,
@@ -22,10 +22,12 @@ from dstack._internal.core.models.runs import (
     RunSpec,
 )
 from dstack._internal.core.models.unix import UnixUser
+from dstack._internal.core.models.volumes import MountPoint, VolumeMountPoint
 from dstack._internal.core.services.profiles import get_retry
 from dstack._internal.core.services.ssh.ports import filter_reserved_ports
 from dstack._internal.server.services.docker import ImageConfig, get_image_config
 from dstack._internal.utils.common import run_async
+from dstack._internal.utils.interpolator import InterpolatorError, VariablesInterpolator
 
 
 def get_default_python_verison() -> str:
@@ -115,6 +117,7 @@ class JobConfigurator(ABC):
             requirements=self._requirements(),
             retry=self._retry(),
             working_dir=self._working_dir(),
+            volumes=self._volumes(job_num),
         )
         return job_spec
 
@@ -223,6 +226,48 @@ class JobConfigurator(ABC):
         if self.run_spec.configuration.python is not None:
             return self.run_spec.configuration.python.value
         return get_default_python_verison()
+
+    def _volumes(self, job_num: int) -> List[MountPoint]:
+        return interpolate_job_volumes(self.run_spec.configuration.volumes, job_num)
+
+
+def interpolate_job_volumes(
+    run_volumes: List[Union[MountPoint, str]],
+    job_num: int,
+) -> List[MountPoint]:
+    if len(run_volumes) == 0:
+        return []
+    interpolator = VariablesInterpolator(
+        namespaces={
+            "dstack": {
+                "job_num": str(job_num),
+                "node_rank": str(job_num),  # an alias for job_num
+            }
+        }
+    )
+    job_volumes = []
+    for mount_point in run_volumes:
+        if isinstance(mount_point, str):
+            # pydantic validator ensures strings are converted to MountPoint
+            continue
+        if not is_core_model_instance(mount_point, VolumeMountPoint):
+            job_volumes.append(mount_point.copy())
+            continue
+        if isinstance(mount_point.name, str):
+            names = [mount_point.name]
+        else:
+            names = mount_point.name
+        try:
+            interpolated_names = [interpolator.interpolate_or_error(n) for n in names]
+        except InterpolatorError as e:
+            raise ServerClientError(e.args[0])
+        job_volumes.append(
+            VolumeMountPoint(
+                name=interpolated_names,
+                path=mount_point.path,
+            )
+        )
+    return job_volumes
 
 
 def _join_shell_commands(commands: List[str]) -> str:

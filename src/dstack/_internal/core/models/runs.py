@@ -27,6 +27,7 @@ from dstack._internal.core.models.profiles import (
 from dstack._internal.core.models.repos import AnyRunRepoData
 from dstack._internal.core.models.resources import Memory, ResourcesSpec
 from dstack._internal.core.models.unix import UnixUser
+from dstack._internal.core.models.volumes import MountPoint
 from dstack._internal.utils import common as common_utils
 from dstack._internal.utils.common import format_pretty_duration
 
@@ -190,6 +191,7 @@ class JobSpec(CoreModel):
     registry_auth: Optional[RegistryAuth]
     requirements: Requirements
     retry: Optional[Retry]
+    volumes: Optional[List[MountPoint]] = None
     # For backward compatibility with 0.18.x when retry_policy was required.
     # TODO: remove in 0.19
     retry_policy: ProfileRetryPolicy = ProfileRetryPolicy(retry=False)
