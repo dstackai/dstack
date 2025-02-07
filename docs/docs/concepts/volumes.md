@@ -133,6 +133,32 @@ and its contents will persist across runs.
 
     `dstack` will attach one of the volumes based on the region and backend of the run.  
 
+!!! info "Volumes with multi-node tasks"
+    To use single-attach volumes such as AWS EBS with multi-node tasks,
+    attach different volumes to different nodes using `dstack` variable interpolation:
+
+    <div editor-title=".dstack.yml">
+
+    ```yaml
+    type: task
+    nodes: 8
+    commands:
+      - ...
+    volumes:
+      - name: data-volume-${{ dstack.node_rank }}
+        path: /volume_data
+    ```
+
+    </div>
+
+    This way, every node will use its own volume.
+
+    Tip: To create volumes for all nodes using one volume configuration, specify volume name with `-n`:
+
+    ```shell
+    $ for i in {0..7}; do dstack apply -f vol.dstack.yml -n data-volume-$i -y; done
+    ```
+
 ??? info "Container path"
     When you're running a dev environment, task, or service with `dstack`, it automatically mounts the project folder contents
     to `/workflow` (and sets that as the current working directory). Right now, `dstack` doesn't allow you to 
