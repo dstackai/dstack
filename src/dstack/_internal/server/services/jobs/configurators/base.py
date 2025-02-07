@@ -237,7 +237,14 @@ def interpolate_job_volumes(
 ) -> List[MountPoint]:
     if len(run_volumes) == 0:
         return []
-    interpolator = VariablesInterpolator(namespaces={"sys": {"DSTACK_NODE_RANK": str(job_num)}})
+    interpolator = VariablesInterpolator(
+        namespaces={
+            "dstack": {
+                "job_num": str(job_num),
+                "node_rank": str(job_num),  # an alias for job_num
+            }
+        }
+    )
     job_volumes = []
     for mount_point in run_volumes:
         if isinstance(mount_point, str):
