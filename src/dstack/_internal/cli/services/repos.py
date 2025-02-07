@@ -1,7 +1,7 @@
-from argparse import ArgumentParser, _ArgumentGroup
 from pathlib import Path
-from typing import Optional, Union
+from typing import Optional
 
+from dstack._internal.cli.services.configurators.base import ArgsParser
 from dstack._internal.core.errors import CLIError
 from dstack._internal.core.models.repos.base import Repo, RepoType
 from dstack._internal.core.models.repos.remote import GitRepoURL, RemoteRepo, RepoError
@@ -12,7 +12,7 @@ from dstack._internal.utils.path import PathLike
 from dstack.api._public import Client
 
 
-def register_init_repo_args(parser: Union[ArgumentParser, _ArgumentGroup]):
+def register_init_repo_args(parser: ArgsParser):
     parser.add_argument(
         "-t",
         "--token",

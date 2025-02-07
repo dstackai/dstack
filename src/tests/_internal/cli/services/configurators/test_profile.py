@@ -73,6 +73,6 @@ def apply_args(profile: Profile, args: List[str]) -> Tuple[Profile, argparse.Nam
     parser = argparse.ArgumentParser()
     register_profile_args(parser)
     profile = profile.copy(deep=True)  # to avoid modifying the original profile
-    args = parser.parse_args(args)
-    apply_profile_args(args, profile)
-    return profile, args
+    parsed_args = parser.parse_args(args)
+    apply_profile_args(parsed_args, profile)
+    return profile, parsed_args
