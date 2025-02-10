@@ -94,21 +94,25 @@ class GCPCompute(Compute):
             for quota in region.quotas:
                 quotas[region.name][quota.metric] = quota.limit - quota.usage
 
-        seen_region_offers = set()
+        offer_keys_to_offers = {}
         offers_with_availability = []
         for offer in offers:
             region = offer.region[:-2]  # strip zone
             key = (_unique_instance_name(offer.instance), region)
-            if key in seen_region_offers:
+            if key in offer_keys_to_offers:
+                offer_keys_to_offers[key].availability_zones.append(offer.region)
                 continue
-            seen_region_offers.add(key)
             availability = InstanceAvailability.NO_QUOTA
             if _has_gpu_quota(quotas[region], offer.instance.resources):
                 availability = InstanceAvailability.UNKNOWN
             # todo quotas: cpu, memory, global gpu, tpu
-            offers_with_availability.append(
-                InstanceOfferWithAvailability(**offer.dict(), availability=availability)
+            offer_with_availability = InstanceOfferWithAvailability(
+                **offer.dict(),
+                availability=availability,
+                availability_zones=[offer.region],
             )
+            offer_keys_to_offers[key] = offer_with_availability
+            offers_with_availability.append(offer_with_availability)
             offers_with_availability[-1].region = region
 
         return offers_with_availability
@@ -156,12 +160,7 @@ class GCPCompute(Compute):
             )
         authorized_keys = instance_config.get_public_keys()
 
-        zones = _get_instance_zones(instance_offer)
-        instance_config_zones = instance_config.get_availability_zones()
-        if instance_config_zones is not None:
-            zones = [z for z in zones if z in instance_config_zones]
-            if len(zones) == 0:
-                raise ComputeError(f"No valid availability zones: {instance_config_zones}")
+        zones = get_or_error(instance_offer.availability_zones)
         # If a shared VPC is not used, we can create firewall rules for user
         if self.config.vpc_project_id is None:
             gcp_resources.create_runner_firewall_rules(
@@ -373,6 +372,7 @@ class GCPCompute(Compute):
         project_ssh_private_key: str,
         volumes: List[Volume],
     ) -> JobProvisioningData:
+        # TODO: run_job is the same for vm-based backends, refactor
         instance_config = InstanceConfiguration(
             project_name=run.project_name,
             instance_name=get_instance_name(run, job),  # TODO: generate name
@@ -380,23 +380,23 @@ class GCPCompute(Compute):
                 SSHKey(public=project_ssh_public_key.strip()),
             ],
             user=run.user,
-            volumes=volumes,
+            reservation=run.run_spec.configuration.reservation,
         )
-        instance_config.availability_zones = run.run_spec.merged_profile.availability_zones
+        instance_offer = instance_offer.copy()
         if len(volumes) > 0:
             volume = volumes[0]
             if (
                 volume.provisioning_data is not None
                 and volume.provisioning_data.availability_zone is not None
             ):
-                if instance_config.availability_zones is None:
-                    instance_config.availability_zones = [
+                if instance_offer.availability_zones is None:
+                    instance_offer.availability_zones = [
                         volume.provisioning_data.availability_zone
                     ]
-                instance_config.availability_zones = [
-                    az
-                    for az in instance_config.availability_zones
-                    if az == volume.provisioning_data.availability_zone
+                instance_offer.availability_zones = [
+                    z
+                    for z in instance_offer.availability_zones
+                    if z == volume.provisioning_data.availability_zone
                 ]
         return self.create_instance(instance_offer, instance_config)
 
@@ -771,17 +771,6 @@ def _unique_instance_name(instance: InstanceType) -> str:
         return name
     gpu = instance.resources.gpus[0]
     return f"{name}-{gpu.name}-{gpu.memory_mib}"
-
-
-def _get_instance_zones(instance_offer: InstanceOffer) -> List[str]:
-    zones = []
-    for offer in get_catalog_offers(backend=BackendType.GCP):
-        if _unique_instance_name(instance_offer.instance) != _unique_instance_name(offer.instance):
-            continue
-        if offer.region[:-2] != instance_offer.region:
-            continue
-        zones.append(offer.region)
-    return zones
 
 
 def _get_tpu_startup_script(authorized_keys: List[str]) -> str:

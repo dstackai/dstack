@@ -42,7 +42,6 @@ from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.fleets import InstanceGroupPlacement
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
-    InstanceConfiguration,
     InstanceOfferWithAvailability,
     InstanceRuntime,
     InstanceStatus,
@@ -518,11 +517,10 @@ async def _create_instance(session: AsyncSession, instance: InstanceModel) -> No
             session=session, fleet_id=instance.fleet_id
         )
 
-    instance_configuration = _patch_instance_configuration(instance)
-
     for backend, instance_offer in offers:
         if instance_offer.backend not in BACKENDS_WITH_CREATE_INSTANCE_SUPPORT:
             continue
+        instance_offer = _get_instance_offer_for_instance(instance_offer, instance)
         if (
             instance_offer.backend in BACKENDS_WITH_PLACEMENT_GROUPS_SUPPORT
             and instance.fleet
@@ -890,24 +888,31 @@ def _need_to_wait_fleet_provisioning(instance: InstanceModel) -> bool:
     )
 
 
-def _patch_instance_configuration(instance: InstanceModel) -> InstanceConfiguration:
-    instance_configuration = get_instance_configuration(instance)
+def _get_instance_offer_for_instance(
+    instance_offer: InstanceOfferWithAvailability,
+    instance: InstanceModel,
+) -> InstanceOfferWithAvailability:
     if instance.fleet is None:
-        return instance_configuration
+        return instance_offer
 
     fleet = fleet_model_to_fleet(instance.fleet)
     master_instance = instance.fleet.instances[0]
     master_job_provisioning_data = get_instance_provisioning_data(master_instance)
+    instance_offer = instance_offer.copy()
     if (
         fleet.spec.configuration.placement == InstanceGroupPlacement.CLUSTER
         and master_job_provisioning_data is not None
         and master_job_provisioning_data.availability_zone is not None
     ):
-        instance_configuration.availability_zones = [
-            master_job_provisioning_data.availability_zone
+        if instance_offer.availability_zones is None:
+            instance_offer.availability_zones = [master_job_provisioning_data.availability_zone]
+        instance_offer.availability_zones = [
+            z
+            for z in instance_offer.availability_zones
+            if instance_offer.availability_zones == master_job_provisioning_data.availability_zone
         ]
 
-    return instance_configuration
+    return instance_offer
 
 
 def _create_placement_group_if_does_not_exist(

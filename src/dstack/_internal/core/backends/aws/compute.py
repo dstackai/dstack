@@ -109,34 +109,21 @@ class AWSCompute(Compute):
             configurable_disk_size=CONFIGURABLE_DISK_SIZE,
             extra_filter=filter,
         )
-        regions = set(i.region for i in offers)
-
-        def get_quotas(client: botocore.client.BaseClient) -> Dict[str, int]:
-            region_quotas = {}
-            for page in client.get_paginator("list_service_quotas").paginate(ServiceCode="ec2"):
-                for q in page["Quotas"]:
-                    if "On-Demand" in q["QuotaName"]:
-                        region_quotas[q["UsageMetric"]["MetricDimensions"]["Class"]] = q["Value"]
-            return region_quotas
-
-        quotas = {}
-        with ThreadPoolExecutor(max_workers=8) as executor:
-            future_to_region = {}
-            for region in regions:
-                future = executor.submit(
-                    get_quotas, self.session.client("service-quotas", region_name=region)
-                )
-                future_to_region[future] = region
-            for future in as_completed(future_to_region):
-                quotas[future_to_region[future]] = future.result()
+        regions = list(set(i.region for i in offers))
+        regions_to_quotas = _get_regions_to_quotas(self.session, regions)
+        regions_to_zones = _get_regions_to_zones(self.session, regions)
 
         availability_offers = []
         for offer in offers:
             availability = InstanceAvailability.UNKNOWN
-            if not _has_quota(quotas[offer.region], offer.instance.name):
+            if not _has_quota(regions_to_quotas[offer.region], offer.instance.name):
                 availability = InstanceAvailability.NO_QUOTA
             availability_offers.append(
-                InstanceOfferWithAvailability(**offer.dict(), availability=availability)
+                InstanceOfferWithAvailability(
+                    **offer.dict(),
+                    availability=availability,
+                    availability_zones=regions_to_zones[offer.region],
+                )
             )
         return availability_offers
 
@@ -161,12 +148,7 @@ class AWSCompute(Compute):
         ec2_resource = self.session.resource("ec2", region_name=instance_offer.region)
         ec2_client = self.session.client("ec2", region_name=instance_offer.region)
         allocate_public_ip = self.config.allocate_public_ips
-        zones = aws_resources.get_availability_zones(ec2_client, instance_offer.region)
-        instance_config_zones = instance_config.get_availability_zones()
-        if instance_config_zones is not None:
-            zones = [z for z in zones if z in instance_config_zones]
-            if len(zones) == 0:
-                raise ComputeError(f"No valid availability zones: {instance_config_zones}")
+        zones = instance_offer.availability_zones
         tags = {
             "Name": instance_config.instance_name,
             "owner": "dstack",
@@ -176,7 +158,7 @@ class AWSCompute(Compute):
         tags = merge_tags(tags=tags, backend_tags=self.config.tags)
 
         disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
-        max_efa_interfaces = get_maximum_efa_interfaces(
+        max_efa_interfaces = _get_maximum_efa_interfaces(
             ec2_client=ec2_client, instance_type=instance_offer.instance.name
         )
         enable_efa = max_efa_interfaces > 0
@@ -295,21 +277,21 @@ class AWSCompute(Compute):
             user=run.user,
             reservation=run.run_spec.configuration.reservation,
         )
-        instance_config.availability_zones = run.run_spec.merged_profile.availability_zones
+        instance_offer = instance_offer.copy()
         if len(volumes) > 0:
             volume = volumes[0]
             if (
                 volume.provisioning_data is not None
                 and volume.provisioning_data.availability_zone is not None
             ):
-                if instance_config.availability_zones is None:
-                    instance_config.availability_zones = [
+                if instance_offer.availability_zones is None:
+                    instance_offer.availability_zones = [
                         volume.provisioning_data.availability_zone
                     ]
-                instance_config.availability_zones = [
-                    az
-                    for az in instance_config.availability_zones
-                    if az == volume.provisioning_data.availability_zone
+                instance_offer.availability_zones = [
+                    z
+                    for z in instance_offer.availability_zones
+                    if z == volume.provisioning_data.availability_zone
                 ]
         return self.create_instance(instance_offer, instance_config)
 
@@ -685,23 +667,6 @@ class AWSCompute(Compute):
         return True
 
 
-def get_maximum_efa_interfaces(ec2_client: botocore.client.BaseClient, instance_type: str) -> int:
-    try:
-        response = ec2_client.describe_instance_types(
-            InstanceTypes=[instance_type],
-            Filters=[{"Name": "network-info.efa-supported", "Values": ["true"]}],
-        )
-    except botocore.exceptions.ClientError as e:
-        if e.response.get("Error", {}).get("Code") == "InvalidInstanceType":
-            # "The following supplied instance types do not exist: [<instance_type>]"
-            return 0
-        raise
-    instance_types = response["InstanceTypes"]
-    if not instance_types:
-        return 0
-    return instance_types[0]["NetworkInfo"]["EfaInfo"]["MaximumEfaInterfaces"]
-
-
 def get_vpc_id_subnet_id_or_error(
     ec2_client: botocore.client.BaseClient,
     config: AWSConfig,
@@ -783,12 +748,52 @@ def _get_vpc_id_subnet_id_by_vpc_name_or_error(
     )
 
 
+def _get_regions_to_quotas(
+    session: boto3.Session, regions: List[str]
+) -> Dict[str, Dict[str, int]]:
+    def get_region_quotas(client: botocore.client.BaseClient) -> Dict[str, int]:
+        region_quotas = {}
+        for page in client.get_paginator("list_service_quotas").paginate(ServiceCode="ec2"):
+            for q in page["Quotas"]:
+                if "On-Demand" in q["QuotaName"]:
+                    region_quotas[q["UsageMetric"]["MetricDimensions"]["Class"]] = q["Value"]
+        return region_quotas
+
+    regions_to_quotas = {}
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        future_to_region = {}
+        for region in regions:
+            future = executor.submit(
+                get_region_quotas, session.client("service-quotas", region_name=region)
+            )
+            future_to_region[future] = region
+        for future in as_completed(future_to_region):
+            regions_to_quotas[future_to_region[future]] = future.result()
+    return regions_to_quotas
+
+
 def _has_quota(quotas: Dict[str, int], instance_name: str) -> bool:
     if instance_name.startswith("p"):
         return quotas.get("P/OnDemand", 0) > 0
     if instance_name.startswith("g"):
         return quotas.get("G/OnDemand", 0) > 0
     return quotas.get("Standard/OnDemand", 0) > 0
+
+
+def _get_regions_to_zones(session: boto3.Session, regions: List[str]) -> Dict[str, List[str]]:
+    regions_to_zones = {}
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        future_to_region = {}
+        for region in regions:
+            future = executor.submit(
+                aws_resources.get_availability_zones,
+                session.client("ec2", region_name=region),
+                region,
+            )
+            future_to_region[future] = region
+        for future in as_completed(future_to_region):
+            regions_to_zones[future_to_region[future]] = future.result()
+    return regions_to_zones
 
 
 def _supported_instances(offer: InstanceOffer) -> bool:
@@ -809,6 +814,23 @@ def _supported_instances(offer: InstanceOffer) -> bool:
         if offer.instance.name.startswith(family):
             return True
     return False
+
+
+def _get_maximum_efa_interfaces(ec2_client: botocore.client.BaseClient, instance_type: str) -> int:
+    try:
+        response = ec2_client.describe_instance_types(
+            InstanceTypes=[instance_type],
+            Filters=[{"Name": "network-info.efa-supported", "Values": ["true"]}],
+        )
+    except botocore.exceptions.ClientError as e:
+        if e.response.get("Error", {}).get("Code") == "InvalidInstanceType":
+            # "The following supplied instance types do not exist: [<instance_type>]"
+            return 0
+        raise
+    instance_types = response["InstanceTypes"]
+    if not instance_types:
+        return 0
+    return instance_types[0]["NetworkInfo"]["EfaInfo"]["MaximumEfaInterfaces"]
 
 
 def _get_instance_ip(instance: Any, public_ip: bool) -> str:

@@ -424,7 +424,7 @@ def filter_pool_instances(
 
     backend_types = profile.backends
     regions = profile.regions
-    zones = None
+    zones = profile.availability_zones
 
     if volumes:
         mount_point_volumes = volumes[0]
@@ -435,8 +435,9 @@ def filter_pool_instances(
             for v in mount_point_volumes
             if v.provisioning_data is not None
         ]
-        if volume_zones:
+        if zones is None:
             zones = volume_zones
+        zones = [z for z in zones if z in volume_zones]
 
     if multinode:
         if not backend_types:
@@ -701,7 +702,6 @@ async def create_instance_model(
         ssh_keys=[project_ssh_key],
         instance_id=str(instance_id),
         placement_group_name=placement_group_name,
-        availability_zones=profile.availability_zones,
         reservation=reservation,
     )
     instance = InstanceModel(

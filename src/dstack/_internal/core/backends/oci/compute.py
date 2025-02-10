@@ -9,7 +9,7 @@ from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.oci import resources
 from dstack._internal.core.backends.oci.config import OCIConfig
 from dstack._internal.core.backends.oci.region import make_region_clients_map
-from dstack._internal.core.errors import ComputeError, NoCapacityError
+from dstack._internal.core.errors import NoCapacityError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
@@ -76,7 +76,13 @@ class OCICompute(Compute):
             else:
                 availability = InstanceAvailability.NO_QUOTA
             offers_with_availability.append(
-                InstanceOfferWithAvailability(**offer.dict(), availability=availability)
+                InstanceOfferWithAvailability(
+                    **offer.dict(),
+                    availability=availability,
+                    availability_zones=shapes_availability[offer.region].get(
+                        offer.instance.name, []
+                    ),
+                )
             )
 
         return offers_with_availability
@@ -115,8 +121,8 @@ class OCICompute(Compute):
             instance_offer.instance.name, self.shapes_quota, region, self.config.compartment_id
         )
         availability_domain = _get_availability_domain_or_error(
-            availabile_domains=available_domains,
-            requested_domains=instance_config.get_availability_zones(),
+            available_domains=available_domains,
+            offer_domains=instance_offer.availability_zones,
         )
 
         listing, package = resources.get_marketplace_listing_and_package(
@@ -203,19 +209,12 @@ def _supported_instances(offer: InstanceOffer) -> bool:
 
 
 def _get_availability_domain_or_error(
-    availabile_domains: List[str],
-    requested_domains: Optional[List[str]],
+    available_domains: List[str],
+    offer_domains: Optional[List[str]],
 ) -> str:
-    domains = availabile_domains
-    if requested_domains is not None:
-        domains = [
-            ad
-            for ad in availabile_domains
-            # Allow specifying domains with or without prefix
-            if ad in requested_domains or ad.split(":")[1] in requested_domains
-        ]
-        if len(availabile_domains) > 0 and len(domains) == 0:
-            raise ComputeError(f"No valid availability domains: {requested_domains}")
+    domains = available_domains
+    if offer_domains is not None:
+        domains = [ad for ad in available_domains if ad in offer_domains]
     if len(domains) == 0:
         raise NoCapacityError("Shape unavailable in all availability domains")
     return domains[0]

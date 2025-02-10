@@ -370,18 +370,6 @@ def get_subnets_ids_for_vpc(
     return subnets_ids
 
 
-def get_any_availability_zone(
-    ec2_client: botocore.client.BaseClient, region: str
-) -> Optional[str]:
-    zone_names = get_availability_zones(
-        ec2_client=ec2_client,
-        region=region,
-    )
-    if len(zone_names) == 0:
-        return None
-    return zone_names[0]
-
-
 def get_availability_zones(ec2_client: botocore.client.BaseClient, region: str) -> List[str]:
     response = ec2_client.describe_availability_zones(
         Filters=[

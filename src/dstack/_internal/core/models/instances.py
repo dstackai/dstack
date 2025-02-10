@@ -101,21 +101,12 @@ class InstanceConfiguration(CoreModel):
     user: str  # dstack user name
     ssh_keys: List[SSHKey]
     instance_id: Optional[str] = None
-    availability_zones: Optional[List[str]] = None
     placement_group_name: Optional[str] = None
     reservation: Optional[str] = None
     volumes: Optional[List[Volume]] = None
-    # Deprecated in favor of availability_zones
-    availability_zone: Optional[str] = None
 
     def get_public_keys(self) -> List[str]:
         return [ssh_key.public.strip() for ssh_key in self.ssh_keys]
-
-    def get_availability_zones(self) -> Optional[List[str]]:
-        if self.availability_zone is not None:
-            # backward compatibility
-            return [self.availability_zone]
-        return self.availability_zones
 
 
 class InstanceRuntime(Enum):
@@ -148,6 +139,7 @@ class InstanceOffer(CoreModel):
 
 class InstanceOfferWithAvailability(InstanceOffer):
     availability: InstanceAvailability
+    availability_zones: Optional[List[str]] = None
     instance_runtime: InstanceRuntime = InstanceRuntime.SHIM
     blocks: int = 1
     total_blocks: int = 1
