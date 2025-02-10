@@ -160,7 +160,10 @@ class GCPCompute(Compute):
             )
         authorized_keys = instance_config.get_public_keys()
 
+        # get_offers always fills instance_offer.availability_zones
         zones = get_or_error(instance_offer.availability_zones)
+        if len(zones) == 0:
+            raise NoCapacityError("No eligible availability zones")
         # If a shared VPC is not used, we can create firewall rules for user
         if self.config.vpc_project_id is None:
             gcp_resources.create_runner_firewall_rules(

@@ -49,9 +49,14 @@ async def get_offers_by_requirements(
 
     if volumes:
         mount_point_volumes = volumes[0]
-        # FIXME: overrides profile?
-        backend_types = [v.configuration.backend for v in mount_point_volumes]
-        regions = [v.configuration.region for v in mount_point_volumes]
+        volumes_backend_types = [v.configuration.backend for v in mount_point_volumes]
+        if not backend_types:
+            backend_types = volumes_backend_types
+        backend_types = [b for b in backend_types if b in volumes_backend_types]
+        volumes_regions = [v.configuration.region for v in mount_point_volumes]
+        if not regions:
+            regions = volumes_regions
+        regions = [r for r in regions if r in volumes_regions]
 
     if multinode:
         if not backend_types:

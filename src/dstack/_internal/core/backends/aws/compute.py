@@ -149,6 +149,9 @@ class AWSCompute(Compute):
         ec2_client = self.session.client("ec2", region_name=instance_offer.region)
         allocate_public_ip = self.config.allocate_public_ips
         zones = instance_offer.availability_zones
+        if zones is not None and len(zones) == 0:
+            raise NoCapacityError("No eligible availability zones")
+
         tags = {
             "Name": instance_config.instance_name,
             "owner": "dstack",
