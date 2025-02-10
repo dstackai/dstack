@@ -39,7 +39,7 @@ you can now specify an AMD GPU under `resources`. Below are a few examples.
 ## Configuration
 
 === "Service"
-    Here's an example of a [service](../../docs/services.md) that deploys
+    Here's an example of a [service](../../docs/concepts/services.md) that deploys
     Llama 3.1 70B in FP16 using [TGI :material-arrow-top-right-thin:{ .external }](https://huggingface.co/docs/text-generation-inference/en/installation_amd){:target="_blank"}.
     
     <div editor-title="examples/deployment/tgi/amd/service.dstack.yml"> 
@@ -71,7 +71,7 @@ you can now specify an AMD GPU under `resources`. Below are a few examples.
     </div>
 
 === "Dev environment"
-    Here's an example of a [dev environment](../../docs/dev-environments.md) using
+    Here's an example of a [dev environment](../../docs/concepts/dev-environments.md) using
     [TGI :material-arrow-top-right-thin:{ .external }](https://huggingface.co/docs/text-generation-inference/en/installation_amd){:target="_blank"}'s
     Docker image:
 

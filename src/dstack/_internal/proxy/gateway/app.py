@@ -28,7 +28,6 @@ from dstack._internal.proxy.gateway.services.registry import ACCESS_LOG_PATH, ap
 from dstack._internal.proxy.gateway.services.server_client import HTTPMultiClient
 from dstack._internal.proxy.gateway.services.stats import StatsCollector
 from dstack._internal.proxy.lib.routers.model_proxy import router as model_proxy_router
-from dstack._internal.proxy.lib.services.service_connection import service_replica_connection_pool
 from dstack._internal.utils.common import run_async
 from dstack.version import __version__
 
@@ -42,12 +41,13 @@ async def lifespan(app: FastAPI):
     injector = get_gateway_injector_from_app(app)
     repo = await get_gateway_proxy_repo(await injector.get_repo().__anext__())
     nginx = injector.get_nginx()
+    service_conn_pool = await injector.get_service_connection_pool()
     await run_async(nginx.write_global_conf)
-    await apply_all(repo, nginx)
+    await apply_all(repo, nginx, service_conn_pool)
 
     yield
 
-    await service_replica_connection_pool.remove_all()
+    await service_conn_pool.remove_all()
 
 
 def make_app(repo: Optional[GatewayProxyRepo] = None, nginx: Optional[Nginx] = None) -> FastAPI:

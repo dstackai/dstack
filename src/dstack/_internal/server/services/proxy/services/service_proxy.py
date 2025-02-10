@@ -8,7 +8,11 @@ from starlette.requests import ClientDisconnect
 from dstack._internal.proxy.lib.deps import ProxyAuthContext
 from dstack._internal.proxy.lib.errors import ProxyError
 from dstack._internal.proxy.lib.repo import BaseProxyRepo
-from dstack._internal.proxy.lib.services.service_connection import get_service_replica_client
+from dstack._internal.proxy.lib.services.service_connection import (
+    ServiceConnectionPool,
+    get_service_replica_client,
+)
+from dstack._internal.utils.common import concat_url_path
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -21,9 +25,8 @@ async def proxy(
     request: fastapi.Request,
     auth: ProxyAuthContext,
     repo: BaseProxyRepo,
+    service_conn_pool: ServiceConnectionPool,
 ) -> fastapi.responses.Response:
-    # TODO(#1595): enforce client_max_body_size
-
     if "Upgrade" in request.headers:
         raise ProxyError("Upgrading connections is not supported", status.HTTP_400_BAD_REQUEST)
 
@@ -33,7 +36,10 @@ async def proxy(
     if service.auth:
         await auth.enforce()
 
-    client = await get_service_replica_client(service, repo)
+    client = await get_service_replica_client(service, repo, service_conn_pool)
+
+    if not service.strip_prefix:
+        path = concat_url_path(request.scope.get("root_path", "/"), request.url.path)
 
     try:
         upstream_request = await build_upstream_request(request, path, client)
@@ -91,7 +97,7 @@ async def build_upstream_request(
     ).get_stream()
     client.cookies.clear()  # the client is shared by all users, don't leak cookies
 
-    # TODO(#1595): add common proxy headers
+    # TODO(#2237): add common proxy headers
     return client.build_request(
         downstream_request.method, url, headers=downstream_request.headers, content=request_stream
     )

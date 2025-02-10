@@ -3,13 +3,17 @@ from typing import Any, Dict, List, Union
 from rich.markup import escape
 from rich.table import Table
 
-from dstack._internal.cli.utils.common import add_row_from_dict, console
+from dstack._internal.cli.utils.common import NO_OFFERS_WARNING, add_row_from_dict, console
 from dstack._internal.core.models.instances import InstanceAvailability
-from dstack._internal.core.models.profiles import TerminationPolicy
+from dstack._internal.core.models.profiles import (
+    DEFAULT_RUN_TERMINATION_IDLE_TIME,
+    TerminationPolicy,
+)
 from dstack._internal.core.models.runs import (
     Job,
     RunPlan,
 )
+from dstack._internal.core.services.profiles import get_termination
 from dstack._internal.utils.common import DateFormatter, format_pretty_duration, pretty_date
 from dstack.api import Run
 
@@ -25,20 +29,26 @@ def print_run_plan(run_plan: RunPlan, offers_limit: int = 3):
     pretty_req = req.pretty_format(resources_only=True)
     max_price = f"${req.max_price:g}" if req.max_price else "-"
     max_duration = (
-        f"{job_plan.job_spec.max_duration / 3600:g}h" if job_plan.job_spec.max_duration else "-"
+        format_pretty_duration(job_plan.job_spec.max_duration)
+        if job_plan.job_spec.max_duration
+        else "-"
     )
     if job_plan.job_spec.retry is None:
-        retry = "no"
+        retry = "-"
     else:
         retry = escape(job_plan.job_spec.retry.pretty_format())
 
     profile = run_plan.run_spec.merged_profile
     creation_policy = profile.creation_policy
-    termination_policy = profile.termination_policy
+    # FIXME: This assumes the default idle_duration is the same for client and server.
+    # If the server changes idle_duration, old clients will see incorrect value.
+    termination_policy, termination_idle_time = get_termination(
+        profile, DEFAULT_RUN_TERMINATION_IDLE_TIME
+    )
     if termination_policy == TerminationPolicy.DONT_DESTROY:
-        termination_idle_time = "-"
+        idle_duration = "-"
     else:
-        termination_idle_time = format_pretty_duration(profile.termination_idle_time)
+        idle_duration = format_pretty_duration(termination_idle_time)
 
     if req.spot is None:
         spot_policy = "auto"
@@ -60,9 +70,8 @@ def print_run_plan(run_plan: RunPlan, offers_limit: int = 3):
     props.add_row(th("Spot policy"), spot_policy)
     props.add_row(th("Retry policy"), retry)
     props.add_row(th("Creation policy"), creation_policy)
-    props.add_row(th("Termination policy"), termination_policy)
-    props.add_row(th("Termination idle time"), termination_idle_time)
-    props.add_row(th("Reservation"), run_plan.run_spec.configuration.reservation)
+    props.add_row(th("Idle duration"), idle_duration)
+    props.add_row(th("Reservation"), run_plan.run_spec.configuration.reservation or "-")
 
     offers = Table(box=None)
     offers.add_column("#")
@@ -87,11 +96,14 @@ def print_run_plan(run_plan: RunPlan, offers_limit: int = 3):
             InstanceAvailability.BUSY,
         }:
             availability = offer.availability.value.replace("_", " ").lower()
+        instance = offer.instance.name
+        if offer.total_blocks > 1:
+            instance += f" ({offer.blocks}/{offer.total_blocks})"
         offers.add_row(
             f"{i}",
             offer.backend.replace("remote", "ssh"),
             offer.region,
-            offer.instance.name,
+            instance,
             r.pretty_format(),
             "yes" if r.spot else "no",
             f"${offer.price:g}",
@@ -111,6 +123,8 @@ def print_run_plan(run_plan: RunPlan, offers_limit: int = 3):
                 f"${job_plan.max_price:g} max[/]"
             )
         console.print()
+    else:
+        console.print(NO_OFFERS_WARNING)
 
 
 def get_runs_table(
@@ -150,13 +164,21 @@ def get_runs_table(
                 "SUBMITTED": format_date(job.job_submissions[-1].submitted_at),
                 "ERROR": _get_job_error(job),
             }
-            jpd = job.job_submissions[-1].job_provisioning_data
+            latest_job_submission = job.job_submissions[-1]
+            jpd = latest_job_submission.job_provisioning_data
             if jpd is not None:
+                resources = jpd.instance_type.resources
+                instance = jpd.instance_type.name
+                jrd = latest_job_submission.job_runtime_data
+                if jrd is not None and jrd.offer is not None:
+                    resources = jrd.offer.instance.resources
+                    if jrd.offer.total_blocks > 1:
+                        instance += f" ({jrd.offer.blocks}/{jrd.offer.total_blocks})"
                 job_row.update(
                     {
                         "BACKEND": f"{jpd.backend.value.replace('remote', 'ssh')} ({jpd.region})",
-                        "INSTANCE": jpd.instance_type.name,
-                        "RESOURCES": jpd.instance_type.resources.pretty_format(include_spot=True),
+                        "INSTANCE": instance,
+                        "RESOURCES": resources.pretty_format(include_spot=True),
                         "RESERVATION": jpd.reservation,
                         "PRICE": f"${jpd.price:.4}",
                     }

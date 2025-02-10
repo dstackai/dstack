@@ -1,10 +1,16 @@
 package schemas
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/dstackai/dstack/runner/internal/types"
+)
 
 type JobStateEvent struct {
-	State     string `json:"state"`
-	Timestamp int64  `json:"timestamp"`
+	State              types.JobState          `json:"state"`
+	Timestamp          int64                   `json:"timestamp"`
+	TerminationReason  types.TerminationReason `json:"termination_reason"`
+	TerminationMessage string                  `json:"termination_message"`
 }
 
 type LogEvent struct {
@@ -45,6 +51,7 @@ type JobSpec struct {
 	Commands       []string          `json:"commands"`
 	Entrypoint     []string          `json:"entrypoint"`
 	Env            map[string]string `json:"env"`
+	SingleBranch   bool              `json:"single_branch"`
 	MaxDuration    int               `json:"max_duration"`
 	WorkingDir     *string           `json:"working_dir"`
 }

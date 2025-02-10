@@ -6,7 +6,7 @@ from pydantic import UUID4, Field, root_validator
 from typing_extensions import Annotated
 
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.common import ApplyAction, CoreModel, RegistryAuth
+from dstack._internal.core.models.common import ApplyAction, CoreModel, NetworkMode, RegistryAuth
 from dstack._internal.core.models.configurations import (
     AnyRunConfiguration,
     RunConfiguration,
@@ -17,18 +17,17 @@ from dstack._internal.core.models.instances import (
     SSHConnectionParams,
 )
 from dstack._internal.core.models.profiles import (
-    DEFAULT_RUN_TERMINATION_IDLE_TIME,
     CreationPolicy,
     Profile,
     ProfileParams,
     ProfileRetryPolicy,
     RetryEvent,
     SpotPolicy,
-    TerminationPolicy,
 )
 from dstack._internal.core.models.repos import AnyRunRepoData
-from dstack._internal.core.models.resources import ResourcesSpec
+from dstack._internal.core.models.resources import Memory, ResourcesSpec
 from dstack._internal.core.models.unix import UnixUser
+from dstack._internal.core.models.volumes import MountPoint
 from dstack._internal.utils import common as common_utils
 from dstack._internal.utils.common import format_pretty_duration
 
@@ -119,6 +118,7 @@ class JobTerminationReason(str, Enum):
     PORTS_BINDING_FAILED = "ports_binding_failed"
     CREATING_CONTAINER_ERROR = "creating_container_error"
     EXECUTOR_ERROR = "executor_error"
+    MAX_DURATION_EXCEEDED = "max_duration_exceeded"
 
     def to_status(self) -> JobStatus:
         mapping = {
@@ -137,6 +137,7 @@ class JobTerminationReason(str, Enum):
             self.PORTS_BINDING_FAILED: JobStatus.FAILED,
             self.CREATING_CONTAINER_ERROR: JobStatus.FAILED,
             self.EXECUTOR_ERROR: JobStatus.FAILED,
+            self.MAX_DURATION_EXCEEDED: JobStatus.TERMINATED,
         }
         return mapping[self]
 
@@ -184,10 +185,13 @@ class JobSpec(CoreModel):
     home_dir: Optional[str]
     image_name: str
     privileged: bool = False
+    single_branch: Optional[bool] = None
     max_duration: Optional[int]
+    stop_duration: Optional[int] = None
     registry_auth: Optional[RegistryAuth]
     requirements: Requirements
     retry: Optional[Retry]
+    volumes: Optional[List[MountPoint]] = None
     # For backward compatibility with 0.18.x when retry_policy was required.
     # TODO: remove in 0.19
     retry_policy: ProfileRetryPolicy = ProfileRetryPolicy(retry=False)
@@ -228,6 +232,33 @@ class JobProvisioningData(CoreModel):
         return self.backend
 
 
+class JobRuntimeData(CoreModel):
+    """
+    Holds various information only available after the job is submitted, such as:
+        * offer (depends on the instance)
+        * volumes used by the job
+        * resource constraints for container (depend on the instance)
+        * port mapping (reported by the shim only after the container is started)
+
+    Some fields are mutable, for example, `ports` only available when the shim starts
+    the container.
+    """
+
+    network_mode: NetworkMode
+    # GPU, CPU, memory resource shares. None means all available (no limit)
+    gpu: Optional[int] = None
+    cpu: Optional[float] = None
+    memory: Optional[Memory] = None
+    # container:host port mapping reported by shim. Empty dict if network_mode == NetworkMode.HOST
+    # None if data is not yet available (on vm-based backends and ssh instances)
+    # or not applicable (container-based backends)
+    ports: Optional[dict[int, int]] = None
+    # List of volumes used by the job
+    volume_names: Optional[list[str]] = None  # None for backward compalibility
+    # Virtual shared offer
+    offer: Optional[InstanceOfferWithAvailability] = None  # None for backward compalibility
+
+
 class ClusterInfo(CoreModel):
     job_ips: List[str]
     master_job_ip: str
@@ -244,6 +275,7 @@ class JobSubmission(CoreModel):
     termination_reason: Optional[JobTerminationReason]
     termination_reason_message: Optional[str]
     job_provisioning_data: Optional[JobProvisioningData]
+    job_runtime_data: Optional[JobRuntimeData]
 
     @property
     def age(self) -> timedelta:
@@ -338,10 +370,6 @@ class RunSpec(CoreModel):
                 setattr(merged_profile, key, conf_val)
         if merged_profile.creation_policy is None:
             merged_profile.creation_policy = CreationPolicy.REUSE_OR_CREATE
-        if merged_profile.termination_policy is None:
-            merged_profile.termination_policy = TerminationPolicy.DESTROY_AFTER_IDLE
-        if merged_profile.termination_idle_time is None:
-            merged_profile.termination_idle_time = DEFAULT_RUN_TERMINATION_IDLE_TIME
         values["merged_profile"] = merged_profile
         return values
 

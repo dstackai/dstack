@@ -129,6 +129,13 @@ try:
 except ImportError:
     pass
 
+try:
+    from dstack._internal.server.services.backends.configurators.vultr import VultrConfigurator
+
+    _CONFIGURATOR_CLASSES.append(VultrConfigurator)
+except ImportError:
+    pass
+
 
 _BACKEND_TYPE_TO_CONFIGURATOR_CLASS_MAP = {c.TYPE: c for c in _CONFIGURATOR_CLASSES}
 
@@ -193,6 +200,7 @@ async def update_backend(
         raise ServerClientError("Backend does not exist")
     await run_async(configurator.get_config_values, config)
     backend = await run_async(configurator.create_backend, project=project, config=config)
+    # FIXME: potentially long write transaction
     await session.execute(
         update(BackendModel)
         .where(
@@ -237,6 +245,8 @@ async def delete_backends(
     deleted_backends_types = current_backends_types.intersection(backends_types)
     if len(deleted_backends_types) == 0:
         return
+    # FIXME: potentially long write transaction
+    # Not urgent since backend deletion is a rare operation
     await session.execute(
         delete(BackendModel).where(
             BackendModel.type.in_(deleted_backends_types),
@@ -411,7 +421,7 @@ async def get_instance_offers(
     Returns list of instances satisfying minimal resource requirements sorted by price
     """
     logger.info("Requesting instance offers from backends: %s", [b.TYPE.value for b in backends])
-    tasks = [run_async(backend.compute().get_offers, requirements) for backend in backends]
+    tasks = [run_async(backend.compute().get_offers_cached, requirements) for backend in backends]
     offers_by_backend = []
     for backend, result in zip(backends, await asyncio.gather(*tasks, return_exceptions=True)):
         if isinstance(result, BackendError):

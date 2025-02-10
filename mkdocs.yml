@@ -109,9 +109,10 @@ plugins:
         'changelog/0.16.1.md': 'https://github.com/dstackai/dstack/releases/0.16.1'
         'changelog/0.17.0.md': 'https://github.com/dstackai/dstack/releases/0.17.0'
         'changelog/0.18.0.md': 'https://github.com/dstackai/dstack/releases/0.18.0'
-        'docs/concepts/dev-environments.md': 'docs/dev-environments.md'
-        'docs/concepts/tasks.md': 'docs/tasks.md'
-        'docs/concepts/services.md': 'docs/services.md'
+        'docs/concepts/projects.md': 'docs/guides/administration.md'
+        'docs/dev-environments.md': 'docs/concepts/dev-environments.md'
+        'docs/tasks.md': 'docs/concepts/tasks.md'
+        'docs/services.md': 'docs/concepts/services.md'
         'docs/fleets.md': 'docs/concepts/fleets.md'
         'docs/examples/index.md': 'examples.md'
         'docs/examples/llms/llama31.md': 'examples/llms/llama31/index.md'
@@ -122,6 +123,7 @@ plugins:
         'docs/examples/deployment/tgi/index.md': 'examples/deployment/tgi/index.md'
         'providers.md': 'partners.md'
         'backends.md': 'partners.md'
+        'developers.md': 'community.md'
   - typeset
   - gen-files:
       scripts:  # always relative to mkdocs.yml
@@ -156,6 +158,8 @@ markdown_extensions:
   - pymdownx.highlight
   - pymdownx.details
   - pymdownx.superfences
+  - pymdownx.snippets:
+      base_path: ["docs"]
   - pymdownx.tabbed:
       alternate_style: true
       slugify: !!python/object/apply:pymdownx.slugs.slugify
@@ -164,7 +168,7 @@ markdown_extensions:
   - pymdownx.tasklist:
       custom_checkbox: true
   - toc:
-      toc_depth: 3
+      toc_depth: 5
       permalink: true
   - attr_list
   - md_in_html
@@ -187,16 +191,18 @@ extra:
     provider: google
     property: G-JX21114P7B
   social:
-#    - icon: /fontawesome/brands/github
-#      link: https://github.com/dstackai/dstack
-#    - icon: /fontawesome/brands/discord
-#      link: https://discord.gg/u8SmfwPpMd
+    - icon: /fontawesome/brands/github
+      link: https://github.com/dstackai/dstack
+    - icon: /fontawesome/brands/python
+      link: https://pypi.org/project/dstack
+    - icon: /fontawesome/brands/docker
+      link: https://hub.docker.com/r/dstackai/dstack
+    - icon: /fontawesome/brands/discord
+      link: https://discord.gg/u8SmfwPpMd
     - icon: /simple/x
       link: https://twitter.com/dstackai
-#    - icon: /fontawesome/brands/python
-#      link: https://pypi.org/project/dstack
-#    - icon: /fontawesome/brands/docker
-#      link: https://hub.docker.com/r/dstackai/dstack
+    - icon: /fontawesome/brands/linkedin
+      link: https://twitter.com/dstackai
   status:
     new: Recently added
 # Page tree
@@ -208,30 +214,29 @@ nav:
           - Installation: docs/installation/index.md
           - Quickstart: docs/quickstart.md
       - Concepts:
-          - Dev environments: docs/dev-environments.md
-          - Tasks: docs/tasks.md
-          - Services: docs/services.md
-          - Repos: docs/concepts/repos.md
+          - Backends: docs/concepts/backends.md
+          - Dev environments: docs/concepts/dev-environments.md
+          - Tasks: docs/concepts/tasks.md
+          - Services: docs/concepts/services.md
           - Fleets: docs/concepts/fleets.md
           - Volumes: docs/concepts/volumes.md
           - Gateways: docs/concepts/gateways.md
-          - Projects: docs/concepts/projects.md
+          - Repos: docs/concepts/repos.md
       - Guides:
           - Protips: docs/guides/protips.md
           - Server deployment: docs/guides/server-deployment.md
           - Troubleshooting: docs/guides/troubleshooting.md
-  - Reference:
-      - .dstack.yml:
-          - dev-environment: docs/reference/dstack.yml/dev-environment.md
-          - task: docs/reference/dstack.yml/task.md
-          - service: docs/reference/dstack.yml/service.md
-          - fleet: docs/reference/dstack.yml/fleet.md
-          - gateway: docs/reference/dstack.yml/gateway.md
-          - volume: docs/reference/dstack.yml/volume.md
-      - Server:
+          - Administration: docs/guides/administration.md
+      - Reference:
+          - .dstack.yml:
+              - dev-environment: docs/reference/dstack.yml/dev-environment.md
+              - task: docs/reference/dstack.yml/task.md
+              - service: docs/reference/dstack.yml/service.md
+              - fleet: docs/reference/dstack.yml/fleet.md
+              - gateway: docs/reference/dstack.yml/gateway.md
+              - volume: docs/reference/dstack.yml/volume.md
           - server/config.yml: docs/reference/server/config.yml.md
-      - CLI:
-          - dstack:
+          - CLI:
               - dstack server: docs/reference/cli/dstack/server.md
               - dstack init: docs/reference/cli/dstack/init.md
               - dstack apply: docs/reference/cli/dstack/apply.md
@@ -245,11 +250,10 @@ nav:
               - dstack fleet: docs/reference/cli/dstack/fleet.md
               - dstack volume: docs/reference/cli/dstack/volume.md
               - dstack gateway: docs/reference/cli/dstack/gateway.md
-      - API:
-          - Python API: docs/reference/api/python/index.md
-          - REST API: docs/reference/api/rest/index.md
-      - Misc:
-          - Environment variables: docs/reference/misc/environment-variables.md
+          - API:
+              - Python API: docs/reference/api/python/index.md
+              - REST API: docs/reference/api/rest/index.md
+          - Environment variables: docs/reference/environment-variables.md
   - Examples:
     - examples.md
     - Deployment:
@@ -267,7 +271,7 @@ nav:
         - Llama 3.2: examples/llms/llama32/index.md
     - Misc:
         - Docker Compose: examples/misc/docker-compose/index.md
-  - Developers: developers.md
+  - Community: community.md
   - Partners: partners.md
   - Blog:
       - blog/index.md

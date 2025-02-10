@@ -17,6 +17,8 @@ from dstack._internal.core.backends import (
     BACKENDS_WITH_PLACEMENT_GROUPS_SUPPORT,
 )
 from dstack._internal.core.backends.base.compute import (
+    DSTACK_RUNNER_BINARY_PATH,
+    DSTACK_SHIM_BINARY_PATH,
     DSTACK_WORKING_DIR,
     get_shim_env,
     get_shim_pre_start_commands,
@@ -26,11 +28,13 @@ from dstack._internal.core.backends.remote.provisioning import (
     get_paramiko_connection,
     get_shim_healthcheck,
     host_info_to_instance_type,
+    remove_dstack_runner_if_exists,
     remove_host_info_if_exists,
     run_pre_start_commands,
     run_shim_as_systemd_service,
     upload_envs,
 )
+from dstack._internal.core.consts import DSTACK_SHIM_HTTP_PORT
 
 # FIXME: ProvisioningError is a subclass of ComputeError and should not be used outside of Compute
 from dstack._internal.core.errors import BackendError, ProvisioningError
@@ -72,10 +76,8 @@ from dstack._internal.server.services.fleets import (
     fleet_model_to_fleet,
     get_create_instance_offers,
 )
-from dstack._internal.server.services.jobs import (
-    terminate_job_provisioning_data_instance,
-)
 from dstack._internal.server.services.locking import get_locker
+from dstack._internal.server.services.offers import is_divisible_into_blocks
 from dstack._internal.server.services.placement import (
     get_fleet_placement_groups,
     placement_group_model_to_placement_group,
@@ -99,14 +101,22 @@ from dstack._internal.utils.ssh import (
 PENDING_JOB_RETRY_INTERVAL = timedelta(seconds=60)
 
 TERMINATION_DEADLINE_OFFSET = timedelta(minutes=20)
-
+TERMINATION_RETRY_TIMEOUT = timedelta(seconds=30)
+TERMINATION_RETRY_MAX_DURATION = timedelta(minutes=15)
 PROVISIONING_TIMEOUT_SECONDS = 10 * 60  # 10 minutes in seconds
 
 
 logger = get_logger(__name__)
 
 
-async def process_instances() -> None:
+async def process_instances(batch_size: int = 1):
+    tasks = []
+    for _ in range(batch_size):
+        tasks.append(_process_next_instance())
+    await asyncio.gather(*tasks)
+
+
+async def _process_next_instance():
     lock, lockset = get_locker().get_lockset(InstanceModel.__tablename__)
     async with get_session_ctx() as session:
         async with lock:
@@ -124,7 +134,7 @@ async def process_instances() -> None:
                     ),
                     InstanceModel.id.not_in(lockset),
                 )
-                .options(lazyload(InstanceModel.job))
+                .options(lazyload(InstanceModel.jobs))
                 .order_by(InstanceModel.last_processed_at.asc())
                 .limit(1)
                 .with_for_update(skip_locked=True)
@@ -147,7 +157,7 @@ async def _process_instance(session: AsyncSession, instance: InstanceModel):
         select(InstanceModel)
         .where(InstanceModel.id == instance.id)
         .options(joinedload(InstanceModel.project).joinedload(ProjectModel.backends))
-        .options(joinedload(InstanceModel.job))
+        .options(joinedload(InstanceModel.jobs))
         .options(joinedload(InstanceModel.fleet).joinedload(FleetModel.instances))
         .execution_options(populate_existing=True)
     )
@@ -155,11 +165,9 @@ async def _process_instance(session: AsyncSession, instance: InstanceModel):
     if (
         instance.status == InstanceStatus.IDLE
         and instance.termination_policy == TerminationPolicy.DESTROY_AFTER_IDLE
-        and instance.job_id is None
+        and not instance.jobs
     ):
-        # terminates the instance and sets instance.status to TERMINATED (along other fields)
-        # if termination_idle_time is reached, noop otherwise
-        await _maybe_terminate_idle_instance(instance)
+        await _mark_terminating_if_idle_duration_expired(instance)
     if instance.status == InstanceStatus.PENDING:
         if instance.remote_connection_info is not None:
             await _add_remote(instance)
@@ -181,34 +189,20 @@ async def _process_instance(session: AsyncSession, instance: InstanceModel):
     await session.commit()
 
 
-async def _maybe_terminate_idle_instance(instance: InstanceModel):
-    current_time = get_current_datetime()
+async def _mark_terminating_if_idle_duration_expired(instance: InstanceModel):
     idle_duration = _get_instance_idle_duration(instance)
     idle_seconds = instance.termination_idle_time
     delta = datetime.timedelta(seconds=idle_seconds)
     if idle_duration > delta:
-        jpd = get_instance_provisioning_data(instance)
-        if jpd is None:
-            logger.error(
-                "Failed to terminate idle instance %s. provisioning_data is None.",
-                instance.name,
-            )
-        else:
-            await terminate_job_provisioning_data_instance(
-                project=instance.project, job_provisioning_data=jpd
-            )
-        instance.deleted = True
-        instance.deleted_at = current_time
-        instance.finished_at = current_time
-        instance.status = InstanceStatus.TERMINATED
+        instance.status = InstanceStatus.TERMINATING
         instance.termination_reason = "Idle timeout"
         logger.info(
-            "Instance %s terminated by termination policy: idle time %ss",
+            "Instance %s idle duration expired: idle time %ss. Terminating",
             instance.name,
             str(idle_duration.seconds),
             extra={
                 "instance_name": instance.name,
-                "instance_status": InstanceStatus.TERMINATED.value,
+                "instance_status": instance.status.value,
             },
         )
 
@@ -329,6 +323,26 @@ async def _add_remote(instance: InstanceModel) -> None:
             )
             return
 
+    divisible, blocks = is_divisible_into_blocks(
+        cpu_count=instance_type.resources.cpus,
+        gpu_count=len(instance_type.resources.gpus),
+        blocks="auto" if instance.total_blocks is None else instance.total_blocks,
+    )
+    if divisible:
+        instance.total_blocks = blocks
+    else:
+        instance.status = InstanceStatus.TERMINATED
+        instance.termination_reason = "Cannot split into blocks"
+        logger.warning(
+            "Failed to add instance %s: cannot split into blocks",
+            instance.name,
+            extra={
+                "instance_name": instance.name,
+                "instance_status": InstanceStatus.TERMINATED.value,
+            },
+        )
+        return
+
     region = instance.region
     jpd = JobProvisioningData(
         backend=BackendType.REMOTE,
@@ -388,12 +402,14 @@ def _deploy_instance(
         upload_envs(client, DSTACK_WORKING_DIR, shim_envs)
         logger.debug("The dstack-shim environment variables have been installed")
 
-        # Ensure host info file does not exist
+        # Ensure we have fresh versions of host info.json and dstack-runner
         remove_host_info_if_exists(client, DSTACK_WORKING_DIR)
+        remove_dstack_runner_if_exists(client, DSTACK_RUNNER_BINARY_PATH)
 
         # Run dstack-shim as a systemd service
         run_shim_as_systemd_service(
             client=client,
+            binary_path=DSTACK_SHIM_BINARY_PATH,
             working_dir=DSTACK_WORKING_DIR,
             dev=settings.DSTACK_VERSION is None,
         )
@@ -484,6 +500,7 @@ async def _create_instance(session: AsyncSession, instance: InstanceModel) -> No
         requirements=requirements,
         exclude_not_available=True,
         fleet_model=instance.fleet,
+        blocks="auto" if instance.total_blocks is None else instance.total_blocks,
     )
 
     if not offers and should_retry:
@@ -559,6 +576,7 @@ async def _create_instance(session: AsyncSession, instance: InstanceModel) -> No
         instance.instance_configuration = instance_configuration.json()
         instance.job_provisioning_data = job_provisioning_data.json()
         instance.offer = instance_offer.json()
+        instance.total_blocks = instance_offer.total_blocks
         instance.started_at = get_current_datetime()
         instance.last_retry_at = get_current_datetime()
 
@@ -590,8 +608,8 @@ async def _create_instance(session: AsyncSession, instance: InstanceModel) -> No
 async def _check_instance(instance: InstanceModel) -> None:
     if (
         instance.status == InstanceStatus.BUSY
-        and instance.job is not None
-        and instance.job.status.is_finished()
+        and instance.jobs
+        and all(job.status.is_finished() for job in instance.jobs)
     ):
         # A busy instance could have no active jobs due to this bug: https://github.com/dstackai/dstack/issues/2068
         instance.status = InstanceStatus.TERMINATING
@@ -633,7 +651,7 @@ async def _check_instance(instance: InstanceModel) -> None:
 
     # May return False if fails to establish ssh connection
     health_status_response = await run_async(
-        _instance_healthcheck, ssh_private_key, job_provisioning_data
+        _instance_healthcheck, ssh_private_key, job_provisioning_data, None
     )
     if isinstance(health_status_response, bool) or health_status_response is None:
         health_status = HealthStatus(healthy=False, reason="SSH or tunnel error")
@@ -653,9 +671,7 @@ async def _check_instance(instance: InstanceModel) -> None:
         instance.unreachable = False
 
         if instance.status == InstanceStatus.PROVISIONING:
-            instance.status = (
-                InstanceStatus.IDLE if instance.job_id is None else InstanceStatus.BUSY
-            )
+            instance.status = InstanceStatus.IDLE if not instance.jobs else InstanceStatus.BUSY
             logger.info(
                 "Instance %s has switched to %s status",
                 instance.name,
@@ -761,9 +777,9 @@ async def _wait_for_instance_provisioning_data(
         )
 
 
-@runner_ssh_tunnel(ports=[runner_client.REMOTE_SHIM_PORT], retries=1)
+@runner_ssh_tunnel(ports=[DSTACK_SHIM_HTTP_PORT], retries=1)
 def _instance_healthcheck(ports: Dict[int, int]) -> HealthStatus:
-    shim_client = runner_client.ShimClient(port=ports[runner_client.REMOTE_SHIM_PORT])
+    shim_client = runner_client.ShimClient(port=ports[DSTACK_SHIM_HTTP_PORT])
     try:
         resp = shim_client.healthcheck(unmask_exeptions=True)
         if resp is None:
@@ -779,6 +795,11 @@ def _instance_healthcheck(ports: Dict[int, int]) -> HealthStatus:
 
 
 async def _terminate(instance: InstanceModel) -> None:
+    if (
+        instance.last_termination_retry_at is not None
+        and _next_termination_retry_at(instance) > get_current_datetime()
+    ):
+        return
     jpd = get_instance_provisioning_data(instance)
     if jpd is not None:
         if jpd.backend != BackendType.REMOTE:
@@ -787,9 +808,12 @@ async def _terminate(instance: InstanceModel) -> None:
             )
             if backend is None:
                 logger.error(
-                    "Failed to terminate instance %s. Backend not available.", instance.name
+                    "Failed to terminate instance %s. Backend %s not available.",
+                    instance.name,
+                    jpd.backend,
                 )
             else:
+                logger.debug("Terminating runner instance %s", jpd.hostname)
                 try:
                     await run_async(
                         backend.compute().terminate_instance,
@@ -797,16 +821,25 @@ async def _terminate(instance: InstanceModel) -> None:
                         jpd.region,
                         jpd.backend_data,
                     )
-                except BackendError as e:
+                except Exception as e:
+                    if instance.first_termination_retry_at is None:
+                        instance.first_termination_retry_at = get_current_datetime()
+                    instance.last_termination_retry_at = get_current_datetime()
+                    if _next_termination_retry_at(instance) < _get_termination_deadline(instance):
+                        logger.warning(
+                            "Failed to terminate instance %s. Will retry. Error: %r",
+                            instance.name,
+                            e,
+                            exc_info=not isinstance(e, BackendError),
+                        )
+                        return
                     logger.error(
-                        "Failed to terminate instance %s: %s",
+                        "Failed all attempts to terminate instance %s."
+                        " Please terminate the instance manually to avoid unexpected charges."
+                        " Error: %r",
                         instance.name,
-                        repr(e),
-                    )
-                except Exception:
-                    logger.exception(
-                        "Got exception when terminating instance %s",
-                        instance.name,
+                        e,
+                        exc_info=not isinstance(e, BackendError),
                     )
 
     instance.deleted = True
@@ -820,6 +853,22 @@ async def _terminate(instance: InstanceModel) -> None:
             "instance_name": instance.name,
             "instance_status": InstanceStatus.TERMINATED.value,
         },
+    )
+
+
+def _next_termination_retry_at(instance: InstanceModel) -> datetime.datetime:
+    assert instance.last_termination_retry_at is not None
+    return (
+        instance.last_termination_retry_at.replace(tzinfo=datetime.timezone.utc)
+        + TERMINATION_RETRY_TIMEOUT
+    )
+
+
+def _get_termination_deadline(instance: InstanceModel) -> datetime.datetime:
+    assert instance.first_termination_retry_at is not None
+    return (
+        instance.first_termination_retry_at.replace(tzinfo=datetime.timezone.utc)
+        + TERMINATION_RETRY_MAX_DURATION
     )
 
 
@@ -911,4 +960,6 @@ def _get_instance_timeout_interval(
         return timedelta(seconds=1200)
     if backend_type == BackendType.OCI and instance_type_name.startswith("BM."):
         return timedelta(seconds=1200)
+    if backend_type == BackendType.VULTR and instance_type_name.startswith("vbm"):
+        return timedelta(seconds=3300)
     return timedelta(seconds=600)

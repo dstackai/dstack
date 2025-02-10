@@ -1,7 +1,7 @@
 # AMD
 
 `dstack` supports running dev environments, tasks, and services on AMD GPUs.
-You can do that by setting up an [SSH fleet](https://dstack.ai/docs/concepts/fleets#ssh-fleets) 
+You can do that by setting up an [SSH fleet](https://dstack.ai/docs/concepts/fleets#ssh) 
 with on-prem AMD GPUs or configuring a backend that offers AMD GPUs such as the `runpod` backend.
 
 ## Deployment

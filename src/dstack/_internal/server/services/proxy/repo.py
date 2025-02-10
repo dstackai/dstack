@@ -5,9 +5,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
+import dstack._internal.server.services.jobs as jobs_services
+from dstack._internal.core.consts import DSTACK_RUNNER_SSH_PORT
 from dstack._internal.core.models.common import is_core_model_instance
 from dstack._internal.core.models.configurations import ServiceConfiguration
-from dstack._internal.core.models.gateways import AnyModel
 from dstack._internal.core.models.instances import SSHConnectionParams
 from dstack._internal.core.models.runs import (
     JobProvisioningData,
@@ -16,6 +17,7 @@ from dstack._internal.core.models.runs import (
     RunStatus,
     ServiceSpec,
 )
+from dstack._internal.core.models.services import AnyModel
 from dstack._internal.proxy.lib.models import (
     AnyModelFormat,
     ChatModel,
@@ -71,7 +73,11 @@ class ServerProxyRepo(BaseProxyRepo):
                 ssh_proxy = jpd.ssh_proxy
             else:
                 ssh_destination = "root@localhost"  # TODO(#1535): support non-root images properly
-                ssh_port = 10022
+                ssh_port = DSTACK_RUNNER_SSH_PORT
+                job_submission = jobs_services.job_model_to_job_submission(job)
+                jrd = job_submission.job_runtime_data
+                if jrd is not None and jrd.ports is not None:
+                    ssh_port = jrd.ports.get(ssh_port, ssh_port)
                 ssh_proxy = SSHConnectionParams(
                     hostname=jpd.hostname,
                     username=jpd.username,
@@ -92,6 +98,7 @@ class ServerProxyRepo(BaseProxyRepo):
             https=None,
             auth=run_spec.configuration.auth,
             client_max_body_size=DEFAULT_SERVICE_CLIENT_MAX_BODY_SIZE,
+            strip_prefix=run_spec.configuration.strip_prefix,
             replicas=tuple(replicas),
         )
 

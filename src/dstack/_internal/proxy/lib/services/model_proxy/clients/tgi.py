@@ -17,7 +17,6 @@ from dstack._internal.proxy.lib.schemas.model_proxy import (
     ChatCompletionsResponse,
     ChatCompletionsUsage,
     ChatMessage,
-    FinishReason,
 )
 from dstack._internal.proxy.lib.services.model_proxy.clients.base import ChatCompletionsClient
 
@@ -180,7 +179,7 @@ class TGIChatCompletions(ChatCompletionsClient):
         }
 
     @staticmethod
-    def finish_reason(reason: str) -> FinishReason:
+    def finish_reason(reason: str) -> str:
         if reason == "stop_sequence" or reason == "eos_token":
             return "stop"
         if reason == "length":

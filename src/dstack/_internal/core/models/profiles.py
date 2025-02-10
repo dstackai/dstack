@@ -15,6 +15,8 @@ DEFAULT_POOL_TERMINATION_IDLE_TIME = 72 * 60 * 60  # 3 days
 
 DEFAULT_INSTANCE_RETRY_DURATION = 60 * 60 * 24  # 24h
 
+DEFAULT_STOP_DURATION = 300
+
 
 class SpotPolicy(str, Enum):
     SPOT = "spot"
@@ -38,9 +40,27 @@ def parse_duration(v: Optional[Union[int, str]]) -> Optional[int]:
     return Duration.parse(v)
 
 
-def parse_max_duration(v: Optional[Union[int, str]]) -> Optional[Union[str, int]]:
-    if v == "off":
-        return v
+def parse_max_duration(v: Optional[Union[int, str, bool]]) -> Optional[Union[str, int, bool]]:
+    return parse_off_duration(v)
+
+
+def parse_stop_duration(v: Optional[Union[int, str, bool]]) -> Optional[Union[str, int, bool]]:
+    return parse_off_duration(v)
+
+
+def parse_off_duration(v: Optional[Union[int, str, bool]]) -> Optional[Union[str, int, bool]]:
+    if v == "off" or v is False:
+        return "off"
+    if v is True:
+        return None
+    return parse_duration(v)
+
+
+def parse_idle_duration(v: Optional[Union[int, str, bool]]) -> Optional[Union[str, int, bool]]:
+    if v is False:
+        return -1
+    if v is True:
+        return None
     return parse_duration(v)
 
 
@@ -129,9 +149,24 @@ class ProfileParams(CoreModel):
         Field(description="The policy for resubmitting the run. Defaults to `false`"),
     ]
     max_duration: Annotated[
-        Optional[Union[Literal["off"], str, int]],
+        Optional[Union[Literal["off"], str, int, bool]],
         Field(
-            description="The maximum duration of a run (e.g., `2h`, `1d`, etc). After it elapses, the run is forced to stop. Defaults to `off`"
+            description=(
+                "The maximum duration of a run (e.g., `2h`, `1d`, etc)."
+                " After it elapses, the run is automatically stopped."
+                " Use `off` for unlimited duration. Defaults to `off`"
+            )
+        ),
+    ]
+    stop_duration: Annotated[
+        Optional[Union[Literal["off"], str, int, bool]],
+        Field(
+            description=(
+                "The maximum duration of a run gracefull stopping."
+                " After it elapses, the run is automatically forced stopped."
+                " This includes force detaching volumes used by the run."
+                " Use `off` for unlimited duration. Defaults to `5m`"
+            )
         ),
     ]
     max_price: Annotated[
@@ -144,17 +179,28 @@ class ProfileParams(CoreModel):
             description="The policy for using instances from the pool. Defaults to `reuse-or-create`"
         ),
     ]
+    idle_duration: Annotated[
+        Optional[Union[Literal["off"], str, int, bool]],
+        Field(
+            description=(
+                "Time to wait before terminating idle instances."
+                " Defaults to `5m` for runs and `3d` for fleets. Use `off` for unlimited duration"
+            )
+        ),
+    ]
+    # Deprecated:
     termination_policy: Annotated[
         Optional[TerminationPolicy],
-        Field(description="The policy for instance termination. Defaults to `destroy-after-idle`"),
+        Field(
+            description="Deprecated in favor of `idle_duration`",
+        ),
     ]
     termination_idle_time: Annotated[
         Optional[Union[str, int]],
         Field(
-            description="Time to wait before destroying the idle instance. Defaults to `5m` for `dstack run` and to `3d` for `dstack pool add`"
+            description="Deprecated in favor of `idle_duration`",
         ),
     ]
-    # Deprecated:
     # The name of the pool. If not set, dstack will use the default name
     pool_name: Optional[str]
     # The name of the instance
@@ -165,9 +211,15 @@ class ProfileParams(CoreModel):
     _validate_max_duration = validator("max_duration", pre=True, allow_reuse=True)(
         parse_max_duration
     )
+    _validate_stop_duration = validator("stop_duration", pre=True, allow_reuse=True)(
+        parse_stop_duration
+    )
     _validate_termination_idle_time = validator(
         "termination_idle_time", pre=True, allow_reuse=True
     )(parse_duration)
+    _validate_idle_duration = validator("idle_duration", pre=True, allow_reuse=True)(
+        parse_idle_duration
+    )
 
 
 class ProfileProps(CoreModel):

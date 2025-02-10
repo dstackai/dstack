@@ -9,17 +9,19 @@ from dstack._internal.core.errors import ConfigurationError
 from dstack._internal.core.models.common import CoreModel, Duration, RegistryAuth
 from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.fleets import FleetConfiguration
-from dstack._internal.core.models.gateways import AnyModel, GatewayConfiguration, OpenAIChatModel
+from dstack._internal.core.models.gateways import GatewayConfiguration
 from dstack._internal.core.models.profiles import ProfileParams
 from dstack._internal.core.models.repos.base import Repo
 from dstack._internal.core.models.repos.virtual import VirtualRepo
 from dstack._internal.core.models.resources import Range, ResourcesSpec
+from dstack._internal.core.models.services import AnyModel, OpenAIChatModel
 from dstack._internal.core.models.unix import UnixUser
 from dstack._internal.core.models.volumes import MountPoint, VolumeConfiguration, parse_mount_point
 
 CommandsList = List[str]
 ValidPort = conint(gt=0, le=65536)
 SERVICE_HTTPS_DEFAULT = True
+STRIP_PREFIX_DEFAULT = True
 
 
 class RunConfigurationType(str, Enum):
@@ -129,6 +131,16 @@ class BaseRunConfiguration(CoreModel):
             description="Use image with NVIDIA CUDA Compiler (NVCC) included. Mutually exclusive with `image`"
         ),
     ]
+    single_branch: Annotated[
+        Optional[bool],
+        Field(
+            description=(
+                "Whether to clone and track only the current branch or all remote branches."
+                " Relevant only when using remote Git repos."
+                " Defaults to `false` for dev environments and to `true` for tasks and services"
+            )
+        ),
+    ] = None
     env: Annotated[
         Env,
         Field(description="The mapping or the list of environment variables"),
@@ -199,7 +211,7 @@ class BaseRunConfigurationWithCommands(BaseRunConfiguration):
 class DevEnvironmentConfigurationParams(CoreModel):
     ide: Annotated[Literal["vscode"], Field(description="The IDE to run")]
     version: Annotated[Optional[str], Field(description="The version of the IDE")]
-    init: Annotated[CommandsList, Field(description="The bash commands to run")] = []
+    init: Annotated[CommandsList, Field(description="The bash commands to run on startup")] = []
 
 
 class DevEnvironmentConfiguration(
@@ -235,6 +247,16 @@ class ServiceConfigurationParams(CoreModel):
             ),
         ),
     ] = None
+    strip_prefix: Annotated[
+        bool,
+        Field(
+            description=(
+                "Strip the `/proxy/services/<project name>/<run name>/` path prefix"
+                " when forwarding requests to the service. Only takes effect"
+                " when running the service without a gateway"
+            )
+        ),
+    ] = STRIP_PREFIX_DEFAULT
     model: Annotated[
         Optional[Union[AnyModel, str]],
         Field(

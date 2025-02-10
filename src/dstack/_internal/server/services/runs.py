@@ -9,7 +9,6 @@ from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
-import dstack._internal.server.services.gateways as gateways
 import dstack._internal.utils.common as common_utils
 from dstack._internal.core.errors import (
     RepoDoesNotExistError,
@@ -30,7 +29,6 @@ from dstack._internal.core.models.runs import (
     ApplyRunPlanInput,
     Job,
     JobPlan,
-    JobProvisioningData,
     JobSpec,
     JobStatus,
     JobSubmission,
@@ -46,8 +44,6 @@ from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.core.models.volumes import (
     InstanceMountPoint,
     Volume,
-    VolumeMountPoint,
-    VolumeStatus,
 )
 from dstack._internal.core.services import validate_dstack_resource_name
 from dstack._internal.core.services.diff import diff_models
@@ -59,16 +55,18 @@ from dstack._internal.server.models import (
     RepoModel,
     RunModel,
     UserModel,
-    VolumeModel,
 )
 from dstack._internal.server.services import repos as repos_services
-from dstack._internal.server.services import volumes as volumes_services
+from dstack._internal.server.services import services
 from dstack._internal.server.services.docker import is_valid_docker_volume_target
 from dstack._internal.server.services.jobs import (
+    check_can_attach_job_volumes,
+    delay_job_instance_termination,
+    get_instances_ids_with_detaching_volumes,
+    get_job_configured_volumes,
     get_jobs_from_run_spec,
     group_jobs_by_replica_latest,
     job_model_to_job_submission,
-    process_terminating_job,
     stop_runner,
 )
 from dstack._internal.server.services.locking import get_locker, string_to_lock_id
@@ -79,6 +77,7 @@ from dstack._internal.server.services.pools import (
     get_instance_offer,
     get_or_create_pool_by_name,
     get_pool_instances,
+    get_shared_pool_instances_with_offers,
 )
 from dstack._internal.server.services.projects import list_project_models, list_user_project_models
 from dstack._internal.server.services.users import get_user_model_by_name
@@ -300,16 +299,18 @@ async def get_plan(
     # TODO(egor-s): do we need to generate all replicas here?
     jobs = await get_jobs_from_run_spec(run_spec, replica_num=0)
 
-    volumes = await get_run_volumes(
+    volumes = await get_job_configured_volumes(
         session=session,
         project=project,
         run_spec=run_spec,
+        job_num=0,
     )
 
     pool = await get_or_create_pool_by_name(
         session=session, project=project, pool_name=profile.pool_name
     )
-    pool_offers = _get_pool_offers(
+    pool_offers = await _get_pool_offers(
+        session=session,
         pool=pool,
         run_spec=run_spec,
         job=jobs[0],
@@ -329,7 +330,7 @@ async def get_plan(
             multinode=jobs[0].job_spec.jobs_per_replica > 1,
             volumes=volumes,
             privileged=jobs[0].job_spec.privileged,
-            instance_mounts=check_run_spec_has_instance_mounts(run_spec),
+            instance_mounts=check_run_spec_requires_instance_mounts(run_spec),
         )
 
     job_plans = []
@@ -402,6 +403,8 @@ async def apply_plan(
             raise ServerClientError(
                 "Failed to apply plan. Resource has been changed. Try again or use force apply."
             )
+    # FIXME: potentially long write transaction
+    # Avoid getting run_model after update
     await session.execute(
         update(RunModel)
         .where(RunModel.id == current_resource.id)
@@ -447,7 +450,7 @@ async def submit_run(
         else:
             await delete_runs(session=session, project=project, runs_names=[run_spec.run_name])
 
-        await validate_run(
+        await _validate_run(
             session=session,
             user=user,
             project=project,
@@ -472,7 +475,7 @@ async def submit_run(
         replicas = 1
         if run_spec.configuration.type == "service":
             replicas = run_spec.configuration.replicas.min
-            await gateways.register_service(session, run_model, run_spec)
+            await services.register_service(session, run_model, run_spec)
 
         for replica_num in range(replicas):
             jobs = await get_jobs_from_run_spec(run_spec, replica_num=replica_num)
@@ -668,30 +671,46 @@ def run_model_to_run(
     return run
 
 
-def _get_pool_offers(
+async def _get_pool_offers(
+    session: AsyncSession,
     pool: PoolModel,
     run_spec: RunSpec,
     job: Job,
     volumes: List[List[Volume]],
-) -> List[InstanceOfferWithAvailability]:
-    pool_filtered_instances = filter_pool_instances(
-        pool_instances=get_pool_instances(pool),
+) -> list[InstanceOfferWithAvailability]:
+    pool_offers: list[InstanceOfferWithAvailability] = []
+
+    detaching_instances_ids = await get_instances_ids_with_detaching_volumes(session)
+    pool_instances = [i for i in get_pool_instances(pool) if i.id not in detaching_instances_ids]
+    multinode = job.job_spec.jobs_per_replica > 1
+
+    if not multinode:
+        shared_instances_with_offers = get_shared_pool_instances_with_offers(
+            pool_instances=pool_instances,
+            profile=run_spec.merged_profile,
+            requirements=job.job_spec.requirements,
+            volumes=volumes,
+        )
+        for _, offer in shared_instances_with_offers:
+            pool_offers.append(offer)
+
+    nonshared_instances = filter_pool_instances(
+        pool_instances=pool_instances,
         profile=run_spec.merged_profile,
         requirements=job.job_spec.requirements,
-        multinode=job.job_spec.jobs_per_replica > 1,
+        multinode=multinode,
         volumes=volumes,
+        shared=False,
     )
-    pool_offers: List[InstanceOfferWithAvailability] = []
-    for instance in pool_filtered_instances:
+    for instance in nonshared_instances:
         offer = get_instance_offer(instance)
         if offer is None:
             continue
         offer.availability = InstanceAvailability.BUSY
         if instance.status == InstanceStatus.IDLE:
             offer.availability = InstanceAvailability.IDLE
-        if instance.unreachable:
-            offer.availability = InstanceAvailability.NOT_AVAILABLE
         pool_offers.append(offer)
+
     pool_offers.sort(key=lambda offer: offer.price)
     return pool_offers
 
@@ -716,185 +735,42 @@ async def _generate_run_name(
         idx += 1
 
 
-async def validate_run(
+def check_run_spec_requires_instance_mounts(run_spec: RunSpec) -> bool:
+    return any(
+        is_core_model_instance(mp, InstanceMountPoint) and not mp.optional
+        for mp in run_spec.configuration.volumes
+    )
+
+
+async def _validate_run(
     session: AsyncSession,
     user: UserModel,
     project: ProjectModel,
     run_spec: RunSpec,
 ):
-    volumes = await get_run_volumes(
+    await _validate_run_volumes(
         session=session,
         project=project,
         run_spec=run_spec,
     )
-    check_can_attach_run_volumes(
-        run_spec=run_spec,
-        volumes=volumes,
-    )
 
 
-async def get_run_volumes(
+async def _validate_run_volumes(
     session: AsyncSession,
     project: ProjectModel,
     run_spec: RunSpec,
-) -> List[List[Volume]]:
-    """
-    Returns list of run volumes grouped by mount points.
-    """
-    volume_models = await get_run_volume_models(
-        session=session,
-        project=project,
-        run_spec=run_spec,
-    )
-    return [
-        [volumes_services.volume_model_to_volume(v) for v in mount_point_volume_models]
-        for mount_point_volume_models in volume_models
-    ]
-
-
-async def get_run_volume_models(
-    session: AsyncSession,
-    project: ProjectModel,
-    run_spec: RunSpec,
-) -> List[List[VolumeModel]]:
-    """
-    Returns list of run volume models grouped by mount points.
-    """
-    if len(run_spec.configuration.volumes) == 0:
-        return []
-    volume_models = []
-    for mount_point in run_spec.configuration.volumes:
-        if not is_core_model_instance(mount_point, VolumeMountPoint):
-            continue
-        if isinstance(mount_point.name, str):
-            names = [mount_point.name]
-        else:
-            names = mount_point.name
-        mount_point_volume_models = []
-        for name in names:
-            volume_model = await volumes_services.get_project_volume_model_by_name(
-                session=session,
-                project=project,
-                name=name,
-            )
-            if volume_model is None:
-                raise ResourceNotExistsError(f"Volume {mount_point.name} not found")
-            mount_point_volume_models.append(volume_model)
-        volume_models.append(mount_point_volume_models)
-    return volume_models
-
-
-def check_can_attach_run_volumes(
-    run_spec: RunSpec,
-    volumes: List[List[Volume]],
 ):
-    """
-    Performs basic checks if volumes can be attached.
-    This is useful to show error ASAP (when user submits the run).
-    If the attachment is to fail anyway, the error will be handled when proccessing submitted jobs.
-    """
-    if len(volumes) == 0:
-        return
-    expected_backends = {v.configuration.backend for v in volumes[0]}
-    expected_regions = {v.configuration.region for v in volumes[0]}
-    for mount_point_volumes in volumes:
-        backends = {v.configuration.backend for v in mount_point_volumes}
-        regions = {v.configuration.region for v in mount_point_volumes}
-        if backends != expected_backends:
-            raise ServerClientError(
-                "Volumes from different backends specified for different mount points"
-            )
-        if regions != expected_regions:
-            raise ServerClientError(
-                "Volumes from different regions specified for different mount points"
-            )
-        for volume in mount_point_volumes:
-            if volume.status != VolumeStatus.ACTIVE:
-                raise ServerClientError(f"Cannot mount volumes that are not active: {volume.name}")
-    volumes_names = [v.name for vs in volumes for v in vs]
-    if len(volumes_names) != len(set(volumes_names)):
-        raise ServerClientError("Cannot attach the same volume at different mount points")
-
-
-async def get_job_volumes(
-    session: AsyncSession,
-    project: ProjectModel,
-    run_spec: RunSpec,
-    job_provisioning_data: JobProvisioningData,
-) -> List[Volume]:
-    """
-    Returns volumes attached to the job.
-    """
-    run_volumes = await get_run_volumes(
-        session=session,
-        project=project,
-        run_spec=run_spec,
-    )
-    job_volumes = []
-    for mount_point_volumes in run_volumes:
-        job_volumes.append(get_job_mount_point_volume(mount_point_volumes, job_provisioning_data))
-    return job_volumes
-
-
-def get_job_mount_point_volume(
-    volumes: List[Volume],
-    job_provisioning_data: JobProvisioningData,
-) -> Volume:
-    """
-    Returns the volume attached to the job among the list of possible mount point volumes.
-    """
-    for volume in volumes:
-        if (
-            volume.configuration.backend != job_provisioning_data.backend
-            or volume.configuration.region != job_provisioning_data.region
-        ):
-            continue
-        if (
-            volume.provisioning_data is not None
-            and volume.provisioning_data.availability_zone is not None
-            and job_provisioning_data.availability_zone is not None
-            and volume.provisioning_data.availability_zone
-            != job_provisioning_data.availability_zone
-        ):
-            continue
-        return volume
-    raise ServerClientError("Failed to find an eligible volume for the mount point")
-
-
-def get_offer_volumes(
-    volumes: List[List[Volume]],
-    offer: InstanceOfferWithAvailability,
-) -> List[Volume]:
-    """
-    Returns volumes suitable for the offer for each mount point.
-    """
-    offer_volumes = []
-    for mount_point_volumes in volumes:
-        offer_volumes.append(get_offer_mount_point_volume(mount_point_volumes, offer))
-    return offer_volumes
-
-
-def get_offer_mount_point_volume(
-    volumes: List[Volume],
-    offer: InstanceOfferWithAvailability,
-) -> Volume:
-    """
-    Returns the first suitable volume for the offer among possible mount point volumes.
-    """
-    for volume in volumes:
-        if (
-            volume.configuration.backend != offer.backend
-            or volume.configuration.region != offer.region
-        ):
-            continue
-        return volume
-    raise ServerClientError("Failed to find an eligible volume for the mount point")
-
-
-def check_run_spec_has_instance_mounts(run_spec: RunSpec) -> bool:
-    return any(
-        is_core_model_instance(mp, InstanceMountPoint) for mp in run_spec.configuration.volumes
-    )
+    # The volumes validation should be done here and not in job configurator
+    # since potentially we may need to validate volumes for jobs/replicas
+    # that won't be created immediately (e.g. range of replicas or nodes).
+    nodes = 1
+    if run_spec.configuration.type == "task":
+        nodes = run_spec.configuration.nodes
+    for job_num in range(nodes):
+        volumes = await get_job_configured_volumes(
+            session=session, project=project, run_spec=run_spec, job_num=job_num
+        )
+        check_can_attach_job_volumes(volumes=volumes)
 
 
 async def _get_run_repo_or_error(
@@ -961,7 +837,7 @@ def _validate_run_spec_and_set_defaults(run_spec: RunSpec):
 _UPDATABLE_SPEC_FIELDS = ["repo_code_hash", "configuration"]
 # Most service fields can be updated via replica redeployment.
 # TODO: Allow updating other fields when a rolling deployment is supported.
-_UPDATABLE_CONFIGURATION_FIELDS = ["replicas", "scaling"]
+_UPDATABLE_CONFIGURATION_FIELDS = ["replicas", "scaling", "strip_prefix"]
 
 
 def _can_update_run_spec(current_run_spec: RunSpec, new_run_spec: RunSpec) -> bool:
@@ -999,7 +875,10 @@ def _check_can_update_run_spec(current_run_spec: RunSpec, new_run_spec: RunSpec)
 
 async def process_terminating_run(session: AsyncSession, run: RunModel):
     """
-    Used by both `process_runs` and `stop_run` to process a run that is TERMINATING.
+    Used by both `process_runs` and `stop_run` to process a TERMINATING run.
+    Stops the jobs gracefully and marks them as TERMINATING.
+    Jobs should be terminated by `process_terminating_jobs`.
+    When all jobs are terminated, assigns a finished status to the run.
     Caller must acquire the lock on run.
     """
     assert run.termination_reason is not None
@@ -1011,26 +890,27 @@ async def process_terminating_run(session: AsyncSession, run: RunModel):
             continue
         unfinished_jobs_count += 1
         if job.status == JobStatus.TERMINATING:
-            # `process_terminating_jobs` will abort frozen jobs
+            if job_termination_reason == JobTerminationReason.ABORTED_BY_USER:
+                # Override termination reason so that
+                # abort actions such as volume force detach are triggered
+                job.termination_reason = job_termination_reason
             continue
 
         if job.status == JobStatus.RUNNING and job_termination_reason not in {
             JobTerminationReason.ABORTED_BY_USER,
             JobTerminationReason.DONE_BY_RUNNER,
         }:
-            # send a signal to stop the job gracefully
+            # Send a signal to stop the job gracefully
             await stop_runner(session, job)
+            delay_job_instance_termination(job)
         job.status = JobStatus.TERMINATING
         job.termination_reason = job_termination_reason
-        await process_terminating_job(session, job)
-        if job.status.is_finished():
-            unfinished_jobs_count -= 1
         job.last_processed_at = common_utils.get_current_datetime()
 
     if unfinished_jobs_count == 0:
         if run.service_spec is not None:
             try:
-                await gateways.unregister_service(session, run)
+                await services.unregister_service(session, run)
             except Exception as e:
                 logger.warning("%s: failed to unregister service: %s", fmt(run), repr(e))
         run.status = run.termination_reason.to_status()

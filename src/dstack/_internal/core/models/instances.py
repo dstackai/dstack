@@ -141,6 +141,8 @@ class InstanceOffer(CoreModel):
 class InstanceOfferWithAvailability(InstanceOffer):
     availability: InstanceAvailability
     instance_runtime: InstanceRuntime = InstanceRuntime.SHIM
+    blocks: int = 1
+    total_blocks: int = 1
 
 
 class InstanceStatus(str, Enum):

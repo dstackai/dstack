@@ -1,7 +1,7 @@
 import json
 from datetime import datetime, timezone
 from unittest.mock import Mock, patch
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 from freezegun import freeze_time
@@ -183,7 +183,10 @@ class TestGetFleet:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_returns_fleet(self, test_db, session: AsyncSession, client: AsyncClient):
+    @pytest.mark.parametrize("deleted", [False, True])
+    async def test_returns_fleet_by_id(
+        self, test_db, session: AsyncSession, client: AsyncClient, deleted: bool
+    ):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
         await add_project_member(
@@ -193,11 +196,12 @@ class TestGetFleet:
             session=session,
             project=project,
             created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+            deleted=deleted,
         )
         response = await client.post(
             f"/api/project/{project.name}/fleets/get",
             headers=get_auth_headers(user.token),
-            json={"name": fleet.name},
+            json={"id": str(fleet.id)},
         )
         assert response.status_code == 200
         assert response.json() == {
@@ -213,7 +217,67 @@ class TestGetFleet:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_returns_400_if_fleet_does_not_exist(
+    async def test_returns_not_deleted_fleet_by_name(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session, global_role=GlobalRole.USER)
+        project = await create_project(session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        active_fleet = await create_fleet(
+            session=session,
+            project=project,
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+            fleet_id=uuid4(),
+        )
+        deleted_fleet = await create_fleet(
+            session=session,
+            project=project,
+            created_at=datetime(2023, 1, 2, 3, 5, tzinfo=timezone.utc),
+            fleet_id=uuid4(),
+            deleted=True,
+        )
+        assert active_fleet.name == deleted_fleet.name
+        assert active_fleet.id != deleted_fleet.id
+        response = await client.post(
+            f"/api/project/{project.name}/fleets/get",
+            headers=get_auth_headers(user.token),
+            json={"name": active_fleet.name},
+        )
+        assert response.status_code == 200
+        assert response.json() == {
+            "id": str(active_fleet.id),
+            "name": active_fleet.name,
+            "project_name": project.name,
+            "spec": json.loads(active_fleet.spec),
+            "created_at": "2023-01-02T03:04:00+00:00",
+            "status": active_fleet.status.value,
+            "status_message": None,
+            "instances": [],
+        }
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_not_returns_by_name_if_fleet_deleted(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session, global_role=GlobalRole.USER)
+        project = await create_project(session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        fleet = await create_fleet(session=session, project=project, deleted=True)
+        response = await client.post(
+            f"/api/project/{project.name}/fleets/get",
+            headers=get_auth_headers(user.token),
+            json={"name": fleet.name},
+        )
+        assert response.status_code == 400
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_not_returns_by_name_if_fleet_does_not_exist(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
         user = await create_user(session, global_role=GlobalRole.USER)
@@ -280,11 +344,13 @@ class TestCreateFleet:
                     "spot_policy": None,
                     "retry": None,
                     "max_price": None,
+                    "idle_duration": None,
                     "termination_policy": None,
                     "termination_idle_time": None,
                     "type": "fleet",
                     "name": "test-fleet",
                     "reservation": None,
+                    "blocks": 1,
                 },
                 "profile": {
                     "backends": None,
@@ -294,10 +360,12 @@ class TestCreateFleet:
                     "retry": None,
                     "retry_policy": None,
                     "max_duration": None,
+                    "stop_duration": None,
                     "max_price": None,
                     "pool_name": None,
                     "instance_name": None,
                     "creation_policy": None,
+                    "idle_duration": None,
                     "termination_policy": None,
                     "termination_idle_time": None,
                     "name": "",
@@ -314,6 +382,8 @@ class TestCreateFleet:
                     "id": "1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e",
                     "project_name": project.name,
                     "name": f"{spec.configuration.name}-0",
+                    "fleet_id": "1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e",
+                    "fleet_name": spec.configuration.name,
                     "instance_num": 0,
                     "job_name": None,
                     "hostname": None,
@@ -326,13 +396,15 @@ class TestCreateFleet:
                     "region": None,
                     "instance_type": None,
                     "price": None,
+                    "total_blocks": 1,
+                    "busy_blocks": 0,
                 }
             ],
         }
         res = await session.execute(select(FleetModel))
         assert res.scalar_one()
         res = await session.execute(select(InstanceModel))
-        assert res.scalar_one()
+        assert res.unique().scalar_one()
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
@@ -393,11 +465,13 @@ class TestCreateFleet:
                     "spot_policy": None,
                     "retry": None,
                     "max_price": None,
+                    "idle_duration": None,
                     "termination_policy": None,
                     "termination_idle_time": None,
                     "type": "fleet",
                     "name": spec.configuration.name,
                     "reservation": None,
+                    "blocks": 1,
                 },
                 "profile": {
                     "backends": None,
@@ -407,10 +481,12 @@ class TestCreateFleet:
                     "retry": None,
                     "retry_policy": None,
                     "max_duration": None,
+                    "stop_duration": None,
                     "max_price": None,
                     "pool_name": None,
                     "instance_name": None,
                     "creation_policy": None,
+                    "idle_duration": None,
                     "termination_policy": None,
                     "termination_idle_time": None,
                     "name": "",
@@ -439,6 +515,8 @@ class TestCreateFleet:
                         },
                     },
                     "name": f"{spec.configuration.name}-0",
+                    "fleet_id": "1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e",
+                    "fleet_name": spec.configuration.name,
                     "instance_num": 0,
                     "pool_name": None,
                     "job_name": None,
@@ -449,13 +527,15 @@ class TestCreateFleet:
                     "created": "2023-01-02T03:04:00+00:00",
                     "region": "remote",
                     "price": 0.0,
+                    "total_blocks": 1,
+                    "busy_blocks": 0,
                 }
             ],
         }
         res = await session.execute(select(FleetModel))
         assert res.scalar_one()
         res = await session.execute(select(InstanceModel))
-        instance = res.scalar_one()
+        instance = res.unique().scalar_one()
         assert instance.remote_connection_info is not None
 
     @pytest.mark.asyncio
@@ -769,13 +849,13 @@ class TestGetPlan:
             backend_mock = Mock()
             m.return_value = [backend_mock]
             backend_mock.TYPE = BackendType.AWS
-            backend_mock.compute.return_value.get_offers.return_value = offers
+            backend_mock.compute.return_value.get_offers_cached.return_value = offers
             response = await client.post(
                 f"/api/project/{project.name}/fleets/get_plan",
                 headers=get_auth_headers(user.token),
                 json={"spec": spec.dict()},
             )
-            backend_mock.compute.return_value.get_offers.assert_called_once()
+            backend_mock.compute.return_value.get_offers_cached.assert_called_once()
 
         assert response.status_code == 200
         assert response.json() == {

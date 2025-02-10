@@ -1,0 +1,23 @@
+## Manage runs
+
+### List runs
+
+The [`dstack ps`](../reference/cli/dstack/ps.md)  command lists all running jobs and their statuses.
+Use `--watch` (or `-w`) to monitor the live status of runs.
+
+### Stop a run
+
+A dev environment runs until you stop it or its lifetime exceeds [`max_duration`](../reference/dstack.yml/dev-environment.md#max_duration).
+To gracefully stop a dev environment, use [`dstack stop`](../reference/cli/dstack/stop.md).
+Pass `--abort` or `-x` to stop without waiting for a graceful shutdown.
+
+### Attach to a run
+
+By default, `dstack apply` runs in attached mode – it establishes the SSH tunnel to the run, forwards ports, and shows real-time logs.
+If you detached from a run, you can reattach to it using [`dstack attach`](../reference/cli/dstack/attach.md).
+
+### See run logs
+
+To see the logs of a run without attaching, use [`dstack logs`](../reference/cli/dstack/logs.md).
+Pass `--diagnose`/`-d` to `dstack logs` to see the diagnostics logs. It may be useful if a run fails.
+For more information on debugging failed runs, see the [troubleshooting](../guides/troubleshooting.md) guide.

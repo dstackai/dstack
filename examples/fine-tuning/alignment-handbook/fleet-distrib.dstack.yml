@@ -10,7 +10,7 @@ placement: cluster
 # Uncomment to leverage spot instances
 #spot_policy: auto
 # Terminate instances if not used for one hour
-termination_idle_time: 1h
+idle_duration: 1h
 
 resources:
   gpu:

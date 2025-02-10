@@ -23,6 +23,12 @@ console = Console(theme=Theme(_colors))
 
 LIVE_TABLE_REFRESH_RATE_PER_SEC = 1
 LIVE_TABLE_PROVISION_INTERVAL_SECS = 2
+NO_OFFERS_WARNING = (
+    "[warning]"
+    "No matching instance offers available. Possible reasons:"
+    " https://dstack.ai/docs/guides/troubleshooting/#no-offers"
+    "[/]\n"
+)
 
 
 def cli_error(e: DstackError) -> CLIError:

@@ -9,9 +9,6 @@ from dstack._internal.server.services.proxy.repo import ServerProxyRepo
 
 
 class ServerProxyDependencyInjector(ProxyDependencyInjector):
-    def __init__(self) -> None:
-        pass
-
     async def get_repo(self) -> AsyncGenerator[BaseProxyRepo, None]:
         async with get_session_ctx() as session:
             yield ServerProxyRepo(session)

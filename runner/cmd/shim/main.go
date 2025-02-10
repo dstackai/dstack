@@ -4,15 +4,18 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"io"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"time"
 
 	"github.com/dstackai/dstack/runner/consts"
+	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/dstackai/dstack/runner/internal/shim"
 	"github.com/dstackai/dstack/runner/internal/shim/api"
+	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 )
 
@@ -21,8 +24,14 @@ var Version string
 
 func main() {
 	var args shim.CLIArgs
-	args.Docker.SSHPort = 10022
 	var serviceMode bool
+
+	const defaultLogLevel = int(logrus.InfoLevel)
+
+	ctx := context.Background()
+
+	log.DefaultEntry.Logger.SetLevel(logrus.Level(defaultLogLevel))
+	log.DefaultEntry.Logger.SetOutput(os.Stderr)
 
 	app := &cli.App{
 		Name:    "dstack-shim",
@@ -31,33 +40,27 @@ func main() {
 		Flags: []cli.Flag{
 			/* Shim Parameters */
 			&cli.PathFlag{
-				Name:        "home",
-				Usage:       "Dstack home directory",
+				Name:        "shim-home",
+				Usage:       "Set shim's home directory",
 				Destination: &args.Shim.HomeDir,
-				EnvVars:     []string{"DSTACK_HOME"},
+				DefaultText: path.Join("~", consts.DstackDirPath),
+				EnvVars:     []string{"DSTACK_SHIM_HOME"},
 			},
 			&cli.IntFlag{
 				Name:        "shim-http-port",
-				Usage:       "Set's shim's http port",
+				Usage:       "Set shim's http port",
 				Value:       10998,
 				Destination: &args.Shim.HTTPPort,
 				EnvVars:     []string{"DSTACK_SHIM_HTTP_PORT"},
 			},
+			&cli.IntFlag{
+				Name:        "shim-log-level",
+				Usage:       "Set shim's log level",
+				Value:       defaultLogLevel,
+				Destination: &args.Shim.LogLevel,
+				EnvVars:     []string{"DSTACK_SHIM_LOG_LEVEL"},
+			},
 			/* Runner Parameters */
-			&cli.IntFlag{
-				Name:        "runner-http-port",
-				Usage:       "Set runner's http port",
-				Value:       10999,
-				Destination: &args.Runner.HTTPPort,
-				EnvVars:     []string{"DSTACK_RUNNER_HTTP_PORT"},
-			},
-			&cli.IntFlag{
-				Name:        "runner-log-level",
-				Usage:       "Set runner's log level",
-				Value:       4,
-				Destination: &args.Runner.LogLevel,
-				EnvVars:     []string{"DSTACK_RUNNER_LOG_LEVEL"},
-			},
 			&cli.StringFlag{
 				Name:        "runner-download-url",
 				Usage:       "Set runner's download URL",
@@ -67,102 +70,136 @@ func main() {
 			&cli.PathFlag{
 				Name:        "runner-binary-path",
 				Usage:       "Path to runner's binary",
+				Value:       consts.RunnerBinaryPath,
 				Destination: &args.Runner.BinaryPath,
 				EnvVars:     []string{"DSTACK_RUNNER_BINARY_PATH"},
 			},
-		},
-		Commands: []*cli.Command{
-			{
-				Name:  "docker",
-				Usage: "Starts docker container and modifies entrypoint",
-				Flags: []cli.Flag{
-					/* Docker Parameters */
-					&cli.BoolFlag{
-						Name:        "privileged",
-						Usage:       "Give extended privileges to the container",
-						Destination: &args.Docker.Privileged,
-						EnvVars:     []string{"DSTACK_DOCKER_PRIVILEGED"},
-					},
-					&cli.StringFlag{
-						Name:        "ssh-key",
-						Usage:       "Public SSH key",
-						Required:    true,
-						Destination: &args.Docker.ConcatinatedPublicSSHKeys,
-						EnvVars:     []string{"DSTACK_PUBLIC_SSH_KEY"},
-					},
-					&cli.StringFlag{
-						Name:        "pjrt-device",
-						Usage:       "Set the PJRT_DEVICE environment variable (e.g., TPU, GPU)",
-						Destination: &args.Docker.PJRTDevice,
-						EnvVars:     []string{"PJRT_DEVICE"},
-					},
-					&cli.BoolFlag{
-						Name:        "service",
-						Usage:       "Start as a service",
-						Destination: &serviceMode,
-						EnvVars:     []string{"DSTACK_SERVICE_MODE"},
-					},
-				},
-				Action: func(c *cli.Context) error {
-					if args.Runner.BinaryPath == "" {
-						if err := args.DownloadRunner(); err != nil {
-							return cli.Exit(err, 1)
-						}
-					}
-
-					args.Runner.HomeDir = "/root"
-					args.Runner.WorkingDir = "/workflow"
-
-					var err error
-
-					shimHomeDir := args.Shim.HomeDir
-					if shimHomeDir == "" {
-						home, err := os.UserHomeDir()
-						if err != nil {
-							return cli.Exit(err, 1)
-						}
-						shimHomeDir = filepath.Join(home, consts.DstackDirPath)
-						args.Shim.HomeDir = shimHomeDir
-					}
-					log.Printf("Config Shim: %+v\n", args.Shim)
-					log.Printf("Config Runner: %+v\n", args.Runner)
-					log.Printf("Config Docker: %+v\n", args.Docker)
-
-					dockerRunner, err := shim.NewDockerRunner(&args)
-					if err != nil {
-						return cli.Exit(err, 1)
-					}
-
-					address := fmt.Sprintf(":%d", args.Shim.HTTPPort)
-					shimServer := api.NewShimServer(address, dockerRunner, Version)
-
-					defer func() {
-						shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), 5*time.Second)
-						defer cancelShutdown()
-						_ = shimServer.HttpServer.Shutdown(shutdownCtx)
-					}()
-
-					if serviceMode {
-						if err := shim.WriteHostInfo(shimHomeDir, dockerRunner.Resources()); err != nil {
-							if errors.Is(err, os.ErrExist) {
-								log.Println("cannot write host info: file already exists")
-							} else {
-								return cli.Exit(err, 1)
-							}
-						}
-					}
-
-					if err := shimServer.HttpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-						return cli.Exit(err, 1)
-					}
-
-					return nil
-				},
+			&cli.IntFlag{
+				Name:        "runner-http-port",
+				Usage:       "Set runner's http port",
+				Value:       10999,
+				Destination: &args.Runner.HTTPPort,
+				EnvVars:     []string{"DSTACK_RUNNER_HTTP_PORT"},
 			},
+			&cli.IntFlag{
+				Name:        "runner-ssh-port",
+				Usage:       "Set runner's ssh port",
+				Value:       10022,
+				Destination: &args.Runner.SSHPort,
+				EnvVars:     []string{"DSTACK_RUNNER_SSH_PORT"},
+			},
+			&cli.IntFlag{
+				Name:        "runner-log-level",
+				Usage:       "Set runner's log level",
+				Value:       defaultLogLevel,
+				Destination: &args.Runner.LogLevel,
+				EnvVars:     []string{"DSTACK_RUNNER_LOG_LEVEL"},
+			},
+			/* Docker Parameters */
+			&cli.BoolFlag{
+				Name:        "privileged",
+				Usage:       "Give extended privileges to the container",
+				Destination: &args.Docker.Privileged,
+				EnvVars:     []string{"DSTACK_DOCKER_PRIVILEGED"},
+			},
+			&cli.StringFlag{
+				Name:        "ssh-key",
+				Usage:       "Public SSH key",
+				Destination: &args.Docker.ConcatinatedPublicSSHKeys,
+				EnvVars:     []string{"DSTACK_PUBLIC_SSH_KEY"},
+			},
+			&cli.StringFlag{
+				Name:        "pjrt-device",
+				Usage:       "Set the PJRT_DEVICE environment variable (e.g., TPU, GPU)",
+				Destination: &args.Docker.PJRTDevice,
+				EnvVars:     []string{"PJRT_DEVICE"},
+			},
+			/* Misc Parameters */
+			&cli.BoolFlag{
+				Name:        "service",
+				Usage:       "Start as a service",
+				Destination: &serviceMode,
+				EnvVars:     []string{"DSTACK_SERVICE_MODE"},
+			},
+		},
+		Action: func(c *cli.Context) error {
+			return start(ctx, args, serviceMode)
 		},
 	}
 
 	if err := app.Run(os.Args); err != nil {
-		log.Fatal(err)
+		log.Fatal(ctx, err.Error())
 	}
+}
+
+func start(ctx context.Context, args shim.CLIArgs, serviceMode bool) (err error) {
+	log.DefaultEntry.Logger.SetLevel(logrus.Level(args.Shim.LogLevel))
+
+	shimHomeDir := args.Shim.HomeDir
+	if shimHomeDir == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return err
+		}
+		shimHomeDir = filepath.Join(home, consts.DstackDirPath)
+		args.Shim.HomeDir = shimHomeDir
+	}
+
+	shimLogFile, err := log.CreateAppendFile(filepath.Join(shimHomeDir, consts.ShimLogFileName))
+	if err != nil {
+		return fmt.Errorf("failed to create shim log file: %w", err)
+	}
+	defer func() {
+		_ = shimLogFile.Close()
+	}()
+
+	originalLogger := log.GetLogger(ctx)
+	loggerOut := io.MultiWriter(originalLogger.Logger.Out, shimLogFile)
+	ctx = log.WithLogger(ctx, log.NewEntry(loggerOut, int(originalLogger.Logger.GetLevel())))
+
+	defer func() {
+		// Should be called _before_ we close shimLogFile
+		// If an error occurs earlier, we still log it to stderr in the main function
+		if err != nil {
+			log.Error(ctx, err.Error())
+		}
+	}()
+
+	if err := args.DownloadRunner(ctx); err != nil {
+		return err
+	}
+
+	log.Debug(ctx, "Shim", "args", args.Shim)
+	log.Debug(ctx, "Runner", "args", args.Runner)
+	log.Debug(ctx, "Docker", "args", args.Docker)
+
+	dockerRunner, err := shim.NewDockerRunner(ctx, &args)
+	if err != nil {
+		return err
+	}
+
+	address := fmt.Sprintf(":%d", args.Shim.HTTPPort)
+	shimServer := api.NewShimServer(ctx, address, dockerRunner, Version)
+
+	defer func() {
+		shutdownCtx, cancelShutdown := context.WithTimeout(ctx, 5*time.Second)
+		defer cancelShutdown()
+		_ = shimServer.HttpServer.Shutdown(shutdownCtx)
+	}()
+
+	if serviceMode {
+		if err := shim.WriteHostInfo(shimHomeDir, dockerRunner.Resources(ctx)); err != nil {
+			if errors.Is(err, os.ErrExist) {
+				log.Error(ctx, "cannot write host info: file already exists")
+			} else {
+				return err
+			}
+		}
+	}
+
+	if err := shimServer.HttpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		return err
+	}
+
+	return nil
 }

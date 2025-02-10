@@ -83,4 +83,4 @@ $ dstack apply -f .dstack.yml --no-repo
 
 ## What's next?
 
-1. Read about [dev environments](../dev-environments.md), [tasks](../tasks.md), [services](../services.md)
+1. Read about [dev environments](dev-environments.md), [tasks](tasks.md), [services](services.md)

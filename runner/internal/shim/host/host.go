@@ -1,21 +1,22 @@
 package host
 
 import (
+	"context"
 	"fmt"
-	"log"
 	"net"
 	"runtime"
 
+	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/shirou/gopsutil/v4/mem"
 	"golang.org/x/sys/unix"
 )
 
-func GetCpuCount() int {
+func GetCpuCount(ctx context.Context) int {
 	return runtime.NumCPU()
 }
 
 // GetTotalMemory returns total amount of RAM on this system
-func GetTotalMemory() (uint64, error) {
+func GetTotalMemory(ctx context.Context) (uint64, error) {
 	v, err := mem.VirtualMemory()
 	if err != nil {
 		return 0, fmt.Errorf("cannot get total memory: %w", err)
@@ -23,7 +24,7 @@ func GetTotalMemory() (uint64, error) {
 	return v.Total, nil
 }
 
-func GetDiskSize(path string) (uint64, error) {
+func GetDiskSize(ctx context.Context, path string) (uint64, error) {
 	var stat unix.Statfs_t
 	err := unix.Statfs(path, &stat)
 	if err != nil {
@@ -33,7 +34,7 @@ func GetDiskSize(path string) (uint64, error) {
 	return size, nil
 }
 
-func GetNetworkAddresses() ([]string, error) {
+func GetNetworkAddresses(ctx context.Context) ([]string, error) {
 	var addresses []string
 	ifaces, err := net.Interfaces()
 	if err != nil {
@@ -42,7 +43,7 @@ func GetNetworkAddresses() ([]string, error) {
 	for _, iface := range ifaces {
 		addrs, err := iface.Addrs()
 		if err != nil {
-			log.Printf("cannot get addrs for %+v: %v", iface, err)
+			log.Error(ctx, "cannot get addrs", "iface", iface, "err", err)
 			continue
 		}
 		for _, addr := range addrs {

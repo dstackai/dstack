@@ -73,7 +73,8 @@
     "account": "User",
     "billing": "Billing",
     "resources": "Resources",
-    "volumes": "Volumes"
+    "volumes": "Volumes",
+    "instances": "Instances"
   },
 
   "backend": {
@@ -431,7 +432,7 @@
     "nomatch_message_title": "No matches",
     "nomatch_message_text": "We can't find a match.",
     "nomatch_message_button_label": "Clear filter",
-    "active_only": "Active instances",
+    "active_only": "Active fleets",
     "statuses": {
       "active": "Active",
       "submitted": "Submitted",
@@ -440,13 +441,19 @@
       "terminated": "Terminated"
     },
     "instances": {
+      "active_only": "Active instances",
       "title": "Instances",
       "empty_message_title": "No instances",
       "empty_message_text": "No instances to display.",
+      "nomatch_message_title": "No matches",
+      "nomatch_message_text": "We can't find a match.",
       "instance_name": "Instance",
+      "instance_num": "Instance num",
       "created": "Created",
       "status": "Status",
       "project": "Project",
+      "hostname": "Host name",
+      "instance_type": "Type",
       "statuses": {
         "pending": "Pending",
         "provisioning": "Provisioning",
@@ -580,4 +587,3 @@
     "message": "Are you sure you want to delete?"
   }
 }
-

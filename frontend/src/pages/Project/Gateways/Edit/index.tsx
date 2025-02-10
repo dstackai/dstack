@@ -18,7 +18,7 @@ import {
 } from 'components';
 
 import { useBreadcrumbs, useHelpPanel, useNotifications } from 'hooks';
-import { isRequestFormErrors2, isRequestFormFieldError } from 'libs';
+import { getServerError, isResponseServerError, isResponseServerFormFieldError } from 'libs';
 import { ROUTES } from 'routes';
 import {
     useGetProjectGatewayQuery,
@@ -122,9 +122,9 @@ export const EditGateway: React.FC = () => {
             .catch((errorResponse) => {
                 const errorRequestData = errorResponse?.data;
 
-                if (isRequestFormErrors2(errorRequestData)) {
+                if (isResponseServerError(errorRequestData)) {
                     errorRequestData.detail.forEach((error) => {
-                        if (isRequestFormFieldError(error)) {
+                        if (isResponseServerFormFieldError(error)) {
                             setError(error.loc.join('.') as FieldPath<TUpdateGatewayParams>, {
                                 type: 'custom',
                                 message: error.msg,
@@ -140,7 +140,7 @@ export const EditGateway: React.FC = () => {
                     pushNotification({
                         type: 'error',
                         content: t('common.server_error', {
-                            error: errorResponse?.data?.detail?.map((i: { msg: string }) => i.msg).join(', '),
+                            error: getServerError(errorResponse),
                         }),
                     });
                 }

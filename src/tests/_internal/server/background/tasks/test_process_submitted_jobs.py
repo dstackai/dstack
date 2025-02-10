@@ -38,6 +38,7 @@ from dstack._internal.server.testing.common import (
     create_run,
     create_user,
     create_volume,
+    get_instance_offer_with_availability,
     get_run_spec,
     get_volume_provisioning_data,
 )
@@ -126,7 +127,7 @@ class TestProcessSubmittedJobs:
             backend_mock = Mock()
             m.return_value = [backend_mock]
             backend_mock.TYPE = backend
-            backend_mock.compute.return_value.get_offers.return_value = [offer]
+            backend_mock.compute.return_value.get_offers_cached.return_value = [offer]
             backend_mock.compute.return_value.run_job.return_value = JobProvisioningData(
                 backend=offer.backend,
                 instance_type=offer.instance,
@@ -143,7 +144,7 @@ class TestProcessSubmittedJobs:
             )
             await process_submitted_jobs()
             m.assert_called_once()
-            backend_mock.compute.return_value.get_offers.assert_called_once()
+            backend_mock.compute.return_value.get_offers_cached.assert_called_once()
             backend_mock.compute.return_value.run_job.assert_called_once()
 
         await session.refresh(job)
@@ -199,7 +200,7 @@ class TestProcessSubmittedJobs:
             backend_mock = Mock()
             m.return_value = [backend_mock]
             backend_mock.TYPE = BackendType.RUNPOD
-            backend_mock.compute.return_value.get_offers.return_value = [offer]
+            backend_mock.compute.return_value.get_offers_cached.return_value = [offer]
             backend_mock.compute.return_value.run_job.return_value = JobProvisioningData(
                 backend=offer.backend,
                 instance_type=offer.instance,
@@ -218,7 +219,7 @@ class TestProcessSubmittedJobs:
                 datetime_mock.return_value = datetime(2023, 1, 2, 3, 30, 0, tzinfo=timezone.utc)
                 await process_submitted_jobs()
             m.assert_called_once()
-            backend_mock.compute.return_value.get_offers.assert_not_called()
+            backend_mock.compute.return_value.get_offers_cached.assert_not_called()
             backend_mock.compute.return_value.run_job.assert_not_called()
 
         await session.refresh(job)
@@ -272,7 +273,7 @@ class TestProcessSubmittedJobs:
             backend_mock = Mock()
             m.return_value = [backend_mock]
             backend_mock.TYPE = BackendType.RUNPOD
-            backend_mock.compute.return_value.get_offers.return_value = [offer]
+            backend_mock.compute.return_value.get_offers_cached.return_value = [offer]
             backend_mock.compute.return_value.run_job.return_value = JobProvisioningData(
                 backend=offer.backend,
                 instance_type=offer.instance,
@@ -291,7 +292,7 @@ class TestProcessSubmittedJobs:
                 datetime_mock.return_value = datetime(2023, 1, 2, 3, 30, 0, tzinfo=timezone.utc)
                 await process_submitted_jobs()
             m.assert_called_once()
-            backend_mock.compute.return_value.get_offers.assert_not_called()
+            backend_mock.compute.return_value.get_offers_cached.assert_not_called()
             backend_mock.compute.return_value.run_job.assert_not_called()
 
         await session.refresh(job)
@@ -301,6 +302,78 @@ class TestProcessSubmittedJobs:
 
         await session.refresh(pool)
         assert not pool.instances
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_provisions_job_with_optional_instance_volume_not_attached(
+        self,
+        test_db,
+        session: AsyncSession,
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        pool = await create_pool(session=session, project=project)
+        repo = await create_repo(
+            session=session,
+            project_id=project.id,
+        )
+        run_spec = get_run_spec(run_name="test-run", repo_id=repo.name)
+        run_spec.configuration.volumes = [
+            InstanceMountPoint(instance_path="/root/.cache", path="/cache", optional=True)
+        ]
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_name="test-run",
+            run_spec=run_spec,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            instance_assigned=True,
+        )
+        offer = InstanceOfferWithAvailability(
+            backend=BackendType.RUNPOD,
+            instance=InstanceType(
+                name="instance",
+                resources=Resources(cpus=1, memory_mib=512, spot=False, gpus=[]),
+            ),
+            region="us",
+            price=1.0,
+            availability=InstanceAvailability.AVAILABLE,
+        )
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            backend_mock = Mock()
+            m.return_value = [backend_mock]
+            backend_mock.TYPE = BackendType.RUNPOD
+            backend_mock.compute.return_value.get_offers_cached.return_value = [offer]
+            backend_mock.compute.return_value.run_job.return_value = JobProvisioningData(
+                backend=offer.backend,
+                instance_type=offer.instance,
+                instance_id="instance_id",
+                hostname="1.1.1.1",
+                internal_ip=None,
+                region=offer.region,
+                price=offer.price,
+                username="ubuntu",
+                ssh_port=22,
+                ssh_proxy=None,
+                dockerized=False,
+                backend_data=None,
+            )
+            await process_submitted_jobs()
+
+        await session.refresh(job)
+        assert job is not None
+        assert job.status == JobStatus.PROVISIONING
+
+        await session.refresh(pool)
+        instance_offer = InstanceOfferWithAvailability.parse_raw(pool.instances[0].offer)
+        assert offer == instance_offer
+        pool_job_provisioning_data = pool.instances[0].job_provisioning_data
+        assert pool_job_provisioning_data == job.job_provisioning_data
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
@@ -375,7 +448,7 @@ class TestProcessSubmittedJobs:
         await process_submitted_jobs()
         await session.refresh(job)
         res = await session.execute(select(JobModel).options(joinedload(JobModel.instance)))
-        job = res.scalar_one()
+        job = res.unique().scalar_one()
         assert job.status == JobStatus.SUBMITTED
         assert (
             job.instance_assigned and job.instance is not None and job.instance.id == instance.id
@@ -412,7 +485,8 @@ class TestProcessSubmittedJobs:
         run_spec = get_run_spec(run_name="test-run", repo_id=repo.name)
         run_spec.configuration.volumes = [
             VolumeMountPoint(name=volume.name, path="/volume"),
-            InstanceMountPoint(instance_path="/root/.cache", path="/cache"),
+            InstanceMountPoint(instance_path="/root/.data", path="/data"),
+            InstanceMountPoint(instance_path="/root/.cache", path="/cache", optional=True),
         ]
         run = await create_run(
             session=session,
@@ -438,17 +512,62 @@ class TestProcessSubmittedJobs:
             await process_submitted_jobs()
 
         await session.refresh(job)
+        await session.refresh(instance)
         res = await session.execute(
             select(JobModel).options(
                 joinedload(JobModel.instance).selectinload(InstanceModel.volumes)
             )
         )
-        job = res.scalar_one()
+        job = res.unique().scalar_one()
         assert job.status == JobStatus.PROVISIONING
         assert (
             job.instance_assigned and job.instance is not None and job.instance.id == instance.id
         )
         assert job.instance.volumes == [volume]
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_assigns_job_to_shared_instance(self, test_db, session: AsyncSession):
+        project = await create_project(session)
+        user = await create_user(session)
+        pool = await create_pool(session=session, project=project)
+        repo = await create_repo(
+            session=session,
+            project_id=project.id,
+        )
+        offer = get_instance_offer_with_availability(gpu_count=8, cpu_count=64, memory_gib=128)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            pool=pool,
+            status=InstanceStatus.IDLE,
+            offer=offer,
+            total_blocks=4,
+            busy_blocks=1,
+        )
+        await session.refresh(pool)
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            instance_assigned=False,
+        )
+        await process_submitted_jobs()
+        await session.refresh(job)
+        await session.refresh(instance)
+        res = await session.execute(select(JobModel).options(joinedload(JobModel.instance)))
+        job = res.unique().scalar_one()
+        assert job.status == JobStatus.SUBMITTED
+        assert (
+            job.instance_assigned and job.instance is not None and job.instance.id == instance.id
+        )
+        assert instance.total_blocks == 4
+        assert instance.busy_blocks == 2
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
@@ -494,7 +613,7 @@ class TestProcessSubmittedJobs:
             backend_mock = Mock()
             m.return_value = [backend_mock]
             backend_mock.TYPE = BackendType.AWS
-            backend_mock.compute.return_value.get_offers.return_value = [offer]
+            backend_mock.compute.return_value.get_offers_cached.return_value = [offer]
             backend_mock.compute.return_value.run_job.return_value = JobProvisioningData(
                 backend=offer.backend,
                 instance_type=offer.instance,
@@ -511,12 +630,12 @@ class TestProcessSubmittedJobs:
             )
             await process_submitted_jobs()
             m.assert_called_once()
-            backend_mock.compute.return_value.get_offers.assert_called_once()
+            backend_mock.compute.return_value.get_offers_cached.assert_called_once()
             backend_mock.compute.return_value.run_job.assert_called_once()
 
         await session.refresh(job)
         res = await session.execute(select(JobModel).options(joinedload(JobModel.instance)))
-        job = res.scalar_one()
+        job = res.unique().scalar_one()
         assert job.status == JobStatus.PROVISIONING
         assert job.instance is not None
         assert job.instance.instance_num == 1

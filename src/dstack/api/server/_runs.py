@@ -1,9 +1,14 @@
 from datetime import datetime
-from typing import List, Optional, Union
+from typing import Any, List, Optional, Union
 from uuid import UUID
 
 from pydantic import parse_obj_as
 
+from dstack._internal.core.models.common import is_core_model_instance
+from dstack._internal.core.models.configurations import (
+    STRIP_PREFIX_DEFAULT,
+    ServiceConfiguration,
+)
 from dstack._internal.core.models.pools import Instance
 from dstack._internal.core.models.profiles import Profile
 from dstack._internal.core.models.runs import (
@@ -14,6 +19,7 @@ from dstack._internal.core.models.runs import (
     RunPlan,
     RunSpec,
 )
+from dstack._internal.core.models.volumes import InstanceMountPoint
 from dstack._internal.server.schemas.runs import (
     ApplyRunPlanRequest,
     CreateInstanceRequest,
@@ -55,7 +61,9 @@ class RunsAPIClient(APIClientGroup):
 
     def get(self, project_name: str, run_name: str) -> Run:
         body = GetRunRequest(run_name=run_name)
-        resp = self._request(f"/api/project/{project_name}/runs/get", body=body.json())
+        # dstack versions prior to 0.18.34 don't support id field, and we don't use it here either
+        json_body = body.json(exclude={"id"})
+        resp = self._request(f"/api/project/{project_name}/runs/get", body=json_body)
         return parse_obj_as(Run.__response__, resp.json())
 
     def get_plan(self, project_name: str, run_spec: RunSpec) -> RunPlan:
@@ -115,23 +123,47 @@ class RunsAPIClient(APIClientGroup):
 
 def _get_run_spec_excludes(run_spec: RunSpec) -> Optional[dict]:
     spec_excludes: dict[str, set[str]] = {}
-    configuration_excludes: set[str] = set()
+    configuration_excludes: dict[str, Any] = {}
     profile_excludes: set[str] = set()
     configuration = run_spec.configuration
+    profile = run_spec.profile
 
     # client >= 0.18.18 / server <= 0.18.17 compatibility tweak
     if not configuration.privileged:
-        configuration_excludes.add("privileged")
+        configuration_excludes["privileged"] = True
     # client >= 0.18.23 / server <= 0.18.22 compatibility tweak
     if configuration.type == "service" and configuration.gateway is None:
-        configuration_excludes.add("gateway")
+        configuration_excludes["gateway"] = True
     # client >= 0.18.30 / server <= 0.18.29 compatibility tweak
     if run_spec.configuration.user is None:
-        configuration_excludes.add("user")
+        configuration_excludes["user"] = True
     # client >= 0.18.30 / server <= 0.18.29 compatibility tweak
-    if not configuration.reservation:
-        configuration_excludes.add("reservation")
+    if configuration.reservation is None:
+        configuration_excludes["reservation"] = True
+    if profile is not None and profile.reservation is None:
         profile_excludes.add("reservation")
+    if configuration.idle_duration is None:
+        configuration_excludes["idle_duration"] = True
+    if profile is not None and profile.idle_duration is None:
+        profile_excludes.add("idle_duration")
+    # client >= 0.18.38 / server <= 0.18.37 compatibility tweak
+    if configuration.stop_duration is None:
+        configuration_excludes["stop_duration"] = True
+    if profile is not None and profile.stop_duration is None:
+        profile_excludes.add("stop_duration")
+    # client >= 0.18.40 / server <= 0.18.39 compatibility tweak
+    if (
+        is_core_model_instance(configuration, ServiceConfiguration)
+        and configuration.strip_prefix == STRIP_PREFIX_DEFAULT
+    ):
+        configuration_excludes["strip_prefix"] = True
+    if configuration.single_branch is None:
+        configuration_excludes["single_branch"] = True
+    if all(
+        not is_core_model_instance(v, InstanceMountPoint) or not v.optional
+        for v in configuration.volumes
+    ):
+        configuration_excludes["volumes"] = {"__all__": {"optional"}}
 
     if configuration_excludes:
         spec_excludes["configuration"] = configuration_excludes

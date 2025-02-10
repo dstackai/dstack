@@ -13,13 +13,13 @@ from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.instances import InstanceOfferWithAvailability, SSHKey
 from dstack._internal.core.models.pools import Instance
 from dstack._internal.core.models.profiles import (
-    DEFAULT_POOL_TERMINATION_IDLE_TIME,
     Profile,
     ProfileParams,
     ProfileRetry,
     SpotPolicy,
     TerminationPolicy,
     parse_duration,
+    parse_idle_duration,
 )
 from dstack._internal.core.models.resources import Range, ResourcesSpec
 
@@ -60,6 +60,19 @@ class SSHHostParams(CoreModel):
         ),
     ] = None
     ssh_key: Optional[SSHKey] = None
+
+    blocks: Annotated[
+        Union[Literal["auto"], int],
+        Field(
+            description=(
+                "The amount of blocks to split the instance into, a number or `auto`."
+                " `auto` means as many as possible."
+                " The number of GPUs and CPUs must be divisible by the number of blocks."
+                " Defaults to `1`, i.e. do not split"
+            ),
+            ge=1,
+        ),
+    ] = 1
 
     @validator("internal_ip")
     def validate_internal_ip(cls, value):
@@ -142,6 +155,19 @@ class InstanceGroupParams(CoreModel):
         Field(description="The resources requirements"),
     ] = ResourcesSpec()
 
+    blocks: Annotated[
+        Union[Literal["auto"], int],
+        Field(
+            description=(
+                "The amount of blocks to split the instance into, a number or `auto`."
+                " `auto` means as many as possible."
+                " The number of GPUs and CPUs must be divisible by the number of blocks."
+                " Defaults to `1`, i.e. do not split"
+            ),
+            ge=1,
+        ),
+    ] = 1
+
     backends: Annotated[
         Optional[List[BackendType]],
         Field(description="The backends to consider for provisioning (e.g., `[aws, gcp]`)"),
@@ -172,18 +198,33 @@ class InstanceGroupParams(CoreModel):
         Optional[float],
         Field(description="The maximum instance price per hour, in dollars", gt=0.0),
     ] = None
+
+    idle_duration: Annotated[
+        Optional[Union[Literal["off"], str, int]],
+        Field(
+            description="Time to wait before terminating idle instances. Defaults to `5m` for runs and `3d` for fleets. Use `off` for unlimited duration"
+        ),
+    ] = None
+    # Deprecated:
     termination_policy: Annotated[
         Optional[TerminationPolicy],
-        Field(description="The policy for instance termination. Defaults to `destroy-after-idle`"),
+        Field(
+            description="Deprecated in favor of `idle_duration`",
+        ),
     ] = None
     termination_idle_time: Annotated[
         Optional[Union[str, int]],
-        Field(description="Time to wait before destroying idle instances. Defaults to `3d`"),
+        Field(
+            description="Deprecated in favor of `idle_duration`",
+        ),
     ] = None
 
     _validate_termination_idle_time = validator(
         "termination_idle_time", pre=True, allow_reuse=True
     )(parse_duration)
+    _validate_idle_duration = validator("idle_duration", pre=True, allow_reuse=True)(
+        parse_idle_duration
+    )
 
 
 class FleetProps(CoreModel):
@@ -224,10 +265,6 @@ class FleetSpec(CoreModel):
             merged_profile.spot_policy = SpotPolicy.ONDEMAND
         if merged_profile.retry is None:
             merged_profile.retry = False
-        if merged_profile.termination_policy is None:
-            merged_profile.termination_policy = TerminationPolicy.DESTROY_AFTER_IDLE
-        if merged_profile.termination_idle_time is None:
-            merged_profile.termination_idle_time = DEFAULT_POOL_TERMINATION_IDLE_TIME
         values["merged_profile"] = merged_profile
         return values
 

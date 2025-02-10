@@ -18,10 +18,10 @@ import (
 
 	"github.com/creack/pty"
 	"github.com/dstackai/dstack/runner/consts"
-	"github.com/dstackai/dstack/runner/consts/states"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/dstackai/dstack/runner/internal/schemas"
+	"github.com/dstackai/dstack/runner/internal/types"
 )
 
 type RunExecutor struct {
@@ -79,14 +79,14 @@ func NewRunExecutor(tempDir string, homeDir string, workingDir string) (*RunExec
 func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 	runnerLogFile, err := log.CreateAppendFile(filepath.Join(ex.tempDir, consts.RunnerLogFileName))
 	if err != nil {
-		ex.SetJobState(ctx, states.Failed)
+		ex.SetJobState(ctx, types.JobStateFailed)
 		return gerrors.Wrap(err)
 	}
 	defer func() { _ = runnerLogFile.Close() }()
 
 	jobLogFile, err := log.CreateAppendFile(filepath.Join(ex.tempDir, consts.RunnerJobLogFileName))
 	if err != nil {
-		ex.SetJobState(ctx, states.Failed)
+		ex.SetJobState(ctx, types.JobStateFailed)
 		return gerrors.Wrap(err)
 	}
 	defer func() { _ = jobLogFile.Close() }()
@@ -95,7 +95,7 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 		// recover goes after runnerLogFile.Close() to keep the log
 		if r := recover(); r != nil {
 			log.Error(ctx, "Executor PANIC", "err", r)
-			ex.SetJobState(ctx, states.Failed)
+			ex.SetJobState(ctx, types.JobStateFailed)
 			err = gerrors.Newf("recovered: %v", r)
 		}
 		// no more logs will be written after this
@@ -115,17 +115,22 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 	log.Info(ctx, "Run job", "log_level", log.GetLogger(ctx).Logger.Level.String())
 
 	if err := ex.setupRepo(ctx); err != nil {
-		ex.SetJobState(ctx, states.Failed)
+		ex.SetJobStateWithTerminationReason(
+			ctx,
+			types.JobStateFailed,
+			types.TerminationReasonContainerExitedWithError,
+			fmt.Sprintf("Failed to set up the repo (%s)", err),
+		)
 		return gerrors.Wrap(err)
 	}
 	cleanupCredentials, err := ex.setupCredentials(ctx)
 	if err != nil {
-		ex.SetJobState(ctx, states.Failed)
+		ex.SetJobState(ctx, types.JobStateFailed)
 		return gerrors.Wrap(err)
 	}
 	defer cleanupCredentials()
 
-	ex.SetJobState(ctx, states.Running)
+	ex.SetJobState(ctx, types.JobStateRunning)
 	timeoutCtx := ctx
 	var cancelTimeout context.CancelFunc
 	if ex.jobSpec.MaxDuration != 0 {
@@ -136,7 +141,7 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 		select {
 		case <-ctx.Done():
 			log.Error(ctx, "Job canceled")
-			ex.SetJobState(ctx, states.Terminated)
+			ex.SetJobState(ctx, types.JobStateTerminated)
 			return gerrors.Wrap(err)
 		default:
 		}
@@ -144,18 +149,25 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 		select {
 		case <-timeoutCtx.Done():
 			log.Error(ctx, "Max duration exceeded", "max_duration", ex.jobSpec.MaxDuration)
-			ex.SetJobState(ctx, states.Terminated)
+			// We do not set "max_duration_exceeded" termination reason yet for backward compatibility
+			// TODO: Set it several releases after 0.18.36
+			ex.SetJobStateWithTerminationReason(
+				ctx,
+				types.JobStateTerminated,
+				types.TerminationReasonContainerExitedWithError,
+				"Max duration exceeded",
+			)
 			return gerrors.Wrap(err)
 		default:
 		}
 
 		// todo fail reason?
 		log.Error(ctx, "Exec failed", "err", err)
-		ex.SetJobState(ctx, states.Failed)
+		ex.SetJobState(ctx, types.JobStateFailed)
 		return gerrors.Wrap(err)
 	}
 
-	ex.SetJobState(ctx, states.Done)
+	ex.SetJobState(ctx, types.JobStateDone)
 	return nil
 }
 
@@ -173,9 +185,23 @@ func (ex *RunExecutor) SetCodePath(codePath string) {
 	ex.state = WaitRun
 }
 
-func (ex *RunExecutor) SetJobState(ctx context.Context, state string) {
+func (ex *RunExecutor) SetJobState(ctx context.Context, state types.JobState) {
+	ex.SetJobStateWithTerminationReason(ctx, state, "", "")
+}
+
+func (ex *RunExecutor) SetJobStateWithTerminationReason(
+	ctx context.Context, state types.JobState, termination_reason types.TerminationReason, termination_message string,
+) {
 	ex.mu.Lock()
-	ex.jobStateHistory = append(ex.jobStateHistory, schemas.JobStateEvent{State: state, Timestamp: ex.timestamp.Next()})
+	ex.jobStateHistory = append(
+		ex.jobStateHistory,
+		schemas.JobStateEvent{
+			State:              state,
+			Timestamp:          ex.timestamp.Next(),
+			TerminationReason:  termination_reason,
+			TerminationMessage: termination_message,
+		},
+	)
 	ex.mu.Unlock()
 	log.Info(ctx, "Job state changed", "new", state)
 }
@@ -268,8 +294,16 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 	envMap.Update(ex.jobSpec.Env, false)
 
 	// As of 2024-11-29, ex.homeDir is always set to /root
-	if err := writeSSHEnvironment(envMap, -1, -1, ex.homeDir); err != nil {
-		log.Warning(ctx, "failed to write SSH environment", "path", ex.homeDir, "err", err)
+	rootSSHDir, err := prepareSSHDir(-1, -1, ex.homeDir)
+	if err != nil {
+		log.Warning(ctx, "failed to prepare ssh dir", "home", ex.homeDir, "err", err)
+	} else {
+		rootSSHEnvPath := filepath.Join(rootSSHDir, "environment")
+		restoreRootSSHEnv := backupFile(ctx, rootSSHEnvPath)
+		defer restoreRootSSHEnv(ctx)
+		if err := writeSSHEnvironment(envMap, -1, -1, rootSSHEnvPath); err != nil {
+			log.Warning(ctx, "failed to write SSH environment", "path", ex.homeDir, "err", err)
+		}
 	}
 	if user != nil && *user.Uid != 0 {
 		// non-root user
@@ -279,12 +313,23 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 		envMap["HOME"] = homeDir
 		if isHomeDirAccessible {
 			log.Trace(ctx, "provisioning homeDir", "path", homeDir)
-			if err := writeSSHEnvironment(envMap, uid, gid, homeDir); err != nil {
-				log.Warning(ctx, "failed to write SSH environment", "path", homeDir, "err", err)
-			}
-			akPath := filepath.Join(ex.homeDir, ".ssh/authorized_keys")
-			if err := copyAuthorizedKeys(akPath, uid, gid, homeDir); err != nil {
-				log.Warning(ctx, "failed to copy authorized keys", "path", homeDir, "err", err)
+			userSSHDir, err := prepareSSHDir(uid, gid, homeDir)
+			if err != nil {
+				log.Warning(ctx, "failed to prepare ssh dir", "home", homeDir, "err", err)
+			} else {
+				userSSHEnvPath := filepath.Join(userSSHDir, "environment")
+				restoreUserSSHEnv := backupFile(ctx, userSSHEnvPath)
+				defer restoreUserSSHEnv(ctx)
+				if err := writeSSHEnvironment(envMap, uid, gid, userSSHEnvPath); err != nil {
+					log.Warning(ctx, "failed to write SSH environment", "path", homeDir, "err", err)
+				}
+				rootSSHKeysPath := filepath.Join(rootSSHDir, "authorized_keys")
+				userSSHKeysPath := filepath.Join(userSSHDir, "authorized_keys")
+				restoreUserSSHKeys := backupFile(ctx, userSSHKeysPath)
+				defer restoreUserSSHKeys(ctx)
+				if err := copyAuthorizedKeys(rootSSHKeysPath, uid, gid, userSSHKeysPath); err != nil {
+					log.Warning(ctx, "failed to copy authorized keys", "path", homeDir, "err", err)
+				}
 			}
 		} else {
 			log.Trace(ctx, "homeDir is not accessible, skipping provisioning", "path", homeDir)
@@ -577,35 +622,31 @@ func prepareHomeDir(ctx context.Context, uid int, gid int, homeDir string) (stri
 	return homeDir, true
 }
 
-func writeSSHEnvironment(env map[string]string, uid int, gid int, homeDir string) error {
-	sshDir, err := joinRelPath(homeDir, ".ssh")
-	if err != nil {
-		return err
-	}
+func prepareSSHDir(uid int, gid int, homeDir string) (string, error) {
+	sshDir := filepath.Join(homeDir, ".ssh")
 	info, err := os.Stat(sshDir)
 	if err == nil {
 		if !info.IsDir() {
-			return fmt.Errorf("not a directory: %s", sshDir)
+			return "", fmt.Errorf("not a directory: %s", sshDir)
 		}
 		if err = os.Chmod(sshDir, 0o700); err != nil {
-			return err
+			return "", err
 		}
 	} else if errors.Is(err, os.ErrNotExist) {
 		if err = os.MkdirAll(sshDir, 0o700); err != nil {
-			return err
+			return "", err
 		}
 	} else {
-		return err
+		return "", err
 	}
 	if err = os.Chown(sshDir, uid, gid); err != nil {
-		return err
+		return "", err
 	}
+	return sshDir, nil
+}
 
-	envPath, err := joinRelPath(sshDir, "environment")
-	if err != nil {
-		return err
-	}
-	info, err = os.Stat(envPath)
+func writeSSHEnvironment(env map[string]string, uid int, gid int, envPath string) error {
+	info, err := os.Stat(envPath)
 	if err == nil {
 		if info.IsDir() {
 			return fmt.Errorf("is a directory: %s", envPath)
@@ -658,42 +699,15 @@ func writeSSHEnvironment(env map[string]string, uid int, gid int, homeDir string
 // without modifying the existing API/bootstrap process
 // TODO: implement key delivery properly, i.e. sumbit keys to and write by the runner,
 // not the outer sh script that launches sshd and runner
-func copyAuthorizedKeys(src string, uid int, gid int, homeDir string) error {
-	srcFile, err := os.Open(src)
+func copyAuthorizedKeys(srcPath string, uid int, gid int, dstPath string) error {
+	srcFile, err := os.Open(srcPath)
 	if err != nil {
 		return err
 	}
 	defer srcFile.Close()
 
-	sshDir, err := joinRelPath(homeDir, ".ssh")
-	if err != nil {
-		return err
-	}
-	info, err := os.Stat(sshDir)
-	if err == nil {
-		if !info.IsDir() {
-			return fmt.Errorf("not a directory: %s", sshDir)
-		}
-		if err = os.Chmod(sshDir, 0o700); err != nil {
-			return err
-		}
-	} else if errors.Is(err, os.ErrNotExist) {
-		if err = os.MkdirAll(sshDir, 0o700); err != nil {
-			return err
-		}
-	} else {
-		return err
-	}
-	if err = os.Chown(sshDir, uid, gid); err != nil {
-		return err
-	}
-
 	dstExists := false
-	dstPath, err := joinRelPath(sshDir, "authorized_keys")
-	if err != nil {
-		return err
-	}
-	info, err = os.Stat(dstPath)
+	info, err := os.Stat(dstPath)
 	if err == nil {
 		dstExists = true
 		if info.IsDir() {
@@ -726,4 +740,58 @@ func copyAuthorizedKeys(src string, uid int, gid int, homeDir string) error {
 	}
 
 	return nil
+}
+
+// backupFile renames `/path/to/file` to `/path/to/file.dstack.bak`,
+// creates a new file with the same content, and returns restore function that
+// renames the backup back to the original name.
+// If the original file does not exist, restore function removes the file if it is created.
+// NB: A newly created file has default uid:gid and permissions, probably not
+// the same as the original file.
+func backupFile(ctx context.Context, path string) func(context.Context) {
+	var existed bool
+	backupPath := path + ".dstack.bak"
+
+	restoreFunc := func(ctx context.Context) {
+		if !existed {
+			err := os.Remove(path)
+			if err != nil && !errors.Is(err, os.ErrNotExist) {
+				log.Error(ctx, "failed to remove", "path", path, "err", err)
+			}
+			return
+		}
+		err := os.Rename(backupPath, path)
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
+			log.Error(ctx, "failed to restore", "path", path, "err", err)
+		}
+	}
+
+	err := os.Rename(path, backupPath)
+	if errors.Is(err, os.ErrNotExist) {
+		existed = false
+		return restoreFunc
+	}
+	existed = true
+	if err != nil {
+		log.Error(ctx, "failed to back up", "path", path, "err", err)
+		return restoreFunc
+	}
+
+	src, err := os.Open(backupPath)
+	if err != nil {
+		log.Error(ctx, "failed to open backup src", "path", backupPath, "err", err)
+		return restoreFunc
+	}
+	defer src.Close()
+	dst, err := os.Create(path)
+	if err != nil {
+		log.Error(ctx, "failed to open backup dest", "path", path, "err", err)
+		return restoreFunc
+	}
+	defer dst.Close()
+	_, err = io.Copy(dst, src)
+	if err != nil {
+		log.Error(ctx, "failed to copy backup", "path", backupPath, "err", err)
+	}
+	return restoreFunc
 }

@@ -6,12 +6,12 @@ from dstack._internal.cli.services.configurators import (
     get_apply_configurator_class,
     load_apply_configuration,
 )
-from dstack._internal.cli.services.configurators.base import BaseApplyConfigurator
 from dstack._internal.cli.services.repos import (
     init_default_virtual_repo,
     init_repo,
     register_init_repo_args,
 )
+from dstack._internal.cli.utils.common import console
 from dstack._internal.core.errors import CLIError
 from dstack._internal.core.models.configurations import ApplyConfigurationType
 
@@ -92,10 +92,13 @@ class ApplyCommand(APIBaseCommand):
                     configurator_class = get_apply_configurator_class(
                         ApplyConfigurationType(args.help)
                     )
-                else:
-                    configurator_class = BaseApplyConfigurator
-                configurator_class.register_args(self._parser)
+                    configurator_class.register_args(self._parser)
+                    self._parser.print_help()
+                    return
                 self._parser.print_help()
+                console.print(
+                    "\nType `dstack apply -h CONFIGURATION_TYPE` to see configuration-specific options.\n"
+                )
                 return
 
             super()._command(args)
@@ -129,5 +132,5 @@ class ApplyCommand(APIBaseCommand):
                 repo=repo,
             )
         except KeyboardInterrupt:
-            print("\nOperation interrupted by user. Exiting...")
+            console.print("\nOperation interrupted by user. Exiting...")
             exit(0)

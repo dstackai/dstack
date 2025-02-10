@@ -68,6 +68,7 @@ class GCPVolumeDiskBackendData(CoreModel):
 
 class GCPCompute(Compute):
     def __init__(self, config: GCPConfig):
+        super().__init__()
         self.config = config
         self.credentials, self.project_id = auth.authenticate(config.creds)
         self.instances_client = compute_v1.InstancesClient(credentials=self.credentials)
@@ -640,7 +641,7 @@ class GCPCompute(Compute):
         )
         return VolumeAttachmentData(device_name=device_name)
 
-    def detach_volume(self, volume: Volume, instance_id: str):
+    def detach_volume(self, volume: Volume, instance_id: str, force: bool = False):
         logger.debug(
             "Detaching persistent disk for volume %s from instance %s",
             volume.volume_id,
@@ -791,6 +792,8 @@ def _get_tpu_runtime_version(instance_name: str) -> str:
     tpu_version = _get_tpu_version(instance_name)
     if tpu_version == "v6e":
         return "v2-alpha-tpuv6e"
+    elif tpu_version == "v5litepod":
+        return "v2-alpha-tpuv5-lite"
     return "tpu-ubuntu2204-base"
 
 

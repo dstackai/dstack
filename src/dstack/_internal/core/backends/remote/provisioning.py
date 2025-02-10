@@ -2,10 +2,13 @@ import io
 import json
 import time
 from contextlib import contextmanager
+from textwrap import dedent
 from typing import Any, Dict, Generator, List
 
 import paramiko
 from gpuhunt import AcceleratorVendor, correct_gpu_memory_gib
+
+from dstack._internal.core.consts import DSTACK_SHIM_HTTP_PORT
 
 # FIXME: ProvisioningError is a subclass of ComputeError and should not be used outside of Compute
 from dstack._internal.core.errors import ProvisioningError
@@ -15,7 +18,11 @@ from dstack._internal.core.models.instances import (
     InstanceType,
     Resources,
 )
-from dstack._internal.utils.gpu import convert_amd_gpu_name, convert_nvidia_gpu_name
+from dstack._internal.utils.gpu import (
+    convert_amd_gpu_name,
+    convert_intel_accelerator_name,
+    convert_nvidia_gpu_name,
+)
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -23,7 +30,7 @@ logger = get_logger(__name__)
 
 SSH_CONNECT_TIMEOUT = 10
 
-DSTACK_SHIM_ENV_FILE = "dstack-shim.env"
+DSTACK_SHIM_ENV_FILE = "shim.env"
 
 HOST_INFO_FILE = "host_info.json"
 
@@ -88,28 +95,28 @@ def run_pre_start_commands(
         raise ProvisioningError(f"run_pre-start_commands failed: {e}") from e
 
 
-def run_shim_as_systemd_service(client: paramiko.SSHClient, working_dir: str, dev: bool) -> None:
-    shim_service = f"""\
-    [Unit]
-    Description=dstack-shim
-    After=network-online.target
+def run_shim_as_systemd_service(
+    client: paramiko.SSHClient, binary_path: str, working_dir: str, dev: bool
+) -> None:
+    shim_service = dedent(f"""\
+        [Unit]
+        Description=dstack-shim
+        After=network-online.target
 
-    [Service]
-    Type=simple
-    User=root
-    Restart=always
-    WorkingDirectory={working_dir}
-    EnvironmentFile={working_dir}/{DSTACK_SHIM_ENV_FILE}
-    ExecStart=/usr/local/bin/dstack-shim docker
-    StandardOutput=append:/root/.dstack/shim.log
-    StandardError=append:/root/.dstack/shim.log
+        [Service]
+        Type=simple
+        User=root
+        Restart=always
+        RestartSec=10
+        WorkingDirectory={working_dir}
+        EnvironmentFile={working_dir}/{DSTACK_SHIM_ENV_FILE}
+        ExecStart={binary_path}
 
-    [Install]
-    WantedBy=multi-user.target
-    """
+        [Install]
+        WantedBy=multi-user.target
+    """)
 
-    stripped_shim_service = "\n".join(line.strip() for line in shim_service.splitlines())
-    sftp_upload(client, "/tmp/dstack-shim.service", stripped_shim_service)
+    sftp_upload(client, "/tmp/dstack-shim.service", shim_service)
 
     try:
         cmd = """\
@@ -155,6 +162,16 @@ def remove_host_info_if_exists(client: paramiko.SSHClient, working_dir: str) -> 
         raise ProvisioningError(f"remove_host_info_if_exists failed: {e}")
 
 
+def remove_dstack_runner_if_exists(client: paramiko.SSHClient, path: str) -> None:
+    try:
+        _, _, stderr = client.exec_command(f"sudo test -e {path} && sudo rm {path}", timeout=10)
+        err = stderr.read().decode().strip()
+        if err:
+            logger.debug(f"{path} hasn't been removed: %s", err)
+    except (paramiko.SSHException, OSError) as e:
+        raise ProvisioningError(f"remove_dstack_runner_if_exists failed: {e}")
+
+
 def get_host_info(client: paramiko.SSHClient, working_dir: str) -> Dict[str, Any]:
     # wait host_info
     retries = 60
@@ -191,7 +208,7 @@ def get_shim_healthcheck(client: paramiko.SSHClient) -> str:
     for _ in range(retries):
         try:
             _, stdout, stderr = client.exec_command(
-                "curl -s http://localhost:10998/api/healthcheck", timeout=15
+                f"curl -s http://localhost:{DSTACK_SHIM_HTTP_PORT}/api/healthcheck", timeout=15
             )
             out = stdout.read().strip().decode()
             err = stderr.read().strip().decode()
@@ -217,6 +234,8 @@ def host_info_to_instance_type(host_info: Dict[str, Any]) -> InstanceType:
             gpu_name = convert_nvidia_gpu_name(gpu_name)
         elif gpu_vendor == AcceleratorVendor.AMD:
             gpu_name = convert_amd_gpu_name(gpu_name)
+        elif gpu_vendor == AcceleratorVendor.INTEL:
+            gpu_name = convert_intel_accelerator_name(gpu_name)
         gpu_memory_mib = host_info["gpu_memory"]
         if isinstance(gpu_memory_mib, str):
             # older shim versions report gpu_memory as a string

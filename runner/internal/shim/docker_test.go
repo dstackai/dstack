@@ -34,7 +34,7 @@ func TestDocker_SSHServer(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 	defer cancel()
 
-	dockerRunner, _ := NewDockerRunner(params)
+	dockerRunner, _ := NewDockerRunner(ctx, params)
 	taskConfig := createTaskConfig(t)
 	defer dockerRunner.Remove(context.Background(), taskConfig.ID)
 
@@ -64,7 +64,7 @@ func TestDocker_SSHServerConnect(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 	defer cancel()
 
-	dockerRunner, _ := NewDockerRunner(params)
+	dockerRunner, _ := NewDockerRunner(ctx, params)
 
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -110,7 +110,7 @@ func TestDocker_ShmNoexecByDefault(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 	defer cancel()
 
-	dockerRunner, _ := NewDockerRunner(params)
+	dockerRunner, _ := NewDockerRunner(ctx, params)
 	taskConfig := createTaskConfig(t)
 	defer dockerRunner.Remove(context.Background(), taskConfig.ID)
 
@@ -132,7 +132,7 @@ func TestDocker_ShmExecIfSizeSpecified(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 	defer cancel()
 
-	dockerRunner, _ := NewDockerRunner(params)
+	dockerRunner, _ := NewDockerRunner(ctx, params)
 	taskConfig := createTaskConfig(t)
 	taskConfig.ShmSize = 1024 * 1024
 	defer dockerRunner.Remove(context.Background(), taskConfig.ID)

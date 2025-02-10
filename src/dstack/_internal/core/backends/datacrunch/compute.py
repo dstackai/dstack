@@ -32,6 +32,7 @@ CONFIGURABLE_DISK_SIZE = Range[Memory](min=IMAGE_SIZE, max=None)
 
 class DataCrunchCompute(Compute):
     def __init__(self, config: DataCrunchConfig):
+        super().__init__()
         self.config = config
         self.api_client = DataCrunchAPIClient(config.creds.client_id, config.creds.client_secret)
 

@@ -22,43 +22,114 @@ and [this :material-arrow-top-right-thin:{ .external }](https://github.com/dstac
 
 ## Typical issues
 
-### Provisioning fails 
+### No instance offers { #no-offers }
+[//]: # (NOTE: This section is referenced in the CLI. Do not change its URL.)
 
-In certain cases, running `dstack apply` may produce the following output:
+If you run `dstack apply` and don't see any instance offers, it means that
+`dstack` could not find instances that match the requirements in your configuration.
+Below are some of the reasons why this might happen.
+
+#### Cause 1: No capacity providers
+
+Before you can run any workloads, you need to configure a [backend](../concepts/backends.md),
+create an [SSH fleet](../concepts/fleets.md#ssh), or sign up for
+[dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"}.
+If you have configured a backend and still can't use it, check the output of `dstack server`
+for backend configuration errors.
+
+> **Tip**: You can find a list of successfully configured backends
+> on the [project settings page](../guides/administration.md#backends) in the UI.
+
+#### Cause 2: Requirements mismatch
+
+When you apply a configuration, `dstack` tries to find instances that match the
+[`resources`](../reference/dstack.yml/task.md#resources),
+[`backends`](../reference/dstack.yml/task.md#backends),
+[`regions`](../reference/dstack.yml/task.md#regions),
+[`instance_types`](../reference/dstack.yml/task.md#instance_types),
+[`spot_policy`](../reference/dstack.yml/task.md#spot_policy),
+and [`max_price`](../reference/dstack.yml/task.md#max_price)
+properties from the configuration.
+
+`dstack` will only select instances that meet all the requirements.
+Make sure your configuration doesn't set any conflicting requirements, such as
+`regions` that don't exist in the specified `backends`, or `instance_types` that
+don't match the specified `resources`.
+
+#### Cause 3: Too specific resources
+
+If you set a resource requirement to an exact value, `dstack` will only select instances
+that have exactly that amount of resources. For example, `cpu: 5` and `memory: 10GB` will only
+match instances that have exactly 5 CPUs and exactly 10GB of memory.
+
+Typically, you will want to set resource ranges to match more instances.
+For example, `cpu: 4..8` and `memory: 10GB..` will match instances with 4 to 8 CPUs
+and at least 10GB of memory.
+
+#### Cause 4: Default resources
+
+By default, `dstack` uses these resource requirements:
+`cpu: 2..`, `memory: 8GB..`, `disk: 100GB..`.
+If you want to use smaller instances, override the `cpu`, `memory`, or `disk`
+properties in your configuration.
+
+#### Cause 5: GPU requirements
+
+By default, `dstack` only selects instances with no GPUs or a single NVIDIA GPU.
+If you want to use non-NVIDIA GPUs or multi-GPU instances, set the `gpu` property
+in your configuration.
+
+Examples: `gpu: amd` (one AMD GPU), `gpu: A10:4..8` (4 to 8 A10 GPUs),
+`gpu: 8:Gaudi2` (8 Gaudi2 accelerators).
+
+> If you don't specify the number of GPUs, `dstack` will only select single-GPU instances.
+
+#### Cause 6: Network volumes
+
+If your run configuration uses [network volumes](../concepts/volumes.md#network-volumes),
+`dstack` will only select instances from the same backend and region as the volumes.
+For AWS, the availability zone of the volume and the instance should also match.
+
+#### Cause 7: Feature support
+
+Some `dstack` features are not supported by all backends. If your configuration uses
+one of these features, `dstack` will only select offers from the backends that support it.
+
+- [Cloud fleet](../concepts/fleets.md#cloud) configurations,
+  [Instance volumes](../concepts/volumes.md#instance-volumes),
+  and [Privileged containers](../reference/dstack.yml/dev-environment.md#privileged)
+  are supported by all backends except `runpod`, `vastai`, and `kubernetes`.
+- [Clusters](../concepts/fleets.md#cloud-placement)
+  and [distributed tasks](../concepts/tasks.md#distributed-tasks)
+  are only supported by the `aws`, `azure`, `gcp`, `oci`, and `vultr` backends,
+  as well as SSH fleets.
+- [Reservations](../reference/dstack.yml/fleet.md#reservation)
+  are only supported by the `aws` backend.
+
+#### Cause 8: dstack Sky balance
+
+If you are using
+[dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"},
+you will not see marketplace offers until you top up your balance.
+Alternatively, you can configure your own cloud accounts
+on the [project settings page](../guides/administration.md#backends)
+or use [SSH fleets](../concepts/fleets.md#ssh).
+
+### Provisioning fails
+
+In certain cases, running `dstack apply` may show instance offers,
+but then produce the following output:
 
 ```shell
 wet-mangust-1 provisioning completed (failed)
 All provisioning attempts failed. This is likely due to cloud providers not having enough capacity. Check CLI and server logs for more details.
 ```
 
-#### Cause 1: Backend misconfiguration
-
-If runs consistently fail to provision due to insufficient capacity, it’s likely there is a backend configuration issue.
-Ensure that your backends are configured correctly and check the server logs for any errors.
-
-#### Cause 2: Insufficient service quotas
+#### Cause 1: Insufficient service quotas
 
 If some runs fail to provision, it may be due to an insufficient service quota. For cloud providers like AWS, GCP,
 Azure, and OCI, you often need to request an increased [service quota](protips.md#service-quotas) before you can use
 specific instances.
-
-#### Cause 3: Resources mismatch
-
-Another possible cause of the insufficient capacity error is that `dstack` cannot find an instance that meets the
-requirements specified in `resources`.
-
-??? info "GPU"
-    The `gpu` property allows you to specify the GPU name, memory, and quantity. Examples include `A100` (one GPU), `A100:40GB` (
-    one GPU with exact memory), `A100:4` (four GPUs), etc. If you specify a GPU name without a quantity, it defaults to `1`. 
-    
-    If you request one GPU but only instances with eight GPUs are available, `dstack` won’t be able to provide it. Use range
-    syntax to specify a range, such as `A100:1..8` (one to eight GPUs) or `A100:1..` (one or more GPUs).
-
-??? info "Disk"
-    If you don't specify the `disk` property, `dstack` defaults it to `100GB`. 
-    In case there is no such instance available, `dstack` won’t be able to provide it. 
-    Use range syntax to specify a range, such as `50GB..100GB` (from fifty GBs to one hundred GBs) or `50GB..` 
-    (fifty GBs or more).
 
 ### Run starts but fails
 
@@ -94,7 +165,7 @@ pointing to the gateway's hostname is configured.
 
 #### Cause 1: Bad Authorization
 
-If the service endpoint returns a 403 error, it is likely because the [`Authorization`](../services.md#access-the-endpoint) 
+If the service endpoint returns a 403 error, it is likely because the [`Authorization`](../concepts/services.md#access-the-endpoint) 
 header with the correct `dstack` token was not provided.
 
 [//]: # (#### Other)

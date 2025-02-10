@@ -1,4 +1,4 @@
-from abc import ABC
+from abc import ABC, abstractmethod
 from typing import AsyncGenerator, Optional
 
 from fastapi import Depends, FastAPI, Request, Security, status
@@ -8,6 +8,7 @@ from typing_extensions import Annotated
 from dstack._internal.proxy.lib.auth import BaseProxyAuthProvider
 from dstack._internal.proxy.lib.errors import ProxyError, UnexpectedProxyError
 from dstack._internal.proxy.lib.repo import BaseProxyRepo
+from dstack._internal.proxy.lib.services.service_connection import ServiceConnectionPool
 
 
 class ProxyDependencyInjector(ABC):
@@ -17,15 +18,19 @@ class ProxyDependencyInjector(ABC):
     a specific repo implementation.
     """
 
-    def __init__(self, repo: BaseProxyRepo, auth: BaseProxyAuthProvider) -> None:
-        self._repo = repo
-        self._auth = auth
+    def __init__(self) -> None:
+        self._service_conn_pool = ServiceConnectionPool()
 
+    @abstractmethod
     async def get_repo(self) -> AsyncGenerator[BaseProxyRepo, None]:
-        yield self._repo
+        pass
 
+    @abstractmethod
     async def get_auth_provider(self) -> AsyncGenerator[BaseProxyAuthProvider, None]:
-        yield self._auth
+        pass
+
+    async def get_service_connection_pool(self) -> ServiceConnectionPool:
+        return self._service_conn_pool
 
 
 def get_injector_from_app(app: FastAPI) -> ProxyDependencyInjector:
@@ -51,6 +56,12 @@ async def get_proxy_auth_provider(
 ) -> AsyncGenerator[BaseProxyAuthProvider, None]:
     async for provider in injector.get_auth_provider():
         yield provider
+
+
+async def get_service_connection_pool(
+    injector: Annotated[ProxyDependencyInjector, Depends(get_injector)],
+) -> ServiceConnectionPool:
+    return await injector.get_service_connection_pool()
 
 
 class ProxyAuthContext:

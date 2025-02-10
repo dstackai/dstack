@@ -22,6 +22,7 @@ from dstack._internal.core.models.gateways import (
     GatewayStatus,
 )
 from dstack._internal.core.models.repos.base import Repo
+from dstack._internal.core.services.diff import diff_models
 from dstack._internal.utils.common import local_time
 from dstack.api._public import Client
 
@@ -38,6 +39,7 @@ class GatewayConfigurator(BaseApplyConfigurator):
         unknown_args: List[str],
         repo: Optional[Repo] = None,
     ):
+        self.apply_args(conf, configurator_args, unknown_args)
         spec = GatewaySpec(
             configuration=conf,
             configuration_path=configuration_path,
@@ -56,7 +58,15 @@ class GatewayConfigurator(BaseApplyConfigurator):
             confirm_message += "Create the gateway?"
         else:
             action_message += f"Found gateway [code]{plan.spec.configuration.name}[/]."
-            if plan.current_resource.configuration == plan.spec.configuration:
+            diff = diff_models(
+                plan.spec.configuration,
+                plan.current_resource.configuration,
+            )
+            changed_fields = list(diff.keys())
+            if (
+                plan.current_resource.configuration == plan.spec.configuration
+                or changed_fields == ["default"]
+            ):
                 if command_args.yes and not command_args.force:
                     # --force is required only with --yes,
                     # otherwise we may ask for force apply interactively.
@@ -160,6 +170,20 @@ class GatewayConfigurator(BaseApplyConfigurator):
             )
 
         console.print(f"Gateway [code]{conf.name}[/] deleted")
+
+    @classmethod
+    def register_args(cls, parser: argparse.ArgumentParser):
+        configuration_group = parser.add_argument_group(f"{cls.TYPE.value} Options")
+        configuration_group.add_argument(
+            "-n",
+            "--name",
+            dest="name",
+            help="The gateway name",
+        )
+
+    def apply_args(self, conf: GatewayConfiguration, args: argparse.Namespace, unknown: List[str]):
+        if args.name:
+            conf.name = args.name
 
 
 def _get_plan(api: Client, spec: GatewaySpec) -> GatewayPlan:

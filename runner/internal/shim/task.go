@@ -4,8 +4,9 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
-	"log"
 	"sync"
+
+	"github.com/dstackai/dstack/runner/internal/log"
 )
 
 type TaskStatus string
@@ -30,7 +31,7 @@ const (
 type Task struct {
 	ID                 string
 	Status             TaskStatus
-	TerminationReason  string // TODO: enum
+	TerminationReason  string
 	TerminationMessage string
 
 	config        TaskConfig
@@ -38,6 +39,7 @@ type Task struct {
 	containerID   string
 	cancelPull    context.CancelFunc
 	gpuIDs        []string
+	ports         []PortMapping
 	runnerDir     string // path on host mapped to consts.RunnerDir in container
 
 	mu *sync.Mutex
@@ -45,26 +47,27 @@ type Task struct {
 
 // Lock is used for exclusive operations, e.g, stopping a container,
 // removing task data, etc.
-func (t *Task) Lock() {
+func (t *Task) Lock(ctx context.Context) {
 	if !t.mu.TryLock() {
-		log.Fatalf("task %s already locked!", t.ID)
+		log.Fatal(ctx, "already locked!", "task", t.ID)
 	}
-	log.Printf("task %s locked", t.ID)
+	log.Debug(ctx, "locked", "task", t.ID)
 }
 
 // Release should be called Unlock, but this name triggers govet copylocks check,
 // since "thanks" to Go implicit interfaces, a struct with Lock/Unlock method pair
 // looks like lock: https://github.com/golang/go/issues/18451
-func (t *Task) Release() {
+func (t *Task) Release(ctx context.Context) {
 	t.mu.Unlock()
-	log.Printf("task %s unlocked", t.ID)
+	log.Debug(ctx, "unlocked", "task", t.ID)
 }
 
 func (t *Task) IsTransitionAllowed(toStatus TaskStatus) bool {
-	if t.Status == TaskStatusTerminated {
-		// terminal status, cannot transition further
-		return false
-	}
+	// same-state transitions are not allowed unless stated otherwise, meaning that
+	// task.Update(); task.Update() is not allowed is most cases.
+	// This is mainly done to avoid erroneous/concurrent updates, though this limits
+	// our ability to commit internal state more often.
+	// If this becomes a problem, consider allowing sameState->sameState transitions in general.
 	switch toStatus {
 	case TaskStatusPending:
 		// initial status, task should be Add()ed with it, not Update()d
@@ -76,14 +79,20 @@ func (t *Task) IsTransitionAllowed(toStatus TaskStatus) bool {
 	case TaskStatusCreating:
 		return t.Status == TaskStatusPulling
 	case TaskStatusRunning:
-		return t.Status == TaskStatusCreating
+		// allow running->running transition to update internal state, e.g., ports
+		return t.Status == TaskStatusCreating || t.Status == TaskStatusRunning
 	case TaskStatusTerminated:
-		// we already checked terminated -> terminated (not allowed),
-		// all other transitions are allowed
+		// terminated -> terminated is also allowed since server _always_ tries to
+		// terminate the task, even if it is already terminated, but this is a special case,
+		// see TaskStorage.Update() for details
 		return true
 	}
 	return false
 }
+
+// NB: Some SetStatus* methods also accept and set state fields, but this is for convenience only,
+// and does not mean that all state fields are managed that way (quite contrary, most of the fields
+// are set directly)
 
 func (t *Task) SetStatusPreparing() {
 	t.Status = TaskStatusPreparing
@@ -99,9 +108,8 @@ func (t *Task) SetStatusCreating() {
 	t.cancelPull = nil
 }
 
-func (t *Task) SetStatusRunning(containerID string) {
+func (t *Task) SetStatusRunning() {
 	t.Status = TaskStatusRunning
-	t.containerID = containerID
 }
 
 func (t *Task) SetStatusTerminated(reason string, message string) {
@@ -111,7 +119,7 @@ func (t *Task) SetStatusTerminated(reason string, message string) {
 	t.cancelPull = nil
 }
 
-func NewTask(id string, status TaskStatus, containerName string, containerID string, gpuIDs []string, runnerDir string) Task {
+func NewTask(id string, status TaskStatus, containerName string, containerID string, gpuIDs []string, ports []PortMapping, runnerDir string) Task {
 	return Task{
 		ID:            id,
 		Status:        status,
@@ -119,6 +127,7 @@ func NewTask(id string, status TaskStatus, containerName string, containerID str
 		containerID:   containerID,
 		runnerDir:     runnerDir,
 		gpuIDs:        gpuIDs,
+		ports:         ports,
 		mu:            &sync.Mutex{},
 	}
 }
@@ -179,6 +188,15 @@ func (ts *TaskStorage) Update(task Task) error {
 	}
 	if !currentTask.IsTransitionAllowed(task.Status) {
 		return fmt.Errorf("%w: %s -> %s transition not allowed", ErrRequest, currentTask.Status, task.Status)
+	}
+	if currentTask.Status == TaskStatusTerminated {
+		// We ignore reason/message fields if they are already set to avoid
+		// overriding these fields by the server, which _always_ tries to terminate the task,
+		// even if it is not running
+		if currentTask.TerminationReason != "" {
+			task.TerminationReason = currentTask.TerminationReason
+			task.TerminationMessage = currentTask.TerminationMessage
+		}
 	}
 	ts.tasks[task.ID] = task
 	return nil

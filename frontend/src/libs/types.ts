@@ -5,19 +5,11 @@ export type FormFieldError = {
     code: string;
 };
 
-export type FormError = {
+export type ResponseServerErrorItem = {
     msg: string;
     code: string;
 };
 
-export type FormErrors = {
-    detail: FormFieldError[];
-};
-
-export type FormErrors2 = {
-    detail: (FormFieldError | FormError)[];
-};
-
-export type RequestErrorWithDetail = {
-    detail: string;
+export type ResponseServerError = {
+    detail: (FormFieldError | ResponseServerErrorItem)[];
 };

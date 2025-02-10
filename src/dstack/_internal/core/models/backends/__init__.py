@@ -77,6 +77,12 @@ from dstack._internal.core.models.backends.vastai import (
     VastAIConfigInfoWithCredsPartial,
     VastAIConfigValues,
 )
+from dstack._internal.core.models.backends.vultr import (
+    VultrConfigInfo,
+    VultrConfigInfoWithCreds,
+    VultrConfigInfoWithCredsPartial,
+    VultrConfigValues,
+)
 from dstack._internal.core.models.common import CoreModel
 
 # The following models are the basis of the JSON-based backend API.
@@ -100,6 +106,7 @@ AnyConfigInfoWithoutCreds = Union[
     RunpodConfigInfo,
     TensorDockConfigInfo,
     VastAIConfigInfo,
+    VultrConfigInfo,
     DstackConfigInfo,
     DstackBaseBackendConfigInfo,
 ]
@@ -120,6 +127,7 @@ AnyConfigInfoWithCreds = Union[
     RunpodConfigInfoWithCreds,
     TensorDockConfigInfoWithCreds,
     VastAIConfigInfoWithCreds,
+    VultrConfigInfoWithCreds,
     DstackConfigInfo,
 ]
 
@@ -141,6 +149,7 @@ AnyConfigInfoWithCredsPartial = Union[
     RunpodConfigInfoWithCredsPartial,
     TensorDockConfigInfoWithCredsPartial,
     VastAIConfigInfoWithCredsPartial,
+    VultrConfigInfoWithCredsPartial,
     DstackConfigInfo,
 ]
 
@@ -158,6 +167,7 @@ AnyConfigValues = Union[
     RunpodConfigValues,
     TensorDockConfigValues,
     VastAIConfigValues,
+    VultrConfigValues,
     DstackConfigValues,
 ]
 

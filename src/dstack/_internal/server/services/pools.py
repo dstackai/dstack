@@ -1,7 +1,8 @@
 import ipaddress
 import uuid
+from collections.abc import Container, Iterable
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import List, Literal, Optional, Union
 
 import gpuhunt
 from sqlalchemy import and_, or_, select
@@ -34,13 +35,14 @@ from dstack._internal.core.models.instances import (
 from dstack._internal.core.models.pools import Instance, Pool, PoolInstances
 from dstack._internal.core.models.profiles import (
     DEFAULT_POOL_NAME,
+    DEFAULT_POOL_TERMINATION_IDLE_TIME,
     Profile,
     TerminationPolicy,
 )
 from dstack._internal.core.models.runs import JobProvisioningData, Requirements
 from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.core.models.volumes import Volume
-from dstack._internal.server import settings
+from dstack._internal.core.services.profiles import get_termination
 from dstack._internal.server.models import (
     FleetModel,
     InstanceModel,
@@ -49,6 +51,7 @@ from dstack._internal.server.models import (
     UserModel,
 )
 from dstack._internal.server.services.locking import get_locker
+from dstack._internal.server.services.offers import generate_shared_offer
 from dstack._internal.server.services.projects import list_project_models, list_user_project_models
 from dstack._internal.utils import common as common_utils
 from dstack._internal.utils import random_names
@@ -67,7 +70,11 @@ async def list_project_pools(session: AsyncSession, project: ProjectModel) -> Li
 
 
 async def get_pool(
-    session: AsyncSession, project: ProjectModel, pool_name: str, select_deleted: bool = False
+    session: AsyncSession,
+    project: ProjectModel,
+    pool_name: str,
+    select_deleted: bool = False,
+    load_instance_fleets: bool = False,
 ) -> Optional[PoolModel]:
     filters = [
         PoolModel.name == pool_name,
@@ -75,29 +82,42 @@ async def get_pool(
     ]
     if not select_deleted:
         filters.append(PoolModel.deleted == False)
-    res = await session.scalars(select(PoolModel).where(*filters))
+    query = select(PoolModel).where(*filters)
+    if load_instance_fleets:
+        query = query.options(joinedload(PoolModel.instances, InstanceModel.fleet))
+    res = await session.scalars(query)
     return res.one_or_none()
 
 
 async def get_or_create_pool_by_name(
-    session: AsyncSession, project: ProjectModel, pool_name: Optional[str]
+    session: AsyncSession,
+    project: ProjectModel,
+    pool_name: Optional[str],
+    load_instance_fleets: bool = False,
 ) -> PoolModel:
     if pool_name is None:
         if project.default_pool_id is not None:
-            return await get_default_pool_or_error(session, project)
-        default_pool = await get_pool(session, project, DEFAULT_POOL_NAME)
+            return await get_default_pool_or_error(session, project, load_instance_fleets)
+        default_pool = await get_pool(
+            session, project, DEFAULT_POOL_NAME, load_instance_fleets=load_instance_fleets
+        )
         if default_pool is not None:
             await set_default_pool(session, project, DEFAULT_POOL_NAME)
             return default_pool
         return await create_pool(session, project, DEFAULT_POOL_NAME)
-    pool = await get_pool(session, project, pool_name)
+    pool = await get_pool(session, project, pool_name, load_instance_fleets=load_instance_fleets)
     if pool is not None:
         return pool
     return await create_pool(session, project, pool_name)
 
 
-async def get_default_pool_or_error(session: AsyncSession, project: ProjectModel) -> PoolModel:
-    res = await session.execute(select(PoolModel).where(PoolModel.id == project.default_pool_id))
+async def get_default_pool_or_error(
+    session: AsyncSession, project: ProjectModel, load_instance_fleets: bool = False
+) -> PoolModel:
+    query = select(PoolModel).where(PoolModel.id == project.default_pool_id)
+    if load_instance_fleets:
+        query = query.options(joinedload(PoolModel.instances, InstanceModel.fleet))
+    res = await session.execute(query)
     return res.scalar_one()
 
 
@@ -187,7 +207,7 @@ async def remove_instance(
     terminated = False
     for instance in pool.instances:
         if instance.name == instance_name:
-            if force or instance.job_id is None:
+            if force or not instance.jobs:
                 instance.status = InstanceStatus.TERMINATING
                 terminated = True
     await session.commit()
@@ -199,11 +219,13 @@ async def show_pool_instances(
     session: AsyncSession, project: ProjectModel, pool_name: Optional[str]
 ) -> PoolInstances:
     if pool_name is not None:
-        pool = await get_pool(session, project, pool_name)
+        pool = await get_pool(session, project, pool_name, load_instance_fleets=True)
         if pool is None:
             raise ResourceNotExistsError("Pool not found")
     else:
-        pool = await get_or_create_pool_by_name(session, project, pool_name)
+        pool = await get_or_create_pool_by_name(
+            session, project, pool_name, load_instance_fleets=True
+        )
     pool_instances = get_pool_instances(pool)
     instances = list(map(instance_model_to_instance, pool_instances))
     return PoolInstances(
@@ -221,11 +243,15 @@ def instance_model_to_instance(instance_model: InstanceModel) -> Instance:
         id=instance_model.id,
         project_name=instance_model.project.name,
         name=instance_model.name,
+        fleet_id=instance_model.fleet_id,
+        fleet_name=instance_model.fleet.name if instance_model.fleet else None,
         instance_num=instance_model.instance_num,
         status=instance_model.status,
         unreachable=instance_model.unreachable,
         termination_reason=instance_model.termination_reason,
         created=instance_model.created_at.replace(tzinfo=timezone.utc),
+        total_blocks=instance_model.total_blocks,
+        busy_blocks=instance_model.busy_blocks,
     )
 
     offer = get_instance_offer(instance_model)
@@ -238,9 +264,6 @@ def instance_model_to_instance(instance_model: InstanceModel) -> Instance:
     if jpd is not None:
         instance.instance_type = jpd.instance_type
         instance.hostname = jpd.hostname
-
-    if instance_model.job is not None:
-        instance.job_name = instance_model.job.job_name
 
     return instance
 
@@ -386,13 +409,14 @@ async def add_remote(
 def filter_pool_instances(
     pool_instances: List[InstanceModel],
     profile: Profile,
-    requirements: Requirements,
     *,
+    requirements: Optional[Requirements] = None,
     status: Optional[InstanceStatus] = None,
     fleet_model: Optional[FleetModel] = None,
     multinode: bool = False,
     master_job_provisioning_data: Optional[JobProvisioningData] = None,
     volumes: Optional[List[List[Volume]]] = None,
+    shared: bool = False,
 ) -> List[InstanceModel]:
     instances: List[InstanceModel] = []
     candidates: List[InstanceModel] = []
@@ -439,19 +463,17 @@ def filter_pool_instances(
             continue
         if status is not None and instance.status != status:
             continue
-
-        # TODO: remove on prod
-        if settings.LOCAL_BACKEND_ENABLED and instance.backend == BackendType.LOCAL:
-            instances.append(instance)
-            continue
-
         if backend_types is not None and instance.backend not in backend_types:
             continue
-
         if regions is not None and instance.region not in regions:
             continue
-
         jpd = get_instance_provisioning_data(instance)
+        if (
+            jpd is not None
+            and profile.instance_types is not None
+            and jpd.instance_type.name not in profile.instance_types
+        ):
+            continue
         if (
             jpd is not None
             and jpd.availability_zone is not None
@@ -459,8 +481,16 @@ def filter_pool_instances(
             and jpd.availability_zone not in zones
         ):
             continue
+        if instance.total_blocks is None:
+            # Still provisioning, we don't know yet if it shared or not
+            continue
+        if (instance.total_blocks > 1) != shared:
+            continue
 
         candidates.append(instance)
+
+    if requirements is None:
+        return candidates
 
     query_filter = requirements_to_query_filter(requirements)
     for instance in candidates:
@@ -473,9 +503,51 @@ def filter_pool_instances(
     return instances
 
 
+def get_shared_pool_instances_with_offers(
+    pool_instances: List[InstanceModel],
+    profile: Profile,
+    requirements: Requirements,
+    *,
+    idle_only: bool = False,
+    fleet_model: Optional[FleetModel] = None,
+    volumes: Optional[List[List[Volume]]] = None,
+) -> list[tuple[InstanceModel, InstanceOfferWithAvailability]]:
+    instances_with_offers: list[tuple[InstanceModel, InstanceOfferWithAvailability]] = []
+    query_filter = requirements_to_query_filter(requirements)
+    filtered_instances = filter_pool_instances(
+        pool_instances=pool_instances,
+        profile=profile,
+        fleet_model=fleet_model,
+        multinode=False,
+        volumes=volumes,
+        shared=True,
+    )
+    for instance in filtered_instances:
+        if idle_only and instance.status not in [InstanceStatus.IDLE, InstanceStatus.BUSY]:
+            continue
+        offer = get_instance_offer(instance)
+        if offer is None:
+            continue
+        total_blocks = common_utils.get_or_error(instance.total_blocks)
+        idle_blocks = total_blocks - instance.busy_blocks
+        for blocks in range(1, total_blocks + 1):
+            shared_offer = generate_shared_offer(offer, blocks, total_blocks)
+            catalog_item = offer_to_catalog_item(shared_offer)
+            if gpuhunt.matches(catalog_item, query_filter):
+                if blocks <= idle_blocks:
+                    shared_offer.availability = InstanceAvailability.IDLE
+                else:
+                    shared_offer.availability = InstanceAvailability.BUSY
+                if shared_offer.availability == InstanceAvailability.IDLE or not idle_only:
+                    instances_with_offers.append((instance, shared_offer))
+                break
+    return instances_with_offers
+
+
 async def list_pools_instance_models(
     session: AsyncSession,
     projects: List[ProjectModel],
+    fleet_ids: Optional[Iterable[uuid.UUID]],
     pool: Optional[PoolModel],
     only_active: bool,
     prev_created_at: Optional[datetime],
@@ -486,6 +558,8 @@ async def list_pools_instance_models(
     filters: List = [
         InstanceModel.project_id.in_(p.id for p in projects),
     ]
+    if fleet_ids is not None:
+        filters.append(InstanceModel.fleet_id.in_(fleet_ids))
     if pool is not None:
         filters.append(InstanceModel.pool_id == pool.id)
     if only_active:
@@ -531,16 +605,17 @@ async def list_pools_instance_models(
         .where(*filters)
         .order_by(*order_by)
         .limit(limit)
-        .options(joinedload(InstanceModel.pool))
+        .options(joinedload(InstanceModel.pool), joinedload(InstanceModel.fleet))
     )
-    instance_models = list(res.scalars().all())
+    instance_models = list(res.unique().scalars().all())
     return instance_models
 
 
 async def list_user_pool_instances(
     session: AsyncSession,
     user: UserModel,
-    project_name: Optional[str],
+    project_names: Optional[Container[str]],
+    fleet_ids: Optional[Iterable[uuid.UUID]],
     pool_name: Optional[str],
     only_active: bool,
     prev_created_at: Optional[datetime],
@@ -556,8 +631,8 @@ async def list_user_pool_instances(
         return []
 
     pool = None
-    if project_name is not None:
-        projects = [proj for proj in projects if proj.name == project_name]
+    if project_names is not None:
+        projects = [proj for proj in projects if proj.name in project_names]
         if len(projects) == 0:
             return []
         if pool_name is not None:
@@ -571,6 +646,7 @@ async def list_user_pool_instances(
     instance_models = await list_pools_instance_models(
         session=session,
         projects=projects,
+        fleet_ids=fleet_ids,
         pool=pool,
         only_active=only_active,
         prev_created_at=prev_created_at,
@@ -592,7 +668,7 @@ async def list_active_remote_instances(
     res = await session.execute(
         select(InstanceModel).where(*filters).order_by(InstanceModel.created_at.asc())
     )
-    instance_models = list(res.scalars().all())
+    instance_models = list(res.unique().scalars().all())
     return instance_models
 
 
@@ -607,9 +683,27 @@ async def create_instance_model(
     instance_num: int,
     placement_group_name: Optional[str],
     reservation: Optional[str],
+    blocks: Union[Literal["auto"], int],
 ) -> InstanceModel:
+    termination_policy, termination_idle_time = get_termination(
+        profile, DEFAULT_POOL_TERMINATION_IDLE_TIME
+    )
+    instance_id = uuid.uuid4()
+    project_ssh_key = SSHKey(
+        public=project.ssh_public_key.strip(),
+        private=project.ssh_private_key.strip(),
+    )
+    instance_config = InstanceConfiguration(
+        project_name=project.name,
+        instance_name=instance_name,
+        user=user.name,
+        instance_id=str(instance_id),
+        ssh_keys=[project_ssh_key],
+        placement_group_name=placement_group_name,
+        reservation=reservation,
+    )
     instance = InstanceModel(
-        id=uuid.uuid4(),
+        id=instance_id,
         name=instance_name,
         instance_num=instance_num,
         project=project,
@@ -619,26 +713,13 @@ async def create_instance_model(
         unreachable=False,
         profile=profile.json(),
         requirements=requirements.json(),
-        instance_configuration=None,
-        termination_policy=profile.termination_policy,
-        termination_idle_time=profile.termination_idle_time,
+        instance_configuration=instance_config.json(),
+        termination_policy=termination_policy,
+        termination_idle_time=termination_idle_time,
+        total_blocks=None if blocks == "auto" else blocks,
+        busy_blocks=0,
     )
     session.add(instance)
-    await session.flush()
-    project_ssh_key = SSHKey(
-        public=project.ssh_public_key.strip(),
-        private=project.ssh_private_key.strip(),
-    )
-    instance_config = InstanceConfiguration(
-        project_name=project.name,
-        instance_name=instance_name,
-        user=user.name,
-        instance_id=str(instance.id),
-        ssh_keys=[project_ssh_key],
-        placement_group_name=placement_group_name,
-        reservation=reservation,
-    )
-    instance.instance_configuration = instance_config.json()
     return instance
 
 
@@ -655,6 +736,7 @@ async def create_ssh_instance_model(
     ssh_user: str,
     ssh_keys: List[SSHKey],
     env: Env,
+    blocks: Union[Literal["auto"], int],
 ) -> InstanceModel:
     # TODO: doc - will overwrite after remote connected
     instance_resource = Resources(cpus=2, memory_mib=8, gpus=[], spot=False)
@@ -709,5 +791,7 @@ async def create_ssh_instance_model(
         price=offer.price,
         termination_policy=TerminationPolicy.DONT_DESTROY,
         termination_idle_time=0,
+        total_blocks=None if blocks == "auto" else blocks,
+        busy_blocks=0,
     )
     return im

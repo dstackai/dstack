@@ -1,27 +1,29 @@
 # Volumes
 
-Volumes allow you to persist data between runs. `dstack` supports two kinds of volumes: [network volumes](#network-volumes)
-and [instance volumes](#instance-volumes).
+Volumes enable data persistence between runs of dev environments, tasks, and services. 
+
+`dstack` supports two kinds of volumes: 
+
+* [Network volumes](#network-volumes) &mdash; provisioned via backends and mounted to specific container directories.
+  Ideal for persistent storage.
+* [Instance volumes](#instance-volumes) &mdash; bind directories on the host instance to container directories.
+Useful as a cache for cloud fleets or for persistent storage with SSH fleets.
 
 ## Network volumes
 
-`dstack` allows to create and attach network volumes to dev environments, tasks, and services.
-
-!!! info "Backends"
-    Network volumes are currently supported for the `aws`, `gcp`, and `runpod` backends.
-    Support for other backends is on the roadmap.
+Network volumes are currently supported for the `aws`, `gcp`, and `runpod` backends.
 
 ### Define a configuration
 
 First, define a volume configuration as a YAML file in your project folder.
-The filename must end with `.dstack.yml` (e.g. `.dstack.yml` or `vol.dstack.yml` are both acceptable).
+The filename must end with `.dstack.yml` (e.g. `.dstack.yml` or `volume.dstack.yml` are both acceptable).
 
-<div editor-title="vol.dstack.yml"> 
+<div editor-title="volume.dstack.yml"> 
 
 ```yaml
 type: volume
 # A name of the volume
-name: my-new-volume
+name: my-volume
 
 # Volumes are bound to a specific backend and region
 backend: aws
@@ -35,16 +37,32 @@ size: 100GB
 
 If you use this configuration, `dstack` will create a new volume based on the specified options.
 
-!!! info "Registering existing volumes"
+??? info "Register existing volumes"
     If you prefer not to create a new volume but to reuse an existing one (e.g., created manually), you can 
-    [specify its ID via `volume_id`](../reference/dstack.yml/volume.md#existing-volume). In this case, `dstack` will register the specified volume so that you can use it with dev environments, tasks, and services.
+    specify its ID via [`volume_id`](../reference/dstack.yml/volume.md#volume_id). In this case, `dstack` will register the specified volume so that you can use it with dev environments, tasks, and services.
+
+    <div editor-title="volume.dstack.yml"> 
+
+    ```yaml
+    type: volume
+    # The name of the volume
+    name: my-volume
+    
+    # Volumes are bound to a specific backend and region
+    backend: aws
+    region: eu-central-1
+    
+    # The ID of the volume in AWS
+    volume_id: vol1235
+    ```
+    
+    </div>
 
     !!! info "Filesystem"
         If you register an existing volume, you must ensure the volume already has a filesystem.
 
 !!! info "Reference"
-    See [.dstack.yml](../reference/dstack.yml/volume.md) for all the options supported by
-    volumes, along with multiple examples.
+    For all volume configuration options, refer to the [reference](../reference/dstack.yml/volume.md).
 
 ### Create, register, or update a volume
 
@@ -54,10 +72,10 @@ To create or register the volume, pass the volume configuration to `dstack apply
 
 ```shell
 $ dstack apply -f volume.dstack.yml
-Volume my-new-volume does not exist yet. Create the volume? [y/n]: y
+Volume my-volume does not exist yet. Create the volume? [y/n]: y
 
- NAME           BACKEND  REGION        STATUS     CREATED 
- my-new-volume  aws      eu-central-1  submitted  now     
+ NAME       BACKEND  REGION        STATUS     CREATED 
+ my-volume  aws      eu-central-1  submitted  now     
 
 ```
 
@@ -67,7 +85,7 @@ Volume my-new-volume does not exist yet. Create the volume? [y/n]: y
 Once created, the volume can be attached to dev environments, tasks, and services.
 
 !!! info "Filesystem"
-    When creating a network volume, `dstack` automatically creates an `ext4` filesystem on it.
+    When creating a new network volume, `dstack` automatically creates an `ext4` filesystem on it.
 
 ### Attach a volume { #attach-network-volume }
 
@@ -86,12 +104,12 @@ ide: vscode
 
 # Map the name of the volume to any path 
 volumes:
-  - name: my-new-volume
+  - name: my-volume
     path: /volume_data
 
 # You can also use the short syntax in the `name:path` form
 # volumes:
-#   - my-new-volume:/volume_data
+#   - my-volume:/volume_data
 ```
 
 </div>
@@ -99,7 +117,7 @@ volumes:
 Once you run this configuration, the contents of the volume will be attached to `/volume_data` inside the dev environment, 
 and its contents will persist across runs.
 
-!!! info "Attaching volumes across regions and backends"
+!!! info "Attach volumes across regions and backends"
     If you're unsure in advance which region or backend you'd like to use (or which is available),
     you can specify multiple volumes for the same path.
 
@@ -115,10 +133,47 @@ and its contents will persist across runs.
 
     `dstack` will attach one of the volumes based on the region and backend of the run.  
 
-??? info "Limitations"
+!!! info "Volumes with multi-node tasks"
+    To use single-attach volumes such as AWS EBS with multi-node tasks,
+    attach different volumes to different nodes using `dstack` variable interpolation:
+
+    <div editor-title=".dstack.yml">
+
+    ```yaml
+    type: task
+    nodes: 8
+    commands:
+      - ...
+    volumes:
+      - name: data-volume-${{ dstack.node_rank }}
+        path: /volume_data
+    ```
+
+    </div>
+
+    This way, every node will use its own volume.
+
+    Tip: To create volumes for all nodes using one volume configuration, specify volume name with `-n`:
+
+    ```shell
+    $ for i in {0..7}; do dstack apply -f vol.dstack.yml -n data-volume-$i -y; done
+    ```
+
+??? info "Container path"
     When you're running a dev environment, task, or service with `dstack`, it automatically mounts the project folder contents
     to `/workflow` (and sets that as the current working directory). Right now, `dstack` doesn't allow you to 
     attach volumes to `/workflow` or any of its subdirectories.
+
+### Detach a volume { #detach-network-volume }
+
+`dstack` automatically detaches volumes from instances when a run stops.
+
+!!! info "Force detach"
+    In some clouds such as AWS a volume may stuck in the detaching state.
+    To fix this, you can abort the run, and `dstack` will force detach the volume.
+    `dstack` will also force detach the stuck volume automatically after `stop_duration`.
+    Note that force detaching a volume is a last resort measure and may corrupt the file system.
+    Contact your cloud support if you're experience volumes stuck in the detaching state.
 
 ### Manage volumes { #manage-network-volumes }
 
@@ -126,49 +181,62 @@ and its contents will persist across runs.
 
 The [`dstack volume list`](../reference/cli/dstack/volume.md#dstack-volume-list) command lists created and registered volumes:
 
-```
+<div class="termy">
+
+```shell
 $ dstack volume list
-NAME            BACKEND  REGION        STATUS  CREATED
- my-new-volume  aws      eu-central-1  active  3 weeks ago
+NAME        BACKEND  REGION        STATUS  CREATED
+ my-volume  aws      eu-central-1  active  3 weeks ago
 ```
+
+</div>
 
 #### Delete volumes
 
 When the volume isn't attached to any active dev environment, task, or service,
 you can delete it by passing the volume configuration to `dstack delete`:
 
+<div class="termy">
+
 ```shell
 $ dstack delete -f vol.dstack.yaml
 ```
+
+</div>
 
 Alternatively, you can delete a volume by passing the volume name  to `dstack volume delete`.
 
 If the volume was created using `dstack`, it will be physically destroyed along with the data.
 If you've registered an existing volume, it will be de-registered with `dstack` but will keep the data.
 
+### FAQs
+
+??? info "Can I use network volumes across backends?"
+
+    Since volumes are backed up by cloud network disks, you can only use them within the same cloud. If you need to access
+    data across different backends, you should either use object storage or replicate the data across multiple volumes.
+
+??? info "Can I use network volumes across regions?"
+
+    Typically, network volumes are associated with specific regions, so you can't use them in other regions. Often,
+    volumes are also linked to availability zones, but some providers support volumes that can be used across different
+    availability zones within the same region.
+    
+    If you don't want to limit a run to one particular region, you can create different volumes for different regions
+    and specify them for the same mount point as [documented above](#attach-network-volume).
+
+??? info "Can I attach network volumes to multiple runs or instances?"
+    You can mount a volume in multiple runs. This feature is currently supported only by the `runpod` backend.
 
 ## Instance volumes
 
-Unlike [network volumes](#network-volumes), which are persistent external resources mounted over network,
-instance volumes are part of the instance storage. Basically, the instance volume is a filesystem path
-(a directory or a file) mounted inside the run container.
+Instance volumes allow mapping any directory on the instance where the run is executed to any path inside the container.
+This means that the data in instance volumes is persisted only if the run is executed on the same instance.
 
-As a consequence, the contents of the instance volume are specific to the instance
-where the run is executed, and data persistence, integrity, and even existence are guaranteed only if the subsequent run
-is executed on the same exact instance, and there is no other runs in between.
+### Attach a volume
 
-!!! info "Backends"
-    Instance volumes are currently supported for all backends except `runpod`, `vastai` and `kubernetes`.
-
-### Manage volumes { #manage-instance-volumes }
-
-You don't need to create or delete instance volumes, and they are not displayed in the
-[`dstack volume list`](../reference/cli/dstack/volume.md#dstack-volume-list) command output.
-
-### Attach a volume { #attach-instance-volume }
-
-Dev environments, tasks, and services let you attach any number of instance volumes.
-To attach an instance volume, specify the `instance_path` and `path` in the `volumes` property:
+A run can configure any number of instance volumes. To attach an instance volume,
+specify the `instance_path` and `path` in the `volumes` property:
 
 <div editor-title=".dstack.yml">
 
@@ -191,31 +259,14 @@ volumes:
 
 </div>
 
-### Use cases { #instance-volumes-use-cases }
+Since persistence isn't guaranteed (instances may be interrupted or runs may occur on different instances), use instance
+volumes only for caching or with directories manually mounted to network storage.
 
-Despite the limitations, instance volumes can still be useful in some cases:
+!!! info "Backends"
+    Instance volumes are currently supported for all backends except `runpod`, `vastai` and `kubernetes`, and can also be used with [SSH fleets](fleets.md#ssh).
 
-=== "Cache"
-
-    For example, if runs regularly install packages with `pip install`, include the instance volume in the run configuration
-    to reuse pip cache between runs:
-
-    <div editor-title=".dstack.yml">
-
-    ```yaml
-    type: task
-
-    volumes:
-      - /dstack-cache/pip:/root/.cache/pip
-    ```
-
-    </div>
-
-=== "Network storage with SSH fleet"
-
-    If you manage your own instances, you can mount network storages (e.g., NFS or SMB) to the hosts and access them in the runs.
-    Imagine you mounted the same network storage to all the fleet instances using the same path `/mnt/nfs-storage`,
-    then you can treat the instance volume as a shared persistent storage:
+??? info "Optional volumes"
+    If the volume is not critical for your workload, you can mark it as `optional`.
 
     <div editor-title=".dstack.yml">
 
@@ -223,27 +274,48 @@ Despite the limitations, instance volumes can still be useful in some cases:
     type: task
 
     volumes:
-      - /mnt/nfs-storage:/storage
+      - instance_path: /dstack-cache
+        path: /root/.cache/
+        optional: true
     ```
+
+    Configurations with optional volumes can run in any backend, but the volume is only mounted
+    if the selected backend supports it.
 
     </div>
 
-## FAQ
+### Use instance volumes for caching
 
-##### Can I use network volumes across backends?
+For example, if a run regularly installs packages with `pip install`,
+you can mount the `/root/.cache/pip` folder inside the container to a folder on the instance for 
+reuse.
 
-Since volumes are backed up by cloud network disks, you can only use them within the same cloud. If you need to access
-data across different backends, you should either use object storage or replicate the data across multiple volumes.
+<div editor-title=".dstack.yml">
 
-##### Can I use network volumes across regions?
+```yaml
+type: task
 
-Typically, network volumes are associated with specific regions, so you can't use them in other regions. Often,
-volumes are also linked to availability zones, but some providers support volumes that can be used across different
-availability zones within the same region.
+volumes:
+  - /dstack-cache/pip:/root/.cache/pip
+```
 
-If you don't want to limit a run to one particular region, you can create different volumes for different regions
-and specify them for the same mount point as [documented above](#attach-network-volume).
+</div>
 
-##### Can I attach network volumes to multiple runs or instances?
+### Use instance volumes with SSH fleets
+    
+If you control the instances (e.g. they are on-prem servers configured via [SSH fleets](fleets.md#ssh)), 
+you can mount network storage (e.g., NFS or SMB) and use the mount points as instance volumes.
 
-You can mount a volume in multiple runs. This feature is currently supported only by the `runpod` backend.
+For example, if you mount a network storage to `/mnt/nfs-storage` on all hosts of your SSH fleet,
+you can map this directory via instance volumes and be sure the data is persisted.
+
+<div editor-title=".dstack.yml">
+
+```yaml
+type: task
+
+volumes:
+  - /mnt/nfs-storage:/storage
+```
+
+</div>

@@ -73,8 +73,8 @@ Continue? [y/n]:
 You can use both on-demand and spot instances without needing to manage quotas, as they are automatically handled
 for you.
 
-With `dstack Sky` you can use all of `dstack`'s features, incl. [dev environments](../../docs/dev-environments.md), 
-[tasks](../../docs/tasks.md), [services](../../docs/services.md), and 
+With `dstack Sky` you can use all of `dstack`'s features, incl. [dev environments](../../docs/concepts/dev-environments.md), 
+[tasks](../../docs/concepts/tasks.md), [services](../../docs/concepts/services.md), and 
 [fleets](../../docs/concepts/fleets.md).
 
 To publish services, the open-source version requires setting up a gateway with your own domain. 

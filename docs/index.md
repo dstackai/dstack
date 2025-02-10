@@ -1,6 +1,6 @@
 ---
 template: home.html
-title: AI container orchestration for everyone
+title: AI container orchestration for AI teams
 hide:
    - navigation
    - toc

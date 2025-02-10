@@ -23,40 +23,47 @@
                 flex-grow: 1;
                 min-height: 0;
 
-                & > [class^="awsui_text-content"] {
-                    overflow: hidden;
-                    position: relative;
+                & > [class^="awsui_content-inner"] {
                     display: flex;
                     flex-direction: column;
                     flex-grow: 1;
-                    min-height: 20px;
+                    min-height: 0;
 
-                    .loader {
-                        pointer-events: none;
-                        position: absolute;
-                        left: 0;
-                        right: 0;
-                        top: -20px;
-                        height: 20px;
-                        background-color: rgba(awsui.$color-background-container-content, .8);
-                        transition: transform .3s ease;
-                        color: #6e6e6e;
-
-                        &:global(.show) {
-                            transform: translateY(100%);
-                        }
-                    }
-
-                    .terminal {
+                    & > [class^="awsui_text-content"] {
+                        overflow: hidden;
+                        position: relative;
+                        display: flex;
+                        flex-direction: column;
                         flex-grow: 1;
-                        min-height: 0;
+                        min-height: 20px;
                     }
+                }
 
-                    .scroll {
-                        overflow-y: auto;
-                        flex-grow: 1;
-                        min-height: 0;
+                .loader {
+                    pointer-events: none;
+                    position: absolute;
+                    left: 0;
+                    right: 0;
+                    top: -20px;
+                    height: 20px;
+                    background-color: rgba(awsui.$color-background-container-content, .8);
+                    transition: transform .3s ease;
+                    color: #6e6e6e;
+
+                    &:global(.show) {
+                        transform: translateY(100%);
                     }
+                }
+
+                .terminal {
+                    flex-grow: 1;
+                    min-height: 0;
+                }
+
+                .scroll {
+                    overflow-y: auto;
+                    flex-grow: 1;
+                    min-height: 0;
                 }
             }
         }

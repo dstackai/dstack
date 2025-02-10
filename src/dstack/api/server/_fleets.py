@@ -20,7 +20,10 @@ class FleetsAPIClient(APIClientGroup):
 
     def get(self, project_name: str, name: str) -> Fleet:
         body = GetFleetRequest(name=name)
-        resp = self._request(f"/api/project/{project_name}/fleets/get", body=body.json())
+        resp = self._request(
+            f"/api/project/{project_name}/fleets/get",
+            body=body.json(exclude={"id"}),  # `id` is not supported in pre-0.18.36 servers
+        )
         return parse_obj_as(Fleet.__response__, resp.json())
 
     def get_plan(
@@ -59,6 +62,7 @@ def _get_fleet_spec_excludes(fleet_spec: FleetSpec) -> Optional[_ExcludeDict]:
     spec_excludes: _ExcludeDict = {}
     configuration_excludes: _ExcludeDict = {}
     profile_excludes: set[str] = set()
+    ssh_hosts_excludes: set[str] = set()
 
     # TODO: Can be removed in 0.19
     if fleet_spec.configuration_path is None:
@@ -68,12 +72,28 @@ def _get_fleet_spec_excludes(fleet_spec: FleetSpec) -> Optional[_ExcludeDict]:
             isinstance(h, str) or h.internal_ip is None
             for h in fleet_spec.configuration.ssh_config.hosts
         ):
-            configuration_excludes["ssh_config"] = {"hosts": {"__all__": {"internal_ip"}}}
+            ssh_hosts_excludes.add("internal_ip")
+        if all(
+            isinstance(h, str) or h.blocks == 1 for h in fleet_spec.configuration.ssh_config.hosts
+        ):
+            ssh_hosts_excludes.add("blocks")
     # client >= 0.18.30 / server <= 0.18.29 compatibility tweak
-    if not fleet_spec.configuration.reservation:
+    if fleet_spec.configuration.reservation is None:
         configuration_excludes["reservation"] = True
+    if fleet_spec.profile is not None and fleet_spec.profile.reservation is None:
         profile_excludes.add("reservation")
+    if fleet_spec.configuration.idle_duration is None:
+        configuration_excludes["idle_duration"] = True
+    if fleet_spec.profile is not None and fleet_spec.profile.idle_duration is None:
+        profile_excludes.add("idle_duration")
+    # client >= 0.18.38 / server <= 0.18.37 compatibility tweak
+    if fleet_spec.profile is not None and fleet_spec.profile.stop_duration is None:
+        profile_excludes.add("stop_duration")
+    if fleet_spec.configuration.blocks == 1:
+        configuration_excludes["blocks"] = True
 
+    if ssh_hosts_excludes:
+        configuration_excludes["ssh_config"] = {"hosts": {"__all__": ssh_hosts_excludes}}
     if configuration_excludes:
         spec_excludes["configuration"] = configuration_excludes
     if profile_excludes:

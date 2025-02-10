@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useNotifications } from 'hooks';
+import { getServerError } from 'libs';
 import { useDeleteFleetMutation } from 'services/fleet';
 
 export const useDeleteFleet = () => {
@@ -41,7 +42,7 @@ export const useDeleteFleet = () => {
             .catch((error) => {
                 pushNotification({
                     type: 'error',
-                    content: t('common.server_error', { error: error?.error }),
+                    content: t('common.server_error', { error: getServerError(error) }),
                 });
             });
     }, []);

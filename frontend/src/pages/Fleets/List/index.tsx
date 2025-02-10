@@ -61,12 +61,6 @@ export const FleetList: React.FC = () => {
         deleteFleets([...selectedItems]).catch(console.log);
     };
 
-    const renderCounter = () => {
-        if (!data?.length) return '';
-
-        return `(${data.length})`;
-    };
-
     return (
         <Table
             {...collectionProps}
@@ -80,7 +74,6 @@ export const FleetList: React.FC = () => {
             header={
                 <Header
                     variant="awsui-h1-sticky"
-                    counter={renderCounter()}
                     actions={
                         <SpaceBetween size="xs" direction="horizontal">
                             <Button formAction="none" onClick={deleteClickHandle} disabled={isDisabledDeleteButton}>

@@ -1,5 +1,6 @@
 import os
 import re
+import threading
 from abc import ABC, abstractmethod
 from functools import lru_cache
 from typing import Dict, List, Optional
@@ -7,8 +8,14 @@ from typing import Dict, List, Optional
 import git
 import requests
 import yaml
+from cachetools import TTLCache, cachedmethod
 
 from dstack._internal import settings
+from dstack._internal.core.consts import (
+    DSTACK_RUNNER_HTTP_PORT,
+    DSTACK_RUNNER_SSH_PORT,
+    DSTACK_SHIM_HTTP_PORT,
+)
 from dstack._internal.core.models.gateways import (
     GatewayComputeConfiguration,
     GatewayProvisioningData,
@@ -29,9 +36,17 @@ from dstack._internal.utils.logging import get_logger
 logger = get_logger(__name__)
 
 DSTACK_WORKING_DIR = "/root/.dstack"
+DSTACK_SHIM_BINARY_NAME = "dstack-shim"
+DSTACK_SHIM_BINARY_PATH = f"/usr/local/bin/{DSTACK_SHIM_BINARY_NAME}"
+DSTACK_RUNNER_BINARY_NAME = "dstack-runner"
+DSTACK_RUNNER_BINARY_PATH = f"/usr/local/bin/{DSTACK_RUNNER_BINARY_NAME}"
 
 
 class Compute(ABC):
+    def __init__(self):
+        self._offers_cache_lock = threading.Lock()
+        self._offers_cache = TTLCache(maxsize=5, ttl=30)
+
     @abstractmethod
     def get_offers(
         self, requirements: Optional[Requirements] = None
@@ -162,11 +177,36 @@ class Compute(ABC):
         """
         raise NotImplementedError()
 
-    def detach_volume(self, volume: Volume, instance_id: str):
+    def detach_volume(self, volume: Volume, instance_id: str, force: bool = False):
         """
         Detaches a volume from the instance.
         """
         raise NotImplementedError()
+
+    def is_volume_detached(self, volume: Volume, instance_id: str) -> bool:
+        """
+        Checks if a volume was detached from the instance.
+        If `detach_volume()` may fail to detach volume,
+        this method should be overridden to check the volume status.
+        The caller will trigger force detach if the volume gets stuck detaching.
+        """
+        return True
+
+    def _get_offers_cached_key(self, requirements: Optional[Requirements] = None) -> int:
+        # Requirements is not hashable, so we use a hack to get arguments hash
+        if requirements is None:
+            return hash(None)
+        return hash(requirements.json())
+
+    @cachedmethod(
+        cache=lambda self: self._offers_cache,
+        key=_get_offers_cached_key,
+        lock=lambda self: self._offers_cache_lock,
+    )
+    def get_offers_cached(
+        self, requirements: Optional[Requirements] = None
+    ) -> List[InstanceOfferWithAvailability]:
+        return self.get_offers(requirements)
 
 
 def get_instance_name(run: Run, job: Job) -> str:
@@ -189,11 +229,17 @@ def get_user_data(
 
 
 def get_shim_env(authorized_keys: List[str]) -> Dict[str, str]:
+    log_level = "6"  # Trace
     envs = {
-        "DSTACK_RUNNER_LOG_LEVEL": "6",
+        "DSTACK_SHIM_HOME": DSTACK_WORKING_DIR,
+        "DSTACK_SHIM_HTTP_PORT": str(DSTACK_SHIM_HTTP_PORT),
+        "DSTACK_SHIM_LOG_LEVEL": log_level,
         "DSTACK_RUNNER_DOWNLOAD_URL": get_dstack_runner_download_url(),
+        "DSTACK_RUNNER_BINARY_PATH": DSTACK_RUNNER_BINARY_PATH,
+        "DSTACK_RUNNER_HTTP_PORT": str(DSTACK_RUNNER_HTTP_PORT),
+        "DSTACK_RUNNER_SSH_PORT": str(DSTACK_RUNNER_SSH_PORT),
+        "DSTACK_RUNNER_LOG_LEVEL": log_level,
         "DSTACK_PUBLIC_SSH_KEY": "\n".join(authorized_keys),
-        "DSTACK_HOME": DSTACK_WORKING_DIR,
     }
     return envs
 
@@ -243,15 +289,13 @@ def get_dstack_shim_download_url() -> str:
 
 def get_shim_pre_start_commands() -> List[str]:
     url = get_dstack_shim_download_url()
-    dstack_shim_binary_name = "dstack-shim"
-    dstack_shim_binary_path = f"/usr/local/bin/{dstack_shim_binary_name}"
 
     return [
-        f"dlpath=$(sudo mktemp -t {dstack_shim_binary_name}.XXXXXXXXXX)",
+        f"dlpath=$(sudo mktemp -t {DSTACK_SHIM_BINARY_NAME}.XXXXXXXXXX)",
         # -sS -- disable progress meter and warnings, but still show errors (unlike bare -s)
         f'sudo curl -sS --compressed --connect-timeout 60 --max-time 240 --retry 1 --output "$dlpath" "{url}"',
-        f'sudo mv "$dlpath" {dstack_shim_binary_path}',
-        f"sudo chmod +x {dstack_shim_binary_path}",
+        f'sudo mv "$dlpath" {DSTACK_SHIM_BINARY_PATH}',
+        f"sudo chmod +x {DSTACK_SHIM_BINARY_PATH}",
         f"sudo mkdir {DSTACK_WORKING_DIR} -p",
     ]
 
@@ -261,7 +305,7 @@ def get_run_shim_script(is_privileged: bool, pjrt_device: Optional[str]) -> List
     pjrt_device_env = f"--pjrt-device={pjrt_device}" if pjrt_device else ""
 
     return [
-        f"nohup dstack-shim docker {privileged_flag} {pjrt_device_env} >{DSTACK_WORKING_DIR}/shim.log 2>&1 &",
+        f"nohup dstack-shim {privileged_flag} {pjrt_device_env} &",
     ]
 
 
@@ -303,18 +347,17 @@ def get_docker_commands(
         "_install() { NAME=Distribution; test -f /etc/os-release && . /etc/os-release; echo $NAME not supported; exit 11; }",
         'if _exists apt-get; then _install() { apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y "$1"; }; fi',
         'if _exists yum; then _install() { yum install -y "$1"; }; fi',
+        'if _exists apk; then _install() { apk add -U "$1"; }; fi',
         # check in sshd is here, install if not
         "if ! _exists sshd; then _install openssh-server; fi",
         # install curl if necessary
         "if ! _exists curl; then _install curl; fi",
-        # prohibit password authentication
-        'sed -i "s/.*PasswordAuthentication.*/PasswordAuthentication no/g" /etc/ssh/sshd_config',
         # create ssh dirs and add public key
         "mkdir -p ~/.ssh",
         "chmod 700 ~/.ssh",
         f"echo '{authorized_keys_content}' > ~/.ssh/authorized_keys",
         "chmod 600 ~/.ssh/authorized_keys",
-        "sed -ie '1s@^@export PATH=\"'\"$PATH\"':$PATH\"\\n\\n@' ~/.profile"
+        r"""if [ -f ~/.profile ]; then sed -ie '1s@^@export PATH="'"$PATH"':$PATH"\n\n@' ~/.profile; fi"""
         if fix_path_in_dot_profile
         else ":",
         # regenerate host keys
@@ -328,18 +371,17 @@ def get_docker_commands(
         "rm -rf /run/sshd && mkdir -p /run/sshd && chown root:root /run/sshd",
         "rm -rf /var/empty && mkdir -p /var/empty && chown root:root /var/empty",
         # start sshd
-        "/usr/sbin/sshd -p 10022 -o PermitUserEnvironment=yes",
+        f"/usr/sbin/sshd -p {DSTACK_RUNNER_SSH_PORT} -o PidFile=none -o PasswordAuthentication=no -o AllowTcpForwarding=yes -o PermitUserEnvironment=yes",
         # restore ld.so variables
         'if [ -n "$_LD_LIBRARY_PATH" ]; then export LD_LIBRARY_PATH="$_LD_LIBRARY_PATH"; fi',
         'if [ -n "$_LD_PRELOAD" ]; then export LD_PRELOAD="$_LD_PRELOAD"; fi',
     ]
 
-    runner = "/usr/local/bin/dstack-runner"
     url = get_dstack_runner_download_url()
     commands += [
-        f"curl --connect-timeout 60 --max-time 240 --retry 1 --output {runner} {url}",
-        f"chmod +x {runner}",
-        f"{runner} --log-level 6 start --http-port 10999 --temp-dir /tmp/runner --home-dir /root --working-dir /workflow",
+        f"curl --connect-timeout 60 --max-time 240 --retry 1 --output {DSTACK_RUNNER_BINARY_PATH} {url}",
+        f"chmod +x {DSTACK_RUNNER_BINARY_PATH}",
+        f"{DSTACK_RUNNER_BINARY_PATH} --log-level 6 start --http-port {DSTACK_RUNNER_HTTP_PORT} --temp-dir /tmp/runner --home-dir /root --working-dir /workflow",
     ]
 
     return commands

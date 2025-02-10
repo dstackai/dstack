@@ -7,9 +7,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.errors import SSHError
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.instances import InstanceStatus, InstanceType, Resources
+from dstack._internal.core.models.common import NetworkMode
+from dstack._internal.core.models.instances import InstanceStatus
 from dstack._internal.core.models.runs import (
-    JobProvisioningData,
+    JobRuntimeData,
     JobStatus,
     JobTerminationReason,
 )
@@ -20,7 +21,15 @@ from dstack._internal.core.models.volumes import (
 )
 from dstack._internal.server import settings
 from dstack._internal.server.background.tasks.process_running_jobs import process_running_jobs
-from dstack._internal.server.schemas.runner import HealthcheckResponse, JobStateEvent, PullResponse
+from dstack._internal.server.schemas.runner import (
+    HealthcheckResponse,
+    JobStateEvent,
+    PortMapping,
+    PullResponse,
+    TaskStatus,
+)
+from dstack._internal.server.services.runner.client import RunnerClient, ShimClient
+from dstack._internal.server.services.runner.ssh import SSHTunnel
 from dstack._internal.server.services.volumes import (
     volume_model_to_volume,
 )
@@ -33,6 +42,8 @@ from dstack._internal.server.testing.common import (
     create_run,
     create_user,
     create_volume,
+    get_job_provisioning_data,
+    get_job_runtime_data,
     get_run_spec,
     get_volume_configuration,
 )
@@ -41,23 +52,34 @@ from dstack._internal.utils.common import get_current_datetime
 pytestmark = pytest.mark.usefixtures("image_config_mock")
 
 
-def get_job_provisioning_data(dockerized: bool) -> JobProvisioningData:
-    return JobProvisioningData(
-        backend=BackendType.AWS,
-        instance_type=InstanceType(
-            name="instance",
-            resources=Resources(cpus=1, memory_mib=512, spot=False, gpus=[]),
-        ),
-        instance_id="instance_id",
-        hostname="127.0.0.4",
-        region="us-east-1",
-        price=10.5,
-        username="ubuntu",
-        ssh_port=22,
-        dockerized=dockerized,
-        backend_data=None,
-        ssh_proxy=None,
+@pytest.fixture
+def ssh_tunnel_mock(monkeypatch: pytest.MonkeyPatch) -> Mock:
+    mock = MagicMock(spec_set=SSHTunnel)
+    monkeypatch.setattr("dstack._internal.server.services.runner.ssh.SSHTunnel", mock)
+    return mock
+
+
+@pytest.fixture
+def shim_client_mock(monkeypatch: pytest.MonkeyPatch) -> Mock:
+    mock = Mock(spec_set=ShimClient)
+    mock.healthcheck.return_value = HealthcheckResponse(service="dstack-shim", version="latest")
+    monkeypatch.setattr(
+        "dstack._internal.server.services.runner.client.ShimClient", Mock(return_value=mock)
     )
+
+    return mock
+
+
+@pytest.fixture
+def runner_client_mock(monkeypatch: pytest.MonkeyPatch) -> Mock:
+    mock = Mock(spec_set=RunnerClient)
+    mock.healthcheck.return_value = HealthcheckResponse(
+        service="dstack-runner", version="0.0.1.dev2"
+    )
+    monkeypatch.setattr(
+        "dstack._internal.server.services.runner.client.RunnerClient", Mock(return_value=mock)
+    )
+    return mock
 
 
 class TestProcessRunningJobs:
@@ -213,7 +235,12 @@ class TestProcessRunningJobs:
     @pytest.mark.parametrize("privileged", [False, True])
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_provisioning_shim_with_volumes(
-        self, test_db, session: AsyncSession, privileged: bool
+        self,
+        test_db,
+        session: AsyncSession,
+        ssh_tunnel_mock: Mock,
+        shim_client_mock: Mock,
+        privileged: bool,
     ):
         project_ssh_pub_key = "__project_ssh_pub_key__"
         project = await create_project(session=session, ssh_public_key=project_ssh_pub_key)
@@ -259,44 +286,96 @@ class TestProcessRunningJobs:
                 status=JobStatus.PROVISIONING,
                 job_provisioning_data=job_provisioning_data,
             )
-        with (
-            patch("dstack._internal.server.services.runner.ssh.SSHTunnel") as SSHTunnelMock,
-            patch("dstack._internal.server.services.runner.client.ShimClient") as ShimClientMock,
-        ):
-            ShimClientMock.return_value.healthcheck.return_value = HealthcheckResponse(
-                service="dstack-shim", version="0.0.1.dev2"
-            )
-            await process_running_jobs()
-            SSHTunnelMock.assert_called_once()
-            ShimClientMock.return_value.healthcheck.assert_called_once()
-            ShimClientMock.return_value.submit.assert_called_once_with(
-                username="",
-                password="",
-                image_name="dstackai/base:py3.13-0.6-cuda-12.1",
-                privileged=privileged,
-                container_name="test-run-0-0",
-                container_user="root",
-                shm_size=None,
-                public_keys=[project_ssh_pub_key, "user_ssh_key"],
-                ssh_user="ubuntu",
-                ssh_key="user_ssh_key",
-                mounts=[VolumeMountPoint(name="my-vol", path="/volume")],
-                volumes=[volume_model_to_volume(volume)],
-                instance_mounts=[InstanceMountPoint(instance_path="/root/.cache", path="/cache")],
-            )
+
+        await process_running_jobs()
+
+        ssh_tunnel_mock.assert_called_once()
+        shim_client_mock.healthcheck.assert_called_once()
+        shim_client_mock.submit_task.assert_called_once_with(
+            task_id=job.id,
+            name="test-run-0-0",
+            registry_username="",
+            registry_password="",
+            image_name="dstackai/base:py3.13-0.6-cuda-12.1",
+            container_user="root",
+            privileged=privileged,
+            gpu=None,
+            cpu=None,
+            memory=None,
+            shm_size=None,
+            network_mode=NetworkMode.HOST,
+            volumes=[volume_model_to_volume(volume)],
+            volume_mounts=[VolumeMountPoint(name="my-vol", path="/volume")],
+            instance_mounts=[InstanceMountPoint(instance_path="/root/.cache", path="/cache")],
+            host_ssh_user="ubuntu",
+            host_ssh_keys=["user_ssh_key"],
+            container_ssh_keys=[project_ssh_pub_key, "user_ssh_key"],
+        )
         await session.refresh(job)
         assert job is not None
         assert job.status == JobStatus.PULLING
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_pulling_shim(self, test_db, session: AsyncSession):
+    async def test_pulling_shim(
+        self,
+        test_db,
+        session: AsyncSession,
+        ssh_tunnel_mock: Mock,
+        shim_client_mock: Mock,
+        runner_client_mock: Mock,
+    ):
         project = await create_project(session=session)
         user = await create_user(session=session)
-        repo = await create_repo(
+        repo = await create_repo(session=session, project_id=project.id)
+        run = await create_run(
             session=session,
-            project_id=project.id,
+            project=project,
+            repo=repo,
+            user=user,
         )
+        job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.PULLING,
+            job_provisioning_data=get_job_provisioning_data(dockerized=True),
+            job_runtime_data=get_job_runtime_data(network_mode="bridge", ports=None),
+        )
+        shim_client_mock.get_task.return_value.status = TaskStatus.RUNNING
+        shim_client_mock.get_task.return_value.ports = [
+            PortMapping(container=10022, host=32771),
+            PortMapping(container=10999, host=32772),
+        ]
+
+        await process_running_jobs()
+
+        assert ssh_tunnel_mock.call_count == 2
+        shim_client_mock.get_task.assert_called_once()
+        runner_client_mock.healthcheck.assert_called_once()
+        runner_client_mock.submit_job.assert_called_once()
+        runner_client_mock.upload_code.assert_called_once()
+        runner_client_mock.run_job.assert_called_once()
+        await session.refresh(job)
+        assert job is not None
+        assert job.status == JobStatus.RUNNING
+        assert JobRuntimeData.__response__.parse_raw(job.job_runtime_data).ports == {
+            10022: 32771,
+            10999: 32772,
+        }
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_pulling_shim_port_mapping_not_ready(
+        self,
+        test_db,
+        session: AsyncSession,
+        ssh_tunnel_mock: Mock,
+        shim_client_mock: Mock,
+        runner_client_mock: Mock,
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
         run = await create_run(
             session=session,
             project=project,
@@ -309,28 +388,20 @@ class TestProcessRunningJobs:
             run=run,
             status=JobStatus.PULLING,
             job_provisioning_data=job_provisioning_data,
+            job_runtime_data=get_job_runtime_data(network_mode="bridge", ports=None),
         )
-        with (
-            patch("dstack._internal.server.services.runner.ssh.SSHTunnel") as SSHTunnelMock,
-            patch(
-                "dstack._internal.server.services.runner.client.RunnerClient"
-            ) as RunnerClientMock,
-            patch("dstack._internal.server.services.runner.client.ShimClient") as ShimClientMock,
-        ):
-            RunnerClientMock.return_value.healthcheck.return_value = HealthcheckResponse(
-                service="dstack-runner", version="0.0.1.dev2"
-            )
-            await process_running_jobs()
-            SSHTunnelMock.assert_called_once()
-            ShimClientMock.return_value.pull.assert_called_once()
-            RunnerClientMock.return_value.healthcheck.assert_called_once()
+        shim_client_mock.get_task.return_value.status = TaskStatus.RUNNING
+        shim_client_mock.get_task.return_value.ports = None
 
-            RunnerClientMock.return_value.submit_job.assert_called_once()
-            RunnerClientMock.return_value.upload_code.assert_called_once()
-            RunnerClientMock.return_value.run_job.assert_called_once()
+        await process_running_jobs()
+
+        ssh_tunnel_mock.assert_called_once()
+        shim_client_mock.get_task.assert_called_once()
+        runner_client_mock.healthcheck.assert_not_called()
+        runner_client_mock.submit_job.assert_not_called()
         await session.refresh(job)
         assert job is not None
-        assert job.status == JobStatus.RUNNING
+        assert job.status == JobStatus.PULLING
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
@@ -377,7 +448,7 @@ class TestProcessRunningJobs:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_provisioning_shim_force_stop_if_already_running(
+    async def test_provisioning_shim_force_stop_if_already_running_api_v1(
         self,
         monkeypatch: pytest.MonkeyPatch,
         test_db,
@@ -414,6 +485,7 @@ class TestProcessRunningJobs:
         shim_client_mock.healthcheck.return_value = HealthcheckResponse(
             service="dstack-shim", version="0.0.1.dev2"
         )
+        shim_client_mock.is_api_v2_supported.return_value = False
         shim_client_mock.submit.return_value = False
 
         await process_running_jobs()

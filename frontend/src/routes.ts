@@ -23,16 +23,16 @@ export const ROUTES = {
 
             RUNS: {
                 DETAILS: {
-                    TEMPLATE: `/projects/:projectName/runs/:runName`,
-                    FORMAT: (projectName: string, runName: string) =>
-                        buildRoute(ROUTES.PROJECT.DETAILS.RUNS.DETAILS.TEMPLATE, { projectName, runName }),
+                    TEMPLATE: `/projects/:projectName/runs/:runId`,
+                    FORMAT: (projectName: string, runId: string) =>
+                        buildRoute(ROUTES.PROJECT.DETAILS.RUNS.DETAILS.TEMPLATE, { projectName, runId }),
                     JOBS: {
                         DETAILS: {
-                            TEMPLATE: `/projects/:projectName/runs/:runName/jobs/:jobName`,
-                            FORMAT: (projectName: string, runName: string, jobName: string) =>
+                            TEMPLATE: `/projects/:projectName/runs/:runId/jobs/:jobName`,
+                            FORMAT: (projectName: string, runId: string, jobName: string) =>
                                 buildRoute(ROUTES.PROJECT.DETAILS.RUNS.DETAILS.JOBS.DETAILS.TEMPLATE, {
                                     projectName,
-                                    runName,
+                                    runId,
                                     jobName,
                                 }),
                         },
@@ -80,10 +80,14 @@ export const ROUTES = {
     FLEETS: {
         LIST: '/fleets',
         DETAILS: {
-            TEMPLATE: `/projects/:projectName/fleets/:fleetName`,
-            FORMAT: (projectName: string, fleetName: string) =>
-                buildRoute(ROUTES.FLEETS.DETAILS.TEMPLATE, { projectName, fleetName }),
+            TEMPLATE: `/projects/:projectName/fleets/:fleetId`,
+            FORMAT: (projectName: string, fleetId: string) =>
+                buildRoute(ROUTES.FLEETS.DETAILS.TEMPLATE, { projectName, fleetId }),
         },
+    },
+
+    INSTANCES: {
+        LIST: '/instances',
     },
 
     VOLUMES: {

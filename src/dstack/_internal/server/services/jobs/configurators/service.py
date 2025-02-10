@@ -11,6 +11,9 @@ class ServiceJobConfigurator(JobConfigurator):
     def _shell_commands(self) -> List[str]:
         return self.run_spec.configuration.commands
 
+    def _default_single_branch(self) -> bool:
+        return True
+
     def _default_max_duration(self) -> Optional[int]:
         return None
 

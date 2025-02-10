@@ -1,3 +1,4 @@
+import asyncio
 import importlib.resources
 import os
 import time
@@ -6,7 +7,7 @@ from pathlib import Path
 from typing import Awaitable, Callable, List
 
 import sentry_sdk
-from fastapi import FastAPI, Request, status
+from fastapi import FastAPI, Request, Response, status
 from fastapi.datastructures import URL
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -14,8 +15,8 @@ from fastapi.staticfiles import StaticFiles
 from dstack._internal.cli.utils.common import console
 from dstack._internal.core.errors import ForbiddenError, ServerClientError
 from dstack._internal.core.services.configs import update_default_project
+from dstack._internal.proxy.lib.deps import get_injector_from_app
 from dstack._internal.proxy.lib.routers import model_proxy
-from dstack._internal.proxy.lib.services.service_connection import service_replica_connection_pool
 from dstack._internal.server import settings
 from dstack._internal.server.background import start_background_tasks
 from dstack._internal.server.db import get_db, get_session_ctx, migrate
@@ -23,6 +24,7 @@ from dstack._internal.server.routers import (
     backends,
     fleets,
     gateways,
+    instances,
     logs,
     metrics,
     pools,
@@ -140,7 +142,11 @@ async def lifespan(app: FastAPI):
     yield
     scheduler.shutdown()
     await gateway_connections_pool.remove_all()
-    await service_replica_connection_pool.remove_all()
+    service_conn_pool = await get_injector_from_app(app).get_service_connection_pool()
+    await service_conn_pool.remove_all()
+    await get_db().engine.dispose()
+    # Let checked-out DB connections close as dispose() only closes checked-in connections
+    await asyncio.sleep(3)
 
 
 _ON_STARTUP_HOOKS = []
@@ -165,6 +171,7 @@ def register_routes(app: FastAPI, ui: bool = True):
     app.include_router(backends.project_router)
     app.include_router(fleets.root_router)
     app.include_router(fleets.project_router)
+    app.include_router(instances.root_router)
     app.include_router(repos.router)
     app.include_router(runs.root_router)
     app.include_router(runs.project_router)
@@ -208,10 +215,14 @@ def register_routes(app: FastAPI, ui: bool = True):
     @app.middleware("http")
     async def log_request(request: Request, call_next):
         start_time = time.time()
-        response = await call_next(request)
+        response: Response = await call_next(request)
         process_time = time.time() - start_time
         logger.debug(
-            "Processed request %s %s in %s", request.method, request.url, f"{process_time:0.6f}s"
+            "Processed request %s %s in %s. Status: %s",
+            request.method,
+            request.url,
+            f"{process_time:0.6f}s",
+            response.status_code,
         )
         return response
 

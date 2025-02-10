@@ -15,13 +15,13 @@ import {
     TextFilter,
 } from 'components';
 
+import { DATE_TIME_FORMAT } from 'consts';
 import { useAppSelector, useBreadcrumbs, useCollection, useNotifications } from 'hooks';
+import { getServerError } from 'libs';
 import { ROUTES } from 'routes';
 import { useDeleteUsersMutation, useGetUserListQuery } from 'services/user';
 
 import { selectUserData } from 'App/slice';
-
-import { DATE_TIME_FORMAT } from '../../../consts';
 
 export const UserList: React.FC = () => {
     const { t } = useTranslation();
@@ -115,7 +115,7 @@ export const UserList: React.FC = () => {
                 .catch((error) => {
                     pushNotification({
                         type: 'error',
-                        content: t('common.server_error', { error: error?.error }),
+                        content: t('common.server_error', { error: getServerError(error) }),
                     });
                 });
         }

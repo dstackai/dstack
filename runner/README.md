@@ -25,13 +25,12 @@ Here's the steps to build `dstack-shim` and `dstack-runner` and run `dstack` wit
 3. Start the shim:
 
     ```shell
-    ./shim --home $RUNNER_DIR --runner-binary-path $COMPILED_RUNNER_PATH docker --ssh-key $DSTACK_PUBLIC_KEY
+    ./shim --shim-home $RUNNER_DIR --runner-binary-path $COMPILED_RUNNER_PATH
     ```
 
     Notes:
 
     * `$RUNNER_DIR` is any directory for storing runner files.
-    * `$DSTACK_PUBLIC_KEY` is `~/.dstack/ssh/id_rsa.pub` that allows the dstack CLI to connect to the ssh server inside the container.
 
 Now you can call shim API:
 
@@ -93,6 +92,8 @@ These are nonexhaustive lists of external dependencies (executables, libraries) 
 * `lsblk`
 * `mkfs.ext4`
 * (NVIDIA GPU SSH fleet instances only) `nvidia-smi`
+* (AMD SSH fleet instances only) `docker` (used for `amd-smi` container)
+* (Intel Gaudi SSH fleet instances only) `hl-smi`
 * ...
 
 Debian/Ubuntu packages: `mount` (`mount`, `umount`), `util-linux` (`mountpoint`, `lsblk`), `e2fsprogs` (`mkfs.ext4`)

@@ -22,12 +22,13 @@ $ dstack apply -R -f examples/.dstack.yml
 
 </div>
 
-### Termination policy
+### Idle duration
 
-If a fleet is created automatically, it remains `idle` for 5 minutes and can be reused within that time.
+If a fleet is created automatically, it stays `idle` for 5 minutes by default and can be reused within that time.
+If the fleet is not reused within this period, it is automatically terminated.
 To change the default idle duration, set
-[`termination_idle_time`](../reference/dstack.yml/fleet.md#termination_idle_time) in the run configuration (e.g., to 0 or a
-longer duration).
+[`idle_duration`](../reference/dstack.yml/fleet.md#idle_duration) in the run configuration (e.g., `0s`, `1m`, or `off` for
+unlimited).
 
 !!! info "Fleets"
     For greater control over fleet provisioning, configuration, and lifecycle management, it is recommended to use
@@ -40,7 +41,7 @@ To persist data across runs, it is recommended to use volumes.
 (for persisting data even if the instance is interrupted)
 and [instance](../concepts/volumes.md#instance-volumes) (useful for persisting cached data across runs while the instance remains active).
 
-> If you use [SSH fleets](../concepts/fleets.md#ssh-fleets), you can mount network storage (e.g., NFS or SMB) to the hosts and access it in runs via instance volumes.
+> If you use [SSH fleets](../concepts/fleets.md#ssh), you can mount network storage (e.g., NFS or SMB) to the hosts and access it in runs via instance volumes.
 
 ## Dev environments
 
@@ -123,8 +124,8 @@ This allows you to access the remote `8501` port on `localhost:8501` while the C
     This will forward the remote `8501` port to `localhost:3000`.
 
 !!! info "Tasks vs. services"
-    [Services](../services.md) provide external access, `https`, replicas with autoscaling, OpenAI-compatible endpoint
-    and other service features. If you don't need them, you can use [tasks](../tasks.md) for running apps.
+    [Services](../concepts/services.md) provide external access, `https`, replicas with autoscaling, OpenAI-compatible endpoint
+    and other service features. If you don't need them, you can use [tasks](../concepts/tasks.md) for running apps.
 
 ## Docker and Docker Compose
 

@@ -29,7 +29,14 @@ module.exports = {
                 target: 'http://127.0.0.1:8000',
                 logLevel: 'debug',
             }
-        ]
+        ],
+        client: {
+            overlay: {
+                runtimeErrors: (error) => {
+                    return !error.message.includes("ResizeObserver loop completed with undelivered notifications");
+                },
+            },
+        }
     },
     devtool: "cheap-module-source-map",
     plugins: [

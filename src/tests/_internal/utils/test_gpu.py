@@ -1,6 +1,10 @@
 import pytest
 
-from dstack._internal.utils.gpu import convert_amd_gpu_name, convert_nvidia_gpu_name
+from dstack._internal.utils.gpu import (
+    convert_amd_gpu_name,
+    convert_intel_accelerator_name,
+    convert_nvidia_gpu_name,
+)
 
 
 class TestConvertGpuName:
@@ -26,7 +30,7 @@ class TestConvertGpuName:
     @pytest.mark.parametrize(
         ["test_input", "expected"],
         [
-            # The following are asic.market_name collected in the wild
+            # The following are asic.market_name from amd-smi collected in the wild
             ("MI300X-O", "MI300X"),
             ("Instinct MI210", "MI210"),
             ("AMD INSTINCT MI250 (MCM) OAM AC MBA", "MI250"),
@@ -38,3 +42,18 @@ class TestConvertGpuName:
     )
     def test_convert_amd_gpu_name(self, test_input, expected):
         assert convert_amd_gpu_name(test_input) == expected
+
+    @pytest.mark.parametrize(
+        ["test_input", "expected"],
+        [
+            # The following are name from hl-smi collected in the wild
+            ("HL-225", "Gaudi2"),
+            # The following are made-up examples
+            ("HL-225B", "Gaudi2"),
+            ("HL-325L", "Gaudi3"),
+            ("HL-338", "Gaudi3"),
+            ("HL-1000", "HL-1000"),
+        ],
+    )
+    def test_convert_intel_accelerator_name(self, test_input, expected):
+        assert convert_intel_accelerator_name(test_input) == expected

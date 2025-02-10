@@ -9,13 +9,13 @@ import { useColumnsDefinitions } from './hooks';
 
 export interface Props {
     projectName: string;
-    runName: string;
+    runId: string;
     jobs: IRun['jobs'];
 }
 
-export const JobList: React.FC<Props> = ({ jobs, projectName, runName }) => {
+export const JobList: React.FC<Props> = ({ jobs, projectName, runId }) => {
     const { t } = useTranslation();
-    const { columns } = useColumnsDefinitions({ projectName, runName });
+    const { columns } = useColumnsDefinitions({ projectName, runId });
 
     const { items, collectionProps, paginationProps } = useCollection(jobs, {
         pagination: { pageSize: 20 },

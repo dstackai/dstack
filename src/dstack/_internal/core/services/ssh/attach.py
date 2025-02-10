@@ -54,7 +54,9 @@ class SSHAttach:
         self,
         hostname: str,
         ssh_port: int,
+        container_ssh_port: int,
         user: str,
+        container_user: str,
         id_rsa_path: PathLike,
         ports_lock: PortsLock,
         run_name: str,
@@ -73,7 +75,7 @@ class SSHAttach:
         self.control_sock_path = FilePath(control_sock_path)
         self.identity_file = FilePath(id_rsa_path)
         self.tunnel = SSHTunnel(
-            destination=run_name,
+            destination=f"root@{run_name}",
             identity=self.identity_file,
             forwarded_sockets=ports_to_forwarded_sockets(
                 ports=self.ports,
@@ -90,7 +92,7 @@ class SSHAttach:
             self.host_config = {
                 "HostName": hostname,
                 "Port": ssh_port,
-                "User": user,
+                "User": user if dockerized else container_user,
                 "IdentityFile": self.identity_file,
                 "IdentitiesOnly": "yes",
                 "StrictHostKeyChecking": "no",
@@ -109,8 +111,8 @@ class SSHAttach:
         if dockerized and not local_backend:
             self.container_config = {
                 "HostName": "localhost",
-                "Port": 10022,
-                "User": "root",  # TODO(#1535): support non-root images properly
+                "Port": container_ssh_port,
+                "User": container_user,
                 "IdentityFile": self.identity_file,
                 "IdentitiesOnly": "yes",
                 "StrictHostKeyChecking": "no",
@@ -121,7 +123,7 @@ class SSHAttach:
             self.container_config = {
                 "HostName": hostname,
                 "Port": ssh_port,
-                "User": user,
+                "User": container_user,
                 "IdentityFile": self.identity_file,
                 "IdentitiesOnly": "yes",
                 "StrictHostKeyChecking": "no",
@@ -130,6 +132,17 @@ class SSHAttach:
             }
         else:
             self.container_config = None
+        if local_backend:
+            self.container_config = None
+            self.host_config = {
+                "HostName": hostname,
+                "Port": container_ssh_port,
+                "User": container_user,
+                "IdentityFile": self.identity_file,
+                "IdentitiesOnly": "yes",
+                "StrictHostKeyChecking": "no",
+                "UserKnownHostsFile": "/dev/null",
+            }
         if self.container_config is not None and get_ssh_client_info().supports_multiplexing:
             self.container_config.update(
                 {

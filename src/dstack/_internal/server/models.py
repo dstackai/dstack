@@ -353,12 +353,17 @@ class JobModel(BaseModel):
     runner_timestamp: Mapped[Optional[int]] = mapped_column(BigInteger)
     # `removed` is used to ensure that the instance is killed after the job is finished
     remove_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
+    volumes_detached_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
     # `instance_assigned` means instance assignment was done.
     # if `instance_assigned` is True and `instance` is None, no instance was assiged.
     instance_assigned: Mapped[bool] = mapped_column(Boolean, default=False)
-    instance: Mapped[Optional["InstanceModel"]] = relationship(back_populates="job")
+    instance_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("instances.id", ondelete="CASCADE")
+    )
+    instance: Mapped[Optional["InstanceModel"]] = relationship(back_populates="jobs")
     used_instance_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUIDType(binary=False))
     replica_num: Mapped[int] = mapped_column(Integer)
+    job_runtime_data: Mapped[Optional[str]] = mapped_column(Text)
 
 
 class GatewayModel(BaseModel):
@@ -513,6 +518,7 @@ class InstanceModel(BaseModel):
 
     # temination policy
     termination_policy: Mapped[Optional[TerminationPolicy]] = mapped_column(String(100))
+    # TODO: Suggestion: do not assign DEFAULT_POOL_TERMINATION_IDLE_TIME as the default here (make Optional instead; also instead of -1)
     termination_idle_time: Mapped[int] = mapped_column(
         Integer, default=DEFAULT_POOL_TERMINATION_IDLE_TIME
     )
@@ -524,6 +530,8 @@ class InstanceModel(BaseModel):
     termination_deadline: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
     termination_reason: Mapped[Optional[str]] = mapped_column(String(4000))
     health_status: Mapped[Optional[str]] = mapped_column(String(4000))
+    first_termination_retry_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
+    last_termination_retry_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
 
     # backend
     backend: Mapped[Optional[BackendType]] = mapped_column(Enum(BackendType))
@@ -538,9 +546,11 @@ class InstanceModel(BaseModel):
 
     remote_connection_info: Mapped[Optional[str]] = mapped_column(Text)
 
-    # current job
-    job_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("jobs.id"))
-    job: Mapped[Optional["JobModel"]] = relationship(back_populates="instance", lazy="joined")
+    # NULL means `auto` (only during provisioning, when ready it's not NULL)
+    total_blocks: Mapped[Optional[int]] = mapped_column(Integer)
+    busy_blocks: Mapped[int] = mapped_column(Integer, default=0)
+
+    jobs: Mapped[list["JobModel"]] = relationship(back_populates="instance", lazy="joined")
     last_job_processed_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
 
     # volumes attached to the instance
@@ -576,6 +586,8 @@ class VolumeModel(BaseModel):
 
     configuration: Mapped[str] = mapped_column(Text)
     volume_provisioning_data: Mapped[Optional[str]] = mapped_column(Text)
+    # FIXME: volume_attachment_data should be in "volumes_attachments"
+    # to support multi-attach volumes
     volume_attachment_data: Mapped[Optional[str]] = mapped_column(Text)
 
     # instances the volume is attached to

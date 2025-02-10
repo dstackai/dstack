@@ -1,66 +1,6 @@
-# fleet
+# `fleet`
 
 The `fleet` configuration type allows creating and updating fleets.
-
-> Configuration files must be inside the project repo, and their names must end with `.dstack.yml` 
-> (e.g. `.dstack.yml` or `fleet.dstack.yml` are both acceptable).
-> Any configuration can be run via [`dstack apply`](../cli/dstack/apply.md).
-
-## Examples
-
-### Cloud fleet
-
-<div editor-title="fleet-distrib.dstack.yml"> 
-
-```yaml
-type: fleet
-# The name is optional, if not specified, generated randomly
-name: my-fleet
-
-# The number of instances
-nodes: 4
-# Ensure the instances are interconnected
-placement: cluster
-
-# Uncomment to leverage spot instances
-#spot_policy: auto
-
-resources:
-  gpu:
-    # 24GB or more vRAM
-    memory: 24GB..
-    # One or more GPU
-    count: 1..
-```
-
-</div>
-
-### SSH fleet
-
-<div editor-title="fleet-ssh.dstack.yml"> 
-    
-```yaml
-type: fleet
-# The name is optional, if not specified, generated randomly
-name: my-ssh-fleet
-
-# Ensure instances are interconnected
-placement: cluster
-
-# The user, private SSH key, and hostnames of the on-prem servers
-ssh_config:
-  user: ubuntu
-  identity_file: ~/.ssh/id_rsa
-  hosts:
-    - 3.255.177.51
-    - 3.255.177.52
-```
-
-</div>
-
-[//]: # (TODO: a cluster, individual user and identity file, etc)
-
-[//]: # (TODO: other examples, for all properties like in dev-environment/task/service)
 
 ## Root reference
 
@@ -70,19 +10,20 @@ ssh_config:
       type:
         required: true
 
-## `ssh_config`
+### `ssh_config` { data-toc-label="ssh_config" }
 
 #SCHEMA# dstack._internal.core.models.fleets.SSHParams
     overrides:
       show_root_heading: false
+      item_id_prefix: ssh_config-
 
-## `ssh_config.hosts[n]`
+#### `ssh_config.hosts[n]` { #ssh_config-hosts data-toc-label="hosts" }
 
 #SCHEMA# dstack._internal.core.models.fleets.SSHHostParams
     overrides:
       show_root_heading: false
 
-## `resources`
+### `resources`
 
 #SCHEMA# dstack._internal.core.models.resources.ResourcesSpecSchema
     overrides:
@@ -91,7 +32,7 @@ ssh_config:
         required: true
       item_id_prefix: resources-
 
-## `resouces.gpu` { #resources-gpu data-toc-label="resources.gpu" } 
+#### `resouces.gpu` { #resources-gpu data-toc-label="gpu" } 
 
 #SCHEMA# dstack._internal.core.models.resources.GPUSpecSchema
     overrides:
@@ -99,7 +40,7 @@ ssh_config:
       type:
         required: true
 
-## `resouces.disk` { #resources-disk data-toc-label="resources.disk" }
+#### `resouces.disk` { #resources-disk data-toc-label="disk" }
 
 #SCHEMA# dstack._internal.core.models.resources.DiskSpecSchema
     overrides:
@@ -107,7 +48,7 @@ ssh_config:
       type:
         required: true
 
-## `retry`
+### `retry`
 
 #SCHEMA# dstack._internal.core.models.profiles.ProfileRetry
     overrides:

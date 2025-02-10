@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 
 import { useNotifications } from 'hooks';
+import { getServerError } from 'libs';
 import { useDeleteProjectsMutation } from 'services/project';
 
 export const useDeleteProject = () => {
@@ -14,7 +15,7 @@ export const useDeleteProject = () => {
         request.catch((error) => {
             pushNotification({
                 type: 'error',
-                content: t('common.server_error', { error: error?.error }),
+                content: t('common.server_error', { error: getServerError(error) }),
             });
         });
 
@@ -27,7 +28,7 @@ export const useDeleteProject = () => {
         request.catch((error) => {
             pushNotification({
                 type: 'error',
-                content: t('common.server_error', { error: error?.error }),
+                content: t('common.server_error', { error: getServerError(error) }),
             });
         });
 

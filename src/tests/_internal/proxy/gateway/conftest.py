@@ -14,8 +14,8 @@ def system_mocks() -> Generator[Mocks, None, None]:
         patch(f"{nginx}.sudo") as sudo,
         patch(f"{nginx}.Nginx.reload") as reload_nginx,
         patch(f"{nginx}.Nginx.run_certbot") as run_certbot,
-        patch(f"{connection}.ServiceReplicaConnection.open") as open_conn,
-        patch(f"{connection}.ServiceReplicaConnection.close") as close_conn,
+        patch(f"{connection}.ServiceConnection.open") as open_conn,
+        patch(f"{connection}.ServiceConnection.close") as close_conn,
     ):
         sudo.return_value = []
         yield Mocks(

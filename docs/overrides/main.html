@@ -66,8 +66,19 @@
 <script src="https://widget.kapa.ai/kapa-widget.bundle.js"
         data-website-id="1c028b8e-609e-40e3-b792-f3939a461850"
         data-project-name="dstack"
-        data-project-color="#000000"
-        data-project-logo="/assets/images/dstack-logo-notext.svg"
+        data-project-color="rgba(0, 0, 0, 0.87)"
+        data-font-size-lg="0.78rem"
+        data-button-width="3.6rem"
+        data-button-height="3.6rem"
+        data-button-text-font-weight="400"
+        data-button-image-width="18"
+        data-button-image-height="18"
+        data-modal-image="/assets/images/dstack-logo-notext.svg"
+        data-modal-title="Ask me anything"
+        data-button-text-shadow="none"
+        data-button-box-shadow="none"
+        data-button-text-font-family='metro-web, Metro, -apple-system, "system-ui", "Segoe UI", Roboto'
+        data-project-logo="/assets/images/kapa.svg"
         data-modal-disclaimer="This is a custom LLM for dstack with access to Documentation, API references and GitHub issues. This feature is experimental - Give it a try!"
         data-user-analytics-fingerprint-enabled="true"
         async></script>
@@ -101,6 +112,13 @@ Support our project with a ⭐ on
                 </div>-->
 
                 <div class="tx-footer__section">
+                    <div class="tx-footer__section-title">Resources</div>
+                    <a href="/docs" class="tx-footer__section-link">Documentation</a>
+                    <a href="/blog" class="tx-footer__section-link">Blog</a>
+                    <a href="https://github.com/dstackai/dstack/releases" target="_blank" class="tx-footer__section-link external">Changelog</a>
+                </div>
+
+                <div class="tx-footer__section">
                     <div class="tx-footer__section-title">Examples</div>
                     <a href="/examples#deployment" class="tx-footer__section-link">Deployment</a>
                     <a href="/examples#fine-tuning" class="tx-footer__section-link">Fine-tuning</a>
@@ -110,17 +128,11 @@ Support our project with a ⭐ on
                 </div>
 
                 <div class="tx-footer__section">
-                    <div class="tx-footer__section-title">Resources</div>
-                    <a href="/docs" class="tx-footer__section-link">Documentation</a>
-                    <a href="/blog" class="tx-footer__section-link">Blog</a>
-                    <a href="https://github.com/dstackai/dstack/releases" target="_blank" class="tx-footer__section-link external">Releases</a>
-                </div>
-
-                <div class="tx-footer__section">
-                    <div class="tx-footer__section-title">Developers</div>
-                    <a href="/developers#user-community" class="tx-footer__section-link">User community</a>
+                    <div class="tx-footer__section-title">Community</div>
+                    <a href="https://discord.gg/u8SmfwPpMd" target="_blank" class="tx-footer__section-link external">Discord</a>
+                    <a href="https://github.com/dstackai/dstack/" target="_blank" class="tx-footer__section-link external">GitHub</a>
+                    <a href="https://github.com/dstackai/dstack/blob/master/CONTRIBUTING.md" target="_blank" class="tx-footer__section-link external">Contributing</a>
                     <a href="/developers#ambassador-program" class="tx-footer__section-link">Ambassador program</a>
-                    <a href="/developers#for-contributors" class="tx-footer__section-link">For contributors</a>
                 </div>
 
                 <div class="tx-footer__section">
@@ -134,4 +146,31 @@ Support our project with a ⭐ on
             </div>
         </div>
     </footer>
+{% endblock %}
+
+{% block site_nav %}
+    {% if nav %}
+      {% if page.meta and page.meta.hide %}
+        {% set hidden = "hidden" if "navigation" in page.meta.hide %}
+      {% endif %}
+      <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" {{ hidden }}>
+        <div class="md-sidebar__scrollwrap">
+          <div class="md-sidebar__inner">
+            {% include "partials/nav.html" %}
+          </div>
+        </div>
+      </div>
+    {% endif %}
+    {% if "toc.integrate" not in features %}
+      {% if page.meta and page.meta.hide %}
+        {% set hidden = "hidden" if "toc" in page.meta.hide %}
+      {% endif %}
+      <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" {{ hidden }}>
+        <div class="md-sidebar__scrollwrap">
+          <div class="md-sidebar__inner">
+            {% include "toc.html" %}
+          </div>
+        </div>
+      </div>
+    {% endif %}
 {% endblock %}

@@ -11,6 +11,7 @@ from dstack._internal.core.backends.base.compute import (
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.runpod.api_client import RunpodApiClient
 from dstack._internal.core.backends.runpod.config import RunpodConfig
+from dstack._internal.core.consts import DSTACK_RUNNER_SSH_PORT
 from dstack._internal.core.errors import (
     BackendError,
     ComputeError,
@@ -37,6 +38,7 @@ class RunpodCompute(Compute):
     _last_cleanup_time = None
 
     def __init__(self, config: RunpodConfig):
+        super().__init__()
         self.config = config
         self.api_client = RunpodApiClient(config.creds.api_key)
 
@@ -107,7 +109,7 @@ class RunpodCompute(Compute):
             min_memory_in_gb=memory_size,
             support_public_ip=True,
             docker_args=_get_docker_args(authorized_keys),
-            ports="10022/tcp",
+            ports=f"{DSTACK_RUNNER_SSH_PORT}/tcp",
             bid_per_gpu=bid_per_gpu,
             network_volume_id=network_volume_id,
             volume_mount_path=volume_mount_path,
@@ -175,7 +177,7 @@ class RunpodCompute(Compute):
         if ports is None:
             return
         for port in pod["runtime"]["ports"]:
-            if port["privatePort"] == 10022:
+            if port["privatePort"] == DSTACK_RUNNER_SSH_PORT:
                 provisioning_data.hostname = port["ip"]
                 provisioning_data.ssh_port = port["publicPort"]
 

@@ -321,6 +321,8 @@ class TestShowPool:
                     "id": str(instance.id),
                     "project_name": project.name,
                     "name": "test_instance",
+                    "fleet_id": None,
+                    "fleet_name": None,
                     "instance_num": 0,
                     "job_name": None,
                     "hostname": "running_instance.ip",
@@ -331,6 +333,8 @@ class TestShowPool:
                     "pool_name": None,
                     "region": "en",
                     "price": 1,
+                    "total_blocks": 1,
+                    "busy_blocks": 0,
                 }
             ],
         }
@@ -490,6 +494,8 @@ class TestRemoveInstance:
                     "id": str(instance.id),
                     "project_name": project.name,
                     "name": "test_instance",
+                    "fleet_id": None,
+                    "fleet_name": None,
                     "instance_num": 0,
                     "job_name": None,
                     "hostname": "running_instance.ip",
@@ -500,6 +506,8 @@ class TestRemoveInstance:
                     "pool_name": None,
                     "region": "en",
                     "price": 1,
+                    "total_blocks": 1,
+                    "busy_blocks": 0,
                 }
             ],
         }

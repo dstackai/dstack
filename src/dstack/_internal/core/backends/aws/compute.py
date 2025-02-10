@@ -40,6 +40,7 @@ from dstack._internal.core.models.volumes import (
     VolumeAttachmentData,
     VolumeProvisioningData,
 )
+from dstack._internal.utils.common import get_or_error
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -60,6 +61,7 @@ class AWSVolumeBackendData(CoreModel):
 
 class AWSCompute(Compute):
     def __init__(self, config: AWSConfig):
+        super().__init__()
         self.config = config
         if is_core_model_instance(config.creds, AWSAccessKeyCreds):
             self.session = boto3.Session(
@@ -238,6 +240,7 @@ class AWSCompute(Compute):
                         allocate_public_ip=allocate_public_ip,
                         placement_group_name=instance_config.placement_group_name,
                         enable_efa=enable_efa,
+                        max_efa_interfaces=max_efa_interfaces,
                         reservation_id=instance_config.reservation,
                         is_capacity_block=is_capacity_block,
                     )
@@ -263,7 +266,7 @@ class AWSCompute(Compute):
                     price=instance_offer.price,
                     username=username,
                     ssh_port=22,
-                    dockerized=True,  # because `dstack-shim docker` is used
+                    dockerized=True,  # because `dstack-shim` is used
                     ssh_proxy=None,
                     backend_data=None,
                 )
@@ -629,16 +632,45 @@ class AWSCompute(Compute):
         logger.debug("Attached EBS volume %s to instance %s", volume.volume_id, instance_id)
         return VolumeAttachmentData(device_name=device_name)
 
-    def detach_volume(self, volume: Volume, instance_id: str):
+    def detach_volume(self, volume: Volume, instance_id: str, force: bool = False):
         ec2_client = self.session.client("ec2", region_name=volume.configuration.region)
 
         logger.debug("Detaching EBS volume %s from instance %s", volume.volume_id, instance_id)
-        ec2_client.detach_volume(
-            VolumeId=volume.volume_id,
-            InstanceId=instance_id,
-            Device=volume.attachment_data.device_name,
-        )
+        try:
+            ec2_client.detach_volume(
+                VolumeId=volume.volume_id,
+                InstanceId=instance_id,
+                Device=get_or_error(volume.attachment_data).device_name,
+                Force=force,
+            )
+        except botocore.exceptions.ClientError as e:
+            if e.response["Error"]["Code"] == "IncorrectState":
+                logger.info(
+                    "Skipping EBS volume %s detach since it's already detached", volume.volume_id
+                )
+                return
+            raise e
         logger.debug("Detached EBS volume %s from instance %s", volume.volume_id, instance_id)
+
+    def is_volume_detached(self, volume: Volume, instance_id: str) -> bool:
+        ec2_client = self.session.client("ec2", region_name=volume.configuration.region)
+
+        logger.debug("Getting EBS volume %s status", volume.volume_id)
+        response = ec2_client.describe_volumes(VolumeIds=[volume.volume_id])
+        volumes_infos = response.get("Volumes")
+        if len(volumes_infos) == 0:
+            logger.debug(
+                "Failed to check EBS volume %s status. Volume not found.", volume.volume_id
+            )
+            return True
+        volume_info = volumes_infos[0]
+        for attachment in volume_info["Attachments"]:
+            if attachment["InstanceId"] != instance_id:
+                continue
+            if attachment["State"] != "detached":
+                return False
+            return True
+        return True
 
 
 def get_maximum_efa_interfaces(ec2_client: botocore.client.BaseClient, instance_type: str) -> int:

@@ -2,7 +2,7 @@ import random
 import string
 import uuid
 from datetime import datetime, timezone
-from typing import List, Optional, Tuple, Union, cast
+from typing import List, Literal, Optional, Tuple, Union, cast
 
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -38,12 +38,12 @@ from dstack._internal.core.models.profiles import (
     DEFAULT_POOL_TERMINATION_IDLE_TIME,
     Profile,
     SpotPolicy,
-    TerminationPolicy,
 )
 from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import Requirements, get_policy_map
 from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.core.services import validate_dstack_resource_name
+from dstack._internal.core.services.profiles import get_termination
 from dstack._internal.server.db import get_db
 from dstack._internal.server.models import (
     FleetModel,
@@ -179,15 +179,40 @@ async def list_project_fleet_models(
     return list(res.unique().scalars().all())
 
 
-async def get_fleet_by_name(
-    session: AsyncSession, project: ProjectModel, name: str
+async def get_fleet(
+    session: AsyncSession,
+    project: ProjectModel,
+    name: Optional[str],
+    fleet_id: Optional[uuid.UUID],
 ) -> Optional[Fleet]:
-    fleet_model = await get_project_fleet_model_by_name(
-        session=session, project=project, name=name
-    )
+    if fleet_id is not None:
+        fleet_model = await get_project_fleet_model_by_id(
+            session=session, project=project, fleet_id=fleet_id
+        )
+    elif name is not None:
+        fleet_model = await get_project_fleet_model_by_name(
+            session=session, project=project, name=name
+        )
+    else:
+        raise ServerClientError("name or id must be specified")
     if fleet_model is None:
         return None
     return fleet_model_to_fleet(fleet_model)
+
+
+async def get_project_fleet_model_by_id(
+    session: AsyncSession,
+    project: ProjectModel,
+    fleet_id: uuid.UUID,
+) -> Optional[FleetModel]:
+    filters = [
+        FleetModel.id == fleet_id,
+        FleetModel.project_id == project.id,
+    ]
+    res = await session.execute(
+        select(FleetModel).where(*filters).options(joinedload(FleetModel.instances))
+    )
+    return res.unique().scalar_one_or_none()
 
 
 async def get_project_fleet_model_by_name(
@@ -214,7 +239,6 @@ async def get_plan(
     user: UserModel,
     spec: FleetSpec,
 ) -> FleetPlan:
-    # TODO: refactor offers logic into a separate module to avoid depending on runs
     current_fleet: Optional[Fleet] = None
     current_fleet_id: Optional[uuid.UUID] = None
     if spec.configuration.name is not None:
@@ -232,8 +256,10 @@ async def get_plan(
             project=project,
             profile=spec.merged_profile,
             requirements=_get_fleet_requirements(spec),
+            blocks=spec.configuration.blocks,
         )
         offers = [offer for _, offer in offers_with_backends]
+    _remove_fleet_spec_sensitive_info(spec)
     plan = FleetPlan(
         project_name=project.name,
         user=user.name,
@@ -252,6 +278,7 @@ async def get_create_instance_offers(
     requirements: Requirements,
     exclude_not_available=False,
     fleet_model: Optional[FleetModel] = None,
+    blocks: Union[int, Literal["auto"]] = 1,
 ) -> List[Tuple[Backend, InstanceOfferWithAvailability]]:
     multinode = False
     master_job_provisioning_data = None
@@ -271,6 +298,7 @@ async def get_create_instance_offers(
         exclude_not_available=exclude_not_available,
         multinode=multinode,
         master_job_provisioning_data=master_job_provisioning_data,
+        blocks=blocks,
     )
     offers = [
         (backend, offer)
@@ -381,6 +409,7 @@ async def create_fleet_instance_model(
         instance_num=instance_num,
         placement_group_name=placement_group_name,
         reservation=reservation,
+        blocks=spec.configuration.blocks,
     )
     return instance_model
 
@@ -400,12 +429,14 @@ async def create_fleet_ssh_instance_model(
         ssh_key = ssh_params.ssh_key
         port = ssh_params.port
         internal_ip = None
+        blocks = 1
     else:
         hostname = host.hostname
         ssh_user = host.user or ssh_params.user
         ssh_key = host.ssh_key or ssh_params.ssh_key
         port = host.port or ssh_params.port
         internal_ip = host.internal_ip
+        blocks = host.blocks
 
     if ssh_user is None or ssh_key is None:
         # This should not be reachable but checked by fleet spec validation
@@ -424,6 +455,7 @@ async def create_fleet_ssh_instance_model(
         internal_ip=internal_ip,
         instance_network=ssh_params.network,
         port=port or 22,
+        blocks=blocks,
     )
     return instance_model
 
@@ -519,7 +551,7 @@ async def generate_fleet_name(session: AsyncSession, project: ProjectModel) -> s
 
 
 def is_fleet_in_use(fleet_model: FleetModel, instance_nums: Optional[List[int]] = None) -> bool:
-    instances_in_use = [i for i in fleet_model.instances if i.job_id is not None and not i.deleted]
+    instances_in_use = [i for i in fleet_model.instances if i.jobs and not i.deleted]
     selected_instance_in_use = instances_in_use
     if instance_nums is not None:
         selected_instance_in_use = [i for i in instances_in_use if i.instance_num in instance_nums]
@@ -564,11 +596,9 @@ async def create_instance(
         pool_name=pool.name,
     )
 
-    termination_policy = profile.termination_policy or TerminationPolicy.DESTROY_AFTER_IDLE
-    termination_idle_time = profile.termination_idle_time
-    if termination_idle_time is None:
-        termination_idle_time = DEFAULT_POOL_TERMINATION_IDLE_TIME
-
+    termination_policy, termination_idle_time = get_termination(
+        profile, DEFAULT_POOL_TERMINATION_IDLE_TIME
+    )
     instance = InstanceModel(
         id=uuid.uuid4(),
         name=instance_name,
@@ -583,6 +613,8 @@ async def create_instance(
         instance_configuration=None,
         termination_policy=termination_policy,
         termination_idle_time=termination_idle_time,
+        total_blocks=1,
+        busy_blocks=0,
     )
     logger.info(
         "Added a new instance %s",

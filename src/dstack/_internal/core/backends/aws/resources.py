@@ -140,6 +140,7 @@ def create_instances_struct(
     allocate_public_ip: bool = True,
     placement_group_name: Optional[str] = None,
     enable_efa: bool = False,
+    max_efa_interfaces: int = 0,
     reservation_id: Optional[str] = None,
     is_capacity_block: bool = False,
 ) -> Dict[str, Any]:
@@ -183,7 +184,7 @@ def create_instances_struct(
     # AWS allows specifying either NetworkInterfaces for specific subnet_id
     # or instance-level SecurityGroupIds in case of no specific subnet_id, not both.
     if subnet_id is not None:
-        # Even if the instance type supports multiple cards, we always request only one interface
+        # If the instance type supports multiple cards, we request multiple interfaces only if not allocate_public_ip
         # due to the limitation: "AssociatePublicIpAddress [...] You cannot specify more than one
         # network interface in the request".
         # Error message: "(InvalidParameterCombination) when calling the RunInstances operation:
@@ -199,9 +200,28 @@ def create_instances_struct(
                 "DeviceIndex": 0,
                 "SubnetId": subnet_id,
                 "Groups": [security_group_id],
-                "InterfaceType": "efa" if enable_efa else "interface",
+                "InterfaceType": "efa" if max_efa_interfaces > 0 else "interface",
             },
         ]
+
+        if max_efa_interfaces > 1 and allocate_public_ip is False:
+            for i in range(1, max_efa_interfaces):
+                # Set to efa-only to use interfaces exclusively for GPU-to-GPU communication
+                interface_type = "efa-only"
+                if instance_type == "p5.48xlarge":
+                    # EFA configuration for P5 instances:
+                    # https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/efa-acc-inst-types.html#efa-for-p5
+                    interface_type = "efa" if i % 4 == 0 else "efa-only"
+                struct["NetworkInterfaces"].append(
+                    {
+                        "AssociatePublicIpAddress": allocate_public_ip,
+                        "NetworkCardIndex": i,
+                        "DeviceIndex": 1,
+                        "SubnetId": subnet_id,
+                        "Groups": [security_group_id],
+                        "InterfaceType": interface_type,
+                    }
+                )
     else:
         struct["SecurityGroupIds"] = [security_group_id]
 

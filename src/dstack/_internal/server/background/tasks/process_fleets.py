@@ -6,7 +6,6 @@ from dstack._internal.core.models.fleets import FleetStatus
 from dstack._internal.server.db import get_session_ctx
 from dstack._internal.server.models import FleetModel, PlacementGroupModel
 from dstack._internal.server.services.fleets import (
-    fleet_model_to_fleet,
     is_fleet_empty,
     is_fleet_in_use,
 )
@@ -58,13 +57,9 @@ async def _process_fleet(session: AsyncSession, fleet_model: FleetModel):
 
 
 async def _autodelete_fleet(session: AsyncSession, fleet_model: FleetModel):
-    fleet = fleet_model_to_fleet(fleet_model)
-
-    if (
-        is_fleet_in_use(fleet_model)
-        or not is_fleet_empty(fleet_model)
-        or (not fleet.spec.autocreated and fleet_model.status != FleetStatus.TERMINATING)
-    ):
+    # Currently all empty fleets are autodeleted.
+    # TODO: If fleets with `nodes: 0..` are supported, their deletion should be skipped.
+    if is_fleet_in_use(fleet_model) or not is_fleet_empty(fleet_model):
         fleet_model.last_processed_at = get_current_datetime()
         await session.commit()
         return

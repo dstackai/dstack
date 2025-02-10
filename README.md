@@ -10,7 +10,7 @@
 
 [![Last commit](https://img.shields.io/github/last-commit/dstackai/dstack?style=flat-square)](https://github.com/dstackai/dstack/commits/)
 [![PyPI - License](https://img.shields.io/pypi/l/dstack?style=flat-square&color=blue)](https://github.com/dstackai/dstack/blob/master/LICENSE.md)
-[![Discord](https://dcbadge.vercel.app/api/server/u8SmfwPpMd?style=flat-square)](https://discord.gg/u8SmfwPpMd)
+[![Discord](https://img.shields.io/discord/1106906313969123368?style=flat-square)](https://discord.gg/u8SmfwPpMd)
 
 </div>
 
@@ -21,16 +21,16 @@ for AI workloads both in the cloud and on-prem, speeding up the development, tra
 
 #### Accelerators
 
-`dstack` supports `NVIDIA GPU`, `AMD GPU`, and `Google Cloud TPU` out of the box.
+`dstack` supports `NVIDIA`, `AMD`, `Google TPU`, and `Intel Gaudi` accelerators out of the box.
 
 ## Major news ✨
 
-- [2024/10] [dstack 0.18.17: on-prem AMD GPUs, AWS EFA, and more](https://github.com/dstackai/dstack/releases/tag/0.18.17)
-- [2024/08] [dstack 0.18.11: AMD, encryption, and more](https://github.com/dstackai/dstack/releases/tag/0.18.11)
-- [2024/08] [dstack 0.18.10: Control plane UI](https://github.com/dstackai/dstack/releases/tag/0.18.10)
-- [2024/07] [dstack 0.18.7: Fleets, RunPod volumes, dstack apply, and more](https://github.com/dstackai/dstack/releases/tag/0.18.7)
-- [2024/05] [dstack 0.18.4: Google Cloud TPU, and more](https://github.com/dstackai/dstack/releases/tag/0.18.4)
-- [2024/05] [dstack 0.18.2: On-prem clusters, private subnets, and more](https://github.com/dstackai/dstack/releases/tag/0.18.2)
+- [2025/01] [dstack 0.18.38: Intel Gaudi](https://github.com/dstackai/dstack/releases/tag/0.18.38)
+- [2025/01] [dstack 0.18.35: Vultr](https://github.com/dstackai/dstack/releases/tag/0.18.35)
+- [2024/12] [dstack 0.18.32: TPU v6e](https://github.com/dstackai/dstack/releases/tag/0.18.32)
+- [2024/12] [dstack 0.18.30: AWS Capacity Reservations and Capacity Blocks](https://github.com/dstackai/dstack/releases/tag/0.18.30)
+- [2024/10] [dstack 0.18.21: Instance volumes](https://github.com/dstackai/dstack/releases/tag/0.18.21)
+- [2024/10] [dstack 0.18.18: Hardware metrics monitoring](https://github.com/dstackai/dstack/releases/tag/0.18.18)
 
 ## Installation
 
@@ -38,10 +38,9 @@ for AI workloads both in the cloud and on-prem, speeding up the development, tra
 
 ### (Optional) Configure backends
 
-To use `dstack` with your own cloud accounts, create the `~/.dstack/server/config.yml` file and 
-[configure backends](https://dstack.ai/docs/reference/server/config.yml). Alternatively, you can configure backends via the control plane UI after you start the server.
+To use `dstack` with cloud providers, configure [backends](https://dstack.ai/docs/concepts/backends).
 
-You can skip backends configuration if you intend to run containers  only on your on-prem servers. Use [SSH fleets](https://dstack.ai/docs/concepts/fleets#ssh-fleets) for that.
+For using `dstack` with on-prem servers, create [SSH fleets](https://dstack.ai/docs/concepts/fleets#ssh) instead.
 
 ### Start the server
 

@@ -48,7 +48,7 @@ BASE_DEPS = [
     "python-multipart>=0.0.16",
     "filelock",
     "psutil",
-    "gpuhunt>=0.0.17,<0.1.0",
+    "gpuhunt>=0.0.19,<0.1.0",
 ]
 
 GATEWAY_AND_SERVER_COMMON_DEPS = [
@@ -74,7 +74,7 @@ SERVER_DEPS = GATEWAY_AND_SERVER_COMMON_DEPS + [
     "alembic-postgresql-enum",
     "asyncpg",
     "cachetools",
-    "python-json-logger",
+    "python-json-logger>=3.1.0",
     "grpcio>=1.50",  # indirect
 ]
 
@@ -133,6 +133,10 @@ setup(
     url="https://dstack.ai",
     project_urls={
         "Source": "https://github.com/dstackai/dstack",
+        "Docs": "https://dstack.ai/docs",
+        "Issues": "https://github.com/dstackai/dstack/issues",
+        "Changelog": "https://github.com/dstackai/dstack/releases",
+        "Discord": "https://discord.gg/u8SmfwPpMd",
     },
     description="dstack is an open-source orchestration engine for running AI workloads on any cloud or on-premises.",
     long_description=get_long_description(),
@@ -152,7 +156,7 @@ setup(
         "oci": SERVER_DEPS + OCI_DEPS,
     },
     classifiers=[
-        "Development Status :: 2 - Pre-Alpha",
+        "Development Status :: 4 - Beta",
         "Topic :: Scientific/Engineering :: Artificial Intelligence",
         "License :: OSI Approved :: Mozilla Public License 2.0 (MPL 2.0)",
         "Programming Language :: Python :: 3",

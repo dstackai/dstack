@@ -6,7 +6,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Button, Container, ContentLayout, FormInput, FormUI, Header, SpaceBetween } from 'components';
 
 import { useBreadcrumbs, useNotifications } from 'hooks';
-import { isRequestFormErrors2, isRequestFormFieldError } from 'libs';
+import { getServerError, isResponseServerError, isResponseServerFormFieldError } from 'libs';
 import { getFieldErrorFromServerResponse } from 'libs/form';
 import { ROUTES } from 'routes';
 import { useAddUserPaymentMutation } from 'services/user';
@@ -72,9 +72,9 @@ export const Add: React.FC = () => {
             .catch((errorResponse) => {
                 const errorRequestData = errorResponse?.data;
 
-                if (isRequestFormErrors2(errorRequestData)) {
+                if (isResponseServerError(errorRequestData)) {
                     errorRequestData.detail.forEach((error) => {
-                        if (isRequestFormFieldError(error)) {
+                        if (isResponseServerFormFieldError(error)) {
                             const { fieldNamePath, message } = getFieldErrorFromServerResponse(error);
 
                             setError(fieldNamePath as FieldPath<TFormValue>, { type: 'custom', message });
@@ -88,7 +88,7 @@ export const Add: React.FC = () => {
                 } else {
                     pushNotification({
                         type: 'error',
-                        content: t('common.server_error', { error: errorResponse?.error ?? errorResponse }),
+                        content: t('common.server_error', { error: getServerError(errorResponse) }),
                     });
                 }
             });

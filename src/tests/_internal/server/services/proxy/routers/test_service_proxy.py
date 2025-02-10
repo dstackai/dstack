@@ -4,14 +4,18 @@ from unittest.mock import patch
 import httpx
 import pytest
 from fastapi import FastAPI
+from fastapi.responses import PlainTextResponse
 
 from dstack._internal.proxy.gateway.repo.repo import GatewayProxyRepo
 from dstack._internal.proxy.lib.auth import BaseProxyAuthProvider
-from dstack._internal.proxy.lib.deps import ProxyDependencyInjector
 from dstack._internal.proxy.lib.repo import BaseProxyRepo
-from dstack._internal.proxy.lib.services.service_connection import ServiceReplicaClient
+from dstack._internal.proxy.lib.services.service_connection import ServiceClient
 from dstack._internal.proxy.lib.testing.auth import ProxyTestAuthProvider
-from dstack._internal.proxy.lib.testing.common import make_project, make_service
+from dstack._internal.proxy.lib.testing.common import (
+    ProxyTestDependencyInjector,
+    make_project,
+    make_service,
+)
 from dstack._internal.server.services.proxy.routers.service_proxy import router
 
 MOCK_REPLICA_CLIENT_TIMEOUT = 8
@@ -22,12 +26,28 @@ ProxyTestRepo = GatewayProxyRepo
 
 @pytest.fixture
 def mock_replica_client_httpbin(httpbin) -> Generator[None, None, None]:
+    """Mocks deployed services. Replaces them with httpbin"""
+
     with patch(
-        "dstack._internal.proxy.lib.services.service_connection.ServiceReplicaConnectionPool.get_or_add"
+        "dstack._internal.proxy.lib.services.service_connection.ServiceConnectionPool.get_or_add"
     ) as add_connection_mock:
-        add_connection_mock.return_value.client.return_value = ServiceReplicaClient(
+        add_connection_mock.return_value.client.return_value = ServiceClient(
             base_url=httpbin.url, timeout=MOCK_REPLICA_CLIENT_TIMEOUT
         )
+        yield
+
+
+@pytest.fixture
+def mock_replica_client_path_reporter() -> Generator[None, None, None]:
+    """Mocks deployed services. Replaces them with an app that returns the requested path"""
+
+    app = FastAPI()
+    app.get("{path:path}")(lambda path: PlainTextResponse(path))
+    client = ServiceClient(base_url="http://test/", transport=httpx.ASGITransport(app))
+    with patch(
+        "dstack._internal.proxy.lib.services.service_connection.ServiceConnectionPool.get_or_add"
+    ) as add_connection_mock:
+        add_connection_mock.return_value.client.return_value = client
         yield
 
 
@@ -35,7 +55,7 @@ def make_app(
     repo: BaseProxyRepo, auth: BaseProxyAuthProvider = ProxyTestAuthProvider()
 ) -> FastAPI:
     app = FastAPI()
-    app.state.proxy_dependency_injector = ProxyDependencyInjector(repo=repo, auth=auth)
+    app.state.proxy_dependency_injector = ProxyTestDependencyInjector(repo=repo, auth=auth)
     app.include_router(router, prefix="/proxy/services")
     return app
 
@@ -197,3 +217,25 @@ async def test_auth(mock_replica_client_httpbin, token: Optional[str], status: i
     url = "http://test-host/proxy/services/test-proj/httpbin/"
     resp = await client.get(url, headers=headers)
     assert resp.status_code == status
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("strip", "downstream_path", "upstream_path"),
+    [
+        (True, "/proxy/services/my-proj/my-run/", "/"),
+        (True, "/proxy/services/my-proj/my-run/a/b", "/a/b"),
+        (False, "/proxy/services/my-proj/my-run/", "/proxy/services/my-proj/my-run/"),
+        (False, "/proxy/services/my-proj/my-run/a/b", "/proxy/services/my-proj/my-run/a/b"),
+    ],
+)
+async def test_strip_prefix(
+    mock_replica_client_path_reporter, strip: bool, downstream_path: str, upstream_path: str
+) -> None:
+    repo = ProxyTestRepo()
+    await repo.set_project(make_project("my-proj"))
+    await repo.set_service(make_service("my-proj", "my-run", strip_prefix=strip))
+    _, client = make_app_client(repo)
+    resp = await client.get(f"http://test-host{downstream_path}")
+    assert resp.status_code == 200
+    assert resp.text == upstream_path

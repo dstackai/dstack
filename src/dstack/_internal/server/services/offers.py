@@ -1,4 +1,6 @@
-from typing import List, Optional, Tuple
+from typing import List, Literal, Optional, Tuple, Union
+
+import gpuhunt
 
 from dstack._internal.core.backends import (
     BACKENDS_WITH_CREATE_INSTANCE_SUPPORT,
@@ -7,7 +9,11 @@ from dstack._internal.core.backends import (
 )
 from dstack._internal.core.backends.base import Backend
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.instances import InstanceOfferWithAvailability
+from dstack._internal.core.models.instances import (
+    InstanceOfferWithAvailability,
+    InstanceType,
+    Resources,
+)
 from dstack._internal.core.models.profiles import Profile
 from dstack._internal.core.models.runs import JobProvisioningData, Requirements
 from dstack._internal.core.models.volumes import Volume
@@ -25,6 +31,7 @@ async def get_offers_by_requirements(
     volumes: Optional[List[List[Volume]]] = None,
     privileged: bool = False,
     instance_mounts: bool = False,
+    blocks: Union[int, Literal["auto"]] = 1,
 ) -> List[Tuple[Backend, InstanceOfferWithAvailability]]:
     backends: List[Backend] = await backends_services.get_project_backends(project=project)
 
@@ -92,4 +99,64 @@ async def get_offers_by_requirements(
     if profile.instance_types is not None:
         offers = [(b, o) for b, o in offers if o.instance.name in profile.instance_types]
 
-    return offers
+    if blocks == 1:
+        return offers
+
+    shareable_offers = []
+    for backend, offer in offers:
+        resources = offer.instance.resources
+        cpu_count = resources.cpus
+        gpu_count = len(resources.gpus)
+        if gpu_count > 0 and resources.gpus[0].vendor == gpuhunt.AcceleratorVendor.GOOGLE:
+            # TPUs cannot be shared
+            gpu_count = 1
+        divisible, _blocks = is_divisible_into_blocks(cpu_count, gpu_count, blocks)
+        if not divisible:
+            continue
+        offer.total_blocks = _blocks
+        shareable_offers.append((backend, offer))
+    return shareable_offers
+
+
+def is_divisible_into_blocks(
+    cpu_count: int, gpu_count: int, blocks: Union[int, Literal["auto"]]
+) -> tuple[bool, int]:
+    """
+    Returns `True` and number of blocks the instance can be split into or `False` and `0` if
+    is not divisible.
+    Requested number of blocks can be `auto`, which means as many as possible.
+    """
+    if blocks == "auto":
+        if gpu_count == 0:
+            blocks = cpu_count
+        else:
+            blocks = min(cpu_count, gpu_count)
+    if blocks < 1 or cpu_count % blocks or gpu_count % blocks:
+        return False, 0
+    return True, blocks
+
+
+def generate_shared_offer(
+    offer: InstanceOfferWithAvailability, blocks: int, total_blocks: int
+) -> InstanceOfferWithAvailability:
+    full_resources = offer.instance.resources
+    resources = Resources(
+        cpus=full_resources.cpus // total_blocks * blocks,
+        memory_mib=full_resources.memory_mib // total_blocks * blocks,
+        gpus=full_resources.gpus[: len(full_resources.gpus) // total_blocks * blocks],
+        spot=full_resources.spot,
+        disk=full_resources.disk,
+        description=full_resources.description,
+    )
+    return InstanceOfferWithAvailability(
+        backend=offer.backend,
+        instance=InstanceType(
+            name=offer.instance.name,
+            resources=resources,
+        ),
+        region=offer.region,
+        price=offer.price,
+        availability=offer.availability,
+        blocks=blocks,
+        total_blocks=total_blocks,
+    )

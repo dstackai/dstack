@@ -110,12 +110,15 @@ def get_dev_env_run_plan_dict(
                 "instance_types": None,
                 "creation_policy": None,
                 "instance_name": None,
+                "single_branch": None,
                 "max_duration": "off",
+                "stop_duration": None,
                 "max_price": None,
                 "pool_name": DEFAULT_POOL_NAME,
                 "retry": None,
                 "retry_policy": None,
                 "spot_policy": "spot",
+                "idle_duration": None,
                 "termination_idle_time": 300,
                 "termination_policy": None,
                 "reservation": None,
@@ -129,12 +132,14 @@ def get_dev_env_run_plan_dict(
                 "default": False,
                 "instance_name": None,
                 "max_duration": "off",
+                "stop_duration": None,
                 "max_price": None,
                 "name": "string",
                 "pool_name": DEFAULT_POOL_NAME,
                 "retry": None,
                 "retry_policy": None,
                 "spot_policy": "spot",
+                "idle_duration": None,
                 "termination_idle_time": 300,
                 "termination_policy": None,
                 "reservation": None,
@@ -176,7 +181,9 @@ def get_dev_env_run_plan_dict(
                     "replica_num": 0,
                     "job_num": 0,
                     "jobs_per_replica": 1,
+                    "single_branch": False,
                     "max_duration": None,
+                    "stop_duration": 300,
                     "registry_auth": None,
                     "requirements": {
                         "resources": {
@@ -191,6 +198,7 @@ def get_dev_env_run_plan_dict(
                         "reservation": None,
                     },
                     "retry": None,
+                    "volumes": volumes,
                     "retry_policy": {"retry": False, "duration": None},
                     "working_dir": ".",
                 },
@@ -256,12 +264,15 @@ def get_dev_env_run_dict(
                 "instance_types": None,
                 "creation_policy": None,
                 "instance_name": None,
+                "single_branch": None,
                 "max_duration": "off",
+                "stop_duration": None,
                 "max_price": None,
                 "pool_name": DEFAULT_POOL_NAME,
                 "retry": None,
                 "retry_policy": None,
                 "spot_policy": "spot",
+                "idle_duration": None,
                 "termination_idle_time": 300,
                 "termination_policy": None,
                 "reservation": None,
@@ -275,12 +286,14 @@ def get_dev_env_run_dict(
                 "default": False,
                 "instance_name": None,
                 "max_duration": "off",
+                "stop_duration": None,
                 "max_price": None,
                 "name": "string",
                 "pool_name": DEFAULT_POOL_NAME,
                 "retry": None,
                 "retry_policy": None,
                 "spot_policy": "spot",
+                "idle_duration": None,
                 "termination_idle_time": 300,
                 "termination_policy": None,
                 "reservation": None,
@@ -322,7 +335,9 @@ def get_dev_env_run_dict(
                     "replica_num": 0,
                     "job_num": 0,
                     "jobs_per_replica": 1,
+                    "single_branch": False,
                     "max_duration": None,
+                    "stop_duration": 300,
                     "registry_auth": None,
                     "requirements": {
                         "resources": {
@@ -337,6 +352,7 @@ def get_dev_env_run_dict(
                         "reservation": None,
                     },
                     "retry": None,
+                    "volumes": [],
                     "retry_policy": {"retry": False, "duration": None},
                     "working_dir": ".",
                 },
@@ -351,6 +367,7 @@ def get_dev_env_run_dict(
                         "termination_reason": None,
                         "termination_reason_message": None,
                         "job_provisioning_data": None,
+                        "job_runtime_data": None,
                     }
                 ],
             }
@@ -365,6 +382,7 @@ def get_dev_env_run_dict(
             "termination_reason": None,
             "termination_reason_message": None,
             "job_provisioning_data": None,
+            "job_runtime_data": None,
         },
         "cost": 0.0,
         "service": None,
@@ -475,6 +493,7 @@ class TestListRuns:
                                 "termination_reason": None,
                                 "termination_reason_message": None,
                                 "job_provisioning_data": None,
+                                "job_runtime_data": None,
                             }
                         ],
                     }
@@ -489,6 +508,7 @@ class TestListRuns:
                     "termination_reason_message": None,
                     "termination_reason": None,
                     "job_provisioning_data": None,
+                    "job_runtime_data": None,
                 },
                 "cost": 0,
                 "service": None,
@@ -717,10 +737,12 @@ class TestGetRunPlan:
         with patch("dstack._internal.server.services.backends.get_project_backends") as m:
             backend_mock_aws = Mock()
             backend_mock_aws.TYPE = BackendType.AWS
-            backend_mock_aws.compute.return_value.get_offers.return_value = [offer_aws]
+            backend_mock_aws.compute.return_value.get_offers_cached.return_value = [offer_aws]
             backend_mock_runpod = Mock()
             backend_mock_runpod.TYPE = BackendType.RUNPOD
-            backend_mock_runpod.compute.return_value.get_offers.return_value = [offer_runpod]
+            backend_mock_runpod.compute.return_value.get_offers_cached.return_value = [
+                offer_runpod
+            ]
             m.return_value = [backend_mock_aws, backend_mock_runpod]
             response = await client.post(
                 f"/api/project/{project.name}/runs/get_plan",
@@ -777,10 +799,12 @@ class TestGetRunPlan:
         with patch("dstack._internal.server.services.backends.get_project_backends") as m:
             backend_mock_aws = Mock()
             backend_mock_aws.TYPE = BackendType.AWS
-            backend_mock_aws.compute.return_value.get_offers.return_value = [offer_aws]
+            backend_mock_aws.compute.return_value.get_offers_cached.return_value = [offer_aws]
             backend_mock_runpod = Mock()
             backend_mock_runpod.TYPE = BackendType.RUNPOD
-            backend_mock_runpod.compute.return_value.get_offers.return_value = [offer_runpod]
+            backend_mock_runpod.compute.return_value.get_offers_cached.return_value = [
+                offer_runpod
+            ]
             m.return_value = [backend_mock_aws, backend_mock_runpod]
             response = await client.post(
                 f"/api/project/{project.name}/runs/get_plan",
@@ -837,10 +861,12 @@ class TestGetRunPlan:
         with patch("dstack._internal.server.services.backends.get_project_backends") as m:
             backend_mock_aws = Mock()
             backend_mock_aws.TYPE = BackendType.AWS
-            backend_mock_aws.compute.return_value.get_offers.return_value = [offer_aws]
+            backend_mock_aws.compute.return_value.get_offers_cached.return_value = [offer_aws]
             backend_mock_runpod = Mock()
             backend_mock_runpod.TYPE = BackendType.RUNPOD
-            backend_mock_runpod.compute.return_value.get_offers.return_value = [offer_runpod]
+            backend_mock_runpod.compute.return_value.get_offers_cached.return_value = [
+                offer_runpod
+            ]
             m.return_value = [backend_mock_aws, backend_mock_runpod]
             response = await client.post(
                 f"/api/project/{project.name}/runs/get_plan",
@@ -1252,10 +1278,10 @@ class TestStopRuns:
         )
         assert response.status_code == 200
         await session.refresh(run)
-        assert run.status == RunStatus.TERMINATED
+        assert run.status == RunStatus.TERMINATING
         assert run.termination_reason == RunTerminationReason.STOPPED_BY_USER
         await session.refresh(job)
-        assert job.status == JobStatus.TERMINATED
+        assert job.status == JobStatus.TERMINATING
         assert job.termination_reason == JobTerminationReason.TERMINATED_BY_USER
 
     @pytest.mark.asyncio
@@ -1468,7 +1494,7 @@ class TestCreateInstance:
                 availability=InstanceAvailability.AVAILABLE,
             )
             backend = Mock()
-            backend.compute.return_value.get_offers.return_value = [offer]
+            backend.compute.return_value.get_offers_cached.return_value = [offer]
             backend.compute.return_value.create_instance.return_value = JobProvisioningData(
                 backend=offer.backend,
                 instance_type=offer.instance,
@@ -1498,6 +1524,8 @@ class TestCreateInstance:
                 "backend": None,
                 "instance_type": None,
                 "name": result["name"],
+                "fleet_id": None,
+                "fleet_name": None,
                 "instance_num": 0,
                 "job_name": None,
                 "hostname": None,
@@ -1508,6 +1536,8 @@ class TestCreateInstance:
                 "pool_name": None,
                 "region": None,
                 "price": None,
+                "total_blocks": 1,
+                "busy_blocks": 0,
             }
             assert result == expected
 
@@ -1540,7 +1570,7 @@ class TestCreateInstance:
             )
             backend = Mock()
             backend.TYPE = BackendType.AZURE
-            backend.compute.return_value.get_offers.return_value = [offer]
+            backend.compute.return_value.get_offers_cached.return_value = [offer]
             backend.compute.return_value.create_instance.side_effect = NotImplementedError()
             run_plan_by_req.return_value = [(backend, offer)]
             response = await client.post(
@@ -1582,7 +1612,7 @@ class TestCreateInstance:
 
             backend = Mock()
             backend.TYPE = BackendType.VASTAI
-            backend.compute.return_value.get_offers.return_value = [offers]
+            backend.compute.return_value.get_offers_cached.return_value = [offers]
             backend.compute.return_value.create_instance.side_effect = NotImplementedError()
             run_plan_by_req.return_value = [(backend, offers)]
 
