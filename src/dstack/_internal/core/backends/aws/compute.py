@@ -240,6 +240,7 @@ class AWSCompute(Compute):
                         allocate_public_ip=allocate_public_ip,
                         placement_group_name=instance_config.placement_group_name,
                         enable_efa=enable_efa,
+                        max_efa_interfaces=max_efa_interfaces,
                         reservation_id=instance_config.reservation,
                         is_capacity_block=is_capacity_block,
                     )

@@ -47,8 +47,8 @@ This ensures all instances are provisioned in the same backend and region with o
 ??? info "AWS"
     `dstack` automatically enables the Elastic Fabric Adapter for all
     [EFA-capable instance types :material-arrow-top-right-thin:{ .external }](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/efa.html#efa-instance-types){:target="_blank"}.
-    Currently, only one EFA interface is enabled per instance, regardless of its maximum capacity.
-    This will change once [this issue :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/1804){:target="_blank"} is resolved.
+    If the `aws` backend config has `public_ips: false` set, `dstack` enables the maximum number of interfaces supported by the instance.
+    Otherwise, if instances have public IPs, only one EFA interface is enabled per instance due to AWS limitations.
 
 > The `cluster` placement is supported only for `aws`, `azure`, `gcp`, `oci`, and `vultr`
 > backends.
