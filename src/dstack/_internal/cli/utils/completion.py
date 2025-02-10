@@ -35,3 +35,29 @@ class RunNameCompleter(BaseProjectCompleter):
         except Exception as e:
             debug("Error fetching run completions: " + str(e))
             return []
+
+
+class FleetNameCompleter(BaseProjectCompleter):
+    def __call__(self, prefix, parsed_args, **kwargs):
+        api = self.get_api(parsed_args)
+        debug("Fetching fleet completions")
+        try:
+            fleets = api.client.fleets.list(api.project)
+            completions = [fleet.name for fleet in fleets if fleet.name.startswith(prefix)]
+            return completions
+        except Exception as e:
+            debug("Error fetching fleet completions: " + str(e))
+            return []
+
+
+class VolumeNameCompleter(BaseProjectCompleter):
+    def __call__(self, prefix, parsed_args, **kwargs):
+        api = self.get_api(parsed_args)
+        debug("Fetching volume completions")
+        try:
+            volumes = api.client.volumes.list(api.project)
+            completions = [volume.name for volume in volumes if volume.name.startswith(prefix)]
+            return completions
+        except Exception as e:
+            debug("Error fetching volume completions: " + str(e))
+            return []
