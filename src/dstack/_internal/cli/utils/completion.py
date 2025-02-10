@@ -16,11 +16,11 @@ class BaseProjectCompleter(BaseCompleter):
         super().__init__()
 
     def get_api(self, parsed_args):
-        # TODO: Feedback needed: Refactor this to avoid duplication with APIBaseCommand._register()
+        # TODO: Feedback needed: Refactor this to avoid duplication with APIBaseCommand._register().
+        # The client has to be explicitly initialized here since argcomplete does not trigger APIBaseCommand._command(),
+        # and APIBaseCommand().api is not being set. This is a temporary hack.
         debug("Retrieving API client")
-        project = getattr(parsed_args, "project", None)
-        if not project:
-            project = os.getenv("DSTACK_PROJECT")
+        project = getattr(parsed_args, "project", os.getenv("DSTACK_PROJECT"))
         return Client.from_config(project_name=project)
 
 
