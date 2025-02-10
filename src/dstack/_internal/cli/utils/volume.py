@@ -2,7 +2,7 @@ from typing import List
 
 from rich.table import Table
 
-from dstack._internal.cli.utils.common import console
+from dstack._internal.cli.utils.common import add_row_from_dict, console
 from dstack._internal.core.models.volumes import Volume
 from dstack._internal.utils.common import DateFormatter, pretty_date
 
@@ -37,17 +37,13 @@ def get_volumes_table(
                 and volume.provisioning_data.availability_zone is not None
             ):
                 region += f" ({volume.provisioning_data.availability_zone})"
-        renderables = [
-            volume.name,
-            backend,
-        ]
-        if verbose:
-            renderables.append(region)
-        renderables += [
-            volume.status,
-            format_date(volume.created_at),
-        ]
-        if verbose:
-            renderables.append(volume.status_message or "")
-        table.add_row(*renderables)
+        row = {
+            "NAME": volume.name,
+            "BACKEND": backend,
+            "REGION": region,
+            "STATUS": volume.status,
+            "CREATED": format_date(volume.created_at),
+            "ERROR": volume.status_message,
+        }
+        add_row_from_dict(table, row)
     return table
