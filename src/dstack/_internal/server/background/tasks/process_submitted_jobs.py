@@ -207,12 +207,14 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
             detaching_instances_ids = await get_instances_ids_with_detaching_volumes(session)
             # Refetch after lock
             res = await session.execute(
-                select(InstanceModel).where(
+                select(InstanceModel)
+                .where(
                     InstanceModel.id.not_in(detaching_instances_ids),
                     InstanceModel.id.in_(instances_ids),
                     InstanceModel.deleted == False,
                     InstanceModel.total_blocks > InstanceModel.busy_blocks,
                 )
+                .execution_options(populate_existing=True)
             )
             pool_instances = list(res.unique().scalars().all())
             instance = await _assign_job_to_pool_instance(
