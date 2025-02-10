@@ -11,8 +11,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import dstack._internal.server.services.backends as backends_services
 from dstack._internal.core.backends.base import Backend
 from dstack._internal.core.consts import DSTACK_RUNNER_HTTP_PORT, DSTACK_SHIM_HTTP_PORT
-from dstack._internal.core.errors import BackendError, ResourceNotExistsError, SSHError
+from dstack._internal.core.errors import (
+    BackendError,
+    ResourceNotExistsError,
+    ServerClientError,
+    SSHError,
+)
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.common import is_core_model_instance
 from dstack._internal.core.models.configurations import RunConfigurationType
 from dstack._internal.core.models.instances import InstanceStatus, RemoteConnectionInfo
 from dstack._internal.core.models.runs import (
@@ -25,6 +31,7 @@ from dstack._internal.core.models.runs import (
     JobTerminationReason,
     RunSpec,
 )
+from dstack._internal.core.models.volumes import Volume, VolumeMountPoint, VolumeStatus
 from dstack._internal.server.models import (
     InstanceModel,
     JobModel,
@@ -33,7 +40,11 @@ from dstack._internal.server.models import (
     VolumeModel,
 )
 from dstack._internal.server.services import services
-from dstack._internal.server.services.jobs.configurators.base import JobConfigurator
+from dstack._internal.server.services import volumes as volumes_services
+from dstack._internal.server.services.jobs.configurators.base import (
+    JobConfigurator,
+    interpolate_job_volumes,
+)
 from dstack._internal.server.services.jobs.configurators.dev import DevEnvironmentJobConfigurator
 from dstack._internal.server.services.jobs.configurators.service import ServiceJobConfigurator
 from dstack._internal.server.services.jobs.configurators.task import TaskJobConfigurator
@@ -535,3 +546,142 @@ async def get_instances_ids_with_detaching_volumes(session: AsyncSession) -> Lis
     )
     job_models = res.scalars().all()
     return [jm.used_instance_id for jm in job_models if jm.used_instance_id]
+
+
+async def get_job_configured_volumes(
+    session: AsyncSession,
+    project: ProjectModel,
+    run_spec: RunSpec,
+    job_num: int,
+    job_spec: Optional[JobSpec] = None,
+) -> List[List[Volume]]:
+    """
+    Returns a list of job volumes grouped by mount points.
+    """
+    volume_models = await get_job_configured_volume_models(
+        session=session,
+        project=project,
+        run_spec=run_spec,
+        job_num=job_num,
+        job_spec=job_spec,
+    )
+    return [
+        [volumes_services.volume_model_to_volume(v) for v in mount_point_volume_models]
+        for mount_point_volume_models in volume_models
+    ]
+
+
+async def get_job_configured_volume_models(
+    session: AsyncSession,
+    project: ProjectModel,
+    run_spec: RunSpec,
+    job_num: int,
+    job_spec: Optional[JobSpec] = None,
+) -> List[List[VolumeModel]]:
+    """
+    Returns a list of job volume models grouped by mount points.
+    """
+    job_volumes = None
+    if job_spec is not None:
+        job_volumes = job_spec.volumes
+    if job_volumes is None:
+        # job_spec not provided or a legacy job_spec without volumes
+        job_volumes = interpolate_job_volumes(run_spec.configuration.volumes, job_num)
+    volume_models = []
+    for mount_point in job_volumes:
+        if not is_core_model_instance(mount_point, VolumeMountPoint):
+            continue
+        if isinstance(mount_point.name, str):
+            names = [mount_point.name]
+        else:
+            names = mount_point.name
+        mount_point_volume_models = []
+        for name in names:
+            volume_model = await volumes_services.get_project_volume_model_by_name(
+                session=session,
+                project=project,
+                name=name,
+            )
+            if volume_model is None:
+                raise ResourceNotExistsError(f"Volume {mount_point.name} not found")
+            mount_point_volume_models.append(volume_model)
+        volume_models.append(mount_point_volume_models)
+    return volume_models
+
+
+def check_can_attach_job_volumes(volumes: List[List[Volume]]):
+    """
+    Performs basic checks if volumes can be attached.
+    This is useful to show error ASAP (when user submits the run).
+    If the attachment is to fail anyway, the error will be handled when proccessing submitted jobs.
+    """
+    if len(volumes) == 0:
+        return
+    expected_backends = {v.configuration.backend for v in volumes[0]}
+    expected_regions = {v.configuration.region for v in volumes[0]}
+    for mount_point_volumes in volumes:
+        backends = {v.configuration.backend for v in mount_point_volumes}
+        regions = {v.configuration.region for v in mount_point_volumes}
+        if backends != expected_backends:
+            raise ServerClientError(
+                "Volumes from different backends specified for different mount points"
+            )
+        if regions != expected_regions:
+            raise ServerClientError(
+                "Volumes from different regions specified for different mount points"
+            )
+        for volume in mount_point_volumes:
+            if volume.status != VolumeStatus.ACTIVE:
+                raise ServerClientError(f"Cannot mount volumes that are not active: {volume.name}")
+    volumes_names = [v.name for vs in volumes for v in vs]
+    if len(volumes_names) != len(set(volumes_names)):
+        raise ServerClientError("Cannot attach the same volume at different mount points")
+
+
+async def get_job_attached_volumes(
+    session: AsyncSession,
+    project: ProjectModel,
+    run_spec: RunSpec,
+    job_num: int,
+    job_provisioning_data: JobProvisioningData,
+) -> List[Volume]:
+    """
+    Returns volumes attached to the job.
+    """
+    job_configured_volumes = await get_job_configured_volumes(
+        session=session,
+        project=project,
+        run_spec=run_spec,
+        job_num=job_num,
+    )
+    job_volumes = []
+    for mount_point_volumes in job_configured_volumes:
+        job_volumes.append(
+            _get_job_mount_point_attached_volume(mount_point_volumes, job_provisioning_data)
+        )
+    return job_volumes
+
+
+def _get_job_mount_point_attached_volume(
+    volumes: List[Volume],
+    job_provisioning_data: JobProvisioningData,
+) -> Volume:
+    """
+    Returns the volume attached to the job among the list of possible mount point volumes.
+    """
+    for volume in volumes:
+        if (
+            volume.configuration.backend != job_provisioning_data.get_base_backend()
+            or volume.configuration.region != job_provisioning_data.region
+        ):
+            continue
+        if (
+            volume.provisioning_data is not None
+            and volume.provisioning_data.availability_zone is not None
+            and job_provisioning_data.availability_zone is not None
+            and volume.provisioning_data.availability_zone
+            != job_provisioning_data.availability_zone
+        ):
+            continue
+        return volume
+    raise ServerClientError("Failed to find an eligible volume for the mount point")

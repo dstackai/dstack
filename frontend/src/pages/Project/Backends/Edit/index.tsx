@@ -6,6 +6,7 @@ import { pick } from 'lodash';
 import { Container, Header, Loader } from 'components';
 
 import { useBreadcrumbs, useNotifications } from 'hooks';
+import { getServerError } from 'libs';
 import { ROUTES } from 'routes';
 import {
     // useGetBackendConfigQuery,
@@ -100,7 +101,12 @@ export const BackendEdit: React.FC = () => {
                     content: t('backend.edit.success_notification'),
                 });
             })
-            .catch(console.log);
+            .catch((error) => {
+                pushNotification({
+                    type: 'error',
+                    content: t('common.server_error', { error: getServerError(error) }),
+                });
+            });
 
         return request;
     };

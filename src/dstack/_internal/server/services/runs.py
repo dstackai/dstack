@@ -29,7 +29,6 @@ from dstack._internal.core.models.runs import (
     ApplyRunPlanInput,
     Job,
     JobPlan,
-    JobProvisioningData,
     JobSpec,
     JobStatus,
     JobSubmission,
@@ -45,8 +44,6 @@ from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.core.models.volumes import (
     InstanceMountPoint,
     Volume,
-    VolumeMountPoint,
-    VolumeStatus,
 )
 from dstack._internal.core.services import validate_dstack_resource_name
 from dstack._internal.core.services.diff import diff_models
@@ -58,15 +55,15 @@ from dstack._internal.server.models import (
     RepoModel,
     RunModel,
     UserModel,
-    VolumeModel,
 )
 from dstack._internal.server.services import repos as repos_services
 from dstack._internal.server.services import services
-from dstack._internal.server.services import volumes as volumes_services
 from dstack._internal.server.services.docker import is_valid_docker_volume_target
 from dstack._internal.server.services.jobs import (
+    check_can_attach_job_volumes,
     delay_job_instance_termination,
     get_instances_ids_with_detaching_volumes,
+    get_job_configured_volumes,
     get_jobs_from_run_spec,
     group_jobs_by_replica_latest,
     job_model_to_job_submission,
@@ -301,10 +298,11 @@ async def get_plan(
     # TODO(egor-s): do we need to generate all replicas here?
     jobs = await get_jobs_from_run_spec(run_spec, replica_num=0)
 
-    volumes = await get_run_volumes(
+    volumes = await get_job_configured_volumes(
         session=session,
         project=project,
         run_spec=run_spec,
+        job_num=0,
     )
 
     pool = await get_or_create_pool_by_name(
@@ -451,7 +449,7 @@ async def submit_run(
         else:
             await delete_runs(session=session, project=project, runs_names=[run_spec.run_name])
 
-        await validate_run(
+        await _validate_run(
             session=session,
             user=user,
             project=project,
@@ -736,186 +734,42 @@ async def _generate_run_name(
         idx += 1
 
 
-async def validate_run(
-    session: AsyncSession,
-    user: UserModel,
-    project: ProjectModel,
-    run_spec: RunSpec,
-):
-    volumes = await get_run_volumes(
-        session=session,
-        project=project,
-        run_spec=run_spec,
-    )
-    check_can_attach_run_volumes(
-        run_spec=run_spec,
-        volumes=volumes,
-    )
-
-
-async def get_run_volumes(
-    session: AsyncSession,
-    project: ProjectModel,
-    run_spec: RunSpec,
-) -> List[List[Volume]]:
-    """
-    Returns list of run volumes grouped by mount points.
-    """
-    volume_models = await get_run_volume_models(
-        session=session,
-        project=project,
-        run_spec=run_spec,
-    )
-    return [
-        [volumes_services.volume_model_to_volume(v) for v in mount_point_volume_models]
-        for mount_point_volume_models in volume_models
-    ]
-
-
-async def get_run_volume_models(
-    session: AsyncSession,
-    project: ProjectModel,
-    run_spec: RunSpec,
-) -> List[List[VolumeModel]]:
-    """
-    Returns list of run volume models grouped by mount points.
-    """
-    if len(run_spec.configuration.volumes) == 0:
-        return []
-    volume_models = []
-    for mount_point in run_spec.configuration.volumes:
-        if not is_core_model_instance(mount_point, VolumeMountPoint):
-            continue
-        if isinstance(mount_point.name, str):
-            names = [mount_point.name]
-        else:
-            names = mount_point.name
-        mount_point_volume_models = []
-        for name in names:
-            volume_model = await volumes_services.get_project_volume_model_by_name(
-                session=session,
-                project=project,
-                name=name,
-            )
-            if volume_model is None:
-                raise ResourceNotExistsError(f"Volume {mount_point.name} not found")
-            mount_point_volume_models.append(volume_model)
-        volume_models.append(mount_point_volume_models)
-    return volume_models
-
-
-def check_can_attach_run_volumes(
-    run_spec: RunSpec,
-    volumes: List[List[Volume]],
-):
-    """
-    Performs basic checks if volumes can be attached.
-    This is useful to show error ASAP (when user submits the run).
-    If the attachment is to fail anyway, the error will be handled when proccessing submitted jobs.
-    """
-    if len(volumes) == 0:
-        return
-    expected_backends = {v.configuration.backend for v in volumes[0]}
-    expected_regions = {v.configuration.region for v in volumes[0]}
-    for mount_point_volumes in volumes:
-        backends = {v.configuration.backend for v in mount_point_volumes}
-        regions = {v.configuration.region for v in mount_point_volumes}
-        if backends != expected_backends:
-            raise ServerClientError(
-                "Volumes from different backends specified for different mount points"
-            )
-        if regions != expected_regions:
-            raise ServerClientError(
-                "Volumes from different regions specified for different mount points"
-            )
-        for volume in mount_point_volumes:
-            if volume.status != VolumeStatus.ACTIVE:
-                raise ServerClientError(f"Cannot mount volumes that are not active: {volume.name}")
-    volumes_names = [v.name for vs in volumes for v in vs]
-    if len(volumes_names) != len(set(volumes_names)):
-        raise ServerClientError("Cannot attach the same volume at different mount points")
-
-
-async def get_job_volumes(
-    session: AsyncSession,
-    project: ProjectModel,
-    run_spec: RunSpec,
-    job_provisioning_data: JobProvisioningData,
-) -> List[Volume]:
-    """
-    Returns volumes attached to the job.
-    """
-    run_volumes = await get_run_volumes(
-        session=session,
-        project=project,
-        run_spec=run_spec,
-    )
-    job_volumes = []
-    for mount_point_volumes in run_volumes:
-        job_volumes.append(get_job_mount_point_volume(mount_point_volumes, job_provisioning_data))
-    return job_volumes
-
-
-def get_job_mount_point_volume(
-    volumes: List[Volume],
-    job_provisioning_data: JobProvisioningData,
-) -> Volume:
-    """
-    Returns the volume attached to the job among the list of possible mount point volumes.
-    """
-    for volume in volumes:
-        if (
-            volume.configuration.backend != job_provisioning_data.get_base_backend()
-            or volume.configuration.region != job_provisioning_data.region
-        ):
-            continue
-        if (
-            volume.provisioning_data is not None
-            and volume.provisioning_data.availability_zone is not None
-            and job_provisioning_data.availability_zone is not None
-            and volume.provisioning_data.availability_zone
-            != job_provisioning_data.availability_zone
-        ):
-            continue
-        return volume
-    raise ServerClientError("Failed to find an eligible volume for the mount point")
-
-
-def get_offer_volumes(
-    volumes: List[List[Volume]],
-    offer: InstanceOfferWithAvailability,
-) -> List[Volume]:
-    """
-    Returns volumes suitable for the offer for each mount point.
-    """
-    offer_volumes = []
-    for mount_point_volumes in volumes:
-        offer_volumes.append(get_offer_mount_point_volume(mount_point_volumes, offer))
-    return offer_volumes
-
-
-def get_offer_mount_point_volume(
-    volumes: List[Volume],
-    offer: InstanceOfferWithAvailability,
-) -> Volume:
-    """
-    Returns the first suitable volume for the offer among possible mount point volumes.
-    """
-    for volume in volumes:
-        if (
-            volume.configuration.backend != offer.backend
-            or volume.configuration.region != offer.region
-        ):
-            continue
-        return volume
-    raise ServerClientError("Failed to find an eligible volume for the mount point")
-
-
 def check_run_spec_requires_instance_mounts(run_spec: RunSpec) -> bool:
     return any(
         is_core_model_instance(mp, InstanceMountPoint) and not mp.optional
         for mp in run_spec.configuration.volumes
     )
+
+
+async def _validate_run(
+    session: AsyncSession,
+    user: UserModel,
+    project: ProjectModel,
+    run_spec: RunSpec,
+):
+    await _validate_run_volumes(
+        session=session,
+        project=project,
+        run_spec=run_spec,
+    )
+
+
+async def _validate_run_volumes(
+    session: AsyncSession,
+    project: ProjectModel,
+    run_spec: RunSpec,
+):
+    # The volumes validation should be done here and not in job configurator
+    # since potentially we may need to validate volumes for jobs/replicas
+    # that won't be created immediately (e.g. range of replicas or nodes).
+    nodes = 1
+    if run_spec.configuration.type == "task":
+        nodes = run_spec.configuration.nodes
+    for job_num in range(nodes):
+        volumes = await get_job_configured_volumes(
+            session=session, project=project, run_spec=run_spec, job_num=job_num
+        )
+        check_can_attach_job_volumes(volumes=volumes)
 
 
 async def _get_run_repo_or_error(

@@ -7,7 +7,7 @@ import { PermissionGuard } from 'components/PermissionGuard';
 import { HotspotIds } from 'layouts/AppLayout/TutorialPanel/constants';
 
 import { useAppSelector, useBreadcrumbs, useNotifications } from 'hooks';
-import { centsToFormattedString, goToUrl } from 'libs';
+import { centsToFormattedString, getServerError, goToUrl } from 'libs';
 import { ROUTES } from 'routes';
 import {
     useGetUserBillingInfoQuery,
@@ -75,7 +75,7 @@ export const Billing: React.FC = () => {
             .catch((error) => {
                 pushNotification({
                     type: 'error',
-                    content: t('common.server_error', { error: error?.msg }),
+                    content: t('common.server_error', { error: getServerError(error) }),
                 });
             })
             .finally(closeModal);
@@ -94,7 +94,7 @@ export const Billing: React.FC = () => {
             .catch((error) => {
                 pushNotification({
                     type: 'error',
-                    content: t('common.server_error', { error: error?.msg }),
+                    content: t('common.server_error', { error: getServerError(error) }),
                 });
             })
             .finally(closeModal);

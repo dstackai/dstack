@@ -34,6 +34,7 @@ from dstack._internal.server.services import logs as logs_services
 from dstack._internal.server.services import services
 from dstack._internal.server.services.jobs import (
     find_job,
+    get_job_attached_volumes,
     get_job_runtime_data,
     job_model_to_job_submission,
 )
@@ -47,7 +48,6 @@ from dstack._internal.server.services.repos import (
 from dstack._internal.server.services.runner import client
 from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
 from dstack._internal.server.services.runs import (
-    get_job_volumes,
     run_model_to_run,
 )
 from dstack._internal.server.services.storage import get_default_storage
@@ -142,10 +142,11 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
         job_provisioning_data=job_provisioning_data,
     )
 
-    volumes = await get_job_volumes(
+    volumes = await get_job_attached_volumes(
         session=session,
         project=project,
         run_spec=run.run_spec,
+        job_num=job.job_spec.job_num,
         job_provisioning_data=job_provisioning_data,
     )
 

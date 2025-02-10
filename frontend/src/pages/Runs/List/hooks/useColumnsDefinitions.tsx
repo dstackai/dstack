@@ -26,12 +26,7 @@ export const useColumnsDefinitions = () => {
             header: t('projects.run.run_name'),
             cell: (item: IRun) => {
                 return item.id !== null ? (
-                    <NavigateLink
-                        href={ROUTES.PROJECT.DETAILS.RUNS.DETAILS.FORMAT(
-                            item.project_name,
-                            item.run_spec.run_name ?? 'No run name',
-                        )}
-                    >
+                    <NavigateLink href={ROUTES.PROJECT.DETAILS.RUNS.DETAILS.FORMAT(item.project_name, item.id)}>
                         {item.run_spec.run_name}
                     </NavigateLink>
                 ) : (

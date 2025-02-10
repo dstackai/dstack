@@ -35,7 +35,7 @@ export const JobDetails: React.FC = () => {
     const { t } = useTranslation();
     const params = useParams();
     const paramProjectName = params.projectName ?? '';
-    const paramRunName = params.runName ?? '';
+    const paramRunId = params.runId ?? '';
     const paramJobName = params.jobName ?? '';
 
     const {
@@ -44,7 +44,7 @@ export const JobDetails: React.FC = () => {
         error: runError,
     } = useGetRunQuery({
         project_name: paramProjectName,
-        run_name: paramRunName,
+        id: paramRunId,
     });
 
     useEffect(() => {
@@ -75,16 +75,16 @@ export const JobDetails: React.FC = () => {
             href: ROUTES.RUNS.LIST,
         },
         {
-            text: paramRunName,
-            href: ROUTES.PROJECT.DETAILS.RUNS.DETAILS.FORMAT(paramProjectName, paramRunName),
+            text: paramRunId,
+            href: ROUTES.PROJECT.DETAILS.RUNS.DETAILS.FORMAT(paramProjectName, paramRunId),
         },
         {
             text: t('projects.run.jobs'),
-            href: ROUTES.PROJECT.DETAILS.RUNS.DETAILS.FORMAT(paramProjectName, paramRunName),
+            href: ROUTES.PROJECT.DETAILS.RUNS.DETAILS.FORMAT(paramProjectName, paramRunId),
         },
         {
             text: paramJobName,
-            href: ROUTES.PROJECT.DETAILS.RUNS.DETAILS.JOBS.DETAILS.FORMAT(paramProjectName, paramRunName, paramJobName),
+            href: ROUTES.PROJECT.DETAILS.RUNS.DETAILS.JOBS.DETAILS.FORMAT(paramProjectName, paramRunId, paramJobName),
         },
     ]);
 
@@ -154,7 +154,7 @@ export const JobDetails: React.FC = () => {
 
                         <Logs
                             projectName={paramProjectName}
-                            runName={paramRunName}
+                            runName={paramRunId}
                             jobSubmissionId={getJobSubmissionId(jobData)}
                             className={styles.logs}
                         />

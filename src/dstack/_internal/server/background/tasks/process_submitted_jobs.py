@@ -50,8 +50,11 @@ from dstack._internal.server.services.fleets import (
     fleet_model_to_fleet,
 )
 from dstack._internal.server.services.jobs import (
+    check_can_attach_job_volumes,
     find_job,
     get_instances_ids_with_detaching_volumes,
+    get_job_configured_volume_models,
+    get_job_configured_volumes,
     get_job_runtime_data,
 )
 from dstack._internal.server.services.locking import get_locker
@@ -64,11 +67,7 @@ from dstack._internal.server.services.pools import (
     get_shared_pool_instances_with_offers,
 )
 from dstack._internal.server.services.runs import (
-    check_can_attach_run_volumes,
     check_run_spec_requires_instance_mounts,
-    get_offer_volumes,
-    get_run_volume_models,
-    get_run_volumes,
     run_model_to_run,
 )
 from dstack._internal.server.services.volumes import (
@@ -154,17 +153,21 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
             await session.commit()
             return
     try:
-        volume_models = await get_run_volume_models(
+        volume_models = await get_job_configured_volume_models(
             session=session,
             project=project,
             run_spec=run_spec,
+            job_num=job.job_spec.job_num,
+            job_spec=job.job_spec,
         )
-        volumes = await get_run_volumes(
+        volumes = await get_job_configured_volumes(
             session=session,
             project=project,
             run_spec=run_spec,
+            job_num=job.job_spec.job_num,
+            job_spec=job.job_spec,
         )
-        check_can_attach_run_volumes(run_spec=run_spec, volumes=volumes)
+        check_can_attach_job_volumes(volumes)
     except ServerClientError as e:
         logger.warning("%s: failed to prepare run volumes: %s", fmt(job_model), repr(e))
         job_model.status = JobStatus.TERMINATING
@@ -453,7 +456,7 @@ async def _run_job_on_new_instance(
             offer.region,
             offer.price,
         )
-        offer_volumes = get_offer_volumes(volumes, offer)
+        offer_volumes = _get_offer_volumes(volumes, offer)
         try:
             job_provisioning_data = await common_utils.run_async(
                 backend.compute().run_job,
@@ -599,6 +602,36 @@ def _prepare_job_runtime_data(offer: InstanceOfferWithAvailability) -> JobRuntim
         gpu=len(offer.instance.resources.gpus),
         memory=Memory(offer.instance.resources.memory_mib / 1024),
     )
+
+
+def _get_offer_volumes(
+    volumes: List[List[Volume]],
+    offer: InstanceOfferWithAvailability,
+) -> List[Volume]:
+    """
+    Returns volumes suitable for the offer for each mount point.
+    """
+    offer_volumes = []
+    for mount_point_volumes in volumes:
+        offer_volumes.append(_get_offer_mount_point_volume(mount_point_volumes, offer))
+    return offer_volumes
+
+
+def _get_offer_mount_point_volume(
+    volumes: List[Volume],
+    offer: InstanceOfferWithAvailability,
+) -> Volume:
+    """
+    Returns the first suitable volume for the offer among possible mount point volumes.
+    """
+    for volume in volumes:
+        if (
+            volume.configuration.backend != offer.backend
+            or volume.configuration.region != offer.region
+        ):
+            continue
+        return volume
+    raise ServerClientError("Failed to find an eligible volume for the mount point")
 
 
 async def _attach_volumes(

@@ -7,7 +7,7 @@ import { get as _get } from 'lodash';
 import { Button, Container, FormSelect, FormSelectOptions, FormUI, Header, SpaceBetween, Spinner } from 'components';
 
 import { useBreadcrumbs, useNotifications } from 'hooks';
-import { isRequestFormErrors2, isRequestFormFieldError } from 'libs';
+import { getServerError, isResponseServerError, isResponseServerFormFieldError } from 'libs';
 import { ROUTES } from 'routes';
 import { useCreateProjectGatewayMutation } from 'services/gateway';
 import { useGetProjectQuery } from 'services/project';
@@ -108,9 +108,9 @@ export const AddGateway: React.FC = () => {
             .catch((errorResponse) => {
                 const errorRequestData = errorResponse?.data;
 
-                if (isRequestFormErrors2(errorRequestData)) {
+                if (isResponseServerError(errorRequestData)) {
                     errorRequestData.detail.forEach((error) => {
-                        if (isRequestFormFieldError(error)) {
+                        if (isResponseServerFormFieldError(error)) {
                             setError(error.loc.join('.') as FieldPath<TCreateGatewayParams>, {
                                 type: 'custom',
                                 message: error.msg,
@@ -126,7 +126,7 @@ export const AddGateway: React.FC = () => {
                     pushNotification({
                         type: 'error',
                         content: t('common.server_error', {
-                            error: errorResponse?.data?.detail?.map((i: { msg: string }) => i.msg).join(', '),
+                            error: getServerError(errorResponse),
                         }),
                     });
                 }

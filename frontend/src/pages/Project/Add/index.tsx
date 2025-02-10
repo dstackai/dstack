@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { ContentLayout, Header } from 'components';
 
 import { useBreadcrumbs, useNotifications } from 'hooks';
+import { getServerError } from 'libs';
 import { ROUTES } from 'routes';
 import { useCreateProjectMutation } from 'services/project';
 
@@ -43,7 +44,12 @@ export const ProjectAdd: React.FC = () => {
 
                 navigate(ROUTES.PROJECT.DETAILS.SETTINGS.FORMAT(data.project_name));
             })
-            .catch((error) => console.log(error));
+            .catch((error) => {
+                pushNotification({
+                    type: 'error',
+                    content: t('common.server_error', { error: getServerError(error) }),
+                });
+            });
 
         return request;
     };

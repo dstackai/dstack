@@ -125,9 +125,9 @@ export const RunList: React.FC = () => {
                                 {t('common.stop')}
                             </Button>
 
-                            <Button formAction="none" onClick={deleteClickHandle} disabled={isDisabledDeleteButton}>
-                                {t('common.delete')}
-                            </Button>
+                            {/*<Button formAction="none" onClick={deleteClickHandle} disabled={isDisabledDeleteButton}>*/}
+                            {/*    {t('common.delete')}*/}
+                            {/*</Button>*/}
 
                             <Button
                                 iconName="refresh"

@@ -39,6 +39,7 @@ class GatewayConfigurator(BaseApplyConfigurator):
         unknown_args: List[str],
         repo: Optional[Repo] = None,
     ):
+        self.apply_args(conf, configurator_args, unknown_args)
         spec = GatewaySpec(
             configuration=conf,
             configuration_path=configuration_path,
@@ -169,6 +170,20 @@ class GatewayConfigurator(BaseApplyConfigurator):
             )
 
         console.print(f"Gateway [code]{conf.name}[/] deleted")
+
+    @classmethod
+    def register_args(cls, parser: argparse.ArgumentParser):
+        configuration_group = parser.add_argument_group(f"{cls.TYPE.value} Options")
+        configuration_group.add_argument(
+            "-n",
+            "--name",
+            dest="name",
+            help="The gateway name",
+        )
+
+    def apply_args(self, conf: GatewayConfiguration, args: argparse.Namespace, unknown: List[str]):
+        if args.name:
+            conf.name = args.name
 
 
 def _get_plan(api: Client, spec: GatewaySpec) -> GatewayPlan:

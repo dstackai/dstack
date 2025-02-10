@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Alert, Button, FormField, FormTiles, FormUI, Grid, InfoLink, SpaceBetween, TilesProps } from 'components';
 
 import { useHelpPanel, useNotifications } from 'hooks';
-import { isRequestFormErrors2, isRequestFormFieldError } from 'libs';
+import { isResponseServerError, isResponseServerFormFieldError } from 'libs';
 import { useGetBackendTypesQuery } from 'services/backend';
 
 import { AWSBackend } from './AWS';
@@ -63,9 +63,9 @@ export const BackendForm: React.FC<IProps> = ({ initialValues, onCancel, loading
         onSubmitProp(data).catch((errorResponse) => {
             const errorRequestData = errorResponse?.data;
 
-            if (isRequestFormErrors2(errorRequestData)) {
+            if (isResponseServerError(errorRequestData)) {
                 errorRequestData.detail.forEach((error) => {
-                    if (isRequestFormFieldError(error)) {
+                    if (isResponseServerFormFieldError(error)) {
                         setError(error.loc.join('.') as FieldPath<TBackendConfig>, { type: 'custom', message: error.msg });
                     } else {
                         pushNotification({
