@@ -2,7 +2,7 @@
 
 A dev environment lets you provision an instance and access it with your desktop IDE.
 
-## Run a configuration
+## Apply a configuration
 
 First, define a dev environment configuration as a YAML file in your project folder.
 The filename must end with `.dstack.yml` (e.g. `.dstack.yml` or `dev.dstack.yml` are both acceptable).

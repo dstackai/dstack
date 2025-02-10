@@ -7,7 +7,7 @@ and handle auto-scaling.
 > If you're using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"},
 > the gateway is already set up for you.
 
-## Run a configuration
+## Apply a configuration
 
 First, define a gateway configuration as a YAML file in your project folder.
 The filename must end with `.dstack.yml` (e.g. `.dstack.yml` or `gateway.dstack.yml` are both acceptable).

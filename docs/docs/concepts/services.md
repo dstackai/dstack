@@ -2,7 +2,7 @@
 
 Services allow you to deploy models or web apps as secure and scalable endpoints.
 
-## Run a configuration
+## Apply a configuration
 
 First, define a service configuration as a YAML file in your project folder.
 The filename must end with `.dstack.yml` (e.g. `.dstack.yml` or `dev.dstack.yml` are both acceptable).
@@ -88,7 +88,7 @@ $ curl http://localhost:3000/proxy/services/main/llama31/v1/chat/completions \
 
 </div>
 
-If the service defines the `model` property, the model can be accessed with
+If the service defines the [`model`](#model) property, the model can be accessed with
 the global OpenAI-compatible endpoint at `<dstack server URL>/proxy/models/<project name>/`,
 or via `dstack` UI.
 
@@ -164,6 +164,12 @@ Setting the minimum number of replicas to `0` allows the service to scale down t
 >The `scaling` property currently requires creating a [gateway](gateways.md).
 This requirement is expected to be removed soon.
 
+### Model
+
+If the service is running a chat model with an OpenAI-compatible interface,
+set the [`model`](#model) property to make the model accessible via `dstack`'s 
+global OpenAI-compatible endpoint, and also accessible via `dstack`'s UI.
+
 ### Authorization
 
 By default, the service enables authorization, meaning the service endpoint requires a `dstack` user token.
@@ -231,12 +237,6 @@ set [`strip_prefix`](../reference/dstack.yml/service.md#strip_prefix) to `false`
 
 If your app cannot be configured to work with a path prefix, you can host it
 on a dedicated domain name by setting up a [gateway](gateways.md).
-
-### Model
-
-If the service is running a chat model with an OpenAI-compatible interface,
-set the [`model`](#model) property to make the model accessible via `dstack`'s 
-global OpenAI-compatible endpoint, and also accessible via `dstack`'s UI.
 
 ### Resources
 

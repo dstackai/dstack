@@ -15,7 +15,7 @@ from an existing fleet. If none match the requirements, `dstack` creates a new c
 
 For greater control over cloud fleet provisioning, create fleets explicitly using configuration files. 
 
-### Run a configuration
+### Apply a configuration
 
 Define a fleet configuration as a YAML file in your project directory. The file must have a
 `.dstack.yml` extension (e.g. `.dstack.yml` or `fleet.dstack.yml`).
@@ -194,7 +194,7 @@ retry:
 
 If you have a group of on-prem servers accessible via SSH, you can create an SSH fleet.
 
-### Run a configuration
+### Apply a configuration
 
 Define a fleet configuration as a YAML file in your project directory. The file must have a
 `.dstack.yml` extension (e.g. `.dstack.yml` or `fleet.dstack.yml`).

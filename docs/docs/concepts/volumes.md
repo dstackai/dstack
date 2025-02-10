@@ -13,7 +13,7 @@ Useful as a cache for cloud fleets or for persistent storage with SSH fleets.
 
 Network volumes are currently supported for the `aws`, `gcp`, and `runpod` backends.
 
-### Run a configuration
+### Apply a configuration
 
 First, define a volume configuration as a YAML file in your project folder.
 The filename must end with `.dstack.yml` (e.g. `.dstack.yml` or `volume.dstack.yml` are both acceptable).
@@ -36,6 +36,26 @@ size: 100GB
 </div>
 
 If you use this configuration, `dstack` will create a new volume based on the specified options.
+
+To create, update, or register the volume, pass the volume configuration to `dstack apply`:
+
+<div class="termy">
+
+```shell
+$ dstack apply -f volume.dstack.yml
+Volume my-volume does not exist yet. Create the volume? [y/n]: y
+
+ NAME       BACKEND  REGION        STATUS     CREATED 
+ my-volume  aws      eu-central-1  submitted  now     
+
+```
+
+</div>
+
+
+Once created, the volume can be attached to dev environments, tasks, and services.
+
+> When creating a new network volume, `dstack` automatically creates an `ext4` filesystem on it.
 
 ??? info "Register existing volumes"
     If you prefer not to create a new volume but to reuse an existing one (e.g., created manually), you can 
@@ -63,29 +83,6 @@ If you use this configuration, `dstack` will create a new volume based on the sp
 
 !!! info "Reference"
     For all volume configuration options, refer to the [reference](../reference/dstack.yml/volume.md).
-
-### Create, register, or update a volume
-
-To create or register the volume, pass the volume configuration to `dstack apply`:
-
-<div class="termy">
-
-```shell
-$ dstack apply -f volume.dstack.yml
-Volume my-volume does not exist yet. Create the volume? [y/n]: y
-
- NAME       BACKEND  REGION        STATUS     CREATED 
- my-volume  aws      eu-central-1  submitted  now     
-
-```
-
-</div>
-
-
-Once created, the volume can be attached to dev environments, tasks, and services.
-
-!!! info "Filesystem"
-    When creating a new network volume, `dstack` automatically creates an `ext4` filesystem on it.
 
 ### Attach a volume { #attach-network-volume }
 

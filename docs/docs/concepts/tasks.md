@@ -3,7 +3,7 @@
 A task allows you to run arbitrary commands on one or more nodes.
 They are best suited for jobs like training or batch processing.
 
-## Run a configuration
+## Apply a configuration
 
 First, define a task configuration as a YAML file in your project folder.
 The filename must end with `.dstack.yml` (e.g. `.dstack.yml` or `dev.dstack.yml` are both acceptable).
