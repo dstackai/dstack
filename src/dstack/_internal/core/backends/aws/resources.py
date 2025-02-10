@@ -184,7 +184,7 @@ def create_instances_struct(
     # AWS allows specifying either NetworkInterfaces for specific subnet_id
     # or instance-level SecurityGroupIds in case of no specific subnet_id, not both.
     if subnet_id is not None:
-        # Even if the instance type supports multiple cards, we always request only one interface
+        # If the instance type supports multiple cards, we request multiple interfaces only if not allocate_public_ip
         # due to the limitation: "AssociatePublicIpAddress [...] You cannot specify more than one
         # network interface in the request".
         # Error message: "(InvalidParameterCombination) when calling the RunInstances operation:
@@ -210,6 +210,7 @@ def create_instances_struct(
                 interface_type = "efa-only"
                 if instance_type == "p5.48xlarge":
                     # EFA configuration for P5 instances:
+                    # https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/efa-acc-inst-types.html#efa-for-p5
                     interface_type = "efa" if i % 4 == 0 else "efa-only"
                 struct["NetworkInterfaces"].append(
                     {
