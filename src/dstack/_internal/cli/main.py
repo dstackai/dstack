@@ -1,5 +1,6 @@
 import argparse
 
+import argcomplete
 from rich.markup import escape
 from rich_argparse import RichHelpFormatter
 
@@ -73,8 +74,10 @@ def main():
     StopCommand.register(subparsers)
     VolumeCommand.register(subparsers)
 
+    argcomplete.autocomplete(parser, always_complete_options=False)
+
     args, unknown_args = parser.parse_known_args()
-    args.unknown = unknown_args
+
     try:
         check_for_updates()
         get_ssh_client_info()

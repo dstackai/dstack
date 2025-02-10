@@ -49,6 +49,7 @@ BASE_DEPS = [
     "filelock",
     "psutil",
     "gpuhunt>=0.0.19,<0.1.0",
+    "argcomplete==3.5.3",  # TODO: Version range
 ]
 
 GATEWAY_AND_SERVER_COMMON_DEPS = [
