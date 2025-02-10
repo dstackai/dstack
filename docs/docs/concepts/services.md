@@ -2,7 +2,7 @@
 
 Services allow you to deploy models or web apps as secure and scalable endpoints.
 
-## Define a configuration
+## Run a configuration
 
 First, define a service configuration as a YAML file in your project folder.
 The filename must end with `.dstack.yml` (e.g. `.dstack.yml` or `dev.dstack.yml` are both acceptable).
@@ -36,6 +36,85 @@ resources:
 ```
 
 </div>
+
+To run a service, pass the configuration to [`dstack apply`](../reference/cli/dstack/apply.md):
+
+<div class="termy">
+
+```shell
+$ HF_TOKEN=...
+$ dstack apply -f service.dstack.yml
+
+ #  BACKEND  REGION    RESOURCES                    SPOT  PRICE
+ 1  runpod   CA-MTL-1  18xCPU, 100GB, A5000:24GB:2  yes   $0.22
+ 2  runpod   EU-SE-1   18xCPU, 100GB, A5000:24GB:2  yes   $0.22
+ 3  gcp      us-west4  27xCPU, 150GB, A5000:24GB:3  yes   $0.33
+ 
+Submit the run llama31? [y/n]: y
+
+Provisioning...
+---> 100%
+
+Service is published at: 
+  http://localhost:3000/proxy/services/main/llama31/
+Model meta-llama/Meta-Llama-3.1-8B-Instruct is published at:
+  http://localhost:3000/proxy/models/main/
+```
+
+</div>
+
+`dstack apply` automatically provisions instances, uploads the contents of the repo (incl. your local uncommitted changes),
+and runs the service.
+
+If a [gateway](gateways.md) is not configured, the service’s endpoint will be accessible at
+`<dstack server URL>/proxy/services/<project name>/<run name>/`.
+
+<div class="termy">
+
+```shell
+$ curl http://localhost:3000/proxy/services/main/llama31/v1/chat/completions \
+    -H 'Content-Type: application/json' \
+    -H 'Authorization: Bearer &lt;dstack token&gt;' \
+    -d '{
+        "model": "meta-llama/Meta-Llama-3.1-8B-Instruct",
+        "messages": [
+            {
+                "role": "user",
+                "content": "Compose a poem that explains the concept of recursion in programming."
+            }
+        ]
+    }'
+```
+
+</div>
+
+If the service defines the `model` property, the model can be accessed with
+the global OpenAI-compatible endpoint at `<dstack server URL>/proxy/models/<project name>/`,
+or via `dstack` UI.
+
+If [authorization](#authorization) is not disabled, the service endpoint requires the `Authorization` header with
+`Bearer <dstack token>`.
+
+??? info "Gateway"
+    Running services for development purposes doesn’t require setting up a [gateway](gateways.md).
+
+    However, you'll need a gateway in the following cases:
+
+    * To use auto-scaling
+    * To enable HTTPS for the endpoint and map it to your domain
+    * If your service requires WebSockets
+    * If your service cannot work with a [path prefix](#path-prefix)
+
+    Note, if you're using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"},
+    a gateway is already pre-configured for you.
+
+    If a [gateway](gateways.md) is configured, the service endpoint will be accessible at
+    `https://<run name>.<gateway domain>/`.
+
+    If the service defines the `model` property, the model will be available via the global OpenAI-compatible endpoint 
+    at `https://gateway.<gateway domain>/`.
+
+## Configuration options
 
 ### Replicas and scaling
 
@@ -82,9 +161,8 @@ case `dstack` adjusts the number of replicas (scales up or down) automatically b
 
 Setting the minimum number of replicas to `0` allows the service to scale down to zero when there are no requests.
 
-!!! info "Gateways"
-    The `scaling` property currently requires creating a [gateway](gateways.md).
-    This requirement is expected to be removed soon.
+>The `scaling` property currently requires creating a [gateway](gateways.md).
+This requirement is expected to be removed soon.
 
 ### Authorization
 
@@ -382,49 +460,6 @@ via the [`spot_policy`](../reference/dstack.yml/service.md#spot_policy) property
     [`max_price`](../reference/dstack.yml/service.md#max_price), and
     among [others](../reference/dstack.yml/service.md).
 
-## (Optional) Set up a gateway
-
-Running services doesn't require [gateways](gateways.md) unless you need to enable auto-scaling or want the endpoint to
-use HTTPS and map it to your domain.
-
-!!! info "Websockets and path prefix"
-    A gateway may also be required if the service needs Websockets or cannot be used with 
-    a [path prefix](#path-prefix).
-
-> If you're using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"},
-> a gateway is already pre-configured for you.
-
-## Run a configuration
-
-To run a service, pass the configuration to [`dstack apply`](../reference/cli/dstack/apply.md):
-
-<div class="termy">
-
-```shell
-$ HF_TOKEN=...
-$ dstack apply -f service.dstack.yml
-
- #  BACKEND  REGION    RESOURCES                    SPOT  PRICE
- 1  runpod   CA-MTL-1  18xCPU, 100GB, A5000:24GB:2  yes   $0.22
- 2  runpod   EU-SE-1   18xCPU, 100GB, A5000:24GB:2  yes   $0.22
- 3  gcp      us-west4  27xCPU, 150GB, A5000:24GB:3  yes   $0.33
- 
-Submit the run llama31? [y/n]: y
-
-Provisioning...
----> 100%
-
-Service is published at: 
-  http://localhost:3000/proxy/services/main/llama31/
-Model meta-llama/Meta-Llama-3.1-8B-Instruct is published at:
-  http://localhost:3000/proxy/models/main/
-```
-
-</div>
-
-`dstack apply` automatically provisions instances, uploads the contents of the repo (incl. your local uncommitted changes),
-and runs the service.
-
 ### Retry policy
 
 By default, if `dstack` can't find capacity, the task exits with an error, or the instance is interrupted, 
@@ -433,43 +468,9 @@ the run will fail.
 If you'd like `dstack` to automatically retry, configure the 
 [retry](../reference/dstack.yml/service.md#retry) property accordingly:
 
-## Access the endpoint
+--8<-- "docs/concepts/snippets/manage-fleets.ext"
 
-If a [gateway](gateways.md) is not configured, the service’s endpoint will be accessible at
-`<dstack server URL>/proxy/services/<project name>/<run name>/`.
-
-<div class="termy">
-
-```shell
-$ curl http://localhost:3000/proxy/services/main/llama31/v1/chat/completions \
-    -H 'Content-Type: application/json' \
-    -H 'Authorization: Bearer &lt;dstack token&gt;' \
-    -d '{
-        "model": "meta-llama/Meta-Llama-3.1-8B-Instruct",
-        "messages": [
-            {
-                "role": "user",
-                "content": "Compose a poem that explains the concept of recursion in programming."
-            }
-        ]
-    }'
-```
-
-</div>
-
-If the service defines the `model` property, the model can be accessed with
-the global OpenAI-compatible endpoint at `<dstack server URL>/proxy/models/<project name>/`,
-or via `dstack` UI.
-
-??? info "Gateway"
-    If a [gateway](gateways.md) is configured, the service endpoint will be accessible at
-    `https://<run name>.<gateway domain>/`.
-
-    If the service defines the `model` property, the model will be available via the global OpenAI-compatible endpoint 
-    at `https://gateway.<gateway domain>/`.
-
-If [authorization](#authorization) is not disabled, the service endpoint requires the `Authorization` header with
-`Bearer <dstack token>`.
+--8<-- "docs/concepts/snippets/manage-runs.ext"
 
 !!! info "What's next?"
     1. Read about [dev environments](dev-environments.md), [tasks](tasks.md), and [repos](repos.md)

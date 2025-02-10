@@ -167,12 +167,12 @@
 
 [dir=ltr] .md-typeset :is(details) {
     border-style: solid;
-    /*border-width: 1px;*/
-    border-width: 0;
+    border-color: rgba(0, 0, 0, 0.87);
+    border-width: 1px;
     border-radius: 6px;
     box-shadow: none;
     padding: .6rem .8rem;
-    background: -webkit-linear-gradient(45deg, rgba(0, 42, 255, 0.1), rgb(0 114 255 / 1%), rgba(0, 42, 255, 0.05));
+    background: none;
 }
 
 [dir=ltr] .md-typeset :is(.admonition) {
@@ -193,7 +193,7 @@
     margin-left: 32px;
 }
 
-[dir=ltr] .md-typeset :is(.admonition,details):not(blockquote) > :is(.md-typeset__scrollwrap,p,h4,h3,.tabbed-set):not(.admonition-title) {
+[dir=ltr] .md-typeset :is(.admonition,details):not(blockquote) > :is(.md-typeset__scrollwrap,p,h4,h3,.tabbed-set,ul):not(.admonition-title) {
     padding-left: 32px;
 }
 

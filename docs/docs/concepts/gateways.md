@@ -7,7 +7,7 @@ and handle auto-scaling.
 > If you're using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"},
 > the gateway is already set up for you.
 
-## Define a configuration
+## Run a configuration
 
 First, define a gateway configuration as a YAML file in your project folder.
 The filename must end with `.dstack.yml` (e.g. `.dstack.yml` or `gateway.dstack.yml` are both acceptable).
@@ -31,11 +31,6 @@ domain: example.com
 
 A domain name is required to create a gateway.
 
-!!! info "Reference"
-    For all gateway configuration options, refer to the [reference](../reference/dstack.yml/gateway.md).
-
-## Create or update a gateway
-
 To create or update the gateway, simply call the [`dstack apply`](../reference/cli/dstack/apply.md) command:
 
 <div class="termy">
@@ -44,11 +39,17 @@ To create or update the gateway, simply call the [`dstack apply`](../reference/c
 $ dstack apply -f gateway.dstack.yml
 The example-gateway doesn't exist. Create it? [y/n]: y
 
+Provisioning...
+---> 100%
+
  BACKEND  REGION     NAME             HOSTNAME  DOMAIN       DEFAULT  STATUS
  aws      eu-west-1  example-gateway            example.com  ✓        submitted
 ```
 
 </div>
+
+!!! info "Reference"
+    For all gateway configuration options, refer to the [reference](../reference/dstack.yml/gateway.md).
 
 ## Update DNS records
 

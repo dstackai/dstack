@@ -140,23 +140,6 @@ inside `dstack` runs. To do that, additional configuration steps are required:
 Note, `start-dockerd` is a part of `dstackai/dind` image, if you use a different DinD image,
 replace it with a corresponding command to start Docker daemon.
 
-=== "Task"
-    <div editor-title="examples/misc/dind/task.dstack.yml">
-
-    ```yaml
-    type: task
-    name: task-dind
-
-    privileged: true
-    image: dstackai/dind
-
-    commands:
-      - start-dockerd
-      - docker compose up
-    ```
-
-    </div>
-
 === "Dev environment"
     <div editor-title="examples/misc/docker-compose/.dstack.yml">
 
@@ -171,6 +154,23 @@ replace it with a corresponding command to start Docker daemon.
 
     init:
       - start-dockerd
+    ```
+
+    </div>
+
+=== "Task"
+    <div editor-title="examples/misc/dind/task.dstack.yml">
+
+    ```yaml
+    type: task
+    name: task-dind
+
+    privileged: true
+    image: dstackai/dind
+
+    commands:
+      - start-dockerd
+      - docker compose up
     ```
 
     </div>

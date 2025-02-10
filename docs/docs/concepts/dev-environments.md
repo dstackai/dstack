@@ -2,7 +2,7 @@
 
 A dev environment lets you provision an instance and access it with your desktop IDE.
 
-## Define a configuration
+## Run a configuration
 
 First, define a dev environment configuration as a YAML file in your project folder.
 The filename must end with `.dstack.yml` (e.g. `.dstack.yml` or `dev.dstack.yml` are both acceptable).
@@ -27,6 +27,55 @@ resources:
 ```
 
 </div>
+
+To run a dev environment, pass the configuration to [`dstack apply`](../reference/cli/dstack/apply.md):
+
+<div class="termy">
+
+```shell
+$ dstack apply -f examples/.dstack.yml
+
+ #  BACKEND  REGION    RESOURCES                SPOT  PRICE
+ 1  runpod   CA-MTL-1  9xCPU, 48GB, A5000:24GB  yes   $0.11
+ 2  runpod   EU-SE-1   9xCPU, 43GB, A5000:24GB  yes   $0.11
+ 3  gcp      us-west4  4xCPU, 16GB, L4:24GB     yes   $0.214516
+
+Submit the run vscode? [y/n]: y
+
+Launching `vscode`...
+---> 100%
+
+To open in VS Code Desktop, use this link:
+  vscode://vscode-remote/ssh-remote+vscode/workflow
+```
+
+</div>
+
+`dstack apply` automatically provisions an instance, uploads the contents of the repo (incl. your local uncommitted changes),
+and sets up an IDE on the instance.
+
+??? info "Windows"
+    On Windows, `dstack` works both natively and inside WSL. But, for dev environments, 
+    it's recommended _not to use_ `dstack apply` _inside WSL_ due to a [VS Code issue :material-arrow-top-right-thin:{ .external }](https://github.com/microsoft/vscode-remote-release/issues/937){:target="_blank"}.
+
+To open the dev environment in your desktop IDE, use the link from the output 
+(such as `vscode://vscode-remote/ssh-remote+fast-moth-1/workflow`).
+
+![](../../assets/images/dstack-vscode-jupyter.png){ width=800 }
+
+??? info "SSH"
+
+    Alternatively, while the CLI is attached to the run, you can connect to the dev environment via SSH:
+    
+    <div class="termy">
+    
+    ```shell
+    $ ssh vscode
+    ```
+    
+    </div>
+
+## Configuration options
 
 ### Initialization
 
@@ -200,55 +249,6 @@ via the [`spot_policy`](../reference/dstack.yml/dev-environment.md#spot_policy) 
     [`max_price`](../reference/dstack.yml/dev-environment.md#max_price), and
     [`max_duration`](../reference/dstack.yml/dev-environment.md#max_duration), 
     among [others](../reference/dstack.yml/dev-environment.md).
-
-## Run a configuration
-
-To run a dev environment, pass the configuration to [`dstack apply`](../reference/cli/dstack/apply.md):
-
-<div class="termy">
-
-```shell
-$ dstack apply -f examples/.dstack.yml
-
- #  BACKEND  REGION    RESOURCES                SPOT  PRICE
- 1  runpod   CA-MTL-1  9xCPU, 48GB, A5000:24GB  yes   $0.11
- 2  runpod   EU-SE-1   9xCPU, 43GB, A5000:24GB  yes   $0.11
- 3  gcp      us-west4  4xCPU, 16GB, L4:24GB     yes   $0.214516
-
-Submit the run vscode? [y/n]: y
-
-Launching `vscode`...
----> 100%
-
-To open in VS Code Desktop, use this link:
-  vscode://vscode-remote/ssh-remote+vscode/workflow
-```
-
-</div>
-
-`dstack apply` automatically provisions an instance, uploads the contents of the repo (incl. your local uncommitted changes),
-and sets up an IDE on the instance.
-
-!!! info "Windows"
-    On Windows, `dstack` works both natively and inside WSL. But, for dev environments, 
-    it's recommended _not to use_ `dstack apply` _inside WSL_ due to a [VS Code issue :material-arrow-top-right-thin:{ .external }](https://github.com/microsoft/vscode-remote-release/issues/937){:target="_blank"}.
-
-To open the dev environment in your desktop IDE, use the link from the output 
-(such as `vscode://vscode-remote/ssh-remote+fast-moth-1/workflow`).
-
-![](../../assets/images/dstack-vscode-jupyter.png){ width=800 }
-
-??? info "SSH"
-
-    Alternatively, while the CLI is attached to the run, you can connect to the dev environment via SSH:
-    
-    <div class="termy">
-    
-    ```shell
-    $ ssh fast-moth-1
-    ```
-    
-    </div>
 
 ### Retry policy
 

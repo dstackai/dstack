@@ -13,7 +13,7 @@ Useful as a cache for cloud fleets or for persistent storage with SSH fleets.
 
 Network volumes are currently supported for the `aws`, `gcp`, and `runpod` backends.
 
-### Define a configuration
+### Run a configuration
 
 First, define a volume configuration as a YAML file in your project folder.
 The filename must end with `.dstack.yml` (e.g. `.dstack.yml` or `volume.dstack.yml` are both acceptable).
@@ -117,7 +117,10 @@ volumes:
 Once you run this configuration, the contents of the volume will be attached to `/volume_data` inside the dev environment, 
 and its contents will persist across runs.
 
-!!! info "Attach volumes across regions and backends"
+> Currently, `dstack` does not allow attaching volumes to `/workflow` or any of its subdirectories because this folder is
+> reserved for fetching the repository
+
+??? info "Multiple regions or backends"
     If you're unsure in advance which region or backend you'd like to use (or which is available),
     you can specify multiple volumes for the same path.
 
@@ -133,9 +136,9 @@ and its contents will persist across runs.
 
     `dstack` will attach one of the volumes based on the region and backend of the run.  
 
-!!! info "Volumes with multi-node tasks"
-    To use single-attach volumes such as AWS EBS with multi-node tasks,
-    attach different volumes to different nodes using `dstack` variable interpolation:
+??? info "Distributed tasks"
+    When using single-attach volumes such as AWS EBS with distributed tasks,
+    you can attach different volumes to different nodes using `dstack` variable interpolation:
 
     <div editor-title=".dstack.yml">
 
@@ -159,11 +162,6 @@ and its contents will persist across runs.
     $ for i in {0..7}; do dstack apply -f vol.dstack.yml -n data-volume-$i -y; done
     ```
 
-??? info "Container path"
-    When you're running a dev environment, task, or service with `dstack`, it automatically mounts the project folder contents
-    to `/workflow` (and sets that as the current working directory). Right now, `dstack` doesn't allow you to 
-    attach volumes to `/workflow` or any of its subdirectories.
-
 ### Detach a volume { #detach-network-volume }
 
 `dstack` automatically detaches volumes from instances when a run stops.
@@ -172,6 +170,7 @@ and its contents will persist across runs.
     In some clouds such as AWS a volume may stuck in the detaching state.
     To fix this, you can abort the run, and `dstack` will force detach the volume.
     `dstack` will also force detach the stuck volume automatically after `stop_duration`.
+    
     Note that force detaching a volume is a last resort measure and may corrupt the file system.
     Contact your cloud support if you're experience volumes stuck in the detaching state.
 
