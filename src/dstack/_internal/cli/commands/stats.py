@@ -13,6 +13,7 @@ from dstack._internal.cli.utils.common import (
     add_row_from_dict,
     console,
 )
+from dstack._internal.cli.utils.completion import RunNameCompleter
 from dstack._internal.core.errors import CLIError
 from dstack._internal.core.models.metrics import JobMetrics
 from dstack.api._public import Client
@@ -25,7 +26,7 @@ class StatsCommand(APIBaseCommand):
 
     def _register(self):
         super()._register()
-        self._parser.add_argument("run_name")
+        self._parser.add_argument("run_name").completer = RunNameCompleter()
         self._parser.add_argument(
             "-w",
             "--watch",
