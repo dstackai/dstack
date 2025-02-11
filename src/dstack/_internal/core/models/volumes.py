@@ -68,6 +68,18 @@ class VolumeAttachmentData(CoreModel):
     device_name: Optional[str] = None
 
 
+class VolumeInstance(CoreModel):
+    name: str
+    fleet_name: Optional[str] = None
+    instance_num: int
+    instance_id: Optional[str] = None
+
+
+class VolumeAttachment(CoreModel):
+    instance: VolumeInstance
+    attachment_data: Optional[VolumeAttachmentData] = None
+
+
 class Volume(CoreModel):
     id: uuid.UUID
     name: str
@@ -83,6 +95,8 @@ class Volume(CoreModel):
     deleted: bool
     volume_id: Optional[str] = None  # id of the volume in the cloud
     provisioning_data: Optional[VolumeProvisioningData] = None
+    attachments: Optional[List[VolumeAttachment]] = None
+    # Deprecated in favor of attachments
     attachment_data: Optional[VolumeAttachmentData] = None
 
 
