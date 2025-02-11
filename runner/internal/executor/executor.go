@@ -18,10 +18,12 @@ import (
 
 	"github.com/creack/pty"
 	"github.com/dstackai/dstack/runner/consts"
+	"github.com/dstackai/dstack/runner/internal/connections"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/dstackai/dstack/runner/internal/schemas"
 	"github.com/dstackai/dstack/runner/internal/types"
+	"github.com/prometheus/procfs"
 )
 
 type RunExecutor struct {
@@ -44,10 +46,11 @@ type RunExecutor struct {
 	runnerLogs      *appendWriter
 	timestamp       *MonotonicTimestamp
 
-	killDelay time.Duration
+	killDelay         time.Duration
+	connectionTracker *connections.ConnectionTracker
 }
 
-func NewRunExecutor(tempDir string, homeDir string, workingDir string) (*RunExecutor, error) {
+func NewRunExecutor(tempDir string, homeDir string, workingDir string, sshPort int) (*RunExecutor, error) {
 	mu := &sync.RWMutex{}
 	timestamp := NewMonotonicTimestamp()
 	user, err := osuser.Current()
@@ -58,6 +61,15 @@ func NewRunExecutor(tempDir string, homeDir string, workingDir string) (*RunExec
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse current user uid: %w", err)
 	}
+	proc, err := procfs.NewDefaultFS()
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize procfs: %w", err)
+	}
+	connectionTracker := connections.NewConnectionTracker(connections.ConnectionTrackerConfig{
+		Port:            uint64(sshPort),
+		MinConnDuration: 10 * time.Second, // shorter connections are likely from dstack-server
+		Procfs:          proc,
+	})
 	return &RunExecutor{
 		tempDir:    tempDir,
 		homeDir:    homeDir,
@@ -71,7 +83,8 @@ func NewRunExecutor(tempDir string, homeDir string, workingDir string) (*RunExec
 		runnerLogs:      newAppendWriter(mu, timestamp),
 		timestamp:       timestamp,
 
-		killDelay: 10 * time.Second,
+		killDelay:         10 * time.Second,
+		connectionTracker: connectionTracker,
 	}, nil
 }
 
@@ -129,6 +142,10 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 		return gerrors.Wrap(err)
 	}
 	defer cleanupCredentials()
+
+	connectionTrackerTicker := time.NewTicker(2500 * time.Millisecond)
+	go ex.connectionTracker.Track(connectionTrackerTicker.C)
+	defer ex.connectionTracker.Stop()
 
 	ex.SetJobState(ctx, types.JobStateRunning)
 	timeoutCtx := ctx
