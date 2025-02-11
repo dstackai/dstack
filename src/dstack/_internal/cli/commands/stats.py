@@ -7,13 +7,13 @@ from rich.live import Live
 from rich.table import Table
 
 from dstack._internal.cli.commands import APIBaseCommand
+from dstack._internal.cli.services.completion import RunNameCompleter
 from dstack._internal.cli.utils.common import (
     LIVE_TABLE_PROVISION_INTERVAL_SECS,
     LIVE_TABLE_REFRESH_RATE_PER_SEC,
     add_row_from_dict,
     console,
 )
-from dstack._internal.cli.utils.completion import RunNameCompleter
 from dstack._internal.core.errors import CLIError
 from dstack._internal.core.models.metrics import JobMetrics
 from dstack.api._public import Client
