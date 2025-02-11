@@ -507,14 +507,23 @@ class TestProcessRunningJobs:
             "no_connections_secs",
             "expected_status",
             "expected_termination_reason",
+            "expected_inactivity_secs",
         ),
         [
-            pytest.param("1h", 60 * 60 - 1, JobStatus.RUNNING, None, id="duration-not-exceeded"),
+            pytest.param(
+                "1h",
+                60 * 60 - 1,
+                JobStatus.RUNNING,
+                None,
+                60 * 60 - 1,
+                id="duration-not-exceeded",
+            ),
             pytest.param(
                 "1h",
                 60 * 60,
                 JobStatus.TERMINATING,
                 JobTerminationReason.TERMINATED_BY_SERVER,
+                60 * 60,
                 id="duration-exceeded-exactly",
             ),
             pytest.param(
@@ -522,19 +531,28 @@ class TestProcessRunningJobs:
                 60 * 60 + 1,
                 JobStatus.TERMINATING,
                 JobTerminationReason.TERMINATED_BY_SERVER,
+                60 * 60 + 1,
                 id="duration-exceeded",
             ),
-            pytest.param("off", 60 * 60, JobStatus.RUNNING, None, id="duration-off"),
-            pytest.param(False, 60 * 60, JobStatus.RUNNING, None, id="duration-false"),
-            pytest.param(None, 60 * 60, JobStatus.RUNNING, None, id="duration-none"),
+            pytest.param("off", 60 * 60, JobStatus.RUNNING, None, None, id="duration-off"),
+            pytest.param(False, 60 * 60, JobStatus.RUNNING, None, None, id="duration-false"),
+            pytest.param(None, 60 * 60, JobStatus.RUNNING, None, None, id="duration-none"),
             pytest.param(
                 "1h",
                 None,
                 JobStatus.TERMINATING,
                 JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY,
+                None,
                 id="legacy-runner",
             ),
-            pytest.param(None, None, JobStatus.RUNNING, None, id="legacy-runner-without-duration"),
+            pytest.param(
+                None,
+                None,
+                JobStatus.RUNNING,
+                None,
+                None,
+                id="legacy-runner-without-duration",
+            ),
         ],
     )
     async def test_inactivity_duration(
@@ -545,6 +563,7 @@ class TestProcessRunningJobs:
         no_connections_secs: Optional[int],
         expected_status: JobStatus,
         expected_termination_reason: Optional[JobTerminationReason],
+        expected_inactivity_secs: Optional[int],
     ) -> None:
         project = await create_project(session=session)
         user = await create_user(session=session)
@@ -595,3 +614,4 @@ class TestProcessRunningJobs:
         await session.refresh(job)
         assert job.status == expected_status
         assert job.termination_reason == expected_termination_reason
+        assert job.inactivity_secs == expected_inactivity_secs

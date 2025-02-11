@@ -351,6 +351,7 @@ class JobModel(BaseModel):
     job_spec_data: Mapped[str] = mapped_column(Text)
     job_provisioning_data: Mapped[Optional[str]] = mapped_column(Text)
     runner_timestamp: Mapped[Optional[int]] = mapped_column(BigInteger)
+    inactivity_secs: Mapped[Optional[int]] = mapped_column(Integer)  # 0 - active, None - N/A
     # `removed` is used to ensure that the instance is killed after the job is finished
     remove_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
     volumes_detached_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)

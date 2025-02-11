@@ -14,7 +14,12 @@ from dstack._internal.core.models.runs import (
     RunPlan,
 )
 from dstack._internal.core.services.profiles import get_termination
-from dstack._internal.utils.common import DateFormatter, format_pretty_duration, pretty_date
+from dstack._internal.utils.common import (
+    DateFormatter,
+    format_duration_multiunit,
+    format_pretty_duration,
+    pretty_date,
+)
 from dstack.api import Run
 
 
@@ -158,13 +163,17 @@ def get_runs_table(
             add_row_from_dict(table, run_row)
 
         for job in run.jobs:
+            latest_job_submission = job.job_submissions[-1]
+            status = latest_job_submission.status.value
+            if verbose and latest_job_submission.inactivity_secs:
+                inactive_for = format_duration_multiunit(latest_job_submission.inactivity_secs)
+                status += f" (inactive for {inactive_for})"
             job_row: Dict[Union[str, int], Any] = {
                 "NAME": f"  replica={job.job_spec.replica_num} job={job.job_spec.job_num}",
-                "STATUS": job.job_submissions[-1].status,
-                "SUBMITTED": format_date(job.job_submissions[-1].submitted_at),
+                "STATUS": status,
+                "SUBMITTED": format_date(latest_job_submission.submitted_at),
                 "ERROR": _get_job_error(job),
             }
-            latest_job_submission = job.job_submissions[-1]
             jpd = latest_job_submission.job_provisioning_data
             if jpd is not None:
                 resources = jpd.instance_type.resources

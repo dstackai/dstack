@@ -631,6 +631,7 @@ def _terminate_if_inactivity_duration_exceeded(
         conf.inactivity_duration, int
     ):
         logger.debug("%s: no SSH connections for %s seconds", fmt(job_model), no_connections_secs)
+        job_model.inactivity_secs = no_connections_secs
         if no_connections_secs is None:
             # TODO(0.19 or earlier): make no_connections_secs required
             job_model.status = JobStatus.TERMINATING
