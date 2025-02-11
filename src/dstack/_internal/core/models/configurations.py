@@ -10,7 +10,7 @@ from dstack._internal.core.models.common import CoreModel, Duration, RegistryAut
 from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.fleets import FleetConfiguration
 from dstack._internal.core.models.gateways import GatewayConfiguration
-from dstack._internal.core.models.profiles import ProfileParams
+from dstack._internal.core.models.profiles import ProfileParams, parse_off_duration
 from dstack._internal.core.models.repos.base import Repo
 from dstack._internal.core.models.repos.virtual import VirtualRepo
 from dstack._internal.core.models.resources import Range, ResourcesSpec
@@ -212,6 +212,29 @@ class DevEnvironmentConfigurationParams(CoreModel):
     ide: Annotated[Literal["vscode"], Field(description="The IDE to run")]
     version: Annotated[Optional[str], Field(description="The version of the IDE")]
     init: Annotated[CommandsList, Field(description="The bash commands to run on startup")] = []
+    inactivity_duration: Annotated[
+        Optional[Union[Literal["off"], int, bool, str]],
+        Field(
+            description=(
+                "The maximum amount of time the dev environment can be inactive"
+                " (e.g., `2h`, `1d`, etc)."
+                " After it elapses, the dev environment is automatically stopped."
+                " Inactivity is defined as the absence of SSH connections to the"
+                " dev environment, including VS Code connections, `ssh <run name>`"
+                " shells, and attached `dstack apply` or `dstack attach` commands."
+                " Use `off` for unlimited duration. Defaults to `off`"
+            )
+        ),
+    ]
+
+    @validator("inactivity_duration", pre=True, allow_reuse=True)
+    def parse_inactivity_duration(
+        cls, v: Optional[Union[Literal["off"], int, bool, str]]
+    ) -> Optional[int]:
+        v = parse_off_duration(v)
+        if isinstance(v, int):
+            return v
+        return None
 
 
 class DevEnvironmentConfiguration(

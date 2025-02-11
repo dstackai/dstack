@@ -7,6 +7,7 @@ from pydantic import parse_obj_as
 from dstack._internal.core.models.common import is_core_model_instance
 from dstack._internal.core.models.configurations import (
     STRIP_PREFIX_DEFAULT,
+    DevEnvironmentConfiguration,
     ServiceConfiguration,
 )
 from dstack._internal.core.models.pools import Instance
@@ -179,6 +180,11 @@ def _get_run_spec_excludes(run_spec: RunSpec) -> Optional[dict]:
         configuration_excludes["availability_zones"] = True
     if profile is not None and profile.availability_zones is None:
         profile_excludes.add("availability_zones")
+    if (
+        is_core_model_instance(configuration, DevEnvironmentConfiguration)
+        and configuration.inactivity_duration is None
+    ):
+        configuration_excludes["inactivity_duration"] = True
 
     if configuration_excludes:
         spec_excludes["configuration"] = configuration_excludes
