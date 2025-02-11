@@ -117,13 +117,9 @@ class OCICompute(Compute):
     ) -> JobProvisioningData:
         region = self.regions[instance_offer.region]
 
-        available_domains = resources.get_available_domains(
-            instance_offer.instance.name, self.shapes_quota, region, self.config.compartment_id
-        )
-        availability_domain = _get_availability_domain_or_error(
-            available_domains=available_domains,
-            offer_domains=instance_offer.availability_zones,
-        )
+        if not instance_offer.availability_zones:
+            raise NoCapacityError("Shape unavailable in all availability domains")
+        availability_domain = instance_offer.availability_zones[0]
 
         listing, package = resources.get_marketplace_listing_and_package(
             cuda=len(instance_offer.instance.resources.gpus) > 0,
@@ -206,15 +202,3 @@ def _supported_instances(offer: InstanceOffer) -> bool:
     if "Flex" in offer.instance.name:
         return False
     return any(map(offer.instance.name.startswith, SUPPORTED_SHAPE_FAMILIES))
-
-
-def _get_availability_domain_or_error(
-    available_domains: List[str],
-    offer_domains: Optional[List[str]],
-) -> str:
-    domains = available_domains
-    if offer_domains is not None:
-        domains = [ad for ad in available_domains if ad in offer_domains]
-    if len(domains) == 0:
-        raise NoCapacityError("Shape unavailable in all availability domains")
-    return domains[0]

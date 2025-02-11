@@ -171,7 +171,7 @@ def check_availability_in_domain(
     availability_domain_name: str,
     client: oci.core.ComputeClient,
     compartment_id: str,
-) -> List[str]:
+) -> Set[str]:
     """
     Returns a subset of `shape_names` with only the shapes available in
     `availability_domain_name`.
@@ -208,7 +208,7 @@ def check_availability_per_domain(
     shapes_quota: ShapesQuota,
     region: OCIRegionClient,
     compartment_id: str,
-) -> Dict[str, List[str]]:
+) -> Dict[str, Set[str]]:
     all_shapes = set(shape_names)
     available_shapes_per_domain = {}
 

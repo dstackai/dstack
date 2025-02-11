@@ -278,6 +278,7 @@ class AWSCompute(Compute):
                 SSHKey(public=project_ssh_public_key.strip()),
             ],
             user=run.user,
+            volumes=volumes,
             reservation=run.run_spec.configuration.reservation,
         )
         instance_offer = instance_offer.copy()
