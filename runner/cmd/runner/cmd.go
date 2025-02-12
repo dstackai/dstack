@@ -13,6 +13,7 @@ var Version string
 func App() {
 	var paths struct{ tempDir, homeDir, workingDir string }
 	var httpPort int
+	var sshPort int
 	var logLevel int
 
 	app := &cli.App{
@@ -57,9 +58,15 @@ func App() {
 						Value:       10999,
 						Destination: &httpPort,
 					},
+					&cli.IntFlag{
+						Name:        "ssh-port",
+						Usage:       "Set the ssh port",
+						Required:    true,
+						Destination: &sshPort,
+					},
 				},
 				Action: func(c *cli.Context) error {
-					err := start(paths.tempDir, paths.homeDir, paths.workingDir, httpPort, logLevel, Version)
+					err := start(paths.tempDir, paths.homeDir, paths.workingDir, httpPort, sshPort, logLevel, Version)
 					if err != nil {
 						return cli.Exit(err, 1)
 					}

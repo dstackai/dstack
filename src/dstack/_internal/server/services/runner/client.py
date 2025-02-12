@@ -30,7 +30,7 @@ from dstack._internal.server.schemas.runner import (
 from dstack._internal.utils.common import get_or_error
 from dstack._internal.utils.logging import get_logger
 
-REQUEST_TIMEOUT = 15
+REQUEST_TIMEOUT = 9
 
 logger = get_logger(__name__)
 

@@ -124,6 +124,15 @@ class AzureConfig(CoreModel):
     type: Annotated[Literal["azure"], Field(description="The type of the backend")] = "azure"
     tenant_id: Annotated[str, Field(description="The tenant ID")]
     subscription_id: Annotated[str, Field(description="The subscription ID")]
+    resource_group: Annotated[
+        Optional[str],
+        Field(
+            description=(
+                "The resource group for resources created by `dstack`."
+                " If not specified, `dstack` will create a new resource group"
+            )
+        ),
+    ] = None
     regions: Annotated[
         Optional[List[str]],
         Field(description="The list of Azure regions (locations). Omit to use all regions"),

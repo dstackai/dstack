@@ -123,6 +123,12 @@ class ProfileParams(CoreModel):
             description="The regions to consider for provisioning (e.g., `[eu-west-1, us-west4, westeurope]`)"
         ),
     ]
+    availability_zones: Annotated[
+        Optional[List[str]],
+        Field(
+            description="The availability zones to consider for provisioning (e.g., `[eu-west-1a, us-west4-a]`)"
+        ),
+    ] = None
     instance_types: Annotated[
         Optional[List[str]],
         Field(

@@ -84,5 +84,6 @@ require (
 require (
 	github.com/codeclysm/extract/v3 v3.1.1
 	github.com/gorilla/websocket v1.5.1
+	github.com/prometheus/procfs v0.15.1
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

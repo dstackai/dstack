@@ -76,7 +76,13 @@ class OCICompute(Compute):
             else:
                 availability = InstanceAvailability.NO_QUOTA
             offers_with_availability.append(
-                InstanceOfferWithAvailability(**offer.dict(), availability=availability)
+                InstanceOfferWithAvailability(
+                    **offer.dict(),
+                    availability=availability,
+                    availability_zones=shapes_availability[offer.region].get(
+                        offer.instance.name, []
+                    ),
+                )
             )
 
         return offers_with_availability
@@ -111,11 +117,9 @@ class OCICompute(Compute):
     ) -> JobProvisioningData:
         region = self.regions[instance_offer.region]
 
-        availability_domain = resources.choose_available_domain(
-            instance_offer.instance.name, self.shapes_quota, region, self.config.compartment_id
-        )
-        if availability_domain is None:
+        if not instance_offer.availability_zones:
             raise NoCapacityError("Shape unavailable in all availability domains")
+        availability_domain = instance_offer.availability_zones[0]
 
         listing, package = resources.get_marketplace_listing_and_package(
             cuda=len(instance_offer.instance.resources.gpus) > 0,
@@ -170,6 +174,7 @@ class OCICompute(Compute):
             hostname=None,
             internal_ip=None,
             region=instance_offer.region,
+            availability_zone=availability_domain,
             price=instance_offer.price,
             username="ubuntu",
             ssh_port=22,

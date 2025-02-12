@@ -25,6 +25,14 @@ def runner_ssh_tunnel(
     [Callable[Concatenate[Dict[int, int], P], R]],
     Callable[Concatenate[str, JobProvisioningData, Optional[JobRuntimeData], P], Union[bool, R]],
 ]:
+    """
+    A decorator that opens an SSH tunnel to the runner.
+
+    NOTE: connections from dstack-server to running jobs are expected to be short.
+    The runner uses a heuristic to differentiate dstack-server connections from
+    client connections based on their duration. See `ConnectionTracker` for details.
+    """
+
     def decorator(
         func: Callable[Concatenate[Dict[int, int], P], R],
     ) -> Callable[

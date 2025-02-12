@@ -264,6 +264,7 @@ def instance_model_to_instance(instance_model: InstanceModel) -> Instance:
     if jpd is not None:
         instance.instance_type = jpd.instance_type
         instance.hostname = jpd.hostname
+        instance.availability_zone = jpd.availability_zone
 
     return instance
 
@@ -423,7 +424,7 @@ def filter_pool_instances(
 
     backend_types = profile.backends
     regions = profile.regions
-    zones = None
+    zones = profile.availability_zones
 
     if volumes:
         mount_point_volumes = volumes[0]
@@ -434,8 +435,9 @@ def filter_pool_instances(
             for v in mount_point_volumes
             if v.provisioning_data is not None
         ]
-        if volume_zones:
+        if zones is None:
             zones = volume_zones
+        zones = [z for z in zones if z in volume_zones]
 
     if multinode:
         if not backend_types:
@@ -697,8 +699,8 @@ async def create_instance_model(
         project_name=project.name,
         instance_name=instance_name,
         user=user.name,
-        instance_id=str(instance_id),
         ssh_keys=[project_ssh_key],
+        instance_id=str(instance_id),
         placement_group_name=placement_group_name,
         reservation=reservation,
     )

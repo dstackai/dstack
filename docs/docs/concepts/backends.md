@@ -325,6 +325,9 @@ There are two ways to configure Azure: using a client secret or using the defaul
     }
     ```
 
+    The `"Microsoft.Resources/subscriptions/resourceGroups/write"` permission is not required
+    if [`resource_group`](/docs/reference/server/config.yml/#azure) is specified.
+
 ??? info "VPC"
     By default, `dstack` creates new Azure networks and subnets for every configured region.
     It's possible to use custom networks by specifying `vpc_ids`:

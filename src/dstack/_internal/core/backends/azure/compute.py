@@ -133,6 +133,8 @@ class AzureCompute(Compute):
         }
         tags = merge_tags(tags=tags, backend_tags=self.config.tags)
 
+        # TODO: Support custom availability_zones.
+        # Currently, VMs are regional, which means they don't have zone info.
         vm = _launch_instance(
             compute_client=self._compute_client,
             subscription_id=self.config.subscription_id,

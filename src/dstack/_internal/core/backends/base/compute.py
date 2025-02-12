@@ -371,7 +371,16 @@ def get_docker_commands(
         "rm -rf /run/sshd && mkdir -p /run/sshd && chown root:root /run/sshd",
         "rm -rf /var/empty && mkdir -p /var/empty && chown root:root /var/empty",
         # start sshd
-        f"/usr/sbin/sshd -p {DSTACK_RUNNER_SSH_PORT} -o PidFile=none -o PasswordAuthentication=no -o AllowTcpForwarding=yes -o PermitUserEnvironment=yes",
+        (
+            "/usr/sbin/sshd"
+            f" -p {DSTACK_RUNNER_SSH_PORT}"
+            " -o PidFile=none"
+            " -o PasswordAuthentication=no"
+            " -o AllowTcpForwarding=yes"
+            " -o PermitUserEnvironment=yes"
+            " -o ClientAliveInterval=30"
+            " -o ClientAliveCountMax=4"
+        ),
         # restore ld.so variables
         'if [ -n "$_LD_LIBRARY_PATH" ]; then export LD_LIBRARY_PATH="$_LD_LIBRARY_PATH"; fi',
         'if [ -n "$_LD_PRELOAD" ]; then export LD_PRELOAD="$_LD_PRELOAD"; fi',
@@ -381,7 +390,16 @@ def get_docker_commands(
     commands += [
         f"curl --connect-timeout 60 --max-time 240 --retry 1 --output {DSTACK_RUNNER_BINARY_PATH} {url}",
         f"chmod +x {DSTACK_RUNNER_BINARY_PATH}",
-        f"{DSTACK_RUNNER_BINARY_PATH} --log-level 6 start --http-port {DSTACK_RUNNER_HTTP_PORT} --temp-dir /tmp/runner --home-dir /root --working-dir /workflow",
+        (
+            f"{DSTACK_RUNNER_BINARY_PATH}"
+            " --log-level 6"
+            " start"
+            f" --http-port {DSTACK_RUNNER_HTTP_PORT}"
+            f" --ssh-port {DSTACK_RUNNER_SSH_PORT}"
+            " --temp-dir /tmp/runner"
+            " --home-dir /root"
+            " --working-dir /workflow"
+        ),
     ]
 
     return commands

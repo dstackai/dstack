@@ -31,21 +31,6 @@ supported_accelerators = [
 ]
 
 
-def get_availability_zone(
-    regions_client: compute_v1.RegionsClient,
-    project_id: str,
-    region: str,
-) -> Optional[str]:
-    zones = get_availability_zones(
-        regions_client=regions_client,
-        project_id=project_id,
-        region=region,
-    )
-    if len(zones) == 0:
-        return None
-    return zones[0]
-
-
 def get_availability_zones(
     regions_client: compute_v1.RegionsClient,
     project_id: str,

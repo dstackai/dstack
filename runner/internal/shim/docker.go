@@ -903,7 +903,17 @@ func getSSHShellCommands(openSSHPort int, publicSSHKey string) []string {
 		"rm -rf /run/sshd && mkdir -p /run/sshd && chown root:root /run/sshd",
 		"rm -rf /var/empty && mkdir -p /var/empty && chown root:root /var/empty",
 		// start sshd
-		fmt.Sprintf("/usr/sbin/sshd -p %d -o PidFile=none -o PasswordAuthentication=no -o AllowTcpForwarding=yes -o PermitUserEnvironment=yes", openSSHPort),
+		fmt.Sprintf(
+			"/usr/sbin/sshd"+
+				" -p %d"+
+				" -o PidFile=none"+
+				" -o PasswordAuthentication=no"+
+				" -o AllowTcpForwarding=yes"+
+				" -o PermitUserEnvironment=yes"+
+				" -o ClientAliveInterval=30"+
+				" -o ClientAliveCountMax=4",
+			openSSHPort,
+		),
 		// restore ld.so variables
 		`if [ -n "$_LD_LIBRARY_PATH" ]; then export LD_LIBRARY_PATH="$_LD_LIBRARY_PATH"; fi`,
 		`if [ -n "$_LD_PRELOAD" ]; then export LD_PRELOAD="$_LD_PRELOAD"; fi`,
