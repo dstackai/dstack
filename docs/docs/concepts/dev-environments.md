@@ -99,6 +99,44 @@ init:
 
 </div>
 
+### Inactivity duration
+
+Set [`inactivity_duration`](../reference/dstack.yml/dev-environment.md#inactivity_duration)
+to automatically stop the dev environment after a configured period of inactivity.
+
+```yaml
+type: dev-environment
+ide: vscode
+
+# Stop if inactive for 2 hours
+inactivity_duration: 2h
+```
+
+The dev environment becomes inactive when you close the remote VS Code window,
+close any `ssh <run name>` shells, and stop the `dstack apply` or `dstack attach` command.
+If you go offline without stopping anything manually, the dev environment will also become inactive
+within about 3 minutes.
+
+If `inactivity_duration` is configured for your dev environment, you can see how long
+it has been inactive in `dstack ps --verbose`.
+
+<div class="termy">
+
+```shell
+$ dstack ps --verbose
+ NAME    BACKEND  RESOURCES       PRICE    STATUS                 SUBMITTED
+ vscode  cudo     2xCPU, 8GB,     $0.0286  running                8 mins ago
+                  100.0GB (disk)           (inactive for 2m 34s)
+```
+
+</div>
+
+If you reattach to the dev environment using [`dstack attach`](../reference/cli/dstack/attach.md),
+the inactivity timer will be reset within a few seconds.
+
+> `inactivity_duration` is not to be confused with [`idle_duration`](#idle-duration).
+> The latter determines how soon the underlying cloud instance will be terminated
+> _after_ the dev environment is stopped.
 
 ### Resources
 
