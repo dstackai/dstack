@@ -43,6 +43,7 @@ from dstack._internal.server.models import (
     PoolModel,
     ProjectModel,
     RunModel,
+    VolumeAttachmentModel,
     VolumeModel,
 )
 from dstack._internal.server.services.backends import get_project_backend_by_type_or_error
@@ -236,7 +237,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         res = await session.execute(
             select(InstanceModel)
             .where(InstanceModel.id == job_model.instance.id)
-            .options(selectinload(InstanceModel.volumes))
+            .options(selectinload(InstanceModel.volume_attachments))
             .execution_options(populate_existing=True)
         )
         instance = res.unique().scalar_one()
@@ -390,11 +391,11 @@ async def _assign_job_to_pool_instance(
 
     instances_with_offers.sort(key=lambda instance_with_offer: instance_with_offer[0].price or 0)
     instance, offer = instances_with_offers[0]
-    # Reload InstanceModel with volumes
+    # Reload InstanceModel with volume attachments
     res = await session.execute(
         select(InstanceModel)
         .where(InstanceModel.id == instance.id)
-        .options(joinedload(InstanceModel.volumes))
+        .options(joinedload(InstanceModel.volume_attachments))
     )
     instance = res.unique().scalar_one()
     instance.status = InstanceStatus.BUSY
@@ -580,7 +581,7 @@ def _create_instance_model_for_job(
         backend=offer.backend,
         price=offer.price,
         region=offer.region,
-        volumes=[],
+        volume_attachments=[],
         total_blocks=1,
         busy_blocks=1,
     )
@@ -696,14 +697,18 @@ async def _attach_volume(
     instance: InstanceModel,
     instance_id: str,
 ):
+    volume = volume_model_to_volume(volume_model)
+    # Refresh only to check if the volume wasn't deleted before the lock
     await session.refresh(volume_model)
     if volume_model.deleted:
         raise ServerClientError("Cannot attach a deleted volume")
-    volume = volume_model_to_volume(volume_model)
     attachment_data = await common_utils.run_async(
         backend.compute().attach_volume,
         volume=volume,
         instance_id=instance_id,
     )
-    volume_model.volume_attachment_data = attachment_data.json()
-    instance.volumes.append(volume_model)
+    volume_attachment_model = VolumeAttachmentModel(
+        volume=volume_model,
+        attachment_data=attachment_data.json(),
+    )
+    instance.volume_attachments.append(volume_attachment_model)

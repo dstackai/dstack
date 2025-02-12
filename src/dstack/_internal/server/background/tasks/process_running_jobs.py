@@ -206,6 +206,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
                     None,
                     run,
                     job_model,
+                    job_provisioning_data,
                     volumes,
                     secrets,
                     job.job_spec.registry_auth,
@@ -361,6 +362,7 @@ def _process_provisioning_with_shim(
     ports: Dict[int, int],
     run: Run,
     job_model: JobModel,
+    job_provisioning_data: JobProvisioningData,
     volumes: List[Volume],
     secrets: Dict[str, str],
     registry_auth: Optional[RegistryAuth],
@@ -444,6 +446,7 @@ def _process_provisioning_with_shim(
             host_ssh_user=ssh_user,
             host_ssh_keys=[ssh_key] if ssh_key else [],
             container_ssh_keys=public_keys,
+            instance_id=job_provisioning_data.instance_id,
         )
     else:
         submitted = shim_client.submit(
@@ -460,6 +463,7 @@ def _process_provisioning_with_shim(
             mounts=volume_mounts,
             volumes=volumes,
             instance_mounts=instance_mounts,
+            instance_id=job_provisioning_data.instance_id,
         )
         if not submitted:
             # This can happen when we lost connection to the runner (e.g., network issues), marked

@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
-from dstack._internal.server.models import VolumeModel
+from dstack._internal.server.models import VolumeAttachmentModel, VolumeModel
 from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.testing.common import (
     create_instance,
@@ -76,6 +76,7 @@ class TestListVolumes:
                 "deleted": False,
                 "volume_id": None,
                 "provisioning_data": None,
+                "attachments": [],
                 "attachment_data": None,
             },
             {
@@ -91,6 +92,7 @@ class TestListVolumes:
                 "deleted": False,
                 "volume_id": None,
                 "provisioning_data": None,
+                "attachments": [],
                 "attachment_data": None,
             },
         ]
@@ -117,6 +119,7 @@ class TestListVolumes:
                 "deleted": False,
                 "volume_id": None,
                 "provisioning_data": None,
+                "attachments": [],
                 "attachment_data": None,
             },
         ]
@@ -170,6 +173,7 @@ class TestListVolumes:
                 "deleted": False,
                 "volume_id": None,
                 "provisioning_data": None,
+                "attachments": [],
                 "attachment_data": None,
             },
         ]
@@ -217,6 +221,7 @@ class TestListProjectVolumes:
                 "deleted": False,
                 "volume_id": None,
                 "provisioning_data": None,
+                "attachments": [],
                 "attachment_data": None,
             }
         ]
@@ -264,6 +269,7 @@ class TestGetVolume:
             "deleted": False,
             "volume_id": None,
             "provisioning_data": None,
+            "attachments": [],
             "attachment_data": None,
         }
 
@@ -325,6 +331,7 @@ class TestCreateVolume:
             "deleted": False,
             "volume_id": None,
             "provisioning_data": None,
+            "attachments": [],
             "attachment_data": None,
         }
         res = await session.execute(select(VolumeModel))
@@ -391,7 +398,7 @@ class TestDeleteVolumes:
             project=project,
             pool=pool,
         )
-        volume.instances.append(instance)
+        volume.attachments.append(VolumeAttachmentModel(instance=instance))
         await session.commit()
         response = await client.post(
             f"/api/project/{project.name}/volumes/delete",

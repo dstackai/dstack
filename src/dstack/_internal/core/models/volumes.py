@@ -99,8 +99,17 @@ class Volume(CoreModel):
     volume_id: Optional[str] = None  # id of the volume in the cloud
     provisioning_data: Optional[VolumeProvisioningData] = None
     attachments: Optional[List[VolumeAttachment]] = None
-    # Deprecated in favor of attachments
+    # attachment_data is deprecated in favor of attachments.
+    # It's only set for volumes that were attached before attachments.
     attachment_data: Optional[VolumeAttachmentData] = None
+
+    def get_attachment_data_for_instance(self, instance_id: str) -> Optional[VolumeAttachmentData]:
+        if self.attachments is not None:
+            for attachment in self.attachments:
+                if attachment.instance.instance_id == instance_id:
+                    return attachment.attachment_data
+        # volume was attached before attachments were introduced
+        return self.attachment_data
 
 
 class VolumePlan(CoreModel):

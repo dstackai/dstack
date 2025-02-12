@@ -24,7 +24,13 @@ from dstack._internal.core.models.volumes import (
 )
 from dstack._internal.core.services import validate_dstack_resource_name
 from dstack._internal.server.db import get_db
-from dstack._internal.server.models import InstanceModel, ProjectModel, UserModel, VolumeModel
+from dstack._internal.server.models import (
+    InstanceModel,
+    ProjectModel,
+    UserModel,
+    VolumeAttachmentModel,
+    VolumeModel,
+)
 from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services.locking import (
     get_locker,
@@ -109,7 +115,11 @@ async def list_projects_volume_models(
         .order_by(*order_by)
         .limit(limit)
         .options(joinedload(VolumeModel.user))
-        .options(joinedload(VolumeModel.instances).joinedload(InstanceModel.fleet))
+        .options(
+            joinedload(VolumeModel.attachments)
+            .joinedload(VolumeAttachmentModel.instance)
+            .joinedload(InstanceModel.fleet)
+        )
     )
     volume_models = list(res.unique().scalars().all())
     return volume_models
@@ -141,7 +151,11 @@ async def list_project_volume_models(
         select(VolumeModel)
         .where(*filters)
         .options(joinedload(VolumeModel.user))
-        .options(joinedload(VolumeModel.instances).joinedload(InstanceModel.fleet))
+        .options(
+            joinedload(VolumeModel.attachments)
+            .joinedload(VolumeAttachmentModel.instance)
+            .joinedload(InstanceModel.fleet)
+        )
     )
     return list(res.unique().scalars().all())
 
@@ -173,7 +187,11 @@ async def get_project_volume_model_by_name(
         select(VolumeModel)
         .where(*filters)
         .options(joinedload(VolumeModel.user))
-        .options(joinedload(VolumeModel.instances).joinedload(InstanceModel.fleet))
+        .options(
+            joinedload(VolumeModel.attachments)
+            .joinedload(VolumeAttachmentModel.instance)
+            .joinedload(InstanceModel.fleet)
+        )
     )
     return res.unique().scalar_one_or_none()
 
@@ -215,10 +233,10 @@ async def create_volume(
             project=project,
             status=VolumeStatus.SUBMITTED,
             configuration=configuration.json(),
+            attachments=[],
         )
         session.add(volume_model)
         await session.commit()
-        await session.refresh(volume_model)
         return volume_model_to_volume(volume_model)
 
 
@@ -244,13 +262,13 @@ async def delete_volumes(session: AsyncSession, project: ProjectModel, names: Li
                 VolumeModel.deleted == False,
             )
             .options(selectinload(VolumeModel.user))
-            .options(selectinload(VolumeModel.instances))
+            .options(selectinload(VolumeModel.attachments))
             .execution_options(populate_existing=True)
             .with_for_update()
         )
         volume_models = res.scalars().unique().all()
         for volume_model in volume_models:
-            if len(volume_model.instances) > 0:
+            if len(volume_model.attachments) > 0:
                 raise ServerClientError(
                     f"Failed to delete volume {volume_model.name}. Volume is in use."
                 )
@@ -281,8 +299,14 @@ def volume_model_to_volume(volume_model: VolumeModel) -> Volume:
     if vpd is not None and vpd.backend is None:
         vpd.backend = configuration.backend
     attachments = []
-    for instance in volume_model.instances:
-        attachments.append(VolumeAttachment(instance=instance_model_to_volume_instance(instance)))
+    for volume_attachment_model in volume_model.attachments:
+        instance = volume_attachment_model.instance
+        attachments.append(
+            VolumeAttachment(
+                instance=instance_model_to_volume_instance(instance),
+                attachment_data=get_attachment_data(volume_attachment_model),
+            )
+        )
     return Volume(
         name=volume_model.name,
         project_name=volume_model.project.name,
@@ -315,6 +339,14 @@ def get_volume_attachment_data(volume_model: VolumeModel) -> Optional[VolumeAtta
     if volume_model.volume_attachment_data is None:
         return None
     return VolumeAttachmentData.__response__.parse_raw(volume_model.volume_attachment_data)
+
+
+def get_attachment_data(
+    volume_attachment_model: VolumeAttachmentModel,
+) -> Optional[VolumeAttachmentData]:
+    if volume_attachment_model.attachment_data is None:
+        return None
+    return VolumeAttachmentData.__response__.parse_raw(volume_attachment_model.attachment_data)
 
 
 def instance_model_to_volume_instance(instance_model: InstanceModel) -> VolumeInstance:
