@@ -6,6 +6,7 @@ from freezegun import freeze_time
 
 from dstack._internal.utils.common import (
     concat_url_path,
+    format_duration_multiunit,
     local_time,
     make_proxy_url,
     parse_memory,
@@ -85,6 +86,26 @@ class TestPrettyDate:
         now = datetime.now(tz=timezone.utc)
         future_time = now + timedelta(hours=1)
         assert pretty_date(future_time) == ""
+
+
+class TestFormatDurationMultiunit:
+    @pytest.mark.parametrize(
+        ("input", "output"),
+        [
+            (0, "0s"),
+            (59, "59s"),
+            (60, "1m"),
+            (61, "1m 1s"),
+            (694861, "1w 1d 1h 1m 1s"),
+            (86401, "1d 1s"),
+        ],
+    )
+    def test(self, input: int, output: str) -> None:
+        assert format_duration_multiunit(input) == output
+
+    def test_forbids_negative(self) -> None:
+        with pytest.raises(ValueError):
+            format_duration_multiunit(-1)
 
 
 class TestParseMemory:

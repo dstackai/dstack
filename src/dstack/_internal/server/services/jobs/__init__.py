@@ -129,6 +129,7 @@ def job_model_to_job_submission(job_model: JobModel) -> JobSubmission:
         submitted_at=job_model.submitted_at.replace(tzinfo=timezone.utc),
         last_processed_at=last_processed_at,
         finished_at=finished_at,
+        inactivity_secs=job_model.inactivity_secs,
         status=job_model.status,
         termination_reason=job_model.termination_reason,
         termination_reason_message=job_model.termination_reason_message,

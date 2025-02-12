@@ -273,6 +273,7 @@ class JobSubmission(CoreModel):
     submitted_at: datetime
     last_processed_at: datetime
     finished_at: Optional[datetime]
+    inactivity_secs: Optional[int]
     status: JobStatus
     termination_reason: Optional[JobTerminationReason]
     termination_reason_message: Optional[str]
