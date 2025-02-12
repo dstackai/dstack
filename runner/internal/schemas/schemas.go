@@ -27,11 +27,12 @@ type SubmitBody struct {
 }
 
 type PullResponse struct {
-	JobStates   []JobStateEvent `json:"job_states"`
-	JobLogs     []LogEvent      `json:"job_logs"`
-	RunnerLogs  []LogEvent      `json:"runner_logs"`
-	LastUpdated int64           `json:"last_updated"`
-	HasMore     bool            `json:"has_more"`
+	JobStates         []JobStateEvent `json:"job_states"`
+	JobLogs           []LogEvent      `json:"job_logs"`
+	RunnerLogs        []LogEvent      `json:"runner_logs"`
+	LastUpdated       int64           `json:"last_updated"`
+	NoConnectionsSecs int64           `json:"no_connections_secs"`
+	HasMore           bool            `json:"has_more"`
 	// todo Result
 }
 

@@ -45,11 +45,18 @@ async def get_offers_by_requirements(
 
     backend_types = profile.backends
     regions = profile.regions
+    availability_zones = profile.availability_zones
 
     if volumes:
         mount_point_volumes = volumes[0]
-        backend_types = [v.configuration.backend for v in mount_point_volumes]
-        regions = [v.configuration.region for v in mount_point_volumes]
+        volumes_backend_types = [v.configuration.backend for v in mount_point_volumes]
+        if not backend_types:
+            backend_types = volumes_backend_types
+        backend_types = [b for b in backend_types if b in volumes_backend_types]
+        volumes_regions = [v.configuration.region for v in mount_point_volumes]
+        if not regions:
+            regions = volumes_regions
+        regions = [r for r in regions if r in volumes_regions]
 
     if multinode:
         if not backend_types:
@@ -95,6 +102,18 @@ async def get_offers_by_requirements(
 
     if regions is not None:
         offers = [(b, o) for b, o in offers if o.region in regions]
+
+    if availability_zones is not None:
+        new_offers = []
+        for b, o in offers:
+            if o.availability_zones is not None:
+                new_offer = o.copy()
+                new_offer.availability_zones = [
+                    z for z in o.availability_zones if z in availability_zones
+                ]
+                if new_offer.availability_zones:
+                    new_offers.append((b, new_offer))
+        offers = new_offers
 
     if profile.instance_types is not None:
         offers = [(b, o) for b, o in offers if o.instance.name in profile.instance_types]

@@ -89,6 +89,11 @@ def _get_fleet_spec_excludes(fleet_spec: FleetSpec) -> Optional[_ExcludeDict]:
     # client >= 0.18.38 / server <= 0.18.37 compatibility tweak
     if fleet_spec.profile is not None and fleet_spec.profile.stop_duration is None:
         profile_excludes.add("stop_duration")
+    # client >= 0.18.41 / server <= 0.18.40 compatibility tweak
+    if fleet_spec.configuration.availability_zones is None:
+        configuration_excludes["availability_zones"] = True
+    if fleet_spec.profile is not None and fleet_spec.profile.availability_zones is None:
+        profile_excludes.add("availability_zones")
     if fleet_spec.configuration.blocks == 1:
         configuration_excludes["blocks"] = True
 

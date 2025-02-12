@@ -157,22 +157,36 @@ def parse_pretty_duration(duration: str) -> int:
     return amount * multiplier
 
 
+DURATION_UNITS_DESC = [
+    ("w", 7 * 24 * 3600),
+    ("d", 24 * 3600),
+    ("h", 3600),
+    ("m", 60),
+    ("s", 1),
+]
+
+
 def format_pretty_duration(seconds: int) -> str:
     if seconds == 0:
         return "0s"
     if seconds < 0:
         raise ValueError("Seconds cannot be negative")
-    units = [
-        ("w", 7 * 24 * 3600),
-        ("d", 24 * 3600),
-        ("h", 3600),
-        ("m", 60),
-        ("s", 1),
-    ]
-    for unit, multiplier in units:
+    for unit, multiplier in DURATION_UNITS_DESC:
         if seconds % multiplier == 0:
             return f"{seconds // multiplier}{unit}"
     return f"{seconds}s"  # Fallback to seconds if no larger unit fits perfectly
+
+
+def format_duration_multiunit(seconds: int) -> str:
+    """90 -> 1m 30s, 4545 -> 1h 15m 45s, etc"""
+    if seconds < 0:
+        raise ValueError("Seconds cannot be negative")
+    result = ""
+    for unit, multiplier in DURATION_UNITS_DESC:
+        if unit_value := seconds // multiplier:
+            result += f" {unit_value}{unit}"
+            seconds -= unit_value * multiplier
+    return result.lstrip() or "0s"
 
 
 def sizeof_fmt(num, suffix="B"):

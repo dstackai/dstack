@@ -203,34 +203,29 @@ def check_availability_in_domain(
     return available
 
 
-def check_availability_in_region(
+def check_availability_per_domain(
     shape_names: Iterable[str],
     shapes_quota: ShapesQuota,
     region: OCIRegionClient,
     compartment_id: str,
-) -> Set[str]:
-    """
-    Returns a subset of `shape_names` with only the shapes available in at least
-    one availability domain within `region`.
-    """
-
+) -> Dict[str, Set[str]]:
     all_shapes = set(shape_names)
-    available_shapes = set()
+    available_shapes_per_domain = {}
 
     for availability_domain in region.availability_domains:
         shapes_to_check = {
             shape
-            for shape in all_shapes - available_shapes
+            for shape in all_shapes
             if shapes_quota.is_within_domain_quota(shape, availability_domain.name)
         }
-        available_shapes |= check_availability_in_domain(
+        available_shapes_per_domain[availability_domain.name] = check_availability_in_domain(
             shape_names=shapes_to_check,
             availability_domain_name=availability_domain.name,
             client=region.compute_client,
             compartment_id=compartment_id,
         )
 
-    return available_shapes
+    return available_shapes_per_domain
 
 
 def get_shapes_availability(
@@ -239,12 +234,11 @@ def get_shapes_availability(
     regions: Mapping[str, OCIRegionClient],
     compartment_id: str,
     executor: Executor,
-) -> Dict[str, Set[str]]:
+) -> Dict[str, Dict[str, List[str]]]:
     """
-    Returns a mapping of region names to sets of shape names available in these
-    regions. Only shapes from `offers` are checked.
+    Returns availability domains where shapes are available as regions->shapes->availability_domains mapping.
+    Only shapes from `offers` are checked.
     """
-
     shape_names_per_region = {region: set() for region in regions}
     for offer in offers:
         if shapes_quota.is_within_region_quota(offer.instance.name, offer.region):
@@ -253,7 +247,7 @@ def get_shapes_availability(
     future_to_region_name = {}
     for region_name, shape_names in shape_names_per_region.items():
         future = executor.submit(
-            check_availability_in_region,
+            check_availability_per_domain,
             shape_names,
             shapes_quota,
             regions[region_name],
@@ -263,29 +257,32 @@ def get_shapes_availability(
 
     result = {}
     for future in as_completed(future_to_region_name):
-        region_name = future_to_region_name[future]
-        result[region_name] = future.result()
+        domains_to_shape_names = future.result()
+        shape_names_to_domains = {}
+        for domain, shape_names in domains_to_shape_names.items():
+            for shape_name in shape_names:
+                shape_names_to_domains.setdefault(shape_name, []).append(domain)
+        result[future_to_region_name[future]] = shape_names_to_domains
 
     return result
 
 
-def choose_available_domain(
+def get_available_domains(
     shape_name: str, shapes_quota: ShapesQuota, region: OCIRegionClient, compartment_id: str
-) -> Optional[str]:
+) -> List[str]:
     """
-    Returns the name of any availability domain within `region` in which
-    `shape_name` is available. None if the shape is unavailable or not within
-    `shapes_quota` in all domains.
+    Returns the names of all availability domains in `region` in which
+    `shape_name` is available and within `shapes_quota`.
     """
-
+    domains = []
     for domain in region.availability_domains:
         if shapes_quota.is_within_domain_quota(
             shape_name, domain.name
         ) and check_availability_in_domain(
             {shape_name}, domain.name, region.compute_client, compartment_id
         ):
-            return domain.name
-    return None
+            domains.append(domain.name)
+    return domains
 
 
 def get_instance_vnic(

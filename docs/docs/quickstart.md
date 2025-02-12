@@ -15,7 +15,7 @@ $ dstack init
 
 </div>
 
-## Run a configuration
+## Apply a configuration
 
 === "Dev environment"
 
@@ -42,7 +42,7 @@ $ dstack init
 
     </div>
 
-    Run the configuration via [`dstack apply`](reference/cli/dstack/apply.md):
+    Apply the configuration via [`dstack apply`](reference/cli/dstack/apply.md):
 
     <div class="termy">
 
@@ -196,7 +196,7 @@ $ dstack init
         If you're using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"},
         a gateway is pre-configured for you.
 
-`dstack apply` automatically provisions instances, uploads the contents of the repo (incl. your local uncommitted changes),
+> `dstack apply` automatically provisions instances, uploads the contents of the repo (incl. your local uncommitted changes),
 and runs the configuration.
 
 ## Troubleshooting

@@ -10,6 +10,7 @@ from dstack._internal.core.consts import DSTACK_RUNNER_HTTP_PORT, DSTACK_SHIM_HT
 from dstack._internal.core.errors import GatewayError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import NetworkMode, RegistryAuth, is_core_model_instance
+from dstack._internal.core.models.configurations import DevEnvironmentConfiguration
 from dstack._internal.core.models.instances import InstanceStatus, RemoteConnectionInfo
 from dstack._internal.core.models.repos import RemoteRepoCreds
 from dstack._internal.core.models.runs import (
@@ -20,6 +21,7 @@ from dstack._internal.core.models.runs import (
     JobStatus,
     JobTerminationReason,
     Run,
+    RunSpec,
 )
 from dstack._internal.core.models.volumes import InstanceMountPoint, Volume, VolumeMountPoint
 from dstack._internal.server.db import get_session_ctx
@@ -598,6 +600,7 @@ def _process_running(
         runner_logs=resp.runner_logs,
         job_logs=resp.job_logs,
     )
+    previous_status = job_model.status
     if len(resp.job_states) > 0:
         latest_state_event = resp.job_states[-1]
         latest_status = latest_state_event.state
@@ -613,8 +616,38 @@ def _process_running(
                 )
             if latest_state_event.termination_message:
                 job_model.termination_reason_message = latest_state_event.termination_message
+    else:
+        _terminate_if_inactivity_duration_exceeded(run_model, job_model, resp.no_connections_secs)
+    if job_model.status != previous_status:
         logger.info("%s: now is %s", fmt(job_model), job_model.status.name)
     return True
+
+
+def _terminate_if_inactivity_duration_exceeded(
+    run_model: RunModel, job_model: JobModel, no_connections_secs: Optional[int]
+) -> None:
+    conf = RunSpec.__response__.parse_raw(run_model.run_spec).configuration
+    if is_core_model_instance(conf, DevEnvironmentConfiguration) and isinstance(
+        conf.inactivity_duration, int
+    ):
+        logger.debug("%s: no SSH connections for %s seconds", fmt(job_model), no_connections_secs)
+        job_model.inactivity_secs = no_connections_secs
+        if no_connections_secs is None:
+            # TODO(0.19 or earlier): make no_connections_secs required
+            job_model.status = JobStatus.TERMINATING
+            job_model.termination_reason = JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY
+            job_model.termination_reason_message = (
+                "The selected instance was created before dstack 0.18.41"
+                " and does not support inactivity_duration"
+            )
+        elif no_connections_secs >= conf.inactivity_duration:
+            job_model.status = JobStatus.TERMINATING
+            # TODO(0.19 or earlier): set JobTerminationReason.INACTIVITY_DURATION_EXCEEDED
+            job_model.termination_reason = JobTerminationReason.TERMINATED_BY_SERVER
+            job_model.termination_reason_message = (
+                f"The job was inactive for {no_connections_secs} seconds,"
+                f" exceeding the inactivity_duration of {conf.inactivity_duration} seconds"
+            )
 
 
 def _get_cluster_info(

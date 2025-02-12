@@ -13,7 +13,7 @@ Useful as a cache for cloud fleets or for persistent storage with SSH fleets.
 
 Network volumes are currently supported for the `aws`, `gcp`, and `runpod` backends.
 
-### Define a configuration
+### Apply a configuration
 
 First, define a volume configuration as a YAML file in your project folder.
 The filename must end with `.dstack.yml` (e.g. `.dstack.yml` or `volume.dstack.yml` are both acceptable).
@@ -36,6 +36,26 @@ size: 100GB
 </div>
 
 If you use this configuration, `dstack` will create a new volume based on the specified options.
+
+To create, update, or register the volume, pass the volume configuration to `dstack apply`:
+
+<div class="termy">
+
+```shell
+$ dstack apply -f volume.dstack.yml
+Volume my-volume does not exist yet. Create the volume? [y/n]: y
+
+ NAME       BACKEND  REGION        STATUS     CREATED 
+ my-volume  aws      eu-central-1  submitted  now     
+
+```
+
+</div>
+
+
+Once created, the volume can be attached to dev environments, tasks, and services.
+
+> When creating a new network volume, `dstack` automatically creates an `ext4` filesystem on it.
 
 ??? info "Register existing volumes"
     If you prefer not to create a new volume but to reuse an existing one (e.g., created manually), you can 
@@ -63,29 +83,6 @@ If you use this configuration, `dstack` will create a new volume based on the sp
 
 !!! info "Reference"
     For all volume configuration options, refer to the [reference](../reference/dstack.yml/volume.md).
-
-### Create, register, or update a volume
-
-To create or register the volume, pass the volume configuration to `dstack apply`:
-
-<div class="termy">
-
-```shell
-$ dstack apply -f volume.dstack.yml
-Volume my-volume does not exist yet. Create the volume? [y/n]: y
-
- NAME       BACKEND  REGION        STATUS     CREATED 
- my-volume  aws      eu-central-1  submitted  now     
-
-```
-
-</div>
-
-
-Once created, the volume can be attached to dev environments, tasks, and services.
-
-!!! info "Filesystem"
-    When creating a new network volume, `dstack` automatically creates an `ext4` filesystem on it.
 
 ### Attach a volume { #attach-network-volume }
 
@@ -117,7 +114,10 @@ volumes:
 Once you run this configuration, the contents of the volume will be attached to `/volume_data` inside the dev environment, 
 and its contents will persist across runs.
 
-!!! info "Attach volumes across regions and backends"
+> Currently, `dstack` does not allow attaching volumes to `/workflow` or any of its subdirectories because this folder is
+> reserved for fetching the repository
+
+??? info "Multiple regions or backends"
     If you're unsure in advance which region or backend you'd like to use (or which is available),
     you can specify multiple volumes for the same path.
 
@@ -133,9 +133,9 @@ and its contents will persist across runs.
 
     `dstack` will attach one of the volumes based on the region and backend of the run.  
 
-!!! info "Volumes with multi-node tasks"
-    To use single-attach volumes such as AWS EBS with multi-node tasks,
-    attach different volumes to different nodes using `dstack` variable interpolation:
+??? info "Distributed tasks"
+    When using single-attach volumes such as AWS EBS with distributed tasks,
+    you can attach different volumes to different nodes using `dstack` variable interpolation:
 
     <div editor-title=".dstack.yml">
 
@@ -159,11 +159,6 @@ and its contents will persist across runs.
     $ for i in {0..7}; do dstack apply -f vol.dstack.yml -n data-volume-$i -y; done
     ```
 
-??? info "Container path"
-    When you're running a dev environment, task, or service with `dstack`, it automatically mounts the project folder contents
-    to `/workflow` (and sets that as the current working directory). Right now, `dstack` doesn't allow you to 
-    attach volumes to `/workflow` or any of its subdirectories.
-
 ### Detach a volume { #detach-network-volume }
 
 `dstack` automatically detaches volumes from instances when a run stops.
@@ -172,6 +167,7 @@ and its contents will persist across runs.
     In some clouds such as AWS a volume may stuck in the detaching state.
     To fix this, you can abort the run, and `dstack` will force detach the volume.
     `dstack` will also force detach the stuck volume automatically after `stop_duration`.
+    
     Note that force detaching a volume is a last resort measure and may corrupt the file system.
     Contact your cloud support if you're experience volumes stuck in the detaching state.
 
