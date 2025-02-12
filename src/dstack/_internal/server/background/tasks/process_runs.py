@@ -230,7 +230,8 @@ async def _process_active_run(session: AsyncSession, run_model: RunModel):
                 # the job is submitted
                 replica_statuses.add(RunStatus.SUBMITTED)
             elif job_model.status == JobStatus.FAILED or (
-                job_model.status == JobStatus.TERMINATING
+                job_model.status
+                in [JobStatus.TERMINATING, JobStatus.TERMINATED, JobStatus.ABORTED]
                 and job_model.termination_reason
                 not in {JobTerminationReason.DONE_BY_RUNNER, JobTerminationReason.SCALED_DOWN}
             ):
@@ -244,17 +245,6 @@ async def _process_active_run(session: AsyncSession, run_model: RunModel):
                         run_termination_reasons.add(RunTerminationReason.RETRY_LIMIT_EXCEEDED)
                     else:
                         replica_needs_retry = True
-            elif job_model.status in {
-                JobStatus.TERMINATING,
-                JobStatus.TERMINATED,
-                JobStatus.ABORTED,
-            }:
-                # FIXME: This code does not expect JobStatus.TERMINATED status,
-                # so if a job transitions from RUNNING to TERMINATED,
-                # the run will transition to PENDING instead of TERMINATING.
-                # This may not be observed because process_runs is invoked more frequently
-                # than process_terminating_jobs and because most jobs usually transition to FAILED.
-                pass  # unexpected, but let's ignore it
             else:
                 raise ValueError(f"Unexpected job status {job_model.status}")
 
