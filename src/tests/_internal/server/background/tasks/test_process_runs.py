@@ -288,13 +288,27 @@ class TestProcessRunsReplicas:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_some_failed_to_terminating(self, test_db, session: AsyncSession):
+    @pytest.mark.parametrize(
+        ("job_status", "job_termination_reason"),
+        [
+            (JobStatus.FAILED, JobTerminationReason.CONTAINER_EXITED_WITH_ERROR),
+            (JobStatus.TERMINATING, JobTerminationReason.TERMINATED_BY_SERVER),
+            (JobStatus.TERMINATED, JobTerminationReason.TERMINATED_BY_SERVER),
+        ],
+    )
+    async def test_some_failed_to_terminating(
+        self,
+        test_db,
+        session: AsyncSession,
+        job_status: JobStatus,
+        job_termination_reason: JobTerminationReason,
+    ) -> None:
         run = await make_run(session, status=RunStatus.RUNNING, replicas=2)
         await create_job(
             session=session,
             run=run,
-            status=JobStatus.FAILED,
-            termination_reason=JobTerminationReason.CONTAINER_EXITED_WITH_ERROR,
+            status=job_status,
+            termination_reason=job_termination_reason,
             replica_num=0,
         )
         await create_job(session=session, run=run, status=JobStatus.RUNNING, replica_num=1)
