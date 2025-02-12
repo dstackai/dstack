@@ -17,11 +17,25 @@ The `fleet` configuration type allows creating and updating fleets.
       show_root_heading: false
       item_id_prefix: ssh_config-
 
+#### `ssh_config.proxy_jump` { #ssh_config-proxy_jump data-toc-label="proxy_jump" }
+
+#SCHEMA# dstack._internal.core.models.fleets.SSHProxyParams
+    overrides:
+      show_root_heading: false
+      item_id_prefix: proxy_jump-
+
 #### `ssh_config.hosts[n]` { #ssh_config-hosts data-toc-label="hosts" }
 
 #SCHEMA# dstack._internal.core.models.fleets.SSHHostParams
     overrides:
       show_root_heading: false
+
+##### `ssh_config.hosts[n].proxy_jump` { #proxy_jump data-toc-label="hosts[n].proxy_jump" }
+
+#SCHEMA# dstack._internal.core.models.fleets.SSHProxyParams
+    overrides:
+      show_root_heading: false
+      item_id_prefix: hosts-proxy_jump-
 
 ### `resources`
 

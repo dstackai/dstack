@@ -2,7 +2,7 @@ import atexit
 import re
 import time
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Union
 
 import psutil
 
@@ -14,6 +14,8 @@ from dstack._internal.core.services.ssh.ports import PortsLock
 from dstack._internal.core.services.ssh.tunnel import SSHTunnel, ports_to_forwarded_sockets
 from dstack._internal.utils.path import FilePath, PathLike
 from dstack._internal.utils.ssh import (
+    default_ssh_config_path,
+    get_host_config,
     include_ssh_config,
     normalize_path,
     update_ssh_config,
@@ -88,28 +90,63 @@ class SSHAttach:
             },
         )
         self.ssh_proxy = ssh_proxy
-        if ssh_proxy is None:
-            self.host_config = {
+
+        hosts: dict[str, dict[str, Union[str, int, FilePath]]] = {}
+        self.hosts = hosts
+
+        if local_backend:
+            hosts[run_name] = {
                 "HostName": hostname,
-                "Port": ssh_port,
-                "User": user if dockerized else container_user,
+                "Port": container_ssh_port,
+                "User": container_user,
                 "IdentityFile": self.identity_file,
                 "IdentitiesOnly": "yes",
                 "StrictHostKeyChecking": "no",
                 "UserKnownHostsFile": "/dev/null",
             }
-        else:
-            self.host_config = {
-                "HostName": ssh_proxy.hostname,
-                "Port": ssh_proxy.port,
-                "User": ssh_proxy.username,
-                "IdentityFile": self.identity_file,
-                "IdentitiesOnly": "yes",
-                "StrictHostKeyChecking": "no",
-                "UserKnownHostsFile": "/dev/null",
-            }
-        if dockerized and not local_backend:
-            self.container_config = {
+        elif dockerized:
+            if ssh_proxy is not None:
+                # SSH instance with jump host
+                # dstack has no IdentityFile for jump host, it must be either preconfigured
+                # in the ~/.ssh/config of loaded into ssh-agent
+                hosts[f"{run_name}-jump-host"] = {
+                    "HostName": ssh_proxy.hostname,
+                    "Port": ssh_proxy.port,
+                    "User": ssh_proxy.username,
+                    "StrictHostKeyChecking": "no",
+                    "UserKnownHostsFile": "/dev/null",
+                }
+                jump_host_config = get_host_config(ssh_proxy.hostname, default_ssh_config_path)
+                jump_host_identity_files = jump_host_config.get("identityfile")
+                if jump_host_identity_files:
+                    hosts[f"{run_name}-jump-host"].update(
+                        {
+                            "IdentityFile": jump_host_identity_files[0],
+                            "IdentitiesOnly": "yes",
+                        }
+                    )
+                hosts[f"{run_name}-host"] = {
+                    "HostName": hostname,
+                    "Port": ssh_port,
+                    "User": user,
+                    "IdentityFile": self.identity_file,
+                    "IdentitiesOnly": "yes",
+                    "StrictHostKeyChecking": "no",
+                    "UserKnownHostsFile": "/dev/null",
+                    "ProxyJump": f"{run_name}-jump-host",
+                }
+            else:
+                # Regular SSH instance or VM-based cloud instance
+                hosts[f"{run_name}-host"] = {
+                    "HostName": hostname,
+                    "Port": ssh_port,
+                    "User": user,
+                    "IdentityFile": self.identity_file,
+                    "IdentitiesOnly": "yes",
+                    "StrictHostKeyChecking": "no",
+                    "UserKnownHostsFile": "/dev/null",
+                }
+            hosts[run_name] = {
                 "HostName": "localhost",
                 "Port": container_ssh_port,
                 "User": container_user,
@@ -119,32 +156,41 @@ class SSHAttach:
                 "UserKnownHostsFile": "/dev/null",
                 "ProxyJump": f"{run_name}-host",
             }
-        elif ssh_proxy is not None:
-            self.container_config = {
-                "HostName": hostname,
-                "Port": ssh_port,
-                "User": container_user,
-                "IdentityFile": self.identity_file,
-                "IdentitiesOnly": "yes",
-                "StrictHostKeyChecking": "no",
-                "UserKnownHostsFile": "/dev/null",
-                "ProxyJump": f"{run_name}-jump-host",
-            }
         else:
-            self.container_config = None
-        if local_backend:
-            self.container_config = None
-            self.host_config = {
-                "HostName": hostname,
-                "Port": container_ssh_port,
-                "User": container_user,
-                "IdentityFile": self.identity_file,
-                "IdentitiesOnly": "yes",
-                "StrictHostKeyChecking": "no",
-                "UserKnownHostsFile": "/dev/null",
-            }
-        if self.container_config is not None and get_ssh_client_info().supports_multiplexing:
-            self.container_config.update(
+            if ssh_proxy is not None:
+                # Kubernetes
+                hosts[f"{run_name}-jump-host"] = {
+                    "HostName": ssh_proxy.hostname,
+                    "Port": ssh_proxy.port,
+                    "User": ssh_proxy.username,
+                    "IdentityFile": self.identity_file,
+                    "IdentitiesOnly": "yes",
+                    "StrictHostKeyChecking": "no",
+                    "UserKnownHostsFile": "/dev/null",
+                }
+                hosts[run_name] = {
+                    "HostName": hostname,
+                    "Port": ssh_port,
+                    "User": container_user,
+                    "IdentityFile": self.identity_file,
+                    "IdentitiesOnly": "yes",
+                    "StrictHostKeyChecking": "no",
+                    "UserKnownHostsFile": "/dev/null",
+                    "ProxyJump": f"{run_name}-jump-host",
+                }
+            else:
+                # Container-based backends
+                hosts[run_name] = {
+                    "HostName": hostname,
+                    "Port": ssh_port,
+                    "User": container_user,
+                    "IdentityFile": self.identity_file,
+                    "IdentitiesOnly": "yes",
+                    "StrictHostKeyChecking": "no",
+                    "UserKnownHostsFile": "/dev/null",
+                }
+        if get_ssh_client_info().supports_multiplexing:
+            hosts[run_name].update(
                 {
                     "ControlMaster": "auto",
                     "ControlPath": self.control_sock_path,
@@ -153,14 +199,8 @@ class SSHAttach:
 
     def attach(self):
         include_ssh_config(self.ssh_config_path)
-        if self.container_config is None:
-            update_ssh_config(self.ssh_config_path, self.run_name, self.host_config)
-        elif self.ssh_proxy is not None:
-            update_ssh_config(self.ssh_config_path, f"{self.run_name}-jump-host", self.host_config)
-            update_ssh_config(self.ssh_config_path, self.run_name, self.container_config)
-        else:
-            update_ssh_config(self.ssh_config_path, f"{self.run_name}-host", self.host_config)
-            update_ssh_config(self.ssh_config_path, self.run_name, self.container_config)
+        for host, options in self.hosts.items():
+            update_ssh_config(self.ssh_config_path, host, options)
 
         max_retries = 10
         self._ports_lock.release()
@@ -178,9 +218,8 @@ class SSHAttach:
 
     def detach(self):
         self.tunnel.close()
-        update_ssh_config(self.ssh_config_path, f"{self.run_name}-jump-host", {})
-        update_ssh_config(self.ssh_config_path, f"{self.run_name}-host", {})
-        update_ssh_config(self.ssh_config_path, self.run_name, {})
+        for host in self.hosts:
+            update_ssh_config(self.ssh_config_path, host, {})
 
     def __enter__(self):
         self.attach()

@@ -30,6 +30,7 @@ from dstack._internal.core.models.instances import (
     InstanceType,
     RemoteConnectionInfo,
     Resources,
+    SSHConnectionParams,
     SSHKey,
 )
 from dstack._internal.core.models.pools import Instance, Pool, PoolInstances
@@ -291,6 +292,27 @@ def get_instance_profile(instance_model: InstanceModel) -> Profile:
 
 def get_instance_requirements(instance_model: InstanceModel) -> Requirements:
     return Requirements.__response__.parse_raw(instance_model.requirements)
+
+
+def get_instance_ssh_private_keys(instance_model: InstanceModel) -> tuple[str, Optional[str]]:
+    """
+    Returns a pair of SSH private keys: host key and optional proxy jump key.
+    """
+    host_private_key = instance_model.project.ssh_private_key
+    if instance_model.remote_connection_info is None:
+        # Cloud instance
+        return host_private_key, None
+    # SSH instance
+    rci = RemoteConnectionInfo.__response__.parse_raw(instance_model.remote_connection_info)
+    if rci.ssh_proxy is None:
+        return host_private_key, None
+    if rci.ssh_proxy_keys is None:
+        # Inconsistent RemoteConnectionInfo structure - proxy without keys
+        raise ValueError("Missing instance SSH proxy private keys")
+    proxy_private_keys = [key.private for key in rci.ssh_proxy_keys if key.private is not None]
+    if not proxy_private_keys:
+        raise ValueError("No instance SSH proxy private key found")
+    return host_private_key, proxy_private_keys[0]
 
 
 async def generate_instance_name(
@@ -737,6 +759,8 @@ async def create_ssh_instance_model(
     port: int,
     ssh_user: str,
     ssh_keys: List[SSHKey],
+    ssh_proxy: Optional[SSHConnectionParams],
+    ssh_proxy_keys: list[SSHKey],
     env: Env,
     blocks: Union[Literal["auto"], int],
 ) -> InstanceModel:
@@ -773,6 +797,8 @@ async def create_ssh_instance_model(
         port=port,
         ssh_user=ssh_user,
         ssh_keys=ssh_keys,
+        ssh_proxy=ssh_proxy,
+        ssh_proxy_keys=ssh_proxy_keys,
         env=env,
     )
     im = InstanceModel(

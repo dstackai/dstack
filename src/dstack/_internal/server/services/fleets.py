@@ -31,6 +31,7 @@ from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
     InstanceStatus,
     RemoteConnectionInfo,
+    SSHConnectionParams,
     SSHKey,
 )
 from dstack._internal.core.models.pools import Instance
@@ -428,6 +429,7 @@ async def create_fleet_ssh_instance_model(
         ssh_user = ssh_params.user
         ssh_key = ssh_params.ssh_key
         port = ssh_params.port
+        proxy_jump = ssh_params.proxy_jump
         internal_ip = None
         blocks = 1
     else:
@@ -435,12 +437,24 @@ async def create_fleet_ssh_instance_model(
         ssh_user = host.user or ssh_params.user
         ssh_key = host.ssh_key or ssh_params.ssh_key
         port = host.port or ssh_params.port
+        proxy_jump = host.proxy_jump or ssh_params.proxy_jump
         internal_ip = host.internal_ip
         blocks = host.blocks
 
     if ssh_user is None or ssh_key is None:
         # This should not be reachable but checked by fleet spec validation
         raise ServerClientError("ssh key or user not specified")
+
+    if proxy_jump is not None:
+        ssh_proxy = SSHConnectionParams(
+            hostname=proxy_jump.hostname,
+            port=proxy_jump.port or 22,
+            username=proxy_jump.user,
+        )
+        ssh_proxy_keys = [proxy_jump.ssh_key]
+    else:
+        ssh_proxy = None
+        ssh_proxy_keys = None
 
     instance_model = await pools_services.create_ssh_instance_model(
         project=project,
@@ -451,6 +465,8 @@ async def create_fleet_ssh_instance_model(
         host=hostname,
         ssh_user=ssh_user,
         ssh_keys=[ssh_key],
+        ssh_proxy=ssh_proxy,
+        ssh_proxy_keys=ssh_proxy_keys,
         env=env,
         internal_ip=internal_ip,
         instance_network=ssh_params.network,

@@ -1,9 +1,9 @@
 import io
 import json
 import time
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from textwrap import dedent
-from typing import Any, Dict, Generator, List
+from typing import Any, Dict, Generator, List, Optional
 
 import paramiko
 from gpuhunt import AcceleratorVendor, correct_gpu_memory_gib
@@ -17,6 +17,7 @@ from dstack._internal.core.models.instances import (
     Gpu,
     InstanceType,
     Resources,
+    SSHConnectionParams,
 )
 from dstack._internal.utils.gpu import (
     convert_amd_gpu_name,
@@ -262,35 +263,72 @@ def host_info_to_instance_type(host_info: Dict[str, Any]) -> InstanceType:
 
 @contextmanager
 def get_paramiko_connection(
-    ssh_user: str, host: str, port: int, pkeys: List[paramiko.PKey]
+    ssh_user: str,
+    host: str,
+    port: int,
+    pkeys: List[paramiko.PKey],
+    proxy: Optional[SSHConnectionParams] = None,
+    proxy_pkeys: Optional[list[paramiko.PKey]] = None,
 ) -> Generator[paramiko.SSHClient, None, None]:
-    with paramiko.SSHClient() as client:
+    if proxy is not None:
+        if proxy_pkeys is None:
+            raise ProvisioningError("Missing proxy private keys")
+        proxy_ctx = get_paramiko_connection(
+            proxy.username, proxy.hostname, proxy.port, proxy_pkeys
+        )
+    else:
+        proxy_ctx = nullcontext()
+    conn_url = f"{ssh_user}@{host}:{port}"
+    with proxy_ctx as proxy_client, paramiko.SSHClient() as client:
+        proxy_channel: Optional[paramiko.Channel] = None
+        if proxy_client is not None:
+            try:
+                proxy_channel = proxy_client.get_transport().open_channel(
+                    "direct-tcpip", (host, port), ("", 0)
+                )
+            except (paramiko.SSHException, OSError) as e:
+                raise ProvisioningError(f"Proxy channel failed: {e}") from e
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         for pkey in pkeys:
-            conn_url = f"{ssh_user}@{host}:{port}"
-            try:
-                logger.debug("Try to connect to %s with key %s", conn_url, pkey.fingerprint)
-                client.connect(
-                    username=ssh_user,
-                    hostname=host,
-                    port=port,
-                    pkey=pkey,
-                    look_for_keys=False,
-                    allow_agent=False,
-                    timeout=SSH_CONNECT_TIMEOUT,
-                )
-            except paramiko.AuthenticationException:
-                logger.debug(
-                    f'Authentication failed to connect to "{conn_url}" and {pkey.fingerprint}'
-                )
-                continue  # try next key
-            except (paramiko.SSHException, OSError) as e:
-                raise ProvisioningError(f"Connect failed: {e}") from e
-            else:
+            logger.debug("Try to connect to %s with key %s", conn_url, pkey.fingerprint)
+            connected = _paramiko_connect(client, ssh_user, host, port, pkey, proxy_channel)
+            if connected:
                 yield client
                 return
-        else:
-            keys_fp = ", ".join(f"{pk.fingerprint!r}" for pk in pkeys)
-            raise ProvisioningError(
-                f"SSH connection to the {conn_url} with keys [{keys_fp}] was unsuccessful"
+            logger.debug(
+                f'Authentication failed to connect to "{conn_url}" and {pkey.fingerprint}'
             )
+        keys_fp = ", ".join(f"{pk.fingerprint!r}" for pk in pkeys)
+        raise ProvisioningError(
+            f"SSH connection to the {conn_url} with keys [{keys_fp}] was unsuccessful"
+        )
+
+
+def _paramiko_connect(
+    client: paramiko.SSHClient,
+    user: str,
+    host: str,
+    port: int,
+    pkey: paramiko.PKey,
+    channel: Optional[paramiko.Channel] = None,
+) -> bool:
+    """
+    Returns `True` if connected, `False` if auth failed, and raises `ProvisioningError`
+    on other errors.
+    """
+    try:
+        client.connect(
+            username=user,
+            hostname=host,
+            port=port,
+            pkey=pkey,
+            look_for_keys=False,
+            allow_agent=False,
+            timeout=SSH_CONNECT_TIMEOUT,
+            sock=channel,
+        )
+        return True
+    except paramiko.AuthenticationException:
+        return False
+    except (paramiko.SSHException, OSError) as e:
+        raise ProvisioningError(f"Connect failed: {e}") from e

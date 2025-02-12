@@ -103,6 +103,13 @@ class TestProcessRunningJobs:
             repo=repo,
             user=user,
         )
+        pool = await create_pool(session=session, project=project)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            pool=pool,
+            status=InstanceStatus.BUSY,
+        )
         job_provisioning_data = get_job_provisioning_data(dockerized=False)
         job = await create_job(
             session=session,
@@ -110,6 +117,8 @@ class TestProcessRunningJobs:
             status=JobStatus.PROVISIONING,
             submitted_at=datetime(2023, 1, 2, 5, 12, 30, 5, tzinfo=timezone.utc),
             job_provisioning_data=job_provisioning_data,
+            instance=instance,
+            instance_assigned=True,
         )
         with (
             patch("dstack._internal.server.services.runner.ssh.SSHTunnel") as SSHTunnelMock,
@@ -144,12 +153,21 @@ class TestProcessRunningJobs:
             repo=repo,
             user=user,
         )
+        pool = await create_pool(session=session, project=project)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            pool=pool,
+            status=InstanceStatus.BUSY,
+        )
         job_provisioning_data = get_job_provisioning_data(dockerized=False)
         job = await create_job(
             session=session,
             run=run,
             status=JobStatus.PROVISIONING,
             job_provisioning_data=job_provisioning_data,
+            instance=instance,
+            instance_assigned=True,
         )
         with (
             patch("dstack._internal.server.services.runner.ssh.SSHTunnel") as SSHTunnelMock,
@@ -186,12 +204,21 @@ class TestProcessRunningJobs:
             repo=repo,
             user=user,
         )
+        pool = await create_pool(session=session, project=project)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            pool=pool,
+            status=InstanceStatus.BUSY,
+        )
         job_provisioning_data = get_job_provisioning_data(dockerized=False)
         job = await create_job(
             session=session,
             run=run,
             status=JobStatus.RUNNING,
             job_provisioning_data=job_provisioning_data,
+            instance=instance,
+            instance_assigned=True,
         )
         with (
             patch("dstack._internal.server.services.runner.ssh.SSHTunnel") as SSHTunnelMock,
@@ -277,6 +304,13 @@ class TestProcessRunningJobs:
             run_name="test-run",
             run_spec=run_spec,
         )
+        pool = await create_pool(session=session, project=project)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            pool=pool,
+            status=InstanceStatus.BUSY,
+        )
         job_provisioning_data = get_job_provisioning_data(dockerized=True)
 
         with patch(
@@ -288,6 +322,8 @@ class TestProcessRunningJobs:
                 run=run,
                 status=JobStatus.PROVISIONING,
                 job_provisioning_data=job_provisioning_data,
+                instance=instance,
+                instance_assigned=True,
             )
 
         await process_running_jobs()
@@ -337,12 +373,21 @@ class TestProcessRunningJobs:
             repo=repo,
             user=user,
         )
+        pool = await create_pool(session=session, project=project)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            pool=pool,
+            status=InstanceStatus.BUSY,
+        )
         job = await create_job(
             session=session,
             run=run,
             status=JobStatus.PULLING,
             job_provisioning_data=get_job_provisioning_data(dockerized=True),
             job_runtime_data=get_job_runtime_data(network_mode="bridge", ports=None),
+            instance=instance,
+            instance_assigned=True,
         )
         shim_client_mock.get_task.return_value.status = TaskStatus.RUNNING
         shim_client_mock.get_task.return_value.ports = [
@@ -385,6 +430,13 @@ class TestProcessRunningJobs:
             repo=repo,
             user=user,
         )
+        pool = await create_pool(session=session, project=project)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            pool=pool,
+            status=InstanceStatus.BUSY,
+        )
         job_provisioning_data = get_job_provisioning_data(dockerized=True)
         job = await create_job(
             session=session,
@@ -392,6 +444,8 @@ class TestProcessRunningJobs:
             status=JobStatus.PULLING,
             job_provisioning_data=job_provisioning_data,
             job_runtime_data=get_job_runtime_data(network_mode="bridge", ports=None),
+            instance=instance,
+            instance_assigned=True,
         )
         shim_client_mock.get_task.return_value.status = TaskStatus.RUNNING
         shim_client_mock.get_task.return_value.ports = None
@@ -470,12 +524,21 @@ class TestProcessRunningJobs:
             run_name="test-run",
             run_spec=run_spec,
         )
+        pool = await create_pool(session=session, project=project)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            pool=pool,
+            status=InstanceStatus.BUSY,
+        )
         job = await create_job(
             session=session,
             run=run,
             status=JobStatus.PROVISIONING,
             job_provisioning_data=get_job_provisioning_data(dockerized=True),
             submitted_at=get_current_datetime(),
+            instance=instance,
+            instance_assigned=True,
         )
         monkeypatch.setattr(
             "dstack._internal.server.services.runner.ssh.SSHTunnel", Mock(return_value=MagicMock())
@@ -588,11 +651,20 @@ class TestProcessRunningJobs:
                 ),
             ),
         )
+        pool = await create_pool(session=session, project=project)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            pool=pool,
+            status=InstanceStatus.BUSY,
+        )
         job = await create_job(
             session=session,
             run=run,
             status=JobStatus.RUNNING,
             job_provisioning_data=get_job_provisioning_data(),
+            instance=instance,
+            instance_assigned=True,
         )
         with (
             patch("dstack._internal.server.services.runner.ssh.SSHTunnel") as SSHTunnelMock,

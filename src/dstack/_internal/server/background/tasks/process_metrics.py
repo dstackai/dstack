@@ -3,18 +3,19 @@ import json
 from typing import Dict, List, Optional
 
 from sqlalchemy import delete, select
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import joinedload
 
 from dstack._internal.core.consts import DSTACK_RUNNER_HTTP_PORT
 from dstack._internal.core.models.runs import JobStatus
 from dstack._internal.server import settings
 from dstack._internal.server.db import get_session_ctx
-from dstack._internal.server.models import JobMetricsPoint, JobModel
+from dstack._internal.server.models import InstanceModel, JobMetricsPoint, JobModel
 from dstack._internal.server.schemas.runner import MetricsResponse
 from dstack._internal.server.services.jobs import get_job_provisioning_data, get_job_runtime_data
+from dstack._internal.server.services.pools import get_instance_ssh_private_keys
 from dstack._internal.server.services.runner import client
 from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
-from dstack._internal.utils.common import batched, get_current_datetime, run_async
+from dstack._internal.utils.common import batched, get_current_datetime, get_or_error, run_async
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -29,14 +30,12 @@ async def collect_metrics():
     async with get_session_ctx() as session:
         res = await session.execute(
             select(JobModel)
-            .where(
-                JobModel.status.in_([JobStatus.RUNNING]),
-            )
-            .options(selectinload(JobModel.project))
+            .where(JobModel.status.in_([JobStatus.RUNNING]))
+            .options(joinedload(JobModel.instance).joinedload(InstanceModel.project))
             .order_by(JobModel.last_processed_at.asc())
             .limit(MAX_JOBS_FETCHED)
         )
-        job_models = res.scalars().all()
+        job_models = res.unique().scalars().all()
 
     for batch in batched(job_models, BATCH_SIZE):
         await _collect_jobs_metrics(batch)
@@ -87,6 +86,7 @@ def _get_recently_collected_metric_cutoff() -> int:
 
 
 async def _collect_job_metrics(job_model: JobModel) -> Optional[JobMetricsPoint]:
+    ssh_private_keys = get_instance_ssh_private_keys(get_or_error(job_model.instance))
     jpd = get_job_provisioning_data(job_model)
     jrd = get_job_runtime_data(job_model)
     if jpd is None:
@@ -94,7 +94,7 @@ async def _collect_job_metrics(job_model: JobModel) -> Optional[JobMetricsPoint]
     try:
         res = await run_async(
             _pull_runner_metrics,
-            job_model.project.ssh_private_key,
+            ssh_private_keys,
             jpd,
             jrd,
         )

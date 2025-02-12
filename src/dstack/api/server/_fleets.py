@@ -62,12 +62,20 @@ def _get_fleet_spec_excludes(fleet_spec: FleetSpec) -> Optional[_ExcludeDict]:
     spec_excludes: _ExcludeDict = {}
     configuration_excludes: _ExcludeDict = {}
     profile_excludes: set[str] = set()
+    ssh_config_excludes: _ExcludeDict = {}
     ssh_hosts_excludes: set[str] = set()
 
     # TODO: Can be removed in 0.19
     if fleet_spec.configuration_path is None:
         spec_excludes["configuration_path"] = True
     if fleet_spec.configuration.ssh_config is not None:
+        if fleet_spec.configuration.ssh_config.proxy_jump is None:
+            ssh_config_excludes["proxy_jump"] = True
+        if all(
+            isinstance(h, str) or h.proxy_jump is None
+            for h in fleet_spec.configuration.ssh_config.hosts
+        ):
+            ssh_hosts_excludes.add("proxy_jump")
         if all(
             isinstance(h, str) or h.internal_ip is None
             for h in fleet_spec.configuration.ssh_config.hosts
@@ -98,7 +106,9 @@ def _get_fleet_spec_excludes(fleet_spec: FleetSpec) -> Optional[_ExcludeDict]:
         configuration_excludes["blocks"] = True
 
     if ssh_hosts_excludes:
-        configuration_excludes["ssh_config"] = {"hosts": {"__all__": ssh_hosts_excludes}}
+        ssh_config_excludes["hosts"] = {"__all__": ssh_hosts_excludes}
+    if ssh_config_excludes:
+        configuration_excludes["ssh_config"] = ssh_config_excludes
     if configuration_excludes:
         spec_excludes["configuration"] = configuration_excludes
     if profile_excludes:

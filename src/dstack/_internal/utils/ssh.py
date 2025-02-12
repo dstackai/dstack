@@ -159,7 +159,7 @@ def get_ssh_config(path: PathLike, host: str) -> Optional[Dict[str, str]]:
         return None
 
 
-def update_ssh_config(path: PathLike, host: str, options: Dict[str, Union[str, FilePath]]):
+def update_ssh_config(path: PathLike, host: str, options: Dict[str, Union[str, int, FilePath]]):
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     with FileLock(str(path) + ".lock"):
         copy_mode = True
