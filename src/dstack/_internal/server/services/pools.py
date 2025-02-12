@@ -760,7 +760,7 @@ async def create_ssh_instance_model(
     ssh_user: str,
     ssh_keys: List[SSHKey],
     ssh_proxy: Optional[SSHConnectionParams],
-    ssh_proxy_keys: list[SSHKey],
+    ssh_proxy_keys: Optional[list[SSHKey]],
     env: Env,
     blocks: Union[Literal["auto"], int],
 ) -> InstanceModel:
