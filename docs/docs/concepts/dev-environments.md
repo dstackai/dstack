@@ -104,6 +104,8 @@ init:
 Set [`inactivity_duration`](../reference/dstack.yml/dev-environment.md#inactivity_duration)
 to automatically stop the dev environment after a configured period of inactivity.
 
+<div editor-title=".dstack.yml">
+
 ```yaml
 type: dev-environment
 ide: vscode
@@ -111,6 +113,8 @@ ide: vscode
 # Stop if inactive for 2 hours
 inactivity_duration: 2h
 ```
+
+</div>
 
 The dev environment becomes inactive when you close the remote VS Code window,
 close any `ssh <run name>` shells, and stop the `dstack apply` or `dstack attach` command.
