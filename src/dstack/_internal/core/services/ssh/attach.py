@@ -108,7 +108,7 @@ class SSHAttach:
             if ssh_proxy is not None:
                 # SSH instance with jump host
                 # dstack has no IdentityFile for jump host, it must be either preconfigured
-                # in the ~/.ssh/config of loaded into ssh-agent
+                # in the ~/.ssh/config or loaded into ssh-agent
                 hosts[f"{run_name}-jump-host"] = {
                     "HostName": ssh_proxy.hostname,
                     "Port": ssh_proxy.port,
