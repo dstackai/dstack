@@ -123,6 +123,8 @@ async def register_replica(
     ssh_destination: str,
     ssh_port: int,
     ssh_proxy: Optional[SSHConnectionParams],
+    ssh_head_proxy: Optional[SSHConnectionParams],
+    ssh_head_proxy_private_key: Optional[str],
     repo: GatewayProxyRepo,
     nginx: Nginx,
     service_conn_pool: ServiceConnectionPool,
@@ -133,6 +135,8 @@ async def register_replica(
         ssh_destination=ssh_destination,
         ssh_port=ssh_port,
         ssh_proxy=ssh_proxy,
+        ssh_head_proxy=ssh_head_proxy,
+        ssh_head_proxy_private_key=ssh_head_proxy_private_key,
     )
 
     async with lock:

@@ -75,6 +75,10 @@ def runner_ssh_tunnel(
             else:
                 proxy_identity = None
 
+            ssh_proxies = []
+            if job_provisioning_data.ssh_proxy is not None:
+                ssh_proxies.append((job_provisioning_data.ssh_proxy, proxy_identity))
+
             for attempt in range(retries):
                 last = attempt == retries - 1
                 # remote_host:local mapping
@@ -91,8 +95,7 @@ def runner_ssh_tunnel(
                         port=job_provisioning_data.ssh_port,
                         forwarded_sockets=ports_to_forwarded_sockets(tunnel_ports_map),
                         identity=identity,
-                        ssh_proxy=job_provisioning_data.ssh_proxy,
-                        ssh_proxy_identity=proxy_identity,
+                        ssh_proxies=ssh_proxies,
                     ):
                         return func(runner_ports_map, *args, **kwargs)
                 except SSHError:

@@ -69,14 +69,16 @@ class SSHTunnel:
         options: Dict[str, str] = SSH_DEFAULT_OPTIONS,
         ssh_config_path: Union[PathLike, Literal["none"]] = "none",
         port: Optional[int] = None,
-        ssh_proxy: Optional[SSHConnectionParams] = None,
-        ssh_proxy_identity: Optional[FilePathOrContent] = None,
+        ssh_proxies: Iterable[tuple[SSHConnectionParams, Optional[FilePathOrContent]]] = (),
     ):
         """
         :param forwarded_sockets: Connections to the specified local sockets will be
             forwarded to their corresponding remote sockets
         :param reverse_forwarded_sockets: Connections to the specified remote sockets
             will be forwarded to their corresponding local sockets
+        :param ssh_proxies: pairs of SSH connections params and optional identities,
+            in order from outer to inner. If an identity is `None`, the `identity` param
+            is used instead.
         """
         self.destination = destination
         self.forwarded_sockets = list(forwarded_sockets)
@@ -84,29 +86,21 @@ class SSHTunnel:
         self.options = options
         self.port = port
         self.ssh_config_path = normalize_path(ssh_config_path)
-        self.ssh_proxy = ssh_proxy
         temp_dir = tempfile.TemporaryDirectory()
         self.temp_dir = temp_dir
         if control_sock_path is None:
             control_sock_path = os.path.join(temp_dir.name, "control.sock")
         self.control_sock_path = normalize_path(control_sock_path)
-        if isinstance(identity, FilePath):
-            identity_path = identity.path
-        else:
-            identity_path = os.path.join(temp_dir.name, "identity")
-            with open(
-                identity_path, opener=lambda path, flags: os.open(path, flags, 0o600), mode="w"
-            ) as f:
-                f.write(identity.content)
         self.identity_path = normalize_path(self._get_identity_path(identity, "identity"))
-        if ssh_proxy_identity is not None:
-            self.ssh_proxy_identity_path = normalize_path(
-                self._get_identity_path(ssh_proxy_identity, "proxy_identity")
-            )
-        elif ssh_proxy is not None:
-            self.ssh_proxy_identity_path = self.identity_path
-        else:
-            self.ssh_proxy_identity_path = None
+        self.ssh_proxies: list[tuple[SSHConnectionParams, PathLike]] = []
+        for proxy_index, (proxy_params, proxy_identity) in enumerate(ssh_proxies):
+            if proxy_identity is None:
+                proxy_identity_path = self.identity_path
+            else:
+                proxy_identity_path = self._get_identity_path(
+                    proxy_identity, f"proxy_identity_{proxy_index}"
+                )
+            self.ssh_proxies.append((proxy_params, proxy_identity_path))
         self.log_path = normalize_path(os.path.join(temp_dir.name, "tunnel.log"))
         self.ssh_client_info = get_ssh_client_info()
         self.ssh_exec_path = str(self.ssh_client_info.path)
@@ -151,8 +145,8 @@ class SSHTunnel:
             command += ["-p", str(self.port)]
         for k, v in self.options.items():
             command += ["-o", f"{k}={v}"]
-        if proxy_command := self.proxy_command():
-            command += ["-o", "ProxyCommand=" + shlex.join(proxy_command)]
+        if proxy_command := self._get_proxy_command():
+            command += ["-o", proxy_command]
         for socket_pair in self.forwarded_sockets:
             command += ["-L", f"{socket_pair.local.render()}:{socket_pair.remote.render()}"]
         for socket_pair in self.reverse_forwarded_sockets:
@@ -168,24 +162,6 @@ class SSHTunnel:
 
     def exec_command(self) -> List[str]:
         return [self.ssh_exec_path, "-S", self.control_sock_path, self.destination]
-
-    def proxy_command(self) -> Optional[List[str]]:
-        if self.ssh_proxy is None:
-            return None
-        return [
-            self.ssh_exec_path,
-            "-i",
-            self.ssh_proxy_identity_path,
-            "-W",
-            "%h:%p",
-            "-o",
-            "StrictHostKeyChecking=no",
-            "-o",
-            "UserKnownHostsFile=/dev/null",
-            "-p",
-            str(self.ssh_proxy.port),
-            f"{self.ssh_proxy.username}@{self.ssh_proxy.hostname}",
-        ]
 
     def open(self) -> None:
         # We cannot use `stderr=subprocess.PIPE` here since the forked process (daemon) does not
@@ -259,6 +235,38 @@ class SSHTunnel:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
+
+    def _get_proxy_command(self) -> Optional[str]:
+        proxy_command: Optional[str] = None
+        for params, identity_path in self.ssh_proxies:
+            proxy_command = self._build_proxy_command(params, identity_path, proxy_command)
+        return proxy_command
+
+    def _build_proxy_command(
+        self,
+        params: SSHConnectionParams,
+        identity_path: PathLike,
+        prev_proxy_command: Optional[str],
+    ) -> Optional[str]:
+        command = [
+            self.ssh_exec_path,
+            "-i",
+            identity_path,
+            "-W",
+            "%h:%p",
+            "-o",
+            "StrictHostKeyChecking=no",
+            "-o",
+            "UserKnownHostsFile=/dev/null",
+        ]
+        if prev_proxy_command is not None:
+            command += ["-o", prev_proxy_command.replace("%", "%%")]
+        command += [
+            "-p",
+            str(params.port),
+            f"{params.username}@{params.hostname}",
+        ]
+        return "ProxyCommand=" + shlex.join(command)
 
     def _read_log_file(self) -> bytes:
         with open(self.log_path, "rb") as f:

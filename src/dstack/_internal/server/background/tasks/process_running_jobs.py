@@ -11,7 +11,11 @@ from dstack._internal.core.errors import GatewayError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import NetworkMode, RegistryAuth, is_core_model_instance
 from dstack._internal.core.models.configurations import DevEnvironmentConfiguration
-from dstack._internal.core.models.instances import InstanceStatus, RemoteConnectionInfo
+from dstack._internal.core.models.instances import (
+    InstanceStatus,
+    RemoteConnectionInfo,
+    SSHConnectionParams,
+)
 from dstack._internal.core.models.repos import RemoteRepoCreds
 from dstack._internal.core.models.runs import (
     ClusterInfo,
@@ -308,8 +312,24 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
         and job_model.job_num == 0  # gateway connects only to the first node
         and run.run_spec.configuration.type == "service"
     ):
+        ssh_head_proxy: Optional[SSHConnectionParams] = None
+        ssh_head_proxy_private_key: Optional[str] = None
+        instance = common_utils.get_or_error(job_model.instance)
+        if instance.remote_connection_info is not None:
+            rci = RemoteConnectionInfo.__response__.parse_raw(instance.remote_connection_info)
+            if rci.ssh_proxy is not None:
+                ssh_head_proxy = rci.ssh_proxy
+                ssh_head_proxy_keys = common_utils.get_or_error(rci.ssh_proxy_keys)
+                ssh_head_proxy_private_key = ssh_head_proxy_keys[0].private
         try:
-            await services.register_replica(session, run_model.gateway_id, run, job_model)
+            await services.register_replica(
+                session,
+                run_model.gateway_id,
+                run,
+                job_model,
+                ssh_head_proxy,
+                ssh_head_proxy_private_key,
+            )
         except GatewayError as e:
             logger.warning(
                 "%s: failed to register service replica: %s, age=%s",

@@ -339,8 +339,6 @@ add a front node key (`~/.ssh/head_node_key`) to an SSH agent or configure a key
 where `Host` must match `ssh_config.proxy_jump.hostname` or `ssh_config.hosts[n].proxy_jump.hostname` if you configure head nodes
 on a per-worker basis.
 
-> Currently, [services](services.md) do not work on instances with a head node setup.
-
 !!! info "Reference"
     For all SSH fleet configuration options, refer to the [reference](../reference/dstack.yml/fleet.md).
 
