@@ -21,6 +21,7 @@ from dstack._internal.core.errors import (
 from dstack._internal.core.models.common import is_core_model_instance
 from dstack._internal.core.models.configurations import SERVICE_HTTPS_DEFAULT, ServiceConfiguration
 from dstack._internal.core.models.gateways import GatewayConfiguration, GatewayStatus
+from dstack._internal.core.models.instances import SSHConnectionParams
 from dstack._internal.core.models.runs import Run, RunSpec, ServiceModelSpec, ServiceSpec
 from dstack._internal.server import settings
 from dstack._internal.server.models import GatewayModel, JobModel, ProjectModel, RunModel
@@ -155,7 +156,12 @@ def get_service_spec(
 
 
 async def register_replica(
-    session: AsyncSession, gateway_id: Optional[uuid.UUID], run: Run, job_model: JobModel
+    session: AsyncSession,
+    gateway_id: Optional[uuid.UUID],
+    run: Run,
+    job_model: JobModel,
+    ssh_head_proxy: Optional[SSHConnectionParams],
+    ssh_head_proxy_private_key: Optional[str],
 ):
     if gateway_id is None:  # in-server proxy
         return
@@ -167,6 +173,8 @@ async def register_replica(
             await client.register_replica(
                 run=run,
                 job_submission=job_submission,
+                ssh_head_proxy=ssh_head_proxy,
+                ssh_head_proxy_private_key=ssh_head_proxy_private_key,
             )
         logger.info("%s: replica is registered for service %s", fmt(job_model), run.id.hex)
     except (httpx.RequestError, SSHError) as e:

@@ -23,6 +23,9 @@ class Replica(ImmutableModel):
     ssh_destination: str
     ssh_port: int
     ssh_proxy: Optional[SSHConnectionParams]
+    # Optional outer proxy, a head node/bastion
+    ssh_head_proxy: Optional[SSHConnectionParams] = None
+    ssh_head_proxy_private_key: Optional[str] = None
 
 
 class Service(ImmutableModel):
