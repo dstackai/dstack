@@ -22,6 +22,8 @@ def get_volumes_table(
     if verbose:
         table.add_column("REGION")
     table.add_column("STATUS")
+    if verbose:
+        table.add_column("ATTACHED")
     table.add_column("CREATED")
     if verbose:
         table.add_column("ERROR")
@@ -37,11 +39,18 @@ def get_volumes_table(
                 and volume.provisioning_data.availability_zone is not None
             ):
                 region += f" ({volume.provisioning_data.availability_zone})"
+        attached = "-"
+        if volume.attachments is not None:
+            attached = ", ".join(
+                {va.instance.fleet_name for va in volume.attachments if va.instance.fleet_name}
+            )
+            attached = attached or "-"
         row = {
             "NAME": volume.name,
             "BACKEND": backend,
             "REGION": region,
             "STATUS": volume.status,
+            "ATTACHED": attached,
             "CREATED": format_date(volume.created_at),
             "ERROR": volume.status_message,
         }
