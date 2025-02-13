@@ -65,6 +65,9 @@ class ConfigManager:
         if len(self.config.projects) == 1:
             self.config.projects[0].default = True
 
+    def list_projects(self):
+        return [project.name for project in self.config.projects]
+
     def delete_project(self, name: str):
         self.config.projects = [p for p in self.config.projects if p.name != name]
 

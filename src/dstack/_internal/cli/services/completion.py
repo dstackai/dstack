@@ -3,13 +3,14 @@ import os
 import argcomplete
 from argcomplete.completers import BaseCompleter
 
+from dstack._internal.core.services.configs import ConfigManager
 from dstack.api import Client
 
 
 class ResourceNameCompleter(BaseCompleter):
     """
     A resource name completer that initializes the API client using the --project option
-    from the parsed arguments, otherwise falls back to the DSTACK_PROJECT environment variable).
+    from the parsed arguments, otherwise falls back to the DSTACK_PROJECT environment variable.
     """
 
     def __init__(self):
@@ -66,20 +67,8 @@ class VolumeNameCompleter(ResourceNameCompleter):
 
 class ProjectNameCompleter(ResourceNameCompleter):
     def __call__(self, prefix, parsed_args, **kwargs):
-        api = self.get_api(parsed_args)
-        argcomplete.debug("Fetching project completions")
-        try:
-            projects = api.client.projects.list()
-            argcomplete.debug(f"Projects: {projects}")
-            completions = [
-                project.project_name
-                for project in projects
-                if project.project_name.startswith(prefix)
-            ]
-            return completions
-        except Exception as e:
-            argcomplete.debug("Error fetching project completions: " + str(e))
-            return [""]
+        projects = ConfigManager().list_projects()
+        return projects
 
 
 class GatewayNameCompleter(ResourceNameCompleter):
