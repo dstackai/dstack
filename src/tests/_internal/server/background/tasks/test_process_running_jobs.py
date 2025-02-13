@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Optional
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
@@ -8,11 +9,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from dstack._internal.core.errors import SSHError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import NetworkMode
+from dstack._internal.core.models.configurations import DevEnvironmentConfiguration
 from dstack._internal.core.models.instances import InstanceStatus
 from dstack._internal.core.models.runs import (
     JobRuntimeData,
     JobStatus,
     JobTerminationReason,
+    RunStatus,
 )
 from dstack._internal.core.models.volumes import (
     InstanceMountPoint,
@@ -496,3 +499,120 @@ class TestProcessRunningJobs:
         shim_client_mock.stop.assert_called_once_with(force=True)
         await session.refresh(job)
         assert job.status == JobStatus.PROVISIONING
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.parametrize(
+        (
+            "inactivity_duration",
+            "no_connections_secs",
+            "expected_status",
+            "expected_termination_reason",
+            "expected_inactivity_secs",
+        ),
+        [
+            pytest.param(
+                "1h",
+                60 * 60 - 1,
+                JobStatus.RUNNING,
+                None,
+                60 * 60 - 1,
+                id="duration-not-exceeded",
+            ),
+            pytest.param(
+                "1h",
+                60 * 60,
+                JobStatus.TERMINATING,
+                JobTerminationReason.TERMINATED_BY_SERVER,
+                60 * 60,
+                id="duration-exceeded-exactly",
+            ),
+            pytest.param(
+                "1h",
+                60 * 60 + 1,
+                JobStatus.TERMINATING,
+                JobTerminationReason.TERMINATED_BY_SERVER,
+                60 * 60 + 1,
+                id="duration-exceeded",
+            ),
+            pytest.param("off", 60 * 60, JobStatus.RUNNING, None, None, id="duration-off"),
+            pytest.param(False, 60 * 60, JobStatus.RUNNING, None, None, id="duration-false"),
+            pytest.param(None, 60 * 60, JobStatus.RUNNING, None, None, id="duration-none"),
+            pytest.param(
+                "1h",
+                None,
+                JobStatus.TERMINATING,
+                JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY,
+                None,
+                id="legacy-runner",
+            ),
+            pytest.param(
+                None,
+                None,
+                JobStatus.RUNNING,
+                None,
+                None,
+                id="legacy-runner-without-duration",
+            ),
+        ],
+    )
+    async def test_inactivity_duration(
+        self,
+        test_db,
+        session: AsyncSession,
+        inactivity_duration,
+        no_connections_secs: Optional[int],
+        expected_status: JobStatus,
+        expected_termination_reason: Optional[JobTerminationReason],
+        expected_inactivity_secs: Optional[int],
+    ) -> None:
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(
+            session=session,
+            project_id=project.id,
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            status=RunStatus.RUNNING,
+            run_name="test-run",
+            run_spec=get_run_spec(
+                run_name="test-run",
+                repo_id=repo.name,
+                configuration=DevEnvironmentConfiguration(
+                    name="test-run",
+                    ide="vscode",
+                    inactivity_duration=inactivity_duration,
+                ),
+            ),
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            job_provisioning_data=get_job_provisioning_data(),
+        )
+        with (
+            patch("dstack._internal.server.services.runner.ssh.SSHTunnel") as SSHTunnelMock,
+            patch(
+                "dstack._internal.server.services.runner.client.RunnerClient"
+            ) as RunnerClientMock,
+        ):
+            runner_client_mock = RunnerClientMock.return_value
+            runner_client_mock.pull.return_value = PullResponse(
+                job_states=[],
+                job_logs=[],
+                runner_logs=[],
+                last_updated=0,
+                no_connections_secs=no_connections_secs,
+            )
+            await process_running_jobs()
+            SSHTunnelMock.assert_called_once()
+            runner_client_mock.pull.assert_called_once()
+        await session.refresh(job)
+        assert job.status == expected_status
+        assert job.termination_reason == expected_termination_reason
+        assert job.inactivity_secs == expected_inactivity_secs

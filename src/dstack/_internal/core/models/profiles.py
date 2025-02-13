@@ -40,15 +40,15 @@ def parse_duration(v: Optional[Union[int, str]]) -> Optional[int]:
     return Duration.parse(v)
 
 
-def parse_max_duration(v: Optional[Union[int, str, bool]]) -> Optional[Union[str, int, bool]]:
+def parse_max_duration(v: Optional[Union[int, str, bool]]) -> Optional[Union[str, int]]:
     return parse_off_duration(v)
 
 
-def parse_stop_duration(v: Optional[Union[int, str, bool]]) -> Optional[Union[str, int, bool]]:
+def parse_stop_duration(v: Optional[Union[int, str, bool]]) -> Optional[Union[str, int]]:
     return parse_off_duration(v)
 
 
-def parse_off_duration(v: Optional[Union[int, str, bool]]) -> Optional[Union[str, int, bool]]:
+def parse_off_duration(v: Optional[Union[int, str, bool]]) -> Optional[Union[str, int]]:
     if v == "off" or v is False:
         return "off"
     if v is True:
@@ -168,7 +168,7 @@ class ProfileParams(CoreModel):
         Optional[Union[Literal["off"], str, int, bool]],
         Field(
             description=(
-                "The maximum duration of a run gracefull stopping."
+                "The maximum duration of a run graceful stopping."
                 " After it elapses, the run is automatically forced stopped."
                 " This includes force detaching volumes used by the run."
                 " Use `off` for unlimited duration. Defaults to `5m`"
