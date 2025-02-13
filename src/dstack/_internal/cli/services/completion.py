@@ -25,11 +25,15 @@ class BaseProjectCompleter(BaseCompleter):
 
 
 class RunNameCompleter(BaseProjectCompleter):
+    def __init__(self, all: bool = False):
+        super().__init__()
+        self.all = all
+
     def __call__(self, prefix, parsed_args, **kwargs):
         api = self.get_api(parsed_args)
         argcomplete.debug("Fetching run completions")
         try:
-            runs = api.runs.list()
+            runs = api.runs.list(self.all)
             completions = [run.name for run in runs if run.name.startswith(prefix)]
             return completions
         except Exception as e:
@@ -60,4 +64,35 @@ class VolumeNameCompleter(BaseProjectCompleter):
             return completions
         except Exception as e:
             argcomplete.debug("Error fetching volume completions: " + str(e))
+            return []
+
+
+class ProjectNameCompleter(BaseProjectCompleter):
+    def __call__(self, prefix, parsed_args, **kwargs):
+        api = self.get_api(parsed_args)
+        argcomplete.debug("Fetching project completions")
+        try:
+            projects = api.client.projects.list()
+            argcomplete.debug(f"Projects: {projects}")
+            completions = [
+                project.project_name
+                for project in projects
+                if project.project_name.startswith(prefix)
+            ]
+            return completions
+        except Exception as e:
+            argcomplete.debug("Error fetching project completions: " + str(e))
+            return []
+
+
+class GatewayNameCompleter(BaseProjectCompleter):
+    def __call__(self, prefix, parsed_args, **kwargs):
+        api = self.get_api(parsed_args)
+        argcomplete.debug("Fetching gateway completions")
+        try:
+            gateways = api.client.gateways.list(api.project)
+            completions = [gateway.name for gateway in gateways if gateway.name.startswith(prefix)]
+            return completions
+        except Exception as e:
+            argcomplete.debug("Error fetching gateway completions: " + str(e))
             return []

@@ -5,6 +5,7 @@ from typing import List, Optional
 
 from rich_argparse import RichHelpFormatter
 
+from dstack._internal.cli.services.completion import ProjectNameCompleter
 from dstack._internal.cli.utils.common import configure_logging
 from dstack.api import Client
 
@@ -61,7 +62,7 @@ class APIBaseCommand(BaseCommand):
             help="The name of the project. Defaults to [code]$DSTACK_PROJECT[/]",
             metavar="NAME",
             default=os.getenv("DSTACK_PROJECT"),
-        )
+        ).completer = ProjectNameCompleter()
 
     def _command(self, args: argparse.Namespace):
         configure_logging()

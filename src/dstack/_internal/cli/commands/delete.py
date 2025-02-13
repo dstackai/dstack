@@ -1,6 +1,8 @@
 import argparse
 from pathlib import Path
 
+from argcomplete import FilesCompleter
+
 from dstack._internal.cli.commands import APIBaseCommand
 from dstack._internal.cli.services.configurators import (
     get_apply_configurator_class,
@@ -22,7 +24,7 @@ class DeleteCommand(APIBaseCommand):
             metavar="FILE",
             help="The path to the configuration file. Defaults to [code]$PWD/.dstack.yml[/]",
             dest="configuration_file",
-        )
+        ).completer = FilesCompleter(allowednames=["*.yml", "*.yaml"])
         self._parser.add_argument(
             "-y",
             "--yes",
