@@ -59,7 +59,7 @@ class ApplyCommand(APIBaseCommand):
         self._parser.add_argument(
             "-d",
             "--detach",
-            help="Exit immediately after sumbitting configuration",
+            help="Exit immediately after submitting configuration",
             action="store_true",
         )
         repo_group = self._parser.add_argument_group("Repo Options")
