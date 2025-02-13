@@ -1,7 +1,7 @@
 """Move attachment_data to volumes_attachments
 
 Revision ID: a751ef183f27
-Revises: 1338b788b612
+Revises: 1e76fb0dde87
 Create Date: 2025-02-12 13:19:57.569591
 
 """
@@ -11,7 +11,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "a751ef183f27"
-down_revision = "1338b788b612"
+down_revision = "1e76fb0dde87"
 branch_labels = None
 depends_on = None
 
