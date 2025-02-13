@@ -92,6 +92,8 @@ class RemoteConnectionInfo(CoreModel):
     port: int
     ssh_user: str
     ssh_keys: List[SSHKey]
+    ssh_proxy: Optional[SSHConnectionParams] = None
+    ssh_proxy_keys: Optional[list[SSHKey]] = None
     env: Env = Env()
 
 

@@ -70,6 +70,7 @@ class SSHTunnel:
         ssh_config_path: Union[PathLike, Literal["none"]] = "none",
         port: Optional[int] = None,
         ssh_proxy: Optional[SSHConnectionParams] = None,
+        ssh_proxy_identity: Optional[FilePathOrContent] = None,
     ):
         """
         :param forwarded_sockets: Connections to the specified local sockets will be
@@ -97,7 +98,15 @@ class SSHTunnel:
                 identity_path, opener=lambda path, flags: os.open(path, flags, 0o600), mode="w"
             ) as f:
                 f.write(identity.content)
-        self.identity_path = normalize_path(identity_path)
+        self.identity_path = normalize_path(self._get_identity_path(identity, "identity"))
+        if ssh_proxy_identity is not None:
+            self.ssh_proxy_identity_path = normalize_path(
+                self._get_identity_path(ssh_proxy_identity, "proxy_identity")
+            )
+        elif ssh_proxy is not None:
+            self.ssh_proxy_identity_path = self.identity_path
+        else:
+            self.ssh_proxy_identity_path = None
         self.log_path = normalize_path(os.path.join(temp_dir.name, "tunnel.log"))
         self.ssh_client_info = get_ssh_client_info()
         self.ssh_exec_path = str(self.ssh_client_info.path)
@@ -166,7 +175,7 @@ class SSHTunnel:
         return [
             self.ssh_exec_path,
             "-i",
-            self.identity_path,
+            self.ssh_proxy_identity_path,
             "-W",
             "%h:%p",
             "-o",
@@ -262,6 +271,16 @@ class SSHTunnel:
             pass
         except OSError as e:
             logger.debug("Failed to remove SSH tunnel log file %s: %s", self.log_path, e)
+
+    def _get_identity_path(self, identity: FilePathOrContent, tmp_filename: str) -> PathLike:
+        if isinstance(identity, FilePath):
+            return identity.path
+        identity_path = os.path.join(self.temp_dir.name, tmp_filename)
+        with open(
+            identity_path, opener=lambda path, flags: os.open(path, flags, 0o600), mode="w"
+        ) as f:
+            f.write(identity.content)
+        return identity_path
 
 
 def ports_to_forwarded_sockets(

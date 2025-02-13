@@ -39,6 +39,14 @@ class InstanceGroupPlacement(str, Enum):
     CLUSTER = "cluster"
 
 
+class SSHProxyParams(CoreModel):
+    hostname: Annotated[str, Field(description="The IP address or domain of proxy host")]
+    port: Annotated[Optional[int], Field(description="The SSH port of proxy host")] = None
+    user: Annotated[str, Field(description="The user to log in with for proxy host")]
+    identity_file: Annotated[str, Field(description="The private key to use for proxy host")]
+    ssh_key: Optional[SSHKey] = None
+
+
 class SSHHostParams(CoreModel):
     hostname: Annotated[str, Field(description="The IP address or domain to connect to")]
     port: Annotated[
@@ -49,6 +57,9 @@ class SSHHostParams(CoreModel):
     )
     identity_file: Annotated[
         Optional[str], Field(description="The private key to use for this host")
+    ] = None
+    proxy_jump: Annotated[
+        Optional[SSHProxyParams], Field(description="The SSH proxy configuration for this host")
     ] = None
     internal_ip: Annotated[
         Optional[str],
@@ -96,6 +107,9 @@ class SSHParams(CoreModel):
         Optional[str], Field(description="The private key to use for all hosts")
     ] = None
     ssh_key: Optional[SSHKey] = None
+    proxy_jump: Annotated[
+        Optional[SSHProxyParams], Field(description="The SSH proxy configuration for all hosts")
+    ] = None
     hosts: Annotated[
         List[Union[SSHHostParams, str]],
         Field(

@@ -18,6 +18,7 @@ from dstack._internal.core.models.gateways import GatewayStatus
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceOfferWithAvailability,
+    InstanceStatus,
     InstanceType,
     Resources,
 )
@@ -47,7 +48,9 @@ from dstack._internal.server.testing.common import (
     create_backend,
     create_gateway,
     create_gateway_compute,
+    create_instance,
     create_job,
+    create_pool,
     create_project,
     create_repo,
     create_run,
@@ -1315,11 +1318,20 @@ class TestStopRuns:
             user=user,
             status=RunStatus.RUNNING,
         )
+        pool = await create_pool(session=session, project=project)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            pool=pool,
+            status=InstanceStatus.BUSY,
+        )
         job = await create_job(
             session=session,
             run=run,
             job_provisioning_data=get_job_provisioning_data(),
             status=JobStatus.RUNNING,
+            instance=instance,
+            instance_assigned=True,
         )
         with patch("dstack._internal.server.services.jobs._stop_runner") as stop_runner:
             response = await client.post(

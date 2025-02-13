@@ -6,6 +6,7 @@ from freezegun import freeze_time
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from dstack._internal.core.models.instances import InstanceStatus
 from dstack._internal.core.models.runs import JobStatus
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server import settings
@@ -17,8 +18,10 @@ from dstack._internal.server.models import JobMetricsPoint
 from dstack._internal.server.schemas.runner import GPUMetrics, MetricsResponse
 from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.testing.common import (
+    create_instance,
     create_job,
     create_job_metrics_point,
+    create_pool,
     create_project,
     create_repo,
     create_run,
@@ -42,6 +45,13 @@ class TestCollectMetrics:
             session=session,
             project_id=project.id,
         )
+        pool = await create_pool(session=session, project=project)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            pool=pool,
+            status=InstanceStatus.BUSY,
+        )
         run = await create_run(
             session=session,
             project=project,
@@ -53,6 +63,8 @@ class TestCollectMetrics:
             run=run,
             status=JobStatus.RUNNING,
             job_provisioning_data=get_job_provisioning_data(),
+            instance_assigned=True,
+            instance=instance,
         )
         with (
             patch("dstack._internal.server.services.runner.ssh.SSHTunnel") as SSHTunnelMock,

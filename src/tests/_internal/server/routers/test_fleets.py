@@ -450,6 +450,7 @@ class TestCreateFleet:
                         "port": None,
                         "identity_file": None,
                         "ssh_key": None,  # should not return ssh_key
+                        "proxy_jump": None,
                         "hosts": ["1.1.1.1"],
                         "network": None,
                     },
