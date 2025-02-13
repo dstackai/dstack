@@ -6,9 +6,9 @@ from argcomplete.completers import BaseCompleter
 from dstack.api import Client
 
 
-class BaseProjectCompleter(BaseCompleter):
+class ResourceNameCompleter(BaseCompleter):
     """
-    A base completer that initializes the API client using the --project option
+    A resource name completer that initializes the API client using the --project option
     from the parsed arguments, otherwise falls back to the DSTACK_PROJECT environment variable).
     """
 
@@ -16,15 +16,12 @@ class BaseProjectCompleter(BaseCompleter):
         super().__init__()
 
     def get_api(self, parsed_args):
-        # TODO: Feedback needed: Refactor this to avoid duplication with APIBaseCommand._register().
-        # The client has to be explicitly initialized here since argcomplete does not trigger APIBaseCommand._command(),
-        # and APIBaseCommand().api is not being set. This is a temporary hack.
         argcomplete.debug("Retrieving API client")
         project = getattr(parsed_args, "project", os.getenv("DSTACK_PROJECT"))
         return Client.from_config(project_name=project)
 
 
-class RunNameCompleter(BaseProjectCompleter):
+class RunNameCompleter(ResourceNameCompleter):
     def __init__(self, all: bool = False):
         super().__init__()
         self.all = all
@@ -38,10 +35,10 @@ class RunNameCompleter(BaseProjectCompleter):
             return completions
         except Exception as e:
             argcomplete.debug("Error fetching run completions: " + str(e))
-            return []
+            return [""]
 
 
-class FleetNameCompleter(BaseProjectCompleter):
+class FleetNameCompleter(ResourceNameCompleter):
     def __call__(self, prefix, parsed_args, **kwargs):
         api = self.get_api(parsed_args)
         argcomplete.debug("Fetching fleet completions")
@@ -51,10 +48,10 @@ class FleetNameCompleter(BaseProjectCompleter):
             return completions
         except Exception as e:
             argcomplete.debug("Error fetching fleet completions: " + str(e))
-            return []
+            return [""]
 
 
-class VolumeNameCompleter(BaseProjectCompleter):
+class VolumeNameCompleter(ResourceNameCompleter):
     def __call__(self, prefix, parsed_args, **kwargs):
         api = self.get_api(parsed_args)
         argcomplete.debug("Fetching volume completions")
@@ -64,10 +61,10 @@ class VolumeNameCompleter(BaseProjectCompleter):
             return completions
         except Exception as e:
             argcomplete.debug("Error fetching volume completions: " + str(e))
-            return []
+            return [""]
 
 
-class ProjectNameCompleter(BaseProjectCompleter):
+class ProjectNameCompleter(ResourceNameCompleter):
     def __call__(self, prefix, parsed_args, **kwargs):
         api = self.get_api(parsed_args)
         argcomplete.debug("Fetching project completions")
@@ -82,10 +79,10 @@ class ProjectNameCompleter(BaseProjectCompleter):
             return completions
         except Exception as e:
             argcomplete.debug("Error fetching project completions: " + str(e))
-            return []
+            return [""]
 
 
-class GatewayNameCompleter(BaseProjectCompleter):
+class GatewayNameCompleter(ResourceNameCompleter):
     def __call__(self, prefix, parsed_args, **kwargs):
         api = self.get_api(parsed_args)
         argcomplete.debug("Fetching gateway completions")
@@ -95,4 +92,4 @@ class GatewayNameCompleter(BaseProjectCompleter):
             return completions
         except Exception as e:
             argcomplete.debug("Error fetching gateway completions: " + str(e))
-            return []
+            return [""]
