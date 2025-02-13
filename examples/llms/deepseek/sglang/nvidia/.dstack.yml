@@ -15,4 +15,4 @@ port: 8000
 model: deepseek-ai/DeepSeek-R1-Distill-Llama-8B
 
 resources:
-    gpu: 24GB
+  gpu: 24GB

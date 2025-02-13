@@ -14,5 +14,5 @@ port: 8000
 model: deepseek-ai/DeepSeek-R1-Distill-Llama-70B
 
 resources:
-    gpu: mi300x
-    disk: 300Gb
+  gpu: mi300x
+  disk: 300Gb

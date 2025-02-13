@@ -265,7 +265,7 @@ nav:
         - TRL: examples/fine-tuning/trl/index.md
     - Accelerators:
         - AMD: examples/accelerators/amd/index.md
-        - INTEL: examples/accelerators/intel/index.md
+        - Intel Gaudi: examples/accelerators/intel/index.md
         - TPU: examples/accelerators/tpu/index.md
     - LLMs:
         - Deepseek: examples/llms/deepseek/index.md
@@ -273,7 +273,7 @@ nav:
         - Llama 3.2: examples/llms/llama32/index.md
     - Misc:
         - Docker Compose: examples/misc/docker-compose/index.md
-  - Community: community.md
+#  - Community: community.md
   - Partners: partners.md
   - Blog:
       - blog/index.md

@@ -86,7 +86,7 @@ hide:
     <a href="/examples/accelerators/intel"
        class="feature-cell sky">
         <h3>
-            INTEL
+            Intel Gaudi
         </h3>
 
         <p>
@@ -117,7 +117,7 @@ hide:
         </h3>
 
         <p>
-            Deploy Deepseek models
+            Deploy and train Deepseek models
         </p>
     </a>
     <a href="/examples/llms/llama31"

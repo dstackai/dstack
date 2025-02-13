@@ -14,5 +14,5 @@ model: deepseek-ai/DeepSeek-V2-Lite
 
 
 resources:
-    gpu: mi300x
-    disk: 150Gb
+  gpu: mi300x
+  disk: 150Gb

@@ -16,4 +16,4 @@ port: 8000
 model: deepseek-ai/DeepSeek-V2-Lite
 
 resources:
-    gpu: 48GB
+  gpu: 48GB

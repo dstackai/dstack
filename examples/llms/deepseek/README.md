@@ -1,7 +1,10 @@
 # Deepseek
-This example walks you through how to deploy and train [Deepseek](https://huggingface.co/deepseek-ai) models with `dstack`. Here we have used Deepseek-R1 distilled models as well as Deepseek-V2-Lite, a 16B parameter model that shares the architecture of Deepseek-R1 (671B). 
 
-Deepseek-V2-Lite uses the same MLA(Multi-head Latent Attention) and DeepSeekMoE (Mixture-of-Experts) as Deepseek-R1, but requires less memory which is ideal for testing inference and fine-tuning on smaller GPUs.
+This example walks you through how to deploy and
+train [Deepseek :material-arrow-top-right-thin:{ .external }](https://huggingface.co/deepseek-ai){:target="_blank"}
+models with `dstack`. 
+
+> We used Deepseek-R1 distilled models and Deepseek-V2-Lite, a 16B model with the same architecture as Deepseek-R1 (671B). Deepseek-V2-Lite retains MLA and DeepSeekMoE but requires less memory, making it ideal for testing and fine-tuning on smaller GPUs.
 
 ??? info "Prerequisites"
     Once `dstack` is [installed](https://dstack.ai/docs/installation), go ahead clone the repo, and run `dstack init`.
@@ -16,12 +19,15 @@ Deepseek-V2-Lite uses the same MLA(Multi-head Latent Attention) and DeepSeekMoE 
     </div>
 
 ## Deployment
+
 ### AMD
-Here's an example of a service that deploys `Deepseek-R1-Distill-Llama-70B` using [SGLang](https://github.com/sgl-project/sglang) and [vLLM](https://github.com/vllm-project/vllm) with AMD `Mi300x` GPU. The below configurations also support `Deepseek-V2-Lite`.
+
+Here's an example of a service that deploys `Deepseek-R1-Distill-Llama-70B` using [SGLang :material-arrow-top-right-thin:{ .external }](https://github.com/sgl-project/sglang){:target="_blank"} and [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/vllm-project/vllm){:target="_blank"} with AMD `MI300X` GPU. The below configurations also support `Deepseek-V2-Lite`.
 
 === "SGLang"
 
     <div editor-title="examples/llms/deepseek/sglang/amd/.dstack.yml">
+
     ```yaml
     type: service
     name: deepseek-r1-amd
@@ -39,8 +45,8 @@ Here's an example of a service that deploys `Deepseek-R1-Distill-Llama-70B` usin
     model: deepseek-ai/DeepSeek-R1-Distill-Llama-70B
 
     resources:
-        gpu: mi300x
-        disk: 300Gb
+      gpu: MI300X
+      disk: 300Gb
 
     ```
     </div>
@@ -48,6 +54,7 @@ Here's an example of a service that deploys `Deepseek-R1-Distill-Llama-70B` usin
 === "vLLM"
     
     <div editor-title="examples/llms/deepseek/sglang/amd/.dstack.yml">
+
     ```yaml
     type: service
     name: deepseek-r1-amd
@@ -63,18 +70,25 @@ Here's an example of a service that deploys `Deepseek-R1-Distill-Llama-70B` usin
     port: 8000
     
     model: deepseek-ai/DeepSeek-R1-Distill-Llama-70B
-    
-    
+
     resources:
-        gpu: mi300x
-        disk: 300Gb
+      gpu: MI300X
+      disk: 300Gb
     ```
     </div>
 
 Note, when using `Deepseek-R1-Distill-Llama-70B` with `vLLM` with a 192GB GPU, we must limit the context size to 126432 tokens to fit the memory.
 
-### INTEL
-Here's an example of a service that deploys `Deepseek-R1-Distill-Llama-70B` using [TGI gaudi](https://github.com/huggingface/tgi-gaudi) and [vLLM habana fork](https://github.com/HabanaAI/vllm-fork) with Intel `Gaudi2` GPUs. Both `TGI gaudi` and `vLLM habana` does not support `Deepseek-V2-Lite`. We have requested support for `Deepseek-V2-Lite` and `Deepseek-R1` to `TGI` and `vLLM` in [TGI issue :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/tgi-gaudi/issues/271) and [vLLM issue :material-arrow-top-right-thin:{ .external }](https://github.com/HabanaAI/vllm-fork/issues/809#issuecomment-2652454824).
+### Intel Gaudi
+
+Here's an example of a service that deploys `Deepseek-R1-Distill-Llama-70B`
+using [TGI on Gaudi :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/tgi-gaudi){:target="_blank"}
+and [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/HabanaAI/vllm-fork){:target="_blank"} (Gaudi fork) with Intel Gaudi 2. 
+
+> Both [TGI on Gaudi :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/tgi-gaudi){:target="_blank"}
+> and [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/HabanaAI/vllm-fork){:target="_blank"} do not support `Deepseek-V2-Lite`.
+> See [this :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/tgi-gaudi/issues/271)
+> and [this :material-arrow-top-right-thin:{ .external }](https://github.com/HabanaAI/vllm-fork/issues/809#issuecomment-2652454824) issues.
 
 === "TGI"
 
@@ -155,11 +169,15 @@ Here's an example of a service that deploys `Deepseek-R1-Distill-Llama-70B` usin
     </div>  
 
 ### NVIDIA
-Here's an example of a service that deploys `Deepseek-R1-Distill-Llama-8B` using [SGLang](https://github.com/sgl-project/sglang) and [vLLM](https://github.com/vllm-project/vllm) with NVIDIA GPUs. Both SGLang and vLLM support `Deepseek-V2-Lite`.
+
+Here's an example of a service that deploys `Deepseek-R1-Distill-Llama-8B`
+using [SGLang :material-arrow-top-right-thin:{ .external }](https://github.com/sgl-project/sglang){:target="_blank"}
+and [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/vllm-project/vllm){:target="_blank"} with NVIDIA GPUs. 
+Both SGLang and vLLM also support `Deepseek-V2-Lite`.
 
 === "SGLang"
-
     <div editor-title="examples/llms/deepseek/sglang/nvidia/.dstack.yml">
+
     ```yaml
     type: service
     name: deepseek-r1-nvidia
@@ -174,17 +192,16 @@ Here's an example of a service that deploys `Deepseek-R1-Distill-Llama-8B` using
           --trust-remote-code
     
     port: 8000
-    
     model: deepseek-ai/DeepSeek-R1-Distill-Llama-8B
     
     resources:
-        gpu: 24GB
+      gpu: 24GB
     ```
     </div>
 
 === "vLLM"
-
     <div editor-title="examples/llms/deepseek/vllm/nvidia/.dstack.yml">
+
     ```yaml
     type: service
     name: deepseek-r1-nvidia
@@ -195,41 +212,39 @@ Here's an example of a service that deploys `Deepseek-R1-Distill-Llama-8B` using
       - MAX_MODEL_LEN=4096
     commands:
       - vllm serve $MODEL_ID
-        --max-model-len $MAX_MODEL_LEN
-    
-    port: 8000
-    
+        --max-model-len $MAX_MODEL_LEN 
+    port: 8000 
     model: deepseek-ai/DeepSeek-R1-Distill-Llama-8B
     
     resources:
-        gpu: 24GB
+      gpu: 24GB
     ```
     </div>
 
-Note, To run `Deepseek-R1-Distill-Llama-8B` with `vLLM` with a 24GB GPU, we must limit the context size to 4096 tokens to fit the memory.
-To run `Deepseek-V2-Lite` with `vLLM`, we must use 40GB GPU and to run `Deepseek-V2-Lite` with `SGLang`, we must use 80GB GPU. For more details on `Sglang`'s memory requirements you can refer to this [issue](https://github.com/sgl-project/sglang/issues/3451).
+Note, to run `Deepseek-R1-Distill-Llama-8B` with `vLLM` with a 24GB GPU, we must limit the context size to 4096 tokens to fit the memory.
+
+> To run `Deepseek-V2-Lite` with `vLLM`, we must use 40GB GPU and to run `Deepseek-V2-Lite` with SGLang, we must use
+> 80GB GPU. For more details on SGlang's memory requirements you can refer to
+> this [issue](https://github.com/sgl-project/sglang/issues/3451).
 
 ### Memory requirements
 
-Below are the approximate memory requirements for loading the model. 
-This excludes memory for the model context and CUDA/ROCm kernel reservations.
+Approximate memory requirements for loading the model (excluding context and CUDA/ROCm kernel reservations).
 
-| Model Name               | Model size | FP16    | FP8     | INT4    |
-|--------------------------|------------|---------|---------|---------|
-| Deepseek-R1              | **671B**   | ~1342GB | ~671GB  | ~336GB  |
-| DeepSeek-R1-Distill-Llama| **70B**    | ~161GB  | ~80.5GB | ~40B    |
-| DeepSeek-R1-Distill-Qwen | **32B**    | ~74GB   | ~37GB   | ~18.5GB |
-| DeepSeek-V2-Lite         | **16B**    | ~35GB   | ~17.5GB | ~8.75GB |
-| DeepSeek-R1-Distill-Qwen | **14B**    | ~32GB   | ~16GB   | ~8GB    |
-| DeepSeek-R1-Distill-Llama| **8B**     | ~18GB   | ~9GB    | ~4.5GB  |
-| DeepSeek-R1-Distill-Qwen | **7B**     | ~16GB   | ~8GB    | ~4GB    |
-| DeepSeek-R1-Distill-Qwen | **1.5B**   | ~3.5GB  | ~2GB    | ~1GB    |
- 
-For example, the FP8 version of Deepseek-R1 671B fits into single node of `Mi300x` with eight 192GB GPUs or 
-single node of `H200` with eight 141GB GPUs or single node of `Intel Gaudi2` with eight 96GB GPUs.
+| Model                       | Size     | FP16   | FP8    | INT4   |
+|-----------------------------|----------|--------|--------|--------|
+| `Deepseek-R1`               | **671B** | 1.35TB | 671GB  | 336GB  |
+| `DeepSeek-R1-Distill-Llama` | **70B**  | 161GB  | 80.5GB | 40B    |
+| `DeepSeek-R1-Distill-Qwen`  | **32B**  | 74GB   | 37GB   | 18.5GB |
+| `DeepSeek-V2-Lite`          | **16B**  | 35GB   | 17.5GB | 8.75GB |
+| `DeepSeek-R1-Distill-Qwen`  | **14B**  | 32GB   | 16GB   | 8GB    |
+| `DeepSeek-R1-Distill-Llama` | **8B**   | 18GB   | 9GB    | 4.5GB  |
+| `DeepSeek-R1-Distill-Qwen`  | **7B**   | 16GB   | 8GB    | 4GB    |
 
+For example, the FP8 version of Deepseek-R1 671B fits on a single node of MI300X with eight 192GB GPUs, a single node of
+H200 with eight 141GB GPUs, or a single node of Intel Gaudi2 with eight 96GB GPUs.
 
-### Running a configuration
+### Applying the configuration
 
 To run a configuration, use the [`dstack apply`](https://dstack.ai/docs/reference/cli/dstack/apply.md) command.
 
@@ -276,32 +291,30 @@ curl http://127.0.0.1:3000/proxy/models/main/chat/completions \
 ```
 </div>
 
-
 When a [gateway](https://dstack.ai/docs/concepts/gateways.md) is configured, the OpenAI-compatible endpoint 
 is available at `https://gateway.<gateway domain>/`.
 
 ## Fine-tuning
+
 ### AMD
-Here are the examples of `LoRA` and `GRPO` fine-tuning of `DeepSeek-R1-Distill-Qwen-1.5B` on `Mi300x` GPU using huggingface's [trl](https://github.com/huggingface/trl).
+
+Here are the examples of LoRA and GRPO fine-tuning of `DeepSeek-R1-Distill-Qwen-1.5B` on `MI300X` GPU using
+HuggingFace's [TRL :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/trl){:target="_blank"}.
 
 === "LoRA"
 
     <div editor-title="examples/llms/deepseek/trl/amd/.dstack.yml">
+
     ```yaml
-    type: dev-environment
-    # The name is optional, if not specified, generated randomly
+    type: task
     name: trl-train
 
     image: rocm/pytorch:rocm6.2.3_ubuntu22.04_py3.10_pytorch_release_2.3.0
 
-    ide: vscode
-    # Required environment variables
     env:
       - WANDB_API_KEY
       - WANDB_PROJECT
       - MODEL_ID=deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B
-
-    # Commands of the task
     commands:
       - git clone https://github.com/huggingface/trl.git
       - pip install transformers
@@ -328,7 +341,7 @@ Here are the examples of `LoRA` and `GRPO` fine-tuning of `DeepSeek-R1-Distill-Q
         --output_dir DeepSeek-R1-Distill-Qwen-1.5B-SFT
 
     resources:
-      gpu: mi300x
+      gpu: MI300X
       disk: 150GB
     ```
     </div>
@@ -338,17 +351,14 @@ Here are the examples of `LoRA` and `GRPO` fine-tuning of `DeepSeek-R1-Distill-Q
     <div editor-title="examples/llms/deepseek/trl/amd/grpo.dstack.yml">
     ```yaml
     type: task
-    # The name is optional, if not specified, generated randomly
     name: trl-train-grpo
 
     image: rocm/pytorch:rocm6.2.3_ubuntu22.04_py3.10_pytorch_release_2.3.0 
 
-    # Required environment variables
     env:
       - WANDB_API_KEY
       - WANDB_PROJECT
       - MODEL_ID=deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B
-    # Commands of the task
     commands:
       - pip install trl
       - pip install datasets
@@ -366,32 +376,33 @@ Here are the examples of `LoRA` and `GRPO` fine-tuning of `DeepSeek-R1-Distill-Q
         --trust_remote_code
 
     resources:
-      gpu: mi300x
+      gpu: MI300X
       disk: 150GB
     ```
     </div>
 
-Note, the `GRPO` fine-tuning of `DeepSeek-R1-Distill-Qwen-1.5B` consumes upto 135GB of VRAM.
+Note, the `GRPO` fine-tuning of `DeepSeek-R1-Distill-Qwen-1.5B` consumes up to 135GB of vRAM.
 
-### INTEL
-Here is an example of distributed `LoRA` fine-tuning of `DeepSeek-R1-Distill-Qwen-7B` on Intel Gaudi2 GPUs using huggingface's [optimum-habana](https://github.com/huggingface/optimum-habana) and [deepspeed](https://github.com/deepspeedai/DeepSpeed). `optimum-habana` and `deepspeed` also supports `LoRA` fine-tuning of `Deepseek-V2-Lite` with same configuration as below.
+### Intel Gaudi
+
+Here is an example of LoRA fine-tuning of `DeepSeek-R1-Distill-Qwen-7B` on Intel Gaudi 2 GPUs using
+HuggingFace's [Optimum for Intel Gaudi :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/optimum-habana){:target="_blank"}
+and [DeepSpeed :material-arrow-top-right-thin:{ .external }](https://github.com/deepspeedai/DeepSpeed){:target="_blank"}. Both also support `LoRA`
+fine-tuning of `Deepseek-V2-Lite` with same configuration as below.
 
 === "LoRA"
 
     <div editor-title="examples/llms/deepseek/trl/intel/.dstack.yml">
     ```yaml
     type: task
-    # The name is optional, if not specified, generated randomly
     name: trl-train
 
     image: vault.habana.ai/gaudi-docker/1.18.0/ubuntu22.04/habanalabs/pytorch-installer-2.4.0
 
-    # Required environment variables
     env:
       - MODEL_ID=deepseek-ai/DeepSeek-R1-Distill-Qwen-7B
       - WANDB_API_KEY
       - WANDB_PROJECT
-    # Commands of the task
     commands:
       - pip install --upgrade-strategy eager optimum[habana]
       - pip install git+https://github.com/HabanaAI/DeepSpeed.git@1.19.0
@@ -426,30 +437,29 @@ Here is an example of distributed `LoRA` fine-tuning of `DeepSeek-R1-Distill-Qwe
 
     resources:
       gpu: gaudi2:8
-
     ```
+
     </div>
 
 
 ### NVIDIA
-Here are examples of `LoRA` fine-tuning of `DeepSeek-R1-Distill-Qwen-1.5B` and `QLoRA` fine-tuning of `DeepSeek-V2-Lite` on NVIDIA GPU using huggingface's [trl](https://github.com/huggingface/trl).
+
+Here are examples of LoRA fine-tuning of `DeepSeek-R1-Distill-Qwen-1.5B` and QLoRA fine-tuning of `DeepSeek-V2-Lite`
+on NVIDIA GPU using HuggingFace's [TRL :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/trl){:target="_blank"} library.
 
 === "LoRA"
-
     <div editor-title="examples/llms/deepseek/trl/nvidia/.dstack.yml">
+
     ```yaml
     type: task
-    # The name is optional, if not specified, generated randomly
     name: trl-train
 
     python: "3.10"
 
-    # Required environment variables
     env:
       - WANDB_API_KEY
       - WANDB_PROJECT
       - MODEL_ID=deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B
-    # Commands of the task
     commands:
       - git clone https://github.com/huggingface/trl.git
       - pip install trl
@@ -480,23 +490,19 @@ Here are examples of `LoRA` fine-tuning of `DeepSeek-R1-Distill-Qwen-1.5B` and `
     </div>
 
 === "QLoRA"
-
     <div editor-title="examples/llms/deepseek/trl/nvidia/deepseek_v2.dstack.yml">
+
     ```yaml
     type: task
-    # The name is optional, if not specified, generated randomly
     name: trl-train-deepseek-v2
 
     python: "3.10"
-
     nvcc: true
-    # Required environment variables
     env:
       - WANDB_API_KEY
       - WANDB_PROJECT
       - MODEL_ID=deepseek-ai/DeepSeek-V2-Lite
       - ACCELERATE_USE_FSDP=False
-    # Commands of the task
     commands:
       - git clone https://github.com/huggingface/peft.git
       - pip install trl
@@ -545,41 +551,39 @@ Here are examples of `LoRA` fine-tuning of `DeepSeek-R1-Distill-Qwen-1.5B` and `
         --bnb_4bit_compute_dtype "bfloat16"
 
     resources:
-    # Consumes ~25GB of vRAM for QLoRA fine-tuning deepseek-ai/DeepSeek-V2-Lite
+      # Consumes ~25GB of vRAM for QLoRA fine-tuning deepseek-ai/DeepSeek-V2-Lite
       gpu: 48GB
     ```
+    </div>
 
 ### Memory requirements
 
-| Model Name               | Model size | Full fine-tuning | LoRA     | QLoRA    |
-|--------------------------|------------|------------------|----------|----------|
-|Deepseek-R1 (BF16)        | **671B**   | ~10.5TB          | ~1.4TB   | ~442GB   |
-|DeepSeek-R1-Distill-Llama | **70B**    | ~1.09TB          | ~151GB   | ~46GB    |
-|DeepSeek-R1-Distill-Qwen  | **32B**    | ~512GB           | ~70GB    | ~21GB    |
-|DeepSeek-V2-Lite          | **16B**    | ~256GB           | ~35GB    | ~11GB    |
-|DeepSeek-R1-Distill-Qwen  | **14B**    | ~224GB           | ~30GB    | ~9GB     |
-|DeepSeek-R1-Distill-Llama | **8B**     | ~128GB           | ~17GB    | ~5GB     |
-|DeepSeek-R1-Distill-Qwen	 | **7B**     | ~112GB           | ~15GB    | ~4GB     |
-|DeepSeek-R1-Distill-Qwen	 | **1.5B**   | ~24GB            | ~3.2GB   | ~1GB     |
+| Model                       | Size     | Full fine-tuning | LoRA  | QLoRA |
+|-----------------------------|----------|------------------|-------|-------|
+| `Deepseek-R1`               | **671B** | 10.5TB           | 1.4TB | 442GB |
+| `DeepSeek-R1-Distill-Llama` | **70B**  | 1.09TB           | 151GB | 46GB  |
+| `DeepSeek-R1-Distill-Qwen`  | **32B**  | 512GB            | 70GB  | 21GB  |
+| `DeepSeek-V2-Lite`          | **16B**  | 256GB            | 35GB  | 11GB  |
+| `DeepSeek-R1-Distill-Qwen`  | **14B**  | 224GB            | 30GB  | 9GB   |
+| `DeepSeek-R1-Distill-Llama` | **8B**   | 128GB            | 17GB  | 5GB   |
+| `DeepSeek-R1-Distill-Qwen`  | **7B**   | 112GB            | 15GB  | 4GB   |
+| `DeepSeek-R1-Distill-Qwen`  | **1.5B** | 24GB             | 3.2GB | 1GB   |
 
-Note, The memory requirements are based on [PyTorch's Finetuning LLMs Guide :material-arrow-top-right-thin:{ .external }](https://pytorch.org/blog/finetune-llms/) and for `LoRA` and `QLoRA` we assume the size of the low-rank update matrices is 1% of the model parameters. But in practice a 7B model with QLoRA requires ~7-10GB due to intermediate hidden states.
-Calculations for 671B model is as follows:
+The memory requirements assume low-rank update matrices are 1% of model parameters. In practice, a 7B model with QLoRA
+needs 7–10GB due to intermediate hidden states.
 
-
-| Training Type    | Calculation                                      |
+| Fine-tuning type | Calculation                                      |
 |------------------|--------------------------------------------------|
-| Full fine-tuning | 671B × 16 Bytes = 10.48TB                        |
-| LoRA             | 671B × 2 Bytes + 1% of 671B × 16 Bytes = 1.41TB  |
-| QLoRA(4-bit)     | 671B × 0.5 Bytes + 1% of 671B × 16 Bytes = 442GB |
-
+| Full fine-tuning | 671B × 16 bytes = 10.48TB                        |
+| LoRA             | 671B × 2 bytes + 1% of 671B × 16 bytes = 1.41TB  |
+| QLoRA(4-bit)     | 671B × 0.5 bytes + 1% of 671B × 16 bytes = 442GB |
 
 ## Source code
 
 The source-code of this example can be found in 
 [`examples/llms/deepseek` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/llms/deepseek).
 
-## What's next?
-1. Check [dev environments](https://dstack.ai/docs/dev-environments), [tasks](https://dstack.ai/docs/tasks), 
-   [services](https://dstack.ai/docs/services), and [protips](https://dstack.ai/docs/protips).
-2. Browse [DeepSeek on Mi300x with SGLang :material-arrow-top-right-thin:{ .external }](https://www.amd.com/en/developer/resources/technical-articles/amd-instinct-gpus-power-deepseek-v3-revolutionizing-ai-development-with-sglang.html), [DeepSeek model optimizations in vLLM :material-arrow-top-right-thin:{ .external }](https://neuralmagic.com/blog/enhancing-deepseek-models-with-mla-and-fp8-optimizations-in-vllm/) and [GRPO Training :material-arrow-top-right-thin:{ .external }](https://huggingface.co/docs/trl/main/en/grpo_trainer).
+!!! info "What's next?"
+    1. Check [dev environments](https://dstack.ai/docs/dev-environments), [tasks](https://dstack.ai/docs/tasks), 
+       [services](https://dstack.ai/docs/services), and [protips](https://dstack.ai/docs/protips).
    
