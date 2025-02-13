@@ -1,9 +1,9 @@
 import argcomplete
 
-from dstack._internal.cli.commands import APIBaseCommand
+from dstack._internal.cli.commands import BaseCommand
 
 
-class CompletionCommand(APIBaseCommand):
+class CompletionCommand(BaseCommand):
     NAME = "completion"
     DESCRIPTION = "Generate shell completion scripts"
 
