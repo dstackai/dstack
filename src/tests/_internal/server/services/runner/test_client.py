@@ -9,7 +9,13 @@ from dstack._internal.core.consts import DSTACK_SHIM_HTTP_PORT
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import NetworkMode
 from dstack._internal.core.models.resources import Memory
-from dstack._internal.core.models.volumes import InstanceMountPoint, VolumeMountPoint
+from dstack._internal.core.models.volumes import (
+    InstanceMountPoint,
+    VolumeAttachment,
+    VolumeAttachmentData,
+    VolumeInstance,
+    VolumeMountPoint,
+)
 from dstack._internal.server.schemas.runner import (
     HealthcheckResponse,
     JobResult,
@@ -133,7 +139,12 @@ class TestShimClientV1(BaseShimClientTest):
             volume_id="vol-id",
             configuration=get_volume_configuration(backend=BackendType.GCP),
             external=False,
-            device_name="/dev/sdv",
+            attachments=[
+                VolumeAttachment(
+                    instance=VolumeInstance(name="instance", instance_num=0, instance_id="i-1"),
+                    attachment_data=VolumeAttachmentData(device_name="/dev/sdv"),
+                )
+            ],
         )
 
         submitted = client.submit(
@@ -150,6 +161,7 @@ class TestShimClientV1(BaseShimClientTest):
             mounts=[VolumeMountPoint(name="vol", path="/vol")],
             volumes=[volume],
             instance_mounts=[InstanceMountPoint(instance_path="/mnt/nfs/home", path="/home")],
+            instance_id="i-1",
         )
 
         assert submitted is True
@@ -198,6 +210,7 @@ class TestShimClientV1(BaseShimClientTest):
             mounts=[],
             volumes=[],
             instance_mounts=[],
+            instance_id="",
         )
 
         assert submitted is False
@@ -294,7 +307,12 @@ class TestShimClientV2(BaseShimClientTest):
             volume_id="vol-id",
             configuration=get_volume_configuration(backend=BackendType.GCP),
             external=False,
-            device_name="/dev/sdv",
+            attachments=[
+                VolumeAttachment(
+                    instance=VolumeInstance(name="instance", instance_num=0, instance_id="i-1"),
+                    attachment_data=VolumeAttachmentData(device_name="/dev/sdv"),
+                )
+            ],
         )
 
         client.submit_task(
@@ -316,6 +334,7 @@ class TestShimClientV2(BaseShimClientTest):
             host_ssh_user="dstack",
             host_ssh_keys=["host_key"],
             container_ssh_keys=["project_key", "user_key"],
+            instance_id="i-1",
         )
 
         assert adapter.call_count == 2

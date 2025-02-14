@@ -6,7 +6,13 @@ from sqlalchemy.orm import joinedload, lazyload
 
 from dstack._internal.core.models.runs import JobStatus
 from dstack._internal.server.db import get_session_ctx
-from dstack._internal.server.models import InstanceModel, JobModel, ProjectModel, VolumeModel
+from dstack._internal.server.models import (
+    InstanceModel,
+    JobModel,
+    ProjectModel,
+    VolumeAttachmentModel,
+    VolumeModel,
+)
 from dstack._internal.server.services.jobs import (
     process_terminating_job,
     process_volumes_detaching,
@@ -80,7 +86,12 @@ async def _process_job(session: AsyncSession, job_model: JobModel):
         .where(InstanceModel.id == job_model.used_instance_id)
         .options(
             joinedload(InstanceModel.project).joinedload(ProjectModel.backends),
-            joinedload(InstanceModel.volumes).joinedload(VolumeModel.user),
+            joinedload(InstanceModel.volume_attachments)
+            .joinedload(VolumeAttachmentModel.volume)
+            .joinedload(VolumeModel.user),
+            joinedload(InstanceModel.volume_attachments)
+            .joinedload(VolumeAttachmentModel.volume)
+            .joinedload(VolumeModel.attachments),
         )
     )
     instance_model = res.unique().scalar()

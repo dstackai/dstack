@@ -666,6 +666,7 @@ class GCPCompute(Compute):
             instance_id,
         )
         zone = get_or_error(volume.provisioning_data).availability_zone
+        attachment_data = get_or_error(volume.get_attachment_data_for_instance(instance_id))
         # This method has no information if the instance is a TPU or a VM,
         # so we first try to see if there is a TPU with such name
         try:
@@ -694,7 +695,7 @@ class GCPCompute(Compute):
                 project=self.config.project_id,
                 zone=get_or_error(volume.provisioning_data).availability_zone,
                 instance=instance_id,
-                device_name=get_or_error(volume.attachment_data).device_name,
+                device_name=attachment_data.device_name,
             )
             gcp_resources.wait_for_extended_operation(operation, "persistent disk detachment")
         logger.debug(

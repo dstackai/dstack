@@ -242,7 +242,7 @@ async def process_terminating_job(
                 session=session, project=instance_model.project, names=jrd.volume_names
             )
         else:
-            volume_models = instance_model.volumes
+            volume_models = [va.volume for va in instance_model.volume_attachments]
         if len(volume_models) > 0:
             logger.info("Detaching volumes: %s", [v.name for v in volume_models])
             all_volumes_detached = await _detach_volumes_from_job_instance(
@@ -306,7 +306,7 @@ async def process_volumes_detaching(
             session=session, project=instance_model.project, names=jrd.volume_names
         )
     else:
-        volume_models = instance_model.volumes
+        volume_models = [va.volume for va in instance_model.volume_attachments]
     logger.info("Detaching volumes: %s", [v.name for v in volume_models])
     all_volumes_detached = await _detach_volumes_from_job_instance(
         project=instance_model.project,
@@ -439,8 +439,8 @@ async def _detach_volumes_from_job_instance(
     if job_model.volumes_detached_at is None:
         job_model.volumes_detached_at = common.get_current_datetime()
     detached_volumes_ids = {v.id for v in detached_volumes}
-    instance_model.volumes = [
-        v for v in instance_model.volumes if v.id not in detached_volumes_ids
+    instance_model.volume_attachments = [
+        va for va in instance_model.volume_attachments if va.volume_id not in detached_volumes_ids
     ]
     return all_detached
 

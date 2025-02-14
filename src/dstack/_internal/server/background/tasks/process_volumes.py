@@ -5,7 +5,12 @@ from sqlalchemy.orm import joinedload
 from dstack._internal.core.errors import BackendError, BackendNotAvailable
 from dstack._internal.core.models.volumes import VolumeStatus
 from dstack._internal.server.db import get_session_ctx
-from dstack._internal.server.models import ProjectModel, VolumeModel
+from dstack._internal.server.models import (
+    InstanceModel,
+    ProjectModel,
+    VolumeAttachmentModel,
+    VolumeModel,
+)
 from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services import volumes as volumes_services
 from dstack._internal.server.services.locking import get_locker
@@ -49,6 +54,11 @@ async def _process_submitted_volume(session: AsyncSession, volume_model: VolumeM
         .where(VolumeModel.id == volume_model.id)
         .options(joinedload(VolumeModel.project).joinedload(ProjectModel.backends))
         .options(joinedload(VolumeModel.user))
+        .options(
+            joinedload(VolumeModel.attachments)
+            .joinedload(VolumeAttachmentModel.instance)
+            .joinedload(InstanceModel.fleet)
+        )
         .execution_options(populate_existing=True)
     )
     volume_model = res.unique().scalar_one()

@@ -15,19 +15,28 @@ from dstack._internal.core.errors import (
 from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.core.models.volumes import (
     Volume,
+    VolumeAttachment,
     VolumeAttachmentData,
     VolumeConfiguration,
+    VolumeInstance,
     VolumeProvisioningData,
     VolumeStatus,
 )
 from dstack._internal.core.services import validate_dstack_resource_name
 from dstack._internal.server.db import get_db
-from dstack._internal.server.models import ProjectModel, UserModel, VolumeModel
+from dstack._internal.server.models import (
+    InstanceModel,
+    ProjectModel,
+    UserModel,
+    VolumeAttachmentModel,
+    VolumeModel,
+)
 from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services.locking import (
     get_locker,
     string_to_lock_id,
 )
+from dstack._internal.server.services.pools import get_instance_provisioning_data
 from dstack._internal.server.services.projects import list_project_models, list_user_project_models
 from dstack._internal.utils import common, random_names
 from dstack._internal.utils.logging import get_logger
@@ -106,8 +115,13 @@ async def list_projects_volume_models(
         .order_by(*order_by)
         .limit(limit)
         .options(joinedload(VolumeModel.user))
+        .options(
+            joinedload(VolumeModel.attachments)
+            .joinedload(VolumeAttachmentModel.instance)
+            .joinedload(InstanceModel.fleet)
+        )
     )
-    volume_models = list(res.scalars().all())
+    volume_models = list(res.unique().scalars().all())
     return volume_models
 
 
@@ -134,9 +148,16 @@ async def list_project_volume_models(
     if not include_deleted:
         filters.append(VolumeModel.deleted == False)
     res = await session.execute(
-        select(VolumeModel).where(*filters).options(joinedload(VolumeModel.user))
+        select(VolumeModel)
+        .where(*filters)
+        .options(joinedload(VolumeModel.user))
+        .options(
+            joinedload(VolumeModel.attachments)
+            .joinedload(VolumeAttachmentModel.instance)
+            .joinedload(InstanceModel.fleet)
+        )
     )
-    return list(res.scalars().all())
+    return list(res.unique().scalars().all())
 
 
 async def get_volume_by_name(
@@ -163,9 +184,16 @@ async def get_project_volume_model_by_name(
     if not include_deleted:
         filters.append(VolumeModel.deleted == False)
     res = await session.execute(
-        select(VolumeModel).where(*filters).options(joinedload(VolumeModel.user))
+        select(VolumeModel)
+        .where(*filters)
+        .options(joinedload(VolumeModel.user))
+        .options(
+            joinedload(VolumeModel.attachments)
+            .joinedload(VolumeAttachmentModel.instance)
+            .joinedload(InstanceModel.fleet)
+        )
     )
-    return res.scalar_one_or_none()
+    return res.unique().scalar_one_or_none()
 
 
 async def create_volume(
@@ -205,10 +233,10 @@ async def create_volume(
             project=project,
             status=VolumeStatus.SUBMITTED,
             configuration=configuration.json(),
+            attachments=[],
         )
         session.add(volume_model)
         await session.commit()
-        await session.refresh(volume_model)
         return volume_model_to_volume(volume_model)
 
 
@@ -234,13 +262,13 @@ async def delete_volumes(session: AsyncSession, project: ProjectModel, names: Li
                 VolumeModel.deleted == False,
             )
             .options(selectinload(VolumeModel.user))
-            .options(selectinload(VolumeModel.instances))
+            .options(selectinload(VolumeModel.attachments))
             .execution_options(populate_existing=True)
             .with_for_update()
         )
         volume_models = res.scalars().unique().all()
         for volume_model in volume_models:
-            if len(volume_model.instances) > 0:
+            if len(volume_model.attachments) > 0:
                 raise ServerClientError(
                     f"Failed to delete volume {volume_model.name}. Volume is in use."
                 )
@@ -270,6 +298,15 @@ def volume_model_to_volume(volume_model: VolumeModel) -> Volume:
     # Initially VolumeProvisionigData lacked backend
     if vpd is not None and vpd.backend is None:
         vpd.backend = configuration.backend
+    attachments = []
+    for volume_attachment_model in volume_model.attachments:
+        instance = volume_attachment_model.instance
+        attachments.append(
+            VolumeAttachment(
+                instance=instance_model_to_volume_instance(instance),
+                attachment_data=get_attachment_data(volume_attachment_model),
+            )
+        )
     return Volume(
         name=volume_model.name,
         project_name=volume_model.project.name,
@@ -282,6 +319,7 @@ def volume_model_to_volume(volume_model: VolumeModel) -> Volume:
         deleted=volume_model.deleted,
         volume_id=vpd.volume_id if vpd is not None else None,
         provisioning_data=vpd,
+        attachments=attachments,
         attachment_data=vad,
         id=volume_model.id,
     )
@@ -301,6 +339,27 @@ def get_volume_attachment_data(volume_model: VolumeModel) -> Optional[VolumeAtta
     if volume_model.volume_attachment_data is None:
         return None
     return VolumeAttachmentData.__response__.parse_raw(volume_model.volume_attachment_data)
+
+
+def get_attachment_data(
+    volume_attachment_model: VolumeAttachmentModel,
+) -> Optional[VolumeAttachmentData]:
+    if volume_attachment_model.attachment_data is None:
+        return None
+    return VolumeAttachmentData.__response__.parse_raw(volume_attachment_model.attachment_data)
+
+
+def instance_model_to_volume_instance(instance_model: InstanceModel) -> VolumeInstance:
+    instance_id = None
+    jpd = get_instance_provisioning_data(instance_model)
+    if jpd is not None:
+        instance_id = jpd.instance_id
+    return VolumeInstance(
+        name=instance_model.name,
+        fleet_name=instance_model.fleet.name if instance_model.fleet else None,
+        instance_num=instance_model.instance_num,
+        instance_id=instance_id,
+    )
 
 
 async def generate_volume_name(session: AsyncSession, project: ProjectModel) -> str:

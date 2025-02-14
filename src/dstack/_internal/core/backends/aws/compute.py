@@ -635,11 +635,12 @@ class AWSCompute(Compute):
         ec2_client = self.session.client("ec2", region_name=volume.configuration.region)
 
         logger.debug("Detaching EBS volume %s from instance %s", volume.volume_id, instance_id)
+        attachment_data = get_or_error(volume.get_attachment_data_for_instance(instance_id))
         try:
             ec2_client.detach_volume(
                 VolumeId=volume.volume_id,
                 InstanceId=instance_id,
-                Device=get_or_error(volume.attachment_data).device_name,
+                Device=attachment_data.device_name,
                 Force=force,
             )
         except botocore.exceptions.ClientError as e:

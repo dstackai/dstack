@@ -71,6 +71,18 @@ class VolumeAttachmentData(CoreModel):
     device_name: Optional[str] = None
 
 
+class VolumeInstance(CoreModel):
+    name: str
+    fleet_name: Optional[str] = None
+    instance_num: int
+    instance_id: Optional[str] = None
+
+
+class VolumeAttachment(CoreModel):
+    instance: VolumeInstance
+    attachment_data: Optional[VolumeAttachmentData] = None
+
+
 class Volume(CoreModel):
     id: uuid.UUID
     name: str
@@ -86,7 +98,18 @@ class Volume(CoreModel):
     deleted: bool
     volume_id: Optional[str] = None  # id of the volume in the cloud
     provisioning_data: Optional[VolumeProvisioningData] = None
+    attachments: Optional[List[VolumeAttachment]] = None
+    # attachment_data is deprecated in favor of attachments.
+    # It's only set for volumes that were attached before attachments.
     attachment_data: Optional[VolumeAttachmentData] = None
+
+    def get_attachment_data_for_instance(self, instance_id: str) -> Optional[VolumeAttachmentData]:
+        if self.attachments is not None:
+            for attachment in self.attachments:
+                if attachment.instance.instance_id == instance_id:
+                    return attachment.attachment_data
+        # volume was attached before attachments were introduced
+        return self.attachment_data
 
 
 class VolumePlan(CoreModel):
