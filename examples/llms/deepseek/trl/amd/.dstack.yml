@@ -37,5 +37,5 @@ commands:
     --output_dir DeepSeek-R1-Distill-Qwen-1.5B-SFT
 
 resources:
-  gpu: mi300x
+  gpu: MI300X
   disk: 150GB

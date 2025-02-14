@@ -359,7 +359,7 @@ Here are the examples of LoRA fine-tuning of `Deepseek-V2-Lite` and GRPO fine-tu
         --lora_target_modules "all-linear"
 
     resources:
-      gpu: mi300x
+      gpu: MI300X
       disk: 150GB
     ```
     </div>

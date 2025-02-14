@@ -55,5 +55,5 @@ commands:
     --lora_target_modules "all-linear"
 
 resources:
-  gpu: mi300x
+  gpu: MI300X
   disk: 150GB
