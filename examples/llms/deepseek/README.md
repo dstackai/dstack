@@ -298,8 +298,7 @@ is available at `https://gateway.<gateway domain>/`.
 
 ### AMD
 
-Here are the examples of LoRA and GRPO fine-tuning of `DeepSeek-R1-Distill-Qwen-1.5B` on `MI300X` GPU using
-HuggingFace's [TRL :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/trl){:target="_blank"}.
+Here are the examples of LoRA fine-tuning of `Deepseek-V2-Lite` and GRPO fine-tuning of `DeepSeek-R1-Distill-Qwen-1.5B` on `MI300X` GPU using HuggingFace's [TRL :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/trl){:target="_blank"}.
 
 === "LoRA"
 
@@ -314,34 +313,53 @@ HuggingFace's [TRL :material-arrow-top-right-thin:{ .external }](https://github.
     env:
       - WANDB_API_KEY
       - WANDB_PROJECT
-      - MODEL_ID=deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B
+      - MODEL_ID=deepseek-ai/DeepSeek-V2-Lite
+      - ACCELERATE_USE_FSDP=False
     commands:
-      - git clone https://github.com/huggingface/trl.git
-      - pip install transformers
+      - git clone https://github.com/huggingface/peft.git
       - pip install trl
+      - pip install "numpy<2"
       - pip install peft
       - pip install wandb
-      - cd trl/trl/scripts
-      - python sft.py
-        --model_name_or_path $MODEL_ID
-        --dataset_name trl-lib/Capybara
-        --learning_rate 2.0e-4
+      - cd peft/examples/sft
+      - python train.py
+        --seed 100
+        --model_name_or_path "deepseek-ai/DeepSeek-V2-Lite"
+        --dataset_name "smangrul/ultrachat-10k-chatml"
+        --chat_template_format "chatml"
+        --add_special_tokens False
+        --append_concat_token False
+        --splits "train,test"
+        --max_seq_len 512
         --num_train_epochs 1
-        --packing
-        --per_device_train_batch_size 2
-        --gradient_accumulation_steps 8
-        --gradient_checkpointing
-        --logging_steps 25
-        --eval_strategy steps
-        --eval_steps 100
-        --use_peft
-        --lora_r 32
+        --logging_steps 5
+        --log_level "info"
+        --logging_strategy "steps"
+        --eval_strategy "epoch"
+        --save_strategy "epoch"
+        --hub_private_repo True
+        --hub_strategy "every_save"
+        --packing True
+        --learning_rate 1e-4
+        --lr_scheduler_type "cosine"
+        --weight_decay 1e-4
+        --warmup_ratio 0.0
+        --max_grad_norm 1.0
+        --output_dir "deepseek-sft-lora"
+        --per_device_train_batch_size 8
+        --per_device_eval_batch_size 8
+        --gradient_accumulation_steps 4
+        --gradient_checkpointing True
+        --use_reentrant True
+        --dataset_text_field "content"
+        --use_peft_lora True
+        --lora_r 16
         --lora_alpha 16
-        --report_to wandb
-        --output_dir DeepSeek-R1-Distill-Qwen-1.5B-SFT
+        --lora_dropout 0.05
+        --lora_target_modules "all-linear"
 
     resources:
-      gpu: MI300X
+      gpu: mi300x
       disk: 150GB
     ```
     </div>

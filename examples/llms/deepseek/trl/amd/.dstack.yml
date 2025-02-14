@@ -1,10 +1,9 @@
-type: dev-environment
+type: task
 # The name is optional, if not specified, generated randomly
 name: trl-train
 
 image: rocm/pytorch:rocm6.2.3_ubuntu22.04_py3.10_pytorch_release_2.3.0
 
-ide: vscode
 # Required environment variables
 env:
   - WANDB_API_KEY
@@ -14,8 +13,8 @@ env:
 # Commands of the task
 commands:
   - git clone https://github.com/huggingface/trl.git
-  - pip install transformers
   - pip install trl
+  - pip install "numpy<2"
   - pip install peft
   - pip install wandb
   - cd trl/trl/scripts
