@@ -74,10 +74,18 @@ class GatewayClient:
         resp.raise_for_status()
         self.is_server_ready = True
 
-    async def register_replica(self, run: Run, job_submission: JobSubmission):
+    async def register_replica(
+        self,
+        run: Run,
+        job_submission: JobSubmission,
+        ssh_head_proxy: Optional[SSHConnectionParams],
+        ssh_head_proxy_private_key: Optional[str],
+    ):
         payload = {
             "job_id": job_submission.id.hex,
             "app_port": run.run_spec.configuration.port.container_port,
+            "ssh_head_proxy": ssh_head_proxy.dict() if ssh_head_proxy is not None else None,
+            "ssh_head_proxy_private_key": ssh_head_proxy_private_key,
         }
         jpd = job_submission.job_provisioning_data
         if not jpd.dockerized:

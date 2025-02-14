@@ -11,7 +11,11 @@ from dstack._internal.core.errors import GatewayError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import NetworkMode, RegistryAuth, is_core_model_instance
 from dstack._internal.core.models.configurations import DevEnvironmentConfiguration
-from dstack._internal.core.models.instances import InstanceStatus, RemoteConnectionInfo
+from dstack._internal.core.models.instances import (
+    InstanceStatus,
+    RemoteConnectionInfo,
+    SSHConnectionParams,
+)
 from dstack._internal.core.models.repos import RemoteRepoCreds
 from dstack._internal.core.models.runs import (
     ClusterInfo,
@@ -26,6 +30,7 @@ from dstack._internal.core.models.runs import (
 from dstack._internal.core.models.volumes import InstanceMountPoint, Volume, VolumeMountPoint
 from dstack._internal.server.db import get_session_ctx
 from dstack._internal.server.models import (
+    InstanceModel,
     JobModel,
     ProjectModel,
     RepoModel,
@@ -42,6 +47,7 @@ from dstack._internal.server.services.jobs import (
 )
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.logging import fmt
+from dstack._internal.server.services.pools import get_instance_ssh_private_keys
 from dstack._internal.server.services.repos import (
     get_code_model,
     get_repo_creds,
@@ -101,7 +107,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
     res = await session.execute(
         select(JobModel)
         .where(JobModel.id == job_model.id)
-        .options(joinedload(JobModel.instance))
+        .options(joinedload(JobModel.instance).joinedload(InstanceModel.project))
         .execution_options(populate_existing=True)
     )
     job_model = res.unique().scalar_one()
@@ -152,18 +158,9 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
         job_provisioning_data=job_provisioning_data,
     )
 
-    server_ssh_private_key = project.ssh_private_key
-    # TODO: Drop this logic and always use project key once it's safe to assume that most on-prem
-    # fleets are (re)created after this change: https://github.com/dstackai/dstack/pull/1716
-    if (
-        job_model.instance is not None
-        and job_model.instance.remote_connection_info is not None
-        and job_provisioning_data.dockerized
-    ):
-        remote_conn_info: RemoteConnectionInfo = RemoteConnectionInfo.__response__.parse_raw(
-            job_model.instance.remote_connection_info
-        )
-        server_ssh_private_key = remote_conn_info.ssh_keys[0].private
+    server_ssh_private_keys = get_instance_ssh_private_keys(
+        common_utils.get_or_error(job_model.instance)
+    )
 
     secrets = {}  # TODO secrets
 
@@ -203,7 +200,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
                     user_ssh_key = ""
                 success = await common_utils.run_async(
                     _process_provisioning_with_shim,
-                    server_ssh_private_key,
+                    server_ssh_private_keys,
                     job_provisioning_data,
                     None,
                     run,
@@ -230,7 +227,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
                 )
                 success = await common_utils.run_async(
                     _submit_job_to_runner,
-                    server_ssh_private_key,
+                    server_ssh_private_keys,
                     job_provisioning_data,
                     None,
                     run,
@@ -273,7 +270,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
             )
             success = await common_utils.run_async(
                 _process_pulling_with_shim,
-                server_ssh_private_key,
+                server_ssh_private_keys,
                 job_provisioning_data,
                 None,
                 run,
@@ -283,14 +280,14 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
                 code,
                 secrets,
                 repo_creds,
-                server_ssh_private_key,
+                server_ssh_private_keys,
                 job_provisioning_data,
             )
         elif initial_status == JobStatus.RUNNING:
             logger.debug("%s: process running job, age=%s", fmt(job_model), job_submission.age)
             success = await common_utils.run_async(
                 _process_running,
-                server_ssh_private_key,
+                server_ssh_private_keys,
                 job_provisioning_data,
                 job_submission.job_runtime_data,
                 run_model,
@@ -316,8 +313,24 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
         and job_model.job_num == 0  # gateway connects only to the first node
         and run.run_spec.configuration.type == "service"
     ):
+        ssh_head_proxy: Optional[SSHConnectionParams] = None
+        ssh_head_proxy_private_key: Optional[str] = None
+        instance = common_utils.get_or_error(job_model.instance)
+        if instance.remote_connection_info is not None:
+            rci = RemoteConnectionInfo.__response__.parse_raw(instance.remote_connection_info)
+            if rci.ssh_proxy is not None:
+                ssh_head_proxy = rci.ssh_proxy
+                ssh_head_proxy_keys = common_utils.get_or_error(rci.ssh_proxy_keys)
+                ssh_head_proxy_private_key = ssh_head_proxy_keys[0].private
         try:
-            await services.register_replica(session, run_model.gateway_id, run, job_model)
+            await services.register_replica(
+                session,
+                run_model.gateway_id,
+                run,
+                job_model,
+                ssh_head_proxy,
+                ssh_head_proxy_private_key,
+            )
         except GatewayError as e:
             logger.warning(
                 "%s: failed to register service replica: %s, age=%s",
@@ -497,7 +510,7 @@ def _process_pulling_with_shim(
     code: bytes,
     secrets: Dict[str, str],
     repo_credentials: Optional[RemoteRepoCreds],
-    server_ssh_private_key: str,
+    server_ssh_private_keys: tuple[str, Optional[str]],
     job_provisioning_data: JobProvisioningData,
 ) -> bool:
     """
@@ -562,7 +575,7 @@ def _process_pulling_with_shim(
             return True
 
     return _submit_job_to_runner(
-        server_ssh_private_key,
+        server_ssh_private_keys,
         job_provisioning_data,
         job_runtime_data,
         run=run,

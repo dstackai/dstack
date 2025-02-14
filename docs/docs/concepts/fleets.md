@@ -300,6 +300,45 @@ ssh_config:
     - 3.255.177.52
 ```
 
+#### Head node
+
+If fleet nodes are behind a head node, configure [`proxy_jump`](../reference/dstack.yml/fleet.md#proxy_jump):
+
+<div editor-title="examples/misc/fleets/.dstack.yml">
+
+    ```yaml
+    type: fleet
+    name: my-fleet
+
+    ssh_config:
+      user: ubuntu
+      identity_file: ~/.ssh/worker_node_key
+      hosts:
+        - 3.255.177.51
+        - 3.255.177.52
+      proxy_jump:
+        hostname: 3.255.177.50
+        user: ubuntu
+        identity_file: ~/.ssh/head_node_key
+    ```
+
+</div>
+
+To be able to attach to runs, both explicitly with `dstack attach` and implicitly with `dstack apply`, you must either
+add a front node key (`~/.ssh/head_node_key`) to an SSH agent or configure a key path in `~/.ssh/config`:
+
+<div editor-title="~/.ssh/config">
+
+    ```
+    Host 3.255.177.50
+        IdentityFile ~/.ssh/head_node_key
+    ```
+
+</div>
+
+where `Host` must match `ssh_config.proxy_jump.hostname` or `ssh_config.hosts[n].proxy_jump.hostname` if you configure head nodes
+on a per-worker basis.
+
 !!! info "Reference"
     For all SSH fleet configuration options, refer to the [reference](../reference/dstack.yml/fleet.md).
 

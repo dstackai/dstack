@@ -47,6 +47,7 @@ from dstack._internal.core.models.instances import (
     InstanceStatus,
     InstanceType,
     RemoteConnectionInfo,
+    SSHKey,
 )
 from dstack._internal.core.models.placement import (
     PlacementGroup,
@@ -86,6 +87,7 @@ from dstack._internal.server.services.pools import (
     get_instance_profile,
     get_instance_provisioning_data,
     get_instance_requirements,
+    get_instance_ssh_private_keys,
 )
 from dstack._internal.server.services.runner import client as runner_client
 from dstack._internal.server.services.runner.client import HealthStatus
@@ -232,11 +234,11 @@ async def _add_remote(instance: InstanceModel) -> None:
         remote_details = RemoteConnectionInfo.parse_raw(cast(str, instance.remote_connection_info))
         # Prepare connection key
         try:
-            pkeys = [
-                pkey_from_str(sk.private)
-                for sk in remote_details.ssh_keys
-                if sk.private is not None
-            ]
+            pkeys = _ssh_keys_to_pkeys(remote_details.ssh_keys)
+            if remote_details.ssh_proxy_keys is not None:
+                ssh_proxy_pkeys = _ssh_keys_to_pkeys(remote_details.ssh_proxy_keys)
+            else:
+                ssh_proxy_pkeys = None
         except (ValueError, PasswordRequiredException):
             instance.status = InstanceStatus.TERMINATED
             instance.termination_reason = "Unsupported private SSH key type"
@@ -254,7 +256,9 @@ async def _add_remote(instance: InstanceModel) -> None:
         authorized_keys.append(instance.project.ssh_public_key.strip())
 
         try:
-            future = run_async(_deploy_instance, remote_details, pkeys, authorized_keys)
+            future = run_async(
+                _deploy_instance, remote_details, pkeys, ssh_proxy_pkeys, authorized_keys
+            )
             deploy_timeout = 20 * 60  # 20 minutes
             result = await asyncio.wait_for(future, timeout=deploy_timeout)
             health, host_info = result
@@ -356,7 +360,7 @@ async def _add_remote(instance: InstanceModel) -> None:
         ssh_port=remote_details.port,
         dockerized=True,
         backend_data=None,
-        ssh_proxy=None,
+        ssh_proxy=remote_details.ssh_proxy,
     )
 
     instance.status = InstanceStatus.IDLE if health else InstanceStatus.PROVISIONING
@@ -379,10 +383,16 @@ async def _add_remote(instance: InstanceModel) -> None:
 def _deploy_instance(
     remote_details: RemoteConnectionInfo,
     pkeys: List[PKey],
+    ssh_proxy_pkeys: Optional[list[PKey]],
     authorized_keys: List[str],
 ) -> Tuple[HealthStatus, Dict[str, Any]]:
     with get_paramiko_connection(
-        remote_details.ssh_user, remote_details.host, remote_details.port, pkeys
+        remote_details.ssh_user,
+        remote_details.host,
+        remote_details.port,
+        pkeys,
+        remote_details.ssh_proxy,
+        ssh_proxy_pkeys,
     ) as client:
         logger.info(f"Connected to {remote_details.ssh_user} {remote_details.host}")
 
@@ -638,18 +648,14 @@ async def _check_instance(instance: InstanceModel) -> None:
             instance.status = InstanceStatus.BUSY
         return
 
-    ssh_private_key = instance.project.ssh_private_key
-    # TODO: Drop this logic and always use project key once it's safe to assume that most on-prem
-    # fleets are (re)created after this change: https://github.com/dstackai/dstack/pull/1716
-    if instance.remote_connection_info is not None:
-        remote_conn_info: RemoteConnectionInfo = RemoteConnectionInfo.__response__.parse_raw(
-            instance.remote_connection_info
-        )
-        ssh_private_key = remote_conn_info.ssh_keys[0].private
+    ssh_private_keys = get_instance_ssh_private_keys(instance)
 
     # May return False if fails to establish ssh connection
     health_status_response = await run_async(
-        _instance_healthcheck, ssh_private_key, job_provisioning_data, None
+        _instance_healthcheck,
+        ssh_private_keys,
+        job_provisioning_data,
+        None,
     )
     if isinstance(health_status_response, bool) or health_status_response is None:
         health_status = HealthStatus(healthy=False, reason="SSH or tunnel error")
@@ -971,3 +977,7 @@ def _get_instance_timeout_interval(
     if backend_type == BackendType.VULTR and instance_type_name.startswith("vbm"):
         return timedelta(seconds=3300)
     return timedelta(seconds=600)
+
+
+def _ssh_keys_to_pkeys(ssh_keys: list[SSHKey]) -> list[PKey]:
+    return [pkey_from_str(sk.private) for sk in ssh_keys if sk.private is not None]
