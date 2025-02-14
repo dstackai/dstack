@@ -3,82 +3,81 @@ import os
 import argcomplete
 from argcomplete.completers import BaseCompleter
 
+from dstack._internal.core.errors import ConfigurationError
 from dstack._internal.core.services.configs import ConfigManager
 from dstack.api import Client
 
 
-class ResourceNameCompleter(BaseCompleter):
+class APIResourceNameCompleter(BaseCompleter):
     """
-    A resource name completer that initializes the API client using the --project option
-    from the parsed arguments, otherwise falls back to the DSTACK_PROJECT environment variable.
+    Base class that handles creating the API client and fetching resources.
+    Subclasses should implement fetch_resources(api, parsed_args).
     """
 
     def __init__(self):
         super().__init__()
 
     def get_api(self, parsed_args):
-        argcomplete.debug("Retrieving API client")
+        argcomplete.debug(f"{self.__class__.__name__}: Retrieving API client")
         project = getattr(parsed_args, "project", os.getenv("DSTACK_PROJECT"))
-        return Client.from_config(project_name=project)
+        try:
+            return Client.from_config(project_name=project)
+        except ConfigurationError as e:
+            argcomplete.debug(f"{self.__class__.__name__}: Error initializing API client: {e}")
+            return None
+
+    def fetch_resources(self, api):
+        """
+        Returns an iterable of objects that have a .name attribute.
+        """
+        raise NotImplementedError
+
+    def __call__(self, prefix, parsed_args, **kwargs):
+        api = self.get_api(parsed_args)
+        if not api:
+            return []
+
+        argcomplete.debug(f"{self.__class__.__name__}: Fetching completions")
+        try:
+            resources = self.fetch_resources(api)
+            return [r.name for r in resources if r.name.startswith(prefix)]
+        except Exception as e:
+            argcomplete.debug(
+                f"{self.__class__.__name__}: Error fetching resource completions: {e}"
+            )
+            return []
 
 
-class RunNameCompleter(ResourceNameCompleter):
-    def __init__(self, all: bool = False):
+class RunNameCompleter(APIResourceNameCompleter):
+    def __init__(self, all=False):
         super().__init__()
         self.all = all
 
+    def fetch_resources(self, api):
+        return api.runs.list(self.all)
+
+
+class FleetNameCompleter(APIResourceNameCompleter):
+    def fetch_resources(self, api):
+        return [api.client.fleets.list(api.project)]
+
+
+class VolumeNameCompleter(APIResourceNameCompleter):
+    def fetch_resources(self, api):
+        return api.client.volumes.list(api.project)
+
+
+class GatewayNameCompleter(APIResourceNameCompleter):
+    def fetch_resources(self, api):
+        return api.client.gateways.list(api.project)
+
+
+class ProjectNameCompleter(BaseCompleter):
+    """
+    Completer for local project names.
+    """
+
     def __call__(self, prefix, parsed_args, **kwargs):
-        api = self.get_api(parsed_args)
-        argcomplete.debug("Fetching run completions")
-        try:
-            runs = api.runs.list(self.all)
-            completions = [run.name for run in runs if run.name.startswith(prefix)]
-            return completions
-        except Exception as e:
-            argcomplete.debug("Error fetching run completions: " + str(e))
-            return [""]
-
-
-class FleetNameCompleter(ResourceNameCompleter):
-    def __call__(self, prefix, parsed_args, **kwargs):
-        api = self.get_api(parsed_args)
-        argcomplete.debug("Fetching fleet completions")
-        try:
-            fleets = api.client.fleets.list(api.project)
-            completions = [fleet.name for fleet in fleets if fleet.name.startswith(prefix)]
-            return completions
-        except Exception as e:
-            argcomplete.debug("Error fetching fleet completions: " + str(e))
-            return [""]
-
-
-class VolumeNameCompleter(ResourceNameCompleter):
-    def __call__(self, prefix, parsed_args, **kwargs):
-        api = self.get_api(parsed_args)
-        argcomplete.debug("Fetching volume completions")
-        try:
-            volumes = api.client.volumes.list(api.project)
-            completions = [volume.name for volume in volumes if volume.name.startswith(prefix)]
-            return completions
-        except Exception as e:
-            argcomplete.debug("Error fetching volume completions: " + str(e))
-            return [""]
-
-
-class ProjectNameCompleter(ResourceNameCompleter):
-    def __call__(self, prefix, parsed_args, **kwargs):
+        argcomplete.debug(f"{self.__class__.__name__}: Listing projects from ConfigManager")
         projects = ConfigManager().list_projects()
-        return projects
-
-
-class GatewayNameCompleter(ResourceNameCompleter):
-    def __call__(self, prefix, parsed_args, **kwargs):
-        api = self.get_api(parsed_args)
-        argcomplete.debug("Fetching gateway completions")
-        try:
-            gateways = api.client.gateways.list(api.project)
-            completions = [gateway.name for gateway in gateways if gateway.name.startswith(prefix)]
-            return completions
-        except Exception as e:
-            argcomplete.debug("Error fetching gateway completions: " + str(e))
-            return [""]
+        return [p for p in projects if p.startswith(prefix)]
