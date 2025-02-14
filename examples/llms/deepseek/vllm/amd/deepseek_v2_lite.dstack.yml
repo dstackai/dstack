@@ -1,0 +1,18 @@
+type: service
+name: deepseek-v2-lite-amd
+
+image: rocm/vllm:rocm6.2_mi300_ubuntu20.04_py3.9_vllm_0.6.4
+env:
+  - MODEL_ID=deepseek-ai/DeepSeek-V2-Lite
+commands:
+  - vllm serve $MODEL_ID
+    --trust-remote-code
+
+port: 8000
+
+model: deepseek-ai/DeepSeek-V2-Lite
+
+
+resources:
+  gpu: mi300x
+  disk: 150Gb

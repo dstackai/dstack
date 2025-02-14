@@ -1,0 +1,45 @@
+type: service
+
+name: tgi
+
+image: ghcr.io/huggingface/tgi-gaudi:2.3.1
+
+auth: false
+port: 8000
+
+model: DeepSeek-R1-Distill-Llama-70B
+
+env:
+  - HF_TOKEN
+  - MODEL_ID=deepseek-ai/DeepSeek-R1-Distill-Llama-70B
+  - PORT=8000
+  - OMPI_MCA_btl_vader_single_copy_mechanism=none
+  - TEXT_GENERATION_SERVER_IGNORE_EOS_TOKEN=true
+  - PT_HPU_ENABLE_LAZY_COLLECTIVES=true
+  - MAX_TOTAL_TOKENS=2048
+  - BATCH_BUCKET_SIZE=256
+  - PREFILL_BATCH_BUCKET_SIZE=4
+  - PAD_SEQUENCE_TO_MULTIPLE_OF=64
+  - ENABLE_HPU_GRAPH=true
+  - LIMIT_HPU_GRAPH=true
+  - USE_FLASH_ATTENTION=true
+  - FLASH_ATTENTION_RECOMPUTE=true
+
+commands:
+  - text-generation-launcher
+      --sharded true
+      --num-shard 8
+      --max-input-length 1024
+      --max-total-tokens 2048
+      --max-batch-prefill-tokens 4096
+      --max-batch-total-tokens 524288
+      --max-waiting-tokens 7
+      --waiting-served-ratio 1.2
+      --max-concurrent-requests 512
+
+resources:
+  gpu: Gaudi2:8
+
+# Uncomment to cache downloaded models
+#volumes:
+#  - /root/.cache/huggingface/hub:/root/.cache/huggingface/hub
