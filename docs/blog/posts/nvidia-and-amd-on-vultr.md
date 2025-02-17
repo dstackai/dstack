@@ -3,6 +3,7 @@ title: Supporting NVIDIA and AMD accelerators on Vultr
 date: 2025-02-17
 description: "TBA"  
 slug: nvidia-and-amd-on-vultr.md
+image: https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-vultr.png?raw=true
 categories:
   - NVIDIA
   - AMD
@@ -17,7 +18,7 @@ approach.
 Today, we’re excited to share a new integration and partnership
 with [Vultr :material-arrow-top-right-thin:{ .external }](https://www.vultr.com/){:target="_blank"}.
 
-<img src="https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-vultr.png?raw=true?raw=true" width="630"/>
+<img src="https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-vultr.png?raw=true" width="630"/>
 
 This new integration enables Vultr customers to train and deploy models on both AMD
 and NVIDIA GPUs with greater flexibility and efficiency–using `dstack`. 
