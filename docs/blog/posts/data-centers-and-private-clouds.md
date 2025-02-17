@@ -3,7 +3,7 @@ title: Orchestrating GPUs in data centers and private clouds
 date: 2025-02-18
 description: "TBA"  
 slug: data-centers-and-private-clouds
-image: https://github.com/`dstackai`/static-assets/blob/main/static-assets/images/data-centers-and-private-clouds.png?raw=true
+image: https://github.com/dstackai/static-assets/blob/main/static-assets/images/data-centers-and-private-clouds.png?raw=true
 categories:
   - Fleets
   - Data centers
