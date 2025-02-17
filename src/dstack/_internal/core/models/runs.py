@@ -150,9 +150,9 @@ class JobTerminationReason(str, Enum):
 class Requirements(CoreModel):
     # TODO: Make requirements' fields required
     resources: ResourcesSpec
-    max_price: Optional[float]
-    spot: Optional[bool]
-    reservation: Optional[str]
+    max_price: Optional[float] = None
+    spot: Optional[bool] = None
+    reservation: Optional[str] = None
 
     def pretty_format(self, resources_only: bool = False):
         res = self.resources.pretty_format()

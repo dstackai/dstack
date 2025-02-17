@@ -507,9 +507,9 @@ async def _create_instance(session: AsyncSession, instance: InstanceModel) -> No
         project=instance.project,
         profile=profile,
         requirements=requirements,
-        exclude_not_available=True,
         fleet_model=instance.fleet,
         blocks="auto" if instance.total_blocks is None else instance.total_blocks,
+        exclude_not_available=True,
     )
 
     if not offers and should_retry:
@@ -915,9 +915,8 @@ def _get_instance_offer_for_instance(
         instance_offer.availability_zones = [
             z
             for z in instance_offer.availability_zones
-            if instance_offer.availability_zones == master_job_provisioning_data.availability_zone
+            if z == master_job_provisioning_data.availability_zone
         ]
-
     return instance_offer
 
 
