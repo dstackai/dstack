@@ -300,9 +300,9 @@ ssh_config:
     - 3.255.177.52
 ```
 
-#### Head node
+#### Proxy jump
 
-If fleet nodes are behind a head node, configure [`proxy_jump`](../reference/dstack.yml/fleet.md#proxy_jump):
+If fleet hosts are behind a head node (aka "login node"), configure [`proxy_jump`](../reference/dstack.yml/fleet.md#proxy_jump):
 
 <div editor-title="examples/misc/fleets/.dstack.yml">
 
