@@ -591,6 +591,7 @@ def get_instance_offer_with_availability(
     spot: bool = False,
     blocks: int = 1,
     total_blocks: int = 1,
+    availability_zones: Optional[List[str]] = None,
 ):
     gpus = [Gpu(name="T4", memory_mib=16384, vendor=gpuhunt.AcceleratorVendor.NVIDIA)] * gpu_count
     return InstanceOfferWithAvailability(
@@ -609,6 +610,7 @@ def get_instance_offer_with_availability(
         region=region,
         price=1,
         availability=InstanceAvailability.AVAILABLE,
+        availability_zones=availability_zones,
         blocks=blocks,
         total_blocks=total_blocks,
     )

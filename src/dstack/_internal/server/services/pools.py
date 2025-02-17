@@ -462,19 +462,19 @@ def filter_pool_instances(
         zones = [z for z in zones if z in volume_zones]
 
     if multinode:
-        if not backend_types:
+        if backend_types is None:
             backend_types = BACKENDS_WITH_MULTINODE_SUPPORT
         backend_types = [b for b in backend_types if b in BACKENDS_WITH_MULTINODE_SUPPORT]
 
     # For multi-node, restrict backend and region.
     # The default behavior is to provision all nodes in the same backend and region.
     if master_job_provisioning_data is not None:
-        if not backend_types:
+        if backend_types is None:
             backend_types = [master_job_provisioning_data.get_base_backend()]
         backend_types = [
             b for b in backend_types if b == master_job_provisioning_data.get_base_backend()
         ]
-        if not regions:
+        if regions is None:
             regions = [master_job_provisioning_data.region]
         regions = [r for r in regions if r == master_job_provisioning_data.region]
 
