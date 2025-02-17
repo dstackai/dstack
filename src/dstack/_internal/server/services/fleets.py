@@ -257,6 +257,7 @@ async def get_plan(
             project=project,
             profile=spec.merged_profile,
             requirements=_get_fleet_requirements(spec),
+            fleet_spec=spec,
             blocks=spec.configuration.blocks,
         )
         offers = [offer for _, offer in offers_with_backends]
@@ -277,12 +278,15 @@ async def get_create_instance_offers(
     project: ProjectModel,
     profile: Profile,
     requirements: Requirements,
-    exclude_not_available=False,
+    fleet_spec: Optional[FleetSpec] = None,
     fleet_model: Optional[FleetModel] = None,
     blocks: Union[int, Literal["auto"]] = 1,
+    exclude_not_available: bool = False,
 ) -> List[Tuple[Backend, InstanceOfferWithAvailability]]:
     multinode = False
     master_job_provisioning_data = None
+    if fleet_spec is not None:
+        multinode = fleet_spec.configuration.placement == InstanceGroupPlacement.CLUSTER
     if fleet_model is not None:
         fleet = fleet_model_to_fleet(fleet_model)
         multinode = fleet.spec.configuration.placement == InstanceGroupPlacement.CLUSTER
