@@ -94,6 +94,57 @@ Configuration is updated at ~/.dstack/config.yml
 
 This configuration is stored in `~/.dstack/config.yml`.
 
+### (Optional) CLI Autocompletion
+
+`dstack` supports shell autocompletion for `bash` and `zsh`.
+
+=== "bash"
+
+    First, validate if completion scripts load correctly in your current shell session:
+    
+    <div class="termy">
+    
+    ```shell
+    $ eval "$(dstack completion bash)"
+    ```
+    
+    If completions work as expected and you would like them to persist across shell sessions, add the completion script to your shell profile using this command:
+    
+    <div class="termy">
+    
+    ```shell
+    $ echo "$(dstack completion bash)" >> ~/.bashrc
+    ```
+        
+    </div>
+
+=== "zsh"
+    
+    > If you get an error similiar to `2: command not found: compdef`, then add the following line to the beginning of your ~/.zshrc file:
+    > 
+    > `autoload -Uz compinit && compinit`
+    
+    First, validate if completion scripts load correctly in your current shell session:
+    
+    <div class="termy">
+    
+    ```shell
+    $ eval "$(dstack completion zsh)"
+    ```
+    
+    If completions work as expected and you would like them to persist across shell sessions, add the completion script to your shell profile using this command:
+    
+    <div class="termy">
+    
+    ```shell
+    $ echo "$(dstack completion zsh)" >> ~/.zshrc
+    ```
+        
+    </div>
+    
+
+
+
 !!! info "What's next?"
     1. Check the [server/config.yml reference](../reference/server/config.yml.md) on how to configure backends
     2. Check [SSH fleets](../concepts/fleets.md#ssh) to learn about running on your on-prem servers
