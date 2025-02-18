@@ -4,6 +4,7 @@ export { useBreadcrumbs } from './useBreadcrumbs';
 export { useNotifications } from './useNotifications';
 export { useHelpPanel } from './useHelpPanel';
 export { usePermissionGuard } from './usePermissionGuard';
+export { useInfiniteScroll } from './useInfiniteScroll';
 
 // cloudscape
 export { useCollection } from '@cloudscape-design/collection-hooks';

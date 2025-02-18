@@ -2,7 +2,7 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 
-import { Button, FormField, Header, Pagination, SelectCSD, SpaceBetween, Table, Toggle } from 'components';
+import { Button, FormField, Header, SelectCSD, SpaceBetween, Table, Toggle } from 'components';
 
 import { useBreadcrumbs, useCollection } from 'hooks';
 import { ROUTES } from 'routes';
@@ -39,12 +39,10 @@ export const RunList: React.FC = () => {
         localStorePrefix: 'administration-run-list-page',
     });
 
-    const { data, isLoading, disabledNext, pagesCount, nextPage, prevPage, refreshList } = useRunsData({
+    const { data, isLoading, refreshList } = useRunsData({
         project_name: selectedProject?.value,
         only_active: onlyActive,
     });
-
-    const isDisabledPagination = isLoading || data.length === 0;
 
     const isDisabledClearFilter = !selectedProject && !onlyActive;
 
@@ -171,16 +169,6 @@ export const RunList: React.FC = () => {
                         </Button>
                     </div>
                 </div>
-            }
-            pagination={
-                <Pagination
-                    currentPageIndex={pagesCount}
-                    pagesCount={pagesCount}
-                    openEnd={!disabledNext}
-                    disabled={isDisabledPagination}
-                    onPreviousPageClick={prevPage}
-                    onNextPageClick={nextPage}
-                />
             }
         />
     );
