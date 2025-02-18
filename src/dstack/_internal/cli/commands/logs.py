@@ -3,6 +3,7 @@ import sys
 from pathlib import Path
 
 from dstack._internal.cli.commands import APIBaseCommand
+from dstack._internal.cli.services.completion import RunNameCompleter
 from dstack._internal.core.errors import CLIError
 from dstack._internal.utils.logging import get_logger
 
@@ -33,7 +34,7 @@ class LogsCommand(APIBaseCommand):
         )
         self._parser.add_argument(
             "--replica",
-            help="The relica number. Defaults to 0.",
+            help="The replica number. Defaults to 0.",
             type=int,
             default=0,
         )
@@ -43,7 +44,7 @@ class LogsCommand(APIBaseCommand):
             type=int,
             default=0,
         )
-        self._parser.add_argument("run_name")
+        self._parser.add_argument("run_name").completer = RunNameCompleter(all=True)
 
     def _command(self, args: argparse.Namespace):
         super()._command(args)

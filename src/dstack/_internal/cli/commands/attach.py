@@ -6,6 +6,7 @@ from typing import Optional
 
 from dstack._internal.cli.commands import APIBaseCommand
 from dstack._internal.cli.services.args import port_mapping
+from dstack._internal.cli.services.completion import RunNameCompleter
 from dstack._internal.cli.utils.common import console
 from dstack._internal.core.consts import DSTACK_RUNNER_HTTP_PORT
 from dstack._internal.core.errors import CLIError
@@ -57,7 +58,7 @@ class AttachCommand(APIBaseCommand):
             type=int,
             default=0,
         )
-        self._parser.add_argument("run_name")
+        self._parser.add_argument("run_name").completer = RunNameCompleter()
 
     def _command(self, args: argparse.Namespace):
         super()._command(args)

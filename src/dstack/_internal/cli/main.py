@@ -1,10 +1,12 @@
 import argparse
 
+import argcomplete
 from rich.markup import escape
 from rich_argparse import RichHelpFormatter
 
 from dstack._internal.cli.commands.apply import ApplyCommand
 from dstack._internal.cli.commands.attach import AttachCommand
+from dstack._internal.cli.commands.completion import CompletionCommand
 from dstack._internal.cli.commands.config import ConfigCommand
 from dstack._internal.cli.commands.delete import DeleteCommand
 from dstack._internal.cli.commands.fleet import FleetCommand
@@ -72,9 +74,13 @@ def main():
     StatsCommand.register(subparsers)
     StopCommand.register(subparsers)
     VolumeCommand.register(subparsers)
+    CompletionCommand.register(subparsers)
+
+    argcomplete.autocomplete(parser, always_complete_options=False)
 
     args, unknown_args = parser.parse_known_args()
     args.unknown = unknown_args
+
     try:
         check_for_updates()
         get_ssh_client_info()

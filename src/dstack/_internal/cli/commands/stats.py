@@ -7,6 +7,7 @@ from rich.live import Live
 from rich.table import Table
 
 from dstack._internal.cli.commands import APIBaseCommand
+from dstack._internal.cli.services.completion import RunNameCompleter
 from dstack._internal.cli.utils.common import (
     LIVE_TABLE_PROVISION_INTERVAL_SECS,
     LIVE_TABLE_REFRESH_RATE_PER_SEC,
@@ -25,7 +26,7 @@ class StatsCommand(APIBaseCommand):
 
     def _register(self):
         super()._register()
-        self._parser.add_argument("run_name")
+        self._parser.add_argument("run_name").completer = RunNameCompleter()
         self._parser.add_argument(
             "-w",
             "--watch",

@@ -1,6 +1,7 @@
 import argparse
 
 from dstack._internal.cli.commands import APIBaseCommand
+from dstack._internal.cli.services.completion import RunNameCompleter
 from dstack._internal.cli.utils.common import confirm_ask
 from dstack._internal.core.errors import CLIError
 
@@ -13,7 +14,7 @@ class StopCommand(APIBaseCommand):
         super()._register()
         self._parser.add_argument("-x", "--abort", action="store_true")
         self._parser.add_argument("-y", "--yes", action="store_true")
-        self._parser.add_argument("run_name")
+        self._parser.add_argument("run_name").completer = RunNameCompleter()
 
     def _command(self, args: argparse.Namespace):
         super()._command(args)

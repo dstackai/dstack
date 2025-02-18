@@ -4,6 +4,7 @@ import time
 from rich.live import Live
 
 from dstack._internal.cli.commands import APIBaseCommand
+from dstack._internal.cli.services.completion import FleetNameCompleter
 from dstack._internal.cli.utils.common import (
     LIVE_TABLE_PROVISION_INTERVAL_SECS,
     LIVE_TABLE_REFRESH_RATE_PER_SEC,
@@ -47,7 +48,7 @@ class FleetCommand(APIBaseCommand):
         delete_parser.add_argument(
             "name",
             help="The name of the fleet",
-        )
+        ).completer = FleetNameCompleter()
         delete_parser.add_argument(
             "-i",
             "--instance",
