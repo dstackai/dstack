@@ -5,22 +5,20 @@ import { QueryDefinition } from '@reduxjs/toolkit/query';
 
 const SCROLL_POSITION_GAP = 400;
 
-type InfinityListArgs = Partial<Record<string, unknown>> & {
-    prev_submitted_at?: string;
-};
+type InfinityListArgs = Partial<Record<string, unknown>>;
 
 type ListResponse<DataItem> = DataItem[];
 
 type UseInfinityParams<DataItem, Args extends InfinityListArgs> = {
     useLazyQuery: UseLazyQuery<QueryDefinition<Args, any, any, ListResponse<DataItem>, any>>;
     args: { limit?: number } & Args;
+    getPaginationParams: (listItem: DataItem) => Partial<Args>;
     // options?: UseQueryStateOptions<QueryDefinition<Args, any, any, Data[], any>, Record<string, any>>;
 };
 
-type WithSubmittedAt = { submitted_at: string };
-
-export const useInfiniteScroll = <DataItem extends WithSubmittedAt, Args extends InfinityListArgs>({
+export const useInfiniteScroll = <DataItem, Args extends InfinityListArgs>({
     useLazyQuery,
+    getPaginationParams,
     // options,
     args,
 }: UseInfinityParams<DataItem, Args>) => {
@@ -65,9 +63,10 @@ export const useInfiniteScroll = <DataItem extends WithSubmittedAt, Args extends
 
         try {
             isLoadingRef.current = true;
+
             const result = await getDataRequest({
                 ...argsProp,
-                prev_submitted_at: data[data.length - 1].submitted_at,
+                ...getPaginationParams(data[data.length - 1]),
             } as Args);
 
             if (result.length > 0) {
@@ -114,5 +113,12 @@ export const useInfiniteScroll = <DataItem extends WithSubmittedAt, Args extends
         };
     }, [onScroll]);
 
-    return { data, isLoading: isLoading || (data.length === 0 && isFetching), refreshList: getEmptyList } as const;
+    const isLoadingMore = data.length > 0 && isFetching;
+
+    return {
+        data,
+        isLoading: isLoading || (data.length === 0 && isFetching),
+        isLoadingMore,
+        refreshList: getEmptyList,
+    } as const;
 };

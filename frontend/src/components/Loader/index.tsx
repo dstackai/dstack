@@ -9,16 +9,17 @@ import styles from './styles.module.scss';
 export interface Props {
     className?: string;
     padding?: BoxProps['padding'];
+    loadingText?: string;
 }
 
-export const Loader: React.FC<Props> = ({ className, padding = { vertical: 'xxxl' } }) => {
+export const Loader: React.FC<Props> = ({ className, loadingText = 'Loading', padding = { vertical: 'xxxl' } }) => {
     return (
         <div className={classNames(styles.loader, className)}>
             <Box padding={padding} textAlign="center" color="inherit">
                 <SpaceBetween size="m" direction="horizontal">
                     <Spinner />
 
-                    <Box color="inherit">Loading</Box>
+                    <Box color="inherit">{loadingText}</Box>
                 </SpaceBetween>
             </Box>
         </div>

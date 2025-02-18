@@ -1,12 +1,14 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Button, FormField, Header, Pagination, SelectCSD, SpaceBetween, Table, Toggle } from 'components';
+import { Button, FormField, Header, Loader, SelectCSD, SpaceBetween, Table, Toggle } from 'components';
 
-import { useBreadcrumbs, useCollection } from 'hooks';
+import { DEFAULT_TABLE_PAGE_SIZE } from 'consts';
+import { useBreadcrumbs, useCollection, useInfiniteScroll } from 'hooks';
 import { ROUTES } from 'routes';
+import { useLazyGetFleetsQuery } from 'services/fleet';
 
-import { useColumnsDefinitions, useEmptyMessages, useFilters, useFleetsData } from './hooks';
+import { useColumnsDefinitions, useEmptyMessages, useFilters } from './hooks';
 import { useDeleteFleet } from './useDeleteFleet';
 
 import styles from './styles.module.scss';
@@ -31,12 +33,15 @@ export const FleetList: React.FC = () => {
         setSelectedProject,
     } = useFilters();
 
-    const { data, pagesCount, disabledNext, isLoading, nextPage, prevPage, refreshList } = useFleetsData({
-        project_name: selectedProject?.value,
-        only_active: onlyActive,
-    });
+    const { data, isLoading, refreshList, isLoadingMore } = useInfiniteScroll<IFleet, TFleetListRequestParams>({
+        useLazyQuery: useLazyGetFleetsQuery,
+        args: { project_name: selectedProject?.value, only_active: onlyActive, limit: DEFAULT_TABLE_PAGE_SIZE },
 
-    const isDisabledPagination = isLoading || data.length === 0;
+        getPaginationParams: (lastFleet) => ({
+            prev_created_at: lastFleet.created_at,
+            prev_id: lastFleet.id,
+        }),
+    });
 
     const { columns } = useColumnsDefinitions();
     const { deleteFleets, isDeleting } = useDeleteFleet();
@@ -47,7 +52,6 @@ export const FleetList: React.FC = () => {
             empty: renderEmptyMessage(),
             noMatch: renderNoMatchMessage(),
         },
-        pagination: { pageSize: 20 },
         selection: {},
     });
 
@@ -123,16 +127,7 @@ export const FleetList: React.FC = () => {
                     </div>
                 </div>
             }
-            pagination={
-                <Pagination
-                    currentPageIndex={pagesCount}
-                    pagesCount={pagesCount}
-                    openEnd={!disabledNext}
-                    disabled={isDisabledPagination}
-                    onPreviousPageClick={prevPage}
-                    onNextPageClick={nextPage}
-                />
-            }
+            footer={isLoadingMore ? <Loader padding={{ vertical: 'l' }} /> : null}
         />
     );
 };
