@@ -121,6 +121,27 @@ and their quantity. Examples: `nvidia` (one NVIDIA GPU), `A100` (one A100), `A10
 
     Currently, only 8 TPU cores can be specified, supporting single TPU device workloads. Multi-TPU support is coming soon.
 
+#### Blocks { #cloud-blocks }
+
+For cloud fleets, `blocks` function the same way as in SSH fleets. 
+See the [`Blocks`](#ssh-blocks) section under SSH fleets for details on the blocks concept.
+
+<div editor-title=".dstack.yml">
+
+```yaml
+type: fleet
+
+name: my-fleet
+
+resources:
+  gpu: NVIDIA:80GB:8
+
+# Split into 4 blocks, each with 2 GPUs
+blocks: 4
+```
+
+</div>
+
 #### Idle duration
 
 By default, fleet instances stay `idle` for 3 days and can be reused within that time.
@@ -274,6 +295,43 @@ However, it's possible to configure it explicitly via
 the [`network`](../reference/dstack.yml/fleet.md#network) property.
 
 [//]: # (TODO: Provide an example and more detail)
+
+#### Blocks { #ssh-blocks }
+
+By default, a single job occupies the entire instance, so if the instance has 8 GPUs, the job will use all of them.
+
+To make it more efficient, you can set the blocks property to specify how many blocks you’d like the instance to be
+divided into, allowing multiple jobs to use these blocks concurrently.
+
+<div editor-title=".dstack.yml">
+
+    ```yaml
+    type: fleet
+    name: my-fleet
+
+    ssh_config:
+      user: ubuntu
+      identity_file: ~/.ssh/id_rsa
+      hosts:
+        - hostname: 3.255.177.51
+          blocks: 4
+        - hostaname: 3.255.177.52
+          # As many as possible, according to numbers of GPUs and CPUs
+          blocks: auto
+        - hostaname: 3.255.177.53
+          # Do not sclice. This is the default value, may be omitted
+          blocks: 1
+    ```
+
+</div>
+
+For instance, with 8 GPUs, 128 CPUs, and 2TB of memory, setting blocks to 8 would assign 1 GPU, 16 CPUs, and 256 GB of
+memory to each block. These blocks can be used concurrently, and a single job can occupy multiple blocks if needed.
+
+> GPUs and CPUs must be divisible by the number of blocks. All resources (GPU, CPU, memory) are split proportionally,
+> except disk storage, which is shared.
+
+You can also set `blocks` to `auto`, which automatically sets the number of blocks to match the number of GPUs.
 
 #### Environment variables
 
