@@ -36,7 +36,7 @@ resource waste.
 
 ### GPU blocks
 
-The newest version of `dstack` introduces a feature called GPU blocks, bringing this level of efficiency to `dstack`. It
+The newest version of `dstack` introduces a feature called [GPU blocks](../../docs/concepts/fleets.md#ssh-blocks), bringing this level of efficiency to `dstack`. It
 enables optimal hardware utilization by allowing concurrent workloads to run on the same hosts, using slices of the
 available resources on each host.
 
@@ -106,7 +106,7 @@ Private clouds typically provide access to GPU clusters via SSH through a login 
 node is internet-accessible, while cluster nodes can only be reached via SSH from the login node. This prevents creating
 an SSH fleet by directly listing the cluster nodes' hostnames.
 
-The latest `dstack` release introduces the `proxy_jump` property in SSH fleet configurations, enabling creating fleets 
+The latest `dstack` release introduces the [`proxy_jump`](../../docs/concepts/fleets.md#proxy-jump) property in SSH fleet configurations, enabling creating fleets 
 through a login node.
 
 > For example, imagine you’ve reserved a 1-Click Cluster from
