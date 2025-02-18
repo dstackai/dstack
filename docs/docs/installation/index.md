@@ -99,20 +99,11 @@ This configuration is stored in `~/.dstack/config.yml`.
 `dstack` supports shell autocompletion for `bash` and `zsh`.
 
 === "bash"
-
-    First, validate if completion scripts load correctly in your current shell session:
     
     <div class="termy">
     
     ```shell
     $ eval "$(dstack completion bash)"
-    ```
-    
-    If completions work as expected and you would like them to persist across shell sessions, add the completion script to your shell profile using this command:
-    
-    <div class="termy">
-    
-    ```shell
     $ echo "$(dstack completion bash)" >> ~/.bashrc
     ```
         
@@ -124,19 +115,8 @@ This configuration is stored in `~/.dstack/config.yml`.
     > 
     > `autoload -Uz compinit && compinit`
     
-    First, validate if completion scripts load correctly in your current shell session:
-    
-    <div class="termy">
-    
     ```shell
     $ eval "$(dstack completion zsh)"
-    ```
-    
-    If completions work as expected and you would like them to persist across shell sessions, add the completion script to your shell profile using this command:
-    
-    <div class="termy">
-    
-    ```shell
     $ echo "$(dstack completion zsh)" >> ~/.zshrc
     ```
         
