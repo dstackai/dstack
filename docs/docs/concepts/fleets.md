@@ -121,6 +121,29 @@ and their quantity. Examples: `nvidia` (one NVIDIA GPU), `A100` (one A100), `A10
 
     Currently, only 8 TPU cores can be specified, supporting single TPU device workloads. Multi-TPU support is coming soon.
 
+#### Blocks
+
+For the introduction to the blocks concept, see the [`blocks`](#ssh-blocks) property in the SSH fleets section.
+
+This property works with the cloud fleets exactly the same. To split the instance into blocks, specify the `blocks` property
+at the top level.
+
+<div editor-title=".dstack.yml">
+
+```yaml
+type: fleet
+
+name: my-fleet
+
+resources:
+  gpu: NVIDIA:80GB:8
+
+# Split into 4 blocks, each with 2 GPUs
+blocks: 4
+```
+
+</div>
+
 #### Idle duration
 
 By default, fleet instances stay `idle` for 3 days and can be reused within that time.
@@ -274,6 +297,44 @@ However, it's possible to configure it explicitly via
 the [`network`](../reference/dstack.yml/fleet.md#network) property.
 
 [//]: # (TODO: Provide an example and more detail)
+
+#### Blocks { #ssh-blocks }
+
+By default, the job ocuppy the entire fleet instance, that is, the instance processes a maximum one job at a time.
+If the instance has multiple GPUs (or, in the case of CPU instances, CPUs), you can split it into multiple blocks.
+Each block acts as a virtual subinstance, and the job can span one or more blocks according to the requested `resources`.
+
+The `blocks` property specifies the number of blocks the instance’s resources will be split into.
+
+<div editor-title=".dstack.yml">
+
+    ```yaml
+    type: fleet
+    name: my-fleet
+
+    ssh_config:
+      user: ubuntu
+      identity_file: ~/.ssh/worker_node_key
+      hosts:
+        - hostname: 3.255.177.51
+          blocks: 4
+        - hostaname: 3.255.177.52
+          # As many as possible, according to numbers of GPUs and CPUs
+          blocks: auto
+        - hostaname: 3.255.177.53
+          # Do not split. This is the default value, may be omitted
+          blocks: 1
+    ```
+
+</div>
+
+The number of GPUs and CPUs must be divisible by the number of blocks. All resources (GPU, CPU, memory)
+are split into blocks proportionally except for disk storage, which is shared by all blocks.
+
+For example, if the instance have 8 GPUs, 128 CPUs, and 2048 GiB RAM and it is provisioned with `blocks: 8`,
+each block will have 1 GPU, 16 CPUs, and 256 GiB RAM.
+
+The special value `blocks: auto` means as many as possible. The default value is `blocks: 1`, i.e. do not split.
 
 #### Environment variables
 
