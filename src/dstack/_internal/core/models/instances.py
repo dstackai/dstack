@@ -92,6 +92,8 @@ class RemoteConnectionInfo(CoreModel):
     port: int
     ssh_user: str
     ssh_keys: List[SSHKey]
+    ssh_proxy: Optional[SSHConnectionParams] = None
+    ssh_proxy_keys: Optional[list[SSHKey]] = None
     env: Env = Env()
 
 
@@ -101,7 +103,6 @@ class InstanceConfiguration(CoreModel):
     user: str  # dstack user name
     ssh_keys: List[SSHKey]
     instance_id: Optional[str] = None
-    availability_zone: Optional[str] = None
     placement_group_name: Optional[str] = None
     reservation: Optional[str] = None
     volumes: Optional[List[Volume]] = None
@@ -140,6 +141,7 @@ class InstanceOffer(CoreModel):
 
 class InstanceOfferWithAvailability(InstanceOffer):
     availability: InstanceAvailability
+    availability_zones: Optional[List[str]] = None
     instance_runtime: InstanceRuntime = InstanceRuntime.SHIM
     blocks: int = 1
     total_blocks: int = 1

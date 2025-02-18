@@ -7,9 +7,113 @@ import dstack._internal.server.services.pools as services_pools
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import InstanceStatus, InstanceType, Resources
 from dstack._internal.core.models.pools import Instance
+from dstack._internal.core.models.profiles import Profile
 from dstack._internal.server.models import InstanceModel
-from dstack._internal.server.testing.common import create_project, create_user
+from dstack._internal.server.testing.common import (
+    create_instance,
+    create_pool,
+    create_project,
+    create_user,
+    get_volume,
+    get_volume_configuration,
+)
 from dstack._internal.utils.common import get_current_datetime
+
+
+class TestFilterPoolInstances:
+    # TODO: Refactor filter_pool_instances to not depend on InstanceModel and simplify tests
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_all_instances(self, test_db, session: AsyncSession):
+        user = await create_user(session=session)
+        project = await create_project(session=session, owner=user)
+        pool = await create_pool(session=session, project=project)
+        aws_instance = await create_instance(
+            session=session,
+            project=project,
+            pool=pool,
+            backend=BackendType.AWS,
+        )
+        runpod_instance = await create_instance(
+            session=session,
+            project=project,
+            pool=pool,
+            backend=BackendType.RUNPOD,
+        )
+        instances = [aws_instance, runpod_instance]
+        res = services_pools.filter_pool_instances(
+            pool_instances=instances,
+            profile=Profile(name="test"),
+        )
+        assert res == instances
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_multinode_instances(self, test_db, session: AsyncSession):
+        user = await create_user(session=session)
+        project = await create_project(session=session, owner=user)
+        pool = await create_pool(session=session, project=project)
+        aws_instance = await create_instance(
+            session=session,
+            project=project,
+            pool=pool,
+            backend=BackendType.AWS,
+        )
+        runpod_instance = await create_instance(
+            session=session,
+            project=project,
+            pool=pool,
+            backend=BackendType.RUNPOD,
+        )
+        instances = [aws_instance, runpod_instance]
+        res = services_pools.filter_pool_instances(
+            pool_instances=instances,
+            profile=Profile(name="test"),
+            multinode=True,
+        )
+        assert res == [aws_instance]
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_volume_instances(self, test_db, session: AsyncSession):
+        user = await create_user(session=session)
+        project = await create_project(session=session, owner=user)
+        pool = await create_pool(session=session, project=project)
+        aws_instance = await create_instance(
+            session=session,
+            project=project,
+            pool=pool,
+            backend=BackendType.AWS,
+        )
+        runpod_instance1 = await create_instance(
+            session=session,
+            project=project,
+            pool=pool,
+            backend=BackendType.RUNPOD,
+            region="eu",
+        )
+        runpod_instance2 = await create_instance(
+            session=session,
+            project=project,
+            pool=pool,
+            backend=BackendType.RUNPOD,
+            region="us",
+        )
+        instances = [aws_instance, runpod_instance1, runpod_instance2]
+        res = services_pools.filter_pool_instances(
+            pool_instances=instances,
+            profile=Profile(name="test"),
+            volumes=[
+                [
+                    get_volume(
+                        configuration=get_volume_configuration(
+                            backend=BackendType.RUNPOD, region="us"
+                        )
+                    )
+                ]
+            ],
+        )
+        assert res == [runpod_instance2]
 
 
 class TestGenerateInstanceName:

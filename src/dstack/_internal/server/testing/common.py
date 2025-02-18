@@ -55,7 +55,7 @@ from dstack._internal.core.models.runs import (
 from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.core.models.volumes import (
     Volume,
-    VolumeAttachmentData,
+    VolumeAttachment,
     VolumeConfiguration,
     VolumeProvisioningData,
     VolumeStatus,
@@ -76,6 +76,7 @@ from dstack._internal.server.models import (
     RepoModel,
     RunModel,
     UserModel,
+    VolumeAttachmentModel,
     VolumeModel,
 )
 from dstack._internal.server.services.jobs import get_job_specs_from_run_spec
@@ -542,6 +543,9 @@ async def create_instance(
 
     if volumes is None:
         volumes = []
+    volume_attachments = []
+    for volume in volumes:
+        volume_attachments.append(VolumeAttachmentModel(volume=volume))
 
     im = InstanceModel(
         id=instance_id,
@@ -566,7 +570,7 @@ async def create_instance(
         requirements=requirements.json(),
         instance_configuration=instance_configuration.json(),
         remote_connection_info=remote_connection_info.json() if remote_connection_info else None,
-        volumes=volumes,
+        volume_attachments=volume_attachments,
         total_blocks=total_blocks,
         busy_blocks=busy_blocks,
     )
@@ -587,6 +591,7 @@ def get_instance_offer_with_availability(
     spot: bool = False,
     blocks: int = 1,
     total_blocks: int = 1,
+    availability_zones: Optional[List[str]] = None,
 ):
     gpus = [Gpu(name="T4", memory_mib=16384, vendor=gpuhunt.AcceleratorVendor.NVIDIA)] * gpu_count
     return InstanceOfferWithAvailability(
@@ -605,6 +610,7 @@ def get_instance_offer_with_availability(
         region=region,
         price=1,
         availability=InstanceAvailability.AVAILABLE,
+        availability_zones=availability_zones,
         blocks=blocks,
         total_blocks=total_blocks,
     )
@@ -669,7 +675,7 @@ async def create_volume(
         volume_provisioning_data=volume_provisioning_data.json()
         if volume_provisioning_data
         else None,
-        instances=[],
+        attachments=[],
         deleted_at=deleted_at,
         deleted=True if deleted_at else False,
     )
@@ -691,16 +697,14 @@ def get_volume(
     deleted: bool = False,
     volume_id: Optional[str] = None,
     provisioning_data: Optional[VolumeProvisioningData] = None,
-    attachment_data: Optional[VolumeAttachmentData] = None,
-    device_name: Optional[str] = None,
+    attachments: Optional[List[VolumeAttachment]] = None,
 ) -> Volume:
     if id_ is None:
         id_ = uuid.uuid4()
     if configuration is None:
         configuration = get_volume_configuration()
-    if device_name is not None:
-        assert attachment_data is None, "attachment_data and device_name are mutually exclusive"
-        attachment_data = VolumeAttachmentData(device_name=device_name)
+    if attachments is None:
+        attachments = []
     return Volume(
         id=id_,
         name=name,
@@ -714,7 +718,7 @@ def get_volume(
         deleted=deleted,
         volume_id=volume_id,
         provisioning_data=provisioning_data,
-        attachment_data=attachment_data,
+        attachments=attachments,
     )
 
 

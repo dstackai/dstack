@@ -7,7 +7,7 @@ image: https://github.com/dstackai/static-assets/blob/main/static-assets/images/
 categories:
   - AMD
   - NVIDIA
-  - Observability
+  - Monitoring
 ---
 
 # Monitoring GPU usage and other container metrics

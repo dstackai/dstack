@@ -32,6 +32,7 @@ class Instance(CoreModel):
     termination_reason: Optional[str] = None
     created: datetime.datetime
     region: Optional[str] = None
+    availability_zone: Optional[str] = None
     price: Optional[float] = None
     total_blocks: Optional[int] = None
     busy_blocks: int = 0

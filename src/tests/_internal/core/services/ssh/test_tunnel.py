@@ -32,7 +32,9 @@ class TestSSHTunnel:
             options={"Opt1": "opt1"},
             ssh_config_path="/home/user/.ssh/config",
             port=10022,
-            ssh_proxy=SSHConnectionParams(hostname="proxy", username="test", port=10022),
+            ssh_proxies=[
+                (SSHConnectionParams(hostname="proxy", username="test", port=10022), None)
+            ],
             forwarded_sockets=[SocketPair(UnixSocket("/1"), UnixSocket("/2"))],
             reverse_forwarded_sockets=[SocketPair(UnixSocket("/1"), UnixSocket("/2"))],
         )
@@ -105,13 +107,18 @@ class TestSSHTunnel:
         )
 
     @pytest.mark.usefixtures("ssh_client_info")
-    def test_open_command_with_proxy(self) -> None:
+    def test_open_command_with_one_proxy(self) -> None:
         tunnel = SSHTunnel(
             destination="ubuntu@my-server",
             identity=FilePath("/home/user/.ssh/id_rsa"),
             control_sock_path="/tmp/control.sock",
             options={},
-            ssh_proxy=SSHConnectionParams(hostname="proxy", username="test", port=10022),
+            ssh_proxies=[
+                (
+                    SSHConnectionParams(hostname="proxy", username="test", port=10022),
+                    FilePath("/home/user/.ssh/proxy"),
+                )
+            ],
         )
         assert tunnel.open_command() == [
             "/usr/bin/ssh",
@@ -130,8 +137,53 @@ class TestSSHTunnel:
             "-o",
             (
                 "ProxyCommand="
-                "/usr/bin/ssh -i /home/user/.ssh/id_rsa -W %h:%p -o StrictHostKeyChecking=no"
+                "/usr/bin/ssh -i /home/user/.ssh/proxy -W %h:%p -o StrictHostKeyChecking=no"
                 " -o UserKnownHostsFile=/dev/null -p 10022 test@proxy"
+            ),
+            "ubuntu@my-server",
+        ]
+
+    @pytest.mark.usefixtures("ssh_client_info")
+    def test_open_command_with_two_proxies(self) -> None:
+        tunnel = SSHTunnel(
+            destination="ubuntu@my-server",
+            identity=FilePath("/home/user/.ssh/id_rsa"),
+            control_sock_path="/tmp/control.sock",
+            options={},
+            ssh_proxies=[
+                (
+                    SSHConnectionParams(hostname="proxy1", username="test1", port=10022),
+                    None,
+                ),
+                (
+                    SSHConnectionParams(hostname="proxy2", username="test2", port=20022),
+                    FilePath("/home/user/.ssh/proxy2"),
+                ),
+            ],
+        )
+        assert tunnel.open_command() == [
+            "/usr/bin/ssh",
+            "-F",
+            "none",
+            "-i",
+            "/home/user/.ssh/id_rsa",
+            "-E",
+            f"{tunnel.temp_dir.name}/tunnel.log",
+            "-N",
+            "-f",
+            "-o",
+            "ControlMaster=auto",
+            "-S",
+            "/tmp/control.sock",
+            "-o",
+            (
+                "ProxyCommand="
+                "/usr/bin/ssh -i /home/user/.ssh/proxy2 -W %h:%p -o StrictHostKeyChecking=no"
+                " -o UserKnownHostsFile=/dev/null"
+                " -o 'ProxyCommand=/usr/bin/ssh -i /home/user/.ssh/id_rsa -W %%h:%%p"
+                " -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+                " -p 10022 test1@proxy1'"
+                " -p 20022 test2@proxy2"
             ),
             "ubuntu@my-server",
         ]

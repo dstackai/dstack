@@ -18,6 +18,7 @@ from dstack._internal.core.models.gateways import GatewayStatus
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceOfferWithAvailability,
+    InstanceStatus,
     InstanceType,
     Resources,
 )
@@ -47,7 +48,9 @@ from dstack._internal.server.testing.common import (
     create_backend,
     create_gateway,
     create_gateway_compute,
+    create_instance,
     create_job,
+    create_pool,
     create_project,
     create_repo,
     create_run,
@@ -85,6 +88,7 @@ def get_dev_env_run_plan_dict(
                 "working_dir": None,
                 "home_dir": "/root",
                 "ide": "vscode",
+                "inactivity_duration": None,
                 "version": None,
                 "image": None,
                 "user": None,
@@ -107,6 +111,7 @@ def get_dev_env_run_plan_dict(
                 "volumes": [json.loads(v.json()) for v in volumes],
                 "backends": ["local", "aws", "azure", "gcp", "lambda", "runpod"],
                 "regions": ["us"],
+                "availability_zones": None,
                 "instance_types": None,
                 "creation_policy": None,
                 "instance_name": None,
@@ -127,6 +132,7 @@ def get_dev_env_run_plan_dict(
             "profile": {
                 "backends": ["local", "aws", "azure", "gcp", "lambda", "runpod"],
                 "regions": ["us"],
+                "availability_zones": None,
                 "instance_types": None,
                 "creation_policy": None,
                 "default": False,
@@ -239,6 +245,7 @@ def get_dev_env_run_dict(
                 "home_dir": "/root",
                 "working_dir": None,
                 "ide": "vscode",
+                "inactivity_duration": None,
                 "version": None,
                 "image": None,
                 "user": None,
@@ -261,6 +268,7 @@ def get_dev_env_run_dict(
                 "volumes": [],
                 "backends": ["local", "aws", "azure", "gcp", "lambda"],
                 "regions": ["us"],
+                "availability_zones": None,
                 "instance_types": None,
                 "creation_policy": None,
                 "instance_name": None,
@@ -281,6 +289,7 @@ def get_dev_env_run_dict(
             "profile": {
                 "backends": ["local", "aws", "azure", "gcp", "lambda"],
                 "regions": ["us"],
+                "availability_zones": None,
                 "instance_types": None,
                 "creation_policy": None,
                 "default": False,
@@ -363,6 +372,7 @@ def get_dev_env_run_dict(
                         "submitted_at": submitted_at,
                         "last_processed_at": last_processed_at,
                         "finished_at": finished_at,
+                        "inactivity_secs": None,
                         "status": "submitted",
                         "termination_reason": None,
                         "termination_reason_message": None,
@@ -377,6 +387,7 @@ def get_dev_env_run_dict(
             "submission_num": 0,
             "submitted_at": submitted_at,
             "last_processed_at": last_processed_at,
+            "inactivity_secs": None,
             "finished_at": finished_at,
             "status": "submitted",
             "termination_reason": None,
@@ -489,6 +500,7 @@ class TestListRuns:
                                 "submitted_at": run1_submitted_at.isoformat(),
                                 "last_processed_at": run1_submitted_at.isoformat(),
                                 "finished_at": None,
+                                "inactivity_secs": None,
                                 "status": "submitted",
                                 "termination_reason": None,
                                 "termination_reason_message": None,
@@ -504,6 +516,7 @@ class TestListRuns:
                     "submitted_at": run1_submitted_at.isoformat(),
                     "last_processed_at": run1_submitted_at.isoformat(),
                     "finished_at": None,
+                    "inactivity_secs": None,
                     "status": "submitted",
                     "termination_reason_message": None,
                     "termination_reason": None,
@@ -1305,11 +1318,20 @@ class TestStopRuns:
             user=user,
             status=RunStatus.RUNNING,
         )
+        pool = await create_pool(session=session, project=project)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            pool=pool,
+            status=InstanceStatus.BUSY,
+        )
         job = await create_job(
             session=session,
             run=run,
             job_provisioning_data=get_job_provisioning_data(),
             status=JobStatus.RUNNING,
+            instance=instance,
+            instance_assigned=True,
         )
         with patch("dstack._internal.server.services.jobs._stop_runner") as stop_runner:
             response = await client.post(
@@ -1535,6 +1557,7 @@ class TestCreateInstance:
                 "created": result["created"],
                 "pool_name": None,
                 "region": None,
+                "availability_zone": None,
                 "price": None,
                 "total_blocks": 1,
                 "busy_blocks": 0,

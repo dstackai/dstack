@@ -3,7 +3,7 @@
 A task allows you to run arbitrary commands on one or more nodes.
 They are best suited for jobs like training or batch processing.
 
-## Define a configuration
+## Apply a configuration
 
 First, define a task configuration as a YAML file in your project folder.
 The filename must end with `.dstack.yml` (e.g. `.dstack.yml` or `dev.dstack.yml` are both acceptable).
@@ -37,6 +37,37 @@ resources:
 ```
 
 </div>
+
+To run a task, pass the configuration to [`dstack apply`](../reference/cli/dstack/apply.md):
+
+<div class="termy">
+
+```shell
+$ HF_TOKEN=...
+$ WANDB_API_KEY=...
+$ dstack apply -f examples/.dstack.yml
+
+ #  BACKEND  REGION    RESOURCES                    SPOT  PRICE
+ 1  runpod   CA-MTL-1  18xCPU, 100GB, A5000:24GB:2  yes   $0.22
+ 2  runpod   EU-SE-1   18xCPU, 100GB, A5000:24GB:2  yes   $0.22
+ 3  gcp      us-west4  27xCPU, 150GB, A5000:24GB:3  yes   $0.33
+
+Submit the run axolotl-train? [y/n]: y
+
+Launching `axolotl-train`...
+---> 100%
+
+{'loss': 1.4967, 'grad_norm': 1.2734375, 'learning_rate': 1.0000000000000002e-06, 'epoch': 0.0}
+  0% 1/24680 [00:13<95:34:17, 13.94s/it]
+  6% 73/1300 [00:48<13:57,  1.47it/s]
+```
+
+</div>
+
+`dstack apply` automatically provisions instances, uploads the contents of the repo (incl. your local uncommitted changes),
+and runs the commands.
+
+## Configuration options
 
 ### Ports
 
@@ -344,37 +375,6 @@ via the [`spot_policy`](../reference/dstack.yml/task.md#spot_policy) property. I
     [`max_price`](../reference/dstack.yml/task.md#max_price), and
     [`max_duration`](../reference/dstack.yml/task.md#max_duration), 
     among [others](../reference/dstack.yml/task.md).
-
-## Run a configuration
-
-To run a task, pass the configuration to [`dstack apply`](../reference/cli/dstack/apply.md):
-
-<div class="termy">
-
-```shell
-$ HF_TOKEN=...
-$ WANDB_API_KEY=...
-$ dstack apply -f examples/.dstack.yml
-
- #  BACKEND  REGION    RESOURCES                    SPOT  PRICE
- 1  runpod   CA-MTL-1  18xCPU, 100GB, A5000:24GB:2  yes   $0.22
- 2  runpod   EU-SE-1   18xCPU, 100GB, A5000:24GB:2  yes   $0.22
- 3  gcp      us-west4  27xCPU, 150GB, A5000:24GB:3  yes   $0.33
-
-Submit the run axolotl-train? [y/n]: y
-
-Launching `axolotl-train`...
----> 100%
-
-{'loss': 1.4967, 'grad_norm': 1.2734375, 'learning_rate': 1.0000000000000002e-06, 'epoch': 0.0}
-  0% 1/24680 [00:13<95:34:17, 13.94s/it]
-  6% 73/1300 [00:48<13:57,  1.47it/s]
-```
-
-</div>
-
-`dstack apply` automatically provisions instances, uploads the contents of the repo (incl. your local uncommitted changes),
-and runs the commands.
 
 ### Retry policy
 

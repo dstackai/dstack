@@ -4,6 +4,7 @@ import time
 from rich.live import Live
 
 from dstack._internal.cli.commands import APIBaseCommand
+from dstack._internal.cli.services.completion import GatewayNameCompleter
 from dstack._internal.cli.utils.common import (
     LIVE_TABLE_PROVISION_INTERVAL_SECS,
     LIVE_TABLE_REFRESH_RATE_PER_SEC,
@@ -59,7 +60,9 @@ class GatewayCommand(APIBaseCommand):
             "delete", help="Delete a gateway", formatter_class=self._parser.formatter_class
         )
         delete_parser.set_defaults(subfunc=self._delete)
-        delete_parser.add_argument("name", help="The name of the gateway")
+        delete_parser.add_argument(
+            "name", help="The name of the gateway"
+        ).completer = GatewayNameCompleter()
         delete_parser.add_argument(
             "-y", "--yes", action="store_true", help="Don't ask for confirmation"
         )
@@ -68,7 +71,9 @@ class GatewayCommand(APIBaseCommand):
             "update", help="Update a gateway", formatter_class=self._parser.formatter_class
         )
         update_parser.set_defaults(subfunc=self._update)
-        update_parser.add_argument("name", help="The name of the gateway")
+        update_parser.add_argument(
+            "name", help="The name of the gateway"
+        ).completer = GatewayNameCompleter()
         update_parser.add_argument(
             "--set-default", action="store_true", help="Set it the default gateway for the project"
         )

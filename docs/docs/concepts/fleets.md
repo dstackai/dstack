@@ -15,7 +15,7 @@ from an existing fleet. If none match the requirements, `dstack` creates a new c
 
 For greater control over cloud fleet provisioning, create fleets explicitly using configuration files. 
 
-### Define a configuration
+### Apply a configuration
 
 Define a fleet configuration as a YAML file in your project directory. The file must have a
 `.dstack.yml` extension (e.g. `.dstack.yml` or `fleet.dstack.yml`).
@@ -38,6 +38,27 @@ Define a fleet configuration as a YAML file in your project directory. The file 
     
 </div>
 
+To create or update the fleet, pass the fleet configuration to [`dstack apply`](../reference/cli/dstack/apply.md):
+
+<div class="termy">
+
+```shell
+$ dstack apply -f examples/misc/fleets/.dstack.yml
+
+Provisioning...
+---> 100%
+
+ FLEET     INSTANCE  BACKEND              GPU             PRICE    STATUS  CREATED 
+ my-fleet  0         gcp (europe-west-1)  L4:24GB (spot)  $0.1624  idle    3 mins ago      
+           1         gcp (europe-west-1)  L4:24GB (spot)  $0.1624  idle    3 mins ago    
+```
+
+</div>
+
+Once the status of instances changes to `idle`, they can be used by dev environments, tasks, and services.
+
+### Configuration options
+
 #### Placement { #cloud-placement }
 
 To ensure instances are interconnected (e.g., for
@@ -47,8 +68,8 @@ This ensures all instances are provisioned in the same backend and region with o
 ??? info "AWS"
     `dstack` automatically enables the Elastic Fabric Adapter for all
     [EFA-capable instance types :material-arrow-top-right-thin:{ .external }](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/efa.html#efa-instance-types){:target="_blank"}.
-    Currently, only one EFA interface is enabled per instance, regardless of its maximum capacity.
-    This will change once [this issue :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/1804){:target="_blank"} is resolved.
+    If the `aws` backend config has `public_ips: false` set, `dstack` enables the maximum number of interfaces supported by the instance.
+    Otherwise, if instances have public IPs, only one EFA interface is enabled per instance due to AWS limitations.
 
 > The `cluster` placement is supported only for `aws`, `azure`, `gcp`, `oci`, and `vultr`
 > backends.
@@ -99,6 +120,27 @@ and their quantity. Examples: `nvidia` (one NVIDIA GPU), `A100` (one A100), `A10
     ```
 
     Currently, only 8 TPU cores can be specified, supporting single TPU device workloads. Multi-TPU support is coming soon.
+
+#### Blocks { #cloud-blocks }
+
+For cloud fleets, `blocks` function the same way as in SSH fleets. 
+See the [`Blocks`](#ssh-blocks) section under SSH fleets for details on the blocks concept.
+
+<div editor-title=".dstack.yml">
+
+```yaml
+type: fleet
+
+name: my-fleet
+
+resources:
+  gpu: NVIDIA:80GB:8
+
+# Split into 4 blocks, each with 2 GPUs
+blocks: 4
+```
+
+</div>
 
 #### Idle duration
 
@@ -169,39 +211,11 @@ retry:
     [`max_price`](../reference/dstack.yml/fleet.md#max_price), and
     among [others](../reference/dstack.yml/fleet.md).
 
-### Create or update a fleet
-
-To create or update the fleet, pass the fleet configuration to [`dstack apply`](../reference/cli/dstack/apply.md):
-
-<div class="termy">
-
-```shell
-$ dstack apply -f examples/misc/fleets/.dstack.yml
-```
-
-</div>
-
-To ensure the fleet is created, you can use the `dstack fleet` command:
-
-<div class="termy">
-
-```shell
-$ dstack fleet
-
- FLEET     INSTANCE  BACKEND              GPU             PRICE    STATUS  CREATED 
- my-fleet  0         gcp (europe-west-1)  L4:24GB (spot)  $0.1624  idle    3 mins ago      
-           1         gcp (europe-west-1)  L4:24GB (spot)  $0.1624  idle    3 mins ago    
-```
-
-</div>
-
-Once the status of instances changes to `idle`, they can be used by dev environments, tasks, and services.
-
 ## SSH fleets { #ssh }
 
 If you have a group of on-prem servers accessible via SSH, you can create an SSH fleet.
 
-### Define a configuration
+### Apply a configuration
 
 Define a fleet configuration as a YAML file in your project directory. The file must have a
 `.dstack.yml` extension (e.g. `.dstack.yml` or `fleet.dstack.yml`).
@@ -245,6 +259,30 @@ Define a fleet configuration as a YAML file in your project directory. The file 
 
     3.&nbsp;The user specified should have passwordless `sudo` access.
 
+To create or update the fleet, pass the fleet configuration to [`dstack apply`](../reference/cli/dstack/apply.md):
+
+<div class="termy">
+
+```shell
+$ dstack apply -f examples/misc/fleets/.dstack.yml
+
+Provisioning...
+---> 100%
+
+ FLEET     INSTANCE  GPU             PRICE  STATUS  CREATED 
+ my-fleet  0         L4:24GB (spot)  $0     idle    3 mins ago      
+           1         L4:24GB (spot)  $0     idle    3 mins ago    
+```
+
+</div>
+
+When you apply, `dstack` connects to the specified hosts using the provided SSH credentials, 
+installs the dependencies, and configures these hosts as a fleet.
+
+Once the status of instances changes to `idle`, they can be used by dev environments, tasks, and services.
+
+### Configuration options
+
 #### Placement { #ssh-placement }
 
 If the hosts are interconnected (i.e. share the same network), set `placement` to `cluster`. 
@@ -257,6 +295,43 @@ However, it's possible to configure it explicitly via
 the [`network`](../reference/dstack.yml/fleet.md#network) property.
 
 [//]: # (TODO: Provide an example and more detail)
+
+#### Blocks { #ssh-blocks }
+
+By default, a single job occupies the entire instance, so if the instance has 8 GPUs, the job will use all of them.
+
+To make it more efficient, you can set the blocks property to specify how many blocks you’d like the instance to be
+divided into, allowing multiple jobs to use these blocks concurrently.
+
+<div editor-title=".dstack.yml">
+
+    ```yaml
+    type: fleet
+    name: my-fleet
+
+    ssh_config:
+      user: ubuntu
+      identity_file: ~/.ssh/id_rsa
+      hosts:
+        - hostname: 3.255.177.51
+          blocks: 4
+        - hostaname: 3.255.177.52
+          # As many as possible, according to numbers of GPUs and CPUs
+          blocks: auto
+        - hostaname: 3.255.177.53
+          # Do not sclice. This is the default value, may be omitted
+          blocks: 1
+    ```
+
+</div>
+
+For instance, with 8 GPUs, 128 CPUs, and 2TB of memory, setting blocks to 8 would assign 1 GPU, 16 CPUs, and 256 GB of
+memory to each block. These blocks can be used concurrently, and a single job can occupy multiple blocks if needed.
+
+> GPUs and CPUs must be divisible by the number of blocks. All resources (GPU, CPU, memory) are split proportionally,
+> except disk storage, which is shared.
+
+You can also set `blocks` to `auto`, which automatically sets the number of blocks to match the number of GPUs.
 
 #### Environment variables
 
@@ -283,39 +358,47 @@ ssh_config:
     - 3.255.177.52
 ```
 
+#### Proxy jump
+
+If fleet hosts are behind a head node (aka "login node"), configure [`proxy_jump`](../reference/dstack.yml/fleet.md#proxy_jump):
+
+<div editor-title="examples/misc/fleets/.dstack.yml">
+
+    ```yaml
+    type: fleet
+    name: my-fleet
+
+    ssh_config:
+      user: ubuntu
+      identity_file: ~/.ssh/worker_node_key
+      hosts:
+        - 3.255.177.51
+        - 3.255.177.52
+      proxy_jump:
+        hostname: 3.255.177.50
+        user: ubuntu
+        identity_file: ~/.ssh/head_node_key
+    ```
+
+</div>
+
+To be able to attach to runs, both explicitly with `dstack attach` and implicitly with `dstack apply`, you must either
+add a front node key (`~/.ssh/head_node_key`) to an SSH agent or configure a key path in `~/.ssh/config`:
+
+<div editor-title="~/.ssh/config">
+
+    ```
+    Host 3.255.177.50
+        IdentityFile ~/.ssh/head_node_key
+    ```
+
+</div>
+
+where `Host` must match `ssh_config.proxy_jump.hostname` or `ssh_config.hosts[n].proxy_jump.hostname` if you configure head nodes
+on a per-worker basis.
+
 !!! info "Reference"
     For all SSH fleet configuration options, refer to the [reference](../reference/dstack.yml/fleet.md).
-
-### Create or update a fleet
-
-To create or update the fleet, pass the fleet configuration to [`dstack apply`](../reference/cli/dstack/apply.md):
-
-<div class="termy">
-
-```shell
-$ dstack apply -f examples/misc/fleets/.dstack.yml
-```
-
-</div>
-
-To ensure the fleet is created, you can use the `dstack fleet` command:
-
-<div class="termy">
-
-```shell
-$ dstack fleet
-
- FLEET     INSTANCE  GPU             PRICE  STATUS  CREATED 
- my-fleet  0         L4:24GB (spot)  $0     idle    3 mins ago      
-           1         L4:24GB (spot)  $0     idle    3 mins ago    
-```
-
-</div>
-
-When you apply this configuration, `dstack` will connect to the specified hosts using the provided SSH credentials, 
-install the dependencies, and configure these servers as a fleet.
-
-Once the status of instances changes to `idle`, they can be used by dev environments, tasks, and services.
 
 #### Troubleshooting
 

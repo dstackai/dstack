@@ -13,7 +13,7 @@ from dstack._internal.core.models.volumes import VolumeStatus
 from dstack._internal.server.background.tasks.process_terminating_jobs import (
     process_terminating_jobs,
 )
-from dstack._internal.server.models import InstanceModel, JobModel
+from dstack._internal.server.models import InstanceModel, JobModel, VolumeAttachmentModel
 from dstack._internal.server.services.volumes import volume_model_to_volume
 from dstack._internal.server.testing.common import (
     create_instance,
@@ -176,7 +176,7 @@ class TestProcessTerminatingJobs:
         # so that stuck volumes don't prevent the instance from terminating.
         assert job.instance is None
         assert job.volumes_detached_at is not None
-        assert len(instance.volumes) == 1
+        assert len(instance.volume_attachments) == 1
 
         # Force detach called
         with (
@@ -214,11 +214,11 @@ class TestProcessTerminatingJobs:
         res = await session.execute(select(JobModel).options(joinedload(JobModel.instance)))
         job = res.unique().scalar_one()
         res = await session.execute(
-            select(InstanceModel).options(joinedload(InstanceModel.volumes))
+            select(InstanceModel).options(joinedload(InstanceModel.volume_attachments))
         )
         instance = res.unique().scalar_one()
         assert job.status == JobStatus.TERMINATED
-        assert len(instance.volumes) == 0
+        assert len(instance.volume_attachments) == 0
 
     async def test_terminates_job_on_shared_instance(self, session: AsyncSession):
         project = await create_project(session)
@@ -330,7 +330,12 @@ class TestProcessTerminatingJobs:
         await session.refresh(instance)
         assert job.status == JobStatus.TERMINATED
         res = await session.execute(
-            select(InstanceModel).options(joinedload(InstanceModel.volumes))
+            select(InstanceModel).options(
+                joinedload(InstanceModel.volume_attachments).joinedload(
+                    VolumeAttachmentModel.volume
+                )
+            )
         )
         instance = res.unique().scalar_one()
-        assert instance.volumes == [volume_2]
+        assert len(instance.volume_attachments) == 1
+        assert instance.volume_attachments[0].volume == volume_2

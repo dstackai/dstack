@@ -7,6 +7,7 @@ from uuid import UUID
 import requests
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
 
 import dstack._internal.server.services.backends as backends_services
 from dstack._internal.core.backends.base import Backend
@@ -20,7 +21,7 @@ from dstack._internal.core.errors import (
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import is_core_model_instance
 from dstack._internal.core.models.configurations import RunConfigurationType
-from dstack._internal.core.models.instances import InstanceStatus, RemoteConnectionInfo
+from dstack._internal.core.models.instances import InstanceStatus
 from dstack._internal.core.models.runs import (
     Job,
     JobProvisioningData,
@@ -49,6 +50,7 @@ from dstack._internal.server.services.jobs.configurators.dev import DevEnvironme
 from dstack._internal.server.services.jobs.configurators.service import ServiceJobConfigurator
 from dstack._internal.server.services.jobs.configurators.task import TaskJobConfigurator
 from dstack._internal.server.services.logging import fmt
+from dstack._internal.server.services.pools import get_instance_ssh_private_keys
 from dstack._internal.server.services.runner import client
 from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
 from dstack._internal.server.services.volumes import (
@@ -129,6 +131,7 @@ def job_model_to_job_submission(job_model: JobModel) -> JobSubmission:
         submitted_at=job_model.submitted_at.replace(tzinfo=timezone.utc),
         last_processed_at=last_processed_at,
         finished_at=finished_at,
+        inactivity_secs=job_model.inactivity_secs,
         status=job_model.status,
         termination_reason=job_model.termination_reason,
         termination_reason_message=job_model.termination_reason_message,
@@ -169,29 +172,22 @@ _configuration_type_to_configurator_class_map = {c.TYPE: c for c in _job_configu
 
 
 async def stop_runner(session: AsyncSession, job_model: JobModel):
-    project = await session.get(ProjectModel, job_model.project_id)
-    ssh_private_key = project.ssh_private_key
-
     res = await session.execute(
-        select(InstanceModel).where(
+        select(InstanceModel)
+        .where(
             InstanceModel.project_id == job_model.project_id,
             InstanceModel.id == job_model.instance_id,
         )
+        .options(joinedload(InstanceModel.project))
     )
     instance: Optional[InstanceModel] = res.scalar()
 
-    # TODO: Drop this logic and always use project key once it's safe to assume that most on-prem
-    # fleets are (re)created after this change: https://github.com/dstackai/dstack/pull/1716
-    if instance and instance.remote_connection_info is not None:
-        remote_conn_info: RemoteConnectionInfo = RemoteConnectionInfo.__response__.parse_raw(
-            instance.remote_connection_info
-        )
-        ssh_private_key = remote_conn_info.ssh_keys[0].private
+    ssh_private_keys = get_instance_ssh_private_keys(common.get_or_error(instance))
     try:
         jpd = get_job_provisioning_data(job_model)
         if jpd is not None:
             jrd = get_job_runtime_data(job_model)
-            await run_async(_stop_runner, ssh_private_key, jpd, jrd, job_model)
+            await run_async(_stop_runner, ssh_private_keys, jpd, jrd, job_model)
     except SSHError:
         logger.debug("%s: failed to stop runner", fmt(job_model))
 
@@ -238,23 +234,15 @@ async def process_terminating_job(
     jpd = get_job_provisioning_data(job_model)
     if jpd is not None:
         logger.debug("%s: stopping container", fmt(job_model))
-        ssh_private_key = instance_model.project.ssh_private_key
-        # TODO: Drop this logic and always use project key once it's safe to assume that
-        # most on-prem fleets are (re)created after this change:
-        # https://github.com/dstackai/dstack/pull/1716
-        if instance_model and instance_model.remote_connection_info is not None:
-            remote_conn_info: RemoteConnectionInfo = RemoteConnectionInfo.__response__.parse_raw(
-                instance_model.remote_connection_info
-            )
-            ssh_private_key = remote_conn_info.ssh_keys[0].private
-        await stop_container(job_model, jpd, ssh_private_key)
+        ssh_private_keys = get_instance_ssh_private_keys(instance_model)
+        await stop_container(job_model, jpd, ssh_private_keys)
         volume_models: list[VolumeModel]
         if jrd is not None and jrd.volume_names is not None:
             volume_models = await list_project_volume_models(
                 session=session, project=instance_model.project, names=jrd.volume_names
             )
         else:
-            volume_models = instance_model.volumes
+            volume_models = [va.volume for va in instance_model.volume_attachments]
         if len(volume_models) > 0:
             logger.info("Detaching volumes: %s", [v.name for v in volume_models])
             all_volumes_detached = await _detach_volumes_from_job_instance(
@@ -318,7 +306,7 @@ async def process_volumes_detaching(
             session=session, project=instance_model.project, names=jrd.volume_names
         )
     else:
-        volume_models = instance_model.volumes
+        volume_models = [va.volume for va in instance_model.volume_attachments]
     logger.info("Detaching volumes: %s", [v.name for v in volume_models])
     all_volumes_detached = await _detach_volumes_from_job_instance(
         project=instance_model.project,
@@ -350,14 +338,16 @@ def _set_job_termination_status(job_model: JobModel):
 
 
 async def stop_container(
-    job_model: JobModel, job_provisioning_data: JobProvisioningData, ssh_private_key: str
+    job_model: JobModel,
+    job_provisioning_data: JobProvisioningData,
+    ssh_private_keys: tuple[str, Optional[str]],
 ):
     if job_provisioning_data.dockerized:
         # send a request to the shim to terminate the docker container
         # SSHError and RequestException are caught in the `runner_ssh_tunner` decorator
         await run_async(
             _shim_submit_stop,
-            ssh_private_key,
+            ssh_private_keys,
             job_provisioning_data,
             None,
             job_model,
@@ -449,8 +439,8 @@ async def _detach_volumes_from_job_instance(
     if job_model.volumes_detached_at is None:
         job_model.volumes_detached_at = common.get_current_datetime()
     detached_volumes_ids = {v.id for v in detached_volumes}
-    instance_model.volumes = [
-        v for v in instance_model.volumes if v.id not in detached_volumes_ids
+    instance_model.volume_attachments = [
+        va for va in instance_model.volume_attachments if va.volume_id not in detached_volumes_ids
     ]
     return all_detached
 

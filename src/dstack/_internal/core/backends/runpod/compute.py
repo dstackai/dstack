@@ -113,6 +113,7 @@ class RunpodCompute(Compute):
             bid_per_gpu=bid_per_gpu,
             network_volume_id=network_volume_id,
             volume_mount_path=volume_mount_path,
+            env={"RUNPOD_POD_USER": "0"},
         )
 
         instance_id = resp["id"]

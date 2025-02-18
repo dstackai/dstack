@@ -48,6 +48,24 @@ def register_replica_payload(job_id: str = "xxx-xxx") -> dict:
         "ssh_host": "host.test",
         "ssh_port": 22,
         "ssh_proxy": None,
+        "ssh_head_proxy": None,
+        "ssh_head_proxy_private_key": None,
+    }
+
+
+def register_replica_payload_with_head_proxy(job_id: str = "xxx-xxx") -> dict:
+    return {
+        "job_id": job_id,
+        "app_port": 8888,
+        "ssh_host": "host.test",
+        "ssh_port": 22,
+        "ssh_proxy": None,
+        "ssh_head_proxy": {
+            "hostname": "proxy.test",
+            "username": "debian",
+            "port": 222,
+        },
+        "ssh_head_proxy_private_key": "private-key",
     }
 
 
@@ -190,13 +208,18 @@ class TestRegisterReplica:
         conf = (tmp_path / "443-test-run.gtw.test.conf").read_text()
         assert "upstream test-run" not in conf
         # register 2 replicas
-        for job_id in ("xxx-xxx", "yyy-yyy"):
-            resp = await client.post(
-                "/api/registry/test-proj/services/test-run/replicas/register",
-                json=register_replica_payload(job_id=job_id),
-            )
-            assert resp.status_code == 200
-            assert resp.json() == {"status": "ok"}
+        resp = await client.post(
+            "/api/registry/test-proj/services/test-run/replicas/register",
+            json=register_replica_payload(job_id="xxx-xxx"),
+        )
+        assert resp.status_code == 200
+        assert resp.json() == {"status": "ok"}
+        resp = await client.post(
+            "/api/registry/test-proj/services/test-run/replicas/register",
+            json=register_replica_payload_with_head_proxy(job_id="yyy-yyy"),
+        )
+        assert resp.status_code == 200
+        assert resp.json() == {"status": "ok"}
         conf = (tmp_path / "443-test-run.gtw.test.conf").read_text()
         assert "upstream test-run" in conf
         assert (m1 := re.search(r"server unix:/(.+)/replica.sock;  # replica xxx-xxx", conf))

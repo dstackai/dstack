@@ -4,6 +4,7 @@ import time
 from rich.live import Live
 
 from dstack._internal.cli.commands import APIBaseCommand
+from dstack._internal.cli.services.completion import VolumeNameCompleter
 from dstack._internal.cli.utils.common import (
     LIVE_TABLE_PROVISION_INTERVAL_SECS,
     LIVE_TABLE_REFRESH_RATE_PER_SEC,
@@ -47,7 +48,7 @@ class VolumeCommand(APIBaseCommand):
         delete_parser.add_argument(
             "name",
             help="The name of the volume",
-        )
+        ).completer = VolumeNameCompleter()
         delete_parser.add_argument(
             "-y", "--yes", help="Don't ask for confirmation", action="store_true"
         )

@@ -31,21 +31,6 @@ supported_accelerators = [
 ]
 
 
-def get_availability_zone(
-    regions_client: compute_v1.RegionsClient,
-    project_id: str,
-    region: str,
-) -> Optional[str]:
-    zones = get_availability_zones(
-        regions_client=regions_client,
-        project_id=project_id,
-        region=region,
-    )
-    if len(zones) == 0:
-        return None
-    return zones[0]
-
-
 def get_availability_zones(
     regions_client: compute_v1.RegionsClient,
     project_id: str,
@@ -79,7 +64,7 @@ def check_vpc(
                 region=region,
             )
     except google.api_core.exceptions.NotFound:
-        raise ComputeError(f"Failed to find Shared VPC project {vpc_project_id}")
+        raise ComputeError(f"Failed to find VPC project {vpc_project_id}")
 
     if allocate_public_ip:
         return

@@ -25,9 +25,9 @@ for AI workloads both in the cloud and on-prem, speeding up the development, tra
 
 ## Major news ✨
 
+- [2025/02] [dstack 0.18.41: GPU blocks, Proxy jump, inactivity duration, and more](https://github.com/dstackai/dstack/releases/tag/0.18.41)
 - [2025/01] [dstack 0.18.38: Intel Gaudi](https://github.com/dstackai/dstack/releases/tag/0.18.38)
 - [2025/01] [dstack 0.18.35: Vultr](https://github.com/dstackai/dstack/releases/tag/0.18.35)
-- [2024/12] [dstack 0.18.32: TPU v6e](https://github.com/dstackai/dstack/releases/tag/0.18.32)
 - [2024/12] [dstack 0.18.30: AWS Capacity Reservations and Capacity Blocks](https://github.com/dstackai/dstack/releases/tag/0.18.30)
 - [2024/10] [dstack 0.18.21: Instance volumes](https://github.com/dstackai/dstack/releases/tag/0.18.21)
 - [2024/10] [dstack 0.18.18: Hardware metrics monitoring](https://github.com/dstackai/dstack/releases/tag/0.18.18)

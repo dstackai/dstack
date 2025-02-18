@@ -17,22 +17,36 @@ from dstack._internal.utils.path import FileContent
 logger = get_logger(__name__)
 P = ParamSpec("P")
 R = TypeVar("R")
+# A host private key or pair of (host private key, optional proxy jump private key)
+PrivateKeyOrPair = Union[str, tuple[str, Optional[str]]]
 
 
 def runner_ssh_tunnel(
     ports: List[int], retries: int = 3, retry_interval: float = 1
 ) -> Callable[
     [Callable[Concatenate[Dict[int, int], P], R]],
-    Callable[Concatenate[str, JobProvisioningData, Optional[JobRuntimeData], P], Union[bool, R]],
+    Callable[
+        Concatenate[PrivateKeyOrPair, JobProvisioningData, Optional[JobRuntimeData], P],
+        Union[bool, R],
+    ],
 ]:
+    """
+    A decorator that opens an SSH tunnel to the runner.
+
+    NOTE: connections from dstack-server to running jobs are expected to be short.
+    The runner uses a heuristic to differentiate dstack-server connections from
+    client connections based on their duration. See `ConnectionTracker` for details.
+    """
+
     def decorator(
         func: Callable[Concatenate[Dict[int, int], P], R],
     ) -> Callable[
-        Concatenate[str, JobProvisioningData, Optional[JobRuntimeData], P], Union[bool, R]
+        Concatenate[PrivateKeyOrPair, JobProvisioningData, Optional[JobRuntimeData], P],
+        Union[bool, R],
     ]:
         @functools.wraps(func)
         def wrapper(
-            ssh_private_key: str,
+            ssh_private_key: PrivateKeyOrPair,
             job_provisioning_data: JobProvisioningData,
             job_runtime_data: Optional[JobRuntimeData],
             *args: P.args,
@@ -51,6 +65,20 @@ def runner_ssh_tunnel(
                 # without SSH
                 return func(container_ports_map, *args, **kwargs)
 
+            if isinstance(ssh_private_key, str):
+                ssh_proxy_private_key = None
+            else:
+                ssh_private_key, ssh_proxy_private_key = ssh_private_key
+            identity = FileContent(ssh_private_key)
+            if ssh_proxy_private_key is not None:
+                proxy_identity = FileContent(ssh_proxy_private_key)
+            else:
+                proxy_identity = None
+
+            ssh_proxies = []
+            if job_provisioning_data.ssh_proxy is not None:
+                ssh_proxies.append((job_provisioning_data.ssh_proxy, proxy_identity))
+
             for attempt in range(retries):
                 last = attempt == retries - 1
                 # remote_host:local mapping
@@ -66,8 +94,8 @@ def runner_ssh_tunnel(
                         ),
                         port=job_provisioning_data.ssh_port,
                         forwarded_sockets=ports_to_forwarded_sockets(tunnel_ports_map),
-                        identity=FileContent(ssh_private_key),
-                        ssh_proxy=job_provisioning_data.ssh_proxy,
+                        identity=identity,
+                        ssh_proxies=ssh_proxies,
                     ):
                         return func(runner_ports_map, *args, **kwargs)
                 except SSHError:

@@ -1,7 +1,7 @@
 type: service
-name: llama31
+name: qwen-nim
 
-image: nvcr.io/nim/meta/llama-3.1-8b-instruct:latest
+image: nvcr.io/nim/qwen/qwen-2.5-7b-instruct:latest
 env:
   - NGC_API_KEY
   - NIM_MAX_MODEL_LEN=4096
@@ -10,16 +10,18 @@ registry_auth:
   password: ${{ env.NGC_API_KEY }}
 port: 8000
 # Register the model
-model: meta/llama-3.1-8b-instruct
+model: qwen/qwen-2.5-7b-instruct
 
 # Uncomment to leverage spot instances
 #spot_policy: auto
 
 # Cache downloaded models
 volumes:
-  - /root/.cache/nim:/opt/nim/.cache
+  - instance_path: /root/.cache/nim
+    path: /opt/nim/.cache
+    optional: true
 
 resources:
   gpu: 24GB
   # Uncomment if using multiple GPUs
-  #shm_size: 24GB
+  shm_size: 16GB

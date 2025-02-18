@@ -11,6 +11,7 @@ class AzureConfigInfo(CoreModel):
     type: Literal["azure"] = "azure"
     tenant_id: str
     subscription_id: str
+    resource_group: Optional[str] = None
     locations: Optional[List[str]] = None
     vpc_ids: Optional[Dict[str, str]] = None
     public_ips: Optional[bool] = None
@@ -48,6 +49,7 @@ class AzureConfigInfoWithCredsPartial(CoreModel):
     creds: Optional[AnyAzureCreds]
     tenant_id: Optional[str]
     subscription_id: Optional[str]
+    resource_group: Optional[str]
     locations: Optional[List[str]]
     vpc_ids: Optional[Dict[str, str]]
     public_ips: Optional[bool]
@@ -63,4 +65,4 @@ class AzureConfigValues(CoreModel):
 
 
 class AzureStoredConfig(AzureConfigInfo):
-    resource_group: str
+    resource_group: str = ""

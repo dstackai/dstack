@@ -10,11 +10,12 @@ func (ex *RunExecutor) GetJobLogsHistory() []schemas.LogEvent {
 
 func (ex *RunExecutor) GetHistory(timestamp int64) *schemas.PullResponse {
 	return &schemas.PullResponse{
-		JobStates:   eventsAfter(ex.jobStateHistory, timestamp),
-		JobLogs:     eventsAfter(ex.jobLogs.history, timestamp),
-		RunnerLogs:  eventsAfter(ex.runnerLogs.history, timestamp),
-		LastUpdated: ex.timestamp.GetLatest(),
-		HasMore:     ex.state != WaitLogsFinished,
+		JobStates:         eventsAfter(ex.jobStateHistory, timestamp),
+		JobLogs:           eventsAfter(ex.jobLogs.history, timestamp),
+		RunnerLogs:        eventsAfter(ex.runnerLogs.history, timestamp),
+		LastUpdated:       ex.timestamp.GetLatest(),
+		NoConnectionsSecs: ex.connectionTracker.GetNoConnectionsSecs(),
+		HasMore:           ex.state != WaitLogsFinished,
 	}
 }
 

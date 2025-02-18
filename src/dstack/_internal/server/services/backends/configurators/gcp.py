@@ -152,24 +152,22 @@ class GCPConfigurator(Configurator):
         ):
             raise_invalid_credentials_error(fields=[["creds"]])
         try:
-            credentials, project_id = auth.authenticate(creds=config.creds)
+            credentials, _ = auth.authenticate(creds=config.creds)
+            # We ignore credentials' project_id since it may be irrelevant.
+            # For example, with Workload Identity Federation for GKE, it's cluster project_id.
+            # config.project_id is not validated directly since it would require org-level permissions.
+            # config.project_id is validated indirectly when checking VPC.
         except BackendAuthError:
             if is_core_model_instance(config.creds, GCPServiceAccountCreds):
                 raise_invalid_credentials_error(fields=[["creds", "data"]])
             else:
                 raise_invalid_credentials_error(fields=[["creds"]])
-        if (
-            project_id is not None
-            and config.project_id is not None
-            and config.project_id != project_id
-        ):
-            raise ServerClientError(msg="Wrong project_id", fields=[["project_id"]])
-        config_values.project_id = self._get_project_id_element(selected=project_id)
         config_values.regions = self._get_regions_element(
             selected=config.regions or DEFAULT_REGIONS
         )
         if config.project_id is None:
             return config_values
+        config_values.project_id = self._get_project_id_element(selected=config.project_id)
         self._check_config(config=config, credentials=credentials)
         return config_values
 

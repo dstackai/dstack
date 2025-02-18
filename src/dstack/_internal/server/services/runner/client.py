@@ -30,7 +30,7 @@ from dstack._internal.server.schemas.runner import (
 from dstack._internal.utils.common import get_or_error
 from dstack._internal.utils.logging import get_logger
 
-REQUEST_TIMEOUT = 15
+REQUEST_TIMEOUT = 9
 
 logger = get_logger(__name__)
 
@@ -239,6 +239,7 @@ class ShimClient:
         host_ssh_user: str,
         host_ssh_keys: list[str],
         container_ssh_keys: list[str],
+        instance_id: str,
     ) -> None:
         if not self.is_api_v2_supported():
             raise ShimAPIVersionError()
@@ -255,7 +256,7 @@ class ShimClient:
             memory=_memory_to_bytes(memory),  # None = 0 = "all available"
             shm_size=_memory_to_bytes(shm_size),  # None = 0 = "use default value"
             network_mode=network_mode,
-            volumes=[_volume_to_shim_volume_info(v) for v in volumes],
+            volumes=[_volume_to_shim_volume_info(v, instance_id) for v in volumes],
             volume_mounts=volume_mounts,
             instance_mounts=instance_mounts,
             host_ssh_user=host_ssh_user,
@@ -303,6 +304,7 @@ class ShimClient:
         mounts: List[VolumeMountPoint],
         volumes: List[Volume],
         instance_mounts: List[InstanceMountPoint],
+        instance_id: str,
     ) -> bool:
         """
         Returns `True` if submitted and `False` if the shim already has a job (`409 Conflict`).
@@ -320,7 +322,7 @@ class ShimClient:
             ssh_user=ssh_user,
             ssh_key=ssh_key,
             mounts=mounts,
-            volumes=[_volume_to_shim_volume_info(v) for v in volumes],
+            volumes=[_volume_to_shim_volume_info(v, instance_id) for v in volumes],
             instance_mounts=instance_mounts,
         )
         resp = self._request("POST", "/api/submit", body)
@@ -398,10 +400,11 @@ def health_response_to_health_status(data: HealthcheckResponse) -> HealthStatus:
         )
 
 
-def _volume_to_shim_volume_info(volume: Volume) -> ShimVolumeInfo:
+def _volume_to_shim_volume_info(volume: Volume, instance_id: str) -> ShimVolumeInfo:
     device_name = None
-    if volume.attachment_data is not None:
-        device_name = volume.attachment_data.device_name
+    attachment_data = volume.get_attachment_data_for_instance(instance_id)
+    if attachment_data is not None:
+        device_name = attachment_data.device_name
     return ShimVolumeInfo(
         backend=volume.configuration.backend.value,
         name=volume.name,
