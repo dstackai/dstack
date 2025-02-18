@@ -26,7 +26,7 @@ export const runApi = createApi({
     tagTypes: ['Runs'],
 
     endpoints: (builder) => ({
-        getRuns: builder.query<IRun[], TRunsRequestParams | void>({
+        getRuns: builder.query<IRun[], TRunsRequestParams>({
             query: (body = {}) => {
                 return {
                     url: API.RUNS.LIST(),

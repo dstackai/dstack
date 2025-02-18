@@ -2,12 +2,14 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 
-import { Button, FormField, Header, SelectCSD, SpaceBetween, Table, Toggle } from 'components';
+import { Button, FormField, Header, Loader, SelectCSD, SpaceBetween, Table, Toggle } from 'components';
 
-import { useBreadcrumbs, useCollection } from 'hooks';
+import { useBreadcrumbs, useCollection, useInfiniteScroll } from 'hooks';
 import { ROUTES } from 'routes';
 
 import { useRunListPreferences } from './Preferences/useRunListPreferences';
+import { DEFAULT_TABLE_PAGE_SIZE } from '../../../consts';
+import { useLazyGetRunsQuery } from '../../../services/run';
 import {
     useAbortRuns,
     useColumnsDefinitions,
@@ -15,7 +17,6 @@ import {
     useDisabledStatesForButtons,
     useEmptyMessages,
     useFilters,
-    useRunsData,
     useStopRuns,
 } from './hooks';
 import { Preferences } from './Preferences';
@@ -39,9 +40,10 @@ export const RunList: React.FC = () => {
         localStorePrefix: 'administration-run-list-page',
     });
 
-    const { data, isLoading, refreshList } = useRunsData({
-        project_name: selectedProject?.value,
-        only_active: onlyActive,
+    const { data, isLoading, refreshList, isLoadingMore } = useInfiniteScroll<IRun, TRunsRequestParams>({
+        useLazyQuery: useLazyGetRunsQuery,
+        args: { project_name: selectedProject?.value, only_active: onlyActive, limit: DEFAULT_TABLE_PAGE_SIZE },
+        getPaginationParams: (lastRun) => ({ prev_submitted_at: lastRun.submitted_at }),
     });
 
     const isDisabledClearFilter = !selectedProject && !onlyActive;
@@ -170,6 +172,7 @@ export const RunList: React.FC = () => {
                     </div>
                 </div>
             }
+            footer={isLoadingMore ? <Loader padding={{ vertical: 'l' }} /> : null}
         />
     );
 };

@@ -1,20 +1,20 @@
 declare var Tally: {
-    openPopup: (string) => void,
-    closePopup: (string) => void,
-}
+    openPopup: (string) => void;
+    closePopup: (string) => void;
+};
 
 declare type AddedEmptyString<Type> = {
     [Property in keyof Type]: Type[Property] | '';
 };
 
-declare type DateTime = string
+declare type DateTime = string;
 
-declare interface IBaseRequestListParams {
-    prev_created_at?: string,
-    prev_id?: string,
-    limit?: number,
-    ascending?: boolean,
-}
+declare type TBaseRequestListParams = {
+    prev_created_at?: string;
+    prev_id?: string;
+    limit?: number;
+    ascending?: boolean;
+};
 
 declare interface HashMap<T = any> {
     [key: string]: T;
@@ -67,9 +67,7 @@ declare module '*.webp' {
 declare module '*.svg' {
     import * as React from 'react';
 
-    export const ReactComponent: React.FunctionComponent<React.SVGProps<
-        SVGSVGElement
-        > & { title?: string }>;
+    export const ReactComponent: React.FunctionComponent<React.SVGProps<SVGSVGElement> & { title?: string }>;
 
     const src: string;
     export default src;

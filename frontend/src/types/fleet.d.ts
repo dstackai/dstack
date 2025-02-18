@@ -1,9 +1,9 @@
-declare type TSpotPolicy = "spot" | "on-demand" | "auto";
+declare type TSpotPolicy = 'spot' | 'on-demand' | 'auto';
 
-declare type TFleetListRequestParams = IBaseRequestListParams & {
-    project_name?: string,
-    only_active?: boolean,
-}
+declare type TFleetListRequestParams = TBaseRequestListParams & {
+    project_name?: string;
+    only_active?: boolean;
+};
 
 declare interface ISSHHostParamsRequest {
     hostname: string;
@@ -37,23 +37,25 @@ declare interface IFleetConfigurationResource {
 }
 
 declare interface IFleetConfigurationRequest {
-    type?: "fleet";
+    type?: 'fleet';
     name?: string;
     ssh_config?: ISSHConfig;
     nodes?: {
         min?: number;
         max?: number;
     };
-    placement?: "any" | "cluster";
+    placement?: 'any' | 'cluster';
     resources?: IFleetConfigurationResource[];
     backends?: TBackendType[];
     regions?: string[];
     instance_types?: string[];
     spot_policy?: TSpotPolicy;
-    retry?: {
-        on_events: ("no-capacity" | "interruption" | "error")[];
-        duration?: number | string;
-    } | boolean;
+    retry?:
+        | {
+              on_events: ('no-capacity' | 'interruption' | 'error')[];
+              duration?: number | string;
+          }
+        | boolean;
     max_price?: number;
     idle_duration?: number | string;
 }
@@ -68,29 +70,29 @@ declare interface IProfileRequest {
         retry?: boolean;
         duration?: number | string;
     };
-    max_duration?: "off" | string | number;
+    max_duration?: 'off' | string | number;
     max_price?: number;
     pool_name?: string;
     instance_name?: string;
-    creation_policy?: "reuse" | "reuse-or-create";
+    creation_policy?: 'reuse' | 'reuse-or-create';
     idle_duration?: number | string;
     name: string;
     default?: boolean;
 }
 
 declare interface IFleetSpec {
-    autocreated: boolean
-    configuration: IFleetConfigurationRequest,
-    profile: IProfileRequest
+    autocreated: boolean;
+    configuration: IFleetConfigurationRequest;
+    profile: IProfileRequest;
 }
 
 declare interface IFleet {
-    id: string,
-    created_at: string
+    id: string;
+    created_at: string;
     instances: IInstance[];
     name: string;
     project_name: string;
     spec: IFleetSpec;
-    status: "submitted" | "active" | "terminating" | "terminated" | "failed"
-    status_message: string
+    status: 'submitted' | 'active' | 'terminating' | 'terminated' | 'failed';
+    status_message: string;
 }
