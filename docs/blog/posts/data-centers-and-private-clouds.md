@@ -57,12 +57,12 @@ ssh_config:
   hosts:
     - hostname: ssh.hotaisle.cloud
       port: 22013
+      blocks: auto
     - hostname: ssh.hotaisle.cloud
       port: 22014
+      blocks: auto
   
 placement: cluster
-
-blocks: auto
 ```
 
 </div>
