@@ -10,7 +10,12 @@ from dstack._internal.core.consts import DSTACK_RUNNER_HTTP_PORT, DSTACK_SHIM_HT
 from dstack._internal.core.errors import GatewayError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import NetworkMode, RegistryAuth, is_core_model_instance
-from dstack._internal.core.models.instances import InstanceStatus, RemoteConnectionInfo
+from dstack._internal.core.models.configurations import DevEnvironmentConfiguration
+from dstack._internal.core.models.instances import (
+    InstanceStatus,
+    RemoteConnectionInfo,
+    SSHConnectionParams,
+)
 from dstack._internal.core.models.repos import RemoteRepoCreds
 from dstack._internal.core.models.runs import (
     ClusterInfo,
@@ -20,10 +25,12 @@ from dstack._internal.core.models.runs import (
     JobStatus,
     JobTerminationReason,
     Run,
+    RunSpec,
 )
 from dstack._internal.core.models.volumes import InstanceMountPoint, Volume, VolumeMountPoint
 from dstack._internal.server.db import get_session_ctx
 from dstack._internal.server.models import (
+    InstanceModel,
     JobModel,
     ProjectModel,
     RepoModel,
@@ -40,6 +47,7 @@ from dstack._internal.server.services.jobs import (
 )
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.logging import fmt
+from dstack._internal.server.services.pools import get_instance_ssh_private_keys
 from dstack._internal.server.services.repos import (
     get_code_model,
     get_repo_creds,
@@ -99,7 +107,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
     res = await session.execute(
         select(JobModel)
         .where(JobModel.id == job_model.id)
-        .options(joinedload(JobModel.instance))
+        .options(joinedload(JobModel.instance).joinedload(InstanceModel.project))
         .execution_options(populate_existing=True)
     )
     job_model = res.unique().scalar_one()
@@ -150,18 +158,9 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
         job_provisioning_data=job_provisioning_data,
     )
 
-    server_ssh_private_key = project.ssh_private_key
-    # TODO: Drop this logic and always use project key once it's safe to assume that most on-prem
-    # fleets are (re)created after this change: https://github.com/dstackai/dstack/pull/1716
-    if (
-        job_model.instance is not None
-        and job_model.instance.remote_connection_info is not None
-        and job_provisioning_data.dockerized
-    ):
-        remote_conn_info: RemoteConnectionInfo = RemoteConnectionInfo.__response__.parse_raw(
-            job_model.instance.remote_connection_info
-        )
-        server_ssh_private_key = remote_conn_info.ssh_keys[0].private
+    server_ssh_private_keys = get_instance_ssh_private_keys(
+        common_utils.get_or_error(job_model.instance)
+    )
 
     secrets = {}  # TODO secrets
 
@@ -201,11 +200,12 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
                     user_ssh_key = ""
                 success = await common_utils.run_async(
                     _process_provisioning_with_shim,
-                    server_ssh_private_key,
+                    server_ssh_private_keys,
                     job_provisioning_data,
                     None,
                     run,
                     job_model,
+                    job_provisioning_data,
                     volumes,
                     secrets,
                     job.job_spec.registry_auth,
@@ -227,7 +227,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
                 )
                 success = await common_utils.run_async(
                     _submit_job_to_runner,
-                    server_ssh_private_key,
+                    server_ssh_private_keys,
                     job_provisioning_data,
                     None,
                     run,
@@ -270,7 +270,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
             )
             success = await common_utils.run_async(
                 _process_pulling_with_shim,
-                server_ssh_private_key,
+                server_ssh_private_keys,
                 job_provisioning_data,
                 None,
                 run,
@@ -280,14 +280,14 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
                 code,
                 secrets,
                 repo_creds,
-                server_ssh_private_key,
+                server_ssh_private_keys,
                 job_provisioning_data,
             )
         elif initial_status == JobStatus.RUNNING:
             logger.debug("%s: process running job, age=%s", fmt(job_model), job_submission.age)
             success = await common_utils.run_async(
                 _process_running,
-                server_ssh_private_key,
+                server_ssh_private_keys,
                 job_provisioning_data,
                 job_submission.job_runtime_data,
                 run_model,
@@ -313,8 +313,24 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
         and job_model.job_num == 0  # gateway connects only to the first node
         and run.run_spec.configuration.type == "service"
     ):
+        ssh_head_proxy: Optional[SSHConnectionParams] = None
+        ssh_head_proxy_private_key: Optional[str] = None
+        instance = common_utils.get_or_error(job_model.instance)
+        if instance.remote_connection_info is not None:
+            rci = RemoteConnectionInfo.__response__.parse_raw(instance.remote_connection_info)
+            if rci.ssh_proxy is not None:
+                ssh_head_proxy = rci.ssh_proxy
+                ssh_head_proxy_keys = common_utils.get_or_error(rci.ssh_proxy_keys)
+                ssh_head_proxy_private_key = ssh_head_proxy_keys[0].private
         try:
-            await services.register_replica(session, run_model.gateway_id, run, job_model)
+            await services.register_replica(
+                session,
+                run_model.gateway_id,
+                run,
+                job_model,
+                ssh_head_proxy,
+                ssh_head_proxy_private_key,
+            )
         except GatewayError as e:
             logger.warning(
                 "%s: failed to register service replica: %s, age=%s",
@@ -361,6 +377,7 @@ def _process_provisioning_with_shim(
     ports: Dict[int, int],
     run: Run,
     job_model: JobModel,
+    job_provisioning_data: JobProvisioningData,
     volumes: List[Volume],
     secrets: Dict[str, str],
     registry_auth: Optional[RegistryAuth],
@@ -444,6 +461,7 @@ def _process_provisioning_with_shim(
             host_ssh_user=ssh_user,
             host_ssh_keys=[ssh_key] if ssh_key else [],
             container_ssh_keys=public_keys,
+            instance_id=job_provisioning_data.instance_id,
         )
     else:
         submitted = shim_client.submit(
@@ -460,6 +478,7 @@ def _process_provisioning_with_shim(
             mounts=volume_mounts,
             volumes=volumes,
             instance_mounts=instance_mounts,
+            instance_id=job_provisioning_data.instance_id,
         )
         if not submitted:
             # This can happen when we lost connection to the runner (e.g., network issues), marked
@@ -491,7 +510,7 @@ def _process_pulling_with_shim(
     code: bytes,
     secrets: Dict[str, str],
     repo_credentials: Optional[RemoteRepoCreds],
-    server_ssh_private_key: str,
+    server_ssh_private_keys: tuple[str, Optional[str]],
     job_provisioning_data: JobProvisioningData,
 ) -> bool:
     """
@@ -556,7 +575,7 @@ def _process_pulling_with_shim(
             return True
 
     return _submit_job_to_runner(
-        server_ssh_private_key,
+        server_ssh_private_keys,
         job_provisioning_data,
         job_runtime_data,
         run=run,
@@ -598,6 +617,7 @@ def _process_running(
         runner_logs=resp.runner_logs,
         job_logs=resp.job_logs,
     )
+    previous_status = job_model.status
     if len(resp.job_states) > 0:
         latest_state_event = resp.job_states[-1]
         latest_status = latest_state_event.state
@@ -613,8 +633,38 @@ def _process_running(
                 )
             if latest_state_event.termination_message:
                 job_model.termination_reason_message = latest_state_event.termination_message
+    else:
+        _terminate_if_inactivity_duration_exceeded(run_model, job_model, resp.no_connections_secs)
+    if job_model.status != previous_status:
         logger.info("%s: now is %s", fmt(job_model), job_model.status.name)
     return True
+
+
+def _terminate_if_inactivity_duration_exceeded(
+    run_model: RunModel, job_model: JobModel, no_connections_secs: Optional[int]
+) -> None:
+    conf = RunSpec.__response__.parse_raw(run_model.run_spec).configuration
+    if is_core_model_instance(conf, DevEnvironmentConfiguration) and isinstance(
+        conf.inactivity_duration, int
+    ):
+        logger.debug("%s: no SSH connections for %s seconds", fmt(job_model), no_connections_secs)
+        job_model.inactivity_secs = no_connections_secs
+        if no_connections_secs is None:
+            # TODO(0.19 or earlier): make no_connections_secs required
+            job_model.status = JobStatus.TERMINATING
+            job_model.termination_reason = JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY
+            job_model.termination_reason_message = (
+                "The selected instance was created before dstack 0.18.41"
+                " and does not support inactivity_duration"
+            )
+        elif no_connections_secs >= conf.inactivity_duration:
+            job_model.status = JobStatus.TERMINATING
+            # TODO(0.19 or earlier): set JobTerminationReason.INACTIVITY_DURATION_EXCEEDED
+            job_model.termination_reason = JobTerminationReason.TERMINATED_BY_SERVER
+            job_model.termination_reason_message = (
+                f"The job was inactive for {no_connections_secs} seconds,"
+                f" exceeding the inactivity_duration of {conf.inactivity_duration} seconds"
+            )
 
 
 def _get_cluster_info(

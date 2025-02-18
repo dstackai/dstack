@@ -1,23 +1,14 @@
 ## Manage runs
 
-### List runs
+`dstack` provides several commands to manage runs:
 
-The [`dstack ps`](../reference/cli/dstack/ps.md)  command lists all running jobs and their statuses.
-Use `--watch` (or `-w`) to monitor the live status of runs.
-
-### Stop a run
-
-A dev environment runs until you stop it or its lifetime exceeds [`max_duration`](../reference/dstack.yml/dev-environment.md#max_duration).
-To gracefully stop a dev environment, use [`dstack stop`](../reference/cli/dstack/stop.md).
-Pass `--abort` or `-x` to stop without waiting for a graceful shutdown.
-
-### Attach to a run
-
-By default, `dstack apply` runs in attached mode – it establishes the SSH tunnel to the run, forwards ports, and shows real-time logs.
-If you detached from a run, you can reattach to it using [`dstack attach`](../reference/cli/dstack/attach.md).
-
-### See run logs
-
-To see the logs of a run without attaching, use [`dstack logs`](../reference/cli/dstack/logs.md).
-Pass `--diagnose`/`-d` to `dstack logs` to see the diagnostics logs. It may be useful if a run fails.
-For more information on debugging failed runs, see the [troubleshooting](../guides/troubleshooting.md) guide.
+* [`dstack ps`](../reference/cli/dstack/ps.md) – Lists all running jobs and their statuses.
+  Use `--watch` (or `-w`) to monitor the live status of runs.
+* [`dstack stop`](../reference/cli/dstack/stop.md) – Stops a run gracefully.
+Pass `--abort` or `-x` to stop it immediately without waiting for a graceful shutdown. By default, a run
+  runs until you stop it or its lifetime exceeds the value of [`max_duration`](../reference/dstack.yml/dev-environment.md#max_duration).
+* [`dstack attach`](../reference/cli/dstack/attach.md) – By default, `dstack apply` runs in attached mode,
+  establishing an SSH tunnel to the run, forwarding ports, and displaying real-time logs.
+  If you detach from a run, use this command to reattach.
+* [`dstack logs`](../reference/cli/dstack/logs.md) – Displays run logs.
+Pass `--diagnose` or `-d` to view diagnostic logs, which can help troubleshoot failed runs.

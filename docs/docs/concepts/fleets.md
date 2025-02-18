@@ -15,7 +15,7 @@ from an existing fleet. If none match the requirements, `dstack` creates a new c
 
 For greater control over cloud fleet provisioning, create fleets explicitly using configuration files. 
 
-### Define a configuration
+### Apply a configuration
 
 Define a fleet configuration as a YAML file in your project directory. The file must have a
 `.dstack.yml` extension (e.g. `.dstack.yml` or `fleet.dstack.yml`).
@@ -37,6 +37,27 @@ Define a fleet configuration as a YAML file in your project directory. The file 
     ```
     
 </div>
+
+To create or update the fleet, pass the fleet configuration to [`dstack apply`](../reference/cli/dstack/apply.md):
+
+<div class="termy">
+
+```shell
+$ dstack apply -f examples/misc/fleets/.dstack.yml
+
+Provisioning...
+---> 100%
+
+ FLEET     INSTANCE  BACKEND              GPU             PRICE    STATUS  CREATED 
+ my-fleet  0         gcp (europe-west-1)  L4:24GB (spot)  $0.1624  idle    3 mins ago      
+           1         gcp (europe-west-1)  L4:24GB (spot)  $0.1624  idle    3 mins ago    
+```
+
+</div>
+
+Once the status of instances changes to `idle`, they can be used by dev environments, tasks, and services.
+
+### Configuration options
 
 #### Placement { #cloud-placement }
 
@@ -169,39 +190,11 @@ retry:
     [`max_price`](../reference/dstack.yml/fleet.md#max_price), and
     among [others](../reference/dstack.yml/fleet.md).
 
-### Create or update a fleet
-
-To create or update the fleet, pass the fleet configuration to [`dstack apply`](../reference/cli/dstack/apply.md):
-
-<div class="termy">
-
-```shell
-$ dstack apply -f examples/misc/fleets/.dstack.yml
-```
-
-</div>
-
-To ensure the fleet is created, you can use the `dstack fleet` command:
-
-<div class="termy">
-
-```shell
-$ dstack fleet
-
- FLEET     INSTANCE  BACKEND              GPU             PRICE    STATUS  CREATED 
- my-fleet  0         gcp (europe-west-1)  L4:24GB (spot)  $0.1624  idle    3 mins ago      
-           1         gcp (europe-west-1)  L4:24GB (spot)  $0.1624  idle    3 mins ago    
-```
-
-</div>
-
-Once the status of instances changes to `idle`, they can be used by dev environments, tasks, and services.
-
 ## SSH fleets { #ssh }
 
 If you have a group of on-prem servers accessible via SSH, you can create an SSH fleet.
 
-### Define a configuration
+### Apply a configuration
 
 Define a fleet configuration as a YAML file in your project directory. The file must have a
 `.dstack.yml` extension (e.g. `.dstack.yml` or `fleet.dstack.yml`).
@@ -245,6 +238,30 @@ Define a fleet configuration as a YAML file in your project directory. The file 
 
     3.&nbsp;The user specified should have passwordless `sudo` access.
 
+To create or update the fleet, pass the fleet configuration to [`dstack apply`](../reference/cli/dstack/apply.md):
+
+<div class="termy">
+
+```shell
+$ dstack apply -f examples/misc/fleets/.dstack.yml
+
+Provisioning...
+---> 100%
+
+ FLEET     INSTANCE  GPU             PRICE  STATUS  CREATED 
+ my-fleet  0         L4:24GB (spot)  $0     idle    3 mins ago      
+           1         L4:24GB (spot)  $0     idle    3 mins ago    
+```
+
+</div>
+
+When you apply, `dstack` connects to the specified hosts using the provided SSH credentials, 
+installs the dependencies, and configures these hosts as a fleet.
+
+Once the status of instances changes to `idle`, they can be used by dev environments, tasks, and services.
+
+### Configuration options
+
 #### Placement { #ssh-placement }
 
 If the hosts are interconnected (i.e. share the same network), set `placement` to `cluster`. 
@@ -283,39 +300,47 @@ ssh_config:
     - 3.255.177.52
 ```
 
+#### Head node
+
+If fleet nodes are behind a head node, configure [`proxy_jump`](../reference/dstack.yml/fleet.md#proxy_jump):
+
+<div editor-title="examples/misc/fleets/.dstack.yml">
+
+    ```yaml
+    type: fleet
+    name: my-fleet
+
+    ssh_config:
+      user: ubuntu
+      identity_file: ~/.ssh/worker_node_key
+      hosts:
+        - 3.255.177.51
+        - 3.255.177.52
+      proxy_jump:
+        hostname: 3.255.177.50
+        user: ubuntu
+        identity_file: ~/.ssh/head_node_key
+    ```
+
+</div>
+
+To be able to attach to runs, both explicitly with `dstack attach` and implicitly with `dstack apply`, you must either
+add a front node key (`~/.ssh/head_node_key`) to an SSH agent or configure a key path in `~/.ssh/config`:
+
+<div editor-title="~/.ssh/config">
+
+    ```
+    Host 3.255.177.50
+        IdentityFile ~/.ssh/head_node_key
+    ```
+
+</div>
+
+where `Host` must match `ssh_config.proxy_jump.hostname` or `ssh_config.hosts[n].proxy_jump.hostname` if you configure head nodes
+on a per-worker basis.
+
 !!! info "Reference"
     For all SSH fleet configuration options, refer to the [reference](../reference/dstack.yml/fleet.md).
-
-### Create or update a fleet
-
-To create or update the fleet, pass the fleet configuration to [`dstack apply`](../reference/cli/dstack/apply.md):
-
-<div class="termy">
-
-```shell
-$ dstack apply -f examples/misc/fleets/.dstack.yml
-```
-
-</div>
-
-To ensure the fleet is created, you can use the `dstack fleet` command:
-
-<div class="termy">
-
-```shell
-$ dstack fleet
-
- FLEET     INSTANCE  GPU             PRICE  STATUS  CREATED 
- my-fleet  0         L4:24GB (spot)  $0     idle    3 mins ago      
-           1         L4:24GB (spot)  $0     idle    3 mins ago    
-```
-
-</div>
-
-When you apply this configuration, `dstack` will connect to the specified hosts using the provided SSH credentials, 
-install the dependencies, and configure these servers as a fleet.
-
-Once the status of instances changes to `idle`, they can be used by dev environments, tasks, and services.
 
 #### Troubleshooting
 

@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Optional
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
@@ -8,11 +9,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from dstack._internal.core.errors import SSHError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import NetworkMode
+from dstack._internal.core.models.configurations import DevEnvironmentConfiguration
 from dstack._internal.core.models.instances import InstanceStatus
 from dstack._internal.core.models.runs import (
     JobRuntimeData,
     JobStatus,
     JobTerminationReason,
+    RunStatus,
 )
 from dstack._internal.core.models.volumes import (
     InstanceMountPoint,
@@ -100,6 +103,13 @@ class TestProcessRunningJobs:
             repo=repo,
             user=user,
         )
+        pool = await create_pool(session=session, project=project)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            pool=pool,
+            status=InstanceStatus.BUSY,
+        )
         job_provisioning_data = get_job_provisioning_data(dockerized=False)
         job = await create_job(
             session=session,
@@ -107,6 +117,8 @@ class TestProcessRunningJobs:
             status=JobStatus.PROVISIONING,
             submitted_at=datetime(2023, 1, 2, 5, 12, 30, 5, tzinfo=timezone.utc),
             job_provisioning_data=job_provisioning_data,
+            instance=instance,
+            instance_assigned=True,
         )
         with (
             patch("dstack._internal.server.services.runner.ssh.SSHTunnel") as SSHTunnelMock,
@@ -141,12 +153,21 @@ class TestProcessRunningJobs:
             repo=repo,
             user=user,
         )
+        pool = await create_pool(session=session, project=project)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            pool=pool,
+            status=InstanceStatus.BUSY,
+        )
         job_provisioning_data = get_job_provisioning_data(dockerized=False)
         job = await create_job(
             session=session,
             run=run,
             status=JobStatus.PROVISIONING,
             job_provisioning_data=job_provisioning_data,
+            instance=instance,
+            instance_assigned=True,
         )
         with (
             patch("dstack._internal.server.services.runner.ssh.SSHTunnel") as SSHTunnelMock,
@@ -183,12 +204,21 @@ class TestProcessRunningJobs:
             repo=repo,
             user=user,
         )
+        pool = await create_pool(session=session, project=project)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            pool=pool,
+            status=InstanceStatus.BUSY,
+        )
         job_provisioning_data = get_job_provisioning_data(dockerized=False)
         job = await create_job(
             session=session,
             run=run,
             status=JobStatus.RUNNING,
             job_provisioning_data=job_provisioning_data,
+            instance=instance,
+            instance_assigned=True,
         )
         with (
             patch("dstack._internal.server.services.runner.ssh.SSHTunnel") as SSHTunnelMock,
@@ -274,6 +304,13 @@ class TestProcessRunningJobs:
             run_name="test-run",
             run_spec=run_spec,
         )
+        pool = await create_pool(session=session, project=project)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            pool=pool,
+            status=InstanceStatus.BUSY,
+        )
         job_provisioning_data = get_job_provisioning_data(dockerized=True)
 
         with patch(
@@ -285,6 +322,8 @@ class TestProcessRunningJobs:
                 run=run,
                 status=JobStatus.PROVISIONING,
                 job_provisioning_data=job_provisioning_data,
+                instance=instance,
+                instance_assigned=True,
             )
 
         await process_running_jobs()
@@ -310,6 +349,7 @@ class TestProcessRunningJobs:
             host_ssh_user="ubuntu",
             host_ssh_keys=["user_ssh_key"],
             container_ssh_keys=[project_ssh_pub_key, "user_ssh_key"],
+            instance_id=job_provisioning_data.instance_id,
         )
         await session.refresh(job)
         assert job is not None
@@ -334,12 +374,21 @@ class TestProcessRunningJobs:
             repo=repo,
             user=user,
         )
+        pool = await create_pool(session=session, project=project)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            pool=pool,
+            status=InstanceStatus.BUSY,
+        )
         job = await create_job(
             session=session,
             run=run,
             status=JobStatus.PULLING,
             job_provisioning_data=get_job_provisioning_data(dockerized=True),
             job_runtime_data=get_job_runtime_data(network_mode="bridge", ports=None),
+            instance=instance,
+            instance_assigned=True,
         )
         shim_client_mock.get_task.return_value.status = TaskStatus.RUNNING
         shim_client_mock.get_task.return_value.ports = [
@@ -382,6 +431,13 @@ class TestProcessRunningJobs:
             repo=repo,
             user=user,
         )
+        pool = await create_pool(session=session, project=project)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            pool=pool,
+            status=InstanceStatus.BUSY,
+        )
         job_provisioning_data = get_job_provisioning_data(dockerized=True)
         job = await create_job(
             session=session,
@@ -389,6 +445,8 @@ class TestProcessRunningJobs:
             status=JobStatus.PULLING,
             job_provisioning_data=job_provisioning_data,
             job_runtime_data=get_job_runtime_data(network_mode="bridge", ports=None),
+            instance=instance,
+            instance_assigned=True,
         )
         shim_client_mock.get_task.return_value.status = TaskStatus.RUNNING
         shim_client_mock.get_task.return_value.ports = None
@@ -467,12 +525,21 @@ class TestProcessRunningJobs:
             run_name="test-run",
             run_spec=run_spec,
         )
+        pool = await create_pool(session=session, project=project)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            pool=pool,
+            status=InstanceStatus.BUSY,
+        )
         job = await create_job(
             session=session,
             run=run,
             status=JobStatus.PROVISIONING,
             job_provisioning_data=get_job_provisioning_data(dockerized=True),
             submitted_at=get_current_datetime(),
+            instance=instance,
+            instance_assigned=True,
         )
         monkeypatch.setattr(
             "dstack._internal.server.services.runner.ssh.SSHTunnel", Mock(return_value=MagicMock())
@@ -495,3 +562,129 @@ class TestProcessRunningJobs:
         shim_client_mock.stop.assert_called_once_with(force=True)
         await session.refresh(job)
         assert job.status == JobStatus.PROVISIONING
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.parametrize(
+        (
+            "inactivity_duration",
+            "no_connections_secs",
+            "expected_status",
+            "expected_termination_reason",
+            "expected_inactivity_secs",
+        ),
+        [
+            pytest.param(
+                "1h",
+                60 * 60 - 1,
+                JobStatus.RUNNING,
+                None,
+                60 * 60 - 1,
+                id="duration-not-exceeded",
+            ),
+            pytest.param(
+                "1h",
+                60 * 60,
+                JobStatus.TERMINATING,
+                JobTerminationReason.TERMINATED_BY_SERVER,
+                60 * 60,
+                id="duration-exceeded-exactly",
+            ),
+            pytest.param(
+                "1h",
+                60 * 60 + 1,
+                JobStatus.TERMINATING,
+                JobTerminationReason.TERMINATED_BY_SERVER,
+                60 * 60 + 1,
+                id="duration-exceeded",
+            ),
+            pytest.param("off", 60 * 60, JobStatus.RUNNING, None, None, id="duration-off"),
+            pytest.param(False, 60 * 60, JobStatus.RUNNING, None, None, id="duration-false"),
+            pytest.param(None, 60 * 60, JobStatus.RUNNING, None, None, id="duration-none"),
+            pytest.param(
+                "1h",
+                None,
+                JobStatus.TERMINATING,
+                JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY,
+                None,
+                id="legacy-runner",
+            ),
+            pytest.param(
+                None,
+                None,
+                JobStatus.RUNNING,
+                None,
+                None,
+                id="legacy-runner-without-duration",
+            ),
+        ],
+    )
+    async def test_inactivity_duration(
+        self,
+        test_db,
+        session: AsyncSession,
+        inactivity_duration,
+        no_connections_secs: Optional[int],
+        expected_status: JobStatus,
+        expected_termination_reason: Optional[JobTerminationReason],
+        expected_inactivity_secs: Optional[int],
+    ) -> None:
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(
+            session=session,
+            project_id=project.id,
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            status=RunStatus.RUNNING,
+            run_name="test-run",
+            run_spec=get_run_spec(
+                run_name="test-run",
+                repo_id=repo.name,
+                configuration=DevEnvironmentConfiguration(
+                    name="test-run",
+                    ide="vscode",
+                    inactivity_duration=inactivity_duration,
+                ),
+            ),
+        )
+        pool = await create_pool(session=session, project=project)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            pool=pool,
+            status=InstanceStatus.BUSY,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            job_provisioning_data=get_job_provisioning_data(),
+            instance=instance,
+            instance_assigned=True,
+        )
+        with (
+            patch("dstack._internal.server.services.runner.ssh.SSHTunnel") as SSHTunnelMock,
+            patch(
+                "dstack._internal.server.services.runner.client.RunnerClient"
+            ) as RunnerClientMock,
+        ):
+            runner_client_mock = RunnerClientMock.return_value
+            runner_client_mock.pull.return_value = PullResponse(
+                job_states=[],
+                job_logs=[],
+                runner_logs=[],
+                last_updated=0,
+                no_connections_secs=no_connections_secs,
+            )
+            await process_running_jobs()
+            SSHTunnelMock.assert_called_once()
+            runner_client_mock.pull.assert_called_once()
+        await session.refresh(job)
+        assert job.status == expected_status
+        assert job.termination_reason == expected_termination_reason
+        assert job.inactivity_secs == expected_inactivity_secs

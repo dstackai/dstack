@@ -5,7 +5,6 @@ from typing import Callable, List, Optional, Union
 from sqlalchemy import (
     BigInteger,
     Boolean,
-    Column,
     DateTime,
     Enum,
     Float,
@@ -15,7 +14,6 @@ from sqlalchemy import (
     LargeBinary,
     MetaData,
     String,
-    Table,
     Text,
     TypeDecorator,
     UniqueConstraint,
@@ -351,6 +349,7 @@ class JobModel(BaseModel):
     job_spec_data: Mapped[str] = mapped_column(Text)
     job_provisioning_data: Mapped[Optional[str]] = mapped_column(Text)
     runner_timestamp: Mapped[Optional[int]] = mapped_column(BigInteger)
+    inactivity_secs: Mapped[Optional[int]] = mapped_column(Integer)  # 0 - active, None - N/A
     # `removed` is used to ensure that the instance is killed after the job is finished
     remove_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
     volumes_detached_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
@@ -553,10 +552,12 @@ class InstanceModel(BaseModel):
     jobs: Mapped[list["JobModel"]] = relationship(back_populates="instance", lazy="joined")
     last_job_processed_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
 
-    # volumes attached to the instance
-    volumes: Mapped[List["VolumeModel"]] = relationship(
-        secondary="volumes_attachments",
-        back_populates="instances",
+    volume_attachments: Mapped[List["VolumeAttachmentModel"]] = relationship(
+        back_populates="instance",
+        # Add delete-orphan option so that removing entries from volume_attachments
+        # automatically marks them for deletion.
+        # SQLalchemy requires delete when using delete-orphan.
+        cascade="save-update, merge, delete-orphan, delete",
     )
 
 
@@ -586,23 +587,21 @@ class VolumeModel(BaseModel):
 
     configuration: Mapped[str] = mapped_column(Text)
     volume_provisioning_data: Mapped[Optional[str]] = mapped_column(Text)
-    # FIXME: volume_attachment_data should be in "volumes_attachments"
-    # to support multi-attach volumes
+
+    attachments: Mapped[List["VolumeAttachmentModel"]] = relationship(back_populates="volume")
+
+    # Deprecated in favor of VolumeAttachmentModel.attachment_data
     volume_attachment_data: Mapped[Optional[str]] = mapped_column(Text)
 
-    # instances the volume is attached to
-    instances: Mapped[List["InstanceModel"]] = relationship(
-        secondary="volumes_attachments",
-        back_populates="volumes",
-    )
 
+class VolumeAttachmentModel(BaseModel):
+    __tablename__ = "volumes_attachments"
 
-volumes_attachments_table = Table(
-    "volumes_attachments",
-    BackendModel.metadata,
-    Column("volume_id", ForeignKey("volumes.id"), primary_key=True),
-    Column("instace_id", ForeignKey("instances.id"), primary_key=True),
-)
+    volume_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("volumes.id"), primary_key=True)
+    volume: Mapped[VolumeModel] = relationship(back_populates="attachments")
+    instance_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("instances.id"), primary_key=True)
+    instance: Mapped[InstanceModel] = relationship(back_populates="volume_attachments")
+    attachment_data: Mapped[Optional[str]] = mapped_column(Text)
 
 
 class PlacementGroupModel(BaseModel):

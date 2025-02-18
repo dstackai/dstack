@@ -27,7 +27,7 @@ from dstack._internal.core.models.volumes import (
     VolumeStatus,
 )
 from dstack._internal.server.background.tasks.process_submitted_jobs import process_submitted_jobs
-from dstack._internal.server.models import InstanceModel, JobModel
+from dstack._internal.server.models import InstanceModel, JobModel, VolumeAttachmentModel
 from dstack._internal.server.testing.common import (
     create_fleet,
     create_instance,
@@ -515,7 +515,9 @@ class TestProcessSubmittedJobs:
         await session.refresh(instance)
         res = await session.execute(
             select(JobModel).options(
-                joinedload(JobModel.instance).selectinload(InstanceModel.volumes)
+                joinedload(JobModel.instance)
+                .joinedload(InstanceModel.volume_attachments)
+                .joinedload(VolumeAttachmentModel.volume)
             )
         )
         job = res.unique().scalar_one()
@@ -523,7 +525,7 @@ class TestProcessSubmittedJobs:
         assert (
             job.instance_assigned and job.instance is not None and job.instance.id == instance.id
         )
-        assert job.instance.volumes == [volume]
+        assert job.instance.volume_attachments[0].volume == volume
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)

@@ -30,6 +30,7 @@ from dstack._internal.core.models.instances import (
     InstanceType,
     RemoteConnectionInfo,
     Resources,
+    SSHConnectionParams,
     SSHKey,
 )
 from dstack._internal.core.models.pools import Instance, Pool, PoolInstances
@@ -264,6 +265,7 @@ def instance_model_to_instance(instance_model: InstanceModel) -> Instance:
     if jpd is not None:
         instance.instance_type = jpd.instance_type
         instance.hostname = jpd.hostname
+        instance.availability_zone = jpd.availability_zone
 
     return instance
 
@@ -290,6 +292,27 @@ def get_instance_profile(instance_model: InstanceModel) -> Profile:
 
 def get_instance_requirements(instance_model: InstanceModel) -> Requirements:
     return Requirements.__response__.parse_raw(instance_model.requirements)
+
+
+def get_instance_ssh_private_keys(instance_model: InstanceModel) -> tuple[str, Optional[str]]:
+    """
+    Returns a pair of SSH private keys: host key and optional proxy jump key.
+    """
+    host_private_key = instance_model.project.ssh_private_key
+    if instance_model.remote_connection_info is None:
+        # Cloud instance
+        return host_private_key, None
+    # SSH instance
+    rci = RemoteConnectionInfo.__response__.parse_raw(instance_model.remote_connection_info)
+    if rci.ssh_proxy is None:
+        return host_private_key, None
+    if rci.ssh_proxy_keys is None:
+        # Inconsistent RemoteConnectionInfo structure - proxy without keys
+        raise ValueError("Missing instance SSH proxy private keys")
+    proxy_private_keys = [key.private for key in rci.ssh_proxy_keys if key.private is not None]
+    if not proxy_private_keys:
+        raise ValueError("No instance SSH proxy private key found")
+    return host_private_key, proxy_private_keys[0]
 
 
 async def generate_instance_name(
@@ -423,7 +446,7 @@ def filter_pool_instances(
 
     backend_types = profile.backends
     regions = profile.regions
-    zones = None
+    zones = profile.availability_zones
 
     if volumes:
         mount_point_volumes = volumes[0]
@@ -434,23 +457,24 @@ def filter_pool_instances(
             for v in mount_point_volumes
             if v.provisioning_data is not None
         ]
-        if volume_zones:
+        if zones is None:
             zones = volume_zones
+        zones = [z for z in zones if z in volume_zones]
 
     if multinode:
-        if not backend_types:
+        if backend_types is None:
             backend_types = BACKENDS_WITH_MULTINODE_SUPPORT
         backend_types = [b for b in backend_types if b in BACKENDS_WITH_MULTINODE_SUPPORT]
 
     # For multi-node, restrict backend and region.
     # The default behavior is to provision all nodes in the same backend and region.
     if master_job_provisioning_data is not None:
-        if not backend_types:
+        if backend_types is None:
             backend_types = [master_job_provisioning_data.get_base_backend()]
         backend_types = [
             b for b in backend_types if b == master_job_provisioning_data.get_base_backend()
         ]
-        if not regions:
+        if regions is None:
             regions = [master_job_provisioning_data.region]
         regions = [r for r in regions if r == master_job_provisioning_data.region]
 
@@ -697,8 +721,8 @@ async def create_instance_model(
         project_name=project.name,
         instance_name=instance_name,
         user=user.name,
-        instance_id=str(instance_id),
         ssh_keys=[project_ssh_key],
+        instance_id=str(instance_id),
         placement_group_name=placement_group_name,
         reservation=reservation,
     )
@@ -735,6 +759,8 @@ async def create_ssh_instance_model(
     port: int,
     ssh_user: str,
     ssh_keys: List[SSHKey],
+    ssh_proxy: Optional[SSHConnectionParams],
+    ssh_proxy_keys: Optional[list[SSHKey]],
     env: Env,
     blocks: Union[Literal["auto"], int],
 ) -> InstanceModel:
@@ -771,6 +797,8 @@ async def create_ssh_instance_model(
         port=port,
         ssh_user=ssh_user,
         ssh_keys=ssh_keys,
+        ssh_proxy=ssh_proxy,
+        ssh_proxy_keys=ssh_proxy_keys,
         env=env,
     )
     im = InstanceModel(

@@ -9,7 +9,7 @@ import dstack._internal.server.services.jobs as jobs_services
 from dstack._internal.core.consts import DSTACK_RUNNER_SSH_PORT
 from dstack._internal.core.models.common import is_core_model_instance
 from dstack._internal.core.models.configurations import ServiceConfiguration
-from dstack._internal.core.models.instances import SSHConnectionParams
+from dstack._internal.core.models.instances import RemoteConnectionInfo, SSHConnectionParams
 from dstack._internal.core.models.runs import (
     JobProvisioningData,
     JobStatus,
@@ -30,6 +30,7 @@ from dstack._internal.proxy.lib.models import (
 from dstack._internal.proxy.lib.repo import BaseProxyRepo
 from dstack._internal.server.models import JobModel, ProjectModel, RunModel
 from dstack._internal.server.settings import DEFAULT_SERVICE_CLIENT_MAX_BODY_SIZE
+from dstack._internal.utils.common import get_or_error
 
 
 class ServerProxyRepo(BaseProxyRepo):
@@ -53,9 +54,12 @@ class ServerProxyRepo(BaseProxyRepo):
                 JobModel.status == JobStatus.RUNNING,
                 JobModel.job_num == 0,
             )
-            .options(joinedload(JobModel.run))
+            .options(
+                joinedload(JobModel.run),
+                joinedload(JobModel.instance),
+            )
         )
-        jobs = res.scalars().all()
+        jobs = res.unique().scalars().all()
         if not len(jobs):
             return None
         run = jobs[0].run
@@ -83,12 +87,22 @@ class ServerProxyRepo(BaseProxyRepo):
                     username=jpd.username,
                     port=jpd.ssh_port,
                 )
+            ssh_head_proxy: Optional[SSHConnectionParams] = None
+            ssh_head_proxy_private_key: Optional[str] = None
+            instance = get_or_error(job.instance)
+            if instance.remote_connection_info is not None:
+                rci = RemoteConnectionInfo.__response__.parse_raw(instance.remote_connection_info)
+                if rci.ssh_proxy is not None:
+                    ssh_head_proxy = rci.ssh_proxy
+                    ssh_head_proxy_private_key = get_or_error(rci.ssh_proxy_keys)[0].private
             replica = Replica(
                 id=job.id.hex,
                 app_port=run_spec.configuration.port.container_port,
                 ssh_destination=ssh_destination,
                 ssh_port=ssh_port,
                 ssh_proxy=ssh_proxy,
+                ssh_head_proxy=ssh_head_proxy,
+                ssh_head_proxy_private_key=ssh_head_proxy_private_key,
             )
             replicas.append(replica)
         return Service(

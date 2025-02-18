@@ -201,13 +201,16 @@ class FleetConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
 
 
 def _preprocess_spec(spec: FleetSpec):
-    if spec.configuration.ssh_config is not None:
-        spec.configuration.ssh_config.ssh_key = _resolve_ssh_key(
-            spec.configuration.ssh_config.identity_file
-        )
-        for host in spec.configuration.ssh_config.hosts:
+    ssh_config = spec.configuration.ssh_config
+    if ssh_config is not None:
+        ssh_config.ssh_key = _resolve_ssh_key(ssh_config.identity_file)
+        if ssh_config.proxy_jump is not None:
+            ssh_config.proxy_jump.ssh_key = _resolve_ssh_key(ssh_config.proxy_jump.identity_file)
+        for host in ssh_config.hosts:
             if not isinstance(host, str):
                 host.ssh_key = _resolve_ssh_key(host.identity_file)
+                if host.proxy_jump is not None:
+                    host.proxy_jump.ssh_key = _resolve_ssh_key(host.proxy_jump.identity_file)
 
 
 def _resolve_ssh_key(ssh_key_path: Optional[str]) -> Optional[SSHKey]:

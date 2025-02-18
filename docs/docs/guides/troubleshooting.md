@@ -46,6 +46,7 @@ When you apply a configuration, `dstack` tries to find instances that match the
 [`resources`](../reference/dstack.yml/task.md#resources),
 [`backends`](../reference/dstack.yml/task.md#backends),
 [`regions`](../reference/dstack.yml/task.md#regions),
+[`availability_zones`](../reference/dstack.yml/task.md#availability_zones),
 [`instance_types`](../reference/dstack.yml/task.md#instance_types),
 [`spot_policy`](../reference/dstack.yml/task.md#spot_policy),
 and [`max_price`](../reference/dstack.yml/task.md#max_price)

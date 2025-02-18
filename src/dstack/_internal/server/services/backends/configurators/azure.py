@@ -2,6 +2,7 @@ import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Optional, Tuple
 
+import azure.core.exceptions
 from azure.core.credentials import TokenCredential
 from azure.mgmt import network as network_mgmt
 from azure.mgmt import resource as resource_mgmt
@@ -154,16 +155,17 @@ class AzureConfigurator(Configurator):
         if is_core_model_instance(config.creds, AzureClientCreds):
             self._set_client_creds_tenant_id(config.creds, config.tenant_id)
         credential, _ = auth.authenticate(config.creds)
-        resource_group = self._create_resource_group(
-            credential=credential,
-            subscription_id=config.subscription_id,
-            location=MAIN_LOCATION,
-            project_name=project.name,
-        )
+        if config.resource_group is None:
+            config.resource_group = self._create_resource_group(
+                credential=credential,
+                subscription_id=config.subscription_id,
+                location=MAIN_LOCATION,
+                project_name=project.name,
+            )
         self._create_network_resources(
             credential=credential,
             subscription_id=config.subscription_id,
-            resource_group=resource_group,
+            resource_group=config.resource_group,
             locations=config.locations,
             create_default_network=config.vpc_ids is None,
         )
@@ -172,7 +174,6 @@ class AzureConfigurator(Configurator):
             type=self.TYPE.value,
             config=AzureStoredConfig(
                 **AzureConfigInfo.__response__.parse_obj(config).dict(),
-                resource_group=resource_group,
             ).json(),
             auth=DecryptedString(plaintext=AzureCreds.parse_obj(config.creds).__root__.json()),
         )
@@ -322,6 +323,7 @@ class AzureConfigurator(Configurator):
         self, config: AzureConfigInfoWithCredsPartial, credential: auth.AzureCredential
     ):
         self._check_tags_config(config)
+        self._check_resource_group(config=config, credential=credential)
         self._check_vpc_config(config=config, credential=credential)
 
     def _check_tags_config(self, config: AzureConfigInfoWithCredsPartial):
@@ -335,6 +337,18 @@ class AzureConfigurator(Configurator):
             resources.validate_tags(config.tags)
         except BackendError as e:
             raise ServerClientError(e.args[0])
+
+    def _check_resource_group(
+        self, config: AzureConfigInfoWithCredsPartial, credential: auth.AzureCredential
+    ):
+        if config.resource_group is None:
+            return
+        resource_manager = ResourceManager(
+            credential=credential,
+            subscription_id=config.subscription_id,
+        )
+        if not resource_manager.resource_group_exists(config.resource_group):
+            raise ServerClientError(f"Resource group {config.resource_group} not found")
 
     def _check_vpc_config(
         self, config: AzureConfigInfoWithCredsPartial, credential: auth.AzureCredential
@@ -405,6 +419,18 @@ class ResourceManager:
             ),
         )
         return resource_group.name
+
+    def resource_group_exists(
+        self,
+        name: str,
+    ) -> bool:
+        try:
+            self.resource_client.resource_groups.get(
+                resource_group_name=name,
+            )
+        except azure.core.exceptions.ResourceNotFoundError:
+            return False
+        return True
 
 
 class NetworkManager:

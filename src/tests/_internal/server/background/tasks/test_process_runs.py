@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 import dstack._internal.server.background.tasks.process_runs as process_runs
 from dstack._internal.core.models.configurations import ServiceConfiguration
+from dstack._internal.core.models.instances import InstanceStatus
 from dstack._internal.core.models.profiles import Profile
 from dstack._internal.core.models.resources import Range
 from dstack._internal.core.models.runs import (
@@ -116,11 +117,20 @@ class TestProcessRuns:
     async def test_terminate_run_jobs(self, test_db, session: AsyncSession):
         run = await make_run(session, status=RunStatus.TERMINATING)
         run.termination_reason = RunTerminationReason.JOB_FAILED
+        pool = await create_pool(session=session, project=run.project)
+        instance = await create_instance(
+            session=session,
+            project=run.project,
+            pool=pool,
+            status=InstanceStatus.BUSY,
+        )
         job = await create_job(
             session=session,
             run=run,
             job_provisioning_data=get_job_provisioning_data(),
             status=JobStatus.RUNNING,
+            instance=instance,
+            instance_assigned=True,
         )
 
         with patch("dstack._internal.server.services.jobs._stop_runner") as stop_runner:
@@ -288,13 +298,27 @@ class TestProcessRunsReplicas:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_some_failed_to_terminating(self, test_db, session: AsyncSession):
+    @pytest.mark.parametrize(
+        ("job_status", "job_termination_reason"),
+        [
+            (JobStatus.FAILED, JobTerminationReason.CONTAINER_EXITED_WITH_ERROR),
+            (JobStatus.TERMINATING, JobTerminationReason.TERMINATED_BY_SERVER),
+            (JobStatus.TERMINATED, JobTerminationReason.TERMINATED_BY_SERVER),
+        ],
+    )
+    async def test_some_failed_to_terminating(
+        self,
+        test_db,
+        session: AsyncSession,
+        job_status: JobStatus,
+        job_termination_reason: JobTerminationReason,
+    ) -> None:
         run = await make_run(session, status=RunStatus.RUNNING, replicas=2)
         await create_job(
             session=session,
             run=run,
-            status=JobStatus.FAILED,
-            termination_reason=JobTerminationReason.CONTAINER_EXITED_WITH_ERROR,
+            status=job_status,
+            termination_reason=job_termination_reason,
             replica_num=0,
         )
         await create_job(session=session, run=run, status=JobStatus.RUNNING, replica_num=1)

@@ -1,0 +1,19 @@
+type: service
+name: deepseek-v2-lite-nvidia
+
+image: vllm/vllm-openai:latest
+env:
+  - MODEL_ID=deepseek-ai/DeepSeek-V2-Lite
+  - MAX_MODEL_LEN=4096
+commands:
+  - vllm serve $MODEL_ID
+    --max-model-len $MAX_MODEL_LEN
+    --tensor-parallel-size $DSTACK_GPUS_NUM
+    --trust-remote-code
+
+port: 8000
+
+model: deepseek-ai/DeepSeek-V2-Lite
+
+resources:
+  gpu: 48GB

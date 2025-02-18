@@ -18,6 +18,7 @@ from dstack._internal.core.services.ssh.tunnel import (
 from dstack._internal.proxy.lib.errors import UnexpectedProxyError
 from dstack._internal.proxy.lib.models import Project, Replica, Service
 from dstack._internal.proxy.lib.repo import BaseProxyRepo
+from dstack._internal.utils.common import get_or_error
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.path import FileContent
 
@@ -45,10 +46,16 @@ class ServiceConnection:
             os.chmod(self._temp_dir.name, 0o755)
             options["StreamLocalBindMask"] = "0111"
         self._app_socket_path = (Path(self._temp_dir.name) / "replica.sock").absolute()
+        ssh_proxies = []
+        if replica.ssh_head_proxy is not None:
+            ssh_head_proxy_private_key = get_or_error(replica.ssh_head_proxy_private_key)
+            ssh_proxies.append((replica.ssh_head_proxy, FileContent(ssh_head_proxy_private_key)))
+        if replica.ssh_proxy is not None:
+            ssh_proxies.append((replica.ssh_proxy, None))
         self._tunnel = SSHTunnel(
             destination=replica.ssh_destination,
             port=replica.ssh_port,
-            ssh_proxy=replica.ssh_proxy,
+            ssh_proxies=ssh_proxies,
             identity=FileContent(project.ssh_private_key),
             forwarded_sockets=[
                 SocketPair(

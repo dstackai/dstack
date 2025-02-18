@@ -31,6 +31,7 @@ func (c *CLIArgs) getRunnerArgs() []string {
 		"--log-level", strconv.Itoa(c.Runner.LogLevel),
 		"start",
 		"--http-port", strconv.Itoa(c.Runner.HTTPPort),
+		"--ssh-port", strconv.Itoa(c.Runner.SSHPort),
 		"--temp-dir", consts.RunnerTempDir,
 		"--home-dir", consts.RunnerHomeDir,
 		"--working-dir", consts.RunnerWorkingDir,
