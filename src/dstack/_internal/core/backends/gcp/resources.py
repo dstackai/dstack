@@ -64,7 +64,7 @@ def check_vpc(
                 region=region,
             )
     except google.api_core.exceptions.NotFound:
-        raise ComputeError(f"Failed to find Shared VPC project {vpc_project_id}")
+        raise ComputeError(f"Failed to find VPC project {vpc_project_id}")
 
     if allocate_public_ip:
         return
