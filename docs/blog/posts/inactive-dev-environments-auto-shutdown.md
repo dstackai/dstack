@@ -61,7 +61,7 @@ $ dstack ps --verbose
 
 </div>
 
-Reattaching to the environment with [`dstack attach`](../../docs/reference/cli/dstack/attach.md),
+Reattaching to the environment with [`dstack attach`](../../docs/reference/cli/dstack/attach.md)
 resets the inactivity timer within seconds.
 
 Overall, the new feature makes using dev environments both safer and more cost-effective.
@@ -70,6 +70,6 @@ fleets by teams.
 
 !!! info "What's next?"
     1. Check [dev environments](../../docs/concepts/dev-environments.md), 
-        [tasks](../../docs/concepts/tasks.md), [services](../../docs/concepts/services.md),
-and [fleets](../../docs/concepts/fleets.md)
+       [tasks](../../docs/concepts/tasks.md), [services](../../docs/concepts/services.md),
+       and [fleets](../../docs/concepts/fleets.md)
     2. Join [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd){:target="_blank"}
