@@ -3,7 +3,7 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
-from dstack._internal.server.services.logs import FileLogStorage
+from dstack._internal.server.services.logs.filelog import FileLogStorage
 from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.testing.common import create_project, create_user, get_auth_headers
 

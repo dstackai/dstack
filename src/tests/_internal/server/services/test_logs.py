@@ -17,11 +17,11 @@ from dstack._internal.core.models.logs import LogEvent, LogEventSource
 from dstack._internal.server.models import ProjectModel
 from dstack._internal.server.schemas.logs import PollLogsRequest
 from dstack._internal.server.schemas.runner import LogEvent as RunnerLogEvent
-from dstack._internal.server.services.logs import (
+from dstack._internal.server.services.logs.aws import (
     CloudWatchLogStorage,
-    FileLogStorage,
-    LogStorageError,
 )
+from dstack._internal.server.services.logs.base import LogStorageError
+from dstack._internal.server.services.logs.filelog import FileLogStorage
 from dstack._internal.server.testing.common import create_project
 
 
