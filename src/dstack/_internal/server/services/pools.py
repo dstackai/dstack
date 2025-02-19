@@ -487,24 +487,23 @@ def filter_pool_instances(
             continue
         if status is not None and instance.status != status:
             continue
-        if backend_types is not None and instance.backend not in backend_types:
-            continue
-        if regions is not None and instance.region not in regions:
-            continue
         jpd = get_instance_provisioning_data(instance)
-        if (
-            jpd is not None
-            and profile.instance_types is not None
-            and jpd.instance_type.name not in profile.instance_types
-        ):
-            continue
-        if (
-            jpd is not None
-            and jpd.availability_zone is not None
-            and zones is not None
-            and jpd.availability_zone not in zones
-        ):
-            continue
+        if jpd is not None:
+            if backend_types is not None and jpd.get_base_backend() not in backend_types:
+                continue
+            if regions is not None and jpd.region not in regions:
+                continue
+            if (
+                profile.instance_types is not None
+                and jpd.instance_type.name not in profile.instance_types
+            ):
+                continue
+            if (
+                jpd.availability_zone is not None
+                and zones is not None
+                and jpd.availability_zone not in zones
+            ):
+                continue
         if instance.total_blocks is None:
             # Still provisioning, we don't know yet if it shared or not
             continue

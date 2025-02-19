@@ -45,7 +45,6 @@ from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
     InstanceRuntime,
     InstanceStatus,
-    InstanceType,
     RemoteConnectionInfo,
     SSHKey,
 )
@@ -695,7 +694,8 @@ async def _check_instance(instance: InstanceModel) -> None:
 
     if instance.status == InstanceStatus.PROVISIONING and instance.started_at is not None:
         provisioning_deadline = _get_provisioning_deadline(
-            instance, job_provisioning_data.instance_type
+            instance=instance,
+            job_provisioning_data=job_provisioning_data,
         )
         if get_current_datetime() > provisioning_deadline:
             instance.status = InstanceStatus.TERMINATING
@@ -737,7 +737,8 @@ async def _wait_for_instance_provisioning_data(
         instance.name,
     )
     provisioning_deadline = _get_provisioning_deadline(
-        instance, job_provisioning_data.instance_type
+        instance=instance,
+        job_provisioning_data=job_provisioning_data,
     )
     if get_current_datetime() > provisioning_deadline:
         logger.warning(
@@ -959,9 +960,13 @@ def _get_retry_duration_deadline(instance: InstanceModel, retry: Retry) -> datet
 
 
 def _get_provisioning_deadline(
-    instance: InstanceModel, instance_type: InstanceType
+    instance: InstanceModel,
+    job_provisioning_data: JobProvisioningData,
 ) -> datetime.datetime:
-    timeout_interval = _get_instance_timeout_interval(instance.backend, instance_type.name)
+    timeout_interval = _get_instance_timeout_interval(
+        backend_type=job_provisioning_data.get_base_backend(),
+        instance_type_name=job_provisioning_data.instance_type.name,
+    )
     return instance.started_at.replace(tzinfo=datetime.timezone.utc) + timeout_interval
 
 
