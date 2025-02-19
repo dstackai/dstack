@@ -1,10 +1,11 @@
 import json
 from typing import Optional, Tuple
 
+import google.api_core.exceptions
 import google.auth
+import google.cloud.compute_v1 as compute_v1
 from google.auth.credentials import Credentials
 from google.auth.exceptions import DefaultCredentialsError
-from google.cloud import storage
 from google.oauth2 import service_account
 
 from dstack._internal.core.errors import BackendAuthError
@@ -16,13 +17,16 @@ from dstack._internal.core.models.backends.gcp import (
 from dstack._internal.core.models.common import is_core_model_instance
 
 
-def authenticate(creds: AnyGCPCreds) -> Tuple[Credentials, Optional[str]]:
-    """
-    :raises BackendAuthError:
-    :return: GCP credentials and project_id
-    """
-    credentials, project_id = get_credentials(creds)
-    validate_credentials(credentials)
+def authenticate(creds: AnyGCPCreds, project_id: Optional[str] = None) -> Tuple[Credentials, str]:
+    credentials, credentials_project_id = get_credentials(creds)
+    if project_id is None:
+        # If project_id is not specified explicitly, try using credentials' project_id.
+        # Explicit project_id takes precedence bacause credentials' project_id may be irrelevant.
+        # For example, with Workload Identity Federation for GKE, it's cluster project_id.
+        project_id = credentials_project_id
+    if project_id is None:
+        raise BackendAuthError("Credentials require project_id to be specified")
+    validate_credentials(credentials, project_id)
     return credentials, project_id
 
 
@@ -40,17 +44,19 @@ def get_credentials(creds: AnyGCPCreds) -> Tuple[Credentials, Optional[str]]:
     try:
         default_credentials, project_id = google.auth.default()
     except DefaultCredentialsError:
-        raise BackendAuthError()
+        raise BackendAuthError("Failed to find default credentials")
 
     return default_credentials, project_id
 
 
-def validate_credentials(credentials: Credentials):
+def validate_credentials(credentials: Credentials, project_id: str):
     try:
-        storage_client = storage.Client(credentials=credentials)
-        storage_client.list_buckets(max_results=1)
+        regions_client = compute_v1.RegionsClient(credentials=credentials)
+        regions_client.list(project=project_id)
+    except google.api_core.exceptions.NotFound:
+        raise BackendAuthError(f"project_id {project_id} not found")
     except Exception:
-        raise BackendAuthError()
+        raise BackendAuthError("Insufficient permissions")
 
 
 def default_creds_available() -> bool:

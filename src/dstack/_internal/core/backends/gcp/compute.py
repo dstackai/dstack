@@ -70,7 +70,7 @@ class GCPCompute(Compute):
     def __init__(self, config: GCPConfig):
         super().__init__()
         self.config = config
-        self.credentials, self.project_id = auth.authenticate(config.creds)
+        self.credentials, _ = auth.authenticate(config.creds, self.config.project_id)
         self.instances_client = compute_v1.InstancesClient(credentials=self.credentials)
         self.firewalls_client = compute_v1.FirewallsClient(credentials=self.credentials)
         self.regions_client = compute_v1.RegionsClient(credentials=self.credentials)
