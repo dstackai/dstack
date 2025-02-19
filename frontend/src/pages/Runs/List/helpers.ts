@@ -35,7 +35,7 @@ export const getRunListItemSpot = (run: IRun) => {
 export const getRunListItemPrice = (run: IRun) => {
     if (run.jobs.length > 1) {
         return `$${run.jobs.reduce<number>((acc, job) => {
-            const price = job.job_submissions?.[0]?.job_provisioning_data?.price;
+            const price = job.job_submissions?.[job.job_submissions.length - 1]?.job_provisioning_data?.price;
 
             if (price) acc += price;
 
