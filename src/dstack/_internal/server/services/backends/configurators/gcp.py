@@ -127,10 +127,6 @@ class GCPConfigurator(Configurator):
             _, project_id = auth.authenticate(GCPDefaultCreds())
         except BackendAuthError:
             return []
-
-        if project_id is None:
-            return []
-
         return [
             GCPConfigInfoWithCreds(
                 project_id=project_id,
@@ -152,16 +148,15 @@ class GCPConfigurator(Configurator):
         ):
             raise_invalid_credentials_error(fields=[["creds"]])
         try:
-            credentials, _ = auth.authenticate(creds=config.creds)
-            # We ignore credentials' project_id since it may be irrelevant.
-            # For example, with Workload Identity Federation for GKE, it's cluster project_id.
-            # config.project_id is not validated directly since it would require org-level permissions.
-            # config.project_id is validated indirectly when checking VPC.
-        except BackendAuthError:
+            credentials, _ = auth.authenticate(creds=config.creds, project_id=config.project_id)
+        except BackendAuthError as e:
+            details = None
+            if len(e.args) > 0:
+                details = e.args[0]
             if is_core_model_instance(config.creds, GCPServiceAccountCreds):
-                raise_invalid_credentials_error(fields=[["creds", "data"]])
+                raise_invalid_credentials_error(fields=[["creds", "data"]], details=details)
             else:
-                raise_invalid_credentials_error(fields=[["creds"]])
+                raise_invalid_credentials_error(fields=[["creds"]], details=details)
         config_values.regions = self._get_regions_element(
             selected=config.regions or DEFAULT_REGIONS
         )
