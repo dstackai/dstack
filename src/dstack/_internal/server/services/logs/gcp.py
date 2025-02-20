@@ -1,9 +1,6 @@
 from typing import Iterable, List
 from uuid import UUID
 
-import google.api_core.exceptions
-from google.cloud import logging
-
 from dstack._internal.core.errors import ServerClientError
 from dstack._internal.core.models.logs import (
     JobSubmissionLogs,
@@ -16,11 +13,21 @@ from dstack._internal.server.schemas.logs import PollLogsRequest
 from dstack._internal.server.schemas.runner import LogEvent as RunnerLogEvent
 from dstack._internal.server.services.logs.base import (
     LogStorage,
+    LogStorageError,
     b64encode_raw_message,
     unix_time_ms_to_datetime,
 )
 from dstack._internal.utils.common import batched
 from dstack._internal.utils.logging import get_logger
+
+GCP_LOGGING_AVAILABLE = True
+try:
+    import google.api_core.exceptions
+    import google.auth.exceptions
+    from google.cloud import logging
+except ImportError:
+    GCP_LOGGING_AVAILABLE = False
+
 
 logger = get_logger(__name__)
 
@@ -40,8 +47,19 @@ class GCPLogStorage(LogStorage):
     # It should be fast to filter by labels since labels are indexed.
 
     def __init__(self, project_id: str):
-        self.client = logging.Client(project=project_id)
-        self.logger = self.client.logger(name=self.LOG_NAME)
+        try:
+            self.client = logging.Client(project=project_id)
+            self.logger = self.client.logger(name=self.LOG_NAME)
+            self.logger.list_entries(max_results=1)
+            # Python client doesn't seem to support dry_run,
+            # so emit an empty log to check permissions.
+            self.logger.log_empty()
+        except google.auth.exceptions.DefaultCredentialsError:
+            raise LogStorageError("Default credentials not found")
+        except google.api_core.exceptions.NotFound:
+            raise LogStorageError(f"Project {project_id} not found")
+        except google.api_core.exceptions.PermissionDenied:
+            raise LogStorageError("Insufficient permissions")
 
     def poll_logs(self, project: ProjectModel, request: PollLogsRequest) -> JobSubmissionLogs:
         producer = LogProducer.RUNNER if request.diagnose else LogProducer.JOB
@@ -75,11 +93,11 @@ class GCPLogStorage(LogStorage):
             ]
         except google.api_core.exceptions.ResourceExhausted as e:
             logger.debug("GCP Logging exception: %s", repr(e))
+            # GCP Logging has severely low quota of 60 reads/min for entries.list
             raise ServerClientError(
                 "GCP Logging read request limit exceeded."
                 " It's recommended to increase default entries.list request quota from 60 per minute."
             )
-
         return JobSubmissionLogs(logs=logs)
 
     def write_logs(

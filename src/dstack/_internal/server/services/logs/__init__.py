@@ -10,7 +10,7 @@ from dstack._internal.server.schemas.runner import LogEvent as RunnerLogEvent
 from dstack._internal.server.services.logs.aws import BOTO_AVAILABLE, CloudWatchLogStorage
 from dstack._internal.server.services.logs.base import LogStorage, LogStorageError
 from dstack._internal.server.services.logs.filelog import FileLogStorage
-from dstack._internal.server.services.logs.gcp import GCPLogStorage
+from dstack._internal.server.services.logs.gcp import GCP_LOGGING_AVAILABLE, GCPLogStorage
 from dstack._internal.utils.common import run_async
 from dstack._internal.utils.logging import get_logger
 
@@ -36,10 +36,17 @@ def get_log_storage() -> LogStorage:
             else:
                 logger.debug("Using CloudWatch Logs storage")
         else:
-            logger.error("Cannot use CloudWatch Logs storage, boto3 is not installed")
+            logger.error("Cannot use CloudWatch Logs storage: boto3 is not installed")
     elif settings.SERVER_GCP_LOGGING_PROJECT:
-        _log_storage = GCPLogStorage(project_id=settings.SERVER_GCP_LOGGING_PROJECT)
-        logger.debug("Using GCP Logs storage")
+        if GCP_LOGGING_AVAILABLE:
+            try:
+                _log_storage = GCPLogStorage(project_id=settings.SERVER_GCP_LOGGING_PROJECT)
+            except LogStorageError as e:
+                logger.error("Failed to initialize GCP Logs storage: %s", e)
+            else:
+                logger.debug("Using GCP Logs storage")
+        else:
+            logger.error("Cannot use GCP Logs storage: GCP deps are not installed")
     if _log_storage is None:
         _log_storage = FileLogStorage()
         logger.debug("Using file-based storage")
