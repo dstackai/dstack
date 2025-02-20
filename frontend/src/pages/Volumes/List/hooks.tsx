@@ -1,18 +1,18 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { format } from 'date-fns';
 
 import { Button, ListEmptyMessage, NavigateLink, StatusIndicator } from 'components';
 import { SelectCSDProps } from 'components';
 
-import { DATE_TIME_FORMAT, DEFAULT_TABLE_PAGE_SIZE } from 'consts';
+import { DATE_TIME_FORMAT } from 'consts';
 import { useNotifications } from 'hooks';
 import { useLocalStorageState } from 'hooks/useLocalStorageState';
 import { getServerError } from 'libs';
 import { getStatusIconType } from 'libs/volumes';
 import { ROUTES } from 'routes';
 import { useGetProjectsQuery } from 'services/project';
-import { useDeleteVolumesMutation, useLazyGetAllVolumesQuery } from 'services/volume';
+import { useDeleteVolumesMutation } from 'services/volume';
 
 export const useVolumesTableEmptyMessages = ({
     clearFilters,
@@ -100,93 +100,6 @@ export const useColumnsDefinitions = () => {
     ];
 
     return { columns } as const;
-};
-export const useVolumesData = ({ project_name, only_active }: TVolumesListRequestParams) => {
-    const [data, setData] = useState<IVolume[]>([]);
-    const [pagesCount, setPagesCount] = useState<number>(1);
-    const [disabledNext, setDisabledNext] = useState(false);
-    const lastRequestParams = useRef<TVolumesListRequestParams | undefined>(undefined);
-
-    const [getVolumes, { isLoading, isFetching }] = useLazyGetAllVolumesQuery();
-
-    const getVolumesRequest = (params?: TVolumesListRequestParams) => {
-        lastRequestParams.current = params;
-
-        return getVolumes({
-            project_name,
-            only_active,
-            limit: DEFAULT_TABLE_PAGE_SIZE,
-            ...params,
-        })
-            .unwrap()
-            .then((result) => {
-                return result;
-            });
-    };
-
-    const refreshList = () => {
-        getVolumesRequest(lastRequestParams.current).then((result) => {
-            setDisabledNext(false);
-            setData(result);
-        });
-    };
-
-    useEffect(() => {
-        getVolumesRequest().then((result) => {
-            setPagesCount(1);
-            setDisabledNext(false);
-            setData(result);
-        });
-    }, [project_name, only_active]);
-
-    const nextPage = async () => {
-        if (data.length === 0 || disabledNext) {
-            return;
-        }
-
-        try {
-            const result = await getVolumesRequest({
-                prev_created_at: data[data.length - 1].created_at,
-                prev_id: data[data.length - 1].id,
-            });
-
-            if (result.length > 0) {
-                setPagesCount((count) => count + 1);
-                setData(result);
-            } else {
-                setDisabledNext(true);
-            }
-        } catch (e) {
-            console.log(e);
-        }
-    };
-
-    const prevPage = async () => {
-        if (pagesCount === 1) {
-            return;
-        }
-
-        try {
-            const result = await getVolumesRequest({
-                prev_created_at: data[0].created_at,
-                prev_id: data[0].id,
-                ascending: true,
-            });
-
-            setDisabledNext(false);
-
-            if (result.length > 0) {
-                setPagesCount((count) => count - 1);
-                setData(result);
-            } else {
-                setPagesCount(1);
-            }
-        } catch (e) {
-            console.log(e);
-        }
-    };
-
-    return { data, pagesCount, disabledNext, isLoading: isLoading || isFetching, nextPage, prevPage, refreshList };
 };
 
 export const useFilters = (storagePrefix?: string) => {

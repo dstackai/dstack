@@ -12,7 +12,7 @@ export const volumeApi = createApi({
     tagTypes: ['Volumes'],
 
     endpoints: (builder) => ({
-        getAllVolumes: builder.query<IVolume[], TVolumesListRequestParams | void>({
+        getAllVolumes: builder.query<IVolume[], TVolumesListRequestParams>({
             query: (body) => {
                 return {
                     url: API.VOLUME.LIST(),
