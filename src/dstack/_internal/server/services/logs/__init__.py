@@ -33,6 +33,8 @@ def get_log_storage() -> LogStorage:
                 )
             except LogStorageError as e:
                 logger.error("Failed to initialize CloudWatch Logs storage: %s", e)
+            except Exception:
+                logger.exception("Got exception when initializing CloudWatch Logs storage")
             else:
                 logger.debug("Using CloudWatch Logs storage")
         else:
@@ -43,6 +45,8 @@ def get_log_storage() -> LogStorage:
                 _log_storage = GCPLogStorage(project_id=settings.SERVER_GCP_LOGGING_PROJECT)
             except LogStorageError as e:
                 logger.error("Failed to initialize GCP Logs storage: %s", e)
+            except Exception:
+                logger.exception("Got exception when initializing GCP Logs storage")
             else:
                 logger.debug("Using GCP Logs storage")
         else:

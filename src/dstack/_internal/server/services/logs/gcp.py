@@ -45,7 +45,8 @@ class GCPLogStorage(LogStorage):
     LOG_NAME = "dstack-run-logs"
     # Logs from different jobs belong to different "streams".
     # GCP Logging has no built-in concepts of streams, so we implement them with labels.
-    # It should be fast to filter by labels since labels are indexed.
+    # It should be fast to filter by labels since labels are indexed by default
+    # (https://cloud.google.com/logging/docs/analyze/custom-index).
 
     def __init__(self, project_id: str):
         try:
