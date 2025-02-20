@@ -215,7 +215,7 @@ class Run(ABC):
                         start_time=next_start_time,
                         end_time=None,
                         descending=False,
-                        limit=100,
+                        limit=1000,
                         diagnose=diagnose,
                     ),
                 )
