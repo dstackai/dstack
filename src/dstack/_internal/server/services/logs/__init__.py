@@ -47,10 +47,6 @@ def get_log_storage() -> LogStorage:
     return _log_storage
 
 
-def poll_logs(project: ProjectModel, request: PollLogsRequest) -> JobSubmissionLogs:
-    return get_log_storage().poll_logs(project=project, request=request)
-
-
 def write_logs(
     project: ProjectModel,
     run_name: str,
@@ -69,20 +65,3 @@ def write_logs(
 
 async def poll_logs_async(project: ProjectModel, request: PollLogsRequest) -> JobSubmissionLogs:
     return await run_async(get_log_storage().poll_logs, project=project, request=request)
-
-
-async def write_logs_async(
-    project: ProjectModel,
-    run_name: str,
-    job_submission_id: UUID,
-    runner_logs: List[RunnerLogEvent],
-    job_logs: List[RunnerLogEvent],
-) -> None:
-    return await run_async(
-        get_log_storage().write_logs,
-        project=project,
-        run_name=run_name,
-        job_submission_id=job_submission_id,
-        runner_logs=runner_logs,
-        job_logs=job_logs,
-    )
