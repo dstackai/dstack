@@ -77,9 +77,13 @@ export const RunDetails: React.FC = () => {
     ]);
 
     const abortClickHandle = () => {
+        if (!runData) {
+            return;
+        }
+
         stopRun({
             project_name: paramProjectName,
-            runs_names: [paramRunId],
+            runs_names: [runData.run_spec.run_name],
             abort: true,
         })
             .unwrap()
@@ -92,9 +96,13 @@ export const RunDetails: React.FC = () => {
     };
 
     const stopClickHandle = () => {
+        if (!runData) {
+            return;
+        }
+
         stopRun({
             project_name: paramProjectName,
-            runs_names: [paramRunId],
+            runs_names: [runData.run_spec.run_name],
             abort: false,
         })
             .unwrap()
@@ -107,9 +115,13 @@ export const RunDetails: React.FC = () => {
     };
 
     const deleteClickHandle = () => {
+        if (!runData) {
+            return;
+        }
+
         deleteRun({
             project_name: paramProjectName,
-            runs_names: [paramRunId],
+            runs_names: [runData.run_spec.run_name],
         })
             .unwrap()
             .then(() => {
