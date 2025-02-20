@@ -154,7 +154,7 @@ export const JobDetails: React.FC = () => {
 
                         <Logs
                             projectName={paramProjectName}
-                            runName={paramRunId}
+                            runName={runData?.run_spec?.run_name ?? ''}
                             jobSubmissionId={getJobSubmissionId(jobData)}
                             className={styles.logs}
                         />
