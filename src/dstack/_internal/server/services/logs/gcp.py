@@ -17,15 +17,26 @@ from dstack._internal.server.services.logs.base import (
     b64encode_raw_message,
     unix_time_ms_to_datetime,
 )
+from dstack._internal.utils.common import batched
+from dstack._internal.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class GCPLogStorage(LogStorage):
+    # Max expected message size from runner is 32KB.
+    # Max expected LogEntry size is 32KB + metadata < 50KB < 256KB limit.
+    # With MAX_BATCH_SIZE = 100, max write request size < 5MB < 10 MB limit.
+    # See: https://cloud.google.com/logging/quotas.
+    MAX_RUNNER_MESSAGE_SIZE = 32**20**2
+    MAX_BATCH_SIZE = 100
+
     def __init__(self, project_id: str):
         self.client = logging.Client(project=project_id)
 
     def poll_logs(self, project: ProjectModel, request: PollLogsRequest) -> JobSubmissionLogs:
         producer = LogProducer.RUNNER if request.diagnose else LogProducer.JOB
-        logger_name = self._get_logger_name(
+        logger_name = self._get_gcp_logger_name(
             project_name=project.name,
             run_name=request.run_name,
             job_submission_id=request.job_submission_id,
@@ -63,32 +74,49 @@ class GCPLogStorage(LogStorage):
         job_submission_id: UUID,
         runner_logs: List[RunnerLogEvent],
         job_logs: List[RunnerLogEvent],
-    ) -> None:
+    ):
         producers_with_logs = [(LogProducer.RUNNER, runner_logs), (LogProducer.JOB, job_logs)]
         for producer, producer_logs in producers_with_logs:
-            logger_name = self._get_logger_name(
+            gcp_logger_name = self._get_gcp_logger_name(
                 project_name=project.name,
                 run_name=run_name,
                 job_submission_id=job_submission_id,
                 producer=producer,
             )
-            logger = self._get_logger(logger_name)
-            for log in producer_logs:
-                # TODO: log in batches
-                logger.log_struct(
-                    {
-                        "message": b64encode_raw_message(log.message),
-                    },
-                    timestamp=unix_time_ms_to_datetime(log.timestamp),
-                )
+            gcp_logger = self._get_gcp_logger(gcp_logger_name)
+            self._write_logs_with_logger(gcp_logger, producer_logs)
 
-    def close(self) -> None:
+    def _write_logs_with_logger(self, gcp_logger: logging.Logger, logs: List[RunnerLogEvent]):
+        with gcp_logger.batch() as batcher:
+            for batch in batched(logs, self.MAX_BATCH_SIZE):
+                for log in logs:
+                    message = b64encode_raw_message(log.message)
+                    timestamp = unix_time_ms_to_datetime(log.timestamp)
+                    # as message is base64-encoded, length in bytes = length in code points
+                    if len(message) > self.MAX_RUNNER_MESSAGE_SIZE:
+                        logger.error(
+                            "Logger %s: skipping event %d, message exceeds max size: %d > %d",
+                            gcp_logger.name,
+                            timestamp,
+                            len(message),
+                            self.MAX_RUNNER_MESSAGE_SIZE,
+                        )
+                        continue
+                    batcher.log_struct(
+                        {
+                            "message": message,
+                        },
+                        timestamp=timestamp,
+                    )
+                batcher.commit()
+
+    def close(self):
         self.client.close()
 
-    def _get_logger_name(
+    def _get_gcp_logger_name(
         self, project_name: str, run_name: str, job_submission_id: UUID, producer: LogProducer
     ) -> str:
         return f"{project_name}-{run_name}-{job_submission_id}-{producer.value}"
 
-    def _get_logger(self, logger_name: str) -> logging.Logger:
+    def _get_gcp_logger(self, logger_name: str) -> logging.Logger:
         return logging.Logger(name=logger_name, client=self.client)

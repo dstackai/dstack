@@ -37,8 +37,8 @@ def get_log_storage() -> LogStorage:
                 logger.debug("Using CloudWatch Logs storage")
         else:
             logger.error("Cannot use CloudWatch Logs storage, boto3 is not installed")
-    elif settings.SERVER_GCP_PROJECT:
-        _log_storage = GCPLogStorage(project_id=settings.SERVER_GCP_PROJECT)
+    elif settings.SERVER_GCP_LOGGING_PROJECT:
+        _log_storage = GCPLogStorage(project_id=settings.SERVER_GCP_LOGGING_PROJECT)
         logger.debug("Using GCP Logs storage")
     if _log_storage is None:
         _log_storage = FileLogStorage()
