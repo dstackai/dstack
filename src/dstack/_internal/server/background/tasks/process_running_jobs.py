@@ -21,6 +21,7 @@ from dstack._internal.core.models.runs import (
     ClusterInfo,
     Job,
     JobProvisioningData,
+    JobRuntimeData,
     JobSpec,
     JobStatus,
     JobTerminationReason,
@@ -148,6 +149,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
         jobs=run.jobs,
         replica_num=job.job_spec.replica_num,
         job_provisioning_data=job_provisioning_data,
+        job_runtime_data=job_submission.job_runtime_data,
     )
 
     volumes = await get_job_attached_volumes(
@@ -671,6 +673,7 @@ def _get_cluster_info(
     jobs: List[Job],
     replica_num: int,
     job_provisioning_data: JobProvisioningData,
+    job_runtime_data: Optional[JobRuntimeData],
 ) -> ClusterInfo:
     job_ips = []
     for job in jobs:
@@ -681,10 +684,13 @@ def _get_cluster_info(
                 ).internal_ip
                 or ""
             )
+    gpus_per_job = len(job_provisioning_data.instance_type.resources.gpus)
+    if job_runtime_data is not None and job_runtime_data.offer is not None:
+        gpus_per_job = len(job_runtime_data.offer.instance.resources.gpus)
     cluster_info = ClusterInfo(
         job_ips=job_ips,
         master_job_ip=job_ips[0],
-        gpus_per_job=len(job_provisioning_data.instance_type.resources.gpus),
+        gpus_per_job=gpus_per_job,
     )
     return cluster_info
 
