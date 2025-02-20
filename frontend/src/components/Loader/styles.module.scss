@@ -1,4 +1,9 @@
 .loader {
     display: flex;
     justify-content: center;
+    transition: opacity .2s ease;
+
+    &:not(.show) {
+        opacity: 0;
+    }
 }

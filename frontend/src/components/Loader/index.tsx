@@ -7,14 +7,20 @@ import Spinner from '@cloudscape-design/components/spinner';
 import styles from './styles.module.scss';
 
 export interface Props {
+    show?: boolean;
     className?: string;
     padding?: BoxProps['padding'];
     loadingText?: string;
 }
 
-export const Loader: React.FC<Props> = ({ className, loadingText = 'Loading', padding = { vertical: 'xxxl' } }) => {
+export const Loader: React.FC<Props> = ({
+    className,
+    show = true,
+    loadingText = 'Loading',
+    padding = { vertical: 'xxxl' },
+}) => {
     return (
-        <div className={classNames(styles.loader, className)}>
+        <div className={classNames(styles.loader, className, { [styles.show]: show })}>
             <Box padding={padding} textAlign="center" color="inherit">
                 <SpaceBetween size="m" direction="horizontal">
                     <Spinner />
