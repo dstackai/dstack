@@ -37,7 +37,7 @@ class GCPLogStorage(LogStorage):
     # Max expected LogEntry size is 32KB + metadata < 50KB < 256KB limit.
     # With MAX_BATCH_SIZE = 100, max write request size < 5MB < 10 MB limit.
     # See: https://cloud.google.com/logging/quotas.
-    MAX_RUNNER_MESSAGE_SIZE = 32**1024
+    MAX_RUNNER_MESSAGE_SIZE = 32 * 1024
     MAX_BATCH_SIZE = 100
 
     # Use the same log name for all run logs so that it's easy to manage all dstack-related logs.
@@ -92,7 +92,7 @@ class GCPLogStorage(LogStorage):
                 for entry in entries
             ]
         except google.api_core.exceptions.ResourceExhausted as e:
-            logger.debug("GCP Logging exception: %s", repr(e))
+            logger.warning("GCP Logging exception: %s", repr(e))
             # GCP Logging has severely low quota of 60 reads/min for entries.list
             raise ServerClientError(
                 "GCP Logging read request limit exceeded."
@@ -133,9 +133,9 @@ class GCPLogStorage(LogStorage):
                     # as message is base64-encoded, length in bytes = length in code points
                     if len(message) > self.MAX_RUNNER_MESSAGE_SIZE:
                         logger.error(
-                            "Stream %s: skipping event %d, message exceeds max size: %d > %d",
+                            "Stream %s: skipping event at %s, message exceeds max size: %d > %d",
                             stream_name,
-                            timestamp,
+                            timestamp.isoformat(),
                             len(message),
                             self.MAX_RUNNER_MESSAGE_SIZE,
                         )
