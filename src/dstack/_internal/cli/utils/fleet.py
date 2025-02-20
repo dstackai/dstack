@@ -45,7 +45,11 @@ def get_fleets_table(
             status = instance.status.value
             total_blocks = instance.total_blocks
             busy_blocks = instance.busy_blocks
-            if total_blocks is not None and total_blocks > 1:
+            if (
+                instance.status in [InstanceStatus.IDLE, InstanceStatus.BUSY]
+                and total_blocks is not None
+                and total_blocks > 1
+            ):
                 status = f"{busy_blocks}/{total_blocks} {InstanceStatus.BUSY.value}"
             if (
                 instance.status in [InstanceStatus.IDLE, InstanceStatus.BUSY]
