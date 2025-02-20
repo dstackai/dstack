@@ -172,7 +172,7 @@ export const RunList: React.FC = () => {
                     </div>
                 </div>
             }
-            footer={isLoadingMore ? <Loader padding={{ vertical: 'l' }} /> : null}
+            footer={<Loader show={isLoadingMore} padding={{ vertical: 'm' }} />}
         />
     );
 };

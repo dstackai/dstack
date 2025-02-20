@@ -1,9 +1,9 @@
 import React, { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Button, FormField, Header, Pagination, SelectCSD, SpaceBetween, Table, Toggle } from 'components';
+import { Button, FormField, Header, Loader, SelectCSD, SpaceBetween, Table, Toggle } from 'components';
 
-import { useBreadcrumbs } from 'hooks';
+import { useBreadcrumbs, useInfiniteScroll } from 'hooks';
 import { useCollection } from 'hooks';
 import { ROUTES } from 'routes';
 
@@ -11,7 +11,8 @@ import { useActions } from './hooks/useActions';
 import { useColumnsDefinitions } from './hooks/useColumnDefinitions';
 import { useEmptyMessages } from './hooks/useEmptyMessage';
 import { useFilters } from './hooks/useFilters';
-import { useInstanceListData } from './hooks/useInstanceListData';
+import { DEFAULT_TABLE_PAGE_SIZE } from '../../../consts';
+import { useLazyGetInstancesQuery } from '../../../services/instance';
 
 import styles from './styles.module.scss';
 
@@ -38,17 +39,24 @@ export const List: React.FC = () => {
         selectedFleet,
     } = useFilters();
 
-    const params = useMemo<TInstanceListRequestParams>(() => {
+    const args = useMemo<TInstanceListRequestParams>(() => {
         return {
             project_names: selectedProject?.value ? [selectedProject.value] : undefined,
             only_active: onlyActive,
             fleet_ids: selectedFleet?.value ? [selectedFleet.value] : undefined,
+            limit: DEFAULT_TABLE_PAGE_SIZE,
         };
     }, [selectedProject, selectedFleet, onlyActive]);
 
-    const { data, pagesCount, disabledNext, isLoading, nextPage, prevPage, refreshList } = useInstanceListData(params);
+    const { data, isLoading, refreshList, isLoadingMore } = useInfiniteScroll<IInstance, TInstanceListRequestParams>({
+        useLazyQuery: useLazyGetInstancesQuery,
+        args,
 
-    const isDisabledPagination = isLoading || data.length === 0;
+        getPaginationParams: (lastInstance) => ({
+            prev_created_at: lastInstance.created,
+            prev_id: lastInstance.id,
+        }),
+    });
 
     const { deleteFleets, isDeleting } = useActions();
 
@@ -59,7 +67,6 @@ export const List: React.FC = () => {
             empty: renderEmptyMessage(),
             noMatch: renderNoMatchMessage(),
         },
-        pagination: { pageSize: 20 },
         selection: {},
     });
 
@@ -148,16 +155,7 @@ export const List: React.FC = () => {
                     </div>
                 </div>
             }
-            pagination={
-                <Pagination
-                    currentPageIndex={pagesCount}
-                    pagesCount={pagesCount}
-                    openEnd={!disabledNext}
-                    disabled={isDisabledPagination}
-                    onPreviousPageClick={prevPage}
-                    onNextPageClick={nextPage}
-                />
-            }
+            footer={<Loader show={isLoadingMore} padding={{ vertical: 'm' }} />}
         />
     );
 };
