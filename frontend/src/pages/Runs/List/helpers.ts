@@ -1,5 +1,8 @@
 import { groupBy as _groupBy } from 'lodash';
 
+import { finishedJobs } from '../constants';
+import { getJobStatus } from '../Details/Jobs/List/helpers';
+
 export const getGroupedRunsByProjectAndRepoID = (runs: IRun[]) => {
     return _groupBy(runs, ({ project_name }) => project_name);
 };
@@ -33,8 +36,10 @@ export const getRunListItemSpot = (run: IRun) => {
 };
 
 export const getRunListItemPrice = (run: IRun) => {
+    const unFinishedJobs = run.jobs.filter((job) => !finishedJobs.includes(getJobStatus(job)));
+
     if (run.jobs.length > 1) {
-        return `$${run.jobs.reduce<number>((acc, job) => {
+        return `$${unFinishedJobs.reduce<number>((acc, job) => {
             const price = job.job_submissions?.[job.job_submissions.length - 1]?.job_provisioning_data?.price;
 
             if (price) acc += price;

@@ -3,3 +3,4 @@ export const inActiveRunStatuses: TJobStatus[] = ['failed', 'aborted', 'done', '
 export const runStatusForStopping: TJobStatus[] = ['submitted', 'provisioning', 'pulling', 'pending', 'running'];
 export const runStatusForAborting: TJobStatus[] = ['submitted', 'provisioning', 'pulling', 'pending', 'running'];
 export const unfinishedRuns: TJobStatus[] = ['running', 'terminating', 'pending'];
+export const finishedJobs: TJobStatus[] = ['terminated', 'aborted', 'failed', 'done'];
