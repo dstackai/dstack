@@ -13,21 +13,28 @@ from dstack._internal.proxy.lib.repo import BaseProxyRepo
 from dstack._internal.proxy.lib.services.service_connection import ServiceConnectionPool
 from dstack._internal.server.services.proxy.services import service_proxy
 
-REDIRECTED_HTTP_METHODS = ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD"]
-PROXIED_HTTP_METHODS = REDIRECTED_HTTP_METHODS + ["OPTIONS"]
-
-
 router = APIRouter()
 
 
-@router.api_route("/{project_name}/{run_name}", methods=REDIRECTED_HTTP_METHODS)
-async def redirect_to_service_root(request: Request) -> Response:
+@router.get("/{project_name}/{run_name}")
+@router.post("/{project_name}/{run_name}")
+@router.put("/{project_name}/{run_name}")
+@router.delete("/{project_name}/{run_name}")
+@router.patch("/{project_name}/{run_name}")
+@router.head("/{project_name}/{run_name}")
+async def redirect_to_service_root(request: Request, project_name: str, run_name: str) -> Response:
     url = URL(str(request.url))
     url = url.replace(path=url.path + "/")
     return RedirectResponse(url, status.HTTP_308_PERMANENT_REDIRECT)
 
 
-@router.api_route("/{project_name}/{run_name}/{path:path}", methods=PROXIED_HTTP_METHODS)
+@router.get("/{project_name}/{run_name}/{path:path}")
+@router.post("/{project_name}/{run_name}/{path:path}")
+@router.put("/{project_name}/{run_name}/{path:path}")
+@router.delete("/{project_name}/{run_name}/{path:path}")
+@router.patch("/{project_name}/{run_name}/{path:path}")
+@router.head("/{project_name}/{run_name}/{path:path}")
+@router.options("/{project_name}/{run_name}/{path:path}")
 async def service_reverse_proxy(
     project_name: str,
     run_name: str,
