@@ -1,22 +1,14 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 
-import {
-    Button,
-    ButtonWithConfirmation,
-    FormField,
-    Header,
-    Pagination,
-    SelectCSD,
-    SpaceBetween,
-    Table,
-    Toggle,
-} from 'components';
+import { Button, ButtonWithConfirmation, FormField, Header, Loader, SelectCSD, SpaceBetween, Table, Toggle } from 'components';
 
-import { useBreadcrumbs, useCollection } from 'hooks';
+import { DEFAULT_TABLE_PAGE_SIZE } from 'consts';
+import { useBreadcrumbs, useCollection, useInfiniteScroll } from 'hooks';
 import { ROUTES } from 'routes';
+import { useLazyGetAllVolumesQuery } from 'services/volume';
 
-import { useColumnsDefinitions, useFilters, useVolumesData, useVolumesDelete, useVolumesTableEmptyMessages } from './hooks';
+import { useColumnsDefinitions, useFilters, useVolumesDelete, useVolumesTableEmptyMessages } from './hooks';
 
 import styles from './styles.module.scss';
 
@@ -39,9 +31,14 @@ export const VolumeList: React.FC = () => {
         isDisabledClearFilter,
     });
 
-    const { data, isLoading, pagesCount, disabledNext, prevPage, nextPage, refreshList } = useVolumesData({
-        project_name: selectedProject?.value ?? undefined,
-        only_active: onlyActive,
+    const { data, isLoading, refreshList, isLoadingMore } = useInfiniteScroll<IVolume, TVolumesListRequestParams>({
+        useLazyQuery: useLazyGetAllVolumesQuery,
+        args: { project_name: selectedProject?.value ?? undefined, only_active: onlyActive, limit: DEFAULT_TABLE_PAGE_SIZE },
+
+        getPaginationParams: (lastFleet) => ({
+            prev_created_at: lastFleet.created_at,
+            prev_id: lastFleet.id,
+        }),
     });
 
     const { columns } = useColumnsDefinitions();
@@ -58,7 +55,6 @@ export const VolumeList: React.FC = () => {
             empty: renderEmptyMessage(),
             noMatch: renderNoMatchMessage(),
         },
-        pagination: { pageSize: 20 },
         selection: {},
     });
 
@@ -145,16 +141,7 @@ export const VolumeList: React.FC = () => {
                     </div>
                 </div>
             }
-            pagination={
-                <Pagination
-                    currentPageIndex={pagesCount}
-                    pagesCount={pagesCount}
-                    openEnd={!disabledNext}
-                    disabled={isLoading || data.length === 0}
-                    onPreviousPageClick={prevPage}
-                    onNextPageClick={nextPage}
-                />
-            }
+            footer={<Loader show={isLoadingMore} padding={{ vertical: 'm' }} />}
         />
     );
 };

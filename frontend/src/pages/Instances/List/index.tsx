@@ -3,16 +3,16 @@ import { useTranslation } from 'react-i18next';
 
 import { Button, FormField, Header, Loader, SelectCSD, SpaceBetween, Table, Toggle } from 'components';
 
+import { DEFAULT_TABLE_PAGE_SIZE } from 'consts';
 import { useBreadcrumbs, useInfiniteScroll } from 'hooks';
 import { useCollection } from 'hooks';
 import { ROUTES } from 'routes';
+import { useLazyGetInstancesQuery } from 'services/instance';
 
 import { useActions } from './hooks/useActions';
 import { useColumnsDefinitions } from './hooks/useColumnDefinitions';
 import { useEmptyMessages } from './hooks/useEmptyMessage';
 import { useFilters } from './hooks/useFilters';
-import { DEFAULT_TABLE_PAGE_SIZE } from '../../../consts';
-import { useLazyGetInstancesQuery } from '../../../services/instance';
 
 import styles from './styles.module.scss';
 
