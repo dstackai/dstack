@@ -1,3 +1,4 @@
+import time
 from typing import Iterable, List
 from uuid import UUID
 
@@ -82,6 +83,8 @@ class GCPLogStorage(LogStorage):
                 filter_=log_filter,
                 order_by=order_by,
                 max_results=request.limit,
+                # Specify max possible page_size (<=1000) to reduce number of API calls.
+                page_size=request.limit,
             )
             logs = [
                 LogEvent(
@@ -98,6 +101,10 @@ class GCPLogStorage(LogStorage):
                 "GCP Logging read request limit exceeded."
                 " It's recommended to increase default entries.list request quota from 60 per minute."
             )
+        # We intentionally make reading logs slow to prevent hitting GCP quota.
+        # This doesn't help with many concurrent clients but
+        # should help with one client reading all logs sequentially.
+        time.sleep(1)
         return JobSubmissionLogs(logs=logs)
 
     def write_logs(
