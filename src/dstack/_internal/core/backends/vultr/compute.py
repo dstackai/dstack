@@ -6,7 +6,7 @@ import requests
 
 from dstack._internal.core.backends.base import Compute
 from dstack._internal.core.backends.base.compute import (
-    get_instance_name,
+    get_job_instance_name,
     get_user_data,
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
@@ -62,7 +62,7 @@ class VultrCompute(Compute):
     ) -> JobProvisioningData:
         instance_config = InstanceConfiguration(
             project_name=run.project_name,
-            instance_name=get_instance_name(run, job),
+            instance_name=get_job_instance_name(run, job),
             ssh_keys=[SSHKey(public=project_ssh_public_key.strip())],
             user=run.user,
         )

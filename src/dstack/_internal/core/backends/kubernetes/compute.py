@@ -11,7 +11,7 @@ from dstack._internal.core.backends.base.compute import (
     Compute,
     get_docker_commands,
     get_dstack_gateway_commands,
-    get_instance_name,
+    get_job_instance_name,
 )
 from dstack._internal.core.backends.base.offers import match_requirements
 from dstack._internal.core.backends.kubernetes.config import KubernetesConfig
@@ -99,7 +99,7 @@ class KubernetesCompute(Compute):
         project_ssh_private_key: str,
         volumes: List[Volume],
     ) -> JobProvisioningData:
-        instance_name = get_instance_name(run, job)
+        instance_name = get_job_instance_name(run, job)
         commands = get_docker_commands(
             [run.run_spec.ssh_key_pub.strip(), project_ssh_public_key.strip()]
         )

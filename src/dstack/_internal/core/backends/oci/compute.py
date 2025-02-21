@@ -4,7 +4,11 @@ from typing import List, Optional
 
 import oci
 
-from dstack._internal.core.backends.base.compute import Compute, get_instance_name, get_user_data
+from dstack._internal.core.backends.base.compute import (
+    Compute,
+    get_job_instance_name,
+    get_user_data,
+)
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.oci import resources
 from dstack._internal.core.backends.oci.config import OCIConfig
@@ -98,7 +102,7 @@ class OCICompute(Compute):
     ) -> JobProvisioningData:
         instance_config = InstanceConfiguration(
             project_name=run.project_name,
-            instance_name=get_instance_name(run, job),
+            instance_name=get_job_instance_name(run, job),
             ssh_keys=[SSHKey(public=project_ssh_public_key.strip())],
             user=run.user,
         )

@@ -6,7 +6,7 @@ from typing import Dict, List, Optional
 
 from dstack._internal.core.backends.base.compute import (
     Compute,
-    get_instance_name,
+    get_job_instance_name,
     get_shim_commands,
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
@@ -107,7 +107,7 @@ class LambdaCompute(Compute):
     ) -> JobProvisioningData:
         instance_config = InstanceConfiguration(
             project_name=run.project_name,
-            instance_name=get_instance_name(run, job),  # TODO: generate name
+            instance_name=get_job_instance_name(run, job),  # TODO: generate name
             ssh_keys=[
                 SSHKey(
                     public=project_ssh_public_key.strip(), private=project_ssh_private_key.strip()

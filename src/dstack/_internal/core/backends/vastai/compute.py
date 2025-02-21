@@ -4,7 +4,7 @@ import gpuhunt
 from gpuhunt.providers.vastai import VastAIProvider
 
 from dstack._internal.core.backends.base import Compute
-from dstack._internal.core.backends.base.compute import get_docker_commands, get_instance_name
+from dstack._internal.core.backends.base.compute import get_docker_commands, get_job_instance_name
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.vastai.api_client import VastAIAPIClient
 from dstack._internal.core.backends.vastai.config import VastAIConfig
@@ -74,7 +74,7 @@ class VastAICompute(Compute):
             [run.run_spec.ssh_key_pub.strip(), project_ssh_public_key.strip()]
         )
         resp = self.api_client.create_instance(
-            instance_name=get_instance_name(run, job),
+            instance_name=get_job_instance_name(run, job),
             bundle_id=instance_offer.instance.name,
             image_name=job.job_spec.image_name,
             onstart=" && ".join(commands),

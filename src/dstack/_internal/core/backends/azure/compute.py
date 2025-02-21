@@ -40,7 +40,7 @@ from dstack._internal.core.backends.azure.config import AzureConfig
 from dstack._internal.core.backends.base.compute import (
     Compute,
     get_gateway_user_data,
-    get_instance_name,
+    get_job_instance_name,
     get_user_data,
     merge_tags,
 )
@@ -197,7 +197,7 @@ class AzureCompute(Compute):
     ) -> JobProvisioningData:
         instance_config = InstanceConfiguration(
             project_name=run.project_name,
-            instance_name=get_instance_name(run, job),  # TODO: generate name
+            instance_name=get_job_instance_name(run, job),  # TODO: generate name
             ssh_keys=[
                 SSHKey(public=project_ssh_public_key.strip()),
             ],

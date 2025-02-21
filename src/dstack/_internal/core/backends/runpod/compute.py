@@ -6,7 +6,7 @@ from typing import List, Optional
 from dstack._internal.core.backends.base import Compute
 from dstack._internal.core.backends.base.compute import (
     get_docker_commands,
-    get_instance_name,
+    get_job_instance_name,
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.runpod.api_client import RunpodApiClient
@@ -69,7 +69,7 @@ class RunpodCompute(Compute):
     ) -> JobProvisioningData:
         instance_config = InstanceConfiguration(
             project_name=run.project_name,
-            instance_name=get_instance_name(run, job),
+            instance_name=get_job_instance_name(run, job),
             ssh_keys=[
                 SSHKey(public=run.run_spec.ssh_key_pub.strip()),
                 SSHKey(public=project_ssh_public_key.strip()),
