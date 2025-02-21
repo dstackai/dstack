@@ -24,7 +24,7 @@ async def poll_logs(
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
 ) -> JobSubmissionLogs:
     _, project = user_project
-    # The runner guarantees logs have different timestamps if throuput < 1k logs / sec.
-    # Otherwise, some logs with duplicated timestamp may be filtered out.
+    # The runner guarantees logs have different timestamps if throughput < 1k logs / sec.
+    # Otherwise, some logs with duplicated timestamps may be filtered out.
     # This limitation is imposed by cloud log services that support up to millisecond timestamp resolution.
     return await logs.poll_logs_async(project=project, request=body)
