@@ -1,14 +1,14 @@
 ---
-title: Supporting Intel Gaudi
+title: Supporting Intel Gaudi accelerators
 date: 2025-02-21
-description: "TBA"  
+description: "dstack now supports Intel Gaudi accelerators with SSH fleets, simplifying container orchestration across private clouds and data centers."  
 slug: intel-gaudi
 image: https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-intel-gaudi-and-intel-tiber-cloud.png-v2?raw=true
 categories:
   - Fleets
 ---
 
-# Supporting Intel Gaudi
+# Supporting Intel Gaudi accelerators
 
 At `dstack`, our goal is to make AI container orchestration simpler and fully vendor-agnostic. That’s why we support not
 just leading cloud providers and on-prem environments but also a wide range of accelerators.
