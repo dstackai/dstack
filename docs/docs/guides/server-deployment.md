@@ -138,7 +138,8 @@ To store the server state in Postgres, set the `DSTACK_DATABASE_URL` environment
 ## Logs storage
 
 By default, `dstack` stores workload logs locally in `~/.dstack/server/projects/<project_name>/logs`.
-For multi-replica server deployments, it's required to store logs externally, e.g. in AWS CloudWatch.
+For multi-replica server deployments, it's required to store logs externally.
+`dstack` supports storing logs using AWS CloudWatch or GCP Logging.
 
 ### AWS CloudWatch
 
@@ -170,6 +171,36 @@ The log group must be created beforehand, `dstack` won't try to create it.
       ]
     }
     ```
+
+### GCP Logging
+
+To store logs using GCP Logging, set the `DSTACK_SERVER_GCP_LOGGING_PROJECT` environment variable.
+
+??? info "Required permissions"
+    Ensure you've configured Application Default Credentials with the following permissions:
+
+    ```
+    logging.logEntries.create
+    logging.logEntries.list
+    ```
+
+??? info "Logs management"
+    `dstack` writes all the logs to the `projects/[PROJECT]/logs/dstack-run-logs` log name.
+    If you want to set up a custom retention policy for `dstack` logs, create a new bucket and configure a sink:
+    
+    <div class="termy">
+
+    ```shell
+    $ gcloud logging buckets create dstack-bucket \
+        --location=global \
+        --description="Bucket for storing dstack run logs" \
+        --retention-days=10
+    $ gcloud logging sinks create dstack-sink \
+        logging.googleapis.com/projects/[PROJECT]/locations/global/buckets/dstack-bucket \
+        --log-filter='logName = "projects/[PROJECT]/logs/dstack-run-logs"'
+    ```
+
+    </div>
 
 ## Encryption
 
