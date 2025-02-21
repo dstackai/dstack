@@ -90,7 +90,7 @@ hide:
         </h3>
 
         <p>
-            Deploy and fine-tune LLMs on AMD
+            Deploy and fine-tune LLMs on Intel Gaudi
         </p>
     </a>
 

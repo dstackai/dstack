@@ -20,7 +20,7 @@ With the latest release of `dstack`, you can now leverage AWS EFA to supercharge
 
 <!-- more -->
 
-## Why EFA?
+## About EFA
 
 AWS EFA delivers up to 400 Gbps of bandwidth, enabling lightning-fast GPU-to-GPU communication across nodes. By
 bypassing the kernel and providing direct network access, EFA minimizes latency and maximizes throughput. Its native
