@@ -1,5 +1,5 @@
 ---
-title: Supporting Intel Gaudi accelerators
+title: Supporting Intel Gaudi AI accelerators
 date: 2025-02-21
 description: "dstack now supports Intel Gaudi accelerators with SSH fleets, simplifying container orchestration across private clouds and data centers."  
 slug: intel-gaudi
@@ -8,14 +8,13 @@ categories:
   - Fleets
 ---
 
-# Supporting Intel Gaudi accelerators
+# Supporting Intel Gaudi AI accelerators
 
 At `dstack`, our goal is to make AI container orchestration simpler and fully vendor-agnostic. That’s why we support not
 just leading cloud providers and on-prem environments but also a wide range of accelerators.
 
 With our latest release, we’re adding support
-for [Intel Gaudi :material-arrow-top-right-thin:{ .external }](https://www.intel.com/content/www/us/en/products/details/processors/ai-accelerators/gaudi.html){:target="_blank"} and
-launching a new partnership with Intel.
+for Intel Gaudi AI Accelerator and launching a new partnership with Intel.
 
 <img src="https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-intel-gaudi-and-intel-tiber-cloud-v2.png?raw=true" width="630"/>
 
@@ -23,7 +22,7 @@ launching a new partnership with Intel.
 
 ## About Intel Gaudi
 
-Intel Gaudi is a series of accelerators built to handle AI tasks. Powered by Intel’s Habana architecture, Gaudi is
+Intel Gaudi AI Accelerator is a series of accelerators built to handle AI tasks. Powered by Intel’s Habana architecture, Gaudi is
 tailored for high-performance AI inference and training, offering high throughput and efficiency. It has a scalable
 design with numerous cores and ample memory bandwidth, enabling better performance per watt.
 
@@ -159,8 +158,15 @@ $ dstack apply -f examples/fine-tuning/trl/intel/.dstack.yml -R
 
 `dstack` will automatically create containers according to the run configuration and execute them across the fleet.
 
-!!! info "Examples":
-    Explore our [examples](../../examples/accelerators/intel/index.md) to learn how to train and deploy large models on Intel Gaudi.
+> Explore our [examples](../../examples/accelerators/intel/index.md) to learn how to train and deploy large models on
+> Intel Gaudi AI Accelerator.
+
+!!! info "Intel Tiber AI Cloud"
+    At `dstack`, we’re grateful to be part of the Intel Liftoff program, which allowed us to access Intel Gaudi AI
+    accelerators via [Intel Tiber AI Cloud :material-arrow-top-right-thin:{ .external }](https://www.intel.com/content/www/us/en/developer/tools/tiber/ai-cloud.html){:target="_blank"}.
+    You can sign up if you’d like to access Intel Gaudi AI accelerators via the cloud.
+
+    Native integration with Intel Tiber AI Cloud is also coming soon to `dstack`.
 
 !!! info "What's next?"
     1. Refer to [Quickstart](../../docs/quickstart.md)
