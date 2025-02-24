@@ -4,7 +4,10 @@ import gpuhunt
 from gpuhunt.providers.vastai import VastAIProvider
 
 from dstack._internal.core.backends.base import Compute
-from dstack._internal.core.backends.base.compute import get_docker_commands, get_job_instance_name
+from dstack._internal.core.backends.base.compute import (
+    generate_unique_instance_name_for_job,
+    get_docker_commands,
+)
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.vastai.api_client import VastAIAPIClient
 from dstack._internal.core.backends.vastai.config import VastAIConfig
@@ -21,6 +24,10 @@ from dstack._internal.core.models.volumes import Volume
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
+
+
+# Undocumented but names of len 60 work
+MAX_INSTANCE_NAME_LEN = 60
 
 
 class VastAICompute(Compute):
@@ -70,11 +77,14 @@ class VastAICompute(Compute):
         project_ssh_private_key: str,
         volumes: List[Volume],
     ) -> JobProvisioningData:
+        instance_name = generate_unique_instance_name_for_job(
+            run, job, max_length=MAX_INSTANCE_NAME_LEN
+        )
         commands = get_docker_commands(
             [run.run_spec.ssh_key_pub.strip(), project_ssh_public_key.strip()]
         )
         resp = self.api_client.create_instance(
-            instance_name=get_job_instance_name(run, job),
+            instance_name=instance_name,
             bundle_id=instance_offer.instance.name,
             image_name=job.job_spec.image_name,
             onstart=" && ".join(commands),
