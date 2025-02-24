@@ -34,7 +34,6 @@ from dstack._internal.core.models.configurations import (
     BaseRunConfigurationWithPorts,
     DevEnvironmentConfiguration,
     PortMapping,
-    PythonVersion,
     RunConfigurationType,
     ServiceConfiguration,
     TaskConfiguration,
@@ -73,12 +72,6 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
     ):
         self.apply_args(conf, configurator_args, unknown_args)
         self.validate_gpu_vendor_and_image(conf)
-        if conf.python == PythonVersion.PY38:
-            logger.warning(
-                "Specifying [code]python: 3.8[/] in run configurations is deprecated"
-                " and will be forbidden in a future [code]dstack[/] release."
-                " Please upgrade your configuration to a newer Python version."
-            )
         if repo is None:
             repo = self.api.repos.load(Path.cwd())
         config_manager = ConfigManager()
