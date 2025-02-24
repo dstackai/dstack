@@ -62,6 +62,7 @@ from dstack._internal.core.models.runs import (
     Retry,
 )
 from dstack._internal.core.services.profiles import get_retry
+from dstack._internal.server.background.tasks import get_provisioning_timeout
 from dstack._internal.server.db import get_session_ctx
 from dstack._internal.server.models import (
     FleetModel,
@@ -963,24 +964,11 @@ def _get_provisioning_deadline(
     instance: InstanceModel,
     job_provisioning_data: JobProvisioningData,
 ) -> datetime.datetime:
-    timeout_interval = _get_instance_timeout_interval(
+    timeout_interval = get_provisioning_timeout(
         backend_type=job_provisioning_data.get_base_backend(),
         instance_type_name=job_provisioning_data.instance_type.name,
     )
     return instance.started_at.replace(tzinfo=datetime.timezone.utc) + timeout_interval
-
-
-def _get_instance_timeout_interval(
-    backend_type: BackendType, instance_type_name: str
-) -> timedelta:
-    # when changing timeouts, also consider process_running_jobs._get_runner_timeout_interval
-    if backend_type == BackendType.RUNPOD:
-        return timedelta(seconds=1200)
-    if backend_type == BackendType.OCI and instance_type_name.startswith("BM."):
-        return timedelta(seconds=1200)
-    if backend_type == BackendType.VULTR and instance_type_name.startswith("vbm"):
-        return timedelta(seconds=3300)
-    return timedelta(seconds=600)
 
 
 def _ssh_keys_to_pkeys(ssh_keys: list[SSHKey]) -> list[PKey]:
