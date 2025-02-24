@@ -2,6 +2,7 @@ from typing import Dict, List, Optional
 
 from dstack._internal.core.backends.base import Compute
 from dstack._internal.core.backends.base.compute import (
+    generate_unique_instance_name,
     get_shim_commands,
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
@@ -21,6 +22,8 @@ from dstack._internal.core.models.volumes import Volume
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger("datacrunch.compute")
+
+MAX_INSTANCE_NAME_LEN = 60
 
 # Ubuntu 22.04 + CUDA 12.0 + Docker
 # from API https://datacrunch.stoplight.io/docs/datacrunch-public/c46ab45dbc508-get-all-image-types
@@ -78,6 +81,9 @@ class DataCrunchCompute(Compute):
         instance_offer: InstanceOfferWithAvailability,
         instance_config: InstanceConfiguration,
     ) -> JobProvisioningData:
+        instance_name = generate_unique_instance_name(
+            instance_config, max_length=MAX_INSTANCE_NAME_LEN
+        )
         public_keys = instance_config.get_public_keys()
         ssh_ids = []
         for ssh_public_key in public_keys:
@@ -106,8 +112,8 @@ class DataCrunchCompute(Compute):
             instance_type=instance_offer.instance.name,
             ssh_key_ids=ssh_ids,
             startup_script_id=startup_script_ids,
-            hostname=instance_config.instance_name,
-            description=instance_config.instance_name,
+            hostname=instance_name,
+            description=instance_name,
             image=IMAGE_ID,
             disk_size=disk_size,
             location=instance_offer.region,
@@ -119,8 +125,8 @@ class DataCrunchCompute(Compute):
                 "instance_type": instance_offer.instance.name,
                 "ssh_key_ids": ssh_ids,
                 "startup_script_id": startup_script_ids,
-                "hostname": instance_config.instance_name,
-                "description": instance_config.instance_name,
+                "hostname": instance_name,
+                "description": instance_name,
                 "image": IMAGE_ID,
                 "disk_size": disk_size,
                 "location": instance_offer.region,
