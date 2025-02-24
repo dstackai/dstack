@@ -6,6 +6,7 @@ import requests
 
 from dstack._internal.core.backends.base import Compute
 from dstack._internal.core.backends.base.compute import (
+    generate_unique_instance_name,
     get_job_instance_name,
     get_user_data,
 )
@@ -26,6 +27,8 @@ from dstack._internal.core.models.volumes import Volume
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
+
+MAX_INSTANCE_NAME_LEN = 64
 
 
 class VultrCompute(Compute):
@@ -71,6 +74,9 @@ class VultrCompute(Compute):
     def create_instance(
         self, instance_offer: InstanceOfferWithAvailability, instance_config: InstanceConfiguration
     ) -> JobProvisioningData:
+        instance_name = generate_unique_instance_name(
+            instance_config, max_length=MAX_INSTANCE_NAME_LEN
+        )
         # create vpc
         vpc = self.api_client.get_vpc_for_region(instance_offer.region)
         if not vpc:
@@ -85,7 +91,7 @@ class VultrCompute(Compute):
         ]
         instance_id = self.api_client.launch_instance(
             region=instance_offer.region,
-            label=instance_config.instance_name,
+            label=instance_name,
             plan=instance_offer.instance.name,
             user_data=get_user_data(
                 authorized_keys=instance_config.get_public_keys(),
