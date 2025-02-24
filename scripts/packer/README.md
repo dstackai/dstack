@@ -4,9 +4,15 @@ This directory contains HashiCorp Packer templates for building VM images that a
 
 For most backends, we build two images: one for CPU-only instances, typically published as `dstack-X.Y`, and one for NVIDIA GPU instances, typically published as `dstack-cuda-X.Y`, where `X.Y` is the image version. Some backends may have additional images, e.g. Azure has `dstack-grid-X.Y` for instances requiring NVIDIA Grid drivers.
 
-The release and staging versions of the images are built automatically using GitHub Actions. If you need to build the images manually, see `.github/workflows/docker.yml` for examples of how to use the templates. Additional instructions for some backends are provided below.
+## Builds
 
-## Azure
+Production builds are triggered manually in GitHub Actions, see `.github/workflows/docker.yml`.
+
+The GitHub Actions workflow also allows for staging builds. Staging builds are more limited than production builds, e.g. the resulting image can be restricted to a single region and not made public, but this is usually sufficient for testing.
+
+If you still need to build the images locally, see the GitHub Actions workflow for examples of how to use the packer templates. Additional instructions for some backends are provided below.
+
+### Azure
 
 Follow [installation instruction](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli-linux?pivots=apt)
 for Azure CLI `az`. [Login](https://learn.microsoft.com/en-us/cli/azure/authenticate-azure-cli) for managing resources:
@@ -53,7 +59,7 @@ Set environment variables.
 | AZURE_TENANT_ID | tenant_id |
 | AZURE_SUBSCRIPTION_ID | subscription_id |
 
-## Nebius
+### Nebius
 
 Create credentials for packer. The `compute.admin` role is not sufficient, use `admin` instead.
 
