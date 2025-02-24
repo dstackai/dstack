@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
@@ -6,8 +6,8 @@ import { format } from 'date-fns';
 import { Button, ListEmptyMessage, NavigateLink, SelectCSDProps, TableProps } from 'components';
 
 import { DATE_TIME_FORMAT } from 'consts';
+import { useProjectFilter } from 'hooks/useProjectFilter';
 import { ROUTES } from 'routes';
-import { useGetProjectsQuery } from 'services/project';
 
 import { getModelGateway } from '../helpers';
 
@@ -118,19 +118,12 @@ export const useEmptyMessages = ({
 
 type Args = {
     projectSearchKey?: string;
+    localStorePrefix?: string;
 };
 
-export const useFilters = ({ projectSearchKey }: Args) => {
+export const useFilters = ({ projectSearchKey, localStorePrefix = 'models-list-page' }: Args) => {
     const [searchParams] = useSearchParams();
-    const [selectedProject, setSelectedProject] = useState<SelectCSDProps.Option | null>(null);
-
-    const { data: projectsData } = useGetProjectsQuery();
-
-    const projectOptions = useMemo<SelectCSDProps.Options>(() => {
-        if (!projectsData?.length) return [];
-
-        return projectsData.map((project) => ({ label: project.project_name, value: project.project_name }));
-    }, [projectsData]);
+    const { selectedProject, setSelectedProject, projectOptions } = useProjectFilter({ localStorePrefix });
 
     const setSelectedOptionFromParams = (
         searchKey: string,

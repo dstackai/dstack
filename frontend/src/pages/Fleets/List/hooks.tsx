@@ -1,15 +1,14 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { format } from 'date-fns';
 
 import { Button, ListEmptyMessage, NavigateLink, StatusIndicator, TableProps } from 'components';
-import { SelectCSDProps } from 'components';
 
 import { DATE_TIME_FORMAT } from 'consts';
 import { useLocalStorageState } from 'hooks/useLocalStorageState';
+import { useProjectFilter } from 'hooks/useProjectFilter';
 import { getFleetInstancesLinkText, getFleetPrice, getFleetStatusIconType } from 'libs/fleet';
 import { ROUTES } from 'routes';
-import { useGetProjectsQuery } from 'services/project';
 
 export const useEmptyMessages = ({
     clearFilters,
@@ -100,17 +99,9 @@ export const useColumnsDefinitions = () => {
     return { columns } as const;
 };
 
-export const useFilters = () => {
-    const [onlyActive, setOnlyActive] = useLocalStorageState<boolean>('fleet-list-is-active', true);
-    const [selectedProject, setSelectedProject] = useState<SelectCSDProps.Option | null>(null);
-
-    const { data: projectsData } = useGetProjectsQuery();
-
-    const projectOptions = useMemo<SelectCSDProps.Options>(() => {
-        if (!projectsData?.length) return [];
-
-        return projectsData.map((project) => ({ label: project.project_name, value: project.project_name }));
-    }, [projectsData]);
+export const useFilters = (localStorePrefix = 'fleet-list-page') => {
+    const [onlyActive, setOnlyActive] = useLocalStorageState<boolean>(`${localStorePrefix}-is-active`, true);
+    const { selectedProject, setSelectedProject, projectOptions } = useProjectFilter({ localStorePrefix });
 
     const clearFilters = () => {
         setOnlyActive(false);
