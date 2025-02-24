@@ -34,7 +34,7 @@ on:
       build_nebius:
         description: "Build Nebius images"
         type: boolean
-        default: true
+        default: false
 
 env:
   PACKER_VERSION: "1.9.2"
