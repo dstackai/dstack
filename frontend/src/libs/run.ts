@@ -30,6 +30,7 @@ export const getExtendedModelFromRun = (run: IRun): IModelExtended | null => {
 
     return {
         ...(run.service?.model ?? {}),
+        id: run.id,
         project_name: run.project_name,
         run_name: run?.run_spec.run_name ?? 'No run name',
         user: run.user,

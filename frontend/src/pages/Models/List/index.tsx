@@ -1,15 +1,12 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { sortBy as _sortBy } from 'lodash';
 
-import { Button, FormField, Header, Pagination, SelectCSD, Table } from 'components';
+import { Button, FormField, Header, Loader, SelectCSD, Table } from 'components';
 
-import { useBreadcrumbs, useCollection } from 'hooks';
-import { getExtendedModelFromRun } from 'libs/run';
+import { DEFAULT_TABLE_PAGE_SIZE } from 'consts';
+import { useBreadcrumbs, useCollection, useInfiniteScroll } from 'hooks';
 import { ROUTES } from 'routes';
-import { useGetRunsQuery } from 'services/run';
-
-import { unfinishedRuns } from 'pages/Runs/constants';
+import { useLazyGetModelsQuery } from 'services/run';
 
 import { useModelListPreferences } from './Preferences/useModelListPreferences';
 import { useColumnsDefinitions, useEmptyMessages, useFilters } from './hooks';
@@ -26,10 +23,6 @@ export const List: React.FC = () => {
         projectSearchKey: 'project',
     });
 
-    const { data, isLoading, isFetching, refetch } = useGetRunsQuery({
-        project_name: selectedProject?.value,
-    });
-
     useBreadcrumbs([
         {
             text: t('navigation.models'),
@@ -40,22 +33,12 @@ export const List: React.FC = () => {
     const { columns } = useColumnsDefinitions();
     const [preferences] = useModelListPreferences();
 
-    const sortedData = useMemo<IModelExtended[]>(() => {
-        if (!data) return [];
+    const { data, isLoading, refreshList, isLoadingMore } = useInfiniteScroll<IModelExtended, TRunsRequestParams>({
+        useLazyQuery: useLazyGetModelsQuery,
+        args: { project_name: selectedProject?.value, limit: DEFAULT_TABLE_PAGE_SIZE },
 
-        return (
-            _sortBy<IRun>(data, [(i) => -i.submitted_at])
-                // Should show models of active runs only
-                .filter((run) => unfinishedRuns.includes(run.status) && run.service?.model)
-                .reduce<IModelExtended[]>((acc, run) => {
-                    const model = getExtendedModelFromRun(run);
-
-                    if (model) acc.push(model);
-
-                    return acc;
-                }, [])
-        );
-    }, [data]);
+        getPaginationParams: (lastModel) => ({ prev_submitted_at: lastModel.submitted_at }),
+    });
 
     const clearFilter = () => {
         clearSelected();
@@ -68,12 +51,11 @@ export const List: React.FC = () => {
         isDisabledClearFilter,
     });
 
-    const { items, collectionProps, paginationProps } = useCollection<IModelExtended>(sortedData ?? [], {
+    const { items, collectionProps } = useCollection<IModelExtended>(data, {
         filtering: {
             empty: renderEmptyMessage(),
             noMatch: renderNoMatchMessage(),
         },
-        pagination: { pageSize: 20 },
         selection: {},
     });
 
@@ -83,7 +65,7 @@ export const List: React.FC = () => {
             variant="full-page"
             columnDefinitions={columns}
             items={items}
-            loading={isLoading || isFetching}
+            loading={isLoading}
             loadingText={t('common.loading')}
             stickyHeader={true}
             columnDisplay={preferences.contentDisplay}
@@ -93,9 +75,9 @@ export const List: React.FC = () => {
                     actions={
                         <Button
                             iconName="refresh"
-                            disabled={isLoading || isFetching}
+                            disabled={isLoading || isLoadingMore}
                             ariaLabel={t('common.refresh')}
-                            onClick={refetch}
+                            onClick={refreshList}
                         />
                     }
                 >
@@ -127,8 +109,8 @@ export const List: React.FC = () => {
                     </div>
                 </div>
             }
-            pagination={<Pagination {...paginationProps} disabled={isLoading} />}
             preferences={<Preferences />}
+            footer={<Loader show={isLoadingMore} padding={{ vertical: 'm' }} />}
         />
     );
 };

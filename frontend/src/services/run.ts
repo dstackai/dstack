@@ -1,7 +1,13 @@
+import { sortBy as _sortBy } from 'lodash';
 import { API } from 'api';
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 
 import fetchBaseQueryHeaders from 'libs/fetchBaseQueryHeaders';
+
+import { getExtendedModelFromRun } from '../libs/run';
+import { unfinishedRuns } from '../pages/Runs/constants';
+
+import { IModelExtended } from '../pages/Models/List/types';
 
 const reduceInvalidateTagsFromRunNames = (names: Array<string>) => {
     return names.reduce((accumulator, runName: string) => {
@@ -23,7 +29,7 @@ export const runApi = createApi({
         prepareHeaders: fetchBaseQueryHeaders,
     }),
 
-    tagTypes: ['Runs'],
+    tagTypes: ['Runs', 'Models'],
 
     endpoints: (builder) => ({
         getRuns: builder.query<IRun[], TRunsRequestParams>({
@@ -86,7 +92,7 @@ export const runApi = createApi({
                 );
 
                 const patchGetAllRunResult = dispatch(
-                    runApi.util.updateQueryData('getRuns', undefined, (draftRuns) => {
+                    runApi.util.updateQueryData('getRuns', {}, (draftRuns) => {
                         runs_names.forEach((runName) => {
                             const index =
                                 draftRuns?.findIndex((run) => {
@@ -108,7 +114,42 @@ export const runApi = createApi({
                 }
             },
         }),
+
+        getModels: builder.query<IModelExtended[], TRunsRequestParams>({
+            query: (body = {}) => {
+                return {
+                    url: API.RUNS.LIST(),
+                    method: 'POST',
+                    body,
+                };
+            },
+
+            transformResponse: (runs: IRun[]): IModelExtended[] => {
+                return (
+                    _sortBy<IRun>(runs, [(i) => -i.submitted_at])
+                        // Should show models of active runs only
+                        .filter((run) => unfinishedRuns.includes(run.status) && run.service?.model)
+                        .reduce<IModelExtended[]>((acc, run) => {
+                            const model = getExtendedModelFromRun(run);
+
+                            if (model) acc.push(model);
+
+                            return acc;
+                        }, [])
+                );
+            },
+
+            providesTags: (result) =>
+                result ? [...result.map(({ id }) => ({ type: 'Models' as const, id: id })), 'Models'] : ['Models'],
+        }),
     }),
 });
 
-export const { useGetRunsQuery, useLazyGetRunsQuery, useGetRunQuery, useStopRunsMutation, useDeleteRunsMutation } = runApi;
+export const {
+    useGetRunsQuery,
+    useLazyGetRunsQuery,
+    useGetRunQuery,
+    useStopRunsMutation,
+    useDeleteRunsMutation,
+    useLazyGetModelsQuery,
+} = runApi;
