@@ -39,6 +39,8 @@ from dstack._internal.core.backends.azure import utils as azure_utils
 from dstack._internal.core.backends.azure.config import AzureConfig
 from dstack._internal.core.backends.base.compute import (
     Compute,
+    generate_unique_gateway_instance_name,
+    generate_unique_instance_name,
     get_gateway_user_data,
     get_job_instance_name,
     get_user_data,
@@ -103,6 +105,9 @@ class AzureCompute(Compute):
         instance_offer: InstanceOfferWithAvailability,
         instance_config: InstanceConfiguration,
     ) -> JobProvisioningData:
+        instance_name = generate_unique_instance_name(
+            instance_config, max_length=azure_resources.MAX_RESOURCE_NAME_LEN
+        )
         location = instance_offer.region
         logger.info(
             "Requesting %s %s instance in %s...",
@@ -129,6 +134,7 @@ class AzureCompute(Compute):
         tags = {
             "owner": "dstack",
             "dstack_project": instance_config.project_name,
+            "dstack_name": instance_config.instance_name,
             "dstack_user": instance_config.user,
         }
         tags = merge_tags(tags=tags, backend_tags=self.config.tags)
@@ -150,9 +156,7 @@ class AzureCompute(Compute):
                 variant=VMImageVariant.from_instance_type(instance_offer.instance),
             ),
             vm_size=instance_offer.instance.name,
-            # instance_name includes region because Azure may create an instance resource
-            # even when provisioning fails.
-            instance_name=f"{instance_config.instance_name}-{instance_offer.region}",
+            instance_name=instance_name,
             user_data=get_user_data(authorized_keys=ssh_pub_keys),
             ssh_pub_keys=ssh_pub_keys,
             spot=instance_offer.instance.resources.spot,
@@ -223,7 +227,9 @@ class AzureCompute(Compute):
             configuration.instance_name,
             configuration.region,
         )
-
+        instance_name = generate_unique_gateway_instance_name(
+            configuration, max_length=azure_resources.MAX_RESOURCE_NAME_LEN
+        )
         network_resource_group, network, subnet = get_resource_group_network_subnet_or_error(
             network_client=self._network_client,
             resource_group=self.config.resource_group,
@@ -240,6 +246,7 @@ class AzureCompute(Compute):
             "Name": configuration.instance_name,
             "owner": "dstack",
             "dstack_project": configuration.project_name,
+            "dstack_name": configuration.instance_name,
         }
         if settings.DSTACK_VERSION is not None:
             tags["dstack_version"] = settings.DSTACK_VERSION
@@ -256,7 +263,7 @@ class AzureCompute(Compute):
             managed_identity=None,
             image_reference=_get_gateway_image_ref(),
             vm_size="Standard_B1ms",
-            instance_name=configuration.instance_name,
+            instance_name=instance_name,
             user_data=get_gateway_user_data(configuration.ssh_key_pub),
             ssh_pub_keys=[configuration.ssh_key_pub],
             spot=False,
