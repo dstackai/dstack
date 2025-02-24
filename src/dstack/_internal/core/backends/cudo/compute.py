@@ -91,7 +91,7 @@ class CudoCompute(Compute):
                 project_id=self.config.project_id,
                 boot_disk_storage_class="STORAGE_CLASS_NETWORK",
                 boot_disk_size_gib=disk_size,
-                book_disk_id=f"{instance_config.instance_name}_{instance_offer.region}_disk_id",
+                book_disk_id=f"{vm_id}_disk_id",
                 boot_disk_image_id=_get_image_id(gpus_no > 0),
                 data_center_id=instance_offer.region,
                 gpus=gpus_no,

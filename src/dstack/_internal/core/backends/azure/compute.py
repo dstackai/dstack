@@ -243,7 +243,6 @@ class AzureCompute(Compute):
         )
 
         tags = {
-            "Name": configuration.instance_name,
             "owner": "dstack",
             "dstack_project": configuration.project_name,
             "dstack_name": configuration.instance_name,

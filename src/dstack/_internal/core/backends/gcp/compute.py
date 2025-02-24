@@ -150,11 +150,10 @@ class GCPCompute(Compute):
         instance_offer: InstanceOfferWithAvailability,
         instance_config: InstanceConfiguration,
     ) -> JobProvisioningData:
-        instance_name = instance_config.instance_name
-        allocate_public_ip = self.config.allocate_public_ips
         instance_name = generate_unique_instance_name(
             instance_config, max_length=gcp_resources.MAX_RESOURCE_NAME_LEN
         )
+        allocate_public_ip = self.config.allocate_public_ips
         authorized_keys = instance_config.get_public_keys()
 
         # get_offers always fills instance_offer.availability_zones
@@ -190,7 +189,7 @@ class GCPCompute(Compute):
             else False
         )
         if is_tpu:
-            instance_id = f"tpu-{instance_config.instance_name}"
+            instance_id = instance_name
             startup_script = _get_tpu_startup_script(authorized_keys)
             # GCP does not allow attaching disks while TPUs is creating,
             # so we need to attach the disks on creation.
@@ -460,10 +459,10 @@ class GCPCompute(Compute):
         operation = self.instances_client.insert(request=request)
         gcp_resources.wait_for_extended_operation(operation, "instance creation")
         instance = self.instances_client.get(
-            project=self.config.project_id, zone=zone, instance=configuration.instance_name
+            project=self.config.project_id, zone=zone, instance=instance_name
         )
         return GatewayProvisioningData(
-            instance_id=configuration.instance_name,
+            instance_id=instance_name,
             region=configuration.region,  # used for instance termination
             availability_zone=zone,
             ip_address=instance.network_interfaces[0].access_configs[0].nat_i_p,

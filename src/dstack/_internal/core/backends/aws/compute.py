@@ -410,7 +410,7 @@ class AWSCompute(Compute):
 
         logger.debug("Creating ALB for gateway %s...", configuration.instance_name)
         response = elb_client.create_load_balancer(
-            Name=f"{configuration.instance_name}-lb",
+            Name=f"{instance_name}-lb",
             Subnets=subnets_ids,
             SecurityGroups=[security_group_id],
             Scheme="internet-facing" if configuration.public_ip else "internal",
@@ -425,7 +425,7 @@ class AWSCompute(Compute):
 
         logger.debug("Creating Target Group for gateway %s...", configuration.instance_name)
         response = elb_client.create_target_group(
-            Name=f"{configuration.instance_name}-tg",
+            Name=f"{instance_name}-tg",
             Protocol="HTTP",
             Port=80,
             VpcId=vpc_id,
