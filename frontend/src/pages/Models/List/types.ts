@@ -1,4 +1,5 @@
 export interface IModelExtended extends Partial<IModel> {
+    id: string;
     run_name: string;
     project_name: string;
     submitted_at: string;
