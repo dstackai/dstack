@@ -1,24 +1,13 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
-import { SelectCSDProps } from 'components';
-
 import { useLocalStorageState } from 'hooks/useLocalStorageState';
-import { useGetProjectsQuery } from 'services/project';
+import { useProjectFilter } from 'hooks/useProjectFilter';
 
-export const useFilters = () => {
+export const useFilters = (localStorePrefix = 'instances-list-page') => {
     const [searchParams, setSearchParams] = useSearchParams();
-
-    const [onlyActive, setOnlyActive] = useLocalStorageState<boolean>('instances-list-is-active', false);
-    const [selectedProject, setSelectedProject] = useState<SelectCSDProps.Option | null>(null);
-
-    const { data: projectsData } = useGetProjectsQuery();
-
-    const projectOptions = useMemo<SelectCSDProps.Options>(() => {
-        if (!projectsData?.length) return [];
-
-        return projectsData.map((project) => ({ label: project.project_name, value: project.project_name }));
-    }, [projectsData]);
+    const [onlyActive, setOnlyActive] = useLocalStorageState<boolean>(`${localStorePrefix}-is-active`, false);
+    const { selectedProject, setSelectedProject, projectOptions } = useProjectFilter({ localStorePrefix });
 
     const clearFilters = () => {
         setOnlyActive(false);

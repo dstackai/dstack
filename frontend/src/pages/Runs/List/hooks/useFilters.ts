@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 import { SelectCSDProps } from 'components';
 
 import { useLocalStorageState } from 'hooks/useLocalStorageState';
-import { useGetProjectsQuery } from 'services/project';
+import { useProjectFilter } from 'hooks/useProjectFilter';
 
 type Args = {
     localStorePrefix: string;
@@ -14,16 +14,8 @@ type Args = {
 
 export const useFilters = ({ localStorePrefix, projectSearchKey }: Args) => {
     const [searchParams] = useSearchParams();
-    const [selectedProject, setSelectedProject] = useState<SelectCSDProps.Option | null>(null);
+    const { selectedProject, setSelectedProject, projectOptions } = useProjectFilter({ localStorePrefix });
     const [onlyActive, setOnlyActive] = useLocalStorageState<boolean>(`${localStorePrefix}-is-active`, false);
-
-    const { data: projectsData } = useGetProjectsQuery();
-
-    const projectOptions = useMemo<SelectCSDProps.Options>(() => {
-        if (!projectsData?.length) return [];
-
-        return projectsData.map((project) => ({ label: project.project_name, value: project.project_name }));
-    }, [projectsData]);
 
     const setSelectedOptionFromParams = (
         searchKey: string,
