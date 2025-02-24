@@ -234,6 +234,21 @@ def generate_unique_instance_name(
     )
 
 
+def generate_unique_instance_name_for_job(
+    run: Run,
+    job: Job,
+    max_length: int = _DEFAULT_MAX_RESOURCE_NAME_LEN,
+) -> str:
+    """
+    Generates a unique instance name for a job valid across all backends.
+    """
+    return generate_unique_backend_name(
+        resource_name=get_job_instance_name(run, job),
+        project_name=run.project_name,
+        max_length=max_length,
+    )
+
+
 def generate_unique_gateway_instance_name(
     gateway_compute_configuration: GatewayComputeConfiguration,
     max_length: int = _DEFAULT_MAX_RESOURCE_NAME_LEN,
