@@ -11,7 +11,6 @@ from dstack._internal.server.models import (
     JobModel,
     ProjectModel,
     VolumeAttachmentModel,
-    VolumeModel,
 )
 from dstack._internal.server.services.jobs import (
     process_terminating_job,
@@ -86,12 +85,7 @@ async def _process_job(session: AsyncSession, job_model: JobModel):
         .where(InstanceModel.id == job_model.used_instance_id)
         .options(
             joinedload(InstanceModel.project).joinedload(ProjectModel.backends),
-            joinedload(InstanceModel.volume_attachments)
-            .joinedload(VolumeAttachmentModel.volume)
-            .joinedload(VolumeModel.user),
-            joinedload(InstanceModel.volume_attachments)
-            .joinedload(VolumeAttachmentModel.volume)
-            .joinedload(VolumeModel.attachments),
+            joinedload(InstanceModel.volume_attachments).joinedload(VolumeAttachmentModel.volume),
         )
     )
     instance_model = res.unique().scalar()

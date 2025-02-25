@@ -236,13 +236,14 @@ async def process_terminating_job(
         logger.debug("%s: stopping container", fmt(job_model))
         ssh_private_keys = get_instance_ssh_private_keys(instance_model)
         await stop_container(job_model, jpd, ssh_private_keys)
-        volume_models: list[VolumeModel]
         if jrd is not None and jrd.volume_names is not None:
-            volume_models = await list_project_volume_models(
-                session=session, project=instance_model.project, names=jrd.volume_names
-            )
+            volume_names = jrd.volume_names
         else:
-            volume_models = [va.volume for va in instance_model.volume_attachments]
+            # Legacy jobs before job_runtime_data/blocks were introduced
+            volume_names = [va.volume.name for va in instance_model.volume_attachments]
+        volume_models = await list_project_volume_models(
+            session=session, project=instance_model.project, names=volume_names
+        )
         if len(volume_models) > 0:
             logger.info("Detaching volumes: %s", [v.name for v in volume_models])
             all_volumes_detached = await _detach_volumes_from_job_instance(
@@ -302,11 +303,13 @@ async def process_volumes_detaching(
     jpd = get_or_error(get_job_provisioning_data(job_model))
     jrd = get_job_runtime_data(job_model)
     if jrd is not None and jrd.volume_names is not None:
-        volume_models = await list_project_volume_models(
-            session=session, project=instance_model.project, names=jrd.volume_names
-        )
+        volume_names = jrd.volume_names
     else:
-        volume_models = [va.volume for va in instance_model.volume_attachments]
+        # Legacy jobs before job_runtime_data/blocks were introduced
+        volume_names = [va.volume.name for va in instance_model.volume_attachments]
+    volume_models = await list_project_volume_models(
+        session=session, project=instance_model.project, names=volume_names
+    )
     logger.info("Detaching volumes: %s", [v.name for v in volume_models])
     all_volumes_detached = await _detach_volumes_from_job_instance(
         project=instance_model.project,
