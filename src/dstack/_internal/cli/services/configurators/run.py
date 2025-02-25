@@ -238,8 +238,8 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
                         reattach = True
                         break
                     if run.status.is_finished():
-                        _print_finished_message(run)
-                        exit(_get_run_exit_code(run))
+                        print_finished_message(run)
+                        exit(get_run_exit_code(run))
                     time.sleep(1)
                 if not reattach:
                     console.print(
@@ -439,7 +439,7 @@ class RunWithPortsConfigurator(BaseRunConfigurator):
     ):
         super().apply_args(conf, args, unknown)
         if args.ports:
-            conf.ports = list(merge_ports(conf.ports, args.ports).values())
+            conf.ports = list(_merge_ports(conf.ports, args.ports).values())
 
 
 class TaskConfigurator(RunWithPortsConfigurator):
@@ -475,17 +475,17 @@ class ServiceConfigurator(BaseRunConfigurator):
         self.interpolate_run_args(conf.commands, unknown)
 
 
-def merge_ports(conf: List[PortMapping], args: List[PortMapping]) -> Dict[int, PortMapping]:
-    unique_ports_constraint([pm.container_port for pm in conf])
-    unique_ports_constraint([pm.container_port for pm in args])
+def _merge_ports(conf: List[PortMapping], args: List[PortMapping]) -> Dict[int, PortMapping]:
+    _unique_ports_constraint([pm.container_port for pm in conf])
+    _unique_ports_constraint([pm.container_port for pm in args])
     ports = {pm.container_port: pm for pm in conf}
     for pm in args:  # override conf
         ports[pm.container_port] = pm
-    unique_ports_constraint([pm.local_port for pm in ports.values() if pm.local_port is not None])
+    _unique_ports_constraint([pm.local_port for pm in ports.values() if pm.local_port is not None])
     return ports
 
 
-def unique_ports_constraint(ports: List[int]):
+def _unique_ports_constraint(ports: List[int]):
     used_ports = set()
     for i in ports:
         if i in used_ports:
@@ -514,7 +514,7 @@ def _print_service_urls(run: Run) -> None:
     console.print()
 
 
-def _print_finished_message(run: Run):
+def print_finished_message(run: Run):
     if run.status == RunStatus.DONE:
         console.print("[code]Done[/]")
         return
@@ -542,7 +542,7 @@ def _print_finished_message(run: Run):
     console.print(f"[error]{message}[/]")
 
 
-def _get_run_exit_code(run: Run) -> int:
+def get_run_exit_code(run: Run) -> int:
     if run.status == RunStatus.DONE:
         return 0
     return 1
