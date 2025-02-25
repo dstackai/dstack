@@ -285,7 +285,7 @@ type: task
 name: train    
 
 # Any custom Docker image
-image: dstackai/base:py3.13-0.6-cuda-12.1
+image: dstackai/base:py3.13-0.7-cuda-12.1
 
 # Commands of the task
 commands:
@@ -304,7 +304,7 @@ commands:
     name: train
     
     # Any private Docker image
-    image: dstackai/base:py3.13-0.6-cuda-12.1
+    image: dstackai/base:py3.13-0.7-cuda-12.1
     # Credentials of the private Docker registry
     registry_auth:
       username: peterschmidt85
