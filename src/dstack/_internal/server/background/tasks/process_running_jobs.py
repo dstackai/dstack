@@ -1,5 +1,4 @@
 import asyncio
-from datetime import timedelta
 from typing import Dict, List, Optional
 
 from sqlalchemy import select
@@ -29,6 +28,7 @@ from dstack._internal.core.models.runs import (
     RunSpec,
 )
 from dstack._internal.core.models.volumes import InstanceMountPoint, Volume, VolumeMountPoint
+from dstack._internal.server.background.tasks.common import get_provisioning_timeout
 from dstack._internal.server.db import get_session_ctx
 from dstack._internal.server.models import (
     InstanceModel,
@@ -244,7 +244,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
 
             if not success:
                 # check timeout
-                if job_submission.age > _get_runner_timeout_interval(
+                if job_submission.age > get_provisioning_timeout(
                     backend_type=job_provisioning_data.get_base_backend(),
                     instance_type_name=job_provisioning_data.instance_type.name,
                 ):
@@ -769,16 +769,3 @@ def _submit_job_to_runner(
     # do not log here, because the runner will send a new status
 
     return True
-
-
-def _get_runner_timeout_interval(backend_type: BackendType, instance_type_name: str) -> timedelta:
-    # when changing timeouts, also consider process_instances._get_instance_timeout_interval
-    if backend_type == BackendType.LAMBDA:
-        return timedelta(seconds=1200)
-    if backend_type == BackendType.KUBERNETES:
-        return timedelta(seconds=1200)
-    if backend_type == BackendType.OCI and instance_type_name.startswith("BM."):
-        return timedelta(seconds=1200)
-    if backend_type == BackendType.VULTR and instance_type_name.startswith("vbm"):
-        return timedelta(seconds=3300)
-    return timedelta(seconds=600)

@@ -183,6 +183,11 @@ and add it to `AnyBackendConfig` (in the same file).
 In [`src/dstack/_internal/server/services/backends/__init__.py`](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/server/services/backends/__init__.py), 
 add the `try`/`except` block that imports the backend configurator and appends it to `_CONFIGURATOR_CLASSES`.
 
+##### 2.4.11. (Optional) Override provisioning timeout
+
+If instances in the backend take more than 10 minutes to start, override the default provisioning timeout in
+[`src/dstack/_internal/server/background/tasks/common.py`](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/server/background/tasks/common.py).
+
 ## 3. Appendix
 
 #### 3.1. Backend compute type
