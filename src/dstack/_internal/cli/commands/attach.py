@@ -7,6 +7,10 @@ from typing import Optional
 from dstack._internal.cli.commands import APIBaseCommand
 from dstack._internal.cli.services.args import port_mapping
 from dstack._internal.cli.services.completion import RunNameCompleter
+from dstack._internal.cli.services.configurators.run import (
+    get_run_exit_code,
+    print_finished_message,
+)
 from dstack._internal.cli.utils.common import console
 from dstack._internal.core.consts import DSTACK_RUNNER_HTTP_PORT
 from dstack._internal.core.errors import CLIError
@@ -100,6 +104,21 @@ class AttachCommand(APIBaseCommand):
                     pass
         finally:
             run.detach()
+        # TODO: Handle run resubmissions similar to dstack apply
+
+        # After reading the logs, the run may not be marked as finished immediately.
+        # Give the run some time to transition to a finished state before exiting.
+        for _ in range(30):
+            run.refresh()
+            if run.status.is_finished():
+                print_finished_message(run)
+                exit(get_run_exit_code(run))
+            time.sleep(1)
+        console.print(
+            "[error]Lost run connection. Timed out waiting for run final status."
+            " Check `dstack ps` to see if it's done or failed."
+        )
+        exit(1)
 
 
 _IGNORED_PORTS = [DSTACK_RUNNER_HTTP_PORT]
