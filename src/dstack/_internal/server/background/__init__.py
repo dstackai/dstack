@@ -1,6 +1,7 @@
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
+from dstack._internal.server import settings
 from dstack._internal.server.background.tasks.process_fleets import process_fleets
 from dstack._internal.server.background.tasks.process_gateways import (
     process_gateways_connections,
@@ -15,6 +16,10 @@ from dstack._internal.server.background.tasks.process_metrics import (
 )
 from dstack._internal.server.background.tasks.process_placement_groups import (
     process_placement_groups,
+)
+from dstack._internal.server.background.tasks.process_prometheus_metrics import (
+    collect_prometheus_metrics,
+    delete_prometheus_metrics,
 )
 from dstack._internal.server.background.tasks.process_running_jobs import process_running_jobs
 from dstack._internal.server.background.tasks.process_runs import process_runs
@@ -43,6 +48,11 @@ def start_background_tasks() -> AsyncIOScheduler:
     # * 150 active instances with up to 2 minutes processing latency
     _scheduler.add_job(collect_metrics, IntervalTrigger(seconds=10), max_instances=1)
     _scheduler.add_job(delete_metrics, IntervalTrigger(minutes=5), max_instances=1)
+    if settings.ENABLE_PROMETHEUS_METRICS:
+        _scheduler.add_job(
+            collect_prometheus_metrics, IntervalTrigger(seconds=10), max_instances=1
+        )
+        _scheduler.add_job(delete_prometheus_metrics, IntervalTrigger(minutes=5), max_instances=1)
     # process_submitted_jobs and process_instances max processing rate is 75 jobs(instances) per minute.
     _scheduler.add_job(
         process_submitted_jobs,

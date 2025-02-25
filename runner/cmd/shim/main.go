@@ -15,6 +15,8 @@ import (
 	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/dstackai/dstack/runner/internal/shim"
 	"github.com/dstackai/dstack/runner/internal/shim/api"
+	"github.com/dstackai/dstack/runner/internal/shim/dcgm"
+	"github.com/dstackai/dstack/runner/internal/shim/host"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 )
@@ -94,6 +96,21 @@ func main() {
 				Value:       defaultLogLevel,
 				Destination: &args.Runner.LogLevel,
 				EnvVars:     []string{"DSTACK_RUNNER_LOG_LEVEL"},
+			},
+			/* DCGM Exporter Parameters */
+			&cli.IntFlag{
+				Name:        "dcgm-exporter-http-port",
+				Usage:       "DCGM Exporter http port",
+				Value:       10997,
+				Destination: &args.DCGMExporter.HTTPPort,
+				EnvVars:     []string{"DSTACK_DCGM_EXPORTER_HTTP_PORT"},
+			},
+			&cli.IntFlag{
+				Name:        "dcgm-exporter-interval",
+				Usage:       "DCGM Exporter collect interval, milliseconds",
+				Value:       5000,
+				Destination: &args.DCGMExporter.Interval,
+				EnvVars:     []string{"DSTACK_DCGM_EXPORTER_INTERVAL"},
 			},
 			/* Docker Parameters */
 			&cli.BoolFlag{
@@ -178,8 +195,28 @@ func start(ctx context.Context, args shim.CLIArgs, serviceMode bool) (err error)
 		return err
 	}
 
+	var dcgmExporter *dcgm.DCGMExporter
+
+	if host.GetGpuVendor() == host.GpuVendorNvidia {
+		dcgmExporterPath, err := dcgm.GetDCGMExporterExecPath(ctx)
+		if err == nil {
+			interval := time.Duration(args.DCGMExporter.Interval * int(time.Millisecond))
+			dcgmExporter = dcgm.NewDCGMExporter(dcgmExporterPath, args.DCGMExporter.HTTPPort, interval)
+			err = dcgmExporter.Start(ctx)
+		}
+		if err == nil {
+			log.Info(ctx, "using DCGM Exporter")
+			defer func() {
+				_ = dcgmExporter.Stop(ctx)
+			}()
+		} else {
+			log.Warning(ctx, "not using DCGM Exporter", "err", err)
+			dcgmExporter = nil
+		}
+	}
+
 	address := fmt.Sprintf(":%d", args.Shim.HTTPPort)
-	shimServer := api.NewShimServer(ctx, address, dockerRunner, Version)
+	shimServer := api.NewShimServer(ctx, address, dockerRunner, dcgmExporter, Version)
 
 	defer func() {
 		shutdownCtx, cancelShutdown := context.WithTimeout(ctx, 5*time.Second)

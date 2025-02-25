@@ -69,6 +69,7 @@ from dstack._internal.server.models import (
     InstanceModel,
     JobMetricsPoint,
     JobModel,
+    JobPrometheusMetrics,
     PlacementGroupModel,
     PoolModel,
     ProjectModel,
@@ -856,6 +857,22 @@ async def create_job_metrics_point(
     session.add(jmp)
     await session.commit()
     return jmp
+
+
+async def create_job_prometheus_metrics(
+    session: AsyncSession,
+    job: JobModel,
+    collected_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+    text: str = "# Prometheus metrics\n",
+):
+    metrics = JobPrometheusMetrics(
+        job_id=job.id,
+        collected_at=collected_at,
+        text=text,
+    )
+    session.add(metrics)
+    await session.commit()
+    return metrics
 
 
 def get_private_key_string() -> str:
