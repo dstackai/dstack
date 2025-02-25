@@ -31,7 +31,7 @@ $ dstack init
     
     # If `image` is not specified, dstack uses its default image
     python: "3.11"
-    #image: dstackai/base:py3.13-0.6-cuda-12.1
+    #image: dstackai/base:py3.13-0.7-cuda-12.1
     
     ide: vscode
     
@@ -83,7 +83,7 @@ $ dstack init
     
     # If `image` is not specified, dstack uses its default image
     python: "3.11"
-    #image: dstackai/base:py3.13-0.6-cuda-12.1
+    #image: dstackai/base:py3.13-0.7-cuda-12.1
     
     # Commands of the task
     commands:
@@ -143,7 +143,7 @@ $ dstack init
     
     # If `image` is not specified, dstack uses its default image
     python: "3.11"
-    #image: dstackai/base:py3.13-0.6-cuda-12.1
+    #image: dstackai/base:py3.13-0.7-cuda-12.1
     
     # Required environment variables
     env:
