@@ -62,7 +62,7 @@ from dstack._internal.core.models.runs import (
     Retry,
 )
 from dstack._internal.core.services.profiles import get_retry
-from dstack._internal.server.background.tasks import get_provisioning_timeout
+from dstack._internal.server.background.tasks.common import get_provisioning_timeout
 from dstack._internal.server.db import get_session_ctx
 from dstack._internal.server.models import (
     FleetModel,

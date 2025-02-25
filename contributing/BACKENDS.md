@@ -186,7 +186,7 @@ add the `try`/`except` block that imports the backend configurator and appends i
 ##### 2.4.11. (Optional) Override provisioning timeout
 
 If instances in the backend take more than 10 minutes to start, override the default provisioning timeout in
-[`src/dstack/_internal/server/background/tasks/__init__.py`](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/server/background/tasks/__init__.py).
+[`src/dstack/_internal/server/background/tasks/common.py`](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/server/background/tasks/common.py).
 
 ## 3. Appendix
 

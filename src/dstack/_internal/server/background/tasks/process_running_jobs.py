@@ -28,7 +28,7 @@ from dstack._internal.core.models.runs import (
     RunSpec,
 )
 from dstack._internal.core.models.volumes import InstanceMountPoint, Volume, VolumeMountPoint
-from dstack._internal.server.background.tasks import get_provisioning_timeout
+from dstack._internal.server.background.tasks.common import get_provisioning_timeout
 from dstack._internal.server.db import get_session_ctx
 from dstack._internal.server.models import (
     InstanceModel,
