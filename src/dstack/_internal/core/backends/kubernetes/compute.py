@@ -9,9 +9,10 @@ from kubernetes import client
 
 from dstack._internal.core.backends.base.compute import (
     Compute,
+    generate_unique_gateway_instance_name,
+    generate_unique_instance_name_for_job,
     get_docker_commands,
     get_dstack_gateway_commands,
-    get_instance_name,
 )
 from dstack._internal.core.backends.base.offers import match_requirements
 from dstack._internal.core.backends.kubernetes.config import KubernetesConfig
@@ -99,7 +100,7 @@ class KubernetesCompute(Compute):
         project_ssh_private_key: str,
         volumes: List[Volume],
     ) -> JobProvisioningData:
-        instance_name = get_instance_name(run, job)
+        instance_name = generate_unique_instance_name_for_job(run, job)
         commands = get_docker_commands(
             [run.run_spec.ssh_key_pub.strip(), project_ssh_public_key.strip()]
         )
@@ -231,7 +232,7 @@ class KubernetesCompute(Compute):
         # TODO: By default EKS creates a Classic Load Balancer for Load Balancer services.
         # Consider deploying an NLB. It seems it requires some extra configuration on the cluster:
         # https://docs.aws.amazon.com/eks/latest/userguide/network-load-balancing.html
-        instance_name = configuration.instance_name
+        instance_name = generate_unique_gateway_instance_name(configuration)
         commands = _get_gateway_commands(authorized_keys=[configuration.ssh_key_pub])
         self.api.create_namespaced_pod(
             namespace=DEFAULT_NAMESPACE,

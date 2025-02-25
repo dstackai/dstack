@@ -5,8 +5,10 @@ from typing import List, Optional
 
 from dstack._internal.core.backends.base import Compute
 from dstack._internal.core.backends.base.compute import (
+    generate_unique_instance_name,
+    generate_unique_volume_name,
     get_docker_commands,
-    get_instance_name,
+    get_job_instance_name,
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.runpod.api_client import RunpodApiClient
@@ -30,6 +32,9 @@ from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
+
+# Undocumented but names of len 60 work
+MAX_RESOURCE_NAME_LEN = 60
 
 CONTAINER_REGISTRY_AUTH_CLEANUP_INTERVAL = 60 * 60 * 24  # 24 hour
 
@@ -69,7 +74,7 @@ class RunpodCompute(Compute):
     ) -> JobProvisioningData:
         instance_config = InstanceConfiguration(
             project_name=run.project_name,
-            instance_name=get_instance_name(run, job),
+            instance_name=get_job_instance_name(run, job),
             ssh_keys=[
                 SSHKey(public=run.run_spec.ssh_key_pub.strip()),
                 SSHKey(public=project_ssh_public_key.strip()),
@@ -77,6 +82,7 @@ class RunpodCompute(Compute):
             user=run.user,
         )
 
+        pod_name = generate_unique_instance_name(instance_config, max_length=MAX_RESOURCE_NAME_LEN)
         authorized_keys = instance_config.get_public_keys()
         memory_size = round(instance_offer.instance.resources.memory_mib / 1024)
         disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
@@ -98,7 +104,7 @@ class RunpodCompute(Compute):
             bid_per_gpu = instance_offer.price / gpu_count
 
         resp = self.api_client.create_pod(
-            name=instance_config.instance_name,
+            name=pod_name,
             image_name=job.job_spec.image_name,
             gpu_type_id=instance_offer.instance.name,
             cloud_type="SECURE",  # ["ALL", "COMMUNITY", "SECURE"]:
@@ -197,9 +203,10 @@ class RunpodCompute(Compute):
         )
 
     def create_volume(self, volume: Volume) -> VolumeProvisioningData:
+        volume_name = generate_unique_volume_name(volume, max_length=MAX_RESOURCE_NAME_LEN)
         size_gb = volume.configuration.size_gb
         volume_id = self.api_client.create_network_volume(
-            name=volume.name,
+            name=volume_name,
             region=volume.configuration.region,
             size=size_gb,
         )

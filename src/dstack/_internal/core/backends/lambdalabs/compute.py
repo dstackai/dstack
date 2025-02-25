@@ -6,7 +6,8 @@ from typing import Dict, List, Optional
 
 from dstack._internal.core.backends.base.compute import (
     Compute,
-    get_instance_name,
+    generate_unique_instance_name,
+    get_job_instance_name,
     get_shim_commands,
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
@@ -22,6 +23,8 @@ from dstack._internal.core.models.instances import (
 )
 from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
 from dstack._internal.core.models.volumes import Volume
+
+MAX_INSTANCE_NAME_LEN = 60
 
 
 class LambdaCompute(Compute):
@@ -44,6 +47,9 @@ class LambdaCompute(Compute):
     def create_instance(
         self, instance_offer: InstanceOfferWithAvailability, instance_config: InstanceConfiguration
     ) -> JobProvisioningData:
+        instance_name = generate_unique_instance_name(
+            instance_config, max_length=MAX_INSTANCE_NAME_LEN
+        )
         project_ssh_key = instance_config.ssh_keys[0]
         project_key_name = _add_project_ssh_key(
             api_client=self.api_client,
@@ -53,7 +59,7 @@ class LambdaCompute(Compute):
             region_name=instance_offer.region,
             instance_type_name=instance_offer.instance.name,
             ssh_key_names=[project_key_name],
-            name=instance_config.instance_name,
+            name=instance_name,
             quantity=1,
             file_system_names=[],
         )
@@ -107,7 +113,7 @@ class LambdaCompute(Compute):
     ) -> JobProvisioningData:
         instance_config = InstanceConfiguration(
             project_name=run.project_name,
-            instance_name=get_instance_name(run, job),  # TODO: generate name
+            instance_name=get_job_instance_name(run, job),  # TODO: generate name
             ssh_keys=[
                 SSHKey(
                     public=project_ssh_public_key.strip(), private=project_ssh_private_key.strip()

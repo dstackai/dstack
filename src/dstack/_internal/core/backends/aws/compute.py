@@ -11,8 +11,11 @@ from dstack._internal import settings
 from dstack._internal.core.backends.aws.config import AWSConfig
 from dstack._internal.core.backends.base.compute import (
     Compute,
+    generate_unique_gateway_instance_name,
+    generate_unique_instance_name,
+    generate_unique_volume_name,
     get_gateway_user_data,
-    get_instance_name,
+    get_job_instance_name,
     get_user_data,
     merge_tags,
 )
@@ -152,10 +155,12 @@ class AWSCompute(Compute):
         if zones is not None and len(zones) == 0:
             raise NoCapacityError("No eligible availability zones")
 
+        instance_name = generate_unique_instance_name(instance_config)
         tags = {
-            "Name": instance_config.instance_name,
+            "Name": instance_name,
             "owner": "dstack",
             "dstack_project": project_name,
+            "dstack_name": instance_config.instance_name,
             "dstack_user": instance_config.user,
         }
         tags = merge_tags(tags=tags, backend_tags=self.config.tags)
@@ -274,7 +279,7 @@ class AWSCompute(Compute):
         # TODO: run_job is the same for vm-based backends, refactor
         instance_config = InstanceConfiguration(
             project_name=run.project_name,
-            instance_name=get_instance_name(run, job),  # TODO: generate name
+            instance_name=get_job_instance_name(run, job),  # TODO: generate name
             ssh_keys=[
                 SSHKey(public=project_ssh_public_key.strip()),
             ],
@@ -342,10 +347,12 @@ class AWSCompute(Compute):
         ec2_resource = self.session.resource("ec2", region_name=configuration.region)
         ec2_client = self.session.client("ec2", region_name=configuration.region)
 
+        instance_name = generate_unique_gateway_instance_name(configuration)
         tags = {
-            "Name": configuration.instance_name,
+            "Name": instance_name,
             "owner": "dstack",
             "dstack_project": configuration.project_name,
+            "dstack_name": configuration.instance_name,
         }
         if settings.DSTACK_VERSION is not None:
             tags["dstack_version"] = settings.DSTACK_VERSION
@@ -403,7 +410,7 @@ class AWSCompute(Compute):
 
         logger.debug("Creating ALB for gateway %s...", configuration.instance_name)
         response = elb_client.create_load_balancer(
-            Name=f"{configuration.instance_name}-lb",
+            Name=f"{instance_name}-lb",
             Subnets=subnets_ids,
             SecurityGroups=[security_group_id],
             Scheme="internet-facing" if configuration.public_ip else "internal",
@@ -418,7 +425,7 @@ class AWSCompute(Compute):
 
         logger.debug("Creating Target Group for gateway %s...", configuration.instance_name)
         response = elb_client.create_target_group(
-            Name=f"{configuration.instance_name}-tg",
+            Name=f"{instance_name}-tg",
             Protocol="HTTP",
             Port=80,
             VpcId=vpc_id,
@@ -535,11 +542,13 @@ class AWSCompute(Compute):
     def create_volume(self, volume: Volume) -> VolumeProvisioningData:
         ec2_client = self.session.client("ec2", region_name=volume.configuration.region)
 
+        volume_name = generate_unique_volume_name(volume)
         tags = {
-            "Name": volume.configuration.name,
+            "Name": volume_name,
             "owner": "dstack",
-            "dstack_user": volume.user,
             "dstack_project": volume.project_name,
+            "dstack_name": volume.name,
+            "dstack_user": volume.user,
         }
         tags = merge_tags(tags=tags, backend_tags=self.config.tags)
 

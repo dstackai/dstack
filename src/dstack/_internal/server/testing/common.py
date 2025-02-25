@@ -16,7 +16,7 @@ from dstack._internal.core.models.configurations import (
 )
 from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.fleets import FleetConfiguration, FleetSpec, FleetStatus
-from dstack._internal.core.models.gateways import GatewayStatus
+from dstack._internal.core.models.gateways import GatewayComputeConfiguration, GatewayStatus
 from dstack._internal.core.models.instances import (
     Disk,
     Gpu,
@@ -420,6 +420,24 @@ async def create_gateway_compute(
     return gateway_compute
 
 
+def get_gateway_compute_configuration(
+    project_name: str = "test-project",
+    instance_name: str = "test-instance",
+    backend: BackendType = BackendType.AWS,
+    region: str = "us",
+    public_ip: bool = True,
+) -> GatewayComputeConfiguration:
+    return GatewayComputeConfiguration(
+        project_name=project_name,
+        instance_name=instance_name,
+        backend=backend,
+        region=region,
+        public_ip=public_ip,
+        ssh_key_pub="",
+        certificate=None,
+    )
+
+
 async def create_pool(
     session: AsyncSession,
     project: ProjectModel,
@@ -533,13 +551,7 @@ async def create_instance(
         requirements = Requirements(resources=ResourcesSpec(cpu=1))
 
     if instance_configuration is None:
-        instance_configuration = InstanceConfiguration(
-            project_name="test_proj",
-            instance_name="test_instance_name",
-            instance_id="test instance id",
-            ssh_keys=[],
-            user="test_user",
-        )
+        instance_configuration = get_instance_configuration()
 
     if volumes is None:
         volumes = []
@@ -579,6 +591,19 @@ async def create_instance(
     session.add(im)
     await session.commit()
     return im
+
+
+def get_instance_configuration(
+    project_name: str = "test-project",
+    instance_name: str = "test-instance",
+    user: str = "dstack-user",
+) -> InstanceConfiguration:
+    return InstanceConfiguration(
+        project_name=project_name,
+        instance_name=instance_name,
+        user=user,
+        ssh_keys=[],
+    )
 
 
 def get_instance_offer_with_availability(

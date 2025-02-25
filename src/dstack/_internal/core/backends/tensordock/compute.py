@@ -4,7 +4,11 @@ from typing import List, Optional
 import requests
 
 from dstack._internal.core.backends.base import Compute
-from dstack._internal.core.backends.base.compute import get_instance_name, get_shim_commands
+from dstack._internal.core.backends.base.compute import (
+    generate_unique_instance_name,
+    get_job_instance_name,
+    get_shim_commands,
+)
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.tensordock.api_client import TensorDockAPIClient
 from dstack._internal.core.backends.tensordock.config import TensorDockConfig
@@ -21,6 +25,10 @@ from dstack._internal.core.models.volumes import Volume
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
+
+
+# Undocumented but names of len 60 work
+MAX_INSTANCE_NAME_LEN = 60
 
 
 class TensorDockCompute(Compute):
@@ -49,10 +57,13 @@ class TensorDockCompute(Compute):
         instance_offer: InstanceOfferWithAvailability,
         instance_config: InstanceConfiguration,
     ) -> JobProvisioningData:
+        instance_name = generate_unique_instance_name(
+            instance_config, max_length=MAX_INSTANCE_NAME_LEN
+        )
         commands = get_shim_commands(authorized_keys=instance_config.get_public_keys())
         try:
             resp = self.api_client.deploy_single(
-                instance_name=instance_config.instance_name,
+                instance_name=instance_name,
                 instance=instance_offer.instance,
                 cloudinit={
                     "ssh_pwauth": False,  # disable password auth
@@ -113,7 +124,7 @@ class TensorDockCompute(Compute):
     ) -> JobProvisioningData:
         instance_config = InstanceConfiguration(
             project_name=run.project_name,
-            instance_name=get_instance_name(run, job),  # TODO: generate name
+            instance_name=get_job_instance_name(run, job),  # TODO: generate name
             ssh_keys=[
                 SSHKey(public=run.run_spec.ssh_key_pub.strip()),
                 SSHKey(public=project_ssh_public_key.strip()),

@@ -1,5 +1,7 @@
 import os
+import random
 import re
+import string
 import threading
 from abc import ABC, abstractmethod
 from functools import lru_cache
@@ -31,6 +33,7 @@ from dstack._internal.core.models.volumes import (
     VolumeAttachmentData,
     VolumeProvisioningData,
 )
+from dstack._internal.core.services import is_valid_dstack_resource_name
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -209,8 +212,105 @@ class Compute(ABC):
         return self.get_offers(requirements)
 
 
-def get_instance_name(run: Run, job: Job) -> str:
-    return f"{run.project_name.lower()}-{job.job_spec.job_name}"
+def get_job_instance_name(run: Run, job: Job) -> str:
+    return job.job_spec.job_name
+
+
+_DEFAULT_MAX_RESOURCE_NAME_LEN = 60
+_CLOUD_RESOURCE_SUFFIX_LEN = 8
+
+
+def generate_unique_instance_name(
+    instance_configuration: InstanceConfiguration,
+    max_length: int = _DEFAULT_MAX_RESOURCE_NAME_LEN,
+) -> str:
+    """
+    Generates a unique instance name valid across all backends.
+    """
+    return generate_unique_backend_name(
+        resource_name=instance_configuration.instance_name,
+        project_name=instance_configuration.project_name,
+        max_length=max_length,
+    )
+
+
+def generate_unique_instance_name_for_job(
+    run: Run,
+    job: Job,
+    max_length: int = _DEFAULT_MAX_RESOURCE_NAME_LEN,
+) -> str:
+    """
+    Generates a unique instance name for a job valid across all backends.
+    """
+    return generate_unique_backend_name(
+        resource_name=get_job_instance_name(run, job),
+        project_name=run.project_name,
+        max_length=max_length,
+    )
+
+
+def generate_unique_gateway_instance_name(
+    gateway_compute_configuration: GatewayComputeConfiguration,
+    max_length: int = _DEFAULT_MAX_RESOURCE_NAME_LEN,
+) -> str:
+    """
+    Generates a unique gateway instance name valid across all backends.
+    """
+    return generate_unique_backend_name(
+        resource_name=gateway_compute_configuration.instance_name,
+        project_name=gateway_compute_configuration.project_name,
+        max_length=max_length,
+    )
+
+
+def generate_unique_volume_name(
+    volume: Volume,
+    max_length: int = _DEFAULT_MAX_RESOURCE_NAME_LEN,
+) -> str:
+    """
+    Generates a unique volume name valid across all backends.
+    """
+    return generate_unique_backend_name(
+        resource_name=volume.name,
+        project_name=volume.project_name,
+        max_length=max_length,
+    )
+
+
+def generate_unique_backend_name(
+    resource_name: str,
+    project_name: Optional[str],
+    max_length: int,
+) -> str:
+    """
+    Generates a unique resource name valid across all backends.
+    Backend resource names must be unique on every provisioning so that
+    resource re-submission/re-creation doesn't lead to conflicts
+    on backends that require unique names (e.g. Azure, GCP).
+    """
+    # resource_name is guaranteed to be valid in all backends
+    prefix = f"dstack-{resource_name}"
+    if project_name is not None and is_valid_dstack_resource_name(project_name):
+        # project_name is not guaranteed to be valid in all backends,
+        # so we add it only if it passes the validation
+        prefix = f"dstack-{project_name}-{resource_name}"
+    return _generate_unique_backend_name_with_prefix(
+        prefix=prefix,
+        max_length=max_length,
+    )
+
+
+def _generate_unique_backend_name_with_prefix(
+    prefix: str,
+    max_length: int,
+) -> str:
+    prefix_len = max_length - _CLOUD_RESOURCE_SUFFIX_LEN - 1
+    prefix = prefix[:prefix_len]
+    suffix = "".join(
+        random.choice(string.ascii_lowercase + string.digits)
+        for _ in range(_CLOUD_RESOURCE_SUFFIX_LEN)
+    )
+    return f"{prefix}-{suffix}"
 
 
 def get_cloud_config(**config) -> str:

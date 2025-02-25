@@ -1,7 +1,5 @@
 import concurrent.futures
-import random
 import re
-import string
 from typing import Dict, List, Optional
 
 import google.api_core.exceptions
@@ -322,12 +320,13 @@ def _is_valid_label(key: str, value: str) -> bool:
     return is_valid_resource_name(key) and is_valid_label_value(value)
 
 
+MAX_RESOURCE_NAME_LEN = 63
 NAME_PATTERN = re.compile(r"^[a-z][_\-a-z0-9]{0,62}$")
 LABEL_VALUE_PATTERN = re.compile(r"^[_\-a-z0-9]{0,63}$")
 
 
 def is_valid_resource_name(name: str) -> bool:
-    if len(name) < 1 or len(name) > 63:
+    if len(name) < 1 or len(name) > MAX_RESOURCE_NAME_LEN:
         return False
     match = re.match(NAME_PATTERN, name)
     return match is not None
@@ -336,12 +335,6 @@ def is_valid_resource_name(name: str) -> bool:
 def is_valid_label_value(value: str) -> bool:
     match = re.match(LABEL_VALUE_PATTERN, value)
     return match is not None
-
-
-def generate_random_resource_name(length: int = 40) -> str:
-    return random.choice(string.ascii_lowercase) + "".join(
-        random.choice(string.ascii_lowercase + string.digits) for _ in range(length)
-    )
 
 
 def create_tpu_node_struct(

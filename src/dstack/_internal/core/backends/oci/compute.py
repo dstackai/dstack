@@ -4,7 +4,12 @@ from typing import List, Optional
 
 import oci
 
-from dstack._internal.core.backends.base.compute import Compute, get_instance_name, get_user_data
+from dstack._internal.core.backends.base.compute import (
+    Compute,
+    generate_unique_instance_name,
+    get_job_instance_name,
+    get_user_data,
+)
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.oci import resources
 from dstack._internal.core.backends.oci.config import OCIConfig
@@ -98,7 +103,7 @@ class OCICompute(Compute):
     ) -> JobProvisioningData:
         instance_config = InstanceConfiguration(
             project_name=run.project_name,
-            instance_name=get_instance_name(run, job),
+            instance_name=get_job_instance_name(run, job),
             ssh_keys=[SSHKey(public=project_ssh_public_key.strip())],
             user=run.user,
         )
@@ -148,6 +153,7 @@ class OCICompute(Compute):
         ]
         cloud_init_user_data = get_user_data(instance_config.get_public_keys(), setup_commands)
 
+        display_name = generate_unique_instance_name(instance_config)
         try:
             instance = resources.launch_instance(
                 region=region,
@@ -155,7 +161,7 @@ class OCICompute(Compute):
                 compartment_id=self.config.compartment_id,
                 subnet_id=subnet.id,
                 security_group_id=security_group.id,
-                display_name=instance_config.instance_name,
+                display_name=display_name,
                 cloud_init_user_data=cloud_init_user_data,
                 shape=instance_offer.instance.name,
                 is_spot=instance_offer.instance.resources.spot,

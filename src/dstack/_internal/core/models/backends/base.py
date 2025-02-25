@@ -15,6 +15,7 @@ class BackendType(str, enum.Enum):
         DATACRUNCH (BackendType): DataCrunch
         KUBERNETES (BackendType): Kubernetes
         LAMBDA (BackendType): Lambda Cloud
+        OCI (BackendType): Oracle Cloud Infrastructure
         RUNPOD (BackendType): Runpod Cloud
         TENSORDOCK (BackendType): TensorDock Marketplace
         VASTAI (BackendType): Vast.ai Marketplace

@@ -4,7 +4,8 @@ import requests
 
 from dstack._internal.core.backends.base import Compute
 from dstack._internal.core.backends.base.compute import (
-    get_instance_name,
+    generate_unique_instance_name,
+    get_job_instance_name,
     get_shim_commands,
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
@@ -23,6 +24,9 @@ from dstack._internal.core.models.volumes import Volume
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
+
+
+MAX_RESOURCE_NAME_LEN = 30
 
 
 class CudoCompute(Compute):
@@ -58,7 +62,7 @@ class CudoCompute(Compute):
     ) -> JobProvisioningData:
         instance_config = InstanceConfiguration(
             project_name=run.project_name,
-            instance_name=get_instance_name(run, job),
+            instance_name=get_job_instance_name(run, job),
             ssh_keys=[
                 SSHKey(public=project_ssh_public_key.strip()),
             ],
@@ -71,6 +75,7 @@ class CudoCompute(Compute):
         instance_offer: InstanceOfferWithAvailability,
         instance_config: InstanceConfiguration,
     ) -> JobProvisioningData:
+        vm_id = generate_unique_instance_name(instance_config, max_length=MAX_RESOURCE_NAME_LEN)
         public_keys = instance_config.get_public_keys()
         memory_size = round(instance_offer.instance.resources.memory_mib / 1024)
         disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
@@ -81,13 +86,12 @@ class CudoCompute(Compute):
             shim_commands if gpus_no > 0 else f"{install_docker_script()} && {shim_commands}"
         )
 
-        vm_id = f"{instance_config.instance_name}-{instance_offer.region}"
         try:
             resp_data = self.api_client.create_virtual_machine(
                 project_id=self.config.project_id,
                 boot_disk_storage_class="STORAGE_CLASS_NETWORK",
                 boot_disk_size_gib=disk_size,
-                book_disk_id=f"{instance_config.instance_name}_{instance_offer.region}_disk_id",
+                book_disk_id=f"{vm_id}_disk_id",
                 boot_disk_image_id=_get_image_id(gpus_no > 0),
                 data_center_id=instance_offer.region,
                 gpus=gpus_no,

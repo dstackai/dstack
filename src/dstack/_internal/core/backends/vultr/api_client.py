@@ -20,7 +20,7 @@ class VultrApiClient:
             return False
         return True
 
-    def get_instance(self, instance_id: str, plan_type: str):
+    def get_instance(self, instance_id: str, plan_type: str) -> dict:
         if plan_type == "bare-metal":
             response = self._make_request("GET", f"/bare-metals/{instance_id}")
             return response.json()["bare_metal"]
@@ -28,7 +28,7 @@ class VultrApiClient:
             response = self._make_request("GET", f"/instances/{instance_id}")
             return response.json()["instance"]
 
-    def get_vpc_for_region(self, region: str) -> Optional[str]:
+    def get_vpc_for_region(self, region: str) -> Optional[dict]:
         response = self._make_request("GET", "/vpcs?per_page=500")
         vpcs = response.json().get("vpcs", [])
         if vpcs:
@@ -37,7 +37,7 @@ class VultrApiClient:
                     return vpc
         return None
 
-    def create_vpc(self, region: str):
+    def create_vpc(self, region: str) -> dict:
         data = {"region": region, "description": f"dstack-vpc-{region}"}
         response = self._make_request("POST", "/vpcs", data=data)
         return response.json()["vpc"]

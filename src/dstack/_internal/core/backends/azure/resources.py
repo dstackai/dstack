@@ -6,6 +6,8 @@ from azure.mgmt.network.models import Subnet
 
 from dstack._internal.core.errors import BackendError
 
+MAX_RESOURCE_NAME_LEN = 64
+
 
 def get_network_subnets(
     network_client: network_mgmt.NetworkManagementClient,

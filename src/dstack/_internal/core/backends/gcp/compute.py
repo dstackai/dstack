@@ -12,8 +12,11 @@ import dstack._internal.core.backends.gcp.auth as auth
 import dstack._internal.core.backends.gcp.resources as gcp_resources
 from dstack._internal.core.backends.base.compute import (
     Compute,
+    generate_unique_gateway_instance_name,
+    generate_unique_instance_name,
+    generate_unique_volume_name,
     get_gateway_user_data,
-    get_instance_name,
+    get_job_instance_name,
     get_shim_commands,
     get_user_data,
     merge_tags,
@@ -147,17 +150,10 @@ class GCPCompute(Compute):
         instance_offer: InstanceOfferWithAvailability,
         instance_config: InstanceConfiguration,
     ) -> JobProvisioningData:
-        instance_name = instance_config.instance_name
+        instance_name = generate_unique_instance_name(
+            instance_config, max_length=gcp_resources.MAX_RESOURCE_NAME_LEN
+        )
         allocate_public_ip = self.config.allocate_public_ips
-        if not gcp_resources.is_valid_resource_name(instance_name):
-            # In a rare case the instance name is invalid in GCP,
-            # we better use a random instance name than fail provisioning.
-            instance_name = gcp_resources.generate_random_resource_name()
-            logger.warning(
-                "Invalid GCP instance name: %s. A new valid name is generated: %s",
-                instance_config.instance_name,
-                instance_name,
-            )
         authorized_keys = instance_config.get_public_keys()
 
         # get_offers always fills instance_offer.availability_zones
@@ -182,6 +178,7 @@ class GCPCompute(Compute):
         labels = {
             "owner": "dstack",
             "dstack_project": instance_config.project_name.lower(),
+            "dstack_name": instance_config.instance_name,
             "dstack_user": instance_config.user.lower(),
         }
         labels = {k: v for k, v in labels.items() if gcp_resources.is_valid_label_value(v)}
@@ -192,7 +189,7 @@ class GCPCompute(Compute):
             else False
         )
         if is_tpu:
-            instance_id = f"tpu-{instance_config.instance_name}"
+            instance_id = instance_name
             startup_script = _get_tpu_startup_script(authorized_keys)
             # GCP does not allow attaching disks while TPUs is creating,
             # so we need to attach the disks on creation.
@@ -378,7 +375,7 @@ class GCPCompute(Compute):
         # TODO: run_job is the same for vm-based backends, refactor
         instance_config = InstanceConfiguration(
             project_name=run.project_name,
-            instance_name=get_instance_name(run, job),  # TODO: generate name
+            instance_name=get_job_instance_name(run, job),  # TODO: generate name
             ssh_keys=[
                 SSHKey(public=project_ssh_public_key.strip()),
             ],
@@ -421,6 +418,9 @@ class GCPCompute(Compute):
         else:
             raise ComputeResourceNotFoundError()
 
+        instance_name = generate_unique_gateway_instance_name(
+            configuration, max_length=gcp_resources.MAX_RESOURCE_NAME_LEN
+        )
         # Choose any usable subnet in a VPC.
         # Configuring a specific subnet per region is not supported yet.
         subnetwork = _get_vpc_subnet(
@@ -432,6 +432,7 @@ class GCPCompute(Compute):
         labels = {
             "owner": "dstack",
             "dstack_project": configuration.project_name.lower(),
+            "dstack_name": configuration.instance_name,
         }
         labels = {k: v for k, v in labels.items() if gcp_resources.is_valid_label_value(v)}
         labels = merge_tags(tags=labels, backend_tags=self.config.tags)
@@ -449,7 +450,7 @@ class GCPCompute(Compute):
             authorized_keys=[configuration.ssh_key_pub],
             labels=labels,
             tags=[gcp_resources.DSTACK_GATEWAY_TAG],
-            instance_name=configuration.instance_name,
+            instance_name=instance_name,
             zone=zone,
             service_account=self.config.vm_service_account,
             network=self.config.vpc_resource_name,
@@ -458,10 +459,10 @@ class GCPCompute(Compute):
         operation = self.instances_client.insert(request=request)
         gcp_resources.wait_for_extended_operation(operation, "instance creation")
         instance = self.instances_client.get(
-            project=self.config.project_id, zone=zone, instance=configuration.instance_name
+            project=self.config.project_id, zone=zone, instance=instance_name
         )
         return GatewayProvisioningData(
-            instance_id=configuration.instance_name,
+            instance_id=instance_name,
             region=configuration.region,  # used for instance termination
             availability_zone=zone,
             ip_address=instance.network_interfaces[0].access_configs[0].nat_i_p,
@@ -525,16 +526,21 @@ class GCPCompute(Compute):
             )
         zone = zones[0]
 
+        disk_name = generate_unique_volume_name(
+            volume, max_length=gcp_resources.MAX_RESOURCE_NAME_LEN
+        )
+
         labels = {
             "owner": "dstack",
             "dstack_project": volume.project_name.lower(),
+            "dstack_name": volume.name,
             "dstack_user": volume.user,
         }
         labels = {k: v for k, v in labels.items() if gcp_resources.is_valid_label_value(v)}
         labels = merge_tags(tags=labels, backend_tags=self.config.tags)
 
         disk = compute_v1.Disk()
-        disk.name = volume.name
+        disk.name = disk_name
         disk.size_gb = volume.configuration.size_gb
         disk.type_ = f"zones/{zone}/diskTypes/pd-balanced"
         disk.labels = labels
@@ -552,7 +558,7 @@ class GCPCompute(Compute):
         created_disk = self.disk_client.get(
             project=self.config.project_id,
             zone=zone,
-            disk=volume.name,
+            disk=disk_name,
         )
         logger.debug("Created persistent disk for volume %s", volume.name)
         return VolumeProvisioningData(
