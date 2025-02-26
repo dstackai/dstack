@@ -131,7 +131,7 @@ def create_instances_struct(
     disk_size: int,
     image_id: str,
     instance_type: str,
-    iam_instance_profile_arn: Optional[str],
+    iam_instance_profile: Optional[str],
     user_data: str,
     tags: List[Dict[str, str]],
     security_group_id: str,
@@ -166,8 +166,8 @@ def create_instances_struct(
             },
         ],
     )
-    if iam_instance_profile_arn:
-        struct["IamInstanceProfile"] = {"Arn": iam_instance_profile_arn}
+    if iam_instance_profile:
+        struct["IamInstanceProfile"] = {"Name": iam_instance_profile}
     if spot:
         struct["InstanceMarketOptions"] = {
             "MarketType": "spot",

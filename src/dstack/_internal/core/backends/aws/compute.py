@@ -219,7 +219,7 @@ class AWSCompute(Compute):
                         disk_size=disk_size,
                         image_id=image_id,
                         instance_type=instance_offer.instance.name,
-                        iam_instance_profile_arn=None,
+                        iam_instance_profile=self.config.iam_instance_profile,
                         user_data=get_user_data(authorized_keys=instance_config.get_public_keys()),
                         tags=aws_resources.make_tags(tags),
                         security_group_id=aws_resources.create_security_group(
@@ -264,6 +264,9 @@ class AWSCompute(Compute):
                 )
             except botocore.exceptions.ClientError as e:
                 logger.warning("Got botocore.exceptions.ClientError: %s", e)
+                if e.response["Error"]["Code"] == "InvalidParameterValue":
+                    msg = e.response["Error"].get("Message", "")
+                    raise ComputeError(f"Invalid AWS request: {msg}")
                 continue
         raise NoCapacityError()
 
@@ -380,7 +383,7 @@ class AWSCompute(Compute):
                 disk_size=10,
                 image_id=aws_resources.get_gateway_image_id(ec2_client),
                 instance_type="t2.micro",
-                iam_instance_profile_arn=None,
+                iam_instance_profile=None,
                 user_data=get_gateway_user_data(configuration.ssh_key_pub),
                 tags=tags,
                 security_group_id=security_group_id,
