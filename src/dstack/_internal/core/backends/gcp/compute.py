@@ -580,7 +580,7 @@ class GCPCompute(Compute):
             operation = self.disk_client.delete(
                 project=self.config.project_id,
                 zone=get_or_error(volume.provisioning_data).availability_zone,
-                disk=volume.name,
+                disk=volume.volume_id,
             )
             gcp_resources.wait_for_extended_operation(operation, "persistent disk deletion")
         except google.api_core.exceptions.NotFound:
