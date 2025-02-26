@@ -312,7 +312,7 @@ def get_resource_group_network_subnet_or_error(
         except Exception:
             raise ComputeError(
                 "Network specified in incorrect format."
-                " Supported format for `vps_ids` values: 'networkResourceGroupName/networkName'"
+                " Supported format for `vpc_ids` values: 'networkResourceGroupName/networkName'"
             )
     elif resource_group is not None:
         network_name = azure_utils.get_default_network_name(resource_group, location)
