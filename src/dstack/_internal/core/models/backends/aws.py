@@ -32,6 +32,7 @@ class AWSConfigInfo(CoreModel):
     vpc_ids: Optional[Dict[str, str]] = None
     default_vpcs: Optional[bool] = None
     public_ips: Optional[bool] = None
+    iam_instance_profile: Optional[str] = None
     tags: Optional[Dict[str, str]] = None
     os_images: Optional[AWSOSImageConfig] = None
 
@@ -70,6 +71,7 @@ class AWSConfigInfoWithCredsPartial(CoreModel):
     vpc_ids: Optional[Dict[str, str]]
     default_vpcs: Optional[bool]
     public_ips: Optional[bool]
+    iam_instance_profile: Optional[str]
     tags: Optional[Dict[str, str]]
     os_images: Optional["AWSOSImageConfig"]
 

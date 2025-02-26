@@ -2,6 +2,7 @@ import concurrent.futures
 import json
 from typing import List
 
+import botocore.exceptions
 from boto3.session import Session
 
 from dstack._internal.core.backends.aws import AWSBackend, auth, compute, resources
@@ -35,6 +36,9 @@ from dstack._internal.server.services.backends.configurators.base import (
     Configurator,
     raise_invalid_credentials_error,
 )
+from dstack._internal.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 REGIONS = [
     ("US East, N. Virginia", "us-east-1"),
@@ -137,7 +141,8 @@ class AWSConfigurator(Configurator):
 
     def _check_config(self, session: Session, config: AWSConfigInfoWithCredsPartial):
         self._check_tags_config(config)
-        self._check_vpc_config(session=session, config=config)
+        self._check_iam_instance_profile_config(session, config)
+        self._check_vpc_config(session, config)
 
     def _check_tags_config(self, config: AWSConfigInfoWithCredsPartial):
         if not config.tags:
@@ -150,6 +155,31 @@ class AWSConfigurator(Configurator):
             resources.validate_tags(config.tags)
         except BackendError as e:
             raise ServerClientError(e.args[0])
+
+    def _check_iam_instance_profile_config(
+        self, session: Session, config: AWSConfigInfoWithCredsPartial
+    ):
+        if config.iam_instance_profile is None:
+            return
+        try:
+            iam_client = session.client("iam")
+            iam_client.get_instance_profile(InstanceProfileName=config.iam_instance_profile)
+        except botocore.exceptions.ClientError as e:
+            if e.response["Error"]["Code"] == "NoSuchEntity":
+                raise ServerClientError(
+                    f"IAM instance profile {config.iam_instance_profile} not found"
+                )
+            logger.exception(
+                "Got botocore.exceptions.ClientError when checking iam_instance_profile"
+            )
+            raise ServerClientError(
+                f"Failed to check IAM instance profile {config.iam_instance_profile}"
+            )
+        except Exception:
+            logger.exception("Got exception when checking iam_instance_profile")
+            raise ServerClientError(
+                f"Failed to check IAM instance profile {config.iam_instance_profile}"
+            )
 
     def _check_vpc_config(self, session: Session, config: AWSConfigInfoWithCredsPartial):
         allocate_public_ip = config.public_ips if config.public_ips is not None else True

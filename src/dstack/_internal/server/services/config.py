@@ -107,6 +107,16 @@ class AWSConfig(CoreModel):
             )
         ),
     ] = None
+    iam_instance_profile: Annotated[
+        Optional[str],
+        Field(
+            description=(
+                "The name of the IAM instance profile to associate with EC2 instances."
+                " You can also specify the IAM role name for roles created via the AWS console."
+                " AWS automatically creates an instance profile and gives it the same name as the role"
+            )
+        ),
+    ] = None
     tags: Annotated[
         Optional[Dict[str, str]],
         Field(description="The tags that will be assigned to resources created by `dstack`"),
@@ -251,7 +261,7 @@ class GCPConfig(CoreModel):
         ),
     ] = None
     vm_service_account: Annotated[
-        Optional[str], Field(description="The service account associated with provisioned VMs")
+        Optional[str], Field(description="The service account to associate with provisioned VMs")
     ] = None
     tags: Annotated[
         Optional[Dict[str, str]],

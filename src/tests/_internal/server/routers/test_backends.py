@@ -1335,6 +1335,7 @@ class TestGetConfigInfo:
             "vpc_ids": None,
             "default_vpcs": None,
             "public_ips": None,
+            "iam_instance_profile": None,
             "tags": None,
             "os_images": None,
             "creds": json.loads(backend.auth.plaintext),

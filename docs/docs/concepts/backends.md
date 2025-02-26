@@ -122,12 +122,43 @@ There are two ways to configure AWS: using an access key or using the default cr
                     "acm:ListCertificates"
                 ],
                 "Resource": "*"
+            },
+            {
+                "Effect": "Allow",
+                "Action": [
+                    "iam:GetInstanceProfile",
+                    "iam:GetRole",
+                    "iam:PassRole"
+                ],
+                "Resource": "*"
             }
         ]
     }
     ```
 
     The `elasticloadbalancing:*` and `acm:*` permissions are only needed for provisioning gateways with ACM (AWS Certificate Manager) certificates.
+
+    The `iam:*` permissions are only needed if you specify `iam_instance_profile` to assign to EC2 instances.
+
+    You can also limit permissions to specific resources in your account:
+    
+    ```
+    {
+        "Version": "2012-10-17",
+        "Statement": [
+            ...
+            {
+                "Effect": "Allow",
+                "Action": [
+                    "iam:GetInstanceProfile",
+                    "iam:GetRole",
+                    "iam:PassRole"
+                ],
+                "Resource": "arn:aws:iam::account-id:role/EC2-roles-for-XYZ-*"
+            }
+        ]
+    }
+    ```
 
 ??? info "VPC"
     By default, `dstack` uses the default VPC. It's possible to customize it:
