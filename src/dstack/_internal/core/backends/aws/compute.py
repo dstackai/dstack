@@ -506,6 +506,7 @@ class AWSCompute(Compute):
                 "Failed to terminate all gateway %s resources. backend_data parsing error.",
                 configuration.instance_name,
             )
+            return
 
         elb_client = self.session.client("elbv2", region_name=configuration.region)
 
