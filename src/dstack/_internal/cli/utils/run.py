@@ -4,6 +4,8 @@ from rich.markup import escape
 from rich.table import Table
 
 from dstack._internal.cli.utils.common import NO_OFFERS_WARNING, add_row_from_dict, console
+from dstack._internal.core.models.common import is_core_model_instance
+from dstack._internal.core.models.configurations import DevEnvironmentConfiguration
 from dstack._internal.core.models.instances import InstanceAvailability
 from dstack._internal.core.models.profiles import (
     DEFAULT_RUN_TERMINATION_IDLE_TIME,
@@ -38,6 +40,13 @@ def print_run_plan(run_plan: RunPlan, offers_limit: int = 3):
         if job_plan.job_spec.max_duration
         else "-"
     )
+    inactivity_duration = None
+    if is_core_model_instance(run_plan.run_spec.configuration, DevEnvironmentConfiguration):
+        inactivity_duration = "-"
+        if isinstance(run_plan.run_spec.configuration.inactivity_duration, int):
+            inactivity_duration = format_pretty_duration(
+                run_plan.run_spec.configuration.inactivity_duration
+            )
     if job_plan.job_spec.retry is None:
         retry = "-"
     else:
@@ -72,6 +81,8 @@ def print_run_plan(run_plan: RunPlan, offers_limit: int = 3):
     props.add_row(th("Resources"), pretty_req)
     props.add_row(th("Max price"), max_price)
     props.add_row(th("Max duration"), max_duration)
+    if inactivity_duration is not None:  # None means n/a
+        props.add_row(th("Inactivity duration"), inactivity_duration)
     props.add_row(th("Spot policy"), spot_policy)
     props.add_row(th("Retry policy"), retry)
     props.add_row(th("Creation policy"), creation_policy)
