@@ -98,6 +98,8 @@ these dependencies, and ensure that you update the `all` section to include them
 Add a new enumeration member for your provider to `BackendType` (`src/dstack/_internal/core/models/backends/base.py`).
 Use the name of the provider.
 
+Then create a database [migration](MIGRATIONS.md) to reflect the new enum member.
+
 ##### 2.4.2. Create the provider directory
 
 Create a new directory under `src/dstack/_internal/core/backends` with the name of the backend type.
@@ -119,6 +121,7 @@ Under the backend directory you've created, create the `compute.py` file and def
 backend compute class there (should extend `dstack._internal.core.backends.base.compute.Compute`).
 
 You'll have to implement `get_offers`, `run_job` and `terminate_instance`.
+You may need to implement `update_provisioning_data`, see its docstring for details.
 
 For VM-based backends, also implement the `create_instance` method and add the backend name to
 [`BACKENDS_WITH_CREATE_INSTANCE_SUPPORT`](`https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/__init__.py`).
