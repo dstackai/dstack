@@ -213,9 +213,8 @@ Each sample includes a set of `dstack_*` labels, e.g., `dstack_project_name="mai
 
 Currently, `dstack` collects the following metrics:
 
-* A fixed subset of NVIDIA GPU metrics from [DCGM Exporter :material-arrow-top-right-thin:{ .external }](https://docs.nvidia.com/datacenter/dcgm/latest/gpu-telemetry/dcgm-exporter.html){:target="_blank"}.
-`dcgm-exporter` and `libdcgm` must be installed on the instance to enable these metrics.
-On AWS, Azure, GCP, and OCI backends the required packages are already installed.
+* A fixed subset of NVIDIA GPU metrics from [DCGM Exporter :material-arrow-top-right-thin:{ .external }](https://docs.nvidia.com/datacenter/dcgm/latest/gpu-telemetry/dcgm-exporter.html){:target="_blank"} on supported cloud backends — AWS, Azure, GCP, OCI — and SSH fleets.
+On supported cloud backends the required packages are already installed.
 If you use SSH fleets, install `datacenter-gpu-manager-4-core` and `datacenter-gpu-manager-exporter`.
 
 ## Encryption
