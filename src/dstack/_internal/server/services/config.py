@@ -45,7 +45,7 @@ logger = get_logger(__name__)
 # By default, PyYAML chooses the style of a collection depending on whether it has nested collections.
 # If a collection has nested collections, it will be assigned the block style. Otherwise it will have the flow style.
 #
-# We want mapping to always be display in block-style but lists without nested objects in flow-style.
+# We want mapping to always be displayed in block-style but lists without nested objects in flow-style.
 # So we define a custom representeter
 
 
@@ -340,7 +340,7 @@ class KubernetesConfig(CoreModel):
     kubeconfig: Annotated[KubeconfigConfig, Field(description="The kubeconfig configuration")]
     networking: Annotated[
         Optional[KubernetesNetworkingConfig], Field(description="The networking configuration")
-    ]
+    ] = None
 
 
 class KubernetesAPIConfig(CoreModel):
@@ -348,7 +348,7 @@ class KubernetesAPIConfig(CoreModel):
     kubeconfig: Annotated[KubeconfigAPIConfig, Field(description="The kubeconfig configuration")]
     networking: Annotated[
         Optional[KubernetesNetworkingConfig], Field(description="The networking configuration")
-    ]
+    ] = None
 
 
 class LambdaConfig(CoreModel):

@@ -80,7 +80,7 @@ class ProjectManager:
         project = await get_project_model_by_name(session=session, project_name=project_name)
         if project is None:
             raise error_forbidden()
-        if user.global_role in GlobalRole.ADMIN:
+        if user.global_role == GlobalRole.ADMIN:
             return user, project
         project_role = get_user_project_role(user=user, project=project)
         if project_role in [ProjectRole.ADMIN, ProjectRole.MANAGER]:
