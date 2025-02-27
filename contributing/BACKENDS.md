@@ -78,7 +78,7 @@ Once the cloud provider is added, submit a pull request.
 Once the provider is added to `gpuhunt`, we can proceed with implementing 
 the corresponding backend with `dstack`. Follow the steps below.
 
-#### 2.1. Determine if will you will implement a VM-based or a container-based backend
+#### 2.1. Determine if you will implement a VM-based or a container-based backend
 
 See the Appendix at the end of this document and make sure the provider meets the outlined requirements.
 
