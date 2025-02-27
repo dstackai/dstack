@@ -648,3 +648,14 @@ class JobMetricsPoint(BaseModel):
     # json-encoded lists of metric values of len(gpus) length
     gpus_memory_usage_bytes: Mapped[str] = mapped_column(Text)
     gpus_util_percent: Mapped[str] = mapped_column(Text)
+
+
+class JobPrometheusMetrics(BaseModel):
+    __tablename__ = "job_prometheus_metrics"
+
+    job_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("jobs.id"), primary_key=True)
+    job: Mapped["JobModel"] = relationship()
+
+    collected_at: Mapped[datetime] = mapped_column(NaiveDateTime)
+    # Raw Prometheus text response
+    text: Mapped[str] = mapped_column(Text)

@@ -76,6 +76,7 @@ SERVER_DEPS = GATEWAY_AND_SERVER_COMMON_DEPS + [
     "asyncpg",
     "cachetools",
     "python-json-logger>=3.1.0",
+    "prometheus-client",
     "grpcio>=1.50",  # indirect
 ]
 

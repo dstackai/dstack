@@ -8,6 +8,7 @@ import (
 	"github.com/dstackai/dstack/runner/internal/api"
 	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/dstackai/dstack/runner/internal/shim"
+	"github.com/dstackai/dstack/runner/internal/shim/dcgm"
 )
 
 func (s *ShimServer) HealthcheckHandler(w http.ResponseWriter, r *http.Request) (interface{}, error) {
@@ -120,4 +121,23 @@ func (s *ShimServer) TaskRemoveHandler(w http.ResponseWriter, r *http.Request) (
 	}
 	log.Info(ctx, "removed", "task", taskID)
 	return nil, nil
+}
+
+func (s *ShimServer) TaskMetricsHandler(w http.ResponseWriter, r *http.Request) {
+	if s.dcgmExporter == nil {
+		http.Error(w, "DCGM Exporter is not available", http.StatusNotFound)
+		return
+	}
+	taskInfo := s.runner.TaskInfo(r.PathValue("id"))
+	if taskInfo.ID == "" {
+		http.Error(w, "Task not found", http.StatusNotFound)
+		return
+	}
+	expfmtBody, err := s.dcgmExporter.Fetch(r.Context())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadGateway)
+		return
+	}
+	response := dcgm.FilterMetrics(expfmtBody, taskInfo.GpuIDs)
+	_, _ = w.Write(response)
 }

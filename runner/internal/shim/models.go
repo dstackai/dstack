@@ -28,6 +28,11 @@ type CLIArgs struct {
 		LogLevel    int
 	}
 
+	DCGMExporter struct {
+		HTTPPort int
+		Interval int // milliseconds
+	}
+
 	Docker struct {
 		ConcatinatedPublicSSHKeys string
 		Privileged                bool

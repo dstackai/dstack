@@ -29,6 +29,7 @@ from dstack._internal.server.routers import (
     metrics,
     pools,
     projects,
+    prometheus,
     repos,
     runs,
     secrets,
@@ -185,6 +186,7 @@ def register_routes(app: FastAPI, ui: bool = True):
     app.include_router(model_proxy.router, prefix="/proxy/models", tags=["model-proxy"])
     app.include_router(pools.root_router)
     app.include_router(pools.router)
+    app.include_router(prometheus.router)
 
     @app.exception_handler(ForbiddenError)
     async def forbidden_error_handler(request: Request, exc: ForbiddenError):
@@ -252,7 +254,11 @@ def register_routes(app: FastAPI, ui: bool = True):
 
         @app.exception_handler(404)
         async def custom_http_exception_handler(request, exc):
-            if request.url.path.startswith("/api") or _is_proxy_request(request):
+            if (
+                request.url.path.startswith("/api")
+                or _is_proxy_request(request)
+                or _is_prometheus_request(request)
+            ):
                 return JSONResponse(
                     {"detail": exc.detail},
                     status_code=status.HTTP_404_NOT_FOUND,
@@ -281,6 +287,10 @@ def _is_proxy_request(request: Request) -> bool:
     return (
         referrer.netloc == "" or referrer.netloc == request.url.netloc
     ) and referrer.path.startswith("/proxy")
+
+
+def _is_prometheus_request(request: Request) -> bool:
+    return request.url.path.startswith("/metrics")
 
 
 def _print_dstack_logo():

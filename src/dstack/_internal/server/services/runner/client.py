@@ -178,9 +178,6 @@ class ShimClient:
     # API v1 (a.k.a. Legacy API) — `/api/{submit,pull,stop}`
     _API_V2_MIN_SHIM_VERSION = (0, 18, 34)
 
-    # A surrogate task ID for API-v1-over-v2 emulation (`_v2_compat_*` methods)
-    _LEGACY_TASK_ID = "00000000-0000-0000-0000-000000000000"
-
     _shim_version: Optional["_Version"]
     _api_version: int
     _negotiated: bool = False
@@ -338,6 +335,20 @@ class ShimClient:
     def pull(self) -> LegacyPullResponse:
         resp = self._request("GET", "/api/pull", raise_for_status=True)
         return self._response(LegacyPullResponse, resp)
+
+    # Metrics
+
+    def get_task_metrics(self, task_id: "_TaskID") -> Optional[str]:
+        resp = self._request("GET", f"/metrics/tasks/{task_id}")
+        if resp.status_code == HTTPStatus.NOT_FOUND:
+            # Metrics exporter is not installed or old shim version
+            return None
+        if resp.status_code == HTTPStatus.BAD_GATEWAY:
+            # Metrics exporter is not available or returned an error
+            logger.info("failed to collect metrics for task %s: %s", task_id, resp.text)
+            return None
+        self._raise_for_status(resp)
+        return resp.text
 
     # Private methods used for public methods implementations
 

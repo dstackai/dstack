@@ -8,6 +8,7 @@ import (
 
 	"github.com/dstackai/dstack/runner/internal/api"
 	"github.com/dstackai/dstack/runner/internal/shim"
+	"github.com/dstackai/dstack/runner/internal/shim/dcgm"
 )
 
 type TaskRunner interface {
@@ -27,10 +28,12 @@ type ShimServer struct {
 
 	runner TaskRunner
 
+	dcgmExporter *dcgm.DCGMExporter
+
 	version string
 }
 
-func NewShimServer(ctx context.Context, address string, runner TaskRunner, version string) *ShimServer {
+func NewShimServer(ctx context.Context, address string, runner TaskRunner, dcgmExporter *dcgm.DCGMExporter, version string) *ShimServer {
 	r := api.NewRouter()
 	s := &ShimServer{
 		HttpServer: &http.Server{
@@ -40,6 +43,8 @@ func NewShimServer(ctx context.Context, address string, runner TaskRunner, versi
 		},
 
 		runner: runner,
+
+		dcgmExporter: dcgmExporter,
 
 		version: version,
 	}
@@ -51,6 +56,7 @@ func NewShimServer(ctx context.Context, address string, runner TaskRunner, versi
 	r.AddHandler("POST", "/api/tasks", s.TaskSubmitHandler)
 	r.AddHandler("POST", "/api/tasks/{id}/terminate", s.TaskTerminateHandler)
 	r.AddHandler("POST", "/api/tasks/{id}/remove", s.TaskRemoveHandler)
+	r.HandleFunc("GET /metrics/tasks/{id}", s.TaskMetricsHandler)
 
 	return s
 }
