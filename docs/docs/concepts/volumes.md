@@ -169,7 +169,7 @@ and its contents will persist across runs.
     `dstack` will also force detach the stuck volume automatically after `stop_duration`.
     
     Note that force detaching a volume is a last resort measure and may corrupt the file system.
-    Contact your cloud support if you're experience volumes stuck in the detaching state.
+    Contact your cloud support if you experience volumes getting stuck in the detaching state.
 
 ### Manage volumes { #manage-network-volumes }
 
