@@ -23,62 +23,64 @@ To add a new cloud provider to `gpuhunt`, follow these steps:
 git clone https://github.com/dstackai/gpuhunt.git
 ```
 
-### 1.2. Create the provider class
+### 1.2. Decide if you will implement an offline or an online provider
+
+- **Offline providers** offer static machine configurations that are not frequently updated.
+  `gpuhunt` collects offline providers' instance offers on an hourly basis.
+  Examples: `aws`, `gcp`, `azure`, etc. 
+- **Online providers** offer dynamic machine configurations that are available at the very moment
+  when you fetch configurations (e.g., GPU marketplaces).
+  `gpuhunt` collects online providers' instance offers each time a `dstack` user provisions a new instance.
+  Examples: `tensordock`, `vastai`, etc.
+
+### 1.3. Create the provider class
 
 Create the provider class file under `src/gpuhunt/providers`. 
 
-Ensure your class...
+Make sure your class extends the [`AbstractProvider`](https://github.com/dstackai/gpuhunt/blob/main/src/gpuhunt/providers/__init__.py)
+base class. See its docstrings for descriptions of the methods that your class should implement.
 
-- Extends the `AbstractProvider` base class.
-- Has the `NAME` property, that will be used as the unique identifier for your provider.
-- Implements the `get` method, that is responsible for fetching the available machine configurations from the cloud provider.
+Refer to examples:
+- Offline providers:
+  [datacrunch.py](https://github.com/dstackai/gpuhunt/blob/main/src/gpuhunt/providers/datacrunch.py),
+  [aws.py](https://github.com/dstackai/gpuhunt/blob/main/src/gpuhunt/providers/aws.py),
+  [azure.py](https://github.com/dstackai/gpuhunt/blob/main/src/gpuhunt/providers/azure.py),
+  [lambdalabs.py](https://github.com/dstackai/gpuhunt/blob/main/src/gpuhunt/providers/lambdalabs.py).
+- Online providers:
+  [vultr.py](https://github.com/dstackai/gpuhunt/blob/main/src/gpuhunt/providers/vultr.py)
+  [tensordock.py](https://github.com/dstackai/gpuhunt/blob/main/src/gpuhunt/providers/tensordock.py),
+  [vastai.py](https://github.com/dstackai/gpuhunt/blob/main/src/gpuhunt/providers/vastai.py).
 
-[//]: # (TODO: Elaborate better on how to use `query_filter` and `balance_resources`)
+### 1.4. Register the provider with the catalog
 
-Refer to examples: [datacrunch.py](https://github.com/dstackai/gpuhunt/blob/main/src/gpuhunt/providers/datacrunch.py), 
-[aws.py](https://github.com/dstackai/gpuhunt/blob/main/src/gpuhunt/providers/aws.py), 
-[gcp.py](https://github.com/dstackai/gpuhunt/blob/main/src/gpuhunt/providers/gcp.py), 
-[azure.py](https://github.com/dstackai/gpuhunt/blob/main/src/gpuhunt/providers/azure.py), 
-[lambdalabs.py](https://github.com/dstackai/gpuhunt/blob/main/src/gpuhunt/providers/lambdalabs.py), 
-[tensordock.py](https://github.com/dstackai/gpuhunt/blob/main/src/gpuhunt/providers/tensordock.py), 
-[vastai.py](https://github.com/dstackai/gpuhunt/blob/main/src/gpuhunt/providers/vastai.py). 
+Add your provider in the following places:
+- Either `OFFLINE_PROVIDERS` or `ONLINE_PROVIDERS` in `src/gpuhunt/_internal/catalog.py`.
+- The `python -m gpuhunt` command in `src/gpuhunt/__main__.py`.
+- (offline providers) The CI workflow in `.github/workflows/catalogs.yml`.
+- (online providers) The default catalog in `src/gpuhunt/_internal/default.py`.
 
-### 1.3. Register the provider with the catalog
+### 1.5. Add data quality tests
 
-Update the `src/gpuhunt/_internal/catalog.py` file by adding the provider name
-to either `OFFLINE_PROVIDERS` or `ONLINE_PROVIDERS` depending on the type of the provider.
-
-How do I decide which type my provider is?
-
-- `OFFLINE_PROVIDERS` - Use this type if your provider offers static machine configurations that may be collected and
-  published on a daily basis. Examples: `aws`, `gcp`, `azure`, etc. These providers offer many machine configurations,
-  but they are not updated frequently.
-- `ONLINE_PROVIDERS` - Use this type if your provider offers dynamic machine configurations that are available at the very moment when you fetch configurations (e.g., GPU marketplaces).
-   Examples: `tensordock`, `vast`, etc.
-
-### 1.4. Add data quality tests
-
-If the provider is registered via `OFFLINE_PROVIDERS`, you can add data quality tests 
-under `src/integrity_tests/`.
+For offline providers, you can add data quality tests under `src/integrity_tests/`.
+Data quality tests are run after collecting offline catalogs to ensure their integrity.
 
 Refer to examples: [test_datacrunch.py](https://github.com/dstackai/gpuhunt/blob/main/src/integrity_tests/test_datacrunch.py),
 [test_gcp.py](https://github.com/dstackai/gpuhunt/blob/main/src/integrity_tests/test_gcp.py).
 
-> Anything unclear? Ask questions on the [Discord server](https://discord.gg/u8SmfwPpMd).
+### 1.6. Submit a pull request
 
 Once the cloud provider is added, submit a pull request. 
 
+> Anything unclear? Ask questions on the [Discord server](https://discord.gg/u8SmfwPpMd).
 
 ## 2. Integrate the cloud provider to dstackai/dstack
 
 Once the provider is added to `gpuhunt`, we can proceed with implementing 
 the corresponding backend with `dstack`. Follow the steps below.
 
-#### 2.1 Clone the repo
+#### 2.1. Determine if will you will implement a VM-based or a container-based backend
 
-```bash
-git clone https://github.com/dstackai/dstack.git
-```
+See the Appendix at the end of this document and make sure the provider meets the outlined requirements.
 
 #### 2.2. Set up the development environment
 
@@ -108,7 +110,7 @@ backend class there (should extend `dstack._internal.core.backends.base.Backend`
 Refer to examples: 
 [datacrunch](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/datacrunch/__init__.py), 
 [aws](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/aws/__init__.py), 
-[gcp.py](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/gcp/__init__.py), 
+[gcp](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/gcp/__init__.py), 
 [azure](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/azure/__init__.py), etc.
 
 ##### 2.4.4. Create the backend compute class
@@ -116,14 +118,15 @@ Refer to examples:
 Under the backend directory you've created, create the `compute.py` file and define the
 backend compute class there (should extend `dstack._internal.core.backends.base.compute.Compute`).
 
-You'll have to implement `get_offers`, `create_instance`, `run_job` and `terminate_instance`.
+You'll have to implement `get_offers`, `run_job` and `terminate_instance`.
 
-The `create_instance` method is required for the pool feature. If you implement the `create_instance` method, you should add the provider name to `BACKENDS_WITH_CREATE_INSTANCE_SUPPORT`. (`src/dstack/_internal/server/services/runs.py`).
+For VM-based backends, also implement the `create_instance` method and add the backend name to
+[`BACKENDS_WITH_CREATE_INSTANCE_SUPPORT`](`https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/__init__.py`).
 
 Refer to examples:
 [datacrunch](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/datacrunch/compute.py),
 [aws](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/aws/compute.py),
-[gcp.py](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/gcp/compute.py),
+[gcp](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/gcp/compute.py),
 [azure](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/azure/compute.py), etc.
 
 ##### 2.4.5. Create the backend config model class
@@ -138,7 +141,7 @@ backend config model classes there.
 Refer to examples: 
 [datacrunch](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/models/backends/datacrunch.py), 
 [aws](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/models/backends/aws.py), 
-[gcp.py](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/models/backends/gcp.py), 
+[gcp](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/models/backends/gcp.py), 
 [azure](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/models/backends/azure.py), etc.
 
 ##### 2.4.6. Create the backend config class
@@ -152,15 +155,13 @@ and the backend configuration model class defined above).
 Refer to examples:
 [datacrunch](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/datacrunch/config.py),
 [aws](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/aws/config.py), 
-[gcp.py](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/gcp/config.py), 
+[gcp](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/gcp/config.py), 
 [azure](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/azure/config.py), etc.
 
 ##### 2.4.7. Import config model classes
 
 Ensure the config model classes are imported
 into [`src/dstack/_internal/core/models/backends/__init__.py`](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/models/backends/__init__.py).
-
-[//]: # (TODO: The backend configuration is overly complex and needs simplification: https://github.com/dstackai/dstack/issues/888)
 
 ##### 2.4.8. Create the configurator class
 
@@ -169,7 +170,7 @@ and define the backend configurator class (must extend `dstack._internal.server.
 
 Refer to examples: [datacrunch](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/server/services/backends/configurators/datacrunch.py),
 [aws](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/server/services/backends/configurators/aws.py), 
-[gcp.py](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/server/services/backends/configurators/gcp.py), 
+[gcp](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/server/services/backends/configurators/gcp.py), 
 [azure](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/server/services/backends/configurators/azure.py), etc.
 
 ##### 2.4.9. Create the server config class
@@ -199,49 +200,43 @@ If instances in the backend take more than 10 minutes to start, override the def
 
 #### 3.1.1. VM-based backend compute type
 
-It's when the cloud provider allows provisioning Virtual machines (VMs). 
-This is the most flexible backend compute type.
+Used if the cloud provider allows provisioning virtual machines (VMs).
+When `dstack` provisions a VM, it launches the `dstack-shim` agent inside the VM.
+The agent controls the VM and starts Docker containers for users' jobs.
 
-[//]: # (TODO: Elaborate why it's the most flexible)
+Since `dstack` controls the entire VM, VM-based backends can support more features,
+such as blocks, instance volumes, privileged containers, and reusable instances.
 
-To support it, `dstack` expects the following from the cloud provider:
+To support a VM-based backend, `dstack` expects the following:
 
 - An API for creating and terminating VMs
-- Ubuntu 22.04 LTS
-- NVIDIA CUDA driver 535
-- Docker with NVIDIA runtime
-- OpenSSH server
-- Cloud-init script (preferred)
-- An external IP and public port for SSH
+- An external IP and a public port for SSH
+- Cloud-init (preferred)
+- VM images with Ubuntu, OpenSSH, GPU drivers, and Docker with NVIDIA runtime
 
-When `dstack` provisions a VM, it launches there `dstack-shim`.
+For some VM-based backends, the `dstack` team also maintains
+[custom VM images](../scripts/packer/README.md) with the required dependencies
+and `dstack`-specific optimizations.
 
-[//]: # (TODO: Elaborate on what dstack-shim is and how it works)
-
-The examples of VM-based backends include: `aws`, `azure`, `gcp`, `lambda`, `datacrunch`, `tensordock`, etc.
-
-[//]: # (TODO: Elaborate on packer scripts)
+Examples of VM-based backends include: `aws`, `azure`, `gcp`, `lambda`, `datacrunch`, `tensordock`, etc.
 
 #### 3.1.2. Container-based backend compute type
 
-It's when the cloud provider allows provisioning only containers.
-This is the most limited backend compute type. 
+Used if the cloud provider only allows provisioning containers.
+When `dstack` provisions a container, it launches the `dstack-runner` agent inside the container.
+The agent accepts and runs users' jobs.
 
-[//]: # (TODO: Elaborate on why it's the most limited)
+Since `dstack` doesn't control the underlying machine, container-based backends don't support some
+`dstack` features, such as blocks, instance volumes, privileged containers, and reusable instances.
 
-To support it, `dstack` expects the following from the cloud provider:
+To support a container-based backend, `dstack` expects the following:
 
 - An API for creating and terminating containers
-- Docker with NVIDIA runtime
+- Containers properly configured to access GPUs
 - An external IP and a public port for SSH
+- A way to specify the Docker image
+- A way to specify credentials for pulling images from private Docker registries
 - A way to override the container entrypoint (at least ~2KB)
+- A way to override the container user to root (as in `docker run --user root ...`)
 
-The examples of container-based backends include: `kubernetes`, `vastai`, etc.
-
-Note: There are two types of computing in dstack:
-
-When `dstack` provisions a VM, it launches their `dstack-runner`.
-
-[//]: # (TODO: Elaborate on what dstack-runner is and how it works)
-
-[//]: # (TODO: Update this guide to incorporate the pool feature)
+Examples of container-based backends include: `kubernetes`, `vastai`, `runpod`.
