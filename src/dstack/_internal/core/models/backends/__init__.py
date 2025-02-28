@@ -64,6 +64,7 @@ from dstack._internal.core.models.backends.runpod import (
     RunpodConfigInfoWithCreds,
     RunpodConfigInfoWithCredsPartial,
     RunpodConfigValues,
+    RunpodInstanceParams,
 )
 from dstack._internal.core.models.backends.tensordock import (
     TensorDockConfigInfo,
@@ -83,7 +84,7 @@ from dstack._internal.core.models.backends.vultr import (
     VultrConfigInfoWithCredsPartial,
     VultrConfigValues,
 )
-from dstack._internal.core.models.common import CoreModel
+from dstack._internal.core.models.common import CoreModel, is_core_model_instance
 
 # The following models are the basis of the JSON-based backend API.
 # They are also the models used by the Configurator interface.
@@ -170,6 +171,20 @@ AnyConfigValues = Union[
     VultrConfigValues,
     DstackConfigValues,
 ]
+
+
+class BackendInstanceParams(CoreModel):
+    """Additional backend-specific instance offer parameters."""
+
+    __root__: Union[
+        RunpodInstanceParams,
+        CoreModel,  # default and fallback option for forward compatibility
+    ]
+
+    def runpod(self) -> RunpodInstanceParams:
+        if is_core_model_instance(self.__root__, RunpodInstanceParams):
+            return self.__root__
+        raise TypeError(f"Cannot cast {type(self.__root__)} to {RunpodInstanceParams}")
 
 
 # In case we'll support multiple backends of the same type,

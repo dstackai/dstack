@@ -3,6 +3,7 @@ from typing import Callable, List, Optional
 
 import gpuhunt
 
+from dstack._internal.core.models.backends import BackendInstanceParams
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     Disk,
@@ -78,11 +79,19 @@ def catalog_item_to_offer(
         disk=Disk(size_mib=disk_size_mib),
     )
     resources.description = resources.pretty_format()
+
+    backend_params = {
+        "type": backend.value,
+        # TODO: parse params from gpuhunt
+        # **json.loads(item.backend_params)
+    }
+
     return InstanceOffer(
         backend=backend,
         instance=InstanceType(
             name=item.instance_name,
             resources=resources,
+            backend_params=BackendInstanceParams.__response__.parse_obj(backend_params),
         ),
         region=item.location,
         price=item.price,

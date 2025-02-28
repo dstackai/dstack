@@ -38,3 +38,8 @@ class RunpodConfigInfoWithCredsPartial(CoreModel):
 class RunpodConfigValues(CoreModel):
     type: Literal["runpod"] = "runpod"
     regions: Optional[ConfigMultiElement]
+
+
+class RunpodInstanceParams(CoreModel):
+    type: Literal["runpod"] = "runpod"
+    cloud_type: Literal["SECURE", "COMMUNITY"]

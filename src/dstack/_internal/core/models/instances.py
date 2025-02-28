@@ -4,6 +4,7 @@ from typing import List, Optional
 import gpuhunt
 from pydantic import root_validator
 
+from dstack._internal.core.models.backends import BackendInstanceParams
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.envs import Env
@@ -71,6 +72,7 @@ class Resources(CoreModel):
 class InstanceType(CoreModel):
     name: str
     resources: Resources
+    backend_params: BackendInstanceParams = CoreModel()
 
 
 class SSHConnectionParams(CoreModel):
