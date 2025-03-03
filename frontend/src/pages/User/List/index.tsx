@@ -56,7 +56,7 @@ export const UserList: React.FC = () => {
                 <NavigateLink href={ROUTES.USER.DETAILS.FORMAT(item.username)}>{item.username}</NavigateLink>
             ),
         },
-        process.env.UI_VERSION === 'sky' && {
+        {
             id: 'email',
             header: t('users.email'),
             cell: (item: IUser) => item.email ?? '-',

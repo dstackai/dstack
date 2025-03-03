@@ -84,7 +84,7 @@ export const UserEdit: React.FC = () => {
     const onSubmitHandler = async (userData: Partial<IUser>) => {
         try {
             const data = await updateUser({
-                ...pick(userData, ['global_role']),
+                ...pick(userData, ['global_role', 'email']),
                 username: paramUserName,
             }).unwrap();
 
