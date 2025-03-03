@@ -185,6 +185,10 @@ def _get_run_spec_excludes(run_spec: RunSpec) -> Optional[dict]:
         and configuration.inactivity_duration is None
     ):
         configuration_excludes["inactivity_duration"] = True
+    if configuration.utilization_policy is None:
+        configuration_excludes["utilization_policy"] = True
+    if profile is not None and profile.utilization_policy is None:
+        profile_excludes.add("utilization_policy")
 
     if configuration_excludes:
         spec_excludes["configuration"] = configuration_excludes

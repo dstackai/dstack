@@ -112,6 +112,32 @@ class ProfileRetry(CoreModel):
         return values
 
 
+class UtilizationPolicy(CoreModel):
+    min_gpu_utilization: Annotated[
+        int,
+        Field(
+            description=(
+                "Minimum required GPU utilization, percent."
+                " If any GPU has utilization below specified value during the whole time window,"
+                " the run is terminated"
+            ),
+            ge=0,
+            le=100,
+        ),
+    ]
+    time_window: Annotated[
+        Union[int, str],
+        Field(
+            description=(
+                "The time window of metric samples taking into account to measure utilization"
+                " (e.g., `30m`, `1h`)"
+            )
+        ),
+    ]
+
+    _validate_time_window = validator("time_window", pre=True, allow_reuse=True)(parse_duration)
+
+
 class ProfileParams(CoreModel):
     backends: Annotated[
         Optional[List[BackendType]],
@@ -193,6 +219,10 @@ class ProfileParams(CoreModel):
                 " Defaults to `5m` for runs and `3d` for fleets. Use `off` for unlimited duration"
             )
         ),
+    ]
+    utilization_policy: Annotated[
+        Optional[UtilizationPolicy],
+        Field(description="Run termination policy based on utilization"),
     ]
     # Deprecated:
     termination_policy: Annotated[

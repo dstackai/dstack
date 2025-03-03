@@ -58,8 +58,22 @@ class TestGetJobMetrics:
         await create_job_metrics_point(
             session=session,
             job_model=job,
+            timestamp=datetime(2023, 1, 2, 3, 4, 5, tzinfo=timezone.utc),
+            cpu_usage_micro=2 * 1_000_000,
+            memory_usage_bytes=256,
+            memory_working_set_bytes=128,
+            gpus_memory_usage_bytes=[256],
+            gpus_util_percent=[2],
+        )
+        await create_job_metrics_point(
+            session=session,
+            job_model=job,
             timestamp=datetime(2023, 1, 2, 3, 4, 15, tzinfo=timezone.utc),
             cpu_usage_micro=4 * 1_000_000,
+            memory_usage_bytes=512,
+            memory_working_set_bytes=256,
+            gpus_memory_usage_bytes=[512],
+            gpus_util_percent=[6],
         )
         await create_job_metrics_point(
             session=session,
@@ -76,6 +90,7 @@ class TestGetJobMetrics:
             headers=get_auth_headers(user.token),
         )
         assert response.status_code == 200
+        # Returns one last sample by default. Filtering is tested in services/test_metrics.py
         assert response.json() == {
             "metrics": [
                 {
