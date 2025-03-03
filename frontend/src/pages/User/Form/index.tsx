@@ -102,6 +102,20 @@ export const UserForm: React.FC<Props> = ({
                                 />
                             )}
 
+                            <FormInput
+                                label={t('users.email')}
+                                description={t('users.email_description')}
+                                control={control}
+                                name="email"
+                                disabled={loading}
+                                rules={{
+                                    pattern: {
+                                        value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+                                        message: t('users.edit.validation.email_format'),
+                                    },
+                                }}
+                            />
+
                             <FormSelect
                                 label={t('users.global_role')}
                                 description={t('users.global_role_description')}

@@ -507,6 +507,7 @@
     "user_name": "User name",
     "user_name_description": "Only latin characters, dashes, underscores, and digits",
     "global_role_description": "Whether the user is an administrator or not",
+    "email_description": "Enter user email",
     "token": "Token",
     "token_description": "Specify use your personal access token",
     "global_role": "Global role",
@@ -530,7 +531,8 @@
       "refresh_token_confirm_message": "Are you sure you want to rotate token?",
       "refresh_token_button_label": "Rotate",
       "validation": {
-        "user_name_format": "Only letters, numbers, - or _"
+        "user_name_format": "Only letters, numbers, - or _",
+        "email_format": "Incorrect email"
       }
     },
 
