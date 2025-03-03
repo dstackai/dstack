@@ -50,6 +50,30 @@ export const authApi = createApi({
                 body,
             }),
         }),
+
+        getEntraInfo: builder.query<{ enabled: boolean }, void>({
+            query: () => {
+                return {
+                    url: API.AUTH.ENTRA.INFO(),
+                    method: 'POST',
+                };
+            },
+        }),
+
+        entraAuthorize: builder.mutation<{ authorization_url: string }, void>({
+            query: () => ({
+                url: API.AUTH.ENTRA.AUTHORIZE(),
+                method: 'POST',
+            }),
+        }),
+
+        entraCallback: builder.mutation<IUserWithCreds, { code: string; state: string }>({
+            query: (body) => ({
+                url: API.AUTH.ENTRA.CALLBACK(),
+                method: 'POST',
+                body,
+            }),
+        }),
     }),
 });
 
@@ -59,4 +83,7 @@ export const {
     useGetOktaInfoQuery,
     useOktaAuthorizeMutation,
     useOktaCallbackMutation,
+    useGetEntraInfoQuery,
+    useEntraAuthorizeMutation,
+    useEntraCallbackMutation,
 } = authApi;

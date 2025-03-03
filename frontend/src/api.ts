@@ -16,6 +16,12 @@ export const API = {
             AUTHORIZE: () => `${API.AUTH.OKTA.BASE()}/authorize`,
             CALLBACK: () => `${API.AUTH.OKTA.BASE()}/callback`,
         },
+        ENTRA: {
+            BASE: () => `${API.AUTH.BASE()}/entra`,
+            INFO: () => `${API.AUTH.ENTRA.BASE()}/info`,
+            AUTHORIZE: () => `${API.AUTH.ENTRA.BASE()}/authorize`,
+            CALLBACK: () => `${API.AUTH.ENTRA.BASE()}/callback`,
+        },
     },
 
     USERS: {
