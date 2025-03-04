@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field, ValidationError, root_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing_extensions import Annotated
 
+from dstack._internal.core.backends.runpod.config import RUNPOD_COMMUNITY_CLOUD_DEFAULT
 from dstack._internal.core.errors import (
     BackendNotAvailable,
     ResourceNotExistsError,
@@ -427,6 +428,15 @@ class RunpodConfig(CoreModel):
     regions: Annotated[
         Optional[List[str]],
         Field(description="The list of RunPod regions. Omit to use all regions"),
+    ] = None
+    community_cloud: Annotated[
+        Optional[bool],
+        Field(
+            description=(
+                "Whether Community Cloud offers can be suggested in addition to Secure Cloud."
+                f" Defaults to `{str(RUNPOD_COMMUNITY_CLOUD_DEFAULT).lower()}`"
+            )
+        ),
     ] = None
     creds: Annotated[AnyRunpodCreds, Field(description="The credentials")]
 

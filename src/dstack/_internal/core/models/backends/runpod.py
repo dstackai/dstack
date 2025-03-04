@@ -10,6 +10,7 @@ from dstack._internal.core.models.common import CoreModel
 class RunpodConfigInfo(CoreModel):
     type: Literal["runpod"] = "runpod"
     regions: Optional[List[str]] = None
+    community_cloud: Optional[bool] = None
 
 
 class RunpodStoredConfig(RunpodConfigInfo):
@@ -33,6 +34,7 @@ class RunpodConfigInfoWithCredsPartial(CoreModel):
     type: Literal["runpod"] = "runpod"
     creds: Optional[AnyRunpodCreds]
     regions: Optional[List[str]]
+    community_cloud: Optional[bool]
 
 
 class RunpodConfigValues(CoreModel):

@@ -28,6 +28,7 @@ async def process_placement_groups():
                     PlacementGroupModel.deleted == False,
                     PlacementGroupModel.id.not_in(lockset),
                 )
+                .order_by(PlacementGroupModel.id)  # take locks in order
                 .with_for_update(skip_locked=True)
             )
             placement_group_models = res.scalars().all()

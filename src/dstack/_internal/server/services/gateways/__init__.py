@@ -220,6 +220,7 @@ async def delete_gateways(
             )
             .options(selectinload(GatewayModel.gateway_compute))
             .execution_options(populate_existing=True)
+            .order_by(GatewayModel.id)  # take locks in order
             .with_for_update()
         )
         gateway_models = res.scalars().all()

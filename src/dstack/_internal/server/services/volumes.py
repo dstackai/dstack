@@ -264,6 +264,7 @@ async def delete_volumes(session: AsyncSession, project: ProjectModel, names: Li
             .options(selectinload(VolumeModel.user))
             .options(selectinload(VolumeModel.attachments))
             .execution_options(populate_existing=True)
+            .order_by(VolumeModel.id)  # take locks in order
             .with_for_update()
         )
         volume_models = res.scalars().unique().all()

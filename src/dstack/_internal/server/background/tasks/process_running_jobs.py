@@ -1,4 +1,6 @@
 import asyncio
+from collections.abc import Iterable
+from datetime import timedelta
 from typing import Dict, List, Optional
 
 from sqlalchemy import select
@@ -15,6 +17,7 @@ from dstack._internal.core.models.instances import (
     RemoteConnectionInfo,
     SSHConnectionParams,
 )
+from dstack._internal.core.models.metrics import Metric
 from dstack._internal.core.models.repos import RemoteRepoCreds
 from dstack._internal.core.models.runs import (
     ClusterInfo,
@@ -48,6 +51,7 @@ from dstack._internal.server.services.jobs import (
 )
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.logging import fmt
+from dstack._internal.server.services.metrics import get_job_metrics
 from dstack._internal.server.services.pools import get_instance_ssh_private_keys
 from dstack._internal.server.services.repos import (
     get_code_model,
@@ -342,6 +346,9 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
             )
             job_model.status = JobStatus.TERMINATING
             job_model.termination_reason = JobTerminationReason.GATEWAY_ERROR
+
+    if job_model.status == JobStatus.RUNNING:
+        await _check_gpu_utilization(session, run_model, job_model)
 
     job_model.last_processed_at = common_utils.get_current_datetime()
     await session.commit()
@@ -667,6 +674,45 @@ def _terminate_if_inactivity_duration_exceeded(
                 f"The job was inactive for {no_connections_secs} seconds,"
                 f" exceeding the inactivity_duration of {conf.inactivity_duration} seconds"
             )
+
+
+async def _check_gpu_utilization(
+    session: AsyncSession, run_model: RunModel, job_model: JobModel
+) -> None:
+    policy = RunSpec.__response__.parse_raw(run_model.run_spec).configuration.utilization_policy
+    if policy is None:
+        return
+    after = common_utils.get_current_datetime() - timedelta(seconds=policy.time_window)
+    job_metrics = await get_job_metrics(session, job_model, after=after)
+    gpus_util_metrics: list[Metric] = []
+    for metric in job_metrics.metrics:
+        if metric.name.startswith("gpu_util_percent_gpu"):
+            gpus_util_metrics.append(metric)
+    if not gpus_util_metrics or gpus_util_metrics[0].timestamps[-1] > after + timedelta(minutes=1):
+        # Job has started recently, not enough points collected.
+        # Assuming that metrics collection interval less than 1 minute.
+        logger.debug("%s: GPU utilization check: not enough samples", fmt(job_model))
+        return
+    if _should_terminate_due_to_low_gpu_util(
+        policy.min_gpu_utilization, [m.values for m in gpus_util_metrics]
+    ):
+        logger.info("%s: GPU utilization check: terminating", fmt(job_model))
+        job_model.status = JobStatus.TERMINATING
+        # TODO(0.19 or earlier): set JobTerminationReason.TERMINATED_DUE_TO_UTILIZATION_POLICY
+        job_model.termination_reason = JobTerminationReason.TERMINATED_BY_SERVER
+        job_model.termination_reason_message = (
+            f"The job GPU utilization below {policy.min_gpu_utilization}%"
+            f" for {policy.time_window} seconds"
+        )
+    else:
+        logger.debug("%s: GPU utilization check: OK", fmt(job_model))
+
+
+def _should_terminate_due_to_low_gpu_util(min_util: int, gpus_util: Iterable[Iterable[int]]):
+    for gpu_util in gpus_util:
+        if all(util < min_util for util in gpu_util):
+            return True
+    return False
 
 
 def _get_cluster_info(
