@@ -617,6 +617,43 @@ projects:
 
 </div>
 
+??? info "Community Cloud"
+    By default, `dstack` considers instance offers from both the Secure Cloud and the
+    [Community Cloud :material-arrow-top-right-thin:{ .external }](https://docs.runpod.io/references/faq/#secure-cloud-vs-community-cloud).
+
+    You can tell them apart by their regions.
+    Secure Cloud regions contain datacenter IDs such as `CA-MTL-3`.
+    Community Cloud regions contain country codes such as `CA`.
+
+    <div class="termy">
+
+    ```shell
+    $ dstack apply -f .dstack.yml -b runpod
+
+     #  BACKEND  REGION    INSTANCE               SPOT  PRICE
+     1  runpod   CA        NVIDIA A100 80GB PCIe  yes   $0.6
+     2  runpod   CA-MTL-3  NVIDIA A100 80GB PCIe  yes   $0.82
+    ```
+
+    </div>
+
+    If you don't want to use the Community Cloud, set `community_cloud: false` in the backend settings.
+
+    <div editor-title="~/.dstack/server/config.yml">
+
+    ```yaml
+    projects:
+      - name: main
+        backends:
+          - type: runpod
+            creds:
+              type: api_key
+              api_key: US9XTPDIV8AR42MMINY8TCKRB8S4E7LNRQ6CAUQ9
+            community_cloud: false
+    ```
+
+    </div>
+
 ### Vultr
 
 Log into your [Vultr :material-arrow-top-right-thin:{ .external }](https://www.vultr.com/) account, click `Account` in the sidebar, select `API`, find the `Personal Access Token` panel and click the `Enable API` button. In the `Access Control` panel, allow API requests from all addresses or from the subnet where your `dstack` server is deployed.

@@ -52,8 +52,9 @@ class RunpodCompute(Compute):
     ) -> List[InstanceOfferWithAvailability]:
         offers = get_catalog_offers(
             backend=BackendType.RUNPOD,
-            locations=self.config.regions,
+            locations=self.config.regions or None,
             requirements=requirements,
+            extra_filter=lambda o: _is_secure_cloud(o.region) or self.config.allow_community_cloud,
         )
         offers = [
             InstanceOfferWithAvailability(
@@ -102,13 +103,22 @@ class RunpodCompute(Compute):
         bid_per_gpu = None
         if instance_offer.instance.resources.spot and gpu_count:
             bid_per_gpu = instance_offer.price / gpu_count
+        if _is_secure_cloud(instance_offer.region):
+            cloud_type = "SECURE"
+            data_center_id = instance_offer.region
+            country_code = None
+        else:
+            cloud_type = "COMMUNITY"
+            data_center_id = None
+            country_code = instance_offer.region
 
         resp = self.api_client.create_pod(
             name=pod_name,
             image_name=job.job_spec.image_name,
             gpu_type_id=instance_offer.instance.name,
-            cloud_type="SECURE",  # ["ALL", "COMMUNITY", "SECURE"]:
-            data_center_id=instance_offer.region,
+            cloud_type=cloud_type,
+            data_center_id=data_center_id,
+            country_code=country_code,
             gpu_count=gpu_count,
             container_disk_in_gb=disk_size,
             min_vcpu_count=instance_offer.instance.resources.cpus,
@@ -257,3 +267,11 @@ def _get_volume_price(size: int) -> float:
     if size < 1000:
         return 0.07 * size
     return 0.05 * size
+
+
+def _is_secure_cloud(region: str) -> str:
+    """
+    Secure cloud regions are datacenter IDs: CA-MTL-1, EU-NL-1, etc.
+    Community cloud regions are country codes: CA, NL, etc.
+    """
+    return "-" in region

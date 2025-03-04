@@ -143,7 +143,7 @@ to configure [backends](../../concepts/backends.md) and other [sever-level setti
         type:
             required: true
 
-###### `projects[n].backends[type=runpod]` { #runpod data-toc-label="runpod" }
+##### `projects[n].backends[type=runpod]` { #runpod data-toc-label="runpod" }
 
 #SCHEMA# dstack._internal.server.services.config.RunpodConfig
     overrides:
@@ -160,7 +160,7 @@ to configure [backends](../../concepts/backends.md) and other [sever-level setti
         type:
             required: true
 
-###### `projects[n].backends[type=vastai]` { #vastai data-toc-label="vastai" }
+##### `projects[n].backends[type=vastai]` { #vastai data-toc-label="vastai" }
 
 #SCHEMA# dstack._internal.server.services.config.VastAIConfig
     overrides:
