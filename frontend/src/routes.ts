@@ -7,6 +7,7 @@ export const ROUTES = {
     AUTH: {
         GITHUB_CALLBACK: `/auth/github/callback`,
         OKTA_CALLBACK: `/auth/okta/callback`,
+        ENTRA_CALLBACK: `/auth/entra/callback`,
         TOKEN: `/auth/token`,
     },
 

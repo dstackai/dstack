@@ -6,8 +6,9 @@ import { Box, NavigateLink, SpaceBetween } from 'components';
 import { UnauthorizedLayout } from 'layouts/UnauthorizedLayout';
 
 import { ROUTES } from 'routes';
-import { useGetOktaInfoQuery } from 'services/auth';
+import { useGetEntraInfoQuery, useGetOktaInfoQuery } from 'services/auth';
 
+import { LoginByEntraID } from '../EntraID/LoginByEntraID';
 import { LoginByOkta } from '../LoginByOkta';
 import { LoginByTokenForm } from '../LoginByTokenForm';
 
@@ -15,9 +16,13 @@ import styles from './styles.module.scss';
 
 export const EnterpriseLogin: React.FC = () => {
     const { t } = useTranslation();
-    const { data, isLoading } = useGetOktaInfoQuery();
+    const { data: oktaData, isLoading: isLoadingOkta } = useGetOktaInfoQuery();
+    const { data: entraData, isLoading: isLoadingEntra } = useGetEntraInfoQuery();
 
-    const oktaEnabled = data?.enabled;
+    const oktaEnabled = oktaData?.enabled;
+    const entraEnabled = entraData?.enabled;
+
+    const isLoading = isLoadingOkta || isLoadingEntra;
 
     return (
         <UnauthorizedLayout>
@@ -28,9 +33,10 @@ export const EnterpriseLogin: React.FC = () => {
                     </Box>
 
                     {!isLoading && !oktaEnabled && <LoginByTokenForm />}
-                    {!isLoading && oktaEnabled && <LoginByOkta className={styles.okta} />}
+                    {!isLoadingOkta && oktaEnabled && <LoginByOkta className={styles.okta} />}
+                    {!isLoadingEntra && entraEnabled && <LoginByEntraID className={styles.entra} />}
 
-                    {!isLoading && oktaEnabled && (
+                    {!isLoading && (oktaEnabled || entraEnabled) && (
                         <Box color="text-body-secondary">
                             <NavigateLink href={ROUTES.AUTH.TOKEN}>{t('auth.login_by_token')}</NavigateLink>
                         </Box>

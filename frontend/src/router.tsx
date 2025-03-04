@@ -4,6 +4,7 @@ import { createBrowserRouter } from 'react-router-dom';
 import { Navigate } from 'react-router-dom';
 
 import App from 'App';
+import { LoginByEntraIDCallback } from 'App/Login/EntraID/LoginByEntraIDCallback';
 import { LoginByGithubCallback } from 'App/Login/LoginByGithubCallback';
 import { LoginByOktaCallback } from 'App/Login/LoginByOktaCallback';
 import { TokenLogin } from 'App/Login/TokenLogin';
@@ -38,6 +39,10 @@ export const router = createBrowserRouter([
             {
                 path: ROUTES.AUTH.OKTA_CALLBACK,
                 element: <LoginByOktaCallback />,
+            },
+            {
+                path: ROUTES.AUTH.ENTRA_CALLBACK,
+                element: <LoginByEntraIDCallback />,
             },
             {
                 path: ROUTES.AUTH.TOKEN,
