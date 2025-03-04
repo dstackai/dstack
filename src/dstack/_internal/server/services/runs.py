@@ -552,6 +552,7 @@ async def stop_run(session: AsyncSession, run_model: RunModel, abort: bool):
     res = await session.execute(
         select(RunModel)
         .where(RunModel.id == run_model.id)
+        .order_by(RunModel.id)  # take locks in order
         .with_for_update()
         .execution_options(populate_existing=True)
     )
@@ -559,6 +560,7 @@ async def stop_run(session: AsyncSession, run_model: RunModel, abort: bool):
     await session.execute(
         select(JobModel)
         .where(JobModel.run_id == run_model.id)
+        .order_by(JobModel.id)  # take locks in order
         .with_for_update()
         .execution_options(populate_existing=True)
     )
@@ -592,7 +594,10 @@ async def delete_runs(
     await session.commit()
     async with get_locker().lock_ctx(RunModel.__tablename__, run_ids):
         res = await session.execute(
-            select(RunModel).where(RunModel.id.in_(run_ids)).with_for_update()
+            select(RunModel)
+            .where(RunModel.id.in_(run_ids))
+            .order_by(RunModel.id)  # take locks in order
+            .with_for_update()
         )
         run_models = res.scalars().all()
         active_runs = [r for r in run_models if not r.status.is_finished()]

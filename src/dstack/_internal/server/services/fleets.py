@@ -517,6 +517,7 @@ async def delete_fleets(
             .options(selectinload(FleetModel.instances))
             .options(selectinload(FleetModel.runs))
             .execution_options(populate_existing=True)
+            .order_by(FleetModel.id)  # take locks in order
             .with_for_update()
         )
         fleet_models = res.scalars().unique().all()
