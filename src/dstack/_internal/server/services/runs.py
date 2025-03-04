@@ -16,6 +16,7 @@ from dstack._internal.core.errors import (
     ServerClientError,
 )
 from dstack._internal.core.models.common import ApplyAction, is_core_model_instance
+from dstack._internal.core.models.configurations import AnyRunConfiguration
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceOfferWithAvailability,
@@ -840,9 +841,12 @@ def _validate_run_spec_and_set_defaults(run_spec: RunSpec):
 
 
 _UPDATABLE_SPEC_FIELDS = ["repo_code_hash", "configuration"]
-# Most service fields can be updated via replica redeployment.
-# TODO: Allow updating other fields when a rolling deployment is supported.
-_UPDATABLE_CONFIGURATION_FIELDS = ["replicas", "scaling", "strip_prefix"]
+_CONF_TYPE_TO_UPDATABLE_FIELDS = {
+    "dev-environment": ["inactivity_duration"],
+    # Most service fields can be updated via replica redeployment.
+    # TODO: Allow updating other fields when rolling deployment is supported.
+    "service": ["replicas", "scaling", "strip_prefix"],
+}
 
 
 def _can_update_run_spec(current_run_spec: RunSpec, new_run_spec: RunSpec) -> bool:
@@ -855,11 +859,6 @@ def _can_update_run_spec(current_run_spec: RunSpec, new_run_spec: RunSpec) -> bo
 
 
 def _check_can_update_run_spec(current_run_spec: RunSpec, new_run_spec: RunSpec):
-    if (
-        current_run_spec.configuration.type != "service"
-        or new_run_spec.configuration.type != "service"
-    ):
-        raise ServerClientError("Can only update service run configuration")
     spec_diff = diff_models(current_run_spec, new_run_spec)
     changed_spec_fields = list(spec_diff.keys())
     for key in changed_spec_fields:
@@ -868,13 +867,28 @@ def _check_can_update_run_spec(current_run_spec: RunSpec, new_run_spec: RunSpec)
                 f"Failed to update fields {changed_spec_fields}."
                 f" Can only update {_UPDATABLE_SPEC_FIELDS}."
             )
-    configuration_diff = diff_models(current_run_spec.configuration, new_run_spec.configuration)
-    changed_configuration_fields = list(configuration_diff.keys())
-    for key in changed_configuration_fields:
-        if key not in _UPDATABLE_CONFIGURATION_FIELDS:
+    _check_can_update_configuration(current_run_spec.configuration, new_run_spec.configuration)
+
+
+def _check_can_update_configuration(
+    current: AnyRunConfiguration, new: AnyRunConfiguration
+) -> None:
+    if current.type != new.type:
+        raise ServerClientError(
+            f"Configuration type changed from {current.type} to {new.type}, cannot update"
+        )
+    updatable_fields = _CONF_TYPE_TO_UPDATABLE_FIELDS.get(new.type)
+    if updatable_fields is None:
+        raise ServerClientError(
+            f"Can only update {', '.join(_CONF_TYPE_TO_UPDATABLE_FIELDS)} configurations."
+            f" Not {new.type}"
+        )
+    diff = diff_models(current, new)
+    changed_fields = list(diff.keys())
+    for key in changed_fields:
+        if key not in updatable_fields:
             raise ServerClientError(
-                f"Failed to update fields {changed_configuration_fields}."
-                f" Can only update {_UPDATABLE_CONFIGURATION_FIELDS}"
+                f"Failed to update fields {changed_fields}. Can only update {updatable_fields}"
             )
 
 
