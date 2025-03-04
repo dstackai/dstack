@@ -696,7 +696,7 @@ async def _check_gpu_utilization(
     if _should_terminate_due_to_low_gpu_util(
         policy.min_gpu_utilization, [m.values for m in gpus_util_metrics]
     ):
-        logger.debug("%s: GPU utilization check: terminating", fmt(job_model))
+        logger.info("%s: GPU utilization check: terminating", fmt(job_model))
         job_model.status = JobStatus.TERMINATING
         # TODO(0.19 or earlier): set JobTerminationReason.TERMINATED_DUE_TO_UTILIZATION_POLICY
         job_model.termination_reason = JobTerminationReason.TERMINATED_BY_SERVER
