@@ -79,29 +79,6 @@ MAIN_LOCATION = "eastus"
 class AzureConfigurator(Configurator):
     TYPE: BackendType = BackendType.AZURE
 
-    def get_default_configs(self) -> List[AzureConfigInfoWithCreds]:
-        if not auth.default_creds_available():
-            return []
-        try:
-            credential, _ = auth.authenticate(AzureDefaultCreds())
-        except BackendAuthError:
-            return []
-        tenant_id_element = self._get_tenant_id_element(credential=credential)
-        tenant_ids = [v.value for v in tenant_id_element.values]
-        subscription_id_element = self._get_subscription_id_element(credential=credential)
-        subscription_ids = [v.value for v in subscription_id_element.values]
-        configs = []
-        for tenant_id in tenant_ids:
-            for subscription_id in subscription_ids:
-                config = AzureConfigInfoWithCreds(
-                    tenant_id=tenant_id,
-                    subscription_id=subscription_id,
-                    locations=DEFAULT_LOCATIONS,
-                    creds=AzureDefaultCreds(),
-                )
-                configs.append(config)
-        return configs
-
     def get_config_values(self, config: AzureConfigInfoWithCredsPartial) -> AzureConfigValues:
         config_values = AzureConfigValues()
         config_values.default_creds = (

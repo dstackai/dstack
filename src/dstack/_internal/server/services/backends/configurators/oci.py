@@ -50,19 +50,6 @@ SUPPORTED_REGIONS = frozenset(
 class OCIConfigurator(Configurator):
     TYPE: BackendType = BackendType.OCI
 
-    def get_default_configs(self) -> List[OCIConfigInfoWithCreds]:
-        creds = OCIDefaultCreds()
-        try:
-            subscribed_regions = get_subscribed_regions(creds).names
-        except any_oci_exception:
-            return []
-        return [
-            OCIConfigInfoWithCreds(
-                regions=list(subscribed_regions & SUPPORTED_REGIONS),
-                creds=creds,
-            )
-        ]
-
     def get_config_values(self, config: OCIConfigInfoWithCredsPartial) -> OCIConfigValues:
         config_values = OCIConfigValues(regions=None)
         config_values.default_creds = (

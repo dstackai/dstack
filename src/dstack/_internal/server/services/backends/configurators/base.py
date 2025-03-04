@@ -20,13 +20,6 @@ TAGS_MAX_NUM = 25
 class Configurator(ABC):
     TYPE: BackendType
 
-    def get_default_configs(self) -> List[AnyConfigInfoWithCreds]:
-        """
-        Tries to detect backend creds on the machine and
-        automatically construct backend configs from the creds.
-        """
-        return []
-
     @abstractmethod
     def get_config_values(self, config: AnyConfigInfoWithCredsPartial) -> AnyConfigValues:
         """

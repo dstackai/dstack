@@ -37,7 +37,6 @@ from dstack._internal.server.services.permissions import (
     DefaultPermissions,
     set_default_permissions,
 )
-from dstack._internal.utils.common import run_async
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -555,19 +554,13 @@ class ServerConfigManager:
         Initializes the default server/config.yml.
         The default config is empty or contains an existing `main` project config.
         """
-        # The backends auto init feature via default creds is currently disabled
-        # so that the backend configuration is always explicit.
-        # Details: https://github.com/dstackai/dstack/issues/1384
-        self.config = await self._init_config(session=session, init_backends=False)
+        self.config = await self._init_config(session)
         if self.config is not None:
             self._save_config(self.config)
 
     async def sync_config(self, session: AsyncSession):
         # Disable config.yml sync for https://github.com/dstackai/dstack/issues/815.
         return
-        # self.config = await self._init_config(session=session, init_backends=False)
-        # if self.config is not None:
-        #     self._save_config(self.config)
 
     async def apply_encryption(self):
         if self.config is None:
@@ -644,9 +637,7 @@ class ServerConfigManager:
             error=False,
         )
 
-    async def _init_config(
-        self, session: AsyncSession, init_backends: bool
-    ) -> Optional[ServerConfig]:
+    async def _init_config(self, session: AsyncSession) -> Optional[ServerConfig]:
         project = await projects_services.get_project_model_by_name(
             session=session,
             project_name=settings.DEFAULT_PROJECT_NAME,
@@ -662,33 +653,11 @@ class ServerConfigManager:
             )
             if config_info is not None:
                 backends.append(internal_config_to_config(config_info))
-        if init_backends and len(backends) == 0:
-            backends = await self._init_backends(session=session, project=project)
         return ServerConfig(
             projects=[ProjectConfig(name=settings.DEFAULT_PROJECT_NAME, backends=backends)],
             encryption=EncryptionConfig(keys=[]),
             default_permissions=None,
         )
-
-    async def _init_backends(
-        self, session: AsyncSession, project: ProjectModel
-    ) -> List[BackendConfig]:
-        backends = []
-        for backend_type in backends_services.list_available_backend_types():
-            configurator = backends_services.get_configurator(backend_type)
-            if configurator is None:
-                continue
-            config_infos = await run_async(configurator.get_default_configs)
-            for config_info in config_infos:
-                try:
-                    await backends_services.create_backend(
-                        session=session, project=project, config=config_info
-                    )
-                    backends.append(internal_config_to_config(config_info))
-                    break
-                except Exception as e:
-                    logger.debug("Failed to configure backend %s: %s", config_info.type, e)
-        return backends
 
     def _load_config(self) -> Optional[ServerConfig]:
         try:

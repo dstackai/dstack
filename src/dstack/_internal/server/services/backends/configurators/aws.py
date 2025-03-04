@@ -8,7 +8,6 @@ from boto3.session import Session
 from dstack._internal.core.backends.aws import AWSBackend, auth, compute, resources
 from dstack._internal.core.backends.aws.config import AWSConfig
 from dstack._internal.core.errors import (
-    BackendAuthError,
     BackendError,
     ServerClientError,
 )
@@ -60,20 +59,6 @@ MAIN_REGION = "us-east-1"
 
 class AWSConfigurator(Configurator):
     TYPE: BackendType = BackendType.AWS
-
-    def get_default_configs(self) -> List[AWSConfigInfoWithCreds]:
-        if not auth.default_creds_available():
-            return []
-        try:
-            auth.authenticate(creds=AWSDefaultCreds(), region=MAIN_REGION)
-        except BackendAuthError:
-            return []
-        return [
-            AWSConfigInfoWithCreds(
-                regions=DEFAULT_REGIONS,
-                creds=AWSDefaultCreds(),
-            )
-        ]
 
     def get_config_values(self, config: AWSConfigInfoWithCredsPartial) -> AWSConfigValues:
         config_values = AWSConfigValues(regions=None)

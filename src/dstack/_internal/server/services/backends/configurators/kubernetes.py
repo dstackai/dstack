@@ -1,5 +1,3 @@
-from typing import List
-
 from dstack._internal.core.backends.kubernetes import KubernetesBackend
 from dstack._internal.core.backends.kubernetes.config import KubernetesConfig
 from dstack._internal.core.backends.kubernetes.utils import get_api_from_config_data
@@ -24,10 +22,6 @@ logger = get_logger(__name__)
 
 class KubernetesConfigurator(Configurator):
     TYPE: BackendType = BackendType.KUBERNETES
-
-    def get_default_configs(self) -> List[KubernetesConfigInfoWithCreds]:
-        # TODO: automatically pick up kubernetes config
-        return []
 
     def get_config_values(
         self, config: KubernetesConfigInfoWithCredsPartial

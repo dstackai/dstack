@@ -120,21 +120,6 @@ MAIN_REGION = "us-east1"
 class GCPConfigurator(Configurator):
     TYPE: BackendType = BackendType.GCP
 
-    def get_default_configs(self) -> List[GCPConfigInfoWithCreds]:
-        if not auth.default_creds_available():
-            return []
-        try:
-            _, project_id = auth.authenticate(GCPDefaultCreds())
-        except BackendAuthError:
-            return []
-        return [
-            GCPConfigInfoWithCreds(
-                project_id=project_id,
-                regions=DEFAULT_REGIONS,
-                creds=GCPDefaultCreds(),
-            )
-        ]
-
     def get_config_values(self, config: GCPConfigInfoWithCredsPartial) -> GCPConfigValues:
         config_values = GCPConfigValues(project_id=None, regions=None)
         config_values.default_creds = (
