@@ -4,6 +4,7 @@ from typing import Optional
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
+from freezegun import freeze_time
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.errors import SSHError
@@ -11,6 +12,7 @@ from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import NetworkMode
 from dstack._internal.core.models.configurations import DevEnvironmentConfiguration
 from dstack._internal.core.models.instances import InstanceStatus
+from dstack._internal.core.models.profiles import UtilizationPolicy
 from dstack._internal.core.models.runs import (
     JobRuntimeData,
     JobStatus,
@@ -39,6 +41,7 @@ from dstack._internal.server.services.volumes import (
 from dstack._internal.server.testing.common import (
     create_instance,
     create_job,
+    create_job_metrics_point,
     create_pool,
     create_project,
     create_repo,
@@ -688,3 +691,125 @@ class TestProcessRunningJobs:
         assert job.status == expected_status
         assert job.termination_reason == expected_termination_reason
         assert job.inactivity_secs == expected_inactivity_secs
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.parametrize(
+        ["samples", "expected_status"],
+        [
+            pytest.param(
+                [
+                    (datetime(2023, 1, 1, 12, 25, 20, tzinfo=timezone.utc), 30),
+                    (datetime(2023, 1, 1, 12, 25, 30, tzinfo=timezone.utc), 30),
+                    (datetime(2023, 1, 1, 12, 29, 50, tzinfo=timezone.utc), 40),
+                ],
+                JobStatus.RUNNING,
+                id="not-enough-points",
+            ),
+            pytest.param(
+                [
+                    (datetime(2023, 1, 1, 12, 20, 10, tzinfo=timezone.utc), 30),
+                    (datetime(2023, 1, 1, 12, 20, 20, tzinfo=timezone.utc), 30),
+                    (datetime(2023, 1, 1, 12, 29, 50, tzinfo=timezone.utc), 80),
+                ],
+                JobStatus.RUNNING,
+                id="any-above-min",
+            ),
+            pytest.param(
+                [
+                    (datetime(2023, 1, 1, 12, 10, 10, tzinfo=timezone.utc), 80),  # outside window
+                    (datetime(2023, 1, 1, 12, 10, 20, tzinfo=timezone.utc), 80),  # outside window
+                    (datetime(2023, 1, 1, 12, 20, 10, tzinfo=timezone.utc), 30),
+                    (datetime(2023, 1, 1, 12, 20, 20, tzinfo=timezone.utc), 30),
+                    (datetime(2023, 1, 1, 12, 29, 50, tzinfo=timezone.utc), 40),
+                ],
+                JobStatus.TERMINATING,
+                id="all-below-min",
+            ),
+        ],
+    )
+    @freeze_time(datetime(2023, 1, 1, 12, 30, tzinfo=timezone.utc))
+    async def test_gpu_utilization(
+        self,
+        test_db,
+        session: AsyncSession,
+        samples: list[tuple[datetime, int]],
+        expected_status: JobStatus,
+    ) -> None:
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(
+            session=session,
+            project_id=project.id,
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            status=RunStatus.RUNNING,
+            run_name="test-run",
+            run_spec=get_run_spec(
+                run_name="test-run",
+                repo_id=repo.name,
+                configuration=DevEnvironmentConfiguration(
+                    name="test-run",
+                    ide="vscode",
+                    utilization_policy=UtilizationPolicy(
+                        min_gpu_utilization=80,
+                        time_window=600,
+                    ),
+                ),
+            ),
+        )
+        pool = await create_pool(session=session, project=project)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            pool=pool,
+            status=InstanceStatus.BUSY,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            job_provisioning_data=get_job_provisioning_data(),
+            instance=instance,
+            instance_assigned=True,
+        )
+        for timestamp, gpu_util in samples:
+            # two GPUs, the second one always 100% utilized
+            await create_job_metrics_point(
+                session=session,
+                job_model=job,
+                timestamp=timestamp,
+                gpus_memory_usage_bytes=[1024, 1024],
+                gpus_util_percent=[gpu_util, 100],
+            )
+        with (
+            patch("dstack._internal.server.services.runner.ssh.SSHTunnel") as SSHTunnelMock,
+            patch(
+                "dstack._internal.server.services.runner.client.RunnerClient"
+            ) as RunnerClientMock,
+        ):
+            runner_client_mock = RunnerClientMock.return_value
+            runner_client_mock.pull.return_value = PullResponse(
+                job_states=[],
+                job_logs=[],
+                runner_logs=[],
+                last_updated=0,
+                no_connections_secs=0,
+            )
+            await process_running_jobs()
+            SSHTunnelMock.assert_called_once()
+            runner_client_mock.pull.assert_called_once()
+        await session.refresh(job)
+        assert job.status == expected_status
+        if expected_status == JobStatus.TERMINATING:
+            assert job.termination_reason == JobTerminationReason.TERMINATED_BY_SERVER
+            assert job.termination_reason_message == (
+                "The job GPU utilization below 80% for 600 seconds"
+            )
+        else:
+            assert job.termination_reason is None
+            assert job.termination_reason_message is None

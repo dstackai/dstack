@@ -104,6 +104,8 @@ def _get_fleet_spec_excludes(fleet_spec: FleetSpec) -> Optional[_ExcludeDict]:
         profile_excludes.add("availability_zones")
     if fleet_spec.configuration.blocks == 1:
         configuration_excludes["blocks"] = True
+    if fleet_spec.profile is not None and fleet_spec.profile.utilization_policy is None:
+        profile_excludes.add("utilization_policy")
 
     if ssh_hosts_excludes:
         ssh_config_excludes["hosts"] = {"__all__": ssh_hosts_excludes}

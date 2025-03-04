@@ -114,6 +114,7 @@ class JobTerminationReason(str, Enum):
     ABORTED_BY_USER = "aborted_by_user"
     TERMINATED_BY_SERVER = "terminated_by_server"
     INACTIVITY_DURATION_EXCEEDED = "inactivity_duration_exceeded"
+    TERMINATED_DUE_TO_UTILIZATION_POLICY = "terminated_due_to_utilization_policy"
     # Set by the runner
     CONTAINER_EXITED_WITH_ERROR = "container_exited_with_error"
     PORTS_BINDING_FAILED = "ports_binding_failed"
@@ -135,6 +136,7 @@ class JobTerminationReason(str, Enum):
             self.ABORTED_BY_USER: JobStatus.ABORTED,
             self.TERMINATED_BY_SERVER: JobStatus.TERMINATED,
             self.INACTIVITY_DURATION_EXCEEDED: JobStatus.TERMINATED,
+            self.TERMINATED_DUE_TO_UTILIZATION_POLICY: JobStatus.TERMINATED,
             self.CONTAINER_EXITED_WITH_ERROR: JobStatus.FAILED,
             self.PORTS_BINDING_FAILED: JobStatus.FAILED,
             self.CREATING_CONTAINER_ERROR: JobStatus.FAILED,
