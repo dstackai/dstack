@@ -1,6 +1,6 @@
 from dstack._internal.core.backends.kubernetes import KubernetesBackend
+from dstack._internal.core.backends.kubernetes import utils as kubernetes_utils
 from dstack._internal.core.backends.kubernetes.config import KubernetesConfig
-from dstack._internal.core.backends.kubernetes.utils import get_api_from_config_data
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.backends.kubernetes import (
     AnyKubernetesConfigInfo,
@@ -23,7 +23,7 @@ class KubernetesConfigurator(Configurator):
 
     def validate_config(self, config: KubernetesConfigInfoWithCreds):
         try:
-            api = get_api_from_config_data(config.kubeconfig.data)
+            api = kubernetes_utils.get_api_from_config_data(config.kubeconfig.data)
             api.list_node()
         except Exception as e:
             logger.debug("Invalid kubeconfig: %s", str(e))
