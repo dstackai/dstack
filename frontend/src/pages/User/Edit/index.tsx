@@ -118,7 +118,7 @@ export const UserEdit: React.FC = () => {
                         loading={isUserUpdating}
                         onCancel={onCancelHandler}
                         onRefreshToken={toggleRefreshConfirm}
-                        disabledRole={userGlobalRole !== 'admin'}
+                        disabledEmailEndRoleFields={userGlobalRole !== 'admin'}
                         disabledRefreshToken={isTokenRefreshing}
                     />
                 )}
