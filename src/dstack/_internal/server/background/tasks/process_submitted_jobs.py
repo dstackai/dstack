@@ -195,6 +195,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
                 InstanceModel.total_blocks > InstanceModel.busy_blocks,
             )
             .options(lazyload(InstanceModel.jobs))
+            .order_by(InstanceModel.id)  # take locks in order
             .with_for_update()
         )
         pool_instances = list(res.unique().scalars().all())
@@ -319,6 +320,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         select(VolumeModel)
         .where(VolumeModel.id.in_(volumes_ids))
         .options(selectinload(VolumeModel.user))
+        .order_by(VolumeModel.id)  # take locks in order
         .with_for_update()
     )
     async with get_locker().lock_ctx(VolumeModel.__tablename__, volumes_ids):
