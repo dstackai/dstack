@@ -6,8 +6,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from dstack._internal.core.errors import ResourceNotExistsError
 from dstack._internal.core.models.backends import (
     AnyConfigInfoWithCreds,
-    AnyConfigInfoWithCredsPartial,
-    AnyConfigValues,
     BackendInfoYAML,
 )
 from dstack._internal.core.models.backends.base import BackendType
@@ -19,7 +17,7 @@ from dstack._internal.server.schemas.backends import (
     DeleteBackendsRequest,
     UpdateBackendYAMLRequest,
 )
-from dstack._internal.server.security.permissions import Authenticated, ProjectAdmin
+from dstack._internal.server.security.permissions import ProjectAdmin
 from dstack._internal.server.services import backends
 from dstack._internal.server.services.backends import handlers as backends_handlers
 from dstack._internal.server.services.config import (
@@ -45,14 +43,6 @@ project_router = APIRouter(
 @root_router.post("/list_types")
 async def list_backend_types() -> List[BackendType]:
     return backends.list_available_backend_types()
-
-
-@root_router.post("/config_values")
-async def get_backend_config_values(
-    body: AnyConfigInfoWithCredsPartial,
-    user: UserModel = Depends(Authenticated()),
-) -> AnyConfigValues:
-    return await backends.get_backend_config_values(config=body)
 
 
 @project_router.post("/create")

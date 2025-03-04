@@ -17,8 +17,6 @@ from dstack._internal.core.errors import (
 )
 from dstack._internal.core.models.backends import (
     AnyConfigInfoWithCreds,
-    AnyConfigInfoWithCredsPartial,
-    AnyConfigValues,
 )
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
@@ -159,16 +157,6 @@ def list_available_backend_types() -> List[BackendType]:
     return available_backend_types
 
 
-async def get_backend_config_values(
-    config: AnyConfigInfoWithCredsPartial,
-) -> AnyConfigValues:
-    configurator = get_configurator(config.type)
-    if configurator is None:
-        raise BackendNotAvailable()
-    config_values = await run_async(configurator.get_config_values, config)
-    return config_values
-
-
 async def create_backend(
     session: AsyncSession,
     project: ProjectModel,
@@ -180,7 +168,7 @@ async def create_backend(
     backend = await get_project_backend_by_type(project=project, backend_type=configurator.TYPE)
     if backend is not None:
         raise ResourceExistsError()
-    await run_async(configurator.get_config_values, config)
+    await run_async(configurator.validate_config, config)
     backend = await run_async(configurator.create_backend, project=project, config=config)
     session.add(backend)
     await session.commit()
@@ -198,7 +186,7 @@ async def update_backend(
     backend_exists = any(configurator.TYPE == b.type for b in project.backends)
     if not backend_exists:
         raise ServerClientError("Backend does not exist")
-    await run_async(configurator.get_config_values, config)
+    await run_async(configurator.validate_config, config)
     backend = await run_async(configurator.create_backend, project=project, config=config)
     # FIXME: potentially long write transaction
     await session.execute(

@@ -1,18 +1,11 @@
 import json
-from typing import List
 
 from dstack._internal.core.backends.base import Backend
 from dstack._internal.core.backends.cudo import CudoBackend, CudoConfig, api_client
-from dstack._internal.core.models.backends.base import (
-    BackendType,
-    ConfigElementValue,
-    ConfigMultiElement,
-)
+from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.backends.cudo import (
     CudoConfigInfo,
     CudoConfigInfoWithCreds,
-    CudoConfigInfoWithCredsPartial,
-    CudoConfigValues,
     CudoCreds,
     CudoStoredConfig,
 )
@@ -37,15 +30,8 @@ DEFAULT_REGION = "no-luster-1"
 class CudoConfigurator(Configurator):
     TYPE: BackendType = BackendType.CUDO
 
-    def get_config_values(self, config: CudoConfigInfoWithCredsPartial) -> CudoConfigValues:
-        config_values = CudoConfigValues()
-        if config.creds is None:
-            return config_values
+    def validate_config(self, config: CudoConfigInfoWithCreds):
         self._validate_cudo_api_key(config.creds.api_key)
-        config_values.regions = self._get_regions_element(
-            selected=config.regions or [DEFAULT_REGION]
-        )
-        return config_values
 
     def create_backend(
         self, project: ProjectModel, config: CudoConfigInfoWithCreds
@@ -68,12 +54,6 @@ class CudoConfigurator(Configurator):
     def get_backend(self, model: BackendModel) -> Backend:
         config = self._get_backend_config(model)
         return CudoBackend(config=config)
-
-    def _get_regions_element(self, selected: List[str]) -> ConfigMultiElement:
-        element = ConfigMultiElement(selected=selected)
-        for r in REGIONS:
-            element.values.append(ConfigElementValue(value=r, label=r))
-        return element
 
     def _get_backend_config(self, model: BackendModel) -> CudoConfig:
         return CudoConfig.__response__(

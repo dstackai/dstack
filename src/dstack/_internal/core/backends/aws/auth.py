@@ -29,12 +29,3 @@ def validate_credentials(session: Session):
         sts.get_caller_identity()
     except (botocore.exceptions.ClientError, botocore.exceptions.NoCredentialsError):
         raise BackendAuthError()
-
-
-def default_creds_available() -> bool:
-    session = boto3.session.Session()
-    try:
-        validate_credentials(session)
-    except BackendAuthError:
-        return False
-    return True

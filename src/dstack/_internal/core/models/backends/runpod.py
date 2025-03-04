@@ -3,7 +3,6 @@ from typing import Annotated, List, Optional
 from pydantic import Field
 from typing_extensions import Literal
 
-from dstack._internal.core.models.backends.base import ConfigMultiElement
 from dstack._internal.core.models.common import CoreModel
 
 
@@ -28,15 +27,3 @@ RunpodCreds = AnyRunpodCreds
 
 class RunpodConfigInfoWithCreds(RunpodConfigInfo):
     creds: AnyRunpodCreds
-
-
-class RunpodConfigInfoWithCredsPartial(CoreModel):
-    type: Literal["runpod"] = "runpod"
-    creds: Optional[AnyRunpodCreds]
-    regions: Optional[List[str]]
-    community_cloud: Optional[bool]
-
-
-class RunpodConfigValues(CoreModel):
-    type: Literal["runpod"] = "runpod"
-    regions: Optional[ConfigMultiElement]

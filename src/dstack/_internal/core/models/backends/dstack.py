@@ -20,7 +20,3 @@ class DstackConfigInfo(CoreModel):
 
 class DstackBaseBackendConfigInfo(CoreModel):
     type: str
-
-
-class DstackConfigValues(CoreModel):
-    type: Literal["dstack"] = "dstack"

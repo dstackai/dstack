@@ -3,7 +3,6 @@ from typing import Dict, List, Optional, Union
 from pydantic import Field
 from typing_extensions import Literal
 
-from dstack._internal.core.models.backends.base import ConfigElement, ConfigMultiElement
 from dstack._internal.core.models.common import CoreModel
 
 
@@ -41,26 +40,6 @@ class GCPConfigInfoWithCreds(GCPConfigInfo):
 
 
 AnyGCPConfigInfo = Union[GCPConfigInfo, GCPConfigInfoWithCreds]
-
-
-class GCPConfigInfoWithCredsPartial(CoreModel):
-    type: Literal["gcp"] = "gcp"
-    creds: Optional[AnyGCPCreds]
-    project_id: Optional[str]
-    regions: Optional[List[str]]
-    vpc_name: Optional[str] = None
-    vpc_project_id: Optional[str] = None
-    public_ips: Optional[bool]
-    nat_check: Optional[bool] = None
-    vm_service_account: Optional[str] = None
-    tags: Optional[Dict[str, str]] = None
-
-
-class GCPConfigValues(CoreModel):
-    type: Literal["gcp"] = "gcp"
-    default_creds: bool = False
-    project_id: Optional[ConfigElement]
-    regions: Optional[ConfigMultiElement]
 
 
 class GCPStoredConfig(GCPConfigInfo):

@@ -1,6 +1,5 @@
 import concurrent.futures
 import json
-from typing import List
 
 import botocore.exceptions
 from boto3.session import Session
@@ -16,16 +15,12 @@ from dstack._internal.core.models.backends.aws import (
     AWSAccessKeyCreds,
     AWSConfigInfo,
     AWSConfigInfoWithCreds,
-    AWSConfigInfoWithCredsPartial,
-    AWSConfigValues,
     AWSCreds,
     AWSDefaultCreds,
     AWSStoredConfig,
 )
 from dstack._internal.core.models.backends.base import (
     BackendType,
-    ConfigElementValue,
-    ConfigMultiElement,
 )
 from dstack._internal.core.models.common import is_core_model_instance
 from dstack._internal.server import settings
@@ -60,13 +55,7 @@ MAIN_REGION = "us-east-1"
 class AWSConfigurator(Configurator):
     TYPE: BackendType = BackendType.AWS
 
-    def get_config_values(self, config: AWSConfigInfoWithCredsPartial) -> AWSConfigValues:
-        config_values = AWSConfigValues(regions=None)
-        config_values.default_creds = (
-            settings.DEFAULT_CREDS_ENABLED and auth.default_creds_available()
-        )
-        if config.creds is None:
-            return config_values
+    def validate_config(self, config: AWSConfigInfoWithCreds):
         if (
             is_core_model_instance(config.creds, AWSDefaultCreds)
             and not settings.DEFAULT_CREDS_ENABLED
@@ -84,11 +73,9 @@ class AWSConfigurator(Configurator):
                 )
             else:
                 raise_invalid_credentials_error(fields=[["creds"]])
-        config_values.regions = self._get_regions_element(
-            selected=config.regions or DEFAULT_REGIONS
-        )
-        self._check_config(session=session, config=config)
-        return config_values
+        self._check_config_tags(config)
+        self._check_config_iam_instance_profile(session, config)
+        self._check_config_vpc(session, config)
 
     def create_backend(
         self, project: ProjectModel, config: AWSConfigInfoWithCreds
@@ -118,18 +105,7 @@ class AWSConfigurator(Configurator):
             creds=AWSCreds.parse_raw(model.auth.get_plaintext_or_error()).__root__,
         )
 
-    def _get_regions_element(self, selected: List[str]) -> ConfigMultiElement:
-        element = ConfigMultiElement(selected=selected)
-        for r in REGION_VALUES:
-            element.values.append(ConfigElementValue(value=r, label=r))
-        return element
-
-    def _check_config(self, session: Session, config: AWSConfigInfoWithCredsPartial):
-        self._check_tags_config(config)
-        self._check_iam_instance_profile_config(session, config)
-        self._check_vpc_config(session, config)
-
-    def _check_tags_config(self, config: AWSConfigInfoWithCredsPartial):
+    def _check_config_tags(self, config: AWSConfigInfoWithCreds):
         if not config.tags:
             return
         if len(config.tags) > TAGS_MAX_NUM:
@@ -141,9 +117,7 @@ class AWSConfigurator(Configurator):
         except BackendError as e:
             raise ServerClientError(e.args[0])
 
-    def _check_iam_instance_profile_config(
-        self, session: Session, config: AWSConfigInfoWithCredsPartial
-    ):
+    def _check_config_iam_instance_profile(self, session: Session, config: AWSConfigInfoWithCreds):
         if config.iam_instance_profile is None:
             return
         try:
@@ -166,7 +140,7 @@ class AWSConfigurator(Configurator):
                 f"Failed to check IAM instance profile {config.iam_instance_profile}"
             )
 
-    def _check_vpc_config(self, session: Session, config: AWSConfigInfoWithCredsPartial):
+    def _check_config_vpc(self, session: Session, config: AWSConfigInfoWithCreds):
         allocate_public_ip = config.public_ips if config.public_ips is not None else True
         use_default_vpcs = config.default_vpcs if config.default_vpcs is not None else True
         if config.vpc_name is not None and config.vpc_ids is not None:

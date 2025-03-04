@@ -1,19 +1,14 @@
 import json
-from typing import List
 
 from dstack._internal.core.backends.tensordock import TensorDockBackend, api_client
 from dstack._internal.core.backends.tensordock.config import TensorDockConfig
 from dstack._internal.core.models.backends.base import (
     BackendType,
-    ConfigElementValue,
-    ConfigMultiElement,
 )
 from dstack._internal.core.models.backends.tensordock import (
     AnyTensorDockConfigInfo,
     TensorDockConfigInfo,
     TensorDockConfigInfoWithCreds,
-    TensorDockConfigInfoWithCredsPartial,
-    TensorDockConfigValues,
     TensorDockCreds,
     TensorDockStoredConfig,
 )
@@ -30,15 +25,8 @@ REGIONS = []
 class TensorDockConfigurator(Configurator):
     TYPE: BackendType = BackendType.TENSORDOCK
 
-    def get_config_values(
-        self, config: TensorDockConfigInfoWithCredsPartial
-    ) -> TensorDockConfigValues:
-        config_values = TensorDockConfigValues()
-        if config.creds is None:
-            return config_values
+    def validate_config(self, config: TensorDockConfigInfoWithCreds):
         self._validate_tensordock_creds(config.creds.api_key, config.creds.api_token)
-        config_values.regions = self._get_regions_element(selected=config.regions or [])
-        return config_values
 
     def create_backend(
         self, project: ProjectModel, config: TensorDockConfigInfoWithCreds
@@ -74,9 +62,3 @@ class TensorDockConfigurator(Configurator):
         client = api_client.TensorDockAPIClient(api_key=api_key, api_token=api_token)
         if not client.auth_test():
             raise_invalid_credentials_error(fields=[["creds", "api_key"], ["creds", "api_token"]])
-
-    def _get_regions_element(self, selected: List[str]) -> ConfigMultiElement:
-        element = ConfigMultiElement(selected=selected)
-        for r in REGIONS:
-            element.values.append(ConfigElementValue(value=r, label=r))
-        return element

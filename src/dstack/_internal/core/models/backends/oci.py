@@ -3,7 +3,6 @@ from typing import Dict
 from pydantic import Field, root_validator
 from typing_extensions import Annotated, List, Literal, Optional, Union
 
-from dstack._internal.core.models.backends.base import ConfigMultiElement
 from dstack._internal.core.models.common import CoreModel
 
 
@@ -67,20 +66,6 @@ class OCIConfigInfoWithCreds(OCIConfigInfo):
 
 
 AnyOCIConfigInfo = Union[OCIConfigInfo, OCIConfigInfoWithCreds]
-
-
-class OCIConfigInfoWithCredsPartial(CoreModel):
-    type: Literal["oci"] = "oci"
-    creds: Optional[AnyOCICreds]
-    regions: Optional[List[str]]
-    compartment_id: Optional[str]
-
-
-class OCIConfigValues(CoreModel):
-    type: Literal["oci"] = "oci"
-    default_creds: bool = False
-    regions: Optional[ConfigMultiElement]
-    compartment_id: Optional[str] = None
 
 
 class OCIStoredConfig(OCIConfigInfo):

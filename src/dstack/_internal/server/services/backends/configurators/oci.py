@@ -1,7 +1,7 @@
 import json
 from typing import Dict, Iterable, List, Set, Tuple
 
-from dstack._internal.core.backends.oci import OCIBackend, auth, resources
+from dstack._internal.core.backends.oci import OCIBackend, resources
 from dstack._internal.core.backends.oci.config import OCIConfig
 from dstack._internal.core.backends.oci.exceptions import any_oci_exception
 from dstack._internal.core.backends.oci.region import (
@@ -12,15 +12,11 @@ from dstack._internal.core.backends.oci.region import (
 from dstack._internal.core.errors import ServerClientError
 from dstack._internal.core.models.backends.base import (
     BackendType,
-    ConfigElementValue,
-    ConfigMultiElement,
 )
 from dstack._internal.core.models.backends.oci import (
     AnyOCIConfigInfo,
     OCIConfigInfo,
     OCIConfigInfoWithCreds,
-    OCIConfigInfoWithCredsPartial,
-    OCIConfigValues,
     OCICreds,
     OCIDefaultCreds,
     OCIStoredConfig,
@@ -50,13 +46,7 @@ SUPPORTED_REGIONS = frozenset(
 class OCIConfigurator(Configurator):
     TYPE: BackendType = BackendType.OCI
 
-    def get_config_values(self, config: OCIConfigInfoWithCredsPartial) -> OCIConfigValues:
-        config_values = OCIConfigValues(regions=None)
-        config_values.default_creds = (
-            settings.DEFAULT_CREDS_ENABLED and auth.default_creds_available()
-        )
-        if config.creds is None:
-            return config_values
+    def validate_config(self, config: OCIConfigInfoWithCreds):
         if (
             is_core_model_instance(config.creds, OCIDefaultCreds)
             and not settings.DEFAULT_CREDS_ENABLED
@@ -65,22 +55,10 @@ class OCIConfigurator(Configurator):
                 fields=[["creds"]],
                 details="Default credentials are forbidden by dstack settings",
             )
-
         try:
-            available_regions = get_subscribed_regions(config.creds).names & SUPPORTED_REGIONS
+            get_subscribed_regions(config.creds).names
         except any_oci_exception as e:
             raise_invalid_credentials_error(fields=[["creds"]], details=e)
-
-        if config.regions:
-            selected_regions = [r for r in config.regions if r in available_regions]
-        else:
-            selected_regions = list(available_regions)
-
-        config_values.regions = self._get_regions_element(
-            available=available_regions,
-            selected=selected_regions,
-        )
-        return config_values
 
     def create_backend(
         self, project: ProjectModel, config: OCIConfigInfoWithCreds
@@ -125,14 +103,6 @@ class OCIConfigurator(Configurator):
             **json.loads(model.config),
             creds=OCICreds.parse_raw(model.auth.get_plaintext_or_error()).__root__,
         )
-
-    def _get_regions_element(
-        self, available: Iterable[str], selected: List[str]
-    ) -> ConfigMultiElement:
-        element = ConfigMultiElement(selected=selected)
-        for region in available:
-            element.values.append(ConfigElementValue(value=region, label=region))
-        return element
 
 
 def _filter_supported_regions(subscribed_region_names: Set[str]) -> List[str]:

@@ -32,17 +32,12 @@ from dstack._internal.core.models.backends.azure import (
     AzureClientCreds,
     AzureConfigInfo,
     AzureConfigInfoWithCreds,
-    AzureConfigInfoWithCredsPartial,
-    AzureConfigValues,
     AzureCreds,
     AzureDefaultCreds,
     AzureStoredConfig,
 )
 from dstack._internal.core.models.backends.base import (
     BackendType,
-    ConfigElement,
-    ConfigElementValue,
-    ConfigMultiElement,
 )
 from dstack._internal.core.models.common import is_core_model_instance
 from dstack._internal.server import settings
@@ -79,13 +74,7 @@ MAIN_LOCATION = "eastus"
 class AzureConfigurator(Configurator):
     TYPE: BackendType = BackendType.AZURE
 
-    def get_config_values(self, config: AzureConfigInfoWithCredsPartial) -> AzureConfigValues:
-        config_values = AzureConfigValues()
-        config_values.default_creds = (
-            settings.DEFAULT_CREDS_ENABLED and auth.default_creds_available()
-        )
-        if config.creds is None:
-            return config_values
+    def validate_config(self, config: AzureConfigInfoWithCreds):
         if (
             is_core_model_instance(config.creds, AzureDefaultCreds)
             and not settings.DEFAULT_CREDS_ENABLED
@@ -94,7 +83,7 @@ class AzureConfigurator(Configurator):
         if is_core_model_instance(config.creds, AzureClientCreds):
             self._set_client_creds_tenant_id(config.creds, config.tenant_id)
         try:
-            credential, creds_tenant_id = auth.authenticate(config.creds)
+            credential, _ = auth.authenticate(config.creds)
         except BackendAuthError:
             if is_core_model_instance(config.creds, AzureClientCreds):
                 raise_invalid_credentials_error(
@@ -106,23 +95,12 @@ class AzureConfigurator(Configurator):
                 )
             else:
                 raise_invalid_credentials_error(fields=[["creds"]])
-        config_values.tenant_id = self._get_tenant_id_element(
-            credential=credential,
-            selected=config.tenant_id or creds_tenant_id,
-        )
-        if config_values.tenant_id.selected is None:
-            return config_values
-        config_values.subscription_id = self._get_subscription_id_element(
-            credential=credential,
-            selected=config.subscription_id,
-        )
-        if config_values.subscription_id.selected is None:
-            return config_values
-        config_values.locations = self._get_locations_element(
-            selected=config.locations or DEFAULT_LOCATIONS
-        )
-        self._check_config(config=config, credential=credential)
-        return config_values
+        self._check_config_tenant_id(config=config, credential=credential)
+        self._check_config_subscription_id(config=config, credential=credential)
+        self._check_config_locations(config)
+        self._check_config_tags(config)
+        self._check_config_resource_group(config=config, credential=credential)
+        self._check_config_vpc(config=config, credential=credential)
 
     def create_backend(
         self, project: ProjectModel, config: AzureConfigInfoWithCreds
@@ -171,6 +149,114 @@ class AzureConfigurator(Configurator):
             creds=AzureCreds.parse_raw(model.auth.get_plaintext_or_error()).__root__,
         )
 
+    def _check_config_tenant_id(
+        self, config: AzureConfigInfoWithCreds, credential: auth.AzureCredential
+    ):
+        subscription_client = subscription_mgmt.SubscriptionClient(credential=credential)
+        tenant_ids = []
+        for tenant in subscription_client.tenants.list():
+            tenant_ids.append(tenant.tenant_id)
+        if config.tenant_id not in tenant_ids:
+            raise ServerClientError(
+                "Invalid tenant_id",
+                fields=[["tenant_id"]],
+            )
+
+    def _check_config_subscription_id(
+        self, config: AzureConfigInfoWithCreds, credential: auth.AzureCredential
+    ):
+        subscription_client = subscription_mgmt.SubscriptionClient(credential=credential)
+        subscription_ids = []
+        for subscription in subscription_client.subscriptions.list():
+            subscription_ids.append(subscription.subscription_id)
+        if config.subscription_id not in subscription_ids:
+            raise ServerClientError(
+                "Invalid subscription_id",
+                fields=[["subscription_id"]],
+            )
+        if len(subscription_ids) == 0:
+            # Credentials without granted roles don't see any subscriptions
+            raise ServerClientError(
+                msg="No Azure subscriptions found for provided credentials. Ensure the account has enough permissions.",
+            )
+
+    def _check_config_locations(self, config: AzureConfigInfoWithCreds):
+        if config.locations is None:
+            return
+        for location in config.locations:
+            if location not in LOCATION_VALUES:
+                raise ServerClientError(f"Unknown Azure location {location}")
+
+    def _check_config_tags(self, config: AzureConfigInfoWithCreds):
+        if not config.tags:
+            return
+        if len(config.tags) > TAGS_MAX_NUM:
+            raise ServerClientError(
+                f"Maximum number of tags exceeded. Up to {TAGS_MAX_NUM} tags is allowed."
+            )
+        try:
+            resources.validate_tags(config.tags)
+        except BackendError as e:
+            raise ServerClientError(e.args[0])
+
+    def _check_config_resource_group(
+        self, config: AzureConfigInfoWithCreds, credential: auth.AzureCredential
+    ):
+        if config.resource_group is None:
+            return
+        resource_manager = ResourceManager(
+            credential=credential,
+            subscription_id=config.subscription_id,
+        )
+        if not resource_manager.resource_group_exists(config.resource_group):
+            raise ServerClientError(f"Resource group {config.resource_group} not found")
+
+    def _check_config_vpc(
+        self, config: AzureConfigInfoWithCreds, credential: auth.AzureCredential
+    ):
+        if config.subscription_id is None:
+            return None
+        allocate_public_ip = config.public_ips if config.public_ips is not None else True
+        if config.public_ips is False and config.vpc_ids is None:
+            raise ServerClientError(msg="`vpc_ids` must be specified if `public_ips: false`.")
+        locations = config.locations
+        if locations is None:
+            locations = DEFAULT_LOCATIONS
+        if config.vpc_ids is not None:
+            vpc_ids_locations = list(config.vpc_ids.keys())
+            not_configured_locations = [loc for loc in locations if loc not in vpc_ids_locations]
+            if len(not_configured_locations) > 0:
+                if config.locations is None:
+                    raise ServerClientError(
+                        f"`vpc_ids` not configured for regions {not_configured_locations}. "
+                        "Configure `vpc_ids` for all regions or specify `regions`."
+                    )
+                raise ServerClientError(
+                    f"`vpc_ids` not configured for regions {not_configured_locations}. "
+                    "Configure `vpc_ids` for all regions specified in `regions`."
+                )
+            network_client = network_mgmt.NetworkManagementClient(
+                credential=credential,
+                subscription_id=config.subscription_id,
+            )
+            with ThreadPoolExecutor(max_workers=8) as executor:
+                futures = []
+                for location in locations:
+                    future = executor.submit(
+                        compute.get_resource_group_network_subnet_or_error,
+                        network_client=network_client,
+                        resource_group=None,
+                        vpc_ids=config.vpc_ids,
+                        location=location,
+                        allocate_public_ip=allocate_public_ip,
+                    )
+                    futures.append(future)
+                for future in as_completed(futures):
+                    try:
+                        future.result()
+                    except BackendError as e:
+                        raise ServerClientError(e.args[0])
+
     def _set_client_creds_tenant_id(
         self,
         creds: AzureClientCreds,
@@ -186,65 +272,6 @@ class AzureConfigurator(Configurator):
                 ]
             )
         creds.tenant_id = tenant_id
-
-    def _get_tenant_id_element(
-        self,
-        credential: auth.AzureCredential,
-        selected: Optional[str] = None,
-    ) -> ConfigElement:
-        subscription_client = subscription_mgmt.SubscriptionClient(credential=credential)
-        element = ConfigElement(selected=selected)
-        tenant_ids = []
-        for tenant in subscription_client.tenants.list():
-            tenant_ids.append(tenant.tenant_id)
-            element.values.append(
-                ConfigElementValue(value=tenant.tenant_id, label=tenant.tenant_id)
-            )
-        if selected is not None and selected not in tenant_ids:
-            raise ServerClientError(
-                "Invalid tenant_id",
-                fields=[["tenant_id"]],
-            )
-        if len(tenant_ids) == 1:
-            element.selected = tenant_ids[0]
-        return element
-
-    def _get_subscription_id_element(
-        self,
-        credential: auth.AzureCredential,
-        selected: Optional[str] = None,
-    ) -> ConfigElement:
-        subscription_client = subscription_mgmt.SubscriptionClient(credential=credential)
-        element = ConfigElement(selected=selected)
-        subscription_ids = []
-        for subscription in subscription_client.subscriptions.list():
-            subscription_ids.append(subscription.subscription_id)
-            element.values.append(
-                ConfigElementValue(
-                    value=subscription.subscription_id,
-                    label=f"{subscription.display_name} ({subscription.subscription_id})",
-                )
-            )
-        if selected is not None and selected not in subscription_ids:
-            raise ServerClientError(
-                "Invalid subscription_id",
-                fields=[["subscription_id"]],
-            )
-        if len(subscription_ids) == 1:
-            element.selected = subscription_ids[0]
-        if len(subscription_ids) == 0:
-            # Credentials without granted roles don't see any subscriptions
-            raise ServerClientError(
-                msg="No Azure subscriptions found for provided credentials. Ensure the account has enough permissions.",
-            )
-        return element
-
-    def _get_locations_element(self, selected: List[str]) -> ConfigMultiElement:
-        element = ConfigMultiElement()
-        for loc in LOCATION_VALUES:
-            element.values.append(ConfigElementValue(value=loc, label=loc))
-        element.selected = selected
-        return element
 
     def _create_resource_group(
         self,
@@ -295,83 +322,6 @@ class AzureConfigurator(Configurator):
         with ThreadPoolExecutor(max_workers=8) as executor:
             for location in locations:
                 executor.submit(func, location)
-
-    def _check_config(
-        self, config: AzureConfigInfoWithCredsPartial, credential: auth.AzureCredential
-    ):
-        self._check_tags_config(config)
-        self._check_resource_group(config=config, credential=credential)
-        self._check_vpc_config(config=config, credential=credential)
-
-    def _check_tags_config(self, config: AzureConfigInfoWithCredsPartial):
-        if not config.tags:
-            return
-        if len(config.tags) > TAGS_MAX_NUM:
-            raise ServerClientError(
-                f"Maximum number of tags exceeded. Up to {TAGS_MAX_NUM} tags is allowed."
-            )
-        try:
-            resources.validate_tags(config.tags)
-        except BackendError as e:
-            raise ServerClientError(e.args[0])
-
-    def _check_resource_group(
-        self, config: AzureConfigInfoWithCredsPartial, credential: auth.AzureCredential
-    ):
-        if config.resource_group is None:
-            return
-        resource_manager = ResourceManager(
-            credential=credential,
-            subscription_id=config.subscription_id,
-        )
-        if not resource_manager.resource_group_exists(config.resource_group):
-            raise ServerClientError(f"Resource group {config.resource_group} not found")
-
-    def _check_vpc_config(
-        self, config: AzureConfigInfoWithCredsPartial, credential: auth.AzureCredential
-    ):
-        if config.subscription_id is None:
-            return None
-        allocate_public_ip = config.public_ips if config.public_ips is not None else True
-        if config.public_ips is False and config.vpc_ids is None:
-            raise ServerClientError(msg="`vpc_ids` must be specified if `public_ips: false`.")
-        locations = config.locations
-        if locations is None:
-            locations = DEFAULT_LOCATIONS
-        if config.vpc_ids is not None:
-            vpc_ids_locations = list(config.vpc_ids.keys())
-            not_configured_locations = [loc for loc in locations if loc not in vpc_ids_locations]
-            if len(not_configured_locations) > 0:
-                if config.locations is None:
-                    raise ServerClientError(
-                        f"`vpc_ids` not configured for regions {not_configured_locations}. "
-                        "Configure `vpc_ids` for all regions or specify `regions`."
-                    )
-                raise ServerClientError(
-                    f"`vpc_ids` not configured for regions {not_configured_locations}. "
-                    "Configure `vpc_ids` for all regions specified in `regions`."
-                )
-            network_client = network_mgmt.NetworkManagementClient(
-                credential=credential,
-                subscription_id=config.subscription_id,
-            )
-            with ThreadPoolExecutor(max_workers=8) as executor:
-                futures = []
-                for location in locations:
-                    future = executor.submit(
-                        compute.get_resource_group_network_subnet_or_error,
-                        network_client=network_client,
-                        resource_group=None,
-                        vpc_ids=config.vpc_ids,
-                        location=location,
-                        allocate_public_ip=allocate_public_ip,
-                    )
-                    futures.append(future)
-                for future in as_completed(futures):
-                    try:
-                        future.result()
-                    except BackendError as e:
-                        raise ServerClientError(e.args[0])
 
 
 def _get_resource_group_name(project_name: str) -> str:

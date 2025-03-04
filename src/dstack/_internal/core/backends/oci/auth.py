@@ -20,7 +20,3 @@ def creds_valid(creds: AnyOCICreds) -> bool:
     except any_oci_exception:
         return False
     return True
-
-
-def default_creds_available() -> bool:
-    return creds_valid(OCIDefaultCreds())

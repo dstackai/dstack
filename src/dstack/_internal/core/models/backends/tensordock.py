@@ -1,7 +1,6 @@
 from pydantic.fields import Field
 from typing_extensions import Annotated, List, Literal, Optional, Union
 
-from dstack._internal.core.models.backends.base import ConfigMultiElement
 from dstack._internal.core.models.common import CoreModel
 
 
@@ -27,17 +26,6 @@ class TensorDockConfigInfoWithCreds(TensorDockConfigInfo):
 
 
 AnyTensorDockConfigInfo = Union[TensorDockConfigInfo, TensorDockConfigInfoWithCreds]
-
-
-class TensorDockConfigInfoWithCredsPartial(CoreModel):
-    type: Literal["tensordock"] = "tensordock"
-    creds: Optional[AnyTensorDockCreds]
-    regions: Optional[List[str]]
-
-
-class TensorDockConfigValues(CoreModel):
-    type: Literal["tensordock"] = "tensordock"
-    regions: Optional[ConfigMultiElement]
 
 
 class TensorDockStoredConfig(TensorDockConfigInfo):

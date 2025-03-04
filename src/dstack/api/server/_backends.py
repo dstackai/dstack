@@ -4,8 +4,6 @@ from pydantic import parse_obj_as
 
 from dstack._internal.core.models.backends import (
     AnyConfigInfoWithCreds,
-    AnyConfigInfoWithCredsPartial,
-    AnyConfigValues,
 )
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.server.schemas.backends import DeleteBackendsRequest
@@ -17,21 +15,13 @@ class BackendsAPIClient(APIClientGroup):
         resp = self._request("/api/backends/list_types")
         return parse_obj_as(List[BackendType], resp.json())
 
-    def config_values(self, config: AnyConfigInfoWithCredsPartial) -> AnyConfigValues:
-        resp = self._request("/api/backends/config_values", body=config.json())
-        return parse_obj_as(AnyConfigValues, resp.json())
-
-    def create(
-        self, project_name: str, config: AnyConfigInfoWithCreds
-    ) -> AnyConfigInfoWithCredsPartial:
+    def create(self, project_name: str, config: AnyConfigInfoWithCreds) -> AnyConfigInfoWithCreds:
         resp = self._request(f"/api/project/{project_name}/backends/create", body=config.json())
-        return parse_obj_as(AnyConfigInfoWithCredsPartial, resp.json())
+        return parse_obj_as(AnyConfigInfoWithCreds, resp.json())
 
-    def update(
-        self, project_name: str, config: AnyConfigInfoWithCreds
-    ) -> AnyConfigInfoWithCredsPartial:
+    def update(self, project_name: str, config: AnyConfigInfoWithCreds) -> AnyConfigInfoWithCreds:
         resp = self._request(f"/api/project/{project_name}/backends/update", body=config.json())
-        return parse_obj_as(AnyConfigInfoWithCredsPartial, resp.json())
+        return parse_obj_as(AnyConfigInfoWithCreds, resp.json())
 
     def delete(self, project_name: str, backends_names: List[BackendType]):
         body = DeleteBackendsRequest(backends_names=backends_names)

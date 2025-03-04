@@ -3,7 +3,6 @@ from typing import Dict
 from pydantic import Field
 from typing_extensions import Annotated, List, Literal, Optional, Union
 
-from dstack._internal.core.models.backends.base import ConfigMultiElement
 from dstack._internal.core.models.common import CoreModel
 
 
@@ -61,25 +60,6 @@ class AWSConfigInfoWithCreds(AWSConfigInfo):
 
 
 AnyAWSConfigInfo = Union[AWSConfigInfo, AWSConfigInfoWithCreds]
-
-
-class AWSConfigInfoWithCredsPartial(CoreModel):
-    type: Literal["aws"] = "aws"
-    creds: Optional[AnyAWSCreds]
-    regions: Optional[List[str]]
-    vpc_name: Optional[str]
-    vpc_ids: Optional[Dict[str, str]]
-    default_vpcs: Optional[bool]
-    public_ips: Optional[bool]
-    iam_instance_profile: Optional[str]
-    tags: Optional[Dict[str, str]]
-    os_images: Optional["AWSOSImageConfig"]
-
-
-class AWSConfigValues(CoreModel):
-    type: Literal["aws"] = "aws"
-    default_creds: bool = False
-    regions: Optional[ConfigMultiElement]
 
 
 class AWSStoredConfig(AWSConfigInfo):

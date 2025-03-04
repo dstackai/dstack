@@ -1,19 +1,14 @@
 import json
-from typing import List
 
 from dstack._internal.core.backends.vastai import VastAIBackend, api_client
 from dstack._internal.core.backends.vastai.config import VastAIConfig
 from dstack._internal.core.models.backends.base import (
     BackendType,
-    ConfigElementValue,
-    ConfigMultiElement,
 )
 from dstack._internal.core.models.backends.vastai import (
     AnyVastAIConfigInfo,
     VastAIConfigInfo,
     VastAIConfigInfoWithCreds,
-    VastAIConfigInfoWithCredsPartial,
-    VastAIConfigValues,
     VastAICreds,
     VastAIStoredConfig,
 )
@@ -30,13 +25,8 @@ REGIONS = []
 class VastAIConfigurator(Configurator):
     TYPE: BackendType = BackendType.VASTAI
 
-    def get_config_values(self, config: VastAIConfigInfoWithCredsPartial) -> VastAIConfigValues:
-        config_values = VastAIConfigValues()
-        if config.creds is None:
-            return config_values
+    def validate_config(self, config: VastAIConfigInfoWithCreds):
         self._validate_vastai_creds(config.creds.api_key)
-        config_values.regions = self._get_regions_element(selected=config.regions or [])
-        return config_values
 
     def create_backend(
         self, project: ProjectModel, config: VastAIConfigInfoWithCreds
@@ -72,9 +62,3 @@ class VastAIConfigurator(Configurator):
         client = api_client.VastAIAPIClient(api_key=api_key)
         if not client.auth_test():
             raise_invalid_credentials_error(fields=[["creds", "api_key"]])
-
-    def _get_regions_element(self, selected: List[str]) -> ConfigMultiElement:
-        element = ConfigMultiElement(selected=selected)
-        for r in REGIONS:
-            element.values.append(ConfigElementValue(value=r, label=r))
-        return element

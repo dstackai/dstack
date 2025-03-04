@@ -3,7 +3,6 @@ from typing import Dict
 from pydantic import Field
 from typing_extensions import Annotated, List, Literal, Optional, Union
 
-from dstack._internal.core.models.backends.base import ConfigElement, ConfigMultiElement
 from dstack._internal.core.models.common import CoreModel
 
 
@@ -42,26 +41,6 @@ class AzureConfigInfoWithCreds(AzureConfigInfo):
 
 
 AnyAzureConfigInfo = Union[AzureConfigInfo, AzureConfigInfoWithCreds]
-
-
-class AzureConfigInfoWithCredsPartial(CoreModel):
-    type: Literal["azure"] = "azure"
-    creds: Optional[AnyAzureCreds]
-    tenant_id: Optional[str]
-    subscription_id: Optional[str]
-    resource_group: Optional[str]
-    locations: Optional[List[str]]
-    vpc_ids: Optional[Dict[str, str]]
-    public_ips: Optional[bool]
-    tags: Optional[Dict[str, str]]
-
-
-class AzureConfigValues(CoreModel):
-    type: Literal["azure"] = "azure"
-    default_creds: bool = False
-    tenant_id: Optional[ConfigElement]
-    subscription_id: Optional[ConfigElement]
-    locations: Optional[ConfigMultiElement]
 
 
 class AzureStoredConfig(AzureConfigInfo):

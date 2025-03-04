@@ -6,8 +6,6 @@ from dstack._internal.core.errors import BackendInvalidCredentialsError
 from dstack._internal.core.models.backends import (
     AnyConfigInfo,
     AnyConfigInfoWithCreds,
-    AnyConfigInfoWithCredsPartial,
-    AnyConfigValues,
 )
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.server.models import BackendModel, ProjectModel
@@ -21,9 +19,10 @@ class Configurator(ABC):
     TYPE: BackendType
 
     @abstractmethod
-    def get_config_values(self, config: AnyConfigInfoWithCredsPartial) -> AnyConfigValues:
+    def validate_config(self, config: AnyConfigInfoWithCreds):
         """
-        Validates backend config and returns possible values for unfilled config parameters.
+        Validates backend config including backend creds and other parameters.
+        Raises `ServerClientError` or its subclass if config is invalid.
         """
         pass
 

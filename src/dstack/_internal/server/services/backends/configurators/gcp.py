@@ -1,24 +1,17 @@
 import json
-from typing import List
 
 import google.cloud.compute_v1 as compute_v1
-from google.auth.credentials import Credentials
 
 from dstack._internal.core.backends.gcp import GCPBackend, auth, resources
 from dstack._internal.core.backends.gcp.config import GCPConfig
 from dstack._internal.core.errors import BackendAuthError, BackendError, ServerClientError
 from dstack._internal.core.models.backends.base import (
     BackendType,
-    ConfigElement,
-    ConfigElementValue,
-    ConfigMultiElement,
 )
 from dstack._internal.core.models.backends.gcp import (
     AnyGCPConfigInfo,
     GCPConfigInfo,
     GCPConfigInfoWithCreds,
-    GCPConfigInfoWithCredsPartial,
-    GCPConfigValues,
     GCPCreds,
     GCPDefaultCreds,
     GCPServiceAccountCreds,
@@ -120,13 +113,7 @@ MAIN_REGION = "us-east1"
 class GCPConfigurator(Configurator):
     TYPE: BackendType = BackendType.GCP
 
-    def get_config_values(self, config: GCPConfigInfoWithCredsPartial) -> GCPConfigValues:
-        config_values = GCPConfigValues(project_id=None, regions=None)
-        config_values.default_creds = (
-            settings.DEFAULT_CREDS_ENABLED and auth.default_creds_available()
-        )
-        if config.creds is None:
-            return config_values
+    def validate_config(self, config: GCPConfigInfoWithCreds):
         if (
             is_core_model_instance(config.creds, GCPDefaultCreds)
             and not settings.DEFAULT_CREDS_ENABLED
@@ -142,14 +129,14 @@ class GCPConfigurator(Configurator):
                 raise_invalid_credentials_error(fields=[["creds", "data"]], details=details)
             else:
                 raise_invalid_credentials_error(fields=[["creds"]], details=details)
-        config_values.regions = self._get_regions_element(
-            selected=config.regions or DEFAULT_REGIONS
+        subnetworks_client = compute_v1.SubnetworksClient(credentials=credentials)
+        routers_client = compute_v1.RoutersClient(credentials=credentials)
+        self._check_config_tags(config)
+        self._check_config_vpc(
+            subnetworks_client=subnetworks_client,
+            routers_client=routers_client,
+            config=config,
         )
-        if config.project_id is None:
-            return config_values
-        config_values.project_id = self._get_project_id_element(selected=config.project_id)
-        self._check_config(config=config, credentials=credentials)
-        return config_values
 
     def create_backend(
         self, project: ProjectModel, config: GCPConfigInfoWithCreds
@@ -181,34 +168,7 @@ class GCPConfigurator(Configurator):
             creds=GCPCreds.parse_raw(model.auth.get_plaintext_or_error()).__root__,
         )
 
-    def _get_project_id_element(
-        self,
-        selected: str,
-    ) -> ConfigElement:
-        element = ConfigElement(selected=selected)
-        element.values.append(ConfigElementValue(value=selected, label=selected))
-        return element
-
-    def _get_regions_element(
-        self,
-        selected: List[str],
-    ) -> ConfigMultiElement:
-        element = ConfigMultiElement(selected=selected)
-        for region_name in REGIONS:
-            element.values.append(ConfigElementValue(value=region_name, label=region_name))
-        return element
-
-    def _check_config(self, config: GCPConfigInfoWithCredsPartial, credentials: Credentials):
-        subnetworks_client = compute_v1.SubnetworksClient(credentials=credentials)
-        routers_client = compute_v1.RoutersClient(credentials=credentials)
-        self._check_tags_config(config)
-        self._check_vpc_config(
-            subnetworks_client=subnetworks_client,
-            routers_client=routers_client,
-            config=config,
-        )
-
-    def _check_tags_config(self, config: GCPConfigInfoWithCredsPartial):
+    def _check_config_tags(self, config: GCPConfigInfoWithCreds):
         if not config.tags:
             return
         if len(config.tags) > TAGS_MAX_NUM:
@@ -220,9 +180,9 @@ class GCPConfigurator(Configurator):
         except BackendError as e:
             raise ServerClientError(e.args[0])
 
-    def _check_vpc_config(
+    def _check_config_vpc(
         self,
-        config: GCPConfigInfoWithCredsPartial,
+        config: GCPConfigInfoWithCreds,
         subnetworks_client: compute_v1.SubnetworksClient,
         routers_client: compute_v1.RoutersClient,
     ):

@@ -1,19 +1,14 @@
 import json
-from typing import List
 
 from dstack._internal.core.backends.datacrunch import DataCrunchBackend
 from dstack._internal.core.backends.datacrunch.config import DataCrunchConfig
 from dstack._internal.core.models.backends.base import (
     BackendType,
-    ConfigElementValue,
-    ConfigMultiElement,
 )
 from dstack._internal.core.models.backends.datacrunch import (
     AnyDataCrunchConfigInfo,
     DataCrunchConfigInfo,
     DataCrunchConfigInfoWithCreds,
-    DataCrunchConfigInfoWithCredsPartial,
-    DataCrunchConfigValues,
     DataCrunchCreds,
     DataCrunchStoredConfig,
 )
@@ -31,16 +26,9 @@ DEFAULT_REGION = "FIN-01"
 class DataCrunchConfigurator(Configurator):
     TYPE: BackendType = BackendType.DATACRUNCH
 
-    def get_config_values(
-        self, config: DataCrunchConfigInfoWithCredsPartial
-    ) -> DataCrunchConfigValues:
-        config_values = DataCrunchConfigValues()
-        if config.creds is None:
-            return config_values
-        config_values.regions = self._get_regions_element(
-            selected=config.regions or [DEFAULT_REGION]
-        )
-        return config_values
+    def validate_config(self, config: DataCrunchConfigInfoWithCreds):
+        # FIXME: validate datacrunch creds
+        return
 
     def create_backend(
         self, project: ProjectModel, config: DataCrunchConfigInfoWithCreds
@@ -71,9 +59,3 @@ class DataCrunchConfigurator(Configurator):
             **json.loads(model.config),
             creds=DataCrunchCreds.parse_raw(model.auth.get_plaintext_or_error()),
         )
-
-    def _get_regions_element(self, selected: List[str]) -> ConfigMultiElement:
-        element = ConfigMultiElement(selected=selected)
-        for r in REGIONS:
-            element.values.append(ConfigElementValue(value=r, label=r))
-        return element

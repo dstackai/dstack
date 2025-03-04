@@ -28,13 +28,5 @@ class KubernetesConfigInfoWithCreds(KubernetesConfigInfo):
 AnyKubernetesConfigInfo = Union[KubernetesConfigInfo, KubernetesConfigInfoWithCreds]
 
 
-class KubernetesConfigInfoWithCredsPartial(KubernetesConfigInfoWithCreds):
-    pass
-
-
-class KubernetesConfigValues(CoreModel):
-    type: Literal["kubernetes"] = "kubernetes"
-
-
 class KubernetesStoredConfig(KubernetesConfigInfoWithCreds):
     pass

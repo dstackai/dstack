@@ -1,5 +1,4 @@
 import json
-from typing import List
 
 import requests
 
@@ -9,14 +8,10 @@ from dstack._internal.core.backends.nebius import NebiusBackend
 from dstack._internal.core.backends.nebius.config import NebiusConfig
 from dstack._internal.core.models.backends.base import (
     BackendType,
-    ConfigElementValue,
-    ConfigMultiElement,
 )
 from dstack._internal.core.models.backends.nebius import (
     NebiusConfigInfo,
     NebiusConfigInfoWithCreds,
-    NebiusConfigInfoWithCredsPartial,
-    NebiusConfigValues,
     NebiusCreds,
     NebiusStoredConfig,
 )
@@ -32,16 +27,8 @@ REGIONS = ["eu-north1-c"]
 class NebiusConfigurator(Configurator):
     TYPE: BackendType = BackendType.NEBIUS
 
-    def get_config_values(self, config: NebiusConfigInfoWithCredsPartial) -> NebiusConfigValues:
-        config_values = NebiusConfigValues()
-        if config.creds is None:
-            return config_values
+    def validate_config(self, config: NebiusConfigInfoWithCreds):
         self._validate_nebius_creds(config.creds)
-        # TODO(egor-s) cloud_id
-        # TODO(egor-s) folder_id
-        # TODO(egor-s) network_id
-        config_values.regions = self._get_regions_element(selected=config.regions or [])
-        return config_values
 
     def create_backend(
         self, project: ProjectModel, config: NebiusConfigInfoWithCreds
@@ -77,9 +64,3 @@ class NebiusConfigurator(Configurator):
             api_client.NebiusAPIClient(json.loads(creds.data)).get_token()
         except requests.HTTPError:
             raise_invalid_credentials_error(fields=[["creds", "data"]])
-
-    def _get_regions_element(self, selected: List[str]) -> ConfigMultiElement:
-        element = ConfigMultiElement(selected=selected)
-        for r in REGIONS:
-            element.values.append(ConfigElementValue(value=r, label=r))
-        return element

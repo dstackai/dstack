@@ -1,14 +1,11 @@
 import json
-from typing import List
 
 from dstack._internal.core.backends.base import Backend
 from dstack._internal.core.backends.runpod import RunpodBackend, RunpodConfig, api_client
-from dstack._internal.core.models.backends.base import BackendType, ConfigMultiElement
+from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.backends.runpod import (
     RunpodConfigInfo,
     RunpodConfigInfoWithCreds,
-    RunpodConfigInfoWithCredsPartial,
-    RunpodConfigValues,
     RunpodCreds,
     RunpodStoredConfig,
 )
@@ -22,13 +19,8 @@ from dstack._internal.server.services.backends.configurators.base import (
 class RunpodConfigurator(Configurator):
     TYPE: BackendType = BackendType.RUNPOD
 
-    def get_config_values(self, config: RunpodConfigInfoWithCredsPartial) -> RunpodConfigValues:
-        config_values = RunpodConfigValues()
-        if config.creds is None:
-            return config_values
+    def validate_config(self, config: RunpodConfigInfoWithCreds):
         self._validate_runpod_api_key(config.creds.api_key)
-        config_values.regions = self._get_regions_element(selected=config.regions or [])
-        return config_values
 
     def create_backend(
         self, project: ProjectModel, config: RunpodConfigInfoWithCreds
@@ -51,9 +43,6 @@ class RunpodConfigurator(Configurator):
     def get_backend(self, model: BackendModel) -> Backend:
         config = self._get_backend_config(model)
         return RunpodBackend(config=config)
-
-    def _get_regions_element(self, selected: List[str]) -> ConfigMultiElement:
-        return ConfigMultiElement(selected=selected)
 
     def _get_backend_config(self, model: BackendModel) -> RunpodConfig:
         return RunpodConfig(

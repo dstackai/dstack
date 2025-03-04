@@ -1,19 +1,14 @@
 import json
-from typing import List
 
 from dstack._internal.core.backends.lambdalabs import LambdaBackend, api_client
 from dstack._internal.core.backends.lambdalabs.config import LambdaConfig
 from dstack._internal.core.models.backends.base import (
     BackendType,
-    ConfigElementValue,
-    ConfigMultiElement,
 )
 from dstack._internal.core.models.backends.lambdalabs import (
     AnyLambdaConfigInfo,
     LambdaConfigInfo,
     LambdaConfigInfoWithCreds,
-    LambdaConfigInfoWithCredsPartial,
-    LambdaConfigValues,
     LambdaCreds,
     LambdaStoredConfig,
 )
@@ -46,15 +41,8 @@ DEFAULT_REGION = "us-east-1"
 class LambdaConfigurator(Configurator):
     TYPE: BackendType = BackendType.LAMBDA
 
-    def get_config_values(self, config: LambdaConfigInfoWithCredsPartial) -> LambdaConfigValues:
-        config_values = LambdaConfigValues()
-        if config.creds is None:
-            return config_values
+    def validate_config(self, config: LambdaConfigInfoWithCreds):
         self._validate_lambda_api_key(config.creds.api_key)
-        config_values.regions = self._get_regions_element(
-            selected=config.regions or [DEFAULT_REGION]
-        )
-        return config_values
 
     def create_backend(
         self, project: ProjectModel, config: LambdaConfigInfoWithCreds
@@ -90,9 +78,3 @@ class LambdaConfigurator(Configurator):
         client = api_client.LambdaAPIClient(api_key=api_key)
         if not client.validate_api_key():
             raise_invalid_credentials_error(fields=[["creds", "api_key"]])
-
-    def _get_regions_element(self, selected: List[str]) -> ConfigMultiElement:
-        element = ConfigMultiElement(selected=selected)
-        for r in REGIONS:
-            element.values.append(ConfigElementValue(value=r, label=r))
-        return element

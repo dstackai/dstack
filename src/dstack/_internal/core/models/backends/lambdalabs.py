@@ -1,7 +1,6 @@
 from pydantic.fields import Field
 from typing_extensions import Annotated, List, Literal, Optional, Union
 
-from dstack._internal.core.models.backends.base import ConfigMultiElement
 from dstack._internal.core.models.common import CoreModel
 
 
@@ -26,17 +25,6 @@ class LambdaConfigInfoWithCreds(LambdaConfigInfo):
 
 
 AnyLambdaConfigInfo = Union[LambdaConfigInfo, LambdaConfigInfoWithCreds]
-
-
-class LambdaConfigInfoWithCredsPartial(CoreModel):
-    type: Literal["lambda"] = "lambda"
-    creds: Optional[AnyLambdaCreds]
-    regions: Optional[List[str]]
-
-
-class LambdaConfigValues(CoreModel):
-    type: Literal["lambda"] = "lambda"
-    regions: Optional[ConfigMultiElement]
 
 
 class LambdaStoredConfig(LambdaConfigInfo):

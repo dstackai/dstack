@@ -1,17 +1,12 @@
 import json
-from typing import List
 
 from dstack._internal.core.backends.base import Backend
 from dstack._internal.core.backends.vultr import VultrBackend, VultrConfig, api_client
 from dstack._internal.core.models.backends import (
     VultrConfigInfoWithCreds,
-    VultrConfigInfoWithCredsPartial,
-    VultrConfigValues,
 )
 from dstack._internal.core.models.backends.base import (
     BackendType,
-    ConfigElementValue,
-    ConfigMultiElement,
 )
 from dstack._internal.core.models.backends.vultr import (
     VultrConfigInfo,
@@ -30,13 +25,8 @@ REGIONS = []
 class VultrConfigurator(Configurator):
     TYPE: BackendType = BackendType.VULTR
 
-    def get_config_values(self, config: VultrConfigInfoWithCredsPartial) -> VultrConfigValues:
-        config_values = VultrConfigValues()
-        if config.creds is None:
-            return config_values
+    def validate_config(self, config: VultrConfigInfoWithCreds):
         self._validate_vultr_api_key(config.creds.api_key)
-        config_values.regions = self._get_regions_element(selected=config.regions or [])
-        return config_values
 
     def create_backend(
         self, project: ProjectModel, config: VultrConfigInfoWithCreds
@@ -61,12 +51,6 @@ class VultrConfigurator(Configurator):
     def get_backend(self, model: BackendModel) -> Backend:
         config = self._get_backend_config(model)
         return VultrBackend(config=config)
-
-    def _get_regions_element(self, selected: List[str]) -> ConfigMultiElement:
-        element = ConfigMultiElement(selected=selected)
-        for r in REGIONS:
-            element.values.append(ConfigElementValue(value=r, label=r))
-        return element
 
     def _get_backend_config(self, model: BackendModel) -> VultrConfig:
         return VultrConfig.__response__(

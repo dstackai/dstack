@@ -1,7 +1,6 @@
 from pydantic.fields import Field
 from typing_extensions import Annotated, List, Literal, Optional, Union
 
-from dstack._internal.core.models.backends.base import ConfigMultiElement
 from dstack._internal.core.models.common import CoreModel
 
 
@@ -27,17 +26,6 @@ class DataCrunchConfigInfoWithCreds(DataCrunchConfigInfo):
 
 
 AnyDataCrunchConfigInfo = Union[DataCrunchConfigInfo, DataCrunchConfigInfoWithCreds]
-
-
-class DataCrunchConfigInfoWithCredsPartial(CoreModel):
-    type: Literal["datacrunch"] = "datacrunch"
-    creds: Optional[AnyDataCrunchCreds]
-    regions: Optional[List[str]]
-
-
-class DataCrunchConfigValues(CoreModel):
-    type: Literal["datacrunch"] = "datacrunch"
-    regions: Optional[ConfigMultiElement]
 
 
 class DataCrunchStoredConfig(DataCrunchConfigInfo):

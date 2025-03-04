@@ -6,8 +6,6 @@ from dstack._internal.core.models.backends.kubernetes import (
     AnyKubernetesConfigInfo,
     KubernetesConfigInfo,
     KubernetesConfigInfoWithCreds,
-    KubernetesConfigInfoWithCredsPartial,
-    KubernetesConfigValues,
     KubernetesStoredConfig,
 )
 from dstack._internal.server.models import BackendModel, DecryptedString, ProjectModel
@@ -23,16 +21,13 @@ logger = get_logger(__name__)
 class KubernetesConfigurator(Configurator):
     TYPE: BackendType = BackendType.KUBERNETES
 
-    def get_config_values(
-        self, config: KubernetesConfigInfoWithCredsPartial
-    ) -> KubernetesConfigValues:
+    def validate_config(self, config: KubernetesConfigInfoWithCreds):
         try:
             api = get_api_from_config_data(config.kubeconfig.data)
             api.list_node()
         except Exception as e:
             logger.debug("Invalid kubeconfig: %s", str(e))
             raise_invalid_credentials_error(fields=[["kubeconfig"]])
-        return KubernetesConfigValues()
 
     def create_backend(
         self, project: ProjectModel, config: KubernetesConfigInfoWithCreds
