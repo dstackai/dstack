@@ -27,7 +27,7 @@ export interface Props {
     onCancel: () => void;
     onSubmit: (user: IUser) => void;
     onRefreshToken?: () => void;
-    disabledRole?: boolean;
+    disabledEmailEndRoleFields?: boolean;
     disabledRefreshToken?: boolean;
 }
 
@@ -36,7 +36,7 @@ export const UserForm: React.FC<Props> = ({
     onCancel,
     loading,
     onRefreshToken,
-    disabledRole,
+    disabledEmailEndRoleFields,
     disabledRefreshToken,
     onSubmit: onSubmitProp,
 }) => {
@@ -62,8 +62,8 @@ export const UserForm: React.FC<Props> = ({
         onSubmitProp(data);
     };
 
-    const isDisabledRoleField = () => {
-        return loading || disabledRole;
+    const isDisabledEmailAndRoleField = () => {
+        return loading || disabledEmailEndRoleFields;
     };
 
     return (
@@ -107,7 +107,7 @@ export const UserForm: React.FC<Props> = ({
                                 description={t('users.email_description')}
                                 control={control}
                                 name="email"
-                                disabled={loading}
+                                disabled={isDisabledEmailAndRoleField()}
                                 rules={{
                                     pattern: {
                                         value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
@@ -122,7 +122,7 @@ export const UserForm: React.FC<Props> = ({
                                 control={control}
                                 name="global_role"
                                 options={roleSelectOptions}
-                                disabled={isDisabledRoleField()}
+                                disabled={isDisabledEmailAndRoleField()}
                             />
                         </ColumnLayout>
 
