@@ -5,12 +5,12 @@ import pytest
 from dstack._internal.core.backends.kubernetes.configurator import (
     KubernetesConfigurator,
 )
-from dstack._internal.core.errors import BackendInvalidCredentialsError
-from dstack._internal.core.models.backends.kubernetes import (
+from dstack._internal.core.backends.kubernetes.models import (
     KubeconfigConfig,
     KubernetesConfigInfoWithCreds,
     KubernetesNetworkingConfig,
 )
+from dstack._internal.core.errors import BackendInvalidCredentialsError
 
 
 class TestKubernetesConfigurator:

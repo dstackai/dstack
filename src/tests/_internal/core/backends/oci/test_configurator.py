@@ -4,11 +4,11 @@ import pytest
 from oci.exceptions import ClientError
 
 from dstack._internal.core.backends.oci.configurator import OCIConfigurator
-from dstack._internal.core.errors import BackendInvalidCredentialsError
-from dstack._internal.core.models.backends.oci import (
+from dstack._internal.core.backends.oci.models import (
     OCIClientCreds,
     OCIConfigInfoWithCreds,
 )
+from dstack._internal.core.errors import BackendInvalidCredentialsError
 
 
 class TestOCIConfigurator:

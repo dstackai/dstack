@@ -3,13 +3,13 @@ from unittest.mock import Mock, patch
 import pytest
 
 from dstack._internal.core.backends.azure.configurator import AzureConfigurator
+from dstack._internal.core.backends.azure.models import (
+    AzureClientCreds,
+    AzureConfigInfoWithCreds,
+)
 from dstack._internal.core.errors import (
     BackendAuthError,
     BackendInvalidCredentialsError,
-)
-from dstack._internal.core.models.backends.azure import (
-    AzureClientCreds,
-    AzureConfigInfoWithCreds,
 )
 
 

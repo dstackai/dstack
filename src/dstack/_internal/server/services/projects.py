@@ -7,12 +7,12 @@ from sqlalchemy import func as safunc
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
-from dstack._internal.core.errors import ForbiddenError, ResourceExistsError, ServerClientError
-from dstack._internal.core.models.backends import BackendInfo
-from dstack._internal.core.models.backends.dstack import (
+from dstack._internal.core.backends.dstack.models import (
     DstackBaseBackendConfigInfo,
     DstackConfigInfo,
 )
+from dstack._internal.core.backends.models import BackendInfo
+from dstack._internal.core.errors import ForbiddenError, ResourceExistsError, ServerClientError
 from dstack._internal.core.models.common import is_core_model_instance
 from dstack._internal.core.models.projects import Member, MemberPermissions, Project
 from dstack._internal.core.models.users import GlobalRole, ProjectRole

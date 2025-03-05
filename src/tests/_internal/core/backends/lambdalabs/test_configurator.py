@@ -3,11 +3,11 @@ from unittest.mock import patch
 import pytest
 
 from dstack._internal.core.backends.lambdalabs.configurator import LambdaConfigurator
-from dstack._internal.core.errors import BackendInvalidCredentialsError
-from dstack._internal.core.models.backends.lambdalabs import (
+from dstack._internal.core.backends.lambdalabs.models import (
     LambdaConfigInfoWithCreds,
     LambdaCreds,
 )
+from dstack._internal.core.errors import BackendInvalidCredentialsError
 
 
 class TestLambdaConfigurator:

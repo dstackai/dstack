@@ -10,6 +10,14 @@ from dstack._internal.core.backends.oci import resources
 from dstack._internal.core.backends.oci.backend import OCIBackend
 from dstack._internal.core.backends.oci.config import OCIConfig
 from dstack._internal.core.backends.oci.exceptions import any_oci_exception
+from dstack._internal.core.backends.oci.models import (
+    AnyOCIConfigInfo,
+    OCIConfigInfo,
+    OCIConfigInfoWithCreds,
+    OCICreds,
+    OCIDefaultCreds,
+    OCIStoredConfig,
+)
 from dstack._internal.core.backends.oci.region import (
     get_subscribed_regions,
     make_region_client,
@@ -18,14 +26,6 @@ from dstack._internal.core.backends.oci.region import (
 from dstack._internal.core.errors import ServerClientError
 from dstack._internal.core.models.backends.base import (
     BackendType,
-)
-from dstack._internal.core.models.backends.oci import (
-    AnyOCIConfigInfo,
-    OCIConfigInfo,
-    OCIConfigInfoWithCreds,
-    OCICreds,
-    OCIDefaultCreds,
-    OCIStoredConfig,
 )
 from dstack._internal.core.models.common import is_core_model_instance
 

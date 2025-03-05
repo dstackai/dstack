@@ -12,6 +12,10 @@ from dstack._internal.core.backends.base.configurator import (
     StoredBackendRecord,
 )
 from dstack._internal.core.backends.local.backend import LocalBackend
+from dstack._internal.core.backends.models import (
+    AnyConfigInfo,
+    AnyConfigInfoWithCreds,
+)
 from dstack._internal.core.errors import (
     BackendError,
     BackendInvalidCredentialsError,
@@ -19,10 +23,6 @@ from dstack._internal.core.errors import (
     ResourceExistsError,
     ResourceNotExistsError,
     ServerClientError,
-)
-from dstack._internal.core.models.backends import (
-    AnyConfigInfo,
-    AnyConfigInfoWithCreds,
 )
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (

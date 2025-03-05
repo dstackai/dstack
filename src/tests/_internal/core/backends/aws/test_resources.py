@@ -3,6 +3,7 @@ from unittest.mock import Mock
 
 import pytest
 
+from dstack._internal.core.backends.aws.models import AWSOSImage, AWSOSImageConfig
 from dstack._internal.core.backends.aws.resources import (
     _is_valid_tag_key,
     _is_valid_tag_value,
@@ -10,7 +11,6 @@ from dstack._internal.core.backends.aws.resources import (
     validate_tags,
 )
 from dstack._internal.core.errors import BackendError, ComputeResourceNotFoundError
-from dstack._internal.core.models.backends.aws import AWSOSImage, AWSOSImageConfig
 
 
 class TestIsValidTagKey:

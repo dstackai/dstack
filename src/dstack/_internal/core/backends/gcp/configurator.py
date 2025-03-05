@@ -11,11 +11,7 @@ from dstack._internal.core.backends.base.configurator import (
 from dstack._internal.core.backends.gcp import auth, resources
 from dstack._internal.core.backends.gcp.backend import GCPBackend
 from dstack._internal.core.backends.gcp.config import GCPConfig
-from dstack._internal.core.errors import BackendAuthError, BackendError, ServerClientError
-from dstack._internal.core.models.backends.base import (
-    BackendType,
-)
-from dstack._internal.core.models.backends.gcp import (
+from dstack._internal.core.backends.gcp.models import (
     AnyGCPConfigInfo,
     GCPConfigInfo,
     GCPConfigInfoWithCreds,
@@ -23,6 +19,10 @@ from dstack._internal.core.models.backends.gcp import (
     GCPDefaultCreds,
     GCPServiceAccountCreds,
     GCPStoredConfig,
+)
+from dstack._internal.core.errors import BackendAuthError, BackendError, ServerClientError
+from dstack._internal.core.models.backends.base import (
+    BackendType,
 )
 from dstack._internal.core.models.common import is_core_model_instance
 

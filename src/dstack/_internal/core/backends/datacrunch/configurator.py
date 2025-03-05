@@ -6,15 +6,15 @@ from dstack._internal.core.backends.base.configurator import (
 )
 from dstack._internal.core.backends.datacrunch.backend import DataCrunchBackend
 from dstack._internal.core.backends.datacrunch.config import DataCrunchConfig
-from dstack._internal.core.models.backends.base import (
-    BackendType,
-)
-from dstack._internal.core.models.backends.datacrunch import (
+from dstack._internal.core.backends.datacrunch.models import (
     AnyDataCrunchConfigInfo,
     DataCrunchConfigInfo,
     DataCrunchConfigInfoWithCreds,
     DataCrunchCreds,
     DataCrunchStoredConfig,
+)
+from dstack._internal.core.models.backends.base import (
+    BackendType,
 )
 
 REGIONS = [

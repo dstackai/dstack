@@ -8,11 +8,11 @@ from google.auth.credentials import Credentials
 from google.auth.exceptions import DefaultCredentialsError
 from google.oauth2 import service_account
 
-from dstack._internal.core.errors import BackendAuthError
-from dstack._internal.core.models.backends.gcp import (
+from dstack._internal.core.backends.gcp.models import (
     AnyGCPCreds,
     GCPServiceAccountCreds,
 )
+from dstack._internal.core.errors import BackendAuthError
 from dstack._internal.core.models.common import is_core_model_instance
 
 

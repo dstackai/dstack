@@ -7,6 +7,15 @@ from boto3.session import Session
 from dstack._internal.core.backends.aws import auth, compute, resources
 from dstack._internal.core.backends.aws.backend import AWSBackend
 from dstack._internal.core.backends.aws.config import AWSConfig
+from dstack._internal.core.backends.aws.models import (
+    AnyAWSConfigInfo,
+    AWSAccessKeyCreds,
+    AWSConfigInfo,
+    AWSConfigInfoWithCreds,
+    AWSCreds,
+    AWSDefaultCreds,
+    AWSStoredConfig,
+)
 from dstack._internal.core.backends.base.configurator import (
     TAGS_MAX_NUM,
     Configurator,
@@ -16,15 +25,6 @@ from dstack._internal.core.backends.base.configurator import (
 from dstack._internal.core.errors import (
     BackendError,
     ServerClientError,
-)
-from dstack._internal.core.models.backends.aws import (
-    AnyAWSConfigInfo,
-    AWSAccessKeyCreds,
-    AWSConfigInfo,
-    AWSConfigInfoWithCreds,
-    AWSCreds,
-    AWSDefaultCreds,
-    AWSStoredConfig,
 )
 from dstack._internal.core.models.backends.base import (
     BackendType,

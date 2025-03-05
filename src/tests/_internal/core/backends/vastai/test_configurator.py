@@ -3,8 +3,8 @@ from unittest.mock import patch
 import pytest
 
 from dstack._internal.core.backends.vastai.configurator import VastAIConfigurator
+from dstack._internal.core.backends.vastai.models import VastAIConfigInfoWithCreds, VastAICreds
 from dstack._internal.core.errors import BackendInvalidCredentialsError
-from dstack._internal.core.models.backends.vastai import VastAIConfigInfoWithCreds, VastAICreds
 
 
 class TestVastAIConfigurator:

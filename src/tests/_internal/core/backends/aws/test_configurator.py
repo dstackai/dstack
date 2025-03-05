@@ -3,11 +3,11 @@ from unittest.mock import patch
 import pytest
 
 from dstack._internal.core.backends.aws.configurator import AWSConfigurator
+from dstack._internal.core.backends.aws.models import AWSAccessKeyCreds, AWSConfigInfoWithCreds
 from dstack._internal.core.errors import (
     BackendAuthError,
     BackendInvalidCredentialsError,
 )
-from dstack._internal.core.models.backends.aws import AWSAccessKeyCreds, AWSConfigInfoWithCreds
 
 
 class TestAWSConfigurator:

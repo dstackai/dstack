@@ -3,8 +3,8 @@ from unittest.mock import patch
 import pytest
 
 from dstack._internal.core.backends.cudo.configurator import CudoConfigurator
+from dstack._internal.core.backends.cudo.models import CudoConfigInfoWithCreds, CudoCreds
 from dstack._internal.core.errors import BackendInvalidCredentialsError
-from dstack._internal.core.models.backends.cudo import CudoConfigInfoWithCreds, CudoCreds
 
 
 class TestCudoConfigurator:

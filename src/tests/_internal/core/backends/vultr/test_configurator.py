@@ -3,8 +3,8 @@ from unittest.mock import patch
 import pytest
 
 from dstack._internal.core.backends.vultr.configurator import VultrConfigurator
+from dstack._internal.core.backends.vultr.models import VultrConfigInfoWithCreds, VultrCreds
 from dstack._internal.core.errors import BackendInvalidCredentialsError
-from dstack._internal.core.models.backends.vultr import VultrConfigInfoWithCreds, VultrCreds
 
 
 class TestVultrConfigurator:

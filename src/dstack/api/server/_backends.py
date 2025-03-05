@@ -2,7 +2,7 @@ from typing import List
 
 from pydantic import parse_obj_as
 
-from dstack._internal.core.models.backends import (
+from dstack._internal.core.backends.models import (
     AnyConfigInfoWithCreds,
 )
 from dstack._internal.core.models.backends.base import BackendType

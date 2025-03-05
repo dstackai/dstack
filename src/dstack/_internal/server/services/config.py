@@ -6,25 +6,25 @@ from pydantic import BaseModel, Field, ValidationError, root_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing_extensions import Annotated
 
+from dstack._internal.core.backends.aws.models import AnyAWSCreds, AWSOSImageConfig
+from dstack._internal.core.backends.azure.models import AnyAzureCreds
+from dstack._internal.core.backends.cudo.models import AnyCudoCreds
+from dstack._internal.core.backends.datacrunch.models import AnyDataCrunchCreds
+from dstack._internal.core.backends.kubernetes.models import KubernetesNetworkingConfig
+from dstack._internal.core.backends.lambdalabs.models import AnyLambdaCreds
+from dstack._internal.core.backends.models import AnyConfigInfoWithCreds, BackendInfoYAML
+from dstack._internal.core.backends.oci.models import AnyOCICreds
 from dstack._internal.core.backends.runpod.config import RUNPOD_COMMUNITY_CLOUD_DEFAULT
+from dstack._internal.core.backends.runpod.models import AnyRunpodCreds
+from dstack._internal.core.backends.tensordock.models import AnyTensorDockCreds
+from dstack._internal.core.backends.vastai.models import AnyVastAICreds
+from dstack._internal.core.backends.vultr.models import AnyVultrCreds
 from dstack._internal.core.errors import (
     BackendNotAvailable,
     ResourceNotExistsError,
     ServerClientError,
 )
-from dstack._internal.core.models.backends import AnyConfigInfoWithCreds, BackendInfoYAML
-from dstack._internal.core.models.backends.aws import AnyAWSCreds, AWSOSImageConfig
-from dstack._internal.core.models.backends.azure import AnyAzureCreds
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.backends.cudo import AnyCudoCreds
-from dstack._internal.core.models.backends.datacrunch import AnyDataCrunchCreds
-from dstack._internal.core.models.backends.kubernetes import KubernetesNetworkingConfig
-from dstack._internal.core.models.backends.lambdalabs import AnyLambdaCreds
-from dstack._internal.core.models.backends.oci import AnyOCICreds
-from dstack._internal.core.models.backends.runpod import AnyRunpodCreds
-from dstack._internal.core.models.backends.tensordock import AnyTensorDockCreds
-from dstack._internal.core.models.backends.vastai import AnyVastAICreds
-from dstack._internal.core.models.backends.vultr import AnyVultrCreds
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.server import settings
 from dstack._internal.server.models import ProjectModel, UserModel

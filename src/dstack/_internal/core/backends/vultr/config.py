@@ -1,5 +1,5 @@
 from dstack._internal.core.backends.base.config import BackendConfig
-from dstack._internal.core.models.backends.vultr import (
+from dstack._internal.core.backends.vultr.models import (
     AnyVultrCreds,
     VultrStoredConfig,
 )

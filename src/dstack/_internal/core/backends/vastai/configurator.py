@@ -8,15 +8,15 @@ from dstack._internal.core.backends.base.configurator import (
 from dstack._internal.core.backends.vastai import api_client
 from dstack._internal.core.backends.vastai.backend import VastAIBackend
 from dstack._internal.core.backends.vastai.config import VastAIConfig
-from dstack._internal.core.models.backends.base import (
-    BackendType,
-)
-from dstack._internal.core.models.backends.vastai import (
+from dstack._internal.core.backends.vastai.models import (
     AnyVastAIConfigInfo,
     VastAIConfigInfo,
     VastAIConfigInfoWithCreds,
     VastAICreds,
     VastAIStoredConfig,
+)
+from dstack._internal.core.models.backends.base import (
+    BackendType,
 )
 
 # VastAI regions are dynamic, currently we don't offer any filtering

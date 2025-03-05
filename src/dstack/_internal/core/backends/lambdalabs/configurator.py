@@ -8,15 +8,15 @@ from dstack._internal.core.backends.base.configurator import (
 from dstack._internal.core.backends.lambdalabs import api_client
 from dstack._internal.core.backends.lambdalabs.backend import LambdaBackend
 from dstack._internal.core.backends.lambdalabs.config import LambdaConfig
-from dstack._internal.core.models.backends.base import (
-    BackendType,
-)
-from dstack._internal.core.models.backends.lambdalabs import (
+from dstack._internal.core.backends.lambdalabs.models import (
     AnyLambdaConfigInfo,
     LambdaConfigInfo,
     LambdaConfigInfoWithCreds,
     LambdaCreds,
     LambdaStoredConfig,
+)
+from dstack._internal.core.models.backends.base import (
+    BackendType,
 )
 
 REGIONS = [

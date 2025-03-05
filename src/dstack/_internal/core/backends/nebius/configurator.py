@@ -10,14 +10,14 @@ from dstack._internal.core.backends.base.configurator import (
 )
 from dstack._internal.core.backends.nebius.backend import NebiusBackend
 from dstack._internal.core.backends.nebius.config import NebiusConfig
-from dstack._internal.core.models.backends.base import (
-    BackendType,
-)
-from dstack._internal.core.models.backends.nebius import (
+from dstack._internal.core.backends.nebius.models import (
     NebiusConfigInfo,
     NebiusConfigInfoWithCreds,
     NebiusCreds,
     NebiusStoredConfig,
+)
+from dstack._internal.core.models.backends.base import (
+    BackendType,
 )
 
 REGIONS = ["eu-north1-c"]

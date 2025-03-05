@@ -23,6 +23,15 @@ from dstack._internal.core.backends.azure import auth, compute, resources
 from dstack._internal.core.backends.azure import utils as azure_utils
 from dstack._internal.core.backends.azure.backend import AzureBackend
 from dstack._internal.core.backends.azure.config import AzureConfig
+from dstack._internal.core.backends.azure.models import (
+    AnyAzureConfigInfo,
+    AzureClientCreds,
+    AzureConfigInfo,
+    AzureConfigInfoWithCreds,
+    AzureCreds,
+    AzureDefaultCreds,
+    AzureStoredConfig,
+)
 from dstack._internal.core.backends.base.configurator import (
     TAGS_MAX_NUM,
     Configurator,
@@ -33,15 +42,6 @@ from dstack._internal.core.errors import (
     BackendAuthError,
     BackendError,
     ServerClientError,
-)
-from dstack._internal.core.models.backends.azure import (
-    AnyAzureConfigInfo,
-    AzureClientCreds,
-    AzureConfigInfo,
-    AzureConfigInfoWithCreds,
-    AzureCreds,
-    AzureDefaultCreds,
-    AzureStoredConfig,
 )
 from dstack._internal.core.models.backends.base import (
     BackendType,

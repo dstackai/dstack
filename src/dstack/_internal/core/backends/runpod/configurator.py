@@ -7,13 +7,13 @@ from dstack._internal.core.backends.base.configurator import (
 )
 from dstack._internal.core.backends.runpod import api_client
 from dstack._internal.core.backends.runpod.backend import RunpodBackend, RunpodConfig
-from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.backends.runpod import (
+from dstack._internal.core.backends.runpod.models import (
     RunpodConfigInfo,
     RunpodConfigInfoWithCreds,
     RunpodCreds,
     RunpodStoredConfig,
 )
+from dstack._internal.core.models.backends.base import BackendType
 
 
 class RunpodConfigurator(Configurator):

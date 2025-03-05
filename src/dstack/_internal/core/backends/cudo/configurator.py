@@ -7,13 +7,13 @@ from dstack._internal.core.backends.base.configurator import (
 )
 from dstack._internal.core.backends.cudo import api_client
 from dstack._internal.core.backends.cudo.backend import CudoBackend, CudoConfig
-from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.backends.cudo import (
+from dstack._internal.core.backends.cudo.models import (
     CudoConfigInfo,
     CudoConfigInfoWithCreds,
     CudoCreds,
     CudoStoredConfig,
 )
+from dstack._internal.core.models.backends.base import BackendType
 
 REGIONS = [
     "no-luster-1",

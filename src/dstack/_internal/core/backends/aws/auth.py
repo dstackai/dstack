@@ -2,8 +2,8 @@ import boto3.session
 import botocore.exceptions
 from boto3.session import Session
 
+from dstack._internal.core.backends.aws.models import AnyAWSCreds, AWSAccessKeyCreds
 from dstack._internal.core.errors import BackendAuthError
-from dstack._internal.core.models.backends.aws import AnyAWSCreds, AWSAccessKeyCreds
 from dstack._internal.core.models.common import is_core_model_instance
 
 

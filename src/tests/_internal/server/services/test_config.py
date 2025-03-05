@@ -6,7 +6,7 @@ import yaml
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dstack._internal.core.models.backends.azure import AzureConfigInfoWithCreds, AzureDefaultCreds
+from dstack._internal.core.backends.azure.models import AzureConfigInfoWithCreds, AzureDefaultCreds
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.server import settings
 from dstack._internal.server.models import BackendModel, ProjectModel

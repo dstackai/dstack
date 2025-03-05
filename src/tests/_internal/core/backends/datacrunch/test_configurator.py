@@ -1,7 +1,7 @@
 from dstack._internal.core.backends.datacrunch.configurator import (
     DataCrunchConfigurator,
 )
-from dstack._internal.core.models.backends.datacrunch import (
+from dstack._internal.core.backends.datacrunch.models import (
     DataCrunchConfigInfoWithCreds,
     DataCrunchCreds,
 )

@@ -3,8 +3,8 @@ from unittest.mock import patch
 import pytest
 
 from dstack._internal.core.backends.runpod.configurator import RunpodConfigurator
+from dstack._internal.core.backends.runpod.models import RunpodConfigInfoWithCreds, RunpodCreds
 from dstack._internal.core.errors import BackendInvalidCredentialsError
-from dstack._internal.core.models.backends.runpod import RunpodConfigInfoWithCreds, RunpodCreds
 
 
 class TestRunpodConfigurator:

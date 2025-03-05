@@ -5,18 +5,18 @@ from dstack._internal.core.backends.base.configurator import (
     StoredBackendRecord,
     raise_invalid_credentials_error,
 )
-from dstack._internal.core.backends.vultr import api_client
-from dstack._internal.core.backends.vultr.backend import VultrBackend, VultrConfig
-from dstack._internal.core.models.backends import (
+from dstack._internal.core.backends.models import (
     VultrConfigInfoWithCreds,
 )
-from dstack._internal.core.models.backends.base import (
-    BackendType,
-)
-from dstack._internal.core.models.backends.vultr import (
+from dstack._internal.core.backends.vultr import api_client
+from dstack._internal.core.backends.vultr.backend import VultrBackend, VultrConfig
+from dstack._internal.core.backends.vultr.models import (
     VultrConfigInfo,
     VultrCreds,
     VultrStoredConfig,
+)
+from dstack._internal.core.models.backends.base import (
+    BackendType,
 )
 
 REGIONS = []

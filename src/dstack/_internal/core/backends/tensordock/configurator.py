@@ -8,15 +8,15 @@ from dstack._internal.core.backends.base.configurator import (
 from dstack._internal.core.backends.tensordock import api_client
 from dstack._internal.core.backends.tensordock.backend import TensorDockBackend
 from dstack._internal.core.backends.tensordock.config import TensorDockConfig
-from dstack._internal.core.models.backends.base import (
-    BackendType,
-)
-from dstack._internal.core.models.backends.tensordock import (
+from dstack._internal.core.backends.tensordock.models import (
     AnyTensorDockConfigInfo,
     TensorDockConfigInfo,
     TensorDockConfigInfoWithCreds,
     TensorDockCreds,
     TensorDockStoredConfig,
+)
+from dstack._internal.core.models.backends.base import (
+    BackendType,
 )
 
 # TensorDock regions are dynamic, currently we don't offer any filtering

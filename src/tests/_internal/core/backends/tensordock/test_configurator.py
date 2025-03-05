@@ -5,11 +5,11 @@ import pytest
 from dstack._internal.core.backends.tensordock.configurator import (
     TensorDockConfigurator,
 )
-from dstack._internal.core.errors import BackendInvalidCredentialsError
-from dstack._internal.core.models.backends.tensordock import (
+from dstack._internal.core.backends.tensordock.models import (
     TensorDockConfigInfoWithCreds,
     TensorDockCreds,
 )
+from dstack._internal.core.errors import BackendInvalidCredentialsError
 
 
 class TestTensorDockConfigurator:

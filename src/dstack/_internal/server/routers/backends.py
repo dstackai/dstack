@@ -3,11 +3,11 @@ from typing import List, Tuple
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dstack._internal.core.errors import ResourceNotExistsError
-from dstack._internal.core.models.backends import (
+from dstack._internal.core.backends.models import (
     AnyConfigInfoWithCreds,
     BackendInfoYAML,
 )
+from dstack._internal.core.errors import ResourceNotExistsError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.server import settings
 from dstack._internal.server.db import get_session

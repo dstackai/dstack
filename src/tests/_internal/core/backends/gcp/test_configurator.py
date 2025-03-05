@@ -3,13 +3,13 @@ from unittest.mock import Mock, patch
 import pytest
 
 from dstack._internal.core.backends.gcp.configurator import GCPConfigurator
+from dstack._internal.core.backends.gcp.models import (
+    GCPConfigInfoWithCreds,
+    GCPServiceAccountCreds,
+)
 from dstack._internal.core.errors import (
     BackendAuthError,
     BackendInvalidCredentialsError,
-)
-from dstack._internal.core.models.backends.gcp import (
-    GCPConfigInfoWithCreds,
-    GCPServiceAccountCreds,
 )
 
 

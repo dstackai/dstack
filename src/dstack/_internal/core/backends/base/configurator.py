@@ -4,11 +4,11 @@ from typing import Annotated, Any, List, Optional
 from pydantic import Field
 
 from dstack._internal.core.backends.base.backend import Backend
-from dstack._internal.core.errors import BackendInvalidCredentialsError
-from dstack._internal.core.models.backends import (
+from dstack._internal.core.backends.models import (
     AnyConfigInfo,
     AnyConfigInfoWithCreds,
 )
+from dstack._internal.core.errors import BackendInvalidCredentialsError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import CoreModel
 

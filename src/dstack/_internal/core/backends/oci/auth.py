@@ -2,7 +2,7 @@ import oci
 from typing_extensions import Any, Mapping
 
 from dstack._internal.core.backends.oci.exceptions import any_oci_exception
-from dstack._internal.core.models.backends.oci import AnyOCICreds, OCIDefaultCreds
+from dstack._internal.core.backends.oci.models import AnyOCICreds, OCIDefaultCreds
 from dstack._internal.core.models.common import is_core_model_instance
 
 
