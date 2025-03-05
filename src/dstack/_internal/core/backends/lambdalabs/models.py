@@ -1,12 +1,8 @@
-from pydantic.fields import Field
-from typing_extensions import Annotated, List, Literal, Optional, Union
+from typing import Annotated, List, Literal, Optional, Union
+
+from pydantic import Field
 
 from dstack._internal.core.models.common import CoreModel
-
-
-class LambdaConfigInfo(CoreModel):
-    type: Literal["lambda"] = "lambda"
-    regions: Optional[List[str]] = None
 
 
 class LambdaAPIKeyCreds(CoreModel):
@@ -15,17 +11,23 @@ class LambdaAPIKeyCreds(CoreModel):
 
 
 AnyLambdaCreds = LambdaAPIKeyCreds
-
-
 LambdaCreds = AnyLambdaCreds
 
 
-class LambdaConfigInfoWithCreds(LambdaConfigInfo):
-    creds: AnyLambdaCreds
+class LambdaBackendConfig(CoreModel):
+    type: Annotated[Literal["lambda"], Field(description="The type of backend")] = "lambda"
+    regions: Annotated[
+        Optional[List[str]],
+        Field(description="The list of Lambda regions. Omit to use all regions"),
+    ] = None
 
 
-AnyLambdaConfigInfo = Union[LambdaConfigInfo, LambdaConfigInfoWithCreds]
+class LambdaBackendConfigWithCreds(LambdaBackendConfig):
+    creds: Annotated[AnyLambdaCreds, Field(description="The credentials")]
 
 
-class LambdaStoredConfig(LambdaConfigInfo):
+AnyLambdaBackendConfig = Union[LambdaBackendConfig, LambdaBackendConfigWithCreds]
+
+
+class LambdaStoredConfig(LambdaBackendConfig):
     pass

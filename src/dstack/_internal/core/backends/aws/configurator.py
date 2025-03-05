@@ -8,10 +8,10 @@ from dstack._internal.core.backends.aws import auth, compute, resources
 from dstack._internal.core.backends.aws.backend import AWSBackend
 from dstack._internal.core.backends.aws.config import AWSConfig
 from dstack._internal.core.backends.aws.models import (
-    AnyAWSConfigInfo,
+    AnyAWSBackendConfig,
     AWSAccessKeyCreds,
-    AWSConfigInfo,
-    AWSConfigInfoWithCreds,
+    AWSBackendConfig,
+    AWSBackendConfigWithCreds,
     AWSCreds,
     AWSDefaultCreds,
     AWSStoredConfig,
@@ -55,7 +55,7 @@ MAIN_REGION = "us-east-1"
 class AWSConfigurator(Configurator):
     TYPE: BackendType = BackendType.AWS
 
-    def validate_config(self, config: AWSConfigInfoWithCreds, default_creds_enabled: bool):
+    def validate_config(self, config: AWSBackendConfigWithCreds, default_creds_enabled: bool):
         if is_core_model_instance(config.creds, AWSDefaultCreds) and not default_creds_enabled:
             raise_invalid_credentials_error(fields=[["creds"]])
         try:
@@ -75,34 +75,36 @@ class AWSConfigurator(Configurator):
         self._check_config_vpc(session, config)
 
     def create_backend(
-        self, project_name: str, config: AWSConfigInfoWithCreds
+        self, project_name: str, config: AWSBackendConfigWithCreds
     ) -> StoredBackendRecord:
         if config.regions is None:
             config.regions = DEFAULT_REGIONS
         return StoredBackendRecord(
-            config=AWSStoredConfig(**AWSConfigInfo.__response__.parse_obj(config).dict()).json(),
+            config=AWSStoredConfig(
+                **AWSBackendConfig.__response__.parse_obj(config).dict()
+            ).json(),
             auth=AWSCreds.parse_obj(config.creds).json(),
         )
 
-    def get_config_info(
+    def get_backend_config(
         self, record: StoredBackendRecord, include_creds: bool
-    ) -> AnyAWSConfigInfo:
-        config = self._get_backend_config(record)
+    ) -> AnyAWSBackendConfig:
+        config = self._get_config(record)
         if include_creds:
-            return AWSConfigInfoWithCreds.__response__.parse_obj(config)
-        return AWSConfigInfo.__response__.parse_obj(config)
+            return AWSBackendConfigWithCreds.__response__.parse_obj(config)
+        return AWSBackendConfig.__response__.parse_obj(config)
 
     def get_backend(self, record: StoredBackendRecord) -> AWSBackend:
-        config = self._get_backend_config(record)
+        config = self._get_config(record)
         return AWSBackend(config=config)
 
-    def _get_backend_config(self, record: StoredBackendRecord) -> AWSConfig:
+    def _get_config(self, record: StoredBackendRecord) -> AWSConfig:
         return AWSConfig.__response__(
             **json.loads(record.config),
             creds=AWSCreds.parse_raw(record.auth).__root__,
         )
 
-    def _check_config_tags(self, config: AWSConfigInfoWithCreds):
+    def _check_config_tags(self, config: AWSBackendConfigWithCreds):
         if not config.tags:
             return
         if len(config.tags) > TAGS_MAX_NUM:
@@ -114,7 +116,9 @@ class AWSConfigurator(Configurator):
         except BackendError as e:
             raise ServerClientError(e.args[0])
 
-    def _check_config_iam_instance_profile(self, session: Session, config: AWSConfigInfoWithCreds):
+    def _check_config_iam_instance_profile(
+        self, session: Session, config: AWSBackendConfigWithCreds
+    ):
         if config.iam_instance_profile is None:
             return
         try:
@@ -137,7 +141,7 @@ class AWSConfigurator(Configurator):
                 f"Failed to check IAM instance profile {config.iam_instance_profile}"
             )
 
-    def _check_config_vpc(self, session: Session, config: AWSConfigInfoWithCreds):
+    def _check_config_vpc(self, session: Session, config: AWSBackendConfigWithCreds):
         allocate_public_ip = config.public_ips if config.public_ips is not None else True
         use_default_vpcs = config.default_vpcs if config.default_vpcs is not None else True
         if config.vpc_name is not None and config.vpc_ids is not None:

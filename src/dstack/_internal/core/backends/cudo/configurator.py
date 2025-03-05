@@ -8,8 +8,9 @@ from dstack._internal.core.backends.base.configurator import (
 from dstack._internal.core.backends.cudo import api_client
 from dstack._internal.core.backends.cudo.backend import CudoBackend, CudoConfig
 from dstack._internal.core.backends.cudo.models import (
-    CudoConfigInfo,
-    CudoConfigInfoWithCreds,
+    AnyCudoBackendConfig,
+    CudoBackendConfig,
+    CudoBackendConfigWithCreds,
     CudoCreds,
     CudoStoredConfig,
 )
@@ -30,30 +31,34 @@ DEFAULT_REGION = "no-luster-1"
 class CudoConfigurator(Configurator):
     TYPE: BackendType = BackendType.CUDO
 
-    def validate_config(self, config: CudoConfigInfoWithCreds, default_creds_enabled: bool):
+    def validate_config(self, config: CudoBackendConfigWithCreds, default_creds_enabled: bool):
         self._validate_cudo_api_key(config.creds.api_key)
 
     def create_backend(
-        self, project_name: str, config: CudoConfigInfoWithCreds
+        self, project_name: str, config: CudoBackendConfigWithCreds
     ) -> StoredBackendRecord:
         if config.regions is None:
             config.regions = REGIONS
         return StoredBackendRecord(
-            config=CudoStoredConfig(**CudoConfigInfo.__response__.parse_obj(config).dict()).json(),
+            config=CudoStoredConfig(
+                **CudoBackendConfig.__response__.parse_obj(config).dict()
+            ).json(),
             auth=CudoCreds.parse_obj(config.creds).json(),
         )
 
-    def get_config_info(self, record: StoredBackendRecord, include_creds: bool) -> CudoConfigInfo:
-        config = self._get_backend_config(record)
+    def get_backend_config(
+        self, record: StoredBackendRecord, include_creds: bool
+    ) -> AnyCudoBackendConfig:
+        config = self._get_config(record)
         if include_creds:
-            return CudoConfigInfoWithCreds.__response__.parse_obj(config)
-        return CudoConfigInfo.__response__.parse_obj(config)
+            return CudoBackendConfigWithCreds.__response__.parse_obj(config)
+        return CudoBackendConfig.__response__.parse_obj(config)
 
     def get_backend(self, record: StoredBackendRecord) -> CudoBackend:
-        config = self._get_backend_config(record)
+        config = self._get_config(record)
         return CudoBackend(config=config)
 
-    def _get_backend_config(self, record: StoredBackendRecord) -> CudoConfig:
+    def _get_config(self, record: StoredBackendRecord) -> CudoConfig:
         return CudoConfig.__response__(
             **json.loads(record.config),
             creds=CudoCreds.parse_raw(record.auth),

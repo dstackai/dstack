@@ -88,14 +88,14 @@ class AzureCompute(Compute):
     ) -> List[InstanceOfferWithAvailability]:
         offers = get_catalog_offers(
             backend=BackendType.AZURE,
-            locations=self.config.locations,
+            locations=self.config.regions,
             requirements=requirements,
             configurable_disk_size=CONFIGURABLE_DISK_SIZE,
             extra_filter=_supported_instances,
         )
         offers_with_availability = _get_offers_with_availability(
             compute_client=self._compute_client,
-            config_locations=self.config.locations,
+            config_locations=self.config.regions,
             offers=offers,
         )
         return offers_with_availability

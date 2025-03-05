@@ -6,7 +6,7 @@ from dstack._internal.core.backends.tensordock.configurator import (
     TensorDockConfigurator,
 )
 from dstack._internal.core.backends.tensordock.models import (
-    TensorDockConfigInfoWithCreds,
+    TensorDockBackendConfigWithCreds,
     TensorDockCreds,
 )
 from dstack._internal.core.errors import BackendInvalidCredentialsError
@@ -14,7 +14,7 @@ from dstack._internal.core.errors import BackendInvalidCredentialsError
 
 class TestTensorDockConfigurator:
     def test_validate_config_valid(self):
-        config = TensorDockConfigInfoWithCreds(
+        config = TensorDockBackendConfigWithCreds(
             creds=TensorDockCreds(api_key="valid", api_token="valid"),
         )
         with patch(
@@ -24,7 +24,7 @@ class TestTensorDockConfigurator:
             TensorDockConfigurator().validate_config(config, default_creds_enabled=True)
 
     def test_validate_config_invalid_creds(self):
-        config = TensorDockConfigInfoWithCreds(
+        config = TensorDockBackendConfigWithCreds(
             creds=TensorDockCreds(api_key="invalid", api_token="invalid"),
         )
         with (

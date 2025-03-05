@@ -3,13 +3,13 @@ from unittest.mock import patch
 import pytest
 
 from dstack._internal.core.backends.vastai.configurator import VastAIConfigurator
-from dstack._internal.core.backends.vastai.models import VastAIConfigInfoWithCreds, VastAICreds
+from dstack._internal.core.backends.vastai.models import VastAIBackendConfigWithCreds, VastAICreds
 from dstack._internal.core.errors import BackendInvalidCredentialsError
 
 
 class TestVastAIConfigurator:
     def test_validate_config_valid(self):
-        config = VastAIConfigInfoWithCreds(
+        config = VastAIBackendConfigWithCreds(
             creds=VastAICreds(api_key="valid"),
         )
         with patch(
@@ -19,7 +19,7 @@ class TestVastAIConfigurator:
             VastAIConfigurator().validate_config(config, default_creds_enabled=True)
 
     def test_validate_config_invalid_creds(self):
-        config = VastAIConfigInfoWithCreds(
+        config = VastAIBackendConfigWithCreds(
             creds=VastAICreds(api_key="invalid"),
         )
         with (

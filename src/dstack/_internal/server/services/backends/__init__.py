@@ -13,8 +13,8 @@ from dstack._internal.core.backends.base.configurator import (
 )
 from dstack._internal.core.backends.local.backend import LocalBackend
 from dstack._internal.core.backends.models import (
-    AnyConfigInfo,
-    AnyConfigInfoWithCreds,
+    AnyBackendConfig,
+    AnyBackendConfigWithCreds,
 )
 from dstack._internal.core.errors import (
     BackendError,
@@ -166,8 +166,8 @@ def list_available_backend_types() -> List[BackendType]:
 async def create_backend(
     session: AsyncSession,
     project: ProjectModel,
-    config: AnyConfigInfoWithCreds,
-) -> AnyConfigInfoWithCreds:
+    config: AnyBackendConfigWithCreds,
+) -> AnyBackendConfigWithCreds:
     configurator = get_configurator(config.type)
     if configurator is None:
         raise BackendNotAvailable()
@@ -185,8 +185,8 @@ async def create_backend(
 async def update_backend(
     session: AsyncSession,
     project: ProjectModel,
-    config: AnyConfigInfoWithCreds,
-) -> AnyConfigInfoWithCreds:
+    config: AnyBackendConfigWithCreds,
+) -> AnyBackendConfigWithCreds:
     configurator = get_configurator(config.type)
     if configurator is None:
         raise BackendNotAvailable()
@@ -214,7 +214,7 @@ async def update_backend(
 async def validate_and_create_backend_model(
     project: ProjectModel,
     configurator: Configurator,
-    config: AnyConfigInfoWithCreds,
+    config: AnyBackendConfigWithCreds,
 ) -> BackendModel:
     await run_async(
         configurator.validate_config, config, default_creds_enabled=settings.DEFAULT_CREDS_ENABLED
@@ -232,10 +232,10 @@ async def validate_and_create_backend_model(
     )
 
 
-async def get_config_info(
+async def get_backend_config(
     project: ProjectModel,
     backend_type: BackendType,
-) -> Optional[AnyConfigInfoWithCreds]:
+) -> Optional[AnyBackendConfigWithCreds]:
     configurator = get_configurator(backend_type)
     if configurator is None:
         raise BackendNotAvailable()
@@ -247,20 +247,20 @@ async def get_config_info(
             )
             continue
         if backend_model.type == backend_type:
-            return get_config_info_from_backend_model(
+            return get_backend_config_from_backend_model(
                 configurator, backend_model, include_creds=True
             )
     return None
 
 
-def get_config_info_from_backend_model(
+def get_backend_config_from_backend_model(
     configurator: Configurator,
     backend_model: BackendModel,
     include_creds: bool,
-) -> AnyConfigInfo:
+) -> AnyBackendConfig:
     backend_record = get_stored_backend_record(backend_model)
-    config_info = configurator.get_config_info(backend_record, include_creds=include_creds)
-    return config_info
+    backend_config = configurator.get_backend_config(backend_record, include_creds=include_creds)
+    return backend_config
 
 
 def get_stored_backend_record(backend_model: BackendModel) -> StoredBackendRecord:

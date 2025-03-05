@@ -11,8 +11,8 @@ from dstack._internal.core.backends.base.configurator import (
 from dstack._internal.core.backends.nebius.backend import NebiusBackend
 from dstack._internal.core.backends.nebius.config import NebiusConfig
 from dstack._internal.core.backends.nebius.models import (
-    NebiusConfigInfo,
-    NebiusConfigInfoWithCreds,
+    NebiusBackendConfig,
+    NebiusBackendConfigWithCreds,
     NebiusCreds,
     NebiusStoredConfig,
 )
@@ -26,11 +26,11 @@ REGIONS = ["eu-north1-c"]
 class NebiusConfigurator(Configurator):
     TYPE: BackendType = BackendType.NEBIUS
 
-    def validate_config(self, config: NebiusConfigInfoWithCreds, default_creds_enabled: bool):
+    def validate_config(self, config: NebiusBackendConfigWithCreds, default_creds_enabled: bool):
         self._validate_nebius_creds(config.creds)
 
     def create_backend(
-        self, project_name: str, config: NebiusConfigInfoWithCreds
+        self, project_name: str, config: NebiusBackendConfigWithCreds
     ) -> StoredBackendRecord:
         if config.regions is None:
             config.regions = REGIONS
@@ -39,19 +39,19 @@ class NebiusConfigurator(Configurator):
             auth=NebiusCreds.parse_obj(config.creds).json(),
         )
 
-    def get_config_info(
+    def get_backend_config(
         self, record: StoredBackendRecord, include_creds: bool
-    ) -> NebiusConfigInfo:
-        config = self._get_backend_config(record)
+    ) -> NebiusBackendConfig:
+        config = self._get_config(record)
         if include_creds:
-            return NebiusConfigInfoWithCreds.__response__.parse_obj(config)
-        return NebiusConfigInfo.__response__.parse_obj(config)
+            return NebiusBackendConfigWithCreds.__response__.parse_obj(config)
+        return NebiusBackendConfig.__response__.parse_obj(config)
 
     def get_backend(self, record: StoredBackendRecord) -> NebiusBackend:
-        config = self._get_backend_config(record)
+        config = self._get_config(record)
         return NebiusBackend(config=config)
 
-    def _get_backend_config(self, record: StoredBackendRecord) -> NebiusConfig:
+    def _get_config(self, record: StoredBackendRecord) -> NebiusConfig:
         return NebiusConfig.__response__(
             **json.loads(record.config),
             creds=NebiusCreds.parse_raw(record.auth),

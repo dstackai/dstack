@@ -7,7 +7,7 @@ from dstack._internal.core.backends.kubernetes.configurator import (
 )
 from dstack._internal.core.backends.kubernetes.models import (
     KubeconfigConfig,
-    KubernetesConfigInfoWithCreds,
+    KubernetesBackendConfigWithCreds,
     KubernetesNetworkingConfig,
 )
 from dstack._internal.core.errors import BackendInvalidCredentialsError
@@ -15,7 +15,7 @@ from dstack._internal.core.errors import BackendInvalidCredentialsError
 
 class TestKubernetesConfigurator:
     def test_validate_config_valid(self):
-        config = KubernetesConfigInfoWithCreds(
+        config = KubernetesBackendConfigWithCreds(
             kubeconfig=KubeconfigConfig(data="valid", filename="-"),
             networking=KubernetesNetworkingConfig(ssh_host=None, ssh_port=None),
         )
@@ -28,7 +28,7 @@ class TestKubernetesConfigurator:
             KubernetesConfigurator().validate_config(config, default_creds_enabled=True)
 
     def test_validate_config_invalid_config(self):
-        config = KubernetesConfigInfoWithCreds(
+        config = KubernetesBackendConfigWithCreds(
             kubeconfig=KubeconfigConfig(data="invalid", filename="-"),
             networking=KubernetesNetworkingConfig(ssh_host=None, ssh_port=None),
         )

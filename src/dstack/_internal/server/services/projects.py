@@ -8,8 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from dstack._internal.core.backends.dstack.models import (
-    DstackBaseBackendConfigInfo,
-    DstackConfigInfo,
+    DstackBackendConfig,
+    DstackBaseBackendConfig,
 )
 from dstack._internal.core.backends.models import BackendInfo
 from dstack._internal.core.errors import ForbiddenError, ResourceExistsError, ServerClientError
@@ -20,7 +20,7 @@ from dstack._internal.server.models import MemberModel, ProjectModel, UserModel
 from dstack._internal.server.schemas.projects import MemberSetting
 from dstack._internal.server.services import users
 from dstack._internal.server.services.backends import (
-    get_config_info_from_backend_model,
+    get_backend_config_from_backend_model,
     get_configurator,
 )
 from dstack._internal.server.services.permissions import get_default_permissions
@@ -379,20 +379,22 @@ def project_model_to_project(
                     b.type.value,
                 )
                 continue
-            config_info = get_config_info_from_backend_model(configurator, b, include_creds=False)
-            if is_core_model_instance(config_info, DstackConfigInfo):
-                for backend_type in config_info.base_backends:
+            backend_config = get_backend_config_from_backend_model(
+                configurator, b, include_creds=False
+            )
+            if is_core_model_instance(backend_config, DstackBackendConfig):
+                for backend_type in backend_config.base_backends:
                     backends.append(
                         BackendInfo(
                             name=backend_type,
-                            config=DstackBaseBackendConfigInfo(type=backend_type),
+                            config=DstackBaseBackendConfig(type=backend_type),
                         )
                     )
             else:
                 backends.append(
                     BackendInfo(
                         name=b.type,
-                        config=config_info,
+                        config=backend_config,
                     )
                 )
     return Project(

@@ -1,12 +1,8 @@
-from pydantic.fields import Field
-from typing_extensions import Annotated, List, Literal, Optional, Union
+from typing import Annotated, List, Literal, Optional, Union
+
+from pydantic import Field
 
 from dstack._internal.core.models.common import CoreModel
-
-
-class VastAIConfigInfo(CoreModel):
-    type: Literal["vastai"] = "vastai"
-    regions: Optional[List[str]] = None
 
 
 class VastAIAPIKeyCreds(CoreModel):
@@ -15,17 +11,23 @@ class VastAIAPIKeyCreds(CoreModel):
 
 
 AnyVastAICreds = VastAIAPIKeyCreds
-
-
 VastAICreds = AnyVastAICreds
 
 
-class VastAIConfigInfoWithCreds(VastAIConfigInfo):
-    creds: AnyVastAICreds
+class VastAIBackendConfig(CoreModel):
+    type: Annotated[Literal["vastai"], Field(description="The type of backend")] = "vastai"
+    regions: Annotated[
+        Optional[List[str]],
+        Field(description="The list of VastAI regions. Omit to use all regions"),
+    ] = None
 
 
-AnyVastAIConfigInfo = Union[VastAIConfigInfo, VastAIConfigInfoWithCreds]
+class VastAIBackendConfigWithCreds(VastAIBackendConfig):
+    creds: Annotated[AnyVastAICreds, Field(description="The credentials")]
 
 
-class VastAIStoredConfig(VastAIConfigInfo):
+AnyVastAIBackendConfig = Union[VastAIBackendConfig, VastAIBackendConfigWithCreds]
+
+
+class VastAIStoredConfig(VastAIBackendConfig):
     pass

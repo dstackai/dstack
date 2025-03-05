@@ -3,7 +3,7 @@ from unittest.mock import patch
 import pytest
 
 from dstack._internal.core.backends.aws.configurator import AWSConfigurator
-from dstack._internal.core.backends.aws.models import AWSAccessKeyCreds, AWSConfigInfoWithCreds
+from dstack._internal.core.backends.aws.models import AWSAccessKeyCreds, AWSBackendConfigWithCreds
 from dstack._internal.core.errors import (
     BackendAuthError,
     BackendInvalidCredentialsError,
@@ -12,7 +12,7 @@ from dstack._internal.core.errors import (
 
 class TestAWSConfigurator:
     def test_validate_config_valid(self):
-        config = AWSConfigInfoWithCreds(
+        config = AWSBackendConfigWithCreds(
             creds=AWSAccessKeyCreds(access_key="valid", secret_key="valid"), regions=["us-west-1"]
         )
         with (
@@ -22,7 +22,7 @@ class TestAWSConfigurator:
             AWSConfigurator().validate_config(config, default_creds_enabled=True)
 
     def test_validate_config_invalid_creds(self):
-        config = AWSConfigInfoWithCreds(
+        config = AWSBackendConfigWithCreds(
             creds=AWSAccessKeyCreds(access_key="invalid", secret_key="invalid"),
             regions=["us-west-1"],
         )

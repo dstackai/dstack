@@ -9,9 +9,9 @@ from dstack._internal.core.backends.lambdalabs import api_client
 from dstack._internal.core.backends.lambdalabs.backend import LambdaBackend
 from dstack._internal.core.backends.lambdalabs.config import LambdaConfig
 from dstack._internal.core.backends.lambdalabs.models import (
-    AnyLambdaConfigInfo,
-    LambdaConfigInfo,
-    LambdaConfigInfoWithCreds,
+    AnyLambdaBackendConfig,
+    LambdaBackendConfig,
+    LambdaBackendConfigWithCreds,
     LambdaCreds,
     LambdaStoredConfig,
 )
@@ -42,34 +42,34 @@ DEFAULT_REGION = "us-east-1"
 class LambdaConfigurator(Configurator):
     TYPE: BackendType = BackendType.LAMBDA
 
-    def validate_config(self, config: LambdaConfigInfoWithCreds, default_creds_enabled: bool):
+    def validate_config(self, config: LambdaBackendConfigWithCreds, default_creds_enabled: bool):
         self._validate_lambda_api_key(config.creds.api_key)
 
     def create_backend(
-        self, project_name: str, config: LambdaConfigInfoWithCreds
+        self, project_name: str, config: LambdaBackendConfigWithCreds
     ) -> StoredBackendRecord:
         if config.regions is None:
             config.regions = REGIONS
         return StoredBackendRecord(
             config=LambdaStoredConfig(
-                **LambdaConfigInfo.__response__.parse_obj(config).dict()
+                **LambdaBackendConfig.__response__.parse_obj(config).dict()
             ).json(),
             auth=LambdaCreds.parse_obj(config.creds).json(),
         )
 
-    def get_config_info(
+    def get_backend_config(
         self, record: StoredBackendRecord, include_creds: bool
-    ) -> AnyLambdaConfigInfo:
-        config = self._get_backend_config(record)
+    ) -> AnyLambdaBackendConfig:
+        config = self._get_config(record)
         if include_creds:
-            return LambdaConfigInfoWithCreds.__response__.parse_obj(config)
-        return LambdaConfigInfo.__response__.parse_obj(config)
+            return LambdaBackendConfigWithCreds.__response__.parse_obj(config)
+        return LambdaBackendConfig.__response__.parse_obj(config)
 
     def get_backend(self, record: StoredBackendRecord) -> LambdaBackend:
-        config = self._get_backend_config(record)
+        config = self._get_config(record)
         return LambdaBackend(config=config)
 
-    def _get_backend_config(self, record: StoredBackendRecord) -> LambdaConfig:
+    def _get_config(self, record: StoredBackendRecord) -> LambdaConfig:
         return LambdaConfig.__response__(
             **json.loads(record.config),
             creds=LambdaCreds.parse_raw(record.auth),

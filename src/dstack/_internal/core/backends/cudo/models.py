@@ -1,19 +1,8 @@
-from typing import List, Optional
+from typing import Annotated, List, Literal, Optional, Union
 
-from pydantic.fields import Field
-from typing_extensions import Annotated, Literal
+from pydantic import Field
 
 from dstack._internal.core.models.common import CoreModel
-
-
-class CudoConfigInfo(CoreModel):
-    type: Literal["cudo"] = "cudo"
-    project_id: str
-    regions: Optional[List[str]] = None
-
-
-class CudoStoredConfig(CudoConfigInfo):
-    pass
 
 
 class CudoAPIKeyCreds(CoreModel):
@@ -25,5 +14,20 @@ AnyCudoCreds = CudoAPIKeyCreds
 CudoCreds = AnyCudoCreds
 
 
-class CudoConfigInfoWithCreds(CudoConfigInfo):
-    creds: AnyCudoCreds
+class CudoBackendConfig(CoreModel):
+    type: Annotated[Literal["cudo"], Field(description="The type of backend")] = "cudo"
+    regions: Annotated[
+        Optional[List[str]], Field(description="The list of Cudo regions. Omit to use all regions")
+    ] = None
+    project_id: Annotated[str, Field(description="The project ID")]
+
+
+class CudoBackendConfigWithCreds(CudoBackendConfig):
+    creds: Annotated[AnyCudoCreds, Field(description="The credentials")]
+
+
+AnyCudoBackendConfig = Union[CudoBackendConfig, CudoBackendConfigWithCreds]
+
+
+class CudoStoredConfig(CudoBackendConfig):
+    pass

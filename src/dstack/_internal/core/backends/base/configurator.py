@@ -5,8 +5,8 @@ from pydantic import Field
 
 from dstack._internal.core.backends.base.backend import Backend
 from dstack._internal.core.backends.models import (
-    AnyConfigInfo,
-    AnyConfigInfoWithCreds,
+    AnyBackendConfig,
+    AnyBackendConfigWithCreds,
 )
 from dstack._internal.core.errors import BackendInvalidCredentialsError
 from dstack._internal.core.models.backends.base import BackendType
@@ -38,7 +38,7 @@ class Configurator(ABC):
     TYPE: BackendType
 
     @abstractmethod
-    def validate_config(self, config: AnyConfigInfoWithCreds, default_creds_enabled: bool):
+    def validate_config(self, config: AnyBackendConfigWithCreds, default_creds_enabled: bool):
         """
         Validates backend config including backend creds and other parameters.
         Raises `ServerClientError` or its subclass if config is invalid.
@@ -48,7 +48,7 @@ class Configurator(ABC):
 
     @abstractmethod
     def create_backend(
-        self, project_name: str, config: AnyConfigInfoWithCreds
+        self, project_name: str, config: AnyBackendConfigWithCreds
     ) -> StoredBackendRecord:
         """
         Creates BackendModel given backend config and returns
@@ -60,9 +60,11 @@ class Configurator(ABC):
         pass
 
     @abstractmethod
-    def get_config_info(self, record: StoredBackendRecord, include_creds: bool) -> AnyConfigInfo:
+    def get_backend_config(
+        self, record: StoredBackendRecord, include_creds: bool
+    ) -> AnyBackendConfig:
         """
-        Constructs backend's ConfigInfo to be returned in API responses.
+        Constructs BackendConfig to be returned in API responses.
         Project admins may need to see backend's creds. In this case `include_creds` will be True.
         Otherwise, no sensitive information should be included.
         """

@@ -264,7 +264,7 @@ class TestCreateBackend:
             },
             "tenant_id": "test_tenant",
             "subscription_id": "test_subscription",
-            "locations": ["eastus"],
+            "regions": ["eastus"],
         }
         with (
             patch("dstack._internal.core.backends.azure.auth.authenticate") as authenticate_mock,

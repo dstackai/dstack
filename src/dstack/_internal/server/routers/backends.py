@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.backends.models import (
-    AnyConfigInfoWithCreds,
+    AnyBackendConfigWithCreds,
     BackendInfoYAML,
 )
 from dstack._internal.core.errors import ResourceNotExistsError
@@ -47,10 +47,10 @@ async def list_backend_types() -> List[BackendType]:
 
 @project_router.post("/create")
 async def create_backend(
-    body: AnyConfigInfoWithCreds,
+    body: AnyBackendConfigWithCreds,
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
-) -> AnyConfigInfoWithCreds:
+) -> AnyBackendConfigWithCreds:
     _, project = user_project
     config = await backends.create_backend(session=session, project=project, config=body)
     if settings.SERVER_CONFIG_ENABLED:
@@ -60,10 +60,10 @@ async def create_backend(
 
 @project_router.post("/update")
 async def update_backend(
-    body: AnyConfigInfoWithCreds,
+    body: AnyBackendConfigWithCreds,
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
-) -> AnyConfigInfoWithCreds:
+) -> AnyBackendConfigWithCreds:
     _, project = user_project
     config = await backends.update_backend(session=session, project=project, config=body)
     if settings.SERVER_CONFIG_ENABLED:
@@ -89,12 +89,12 @@ async def delete_backends(
 async def get_backend_config_info(
     backend_name: BackendType,
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
-) -> AnyConfigInfoWithCreds:
+) -> AnyBackendConfigWithCreds:
     _, project = user_project
-    config_info = await backends.get_config_info(project=project, backend_type=backend_name)
-    if config_info is None:
+    config = await backends.get_backend_config(project=project, backend_type=backend_name)
+    if config is None:
         raise ResourceNotExistsError()
-    return config_info
+    return config
 
 
 @project_router.post("/create_yaml")

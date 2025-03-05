@@ -6,12 +6,12 @@ from dstack._internal.core.backends.base.configurator import (
     raise_invalid_credentials_error,
 )
 from dstack._internal.core.backends.models import (
-    VultrConfigInfoWithCreds,
+    VultrBackendConfigWithCreds,
 )
 from dstack._internal.core.backends.vultr import api_client
 from dstack._internal.core.backends.vultr.backend import VultrBackend, VultrConfig
 from dstack._internal.core.backends.vultr.models import (
-    VultrConfigInfo,
+    VultrBackendConfig,
     VultrCreds,
     VultrStoredConfig,
 )
@@ -25,32 +25,34 @@ REGIONS = []
 class VultrConfigurator(Configurator):
     TYPE: BackendType = BackendType.VULTR
 
-    def validate_config(self, config: VultrConfigInfoWithCreds, default_creds_enabled: bool):
+    def validate_config(self, config: VultrBackendConfigWithCreds, default_creds_enabled: bool):
         self._validate_vultr_api_key(config.creds.api_key)
 
     def create_backend(
-        self, project_name: str, config: VultrConfigInfoWithCreds
+        self, project_name: str, config: VultrBackendConfigWithCreds
     ) -> StoredBackendRecord:
         if config.regions is None:
             config.regions = REGIONS
         return StoredBackendRecord(
             config=VultrStoredConfig(
-                **VultrConfigInfo.__response__.parse_obj(config).dict()
+                **VultrBackendConfig.__response__.parse_obj(config).dict()
             ).json(),
             auth=VultrCreds.parse_obj(config.creds).json(),
         )
 
-    def get_config_info(self, record: StoredBackendRecord, include_creds: bool) -> VultrConfigInfo:
-        config = self._get_backend_config(record)
+    def get_backend_config(
+        self, record: StoredBackendRecord, include_creds: bool
+    ) -> VultrBackendConfig:
+        config = self._get_config(record)
         if include_creds:
-            return VultrConfigInfoWithCreds.__response__.parse_obj(config)
-        return VultrConfigInfo.__response__.parse_obj(config)
+            return VultrBackendConfigWithCreds.__response__.parse_obj(config)
+        return VultrBackendConfig.__response__.parse_obj(config)
 
     def get_backend(self, record: StoredBackendRecord) -> VultrBackend:
-        config = self._get_backend_config(record)
+        config = self._get_config(record)
         return VultrBackend(config=config)
 
-    def _get_backend_config(self, record: StoredBackendRecord) -> VultrConfig:
+    def _get_config(self, record: StoredBackendRecord) -> VultrConfig:
         return VultrConfig.__response__(
             **json.loads(record.config),
             creds=VultrCreds.parse_raw(record.auth),

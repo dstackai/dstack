@@ -11,9 +11,9 @@ from dstack._internal.core.backends.oci.backend import OCIBackend
 from dstack._internal.core.backends.oci.config import OCIConfig
 from dstack._internal.core.backends.oci.exceptions import any_oci_exception
 from dstack._internal.core.backends.oci.models import (
-    AnyOCIConfigInfo,
-    OCIConfigInfo,
-    OCIConfigInfoWithCreds,
+    AnyOCIBackendConfig,
+    OCIBackendConfig,
+    OCIBackendConfigWithCreds,
     OCICreds,
     OCIDefaultCreds,
     OCIStoredConfig,
@@ -46,7 +46,7 @@ SUPPORTED_REGIONS = frozenset(
 class OCIConfigurator(Configurator):
     TYPE: BackendType = BackendType.OCI
 
-    def validate_config(self, config: OCIConfigInfoWithCreds, default_creds_enabled: bool):
+    def validate_config(self, config: OCIBackendConfigWithCreds, default_creds_enabled: bool):
         if is_core_model_instance(config.creds, OCIDefaultCreds) and not default_creds_enabled:
             raise_invalid_credentials_error(
                 fields=[["creds"]],
@@ -58,7 +58,7 @@ class OCIConfigurator(Configurator):
             raise_invalid_credentials_error(fields=[["creds"]], details=e)
 
     def create_backend(
-        self, project_name: str, config: OCIConfigInfoWithCreds
+        self, project_name: str, config: OCIBackendConfigWithCreds
     ) -> StoredBackendRecord:
         try:
             subscribed_regions = get_subscribed_regions(config.creds)
@@ -83,19 +83,19 @@ class OCIConfigurator(Configurator):
             auth=OCICreds.parse_obj(config.creds).json(),
         )
 
-    def get_config_info(
+    def get_backend_config(
         self, record: StoredBackendRecord, include_creds: bool
-    ) -> AnyOCIConfigInfo:
-        config = self._get_backend_config(record)
+    ) -> AnyOCIBackendConfig:
+        config = self._get_config(record)
         if include_creds:
-            return OCIConfigInfoWithCreds.__response__.parse_obj(config)
-        return OCIConfigInfo.__response__.parse_obj(config)
+            return OCIBackendConfigWithCreds.__response__.parse_obj(config)
+        return OCIBackendConfig.__response__.parse_obj(config)
 
     def get_backend(self, record: StoredBackendRecord) -> OCIBackend:
-        config = self._get_backend_config(record)
+        config = self._get_config(record)
         return OCIBackend(config=config)
 
-    def _get_backend_config(self, record: StoredBackendRecord) -> OCIConfig:
+    def _get_config(self, record: StoredBackendRecord) -> OCIConfig:
         return OCIConfig.__response__(
             **json.loads(record.config),
             creds=OCICreds.parse_raw(record.auth).__root__,
@@ -132,7 +132,7 @@ def _raise_if_regions_unavailable(
 
 
 def _create_resources(
-    project_name: str, config: OCIConfigInfoWithCreds, home_region: str
+    project_name: str, config: OCIBackendConfigWithCreds, home_region: str
 ) -> Tuple[str, Dict[str, str]]:
     compartment_id = config.compartment_id
     if not compartment_id:

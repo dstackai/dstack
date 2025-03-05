@@ -7,9 +7,9 @@ from dstack._internal.core.backends.kubernetes import utils as kubernetes_utils
 from dstack._internal.core.backends.kubernetes.backend import KubernetesBackend
 from dstack._internal.core.backends.kubernetes.config import KubernetesConfig
 from dstack._internal.core.backends.kubernetes.models import (
-    AnyKubernetesConfigInfo,
-    KubernetesConfigInfo,
-    KubernetesConfigInfoWithCreds,
+    AnyKubernetesBackendConfig,
+    KubernetesBackendConfig,
+    KubernetesBackendConfigWithCreds,
     KubernetesStoredConfig,
 )
 from dstack._internal.core.models.backends.base import BackendType
@@ -21,7 +21,9 @@ logger = get_logger(__name__)
 class KubernetesConfigurator(Configurator):
     TYPE: BackendType = BackendType.KUBERNETES
 
-    def validate_config(self, config: KubernetesConfigInfoWithCreds, default_creds_enabled: bool):
+    def validate_config(
+        self, config: KubernetesBackendConfigWithCreds, default_creds_enabled: bool
+    ):
         try:
             api = kubernetes_utils.get_api_from_config_data(config.kubeconfig.data)
             api.list_node()
@@ -30,23 +32,23 @@ class KubernetesConfigurator(Configurator):
             raise_invalid_credentials_error(fields=[["kubeconfig"]])
 
     def create_backend(
-        self, project_name: str, config: KubernetesConfigInfoWithCreds
+        self, project_name: str, config: KubernetesBackendConfigWithCreds
     ) -> StoredBackendRecord:
         return StoredBackendRecord(
             config=KubernetesStoredConfig.__response__.parse_obj(config).json(),
             auth="",
         )
 
-    def get_config_info(
+    def get_backend_config(
         self, record: StoredBackendRecord, include_creds: bool
-    ) -> AnyKubernetesConfigInfo:
-        config = self._get_backend_config(record)
+    ) -> AnyKubernetesBackendConfig:
+        config = self._get_config(record)
         if include_creds:
-            return KubernetesConfigInfoWithCreds.__response__.parse_obj(config)
-        return KubernetesConfigInfo.__response__.parse_obj(config)
+            return KubernetesBackendConfigWithCreds.__response__.parse_obj(config)
+        return KubernetesBackendConfig.__response__.parse_obj(config)
 
     def get_backend(self, record: StoredBackendRecord) -> KubernetesBackend:
-        return KubernetesBackend(self._get_backend_config(record))
+        return KubernetesBackend(self._get_config(record))
 
-    def _get_backend_config(self, record: StoredBackendRecord) -> KubernetesConfig:
+    def _get_config(self, record: StoredBackendRecord) -> KubernetesConfig:
         return KubernetesConfig.__response__.parse_raw(record.config)

@@ -1,15 +1,8 @@
-from typing import Dict
+from typing import Annotated, Dict, List, Literal, Optional, Union
 
 from pydantic import Field, root_validator
-from typing_extensions import Annotated, List, Literal, Optional, Union
 
 from dstack._internal.core.models.common import CoreModel
-
-
-class OCIConfigInfo(CoreModel):
-    type: Literal["oci"] = "oci"
-    regions: Optional[List[str]] = None
-    compartment_id: Optional[str] = None
 
 
 class OCIClientCreds(CoreModel):
@@ -61,13 +54,30 @@ class OCICreds(CoreModel):
     __root__: AnyOCICreds = Field(..., discriminator="type")
 
 
-class OCIConfigInfoWithCreds(OCIConfigInfo):
-    creds: AnyOCICreds
+class OCIBackendConfig(CoreModel):
+    type: Annotated[Literal["oci"], Field(description="The type of backend")] = "oci"
+    regions: Annotated[
+        Optional[List[str]],
+        Field(description="The list of OCI regions. Omit to use all regions"),
+    ] = None
+    compartment_id: Annotated[
+        Optional[str],
+        Field(
+            description=(
+                "Compartment where `dstack` will create all resources."
+                " Omit to instruct `dstack` to create a new compartment"
+            )
+        ),
+    ] = None
 
 
-AnyOCIConfigInfo = Union[OCIConfigInfo, OCIConfigInfoWithCreds]
+class OCIBackendConfigWithCreds(OCIBackendConfig):
+    creds: Annotated[AnyOCICreds, Field(description="The credentials", discriminator="type")]
 
 
-class OCIStoredConfig(OCIConfigInfo):
+AnyOCIBackendConfig = Union[OCIBackendConfig, OCIBackendConfigWithCreds]
+
+
+class OCIStoredConfig(OCIBackendConfig):
     compartment_id: str
     subnet_ids_per_region: Dict[str, str]

@@ -4,7 +4,7 @@ import pytest
 
 from dstack._internal.core.backends.gcp.configurator import GCPConfigurator
 from dstack._internal.core.backends.gcp.models import (
-    GCPConfigInfoWithCreds,
+    GCPBackendConfigWithCreds,
     GCPServiceAccountCreds,
 )
 from dstack._internal.core.errors import (
@@ -15,7 +15,7 @@ from dstack._internal.core.errors import (
 
 class TestGCPConfigurator:
     def test_validate_config_valid(self):
-        config = GCPConfigInfoWithCreds(
+        config = GCPBackendConfigWithCreds(
             creds=GCPServiceAccountCreds(data="valid", filename="-"),
             project_id="valid-project",
             regions=["us-west1"],
@@ -28,7 +28,7 @@ class TestGCPConfigurator:
             GCPConfigurator().validate_config(config, default_creds_enabled=True)
 
     def test_validate_config_invalid_creds(self):
-        config = GCPConfigInfoWithCreds(
+        config = GCPBackendConfigWithCreds(
             creds=GCPServiceAccountCreds(data="invalid", filename="-"),
             project_id="invalid-project",
             regions=["us-west1"],

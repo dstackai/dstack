@@ -1,6 +1,8 @@
-from pydantic.fields import Field
-from typing_extensions import Annotated, Literal, Optional, Union
+from typing import Annotated, Literal, Optional, Union
 
+from pydantic import Field, root_validator
+
+from dstack._internal.core.backends.base.models import fill_data
 from dstack._internal.core.models.common import CoreModel
 
 
@@ -11,22 +13,54 @@ class KubernetesNetworkingConfig(CoreModel):
     ]
 
 
-class KubernetesConfigInfo(CoreModel):
-    type: Literal["kubernetes"] = "kubernetes"
-    networking: KubernetesNetworkingConfig
-
-
 class KubeconfigConfig(CoreModel):
-    filename: str
-    data: str
+    filename: Annotated[str, Field(description="The path to the kubeconfig file")] = ""
+    data: Annotated[str, Field(description="The contents of the kubeconfig file")]
 
 
-class KubernetesConfigInfoWithCreds(KubernetesConfigInfo):
-    kubeconfig: KubeconfigConfig
+class KubernetesBackendConfig(CoreModel):
+    type: Annotated[Literal["kubernetes"], Field(description="The type of backend")] = "kubernetes"
+    networking: Annotated[
+        Optional[KubernetesNetworkingConfig], Field(description="The networking configuration")
+    ] = None
 
 
-AnyKubernetesConfigInfo = Union[KubernetesConfigInfo, KubernetesConfigInfoWithCreds]
+class KubernetesBackendConfigWithCreds(CoreModel):
+    type: Annotated[Literal["kubernetes"], Field(description="The type of backend")] = "kubernetes"
+    networking: Annotated[
+        Optional[KubernetesNetworkingConfig], Field(description="The networking configuration")
+    ] = None
+    kubeconfig: Annotated[KubeconfigConfig, Field(description="The kubeconfig configuration")]
 
 
-class KubernetesStoredConfig(KubernetesConfigInfoWithCreds):
+class KubeconfigFileConfig(CoreModel):
+    filename: Annotated[str, Field(description="The path to the kubeconfig file")]
+    data: Annotated[
+        Optional[str],
+        Field(
+            description=(
+                "The contents of the kubeconfig file."
+                " When configuring via `server/config.yml`, it's automatically filled from `filename`."
+                " When configuring via UI, it has to be specified explicitly"
+            )
+        ),
+    ] = None
+
+    @root_validator
+    def fill_data(cls, values):
+        return fill_data(values)
+
+
+class KubernetesBackendFileConfigWithCreds(CoreModel):
+    type: Annotated[Literal["kubernetes"], Field(description="The type of backend")] = "kubernetes"
+    networking: Annotated[
+        Optional[KubernetesNetworkingConfig], Field(description="The networking configuration")
+    ] = None
+    kubeconfig: Annotated[KubeconfigFileConfig, Field(description="The kubeconfig configuration")]
+
+
+AnyKubernetesBackendConfig = Union[KubernetesBackendConfig, KubernetesBackendConfigWithCreds]
+
+
+class KubernetesStoredConfig(KubernetesBackendConfigWithCreds):
     pass

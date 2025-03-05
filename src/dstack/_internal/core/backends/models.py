@@ -1,115 +1,134 @@
 from typing import Union
 
 from dstack._internal.core.backends.aws.models import (
-    AWSConfigInfo,
-    AWSConfigInfoWithCreds,
+    AWSBackendConfig,
+    AWSBackendConfigWithCreds,
 )
 from dstack._internal.core.backends.azure.models import (
-    AzureConfigInfo,
-    AzureConfigInfoWithCreds,
+    AzureBackendConfig,
+    AzureBackendConfigWithCreds,
 )
 from dstack._internal.core.backends.cudo.models import (
-    CudoConfigInfo,
-    CudoConfigInfoWithCreds,
+    CudoBackendConfig,
+    CudoBackendConfigWithCreds,
 )
 from dstack._internal.core.backends.datacrunch.models import (
-    DataCrunchConfigInfo,
-    DataCrunchConfigInfoWithCreds,
+    DataCrunchBackendConfig,
+    DataCrunchBackendConfigWithCreds,
 )
 from dstack._internal.core.backends.dstack.models import (
-    DstackBaseBackendConfigInfo,
-    DstackConfigInfo,
+    DstackBackendConfig,
+    DstackBaseBackendConfig,
 )
 from dstack._internal.core.backends.gcp.models import (
-    GCPConfigInfo,
-    GCPConfigInfoWithCreds,
+    GCPBackendConfig,
+    GCPBackendConfigWithCreds,
+    GCPBackendFileConfigWithCreds,
 )
 from dstack._internal.core.backends.kubernetes.models import (
-    KubernetesConfigInfo,
-    KubernetesConfigInfoWithCreds,
+    KubernetesBackendConfig,
+    KubernetesBackendConfigWithCreds,
+    KubernetesBackendFileConfigWithCreds,
 )
 from dstack._internal.core.backends.lambdalabs.models import (
-    LambdaConfigInfo,
-    LambdaConfigInfoWithCreds,
+    LambdaBackendConfig,
+    LambdaBackendConfigWithCreds,
 )
 from dstack._internal.core.backends.nebius.models import (
-    NebiusConfigInfo,
-    NebiusConfigInfoWithCreds,
+    NebiusBackendConfig,
+    NebiusBackendConfigWithCreds,
+    NebiusBackendFileConfigWithCreds,
 )
 from dstack._internal.core.backends.oci.models import (
-    OCIConfigInfo,
-    OCIConfigInfoWithCreds,
+    OCIBackendConfig,
+    OCIBackendConfigWithCreds,
 )
 from dstack._internal.core.backends.runpod.models import (
-    RunpodConfigInfo,
-    RunpodConfigInfoWithCreds,
+    RunpodBackendConfig,
+    RunpodBackendConfigWithCreds,
 )
 from dstack._internal.core.backends.tensordock.models import (
-    TensorDockConfigInfo,
-    TensorDockConfigInfoWithCreds,
+    TensorDockBackendConfig,
+    TensorDockBackendConfigWithCreds,
 )
 from dstack._internal.core.backends.vastai.models import (
-    VastAIConfigInfo,
-    VastAIConfigInfoWithCreds,
+    VastAIBackendConfig,
+    VastAIBackendConfigWithCreds,
 )
 from dstack._internal.core.backends.vultr.models import (
-    VultrConfigInfo,
-    VultrConfigInfoWithCreds,
+    VultrBackendConfig,
+    VultrBackendConfigWithCreds,
 )
 from dstack._internal.core.models.common import CoreModel
 
-# The following models are the basis of the JSON-based backend API.
-# They are also the models used by the Configurator interface.
-# The JSON-based backend API is replaced by the YAML-based backend API and not used.
-# It's likely to be deprecated and removed.
-
 # Backend config returned by the API
-AnyConfigInfoWithoutCreds = Union[
-    AWSConfigInfo,
-    AzureConfigInfo,
-    CudoConfigInfo,
-    DataCrunchConfigInfo,
-    GCPConfigInfo,
-    KubernetesConfigInfo,
-    LambdaConfigInfo,
-    NebiusConfigInfo,
-    OCIConfigInfo,
-    RunpodConfigInfo,
-    TensorDockConfigInfo,
-    VastAIConfigInfo,
-    VultrConfigInfo,
-    DstackConfigInfo,
-    DstackBaseBackendConfigInfo,
+AnyBackendConfigWithoutCreds = Union[
+    AWSBackendConfig,
+    AzureBackendConfig,
+    CudoBackendConfig,
+    DataCrunchBackendConfig,
+    GCPBackendConfig,
+    KubernetesBackendConfig,
+    LambdaBackendConfig,
+    NebiusBackendConfig,
+    OCIBackendConfig,
+    RunpodBackendConfig,
+    TensorDockBackendConfig,
+    VastAIBackendConfig,
+    VultrBackendConfig,
+    DstackBackendConfig,
+    DstackBaseBackendConfig,
 ]
 
-# Same as AnyConfigInfoWithoutCreds but also includes creds.
+# Same as AnyBackendConfigWithoutCreds but also includes creds.
 # Used to create/update backend.
 # Also returned by the API to project admins so that they can see/update backend creds.
-AnyConfigInfoWithCreds = Union[
-    AWSConfigInfoWithCreds,
-    AzureConfigInfoWithCreds,
-    CudoConfigInfoWithCreds,
-    DataCrunchConfigInfoWithCreds,
-    GCPConfigInfoWithCreds,
-    KubernetesConfigInfoWithCreds,
-    LambdaConfigInfoWithCreds,
-    NebiusConfigInfoWithCreds,
-    OCIConfigInfoWithCreds,
-    RunpodConfigInfoWithCreds,
-    TensorDockConfigInfoWithCreds,
-    VastAIConfigInfoWithCreds,
-    VultrConfigInfoWithCreds,
-    DstackConfigInfo,
+AnyBackendConfigWithCreds = Union[
+    AWSBackendConfigWithCreds,
+    AzureBackendConfigWithCreds,
+    CudoBackendConfigWithCreds,
+    DataCrunchBackendConfigWithCreds,
+    GCPBackendConfigWithCreds,
+    KubernetesBackendConfigWithCreds,
+    LambdaBackendConfigWithCreds,
+    NebiusBackendConfigWithCreds,
+    OCIBackendConfigWithCreds,
+    RunpodBackendConfigWithCreds,
+    TensorDockBackendConfigWithCreds,
+    VastAIBackendConfigWithCreds,
+    VultrBackendConfigWithCreds,
+    DstackBackendConfig,
 ]
 
-AnyConfigInfo = Union[AnyConfigInfoWithoutCreds, AnyConfigInfoWithCreds]
+# Backend config accepted in server/config.yaml.
+# This can be different from the API config.
+# For example, it can make creds data optional and resolve it by filename.
+AnyBackendFileConfigWithCreds = Union[
+    AWSBackendConfigWithCreds,
+    AzureBackendConfigWithCreds,
+    CudoBackendConfigWithCreds,
+    DataCrunchBackendConfigWithCreds,
+    GCPBackendFileConfigWithCreds,
+    KubernetesBackendFileConfigWithCreds,
+    LambdaBackendConfigWithCreds,
+    NebiusBackendFileConfigWithCreds,
+    OCIBackendConfigWithCreds,
+    RunpodBackendConfigWithCreds,
+    TensorDockBackendConfigWithCreds,
+    VastAIBackendConfigWithCreds,
+    VultrBackendConfigWithCreds,
+]
+
+
+# The API can return backend config with or without creds
+AnyBackendConfig = Union[AnyBackendConfigWithoutCreds, AnyBackendConfigWithCreds]
 
 
 # In case we'll support multiple backends of the same type,
 # this adds backend name to backend config.
 class BackendInfo(CoreModel):
     name: str
-    config: AnyConfigInfoWithoutCreds
+    config: AnyBackendConfigWithoutCreds
 
 
 class BackendInfoYAML(CoreModel):
