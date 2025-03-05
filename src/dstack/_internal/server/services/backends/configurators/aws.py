@@ -24,10 +24,10 @@ from dstack._internal.core.models.backends.base import (
 )
 from dstack._internal.core.models.common import is_core_model_instance
 from dstack._internal.server import settings
-from dstack._internal.server.models import BackendModel, DecryptedString, ProjectModel
 from dstack._internal.server.services.backends.configurators.base import (
     TAGS_MAX_NUM,
     Configurator,
+    StoredBackendRecord,
     raise_invalid_credentials_error,
 )
 from dstack._internal.utils.logging import get_logger
@@ -78,31 +78,31 @@ class AWSConfigurator(Configurator):
         self._check_config_vpc(session, config)
 
     def create_backend(
-        self, project: ProjectModel, config: AWSConfigInfoWithCreds
-    ) -> BackendModel:
+        self, project_name: str, config: AWSConfigInfoWithCreds
+    ) -> StoredBackendRecord:
         if config.regions is None:
             config.regions = DEFAULT_REGIONS
-        return BackendModel(
-            project_id=project.id,
-            type=self.TYPE.value,
+        return StoredBackendRecord(
             config=AWSStoredConfig(**AWSConfigInfo.__response__.parse_obj(config).dict()).json(),
-            auth=DecryptedString(plaintext=AWSCreds.parse_obj(config.creds).json()),
+            auth=AWSCreds.parse_obj(config.creds).json(),
         )
 
-    def get_config_info(self, model: BackendModel, include_creds: bool) -> AnyAWSConfigInfo:
-        config = self._get_backend_config(model)
+    def get_config_info(
+        self, record: StoredBackendRecord, include_creds: bool
+    ) -> AnyAWSConfigInfo:
+        config = self._get_backend_config(record)
         if include_creds:
             return AWSConfigInfoWithCreds.__response__.parse_obj(config)
         return AWSConfigInfo.__response__.parse_obj(config)
 
-    def get_backend(self, model: BackendModel) -> AWSBackend:
-        config = self._get_backend_config(model)
+    def get_backend(self, record: StoredBackendRecord) -> AWSBackend:
+        config = self._get_backend_config(record)
         return AWSBackend(config=config)
 
-    def _get_backend_config(self, model: BackendModel) -> AWSConfig:
+    def _get_backend_config(self, record: StoredBackendRecord) -> AWSConfig:
         return AWSConfig.__response__(
-            **json.loads(model.config),
-            creds=AWSCreds.parse_raw(model.auth.get_plaintext_or_error()).__root__,
+            **json.loads(record.config),
+            creds=AWSCreds.parse_raw(record.auth).__root__,
         )
 
     def _check_config_tags(self, config: AWSConfigInfoWithCreds):

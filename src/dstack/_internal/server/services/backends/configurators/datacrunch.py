@@ -12,8 +12,10 @@ from dstack._internal.core.models.backends.datacrunch import (
     DataCrunchCreds,
     DataCrunchStoredConfig,
 )
-from dstack._internal.server.models import BackendModel, DecryptedString, ProjectModel
-from dstack._internal.server.services.backends.configurators.base import Configurator
+from dstack._internal.server.services.backends.configurators.base import (
+    Configurator,
+    StoredBackendRecord,
+)
 
 REGIONS = [
     "FIN-01",
@@ -31,31 +33,31 @@ class DataCrunchConfigurator(Configurator):
         return
 
     def create_backend(
-        self, project: ProjectModel, config: DataCrunchConfigInfoWithCreds
-    ) -> BackendModel:
+        self, project_name: str, config: DataCrunchConfigInfoWithCreds
+    ) -> StoredBackendRecord:
         if config.regions is None:
             config.regions = REGIONS
-        return BackendModel(
-            project_id=project.id,
-            type=self.TYPE.value,
+        return StoredBackendRecord(
             config=DataCrunchStoredConfig(
                 **DataCrunchConfigInfo.__response__.parse_obj(config).dict()
             ).json(),
-            auth=DecryptedString(plaintext=DataCrunchCreds.parse_obj(config.creds).json()),
+            auth=DataCrunchCreds.parse_obj(config.creds).json(),
         )
 
-    def get_config_info(self, model: BackendModel, include_creds: bool) -> AnyDataCrunchConfigInfo:
-        config = self._get_backend_config(model)
+    def get_config_info(
+        self, record: StoredBackendRecord, include_creds: bool
+    ) -> AnyDataCrunchConfigInfo:
+        config = self._get_backend_config(record)
         if include_creds:
             return DataCrunchConfigInfoWithCreds.__response__.parse_obj(config)
         return DataCrunchConfigInfo.__response__.parse_obj(config)
 
-    def get_backend(self, model: BackendModel) -> DataCrunchBackend:
-        config = self._get_backend_config(model)
+    def get_backend(self, record: StoredBackendRecord) -> DataCrunchBackend:
+        config = self._get_backend_config(record)
         return DataCrunchBackend(config=config)
 
-    def _get_backend_config(self, model: BackendModel) -> DataCrunchConfig:
+    def _get_backend_config(self, record: StoredBackendRecord) -> DataCrunchConfig:
         return DataCrunchConfig.__response__(
-            **json.loads(model.config),
-            creds=DataCrunchCreds.parse_raw(model.auth.get_plaintext_or_error()),
+            **json.loads(record.config),
+            creds=DataCrunchCreds.parse_raw(record.auth),
         )

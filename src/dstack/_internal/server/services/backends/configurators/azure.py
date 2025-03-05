@@ -41,10 +41,10 @@ from dstack._internal.core.models.backends.base import (
 )
 from dstack._internal.core.models.common import is_core_model_instance
 from dstack._internal.server import settings
-from dstack._internal.server.models import BackendModel, DecryptedString, ProjectModel
 from dstack._internal.server.services.backends.configurators.base import (
     TAGS_MAX_NUM,
     Configurator,
+    StoredBackendRecord,
     raise_invalid_credentials_error,
 )
 
@@ -103,8 +103,8 @@ class AzureConfigurator(Configurator):
         self._check_config_vpc(config=config, credential=credential)
 
     def create_backend(
-        self, project: ProjectModel, config: AzureConfigInfoWithCreds
-    ) -> BackendModel:
+        self, project_name: str, config: AzureConfigInfoWithCreds
+    ) -> StoredBackendRecord:
         if config.locations is None:
             config.locations = DEFAULT_LOCATIONS
         if is_core_model_instance(config.creds, AzureClientCreds):
@@ -115,7 +115,7 @@ class AzureConfigurator(Configurator):
                 credential=credential,
                 subscription_id=config.subscription_id,
                 location=MAIN_LOCATION,
-                project_name=project.name,
+                project_name=project_name,
             )
         self._create_network_resources(
             credential=credential,
@@ -124,29 +124,29 @@ class AzureConfigurator(Configurator):
             locations=config.locations,
             create_default_network=config.vpc_ids is None,
         )
-        return BackendModel(
-            project_id=project.id,
-            type=self.TYPE.value,
+        return StoredBackendRecord(
             config=AzureStoredConfig(
-                **AzureConfigInfo.__response__.parse_obj(config).dict(),
+                **AzureConfigInfo.__response__.parse_obj(config).dict()
             ).json(),
-            auth=DecryptedString(plaintext=AzureCreds.parse_obj(config.creds).__root__.json()),
+            auth=AzureCreds.parse_obj(config.creds).__root__.json(),
         )
 
-    def get_config_info(self, model: BackendModel, include_creds: bool) -> AnyAzureConfigInfo:
-        config = self._get_backend_config(model)
+    def get_config_info(
+        self, record: StoredBackendRecord, include_creds: bool
+    ) -> AnyAzureConfigInfo:
+        config = self._get_backend_config(record)
         if include_creds:
             return AzureConfigInfoWithCreds.__response__.parse_obj(config)
         return AzureConfigInfo.__response__.parse_obj(config)
 
-    def get_backend(self, model: BackendModel) -> AzureBackend:
-        config = self._get_backend_config(model)
+    def get_backend(self, record: StoredBackendRecord) -> AzureBackend:
+        config = self._get_backend_config(record)
         return AzureBackend(config=config)
 
-    def _get_backend_config(self, model: BackendModel) -> AzureConfig:
+    def _get_backend_config(self, record: StoredBackendRecord) -> AzureConfig:
         return AzureConfig.__response__(
-            **json.loads(model.config),
-            creds=AzureCreds.parse_raw(model.auth.get_plaintext_or_error()).__root__,
+            **json.loads(record.config),
+            creds=AzureCreds.parse_raw(record.auth).__root__,
         )
 
     def _check_config_tenant_id(

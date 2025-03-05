@@ -23,9 +23,9 @@ from dstack._internal.core.models.backends.oci import (
 )
 from dstack._internal.core.models.common import is_core_model_instance
 from dstack._internal.server import settings
-from dstack._internal.server.models import BackendModel, DecryptedString, ProjectModel
 from dstack._internal.server.services.backends.configurators.base import (
     Configurator,
+    StoredBackendRecord,
     raise_invalid_credentials_error,
 )
 
@@ -61,8 +61,8 @@ class OCIConfigurator(Configurator):
             raise_invalid_credentials_error(fields=[["creds"]], details=e)
 
     def create_backend(
-        self, project: ProjectModel, config: OCIConfigInfoWithCreds
-    ) -> BackendModel:
+        self, project_name: str, config: OCIConfigInfoWithCreds
+    ) -> StoredBackendRecord:
         try:
             subscribed_regions = get_subscribed_regions(config.creds)
         except any_oci_exception as e:
@@ -74,34 +74,34 @@ class OCIConfigurator(Configurator):
             _raise_if_regions_unavailable(config.regions, subscribed_regions.names)
 
         compartment_id, subnet_ids_per_region = _create_resources(
-            project, config, subscribed_regions.home_region_name
+            project_name, config, subscribed_regions.home_region_name
         )
         config.compartment_id = compartment_id
         stored_config = OCIStoredConfig.__response__(
             **config.dict(), subnet_ids_per_region=subnet_ids_per_region
         )
 
-        return BackendModel(
-            project_id=project.id,
-            type=self.TYPE.value,
+        return StoredBackendRecord(
             config=stored_config.json(),
-            auth=DecryptedString(plaintext=OCICreds.parse_obj(config.creds).json()),
+            auth=OCICreds.parse_obj(config.creds).json(),
         )
 
-    def get_config_info(self, model: BackendModel, include_creds: bool) -> AnyOCIConfigInfo:
-        config = self._get_backend_config(model)
+    def get_config_info(
+        self, record: StoredBackendRecord, include_creds: bool
+    ) -> AnyOCIConfigInfo:
+        config = self._get_backend_config(record)
         if include_creds:
             return OCIConfigInfoWithCreds.__response__.parse_obj(config)
         return OCIConfigInfo.__response__.parse_obj(config)
 
-    def get_backend(self, model: BackendModel) -> OCIBackend:
-        config = self._get_backend_config(model)
+    def get_backend(self, record: StoredBackendRecord) -> OCIBackend:
+        config = self._get_backend_config(record)
         return OCIBackend(config=config)
 
-    def _get_backend_config(self, model: BackendModel) -> OCIConfig:
+    def _get_backend_config(self, record: StoredBackendRecord) -> OCIConfig:
         return OCIConfig.__response__(
-            **json.loads(model.config),
-            creds=OCICreds.parse_raw(model.auth.get_plaintext_or_error()).__root__,
+            **json.loads(record.config),
+            creds=OCICreds.parse_raw(record.auth).__root__,
         )
 
 
@@ -135,13 +135,13 @@ def _raise_if_regions_unavailable(
 
 
 def _create_resources(
-    project: ProjectModel, config: OCIConfigInfoWithCreds, home_region: str
+    project_name: str, config: OCIConfigInfoWithCreds, home_region: str
 ) -> Tuple[str, Dict[str, str]]:
     compartment_id = config.compartment_id
     if not compartment_id:
         home_region_client = make_region_client(home_region, config.creds)
         compartment_id = resources.get_or_create_compartment(
-            f"dstack-{project.name}",
+            f"dstack-{project_name}",
             home_region_client.client_config["tenancy"],
             home_region_client.identity_client,
         ).id
@@ -149,7 +149,7 @@ def _create_resources(
     region_clients = make_region_clients_map(config.regions, config.creds)
     resources.wait_until_compartment_active(compartment_id, region_clients)
     subnets_per_region = resources.set_up_network_resources(
-        compartment_id, project.name, region_clients
+        compartment_id, project_name, region_clients
     )
 
     return compartment_id, subnets_per_region

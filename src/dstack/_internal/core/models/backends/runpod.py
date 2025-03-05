@@ -1,4 +1,4 @@
-from typing import Annotated, List, Optional
+from typing import Annotated, List, Optional, Union
 
 from pydantic import Field
 from typing_extensions import Literal
@@ -12,10 +12,6 @@ class RunpodConfigInfo(CoreModel):
     community_cloud: Optional[bool] = None
 
 
-class RunpodStoredConfig(RunpodConfigInfo):
-    pass
-
-
 class RunpodAPIKeyCreds(CoreModel):
     type: Literal["api_key"] = "api_key"
     api_key: Annotated[str, Field(description="The API key")]
@@ -27,3 +23,10 @@ RunpodCreds = AnyRunpodCreds
 
 class RunpodConfigInfoWithCreds(RunpodConfigInfo):
     creds: AnyRunpodCreds
+
+
+AnyRunpodConfigInfo = Union[RunpodConfigInfo, RunpodConfigInfoWithCreds]
+
+
+class RunpodStoredConfig(RunpodConfigInfo):
+    pass

@@ -19,7 +19,10 @@ from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.models import MemberModel, ProjectModel, UserModel
 from dstack._internal.server.schemas.projects import MemberSetting
 from dstack._internal.server.services import users
-from dstack._internal.server.services.backends import get_configurator
+from dstack._internal.server.services.backends import (
+    get_config_info_from_backend_model,
+    get_configurator,
+)
 from dstack._internal.server.services.permissions import get_default_permissions
 from dstack._internal.server.settings import DEFAULT_PROJECT_NAME
 from dstack._internal.utils.common import get_current_datetime, run_async
@@ -376,7 +379,7 @@ def project_model_to_project(
                     b.type.value,
                 )
                 continue
-            config_info = configurator.get_config_info(model=b, include_creds=False)
+            config_info = get_config_info_from_backend_model(configurator, b, include_creds=False)
             if is_core_model_instance(config_info, DstackConfigInfo):
                 for backend_type in config_info.base_backends:
                     backends.append(

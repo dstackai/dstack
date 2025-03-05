@@ -3,7 +3,6 @@ import json
 import requests
 
 import dstack._internal.core.backends.nebius.api_client as api_client
-from dstack._internal.core.backends.base import Backend
 from dstack._internal.core.backends.nebius import NebiusBackend
 from dstack._internal.core.backends.nebius.config import NebiusConfig
 from dstack._internal.core.models.backends.base import (
@@ -15,9 +14,9 @@ from dstack._internal.core.models.backends.nebius import (
     NebiusCreds,
     NebiusStoredConfig,
 )
-from dstack._internal.server.models import BackendModel, DecryptedString, ProjectModel
-from dstack._internal.server.services.backends import Configurator
 from dstack._internal.server.services.backends.configurators.base import (
+    Configurator,
+    StoredBackendRecord,
     raise_invalid_credentials_error,
 )
 
@@ -31,32 +30,31 @@ class NebiusConfigurator(Configurator):
         self._validate_nebius_creds(config.creds)
 
     def create_backend(
-        self, project: ProjectModel, config: NebiusConfigInfoWithCreds
-    ) -> BackendModel:
+        self, project_name: str, config: NebiusConfigInfoWithCreds
+    ) -> StoredBackendRecord:
         if config.regions is None:
             config.regions = REGIONS
-        self._validate_nebius_creds(config.creds)
-        return BackendModel(
-            project_id=project.id,
-            type=self.TYPE.value,
+        return StoredBackendRecord(
             config=NebiusStoredConfig.__response__.parse_obj(config).json(),
-            auth=DecryptedString(plaintext=NebiusCreds.parse_obj(config.creds).json()),
+            auth=NebiusCreds.parse_obj(config.creds).json(),
         )
 
-    def get_config_info(self, model: BackendModel, include_creds: bool) -> NebiusConfigInfo:
-        config = self._get_backend_config(model)
+    def get_config_info(
+        self, record: StoredBackendRecord, include_creds: bool
+    ) -> NebiusConfigInfo:
+        config = self._get_backend_config(record)
         if include_creds:
             return NebiusConfigInfoWithCreds.__response__.parse_obj(config)
         return NebiusConfigInfo.__response__.parse_obj(config)
 
-    def get_backend(self, model: BackendModel) -> Backend:
-        config = self._get_backend_config(model)
+    def get_backend(self, record: StoredBackendRecord) -> NebiusBackend:
+        config = self._get_backend_config(record)
         return NebiusBackend(config=config)
 
-    def _get_backend_config(self, model: BackendModel) -> NebiusConfig:
+    def _get_backend_config(self, record: StoredBackendRecord) -> NebiusConfig:
         return NebiusConfig.__response__(
-            **json.loads(model.config),
-            creds=NebiusCreds.parse_raw(model.auth.get_plaintext_or_error()),
+            **json.loads(record.config),
+            creds=NebiusCreds.parse_raw(record.auth),
         )
 
     def _validate_nebius_creds(self, creds: NebiusCreds):

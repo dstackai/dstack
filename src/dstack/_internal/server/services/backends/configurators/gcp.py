@@ -19,10 +19,10 @@ from dstack._internal.core.models.backends.gcp import (
 )
 from dstack._internal.core.models.common import is_core_model_instance
 from dstack._internal.server import settings
-from dstack._internal.server.models import BackendModel, DecryptedString, ProjectModel
 from dstack._internal.server.services.backends.configurators.base import (
     TAGS_MAX_NUM,
     Configurator,
+    StoredBackendRecord,
     raise_invalid_credentials_error,
 )
 
@@ -139,33 +139,33 @@ class GCPConfigurator(Configurator):
         )
 
     def create_backend(
-        self, project: ProjectModel, config: GCPConfigInfoWithCreds
-    ) -> BackendModel:
+        self, project_name: str, config: GCPConfigInfoWithCreds
+    ) -> StoredBackendRecord:
         if config.regions is None:
             config.regions = DEFAULT_REGIONS
-        return BackendModel(
-            project_id=project.id,
-            type=self.TYPE.value,
+        return StoredBackendRecord(
             config=GCPStoredConfig(
                 **GCPConfigInfo.__response__.parse_obj(config).dict(),
             ).json(),
-            auth=DecryptedString(plaintext=GCPCreds.parse_obj(config.creds).json()),
+            auth=GCPCreds.parse_obj(config.creds).json(),
         )
 
-    def get_config_info(self, model: BackendModel, include_creds: bool) -> AnyGCPConfigInfo:
-        config = self._get_backend_config(model)
+    def get_config_info(
+        self, record: StoredBackendRecord, include_creds: bool
+    ) -> AnyGCPConfigInfo:
+        config = self._get_backend_config(record)
         if include_creds:
             return GCPConfigInfoWithCreds.__response__.parse_obj(config)
         return GCPConfigInfo.__response__.parse_obj(config)
 
-    def get_backend(self, model: BackendModel) -> GCPBackend:
-        config = self._get_backend_config(model)
+    def get_backend(self, record: StoredBackendRecord) -> GCPBackend:
+        config = self._get_backend_config(record)
         return GCPBackend(config=config)
 
-    def _get_backend_config(self, model: BackendModel) -> GCPConfig:
+    def _get_backend_config(self, record: StoredBackendRecord) -> GCPConfig:
         return GCPConfig.__response__(
-            **json.loads(model.config),
-            creds=GCPCreds.parse_raw(model.auth.get_plaintext_or_error()).__root__,
+            **json.loads(record.config),
+            creds=GCPCreds.parse_raw(record.auth).__root__,
         )
 
     def _check_config_tags(self, config: GCPConfigInfoWithCreds):

@@ -16,6 +16,7 @@ from dstack._internal.core.errors import (
     ServerClientError,
 )
 from dstack._internal.core.models.backends import (
+    AnyConfigInfo,
     AnyConfigInfoWithCreds,
 )
 from dstack._internal.core.models.backends.base import BackendType
@@ -23,8 +24,11 @@ from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
 )
 from dstack._internal.core.models.runs import Requirements
-from dstack._internal.server.models import BackendModel, ProjectModel
-from dstack._internal.server.services.backends.configurators.base import Configurator
+from dstack._internal.server.models import BackendModel, DecryptedString, ProjectModel
+from dstack._internal.server.services.backends.configurators.base import (
+    Configurator,
+    StoredBackendRecord,
+)
 from dstack._internal.server.settings import LOCAL_BACKEND_ENABLED
 from dstack._internal.utils.common import run_async
 from dstack._internal.utils.logging import get_logger
@@ -169,7 +173,7 @@ async def create_backend(
     if backend is not None:
         raise ResourceExistsError()
     await run_async(configurator.validate_config, config)
-    backend = await run_async(configurator.create_backend, project=project, config=config)
+    backend = await create_backend_model(project=project, configurator=configurator, config=config)
     session.add(backend)
     await session.commit()
     return config
@@ -187,7 +191,7 @@ async def update_backend(
     if not backend_exists:
         raise ServerClientError("Backend does not exist")
     await run_async(configurator.validate_config, config)
-    backend = await run_async(configurator.create_backend, project=project, config=config)
+    backend = await create_backend_model(project=project, configurator=configurator, config=config)
     # FIXME: potentially long write transaction
     await session.execute(
         update(BackendModel)
@@ -201,6 +205,24 @@ async def update_backend(
         )
     )
     return config
+
+
+async def create_backend_model(
+    project: ProjectModel,
+    configurator: Configurator,
+    config: AnyConfigInfoWithCreds,
+) -> BackendModel:
+    backend_record = await run_async(
+        configurator.create_backend,
+        project_name=project.name,
+        config=config,
+    )
+    return BackendModel(
+        project_id=project.id,
+        type=configurator.TYPE.value,
+        config=backend_record.config,
+        auth=DecryptedString(plaintext=backend_record.auth),
+    )
 
 
 async def get_config_info(
@@ -218,8 +240,26 @@ async def get_config_info(
             )
             continue
         if backend_model.type == backend_type:
-            return configurator.get_config_info(backend_model, include_creds=True)
+            return get_config_info_from_backend_model(
+                configurator, backend_model, include_creds=True
+            )
     return None
+
+
+def get_config_info_from_backend_model(
+    configurator: Configurator,
+    backend_model: BackendModel,
+    include_creds: bool,
+) -> AnyConfigInfo:
+    backend_record = get_stored_backend_record(backend_model)
+    config_info = configurator.get_config_info(backend_record, include_creds=include_creds)
+    return config_info
+
+
+def get_stored_backend_record(backend_model: BackendModel) -> StoredBackendRecord:
+    return StoredBackendRecord(
+        config=backend_model.config, auth=backend_model.auth.get_plaintext_or_error()
+    )
 
 
 async def delete_backends(
@@ -287,7 +327,8 @@ async def get_project_backends_with_models(project: ProjectModel) -> List[Backen
                 )
                 continue
             try:
-                backend = await run_async(configurator.get_backend, backend_model)
+                backend_record = get_stored_backend_record(backend_model)
+                backend = await run_async(configurator.get_backend, backend_record)
             except BackendInvalidCredentialsError:
                 logger.warning(
                     "Credentials for %s backend are invalid. Backend will be ignored.",
