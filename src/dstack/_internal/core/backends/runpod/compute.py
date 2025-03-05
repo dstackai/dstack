@@ -3,7 +3,7 @@ import uuid
 from datetime import timedelta
 from typing import List, Optional
 
-from dstack._internal.core.backends.base import Compute
+from dstack._internal.core.backends.base.backend import Compute
 from dstack._internal.core.backends.base.compute import (
     generate_unique_instance_name,
     generate_unique_volume_name,

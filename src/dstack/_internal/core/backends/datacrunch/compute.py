@@ -1,6 +1,6 @@
 from typing import Dict, List, Optional
 
-from dstack._internal.core.backends.base import Compute
+from dstack._internal.core.backends.base.backend import Compute
 from dstack._internal.core.backends.base.compute import (
     generate_unique_instance_name,
     get_shim_commands,

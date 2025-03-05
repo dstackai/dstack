@@ -6,8 +6,12 @@ from uuid import UUID
 from sqlalchemy import delete, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dstack._internal.core.backends.base import Backend
-from dstack._internal.core.backends.local import LocalBackend
+from dstack._internal.core.backends.base.backend import Backend
+from dstack._internal.core.backends.base.configurator import (
+    Configurator,
+    StoredBackendRecord,
+)
+from dstack._internal.core.backends.local.backend import LocalBackend
 from dstack._internal.core.errors import (
     BackendError,
     BackendInvalidCredentialsError,
@@ -27,10 +31,6 @@ from dstack._internal.core.models.instances import (
 from dstack._internal.core.models.runs import Requirements
 from dstack._internal.server import settings
 from dstack._internal.server.models import BackendModel, DecryptedString, ProjectModel
-from dstack._internal.server.services.backends.configurators.base import (
-    Configurator,
-    StoredBackendRecord,
-)
 from dstack._internal.server.settings import LOCAL_BACKEND_ENABLED
 from dstack._internal.utils.common import run_async
 from dstack._internal.utils.logging import get_logger
@@ -40,21 +40,21 @@ logger = get_logger(__name__)
 _CONFIGURATOR_CLASSES: List[Type[Configurator]] = []
 
 try:
-    from dstack._internal.server.services.backends.configurators.aws import AWSConfigurator
+    from dstack._internal.core.backends.aws.configurator import AWSConfigurator
 
     _CONFIGURATOR_CLASSES.append(AWSConfigurator)
 except ImportError:
     pass
 
 try:
-    from dstack._internal.server.services.backends.configurators.azure import AzureConfigurator
+    from dstack._internal.core.backends.azure.configurator import AzureConfigurator
 
     _CONFIGURATOR_CLASSES.append(AzureConfigurator)
 except ImportError:
     pass
 
 try:
-    from dstack._internal.server.services.backends.configurators.cudo import (
+    from dstack._internal.core.backends.cudo.configurator import (
         CudoConfigurator,
     )
 
@@ -63,7 +63,7 @@ except ImportError:
     pass
 
 try:
-    from dstack._internal.server.services.backends.configurators.datacrunch import (
+    from dstack._internal.core.backends.datacrunch.configurator import (
         DataCrunchConfigurator,
     )
 
@@ -72,14 +72,14 @@ except ImportError:
     pass
 
 try:
-    from dstack._internal.server.services.backends.configurators.gcp import GCPConfigurator
+    from dstack._internal.core.backends.gcp.configurator import GCPConfigurator
 
     _CONFIGURATOR_CLASSES.append(GCPConfigurator)
 except ImportError:
     pass
 
 try:
-    from dstack._internal.server.services.backends.configurators.kubernetes import (
+    from dstack._internal.core.backends.kubernetes.configurator import (
         KubernetesConfigurator,
     )
 
@@ -88,7 +88,7 @@ except ImportError:
     pass
 
 try:
-    from dstack._internal.server.services.backends.configurators.lambdalabs import (
+    from dstack._internal.core.backends.lambdalabs.configurator import (
         LambdaConfigurator,
     )
 
@@ -97,28 +97,28 @@ except ImportError:
     pass
 
 try:
-    from dstack._internal.server.services.backends.configurators.nebius import NebiusConfigurator
+    from dstack._internal.core.backends.nebius.configurator import NebiusConfigurator
 
     _CONFIGURATOR_CLASSES.append(NebiusConfigurator)
 except ImportError:
     pass
 
 try:
-    from dstack._internal.server.services.backends.configurators.oci import OCIConfigurator
+    from dstack._internal.core.backends.oci.configurator import OCIConfigurator
 
     _CONFIGURATOR_CLASSES.append(OCIConfigurator)
 except ImportError:
     pass
 
 try:
-    from dstack._internal.server.services.backends.configurators.runpod import RunpodConfigurator
+    from dstack._internal.core.backends.runpod.configurator import RunpodConfigurator
 
     _CONFIGURATOR_CLASSES.append(RunpodConfigurator)
 except ImportError:
     pass
 
 try:
-    from dstack._internal.server.services.backends.configurators.tensordock import (
+    from dstack._internal.core.backends.tensordock.configurator import (
         TensorDockConfigurator,
     )
 
@@ -127,14 +127,14 @@ except ImportError:
     pass
 
 try:
-    from dstack._internal.server.services.backends.configurators.vastai import VastAIConfigurator
+    from dstack._internal.core.backends.vastai.configurator import VastAIConfigurator
 
     _CONFIGURATOR_CLASSES.append(VastAIConfigurator)
 except ImportError:
     pass
 
 try:
-    from dstack._internal.server.services.backends.configurators.vultr import VultrConfigurator
+    from dstack._internal.core.backends.vultr.configurator import VultrConfigurator
 
     _CONFIGURATOR_CLASSES.append(VultrConfigurator)
 except ImportError:

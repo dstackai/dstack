@@ -7,7 +7,7 @@ from dstack._internal.core.backends import (
     BACKENDS_WITH_MULTINODE_SUPPORT,
     BACKENDS_WITH_RESERVATION_SUPPORT,
 )
-from dstack._internal.core.backends.base import Backend
+from dstack._internal.core.backends.base.backend import Backend
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,

@@ -198,10 +198,10 @@ class TestCreateBackend:
         }
         with (
             patch(
-                "dstack._internal.server.services.backends.configurators.oci.get_subscribed_regions"
+                "dstack._internal.core.backends.oci.configurator.get_subscribed_regions"
             ) as get_regions_mock,
             patch(
-                "dstack._internal.server.services.backends.configurators.oci._create_resources"
+                "dstack._internal.core.backends.oci.configurator._create_resources"
             ) as create_resources_mock,
         ):
             get_regions_mock.return_value = SAMPLE_OCI_SUBSCRIBED_REGIONS
@@ -232,7 +232,7 @@ class TestCreateBackend:
         }
         with (
             patch(
-                "dstack._internal.server.services.backends.configurators.oci.get_subscribed_regions"
+                "dstack._internal.core.backends.oci.configurator.get_subscribed_regions"
             ) as get_regions_mock,
         ):
             # us-ashburn-1 not subscribed
@@ -665,10 +665,10 @@ class TestCreateBackendYAML:
         body = {"config_yaml": yaml.dump(config_dict)}
         with (
             patch(
-                "dstack._internal.server.services.backends.configurators.oci.get_subscribed_regions"
+                "dstack._internal.core.backends.oci.configurator.get_subscribed_regions"
             ) as get_regions_mock,
             patch(
-                "dstack._internal.server.services.backends.configurators.oci._create_resources"
+                "dstack._internal.core.backends.oci.configurator._create_resources"
             ) as create_resources_mock,
         ):
             get_regions_mock.return_value = SAMPLE_OCI_SUBSCRIBED_REGIONS

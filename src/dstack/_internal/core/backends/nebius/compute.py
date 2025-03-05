@@ -5,7 +5,7 @@ from typing import List, Optional
 
 import dstack.version as version
 from dstack._internal import settings
-from dstack._internal.core.backends.base import Compute
+from dstack._internal.core.backends.base.backend import Compute
 from dstack._internal.core.backends.base.compute import get_job_instance_name, get_user_data
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.nebius.api_client import NebiusAPIClient

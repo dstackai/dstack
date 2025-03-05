@@ -4,7 +4,7 @@ from unittest.mock import Mock
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dstack._internal.core.backends.base import Backend
+from dstack._internal.core.backends.base.backend import Backend
 from dstack._internal.core.errors import ServerClientError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.fleets import (
