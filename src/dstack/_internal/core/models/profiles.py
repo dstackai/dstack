@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import List, Optional, Union
+from typing import List, Optional, Union, overload
 
 from pydantic import Field, root_validator, validator
 from typing_extensions import Annotated, Literal
@@ -32,6 +32,14 @@ class CreationPolicy(str, Enum):
 class TerminationPolicy(str, Enum):
     DONT_DESTROY = "dont-destroy"
     DESTROY_AFTER_IDLE = "destroy-after-idle"
+
+
+@overload
+def parse_duration(v: None) -> None: ...
+
+
+@overload
+def parse_duration(v: Union[int, str]) -> int: ...
 
 
 def parse_duration(v: Optional[Union[int, str]]) -> Optional[int]:
@@ -113,6 +121,8 @@ class ProfileRetry(CoreModel):
 
 
 class UtilizationPolicy(CoreModel):
+    _min_time_window = "5m"
+
     min_gpu_utilization: Annotated[
         int,
         Field(
@@ -130,12 +140,17 @@ class UtilizationPolicy(CoreModel):
         Field(
             description=(
                 "The time window of metric samples taking into account to measure utilization"
-                " (e.g., `30m`, `1h`)"
+                f" (e.g., `30m`, `1h`). Minimum is `{_min_time_window}`"
             )
         ),
     ]
 
-    _validate_time_window = validator("time_window", pre=True, allow_reuse=True)(parse_duration)
+    @validator("time_window", pre=True)
+    def validate_time_window(cls, v: Union[int, str]) -> int:
+        v = parse_duration(v)
+        if v < parse_duration(cls._min_time_window):
+            raise ValueError(f"Minimum time_window is {cls._min_time_window}")
+        return v
 
 
 class ProfileParams(CoreModel):

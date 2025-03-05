@@ -48,6 +48,7 @@ from dstack._internal.core.models.volumes import (
 )
 from dstack._internal.core.services import validate_dstack_resource_name
 from dstack._internal.core.services.diff import diff_models
+from dstack._internal.server import settings
 from dstack._internal.server.db import get_db
 from dstack._internal.server.models import (
     JobModel,
@@ -838,6 +839,14 @@ def _validate_run_spec_and_set_defaults(run_spec: RunSpec):
         run_spec.repo_id = DEFAULT_VIRTUAL_REPO_ID
     if run_spec.repo_data is None:
         run_spec.repo_data = VirtualRunRepoData()
+    if (
+        run_spec.merged_profile.utilization_policy is not None
+        and run_spec.merged_profile.utilization_policy.time_window
+        > settings.SERVER_METRICS_TTL_SECONDS
+    ):
+        raise ServerClientError(
+            f"Maximum utilization_policy.time_window is {settings.SERVER_METRICS_TTL_SECONDS}s"
+        )
 
 
 _UPDATABLE_SPEC_FIELDS = ["repo_code_hash", "configuration"]
