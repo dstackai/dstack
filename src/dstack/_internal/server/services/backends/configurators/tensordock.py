@@ -25,7 +25,7 @@ REGIONS = []
 class TensorDockConfigurator(Configurator):
     TYPE: BackendType = BackendType.TENSORDOCK
 
-    def validate_config(self, config: TensorDockConfigInfoWithCreds):
+    def validate_config(self, config: TensorDockConfigInfoWithCreds, default_creds_enabled: bool):
         self._validate_tensordock_creds(config.creds.api_key, config.creds.api_token)
 
     def create_backend(

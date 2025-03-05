@@ -38,10 +38,11 @@ class Configurator(ABC):
     TYPE: BackendType
 
     @abstractmethod
-    def validate_config(self, config: AnyConfigInfoWithCreds):
+    def validate_config(self, config: AnyConfigInfoWithCreds, default_creds_enabled: bool):
         """
         Validates backend config including backend creds and other parameters.
         Raises `ServerClientError` or its subclass if config is invalid.
+        If the backend supports default creds and not `default_creds_enabled`, should raise an error.
         """
         pass
 

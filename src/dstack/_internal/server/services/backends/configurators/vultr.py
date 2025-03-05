@@ -24,7 +24,7 @@ REGIONS = []
 class VultrConfigurator(Configurator):
     TYPE: BackendType = BackendType.VULTR
 
-    def validate_config(self, config: VultrConfigInfoWithCreds):
+    def validate_config(self, config: VultrConfigInfoWithCreds, default_creds_enabled: bool):
         self._validate_vultr_api_key(config.creds.api_key)
 
     def create_backend(

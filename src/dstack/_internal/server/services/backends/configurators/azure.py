@@ -40,7 +40,6 @@ from dstack._internal.core.models.backends.base import (
     BackendType,
 )
 from dstack._internal.core.models.common import is_core_model_instance
-from dstack._internal.server import settings
 from dstack._internal.server.services.backends.configurators.base import (
     TAGS_MAX_NUM,
     Configurator,
@@ -74,11 +73,8 @@ MAIN_LOCATION = "eastus"
 class AzureConfigurator(Configurator):
     TYPE: BackendType = BackendType.AZURE
 
-    def validate_config(self, config: AzureConfigInfoWithCreds):
-        if (
-            is_core_model_instance(config.creds, AzureDefaultCreds)
-            and not settings.DEFAULT_CREDS_ENABLED
-        ):
+    def validate_config(self, config: AzureConfigInfoWithCreds, default_creds_enabled: bool):
+        if is_core_model_instance(config.creds, AzureDefaultCreds) and not default_creds_enabled:
             raise_invalid_credentials_error(fields=[["creds"]])
         if is_core_model_instance(config.creds, AzureClientCreds):
             self._set_client_creds_tenant_id(config.creds, config.tenant_id)

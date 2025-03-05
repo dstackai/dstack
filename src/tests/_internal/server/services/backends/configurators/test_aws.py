@@ -19,7 +19,7 @@ class TestAWSConfigurator:
             patch("dstack._internal.core.backends.aws.auth.authenticate"),
             patch("dstack._internal.core.backends.aws.compute.get_vpc_id_subnet_id_or_error"),
         ):
-            AWSConfigurator().validate_config(config)
+            AWSConfigurator().validate_config(config, default_creds_enabled=True)
 
     def test_validate_config_invalid_creds(self):
         config = AWSConfigInfoWithCreds(
@@ -31,5 +31,5 @@ class TestAWSConfigurator:
             pytest.raises(BackendInvalidCredentialsError) as exc_info,
         ):
             authenticate_mock.side_effect = BackendAuthError()
-            AWSConfigurator().validate_config(config)
+            AWSConfigurator().validate_config(config, default_creds_enabled=True)
         assert exc_info.value.fields == [["creds", "access_key"], ["creds", "secret_key"]]

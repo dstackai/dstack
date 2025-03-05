@@ -21,7 +21,7 @@ logger = get_logger(__name__)
 class KubernetesConfigurator(Configurator):
     TYPE: BackendType = BackendType.KUBERNETES
 
-    def validate_config(self, config: KubernetesConfigInfoWithCreds):
+    def validate_config(self, config: KubernetesConfigInfoWithCreds, default_creds_enabled: bool):
         try:
             api = kubernetes_utils.get_api_from_config_data(config.kubeconfig.data)
             api.list_node()

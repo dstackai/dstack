@@ -18,7 +18,7 @@ from dstack._internal.server.services.backends.configurators.base import (
 class RunpodConfigurator(Configurator):
     TYPE: BackendType = BackendType.RUNPOD
 
-    def validate_config(self, config: RunpodConfigInfoWithCreds):
+    def validate_config(self, config: RunpodConfigInfoWithCreds, default_creds_enabled: bool):
         self._validate_runpod_api_key(config.creds.api_key)
 
     def create_backend(

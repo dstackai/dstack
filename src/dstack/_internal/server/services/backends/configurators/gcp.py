@@ -18,7 +18,6 @@ from dstack._internal.core.models.backends.gcp import (
     GCPStoredConfig,
 )
 from dstack._internal.core.models.common import is_core_model_instance
-from dstack._internal.server import settings
 from dstack._internal.server.services.backends.configurators.base import (
     TAGS_MAX_NUM,
     Configurator,
@@ -113,11 +112,8 @@ MAIN_REGION = "us-east1"
 class GCPConfigurator(Configurator):
     TYPE: BackendType = BackendType.GCP
 
-    def validate_config(self, config: GCPConfigInfoWithCreds):
-        if (
-            is_core_model_instance(config.creds, GCPDefaultCreds)
-            and not settings.DEFAULT_CREDS_ENABLED
-        ):
+    def validate_config(self, config: GCPConfigInfoWithCreds, default_creds_enabled: bool):
+        if is_core_model_instance(config.creds, GCPDefaultCreds) and not default_creds_enabled:
             raise_invalid_credentials_error(fields=[["creds"]])
         try:
             credentials, _ = auth.authenticate(creds=config.creds, project_id=config.project_id)

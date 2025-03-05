@@ -25,7 +25,7 @@ class TestKubernetesConfigurator:
             api_mock = Mock()
             api_mock.list_node.return_value = Mock()
             get_api_mock.return_value = api_mock
-            KubernetesConfigurator().validate_config(config)
+            KubernetesConfigurator().validate_config(config, default_creds_enabled=True)
 
     def test_validate_config_invalid_config(self):
         config = KubernetesConfigInfoWithCreds(
@@ -39,5 +39,5 @@ class TestKubernetesConfigurator:
             pytest.raises(BackendInvalidCredentialsError) as exc_info,
         ):
             get_api_mock.side_effect = Exception("Invalid config")
-            KubernetesConfigurator().validate_config(config)
+            KubernetesConfigurator().validate_config(config, default_creds_enabled=True)
         assert exc_info.value.fields == [["kubeconfig"]]

@@ -18,7 +18,7 @@ class TestCudoConfigurator:
             "dstack._internal.core.backends.cudo.api_client.CudoApiClient.validate_api_key"
         ) as validate_mock:
             validate_mock.return_value = True
-            CudoConfigurator().validate_config(config)
+            CudoConfigurator().validate_config(config, default_creds_enabled=True)
 
     def test_validate_config_invalid_creds(self):
         config = CudoConfigInfoWithCreds(
@@ -33,5 +33,5 @@ class TestCudoConfigurator:
             pytest.raises(BackendInvalidCredentialsError) as exc_info,
         ):
             validate_mock.return_value = False
-            CudoConfigurator().validate_config(config)
+            CudoConfigurator().validate_config(config, default_creds_enabled=True)
         assert exc_info.value.fields == [["creds", "api_key"]]

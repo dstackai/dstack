@@ -35,7 +35,7 @@ class TestAzureConfigurator:
             subcription_client_mock.subscriptions.list.return_value = [
                 Mock(subscription_id="sub1")
             ]
-            AzureConfigurator().validate_config(config)
+            AzureConfigurator().validate_config(config, default_creds_enabled=True)
 
     def test_validate_config_invalid_creds(self):
         config = AzureConfigInfoWithCreds(
@@ -53,7 +53,7 @@ class TestAzureConfigurator:
             pytest.raises(BackendInvalidCredentialsError) as exc_info,
         ):
             mock_authenticate.side_effect = BackendAuthError()
-            AzureConfigurator().validate_config(config)
+            AzureConfigurator().validate_config(config, default_creds_enabled=True)
         assert exc_info.value.fields == [
             ["creds", "tenant_id"],
             ["creds", "client_id"],

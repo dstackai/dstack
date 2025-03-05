@@ -21,7 +21,7 @@ class TestTensorDockConfigurator:
             "dstack._internal.core.backends.tensordock.api_client.TensorDockAPIClient.auth_test"
         ) as auth_test_mock:
             auth_test_mock.return_value = True
-            TensorDockConfigurator().validate_config(config)
+            TensorDockConfigurator().validate_config(config, default_creds_enabled=True)
 
     def test_validate_config_invalid_creds(self):
         config = TensorDockConfigInfoWithCreds(
@@ -34,5 +34,5 @@ class TestTensorDockConfigurator:
             pytest.raises(BackendInvalidCredentialsError) as exc_info,
         ):
             auth_test_mock.return_value = False
-            TensorDockConfigurator().validate_config(config)
+            TensorDockConfigurator().validate_config(config, default_creds_enabled=True)
         assert exc_info.value.fields == [["creds", "api_key"], ["creds", "api_token"]]

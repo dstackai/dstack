@@ -20,7 +20,7 @@ class TestLambdaConfigurator:
             "dstack._internal.core.backends.lambdalabs.api_client.LambdaAPIClient.validate_api_key"
         ) as validate_mock:
             validate_mock.return_value = True
-            LambdaConfigurator().validate_config(config)
+            LambdaConfigurator().validate_config(config, default_creds_enabled=True)
 
     def test_validate_config_invalid_creds(self):
         config = LambdaConfigInfoWithCreds(
@@ -34,5 +34,5 @@ class TestLambdaConfigurator:
             pytest.raises(BackendInvalidCredentialsError) as exc_info,
         ):
             validate_mock.return_value = False
-            LambdaConfigurator().validate_config(config)
+            LambdaConfigurator().validate_config(config, default_creds_enabled=True)
         assert exc_info.value.fields == [["creds", "api_key"]]

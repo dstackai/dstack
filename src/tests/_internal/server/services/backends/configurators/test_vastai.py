@@ -16,7 +16,7 @@ class TestVastAIConfigurator:
             "dstack._internal.core.backends.vastai.api_client.VastAIAPIClient.auth_test"
         ) as auth_test_mock:
             auth_test_mock.return_value = True
-            VastAIConfigurator().validate_config(config)
+            VastAIConfigurator().validate_config(config, default_creds_enabled=True)
 
     def test_validate_config_invalid_creds(self):
         config = VastAIConfigInfoWithCreds(
@@ -29,5 +29,5 @@ class TestVastAIConfigurator:
             pytest.raises(BackendInvalidCredentialsError) as exc_info,
         ):
             auth_test_mock.return_value = False
-            VastAIConfigurator().validate_config(config)
+            VastAIConfigurator().validate_config(config, default_creds_enabled=True)
         assert exc_info.value.fields == [["creds", "api_key"]]

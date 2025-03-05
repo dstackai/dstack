@@ -16,7 +16,7 @@ class TestRunpodConfigurator:
             "dstack._internal.core.backends.runpod.api_client.RunpodApiClient.validate_api_key"
         ) as validate_mock:
             validate_mock.return_value = True
-            RunpodConfigurator().validate_config(config)
+            RunpodConfigurator().validate_config(config, default_creds_enabled=True)
 
     def test_validate_config_invalid_creds(self):
         config = RunpodConfigInfoWithCreds(
@@ -29,5 +29,5 @@ class TestRunpodConfigurator:
             pytest.raises(BackendInvalidCredentialsError) as exc_info,
         ):
             validate_mock.return_value = False
-            RunpodConfigurator().validate_config(config)
+            RunpodConfigurator().validate_config(config, default_creds_enabled=True)
         assert exc_info.value.fields == [["creds", "api_key"]]

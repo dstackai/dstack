@@ -13,6 +13,7 @@ from dstack._internal.core.errors import (
     BackendInvalidCredentialsError,
     BackendNotAvailable,
     ResourceExistsError,
+    ResourceNotExistsError,
     ServerClientError,
 )
 from dstack._internal.core.models.backends import (
@@ -24,6 +25,7 @@ from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
 )
 from dstack._internal.core.models.runs import Requirements
+from dstack._internal.server import settings
 from dstack._internal.server.models import BackendModel, DecryptedString, ProjectModel
 from dstack._internal.server.services.backends.configurators.base import (
     Configurator,
@@ -172,8 +174,9 @@ async def create_backend(
     backend = await get_project_backend_by_type(project=project, backend_type=configurator.TYPE)
     if backend is not None:
         raise ResourceExistsError()
-    await run_async(configurator.validate_config, config)
-    backend = await create_backend_model(project=project, configurator=configurator, config=config)
+    backend = await validate_and_create_backend_model(
+        project=project, configurator=configurator, config=config
+    )
     session.add(backend)
     await session.commit()
     return config
@@ -189,9 +192,10 @@ async def update_backend(
         raise BackendNotAvailable()
     backend_exists = any(configurator.TYPE == b.type for b in project.backends)
     if not backend_exists:
-        raise ServerClientError("Backend does not exist")
-    await run_async(configurator.validate_config, config)
-    backend = await create_backend_model(project=project, configurator=configurator, config=config)
+        raise ResourceNotExistsError()
+    backend = await validate_and_create_backend_model(
+        project=project, configurator=configurator, config=config
+    )
     # FIXME: potentially long write transaction
     await session.execute(
         update(BackendModel)
@@ -207,11 +211,14 @@ async def update_backend(
     return config
 
 
-async def create_backend_model(
+async def validate_and_create_backend_model(
     project: ProjectModel,
     configurator: Configurator,
     config: AnyConfigInfoWithCreds,
 ) -> BackendModel:
+    await run_async(
+        configurator.validate_config, config, default_creds_enabled=settings.DEFAULT_CREDS_ENABLED
+    )
     backend_record = await run_async(
         configurator.create_backend,
         project_name=project.name,

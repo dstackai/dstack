@@ -14,4 +14,4 @@ class TestDataCrunchConfigurator:
             regions=["FIN-01"],
         )
         # Currently no validation is implemented
-        DataCrunchConfigurator().validate_config(config)
+        DataCrunchConfigurator().validate_config(config, default_creds_enabled=True)

@@ -25,7 +25,7 @@ class TestGCPConfigurator:
             patch("dstack._internal.core.backends.gcp.resources.check_vpc"),
         ):
             authenticate_mock.return_value = Mock(), Mock()
-            GCPConfigurator().validate_config(config)
+            GCPConfigurator().validate_config(config, default_creds_enabled=True)
 
     def test_validate_config_invalid_creds(self):
         config = GCPConfigInfoWithCreds(
@@ -38,5 +38,5 @@ class TestGCPConfigurator:
             pytest.raises(BackendInvalidCredentialsError) as exc_info,
         ):
             authenticate_mock.side_effect = BackendAuthError()
-            GCPConfigurator().validate_config(config)
+            GCPConfigurator().validate_config(config, default_creds_enabled=True)
         assert exc_info.value.fields == [["creds", "data"]]

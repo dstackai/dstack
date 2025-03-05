@@ -23,7 +23,6 @@ from dstack._internal.core.models.backends.base import (
     BackendType,
 )
 from dstack._internal.core.models.common import is_core_model_instance
-from dstack._internal.server import settings
 from dstack._internal.server.services.backends.configurators.base import (
     TAGS_MAX_NUM,
     Configurator,
@@ -55,11 +54,8 @@ MAIN_REGION = "us-east-1"
 class AWSConfigurator(Configurator):
     TYPE: BackendType = BackendType.AWS
 
-    def validate_config(self, config: AWSConfigInfoWithCreds):
-        if (
-            is_core_model_instance(config.creds, AWSDefaultCreds)
-            and not settings.DEFAULT_CREDS_ENABLED
-        ):
+    def validate_config(self, config: AWSConfigInfoWithCreds, default_creds_enabled: bool):
+        if is_core_model_instance(config.creds, AWSDefaultCreds) and not default_creds_enabled:
             raise_invalid_credentials_error(fields=[["creds"]])
         try:
             session = auth.authenticate(creds=config.creds, region=MAIN_REGION)

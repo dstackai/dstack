@@ -16,7 +16,7 @@ class TestVultrConfigurator:
             "dstack._internal.core.backends.vultr.api_client.VultrApiClient.validate_api_key"
         ) as validate_mock:
             validate_mock.return_value = True
-            VultrConfigurator().validate_config(config)
+            VultrConfigurator().validate_config(config, default_creds_enabled=True)
 
     def test_validate_config_invalid_creds(self):
         config = VultrConfigInfoWithCreds(
@@ -29,5 +29,5 @@ class TestVultrConfigurator:
             pytest.raises(BackendInvalidCredentialsError) as exc_info,
         ):
             validate_mock.return_value = False
-            VultrConfigurator().validate_config(config)
+            VultrConfigurator().validate_config(config, default_creds_enabled=True)
         assert exc_info.value.fields == [["creds", "api_key"]]

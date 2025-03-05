@@ -22,7 +22,6 @@ from dstack._internal.core.models.backends.oci import (
     OCIStoredConfig,
 )
 from dstack._internal.core.models.common import is_core_model_instance
-from dstack._internal.server import settings
 from dstack._internal.server.services.backends.configurators.base import (
     Configurator,
     StoredBackendRecord,
@@ -46,11 +45,8 @@ SUPPORTED_REGIONS = frozenset(
 class OCIConfigurator(Configurator):
     TYPE: BackendType = BackendType.OCI
 
-    def validate_config(self, config: OCIConfigInfoWithCreds):
-        if (
-            is_core_model_instance(config.creds, OCIDefaultCreds)
-            and not settings.DEFAULT_CREDS_ENABLED
-        ):
+    def validate_config(self, config: OCIConfigInfoWithCreds, default_creds_enabled: bool):
+        if is_core_model_instance(config.creds, OCIDefaultCreds) and not default_creds_enabled:
             raise_invalid_credentials_error(
                 fields=[["creds"]],
                 details="Default credentials are forbidden by dstack settings",
