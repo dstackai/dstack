@@ -95,6 +95,7 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
                 reservation=profile.reservation,
                 spot_policy=profile.spot_policy,
                 retry_policy=profile.retry_policy,
+                utilization_policy=profile.utilization_policy,
                 max_duration=profile.max_duration,
                 stop_duration=profile.stop_duration,
                 max_price=profile.max_price,

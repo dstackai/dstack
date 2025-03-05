@@ -25,6 +25,7 @@ from dstack._internal.core.models.profiles import (
     ProfileRetryPolicy,
     SpotPolicy,
     TerminationPolicy,
+    UtilizationPolicy,
 )
 from dstack._internal.core.models.repos.base import Repo
 from dstack._internal.core.models.resources import ResourcesSpec
@@ -485,6 +486,7 @@ class RunCollection:
         resources: Optional[ResourcesSpec] = None,
         spot_policy: Optional[SpotPolicy] = None,
         retry_policy: Optional[ProfileRetryPolicy] = None,
+        utilization_policy: Optional[UtilizationPolicy] = None,
         max_duration: Optional[Union[int, str]] = None,
         max_price: Optional[float] = None,
         working_dir: Optional[str] = None,
@@ -535,6 +537,7 @@ class RunCollection:
             spot_policy=spot_policy,
             retry=None,
             retry_policy=retry_policy,
+            utilization_policy=utilization_policy,
             max_duration=max_duration,
             stop_duration=stop_duration,
             max_price=max_price,
