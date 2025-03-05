@@ -13,7 +13,11 @@ from dstack._internal.core.models.configurations import (
     PythonVersion,
     RunConfigurationType,
 )
-from dstack._internal.core.models.profiles import DEFAULT_STOP_DURATION, SpotPolicy
+from dstack._internal.core.models.profiles import (
+    DEFAULT_STOP_DURATION,
+    SpotPolicy,
+    UtilizationPolicy,
+)
 from dstack._internal.core.models.runs import (
     AppSpec,
     JobSpec,
@@ -113,6 +117,7 @@ class JobConfigurator(ABC):
             single_branch=self._single_branch(),
             max_duration=self._max_duration(),
             stop_duration=self._stop_duration(),
+            utilization_policy=self._utilization_policy(),
             registry_auth=self._registry_auth(),
             requirements=self._requirements(),
             retry=self._retry(),
@@ -200,6 +205,9 @@ class JobConfigurator(ABC):
             return None
         # pydantic validator ensures this is int
         return self.run_spec.merged_profile.stop_duration
+
+    def _utilization_policy(self) -> Optional[UtilizationPolicy]:
+        return self.run_spec.merged_profile.utilization_policy
 
     def _registry_auth(self) -> Optional[RegistryAuth]:
         return self.run_spec.configuration.registry_auth

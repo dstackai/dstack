@@ -348,7 +348,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
             job_model.termination_reason = JobTerminationReason.GATEWAY_ERROR
 
     if job_model.status == JobStatus.RUNNING:
-        await _check_gpu_utilization(session, run_model, job_model)
+        await _check_gpu_utilization(session, job_model, job)
 
     job_model.last_processed_at = common_utils.get_current_datetime()
     await session.commit()
@@ -679,10 +679,8 @@ def _terminate_if_inactivity_duration_exceeded(
         )
 
 
-async def _check_gpu_utilization(
-    session: AsyncSession, run_model: RunModel, job_model: JobModel
-) -> None:
-    policy = RunSpec.__response__.parse_raw(run_model.run_spec).configuration.utilization_policy
+async def _check_gpu_utilization(session: AsyncSession, job_model: JobModel, job: Job) -> None:
+    policy = job.job_spec.utilization_policy
     if policy is None:
         return
     after = common_utils.get_current_datetime() - timedelta(seconds=policy.time_window)

@@ -198,6 +198,7 @@ def get_dev_env_run_plan_dict(
                     "single_branch": False,
                     "max_duration": None,
                     "stop_duration": 300,
+                    "utilization_policy": None,
                     "registry_auth": None,
                     "requirements": {
                         "resources": {
@@ -357,6 +358,7 @@ def get_dev_env_run_dict(
                     "single_branch": False,
                     "max_duration": None,
                     "stop_duration": 300,
+                    "utilization_policy": None,
                     "registry_auth": None,
                     "requirements": {
                         "resources": {
