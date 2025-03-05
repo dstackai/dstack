@@ -112,6 +112,8 @@ For more details on the options below, refer to the [server deployment](../guide
 
      * `DSTACK_SERVER_ROOT_LOG_LEVEL` – Sets root logger log level. Defaults to `ERROR`.
      * `DSTACK_SERVER_UVICORN_LOG_LEVEL` – Sets uvicorn logger log level. Defaults to `ERROR`.
+     * `DSTACK_SERVER_MAX_OFFERS_TRIED` - Sets how many instance offers to try when starting a job.
+       Setting a high value can degrade server performance.
      * `DSTACK_RUNNER_VERSION` – Sets exact runner version for debug. Defaults to `latest`. Ignored if `DSTACK_RUNNER_DOWNLOAD_URL` is set.
      * `DSTACK_RUNNER_DOWNLOAD_URL` – Overrides `dstack-runner` binary download URL.
      * `DSTACK_SHIM_DOWNLOAD_URL` – Overrides `dstack-shim` binary download URL.

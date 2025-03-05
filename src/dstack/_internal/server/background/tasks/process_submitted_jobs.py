@@ -35,6 +35,7 @@ from dstack._internal.core.models.runs import (
 )
 from dstack._internal.core.models.volumes import Volume
 from dstack._internal.core.services.profiles import get_termination
+from dstack._internal.server import settings
 from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import (
     FleetModel,
@@ -452,7 +453,7 @@ async def _run_job_on_new_instance(
     )
     # Limit number of offers tried to prevent long-running processing
     # in case all offers fail.
-    for backend, offer in offers[:15]:
+    for backend, offer in offers[: settings.MAX_OFFERS_TRIED]:
         logger.debug(
             "%s: trying %s in %s/%s for $%0.4f per hour",
             fmt(job_model),
