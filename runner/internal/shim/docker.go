@@ -692,6 +692,7 @@ func pullImage(ctx context.Context, client docker.APIClient, taskConfig TaskConf
 	}
 
 	var status bool
+	pullErrors := make([]string, 0)
 
 	scanner := bufio.NewScanner(reader)
 	for scanner.Scan() {
@@ -709,6 +710,7 @@ func pullImage(ctx context.Context, client docker.APIClient, taskConfig TaskConf
 		}
 		if progressRow.Error != "" {
 			log.Error(ctx, "error pulling image", "name", taskConfig.ImageName, "err", progressRow.Error)
+			pullErrors = append(pullErrors, progressRow.Error)
 		}
 		if strings.HasPrefix(progressRow.Status, "Status:") {
 			status = true
@@ -731,7 +733,10 @@ func pullImage(ctx context.Context, client docker.APIClient, taskConfig TaskConf
 	if status && currentBytes == totalBytes {
 		log.Debug(ctx, "image successfully pulled", "bytes", currentBytes, "bps", speed)
 	} else {
-		log.Error(ctx, "image pulling interrupted", "bytes", currentBytes, "total", totalBytes, "bps", speed)
+		return tracerr.Errorf(
+			"failed pulling %s: downloaded %d/%d bytes (%s/s), errors: %q",
+			taskConfig.ImageName, currentBytes, totalBytes, speed, pullErrors,
+		)
 	}
 
 	err = ctx.Err()
