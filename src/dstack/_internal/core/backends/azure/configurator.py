@@ -24,10 +24,10 @@ from dstack._internal.core.backends.azure import utils as azure_utils
 from dstack._internal.core.backends.azure.backend import AzureBackend
 from dstack._internal.core.backends.azure.config import AzureConfig
 from dstack._internal.core.backends.azure.models import (
-    AnyAzureConfigInfo,
+    AnyAzureBackendConfig,
+    AzureBackendConfig,
+    AzureBackendConfigWithCreds,
     AzureClientCreds,
-    AzureConfigInfo,
-    AzureConfigInfoWithCreds,
     AzureCreds,
     AzureDefaultCreds,
     AzureStoredConfig,
@@ -74,7 +74,7 @@ MAIN_LOCATION = "eastus"
 class AzureConfigurator(Configurator):
     TYPE: BackendType = BackendType.AZURE
 
-    def validate_config(self, config: AzureConfigInfoWithCreds, default_creds_enabled: bool):
+    def validate_config(self, config: AzureBackendConfigWithCreds, default_creds_enabled: bool):
         if is_core_model_instance(config.creds, AzureDefaultCreds) and not default_creds_enabled:
             raise_invalid_credentials_error(fields=[["creds"]])
         if is_core_model_instance(config.creds, AzureClientCreds):
@@ -100,10 +100,10 @@ class AzureConfigurator(Configurator):
         self._check_config_vpc(config=config, credential=credential)
 
     def create_backend(
-        self, project_name: str, config: AzureConfigInfoWithCreds
+        self, project_name: str, config: AzureBackendConfigWithCreds
     ) -> StoredBackendRecord:
-        if config.locations is None:
-            config.locations = DEFAULT_LOCATIONS
+        if config.regions is None:
+            config.regions = DEFAULT_LOCATIONS
         if is_core_model_instance(config.creds, AzureClientCreds):
             self._set_client_creds_tenant_id(config.creds, config.tenant_id)
         credential, _ = auth.authenticate(config.creds)
@@ -118,36 +118,42 @@ class AzureConfigurator(Configurator):
             credential=credential,
             subscription_id=config.subscription_id,
             resource_group=config.resource_group,
-            locations=config.locations,
+            locations=config.regions,
             create_default_network=config.vpc_ids is None,
         )
         return StoredBackendRecord(
             config=AzureStoredConfig(
-                **AzureConfigInfo.__response__.parse_obj(config).dict()
+                **AzureBackendConfig.__response__.parse_obj(config).dict()
             ).json(),
             auth=AzureCreds.parse_obj(config.creds).__root__.json(),
         )
 
-    def get_config_info(
+    def get_backend_config(
         self, record: StoredBackendRecord, include_creds: bool
-    ) -> AnyAzureConfigInfo:
-        config = self._get_backend_config(record)
+    ) -> AnyAzureBackendConfig:
+        config = self._get_config(record)
         if include_creds:
-            return AzureConfigInfoWithCreds.__response__.parse_obj(config)
-        return AzureConfigInfo.__response__.parse_obj(config)
+            return AzureBackendConfigWithCreds.__response__.parse_obj(config)
+        return AzureBackendConfig.__response__.parse_obj(config)
 
     def get_backend(self, record: StoredBackendRecord) -> AzureBackend:
-        config = self._get_backend_config(record)
+        config = self._get_config(record)
         return AzureBackend(config=config)
 
-    def _get_backend_config(self, record: StoredBackendRecord) -> AzureConfig:
+    def _get_config(self, record: StoredBackendRecord) -> AzureConfig:
+        config_dict = json.loads(record.config)
+        regions = config_dict.get("regions")
+        if regions is None:
+            # Legacy config store regions in locations
+            regions = config_dict.get("locations")
         return AzureConfig.__response__(
             **json.loads(record.config),
+            regions=regions,
             creds=AzureCreds.parse_raw(record.auth).__root__,
         )
 
     def _check_config_tenant_id(
-        self, config: AzureConfigInfoWithCreds, credential: auth.AzureCredential
+        self, config: AzureBackendConfigWithCreds, credential: auth.AzureCredential
     ):
         subscription_client = subscription_mgmt.SubscriptionClient(credential=credential)
         tenant_ids = []
@@ -160,7 +166,7 @@ class AzureConfigurator(Configurator):
             )
 
     def _check_config_subscription_id(
-        self, config: AzureConfigInfoWithCreds, credential: auth.AzureCredential
+        self, config: AzureBackendConfigWithCreds, credential: auth.AzureCredential
     ):
         subscription_client = subscription_mgmt.SubscriptionClient(credential=credential)
         subscription_ids = []
@@ -177,14 +183,14 @@ class AzureConfigurator(Configurator):
                 msg="No Azure subscriptions found for provided credentials. Ensure the account has enough permissions.",
             )
 
-    def _check_config_locations(self, config: AzureConfigInfoWithCreds):
-        if config.locations is None:
+    def _check_config_locations(self, config: AzureBackendConfigWithCreds):
+        if config.regions is None:
             return
-        for location in config.locations:
+        for location in config.regions:
             if location not in LOCATION_VALUES:
                 raise ServerClientError(f"Unknown Azure location {location}")
 
-    def _check_config_tags(self, config: AzureConfigInfoWithCreds):
+    def _check_config_tags(self, config: AzureBackendConfigWithCreds):
         if not config.tags:
             return
         if len(config.tags) > TAGS_MAX_NUM:
@@ -197,7 +203,7 @@ class AzureConfigurator(Configurator):
             raise ServerClientError(e.args[0])
 
     def _check_config_resource_group(
-        self, config: AzureConfigInfoWithCreds, credential: auth.AzureCredential
+        self, config: AzureBackendConfigWithCreds, credential: auth.AzureCredential
     ):
         if config.resource_group is None:
             return
@@ -209,21 +215,21 @@ class AzureConfigurator(Configurator):
             raise ServerClientError(f"Resource group {config.resource_group} not found")
 
     def _check_config_vpc(
-        self, config: AzureConfigInfoWithCreds, credential: auth.AzureCredential
+        self, config: AzureBackendConfigWithCreds, credential: auth.AzureCredential
     ):
         if config.subscription_id is None:
             return None
         allocate_public_ip = config.public_ips if config.public_ips is not None else True
         if config.public_ips is False and config.vpc_ids is None:
             raise ServerClientError(msg="`vpc_ids` must be specified if `public_ips: false`.")
-        locations = config.locations
+        locations = config.regions
         if locations is None:
             locations = DEFAULT_LOCATIONS
         if config.vpc_ids is not None:
             vpc_ids_locations = list(config.vpc_ids.keys())
             not_configured_locations = [loc for loc in locations if loc not in vpc_ids_locations]
             if len(not_configured_locations) > 0:
-                if config.locations is None:
+                if config.regions is None:
                     raise ServerClientError(
                         f"`vpc_ids` not configured for regions {not_configured_locations}. "
                         "Configure `vpc_ids` for all regions or specify `regions`."

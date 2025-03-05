@@ -5,15 +5,15 @@ from oci.exceptions import ClientError
 
 from dstack._internal.core.backends.oci.configurator import OCIConfigurator
 from dstack._internal.core.backends.oci.models import (
+    OCIBackendConfigWithCreds,
     OCIClientCreds,
-    OCIConfigInfoWithCreds,
 )
 from dstack._internal.core.errors import BackendInvalidCredentialsError
 
 
 class TestOCIConfigurator:
     def test_validate_config_valid(self):
-        config = OCIConfigInfoWithCreds(
+        config = OCIBackendConfigWithCreds(
             creds=OCIClientCreds(
                 user="valid_user",
                 tenancy="valid_tenancy",
@@ -32,7 +32,7 @@ class TestOCIConfigurator:
             OCIConfigurator().validate_config(config, default_creds_enabled=True)
 
     def test_validate_config_invalid_creds(self):
-        config = OCIConfigInfoWithCreds(
+        config = OCIBackendConfigWithCreds(
             creds=OCIClientCreds(
                 user="invalid_user",
                 tenancy="invalid_tenancy",

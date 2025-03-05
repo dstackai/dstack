@@ -8,8 +8,9 @@ from dstack._internal.core.backends.base.configurator import (
 from dstack._internal.core.backends.runpod import api_client
 from dstack._internal.core.backends.runpod.backend import RunpodBackend, RunpodConfig
 from dstack._internal.core.backends.runpod.models import (
-    RunpodConfigInfo,
-    RunpodConfigInfoWithCreds,
+    AnyRunpodBackendConfig,
+    RunpodBackendConfig,
+    RunpodBackendConfigWithCreds,
     RunpodCreds,
     RunpodStoredConfig,
 )
@@ -19,32 +20,32 @@ from dstack._internal.core.models.backends.base import BackendType
 class RunpodConfigurator(Configurator):
     TYPE: BackendType = BackendType.RUNPOD
 
-    def validate_config(self, config: RunpodConfigInfoWithCreds, default_creds_enabled: bool):
+    def validate_config(self, config: RunpodBackendConfigWithCreds, default_creds_enabled: bool):
         self._validate_runpod_api_key(config.creds.api_key)
 
     def create_backend(
-        self, project_name: str, config: RunpodConfigInfoWithCreds
+        self, project_name: str, config: RunpodBackendConfigWithCreds
     ) -> StoredBackendRecord:
         return StoredBackendRecord(
             config=RunpodStoredConfig(
-                **RunpodConfigInfo.__response__.parse_obj(config).dict()
+                **RunpodBackendConfig.__response__.parse_obj(config).dict()
             ).json(),
             auth=RunpodCreds.parse_obj(config.creds).json(),
         )
 
-    def get_config_info(
+    def get_backend_config(
         self, record: StoredBackendRecord, include_creds: bool
-    ) -> RunpodConfigInfo:
-        config = self._get_backend_config(record)
+    ) -> AnyRunpodBackendConfig:
+        config = self._get_config(record)
         if include_creds:
-            return RunpodConfigInfoWithCreds.__response__.parse_obj(config)
-        return RunpodConfigInfo.__response__.parse_obj(config)
+            return RunpodBackendConfigWithCreds.__response__.parse_obj(config)
+        return RunpodBackendConfig.__response__.parse_obj(config)
 
     def get_backend(self, record: StoredBackendRecord) -> RunpodBackend:
-        config = self._get_backend_config(record)
+        config = self._get_config(record)
         return RunpodBackend(config=config)
 
-    def _get_backend_config(self, record: StoredBackendRecord) -> RunpodConfig:
+    def _get_config(self, record: StoredBackendRecord) -> RunpodConfig:
         return RunpodConfig(
             **json.loads(record.config),
             creds=RunpodCreds.parse_raw(record.auth),

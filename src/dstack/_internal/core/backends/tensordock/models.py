@@ -1,12 +1,8 @@
-from pydantic.fields import Field
-from typing_extensions import Annotated, List, Literal, Optional, Union
+from typing import Annotated, List, Literal, Optional, Union
+
+from pydantic import Field
 
 from dstack._internal.core.models.common import CoreModel
-
-
-class TensorDockConfigInfo(CoreModel):
-    type: Literal["tensordock"] = "tensordock"
-    regions: Optional[List[str]] = None
 
 
 class TensorDockAPIKeyCreds(CoreModel):
@@ -16,17 +12,23 @@ class TensorDockAPIKeyCreds(CoreModel):
 
 
 AnyTensorDockCreds = TensorDockAPIKeyCreds
-
-
 TensorDockCreds = AnyTensorDockCreds
 
 
-class TensorDockConfigInfoWithCreds(TensorDockConfigInfo):
-    creds: AnyTensorDockCreds
+class TensorDockBackendConfig(CoreModel):
+    type: Annotated[Literal["tensordock"], Field(description="The type of backend")] = "tensordock"
+    regions: Annotated[
+        Optional[List[str]],
+        Field(description="The list of TensorDock regions. Omit to use all regions"),
+    ] = None
 
 
-AnyTensorDockConfigInfo = Union[TensorDockConfigInfo, TensorDockConfigInfoWithCreds]
+class TensorDockBackendConfigWithCreds(TensorDockBackendConfig):
+    creds: Annotated[AnyTensorDockCreds, Field(description="The credentials")]
 
 
-class TensorDockStoredConfig(TensorDockConfigInfo):
+AnyTensorDockBackendConfig = Union[TensorDockBackendConfig, TensorDockBackendConfigWithCreds]
+
+
+class TensorDockStoredConfig(TensorDockBackendConfig):
     pass

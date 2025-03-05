@@ -1,11 +1,24 @@
-from typing import List, Optional, Union
+from typing import Annotated, List, Literal, Optional, Union
 
-from typing_extensions import Literal
+from pydantic import Field, root_validator
 
+from dstack._internal.core.backends.base.models import fill_data
 from dstack._internal.core.models.common import CoreModel
 
 
-class NebiusConfigInfo(CoreModel):
+class NebiusServiceAccountCreds(CoreModel):
+    type: Annotated[Literal["service_account"], Field(description="The type of credentials")] = (
+        "service_account"
+    )
+    filename: Annotated[str, Field(description="The path to the service account file")]
+    data: Annotated[str, Field(description="The contents of the service account file")]
+
+
+AnyNebiusCreds = NebiusServiceAccountCreds
+NebiusCreds = AnyNebiusCreds
+
+
+class NebiusBackendConfig(CoreModel):
     type: Literal["nebius"] = "nebius"
     cloud_id: str
     folder_id: str
@@ -13,24 +26,30 @@ class NebiusConfigInfo(CoreModel):
     regions: Optional[List[str]] = None
 
 
-class NebiusServiceAccountCreds(CoreModel):
-    type: Literal["service_account"] = "service_account"
-    filename: str
-    data: str
-
-
-AnyNebiusCreds = NebiusServiceAccountCreds
-
-
-NebiusCreds = AnyNebiusCreds
-
-
-class NebiusConfigInfoWithCreds(NebiusConfigInfo):
+class NebiusBackendConfigWithCreds(NebiusBackendConfig):
     creds: AnyNebiusCreds
 
 
-AnyNebiusConfigInfo = Union[NebiusConfigInfo, NebiusConfigInfoWithCreds]
+AnyNebiusBackendConfig = Union[NebiusBackendConfig, NebiusBackendConfigWithCreds]
 
 
-class NebiusStoredConfig(NebiusConfigInfo):
+class NebiusServiceAccountFileCreds(CoreModel):
+    type: Annotated[Literal["service_account"], Field(description="The type of credentials")] = (
+        "service_account"
+    )
+    filename: Annotated[str, Field(description="The path to the service account file")]
+    data: Annotated[
+        Optional[str], Field(description="The contents of the service account file")
+    ] = None
+
+    @root_validator
+    def fill_data(cls, values):
+        return fill_data(values)
+
+
+class NebiusBackendFileConfigWithCreds(NebiusBackendConfig):
+    creds: NebiusServiceAccountFileCreds
+
+
+class NebiusStoredConfig(NebiusBackendConfig):
     pass

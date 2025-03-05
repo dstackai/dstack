@@ -1,15 +1,10 @@
-from typing import Annotated, List, Optional, Union
+from typing import Annotated, List, Literal, Optional, Union
 
 from pydantic import Field
-from typing_extensions import Literal
 
 from dstack._internal.core.models.common import CoreModel
 
-
-class RunpodConfigInfo(CoreModel):
-    type: Literal["runpod"] = "runpod"
-    regions: Optional[List[str]] = None
-    community_cloud: Optional[bool] = None
+RUNPOD_COMMUNITY_CLOUD_DEFAULT = True
 
 
 class RunpodAPIKeyCreds(CoreModel):
@@ -21,12 +16,29 @@ AnyRunpodCreds = RunpodAPIKeyCreds
 RunpodCreds = AnyRunpodCreds
 
 
-class RunpodConfigInfoWithCreds(RunpodConfigInfo):
-    creds: AnyRunpodCreds
+class RunpodBackendConfig(CoreModel):
+    type: Literal["runpod"] = "runpod"
+    regions: Annotated[
+        Optional[List[str]],
+        Field(description="The list of RunPod regions. Omit to use all regions"),
+    ] = None
+    community_cloud: Annotated[
+        Optional[bool],
+        Field(
+            description=(
+                "Whether Community Cloud offers can be suggested in addition to Secure Cloud."
+                f" Defaults to `{str(RUNPOD_COMMUNITY_CLOUD_DEFAULT).lower()}`"
+            )
+        ),
+    ] = None
 
 
-AnyRunpodConfigInfo = Union[RunpodConfigInfo, RunpodConfigInfoWithCreds]
+class RunpodBackendConfigWithCreds(RunpodBackendConfig):
+    creds: Annotated[AnyRunpodCreds, Field(description="The credentials")]
 
 
-class RunpodStoredConfig(RunpodConfigInfo):
+AnyRunpodBackendConfig = Union[RunpodBackendConfig, RunpodBackendConfigWithCreds]
+
+
+class RunpodStoredConfig(RunpodBackendConfig):
     pass

@@ -4,7 +4,7 @@ import pytest
 
 from dstack._internal.core.backends.lambdalabs.configurator import LambdaConfigurator
 from dstack._internal.core.backends.lambdalabs.models import (
-    LambdaConfigInfoWithCreds,
+    LambdaBackendConfigWithCreds,
     LambdaCreds,
 )
 from dstack._internal.core.errors import BackendInvalidCredentialsError
@@ -12,7 +12,7 @@ from dstack._internal.core.errors import BackendInvalidCredentialsError
 
 class TestLambdaConfigurator:
     def test_validate_config_valid(self):
-        config = LambdaConfigInfoWithCreds(
+        config = LambdaBackendConfigWithCreds(
             creds=LambdaCreds(api_key="valid"),
             regions=["us-east-1"],
         )
@@ -23,7 +23,7 @@ class TestLambdaConfigurator:
             LambdaConfigurator().validate_config(config, default_creds_enabled=True)
 
     def test_validate_config_invalid_creds(self):
-        config = LambdaConfigInfoWithCreds(
+        config = LambdaBackendConfigWithCreds(
             creds=LambdaCreds(api_key="invalid"),
             regions=["us-east-1"],
         )

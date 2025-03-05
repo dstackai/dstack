@@ -9,9 +9,9 @@ from dstack._internal.core.backends.vastai import api_client
 from dstack._internal.core.backends.vastai.backend import VastAIBackend
 from dstack._internal.core.backends.vastai.config import VastAIConfig
 from dstack._internal.core.backends.vastai.models import (
-    AnyVastAIConfigInfo,
-    VastAIConfigInfo,
-    VastAIConfigInfoWithCreds,
+    AnyVastAIBackendConfig,
+    VastAIBackendConfig,
+    VastAIBackendConfigWithCreds,
     VastAICreds,
     VastAIStoredConfig,
 )
@@ -26,34 +26,34 @@ REGIONS = []
 class VastAIConfigurator(Configurator):
     TYPE: BackendType = BackendType.VASTAI
 
-    def validate_config(self, config: VastAIConfigInfoWithCreds, default_creds_enabled: bool):
+    def validate_config(self, config: VastAIBackendConfigWithCreds, default_creds_enabled: bool):
         self._validate_vastai_creds(config.creds.api_key)
 
     def create_backend(
-        self, project_name: str, config: VastAIConfigInfoWithCreds
+        self, project_name: str, config: VastAIBackendConfigWithCreds
     ) -> StoredBackendRecord:
         if config.regions is None:
             config.regions = REGIONS
         return StoredBackendRecord(
             config=VastAIStoredConfig(
-                **VastAIConfigInfo.__response__.parse_obj(config).dict()
+                **VastAIBackendConfig.__response__.parse_obj(config).dict()
             ).json(),
             auth=VastAICreds.parse_obj(config.creds).json(),
         )
 
-    def get_config_info(
+    def get_backend_config(
         self, record: StoredBackendRecord, include_creds: bool
-    ) -> AnyVastAIConfigInfo:
-        config = self._get_backend_config(record)
+    ) -> AnyVastAIBackendConfig:
+        config = self._get_config(record)
         if include_creds:
-            return VastAIConfigInfoWithCreds.__response__.parse_obj(config)
-        return VastAIConfigInfo.__response__.parse_obj(config)
+            return VastAIBackendConfigWithCreds.__response__.parse_obj(config)
+        return VastAIBackendConfig.__response__.parse_obj(config)
 
     def get_backend(self, record: StoredBackendRecord) -> VastAIBackend:
-        config = self._get_backend_config(record)
+        config = self._get_config(record)
         return VastAIBackend(config=config)
 
-    def _get_backend_config(self, record: StoredBackendRecord) -> VastAIConfig:
+    def _get_config(self, record: StoredBackendRecord) -> VastAIConfig:
         return VastAIConfig.__response__(
             **json.loads(record.config),
             creds=VastAICreds.parse_raw(record.auth),

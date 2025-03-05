@@ -1,18 +1,8 @@
-from typing import List, Optional
+from typing import Annotated, List, Literal, Optional
 
-from pydantic.fields import Field
-from typing_extensions import Annotated, Literal
+from pydantic import Field
 
 from dstack._internal.core.models.common import CoreModel
-
-
-class VultrConfigInfo(CoreModel):
-    type: Literal["vultr"] = "vultr"
-    regions: Optional[List[str]] = None
-
-
-class VultrStoredConfig(VultrConfigInfo):
-    pass
 
 
 class VultrAPIKeyCreds(CoreModel):
@@ -24,5 +14,17 @@ AnyVultrCreds = VultrAPIKeyCreds
 VultrCreds = AnyVultrCreds
 
 
-class VultrConfigInfoWithCreds(VultrConfigInfo):
-    creds: AnyVultrCreds
+class VultrBackendConfig(CoreModel):
+    type: Annotated[Literal["vultr"], Field(description="The type of backend")] = "vultr"
+    regions: Annotated[
+        Optional[List[str]],
+        Field(description="The list of Vultr regions. Omit to use all regions"),
+    ] = None
+
+
+class VultrBackendConfigWithCreds(VultrBackendConfig):
+    creds: Annotated[AnyVultrCreds, Field(description="The credentials")]
+
+
+class VultrStoredConfig(VultrBackendConfig):
+    pass

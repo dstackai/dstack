@@ -9,9 +9,9 @@ from dstack._internal.core.backends.tensordock import api_client
 from dstack._internal.core.backends.tensordock.backend import TensorDockBackend
 from dstack._internal.core.backends.tensordock.config import TensorDockConfig
 from dstack._internal.core.backends.tensordock.models import (
-    AnyTensorDockConfigInfo,
-    TensorDockConfigInfo,
-    TensorDockConfigInfoWithCreds,
+    AnyTensorDockBackendConfig,
+    TensorDockBackendConfig,
+    TensorDockBackendConfigWithCreds,
     TensorDockCreds,
     TensorDockStoredConfig,
 )
@@ -26,34 +26,36 @@ REGIONS = []
 class TensorDockConfigurator(Configurator):
     TYPE: BackendType = BackendType.TENSORDOCK
 
-    def validate_config(self, config: TensorDockConfigInfoWithCreds, default_creds_enabled: bool):
+    def validate_config(
+        self, config: TensorDockBackendConfigWithCreds, default_creds_enabled: bool
+    ):
         self._validate_tensordock_creds(config.creds.api_key, config.creds.api_token)
 
     def create_backend(
-        self, project_name: str, config: TensorDockConfigInfoWithCreds
+        self, project_name: str, config: TensorDockBackendConfigWithCreds
     ) -> StoredBackendRecord:
         if config.regions is None:
             config.regions = REGIONS
         return StoredBackendRecord(
             config=TensorDockStoredConfig(
-                **TensorDockConfigInfo.__response__.parse_obj(config).dict()
+                **TensorDockBackendConfig.__response__.parse_obj(config).dict()
             ).json(),
             auth=TensorDockCreds.parse_obj(config.creds).json(),
         )
 
-    def get_config_info(
+    def get_backend_config(
         self, record: StoredBackendRecord, include_creds: bool
-    ) -> AnyTensorDockConfigInfo:
-        config = self._get_backend_config(record)
+    ) -> AnyTensorDockBackendConfig:
+        config = self._get_config(record)
         if include_creds:
-            return TensorDockConfigInfoWithCreds.__response__.parse_obj(config)
-        return TensorDockConfigInfo.__response__.parse_obj(config)
+            return TensorDockBackendConfigWithCreds.__response__.parse_obj(config)
+        return TensorDockBackendConfig.__response__.parse_obj(config)
 
     def get_backend(self, record: StoredBackendRecord) -> TensorDockBackend:
-        config = self._get_backend_config(record)
+        config = self._get_config(record)
         return TensorDockBackend(config=config)
 
-    def _get_backend_config(self, record: StoredBackendRecord) -> TensorDockConfig:
+    def _get_config(self, record: StoredBackendRecord) -> TensorDockConfig:
         return TensorDockConfig.__response__(
             **json.loads(record.config),
             creds=TensorDockCreds.parse_raw(record.auth),

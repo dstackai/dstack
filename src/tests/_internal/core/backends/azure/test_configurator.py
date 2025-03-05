@@ -4,8 +4,8 @@ import pytest
 
 from dstack._internal.core.backends.azure.configurator import AzureConfigurator
 from dstack._internal.core.backends.azure.models import (
+    AzureBackendConfigWithCreds,
     AzureClientCreds,
-    AzureConfigInfoWithCreds,
 )
 from dstack._internal.core.errors import (
     BackendAuthError,
@@ -15,7 +15,7 @@ from dstack._internal.core.errors import (
 
 class TestAzureConfigurator:
     def test_validate_config_valid(self):
-        config = AzureConfigInfoWithCreds(
+        config = AzureBackendConfigWithCreds(
             creds=AzureClientCreds(
                 tenant_id="valid",
                 client_id="valid",
@@ -23,7 +23,7 @@ class TestAzureConfigurator:
             ),
             tenant_id="ten1",
             subscription_id="sub1",
-            locations=["eastus"],
+            regions=["eastus"],
         )
         with (
             patch("dstack._internal.core.backends.azure.auth.authenticate") as authenticate_mock,
@@ -38,7 +38,7 @@ class TestAzureConfigurator:
             AzureConfigurator().validate_config(config, default_creds_enabled=True)
 
     def test_validate_config_invalid_creds(self):
-        config = AzureConfigInfoWithCreds(
+        config = AzureBackendConfigWithCreds(
             creds=AzureClientCreds(
                 tenant_id="invalid",
                 client_id="invalid",
@@ -46,7 +46,7 @@ class TestAzureConfigurator:
             ),
             tenant_id="invalid",
             subscription_id="invalid",
-            locations=["eastus"],
+            regions=["eastus"],
         )
         with (
             patch("dstack._internal.core.backends.azure.auth.authenticate") as mock_authenticate,

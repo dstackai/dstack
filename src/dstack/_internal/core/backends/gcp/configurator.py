@@ -12,9 +12,9 @@ from dstack._internal.core.backends.gcp import auth, resources
 from dstack._internal.core.backends.gcp.backend import GCPBackend
 from dstack._internal.core.backends.gcp.config import GCPConfig
 from dstack._internal.core.backends.gcp.models import (
-    AnyGCPConfigInfo,
-    GCPConfigInfo,
-    GCPConfigInfoWithCreds,
+    AnyGCPBackendConfig,
+    GCPBackendConfig,
+    GCPBackendConfigWithCreds,
     GCPCreds,
     GCPDefaultCreds,
     GCPServiceAccountCreds,
@@ -113,7 +113,7 @@ MAIN_REGION = "us-east1"
 class GCPConfigurator(Configurator):
     TYPE: BackendType = BackendType.GCP
 
-    def validate_config(self, config: GCPConfigInfoWithCreds, default_creds_enabled: bool):
+    def validate_config(self, config: GCPBackendConfigWithCreds, default_creds_enabled: bool):
         if is_core_model_instance(config.creds, GCPDefaultCreds) and not default_creds_enabled:
             raise_invalid_credentials_error(fields=[["creds"]])
         try:
@@ -136,36 +136,36 @@ class GCPConfigurator(Configurator):
         )
 
     def create_backend(
-        self, project_name: str, config: GCPConfigInfoWithCreds
+        self, project_name: str, config: GCPBackendConfigWithCreds
     ) -> StoredBackendRecord:
         if config.regions is None:
             config.regions = DEFAULT_REGIONS
         return StoredBackendRecord(
             config=GCPStoredConfig(
-                **GCPConfigInfo.__response__.parse_obj(config).dict(),
+                **GCPBackendConfig.__response__.parse_obj(config).dict(),
             ).json(),
             auth=GCPCreds.parse_obj(config.creds).json(),
         )
 
-    def get_config_info(
+    def get_backend_config(
         self, record: StoredBackendRecord, include_creds: bool
-    ) -> AnyGCPConfigInfo:
-        config = self._get_backend_config(record)
+    ) -> AnyGCPBackendConfig:
+        config = self._get_config(record)
         if include_creds:
-            return GCPConfigInfoWithCreds.__response__.parse_obj(config)
-        return GCPConfigInfo.__response__.parse_obj(config)
+            return GCPBackendConfigWithCreds.__response__.parse_obj(config)
+        return GCPBackendConfig.__response__.parse_obj(config)
 
     def get_backend(self, record: StoredBackendRecord) -> GCPBackend:
-        config = self._get_backend_config(record)
+        config = self._get_config(record)
         return GCPBackend(config=config)
 
-    def _get_backend_config(self, record: StoredBackendRecord) -> GCPConfig:
+    def _get_config(self, record: StoredBackendRecord) -> GCPConfig:
         return GCPConfig.__response__(
             **json.loads(record.config),
             creds=GCPCreds.parse_raw(record.auth).__root__,
         )
 
-    def _check_config_tags(self, config: GCPConfigInfoWithCreds):
+    def _check_config_tags(self, config: GCPBackendConfigWithCreds):
         if not config.tags:
             return
         if len(config.tags) > TAGS_MAX_NUM:
@@ -179,7 +179,7 @@ class GCPConfigurator(Configurator):
 
     def _check_config_vpc(
         self,
-        config: GCPConfigInfoWithCreds,
+        config: GCPBackendConfigWithCreds,
         subnetworks_client: compute_v1.SubnetworksClient,
         routers_client: compute_v1.RoutersClient,
     ):

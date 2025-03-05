@@ -1,12 +1,8 @@
-from pydantic.fields import Field
-from typing_extensions import Annotated, List, Literal, Optional, Union
+from typing import Annotated, List, Literal, Optional, Union
+
+from pydantic import Field
 
 from dstack._internal.core.models.common import CoreModel
-
-
-class DataCrunchConfigInfo(CoreModel):
-    type: Literal["datacrunch"] = "datacrunch"
-    regions: Optional[List[str]] = None
 
 
 class DataCrunchAPIKeyCreds(CoreModel):
@@ -16,17 +12,23 @@ class DataCrunchAPIKeyCreds(CoreModel):
 
 
 AnyDataCrunchCreds = DataCrunchAPIKeyCreds
-
-
 DataCrunchCreds = AnyDataCrunchCreds
 
 
-class DataCrunchConfigInfoWithCreds(DataCrunchConfigInfo):
-    creds: AnyDataCrunchCreds
+class DataCrunchBackendConfig(CoreModel):
+    type: Annotated[Literal["datacrunch"], Field(description="The type of backend")] = "datacrunch"
+    regions: Annotated[
+        Optional[List[str]],
+        Field(description="The list of DataCrunch regions. Omit to use all regions"),
+    ] = None
 
 
-AnyDataCrunchConfigInfo = Union[DataCrunchConfigInfo, DataCrunchConfigInfoWithCreds]
+class DataCrunchBackendConfigWithCreds(DataCrunchBackendConfig):
+    creds: Annotated[AnyDataCrunchCreds, Field(description="The credentials")]
 
 
-class DataCrunchStoredConfig(DataCrunchConfigInfo):
+AnyDataCrunchBackendConfig = Union[DataCrunchBackendConfig, DataCrunchBackendConfigWithCreds]
+
+
+class DataCrunchStoredConfig(DataCrunchBackendConfig):
     pass

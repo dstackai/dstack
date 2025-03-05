@@ -1,7 +1,6 @@
-from typing import Dict
+from typing import Annotated, Dict, List, Literal, Optional, Union
 
 from pydantic import Field
-from typing_extensions import Annotated, List, Literal, Optional, Union
 
 from dstack._internal.core.models.common import CoreModel
 
@@ -24,18 +23,6 @@ class AWSOSImageConfig(CoreModel):
     ] = None
 
 
-class AWSConfigInfo(CoreModel):
-    type: Literal["aws"] = "aws"
-    regions: Optional[List[str]] = None
-    vpc_name: Optional[str] = None
-    vpc_ids: Optional[Dict[str, str]] = None
-    default_vpcs: Optional[bool] = None
-    public_ips: Optional[bool] = None
-    iam_instance_profile: Optional[str] = None
-    tags: Optional[Dict[str, str]] = None
-    os_images: Optional[AWSOSImageConfig] = None
-
-
 class AWSAccessKeyCreds(CoreModel):
     type: Annotated[Literal["access_key"], Field(description="The type of credentials")] = (
         "access_key"
@@ -55,12 +42,78 @@ class AWSCreds(CoreModel):
     __root__: AnyAWSCreds = Field(..., discriminator="type")
 
 
-class AWSConfigInfoWithCreds(AWSConfigInfo):
-    creds: AnyAWSCreds
+class AWSBackendConfig(CoreModel):
+    type: Annotated[Literal["aws"], Field(description="The type of the backend")] = "aws"
+    regions: Annotated[
+        Optional[List[str]], Field(description="The list of AWS regions. Omit to use all regions")
+    ] = None
+    vpc_name: Annotated[
+        Optional[str],
+        Field(
+            description=(
+                "The name of custom VPCs. All configured regions must have a VPC with this name."
+                " If your custom VPCs don't have names or have different names in different regions, use `vpc_ids` instead."
+            )
+        ),
+    ] = None
+    vpc_ids: Annotated[
+        Optional[Dict[str, str]],
+        Field(
+            description=(
+                "The mapping from AWS regions to VPC IDs."
+                " If `default_vpcs: true`, omitted regions will use default VPCs"
+            )
+        ),
+    ] = None
+    default_vpcs: Annotated[
+        Optional[bool],
+        Field(
+            description=(
+                "A flag to enable/disable using default VPCs in regions not configured by `vpc_ids`."
+                " Set to `false` if default VPCs should never be used."
+                " Defaults to `true`"
+            )
+        ),
+    ] = None
+    public_ips: Annotated[
+        Optional[bool],
+        Field(
+            description=(
+                "A flag to enable/disable public IP assigning on instances."
+                " `public_ips: false` requires at least one private subnet with outbound internet connectivity"
+                " provided by a NAT Gateway or a Transit Gateway."
+                " Defaults to `true`"
+            )
+        ),
+    ] = None
+    iam_instance_profile: Annotated[
+        Optional[str],
+        Field(
+            description=(
+                "The name of the IAM instance profile to associate with EC2 instances."
+                " You can also specify the IAM role name for roles created via the AWS console."
+                " AWS automatically creates an instance profile and gives it the same name as the role"
+            )
+        ),
+    ] = None
+    tags: Annotated[
+        Optional[Dict[str, str]],
+        Field(description="The tags that will be assigned to resources created by `dstack`"),
+    ] = None
+    os_images: Annotated[
+        Optional[AWSOSImageConfig],
+        Field(
+            description="The mapping of instance categories (CPU, NVIDIA GPU) to AMI configurations"
+        ),
+    ] = None
 
 
-AnyAWSConfigInfo = Union[AWSConfigInfo, AWSConfigInfoWithCreds]
+class AWSBackendConfigWithCreds(AWSBackendConfig):
+    creds: AnyAWSCreds = Field(..., description="The credentials", discriminator="type")
 
 
-class AWSStoredConfig(AWSConfigInfo):
+AnyAWSBackendConfig = Union[AWSBackendConfig, AWSBackendConfigWithCreds]
+
+
+class AWSStoredConfig(AWSBackendConfig):
     pass

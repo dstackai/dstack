@@ -3,13 +3,13 @@ from unittest.mock import patch
 import pytest
 
 from dstack._internal.core.backends.vultr.configurator import VultrConfigurator
-from dstack._internal.core.backends.vultr.models import VultrConfigInfoWithCreds, VultrCreds
+from dstack._internal.core.backends.vultr.models import VultrBackendConfigWithCreds, VultrCreds
 from dstack._internal.core.errors import BackendInvalidCredentialsError
 
 
 class TestVultrConfigurator:
     def test_validate_config_valid(self):
-        config = VultrConfigInfoWithCreds(
+        config = VultrBackendConfigWithCreds(
             creds=VultrCreds(api_key="valid"),
         )
         with patch(
@@ -19,7 +19,7 @@ class TestVultrConfigurator:
             VultrConfigurator().validate_config(config, default_creds_enabled=True)
 
     def test_validate_config_invalid_creds(self):
-        config = VultrConfigInfoWithCreds(
+        config = VultrBackendConfigWithCreds(
             creds=VultrCreds(api_key="invalid"),
         )
         with (
