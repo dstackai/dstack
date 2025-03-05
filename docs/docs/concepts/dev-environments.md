@@ -108,6 +108,7 @@ to automatically stop the dev environment after a configured period of inactivit
 
 ```yaml
 type: dev-environment
+name: vscode
 ide: vscode
 
 # Stop if inactive for 2 hours
@@ -137,6 +138,22 @@ $ dstack ps --verbose
 
 If you reattach to the dev environment using [`dstack attach`](../reference/cli/dstack/attach.md),
 the inactivity timer will be reset within a few seconds.
+
+??? info "In-place update"
+    As long as the configuration defines the `name` property, the value of `inactivity_duration`
+    can be changed for a running dev environment without a restart.
+    Just change the value in the configuration and run `dstack apply` again.
+
+    <div class="termy">
+
+    ```shell
+    $ dstack apply -f .dstack.yml
+
+    Detected configuration changes that can be updated in-place: ['inactivity_duration']
+    Update the run? [y/n]:
+    ```
+
+    </div>
 
 > `inactivity_duration` is not to be confused with [`idle_duration`](#idle-duration).
 > The latter determines how soon the underlying cloud instance will be terminated
