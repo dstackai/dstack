@@ -16,6 +16,7 @@ from dstack._internal.core.backends.base.compute import (
 )
 from dstack._internal.core.backends.base.offers import match_requirements
 from dstack._internal.core.backends.kubernetes.config import KubernetesConfig
+from dstack._internal.core.backends.kubernetes.models import KubernetesNetworkingConfig
 from dstack._internal.core.backends.kubernetes.utils import (
     get_api_from_config_data,
     get_cluster_public_ip,
@@ -56,7 +57,11 @@ NVIDIA_GPU_NAMES = NVIDIA_GPU_NAME_TO_GPU_INFO.keys()
 class KubernetesCompute(Compute):
     def __init__(self, config: KubernetesConfig):
         super().__init__()
-        self.config = config
+        self.config = config.copy()
+        networking_config = self.config.networking
+        if networking_config is None:
+            networking_config = KubernetesNetworkingConfig()
+        self.networking_config = networking_config
         self.api = get_api_from_config_data(config.kubeconfig.data)
 
     def get_offers(
@@ -109,7 +114,7 @@ class KubernetesCompute(Compute):
         # as an ssh proxy jump to connect to all other services in Kubernetes.
         # Setup jump pod in a separate thread to avoid long-running run_job.
         # In case the thread fails, the job will be failed and resubmitted.
-        jump_pod_hostname = self.config.networking.ssh_host
+        jump_pod_hostname = self.networking_config.ssh_host
         if jump_pod_hostname is None:
             jump_pod_hostname = get_cluster_public_ip(self.api)
             if jump_pod_hostname is None:
@@ -121,7 +126,7 @@ class KubernetesCompute(Compute):
             api=self.api,
             project_name=run.project_name,
             ssh_public_keys=[project_ssh_public_key.strip(), run.run_spec.ssh_key_pub.strip()],
-            jump_pod_port=self.config.networking.ssh_port,
+            jump_pod_port=self.networking_config.ssh_port,
         )
         if not created:
             threading.Thread(

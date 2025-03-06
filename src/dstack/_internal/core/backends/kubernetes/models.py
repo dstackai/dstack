@@ -7,10 +7,12 @@ from dstack._internal.core.models.common import CoreModel
 
 
 class KubernetesNetworkingConfig(CoreModel):
-    ssh_host: Annotated[Optional[str], Field(description="The external IP address of any node")]
+    ssh_host: Annotated[
+        Optional[str], Field(description="The external IP address of any node")
+    ] = None
     ssh_port: Annotated[
         Optional[int], Field(description="Any port accessible outside of the cluster")
-    ]
+    ] = None
 
 
 class KubeconfigConfig(CoreModel):
