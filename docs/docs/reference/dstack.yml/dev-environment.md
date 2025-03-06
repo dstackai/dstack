@@ -18,6 +18,14 @@ The `dev-environment` configuration type allows running [dev environments](../..
       type:
         required: true
 
+### `utilization_policy`
+
+#SCHEMA# dstack._internal.core.models.profiles.UtilizationPolicy
+    overrides:
+      show_root_heading: false
+      type:
+        required: true
+
 ### `resources`
 
 #SCHEMA# dstack._internal.core.models.resources.ResourcesSpecSchema

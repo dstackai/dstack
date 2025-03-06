@@ -221,7 +221,8 @@ class DevEnvironmentConfigurationParams(CoreModel):
                 " Inactivity is defined as the absence of SSH connections to the"
                 " dev environment, including VS Code connections, `ssh <run name>`"
                 " shells, and attached `dstack apply` or `dstack attach` commands."
-                " Use `off` for unlimited duration. Defaults to `off`"
+                " Use `off` for unlimited duration. Can be updated in-place."
+                " Defaults to `off`"
             )
         ),
     ]

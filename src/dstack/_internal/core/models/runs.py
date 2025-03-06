@@ -23,6 +23,7 @@ from dstack._internal.core.models.profiles import (
     ProfileRetryPolicy,
     RetryEvent,
     SpotPolicy,
+    UtilizationPolicy,
 )
 from dstack._internal.core.models.repos import AnyRunRepoData
 from dstack._internal.core.models.resources import Memory, ResourcesSpec
@@ -192,6 +193,7 @@ class JobSpec(CoreModel):
     single_branch: Optional[bool] = None
     max_duration: Optional[int]
     stop_duration: Optional[int] = None
+    utilization_policy: Optional[UtilizationPolicy] = None
     registry_auth: Optional[RegistryAuth]
     requirements: Requirements
     retry: Optional[Retry]

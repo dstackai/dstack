@@ -13,7 +13,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import ApplyAction
-from dstack._internal.core.models.configurations import ServiceConfiguration
+from dstack._internal.core.models.configurations import (
+    AnyRunConfiguration,
+    DevEnvironmentConfiguration,
+    ScalingSpec,
+    ServiceConfiguration,
+    TaskConfiguration,
+)
 from dstack._internal.core.models.gateways import GatewayStatus
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
@@ -192,6 +198,7 @@ def get_dev_env_run_plan_dict(
                     "single_branch": False,
                     "max_duration": None,
                     "stop_duration": 300,
+                    "utilization_policy": None,
                     "registry_auth": None,
                     "requirements": {
                         "resources": {
@@ -351,6 +358,7 @@ def get_dev_env_run_dict(
                     "single_branch": False,
                     "max_duration": None,
                     "stop_duration": 300,
+                    "utilization_policy": None,
                     "registry_auth": None,
                     "requirements": {
                         "resources": {
@@ -895,25 +903,77 @@ class TestGetRunPlan:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_returns_update_action_when_changing_updatable_fields(
-        self, test_db, session: AsyncSession, client: AsyncClient
-    ):
+    @pytest.mark.parametrize(
+        ("old_conf", "new_conf", "action"),
+        [
+            pytest.param(
+                ServiceConfiguration(
+                    commands=["one", "two"],
+                    port=80,
+                    replicas=1,
+                    scaling=None,
+                ),
+                ServiceConfiguration(
+                    commands=["one", "two"],
+                    port=80,
+                    replicas="2..4",
+                    scaling=ScalingSpec(metric="rps", target=5),
+                ),
+                "update",
+                id="update-service",
+            ),
+            pytest.param(
+                ServiceConfiguration(
+                    commands=["one", "two"],
+                    port=80,
+                    replicas=1,
+                    scaling=None,
+                ),
+                ServiceConfiguration(
+                    commands=["one", "two"],
+                    port=8080,  # not updatable
+                    replicas="2..4",
+                    scaling=ScalingSpec(metric="rps", target=5),
+                ),
+                "create",
+                id="no-update-service",
+            ),
+            pytest.param(
+                DevEnvironmentConfiguration(ide="vscode", inactivity_duration=False),
+                DevEnvironmentConfiguration(ide="vscode", inactivity_duration="30m"),
+                "update",
+                id="update-dev-env",
+            ),
+            pytest.param(
+                TaskConfiguration(image="test-image-1"),
+                TaskConfiguration(image="test-image-2"),
+                "create",
+                id="no-update-task",
+            ),
+            pytest.param(
+                DevEnvironmentConfiguration(ide="vscode", image="test-image"),
+                TaskConfiguration(image="test-image"),
+                "create",
+                id="no-update-on-type-change",
+            ),
+        ],
+    )
+    async def test_returns_update_or_create_action_on_conf_change(
+        self,
+        test_db,
+        session: AsyncSession,
+        client: AsyncClient,
+        old_conf: AnyRunConfiguration,
+        new_conf: AnyRunConfiguration,
+        action: str,
+    ) -> None:
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
         repo = await create_repo(session=session, project_id=project.id)
-        run_spec = get_run_spec(
-            run_name="test-service",
-            repo_id=repo.name,
-            configuration=ServiceConfiguration(
-                type="service",
-                commands=["one", "two"],
-                port=80,
-                replicas=1,
-            ),
-        )
+        run_spec = get_run_spec(run_name="test-run", repo_id=repo.name, configuration=old_conf)
         run_model = await create_run(
             session=session,
             project=project,
@@ -923,7 +983,7 @@ class TestGetRunPlan:
             run_spec=run_spec,
         )
         run = run_model_to_run(run_model)
-        run_spec.configuration.replicas = 2
+        run_spec.configuration = new_conf
         response = await client.post(
             f"/api/project/{project.name}/runs/get_plan",
             headers=get_auth_headers(user.token),
@@ -931,48 +991,7 @@ class TestGetRunPlan:
         )
         assert response.status_code == 200
         response_json = response.json()
-        assert response_json["action"] == "update"
-        assert response_json["current_resource"] == json.loads(run.json())
-
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_returns_create_action_when_changing_non_updatable_fields(
-        self, test_db, session: AsyncSession, client: AsyncClient
-    ):
-        user = await create_user(session=session, global_role=GlobalRole.USER)
-        project = await create_project(session=session, owner=user)
-        await add_project_member(
-            session=session, project=project, user=user, project_role=ProjectRole.USER
-        )
-        repo = await create_repo(session=session, project_id=project.id)
-        run_spec = get_run_spec(
-            run_name="test-service",
-            repo_id=repo.name,
-            configuration=ServiceConfiguration(
-                type="service",
-                commands=["one", "two"],
-                port=80,
-                replicas=1,
-            ),
-        )
-        run_model = await create_run(
-            session=session,
-            project=project,
-            repo=repo,
-            user=user,
-            run_name=run_spec.run_name,
-            run_spec=run_spec,
-        )
-        run = run_model_to_run(run_model)
-        run_spec.configuration.port = 8080
-        response = await client.post(
-            f"/api/project/{project.name}/runs/get_plan",
-            headers=get_auth_headers(user.token),
-            json={"run_spec": run_spec.dict()},
-        )
-        assert response.status_code == 200
-        response_json = response.json()
-        assert response_json["action"] == "create"
+        assert response_json["action"] == action
         assert response_json["current_resource"] == json.loads(run.json())
 
 

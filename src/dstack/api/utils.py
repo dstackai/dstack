@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import Optional, Tuple
 
 import yaml
+from pydantic import ValidationError
 
 from dstack._internal.core.errors import ConfigurationError
 from dstack._internal.core.models.configurations import AnyRunConfiguration
@@ -96,6 +97,8 @@ def _load_profile_from_path(profiles_path: Path, profile_name: Optional[str]) ->
             config = ProfilesConfig.parse_obj(yaml.safe_load(f))
     except FileNotFoundError:
         return None
+    except ValidationError as e:
+        raise ConfigurationError(e)
 
     if profile_name is None:
         return config.default()

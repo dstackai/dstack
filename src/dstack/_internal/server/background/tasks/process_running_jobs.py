@@ -348,7 +348,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
             job_model.termination_reason = JobTerminationReason.GATEWAY_ERROR
 
     if job_model.status == JobStatus.RUNNING:
-        await _check_gpu_utilization(session, run_model, job_model)
+        await _check_gpu_utilization(session, job_model, job)
 
     job_model.last_processed_at = common_utils.get_current_datetime()
     await session.commit()
@@ -653,33 +653,34 @@ def _terminate_if_inactivity_duration_exceeded(
     run_model: RunModel, job_model: JobModel, no_connections_secs: Optional[int]
 ) -> None:
     conf = RunSpec.__response__.parse_raw(run_model.run_spec).configuration
-    if is_core_model_instance(conf, DevEnvironmentConfiguration) and isinstance(
+    if not is_core_model_instance(conf, DevEnvironmentConfiguration) or not isinstance(
         conf.inactivity_duration, int
     ):
-        logger.debug("%s: no SSH connections for %s seconds", fmt(job_model), no_connections_secs)
-        job_model.inactivity_secs = no_connections_secs
-        if no_connections_secs is None:
-            # TODO(0.19 or earlier): make no_connections_secs required
-            job_model.status = JobStatus.TERMINATING
-            job_model.termination_reason = JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY
-            job_model.termination_reason_message = (
-                "The selected instance was created before dstack 0.18.41"
-                " and does not support inactivity_duration"
-            )
-        elif no_connections_secs >= conf.inactivity_duration:
-            job_model.status = JobStatus.TERMINATING
-            # TODO(0.19 or earlier): set JobTerminationReason.INACTIVITY_DURATION_EXCEEDED
-            job_model.termination_reason = JobTerminationReason.TERMINATED_BY_SERVER
-            job_model.termination_reason_message = (
-                f"The job was inactive for {no_connections_secs} seconds,"
-                f" exceeding the inactivity_duration of {conf.inactivity_duration} seconds"
-            )
+        # reset in case inactivity_duration was disabled via in-place update
+        job_model.inactivity_secs = None
+        return
+    logger.debug("%s: no SSH connections for %s seconds", fmt(job_model), no_connections_secs)
+    job_model.inactivity_secs = no_connections_secs
+    if no_connections_secs is None:
+        # TODO(0.19 or earlier): make no_connections_secs required
+        job_model.status = JobStatus.TERMINATING
+        job_model.termination_reason = JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY
+        job_model.termination_reason_message = (
+            "The selected instance was created before dstack 0.18.41"
+            " and does not support inactivity_duration"
+        )
+    elif no_connections_secs >= conf.inactivity_duration:
+        job_model.status = JobStatus.TERMINATING
+        # TODO(0.19 or earlier): set JobTerminationReason.INACTIVITY_DURATION_EXCEEDED
+        job_model.termination_reason = JobTerminationReason.TERMINATED_BY_SERVER
+        job_model.termination_reason_message = (
+            f"The job was inactive for {no_connections_secs} seconds,"
+            f" exceeding the inactivity_duration of {conf.inactivity_duration} seconds"
+        )
 
 
-async def _check_gpu_utilization(
-    session: AsyncSession, run_model: RunModel, job_model: JobModel
-) -> None:
-    policy = RunSpec.__response__.parse_raw(run_model.run_spec).configuration.utilization_policy
+async def _check_gpu_utilization(session: AsyncSession, job_model: JobModel, job: Job) -> None:
+    policy = job.job_spec.utilization_policy
     if policy is None:
         return
     after = common_utils.get_current_datetime() - timedelta(seconds=policy.time_window)
