@@ -15,7 +15,7 @@ to configure [backends](../../concepts/backends.md) and other [sever-level setti
     overrides:
         show_root_heading: false
         backends:
-            type: 'Union[AWSConfigInfoWithCreds, AzureConfigInfoWithCreds, GCPConfigInfoWithCreds, LambdaConfigInfoWithCreds, TensorDockConfigInfoWithCreds, VastAIConfigInfoWithCreds, KubernetesConfig]'
+            type: 'Union[AWSConfigInfoWithCreds, AzureConfigInfoWithCreds, GCPConfigInfoWithCreds, LambdaConfigInfoWithCreds, NebiusConfigInfoWithCreds, RunpodConfigInfoWithCreds, TensorDockConfigInfoWithCreds, VastAIConfigInfoWithCreds, KubernetesConfig]'
 
 #### `projects[n].backends` { #backends data-toc-label="backends" }
 
