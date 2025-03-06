@@ -4,16 +4,6 @@ from pydantic import Field
 
 from dstack._internal.core.models.common import CoreModel
 
-# class AzureBackendConfig(CoreModel):
-#     type: Literal["azure"] = "azure"
-#     tenant_id: str
-#     subscription_id: str
-#     resource_group: Optional[str] = None
-#     locations: Optional[List[str]] = None
-#     vpc_ids: Optional[Dict[str, str]] = None
-#     public_ips: Optional[bool] = None
-#     tags: Optional[Dict[str, str]] = None
-
 
 class AzureClientCreds(CoreModel):
     type: Annotated[Literal["client"], Field(description="The type of credentials")] = "client"
