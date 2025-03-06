@@ -298,6 +298,57 @@ to configure [backends](../../concepts/backends.md) and other [sever-level setti
         type:
             required: true
 
+##### `projects[n].backends[type=nebius]` { #nebius data-toc-label="nebius" }
+
+#SCHEMA# dstack._internal.server.services.config.NebiusConfig
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+        item_id_prefix: nebius-
+
+###### `projects[n].backends[type=nebius].creds` { #nebius-creds data-toc-label="creds" }
+
+#SCHEMA# dstack._internal.core.backends.nebius.models.NebiusServiceAccountCreds
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+
+##### `projects[n].backends[type=runpod]` { #runpod data-toc-label="runpod" }
+
+#SCHEMA# dstack._internal.server.services.config.RunpodConfig
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+        item_id_prefix: runpod-
+
+###### `projects[n].backends[type=runpod].creds` { #runpod-creds data-toc-label="creds" }
+
+#SCHEMA# dstack._internal.core.backends.runpod.models.RunpodAPIKeyCreds
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+
+##### `projects[n].backends[type=datacrunch]` { #datacrunch data-toc-label="datacrunch" }
+
+#SCHEMA# dstack._internal.server.services.config.DataCrunchConfig
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+        item_id_prefix: datacrunch-
+
+###### `projects[n].backends[type=datacrunch].creds` { #datacrunch-creds data-toc-label="creds" }
+
+#SCHEMA# dstack._internal.core.backends.datacrunch.models.DataCrunchAPIKeyCreds
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+
 ### `encryption` { #encryption data-toc-label="encryption" }
 
 #SCHEMA# dstack._internal.server.services.config.EncryptionConfig
