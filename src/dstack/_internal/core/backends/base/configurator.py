@@ -1,7 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Annotated, Any, List, Optional
-
-from pydantic import Field
+from typing import Any, List, Optional
 
 from dstack._internal.core.backends.base.backend import Backend
 from dstack._internal.core.backends.models import (
@@ -18,23 +16,26 @@ TAGS_MAX_NUM = 25
 
 
 class StoredBackendRecord(CoreModel):
-    config: Annotated[
-        str,
-        Field(description="Text-encoded non-sensitive backend config parameters (e.g. json)"),
-    ]
-    auth: Annotated[
-        str,
-        Field(
-            description=(
-                "Text-encoded sensitive backend config parameters (e.g. json)."
-                " Configurator should not encrypt/decrypt it."
-                " This is done by the caller."
-            )
-        ),
-    ]
+    """
+    This model includes backend parameters stored in the DB.
+    `Configurator` uses it to save and read backend configs.
+    """
+
+    # `config` stores text-encoded non-sensitive backend config parameters (e.g. json)
+    config: str
+    # `auth` stores text-encoded sensitive backend config parameters (e.g. json).
+    # Configurator should not encrypt/decrypt it. This is done by the caller.
+    auth: str
 
 
 class Configurator(ABC):
+    """
+    `Configurator` is responsible for configuring backends
+    and initializing `Backend` instances from backend configs.
+    Every backend must implement `Configurator` and register it
+    in `dstack._internal.core.backends.configurators`.
+    """
+
     TYPE: BackendType
 
     @abstractmethod
@@ -51,8 +52,8 @@ class Configurator(ABC):
         self, project_name: str, config: AnyBackendConfigWithCreds
     ) -> StoredBackendRecord:
         """
-        Creates BackendModel given backend config and returns
-        text-encoded config and creds to be stored in the db.
+        Sets up backend given backend config and returns
+        text-encoded config and creds to be stored in the DB.
         It may perform backend initialization, create
         cloud resources such as networks and managed identites, and
         save additional configuration parameters.
@@ -64,7 +65,7 @@ class Configurator(ABC):
         self, record: StoredBackendRecord, include_creds: bool
     ) -> AnyBackendConfig:
         """
-        Constructs BackendConfig to be returned in API responses.
+        Constructs `BackendConfig` to be returned in API responses.
         Project admins may need to see backend's creds. In this case `include_creds` will be True.
         Otherwise, no sensitive information should be included.
         """
@@ -73,7 +74,7 @@ class Configurator(ABC):
     @abstractmethod
     def get_backend(self, record: StoredBackendRecord) -> Backend:
         """
-        Returns Backend instance from config and creds stored in `model`.
+        Returns `Backend` instance from config and creds stored in `record`.
         """
         pass
 

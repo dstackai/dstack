@@ -7,6 +7,7 @@ from sqlalchemy import func as safunc
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
+from dstack._internal.core.backends.configurators import get_configurator
 from dstack._internal.core.backends.dstack.models import (
     DstackBackendConfig,
     DstackBaseBackendConfig,
@@ -21,7 +22,6 @@ from dstack._internal.server.schemas.projects import MemberSetting
 from dstack._internal.server.services import users
 from dstack._internal.server.services.backends import (
     get_backend_config_from_backend_model,
-    get_configurator,
 )
 from dstack._internal.server.services.permissions import get_default_permissions
 from dstack._internal.server.settings import DEFAULT_PROJECT_NAME

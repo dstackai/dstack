@@ -3,6 +3,7 @@ from typing import List, Tuple
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
+import dstack._internal.core.backends.configurators
 from dstack._internal.core.backends.models import (
     AnyBackendConfigWithCreds,
     BackendInfoYAML,
@@ -42,7 +43,7 @@ project_router = APIRouter(
 
 @root_router.post("/list_types")
 async def list_backend_types() -> List[BackendType]:
-    return backends.list_available_backend_types()
+    return dstack._internal.core.backends.configurators.list_available_backend_types()
 
 
 @project_router.post("/create")

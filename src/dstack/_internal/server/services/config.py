@@ -5,6 +5,7 @@ from pydantic import Field, ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing_extensions import Annotated
 
+import dstack._internal.core.backends.configurators
 from dstack._internal.core.backends.models import (
     AnyBackendConfigWithCreds,
     AnyBackendFileConfigWithCreds,
@@ -46,10 +47,6 @@ def seq_representer(dumper, sequence):
 
 
 yaml.add_representer(list, seq_representer)
-
-
-class _BackendConfigWithCreds(CoreModel):
-    __root__: Annotated[AnyBackendConfigWithCreds, Field(..., discriminator="type")]
 
 
 BackendFileConfigWithCreds = Annotated[
@@ -133,7 +130,9 @@ class ServerConfigManager:
             project = await projects_services.get_project_model_by_name_or_error(
                 session=session, project_name=project_config.name
             )
-        backends_to_delete = set(backends_services.list_available_backend_types())
+        backends_to_delete = set(
+            dstack._internal.core.backends.configurators.list_available_backend_types()
+        )
         for backend_file_config in project_config.backends or []:
             backend_config = file_config_to_config(backend_file_config)
             backend_type = BackendType(backend_config.type)
@@ -184,7 +183,9 @@ class ServerConfigManager:
         # Force project reload to reflect updates when syncing
         await session.refresh(project)
         backends = []
-        for backend_type in backends_services.list_available_backend_types():
+        for (
+            backend_type
+        ) in dstack._internal.core.backends.configurators.list_available_backend_types():
             backend_config = await backends_services.get_backend_config(
                 project=project, backend_type=backend_type
             )
@@ -243,13 +244,12 @@ async def update_backend_config_yaml(
     await backends_services.update_backend(session=session, project=project, config=config)
 
 
-server_config_manager = ServerConfigManager()
+class _BackendConfigWithCreds(CoreModel):
+    """
+    Model for parsing API and file YAML configs.
+    """
 
-
-def file_config_to_config(file_config: AnyBackendFileConfigWithCreds) -> AnyBackendConfigWithCreds:
-    backend_config_dict = file_config.dict()
-    backend_config = _BackendConfigWithCreds.parse_obj(backend_config_dict)
-    return backend_config.__root__
+    __root__: Annotated[AnyBackendConfigWithCreds, Field(..., discriminator="type")]
 
 
 def config_yaml_to_backend_config(config_yaml: str) -> AnyBackendConfigWithCreds:
@@ -262,6 +262,12 @@ def config_yaml_to_backend_config(config_yaml: str) -> AnyBackendConfigWithCreds
     except ValidationError as e:
         raise ServerClientError(str(e))
     return backend_config
+
+
+def file_config_to_config(file_config: AnyBackendFileConfigWithCreds) -> AnyBackendConfigWithCreds:
+    backend_config_dict = file_config.dict()
+    backend_config = _BackendConfigWithCreds.parse_obj(backend_config_dict)
+    return backend_config.__root__
 
 
 def config_to_yaml(config: CoreModel) -> str:

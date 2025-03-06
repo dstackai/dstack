@@ -142,12 +142,12 @@ class AzureConfigurator(Configurator):
 
     def _get_config(self, record: StoredBackendRecord) -> AzureConfig:
         config_dict = json.loads(record.config)
-        regions = config_dict.get("regions")
+        regions = config_dict.pop("regions", None)
         if regions is None:
-            # Legacy config store regions in locations
-            regions = config_dict.get("locations")
+            # Legacy config stores regions as locations
+            regions = config_dict.pop("locations")
         return AzureConfig.__response__(
-            **json.loads(record.config),
+            **config_dict,
             regions=regions,
             creds=AzureCreds.parse_raw(record.auth).__root__,
         )
