@@ -141,7 +141,10 @@ def get_backend_config_from_backend_model(
 
 def get_stored_backend_record(backend_model: BackendModel) -> StoredBackendRecord:
     return StoredBackendRecord(
-        config=backend_model.config, auth=backend_model.auth.get_plaintext_or_error()
+        config=backend_model.config,
+        auth=backend_model.auth.get_plaintext_or_error(),
+        project_id=backend_model.project_id,
+        backend_id=backend_model.id,
     )
 
 

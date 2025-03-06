@@ -4,8 +4,8 @@ import requests
 
 import dstack._internal.core.backends.nebius.api_client as api_client
 from dstack._internal.core.backends.base.configurator import (
+    BackendRecord,
     Configurator,
-    StoredBackendRecord,
     raise_invalid_credentials_error,
 )
 from dstack._internal.core.backends.nebius.backend import NebiusBackend
@@ -31,27 +31,27 @@ class NebiusConfigurator(Configurator):
 
     def create_backend(
         self, project_name: str, config: NebiusBackendConfigWithCreds
-    ) -> StoredBackendRecord:
+    ) -> BackendRecord:
         if config.regions is None:
             config.regions = REGIONS
-        return StoredBackendRecord(
+        return BackendRecord(
             config=NebiusStoredConfig.__response__.parse_obj(config).json(),
             auth=NebiusCreds.parse_obj(config.creds).json(),
         )
 
     def get_backend_config(
-        self, record: StoredBackendRecord, include_creds: bool
+        self, record: BackendRecord, include_creds: bool
     ) -> NebiusBackendConfig:
         config = self._get_config(record)
         if include_creds:
             return NebiusBackendConfigWithCreds.__response__.parse_obj(config)
         return NebiusBackendConfig.__response__.parse_obj(config)
 
-    def get_backend(self, record: StoredBackendRecord) -> NebiusBackend:
+    def get_backend(self, record: BackendRecord) -> NebiusBackend:
         config = self._get_config(record)
         return NebiusBackend(config=config)
 
-    def _get_config(self, record: StoredBackendRecord) -> NebiusConfig:
+    def _get_config(self, record: BackendRecord) -> NebiusConfig:
         return NebiusConfig.__response__(
             **json.loads(record.config),
             creds=NebiusCreds.parse_raw(record.auth),

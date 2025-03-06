@@ -1,8 +1,8 @@
 import json
 
 from dstack._internal.core.backends.base.configurator import (
+    BackendRecord,
     Configurator,
-    StoredBackendRecord,
     raise_invalid_credentials_error,
 )
 from dstack._internal.core.backends.models import (
@@ -30,29 +30,27 @@ class VultrConfigurator(Configurator):
 
     def create_backend(
         self, project_name: str, config: VultrBackendConfigWithCreds
-    ) -> StoredBackendRecord:
+    ) -> BackendRecord:
         if config.regions is None:
             config.regions = REGIONS
-        return StoredBackendRecord(
+        return BackendRecord(
             config=VultrStoredConfig(
                 **VultrBackendConfig.__response__.parse_obj(config).dict()
             ).json(),
             auth=VultrCreds.parse_obj(config.creds).json(),
         )
 
-    def get_backend_config(
-        self, record: StoredBackendRecord, include_creds: bool
-    ) -> VultrBackendConfig:
+    def get_backend_config(self, record: BackendRecord, include_creds: bool) -> VultrBackendConfig:
         config = self._get_config(record)
         if include_creds:
             return VultrBackendConfigWithCreds.__response__.parse_obj(config)
         return VultrBackendConfig.__response__.parse_obj(config)
 
-    def get_backend(self, record: StoredBackendRecord) -> VultrBackend:
+    def get_backend(self, record: BackendRecord) -> VultrBackend:
         config = self._get_config(record)
         return VultrBackend(config=config)
 
-    def _get_config(self, record: StoredBackendRecord) -> VultrConfig:
+    def _get_config(self, record: BackendRecord) -> VultrConfig:
         return VultrConfig.__response__(
             **json.loads(record.config),
             creds=VultrCreds.parse_raw(record.auth),

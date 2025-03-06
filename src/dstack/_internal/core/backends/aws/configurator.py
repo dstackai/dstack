@@ -18,8 +18,8 @@ from dstack._internal.core.backends.aws.models import (
 )
 from dstack._internal.core.backends.base.configurator import (
     TAGS_MAX_NUM,
+    BackendRecord,
     Configurator,
-    StoredBackendRecord,
     raise_invalid_credentials_error,
 )
 from dstack._internal.core.errors import (
@@ -76,10 +76,10 @@ class AWSConfigurator(Configurator):
 
     def create_backend(
         self, project_name: str, config: AWSBackendConfigWithCreds
-    ) -> StoredBackendRecord:
+    ) -> BackendRecord:
         if config.regions is None:
             config.regions = DEFAULT_REGIONS
-        return StoredBackendRecord(
+        return BackendRecord(
             config=AWSStoredConfig(
                 **AWSBackendConfig.__response__.parse_obj(config).dict()
             ).json(),
@@ -87,18 +87,18 @@ class AWSConfigurator(Configurator):
         )
 
     def get_backend_config(
-        self, record: StoredBackendRecord, include_creds: bool
+        self, record: BackendRecord, include_creds: bool
     ) -> AnyAWSBackendConfig:
         config = self._get_config(record)
         if include_creds:
             return AWSBackendConfigWithCreds.__response__.parse_obj(config)
         return AWSBackendConfig.__response__.parse_obj(config)
 
-    def get_backend(self, record: StoredBackendRecord) -> AWSBackend:
+    def get_backend(self, record: BackendRecord) -> AWSBackend:
         config = self._get_config(record)
         return AWSBackend(config=config)
 
-    def _get_config(self, record: StoredBackendRecord) -> AWSConfig:
+    def _get_config(self, record: BackendRecord) -> AWSConfig:
         return AWSConfig.__response__(
             **json.loads(record.config),
             creds=AWSCreds.parse_raw(record.auth).__root__,

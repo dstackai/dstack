@@ -4,8 +4,8 @@ import google.cloud.compute_v1 as compute_v1
 
 from dstack._internal.core.backends.base.configurator import (
     TAGS_MAX_NUM,
+    BackendRecord,
     Configurator,
-    StoredBackendRecord,
     raise_invalid_credentials_error,
 )
 from dstack._internal.core.backends.gcp import auth, resources
@@ -137,10 +137,10 @@ class GCPConfigurator(Configurator):
 
     def create_backend(
         self, project_name: str, config: GCPBackendConfigWithCreds
-    ) -> StoredBackendRecord:
+    ) -> BackendRecord:
         if config.regions is None:
             config.regions = DEFAULT_REGIONS
-        return StoredBackendRecord(
+        return BackendRecord(
             config=GCPStoredConfig(
                 **GCPBackendConfig.__response__.parse_obj(config).dict(),
             ).json(),
@@ -148,18 +148,18 @@ class GCPConfigurator(Configurator):
         )
 
     def get_backend_config(
-        self, record: StoredBackendRecord, include_creds: bool
+        self, record: BackendRecord, include_creds: bool
     ) -> AnyGCPBackendConfig:
         config = self._get_config(record)
         if include_creds:
             return GCPBackendConfigWithCreds.__response__.parse_obj(config)
         return GCPBackendConfig.__response__.parse_obj(config)
 
-    def get_backend(self, record: StoredBackendRecord) -> GCPBackend:
+    def get_backend(self, record: BackendRecord) -> GCPBackend:
         config = self._get_config(record)
         return GCPBackend(config=config)
 
-    def _get_config(self, record: StoredBackendRecord) -> GCPConfig:
+    def _get_config(self, record: BackendRecord) -> GCPConfig:
         return GCPConfig.__response__(
             **json.loads(record.config),
             creds=GCPCreds.parse_raw(record.auth).__root__,

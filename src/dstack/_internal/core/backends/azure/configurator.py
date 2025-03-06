@@ -34,8 +34,8 @@ from dstack._internal.core.backends.azure.models import (
 )
 from dstack._internal.core.backends.base.configurator import (
     TAGS_MAX_NUM,
+    BackendRecord,
     Configurator,
-    StoredBackendRecord,
     raise_invalid_credentials_error,
 )
 from dstack._internal.core.errors import (
@@ -101,7 +101,7 @@ class AzureConfigurator(Configurator):
 
     def create_backend(
         self, project_name: str, config: AzureBackendConfigWithCreds
-    ) -> StoredBackendRecord:
+    ) -> BackendRecord:
         if config.regions is None:
             config.regions = DEFAULT_LOCATIONS
         if is_core_model_instance(config.creds, AzureClientCreds):
@@ -121,7 +121,7 @@ class AzureConfigurator(Configurator):
             locations=config.regions,
             create_default_network=config.vpc_ids is None,
         )
-        return StoredBackendRecord(
+        return BackendRecord(
             config=AzureStoredConfig(
                 **AzureBackendConfig.__response__.parse_obj(config).dict()
             ).json(),
@@ -129,18 +129,18 @@ class AzureConfigurator(Configurator):
         )
 
     def get_backend_config(
-        self, record: StoredBackendRecord, include_creds: bool
+        self, record: BackendRecord, include_creds: bool
     ) -> AnyAzureBackendConfig:
         config = self._get_config(record)
         if include_creds:
             return AzureBackendConfigWithCreds.__response__.parse_obj(config)
         return AzureBackendConfig.__response__.parse_obj(config)
 
-    def get_backend(self, record: StoredBackendRecord) -> AzureBackend:
+    def get_backend(self, record: BackendRecord) -> AzureBackend:
         config = self._get_config(record)
         return AzureBackend(config=config)
 
-    def _get_config(self, record: StoredBackendRecord) -> AzureConfig:
+    def _get_config(self, record: BackendRecord) -> AzureConfig:
         config_dict = json.loads(record.config)
         regions = config_dict.pop("regions", None)
         if regions is None:

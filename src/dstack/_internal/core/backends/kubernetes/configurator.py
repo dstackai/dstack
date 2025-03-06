@@ -1,6 +1,6 @@
 from dstack._internal.core.backends.base.configurator import (
+    BackendRecord,
     Configurator,
-    StoredBackendRecord,
     raise_invalid_credentials_error,
 )
 from dstack._internal.core.backends.kubernetes import utils as kubernetes_utils
@@ -33,22 +33,22 @@ class KubernetesConfigurator(Configurator):
 
     def create_backend(
         self, project_name: str, config: KubernetesBackendConfigWithCreds
-    ) -> StoredBackendRecord:
-        return StoredBackendRecord(
+    ) -> BackendRecord:
+        return BackendRecord(
             config=KubernetesStoredConfig.__response__.parse_obj(config).json(),
             auth="",
         )
 
     def get_backend_config(
-        self, record: StoredBackendRecord, include_creds: bool
+        self, record: BackendRecord, include_creds: bool
     ) -> AnyKubernetesBackendConfig:
         config = self._get_config(record)
         if include_creds:
             return KubernetesBackendConfigWithCreds.__response__.parse_obj(config)
         return KubernetesBackendConfig.__response__.parse_obj(config)
 
-    def get_backend(self, record: StoredBackendRecord) -> KubernetesBackend:
+    def get_backend(self, record: BackendRecord) -> KubernetesBackend:
         return KubernetesBackend(self._get_config(record))
 
-    def _get_config(self, record: StoredBackendRecord) -> KubernetesConfig:
+    def _get_config(self, record: BackendRecord) -> KubernetesConfig:
         return KubernetesConfig.__response__.parse_raw(record.config)

@@ -1,8 +1,8 @@
 import json
 
 from dstack._internal.core.backends.base.configurator import (
+    BackendRecord,
     Configurator,
-    StoredBackendRecord,
     raise_invalid_credentials_error,
 )
 from dstack._internal.core.backends.vastai import api_client
@@ -31,10 +31,10 @@ class VastAIConfigurator(Configurator):
 
     def create_backend(
         self, project_name: str, config: VastAIBackendConfigWithCreds
-    ) -> StoredBackendRecord:
+    ) -> BackendRecord:
         if config.regions is None:
             config.regions = REGIONS
-        return StoredBackendRecord(
+        return BackendRecord(
             config=VastAIStoredConfig(
                 **VastAIBackendConfig.__response__.parse_obj(config).dict()
             ).json(),
@@ -42,18 +42,18 @@ class VastAIConfigurator(Configurator):
         )
 
     def get_backend_config(
-        self, record: StoredBackendRecord, include_creds: bool
+        self, record: BackendRecord, include_creds: bool
     ) -> AnyVastAIBackendConfig:
         config = self._get_config(record)
         if include_creds:
             return VastAIBackendConfigWithCreds.__response__.parse_obj(config)
         return VastAIBackendConfig.__response__.parse_obj(config)
 
-    def get_backend(self, record: StoredBackendRecord) -> VastAIBackend:
+    def get_backend(self, record: BackendRecord) -> VastAIBackend:
         config = self._get_config(record)
         return VastAIBackend(config=config)
 
-    def _get_config(self, record: StoredBackendRecord) -> VastAIConfig:
+    def _get_config(self, record: BackendRecord) -> VastAIConfig:
         return VastAIConfig.__response__(
             **json.loads(record.config),
             creds=VastAICreds.parse_raw(record.auth),

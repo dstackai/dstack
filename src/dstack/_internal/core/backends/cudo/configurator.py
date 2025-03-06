@@ -1,8 +1,8 @@
 import json
 
 from dstack._internal.core.backends.base.configurator import (
+    BackendRecord,
     Configurator,
-    StoredBackendRecord,
     raise_invalid_credentials_error,
 )
 from dstack._internal.core.backends.cudo import api_client
@@ -36,10 +36,10 @@ class CudoConfigurator(Configurator):
 
     def create_backend(
         self, project_name: str, config: CudoBackendConfigWithCreds
-    ) -> StoredBackendRecord:
+    ) -> BackendRecord:
         if config.regions is None:
             config.regions = REGIONS
-        return StoredBackendRecord(
+        return BackendRecord(
             config=CudoStoredConfig(
                 **CudoBackendConfig.__response__.parse_obj(config).dict()
             ).json(),
@@ -47,18 +47,18 @@ class CudoConfigurator(Configurator):
         )
 
     def get_backend_config(
-        self, record: StoredBackendRecord, include_creds: bool
+        self, record: BackendRecord, include_creds: bool
     ) -> AnyCudoBackendConfig:
         config = self._get_config(record)
         if include_creds:
             return CudoBackendConfigWithCreds.__response__.parse_obj(config)
         return CudoBackendConfig.__response__.parse_obj(config)
 
-    def get_backend(self, record: StoredBackendRecord) -> CudoBackend:
+    def get_backend(self, record: BackendRecord) -> CudoBackend:
         config = self._get_config(record)
         return CudoBackend(config=config)
 
-    def _get_config(self, record: StoredBackendRecord) -> CudoConfig:
+    def _get_config(self, record: BackendRecord) -> CudoConfig:
         return CudoConfig.__response__(
             **json.loads(record.config),
             creds=CudoCreds.parse_raw(record.auth),

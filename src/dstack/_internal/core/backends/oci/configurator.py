@@ -2,8 +2,8 @@ import json
 from typing import Dict, Iterable, List, Set, Tuple
 
 from dstack._internal.core.backends.base.configurator import (
+    BackendRecord,
     Configurator,
-    StoredBackendRecord,
     raise_invalid_credentials_error,
 )
 from dstack._internal.core.backends.oci import resources
@@ -59,7 +59,7 @@ class OCIConfigurator(Configurator):
 
     def create_backend(
         self, project_name: str, config: OCIBackendConfigWithCreds
-    ) -> StoredBackendRecord:
+    ) -> BackendRecord:
         try:
             subscribed_regions = get_subscribed_regions(config.creds)
         except any_oci_exception as e:
@@ -78,24 +78,24 @@ class OCIConfigurator(Configurator):
             **config.dict(), subnet_ids_per_region=subnet_ids_per_region
         )
 
-        return StoredBackendRecord(
+        return BackendRecord(
             config=stored_config.json(),
             auth=OCICreds.parse_obj(config.creds).json(),
         )
 
     def get_backend_config(
-        self, record: StoredBackendRecord, include_creds: bool
+        self, record: BackendRecord, include_creds: bool
     ) -> AnyOCIBackendConfig:
         config = self._get_config(record)
         if include_creds:
             return OCIBackendConfigWithCreds.__response__.parse_obj(config)
         return OCIBackendConfig.__response__.parse_obj(config)
 
-    def get_backend(self, record: StoredBackendRecord) -> OCIBackend:
+    def get_backend(self, record: BackendRecord) -> OCIBackend:
         config = self._get_config(record)
         return OCIBackend(config=config)
 
-    def _get_config(self, record: StoredBackendRecord) -> OCIConfig:
+    def _get_config(self, record: BackendRecord) -> OCIConfig:
         return OCIConfig.__response__(
             **json.loads(record.config),
             creds=OCICreds.parse_raw(record.auth).__root__,

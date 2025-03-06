@@ -1,8 +1,8 @@
 import json
 
 from dstack._internal.core.backends.base.configurator import (
+    BackendRecord,
     Configurator,
-    StoredBackendRecord,
     raise_invalid_credentials_error,
 )
 from dstack._internal.core.backends.tensordock import api_client
@@ -33,10 +33,10 @@ class TensorDockConfigurator(Configurator):
 
     def create_backend(
         self, project_name: str, config: TensorDockBackendConfigWithCreds
-    ) -> StoredBackendRecord:
+    ) -> BackendRecord:
         if config.regions is None:
             config.regions = REGIONS
-        return StoredBackendRecord(
+        return BackendRecord(
             config=TensorDockStoredConfig(
                 **TensorDockBackendConfig.__response__.parse_obj(config).dict()
             ).json(),
@@ -44,18 +44,18 @@ class TensorDockConfigurator(Configurator):
         )
 
     def get_backend_config(
-        self, record: StoredBackendRecord, include_creds: bool
+        self, record: BackendRecord, include_creds: bool
     ) -> AnyTensorDockBackendConfig:
         config = self._get_config(record)
         if include_creds:
             return TensorDockBackendConfigWithCreds.__response__.parse_obj(config)
         return TensorDockBackendConfig.__response__.parse_obj(config)
 
-    def get_backend(self, record: StoredBackendRecord) -> TensorDockBackend:
+    def get_backend(self, record: BackendRecord) -> TensorDockBackend:
         config = self._get_config(record)
         return TensorDockBackend(config=config)
 
-    def _get_config(self, record: StoredBackendRecord) -> TensorDockConfig:
+    def _get_config(self, record: BackendRecord) -> TensorDockConfig:
         return TensorDockConfig.__response__(
             **json.loads(record.config),
             creds=TensorDockCreds.parse_raw(record.auth),

@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Any, List, Optional
+from uuid import UUID
 
 from dstack._internal.core.backends.base.backend import Backend
 from dstack._internal.core.backends.models import (
@@ -15,10 +16,9 @@ from dstack._internal.core.models.common import CoreModel
 TAGS_MAX_NUM = 25
 
 
-class StoredBackendRecord(CoreModel):
+class BackendRecord(CoreModel):
     """
-    This model includes backend parameters stored in the DB.
-    `Configurator` uses it to save and read backend configs.
+    This model includes backend parameters to store in the DB.
     """
 
     # `config` stores text-encoded non-sensitive backend config parameters (e.g. json)
@@ -26,6 +26,17 @@ class StoredBackendRecord(CoreModel):
     # `auth` stores text-encoded sensitive backend config parameters (e.g. json).
     # Configurator should not encrypt/decrypt it. This is done by the caller.
     auth: str
+
+
+class StoredBackendRecord(BackendRecord):
+    """
+    This model includes backend parameters stored in the DB.
+    """
+
+    # IDs of DB models.
+    # Can be used by externally-registered Configurator to work with the DB directly.
+    project_id: UUID
+    backend_id: UUID
 
 
 class Configurator(ABC):
@@ -50,7 +61,7 @@ class Configurator(ABC):
     @abstractmethod
     def create_backend(
         self, project_name: str, config: AnyBackendConfigWithCreds
-    ) -> StoredBackendRecord:
+    ) -> BackendRecord:
         """
         Sets up backend given backend config and returns
         text-encoded config and creds to be stored in the DB.
