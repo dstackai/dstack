@@ -54,17 +54,13 @@ async def process_submitted_gateways():
 
 
 async def _remove_inactive_connections():
-    connections = await gateway_connections_pool.all()
-    ip_addresses = [c.ip_address for c in connections]
     async with get_session_ctx() as session:
         res = await session.execute(
-            select(GatewayComputeModel).where(
-                GatewayComputeModel.ip_address.in_(ip_addresses),
-                GatewayComputeModel.active == False,
-            )
+            select(GatewayComputeModel.ip_address).where(GatewayComputeModel.active == True)
         )
-        removed_connections = res.scalars().all()
-        for conn in removed_connections:
+    active_connection_ips = set(res.scalars().all())
+    for conn in await gateway_connections_pool.all():
+        if conn.ip_address not in active_connection_ips:
             await gateway_connections_pool.remove(conn.ip_address)
 
 
