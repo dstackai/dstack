@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
 from dstack._internal.core.backends import BACKENDS_WITH_VOLUMES_SUPPORT
+from dstack._internal.core.backends.base.compute import ComputeWithVolumeSupport
 from dstack._internal.core.errors import (
     BackendNotAvailable,
     ResourceExistsError,
@@ -409,7 +410,9 @@ async def _delete_volume(session: AsyncSession, project: ProjectModel, volume_mo
         )
         return
 
+    compute = backend.compute()
+    assert isinstance(compute, ComputeWithVolumeSupport)
     await common.run_async(
-        backend.compute().delete_volume,
+        compute.delete_volume,
         volume=volume,
     )

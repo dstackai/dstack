@@ -5,7 +5,8 @@ from dstack._internal.core.models.backends.base import BackendType
 
 
 class OCIBackend(Backend):
-    TYPE: BackendType = BackendType.OCI
+    TYPE = BackendType.OCI
+    COMPUTE_CLASS = OCICompute
 
     def __init__(self, config: OCIConfig):
         self.config = config

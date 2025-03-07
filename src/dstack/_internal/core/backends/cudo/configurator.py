@@ -29,7 +29,8 @@ DEFAULT_REGION = "no-luster-1"
 
 
 class CudoConfigurator(Configurator):
-    TYPE: BackendType = BackendType.CUDO
+    TYPE = BackendType.CUDO
+    BACKEND_CLASS = CudoBackend
 
     def validate_config(self, config: CudoBackendConfigWithCreds, default_creds_enabled: bool):
         self._validate_cudo_api_key(config.creds.api_key)

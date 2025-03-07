@@ -20,6 +20,8 @@ from dstack._internal.core.backends.base.compute import (
     DSTACK_RUNNER_BINARY_PATH,
     DSTACK_SHIM_BINARY_PATH,
     DSTACK_WORKING_DIR,
+    ComputeWithCreateInstanceSupport,
+    ComputeWithPlacementGroupSupport,
     get_shim_env,
     get_shim_pre_start_commands,
 )
@@ -530,12 +532,15 @@ async def _create_instance(session: AsyncSession, instance: InstanceModel) -> No
     for backend, instance_offer in offers:
         if instance_offer.backend not in BACKENDS_WITH_CREATE_INSTANCE_SUPPORT:
             continue
+        compute = backend.compute()
+        assert isinstance(compute, ComputeWithCreateInstanceSupport)
         instance_offer = _get_instance_offer_for_instance(instance_offer, instance)
         if (
             instance_offer.backend in BACKENDS_WITH_PLACEMENT_GROUPS_SUPPORT
             and instance.fleet
             and instance_configuration.placement_group_name
         ):
+            assert isinstance(compute, ComputeWithPlacementGroupSupport)
             placement_group_model = _create_placement_group_if_does_not_exist(
                 session=session,
                 fleet_model=instance.fleet,
@@ -546,7 +551,7 @@ async def _create_instance(session: AsyncSession, instance: InstanceModel) -> No
             )
             if placement_group_model is not None:
                 placement_group = placement_group_model_to_placement_group(placement_group_model)
-                pgpd = await run_async(backend.compute().create_placement_group, placement_group)
+                pgpd = await run_async(compute.create_placement_group, placement_group)
                 placement_group_model.provisioning_data = pgpd.json()
                 session.add(placement_group_model)
                 placement_groups.append(placement_group)
@@ -559,7 +564,7 @@ async def _create_instance(session: AsyncSession, instance: InstanceModel) -> No
         )
         try:
             job_provisioning_data = await run_async(
-                backend.compute().create_instance,
+                compute.create_instance,
                 instance_offer,
                 instance_configuration,
             )

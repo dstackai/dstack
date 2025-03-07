@@ -8,6 +8,16 @@ from uuid import UUID
 import gpuhunt
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from dstack._internal.core.backends.base.compute import (
+    Compute,
+    ComputeWithCreateInstanceSupport,
+    ComputeWithGatewaySupport,
+    ComputeWithMultinodeSupport,
+    ComputeWithPlacementGroupSupport,
+    ComputeWithPrivateGatewaySupport,
+    ComputeWithReservationSupport,
+    ComputeWithVolumeSupport,
+)
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import NetworkMode
 from dstack._internal.core.models.configurations import (
@@ -947,3 +957,20 @@ class AsyncContextManager:
 
     async def __aexit__(self, exc_type, exc, traceback):
         pass
+
+
+class ComputeMockSpec(
+    Compute,
+    ComputeWithCreateInstanceSupport,
+    ComputeWithMultinodeSupport,
+    ComputeWithReservationSupport,
+    ComputeWithPlacementGroupSupport,
+    ComputeWithGatewaySupport,
+    ComputeWithPrivateGatewaySupport,
+    ComputeWithVolumeSupport,
+):
+    """
+    Can be used to create Compute mocks that pass all isinstance asserts.
+    """
+
+    pass

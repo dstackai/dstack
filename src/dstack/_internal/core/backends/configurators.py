@@ -132,6 +132,10 @@ def list_available_backend_types() -> List[BackendType]:
     return available_backend_types
 
 
+def list_available_configurator_classes() -> List[type[Configurator]]:
+    return _CONFIGURATOR_CLASSES
+
+
 def register_configurator(configurator: Type[Configurator]):
     """
     A hook to for registering new configurators without importing them.

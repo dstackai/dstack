@@ -19,7 +19,8 @@ logger = get_logger(__name__)
 
 
 class KubernetesConfigurator(Configurator):
-    TYPE: BackendType = BackendType.KUBERNETES
+    TYPE = BackendType.KUBERNETES
+    BACKEND_CLASS = KubernetesBackend
 
     def validate_config(
         self, config: KubernetesBackendConfigWithCreds, default_creds_enabled: bool

@@ -12,6 +12,10 @@ import dstack._internal.core.backends.gcp.auth as auth
 import dstack._internal.core.backends.gcp.resources as gcp_resources
 from dstack._internal.core.backends.base.compute import (
     Compute,
+    ComputeWithCreateInstanceSupport,
+    ComputeWithGatewaySupport,
+    ComputeWithMultinodeSupport,
+    ComputeWithVolumeSupport,
     generate_unique_gateway_instance_name,
     generate_unique_instance_name,
     generate_unique_volume_name,
@@ -69,7 +73,13 @@ class GCPVolumeDiskBackendData(CoreModel):
     disk_type: str
 
 
-class GCPCompute(Compute):
+class GCPCompute(
+    Compute,
+    ComputeWithCreateInstanceSupport,
+    ComputeWithMultinodeSupport,
+    ComputeWithGatewaySupport,
+    ComputeWithVolumeSupport,
+):
     def __init__(self, config: GCPConfig):
         super().__init__()
         self.config = config

@@ -29,6 +29,7 @@ from dstack._internal.core.models.volumes import (
 from dstack._internal.server.background.tasks.process_submitted_jobs import process_submitted_jobs
 from dstack._internal.server.models import InstanceModel, JobModel, VolumeAttachmentModel
 from dstack._internal.server.testing.common import (
+    ComputeMockSpec,
     create_fleet,
     create_instance,
     create_job,
@@ -506,6 +507,7 @@ class TestProcessSubmittedJobs:
             backend_mock = Mock()
             m.return_value = backend_mock
             backend_mock.TYPE = BackendType.AWS
+            backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
             backend_mock.compute.return_value.attach_volume.return_value = VolumeAttachmentData()
             # Submitted jobs processing happens in two steps
             await process_submitted_jobs()

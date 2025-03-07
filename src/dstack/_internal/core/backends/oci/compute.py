@@ -6,6 +6,8 @@ import oci
 
 from dstack._internal.core.backends.base.compute import (
     Compute,
+    ComputeWithCreateInstanceSupport,
+    ComputeWithMultinodeSupport,
     generate_unique_instance_name,
     get_job_instance_name,
     get_user_data,
@@ -46,7 +48,11 @@ SUPPORTED_SHAPE_FAMILIES = [
 CONFIGURABLE_DISK_SIZE = Range[Memory](min=Memory.parse("50GB"), max=Memory.parse("32TB"))
 
 
-class OCICompute(Compute):
+class OCICompute(
+    Compute,
+    ComputeWithCreateInstanceSupport,
+    ComputeWithMultinodeSupport,
+):
     def __init__(self, config: OCIConfig):
         super().__init__()
         self.config = config

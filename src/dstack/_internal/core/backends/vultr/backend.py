@@ -5,7 +5,8 @@ from dstack._internal.core.models.backends.base import BackendType
 
 
 class VultrBackend(Backend):
-    TYPE: BackendType = BackendType.VULTR
+    TYPE = BackendType.VULTR
+    COMPUTE_CLASS = VultrCompute
 
     def __init__(self, config: VultrConfig):
         self.config = config

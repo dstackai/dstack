@@ -14,6 +14,7 @@ from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.models import VolumeAttachmentModel, VolumeModel
 from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.testing.common import (
+    ComputeMockSpec,
     create_instance,
     create_pool,
     create_project,
@@ -366,6 +367,7 @@ class TestDeleteVolumes:
         ) as m:
             aws_mock = Mock()
             m.return_value = aws_mock
+            aws_mock.compute.return_value = Mock(spec=ComputeMockSpec)
             response = await client.post(
                 f"/api/project/{project.name}/volumes/delete",
                 headers=get_auth_headers(user.token),

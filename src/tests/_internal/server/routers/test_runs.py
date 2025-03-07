@@ -51,6 +51,7 @@ from dstack._internal.server.schemas.runs import ApplyRunPlanRequest, CreateInst
 from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.services.runs import run_model_to_run
 from dstack._internal.server.testing.common import (
+    ComputeMockSpec,
     create_backend,
     create_gateway,
     create_gateway_compute,
@@ -1616,6 +1617,7 @@ class TestCreateInstance:
             )
             backend = Mock()
             backend.TYPE = BackendType.AZURE
+            backend.compute.return_value = Mock(spec=ComputeMockSpec)
             backend.compute.return_value.get_offers_cached.return_value = [offer]
             backend.compute.return_value.create_instance.side_effect = NotImplementedError()
             run_plan_by_req.return_value = [(backend, offer)]
@@ -1658,6 +1660,7 @@ class TestCreateInstance:
 
             backend = Mock()
             backend.TYPE = BackendType.VASTAI
+            backend.compute.return_value = Mock(spec=ComputeMockSpec)
             backend.compute.return_value.get_offers_cached.return_value = [offers]
             backend.compute.return_value.create_instance.side_effect = NotImplementedError()
             run_plan_by_req.return_value = [(backend, offers)]

@@ -40,7 +40,8 @@ DEFAULT_REGION = "us-east-1"
 
 
 class LambdaConfigurator(Configurator):
-    TYPE: BackendType = BackendType.LAMBDA
+    TYPE = BackendType.LAMBDA
+    BACKEND_CLASS = LambdaBackend
 
     def validate_config(self, config: LambdaBackendConfigWithCreds, default_creds_enabled: bool):
         self._validate_lambda_api_key(config.creds.api_key)
