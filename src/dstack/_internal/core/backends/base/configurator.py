@@ -66,7 +66,7 @@ class Configurator(ABC):
         Sets up backend given backend config and returns
         text-encoded config and creds to be stored in the DB.
         It may perform backend initialization, create
-        cloud resources such as networks and managed identites, and
+        cloud resources such as networks and managed identities, and
         save additional configuration parameters.
         """
         pass
