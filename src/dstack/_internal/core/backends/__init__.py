@@ -1,42 +1,58 @@
+from dstack._internal.core.backends.base.compute import (
+    ComputeWithCreateInstanceSupport,
+    ComputeWithGatewaySupport,
+    ComputeWithMultinodeSupport,
+    ComputeWithPlacementGroupSupport,
+    ComputeWithPrivateGatewaySupport,
+    ComputeWithReservationSupport,
+    ComputeWithVolumeSupport,
+)
+from dstack._internal.core.backends.base.configurator import Configurator
+from dstack._internal.core.backends.configurators import list_available_configurator_classes
 from dstack._internal.core.models.backends.base import BackendType
 
-BACKENDS_WITH_MULTINODE_SUPPORT = [
-    BackendType.AWS,
-    BackendType.AZURE,
-    BackendType.GCP,
-    BackendType.REMOTE,
-    BackendType.OCI,
-    BackendType.VULTR,
-]
-BACKENDS_WITH_CREATE_INSTANCE_SUPPORT = [
-    BackendType.AWS,
-    BackendType.DSTACK,
-    BackendType.AZURE,
-    BackendType.CUDO,
-    BackendType.DATACRUNCH,
-    BackendType.GCP,
-    BackendType.LAMBDA,
-    BackendType.OCI,
-    BackendType.TENSORDOCK,
-    BackendType.VULTR,
-]
-BACKENDS_WITH_PLACEMENT_GROUPS_SUPPORT = [
-    BackendType.AWS,
-]
-BACKENDS_WITH_RESERVATION_SUPPORT = [
-    BackendType.AWS,
-]
 
-BACKENDS_WITH_GATEWAY_SUPPORT = [
-    BackendType.AWS,
-    BackendType.AZURE,
-    BackendType.GCP,
-    BackendType.KUBERNETES,
-]
-BACKENDS_WITH_PRIVATE_GATEWAY_SUPPORT = [BackendType.AWS]
-BACKENDS_WITH_VOLUMES_SUPPORT = [
-    BackendType.AWS,
-    BackendType.GCP,
-    BackendType.LOCAL,
-    BackendType.RUNPOD,
-]
+def _get_backends_with_compute_feature(
+    configurator_classes: list[type[Configurator]],
+    compute_feature_class: type,
+) -> list[BackendType]:
+    backend_types = []
+    for configurator_class in configurator_classes:
+        compute_class = configurator_class.BACKEND_CLASS.COMPUTE_CLASS
+        if issubclass(compute_class, compute_feature_class):
+            backend_types.append(configurator_class.TYPE)
+    return backend_types
+
+
+_configurator_classes = list_available_configurator_classes()
+
+
+# TODO: Add LocalBackend to lists if it's enabled
+BACKENDS_WITH_CREATE_INSTANCE_SUPPORT = _get_backends_with_compute_feature(
+    configurator_classes=_configurator_classes,
+    compute_feature_class=ComputeWithCreateInstanceSupport,
+)
+BACKENDS_WITH_MULTINODE_SUPPORT = [BackendType.REMOTE] + _get_backends_with_compute_feature(
+    configurator_classes=_configurator_classes,
+    compute_feature_class=ComputeWithMultinodeSupport,
+)
+BACKENDS_WITH_PLACEMENT_GROUPS_SUPPORT = _get_backends_with_compute_feature(
+    configurator_classes=_configurator_classes,
+    compute_feature_class=ComputeWithPlacementGroupSupport,
+)
+BACKENDS_WITH_RESERVATION_SUPPORT = _get_backends_with_compute_feature(
+    configurator_classes=_configurator_classes,
+    compute_feature_class=ComputeWithReservationSupport,
+)
+BACKENDS_WITH_GATEWAY_SUPPORT = _get_backends_with_compute_feature(
+    configurator_classes=_configurator_classes,
+    compute_feature_class=ComputeWithGatewaySupport,
+)
+BACKENDS_WITH_PRIVATE_GATEWAY_SUPPORT = _get_backends_with_compute_feature(
+    configurator_classes=_configurator_classes,
+    compute_feature_class=ComputeWithPrivateGatewaySupport,
+)
+BACKENDS_WITH_VOLUMES_SUPPORT = _get_backends_with_compute_feature(
+    configurator_classes=_configurator_classes,
+    compute_feature_class=ComputeWithVolumeSupport,
+)

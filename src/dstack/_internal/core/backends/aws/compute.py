@@ -12,6 +12,13 @@ from dstack._internal.core.backends.aws.config import AWSConfig
 from dstack._internal.core.backends.aws.models import AWSAccessKeyCreds
 from dstack._internal.core.backends.base.compute import (
     Compute,
+    ComputeWithCreateInstanceSupport,
+    ComputeWithGatewaySupport,
+    ComputeWithMultinodeSupport,
+    ComputeWithPlacementGroupSupport,
+    ComputeWithPrivateGatewaySupport,
+    ComputeWithReservationSupport,
+    ComputeWithVolumeSupport,
     generate_unique_gateway_instance_name,
     generate_unique_instance_name,
     generate_unique_volume_name,
@@ -62,7 +69,16 @@ class AWSVolumeBackendData(CoreModel):
     iops: int
 
 
-class AWSCompute(Compute):
+class AWSCompute(
+    Compute,
+    ComputeWithCreateInstanceSupport,
+    ComputeWithMultinodeSupport,
+    ComputeWithReservationSupport,
+    ComputeWithPlacementGroupSupport,
+    ComputeWithGatewaySupport,
+    ComputeWithPrivateGatewaySupport,
+    ComputeWithVolumeSupport,
+):
     def __init__(self, config: AWSConfig):
         super().__init__()
         self.config = config

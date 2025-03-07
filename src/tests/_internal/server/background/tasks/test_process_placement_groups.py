@@ -7,6 +7,7 @@ from dstack._internal.server.background.tasks.process_placement_groups import (
     process_placement_groups,
 )
 from dstack._internal.server.testing.common import (
+    ComputeMockSpec,
     create_fleet,
     create_placement_group,
     create_project,
@@ -34,6 +35,7 @@ class TestProcessPlacementGroups:
         with patch("dstack._internal.server.services.backends.get_project_backend_by_type") as m:
             aws_mock = Mock()
             m.return_value = aws_mock
+            aws_mock.compute.return_value = Mock(spec=ComputeMockSpec)
             await process_placement_groups()
             aws_mock.compute.return_value.delete_placement_group.assert_called_once()
         await session.refresh(placement_group1)

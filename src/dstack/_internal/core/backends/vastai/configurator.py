@@ -24,7 +24,8 @@ REGIONS = []
 
 
 class VastAIConfigurator(Configurator):
-    TYPE: BackendType = BackendType.VASTAI
+    TYPE = BackendType.VASTAI
+    BACKEND_CLASS = VastAIBackend
 
     def validate_config(self, config: VastAIBackendConfigWithCreds, default_creds_enabled: bool):
         self._validate_vastai_creds(config.creds.api_key)

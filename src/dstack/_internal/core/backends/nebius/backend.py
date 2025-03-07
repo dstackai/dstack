@@ -5,7 +5,8 @@ from dstack._internal.core.models.backends.base import BackendType
 
 
 class NebiusBackend(Backend):
-    TYPE: BackendType = BackendType.NEBIUS
+    TYPE = BackendType.NEBIUS
+    COMPUTE_CLASS = NebiusCompute
 
     def __init__(self, config: NebiusConfig):
         self.config = config

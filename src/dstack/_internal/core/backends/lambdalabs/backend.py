@@ -5,7 +5,8 @@ from dstack._internal.core.models.backends.base import BackendType
 
 
 class LambdaBackend(Backend):
-    TYPE: BackendType = BackendType.LAMBDA
+    TYPE = BackendType.LAMBDA
+    COMPUTE_CLASS = LambdaCompute
 
     def __init__(self, config: LambdaConfig):
         self.config = config

@@ -5,7 +5,8 @@ from dstack._internal.core.models.backends.base import BackendType
 
 
 class DataCrunchBackend(Backend):
-    TYPE: BackendType = BackendType.DATACRUNCH
+    TYPE = BackendType.DATACRUNCH
+    COMPUTE_CLASS = DataCrunchCompute
 
     def __init__(self, config: DataCrunchConfig):
         self.config = config

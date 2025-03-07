@@ -8,7 +8,8 @@ from dstack._internal.core.models.backends.base import BackendType
 
 
 class AWSBackend(Backend):
-    TYPE: BackendType = BackendType.AWS
+    TYPE = BackendType.AWS
+    COMPUTE_CLASS = AWSCompute
 
     def __init__(self, config: AWSConfig):
         self.config = config

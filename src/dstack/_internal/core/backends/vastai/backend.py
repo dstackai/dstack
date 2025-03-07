@@ -5,7 +5,8 @@ from dstack._internal.core.models.backends.base import BackendType
 
 
 class VastAIBackend(Backend):
-    TYPE: BackendType = BackendType.VASTAI
+    TYPE = BackendType.VASTAI
+    COMPUTE_CLASS = VastAICompute
 
     def __init__(self, config: VastAIConfig):
         self.config = config

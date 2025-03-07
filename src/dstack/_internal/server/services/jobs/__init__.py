@@ -11,6 +11,7 @@ from sqlalchemy.orm import joinedload
 
 import dstack._internal.server.services.backends as backends_services
 from dstack._internal.core.backends.base.backend import Backend
+from dstack._internal.core.backends.base.compute import ComputeWithVolumeSupport
 from dstack._internal.core.consts import DSTACK_RUNNER_HTTP_PORT, DSTACK_SHIM_HTTP_PORT
 from dstack._internal.core.errors import (
     BackendError,
@@ -461,24 +462,26 @@ async def _detach_volume_from_job_instance(
     if volume.provisioning_data is None or not volume.provisioning_data.detachable:
         # Backends without `detach_volume` detach volumes automatically
         return detached
+    compute = backend.compute()
+    assert isinstance(compute, ComputeWithVolumeSupport)
     try:
         if job_model.volumes_detached_at is None:
             # We haven't tried detaching volumes yet, try soft detach first
             await run_async(
-                backend.compute().detach_volume,
+                compute.detach_volume,
                 volume=volume,
                 instance_id=jpd.instance_id,
                 force=False,
             )
             # For some backends, the volume may be detached immediately
             detached = await run_async(
-                backend.compute().is_volume_detached,
+                compute.is_volume_detached,
                 volume=volume,
                 instance_id=jpd.instance_id,
             )
         else:
             detached = await run_async(
-                backend.compute().is_volume_detached,
+                compute.is_volume_detached,
                 volume=volume,
                 instance_id=jpd.instance_id,
             )
@@ -489,7 +492,7 @@ async def _detach_volume_from_job_instance(
                     instance_model.name,
                 )
                 await run_async(
-                    backend.compute().detach_volume,
+                    compute.detach_volume,
                     volume=volume,
                     instance_id=jpd.instance_id,
                     force=True,

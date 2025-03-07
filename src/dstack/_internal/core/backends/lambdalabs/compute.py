@@ -6,6 +6,7 @@ from typing import Dict, List, Optional
 
 from dstack._internal.core.backends.base.compute import (
     Compute,
+    ComputeWithCreateInstanceSupport,
     generate_unique_instance_name,
     get_job_instance_name,
     get_shim_commands,
@@ -27,7 +28,10 @@ from dstack._internal.core.models.volumes import Volume
 MAX_INSTANCE_NAME_LEN = 60
 
 
-class LambdaCompute(Compute):
+class LambdaCompute(
+    Compute,
+    ComputeWithCreateInstanceSupport,
+):
     def __init__(self, config: LambdaConfig):
         super().__init__()
         self.config = config

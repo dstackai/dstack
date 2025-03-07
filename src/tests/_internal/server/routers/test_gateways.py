@@ -13,6 +13,7 @@ from dstack._internal.server.services.gateways import (
 )
 from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.testing.common import (
+    ComputeMockSpec,
     create_backend,
     create_gateway,
     create_gateway_compute,
@@ -437,8 +438,10 @@ class TestDeleteGateway:
             "dstack._internal.server.services.gateways.get_project_backend_by_type_or_error"
         ) as m:
             aws = Mock()
+            aws.compute.return_value = Mock(spec=ComputeMockSpec)
             aws.compute.return_value.terminate_gateway.return_value = None  # success
             gcp = Mock()
+            gcp.compute.return_value = Mock(spec=ComputeMockSpec)
             gcp.compute.return_value.terminate_gateway.side_effect = DstackError()  # fail
 
             def get_backend(project, backend_type):

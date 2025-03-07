@@ -1,6 +1,10 @@
 from typing import List, Optional
 
-from dstack._internal.core.backends.base.compute import Compute
+from dstack._internal.core.backends.base.compute import (
+    Compute,
+    ComputeWithCreateInstanceSupport,
+    ComputeWithVolumeSupport,
+)
 from dstack._internal.core.consts import DSTACK_RUNNER_SSH_PORT
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
@@ -18,7 +22,11 @@ from dstack._internal.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
-class LocalCompute(Compute):
+class LocalCompute(
+    Compute,
+    ComputeWithCreateInstanceSupport,
+    ComputeWithVolumeSupport,
+):
     def get_offers(
         self, requirements: Optional[Requirements] = None
     ) -> List[InstanceOfferWithAvailability]:
@@ -83,6 +91,12 @@ class LocalCompute(Compute):
             ssh_proxy=None,
             dockerized=True,
             backend_data=None,
+        )
+
+    def register_volume(self, volume: Volume) -> VolumeProvisioningData:
+        return VolumeProvisioningData(
+            volume_id=volume.volume_id,
+            size_gb=volume.configuration.size_gb,
         )
 
     def create_volume(self, volume: Volume) -> VolumeProvisioningData:

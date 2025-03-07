@@ -26,7 +26,8 @@ DEFAULT_REGION = "FIN-01"
 
 
 class DataCrunchConfigurator(Configurator):
-    TYPE: BackendType = BackendType.DATACRUNCH
+    TYPE = BackendType.DATACRUNCH
+    BACKEND_CLASS = DataCrunchBackend
 
     def validate_config(
         self, config: DataCrunchBackendConfigWithCreds, default_creds_enabled: bool

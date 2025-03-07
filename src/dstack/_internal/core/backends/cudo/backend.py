@@ -5,7 +5,8 @@ from dstack._internal.core.models.backends.base import BackendType
 
 
 class CudoBackend(Backend):
-    TYPE: BackendType = BackendType.CUDO
+    TYPE = BackendType.CUDO
+    COMPUTE_CLASS = CudoCompute
 
     def __init__(self, config: CudoConfig):
         self.config = config

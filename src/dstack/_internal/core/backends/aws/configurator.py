@@ -53,7 +53,8 @@ MAIN_REGION = "us-east-1"
 
 
 class AWSConfigurator(Configurator):
-    TYPE: BackendType = BackendType.AWS
+    TYPE = BackendType.AWS
+    BACKEND_CLASS = AWSBackend
 
     def validate_config(self, config: AWSBackendConfigWithCreds, default_creds_enabled: bool):
         if is_core_model_instance(config.creds, AWSDefaultCreds) and not default_creds_enabled:

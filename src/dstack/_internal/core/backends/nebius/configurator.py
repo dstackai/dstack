@@ -24,7 +24,8 @@ REGIONS = ["eu-north1-c"]
 
 
 class NebiusConfigurator(Configurator):
-    TYPE: BackendType = BackendType.NEBIUS
+    TYPE = BackendType.NEBIUS
+    BACKEND_CLASS = NebiusBackend
 
     def validate_config(self, config: NebiusBackendConfigWithCreds, default_creds_enabled: bool):
         self._validate_nebius_creds(config.creds)

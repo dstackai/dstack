@@ -5,7 +5,8 @@ from dstack._internal.core.models.backends.base import BackendType
 
 
 class TensorDockBackend(Backend):
-    TYPE: BackendType = BackendType.TENSORDOCK
+    TYPE = BackendType.TENSORDOCK
+    COMPUTE_CLASS = TensorDockCompute
 
     def __init__(self, config: TensorDockConfig):
         self.config = config

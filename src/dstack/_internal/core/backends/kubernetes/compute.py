@@ -9,6 +9,7 @@ from kubernetes import client
 
 from dstack._internal.core.backends.base.compute import (
     Compute,
+    ComputeWithGatewaySupport,
     generate_unique_gateway_instance_name,
     generate_unique_instance_name_for_job,
     get_docker_commands,
@@ -54,7 +55,10 @@ NVIDIA_GPU_NAME_TO_GPU_INFO = {gpu.name: gpu for gpu in KNOWN_NVIDIA_GPUS}
 NVIDIA_GPU_NAMES = NVIDIA_GPU_NAME_TO_GPU_INFO.keys()
 
 
-class KubernetesCompute(Compute):
+class KubernetesCompute(
+    Compute,
+    ComputeWithGatewaySupport,
+):
     def __init__(self, config: KubernetesConfig):
         super().__init__()
         self.config = config.copy()

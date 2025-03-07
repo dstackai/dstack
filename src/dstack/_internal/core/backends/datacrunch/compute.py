@@ -2,6 +2,7 @@ from typing import Dict, List, Optional
 
 from dstack._internal.core.backends.base.backend import Compute
 from dstack._internal.core.backends.base.compute import (
+    ComputeWithCreateInstanceSupport,
     generate_unique_instance_name,
     get_shim_commands,
 )
@@ -33,7 +34,10 @@ IMAGE_SIZE = Memory.parse("50GB")
 CONFIGURABLE_DISK_SIZE = Range[Memory](min=IMAGE_SIZE, max=None)
 
 
-class DataCrunchCompute(Compute):
+class DataCrunchCompute(
+    Compute,
+    ComputeWithCreateInstanceSupport,
+):
     def __init__(self, config: DataCrunchConfig):
         super().__init__()
         self.config = config

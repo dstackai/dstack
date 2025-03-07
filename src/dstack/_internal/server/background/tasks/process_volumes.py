@@ -2,6 +2,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
+from dstack._internal.core.backends.base.compute import ComputeWithVolumeSupport
 from dstack._internal.core.errors import BackendError, BackendNotAvailable
 from dstack._internal.core.models.volumes import VolumeStatus
 from dstack._internal.server.db import get_session_ctx
@@ -81,17 +82,19 @@ async def _process_submitted_volume(session: AsyncSession, volume_model: VolumeM
         await session.commit()
         return
 
+    compute = backend.compute()
+    assert isinstance(compute, ComputeWithVolumeSupport)
     try:
         if volume.configuration.volume_id is not None:
             logger.info("Registering external volume %s", volume_model.name)
             vpd = await run_async(
-                backend.compute().register_volume,
+                compute.register_volume,
                 volume=volume,
             )
         else:
             logger.info("Provisioning new volume %s", volume_model.name)
             vpd = await run_async(
-                backend.compute().create_volume,
+                compute.create_volume,
                 volume=volume,
             )
     except BackendError as e:

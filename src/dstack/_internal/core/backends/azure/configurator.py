@@ -72,7 +72,8 @@ MAIN_LOCATION = "eastus"
 
 
 class AzureConfigurator(Configurator):
-    TYPE: BackendType = BackendType.AZURE
+    TYPE = BackendType.AZURE
+    BACKEND_CLASS = AzureBackend
 
     def validate_config(self, config: AzureBackendConfigWithCreds, default_creds_enabled: bool):
         if is_core_model_instance(config.creds, AzureDefaultCreds) and not default_creds_enabled:

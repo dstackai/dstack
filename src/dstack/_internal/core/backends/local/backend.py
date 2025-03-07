@@ -4,7 +4,8 @@ from dstack._internal.core.models.backends.base import BackendType
 
 
 class LocalBackend(Backend):
-    TYPE: BackendType = BackendType.LOCAL
+    TYPE = BackendType.LOCAL
+    COMPUTE_CLASS = LocalCompute
 
     def __init__(self):
         self._compute = LocalCompute()

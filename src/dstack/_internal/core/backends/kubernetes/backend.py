@@ -5,7 +5,8 @@ from dstack._internal.core.models.backends.base import BackendType
 
 
 class KubernetesBackend(Backend):
-    TYPE: BackendType = BackendType.KUBERNETES
+    TYPE = BackendType.KUBERNETES
+    COMPUTE_CLASS = KubernetesCompute
 
     def __init__(self, config: KubernetesConfig):
         self.config = config

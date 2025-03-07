@@ -39,6 +39,9 @@ from dstack._internal.core.backends.azure import utils as azure_utils
 from dstack._internal.core.backends.azure.config import AzureConfig
 from dstack._internal.core.backends.base.compute import (
     Compute,
+    ComputeWithCreateInstanceSupport,
+    ComputeWithGatewaySupport,
+    ComputeWithMultinodeSupport,
     generate_unique_gateway_instance_name,
     generate_unique_instance_name,
     get_gateway_user_data,
@@ -71,7 +74,12 @@ logger = get_logger(__name__)
 CONFIGURABLE_DISK_SIZE = Range[Memory](min=Memory.parse("30GB"), max=Memory.parse("4095GB"))
 
 
-class AzureCompute(Compute):
+class AzureCompute(
+    Compute,
+    ComputeWithCreateInstanceSupport,
+    ComputeWithMultinodeSupport,
+    ComputeWithGatewaySupport,
+):
     def __init__(self, config: AzureConfig, credential: TokenCredential):
         super().__init__()
         self.config = config

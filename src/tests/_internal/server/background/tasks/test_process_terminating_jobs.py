@@ -16,6 +16,7 @@ from dstack._internal.server.background.tasks.process_terminating_jobs import (
 from dstack._internal.server.models import InstanceModel, JobModel, VolumeAttachmentModel
 from dstack._internal.server.services.volumes import volume_model_to_volume
 from dstack._internal.server.testing.common import (
+    ComputeMockSpec,
     create_instance,
     create_job,
     create_pool,
@@ -114,6 +115,7 @@ class TestProcessTerminatingJobs:
         with patch("dstack._internal.server.services.backends.get_project_backend_by_type") as m:
             backend_mock = Mock()
             m.return_value = backend_mock
+            backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
             backend_mock.compute.return_value.is_volume_detached.return_value = True
             await process_terminating_jobs()
             m.assert_awaited_once()
@@ -163,6 +165,7 @@ class TestProcessTerminatingJobs:
         with patch("dstack._internal.server.services.backends.get_project_backend_by_type") as m:
             backend_mock = Mock()
             m.return_value = backend_mock
+            backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
             backend_mock.compute.return_value.is_volume_detached.return_value = False
             await process_terminating_jobs()
             m.assert_awaited_once()
@@ -188,6 +191,7 @@ class TestProcessTerminatingJobs:
             ) + timedelta(minutes=30)
             backend_mock = Mock()
             m.return_value = backend_mock
+            backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
             backend_mock.compute.return_value.is_volume_detached.return_value = False
             await process_terminating_jobs()
             m.assert_awaited_once()
@@ -205,6 +209,7 @@ class TestProcessTerminatingJobs:
         with patch("dstack._internal.server.services.backends.get_project_backend_by_type") as m:
             backend_mock = Mock()
             m.return_value = backend_mock
+            backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
             backend_mock.compute.return_value.is_volume_detached.return_value = True
             await process_terminating_jobs()
             m.assert_awaited_once()
@@ -319,13 +324,15 @@ class TestProcessTerminatingJobs:
         with patch("dstack._internal.server.services.backends.get_project_backend_by_type") as m:
             backend_mock = Mock()
             m.return_value = backend_mock
+            backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
             backend_mock.compute.return_value.is_volume_detached.return_value = True
 
             await process_terminating_jobs()
 
-        m.assert_awaited_once()
-        backend_mock.compute.return_value.detach_volume.assert_called_once()
-        backend_mock.compute.return_value.is_volume_detached.assert_called_once()
+            m.assert_awaited_once()
+            backend_mock.compute.return_value.detach_volume.assert_called_once()
+            backend_mock.compute.return_value.is_volume_detached.assert_called_once()
+
         await session.refresh(job)
         await session.refresh(instance)
         assert job.status == JobStatus.TERMINATED
