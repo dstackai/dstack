@@ -8,12 +8,11 @@ from google.auth.credentials import Credentials
 from google.auth.exceptions import DefaultCredentialsError
 from google.oauth2 import service_account
 
-from dstack._internal.core.errors import BackendAuthError
-from dstack._internal.core.models.backends.gcp import (
+from dstack._internal.core.backends.gcp.models import (
     AnyGCPCreds,
-    GCPDefaultCreds,
     GCPServiceAccountCreds,
 )
+from dstack._internal.core.errors import BackendAuthError
 from dstack._internal.core.models.common import is_core_model_instance
 
 
@@ -57,11 +56,3 @@ def validate_credentials(credentials: Credentials, project_id: str):
         raise BackendAuthError(f"project_id {project_id} not found")
     except Exception:
         raise BackendAuthError("Insufficient permissions")
-
-
-def default_creds_available() -> bool:
-    try:
-        authenticate(GCPDefaultCreds())
-    except BackendAuthError:
-        return False
-    return True

@@ -4,12 +4,11 @@ from azure.core.exceptions import ClientAuthenticationError
 from azure.identity import ClientSecretCredential, DefaultAzureCredential
 from azure.mgmt.subscription import SubscriptionClient
 
-from dstack._internal.core.errors import BackendAuthError
-from dstack._internal.core.models.backends.azure import (
+from dstack._internal.core.backends.azure.models import (
     AnyAzureCreds,
     AzureClientCreds,
-    AzureDefaultCreds,
 )
+from dstack._internal.core.errors import BackendAuthError
 from dstack._internal.core.models.common import is_core_model_instance
 
 AzureCredential = Union[ClientSecretCredential, DefaultAzureCredential]
@@ -39,11 +38,3 @@ def check_credential(credential: AzureCredential):
         list(client.subscriptions.list())
     except ClientAuthenticationError:
         raise BackendAuthError()
-
-
-def default_creds_available() -> bool:
-    try:
-        authenticate(AzureDefaultCreds())
-    except BackendAuthError:
-        return False
-    return True

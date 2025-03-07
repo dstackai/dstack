@@ -1,5 +1,5 @@
+from dstack._internal.core.backends.aws.models import AnyAWSCreds, AWSStoredConfig
 from dstack._internal.core.backends.base.config import BackendConfig
-from dstack._internal.core.models.backends.aws import AnyAWSCreds, AWSStoredConfig
 
 
 class AWSConfig(AWSStoredConfig, BackendConfig):

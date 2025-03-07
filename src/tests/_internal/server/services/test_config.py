@@ -6,11 +6,14 @@ import yaml
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dstack._internal.core.models.backends.azure import AzureConfigInfoWithCreds, AzureDefaultCreds
+from dstack._internal.core.backends.azure.models import (
+    AzureBackendConfigWithCreds,
+    AzureDefaultCreds,
+)
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.server import settings
 from dstack._internal.server.models import BackendModel, ProjectModel
-from dstack._internal.server.services.config import AzureConfig, ServerConfigManager
+from dstack._internal.server.services.config import ServerConfigManager
 from dstack._internal.server.testing.common import (
     create_project,
     create_user,
@@ -38,7 +41,7 @@ class TestServerConfigManager:
                 ) as create_backend_mock,
             ):
                 list_available_backend_types_mock.return_value = [BackendType.AZURE]
-                default_config = AzureConfigInfoWithCreds(
+                default_config = AzureBackendConfigWithCreds(
                     tenant_id="test_tenant",
                     subscription_id="test_subscription",
                     locations=["westeurope"],
@@ -52,7 +55,7 @@ class TestServerConfigManager:
                 list_available_backend_types_mock.assert_called()
                 get_configurator_mock.assert_called()
                 create_backend_mock.assert_called()
-                assert manager.config.projects[0].backends[0] == AzureConfig(
+                assert manager.config.projects[0].backends[0] == AzureBackendConfigWithCreds(
                     tenant_id="test_tenant",
                     subscription_id="test_subscription",
                     regions=["westeurope"],

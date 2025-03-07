@@ -1,7 +1,4 @@
 import enum
-from typing import List, Optional
-
-from dstack._internal.core.models.common import CoreModel
 
 
 class BackendType(str, enum.Enum):
@@ -38,18 +35,3 @@ class BackendType(str, enum.Enum):
     TENSORDOCK = "tensordock"
     VASTAI = "vastai"
     VULTR = "vultr"
-
-
-class ConfigElementValue(CoreModel):
-    value: str
-    label: str
-
-
-class ConfigElement(CoreModel):
-    selected: Optional[str] = None
-    values: List[ConfigElementValue] = []
-
-
-class ConfigMultiElement(CoreModel):
-    selected: List[str] = []
-    values: List[ConfigElementValue] = []

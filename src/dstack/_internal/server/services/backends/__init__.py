@@ -1,187 +1,58 @@
 import asyncio
 import heapq
-from typing import Callable, Coroutine, Dict, List, Optional, Tuple, Type, Union
+from typing import Callable, Coroutine, Dict, List, Optional, Tuple
 from uuid import UUID
 
 from sqlalchemy import delete, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dstack._internal.core.backends.base import Backend
-from dstack._internal.core.backends.local import LocalBackend
+from dstack._internal.core.backends.base.backend import Backend
+from dstack._internal.core.backends.base.configurator import (
+    Configurator,
+    StoredBackendRecord,
+)
+from dstack._internal.core.backends.configurators import get_configurator
+from dstack._internal.core.backends.local.backend import LocalBackend
+from dstack._internal.core.backends.models import (
+    AnyBackendConfig,
+    AnyBackendConfigWithCreds,
+)
 from dstack._internal.core.errors import (
     BackendError,
     BackendInvalidCredentialsError,
     BackendNotAvailable,
     ResourceExistsError,
+    ResourceNotExistsError,
     ServerClientError,
-)
-from dstack._internal.core.models.backends import (
-    AnyConfigInfoWithCreds,
-    AnyConfigInfoWithCredsPartial,
-    AnyConfigValues,
 )
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
 )
 from dstack._internal.core.models.runs import Requirements
-from dstack._internal.server.models import BackendModel, ProjectModel
-from dstack._internal.server.services.backends.configurators.base import Configurator
+from dstack._internal.server import settings
+from dstack._internal.server.models import BackendModel, DecryptedString, ProjectModel
 from dstack._internal.server.settings import LOCAL_BACKEND_ENABLED
 from dstack._internal.utils.common import run_async
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
-_CONFIGURATOR_CLASSES: List[Type[Configurator]] = []
-
-try:
-    from dstack._internal.server.services.backends.configurators.aws import AWSConfigurator
-
-    _CONFIGURATOR_CLASSES.append(AWSConfigurator)
-except ImportError:
-    pass
-
-try:
-    from dstack._internal.server.services.backends.configurators.azure import AzureConfigurator
-
-    _CONFIGURATOR_CLASSES.append(AzureConfigurator)
-except ImportError:
-    pass
-
-try:
-    from dstack._internal.server.services.backends.configurators.cudo import (
-        CudoConfigurator,
-    )
-
-    _CONFIGURATOR_CLASSES.append(CudoConfigurator)
-except ImportError:
-    pass
-
-try:
-    from dstack._internal.server.services.backends.configurators.datacrunch import (
-        DataCrunchConfigurator,
-    )
-
-    _CONFIGURATOR_CLASSES.append(DataCrunchConfigurator)
-except ImportError:
-    pass
-
-try:
-    from dstack._internal.server.services.backends.configurators.gcp import GCPConfigurator
-
-    _CONFIGURATOR_CLASSES.append(GCPConfigurator)
-except ImportError:
-    pass
-
-try:
-    from dstack._internal.server.services.backends.configurators.kubernetes import (
-        KubernetesConfigurator,
-    )
-
-    _CONFIGURATOR_CLASSES.append(KubernetesConfigurator)
-except ImportError:
-    pass
-
-try:
-    from dstack._internal.server.services.backends.configurators.lambdalabs import (
-        LambdaConfigurator,
-    )
-
-    _CONFIGURATOR_CLASSES.append(LambdaConfigurator)
-except ImportError:
-    pass
-
-try:
-    from dstack._internal.server.services.backends.configurators.nebius import NebiusConfigurator
-
-    _CONFIGURATOR_CLASSES.append(NebiusConfigurator)
-except ImportError:
-    pass
-
-try:
-    from dstack._internal.server.services.backends.configurators.oci import OCIConfigurator
-
-    _CONFIGURATOR_CLASSES.append(OCIConfigurator)
-except ImportError:
-    pass
-
-try:
-    from dstack._internal.server.services.backends.configurators.runpod import RunpodConfigurator
-
-    _CONFIGURATOR_CLASSES.append(RunpodConfigurator)
-except ImportError:
-    pass
-
-try:
-    from dstack._internal.server.services.backends.configurators.tensordock import (
-        TensorDockConfigurator,
-    )
-
-    _CONFIGURATOR_CLASSES.append(TensorDockConfigurator)
-except ImportError:
-    pass
-
-try:
-    from dstack._internal.server.services.backends.configurators.vastai import VastAIConfigurator
-
-    _CONFIGURATOR_CLASSES.append(VastAIConfigurator)
-except ImportError:
-    pass
-
-try:
-    from dstack._internal.server.services.backends.configurators.vultr import VultrConfigurator
-
-    _CONFIGURATOR_CLASSES.append(VultrConfigurator)
-except ImportError:
-    pass
-
-
-_BACKEND_TYPE_TO_CONFIGURATOR_CLASS_MAP = {c.TYPE: c for c in _CONFIGURATOR_CLASSES}
-
-
-def register_configurator(configurator: Type[Configurator]):
-    _BACKEND_TYPE_TO_CONFIGURATOR_CLASS_MAP[configurator.TYPE] = configurator
-
-
-def get_configurator(backend_type: Union[BackendType, str]) -> Optional[Configurator]:
-    backend_type = BackendType(backend_type)
-    configurator_class = _BACKEND_TYPE_TO_CONFIGURATOR_CLASS_MAP.get(backend_type)
-    if configurator_class is None:
-        return None
-    return configurator_class()
-
-
-def list_available_backend_types() -> List[BackendType]:
-    available_backend_types = []
-    for configurator_class in _BACKEND_TYPE_TO_CONFIGURATOR_CLASS_MAP.values():
-        available_backend_types.append(configurator_class.TYPE)
-    return available_backend_types
-
-
-async def get_backend_config_values(
-    config: AnyConfigInfoWithCredsPartial,
-) -> AnyConfigValues:
-    configurator = get_configurator(config.type)
-    if configurator is None:
-        raise BackendNotAvailable()
-    config_values = await run_async(configurator.get_config_values, config)
-    return config_values
-
 
 async def create_backend(
     session: AsyncSession,
     project: ProjectModel,
-    config: AnyConfigInfoWithCreds,
-) -> AnyConfigInfoWithCreds:
+    config: AnyBackendConfigWithCreds,
+) -> AnyBackendConfigWithCreds:
     configurator = get_configurator(config.type)
     if configurator is None:
         raise BackendNotAvailable()
     backend = await get_project_backend_by_type(project=project, backend_type=configurator.TYPE)
     if backend is not None:
         raise ResourceExistsError()
-    await run_async(configurator.get_config_values, config)
-    backend = await run_async(configurator.create_backend, project=project, config=config)
+    backend = await validate_and_create_backend_model(
+        project=project, configurator=configurator, config=config
+    )
     session.add(backend)
     await session.commit()
     return config
@@ -190,16 +61,17 @@ async def create_backend(
 async def update_backend(
     session: AsyncSession,
     project: ProjectModel,
-    config: AnyConfigInfoWithCreds,
-) -> AnyConfigInfoWithCreds:
+    config: AnyBackendConfigWithCreds,
+) -> AnyBackendConfigWithCreds:
     configurator = get_configurator(config.type)
     if configurator is None:
         raise BackendNotAvailable()
     backend_exists = any(configurator.TYPE == b.type for b in project.backends)
     if not backend_exists:
-        raise ServerClientError("Backend does not exist")
-    await run_async(configurator.get_config_values, config)
-    backend = await run_async(configurator.create_backend, project=project, config=config)
+        raise ResourceNotExistsError()
+    backend = await validate_and_create_backend_model(
+        project=project, configurator=configurator, config=config
+    )
     # FIXME: potentially long write transaction
     await session.execute(
         update(BackendModel)
@@ -215,10 +87,31 @@ async def update_backend(
     return config
 
 
-async def get_config_info(
+async def validate_and_create_backend_model(
+    project: ProjectModel,
+    configurator: Configurator,
+    config: AnyBackendConfigWithCreds,
+) -> BackendModel:
+    await run_async(
+        configurator.validate_config, config, default_creds_enabled=settings.DEFAULT_CREDS_ENABLED
+    )
+    backend_record = await run_async(
+        configurator.create_backend,
+        project_name=project.name,
+        config=config,
+    )
+    return BackendModel(
+        project_id=project.id,
+        type=configurator.TYPE.value,
+        config=backend_record.config,
+        auth=DecryptedString(plaintext=backend_record.auth),
+    )
+
+
+async def get_backend_config(
     project: ProjectModel,
     backend_type: BackendType,
-) -> Optional[AnyConfigInfoWithCreds]:
+) -> Optional[AnyBackendConfigWithCreds]:
     configurator = get_configurator(backend_type)
     if configurator is None:
         raise BackendNotAvailable()
@@ -230,8 +123,29 @@ async def get_config_info(
             )
             continue
         if backend_model.type == backend_type:
-            return configurator.get_config_info(backend_model, include_creds=True)
+            return get_backend_config_from_backend_model(
+                configurator, backend_model, include_creds=True
+            )
     return None
+
+
+def get_backend_config_from_backend_model(
+    configurator: Configurator,
+    backend_model: BackendModel,
+    include_creds: bool,
+) -> AnyBackendConfig:
+    backend_record = get_stored_backend_record(backend_model)
+    backend_config = configurator.get_backend_config(backend_record, include_creds=include_creds)
+    return backend_config
+
+
+def get_stored_backend_record(backend_model: BackendModel) -> StoredBackendRecord:
+    return StoredBackendRecord(
+        config=backend_model.config,
+        auth=backend_model.auth.get_plaintext_or_error(),
+        project_id=backend_model.project_id,
+        backend_id=backend_model.id,
+    )
 
 
 async def delete_backends(
@@ -299,7 +213,8 @@ async def get_project_backends_with_models(project: ProjectModel) -> List[Backen
                 )
                 continue
             try:
-                backend = await run_async(configurator.get_backend, backend_model)
+                backend_record = get_stored_backend_record(backend_model)
+                backend = await run_async(configurator.get_backend, backend_record)
             except BackendInvalidCredentialsError:
                 logger.warning(
                     "Credentials for %s backend are invalid. Backend will be ignored.",

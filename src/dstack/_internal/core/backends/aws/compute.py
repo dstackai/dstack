@@ -9,6 +9,7 @@ from pydantic import ValidationError
 import dstack._internal.core.backends.aws.resources as aws_resources
 from dstack._internal import settings
 from dstack._internal.core.backends.aws.config import AWSConfig
+from dstack._internal.core.backends.aws.models import AWSAccessKeyCreds
 from dstack._internal.core.backends.base.compute import (
     Compute,
     generate_unique_gateway_instance_name,
@@ -21,7 +22,6 @@ from dstack._internal.core.backends.base.compute import (
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.errors import ComputeError, NoCapacityError, PlacementGroupInUseError
-from dstack._internal.core.models.backends.aws import AWSAccessKeyCreds
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import CoreModel, is_core_model_instance
 from dstack._internal.core.models.gateways import (

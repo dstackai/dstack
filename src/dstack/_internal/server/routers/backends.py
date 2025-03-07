@@ -3,13 +3,12 @@ from typing import List, Tuple
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dstack._internal.core.errors import ResourceNotExistsError
-from dstack._internal.core.models.backends import (
-    AnyConfigInfoWithCreds,
-    AnyConfigInfoWithCredsPartial,
-    AnyConfigValues,
+import dstack._internal.core.backends.configurators
+from dstack._internal.core.backends.models import (
+    AnyBackendConfigWithCreds,
     BackendInfoYAML,
 )
+from dstack._internal.core.errors import ResourceNotExistsError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.server import settings
 from dstack._internal.server.db import get_session
@@ -19,7 +18,7 @@ from dstack._internal.server.schemas.backends import (
     DeleteBackendsRequest,
     UpdateBackendYAMLRequest,
 )
-from dstack._internal.server.security.permissions import Authenticated, ProjectAdmin
+from dstack._internal.server.security.permissions import ProjectAdmin
 from dstack._internal.server.services import backends
 from dstack._internal.server.services.backends import handlers as backends_handlers
 from dstack._internal.server.services.config import (
@@ -44,23 +43,15 @@ project_router = APIRouter(
 
 @root_router.post("/list_types")
 async def list_backend_types() -> List[BackendType]:
-    return backends.list_available_backend_types()
-
-
-@root_router.post("/config_values")
-async def get_backend_config_values(
-    body: AnyConfigInfoWithCredsPartial,
-    user: UserModel = Depends(Authenticated()),
-) -> AnyConfigValues:
-    return await backends.get_backend_config_values(config=body)
+    return dstack._internal.core.backends.configurators.list_available_backend_types()
 
 
 @project_router.post("/create")
 async def create_backend(
-    body: AnyConfigInfoWithCreds,
+    body: AnyBackendConfigWithCreds,
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
-) -> AnyConfigInfoWithCreds:
+) -> AnyBackendConfigWithCreds:
     _, project = user_project
     config = await backends.create_backend(session=session, project=project, config=body)
     if settings.SERVER_CONFIG_ENABLED:
@@ -70,10 +61,10 @@ async def create_backend(
 
 @project_router.post("/update")
 async def update_backend(
-    body: AnyConfigInfoWithCreds,
+    body: AnyBackendConfigWithCreds,
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
-) -> AnyConfigInfoWithCreds:
+) -> AnyBackendConfigWithCreds:
     _, project = user_project
     config = await backends.update_backend(session=session, project=project, config=body)
     if settings.SERVER_CONFIG_ENABLED:
@@ -99,12 +90,12 @@ async def delete_backends(
 async def get_backend_config_info(
     backend_name: BackendType,
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
-) -> AnyConfigInfoWithCreds:
+) -> AnyBackendConfigWithCreds:
     _, project = user_project
-    config_info = await backends.get_config_info(project=project, backend_type=backend_name)
-    if config_info is None:
+    config = await backends.get_backend_config(project=project, backend_type=backend_name)
+    if config is None:
         raise ResourceNotExistsError()
-    return config_info
+    return config
 
 
 @project_router.post("/create_yaml")

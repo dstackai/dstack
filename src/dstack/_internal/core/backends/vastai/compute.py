@@ -3,7 +3,7 @@ from typing import List, Optional
 import gpuhunt
 from gpuhunt.providers.vastai import VastAIProvider
 
-from dstack._internal.core.backends.base import Compute
+from dstack._internal.core.backends.base.backend import Compute
 from dstack._internal.core.backends.base.compute import (
     generate_unique_instance_name_for_job,
     get_docker_commands,
