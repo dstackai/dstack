@@ -68,6 +68,10 @@ class Configurator(ABC):
         It may perform backend initialization, create
         cloud resources such as networks and managed identities, and
         save additional configuration parameters.
+        It does not need to duplicate validation done by `validate_config()`
+        since the caller guarantees to call `validate_config()` first.
+        It may perform additional validation not possible in `validate_config()`
+        and raise `ServerClientError` or its subclass if config is invalid.
         """
         pass
 
@@ -77,7 +81,7 @@ class Configurator(ABC):
     ) -> AnyBackendConfig:
         """
         Constructs `BackendConfig` to be returned in API responses.
-        Project admins may need to see backend's creds. In this case `include_creds` will be True.
+        Project admins may need to see backend's creds. In this case `include_creds` will be `True`.
         Otherwise, no sensitive information should be included.
         """
         pass
