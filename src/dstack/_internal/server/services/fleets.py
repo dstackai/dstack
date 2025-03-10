@@ -308,7 +308,7 @@ async def get_create_instance_offers(
     offers = [
         (backend, offer)
         for backend, offer in offers
-        if backend.TYPE in BACKENDS_WITH_CREATE_INSTANCE_SUPPORT
+        if offer.backend in BACKENDS_WITH_CREATE_INSTANCE_SUPPORT
     ]
     return offers
 
@@ -600,7 +600,7 @@ async def create_instance(
     )
 
     # Raise error if no backends suppport create_instance
-    backend_types = set((backend.TYPE for backend, _ in offers))
+    backend_types = set(offer.backend for _, offer in offers)
     if all(
         (backend_type not in BACKENDS_WITH_CREATE_INSTANCE_SUPPORT)
         for backend_type in backend_types
