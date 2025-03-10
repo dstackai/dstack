@@ -152,7 +152,7 @@ class EnumAsString(TypeDecorator):
             return None
         return value.name
 
-    def process_result_value(self, value: str, dialect) -> Optional[enum.Enum]:
+    def process_result_value(self, value: Optional[str], dialect) -> Optional[enum.Enum]:
         if value is None:
             return None
         return self.enum_class[value]
