@@ -97,8 +97,6 @@ Add any dependencies required by your cloud provider to `setup.py`. Create a sep
 Add a new enumeration member for your provider to `BackendType` (`src/dstack/_internal/core/models/backends/base.py`).
 Use the name of the provider.
 
-Then create a database [migration](MIGRATIONS.md) to reflect the new enum member.
-
 ##### 2.4.2. Create the backend directory
 
 Create a new directory under `src/dstack/_internal/core/backends` with the name of the backend type.
