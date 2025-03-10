@@ -27,6 +27,7 @@ def _get_backends_with_compute_feature(
 _configurator_classes = list_available_configurator_classes()
 
 
+# The following backend lists do not include unavailable backends (i.e. backends missing deps).
 # TODO: Add LocalBackend to lists if it's enabled
 BACKENDS_WITH_CREATE_INSTANCE_SUPPORT = _get_backends_with_compute_feature(
     configurator_classes=_configurator_classes,

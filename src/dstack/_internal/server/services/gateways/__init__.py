@@ -39,6 +39,7 @@ from dstack._internal.server import settings
 from dstack._internal.server.db import get_db
 from dstack._internal.server.models import GatewayComputeModel, GatewayModel, ProjectModel
 from dstack._internal.server.services.backends import (
+    check_backed_type_available,
     get_project_backend_by_type_or_error,
     get_project_backend_with_model_by_type_or_error,
 )
@@ -537,10 +538,12 @@ def gateway_model_to_gateway(gateway_model: GatewayModel) -> Gateway:
 
 
 def _validate_gateway_configuration(configuration: GatewayConfiguration):
+    check_backed_type_available(configuration.backend)
     if configuration.backend not in BACKENDS_WITH_GATEWAY_SUPPORT:
         raise ServerClientError(
-            f"Gateways are not supported for {configuration.backend.value} backend. "
-            f"Supported backends: {[b.value for b in BACKENDS_WITH_GATEWAY_SUPPORT]}."
+            f"Gateways are not supported for {configuration.backend.value} backend."
+            " Available backends with gateway support:"
+            f" {[b.value for b in BACKENDS_WITH_GATEWAY_SUPPORT]}."
         )
 
     if configuration.name is not None:
@@ -552,7 +555,8 @@ def _validate_gateway_configuration(configuration: GatewayConfiguration):
     ):
         raise ServerClientError(
             f"Private gateways are not supported for {configuration.backend.value} backend. "
-            f"Supported backends: {[b.value for b in BACKENDS_WITH_PRIVATE_GATEWAY_SUPPORT]}."
+            " Available backends with private gateway support:"
+            f" {[b.value for b in BACKENDS_WITH_PRIVATE_GATEWAY_SUPPORT]}."
         )
 
     if configuration.certificate is not None:

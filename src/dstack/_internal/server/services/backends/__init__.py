@@ -11,7 +11,10 @@ from dstack._internal.core.backends.base.configurator import (
     Configurator,
     StoredBackendRecord,
 )
-from dstack._internal.core.backends.configurators import get_configurator
+from dstack._internal.core.backends.configurators import (
+    get_configurator,
+    list_available_backend_types,
+)
 from dstack._internal.core.backends.local.backend import LocalBackend
 from dstack._internal.core.backends.models import (
     AnyBackendConfig,
@@ -364,3 +367,12 @@ async def get_instance_offers(
     offers = heapq.merge(*offers_by_backend, key=lambda i: i[1].price)
     # Put NOT_AVAILABLE, NO_QUOTA, and BUSY instances at the end, do not sort by price
     return sorted(offers, key=lambda i: not i[1].availability.is_available())
+
+
+def check_backed_type_available(backend_type: BackendType):
+    if backend_type not in list_available_backend_types():
+        raise BackendNotAvailable(
+            f"Backend {backend_type.value} not available."
+            " Ensure that backend dependencies are installed."
+            f" Available backends: {[b.value for b in list_available_backend_types()]}."
+        )
