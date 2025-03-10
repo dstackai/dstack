@@ -1,3 +1,4 @@
+import enum
 import uuid
 from datetime import datetime
 from typing import Callable, List, Optional, Union
@@ -112,7 +113,11 @@ class EncryptedString(TypeDecorator):
         cls._encrypt_func = encrypt_func
         cls._decrypt_func = decrypt_func
 
-    def process_bind_param(self, value: Union[DecryptedString, str], dialect):
+    def process_bind_param(
+        self, value: Optional[Union[DecryptedString, str]], dialect
+    ) -> Optional[str]:
+        if value is None:
+            return None
         if isinstance(value, str):
             # Passing string allows binding an encrypted value directly
             # e.g. for comparisons
@@ -128,6 +133,29 @@ class EncryptedString(TypeDecorator):
         except Exception as e:
             logger.debug("Failed to decrypt encrypted string: %s", repr(e))
             return DecryptedString(plaintext=None, decrypted=False, exc=e)
+
+
+class EnumAsString(TypeDecorator):
+    """
+    A custom type decorator that stores enums as strings in the DB.
+    """
+
+    impl = String
+    cache_ok = True
+
+    def __init__(self, enum_class: type[enum.Enum], *args, **kwargs):
+        self.enum_class = enum_class
+        super().__init__(*args, **kwargs)
+
+    def process_bind_param(self, value: Optional[enum.Enum], dialect) -> Optional[str]:
+        if value is None:
+            return None
+        return value.name
+
+    def process_result_value(self, value: Optional[str], dialect) -> Optional[enum.Enum]:
+        if value is None:
+            return None
+        return self.enum_class[value]
 
 
 constraint_naming_convention = {
@@ -222,7 +250,7 @@ class BackendModel(BaseModel):
     )
     project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
     project: Mapped["ProjectModel"] = relationship()
-    type: Mapped[BackendType] = mapped_column(Enum(BackendType))
+    type: Mapped[BackendType] = mapped_column(EnumAsString(BackendType, 100))
 
     config: Mapped[str] = mapped_column(String(20000))
     auth: Mapped[DecryptedString] = mapped_column(EncryptedString(20000))
@@ -533,7 +561,7 @@ class InstanceModel(BaseModel):
     last_termination_retry_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
 
     # backend
-    backend: Mapped[Optional[BackendType]] = mapped_column(Enum(BackendType))
+    backend: Mapped[Optional[BackendType]] = mapped_column(EnumAsString(BackendType, 100))
     backend_data: Mapped[Optional[str]] = mapped_column(Text)
 
     # offer

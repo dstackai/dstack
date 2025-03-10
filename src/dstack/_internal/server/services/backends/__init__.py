@@ -102,7 +102,7 @@ async def validate_and_create_backend_model(
     )
     return BackendModel(
         project_id=project.id,
-        type=configurator.TYPE.value,
+        type=configurator.TYPE,
         config=backend_record.config,
         auth=DecryptedString(plaintext=backend_record.auth),
     )
