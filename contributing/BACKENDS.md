@@ -117,13 +117,8 @@ Refer to examples:
 ##### 2.4.4. Create the backend compute class
 
 Under the backend directory you've created, create the `compute.py` file and define the
-backend compute class there (should extend `dstack._internal.core.backends.base.compute.Compute`).
-
-You'll have to implement `get_offers`, `run_job` and `terminate_instance`.
-You may need to implement `update_provisioning_data`, see its docstring for details.
-
-For VM-based backends, also implement the `create_instance` method and add the backend name to
-[`BACKENDS_WITH_CREATE_INSTANCE_SUPPORT`](`https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/__init__.py`).
+backend compute class that extends the `dstack._internal.core.backends.base.compute.Compute` class.
+It can also extend and implement `ComputeWith*` classes to support additional features such as fleets, volumes, gateways, placement groups, etc.
 
 Refer to examples:
 [datacrunch](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/datacrunch/compute.py),
