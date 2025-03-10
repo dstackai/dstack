@@ -98,14 +98,16 @@ For more details on the options below, refer to the [server deployment](../guide
 - `DSTACK_SERVER_LOG_FORMAT`{ #DSTACK_SERVER_LOG_FORMAT } – Sets format of log output. Can be `rich`, `standard`, `json`. Defaults to `rich`.
 - `DSTACK_SERVER_HOST`{ #DSTACK_SERVER_HOST } – Has the same effect as `--host`. Defaults to `127.0.0.1`.
 - `DSTACK_SERVER_PORT`{ #DSTACK_SERVER_PORT } – Has the same effect as `--port`. Defaults to `3000`.
+- `DSTACK_SERVER_URL`{ #DSTACK_SERVER_URL } – The URL that the server is running on, e.g. `https://my-server.dstack.ai` Defaults to `http://{DSTACK_SERVER_HOST}:{DSTACK_SERVER_PORT}`.
 - `DSTACK_SERVER_ADMIN_TOKEN`{ #DSTACK_SERVER_ADMIN_TOKEN } – Has the same effect as `--token`. Defaults to `None`.
 - `DSTACK_SERVER_DIR`{ #DSTACK_SERVER_DIR } – Sets path to store data and server configs. Defaults to `~/.dstack/server`.
 - `DSTACK_DATABASE_URL`{ #DSTACK_DATABASE_URL } – The database URL to use instead of default SQLite. Currently `dstack` supports Postgres. Example: `postgresql+asyncpg://myuser:mypassword@localhost:5432/mydatabase`. Defaults to `None`.
-- `DSTACK_SERVER_CLOUDWATCH_LOG_GROUP`{ #DSTACK_SERVER_CLOUDWATCH_LOG_GROUP } – The CloudWatch Logs group for workloads logs. If not set, the default file-based log storage is used.
+- `DSTACK_SERVER_CLOUDWATCH_LOG_GROUP`{ #DSTACK_SERVER_CLOUDWATCH_LOG_GROUP } – The CloudWatch Logs group for storing workloads logs. If not set, the default file-based log storage is used.
 - `DSTACK_SERVER_CLOUDWATCH_LOG_REGION`{ #DSTACK_SERVER_CLOUDWATCH_LOG_REGION } – The CloudWatch Logs region. Defaults to `None`.
+- `DSTACK_SERVER_GCP_LOGGING_PROJECT`{ #DSTACK_SERVER_GCP_LOGGING_PROJECT } – The GCP Logging project for storing workloads logs. If not set, the default file-based log storage is used.
+- `DSTACK_ENABLE_PROMETHEUS_METRICS`{ #DSTACK_ENABLE_PROMETHEUS_METRICS } — Enables Prometheus metrics collection and export.
 - `DSTACK_DEFAULT_SERVICE_CLIENT_MAX_BODY_SIZE`{ #DSTACK_DEFAULT_SERVICE_CLIENT_MAX_BODY_SIZE } – Request body size limit for services running with a gateway, in bytes. Defaults to 64 MiB.
 - `DSTACK_FORBID_SERVICES_WITHOUT_GATEWAY`{ #DSTACK_FORBID_SERVICES_WITHOUT_GATEWAY } – Forbids registering new services without a gateway if set to any value.
-- `DSTACK_ENABLE_PROMETHEUS_METRICS`{ #DSTACK_ENABLE_PROMETHEUS_METRICS } — Enables Prometheus metrics collection and export.
 
 ??? info "Internal environment variables"
      The following environment variables are intended for development purposes: 
