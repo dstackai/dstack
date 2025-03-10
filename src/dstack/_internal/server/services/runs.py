@@ -342,8 +342,11 @@ async def get_plan(
         job_offers.extend(offer for _, offer in offers)
         job_offers.sort(key=lambda offer: not offer.availability.is_available())
 
+        job_spec = job.job_spec
+        _remove_job_spec_sensitive_info(job_spec)
+
         job_plan = JobPlan(
-            job_spec=job.job_spec,
+            job_spec=job_spec,
             offers=job_offers[:50],
             total_offers=len(job_offers),
             max_price=max((offer.price for offer in job_offers), default=None),
@@ -619,7 +622,10 @@ async def delete_runs(
 
 
 def run_model_to_run(
-    run_model: RunModel, include_job_submissions: bool = True, return_in_api: bool = False
+    run_model: RunModel,
+    include_job_submissions: bool = True,
+    return_in_api: bool = False,
+    include_sensitive: bool = False,
 ) -> Run:
     jobs: List[Job] = []
     run_jobs = sorted(run_model.jobs, key=lambda j: (j.replica_num, j.job_num, j.submission_num))
@@ -634,6 +640,8 @@ def run_model_to_run(
             for job_model in job_submissions:
                 if job_spec is None:
                     job_spec = JobSpec.__response__.parse_raw(job_model.job_spec_data)
+                    if not include_sensitive:
+                        _remove_job_spec_sensitive_info(job_spec)
                 if include_job_submissions:
                     job_submission = job_model_to_job_submission(job_model)
                     if return_in_api:
@@ -1046,3 +1054,7 @@ async def retry_run_replica_jobs(
         # dirty hack to avoid passing all job submissions
         new_job_model.submission_num = job_model.submission_num + 1
         session.add(new_job_model)
+
+
+def _remove_job_spec_sensitive_info(spec: JobSpec):
+    spec.ssh_key = None

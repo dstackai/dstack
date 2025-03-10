@@ -273,6 +273,7 @@ nav:
         - Llama 3.2: examples/llms/llama32/index.md
     - Misc:
         - Docker Compose: examples/misc/docker-compose/index.md
+        - NCCL Tests: examples/misc/nccl-tests/index.md
 #  - Community: community.md
   - Partners: partners.md
   - Blog:

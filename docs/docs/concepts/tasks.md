@@ -136,7 +136,7 @@ resources:
 </div>
 
 Nodes can communicate using their private IP addresses.
-Use `DSTACK_MASTER_NODE_IP`, `$DSTACK_NODE_RANK`, and other
+Use `DSTACK_MASTER_NODE_IP`, `DSTACK_NODES_IPS`, `DSTACK_NODE_RANK`, and other
 [System environment variables](#system-environment-variables)
 to discover IP addresses and other details.
 
@@ -158,6 +158,11 @@ to discover IP addresses and other details.
         fi
       # ... The rest of the commands
     ```
+
+??? info "SSH"
+    You can log in to any node from any node via SSH on port 10022 using the `~/.ssh/dstack_job` private key.
+    For convenience, `~/.ssh/config` is preconfigured with these options, so a simple `ssh <node_ip>` is enough.
+    For a list of nodes IPs check the `DSTACK_NODES_IPS` environment variable.
 
 !!! info "Fleets"
     Distributed tasks can only run on fleets with

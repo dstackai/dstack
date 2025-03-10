@@ -1,0 +1,42 @@
+type: task
+name: nccl-tests
+
+image: un1def/aws-efa-test
+nodes: 2
+
+env:
+  - NCCL_DEBUG=INFO
+
+commands:
+  - |
+    # We use FIFO for inter-node communication
+    FIFO=/tmp/dstack_job
+    if [ ${DSTACK_NODE_RANK} -eq 0 ]; then
+      cd /root/nccl-tests/build
+      echo "${DSTACK_NODES_IPS}" > hostfile
+      MPIRUN='mpirun --allow-run-as-root --hostfile hostfile'
+      # Wait for other nodes
+      while true; do
+        if ${MPIRUN} -n ${DSTACK_NODES_NUM} -N 1 true >/dev/null 2>&1; then
+          break
+        fi
+        echo 'Waiting for nodes...'
+        sleep 5
+      done
+      # Run NCCL Tests
+      ${MPIRUN} \
+        -n $((DSTACK_NODES_NUM * DSTACK_GPUS_PER_NODE)) -N ${DSTACK_GPUS_PER_NODE} \
+        --mca btl_tcp_if_exclude lo,docker0 \
+        --bind-to none \
+        ./all_reduce_perf -b 8 -e 8G -f 2 -g 1
+      # Notify nodes the job is done
+      ${MPIRUN} -n ${DSTACK_NODES_NUM} -N 1 sh -c "echo done > ${FIFO}"
+    else
+      mkfifo ${FIFO}
+      # Wait for a message from the first node
+      cat ${FIFO}
+    fi
+
+resources:
+  gpu: nvidia:4:16GB
+  shm_size: 16GB

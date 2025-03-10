@@ -1,6 +1,7 @@
 package executor
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -30,6 +31,7 @@ type RunExecutor struct {
 	tempDir    string
 	homeDir    string
 	workingDir string
+	sshPort    int
 	uid        uint32
 
 	run             schemas.RunSpec
@@ -74,6 +76,7 @@ func NewRunExecutor(tempDir string, homeDir string, workingDir string, sshPort i
 		tempDir:    tempDir,
 		homeDir:    homeDir,
 		workingDir: workingDir,
+		sshPort:    sshPort,
 		uid:        uid,
 
 		mu:              mu,
@@ -322,15 +325,18 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 			log.Warning(ctx, "failed to write SSH environment", "path", ex.homeDir, "err", err)
 		}
 	}
+	userSSHDir := ""
+	uid := -1
+	gid := -1
 	if user != nil && *user.Uid != 0 {
 		// non-root user
-		uid := int(*user.Uid)
-		gid := int(*user.Gid)
+		uid = int(*user.Uid)
+		gid = int(*user.Gid)
 		homeDir, isHomeDirAccessible := prepareHomeDir(ctx, uid, gid, user.HomeDir)
 		envMap["HOME"] = homeDir
 		if isHomeDirAccessible {
 			log.Trace(ctx, "provisioning homeDir", "path", homeDir)
-			userSSHDir, err := prepareSSHDir(uid, gid, homeDir)
+			userSSHDir, err = prepareSSHDir(uid, gid, homeDir)
 			if err != nil {
 				log.Warning(ctx, "failed to prepare ssh dir", "home", homeDir, "err", err)
 			} else {
@@ -354,6 +360,17 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 	} else {
 		// root user
 		envMap["HOME"] = ex.homeDir
+		userSSHDir = filepath.Join(ex.homeDir, ".ssh")
+	}
+
+	if ex.jobSpec.SSHKey != nil && userSSHDir != "" {
+		err := configureSSH(
+			ex.jobSpec.SSHKey.Private, ex.jobSpec.SSHKey.Public, ex.clusterInfo.JobIPs, ex.sshPort,
+			uid, gid, userSSHDir,
+		)
+		if err != nil {
+			log.Warning(ctx, "failed to configure SSH", "err", err)
+		}
 	}
 
 	cmd.Env = envMap.Render()
@@ -709,6 +726,56 @@ func writeSSHEnvironment(env map[string]string, uid int, gid int, envPath string
 		return err
 	}
 
+	return nil
+}
+
+func configureSSH(private string, public string, ips []string, port int, uid int, gid int, sshDir string) error {
+	privatePath := filepath.Join(sshDir, "dstack_job")
+	privateFile, err := os.OpenFile(privatePath, os.O_TRUNC|os.O_WRONLY|os.O_CREATE, 0o600)
+	if err != nil {
+		return err
+	}
+	defer privateFile.Close()
+	if err := os.Chown(privatePath, uid, gid); err != nil {
+		return err
+	}
+	if _, err := privateFile.WriteString(private); err != nil {
+		return err
+	}
+
+	akPath := filepath.Join(sshDir, "authorized_keys")
+	akFile, err := os.OpenFile(akPath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0o600)
+	if err != nil {
+		return err
+	}
+	defer akFile.Close()
+	if err := os.Chown(akPath, uid, gid); err != nil {
+		return err
+	}
+	if _, err := akFile.WriteString(public); err != nil {
+		return err
+	}
+
+	configPath := filepath.Join(sshDir, "config")
+	configFile, err := os.OpenFile(configPath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0o600)
+	if err != nil {
+		return err
+	}
+	defer configFile.Close()
+	if err := os.Chown(configPath, uid, gid); err != nil {
+		return err
+	}
+	var configBuffer bytes.Buffer
+	for _, ip := range ips {
+		configBuffer.WriteString(fmt.Sprintf("\nHost %s\n", ip))
+		configBuffer.WriteString(fmt.Sprintf("    Port %d\n", port))
+		configBuffer.WriteString("    StrictHostKeyChecking no\n")
+		configBuffer.WriteString("    UserKnownHostsFile /dev/null\n")
+		configBuffer.WriteString(fmt.Sprintf("    IdentityFile %s\n", privatePath))
+	}
+	if _, err := configFile.Write(configBuffer.Bytes()); err != nil {
+		return err
+	}
 	return nil
 }
 

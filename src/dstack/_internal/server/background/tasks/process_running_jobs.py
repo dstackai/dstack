@@ -127,7 +127,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
     run_model = res.unique().scalar_one()
     repo_model = run_model.repo
     project = run_model.project
-    run = run_model_to_run(run_model)
+    run = run_model_to_run(run_model, include_sensitive=True)
     job_submission = job_model_to_job_submission(job_model)
     job_provisioning_data = job_submission.job_provisioning_data
     if job_provisioning_data is None:
