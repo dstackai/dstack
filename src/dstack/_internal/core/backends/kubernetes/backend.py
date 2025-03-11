@@ -1,6 +1,6 @@
 from dstack._internal.core.backends.base.backend import Backend
 from dstack._internal.core.backends.kubernetes.compute import KubernetesCompute
-from dstack._internal.core.backends.kubernetes.config import KubernetesConfig
+from dstack._internal.core.backends.kubernetes.models import KubernetesConfig
 from dstack._internal.core.models.backends.base import BackendType
 
 

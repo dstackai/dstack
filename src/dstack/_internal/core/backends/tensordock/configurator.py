@@ -7,11 +7,11 @@ from dstack._internal.core.backends.base.configurator import (
 )
 from dstack._internal.core.backends.tensordock import api_client
 from dstack._internal.core.backends.tensordock.backend import TensorDockBackend
-from dstack._internal.core.backends.tensordock.config import TensorDockConfig
 from dstack._internal.core.backends.tensordock.models import (
     AnyTensorDockBackendConfig,
     TensorDockBackendConfig,
     TensorDockBackendConfigWithCreds,
+    TensorDockConfig,
     TensorDockCreds,
     TensorDockStoredConfig,
 )

@@ -8,8 +8,7 @@ from pydantic import ValidationError
 
 import dstack._internal.core.backends.aws.resources as aws_resources
 from dstack._internal import settings
-from dstack._internal.core.backends.aws.config import AWSConfig
-from dstack._internal.core.backends.aws.models import AWSAccessKeyCreds
+from dstack._internal.core.backends.aws.models import AWSAccessKeyCreds, AWSConfig
 from dstack._internal.core.backends.base.compute import (
     Compute,
     ComputeWithCreateInstanceSupport,

@@ -10,7 +10,7 @@ from dstack._internal.core.backends.base.compute import (
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.vastai.api_client import VastAIAPIClient
-from dstack._internal.core.backends.vastai.config import VastAIConfig
+from dstack._internal.core.backends.vastai.models import VastAIConfig
 from dstack._internal.core.consts import DSTACK_RUNNER_SSH_PORT
 from dstack._internal.core.errors import ProvisioningError
 from dstack._internal.core.models.backends.base import BackendType

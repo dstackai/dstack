@@ -36,7 +36,7 @@ from dstack import version
 from dstack._internal import settings
 from dstack._internal.core.backends.azure import resources as azure_resources
 from dstack._internal.core.backends.azure import utils as azure_utils
-from dstack._internal.core.backends.azure.config import AzureConfig
+from dstack._internal.core.backends.azure.models import AzureConfig
 from dstack._internal.core.backends.base.compute import (
     Compute,
     ComputeWithCreateInstanceSupport,

@@ -127,7 +127,7 @@ Refer to examples:
 ##### 2.4.5. Create and register the backend config models
 
 Under the backend directory, create the `models.py` file and define the backend config model classes there.
-Every backend must define two models: 
+Every backend must define at least two models: 
 
 * `*BackendConfig` that contains all backend parameters available for user configuration except for creds.
 * `*BackendConfigWithCreds` that contains all backends parameters available for user configuration and also creds.
@@ -136,7 +136,7 @@ These models are used in server/config.yaml, the API, and for backend configurat
 
 The models should be added to `AnyBackendConfig*` unions in [`src/dstack/_internal/core/backends/models.py`](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/models.py).
 
-It's not required but recommended to define `*BackendStoredConfig` that extends `*BackendConfig` to be able to store extra parameters in the DB. By the same logic, it's recommended to define `*Config` that extends `*BackendStoredConfig` with creds and use it as the main `Backend` and `Compute` config instead of using `*BackendConfigWithCreds` directly.
+It's not required but recommended to also define `*BackendStoredConfig` that extends `*BackendConfig` to be able to store extra parameters in the DB. By the same logic, it's recommended to define `*Config` that extends `*BackendStoredConfig` with creds and use it as the main `Backend` and `Compute` config instead of using `*BackendConfigWithCreds` directly.
 
 Refer to examples: 
 [datacrunch](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/datacrunch/models.py), 

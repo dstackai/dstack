@@ -32,3 +32,7 @@ AnyDataCrunchBackendConfig = Union[DataCrunchBackendConfig, DataCrunchBackendCon
 
 class DataCrunchStoredConfig(DataCrunchBackendConfig):
     pass
+
+
+class DataCrunchConfig(DataCrunchStoredConfig):
+    creds: AnyDataCrunchCreds

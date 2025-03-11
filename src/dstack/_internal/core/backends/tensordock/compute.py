@@ -12,7 +12,7 @@ from dstack._internal.core.backends.base.compute import (
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.tensordock.api_client import TensorDockAPIClient
-from dstack._internal.core.backends.tensordock.config import TensorDockConfig
+from dstack._internal.core.backends.tensordock.models import TensorDockConfig
 from dstack._internal.core.errors import BackendError, NoCapacityError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (

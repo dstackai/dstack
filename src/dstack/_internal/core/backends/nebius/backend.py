@@ -1,6 +1,6 @@
 from dstack._internal.core.backends.base.backend import Backend
 from dstack._internal.core.backends.nebius.compute import NebiusCompute
-from dstack._internal.core.backends.nebius.config import NebiusConfig
+from dstack._internal.core.backends.nebius.models import NebiusConfig
 from dstack._internal.core.models.backends.base import BackendType
 
 

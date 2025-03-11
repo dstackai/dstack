@@ -28,3 +28,7 @@ class VultrBackendConfigWithCreds(VultrBackendConfig):
 
 class VultrStoredConfig(VultrBackendConfig):
     pass
+
+
+class VultrConfig(VultrStoredConfig):
+    creds: AnyVultrCreds

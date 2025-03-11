@@ -22,12 +22,12 @@ from azure.mgmt.resource.resources.models import ResourceGroup
 from dstack._internal.core.backends.azure import auth, compute, resources
 from dstack._internal.core.backends.azure import utils as azure_utils
 from dstack._internal.core.backends.azure.backend import AzureBackend
-from dstack._internal.core.backends.azure.config import AzureConfig
 from dstack._internal.core.backends.azure.models import (
     AnyAzureBackendConfig,
     AzureBackendConfig,
     AzureBackendConfigWithCreds,
     AzureClientCreds,
+    AzureConfig,
     AzureCreds,
     AzureDefaultCreds,
     AzureStoredConfig,

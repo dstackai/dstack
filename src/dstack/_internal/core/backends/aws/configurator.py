@@ -6,12 +6,12 @@ from boto3.session import Session
 
 from dstack._internal.core.backends.aws import auth, compute, resources
 from dstack._internal.core.backends.aws.backend import AWSBackend
-from dstack._internal.core.backends.aws.config import AWSConfig
 from dstack._internal.core.backends.aws.models import (
     AnyAWSBackendConfig,
     AWSAccessKeyCreds,
     AWSBackendConfig,
     AWSBackendConfigWithCreds,
+    AWSConfig,
     AWSCreds,
     AWSDefaultCreds,
     AWSStoredConfig,

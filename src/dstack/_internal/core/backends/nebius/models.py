@@ -53,3 +53,7 @@ class NebiusBackendFileConfigWithCreds(NebiusBackendConfig):
 
 class NebiusStoredConfig(NebiusBackendConfig):
     pass
+
+
+class NebiusConfig(NebiusStoredConfig):
+    creds: AnyNebiusCreds

@@ -13,7 +13,7 @@ from dstack._internal.core.backends.base.compute import (
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.runpod.api_client import RunpodApiClient
-from dstack._internal.core.backends.runpod.config import RunpodConfig
+from dstack._internal.core.backends.runpod.models import RunpodConfig
 from dstack._internal.core.consts import DSTACK_RUNNER_SSH_PORT
 from dstack._internal.core.errors import (
     BackendError,

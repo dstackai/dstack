@@ -1,6 +1,6 @@
 from dstack._internal.core.backends.base.backend import Backend
 from dstack._internal.core.backends.oci.compute import OCICompute
-from dstack._internal.core.backends.oci.config import OCIConfig
+from dstack._internal.core.backends.oci.models import OCIConfig
 from dstack._internal.core.models.backends.base import BackendType
 
 

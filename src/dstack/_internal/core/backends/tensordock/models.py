@@ -32,3 +32,7 @@ AnyTensorDockBackendConfig = Union[TensorDockBackendConfig, TensorDockBackendCon
 
 class TensorDockStoredConfig(TensorDockBackendConfig):
     pass
+
+
+class TensorDockConfig(TensorDockStoredConfig):
+    creds: AnyTensorDockCreds

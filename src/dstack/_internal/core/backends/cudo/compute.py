@@ -11,7 +11,7 @@ from dstack._internal.core.backends.base.compute import (
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.cudo.api_client import CudoApiClient
-from dstack._internal.core.backends.cudo.config import CudoConfig
+from dstack._internal.core.backends.cudo.models import CudoConfig
 from dstack._internal.core.errors import BackendError, NoCapacityError, ProvisioningError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (

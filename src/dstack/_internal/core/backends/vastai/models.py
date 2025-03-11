@@ -31,3 +31,7 @@ AnyVastAIBackendConfig = Union[VastAIBackendConfig, VastAIBackendConfigWithCreds
 
 class VastAIStoredConfig(VastAIBackendConfig):
     pass
+
+
+class VastAIConfig(VastAIStoredConfig):
+    creds: AnyVastAICreds

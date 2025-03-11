@@ -42,3 +42,13 @@ AnyRunpodBackendConfig = Union[RunpodBackendConfig, RunpodBackendConfigWithCreds
 
 class RunpodStoredConfig(RunpodBackendConfig):
     pass
+
+
+class RunpodConfig(RunpodStoredConfig):
+    creds: AnyRunpodCreds
+
+    @property
+    def allow_community_cloud(self) -> bool:
+        if self.community_cloud is not None:
+            return self.community_cloud
+        return RUNPOD_COMMUNITY_CLOUD_DEFAULT

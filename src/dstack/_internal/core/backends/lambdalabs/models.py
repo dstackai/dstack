@@ -31,3 +31,7 @@ AnyLambdaBackendConfig = Union[LambdaBackendConfig, LambdaBackendConfigWithCreds
 
 class LambdaStoredConfig(LambdaBackendConfig):
     pass
+
+
+class LambdaConfig(LambdaStoredConfig):
+    creds: AnyLambdaCreds

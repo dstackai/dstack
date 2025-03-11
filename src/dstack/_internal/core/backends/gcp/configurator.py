@@ -10,11 +10,11 @@ from dstack._internal.core.backends.base.configurator import (
 )
 from dstack._internal.core.backends.gcp import auth, resources
 from dstack._internal.core.backends.gcp.backend import GCPBackend
-from dstack._internal.core.backends.gcp.config import GCPConfig
 from dstack._internal.core.backends.gcp.models import (
     AnyGCPBackendConfig,
     GCPBackendConfig,
     GCPBackendConfigWithCreds,
+    GCPConfig,
     GCPCreds,
     GCPDefaultCreds,
     GCPServiceAccountCreds,

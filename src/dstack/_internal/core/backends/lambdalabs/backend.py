@@ -1,6 +1,6 @@
 from dstack._internal.core.backends.base.backend import Backend
 from dstack._internal.core.backends.lambdalabs.compute import LambdaCompute
-from dstack._internal.core.backends.lambdalabs.config import LambdaConfig
+from dstack._internal.core.backends.lambdalabs.models import LambdaConfig
 from dstack._internal.core.models.backends.base import BackendType
 
 

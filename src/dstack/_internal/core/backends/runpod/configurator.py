@@ -6,11 +6,12 @@ from dstack._internal.core.backends.base.configurator import (
     raise_invalid_credentials_error,
 )
 from dstack._internal.core.backends.runpod import api_client
-from dstack._internal.core.backends.runpod.backend import RunpodBackend, RunpodConfig
+from dstack._internal.core.backends.runpod.backend import RunpodBackend
 from dstack._internal.core.backends.runpod.models import (
     AnyRunpodBackendConfig,
     RunpodBackendConfig,
     RunpodBackendConfigWithCreds,
+    RunpodConfig,
     RunpodCreds,
     RunpodStoredConfig,
 )

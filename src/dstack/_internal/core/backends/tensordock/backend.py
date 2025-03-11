@@ -1,6 +1,6 @@
 from dstack._internal.core.backends.base.backend import Backend
 from dstack._internal.core.backends.tensordock.compute import TensorDockCompute
-from dstack._internal.core.backends.tensordock.config import TensorDockConfig
+from dstack._internal.core.backends.tensordock.models import TensorDockConfig
 from dstack._internal.core.models.backends.base import BackendType
 
 

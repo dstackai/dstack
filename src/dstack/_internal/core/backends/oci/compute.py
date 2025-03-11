@@ -14,7 +14,7 @@ from dstack._internal.core.backends.base.compute import (
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.oci import resources
-from dstack._internal.core.backends.oci.config import OCIConfig
+from dstack._internal.core.backends.oci.models import OCIConfig
 from dstack._internal.core.backends.oci.region import make_region_clients_map
 from dstack._internal.core.errors import NoCapacityError
 from dstack._internal.core.models.backends.base import BackendType

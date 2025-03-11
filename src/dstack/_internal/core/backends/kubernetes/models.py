@@ -66,3 +66,7 @@ AnyKubernetesBackendConfig = Union[KubernetesBackendConfig, KubernetesBackendCon
 
 class KubernetesStoredConfig(KubernetesBackendConfigWithCreds):
     pass
+
+
+class KubernetesConfig(KubernetesStoredConfig):
+    pass

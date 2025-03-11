@@ -7,11 +7,11 @@ from dstack._internal.core.backends.base.configurator import (
 )
 from dstack._internal.core.backends.lambdalabs import api_client
 from dstack._internal.core.backends.lambdalabs.backend import LambdaBackend
-from dstack._internal.core.backends.lambdalabs.config import LambdaConfig
 from dstack._internal.core.backends.lambdalabs.models import (
     AnyLambdaBackendConfig,
     LambdaBackendConfig,
     LambdaBackendConfigWithCreds,
+    LambdaConfig,
     LambdaCreds,
     LambdaStoredConfig,
 )

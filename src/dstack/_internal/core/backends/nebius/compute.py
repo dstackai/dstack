@@ -9,7 +9,7 @@ from dstack._internal.core.backends.base.backend import Compute
 from dstack._internal.core.backends.base.compute import get_job_instance_name, get_user_data
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.nebius.api_client import NebiusAPIClient
-from dstack._internal.core.backends.nebius.config import NebiusConfig
+from dstack._internal.core.backends.nebius.models import NebiusConfig
 from dstack._internal.core.backends.nebius.types import (
     ForbiddenError,
     NotFoundError,

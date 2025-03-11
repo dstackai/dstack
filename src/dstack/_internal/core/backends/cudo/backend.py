@@ -1,6 +1,6 @@
 from dstack._internal.core.backends.base.backend import Backend
 from dstack._internal.core.backends.cudo.compute import CudoCompute
-from dstack._internal.core.backends.cudo.config import CudoConfig
+from dstack._internal.core.backends.cudo.models import CudoConfig
 from dstack._internal.core.models.backends.base import BackendType
 
 

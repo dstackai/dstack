@@ -26,7 +26,7 @@ from dstack._internal.core.backends.base.compute import (
     merge_tags,
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
-from dstack._internal.core.backends.gcp.config import GCPConfig
+from dstack._internal.core.backends.gcp.models import GCPConfig
 from dstack._internal.core.errors import (
     ComputeError,
     ComputeResourceNotFoundError,
