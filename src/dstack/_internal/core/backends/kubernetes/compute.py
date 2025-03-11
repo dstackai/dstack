@@ -58,8 +58,8 @@ NVIDIA_GPU_NAMES = NVIDIA_GPU_NAME_TO_GPU_INFO.keys()
 
 
 class KubernetesCompute(
-    Compute,
     ComputeWithGatewaySupport,
+    Compute,
 ):
     def __init__(self, config: KubernetesConfig):
         super().__init__()

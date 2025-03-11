@@ -7,7 +7,6 @@ from dstack._internal.core.backends.base.backend import Compute
 from dstack._internal.core.backends.base.compute import (
     ComputeWithCreateInstanceSupport,
     generate_unique_instance_name,
-    get_job_instance_name,
     get_shim_commands,
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
@@ -19,10 +18,8 @@ from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceConfiguration,
     InstanceOfferWithAvailability,
-    SSHKey,
 )
-from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
-from dstack._internal.core.models.volumes import Volume
+from dstack._internal.core.models.runs import JobProvisioningData, Requirements
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -33,8 +30,8 @@ MAX_INSTANCE_NAME_LEN = 60
 
 
 class TensorDockCompute(
-    Compute,
     ComputeWithCreateInstanceSupport,
+    Compute,
 ):
     def __init__(self, config: TensorDockConfig):
         super().__init__()
@@ -116,26 +113,6 @@ class TensorDockCompute(
             ssh_proxy=None,
             backend_data=None,
         )
-
-    def run_job(
-        self,
-        run: Run,
-        job: Job,
-        instance_offer: InstanceOfferWithAvailability,
-        project_ssh_public_key: str,
-        project_ssh_private_key: str,
-        volumes: List[Volume],
-    ) -> JobProvisioningData:
-        instance_config = InstanceConfiguration(
-            project_name=run.project_name,
-            instance_name=get_job_instance_name(run, job),  # TODO: generate name
-            ssh_keys=[
-                SSHKey(public=run.run_spec.ssh_key_pub.strip()),
-                SSHKey(public=project_ssh_public_key.strip()),
-            ],
-            user=run.user,
-        )
-        return self.create_instance(instance_offer, instance_config)
 
     def terminate_instance(
         self, instance_id: str, region: str, backend_data: Optional[str] = None

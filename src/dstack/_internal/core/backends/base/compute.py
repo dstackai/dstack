@@ -25,6 +25,7 @@ from dstack._internal.core.models.gateways import (
 from dstack._internal.core.models.instances import (
     InstanceConfiguration,
     InstanceOfferWithAvailability,
+    SSHKey,
 )
 from dstack._internal.core.models.placement import PlacementGroup, PlacementGroupProvisioningData
 from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
@@ -143,6 +144,51 @@ class ComputeWithCreateInstanceSupport(ABC):
         and implement `update_provisioning_data()`.
         """
         pass
+
+    def run_job(
+        self,
+        run: Run,
+        job: Job,
+        instance_offer: InstanceOfferWithAvailability,
+        project_ssh_public_key: str,
+        project_ssh_private_key: str,
+        volumes: List[Volume],
+    ) -> JobProvisioningData:
+        """
+        The default `run_job()` implementation for all backends that support `create_instance()`.
+        Override only if custom `run_job()` behavior is required.
+        """
+        instance_config = InstanceConfiguration(
+            project_name=run.project_name,
+            instance_name=get_job_instance_name(run, job),
+            user=run.user,
+            ssh_keys=[SSHKey(public=project_ssh_public_key.strip())],
+            volumes=volumes,
+            reservation=run.run_spec.configuration.reservation,
+        )
+        instance_offer = instance_offer.copy()
+        self._restrict_instance_offer_az_to_volumes_az(instance_offer, volumes)
+        return self.create_instance(instance_offer, instance_config)
+
+    def _restrict_instance_offer_az_to_volumes_az(
+        self,
+        instance_offer: InstanceOfferWithAvailability,
+        volumes: List[Volume],
+    ):
+        if len(volumes) == 0:
+            return
+        volume = volumes[0]
+        if (
+            volume.provisioning_data is not None
+            and volume.provisioning_data.availability_zone is not None
+        ):
+            if instance_offer.availability_zones is None:
+                instance_offer.availability_zones = [volume.provisioning_data.availability_zone]
+            instance_offer.availability_zones = [
+                z
+                for z in instance_offer.availability_zones
+                if z == volume.provisioning_data.availability_zone
+            ]
 
 
 class ComputeWithMultinodeSupport:
