@@ -376,7 +376,7 @@ async def generate_volume_name(session: AsyncSession, project: ProjectModel) -> 
 def _validate_volume_configuration(configuration: VolumeConfiguration):
     if configuration.volume_id is None and configuration.size is None:
         raise ServerClientError("Volume must specify either volume_id or size")
-    backends_services.check_backed_type_available(configuration.backend)
+    backends_services.check_backend_type_available(configuration.backend)
     if configuration.backend not in BACKENDS_WITH_VOLUMES_SUPPORT:
         raise ServerClientError(
             f"Volumes are not supported for {configuration.backend.value} backend."

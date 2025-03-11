@@ -118,7 +118,7 @@ Refer to examples:
 
 Under the backend directory you've created, create the `compute.py` file and define the
 backend compute class that extends the `dstack._internal.core.backends.base.compute.Compute` class.
-It can also extend and implement `ComputeWith*` classes to support additional features such as fleets, volumes, gateways, placement groups, etc.
+It can also extend and implement `ComputeWith*` classes to support additional features such as fleets, volumes, gateways, placement groups, etc. For example, it should extend `ComputeWithCreateInstanceSupport` to support fleets.
 
 Refer to examples:
 [datacrunch](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/datacrunch/compute.py),

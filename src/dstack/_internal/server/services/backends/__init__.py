@@ -369,7 +369,7 @@ async def get_instance_offers(
     return sorted(offers, key=lambda i: not i[1].availability.is_available())
 
 
-def check_backed_type_available(backend_type: BackendType):
+def check_backend_type_available(backend_type: BackendType):
     if backend_type not in list_available_backend_types():
         raise BackendNotAvailable(
             f"Backend {backend_type.value} not available."
