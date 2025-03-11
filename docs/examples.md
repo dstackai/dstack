@@ -155,4 +155,14 @@ hide:
             Use Docker and Docker Compose inside runs
         </p>
     </a>
+    <a href="/examples/misc/nccl-tests"
+       class="feature-cell sky">
+        <h3>
+            NCCL Tests
+        </h3>
+
+        <p>
+            Run multi-node NCCL Tests with MPI
+        </p>
+    </a>
 </div>

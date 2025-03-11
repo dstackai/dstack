@@ -178,6 +178,11 @@ class Gateway(CoreModel):
     options: dict = {}
 
 
+class JobSSHKey(CoreModel):
+    private: str
+    public: str
+
+
 class JobSpec(CoreModel):
     replica_num: int = 0  # default value for backward compatibility
     job_num: int
@@ -198,6 +203,7 @@ class JobSpec(CoreModel):
     requirements: Requirements
     retry: Optional[Retry]
     volumes: Optional[List[MountPoint]] = None
+    ssh_key: Optional[JobSSHKey] = None
     # For backward compatibility with 0.18.x when retry_policy was required.
     # TODO: remove in 0.19
     retry_policy: ProfileRetryPolicy = ProfileRetryPolicy(retry=False)
