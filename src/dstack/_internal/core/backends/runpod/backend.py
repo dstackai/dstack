@@ -5,7 +5,8 @@ from dstack._internal.core.models.backends.base import BackendType
 
 
 class RunpodBackend(Backend):
-    TYPE: BackendType = BackendType.RUNPOD
+    TYPE = BackendType.RUNPOD
+    COMPUTE_CLASS = RunpodCompute
 
     def __init__(self, config: RunpodConfig):
         self.config = config

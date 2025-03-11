@@ -6,7 +6,8 @@ from dstack._internal.core.models.backends.base import BackendType
 
 
 class AzureBackend(Backend):
-    TYPE: BackendType = BackendType.AZURE
+    TYPE = BackendType.AZURE
+    COMPUTE_CLASS = AzureCompute
 
     def __init__(self, config: AzureConfig):
         self.config = config

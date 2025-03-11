@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, lazyload, selectinload
 
 from dstack._internal.core.backends.base.backend import Backend
+from dstack._internal.core.backends.base.compute import ComputeWithVolumeSupport
 from dstack._internal.core.errors import BackendError, ServerClientError
 from dstack._internal.core.models.common import NetworkMode
 from dstack._internal.core.models.fleets import (
@@ -700,13 +701,15 @@ async def _attach_volume(
     instance: InstanceModel,
     instance_id: str,
 ):
+    compute = backend.compute()
+    assert isinstance(compute, ComputeWithVolumeSupport)
     volume = volume_model_to_volume(volume_model)
     # Refresh only to check if the volume wasn't deleted before the lock
     await session.refresh(volume_model)
     if volume_model.deleted:
         raise ServerClientError("Cannot attach a deleted volume")
     attachment_data = await common_utils.run_async(
-        backend.compute().attach_volume,
+        compute.attach_volume,
         volume=volume,
         instance_id=instance_id,
     )

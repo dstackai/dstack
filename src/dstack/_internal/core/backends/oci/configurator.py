@@ -44,7 +44,8 @@ SUPPORTED_REGIONS = frozenset(
 
 
 class OCIConfigurator(Configurator):
-    TYPE: BackendType = BackendType.OCI
+    TYPE = BackendType.OCI
+    BACKEND_CLASS = OCIBackend
 
     def validate_config(self, config: OCIBackendConfigWithCreds, default_creds_enabled: bool):
         if is_core_model_instance(config.creds, OCIDefaultCreds) and not default_creds_enabled:

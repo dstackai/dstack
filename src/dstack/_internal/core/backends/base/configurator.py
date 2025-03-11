@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, List, Optional
+from typing import Any, ClassVar, List, Optional
 from uuid import UUID
 
 from dstack._internal.core.backends.base.backend import Backend
@@ -47,7 +47,9 @@ class Configurator(ABC):
     in `dstack._internal.core.backends.configurators`.
     """
 
-    TYPE: BackendType
+    TYPE: ClassVar[BackendType]
+    # `BACKEND_CLASS` is used to introspect backend features without initializing it.
+    BACKEND_CLASS: ClassVar[type[Backend]]
 
     @abstractmethod
     def validate_config(self, config: AnyBackendConfigWithCreds, default_creds_enabled: bool):

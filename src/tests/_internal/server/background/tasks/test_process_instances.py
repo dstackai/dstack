@@ -28,6 +28,7 @@ from dstack._internal.server.background.tasks.process_instances import (
     process_instances,
 )
 from dstack._internal.server.testing.common import (
+    ComputeMockSpec,
     create_instance,
     create_job,
     create_pool,
@@ -531,6 +532,7 @@ class TestCreateInstance:
                 price=1.0,
                 availability=InstanceAvailability.AVAILABLE,
             )
+            backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
             backend_mock.compute.return_value.get_offers_cached.return_value = [offer]
             backend_mock.compute.return_value.create_instance.return_value = JobProvisioningData(
                 backend=offer.backend,

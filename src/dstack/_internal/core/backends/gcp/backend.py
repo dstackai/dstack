@@ -5,7 +5,8 @@ from dstack._internal.core.models.backends.base import BackendType
 
 
 class GCPBackend(Backend):
-    TYPE: BackendType = BackendType.GCP
+    TYPE = BackendType.GCP
+    COMPUTE_CLASS = GCPCompute
 
     def __init__(self, config: GCPConfig):
         self.config = config

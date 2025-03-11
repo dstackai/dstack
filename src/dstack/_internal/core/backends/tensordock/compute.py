@@ -5,6 +5,7 @@ import requests
 
 from dstack._internal.core.backends.base.backend import Compute
 from dstack._internal.core.backends.base.compute import (
+    ComputeWithCreateInstanceSupport,
     generate_unique_instance_name,
     get_job_instance_name,
     get_shim_commands,
@@ -31,7 +32,10 @@ logger = get_logger(__name__)
 MAX_INSTANCE_NAME_LEN = 60
 
 
-class TensorDockCompute(Compute):
+class TensorDockCompute(
+    Compute,
+    ComputeWithCreateInstanceSupport,
+):
     def __init__(self, config: TensorDockConfig):
         super().__init__()
         self.config = config

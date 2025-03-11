@@ -111,7 +111,8 @@ MAIN_REGION = "us-east1"
 
 
 class GCPConfigurator(Configurator):
-    TYPE: BackendType = BackendType.GCP
+    TYPE = BackendType.GCP
+    BACKEND_CLASS = GCPBackend
 
     def validate_config(self, config: GCPBackendConfigWithCreds, default_creds_enabled: bool):
         if is_core_model_instance(config.creds, GCPDefaultCreds) and not default_creds_enabled:

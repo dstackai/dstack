@@ -6,6 +6,8 @@ import requests
 
 from dstack._internal.core.backends.base.backend import Compute
 from dstack._internal.core.backends.base.compute import (
+    ComputeWithCreateInstanceSupport,
+    ComputeWithMultinodeSupport,
     generate_unique_instance_name,
     get_job_instance_name,
     get_user_data,
@@ -31,7 +33,11 @@ logger = get_logger(__name__)
 MAX_INSTANCE_NAME_LEN = 64
 
 
-class VultrCompute(Compute):
+class VultrCompute(
+    Compute,
+    ComputeWithCreateInstanceSupport,
+    ComputeWithMultinodeSupport,
+):
     def __init__(self, config: VultrConfig):
         super().__init__()
         self.config = config

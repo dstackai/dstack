@@ -7,6 +7,7 @@ from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.volumes import VolumeProvisioningData, VolumeStatus
 from dstack._internal.server.background.tasks.process_volumes import process_submitted_volumes
 from dstack._internal.server.testing.common import (
+    ComputeMockSpec,
     create_project,
     create_user,
     create_volume,
@@ -40,6 +41,7 @@ class TestProcessSubmittedVolumes:
         ) as m:
             aws_mock = Mock()
             m.return_value = aws_mock
+            aws_mock.compute.return_value = Mock(spec=ComputeMockSpec)
             aws_mock.compute.return_value.create_volume.return_value = VolumeProvisioningData(
                 backend=BackendType.AWS,
                 volume_id="1234",

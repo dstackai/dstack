@@ -46,6 +46,11 @@ DSTACK_RUNNER_BINARY_PATH = f"/usr/local/bin/{DSTACK_RUNNER_BINARY_NAME}"
 
 
 class Compute(ABC):
+    """
+    A base class for all compute implementations with minimal features.
+    If a compute supports additional features, it must also subclass `ComputeWith*` classes.
+    """
+
     def __init__(self):
         self._offers_cache_lock = threading.Lock()
         self._offers_cache = TTLCache(maxsize=5, ttl=30)
@@ -86,18 +91,6 @@ class Compute(ABC):
         """
         pass
 
-    def create_instance(
-        self,
-        instance_offer: InstanceOfferWithAvailability,
-        instance_config: InstanceConfiguration,
-    ) -> JobProvisioningData:
-        """
-        Launches a new instance. It should return `JobProvisioningData` ASAP.
-        If required to wait to get the IP address or SSH port, return partially filled `JobProvisioningData`
-        and implement `update_provisioning_data()`.
-        """
-        raise NotImplementedError()
-
     def update_provisioning_data(
         self,
         provisioning_data: JobProvisioningData,
@@ -114,87 +107,6 @@ class Compute(ABC):
         """
         pass
 
-    def create_placement_group(
-        self,
-        placement_group: PlacementGroup,
-    ) -> PlacementGroupProvisioningData:
-        """
-        Creates a placement group.
-        """
-        raise NotImplementedError()
-
-    def delete_placement_group(
-        self,
-        placement_group: PlacementGroup,
-    ):
-        """
-        Deletes a placement group.
-        If the group does not exist, it should not raise errors but return silently.
-        """
-        raise NotImplementedError()
-
-    def create_gateway(
-        self,
-        configuration: GatewayComputeConfiguration,
-    ) -> GatewayProvisioningData:
-        """
-        Creates a gateway instance.
-        """
-        raise NotImplementedError()
-
-    def terminate_gateway(
-        self,
-        instance_id: str,
-        configuration: GatewayComputeConfiguration,
-        backend_data: Optional[str] = None,
-    ):
-        """
-        Terminates a gateway instance. Generally, it passes the call to `terminate_instance()`,
-        but may perform additional work such as deleting a load balancer when a gateway has one.
-        """
-        raise NotImplementedError()
-
-    def register_volume(self, volume: Volume) -> VolumeProvisioningData:
-        """
-        Returns VolumeProvisioningData for an existing volume.
-        Used to add external volumes to dstack.
-        """
-        raise NotImplementedError()
-
-    def create_volume(self, volume: Volume) -> VolumeProvisioningData:
-        """
-        Creates a new volume.
-        """
-        raise NotImplementedError()
-
-    def delete_volume(self, volume: Volume):
-        """
-        Deletes a volume.
-        """
-        raise NotImplementedError()
-
-    def attach_volume(self, volume: Volume, instance_id: str) -> VolumeAttachmentData:
-        """
-        Attaches a volume to the instance.
-        If the volume is not found, it should raise `ComputeError()` instead of a thrid-party exception.
-        """
-        raise NotImplementedError()
-
-    def detach_volume(self, volume: Volume, instance_id: str, force: bool = False):
-        """
-        Detaches a volume from the instance.
-        """
-        raise NotImplementedError()
-
-    def is_volume_detached(self, volume: Volume, instance_id: str) -> bool:
-        """
-        Checks if a volume was detached from the instance.
-        If `detach_volume()` may fail to detach volume,
-        this method should be overridden to check the volume status.
-        The caller will trigger force detach if the volume gets stuck detaching.
-        """
-        return True
-
     def _get_offers_cached_key(self, requirements: Optional[Requirements] = None) -> int:
         # Requirements is not hashable, so we use a hack to get arguments hash
         if requirements is None:
@@ -210,6 +122,163 @@ class Compute(ABC):
         self, requirements: Optional[Requirements] = None
     ) -> List[InstanceOfferWithAvailability]:
         return self.get_offers(requirements)
+
+
+class ComputeWithCreateInstanceSupport(ABC):
+    """
+    Must be subclassed and implemented to support fleets (instance creation without running a job).
+    Typically, a compute that runs VMs would implement it,
+    and a compute that runs containers would not.
+    """
+
+    @abstractmethod
+    def create_instance(
+        self,
+        instance_offer: InstanceOfferWithAvailability,
+        instance_config: InstanceConfiguration,
+    ) -> JobProvisioningData:
+        """
+        Launches a new instance. It should return `JobProvisioningData` ASAP.
+        If required to wait to get the IP address or SSH port, return partially filled `JobProvisioningData`
+        and implement `update_provisioning_data()`.
+        """
+        pass
+
+
+class ComputeWithMultinodeSupport:
+    """
+    Must be subclassed to support multinode tasks and cluster fleets.
+    Instances provisioned in the same project/region must be interconnected.
+    """
+
+    pass
+
+
+class ComputeWithReservationSupport:
+    """
+    Must be subclassed to support provisioning from reservations.
+    """
+
+    pass
+
+
+class ComputeWithPlacementGroupSupport(ABC):
+    """
+    Must be subclassed and implemented to support placement groups.
+    """
+
+    @abstractmethod
+    def create_placement_group(
+        self,
+        placement_group: PlacementGroup,
+    ) -> PlacementGroupProvisioningData:
+        """
+        Creates a placement group.
+        """
+        pass
+
+    @abstractmethod
+    def delete_placement_group(
+        self,
+        placement_group: PlacementGroup,
+    ):
+        """
+        Deletes a placement group.
+        If the group does not exist, it should not raise errors but return silently.
+        """
+        pass
+
+
+class ComputeWithGatewaySupport(ABC):
+    """
+    Must be subclassed and imlemented to support gateways.
+    """
+
+    @abstractmethod
+    def create_gateway(
+        self,
+        configuration: GatewayComputeConfiguration,
+    ) -> GatewayProvisioningData:
+        """
+        Creates a gateway instance.
+        """
+        pass
+
+    @abstractmethod
+    def terminate_gateway(
+        self,
+        instance_id: str,
+        configuration: GatewayComputeConfiguration,
+        backend_data: Optional[str] = None,
+    ):
+        """
+        Terminates a gateway instance. Generally, it passes the call to `terminate_instance()`,
+        but may perform additional work such as deleting a load balancer when a gateway has one.
+        """
+        pass
+
+
+class ComputeWithPrivateGatewaySupport:
+    """
+    Must be subclassed to support private gateways.
+    `create_gateway()` must be able to create private gateways.
+    """
+
+    pass
+
+
+class ComputeWithVolumeSupport(ABC):
+    """
+    Must be subclassed and implemented to support volumes.
+    """
+
+    @abstractmethod
+    def register_volume(self, volume: Volume) -> VolumeProvisioningData:
+        """
+        Returns VolumeProvisioningData for an existing volume.
+        Used to add external volumes to dstack.
+        """
+        pass
+
+    @abstractmethod
+    def create_volume(self, volume: Volume) -> VolumeProvisioningData:
+        """
+        Creates a new volume.
+        """
+        raise NotImplementedError()
+
+    @abstractmethod
+    def delete_volume(self, volume: Volume):
+        """
+        Deletes a volume.
+        """
+        raise NotImplementedError()
+
+    def attach_volume(self, volume: Volume, instance_id: str) -> VolumeAttachmentData:
+        """
+        Attaches a volume to the instance.
+        If the volume is not found, it should raise `ComputeError()`.
+        Implement only if compute may return `VolumeProvisioningData.attachable`.
+        Otherwise, volumes should be attached by `run_job()`.
+        """
+        raise NotImplementedError()
+
+    def detach_volume(self, volume: Volume, instance_id: str, force: bool = False):
+        """
+        Detaches a volume from the instance.
+        Implement only if compute may return `VolumeProvisioningData.detachable`.
+        Otherwise, volumes should be detached on instance termination.
+        """
+        raise NotImplementedError()
+
+    def is_volume_detached(self, volume: Volume, instance_id: str) -> bool:
+        """
+        Checks if a volume was detached from the instance.
+        If `detach_volume()` may fail to detach volume,
+        this method should be overridden to check the volume status.
+        The caller will trigger force detach if the volume gets stuck detaching.
+        """
+        return True
 
 
 def get_job_instance_name(run: Run, job: Job) -> str:
