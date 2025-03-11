@@ -1,7 +1,7 @@
 import botocore.exceptions
 
 from dstack._internal.core.backends.aws.compute import AWSCompute
-from dstack._internal.core.backends.aws.config import AWSConfig
+from dstack._internal.core.backends.aws.models import AWSConfig
 from dstack._internal.core.backends.base.backend import Backend
 from dstack._internal.core.errors import BackendInvalidCredentialsError
 from dstack._internal.core.models.backends.base import BackendType

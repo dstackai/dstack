@@ -13,7 +13,7 @@ from dstack._internal.core.backends.base.compute import (
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.lambdalabs.api_client import LambdaAPIClient
-from dstack._internal.core.backends.lambdalabs.config import LambdaConfig
+from dstack._internal.core.backends.lambdalabs.models import LambdaConfig
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,

@@ -5,11 +5,11 @@ from dstack._internal.core.backends.base.configurator import (
 )
 from dstack._internal.core.backends.kubernetes import utils as kubernetes_utils
 from dstack._internal.core.backends.kubernetes.backend import KubernetesBackend
-from dstack._internal.core.backends.kubernetes.config import KubernetesConfig
 from dstack._internal.core.backends.kubernetes.models import (
     AnyKubernetesBackendConfig,
     KubernetesBackendConfig,
     KubernetesBackendConfigWithCreds,
+    KubernetesConfig,
     KubernetesStoredConfig,
 )
 from dstack._internal.core.models.backends.base import BackendType

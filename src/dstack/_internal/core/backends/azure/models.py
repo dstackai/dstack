@@ -77,3 +77,13 @@ AnyAzureBackendConfig = Union[AzureBackendConfig, AzureBackendConfigWithCreds]
 
 class AzureStoredConfig(AzureBackendConfig):
     resource_group: str = ""
+
+
+class AzureConfig(AzureStoredConfig):
+    creds: AnyAzureCreds
+
+    @property
+    def allocate_public_ips(self) -> bool:
+        if self.public_ips is not None:
+            return self.public_ips
+        return True

@@ -16,8 +16,10 @@ from dstack._internal.core.backends.base.compute import (
     get_dstack_gateway_commands,
 )
 from dstack._internal.core.backends.base.offers import match_requirements
-from dstack._internal.core.backends.kubernetes.config import KubernetesConfig
-from dstack._internal.core.backends.kubernetes.models import KubernetesNetworkingConfig
+from dstack._internal.core.backends.kubernetes.models import (
+    KubernetesConfig,
+    KubernetesNetworkingConfig,
+)
 from dstack._internal.core.backends.kubernetes.utils import (
     get_api_from_config_data,
     get_cluster_public_ip,

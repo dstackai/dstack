@@ -1,6 +1,6 @@
 from dstack._internal.core.backends.base.backend import Backend
 from dstack._internal.core.backends.gcp.compute import GCPCompute
-from dstack._internal.core.backends.gcp.config import GCPConfig
+from dstack._internal.core.backends.gcp.models import GCPConfig
 from dstack._internal.core.models.backends.base import BackendType
 
 

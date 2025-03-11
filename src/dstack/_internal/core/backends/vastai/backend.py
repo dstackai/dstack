@@ -1,6 +1,6 @@
 from dstack._internal.core.backends.base.backend import Backend
 from dstack._internal.core.backends.vastai.compute import VastAICompute
-from dstack._internal.core.backends.vastai.config import VastAIConfig
+from dstack._internal.core.backends.vastai.models import VastAIConfig
 from dstack._internal.core.models.backends.base import BackendType
 
 

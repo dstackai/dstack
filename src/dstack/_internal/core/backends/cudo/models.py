@@ -31,3 +31,7 @@ AnyCudoBackendConfig = Union[CudoBackendConfig, CudoBackendConfigWithCreds]
 
 class CudoStoredConfig(CudoBackendConfig):
     pass
+
+
+class CudoConfig(CudoStoredConfig):
+    creds: AnyCudoCreds

@@ -8,7 +8,7 @@ from dstack._internal.core.backends.base.compute import (
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.datacrunch.api_client import DataCrunchAPIClient
-from dstack._internal.core.backends.datacrunch.config import DataCrunchConfig
+from dstack._internal.core.backends.datacrunch.models import DataCrunchConfig
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,

@@ -81,3 +81,7 @@ AnyOCIBackendConfig = Union[OCIBackendConfig, OCIBackendConfigWithCreds]
 class OCIStoredConfig(OCIBackendConfig):
     compartment_id: str
     subnet_ids_per_region: Dict[str, str]
+
+
+class OCIConfig(OCIStoredConfig):
+    creds: AnyOCICreds

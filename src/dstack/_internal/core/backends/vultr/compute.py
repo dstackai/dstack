@@ -14,7 +14,7 @@ from dstack._internal.core.backends.base.compute import (
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.vultr.api_client import VultrApiClient
-from dstack._internal.core.backends.vultr.config import VultrConfig
+from dstack._internal.core.backends.vultr.models import VultrConfig
 from dstack._internal.core.errors import BackendError, ProvisioningError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (

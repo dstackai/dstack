@@ -8,12 +8,12 @@ from dstack._internal.core.backends.base.configurator import (
 )
 from dstack._internal.core.backends.oci import resources
 from dstack._internal.core.backends.oci.backend import OCIBackend
-from dstack._internal.core.backends.oci.config import OCIConfig
 from dstack._internal.core.backends.oci.exceptions import any_oci_exception
 from dstack._internal.core.backends.oci.models import (
     AnyOCIBackendConfig,
     OCIBackendConfig,
     OCIBackendConfigWithCreds,
+    OCIConfig,
     OCICreds,
     OCIDefaultCreds,
     OCIStoredConfig,

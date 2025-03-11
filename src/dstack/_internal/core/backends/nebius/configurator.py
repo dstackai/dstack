@@ -9,10 +9,10 @@ from dstack._internal.core.backends.base.configurator import (
     raise_invalid_credentials_error,
 )
 from dstack._internal.core.backends.nebius.backend import NebiusBackend
-from dstack._internal.core.backends.nebius.config import NebiusConfig
 from dstack._internal.core.backends.nebius.models import (
     NebiusBackendConfig,
     NebiusBackendConfigWithCreds,
+    NebiusConfig,
     NebiusCreds,
     NebiusStoredConfig,
 )

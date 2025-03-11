@@ -5,11 +5,11 @@ from dstack._internal.core.backends.base.configurator import (
     Configurator,
 )
 from dstack._internal.core.backends.datacrunch.backend import DataCrunchBackend
-from dstack._internal.core.backends.datacrunch.config import DataCrunchConfig
 from dstack._internal.core.backends.datacrunch.models import (
     AnyDataCrunchBackendConfig,
     DataCrunchBackendConfig,
     DataCrunchBackendConfigWithCreds,
+    DataCrunchConfig,
     DataCrunchCreds,
     DataCrunchStoredConfig,
 )

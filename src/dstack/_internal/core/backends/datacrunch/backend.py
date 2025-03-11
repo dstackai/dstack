@@ -1,6 +1,6 @@
 from dstack._internal.core.backends.base.backend import Backend
 from dstack._internal.core.backends.datacrunch.compute import DataCrunchCompute
-from dstack._internal.core.backends.datacrunch.config import DataCrunchConfig
+from dstack._internal.core.backends.datacrunch.models import DataCrunchConfig
 from dstack._internal.core.models.backends.base import BackendType
 
 

@@ -9,9 +9,10 @@ from dstack._internal.core.backends.models import (
     VultrBackendConfigWithCreds,
 )
 from dstack._internal.core.backends.vultr import api_client
-from dstack._internal.core.backends.vultr.backend import VultrBackend, VultrConfig
+from dstack._internal.core.backends.vultr.backend import VultrBackend
 from dstack._internal.core.backends.vultr.models import (
     VultrBackendConfig,
+    VultrConfig,
     VultrCreds,
     VultrStoredConfig,
 )

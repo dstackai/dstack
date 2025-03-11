@@ -1,6 +1,6 @@
 from dstack._internal.core.backends.azure import auth
 from dstack._internal.core.backends.azure.compute import AzureCompute
-from dstack._internal.core.backends.azure.config import AzureConfig
+from dstack._internal.core.backends.azure.models import AzureConfig
 from dstack._internal.core.backends.base.backend import Backend
 from dstack._internal.core.models.backends.base import BackendType
 

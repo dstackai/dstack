@@ -1,6 +1,6 @@
 from dstack._internal.core.backends.base.backend import Backend
 from dstack._internal.core.backends.runpod.compute import RunpodCompute
-from dstack._internal.core.backends.runpod.config import RunpodConfig
+from dstack._internal.core.backends.runpod.models import RunpodConfig
 from dstack._internal.core.models.backends.base import BackendType
 
 

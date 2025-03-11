@@ -6,11 +6,12 @@ from dstack._internal.core.backends.base.configurator import (
     raise_invalid_credentials_error,
 )
 from dstack._internal.core.backends.cudo import api_client
-from dstack._internal.core.backends.cudo.backend import CudoBackend, CudoConfig
+from dstack._internal.core.backends.cudo.backend import CudoBackend
 from dstack._internal.core.backends.cudo.models import (
     AnyCudoBackendConfig,
     CudoBackendConfig,
     CudoBackendConfigWithCreds,
+    CudoConfig,
     CudoCreds,
     CudoStoredConfig,
 )

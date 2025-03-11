@@ -7,11 +7,11 @@ from dstack._internal.core.backends.base.configurator import (
 )
 from dstack._internal.core.backends.vastai import api_client
 from dstack._internal.core.backends.vastai.backend import VastAIBackend
-from dstack._internal.core.backends.vastai.config import VastAIConfig
 from dstack._internal.core.backends.vastai.models import (
     AnyVastAIBackendConfig,
     VastAIBackendConfig,
     VastAIBackendConfigWithCreds,
+    VastAIConfig,
     VastAICreds,
     VastAIStoredConfig,
 )
