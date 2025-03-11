@@ -9,7 +9,6 @@ from dstack._internal.core.backends.base.compute import (
     ComputeWithCreateInstanceSupport,
     ComputeWithMultinodeSupport,
     generate_unique_instance_name,
-    get_job_instance_name,
     get_user_data,
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
@@ -22,10 +21,8 @@ from dstack._internal.core.models.instances import (
     InstanceConfiguration,
     InstanceOffer,
     InstanceOfferWithAvailability,
-    SSHKey,
 )
-from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
-from dstack._internal.core.models.volumes import Volume
+from dstack._internal.core.models.runs import JobProvisioningData, Requirements
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -34,9 +31,9 @@ MAX_INSTANCE_NAME_LEN = 64
 
 
 class VultrCompute(
-    Compute,
     ComputeWithCreateInstanceSupport,
     ComputeWithMultinodeSupport,
+    Compute,
 ):
     def __init__(self, config: VultrConfig):
         super().__init__()
@@ -59,23 +56,6 @@ class VultrCompute(
             for offer in offers
         ]
         return offers
-
-    def run_job(
-        self,
-        run: Run,
-        job: Job,
-        instance_offer: InstanceOfferWithAvailability,
-        project_ssh_public_key: str,
-        project_ssh_private_key: str,
-        volumes: List[Volume],
-    ) -> JobProvisioningData:
-        instance_config = InstanceConfiguration(
-            project_name=run.project_name,
-            instance_name=get_job_instance_name(run, job),
-            ssh_keys=[SSHKey(public=project_ssh_public_key.strip())],
-            user=run.user,
-        )
-        return self.create_instance(instance_offer, instance_config)
 
     def create_instance(
         self, instance_offer: InstanceOfferWithAvailability, instance_config: InstanceConfiguration

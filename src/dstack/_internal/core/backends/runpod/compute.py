@@ -41,8 +41,8 @@ CONTAINER_REGISTRY_AUTH_CLEANUP_INTERVAL = 60 * 60 * 24  # 24 hour
 
 
 class RunpodCompute(
-    Compute,
     ComputeWithVolumeSupport,
+    Compute,
 ):
     _last_cleanup_time = None
 

@@ -45,7 +45,6 @@ from dstack._internal.core.backends.base.compute import (
     generate_unique_gateway_instance_name,
     generate_unique_instance_name,
     get_gateway_user_data,
-    get_job_instance_name,
     get_user_data,
     merge_tags,
 )
@@ -62,11 +61,9 @@ from dstack._internal.core.models.instances import (
     InstanceOffer,
     InstanceOfferWithAvailability,
     InstanceType,
-    SSHKey,
 )
 from dstack._internal.core.models.resources import Memory, Range
-from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
-from dstack._internal.core.models.volumes import Volume
+from dstack._internal.core.models.runs import JobProvisioningData, Requirements
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -75,10 +72,10 @@ CONFIGURABLE_DISK_SIZE = Range[Memory](min=Memory.parse("30GB"), max=Memory.pars
 
 
 class AzureCompute(
-    Compute,
     ComputeWithCreateInstanceSupport,
     ComputeWithMultinodeSupport,
     ComputeWithGatewaySupport,
+    Compute,
 ):
     def __init__(self, config: AzureConfig, credential: TokenCredential):
         super().__init__()
@@ -197,25 +194,6 @@ class AzureCompute(
             ssh_proxy=None,
             backend_data=None,
         )
-
-    def run_job(
-        self,
-        run: Run,
-        job: Job,
-        instance_offer: InstanceOfferWithAvailability,
-        project_ssh_public_key: str,
-        project_ssh_private_key: str,
-        volumes: List[Volume],
-    ) -> JobProvisioningData:
-        instance_config = InstanceConfiguration(
-            project_name=run.project_name,
-            instance_name=get_job_instance_name(run, job),  # TODO: generate name
-            ssh_keys=[
-                SSHKey(public=project_ssh_public_key.strip()),
-            ],
-            user=run.user,
-        )
-        return self.create_instance(instance_offer, instance_config)
 
     def terminate_instance(
         self, instance_id: str, region: str, backend_data: Optional[str] = None

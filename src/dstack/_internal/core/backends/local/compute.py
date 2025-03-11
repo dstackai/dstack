@@ -23,9 +23,9 @@ logger = get_logger(__name__)
 
 
 class LocalCompute(
-    Compute,
     ComputeWithCreateInstanceSupport,
     ComputeWithVolumeSupport,
+    Compute,
 ):
     def get_offers(
         self, requirements: Optional[Requirements] = None
