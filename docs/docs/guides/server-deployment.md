@@ -215,7 +215,7 @@ Currently, `dstack` collects the following metrics:
 
 * A fixed subset of NVIDIA GPU metrics from [DCGM Exporter :material-arrow-top-right-thin:{ .external }](https://docs.nvidia.com/datacenter/dcgm/latest/gpu-telemetry/dcgm-exporter.html){:target="_blank"} on supported cloud backends — AWS, Azure, GCP, OCI — and SSH fleets.
 On supported cloud backends the required packages are already installed.
-If you use SSH fleets, install `datacenter-gpu-manager-4-core` and `datacenter-gpu-manager-exporter`.
+If you use SSH fleets, install `datacenter-gpu-manager-4-core`, `datacenter-gpu-manager-4-proprietary` and `datacenter-gpu-manager-exporter`.
 
 ## Encryption
 
