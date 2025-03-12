@@ -8,7 +8,6 @@ from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import CoreModel, Duration
 
 DEFAULT_RETRY_DURATION = 3600
-DEFAULT_POOL_NAME = "default-pool"
 
 DEFAULT_RUN_TERMINATION_IDLE_TIME = 5 * 60  # 5 minutes
 DEFAULT_FLEET_TERMINATION_IDLE_TIME = 72 * 60 * 60  # 3 days

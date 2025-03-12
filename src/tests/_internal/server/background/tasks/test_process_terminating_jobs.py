@@ -19,7 +19,6 @@ from dstack._internal.server.testing.common import (
     ComputeMockSpec,
     create_instance,
     create_job,
-    create_pool,
     create_project,
     create_repo,
     create_run,
@@ -40,11 +39,9 @@ class TestProcessTerminatingJobs:
     async def test_terminates_job(self, session: AsyncSession):
         project = await create_project(session=session)
         user = await create_user(session=session)
-        pool = await create_pool(session=session, project=project)
         instance = await create_instance(
             session=session,
             project=project,
-            pool=pool,
             status=InstanceStatus.BUSY,
         )
         repo = await create_repo(session=session, project_id=project.id)
@@ -79,7 +76,6 @@ class TestProcessTerminatingJobs:
     async def test_detaches_job_volumes(self, session: AsyncSession):
         project = await create_project(session=session)
         user = await create_user(session=session)
-        pool = await create_pool(session=session, project=project)
         volume = await create_volume(
             session=session,
             project=project,
@@ -91,7 +87,6 @@ class TestProcessTerminatingJobs:
         instance = await create_instance(
             session=session,
             project=project,
-            pool=pool,
             status=InstanceStatus.BUSY,
             volumes=[volume],
         )
@@ -127,7 +122,6 @@ class TestProcessTerminatingJobs:
     async def test_force_detaches_job_volumes(self, session: AsyncSession):
         project = await create_project(session=session)
         user = await create_user(session=session)
-        pool = await create_pool(session=session, project=project)
         volume = await create_volume(
             session=session,
             project=project,
@@ -139,7 +133,6 @@ class TestProcessTerminatingJobs:
         instance = await create_instance(
             session=session,
             project=project,
-            pool=pool,
             status=InstanceStatus.BUSY,
             volumes=[volume],
         )
@@ -228,7 +221,6 @@ class TestProcessTerminatingJobs:
     async def test_terminates_job_on_shared_instance(self, session: AsyncSession):
         project = await create_project(session)
         user = await create_user(session)
-        pool = await create_pool(session=session, project=project)
         repo = await create_repo(
             session=session,
             project_id=project.id,
@@ -236,12 +228,10 @@ class TestProcessTerminatingJobs:
         instance = await create_instance(
             session=session,
             project=project,
-            pool=pool,
             status=InstanceStatus.BUSY,
             total_blocks=4,
             busy_blocks=3,
         )
-        await session.refresh(pool)
         run = await create_run(
             session=session,
             project=project,
@@ -275,7 +265,6 @@ class TestProcessTerminatingJobs:
     async def test_detaches_job_volumes_on_shared_instance(self, session: AsyncSession):
         project = await create_project(session=session)
         user = await create_user(session=session)
-        pool = await create_pool(session=session, project=project)
         volume_conf_1 = get_volume_configuration(name="vol-1")
         volume_1 = await create_volume(
             session=session,
@@ -299,7 +288,6 @@ class TestProcessTerminatingJobs:
         instance = await create_instance(
             session=session,
             project=project,
-            pool=pool,
             status=InstanceStatus.BUSY,
             volumes=[volume_1, volume_2],
         )

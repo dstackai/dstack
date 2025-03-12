@@ -15,7 +15,6 @@ from dstack._internal.server.services.jobs import check_can_attach_job_volumes
 from dstack._internal.server.services.runs import scale_run_replicas
 from dstack._internal.server.testing.common import (
     create_job,
-    create_pool,
     create_project,
     create_repo,
     create_run,
@@ -38,9 +37,6 @@ async def make_run(
     repo = await create_repo(
         session=session,
         project_id=project.id,
-    )
-    project.default_pool = await create_pool(
-        session=session, project=project, pool_name="default-pool"
     )
     run_name = "test-run"
     profile = Profile(name="test-profile")

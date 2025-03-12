@@ -52,7 +52,6 @@ from dstack._internal.server.testing.common import (
     create_gateway_compute,
     create_instance,
     create_job,
-    create_pool,
     create_project,
     create_repo,
     create_run,
@@ -1331,11 +1330,9 @@ class TestStopRuns:
             user=user,
             status=RunStatus.RUNNING,
         )
-        pool = await create_pool(session=session, project=project)
         instance = await create_instance(
             session=session,
             project=project,
-            pool=pool,
             status=InstanceStatus.BUSY,
         )
         job = await create_job(

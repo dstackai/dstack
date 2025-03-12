@@ -11,8 +11,8 @@ from dstack._internal.server import settings
 from dstack._internal.server.db import get_session_ctx
 from dstack._internal.server.models import InstanceModel, JobMetricsPoint, JobModel
 from dstack._internal.server.schemas.runner import MetricsResponse
+from dstack._internal.server.services.instances import get_instance_ssh_private_keys
 from dstack._internal.server.services.jobs import get_job_provisioning_data, get_job_runtime_data
-from dstack._internal.server.services.pools import get_instance_ssh_private_keys
 from dstack._internal.server.services.runner import client
 from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
 from dstack._internal.utils.common import batched, get_current_datetime, get_or_error, run_async

@@ -45,17 +45,16 @@ from dstack._internal.server.db import get_db
 from dstack._internal.server.models import (
     FleetModel,
     InstanceModel,
-    PoolModel,
     ProjectModel,
     UserModel,
 )
+from dstack._internal.server.services import instances as instances_services
 from dstack._internal.server.services import offers as offers_services
-from dstack._internal.server.services import pools as pools_services
+from dstack._internal.server.services.instances import list_active_remote_instances
 from dstack._internal.server.services.locking import (
     get_locker,
     string_to_lock_id,
 )
-from dstack._internal.server.services.pools import list_active_remote_instances
 from dstack._internal.server.services.projects import (
     get_member,
     get_member_permissions,
@@ -286,7 +285,7 @@ async def get_create_instance_offers(
         fleet = fleet_model_to_fleet(fleet_model)
         multinode = fleet.spec.configuration.placement == InstanceGroupPlacement.CLUSTER
         for instance in fleet_model.instances:
-            jpd = pools_services.get_instance_provisioning_data(instance)
+            jpd = instances_services.get_instance_provisioning_data(instance)
             if jpd is not None:
                 master_job_provisioning_data = jpd
                 break
@@ -341,9 +340,6 @@ async def create_fleet(
         else:
             spec.configuration.name = await generate_fleet_name(session=session, project=project)
 
-        pool = await pools_services.get_or_create_pool_by_name(
-            session=session, project=project, pool_name=None
-        )
         fleet_model = FleetModel(
             id=uuid.uuid4(),
             name=spec.configuration.name,
@@ -357,7 +353,6 @@ async def create_fleet(
             for i, host in enumerate(spec.configuration.ssh_config.hosts):
                 instances_model = await create_fleet_ssh_instance_model(
                     project=project,
-                    pool=pool,
                     spec=spec,
                     ssh_params=spec.configuration.ssh_config,
                     env=spec.configuration.env,
@@ -375,7 +370,6 @@ async def create_fleet(
                     session=session,
                     project=project,
                     user=user,
-                    pool=pool,
                     spec=spec,
                     placement_group_name=placement_group_name,
                     reservation=spec.configuration.reservation,
@@ -390,7 +384,6 @@ async def create_fleet_instance_model(
     session: AsyncSession,
     project: ProjectModel,
     user: UserModel,
-    pool: PoolModel,
     spec: FleetSpec,
     placement_group_name: Optional[str],
     reservation: Optional[str],
@@ -398,11 +391,10 @@ async def create_fleet_instance_model(
 ) -> InstanceModel:
     profile = spec.merged_profile
     requirements = _get_fleet_requirements(spec)
-    instance_model = await pools_services.create_instance_model(
+    instance_model = await instances_services.create_instance_model(
         session=session,
         project=project,
         user=user,
-        pool=pool,
         profile=profile,
         requirements=requirements,
         instance_name=f"{spec.configuration.name}-{instance_num}",
@@ -416,7 +408,6 @@ async def create_fleet_instance_model(
 
 async def create_fleet_ssh_instance_model(
     project: ProjectModel,
-    pool: PoolModel,
     spec: FleetSpec,
     ssh_params: SSHParams,
     env: Env,
@@ -455,9 +446,8 @@ async def create_fleet_ssh_instance_model(
         ssh_proxy = None
         ssh_proxy_keys = None
 
-    instance_model = await pools_services.create_ssh_instance_model(
+    instance_model = await instances_services.create_ssh_instance_model(
         project=project,
-        pool=pool,
         instance_name=f"{spec.configuration.name}-{instance_num}",
         instance_num=instance_num,
         region="remote",
@@ -536,7 +526,7 @@ def fleet_model_to_fleet(
     instance_models = fleet_model.instances
     if not include_deleted_instances:
         instance_models = [i for i in instance_models if not i.deleted]
-    instances = [pools_services.instance_model_to_instance(i) for i in instance_models]
+    instances = [instances_services.instance_model_to_instance(i) for i in instance_models]
     instances = sorted(instances, key=lambda i: i.instance_num)
     spec = get_fleet_spec(fleet_model)
     if not include_sensitive:

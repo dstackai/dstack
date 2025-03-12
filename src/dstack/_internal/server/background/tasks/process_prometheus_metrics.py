@@ -10,8 +10,8 @@ from dstack._internal.core.consts import DSTACK_SHIM_HTTP_PORT
 from dstack._internal.core.models.runs import JobStatus
 from dstack._internal.server.db import get_session_ctx
 from dstack._internal.server.models import InstanceModel, JobModel, JobPrometheusMetrics
+from dstack._internal.server.services.instances import get_instance_ssh_private_keys
 from dstack._internal.server.services.jobs import get_job_provisioning_data, get_job_runtime_data
-from dstack._internal.server.services.pools import get_instance_ssh_private_keys
 from dstack._internal.server.services.runner import client
 from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
 from dstack._internal.server.utils.common import gather_map_async

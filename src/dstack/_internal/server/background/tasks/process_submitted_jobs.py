@@ -18,7 +18,6 @@ from dstack._internal.core.models.fleets import (
 )
 from dstack._internal.core.models.instances import InstanceOfferWithAvailability, InstanceStatus
 from dstack._internal.core.models.profiles import (
-    DEFAULT_POOL_NAME,
     DEFAULT_RUN_TERMINATION_IDLE_TIME,
     CreationPolicy,
     TerminationPolicy,
@@ -41,7 +40,6 @@ from dstack._internal.server.models import (
     FleetModel,
     InstanceModel,
     JobModel,
-    PoolModel,
     ProjectModel,
     RunModel,
     VolumeAttachmentModel,
@@ -50,6 +48,12 @@ from dstack._internal.server.models import (
 from dstack._internal.server.services.backends import get_project_backend_by_type_or_error
 from dstack._internal.server.services.fleets import (
     fleet_model_to_fleet,
+)
+from dstack._internal.server.services.instances import (
+    filter_pool_instances,
+    get_instance_offer,
+    get_instance_provisioning_data,
+    get_shared_pool_instances_with_offers,
 )
 from dstack._internal.server.services.jobs import (
     check_can_attach_job_volumes,
@@ -62,12 +66,6 @@ from dstack._internal.server.services.jobs import (
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.offers import get_offers_by_requirements
-from dstack._internal.server.services.pools import (
-    filter_pool_instances,
-    get_instance_offer,
-    get_instance_provisioning_data,
-    get_shared_pool_instances_with_offers,
-)
 from dstack._internal.server.services.runs import (
     check_run_spec_requires_instance_mounts,
     run_model_to_run,
@@ -180,18 +178,16 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         await session.commit()
         return
 
-    pool = await _get_pool(session=session, project=project)
-
     # Submitted jobs processing happens in two steps (transactions).
     # First, the jobs gets an instance assigned (or no instance).
     # Then, the job runs on the assigned instance or a new instance is provisioned.
     # This is needed to avoid holding instances lock for a long time.
     if not job_model.instance_assigned:
-        # Try assigning instances from the pool.
+        # Try assigning an existing instance
         res = await session.execute(
             select(InstanceModel)
             .where(
-                InstanceModel.pool_id == pool.id,
+                InstanceModel.project_id == project.id,
                 InstanceModel.deleted == False,
                 InstanceModel.total_blocks > InstanceModel.busy_blocks,
             )
@@ -289,7 +285,6 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         )
         instance = _create_instance_model_for_job(
             project=project,
-            pool=pool,
             fleet_model=fleet_model,
             run_spec=run_spec,
             job_model=job_model,
@@ -335,19 +330,6 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
             )
         job_model.last_processed_at = common_utils.get_current_datetime()
         await session.commit()
-
-
-async def _get_pool(session: AsyncSession, project: ProjectModel) -> PoolModel:
-    res = await session.execute(
-        select(PoolModel)
-        .where(
-            PoolModel.project_id == project.id,
-            PoolModel.name == DEFAULT_POOL_NAME,
-            PoolModel.deleted == False,
-        )
-        .options(lazyload(PoolModel.instances))
-    )
-    return res.scalar_one()
 
 
 async def _assign_job_to_pool_instance(
@@ -548,7 +530,6 @@ async def _get_next_instance_num(session: AsyncSession, fleet_model: FleetModel)
 
 def _create_instance_model_for_job(
     project: ProjectModel,
-    pool: PoolModel,
     fleet_model: FleetModel,
     run_spec: RunSpec,
     job_model: JobModel,
@@ -571,7 +552,6 @@ def _create_instance_model_for_job(
         name=f"{fleet_model.name}-{instance_num}",
         instance_num=instance_num,
         project=project,
-        pool=pool,
         created_at=common_utils.get_current_datetime(),
         started_at=common_utils.get_current_datetime(),
         status=InstanceStatus.PROVISIONING,

@@ -10,8 +10,7 @@ from typing_extensions import Annotated, Literal
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.envs import Env
-from dstack._internal.core.models.instances import InstanceOfferWithAvailability, SSHKey
-from dstack._internal.core.models.pools import Instance
+from dstack._internal.core.models.instances import Instance, InstanceOfferWithAvailability, SSHKey
 from dstack._internal.core.models.profiles import (
     Profile,
     ProfileParams,

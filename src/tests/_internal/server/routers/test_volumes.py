@@ -16,7 +16,6 @@ from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.testing.common import (
     ComputeMockSpec,
     create_instance,
-    create_pool,
     create_project,
     create_user,
     create_volume,
@@ -385,7 +384,6 @@ class TestDeleteVolumes:
     ):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
-        pool = await create_pool(session=session, project=project)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
@@ -398,7 +396,6 @@ class TestDeleteVolumes:
         instance = await create_instance(
             session=session,
             project=project,
-            pool=pool,
         )
         volume.attachments.append(VolumeAttachmentModel(instance=instance))
         await session.commit()

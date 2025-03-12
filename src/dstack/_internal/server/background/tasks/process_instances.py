@@ -78,18 +78,18 @@ from dstack._internal.server.services.fleets import (
     fleet_model_to_fleet,
     get_create_instance_offers,
 )
-from dstack._internal.server.services.locking import get_locker
-from dstack._internal.server.services.offers import is_divisible_into_blocks
-from dstack._internal.server.services.placement import (
-    get_fleet_placement_groups,
-    placement_group_model_to_placement_group,
-)
-from dstack._internal.server.services.pools import (
+from dstack._internal.server.services.instances import (
     get_instance_configuration,
     get_instance_profile,
     get_instance_provisioning_data,
     get_instance_requirements,
     get_instance_ssh_private_keys,
+)
+from dstack._internal.server.services.locking import get_locker
+from dstack._internal.server.services.offers import is_divisible_into_blocks
+from dstack._internal.server.services.placement import (
+    get_fleet_placement_groups,
+    placement_group_model_to_placement_group,
 )
 from dstack._internal.server.services.runner import client as runner_client
 from dstack._internal.server.services.runner.client import HealthStatus

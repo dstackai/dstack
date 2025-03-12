@@ -33,11 +33,11 @@ from dstack._internal.server.models import (
     VolumeModel,
 )
 from dstack._internal.server.services import backends as backends_services
+from dstack._internal.server.services.instances import get_instance_provisioning_data
 from dstack._internal.server.services.locking import (
     get_locker,
     string_to_lock_id,
 )
-from dstack._internal.server.services.pools import get_instance_provisioning_data
 from dstack._internal.server.services.projects import list_project_models, list_user_project_models
 from dstack._internal.utils import common, random_names
 from dstack._internal.utils.logging import get_logger
