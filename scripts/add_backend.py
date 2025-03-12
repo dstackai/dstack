@@ -22,10 +22,12 @@ def main():
 
 
 def generate_backend_code(backend_name: str):
+    template_dir_path = Path(__file__).parent.parent.joinpath(
+        "src/dstack/_internal/core/backends/template"
+    )
     env = jinja2.Environment(
-        loader=jinja2.PackageLoader(
-            package_name="dstack",
-            package_path="_internal/core/backends/template",
+        loader=jinja2.FileSystemLoader(
+            searchpath=template_dir_path,
         ),
         keep_trailing_newline=True,
     )
