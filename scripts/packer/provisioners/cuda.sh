@@ -18,5 +18,5 @@ sudo apt-get update
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     cuda-drivers-$CUDA_DRIVERS_VERSION \
     nvidia-fabricmanager-$CUDA_DRIVERS_VERSION \
-    datacenter-gpu-manager-4-core datacenter-gpu-manager-exporter
+    datacenter-gpu-manager-4-core datacenter-gpu-manager-4-proprietary datacenter-gpu-manager-exporter
 sudo systemctl enable nvidia-fabricmanager
