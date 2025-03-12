@@ -1,0 +1,87 @@
+from typing import List, Optional
+
+from dstack._internal.core.backends.base.backend import Compute
+from dstack._internal.core.backends.base.compute import (
+    ComputeWithCreateInstanceSupport,
+    ComputeWithGatewaySupport,
+    ComputeWithMultinodeSupport,
+    ComputeWithPlacementGroupSupport,
+    ComputeWithPrivateGatewaySupport,
+    ComputeWithReservationSupport,
+    ComputeWithVolumeSupport,
+)
+from dstack._internal.core.backends.base.offers import get_catalog_offers
+from dstack._internal.core.backends.{{ backend_name|lower }}.models import {{ backend_name }}Config
+from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.instances import (
+    InstanceAvailability,
+    InstanceConfiguration,
+    InstanceOfferWithAvailability,
+)
+from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
+from dstack._internal.core.models.volumes import Volume
+from dstack._internal.utils.logging import get_logger
+
+logger = get_logger(__name__)
+
+
+class {{ backend_name }}Compute(
+    # TODO: Choose ComputeWith* classes to extend and implement
+    # ComputeWithCreateInstanceSupport,
+    # ComputeWithMultinodeSupport,
+    # ComputeWithReservationSupport,
+    # ComputeWithPlacementGroupSupport,
+    # ComputeWithGatewaySupport,
+    # ComputeWithPrivateGatewaySupport,
+    # ComputeWithVolumeSupport,
+    Compute,
+):
+    def __init__(self, config: {{ backend_name }}Config):
+        super().__init__()
+        self.config = config
+
+    def get_offers(
+        self, requirements: Optional[Requirements] = None
+    ) -> List[InstanceOfferWithAvailability]:
+        # If the provider is added to gpuhunt, you'd typically get offers
+        # using `get_catalog_offers()` and extend them with availability info.
+        offers = get_catalog_offers(
+            backend=BackendType.{{ backend_name|upper }},
+            locations=self.config.regions or None,
+            requirements=requirements,
+            # configurable_disk_size=...,  TODO: set in case of boot volume size limits
+        )
+        # TODO: Add availability info to offers
+        return [
+            InstanceOfferWithAvailability(
+                **offer.dict(),
+                availability=InstanceAvailability.UNKNOWN,
+            )
+            for offer in offers
+        ]
+
+    def create_instance(
+        self,
+        instance_offer: InstanceOfferWithAvailability,
+        instance_config: InstanceConfiguration,
+    ) -> JobProvisioningData:
+        # TODO: Implement if backend supports creating instances (VM-based).
+        # Delete if backend can only run jobs (container-based).
+        raise NotImplementedError()
+
+    def run_job(
+        self,
+        run: Run,
+        job: Job,
+        instance_offer: InstanceOfferWithAvailability,
+        project_ssh_public_key: str,
+        project_ssh_private_key: str,
+        volumes: List[Volume],
+    ) -> JobProvisioningData:
+        # TODO: Implement if create_instance() is not implemented. Delete otherwise.
+        raise NotImplementedError()
+
+    def terminate_instance(
+        self, instance_id: str, region: str, backend_data: Optional[str] = None
+    ):
+        raise NotImplementedError()

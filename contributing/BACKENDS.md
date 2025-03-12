@@ -84,59 +84,45 @@ See the Appendix at the end of this document and make sure the provider meets th
 
 #### 2.2. Set up the development environment
 
-Follow [DEVELOPMENT.md](DEVELOPMENT.md)`.
+Follow [DEVELOPMENT.md](DEVELOPMENT.md).
 
 #### 2.3. Add dependencies to setup.py
 
 Add any dependencies required by your cloud provider to `setup.py`. Create a separate section with the provider's name for these dependencies, and ensure that you update the `all` section to include them as well.
 
-#### 2.4. Implement the provider backend
+#### 2.4. Add a new backend type
 
-##### 2.4.1. Define the backend type
+Add a new enumeration member for your provider to `BackendType` ([`src/dstack/_internal/core/models/backends/base.py`](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/models/backends/base.py)).
 
-Add a new enumeration member for your provider to `BackendType` (`src/dstack/_internal/core/models/backends/base.py`).
-Use the name of the provider.
+#### 2.5. Create backend files and classes
 
-##### 2.4.2. Create the backend directory
+`dstack` provides a helper script to generate all the necessary files and classes for a new backend.
+To add a new backend named `ExampleXYZ`, you should run:
 
-Create a new directory under `src/dstack/_internal/core/backends` with the name of the backend type.
+```shell
+python scripts/add_backend.py -n ExampleXYZ
+```
 
-##### 2.4.3. Create the backend class
+It will create an `examplexyz` backend directory under `src/dstack/_internal/core/backends` with the following files:
 
-Under the backend directory you've created, create the `backend.py` file and define the
-backend class there (should extend `dstack._internal.core.backends.base.Backend`).
+* `backend.py` with the `Backend` class implementation. You typically don't need to modify it.
+* `compute.py` with the `Compute` class implementation. This is the core of the backend that you need to implement.
+* `configurator.py` with the `Configurator` class implementation. It deals with validating and storing backend config. You need to adjust it with custom backend config validation.
+* `models.py` with all the backend config models used by `Backend`, `Compute`, `Configurator` and other parts of `dstack`.
 
-Refer to examples: 
-[datacrunch](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/datacrunch/backend.py), 
-[aws](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/aws/backend.py), 
-[gcp](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/gcp/backend.py), 
-[azure](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/azure/backend.py), etc.
+##### 2.6. Adjust and register the backend config models
 
-##### 2.4.4. Create the backend compute class
-
-Under the backend directory you've created, create the `compute.py` file and define the
-backend compute class that extends the `dstack._internal.core.backends.base.compute.Compute` class.
-It can also extend and implement `ComputeWith*` classes to support additional features such as fleets, volumes, gateways, placement groups, etc. For example, it should extend `ComputeWithCreateInstanceSupport` to support fleets.
-
-Refer to examples:
-[datacrunch](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/datacrunch/compute.py),
-[aws](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/aws/compute.py),
-[gcp](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/gcp/compute.py),
-[azure](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/azure/compute.py), etc.
-
-##### 2.4.5. Create and register the backend config models
-
-Under the backend directory, create the `models.py` file and define the backend config model classes there.
-Every backend must define at least two models: 
+Go to `models.py`. It'll contain two config models required for all backends:
 
 * `*BackendConfig` that contains all backend parameters available for user configuration except for creds.
 * `*BackendConfigWithCreds` that contains all backends parameters available for user configuration and also creds.
 
-These models are used in server/config.yaml, the API, and for backend configuration.
+Adjust generated config models by adding additional config parameters.
+Typically you'd need to only modify the `*BackendConfig` model since other models extend it.
 
-The models should be added to `AnyBackendConfig*` unions in [`src/dstack/_internal/core/backends/models.py`](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/models.py).
+Then add these models to `AnyBackendConfig*` unions in [`src/dstack/_internal/core/backends/models.py`](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/models.py).
 
-It's not required but recommended to also define `*BackendStoredConfig` that extends `*BackendConfig` to be able to store extra parameters in the DB. By the same logic, it's recommended to define `*Config` that extends `*BackendStoredConfig` with creds and use it as the main `Backend` and `Compute` config instead of using `*BackendConfigWithCreds` directly.
+The script also generates `*BackendStoredConfig` that extends `*BackendConfig` to be able to store extra parameters in the DB. By the same logic, it generates `*Config` that extends `*BackendStoredConfig` with creds and uses it as the main `Backend` and `Compute` config instead of using `*BackendConfigWithCreds` directly.
 
 Refer to examples: 
 [datacrunch](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/datacrunch/models.py), 
@@ -144,9 +130,21 @@ Refer to examples:
 [gcp](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/gcp/models.py), 
 [azure](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/models.py), etc.
 
-##### 2.4.6. Create and register the configurator class
+##### 2.7. Implement the backend compute class
 
-Under the backend directory, create the `configurator.py` file and and define the backend configurator class (must extend `dstack._internal.core.backends.base.configurator.Configurator`).
+Go to `compute.py` and implement `Compute` methods.
+Optionally, extend and implement `ComputeWith*` classes to support additional features such as fleets, volumes, gateways, placement groups, etc. For example, extend `ComputeWithCreateInstanceSupport` to support fleets.
+
+Refer to examples:
+[datacrunch](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/datacrunch/compute.py),
+[aws](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/aws/compute.py),
+[gcp](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/gcp/compute.py),
+[azure](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/azure/compute.py), etc.
+
+##### 2.8. Implement and register the configurator class
+
+Go to `configurator.py` and implement custom `Configurator` logic. At minimum, you should implement creds validation.
+You may also need to validate other config parameters if there are any.
 
 Refer to examples: [datacrunch](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/datacrunch/configurator.py),
 [aws](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/aws/configurator.py), 
@@ -155,7 +153,7 @@ Refer to examples: [datacrunch](https://github.com/dstackai/dstack/blob/master/s
 
 Register configurator by appending it to `_CONFIGURATOR_CLASSES` in [`src/dstack/_internal/core/backends/configurators.py`](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/configurators.py).
 
-##### 2.4.7. (Optional) Override provisioning timeout
+##### 2.9. (Optional) Override provisioning timeout
 
 If instances in the backend take more than 10 minutes to start, override the default provisioning timeout in
 [`src/dstack/_internal/server/background/tasks/common.py`](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/server/background/tasks/common.py).

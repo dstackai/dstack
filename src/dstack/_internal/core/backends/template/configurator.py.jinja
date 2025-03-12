@@ -1,0 +1,70 @@
+import json
+
+from dstack._internal.core.backends.base.configurator import (
+    BackendRecord,
+    Configurator,
+    raise_invalid_credentials_error,
+)
+from dstack._internal.core.backends.{{ backend_name|lower }}.backend import {{ backend_name }}Backend
+from dstack._internal.core.backends.{{ backend_name|lower }}.models import (
+    Any{{ backend_name }}BackendConfig,
+    Any{{ backend_name }}Creds,
+    {{ backend_name }}BackendConfig,
+    {{ backend_name }}BackendConfigWithCreds,
+    {{ backend_name }}Config,
+    {{ backend_name }}Creds,
+    {{ backend_name }}StoredConfig,
+)
+from dstack._internal.core.models.backends.base import (
+    BackendType,
+)
+
+# TODO: Add all supported regions and default regions
+REGIONS = []
+
+
+class {{ backend_name }}Configurator(Configurator):
+    TYPE = BackendType.{{ backend_name|upper }}
+    BACKEND_CLASS = {{ backend_name }}Backend
+
+    def validate_config(
+        self, config: {{ backend_name }}BackendConfigWithCreds, default_creds_enabled: bool
+    ):
+        self._validate_creds(config.creds)
+        # TODO: Validate additional config parameters if any
+
+    def create_backend(
+        self, project_name: str, config: {{ backend_name }}BackendConfigWithCreds
+    ) -> BackendRecord:
+        if config.regions is None:
+            config.regions = REGIONS
+        return BackendRecord(
+            config={{ backend_name }}StoredConfig(
+                **{{ backend_name }}BackendConfig.__response__.parse_obj(config).dict()
+            ).json(),
+            auth={{ backend_name }}Creds.parse_obj(config.creds).json(),
+        )
+
+    def get_backend_config(
+        self, record: BackendRecord, include_creds: bool
+    ) -> Any{{ backend_name }}BackendConfig:
+        config = self._get_config(record)
+        if include_creds:
+            return {{ backend_name }}BackendConfigWithCreds.__response__.parse_obj(config)
+        return {{ backend_name }}BackendConfig.__response__.parse_obj(config)
+
+    def get_backend(self, record: BackendRecord) -> {{ backend_name }}Backend:
+        config = self._get_config(record)
+        return {{ backend_name }}Backend(config=config)
+
+    def _get_config(self, record: BackendRecord) -> {{ backend_name }}Config:
+        return {{ backend_name }}Config.__response__(
+            **json.loads(record.config),
+            creds={{ backend_name }}Creds.parse_raw(record.auth),
+        )
+
+    def _validate_creds(self, creds: Any{{ backend_name }}Creds):
+        # TODO: Implement API key or other creds validation
+        # if valid:
+        #     return
+        raise_invalid_credentials_error(fields=[["creds", "api_key"]])

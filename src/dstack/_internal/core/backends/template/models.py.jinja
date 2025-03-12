@@ -1,0 +1,58 @@
+from typing import Annotated, List, Literal, Optional, Union
+
+from pydantic import Field
+
+from dstack._internal.core.models.common import CoreModel
+
+
+# The template uses "api_key" creds as the most popular creds type.
+# TODO: Adjust it or add additional creds models if necessary.
+class {{ backend_name }}APIKeyCreds(CoreModel):
+    type: Annotated[Literal["api_key"], Field(description="The type of credentials")] = "api_key"
+    api_key: Annotated[str, Field(description="The API key")]
+
+
+Any{{ backend_name }}Creds = {{ backend_name }}APIKeyCreds
+{{ backend_name }}Creds = Any{{ backend_name }}Creds
+
+
+class {{ backend_name }}BackendConfig(CoreModel):
+    """
+    The backend config used in the API, server/config.yml, `{{ backend_name }}Configurator`.
+    It also serves as a base class for other backend config models.
+    Should not include creds.
+    """
+    type: Annotated[
+        Literal["{{ backend_name|lower }}"],
+        Field(description="The type of backend"),
+    ] = "{{ backend_name|lower }}"
+    regions: Annotated[
+        Optional[List[str]],
+        Field(description="The list of {{ backend_name }} regions. Omit to use all regions"),
+    ] = None
+    # TODO: Add additional backend parameters if necessary
+
+
+class {{ backend_name }}BackendConfigWithCreds({{ backend_name }}BackendConfig):
+    """
+    Same as `{{ backend_name }}BackendConfig` but also includes creds.
+    """
+    creds: Annotated[Any{{ backend_name }}Creds, Field(description="The credentials")]
+
+
+Any{{ backend_name }}BackendConfig = Union[{{ backend_name }}BackendConfig, {{ backend_name }}BackendConfigWithCreds]
+
+
+class {{ backend_name }}StoredConfig({{ backend_name }}BackendConfig):
+    """
+    The backend config used for config parameters in the DB.
+    Can extend `{{ backend_name }}BackendConfig` with additional parameters.
+    """
+    pass
+
+
+class {{ backend_name }}Config({{ backend_name }}StoredConfig):
+    """
+    The backend config used by `{{ backend_name }}Backend` and `{{ backend_name }}Compute`.
+    """
+    creds: Any{{ backend_name }}Creds

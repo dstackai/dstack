@@ -60,6 +60,11 @@ class Compute(ABC):
     def get_offers(
         self, requirements: Optional[Requirements] = None
     ) -> List[InstanceOfferWithAvailability]:
+        """
+        Returns offers with availability matching `requirements`.
+        If the provider is added to gpuhunt, typically gets offers using `base.offers.get_catalog_offers()`
+        and extends them with availability info.
+        """
         pass
 
     @abstractmethod
