@@ -31,10 +31,6 @@ on:
         description: "Build OCI images"
         type: boolean
         default: true
-      build_nebius:
-        description: "Build Nebius images"
-        type: boolean
-        default: false
 
 env:
   PACKER_VERSION: "1.9.2"
@@ -239,45 +235,3 @@ jobs:
             --os "Ubuntu 22.04" \
             --contact-name dstack \
             --contact-email hello@dstack.ai
-
-  build-nebius-images:
-    needs: build-docker
-    if: always() && inputs.build_nebius && (needs.build-docker.result == 'success' || needs.build-docker.result == 'skipped')
-    defaults:
-      run:
-        working-directory: scripts/packer
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Get Nebius CLI
-        run: |
-          echo "CLI_VERSION=$CLI_VERSION"
-          curl -sSL https://storage.ai.nebius.cloud/ncp/install.sh | bash
-          echo "$HOME/nebius-cloud/bin" >> $GITHUB_PATH
-        env:
-          CLI_VERSION: 0.113.0+Nebius-AI
-      - name: Write Nebius credentials
-        uses: jsdaniell/create-json@v1.2.3
-        with:
-          name: "service_account.json"
-          json: ${{ secrets.NEBIUS_SERVICE_ACCOUNT }}
-          dir: "scripts/packer/"
-      - name: Setup Nebius profile
-        run: |
-          ncp config profile create packer
-          ncp config set endpoint api.ai.nebius.cloud:443
-          ncp config set service-account-key service_account.json
-          rm service_account.json
-      - name: Download packer
-        run: |
-          wget https://releases.hashicorp.com/packer/${{ env.PACKER_VERSION }}/packer_${{ env.PACKER_VERSION }}_linux_amd64.zip
-          unzip packer_${{ env.PACKER_VERSION }}_linux_amd64.zip
-          chmod +x packer
-          ./packer init .
-      - name: Run packer (HCL2)
-        run: |
-          export PKR_VAR_nebius_token=$(ncp iam create-token)
-          ./packer build -only yandex.nebius,yandex.nebius-cuda -var image_version=${{ inputs.image_version }} -var build_prefix=$BUILD_PREFIX .
-        env:
-          PKR_VAR_nebius_folder_id: ${{ secrets.NEBIUS_FOLDER_ID }}
-          PKR_VAR_nebius_subnet_id: ${{ secrets.NEBIUS_SUBNET_ID }}

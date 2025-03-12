@@ -15,7 +15,7 @@ to configure [backends](../../concepts/backends.md) and other [sever-level setti
     overrides:
         show_root_heading: false
         backends:
-            type: 'Union[AWSBackendConfigWithCreds, AzureBackendConfigWithCreds, GCPBackendConfigWithCreds, LambdaBackendConfigWithCreds, NebiusBackendConfigWithCreds, RunpodBackendConfigWithCreds, TensorDockBackendConfigWithCreds, VastAIBackendConfigWithCreds, KubernetesConfig]'
+            type: 'Union[AWSBackendConfigWithCreds, AzureBackendConfigWithCreds, GCPBackendConfigWithCreds, LambdaBackendConfigWithCreds, RunpodBackendConfigWithCreds, TensorDockBackendConfigWithCreds, VastAIBackendConfigWithCreds, KubernetesConfig]'
 
 #### `projects[n].backends` { #backends data-toc-label="backends" }
 
@@ -293,23 +293,6 @@ to configure [backends](../../concepts/backends.md) and other [sever-level setti
 ###### `projects[n].backends[type=vultr].creds` { #vultr-creds data-toc-label="creds" }
 
 #SCHEMA# dstack._internal.core.backends.vultr.models.VultrAPIKeyCreds
-    overrides:
-        show_root_heading: false
-        type:
-            required: true
-
-##### `projects[n].backends[type=nebius]` { #nebius data-toc-label="nebius" }
-
-#SCHEMA# dstack._internal.core.backends.nebius.models.NebiusBackendConfigWithCreds
-    overrides:
-        show_root_heading: false
-        type:
-            required: true
-        item_id_prefix: nebius-
-
-###### `projects[n].backends[type=nebius].creds` { #nebius-creds data-toc-label="creds" }
-
-#SCHEMA# dstack._internal.core.backends.nebius.models.NebiusServiceAccountCreds
     overrides:
         show_root_heading: false
         type:

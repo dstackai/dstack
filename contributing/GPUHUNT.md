@@ -85,11 +85,6 @@ Some providers offer extreme flexibility in possible configurations, but not all
 - Parses Oracle's [Cost Estimator](https://www.oracle.com/cloud/costestimator.html) datasets
 - Duplicates each offer in all regions, since prices are the same everywhere and availability is mostly the same
 
-### Nebius
-
-- Uses hardcoded CPU and GPU platforms configurations
-- Applies SKUs pricing to the platforms
-
 ### GitHub Actions: collect catalog
 
 The offline catalog is built in GitHub Actions every night. Every offline provider produces a CSV file with offers. Later, those files get compressed into a zip archive and uploaded to the public S3 bucket.
