@@ -78,23 +78,23 @@ Once the cloud provider is added, submit a pull request.
 Once the provider is added to `gpuhunt`, we can proceed with implementing 
 the corresponding backend with `dstack`. Follow the steps below.
 
-#### 2.1. Determine if you will implement a VM-based or a container-based backend
+### 2.1. Determine if you will implement a VM-based or a container-based backend
 
 See the Appendix at the end of this document and make sure the provider meets the outlined requirements.
 
-#### 2.2. Set up the development environment
+### 2.2. Set up the development environment
 
 Follow [DEVELOPMENT.md](DEVELOPMENT.md).
 
-#### 2.3. Add dependencies to setup.py
+### 2.3. Add dependencies to setup.py
 
 Add any dependencies required by your cloud provider to `setup.py`. Create a separate section with the provider's name for these dependencies, and ensure that you update the `all` section to include them as well.
 
-#### 2.4. Add a new backend type
+### 2.4. Add a new backend type
 
 Add a new enumeration member for your provider to `BackendType` ([`src/dstack/_internal/core/models/backends/base.py`](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/models/backends/base.py)).
 
-#### 2.5. Create backend files and classes
+### 2.5. Create backend files and classes
 
 `dstack` provides a helper script to generate all the necessary files and classes for a new backend.
 To add a new backend named `ExampleXYZ`, you should run:
@@ -110,7 +110,7 @@ It will create an `examplexyz` backend directory under `src/dstack/_internal/cor
 * `configurator.py` with the `Configurator` class implementation. It deals with validating and storing backend config. You need to adjust it with custom backend config validation.
 * `models.py` with all the backend config models used by `Backend`, `Compute`, `Configurator` and other parts of `dstack`.
 
-##### 2.6. Adjust and register the backend config models
+### 2.6. Adjust and register the backend config models
 
 Go to `models.py`. It'll contain two config models required for all backends:
 
@@ -130,7 +130,7 @@ Refer to examples:
 [gcp](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/gcp/models.py), 
 [azure](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/models.py), etc.
 
-##### 2.7. Implement the backend compute class
+### 2.7. Implement the backend compute class
 
 Go to `compute.py` and implement `Compute` methods.
 Optionally, extend and implement `ComputeWith*` classes to support additional features such as fleets, volumes, gateways, placement groups, etc. For example, extend `ComputeWithCreateInstanceSupport` to support fleets.
@@ -141,7 +141,7 @@ Refer to examples:
 [gcp](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/gcp/compute.py),
 [azure](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/azure/compute.py), etc.
 
-##### 2.8. Implement and register the configurator class
+### 2.8. Implement and register the configurator class
 
 Go to `configurator.py` and implement custom `Configurator` logic. At minimum, you should implement creds validation.
 You may also need to validate other config parameters if there are any.
@@ -153,14 +153,19 @@ Refer to examples: [datacrunch](https://github.com/dstackai/dstack/blob/master/s
 
 Register configurator by appending it to `_CONFIGURATOR_CLASSES` in [`src/dstack/_internal/core/backends/configurators.py`](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/configurators.py).
 
-##### 2.9. (Optional) Override provisioning timeout
+### 2.9. (Optional) Override provisioning timeout
 
 If instances in the backend take more than 10 minutes to start, override the default provisioning timeout in
 [`src/dstack/_internal/server/background/tasks/common.py`](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/server/background/tasks/common.py).
 
+### 2.10. Document the backend
+
+Add the backend to the [Concepts->Backends](https://github.com/dstackai/dstack/blob/master/docs/docs/concepts/backends.md
+) page and the [server/comfig.yml](https://github.com/dstackai/dstack/blob/master/docs/docs/reference/server/config.yml.md) reference.
+
 ## 3. Appendix
 
-#### 3.1. Backend compute type
+### 3.1. Backend compute type
 
 `dstack` supports two types of backend compute:
 
