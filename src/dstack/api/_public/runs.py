@@ -18,7 +18,6 @@ from dstack._internal.core.errors import ClientError, ConfigurationError, Resour
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import ApplyAction
 from dstack._internal.core.models.configurations import AnyRunConfiguration, PortMapping
-from dstack._internal.core.models.pools import Instance
 from dstack._internal.core.models.profiles import (
     CreationPolicy,
     Profile,
@@ -32,8 +31,6 @@ from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import (
     Job,
     JobSpec,
-    PoolInstanceOffers,
-    Requirements,
     RunPlan,
     RunSpec,
     RunStatus,
@@ -467,12 +464,6 @@ class RunCollection:
             run_name=run_name,
         )
         return self.exec_plan(run_plan, repo, reserve_ports=reserve_ports)
-
-    def get_offers(self, profile: Profile, requirements: Requirements) -> PoolInstanceOffers:
-        return self._api_client.runs.get_offers(self._project, profile, requirements)
-
-    def create_instance(self, profile: Profile, requirements: Requirements) -> Instance:
-        return self._api_client.runs.create_instance(self._project, profile, requirements)
 
     # TODO: [Andrey] I guess we need to drop profile-related fields (currently retry is not reflected there)
     def get_plan(

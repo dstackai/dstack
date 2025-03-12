@@ -10,12 +10,8 @@ from dstack._internal.core.models.configurations import (
     DevEnvironmentConfiguration,
     ServiceConfiguration,
 )
-from dstack._internal.core.models.pools import Instance
-from dstack._internal.core.models.profiles import Profile
 from dstack._internal.core.models.runs import (
     ApplyRunPlanInput,
-    PoolInstanceOffers,
-    Requirements,
     Run,
     RunPlan,
     RunSpec,
@@ -23,9 +19,7 @@ from dstack._internal.core.models.runs import (
 from dstack._internal.core.models.volumes import InstanceMountPoint
 from dstack._internal.server.schemas.runs import (
     ApplyRunPlanRequest,
-    CreateInstanceRequest,
     DeleteRunsRequest,
-    GetOffersRequest,
     GetRunPlanRequest,
     GetRunRequest,
     ListRunsRequest,
@@ -104,25 +98,6 @@ class RunsAPIClient(APIClientGroup):
     def delete(self, project_name: str, runs_names: List[str]):
         body = DeleteRunsRequest(runs_names=runs_names)
         self._request(f"/api/project/{project_name}/runs/delete", body=body.json())
-
-    # FIXME: get_offers and create_instance do not belong runs api
-
-    def get_offers(
-        self, project_name: str, profile: Profile, requirements: Requirements
-    ) -> PoolInstanceOffers:
-        body = GetOffersRequest(profile=profile, requirements=requirements)
-        resp = self._request(f"/api/project/{project_name}/runs/get_offers", body=body.json())
-        return parse_obj_as(PoolInstanceOffers.__response__, resp.json())
-
-    def create_instance(
-        self,
-        project_name: str,
-        profile: Profile,
-        requirements: Requirements,
-    ) -> Instance:
-        body = CreateInstanceRequest(profile=profile, requirements=requirements)
-        resp = self._request(f"/api/project/{project_name}/runs/create_instance", body=body.json())
-        return parse_obj_as(Instance.__response__, resp.json())
 
 
 def _get_apply_plan_excludes(plan: ApplyRunPlanInput) -> Optional[dict]:
