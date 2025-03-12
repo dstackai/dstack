@@ -5,7 +5,7 @@ from pydantic import Field
 from dstack._internal.core.models.common import CoreModel
 
 
-# The template uses "api_key" creds as a most popular creds type.
+# The template uses "api_key" creds as the most popular creds type.
 # TODO: Adjust it or add additional creds models if necessary.
 class {{ backend_name }}APIKeyCreds(CoreModel):
     type: Annotated[Literal["api_key"], Field(description="The type of credentials")] = "api_key"
