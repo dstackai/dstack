@@ -101,8 +101,6 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
                 max_price=profile.max_price,
                 working_dir=conf.working_dir,
                 run_name=conf.name,
-                pool_name=profile.pool_name,
-                instance_name=profile.instance_name,
                 creation_policy=profile.creation_policy,
                 termination_policy=profile.termination_policy,
                 termination_policy_idle=profile.termination_idle_time,

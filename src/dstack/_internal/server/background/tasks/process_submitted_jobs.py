@@ -21,7 +21,6 @@ from dstack._internal.core.models.profiles import (
     DEFAULT_POOL_NAME,
     DEFAULT_RUN_TERMINATION_IDLE_TIME,
     CreationPolicy,
-    Profile,
     TerminationPolicy,
 )
 from dstack._internal.core.models.resources import Memory
@@ -181,7 +180,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         await session.commit()
         return
 
-    pool = await _get_pool(session=session, project=project, profile=profile)
+    pool = await _get_pool(session=session, project=project)
 
     # Submitted jobs processing happens in two steps (transactions).
     # First, the jobs gets an instance assigned (or no instance).
@@ -338,12 +337,12 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         await session.commit()
 
 
-async def _get_pool(session: AsyncSession, project: ProjectModel, profile: Profile) -> PoolModel:
+async def _get_pool(session: AsyncSession, project: ProjectModel) -> PoolModel:
     res = await session.execute(
         select(PoolModel)
         .where(
             PoolModel.project_id == project.id,
-            PoolModel.name == (profile.pool_name or DEFAULT_POOL_NAME),
+            PoolModel.name == DEFAULT_POOL_NAME,
             PoolModel.deleted == False,
         )
         .options(lazyload(PoolModel.instances))

@@ -532,8 +532,6 @@ class RunCollection:
             max_duration=max_duration,
             stop_duration=stop_duration,
             max_price=max_price,
-            pool_name=pool_name,
-            instance_name=instance_name,
             creation_policy=creation_policy,
             idle_duration=idle_duration,
             termination_policy=termination_policy,

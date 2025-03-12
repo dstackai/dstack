@@ -476,11 +476,6 @@ class ApplyRunPlanInput(CoreModel):
     ] = None
 
 
-class PoolInstanceOffers(CoreModel):
-    pool_name: str
-    instances: List[InstanceOfferWithAvailability]
-
-
 def get_policy_map(spot_policy: Optional[SpotPolicy], default: SpotPolicy) -> Optional[bool]:
     """
     Map profile.spot_policy[SpotPolicy|None] to requirements.spot[bool|None]

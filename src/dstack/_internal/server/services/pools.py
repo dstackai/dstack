@@ -1,4 +1,3 @@
-import ipaddress
 import uuid
 from collections.abc import Container, Iterable
 from datetime import datetime, timezone
@@ -17,7 +16,6 @@ from dstack._internal.core.backends.base.offers import (
 from dstack._internal.core.errors import (
     ResourceExistsError,
     ResourceNotExistsError,
-    ServerClientError,
 )
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.envs import Env
@@ -33,10 +31,10 @@ from dstack._internal.core.models.instances import (
     SSHConnectionParams,
     SSHKey,
 )
-from dstack._internal.core.models.pools import Instance, Pool, PoolInstances
+from dstack._internal.core.models.pools import Instance
 from dstack._internal.core.models.profiles import (
+    DEFAULT_FLEET_TERMINATION_IDLE_TIME,
     DEFAULT_POOL_NAME,
-    DEFAULT_POOL_TERMINATION_IDLE_TIME,
     Profile,
     TerminationPolicy,
 )
@@ -56,18 +54,9 @@ from dstack._internal.server.services.offers import generate_shared_offer
 from dstack._internal.server.services.projects import list_project_models, list_user_project_models
 from dstack._internal.utils import common as common_utils
 from dstack._internal.utils import random_names
-from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
-
-
-async def list_project_pools(session: AsyncSession, project: ProjectModel) -> List[Pool]:
-    pools = await list_project_pool_models(session=session, project=project)
-    if len(pools) == 0:
-        pool = await get_or_create_pool_by_name(session, project, DEFAULT_POOL_NAME)
-        pools.append(pool)
-    return [pool_model_to_pool(p) for p in pools]
 
 
 async def get_pool(
@@ -156,83 +145,6 @@ async def set_default_pool(session: AsyncSession, project: ProjectModel, pool_na
         raise ResourceNotExistsError("Pool not found")
     project.default_pool = pool
     await session.commit()
-
-
-async def delete_pool(session: AsyncSession, project: ProjectModel, pool_name: str) -> None:
-    # TODO force delete
-    pool = await get_pool(session, project, pool_name)
-    if pool is None:
-        raise ResourceNotExistsError("Pool not found")
-
-    pool_instances = get_pool_instances(pool)
-    for instance in pool_instances:
-        if instance.status != InstanceStatus.TERMINATED:
-            raise ServerClientError("Cannot delete pool with running instances")
-
-    pool.deleted = True
-    pool.deleted_at = get_current_datetime()
-    if project.default_pool_id == pool.id:
-        project.default_pool_id = None
-    await session.commit()
-
-
-def pool_model_to_pool(pool_model: PoolModel) -> Pool:
-    total = 0
-    available = 0
-    for instance in pool_model.instances:
-        if not instance.deleted:
-            total += 1
-            if instance.status.is_available():
-                available += 1
-    return Pool(
-        name=pool_model.name,
-        default=pool_model.project.default_pool_id == pool_model.id,
-        created_at=pool_model.created_at.replace(tzinfo=timezone.utc),
-        total_instances=total,
-        available_instances=available,
-    )
-
-
-async def remove_instance(
-    session: AsyncSession,
-    project: ProjectModel,
-    pool_name: str,
-    instance_name: str,
-    force: bool,
-):
-    # This is a buggy function since it doesn't lock instances (and never did correctly).
-    # No need to fix it since it's deprecated.
-    pool = await get_pool(session, project, pool_name)
-    if pool is None:
-        raise ResourceNotExistsError("Pool not found")
-    terminated = False
-    for instance in pool.instances:
-        if instance.name == instance_name:
-            if force or not instance.jobs:
-                instance.status = InstanceStatus.TERMINATING
-                terminated = True
-    await session.commit()
-    if not terminated:
-        raise ResourceNotExistsError("Could not find instance to terminate")
-
-
-async def show_pool_instances(
-    session: AsyncSession, project: ProjectModel, pool_name: Optional[str]
-) -> PoolInstances:
-    if pool_name is not None:
-        pool = await get_pool(session, project, pool_name, load_instance_fleets=True)
-        if pool is None:
-            raise ResourceNotExistsError("Pool not found")
-    else:
-        pool = await get_or_create_pool_by_name(
-            session, project, pool_name, load_instance_fleets=True
-        )
-    pool_instances = get_pool_instances(pool)
-    instances = list(map(instance_model_to_instance, pool_instances))
-    return PoolInstances(
-        name=pool.name,
-        instances=instances,
-    )
 
 
 def get_pool_instances(pool: PoolModel) -> List[InstanceModel]:
@@ -335,100 +247,6 @@ async def generate_instance_name(
                 return name
 
 
-async def add_remote(
-    session: AsyncSession,
-    project: ProjectModel,
-    pool_name: Optional[str],
-    instance_name: Optional[str],
-    instance_network: Optional[str],
-    region: Optional[str],
-    host: str,
-    port: int,
-    ssh_user: str,
-    ssh_keys: List[SSHKey],
-) -> Instance:
-    if instance_network is not None:
-        try:
-            interface = ipaddress.IPv4Interface(instance_network)
-            instance_network = str(interface.network)
-        except ipaddress.AddressValueError:
-            raise ServerClientError("Failed to parse network value")
-
-    # Check instance in all instances
-    pools = await list_project_pool_models(session, project)
-    for pool in pools:
-        for instance in pool.instances:
-            if instance.deleted:
-                continue
-            if instance.remote_connection_info is not None:
-                rci = RemoteConnectionInfo.__response__.parse_raw(instance.remote_connection_info)
-                if rci.host == host and rci.port == port and rci.ssh_user == ssh_user:
-                    return instance_model_to_instance(instance)
-
-    pool_model = await get_or_create_pool_by_name(session, project, pool_name)
-    pool_model_name = pool_model.name
-    if instance_name is None:
-        instance_name = await generate_instance_name(session, project, pool_model_name)
-
-    # TODO: doc - will overwrite after remote connected
-    instance_resource = Resources(cpus=2, memory_mib=8, gpus=[], spot=False)
-    instance_type = InstanceType(name="ssh", resources=instance_resource)
-
-    host_region = region if region is not None else "remote"
-
-    remote = JobProvisioningData(
-        backend=BackendType.REMOTE,
-        instance_type=instance_type,
-        instance_id=instance_name,
-        hostname=host,
-        region=host_region,
-        internal_ip=None,
-        instance_network=instance_network,
-        price=0,
-        username=ssh_user,
-        ssh_port=port,
-        dockerized=True,
-        backend_data="",
-        ssh_proxy=None,
-    )
-    offer = InstanceOfferWithAvailability(
-        backend=BackendType.REMOTE,
-        instance=instance_type,
-        region=host_region,
-        price=0.0,
-        availability=InstanceAvailability.AVAILABLE,
-    )
-
-    ssh_connection_info = RemoteConnectionInfo(
-        host=host, port=port, ssh_user=ssh_user, ssh_keys=ssh_keys
-    ).json()
-
-    im = InstanceModel(
-        id=uuid.uuid4(),
-        name=instance_name,
-        instance_num=0,
-        project=project,
-        pool=pool_model,
-        backend=BackendType.REMOTE,
-        created_at=common_utils.get_current_datetime(),
-        started_at=common_utils.get_current_datetime(),
-        status=InstanceStatus.PENDING,
-        unreachable=False,
-        job_provisioning_data=remote.json(),
-        remote_connection_info=ssh_connection_info,
-        offer=offer.json(),
-        region=offer.region,
-        price=offer.price,
-        termination_policy=TerminationPolicy.DONT_DESTROY,
-        termination_idle_time=0,
-    )
-    session.add(im)
-    await session.commit()
-
-    instance = instance_model_to_instance(im)
-    return instance
-
-
 def filter_pool_instances(
     pool_instances: List[InstanceModel],
     profile: Profile,
@@ -482,8 +300,6 @@ def filter_pool_instances(
         if fleet_model is not None and instance.fleet_id != fleet_model.id:
             continue
         if instance.unreachable:
-            continue
-        if profile.instance_name is not None and instance.name != profile.instance_name:
             continue
         if status is not None and instance.status != status:
             continue
@@ -639,7 +455,6 @@ async def list_user_pool_instances(
     user: UserModel,
     project_names: Optional[Container[str]],
     fleet_ids: Optional[Iterable[uuid.UUID]],
-    pool_name: Optional[str],
     only_active: bool,
     prev_created_at: Optional[datetime],
     prev_id: Optional[uuid.UUID],
@@ -658,13 +473,6 @@ async def list_user_pool_instances(
         projects = [proj for proj in projects if proj.name in project_names]
         if len(projects) == 0:
             return []
-        if pool_name is not None:
-            pool = await get_pool(
-                session=session,
-                project=projects[0],
-                pool_name=pool_name,
-                select_deleted=(not only_active),
-            )
 
     instance_models = await list_pools_instance_models(
         session=session,
@@ -709,7 +517,7 @@ async def create_instance_model(
     blocks: Union[Literal["auto"], int],
 ) -> InstanceModel:
     termination_policy, termination_idle_time = get_termination(
-        profile, DEFAULT_POOL_TERMINATION_IDLE_TIME
+        profile, DEFAULT_FLEET_TERMINATION_IDLE_TIME
     )
     instance_id = uuid.uuid4()
     project_ssh_key = SSHKey(

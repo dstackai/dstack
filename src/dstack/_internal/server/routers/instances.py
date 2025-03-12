@@ -36,7 +36,6 @@ async def list_instances(
         user=user,
         project_names=body.project_names,
         fleet_ids=body.fleet_ids,
-        pool_name=None,
         only_active=body.only_active,
         prev_created_at=body.prev_created_at,
         prev_id=body.prev_id,

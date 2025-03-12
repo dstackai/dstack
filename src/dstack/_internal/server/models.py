@@ -30,7 +30,7 @@ from dstack._internal.core.models.fleets import FleetStatus
 from dstack._internal.core.models.gateways import GatewayStatus
 from dstack._internal.core.models.instances import InstanceStatus
 from dstack._internal.core.models.profiles import (
-    DEFAULT_POOL_TERMINATION_IDLE_TIME,
+    DEFAULT_FLEET_TERMINATION_IDLE_TIME,
     TerminationPolicy,
 )
 from dstack._internal.core.models.repos.base import RepoType
@@ -545,9 +545,10 @@ class InstanceModel(BaseModel):
 
     # temination policy
     termination_policy: Mapped[Optional[TerminationPolicy]] = mapped_column(String(100))
-    # TODO: Suggestion: do not assign DEFAULT_POOL_TERMINATION_IDLE_TIME as the default here (make Optional instead; also instead of -1)
+    # TODO: Suggestion: do not assign DEFAULT_FLEET_TERMINATION_IDLE_TIME as the default here
+    # (make Optional instead; also instead of -1)
     termination_idle_time: Mapped[int] = mapped_column(
-        Integer, default=DEFAULT_POOL_TERMINATION_IDLE_TIME
+        Integer, default=DEFAULT_FLEET_TERMINATION_IDLE_TIME
     )
 
     # retry policy

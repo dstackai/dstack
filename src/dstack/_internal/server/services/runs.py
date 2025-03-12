@@ -308,9 +308,7 @@ async def get_plan(
         job_num=0,
     )
 
-    pool = await get_or_create_pool_by_name(
-        session=session, project=project, pool_name=profile.pool_name
-    )
+    pool = await get_or_create_pool_by_name(session=session, project=project, pool_name=None)
     pool_offers = await _get_pool_offers(
         session=session,
         pool=pool,

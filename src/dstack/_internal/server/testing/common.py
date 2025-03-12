@@ -45,8 +45,8 @@ from dstack._internal.core.models.placement import (
     PlacementStrategy,
 )
 from dstack._internal.core.models.profiles import (
+    DEFAULT_FLEET_TERMINATION_IDLE_TIME,
     DEFAULT_POOL_NAME,
-    DEFAULT_POOL_TERMINATION_IDLE_TIME,
     Profile,
     TerminationPolicy,
 )
@@ -532,7 +532,7 @@ async def create_instance(
     instance_num: int = 0,
     backend: BackendType = BackendType.DATACRUNCH,
     termination_policy: Optional[TerminationPolicy] = None,
-    termination_idle_time: int = DEFAULT_POOL_TERMINATION_IDLE_TIME,
+    termination_idle_time: int = DEFAULT_FLEET_TERMINATION_IDLE_TIME,
     region: str = "eu-west",
     remote_connection_info: Optional[RemoteConnectionInfo] = None,
     offer: Optional[InstanceOfferWithAvailability] = None,
