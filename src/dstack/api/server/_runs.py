@@ -24,7 +24,6 @@ from dstack._internal.server.schemas.runs import (
     GetRunRequest,
     ListRunsRequest,
     StopRunsRequest,
-    SubmitRunRequest,
 )
 from dstack.api.server._group import APIClientGroup
 
@@ -80,14 +79,6 @@ class RunsAPIClient(APIClientGroup):
         resp = self._request(
             f"/api/project/{project_name}/runs/apply",
             body=body.json(exclude=_get_apply_plan_excludes(plan_input)),
-        )
-        return parse_obj_as(Run.__response__, resp.json())
-
-    def submit(self, project_name: str, run_spec: RunSpec) -> Run:
-        body = SubmitRunRequest(run_spec=run_spec)
-        resp = self._request(
-            f"/api/project/{project_name}/runs/submit",
-            body=body.json(exclude=_get_run_spec_excludes(run_spec)),
         )
         return parse_obj_as(Run.__response__, resp.json())
 
