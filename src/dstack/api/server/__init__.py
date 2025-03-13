@@ -29,22 +29,26 @@ _RETRY_INTERVAL = 1
 
 class APIClient:
     """
-    Low-level API client for interacting with dstack server. Implements all API endpoints
+    Low-level API client for interacting with the `dstack` server.
+    Supports all HTTP API endpoints.
 
     Attributes:
         users: operations with users
         projects: operations with projects
         backends: operations with backends
+        fleets: operations with fleets
         runs: operations with runs
+        metrics: operations with metrics
         logs: operations with logs
         gateways: operations with gateways
+        volumes: operations with volumes
     """
 
     def __init__(self, base_url: str, token: str):
         """
         Args:
-            base_url: API endpoints prefix, e.g. `http://127.0.0.1:3000/`
-            token: API token
+            base_url: The API endpoints prefix, e.g. `http://127.0.0.1:3000/`.
+            token: The API token.
         """
         self._base_url = base_url.rstrip("/")
         self._token = token
@@ -71,6 +75,10 @@ class APIClient:
         return BackendsAPIClient(self._request)
 
     @property
+    def fleets(self) -> FleetsAPIClient:
+        return FleetsAPIClient(self._request)
+
+    @property
     def repos(self) -> ReposAPIClient:
         return ReposAPIClient(self._request)
 
@@ -93,10 +101,6 @@ class APIClient:
     @property
     def gateways(self) -> GatewaysAPIClient:
         return GatewaysAPIClient(self._request)
-
-    @property
-    def fleets(self) -> FleetsAPIClient:
-        return FleetsAPIClient(self._request)
 
     @property
     def volumes(self) -> VolumesAPIClient:

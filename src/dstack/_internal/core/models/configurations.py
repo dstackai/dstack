@@ -93,7 +93,9 @@ class BaseRunConfiguration(CoreModel):
         Optional[str],
         Field(description="The run name. If not specified, a random name is generated"),
     ] = None
-    image: Annotated[Optional[str], Field(description="The name of the Docker image to run")]
+    image: Annotated[Optional[str], Field(description="The name of the Docker image to run")] = (
+        None
+    )
     user: Annotated[
         Optional[str],
         Field(
@@ -104,7 +106,7 @@ class BaseRunConfiguration(CoreModel):
         ),
     ] = None
     privileged: Annotated[bool, Field(description="Run the container in privileged mode")] = False
-    entrypoint: Annotated[Optional[str], Field(description="The Docker entrypoint")]
+    entrypoint: Annotated[Optional[str], Field(description="The Docker entrypoint")] = None
     working_dir: Annotated[
         Optional[str],
         Field(
@@ -119,17 +121,17 @@ class BaseRunConfiguration(CoreModel):
     home_dir: str = "/root"
     registry_auth: Annotated[
         Optional[RegistryAuth], Field(description="Credentials for pulling a private Docker image")
-    ]
+    ] = None
     python: Annotated[
         Optional[PythonVersion],
         Field(description="The major version of Python. Mutually exclusive with `image`"),
-    ]
+    ] = None
     nvcc: Annotated[
         Optional[bool],
         Field(
             description="Use image with NVIDIA CUDA Compiler (NVCC) included. Mutually exclusive with `image`"
         ),
-    ]
+    ] = None
     single_branch: Annotated[
         Optional[bool],
         Field(
@@ -209,7 +211,7 @@ class BaseRunConfigurationWithCommands(BaseRunConfiguration):
 
 class DevEnvironmentConfigurationParams(CoreModel):
     ide: Annotated[Literal["vscode"], Field(description="The IDE to run")]
-    version: Annotated[Optional[str], Field(description="The version of the IDE")]
+    version: Annotated[Optional[str], Field(description="The version of the IDE")] = None
     init: Annotated[CommandsList, Field(description="The bash commands to run on startup")] = []
     inactivity_duration: Annotated[
         Optional[Union[Literal["off"], int, bool, str]],
@@ -225,7 +227,7 @@ class DevEnvironmentConfigurationParams(CoreModel):
                 " Defaults to `off`"
             )
         ),
-    ]
+    ] = None
 
     @validator("inactivity_duration", pre=True, allow_reuse=True)
     def parse_inactivity_duration(

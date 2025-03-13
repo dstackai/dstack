@@ -41,10 +41,10 @@ class LocalRepo(Repo):
         Creates an instance of a local repo from a local path.
 
         Args:
-            repo_dir: The path to a local folder
+            repo_dir: The path to a local folder.
 
         Returns:
-            A local repo instance
+            A local repo instance.
         """
         return LocalRepo(repo_dir=repo_dir)
 

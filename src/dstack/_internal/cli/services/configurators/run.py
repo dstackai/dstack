@@ -85,26 +85,11 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
             )
         profile = load_profile(Path.cwd(), configurator_args.profile)
         with console.status("Getting apply plan..."):
-            run_plan = self.api.runs.get_plan(
+            run_plan = self.api.runs.get_run_plan(
                 configuration=conf,
                 repo=repo,
                 configuration_path=configuration_path,
-                backends=profile.backends,
-                regions=profile.regions,
-                instance_types=profile.instance_types,
-                reservation=profile.reservation,
-                spot_policy=profile.spot_policy,
-                retry_policy=profile.retry_policy,
-                utilization_policy=profile.utilization_policy,
-                max_duration=profile.max_duration,
-                stop_duration=profile.stop_duration,
-                max_price=profile.max_price,
-                working_dir=conf.working_dir,
-                run_name=conf.name,
-                creation_policy=profile.creation_policy,
-                termination_policy=profile.termination_policy,
-                termination_policy_idle=profile.termination_idle_time,
-                idle_duration=profile.idle_duration,
+                profile=profile,
             )
 
         print_run_plan(run_plan, offers_limit=configurator_args.max_offers)
@@ -163,8 +148,8 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
 
         try:
             with console.status("Applying plan..."):
-                run = self.api.runs.exec_plan(
-                    run_plan, repo, reserve_ports=not command_args.detach
+                run = self.api.runs.apply_plan(
+                    run_plan=run_plan, repo=repo, reserve_ports=not command_args.detach
                 )
         except ServerClientError as e:
             raise CLIError(e.msg)
