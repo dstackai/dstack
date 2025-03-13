@@ -55,7 +55,7 @@ class RepoCollection:
         Once the repo is initialized, you can pass the repo object to the run:
 
         ```python
-        run = client.runs.submit(
+        run = client.runs.apply_configuration(
             configuration=...,
             repo=repo,
         )

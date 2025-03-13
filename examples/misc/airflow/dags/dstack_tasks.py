@@ -54,7 +54,7 @@ def dstack_tasks():
         )
 
     @task.external_python(task_id="external_python", python=DSTACK_VENV_PYTHON_BINARY_PATH)
-    def dstack_api_submit_venv() -> str:
+    def dstack_api_submit_venv():
         """
         This task shows how to run the dstack API when
         dstack is installed into a separate virtual environment available to Airflow.
@@ -63,18 +63,18 @@ def dstack_tasks():
         from dstack.api import Client, Task
 
         task = Task(
+            name="my-airflow-task",
             commands=[
                 "echo 'Running dstack task via Airflow'",
                 "sleep 10",
                 "echo 'Finished'",
-            ]
+            ],
         )
         # Pick up config from `~/.dstack/config.yml`
         # or set explicitly from Ariflow Variables.
         client = Client.from_config()
 
-        run = client.runs.submit(
-            run_name="my-airflow-task",
+        run = client.runs.apply_configuration(
             configuration=task,
         )
         run.attach()

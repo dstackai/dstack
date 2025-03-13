@@ -26,7 +26,7 @@ class LocalRepo(Repo):
     Example:
 
     ```python
-    run = client.runs.submit(
+    run = client.runs.apply_configuration(
         configuration=...,
         repo=LocalRepo.from_dir("."), # Mount the current folder to the run
     )
