@@ -27,16 +27,13 @@ from dstack._internal.core.models.fleets import (
     SSHParams,
 )
 from dstack._internal.core.models.instances import (
-    InstanceConfiguration,
     InstanceOfferWithAvailability,
     InstanceStatus,
     RemoteConnectionInfo,
     SSHConnectionParams,
     SSHKey,
 )
-from dstack._internal.core.models.pools import Instance
 from dstack._internal.core.models.profiles import (
-    DEFAULT_POOL_TERMINATION_IDLE_TIME,
     Profile,
     SpotPolicy,
 )
@@ -44,29 +41,26 @@ from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import Requirements, get_policy_map
 from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.core.services import validate_dstack_resource_name
-from dstack._internal.core.services.profiles import get_termination
 from dstack._internal.server.db import get_db
 from dstack._internal.server.models import (
     FleetModel,
     InstanceModel,
-    PoolModel,
     ProjectModel,
     UserModel,
 )
+from dstack._internal.server.services import instances as instances_services
 from dstack._internal.server.services import offers as offers_services
-from dstack._internal.server.services import pools as pools_services
+from dstack._internal.server.services.instances import list_active_remote_instances
 from dstack._internal.server.services.locking import (
     get_locker,
     string_to_lock_id,
 )
-from dstack._internal.server.services.pools import list_active_remote_instances
 from dstack._internal.server.services.projects import (
     get_member,
     get_member_permissions,
     list_project_models,
     list_user_project_models,
 )
-from dstack._internal.utils import common as common_utils
 from dstack._internal.utils import random_names
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.ssh import pkey_from_str
@@ -291,7 +285,7 @@ async def get_create_instance_offers(
         fleet = fleet_model_to_fleet(fleet_model)
         multinode = fleet.spec.configuration.placement == InstanceGroupPlacement.CLUSTER
         for instance in fleet_model.instances:
-            jpd = pools_services.get_instance_provisioning_data(instance)
+            jpd = instances_services.get_instance_provisioning_data(instance)
             if jpd is not None:
                 master_job_provisioning_data = jpd
                 break
@@ -346,9 +340,6 @@ async def create_fleet(
         else:
             spec.configuration.name = await generate_fleet_name(session=session, project=project)
 
-        pool = await pools_services.get_or_create_pool_by_name(
-            session=session, project=project, pool_name=None
-        )
         fleet_model = FleetModel(
             id=uuid.uuid4(),
             name=spec.configuration.name,
@@ -362,7 +353,6 @@ async def create_fleet(
             for i, host in enumerate(spec.configuration.ssh_config.hosts):
                 instances_model = await create_fleet_ssh_instance_model(
                     project=project,
-                    pool=pool,
                     spec=spec,
                     ssh_params=spec.configuration.ssh_config,
                     env=spec.configuration.env,
@@ -380,7 +370,6 @@ async def create_fleet(
                     session=session,
                     project=project,
                     user=user,
-                    pool=pool,
                     spec=spec,
                     placement_group_name=placement_group_name,
                     reservation=spec.configuration.reservation,
@@ -395,7 +384,6 @@ async def create_fleet_instance_model(
     session: AsyncSession,
     project: ProjectModel,
     user: UserModel,
-    pool: PoolModel,
     spec: FleetSpec,
     placement_group_name: Optional[str],
     reservation: Optional[str],
@@ -403,11 +391,10 @@ async def create_fleet_instance_model(
 ) -> InstanceModel:
     profile = spec.merged_profile
     requirements = _get_fleet_requirements(spec)
-    instance_model = await pools_services.create_instance_model(
+    instance_model = await instances_services.create_instance_model(
         session=session,
         project=project,
         user=user,
-        pool=pool,
         profile=profile,
         requirements=requirements,
         instance_name=f"{spec.configuration.name}-{instance_num}",
@@ -421,7 +408,6 @@ async def create_fleet_instance_model(
 
 async def create_fleet_ssh_instance_model(
     project: ProjectModel,
-    pool: PoolModel,
     spec: FleetSpec,
     ssh_params: SSHParams,
     env: Env,
@@ -460,9 +446,8 @@ async def create_fleet_ssh_instance_model(
         ssh_proxy = None
         ssh_proxy_keys = None
 
-    instance_model = await pools_services.create_ssh_instance_model(
+    instance_model = await instances_services.create_ssh_instance_model(
         project=project,
-        pool=pool,
         instance_name=f"{spec.configuration.name}-{instance_num}",
         instance_num=instance_num,
         region="remote",
@@ -541,7 +526,7 @@ def fleet_model_to_fleet(
     instance_models = fleet_model.instances
     if not include_deleted_instances:
         instance_models = [i for i in instance_models if not i.deleted]
-    instances = [pools_services.instance_model_to_instance(i) for i in instance_models]
+    instances = [instances_services.instance_model_to_instance(i) for i in instance_models]
     instances = sorted(instances, key=lambda i: i.instance_num)
     spec = get_fleet_spec(fleet_model)
     if not include_sensitive:
@@ -583,86 +568,6 @@ def is_fleet_in_use(fleet_model: FleetModel, instance_nums: Optional[List[int]] 
 def is_fleet_empty(fleet_model: FleetModel) -> bool:
     active_instances = [i for i in fleet_model.instances if not i.deleted]
     return len(active_instances) == 0
-
-
-async def create_instance(
-    session: AsyncSession,
-    project: ProjectModel,
-    user: UserModel,
-    profile: Profile,
-    requirements: Requirements,
-) -> Instance:
-    offers = await get_create_instance_offers(
-        project=project,
-        profile=profile,
-        requirements=requirements,
-        exclude_not_available=True,
-    )
-
-    # Raise error if no backends suppport create_instance
-    backend_types = set(offer.backend for _, offer in offers)
-    if all(
-        (backend_type not in BACKENDS_WITH_CREATE_INSTANCE_SUPPORT)
-        for backend_type in backend_types
-    ):
-        backends = ", ".join(sorted(backend_types))
-        raise ServerClientError(
-            f"Backends {backends} do not support create_instance. Try to select other backends."
-        )
-
-    pool = await pools_services.get_or_create_pool_by_name(session, project, profile.pool_name)
-    instance_name = await pools_services.generate_instance_name(
-        session=session,
-        project=project,
-        pool_name=pool.name,
-    )
-
-    termination_policy, termination_idle_time = get_termination(
-        profile, DEFAULT_POOL_TERMINATION_IDLE_TIME
-    )
-    instance = InstanceModel(
-        id=uuid.uuid4(),
-        name=instance_name,
-        instance_num=0,
-        project=project,
-        pool=pool,
-        created_at=common_utils.get_current_datetime(),
-        status=InstanceStatus.PENDING,
-        unreachable=False,
-        profile=profile.json(),
-        requirements=requirements.json(),
-        instance_configuration=None,
-        termination_policy=termination_policy,
-        termination_idle_time=termination_idle_time,
-        total_blocks=1,
-        busy_blocks=0,
-    )
-    logger.info(
-        "Added a new instance %s",
-        instance.name,
-        extra={
-            "instance_name": instance.name,
-            "instance_status": InstanceStatus.PENDING.value,
-        },
-    )
-    session.add(instance)
-    await session.commit()
-
-    project_ssh_key = SSHKey(
-        public=project.ssh_public_key.strip(),
-        private=project.ssh_private_key.strip(),
-    )
-    instance_config = InstanceConfiguration(
-        project_name=project.name,
-        instance_name=instance_name,
-        instance_id=str(instance.id),
-        ssh_keys=[project_ssh_key],
-        user=user.name,
-    )
-    instance.instance_configuration = instance_config.json()
-    await session.commit()
-
-    return pools_services.instance_model_to_instance(instance)
 
 
 def _check_can_manage_ssh_fleets(user: UserModel, project: ProjectModel):

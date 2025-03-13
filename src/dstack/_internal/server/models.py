@@ -30,7 +30,7 @@ from dstack._internal.core.models.fleets import FleetStatus
 from dstack._internal.core.models.gateways import GatewayStatus
 from dstack._internal.core.models.instances import InstanceStatus
 from dstack._internal.core.models.profiles import (
-    DEFAULT_POOL_TERMINATION_IDLE_TIME,
+    DEFAULT_FLEET_TERMINATION_IDLE_TIME,
     TerminationPolicy,
 )
 from dstack._internal.core.models.repos.base import RepoType
@@ -221,8 +221,13 @@ class ProjectModel(BaseModel):
         foreign_keys=[default_gateway_id]
     )
 
+    # TODO: Drop after the release without pools
+    # Note that multi-replica deployments can break if
+    # upgrading from an old version that uses pools to the version that drops pools from the DB.
     default_pool_id: Mapped[Optional[UUIDType]] = mapped_column(
-        ForeignKey("pools.id", use_alter=True, ondelete="SET NULL"), nullable=True
+        ForeignKey("pools.id", use_alter=True, ondelete="SET NULL"),
+        nullable=True,
+        deferred=True,  # Not loaded so it can be deleted in the next releases
     )
     default_pool: Mapped[Optional["PoolModel"]] = relationship(foreign_keys=[default_pool_id])
 
@@ -456,6 +461,7 @@ class GatewayComputeModel(BaseModel):
     app_updated_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
 
 
+# TODO: Drop after the release without pools
 class PoolModel(BaseModel):
     __tablename__ = "pools"
 
@@ -521,8 +527,12 @@ class InstanceModel(BaseModel):
     project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
     project: Mapped["ProjectModel"] = relationship(foreign_keys=[project_id])
 
-    pool_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("pools.id"))
-    pool: Mapped["PoolModel"] = relationship(back_populates="instances")
+    # TODO: Drop after the release without pools
+    pool_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("pools.id"),
+        deferred=True,  # Not loaded so it can be deleted in the next releases
+    )
+    pool: Mapped[Optional["PoolModel"]] = relationship(back_populates="instances")
 
     fleet_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("fleets.id"))
     fleet: Mapped[Optional["FleetModel"]] = relationship(back_populates="instances")
@@ -545,9 +555,10 @@ class InstanceModel(BaseModel):
 
     # temination policy
     termination_policy: Mapped[Optional[TerminationPolicy]] = mapped_column(String(100))
-    # TODO: Suggestion: do not assign DEFAULT_POOL_TERMINATION_IDLE_TIME as the default here (make Optional instead; also instead of -1)
+    # TODO: Suggestion: do not assign DEFAULT_FLEET_TERMINATION_IDLE_TIME as the default here
+    # (make Optional instead; also instead of -1)
     termination_idle_time: Mapped[int] = mapped_column(
-        Integer, default=DEFAULT_POOL_TERMINATION_IDLE_TIME
+        Integer, default=DEFAULT_FLEET_TERMINATION_IDLE_TIME
     )
 
     # retry policy

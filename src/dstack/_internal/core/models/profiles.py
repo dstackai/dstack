@@ -8,12 +8,9 @@ from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import CoreModel, Duration
 
 DEFAULT_RETRY_DURATION = 3600
-DEFAULT_POOL_NAME = "default-pool"
 
 DEFAULT_RUN_TERMINATION_IDLE_TIME = 5 * 60  # 5 minutes
-DEFAULT_POOL_TERMINATION_IDLE_TIME = 72 * 60 * 60  # 3 days
-
-DEFAULT_INSTANCE_RETRY_DURATION = 60 * 60 * 24  # 24h
+DEFAULT_FLEET_TERMINATION_IDLE_TIME = 72 * 60 * 60  # 3 days
 
 DEFAULT_STOP_DURATION = 300
 
@@ -223,7 +220,7 @@ class ProfileParams(CoreModel):
     creation_policy: Annotated[
         Optional[CreationPolicy],
         Field(
-            description="The policy for using instances from the pool. Defaults to `reuse-or-create`"
+            description="The policy for using instances from fleets. Defaults to `reuse-or-create`"
         ),
     ]
     idle_duration: Annotated[
@@ -252,10 +249,6 @@ class ProfileParams(CoreModel):
             description="Deprecated in favor of `idle_duration`",
         ),
     ]
-    # The name of the pool. If not set, dstack will use the default name
-    pool_name: Optional[str]
-    # The name of the instance
-    instance_name: Optional[str]
     # The policy for resubmitting the run. Deprecated in favor of `retry`
     retry_policy: Optional[ProfileRetryPolicy]
 

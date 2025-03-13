@@ -45,8 +45,7 @@ from dstack._internal.core.models.placement import (
     PlacementStrategy,
 )
 from dstack._internal.core.models.profiles import (
-    DEFAULT_POOL_NAME,
-    DEFAULT_POOL_TERMINATION_IDLE_TIME,
+    DEFAULT_FLEET_TERMINATION_IDLE_TIME,
     Profile,
     TerminationPolicy,
 )
@@ -81,7 +80,6 @@ from dstack._internal.server.models import (
     JobModel,
     JobPrometheusMetrics,
     PlacementGroupModel,
-    PoolModel,
     ProjectModel,
     RepoCredsModel,
     RepoModel,
@@ -449,22 +447,6 @@ def get_gateway_compute_configuration(
     )
 
 
-async def create_pool(
-    session: AsyncSession,
-    project: ProjectModel,
-    pool_name: Optional[str] = None,
-) -> PoolModel:
-    pool_name = pool_name if pool_name is not None else DEFAULT_POOL_NAME
-    pool = PoolModel(
-        name=pool_name,
-        project=project,
-        project_id=project.id,
-    )
-    session.add(pool)
-    await session.commit()
-    return pool
-
-
 async def create_fleet(
     session: AsyncSession,
     project: ProjectModel,
@@ -517,7 +499,6 @@ def get_fleet_configuration(
 async def create_instance(
     session: AsyncSession,
     project: ProjectModel,
-    pool: PoolModel,
     fleet: Optional[FleetModel] = None,
     status: InstanceStatus = InstanceStatus.IDLE,
     unreachable: bool = False,
@@ -532,7 +513,7 @@ async def create_instance(
     instance_num: int = 0,
     backend: BackendType = BackendType.DATACRUNCH,
     termination_policy: Optional[TerminationPolicy] = None,
-    termination_idle_time: int = DEFAULT_POOL_TERMINATION_IDLE_TIME,
+    termination_idle_time: int = DEFAULT_FLEET_TERMINATION_IDLE_TIME,
     region: str = "eu-west",
     remote_connection_info: Optional[RemoteConnectionInfo] = None,
     offer: Optional[InstanceOfferWithAvailability] = None,
@@ -574,7 +555,6 @@ async def create_instance(
         id=instance_id,
         name=name,
         instance_num=instance_num,
-        pool=pool,
         fleet=fleet,
         project=project,
         status=status,

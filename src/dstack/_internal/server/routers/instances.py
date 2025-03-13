@@ -3,8 +3,8 @@ from typing import List
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-import dstack._internal.server.services.pools as pools
-from dstack._internal.core.models.pools import Instance
+import dstack._internal.server.services.instances as instances
+from dstack._internal.core.models.instances import Instance
 from dstack._internal.server.db import get_session
 from dstack._internal.server.models import UserModel
 from dstack._internal.server.schemas.instances import ListInstancesRequest
@@ -31,12 +31,11 @@ async def list_instances(
     The results are paginated. To get the next page, pass `created_at` and `id` of
     the last instance from the previous page as `prev_created_at` and `prev_id`.
     """
-    return await pools.list_user_pool_instances(
+    return await instances.list_user_instances(
         session=session,
         user=user,
         project_names=body.project_names,
         fleet_ids=body.fleet_ids,
-        pool_name=None,
         only_active=body.only_active,
         prev_created_at=body.prev_created_at,
         prev_id=body.prev_id,

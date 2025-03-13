@@ -20,7 +20,6 @@ from dstack._internal.server.services.fleets import get_plan
 from dstack._internal.server.testing.common import (
     create_fleet,
     create_instance,
-    create_pool,
     create_project,
     create_user,
     get_fleet_spec,
@@ -45,7 +44,6 @@ class TestGetPlanSSHFleetHostsValidation:
         self, session: AsyncSession, project: ProjectModel, spec: FleetSpec
     ) -> FleetModel:
         assert spec.configuration.ssh_config is not None, spec.configuration
-        pool = await create_pool(session=session, project=project)
         fleet = await create_fleet(session=session, project=project, spec=spec)
         for host in spec.configuration.ssh_config.hosts:
             if isinstance(host, SSHHostParams):
@@ -56,7 +54,6 @@ class TestGetPlanSSHFleetHostsValidation:
             await create_instance(
                 session=session,
                 project=project,
-                pool=pool,
                 fleet=fleet,
                 backend=BackendType.REMOTE,
                 remote_connection_info=rci,

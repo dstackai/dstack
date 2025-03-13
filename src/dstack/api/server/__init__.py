@@ -13,7 +13,6 @@ from dstack.api.server._fleets import FleetsAPIClient
 from dstack.api.server._gateways import GatewaysAPIClient
 from dstack.api.server._logs import LogsAPIClient
 from dstack.api.server._metrics import MetricsAPIClient
-from dstack.api.server._pools import PoolAPIClient
 from dstack.api.server._projects import ProjectsAPIClient
 from dstack.api.server._repos import ReposAPIClient
 from dstack.api.server._runs import RunsAPIClient
@@ -39,7 +38,6 @@ class APIClient:
         runs: operations with runs
         logs: operations with logs
         gateways: operations with gateways
-        pools: operations with pools
     """
 
     def __init__(self, base_url: str, token: str):
@@ -95,10 +93,6 @@ class APIClient:
     @property
     def gateways(self) -> GatewaysAPIClient:
         return GatewaysAPIClient(self._request)
-
-    @property
-    def pool(self) -> PoolAPIClient:
-        return PoolAPIClient(self._request)
 
     @property
     def fleets(self) -> FleetsAPIClient:

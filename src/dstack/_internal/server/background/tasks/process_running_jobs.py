@@ -43,6 +43,7 @@ from dstack._internal.server.models import (
 from dstack._internal.server.schemas.runner import TaskStatus
 from dstack._internal.server.services import logs as logs_services
 from dstack._internal.server.services import services
+from dstack._internal.server.services.instances import get_instance_ssh_private_keys
 from dstack._internal.server.services.jobs import (
     find_job,
     get_job_attached_volumes,
@@ -52,7 +53,6 @@ from dstack._internal.server.services.jobs import (
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.metrics import get_job_metrics
-from dstack._internal.server.services.pools import get_instance_ssh_private_keys
 from dstack._internal.server.services.repos import (
     get_code_model,
     get_repo_creds,

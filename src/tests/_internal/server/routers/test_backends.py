@@ -19,7 +19,6 @@ from dstack._internal.server.testing.common import (
     create_backend,
     create_fleet,
     create_instance,
-    create_pool,
     create_project,
     create_user,
     create_volume,
@@ -468,19 +467,16 @@ class TestDeleteBackends:
             session=session, project=project, user=user, project_role=ProjectRole.ADMIN
         )
         backend = await create_backend(session=session, project_id=project.id)
-        pool = await create_pool(session=session, project=project)
         fleet = await create_fleet(session=session, project=project)
         instance1 = await create_instance(
             session=session,
             project=project,
-            pool=pool,
             status=InstanceStatus.TERMINATED,
             backend=backend.type,
         )
         instance2 = await create_instance(
             session=session,
             project=project,
-            pool=pool,
             status=InstanceStatus.IDLE,
             backend=backend.type,
         )

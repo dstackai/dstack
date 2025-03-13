@@ -5,9 +5,7 @@ from uuid import UUID
 from pydantic import Field
 
 from dstack._internal.core.models.common import CoreModel
-from dstack._internal.core.models.instances import SSHKey
-from dstack._internal.core.models.profiles import Profile
-from dstack._internal.core.models.runs import ApplyRunPlanInput, Requirements, RunSpec
+from dstack._internal.core.models.runs import ApplyRunPlanInput, RunSpec
 
 
 class ListRunsRequest(CoreModel):
@@ -28,27 +26,6 @@ class GetRunRequest(CoreModel):
 
 class GetRunPlanRequest(CoreModel):
     run_spec: RunSpec
-
-
-class GetOffersRequest(CoreModel):
-    profile: Profile
-    requirements: Requirements
-
-
-class CreateInstanceRequest(CoreModel):
-    profile: Profile
-    requirements: Requirements
-
-
-class AddRemoteInstanceRequest(CoreModel):
-    pool_name: Optional[str]
-    instance_name: Optional[str]
-    instance_network: Optional[str]
-    region: Optional[str]
-    host: str
-    port: int
-    ssh_user: str
-    ssh_keys: List[SSHKey]
 
 
 class SubmitRunRequest(CoreModel):

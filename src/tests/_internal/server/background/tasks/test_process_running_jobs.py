@@ -42,7 +42,6 @@ from dstack._internal.server.testing.common import (
     create_instance,
     create_job,
     create_job_metrics_point,
-    create_pool,
     create_project,
     create_repo,
     create_run,
@@ -106,11 +105,9 @@ class TestProcessRunningJobs:
             repo=repo,
             user=user,
         )
-        pool = await create_pool(session=session, project=project)
         instance = await create_instance(
             session=session,
             project=project,
-            pool=pool,
             status=InstanceStatus.BUSY,
         )
         job_provisioning_data = get_job_provisioning_data(dockerized=False)
@@ -156,11 +153,9 @@ class TestProcessRunningJobs:
             repo=repo,
             user=user,
         )
-        pool = await create_pool(session=session, project=project)
         instance = await create_instance(
             session=session,
             project=project,
-            pool=pool,
             status=InstanceStatus.BUSY,
         )
         job_provisioning_data = get_job_provisioning_data(dockerized=False)
@@ -207,11 +202,9 @@ class TestProcessRunningJobs:
             repo=repo,
             user=user,
         )
-        pool = await create_pool(session=session, project=project)
         instance = await create_instance(
             session=session,
             project=project,
-            pool=pool,
             status=InstanceStatus.BUSY,
         )
         job_provisioning_data = get_job_provisioning_data(dockerized=False)
@@ -307,11 +300,9 @@ class TestProcessRunningJobs:
             run_name="test-run",
             run_spec=run_spec,
         )
-        pool = await create_pool(session=session, project=project)
         instance = await create_instance(
             session=session,
             project=project,
-            pool=pool,
             status=InstanceStatus.BUSY,
         )
         job_provisioning_data = get_job_provisioning_data(dockerized=True)
@@ -377,11 +368,9 @@ class TestProcessRunningJobs:
             repo=repo,
             user=user,
         )
-        pool = await create_pool(session=session, project=project)
         instance = await create_instance(
             session=session,
             project=project,
-            pool=pool,
             status=InstanceStatus.BUSY,
         )
         job = await create_job(
@@ -434,11 +423,9 @@ class TestProcessRunningJobs:
             repo=repo,
             user=user,
         )
-        pool = await create_pool(session=session, project=project)
         instance = await create_instance(
             session=session,
             project=project,
-            pool=pool,
             status=InstanceStatus.BUSY,
         )
         job_provisioning_data = get_job_provisioning_data(dockerized=True)
@@ -479,11 +466,9 @@ class TestProcessRunningJobs:
             repo=repo,
             user=user,
         )
-        pool = await create_pool(session, project)
         instance = await create_instance(
             session=session,
             project=project,
-            pool=pool,
             status=InstanceStatus.IDLE,
         )
         job_provisioning_data = get_job_provisioning_data(dockerized=True)
@@ -528,11 +513,9 @@ class TestProcessRunningJobs:
             run_name="test-run",
             run_spec=run_spec,
         )
-        pool = await create_pool(session=session, project=project)
         instance = await create_instance(
             session=session,
             project=project,
-            pool=pool,
             status=InstanceStatus.BUSY,
         )
         job = await create_job(
@@ -655,11 +638,9 @@ class TestProcessRunningJobs:
                 ),
             ),
         )
-        pool = await create_pool(session=session, project=project)
         instance = await create_instance(
             session=session,
             project=project,
-            pool=pool,
             status=InstanceStatus.BUSY,
         )
         job = await create_job(
@@ -762,11 +743,9 @@ class TestProcessRunningJobs:
                 ),
             ),
         )
-        pool = await create_pool(session=session, project=project)
         instance = await create_instance(
             session=session,
             project=project,
-            pool=pool,
             status=InstanceStatus.BUSY,
         )
         job = await create_job(

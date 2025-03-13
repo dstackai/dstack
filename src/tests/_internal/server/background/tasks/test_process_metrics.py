@@ -21,7 +21,6 @@ from dstack._internal.server.testing.common import (
     create_instance,
     create_job,
     create_job_metrics_point,
-    create_pool,
     create_project,
     create_repo,
     create_run,
@@ -45,11 +44,9 @@ class TestCollectMetrics:
             session=session,
             project_id=project.id,
         )
-        pool = await create_pool(session=session, project=project)
         instance = await create_instance(
             session=session,
             project=project,
-            pool=pool,
             status=InstanceStatus.BUSY,
         )
         run = await create_run(

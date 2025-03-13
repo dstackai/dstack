@@ -52,7 +52,6 @@ from dstack._internal.server import settings
 from dstack._internal.server.db import get_db
 from dstack._internal.server.models import (
     JobModel,
-    PoolModel,
     ProjectModel,
     RepoModel,
     RunModel,
@@ -61,6 +60,12 @@ from dstack._internal.server.models import (
 from dstack._internal.server.services import repos as repos_services
 from dstack._internal.server.services import services
 from dstack._internal.server.services.docker import is_valid_docker_volume_target
+from dstack._internal.server.services.instances import (
+    filter_pool_instances,
+    get_instance_offer,
+    get_pool_instances,
+    get_shared_pool_instances_with_offers,
+)
 from dstack._internal.server.services.jobs import (
     check_can_attach_job_volumes,
     delay_job_instance_termination,
@@ -74,13 +79,6 @@ from dstack._internal.server.services.jobs import (
 from dstack._internal.server.services.locking import get_locker, string_to_lock_id
 from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.offers import get_offers_by_requirements
-from dstack._internal.server.services.pools import (
-    filter_pool_instances,
-    get_instance_offer,
-    get_or_create_pool_by_name,
-    get_pool_instances,
-    get_shared_pool_instances_with_offers,
-)
 from dstack._internal.server.services.projects import list_project_models, list_user_project_models
 from dstack._internal.server.services.users import get_user_model_by_name
 from dstack._internal.utils.logging import get_logger
@@ -308,12 +306,9 @@ async def get_plan(
         job_num=0,
     )
 
-    pool = await get_or_create_pool_by_name(
-        session=session, project=project, pool_name=profile.pool_name
-    )
     pool_offers = await _get_pool_offers(
         session=session,
-        pool=pool,
+        project=project,
         run_spec=run_spec,
         job=jobs[0],
         volumes=volumes,
@@ -688,7 +683,7 @@ def run_model_to_run(
 
 async def _get_pool_offers(
     session: AsyncSession,
-    pool: PoolModel,
+    project: ProjectModel,
     run_spec: RunSpec,
     job: Job,
     volumes: List[List[Volume]],
@@ -696,7 +691,8 @@ async def _get_pool_offers(
     pool_offers: list[InstanceOfferWithAvailability] = []
 
     detaching_instances_ids = await get_instances_ids_with_detaching_volumes(session)
-    pool_instances = [i for i in get_pool_instances(pool) if i.id not in detaching_instances_ids]
+    pool_instances = await get_pool_instances(session, project)
+    pool_instances = [i for i in pool_instances if i.id not in detaching_instances_ids]
     multinode = job.job_spec.jobs_per_replica > 1
 
     if not multinode:

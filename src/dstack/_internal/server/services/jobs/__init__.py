@@ -43,6 +43,7 @@ from dstack._internal.server.models import (
 )
 from dstack._internal.server.services import services
 from dstack._internal.server.services import volumes as volumes_services
+from dstack._internal.server.services.instances import get_instance_ssh_private_keys
 from dstack._internal.server.services.jobs.configurators.base import (
     JobConfigurator,
     interpolate_job_volumes,
@@ -51,7 +52,6 @@ from dstack._internal.server.services.jobs.configurators.dev import DevEnvironme
 from dstack._internal.server.services.jobs.configurators.service import ServiceJobConfigurator
 from dstack._internal.server.services.jobs.configurators.task import TaskJobConfigurator
 from dstack._internal.server.services.logging import fmt
-from dstack._internal.server.services.pools import get_instance_ssh_private_keys
 from dstack._internal.server.services.runner import client
 from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
 from dstack._internal.server.services.volumes import (

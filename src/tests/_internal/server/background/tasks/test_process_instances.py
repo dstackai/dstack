@@ -31,7 +31,6 @@ from dstack._internal.server.testing.common import (
     ComputeMockSpec,
     create_instance,
     create_job,
-    create_pool,
     create_project,
     create_repo,
     create_run,
@@ -50,10 +49,10 @@ class TestCheckShim:
         self, test_db, session: AsyncSession
     ):
         project = await create_project(session=session)
-        pool = await create_pool(session, project)
-
         instance = await create_instance(
-            session, project, pool, status=InstanceStatus.PROVISIONING
+            session=session,
+            project=project,
+            status=InstanceStatus.PROVISIONING,
         )
         instance.termination_deadline = get_current_datetime() + dt.timedelta(days=1)
         instance.health_status = "ssh connect problem"
@@ -79,10 +78,10 @@ class TestCheckShim:
         self, test_db, session: AsyncSession
     ):
         project = await create_project(session=session)
-        pool = await create_pool(session, project)
-
         instance = await create_instance(
-            session, project, pool, status=InstanceStatus.PROVISIONING
+            session=session,
+            project=project,
+            status=InstanceStatus.PROVISIONING,
         )
         instance.started_at = get_current_datetime() + dt.timedelta(minutes=-20)
         instance.health_status = "ssh connect problem"
@@ -111,7 +110,6 @@ class TestCheckShim:
     ):
         user = await create_user(session=session)
         project = await create_project(session=session, owner=user)
-        pool = await create_pool(session, project)
         repo = await create_repo(
             session=session,
             project_id=project.id,
@@ -122,9 +120,10 @@ class TestCheckShim:
             repo=repo,
             user=user,
         )
-
         instance = await create_instance(
-            session, project, pool, status=InstanceStatus.PROVISIONING
+            session=session,
+            project=project,
+            status=InstanceStatus.PROVISIONING,
         )
         instance.termination_deadline = get_current_datetime().replace(
             tzinfo=dt.timezone.utc
@@ -159,10 +158,11 @@ class TestCheckShim:
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_check_shim_start_termination_deadline(self, test_db, session: AsyncSession):
         project = await create_project(session=session)
-        pool = await create_pool(session, project)
-
-        instance = await create_instance(session, project, pool, status=InstanceStatus.IDLE)
-
+        instance = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.IDLE,
+        )
         health_status = "SSH connection fail"
         with patch(
             "dstack._internal.server.background.tasks.process_instances._instance_healthcheck"
@@ -184,9 +184,11 @@ class TestCheckShim:
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_check_shim_stop_termination_deadline(self, test_db, session: AsyncSession):
         project = await create_project(session=session)
-        pool = await create_pool(session, project)
-
-        instance = await create_instance(session, project, pool, status=InstanceStatus.IDLE)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.IDLE,
+        )
         instance.termination_deadline = get_current_datetime() + dt.timedelta(minutes=19)
         await session.commit()
 
@@ -207,9 +209,11 @@ class TestCheckShim:
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_check_shim_terminate_instance_by_dedaline(self, test_db, session: AsyncSession):
         project = await create_project(session=session)
-        pool = await create_pool(session, project)
-
-        instance = await create_instance(session, project, pool, status=InstanceStatus.IDLE)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.IDLE,
+        )
         termination_deadline_time = get_current_datetime() + dt.timedelta(minutes=-19)
         instance.termination_deadline = termination_deadline_time
         await session.commit()
@@ -252,7 +256,6 @@ class TestCheckShim:
     ):
         # see https://github.com/dstackai/dstack/issues/2041
         project = await create_project(session=session)
-        pool = await create_pool(session, project)
         if has_job:
             user = await create_user(session=session)
             repo = await create_repo(
@@ -273,9 +276,8 @@ class TestCheckShim:
         else:
             job = None
         instance = await create_instance(
-            session,
-            project,
-            pool,
+            session=session,
+            project=project,
             created_at=get_current_datetime(),
             termination_policy=termination_policy,
             status=InstanceStatus.IDLE,
@@ -303,8 +305,9 @@ class TestTerminateIdleTime:
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_terminate_by_idle_timeout(self, test_db, session: AsyncSession):
         project = await create_project(session=session)
-        pool = await create_pool(session, project)
-        instance = await create_instance(session, project, pool, status=InstanceStatus.IDLE)
+        instance = await create_instance(
+            session=session, project=project, status=InstanceStatus.IDLE
+        )
         instance.termination_idle_time = 300
         instance.termination_policy = TerminationPolicy.DESTROY_AFTER_IDLE
         instance.last_job_processed_at = get_current_datetime() + dt.timedelta(minutes=-19)
@@ -321,11 +324,9 @@ class TestSSHInstanceTerminateProvisionTimeoutExpired:
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_terminate_by_idle_timeout(self, test_db, session: AsyncSession):
         project = await create_project(session=session)
-        pool = await create_pool(session, project)
         instance = await create_instance(
-            session,
-            project,
-            pool,
+            session=session,
+            project=project,
             status=InstanceStatus.PENDING,
             created_at=get_current_datetime() - dt.timedelta(days=100),
         )
@@ -358,10 +359,9 @@ class TestTerminate:
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_terminate(self, test_db, session: AsyncSession):
         project = await create_project(session=session)
-        pool = await create_pool(session, project)
-
-        instance = await create_instance(session, project, pool, status=InstanceStatus.TERMINATING)
-
+        instance = await create_instance(
+            session=session, project=project, status=InstanceStatus.TERMINATING
+        )
         reason = "some reason"
         instance.termination_reason = reason
         instance.last_job_processed_at = get_current_datetime() + dt.timedelta(minutes=-19)
@@ -385,8 +385,9 @@ class TestTerminate:
     @pytest.mark.parametrize("error", [BackendError("err"), RuntimeError("err")])
     async def test_terminate_retry(self, test_db, session: AsyncSession, error: Exception):
         project = await create_project(session=session)
-        pool = await create_pool(session, project)
-        instance = await create_instance(session, project, pool, status=InstanceStatus.TERMINATING)
+        instance = await create_instance(
+            session=session, project=project, status=InstanceStatus.TERMINATING
+        )
         instance.termination_reason = "some reason"
         initial_time = dt.datetime(2025, 1, 1, tzinfo=dt.timezone.utc)
         instance.last_job_processed_at = initial_time
@@ -416,8 +417,9 @@ class TestTerminate:
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_terminate_not_retries_if_too_early(self, test_db, session: AsyncSession):
         project = await create_project(session=session)
-        pool = await create_pool(session, project)
-        instance = await create_instance(session, project, pool, status=InstanceStatus.TERMINATING)
+        instance = await create_instance(
+            session=session, project=project, status=InstanceStatus.TERMINATING
+        )
         instance.termination_reason = "some reason"
         initial_time = dt.datetime(2025, 1, 1, tzinfo=dt.timezone.utc)
         instance.last_job_processed_at = initial_time
@@ -447,8 +449,9 @@ class TestTerminate:
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_terminate_on_termination_deadline(self, test_db, session: AsyncSession):
         project = await create_project(session=session)
-        pool = await create_pool(session, project)
-        instance = await create_instance(session, project, pool, status=InstanceStatus.TERMINATING)
+        instance = await create_instance(
+            session=session, project=project, status=InstanceStatus.TERMINATING
+        )
         instance.termination_reason = "some reason"
         initial_time = dt.datetime(2025, 1, 1, tzinfo=dt.timezone.utc)
         instance.last_job_processed_at = initial_time
@@ -506,11 +509,9 @@ class TestCreateInstance:
         expected_blocks: int,
     ):
         project = await create_project(session=session)
-        pool = await create_pool(session, project)
         instance = await create_instance(
-            session,
-            project,
-            pool,
+            session=session,
+            project=project,
             status=InstanceStatus.PENDING,
             total_blocks=requested_blocks,
             busy_blocks=0,
@@ -613,11 +614,9 @@ class TestAddSSHInstance:
         host_info["cpus"] = cpus
         host_info["gpu_count"] = gpus
         project = await create_project(session=session)
-        pool = await create_pool(session, project)
         instance = await create_instance(
-            session,
-            project,
-            pool,
+            session=session,
+            project=project,
             status=InstanceStatus.PENDING,
             created_at=get_current_datetime(),
             remote_connection_info=get_remote_connection_info(),
