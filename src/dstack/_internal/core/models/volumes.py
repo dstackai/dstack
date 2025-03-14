@@ -86,9 +86,7 @@ class VolumeAttachment(CoreModel):
 class Volume(CoreModel):
     id: uuid.UUID
     name: str
-    # Default user to "" for client backward compatibility (old 0.18 servers).
-    # TODO: Remove in 0.19
-    user: str = ""
+    user: str
     project_name: str
     configuration: VolumeConfiguration
     external: bool

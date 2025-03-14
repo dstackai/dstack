@@ -1,8 +1,7 @@
-from typing import List, Optional
+from typing import List
 
 from pydantic import parse_obj_as
 
-from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.gateways import Gateway, GatewayConfiguration
 from dstack._internal.server.schemas.gateways import (
     CreateGatewayRequest,
@@ -24,22 +23,12 @@ class GatewaysAPIClient(APIClientGroup):
         resp = self._request(f"/api/project/{project_name}/gateways/get", body=body.json())
         return parse_obj_as(Gateway.__response__, resp.json())
 
-    # gateway_name, backend_type, region are left for backward-compatibility with 0.18.x
-    # TODO: Remove in 0.19
     def create(
         self,
         project_name: str,
-        gateway_name: Optional[str] = None,
-        backend_type: Optional[BackendType] = None,
-        region: Optional[str] = None,
-        configuration: Optional[GatewayConfiguration] = None,
+        configuration: GatewayConfiguration,
     ) -> Gateway:
-        body = CreateGatewayRequest(
-            name=gateway_name,
-            backend_type=backend_type,
-            region=region,
-            configuration=configuration,
-        )
+        body = CreateGatewayRequest(configuration=configuration)
         resp = self._request(f"/api/project/{project_name}/gateways/create", body=body.json())
         return parse_obj_as(Gateway.__response__, resp.json())
 

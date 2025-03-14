@@ -270,8 +270,7 @@ class FleetSpec(CoreModel):
 
 
 class Fleet(CoreModel):
-    # id is Optional for backward compatibility within 0.18.x
-    id: Optional[uuid.UUID] = None
+    id: uuid.UUID
     name: str
     project_name: str
     spec: FleetSpec

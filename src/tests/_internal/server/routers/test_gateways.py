@@ -175,7 +175,14 @@ class TestCreateGateway:
         backend = await create_backend(session, project.id, backend_type=BackendType.AWS)
         response = await client.post(
             f"/api/project/{project.name}/gateways/create",
-            json={"name": "test", "backend_type": "aws", "region": "us"},
+            json={
+                "configuration": {
+                    "type": "gateway",
+                    "name": "test",
+                    "backend": "aws",
+                    "region": "us",
+                },
+            },
             headers=get_auth_headers(user.token),
         )
         assert response.status_code == 200
@@ -218,7 +225,14 @@ class TestCreateGateway:
             g.return_value = "random-name"
             response = await client.post(
                 f"/api/project/{project.name}/gateways/create",
-                json={"name": None, "backend_type": "aws", "region": "us"},
+                json={
+                    "configuration": {
+                        "type": "gateway",
+                        "name": None,
+                        "backend": "aws",
+                        "region": "us",
+                    },
+                },
                 headers=get_auth_headers(user.token),
             )
             g.assert_called_once()
@@ -259,7 +273,14 @@ class TestCreateGateway:
         )
         response = await client.post(
             f"/api/project/{project.name}/gateways/create",
-            json={"name": "test", "backend_type": "aws", "region": "us"},
+            json={
+                "configuration": {
+                    "type": "gateway",
+                    "name": "test",
+                    "backend": "aws",
+                    "region": "us",
+                },
+            },
             headers=get_auth_headers(user.token),
         )
         assert response.status_code == 400
