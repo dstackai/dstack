@@ -455,7 +455,7 @@ class RunCollection:
         Args:
             run_plan: Result of `get_run_plan` call.
             repo: Repo to use for the run.
-            reserve_ports: Reserve local ports before submit.
+            reserve_ports: Reserve local ports before applying. Use if you'll attach to the run.
 
         Returns:
             Submitted run.
@@ -491,6 +491,7 @@ class RunCollection:
             repo (Union[LocalRepo, RemoteRepo, VirtualRepo]): The repo to mount to the run.
             profile: The profile to use for the run.
             configuration_path: The path to the configuration file. Omit if the configuration is not loaded from a file.
+            reserve_ports: Reserve local ports before applying. Use if you'll attach to the run.
 
         Returns:
             Submitted run.
