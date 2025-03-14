@@ -6,7 +6,7 @@ from dstack._internal.core.models.configurations import AnyRunConfiguration
 from dstack._internal.core.models.profiles import (
     CreationPolicy,
     Profile,
-    ProfileRetryPolicy,
+    ProfileRetry,
     SpotPolicy,
     TerminationPolicy,
     parse_duration,
@@ -120,10 +120,8 @@ def register_profile_args(parser: argparse.ArgumentParser):
 
     retry_group = parser.add_argument_group("Retry policy")
     retry_group_exc = retry_group.add_mutually_exclusive_group()
-    retry_group_exc.add_argument("--retry", action="store_const", dest="retry_policy", const=True)
-    retry_group_exc.add_argument(
-        "--no-retry", action="store_const", dest="retry_policy", const=False
-    )
+    retry_group_exc.add_argument("--retry", action="store_const", dest="retry", const=True)
+    retry_group_exc.add_argument("--no-retry", action="store_const", dest="retry", const=False)
     retry_group_exc.add_argument(
         "--retry-duration", type=retry_duration, dest="retry_duration", metavar="DURATION"
     )
@@ -161,15 +159,12 @@ def apply_profile_args(
     if args.spot_policy is not None:
         profile_settings.spot_policy = args.spot_policy
 
-    if args.retry_policy is not None:
-        if not profile_settings.retry_policy:
-            profile_settings.retry_policy = ProfileRetryPolicy()
-        profile_settings.retry_policy.retry = args.retry_policy
+    if args.retry is not None:
+        profile_settings.retry = args.retry
     elif args.retry_duration is not None:
-        if not profile_settings.retry_policy:
-            profile_settings.retry_policy = ProfileRetryPolicy()
-        profile_settings.retry_policy.retry = True
-        profile_settings.retry_policy.duration = args.retry_duration
+        profile_settings.retry = ProfileRetry(
+            duration=args.retry_duration,
+        )
 
 
 def max_duration(v: str) -> int:
