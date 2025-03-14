@@ -34,7 +34,7 @@ def get_gateways_table(
     for gateway in gateways:
         row = {
             "NAME": gateway.name,
-            "BACKEND": f"{gateway.backend.value} ({gateway.region})",
+            "BACKEND": f"{gateway.configuration.backend.value} ({gateway.configuration.region})",
             "HOSTNAME": gateway.hostname,
             "DOMAIN": gateway.wildcard_domain,
             "DEFAULT": "✓" if gateway.default else "",

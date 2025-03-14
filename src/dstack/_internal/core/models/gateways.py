@@ -76,12 +76,12 @@ class Gateway(CoreModel):
     # The ip address of the gateway instance
     ip_address: Optional[str]
     instance_id: Optional[str]
+    wildcard_domain: Optional[str]
+    default: bool
     # TODO: configuration fields are duplicated on top-level for backward compatibility with 0.18.x
-    # Remove in 0.19
+    # Remove after 0.19
     backend: BackendType
     region: str
-    default: bool
-    wildcard_domain: Optional[str]
 
 
 class GatewayPlan(CoreModel):

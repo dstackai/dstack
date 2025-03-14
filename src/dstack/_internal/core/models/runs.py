@@ -457,9 +457,7 @@ class RunPlan(CoreModel):
     run_spec: RunSpec
     job_plans: List[JobPlan]
     current_resource: Optional[Run] = None
-    # Optional for backward-compatibility with 0.18.x servers
-    # TODO: make required in 0.19
-    action: Optional[ApplyAction] = None
+    action: ApplyAction
 
 
 class ApplyRunPlanInput(CoreModel):

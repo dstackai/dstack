@@ -13,6 +13,10 @@ from dstack._internal.cli.utils.common import (
 )
 from dstack._internal.cli.utils.gateway import get_gateways_table, print_gateways_table
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.gateways import GatewayConfiguration
+from dstack._internal.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class GatewayCommand(APIBaseCommand):
@@ -41,7 +45,9 @@ class GatewayCommand(APIBaseCommand):
             )
 
         create_parser = subparsers.add_parser(
-            "create", help="Add a gateway", formatter_class=self._parser.formatter_class
+            "create",
+            help="Add a gateway. Deprecated in favor of `dstack apply` with gateway configuration.",
+            formatter_class=self._parser.formatter_class,
         )
         create_parser.set_defaults(subfunc=self._create)
         create_parser.add_argument(
@@ -100,10 +106,16 @@ class GatewayCommand(APIBaseCommand):
             pass
 
     def _create(self, args: argparse.Namespace):
+        logger.warning(
+            "`dstack gateway create` is deperecated in favor of `dstack apply` with gateway configurations."
+        )
         with console.status("Creating gateway..."):
-            gateway = self.api.client.gateways.create(
-                self.api.project, args.name, BackendType(args.backend), args.region
+            configuration = GatewayConfiguration(
+                name=args.name,
+                backend=BackendType(args.backend),
+                region=args.region,
             )
+            gateway = self.api.client.gateways.create(self.api.project, configuration)
             if args.set_default:
                 self.api.client.gateways.set_default(self.api.project, gateway.name)
             if args.domain:
