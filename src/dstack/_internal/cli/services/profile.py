@@ -8,7 +8,6 @@ from dstack._internal.core.models.profiles import (
     Profile,
     ProfileRetry,
     SpotPolicy,
-    TerminationPolicy,
     parse_duration,
     parse_max_duration,
 )
@@ -149,10 +148,9 @@ def apply_profile_args(
         profile_settings.max_duration = args.max_duration
 
     if args.idle_duration is not None:
-        profile_settings.termination_idle_time = args.idle_duration
-
-    if args.dont_destroy:
-        profile_settings.termination_policy = TerminationPolicy.DONT_DESTROY
+        profile_settings.idle_duration = args.idle_duration
+    elif args.dont_destroy:
+        profile_settings.idle_duration = False
     if args.creation_policy_reuse:
         profile_settings.creation_policy = CreationPolicy.REUSE
 
