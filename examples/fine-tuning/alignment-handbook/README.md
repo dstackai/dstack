@@ -150,7 +150,7 @@ Here's how the multi-node task is different from the single-node one:
 
 ## Fleets
 
-> By default, `dstack run` reuses `idle` instances from one of the existing [fleets](https://dstack.ai/docs/fleets). 
+> By default, `dstack apply` reuses `idle` instances from one of the existing [fleets](https://dstack.ai/docs/fleets). 
 If no `idle` instances meet the requirements, it creates a new fleet using one of the configured backends.
 
 The example folder includes two cloud fleet configurations: [`examples/fine-tuning/alignment-handbook/fleet.dstack.yml`](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/alignment-handbook/fleet.dstack.yml) (a single node with a `24GB` GPU),

@@ -49,7 +49,7 @@ DSTACK_LOCAL_BACKEND_ENABLED= dstack server --log-level=debug
 The `local` backend will submit the run to the locally started shim and runner. The CLI will attach to the container just as if it were any other cloud backend:
 
 ```shell
-✗ dstack run .                   
+✗ dstack apply .                   
  Configuration          .dstack.yml        
  Project                main               
  User                   admin              
