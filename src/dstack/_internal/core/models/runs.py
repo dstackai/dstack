@@ -312,7 +312,7 @@ class RunSpec(CoreModel):
     run_name: Annotated[
         Optional[str],
         Field(description="The run name. If not set, the run name is generated automatically."),
-    ]
+    ] = None
     repo_id: Annotated[
         Optional[str],
         Field(
@@ -322,15 +322,18 @@ class RunSpec(CoreModel):
                 " If not specified, a default virtual repo is used."
             )
         ),
-    ]
+    ] = None
     repo_data: Annotated[
         Optional[AnyRunRepoData],
         Field(
             discriminator="repo_type",
             description="The repo data such as the current branch and commit.",
         ),
-    ]
-    repo_code_hash: Annotated[Optional[str], Field(description="The hash of the repo diff")]
+    ] = None
+    repo_code_hash: Annotated[
+        Optional[str],
+        Field(description="The hash of the repo diff. Can be omitted if there is no repo diff."),
+    ] = None
     working_dir: Annotated[
         Optional[str],
         Field(
@@ -340,7 +343,7 @@ class RunSpec(CoreModel):
                 ' Defaults to `"."`.'
             )
         ),
-    ]
+    ] = None
     configuration_path: Annotated[
         Optional[str],
         Field(
@@ -349,9 +352,9 @@ class RunSpec(CoreModel):
                 " It can be omitted when using the programmatic API."
             )
         ),
-    ]
+    ] = None
     configuration: Annotated[AnyRunConfiguration, Field(discriminator="type")]
-    profile: Annotated[Optional[Profile], Field(description="The profile parameters")]
+    profile: Annotated[Optional[Profile], Field(description="The profile parameters")] = None
     ssh_key_pub: Annotated[
         str,
         Field(

@@ -126,23 +126,6 @@ async def apply_plan(
     )
 
 
-# apply_plan replaces submit_run since it can create new runs.
-# submit_run can be deprecated in the future.
-@project_router.post("/submit")
-async def submit_run(
-    body: SubmitRunRequest,
-    session: AsyncSession = Depends(get_session),
-    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
-) -> Run:
-    user, project = user_project
-    return await runs.submit_run(
-        session=session,
-        user=user,
-        project=project,
-        run_spec=body.run_spec,
-    )
-
-
 @project_router.post("/stop")
 async def stop_runs(
     body: StopRunsRequest,
@@ -172,3 +155,19 @@ async def delete_runs(
     """
     _, project = user_project
     await runs.delete_runs(session=session, project=project, runs_names=body.runs_names)
+
+
+# apply_plan replaces submit_run since it can create new runs.
+@project_router.post("/submit", deprecated=True)
+async def submit_run(
+    body: SubmitRunRequest,
+    session: AsyncSession = Depends(get_session),
+    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
+) -> Run:
+    user, project = user_project
+    return await runs.submit_run(
+        session=session,
+        user=user,
+        project=project,
+        run_spec=body.run_spec,
+    )

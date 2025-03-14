@@ -47,10 +47,11 @@ DSTACK_VENV_PYTHON_BINARY_PATH = f"{DSTACK_VENV_PATH}/bin/python"
 def pipeline(...):
     ...
     @task.external_python(task_id="external_python", python=DSTACK_VENV_PYTHON_BINARY_PATH)
-    def dstack_api_submit_venv() -> str:
+    def dstack_api_submit_venv():
         from dstack.api import Client, Task
 
         task = Task(
+            name="my-airflow-task",
             commands=[
                 "echo 'Running dstack task via Airflow'",
                 "sleep 10",
@@ -61,8 +62,7 @@ def pipeline(...):
         # or set explicitly from Ariflow Variables.
         client = Client.from_config()
 
-        run = client.runs.submit(
-            run_name="my-airflow-task",
+        run = client.runs.apply_configuration(
             configuration=task,
         )
         run.attach()

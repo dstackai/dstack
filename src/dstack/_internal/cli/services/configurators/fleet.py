@@ -3,7 +3,6 @@ import time
 from pathlib import Path
 from typing import List, Optional
 
-import requests
 from rich.table import Table
 
 from dstack._internal.cli.services.configurators.base import (
@@ -32,7 +31,6 @@ from dstack._internal.core.models.repos.base import Repo
 from dstack._internal.utils.common import local_time
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.ssh import convert_ssh_key_to_pem, generate_public_key, pkey_from_str
-from dstack.api._public import Client
 from dstack.api.utils import load_profile
 
 logger = get_logger(__name__)
@@ -60,7 +58,10 @@ class FleetConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
         _preprocess_spec(spec)
 
         with console.status("Getting apply plan..."):
-            plan = _get_plan(api=self.api, spec=spec)
+            plan = self.api.client.fleets.get_plan(
+                project_name=self.api.project,
+                spec=spec,
+            )
         _print_plan_header(plan)
 
         action_message = ""
@@ -232,42 +233,6 @@ def _resolve_ssh_key(ssh_key_path: Optional[str]) -> Optional[SSHKey]:
         logger.debug("Key type is not supported", repr(e))
         console.print("[error]Key type is not supported[/]")
         exit()
-
-
-def _get_plan(api: Client, spec: FleetSpec) -> FleetPlan:
-    try:
-        return api.client.fleets.get_plan(
-            project_name=api.project,
-            spec=spec,
-        )
-    except requests.exceptions.HTTPError as e:
-        # Handle older server versions that do not have /get_plan for fleets
-        # TODO: Can be removed in 0.19
-        if e.response.status_code == 405:
-            logger.warning(
-                "Fleet apply plan is not fully supported before 0.18.17. "
-                "Update the server to view full-featured apply plan."
-            )
-            user = api.client.users.get_my_user()
-            spec.configuration_path = None
-            current_resource = None
-            if spec.configuration.name is not None:
-                try:
-                    current_resource = api.client.fleets.get(
-                        project_name=api.project, name=spec.configuration.name
-                    )
-                except ResourceNotExistsError:
-                    pass
-            return FleetPlan(
-                project_name=api.project,
-                user=user.username,
-                spec=spec,
-                current_resource=current_resource,
-                offers=[],
-                total_offers=0,
-                max_offer_price=0,
-            )
-        raise e
 
 
 def _print_plan_header(plan: FleetPlan):

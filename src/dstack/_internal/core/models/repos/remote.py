@@ -84,7 +84,7 @@ class RemoteRepo(Repo):
     Finally, you can pass the repo object to the run:
 
     ```python
-    run = client.runs.submit(
+    run = client.runs.apply_configuration(
         configuration=...,
         repo=repo,
     )
@@ -100,10 +100,10 @@ class RemoteRepo(Repo):
         Creates an instance of a remote repo from a local path.
 
         Args:
-            repo_dir: The path to a local folder
+            repo_dir: The path to a local folder.
 
         Returns:
-            A remote repo instance
+            A remote repo instance.
         """
         return RemoteRepo(local_repo_dir=repo_dir)
 
@@ -115,12 +115,12 @@ class RemoteRepo(Repo):
         Creates an instance of a remote repo from a URL.
 
         Args:
-            repo_url: The URL of a remote Git repo
+            repo_url: The URL of a remote Git repo.
             repo_branch: The name of the remote branch. Must be specified if `hash` is not specified.
             repo_hash: The hash of the revision. Must be specified if `branch` is not specified.
 
         Returns:
-            A remote repo instance
+            A remote repo instance.
         """
         if repo_branch is None and repo_hash is None:
             raise ValueError("Either `repo_branch` or `repo_hash` must be specified.")

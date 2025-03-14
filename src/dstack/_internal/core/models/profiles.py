@@ -154,13 +154,13 @@ class ProfileParams(CoreModel):
     backends: Annotated[
         Optional[List[BackendType]],
         Field(description="The backends to consider for provisioning (e.g., `[aws, gcp]`)"),
-    ]
+    ] = None
     regions: Annotated[
         Optional[List[str]],
         Field(
             description="The regions to consider for provisioning (e.g., `[eu-west-1, us-west4, westeurope]`)"
         ),
-    ]
+    ] = None
     availability_zones: Annotated[
         Optional[List[str]],
         Field(
@@ -172,7 +172,7 @@ class ProfileParams(CoreModel):
         Field(
             description="The cloud-specific instance types to consider for provisioning (e.g., `[p3.8xlarge, n1-standard-4]`)"
         ),
-    ]
+    ] = None
     reservation: Annotated[
         Optional[str],
         Field(
@@ -181,17 +181,17 @@ class ProfileParams(CoreModel):
                 " Supports AWS Capacity Reservations and Capacity Blocks"
             )
         ),
-    ]
+    ] = None
     spot_policy: Annotated[
         Optional[SpotPolicy],
         Field(
             description="The policy for provisioning spot or on-demand instances: `spot`, `on-demand`, or `auto`. Defaults to `on-demand`"
         ),
-    ]
+    ] = None
     retry: Annotated[
         Optional[Union[ProfileRetry, bool]],
         Field(description="The policy for resubmitting the run. Defaults to `false`"),
-    ]
+    ] = None
     max_duration: Annotated[
         Optional[Union[Literal["off"], str, int, bool]],
         Field(
@@ -201,7 +201,7 @@ class ProfileParams(CoreModel):
                 " Use `off` for unlimited duration. Defaults to `off`"
             )
         ),
-    ]
+    ] = None
     stop_duration: Annotated[
         Optional[Union[Literal["off"], str, int, bool]],
         Field(
@@ -212,17 +212,17 @@ class ProfileParams(CoreModel):
                 " Use `off` for unlimited duration. Defaults to `5m`"
             )
         ),
-    ]
+    ] = None
     max_price: Annotated[
         Optional[float],
         Field(description="The maximum instance price per hour, in dollars", gt=0.0),
-    ]
+    ] = None
     creation_policy: Annotated[
         Optional[CreationPolicy],
         Field(
             description="The policy for using instances from fleets. Defaults to `reuse-or-create`"
         ),
-    ]
+    ] = None
     idle_duration: Annotated[
         Optional[Union[Literal["off"], str, int, bool]],
         Field(
@@ -231,26 +231,26 @@ class ProfileParams(CoreModel):
                 " Defaults to `5m` for runs and `3d` for fleets. Use `off` for unlimited duration"
             )
         ),
-    ]
+    ] = None
     utilization_policy: Annotated[
         Optional[UtilizationPolicy],
         Field(description="Run termination policy based on utilization"),
-    ]
+    ] = None
     # Deprecated:
     termination_policy: Annotated[
         Optional[TerminationPolicy],
         Field(
             description="Deprecated in favor of `idle_duration`",
         ),
-    ]
+    ] = None
     termination_idle_time: Annotated[
         Optional[Union[str, int]],
         Field(
             description="Deprecated in favor of `idle_duration`",
         ),
-    ]
+    ] = None
     # The policy for resubmitting the run. Deprecated in favor of `retry`
-    retry_policy: Optional[ProfileRetryPolicy]
+    retry_policy: Optional[ProfileRetryPolicy] = None
 
     _validate_max_duration = validator("max_duration", pre=True, allow_reuse=True)(
         parse_max_duration

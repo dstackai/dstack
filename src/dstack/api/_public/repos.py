@@ -55,7 +55,7 @@ class RepoCollection:
         Once the repo is initialized, you can pass the repo object to the run:
 
         ```python
-        run = client.runs.submit(
+        run = client.runs.apply_configuration(
             configuration=...,
             repo=repo,
         )
@@ -78,25 +78,6 @@ class RepoCollection:
                 raise ConfigurationError(*e.args)
         self._api_client.repos.init(self._project, repo.repo_id, repo.get_repo_info(), creds)
 
-    def is_initialized(
-        self,
-        repo: Repo,
-    ) -> bool:
-        # """
-        # Checks if the remote repo is initialized in the project
-        #
-        # Args:
-        #     repo: repo to check
-        #
-        # Returns:
-        #     repo is initialized
-        # """
-        try:
-            self._api_client.repos.get(self._project, repo.repo_id, include_creds=False)
-            return True
-        except ResourceNotExistsError:
-            return False
-
     def load(
         self,
         repo_dir: PathLike,
@@ -105,22 +86,22 @@ class RepoCollection:
         git_identity_file: Optional[PathLike] = None,
         oauth_token: Optional[str] = None,
     ) -> Union[RemoteRepo, LocalRepo]:
-        # """
-        # Loads the repo from the local directory using global config
-        #
-        # Args:
-        #     repo_dir: repo root directory
-        #     local: do not try to load `RemoteRepo` first
-        #     init: initialize the repo if it's not initialized
-        #     git_identity_file: path to an SSH private key to access the remote repo
-        #     oauth_token: GitHub OAuth token to access the remote repo
-        #
-        # Raises:
-        #     ConfigurationError: if the repo is not initialized and `init` is `False`
-        #
-        # Returns:
-        #     repo: initialized repo
-        # """
+        """
+        Loads the repo from the local directory using global config
+
+        Args:
+            repo_dir: Repo root directory.
+            local: Do not try to load `RemoteRepo` first.
+            init: Initialize the repo if it's not initialized.
+            git_identity_file: Path to an SSH private key to access the remote repo.
+            oauth_token: GitHub OAuth token to access the remote repo.
+
+        Raises:
+            ConfigurationError: If the repo is not initialized and `init` is `False`.
+
+        Returns:
+            repo: Initialized repo.
+        """
         config = ConfigManager()
         if not init:
             logger.debug("Loading repo config")
@@ -154,6 +135,25 @@ class RepoCollection:
                 get_ssh_keypair(None, config.dstack_key_path),
             )
         return repo
+
+    def is_initialized(
+        self,
+        repo: Repo,
+    ) -> bool:
+        """
+        Checks if the remote repo is initialized in the project
+
+        Args:
+            repo: The repo to check.
+
+        Returns:
+            Whether the repo is initialized or not.
+        """
+        try:
+            self._api_client.repos.get(self._project, repo.repo_id, include_creds=False)
+            return True
+        except ResourceNotExistsError:
+            return False
 
 
 def get_ssh_keypair(key_path: Optional[PathLike], dstack_key_path: Path) -> str:

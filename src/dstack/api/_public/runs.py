@@ -16,7 +16,6 @@ import dstack.api as api
 from dstack._internal.core.consts import DSTACK_RUNNER_HTTP_PORT, DSTACK_RUNNER_SSH_PORT
 from dstack._internal.core.errors import ClientError, ConfigurationError, ResourceNotExistsError
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.common import ApplyAction
 from dstack._internal.core.models.configurations import AnyRunConfiguration, PortMapping
 from dstack._internal.core.models.profiles import (
     CreationPolicy,
@@ -27,6 +26,7 @@ from dstack._internal.core.models.profiles import (
     UtilizationPolicy,
 )
 from dstack._internal.core.models.repos.base import Repo
+from dstack._internal.core.models.repos.virtual import VirtualRepo
 from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import (
     Job,
@@ -188,14 +188,14 @@ class Run(ABC):
         job_num: int = 0,
     ) -> Iterable[bytes]:
         """
-        Iterate through run's log messages
+        Iterate through run's log messages.
 
         Args:
-            start_time: minimal log timestamp
-            diagnose: return runner logs if `True`
+            start_time: Minimal log timestamp.
+            diagnose: Return runner logs if `True`.
 
         Yields:
-            log messages
+            Log messages.
         """
         if diagnose is False and self._ssh_attach is not None:
             yield from self._attached_logs()
@@ -225,17 +225,17 @@ class Run(ABC):
 
     def refresh(self):
         """
-        Get up-to-date run info
+        Get up-to-date run info.
         """
         self._run = self._api_client.runs.get(self._project, self._run.run_spec.run_name)
         logger.debug("Refreshed run %s: %s", self.name, self.status)
 
     def stop(self, abort: bool = False):
         """
-        Terminate the instance and detach
+        Terminate the instance and detach.
 
         Args:
-            abort: gracefully stop the run if `False`
+            abort: Gracefully stop the run if `False`.
         """
         self._api_client.runs.stop(self._project, [self.name], abort)
         logger.debug("%s run %s", "Aborted" if abort else "Stopped", self.name)
@@ -253,7 +253,7 @@ class Run(ABC):
         Establish an SSH tunnel to the instance and update SSH config
 
         Args:
-            ssh_identity_file: SSH keypair to access instances
+            ssh_identity_file: SSH keypair to access instances.
 
         Raises:
             dstack.api.PortUsedError: If ports are in use or the run is attached by another process.
@@ -390,7 +390,7 @@ class ServiceModel:
 
 class RunCollection:
     """
-    Operations with runs
+    Operations with runs.
     """
 
     def __init__(
@@ -402,6 +402,122 @@ class RunCollection:
         self._api_client = api_client
         self._project = project
         self._client = client
+
+    def get_run_plan(
+        self,
+        configuration: AnyRunConfiguration,
+        repo: Optional[Repo] = None,
+        profile: Optional[Profile] = None,
+        configuration_path: Optional[str] = None,
+    ) -> RunPlan:
+        """
+        Get a run plan.
+        Use this method to see the run plan before applying the cofiguration.
+
+        Args:
+            configuration (Union[Task, Service, DevEnvironment]): The run configuration.
+            repo (Union[LocalRepo, RemoteRepo, VirtualRepo, None]):
+                The repo to use for the run. Pass `None` if repo is not needed.
+            profile: The profile to use for the run.
+            configuration_path: The path to the configuration file. Omit if the configuration is not loaded from a file.
+
+        Returns:
+            Run plan.
+        """
+        if repo is None:
+            repo = VirtualRepo()
+
+        run_spec = RunSpec(
+            run_name=configuration.name,
+            repo_id=repo.repo_id,
+            repo_data=repo.run_repo_data,
+            repo_code_hash=None,  # `apply_plan` will fill it
+            working_dir=configuration.working_dir,
+            configuration_path=configuration_path,
+            configuration=configuration,
+            profile=profile,
+            ssh_key_pub=Path(self._client.ssh_identity_file + ".pub").read_text().strip(),
+        )
+        logger.debug("Getting run plan")
+        run_plan = self._api_client.runs.get_plan(self._project, run_spec)
+        return run_plan
+
+    def apply_plan(
+        self,
+        run_plan: RunPlan,
+        repo: Optional[Repo] = None,
+        reserve_ports: bool = True,
+    ) -> Run:
+        """
+        Apply the run plan.
+        Use this method to apply run plans returned by `get_run_plan`.
+
+        Args:
+            run_plan: The result of `get_run_plan` call.
+            repo (Union[LocalRepo, RemoteRepo, VirtualRepo, None]):
+                The repo to use for the run. Should be the same repo that is passed to `get_run_plan`.
+            reserve_ports: Reserve local ports before applying. Use if you'll attach to the run.
+
+        Returns:
+            Submitted run.
+        """
+        ports_lock = None
+        if reserve_ports:
+            # TODO handle multiple jobs
+            ports_lock = _reserve_ports(run_plan.job_plans[0].job_spec)
+
+        if repo is None:
+            repo = VirtualRepo()
+        else:
+            # Do not upload the diff without a repo (a default virtual repo)
+            # since upload_code() requires a repo to be initialized.
+            with tempfile.TemporaryFile("w+b") as fp:
+                run_plan.run_spec.repo_code_hash = repo.write_code_file(fp)
+                fp.seek(0)
+                self._api_client.repos.upload_code(
+                    project_name=self._project,
+                    repo_id=repo.repo_id,
+                    code_hash=run_plan.run_spec.repo_code_hash,
+                    fp=fp,
+                )
+        run = self._api_client.runs.apply_plan(self._project, run_plan)
+        return self._model_to_submitted_run(run, ports_lock)
+
+    def apply_configuration(
+        self,
+        configuration: AnyRunConfiguration,
+        repo: Optional[Repo] = None,
+        profile: Optional[Profile] = None,
+        configuration_path: Optional[str] = None,
+        reserve_ports: bool = True,
+    ) -> Run:
+        """
+        Apply the run configuration.
+        Use this method to apply configurations without getting a run plan first.
+
+        Args:
+            configuration (Union[Task, Service, DevEnvironment]): The run configuration.
+            repo (Union[LocalRepo, RemoteRepo, VirtualRepo, None]):
+                The repo to use for the run. Pass `None` if repo is not needed.
+            profile: The profile to use for the run.
+            configuration_path: The path to the configuration file. Omit if the configuration is not loaded from a file.
+            reserve_ports: Reserve local ports before applying. Use if you'll attach to the run.
+
+        Returns:
+            Submitted run.
+        """
+        run_plan = self.get_run_plan(
+            configuration=configuration,
+            repo=repo,
+            profile=profile,
+            configuration_path=configuration_path,
+        )
+        run = self.apply_plan(
+            run_plan=run_plan,
+            repo=repo,
+            reserve_ports=reserve_ports,
+        )
+        return run
 
     def submit(
         self,
@@ -420,31 +536,30 @@ class RunCollection:
         run_name: Optional[str] = None,
         reserve_ports: bool = True,
     ) -> Run:
-        """
-        Submit a run
+        # """
+        # Submit a run
 
-        Args:
-            configuration (Union[Task, Service]): A run configuration.
-            configuration_path: The path to the configuration file, relative to the root directory of the repo.
-            repo (Union[LocalRepo, RemoteRepo, VirtualRepo]): A repo to mount to the run.
-            backends: A list of allowed backend for provisioning.
-            regions: A list of cloud regions for provisioning.
-            resources: The requirements to run the configuration. Overrides the configuration's resources.
-            spot_policy: A spot policy for provisioning.
-            retry_policy (RetryPolicy): A retry policy.
-            max_duration: The max instance running duration in seconds.
-            max_price: The max instance price in dollars per hour for provisioning.
-            working_dir: A working directory relative to the repo root directory
-            run_name: A desired name of the run. Must be unique in the project. If not specified, a random name is assigned.
-            reserve_ports: Whether local ports should be reserved in advance.
+        # Args:
+        #     configuration (Union[Task, Service]): A run configuration.
+        #     configuration_path: The path to the configuration file, relative to the root directory of the repo.
+        #     repo (Union[LocalRepo, RemoteRepo, VirtualRepo]): A repo to mount to the run.
+        #     backends: A list of allowed backend for provisioning.
+        #     regions: A list of cloud regions for provisioning.
+        #     resources: The requirements to run the configuration. Overrides the configuration's resources.
+        #     spot_policy: A spot policy for provisioning.
+        #     retry_policy (RetryPolicy): A retry policy.
+        #     max_duration: The max instance running duration in seconds.
+        #     max_price: The max instance price in dollars per hour for provisioning.
+        #     working_dir: A working directory relative to the repo root directory
+        #     run_name: A desired name of the run. Must be unique in the project. If not specified, a random name is assigned.
+        #     reserve_ports: Whether local ports should be reserved in advance.
 
-        Returns:
-            submitted run
-        """
+        # Returns:
+        #     Submitted run.
+        # """
+        logger.warning("The submit() method is deprecated in favor of apply_configuration().")
         if repo is None:
-            repo = configuration.get_repo()
-            if repo is None:
-                raise ConfigurationError("Repo is required for this type of configuration")
+            repo = VirtualRepo()
             # TODO: Add Git credentials to RemoteRepo and if they are set, pass them here to RepoCollection.init
             self._client.repos.init(repo)
 
@@ -465,7 +580,7 @@ class RunCollection:
         )
         return self.exec_plan(run_plan, repo, reserve_ports=reserve_ports)
 
-    # TODO: [Andrey] I guess we need to drop profile-related fields (currently retry is not reflected there)
+    # Deprecated in favor of get_run_plan()
     def get_plan(
         self,
         configuration: AnyRunConfiguration,
@@ -497,11 +612,9 @@ class RunCollection:
         # Returns:
         #     run plan
         # """
-
+        logger.warning("The get_plan() method is deprecated in favor of get_run_plan().")
         if repo is None:
-            repo = configuration.get_repo()
-            if repo is None:
-                raise ConfigurationError("Repo is required for this type of configuration")
+            repo = VirtualRepo()
 
         if working_dir is None:
             working_dir = "."
@@ -566,45 +679,28 @@ class RunCollection:
         reserve_ports: bool = True,
     ) -> Run:
         # """
-        # Execute run plan
-        #
-        # Args:
-        #     run_plan: result of `get_plan` call
-        #     repo: repo to use for the run
-        #     reserve_ports: reserve local ports before submit
-        #
-        # Returns:
-        #     submitted run
-        # """
-        ports_lock = None
-        if reserve_ports:
-            # TODO handle multiple jobs
-            ports_lock = _reserve_ports(run_plan.job_plans[0].job_spec)
+        # Execute the run plan.
 
-        with tempfile.TemporaryFile("w+b") as fp:
-            run_plan.run_spec.repo_code_hash = repo.write_code_file(fp)
-            fp.seek(0)
-            self._api_client.repos.upload_code(
-                self._project, repo.repo_id, run_plan.run_spec.repo_code_hash, fp
-            )
-        # Calling submit when action is CREATE since apply_plan is not backward-compatible.
-        # Otherwise, apply_plan can replace submit, i.e. it creates the run if it does not exist.
-        # TODO: Remove in 0.19
-        if run_plan.action == ApplyAction.UPDATE:
-            run = self._api_client.runs.apply_plan(self._project, run_plan)
-        else:
-            run = self._api_client.runs.submit(self._project, run_plan.run_spec)
-        return self._model_to_submitted_run(run, ports_lock)
+        # Args:
+        #     run_plan: Result of `get_run_plan` call.
+        #     repo: Repo to use for the run.
+        #     reserve_ports: Reserve local ports before submit.
+
+        # Returns:
+        #     Submitted run.
+        # """
+        logger.warning("The exec_plan() method is deprecated in favor of apply_plan().")
+        return self.apply_plan(run_plan=run_plan, repo=repo, reserve_ports=reserve_ports)
 
     def list(self, all: bool = False) -> List[Run]:
         """
-        List runs
+        List runs.
 
         Args:
-            all: show all runs (active and finished) if `True`
+            all: Show all runs (active and finished) if `True`.
 
         Returns:
-            list of runs
+            List of runs.
         """
         # Return only one page of latest runs (<=100). Returning all the pages may be costly.
         # TODO: Consider introducing `since` filter with a reasonable default.
@@ -623,13 +719,13 @@ class RunCollection:
 
     def get(self, run_name: str) -> Optional[Run]:
         """
-        Get run by run name
+        Get run by run name.
 
         Args:
-            run_name: run name
+            run_name: Run name.
 
         Returns:
-            The run or `None` if not found
+            The run or `None` if not found.
         """
         try:
             run = self._api_client.runs.get(self._project, run_name)
