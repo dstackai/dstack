@@ -8,7 +8,7 @@ Profiles can be defined on the repository level (via the `.dstack/profiles.yml` 
 repository) or on the global level (via the `~/.dstack/profiles.yml` file).
 
 Any profile can be marked as default so that it will be applied automatically for any run. Otherwise, you can refer to a specific profile
-via `--profile NAME` in `dstack run`.
+via `--profile NAME` in `dstack apply`.
 
 ### Example
 

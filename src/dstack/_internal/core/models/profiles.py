@@ -270,11 +270,11 @@ class ProfileProps(CoreModel):
     name: Annotated[
         str,
         Field(
-            description="The name of the profile that can be passed as `--profile` to `dstack run`"
+            description="The name of the profile that can be passed as `--profile` to `dstack apply`"
         ),
     ]
     default: Annotated[
-        bool, Field(description="If set to true, `dstack run` will use this profile by default.")
+        bool, Field(description="If set to true, `dstack apply` will use this profile by default.")
     ] = False
 
 
