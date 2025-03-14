@@ -14,7 +14,7 @@ from dstack._internal.core.models.instances import (
     InstanceType,
     Resources,
 )
-from dstack._internal.core.models.profiles import Profile, ProfileRetryPolicy
+from dstack._internal.core.models.profiles import Profile
 from dstack._internal.core.models.runs import (
     JobProvisioningData,
     JobStatus,
@@ -372,7 +372,6 @@ class TestProcessSubmittedJobs:
                 repo_id=repo.name,
                 profile=Profile(
                     name="default",
-                    retry_policy=ProfileRetryPolicy(retry=True, duration=3600),
                 ),
             ),
         )

@@ -69,6 +69,8 @@ def parse_idle_duration(v: Optional[Union[int, str, bool]]) -> Optional[Union[st
     return parse_duration(v)
 
 
+# Deprecated in favor of ProfileRetry().
+# TODO: Remove when no longer referenced.
 class ProfileRetryPolicy(CoreModel):
     retry: Annotated[bool, Field(description="Whether to retry the run on failure or not")] = False
     duration: Annotated[
@@ -95,14 +97,15 @@ class RetryEvent(str, Enum):
 
 class ProfileRetry(CoreModel):
     on_events: Annotated[
-        List[RetryEvent],
+        Optional[List[RetryEvent]],
         Field(
             description=(
                 "The list of events that should be handled with retry."
-                " Supported events are `no-capacity`, `interruption`, and `error`"
+                " Supported events are `no-capacity`, `interruption`, and `error`."
+                " Omit to retry on all events"
             )
         ),
-    ]
+    ] = None
     duration: Annotated[
         Optional[Union[int, str]],
         Field(description="The maximum period of retrying the run, e.g., `4h` or `1d`"),
@@ -112,7 +115,8 @@ class ProfileRetry(CoreModel):
 
     @root_validator
     def _validate_fields(cls, values):
-        if "on_events" in values and len(values["on_events"]) == 0:
+        on_events = values.get("on_events", None)
+        if on_events is not None and len(values["on_events"]) == 0:
             raise ValueError("`on_events` cannot be empty")
         return values
 
@@ -249,8 +253,6 @@ class ProfileParams(CoreModel):
             description="Deprecated in favor of `idle_duration`",
         ),
     ] = None
-    # The policy for resubmitting the run. Deprecated in favor of `retry`
-    retry_policy: Optional[ProfileRetryPolicy] = None
 
     _validate_max_duration = validator("max_duration", pre=True, allow_reuse=True)(
         parse_max_duration

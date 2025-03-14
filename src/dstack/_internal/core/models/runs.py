@@ -20,7 +20,6 @@ from dstack._internal.core.models.profiles import (
     CreationPolicy,
     Profile,
     ProfileParams,
-    ProfileRetryPolicy,
     RetryEvent,
     SpotPolicy,
     UtilizationPolicy,
@@ -204,9 +203,6 @@ class JobSpec(CoreModel):
     retry: Optional[Retry]
     volumes: Optional[List[MountPoint]] = None
     ssh_key: Optional[JobSSHKey] = None
-    # For backward compatibility with 0.18.x when retry_policy was required.
-    # TODO: remove in 0.19
-    retry_policy: ProfileRetryPolicy = ProfileRetryPolicy(retry=False)
     working_dir: Optional[str]
 
 

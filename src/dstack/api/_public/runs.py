@@ -640,7 +640,6 @@ class RunCollection:
             reservation=reservation,
             spot_policy=spot_policy,
             retry=None,
-            retry_policy=retry_policy,
             utilization_policy=utilization_policy,
             max_duration=max_duration,
             stop_duration=stop_duration,

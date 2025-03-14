@@ -5,7 +5,7 @@ from dstack._internal.cli.services.profile import (
     apply_profile_args,
     register_profile_args,
 )
-from dstack._internal.core.models.profiles import Profile, ProfileRetryPolicy, SpotPolicy
+from dstack._internal.core.models.profiles import Profile, ProfileRetry, SpotPolicy
 
 
 class TestProfileArgs:
@@ -51,21 +51,21 @@ class TestProfileArgs:
         assert profile.dict() == modified.dict()
 
     def test_retry(self):
-        profile = Profile(name="test")
-        profile.retry_policy = ProfileRetryPolicy(retry=True)
+        profile = Profile(name="test", retry=None)
         modified, _ = apply_args(profile, ["--retry"])
+        profile.retry = True
         assert profile.dict() == modified.dict()
 
     def test_no_retry(self):
-        profile = Profile(name="test", retry_policy=ProfileRetryPolicy(retry=True, duration=3600))
+        profile = Profile(name="test", retry=None)
         modified, _ = apply_args(profile, ["--no-retry"])
-        profile.retry_policy.retry = False
+        profile.retry = False
         assert profile.dict() == modified.dict()
 
     def test_retry_duration(self):
         profile = Profile(name="test")
         modified, _ = apply_args(profile, ["--retry-duration", "1h"])
-        profile.retry_policy = ProfileRetryPolicy(retry=True, duration=3600)
+        profile.retry = ProfileRetry(on_events=None, duration="1h")
         assert profile.dict() == modified.dict()
 
 
