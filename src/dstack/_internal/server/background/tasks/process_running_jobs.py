@@ -743,20 +743,29 @@ def _get_cluster_info(
 
 
 async def _get_job_code(
-    session: AsyncSession, project: ProjectModel, repo: RepoModel, code_hash: str
+    session: AsyncSession, project: ProjectModel, repo: RepoModel, code_hash: Optional[str]
 ) -> bytes:
+    if code_hash is None:
+        return b""
     code_model = await get_code_model(session=session, repo=repo, code_hash=code_hash)
     if code_model is None:
         return b""
-    storage = get_default_storage()
-    if storage is None or code_model.blob is not None:
+    if code_model.blob is not None:
         return code_model.blob
+    storage = get_default_storage()
+    if storage is None:
+        return b""
     blob = await common_utils.run_async(
         storage.get_code,
         project.name,
         repo.name,
         code_hash,
     )
+    if blob is None:
+        logger.error(
+            "Failed to get repo code hash %s from storage for repo %s", code_hash, repo.name
+        )
+        return b""
     return blob
 
 

@@ -11,8 +11,6 @@ from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.fleets import FleetConfiguration
 from dstack._internal.core.models.gateways import GatewayConfiguration
 from dstack._internal.core.models.profiles import ProfileParams, parse_off_duration
-from dstack._internal.core.models.repos.base import Repo
-from dstack._internal.core.models.repos.virtual import VirtualRepo
 from dstack._internal.core.models.resources import Range, ResourcesSpec
 from dstack._internal.core.models.services import AnyModel, OpenAIChatModel
 from dstack._internal.core.models.unix import UnixUser
@@ -179,9 +177,6 @@ class BaseRunConfiguration(CoreModel):
             return None
         UnixUser.parse(v)
         return v
-
-    def get_repo(self) -> Repo:
-        return VirtualRepo()
 
 
 class BaseRunConfigurationWithPorts(BaseRunConfiguration):

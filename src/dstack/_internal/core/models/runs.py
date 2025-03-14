@@ -330,7 +330,10 @@ class RunSpec(CoreModel):
             description="The repo data such as the current branch and commit.",
         ),
     ] = None
-    repo_code_hash: Annotated[Optional[str], Field(description="The hash of the repo diff")] = None
+    repo_code_hash: Annotated[
+        Optional[str],
+        Field(description="The hash of the repo diff. Can be omitted if there is no repo diff."),
+    ] = None
     working_dir: Annotated[
         Optional[str],
         Field(

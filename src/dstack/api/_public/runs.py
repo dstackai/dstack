@@ -26,6 +26,7 @@ from dstack._internal.core.models.profiles import (
     UtilizationPolicy,
 )
 from dstack._internal.core.models.repos.base import Repo
+from dstack._internal.core.models.repos.virtual import VirtualRepo
 from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import (
     Job,
@@ -415,7 +416,8 @@ class RunCollection:
 
         Args:
             configuration (Union[Task, Service, DevEnvironment]): The run configuration.
-            repo (Union[LocalRepo, RemoteRepo, VirtualRepo]): The repo to mount to the run.
+            repo (Union[LocalRepo, RemoteRepo, VirtualRepo, None]):
+                The repo to use for the run. Pass `None` if repo is not needed.
             profile: The profile to use for the run.
             configuration_path: The path to the configuration file. Omit if the configuration is not loaded from a file.
 
@@ -423,9 +425,7 @@ class RunCollection:
             Run plan.
         """
         if repo is None:
-            repo = configuration.get_repo()
-            if repo is None:
-                raise ConfigurationError("Repo is required for this type of configuration")
+            repo = VirtualRepo()
 
         run_spec = RunSpec(
             run_name=configuration.name,
@@ -445,7 +445,7 @@ class RunCollection:
     def apply_plan(
         self,
         run_plan: RunPlan,
-        repo: Repo,
+        repo: Optional[Repo] = None,
         reserve_ports: bool = True,
     ) -> Run:
         """
@@ -453,8 +453,9 @@ class RunCollection:
         Use this method to apply run plans returned by `get_run_plan`.
 
         Args:
-            run_plan: Result of `get_run_plan` call.
-            repo: Repo to use for the run.
+            run_plan: The result of `get_run_plan` call.
+            repo (Union[LocalRepo, RemoteRepo, VirtualRepo, None]):
+                The repo to use for the run. Should be the same repo that is passed to `get_run_plan`.
             reserve_ports: Reserve local ports before applying. Use if you'll attach to the run.
 
         Returns:
@@ -465,12 +466,20 @@ class RunCollection:
             # TODO handle multiple jobs
             ports_lock = _reserve_ports(run_plan.job_plans[0].job_spec)
 
-        with tempfile.TemporaryFile("w+b") as fp:
-            run_plan.run_spec.repo_code_hash = repo.write_code_file(fp)
-            fp.seek(0)
-            self._api_client.repos.upload_code(
-                self._project, repo.repo_id, run_plan.run_spec.repo_code_hash, fp
-            )
+        if repo is None:
+            repo = VirtualRepo()
+        else:
+            # Do not upload the diff without a repo (a default virtual repo)
+            # since upload_code() requires a repo to be initialized.
+            with tempfile.TemporaryFile("w+b") as fp:
+                run_plan.run_spec.repo_code_hash = repo.write_code_file(fp)
+                fp.seek(0)
+                self._api_client.repos.upload_code(
+                    project_name=self._project,
+                    repo_id=repo.repo_id,
+                    code_hash=run_plan.run_spec.repo_code_hash,
+                    fp=fp,
+                )
         run = self._api_client.runs.apply_plan(self._project, run_plan)
         return self._model_to_submitted_run(run, ports_lock)
 
@@ -488,7 +497,8 @@ class RunCollection:
 
         Args:
             configuration (Union[Task, Service, DevEnvironment]): The run configuration.
-            repo (Union[LocalRepo, RemoteRepo, VirtualRepo]): The repo to mount to the run.
+            repo (Union[LocalRepo, RemoteRepo, VirtualRepo, None]):
+                The repo to use for the run. Pass `None` if repo is not needed.
             profile: The profile to use for the run.
             configuration_path: The path to the configuration file. Omit if the configuration is not loaded from a file.
             reserve_ports: Reserve local ports before applying. Use if you'll attach to the run.
@@ -496,11 +506,6 @@ class RunCollection:
         Returns:
             Submitted run.
         """
-        if repo is None:
-            repo = configuration.get_repo()
-            if repo is None:
-                raise ConfigurationError("Repo is required for this type of configuration")
-
         run_plan = self.get_run_plan(
             configuration=configuration,
             repo=repo,
@@ -554,9 +559,7 @@ class RunCollection:
         # """
         logger.warning("The submit() method is deprecated in favor of apply_configuration().")
         if repo is None:
-            repo = configuration.get_repo()
-            if repo is None:
-                raise ConfigurationError("Repo is required for this type of configuration")
+            repo = VirtualRepo()
             # TODO: Add Git credentials to RemoteRepo and if they are set, pass them here to RepoCollection.init
             self._client.repos.init(repo)
 
@@ -611,9 +614,7 @@ class RunCollection:
         # """
         logger.warning("The get_plan() method is deprecated in favor of get_run_plan().")
         if repo is None:
-            repo = configuration.get_repo()
-            if repo is None:
-                raise ConfigurationError("Repo is required for this type of configuration")
+            repo = VirtualRepo()
 
         if working_dir is None:
             working_dir = "."
