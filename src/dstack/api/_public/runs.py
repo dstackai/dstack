@@ -586,6 +586,8 @@ class RunCollection:
         configuration: AnyRunConfiguration,
         repo: Optional[Repo] = None,
         configuration_path: Optional[str] = None,
+        # Unused profile args are deprecated and removed but
+        # kept for signature backward compatibility.
         backends: Optional[List[BackendType]] = None,
         regions: Optional[List[str]] = None,
         instance_types: Optional[List[str]] = None,
@@ -646,8 +648,6 @@ class RunCollection:
             max_price=max_price,
             creation_policy=creation_policy,
             idle_duration=idle_duration,
-            termination_policy=termination_policy,
-            termination_idle_time=termination_policy_idle,
         )
         run_spec = RunSpec(
             run_name=run_name,

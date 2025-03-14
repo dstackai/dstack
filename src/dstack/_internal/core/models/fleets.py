@@ -16,8 +16,6 @@ from dstack._internal.core.models.profiles import (
     ProfileParams,
     ProfileRetry,
     SpotPolicy,
-    TerminationPolicy,
-    parse_duration,
     parse_idle_duration,
 )
 from dstack._internal.core.models.resources import Range, ResourcesSpec
@@ -217,30 +215,13 @@ class InstanceGroupParams(CoreModel):
         Optional[float],
         Field(description="The maximum instance price per hour, in dollars", gt=0.0),
     ] = None
-
     idle_duration: Annotated[
         Optional[Union[Literal["off"], str, int]],
         Field(
             description="Time to wait before terminating idle instances. Defaults to `5m` for runs and `3d` for fleets. Use `off` for unlimited duration"
         ),
     ] = None
-    # Deprecated:
-    termination_policy: Annotated[
-        Optional[TerminationPolicy],
-        Field(
-            description="Deprecated in favor of `idle_duration`",
-        ),
-    ] = None
-    termination_idle_time: Annotated[
-        Optional[Union[str, int]],
-        Field(
-            description="Deprecated in favor of `idle_duration`",
-        ),
-    ] = None
 
-    _validate_termination_idle_time = validator(
-        "termination_idle_time", pre=True, allow_reuse=True
-    )(parse_duration)
     _validate_idle_duration = validator("idle_duration", pre=True, allow_reuse=True)(
         parse_idle_duration
     )
