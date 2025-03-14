@@ -128,7 +128,6 @@ class TestGetRepo:
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         legacy_creds = {
-            "protocol": "https",
             "clone_url": "https://github.com/dstackai/dstack.git",
             "private_key": None,
             "oauth_token": "test_token",
@@ -157,14 +156,12 @@ class TestGetRepo:
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         legacy_creds = {
-            "protocol": "https",
             "clone_url": "https://github.com/dstackai/dstack.git",
             "private_key": None,
             "oauth_token": "legacy_creds",
         }
         repo = await create_repo(session=session, project_id=project.id, creds=legacy_creds)
         user_creds = {
-            "protocol": "https",
             "clone_url": "https://github.com/dstackai/dstack.git",
             "private_key": None,
             "oauth_token": "user_creds",
@@ -214,13 +211,9 @@ class TestInitRepo:
             "repo_id": "test_repo",
             "repo_info": {
                 "repo_type": "remote",
-                "repo_host_name": "",
-                "repo_port": None,
-                "repo_user_name": "",
                 "repo_name": "dstack",
             },
             "repo_creds": {
-                "protocol": "https",
                 "clone_url": "https://github.com/dstackai/dstack.git",
                 "private_key": None,
                 "oauth_token": "test_token",
@@ -254,13 +247,9 @@ class TestInitRepo:
             "repo_id": "test_repo",
             "repo_info": {
                 "repo_type": "remote",
-                "repo_host_name": "",
-                "repo_port": None,
-                "repo_user_name": "",
                 "repo_name": "dstack",
             },
             "repo_creds": {
-                "protocol": "https",
                 "clone_url": "https://github.com/dstackai/dstack.git",
                 "private_key": None,
                 "oauth_token": "test_token",
@@ -276,13 +265,9 @@ class TestInitRepo:
             "repo_id": "test_repo",
             "repo_info": {
                 "repo_type": "remote",
-                "repo_host_name": "",
-                "repo_port": None,
-                "repo_user_name": "",
                 "repo_name": "dstack",
             },
             "repo_creds": {
-                "protocol": "https",
                 "clone_url": "https://github.com/dstackai/dstack.git",
                 "private_key": None,
                 "oauth_token": "test_token_updated",
