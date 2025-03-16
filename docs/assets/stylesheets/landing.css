@@ -1100,9 +1100,9 @@
 }
 
 .tx-landing__quotes_grid .cell {
-    padding: 26px 28px;
+    padding: 23px 23px 13px;
     border-radius: 3px;
-    border-color: rgba(0, 0, 0, 1);
+    border-color: rgba(0, 0, 0, 0.75);
     border-width: 0.5px;
-    border-style: dotted;
+    border-style: solid;
 }
