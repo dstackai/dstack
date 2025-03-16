@@ -442,6 +442,14 @@ class DevEnvironmentConfigurator(RunWithPortsConfigurator):
                     "Fix by opening [code]Command Palette[/code], executing [code]Shell Command: "
                     "Install 'code' command in PATH[/code], and restarting terminal.[/]\n"
                 )
+        if conf.ide == "cursor" and conf.version is None:
+            conf.version = _detect_cursor_version()
+            if conf.version is None:
+                console.print(
+                    "[secondary]Unable to detect the Cursor version and pre-install extensions. "
+                    "Fix by opening [code]Command Palette[/code], executing [code]Shell Command: "
+                    "Install 'cursor' command in PATH[/code], and restarting terminal.[/]\n"
+                )
 
 
 class ServiceConfigurator(BaseRunConfigurator):
@@ -471,6 +479,16 @@ def _unique_ports_constraint(ports: List[int]):
 
 
 def _detect_vscode_version(exe: str = "code") -> Optional[str]:
+    try:
+        run = subprocess.run([exe, "--version"], capture_output=True)
+    except FileNotFoundError:
+        return None
+    if run.returncode == 0:
+        return run.stdout.decode().split("\n")[1].strip()
+    return None
+
+
+def _detect_cursor_version(exe: str = "cursor") -> Optional[str]:
     try:
         run = subprocess.run([exe, "--version"], capture_output=True)
     except FileNotFoundError:
