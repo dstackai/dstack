@@ -1,4 +1,4 @@
-from typing import List, Optional, Union
+from typing import Any, Dict, List, Optional
 
 from pydantic import parse_obj_as
 
@@ -22,7 +22,7 @@ class FleetsAPIClient(APIClientGroup):
         body = GetFleetRequest(name=name)
         resp = self._request(
             f"/api/project/{project_name}/fleets/get",
-            body=body.json(exclude={"id"}),  # `id` is not supported in pre-0.18.36 servers
+            body=body.json(),
         )
         return parse_obj_as(Fleet.__response__, resp.json())
 
@@ -55,62 +55,20 @@ class FleetsAPIClient(APIClientGroup):
         self._request(f"/api/project/{project_name}/fleets/delete_instances", body=body.json())
 
 
-_ExcludeDict = dict[str, Union[bool, set[str], "_ExcludeDict"]]
-
-
-def _get_fleet_spec_excludes(fleet_spec: FleetSpec) -> Optional[_ExcludeDict]:
-    spec_excludes: _ExcludeDict = {}
-    configuration_excludes: _ExcludeDict = {}
+def _get_fleet_spec_excludes(fleet_spec: FleetSpec) -> Optional[Dict]:
+    """
+    Returns `fleet_spec` exclude mapping to exclude certain fields from the request.
+    Use this method to exclude new fields when they are not set to keep
+    clients backward-compatibility with older servers.
+    """
+    spec_excludes: Dict[str, Any] = {}
+    configuration_excludes: Dict[str, Any] = {}
     profile_excludes: set[str] = set()
-    ssh_config_excludes: _ExcludeDict = {}
-    ssh_hosts_excludes: set[str] = set()
-
-    # TODO: Can be removed in 0.19
-    if fleet_spec.configuration_path is None:
-        spec_excludes["configuration_path"] = True
-    if fleet_spec.configuration.ssh_config is not None:
-        if fleet_spec.configuration.ssh_config.proxy_jump is None:
-            ssh_config_excludes["proxy_jump"] = True
-        if all(
-            isinstance(h, str) or h.proxy_jump is None
-            for h in fleet_spec.configuration.ssh_config.hosts
-        ):
-            ssh_hosts_excludes.add("proxy_jump")
-        if all(
-            isinstance(h, str) or h.internal_ip is None
-            for h in fleet_spec.configuration.ssh_config.hosts
-        ):
-            ssh_hosts_excludes.add("internal_ip")
-        if all(
-            isinstance(h, str) or h.blocks == 1 for h in fleet_spec.configuration.ssh_config.hosts
-        ):
-            ssh_hosts_excludes.add("blocks")
-    # client >= 0.18.30 / server <= 0.18.29 compatibility tweak
-    if fleet_spec.configuration.reservation is None:
-        configuration_excludes["reservation"] = True
-    if fleet_spec.profile is not None and fleet_spec.profile.reservation is None:
-        profile_excludes.add("reservation")
-    if fleet_spec.configuration.idle_duration is None:
-        configuration_excludes["idle_duration"] = True
-    if fleet_spec.profile is not None and fleet_spec.profile.idle_duration is None:
-        profile_excludes.add("idle_duration")
-    # client >= 0.18.38 / server <= 0.18.37 compatibility tweak
-    if fleet_spec.profile is not None and fleet_spec.profile.stop_duration is None:
-        profile_excludes.add("stop_duration")
-    # client >= 0.18.41 / server <= 0.18.40 compatibility tweak
-    if fleet_spec.configuration.availability_zones is None:
-        configuration_excludes["availability_zones"] = True
-    if fleet_spec.profile is not None and fleet_spec.profile.availability_zones is None:
-        profile_excludes.add("availability_zones")
-    if fleet_spec.configuration.blocks == 1:
-        configuration_excludes["blocks"] = True
-    if fleet_spec.profile is not None and fleet_spec.profile.utilization_policy is None:
-        profile_excludes.add("utilization_policy")
-
-    if ssh_hosts_excludes:
-        ssh_config_excludes["hosts"] = {"__all__": ssh_hosts_excludes}
-    if ssh_config_excludes:
-        configuration_excludes["ssh_config"] = ssh_config_excludes
+    # Fields can be excluded like this:
+    # if fleet_spec.configuration.availability_zones is None:
+    #     configuration_excludes["availability_zones"] = True
+    # if fleet_spec.profile is not None and fleet_spec.profile.availability_zones is None:
+    #     profile_excludes.add("availability_zones")
     if configuration_excludes:
         spec_excludes["configuration"] = configuration_excludes
     if profile_excludes:
