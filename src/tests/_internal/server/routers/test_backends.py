@@ -62,7 +62,6 @@ class TestListBackendTypes:
             "gcp",
             "kubernetes",
             "lambda",
-            "nebius",
             "oci",
             "runpod",
             "tensordock",
