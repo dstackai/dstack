@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.models.repos import RemoteRepoCreds, RemoteRepoInfo, RepoHeadWithCreds
-from dstack._internal.core.models.repos.base import RepoProtocol, RepoType
+from dstack._internal.core.models.repos.base import RepoType
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.models import ProjectModel, RepoCredsModel, UserModel
 from dstack._internal.server.services.projects import add_project_member
@@ -90,7 +90,6 @@ class TestGetRemoteRepo:
     ):
         repo_info = RemoteRepoInfo(repo_type="remote", repo_name="test")
         legacy_repo_creds = RemoteRepoCreds(
-            protocol=RepoProtocol.HTTPS,
             clone_url="https://git.example.com/repo.git",
             private_key=None,
             oauth_token="legacy-oauth-token",
@@ -104,7 +103,6 @@ class TestGetRemoteRepo:
             creds=legacy_repo_creds.dict(),
         )
         user_repo_creds = RemoteRepoCreds(
-            protocol=RepoProtocol.HTTPS,
             clone_url="https://git.example.com/repo.git",
             private_key=None,
             oauth_token="user-oauth-token",
@@ -142,7 +140,6 @@ class TestGetRemoteRepo:
         # another user's creds should be ignored
         another_user = await _create_user(session, project, name="another-user")
         another_user_repo_creds = RemoteRepoCreds(
-            protocol=RepoProtocol.HTTPS,
             clone_url="https://git.example.com/repo.git",
             private_key=None,
             oauth_token="another-oauth-token",
@@ -185,7 +182,6 @@ class TestGetRemoteRepo:
         repo_info = RemoteRepoInfo(repo_type="remote", repo_name="test")
         if with_legacy_creds:
             legacy_repo_creds = RemoteRepoCreds(
-                protocol=RepoProtocol.HTTPS,
                 clone_url="https://git.example.com/repo.git",
                 private_key=None,
                 oauth_token="legacy-oauth-token",
@@ -201,7 +197,6 @@ class TestGetRemoteRepo:
             creds=legacy_repo_creds.dict() if legacy_repo_creds else None,
         )
         user_repo_creds = RemoteRepoCreds(
-            protocol=RepoProtocol.HTTPS,
             clone_url="https://git.example.com/repo.git",
             private_key=None,
             oauth_token="user-oauth-token",
@@ -228,7 +223,6 @@ class TestGetRemoteRepo:
     ):
         repo_info = RemoteRepoInfo(repo_type="remote", repo_name="test")
         legacy_repo_creds = RemoteRepoCreds(
-            protocol=RepoProtocol.HTTPS,
             clone_url="https://git.example.com/repo.git",
             private_key=None,
             oauth_token="legacy-oauth-token",
@@ -259,7 +253,6 @@ class TestInitRemoteRepo:
     ):
         repo_info = RemoteRepoInfo(repo_type="remote", repo_name="test")
         repo_creds = RemoteRepoCreds(
-            protocol=RepoProtocol.HTTPS,
             clone_url="https://git.example.com/repo.git",
             private_key=None,
             oauth_token="oauth-token",
@@ -283,7 +276,6 @@ class TestInitRemoteRepo:
         old_repo_info = RemoteRepoInfo(repo_type="remote", repo_name="old-name")
         new_repo_info = RemoteRepoInfo(repo_type="remote", repo_name="new-name")
         our_repo_creds = RemoteRepoCreds(
-            protocol=RepoProtocol.HTTPS,
             clone_url="https://git.example.com/repo.git",
             private_key=None,
             oauth_token="our-oauth-token",
@@ -323,7 +315,6 @@ class TestInitRemoteRepo:
             creds=None,
         )
         old_repo_creds = RemoteRepoCreds(
-            protocol=RepoProtocol.HTTPS,
             clone_url="https://git.example.com/repo.git",
             private_key=None,
             oauth_token="oauth-token",
@@ -335,7 +326,6 @@ class TestInitRemoteRepo:
             creds=old_repo_creds.dict(),
         )
         new_repo_creds = RemoteRepoCreds(
-            protocol=RepoProtocol.HTTPS,
             clone_url="ssh://git@git.example.com/repo.git",
             private_key="private-key",
             oauth_token=None,
@@ -357,7 +347,6 @@ class TestInitRemoteRepo:
     ):
         repo_info = RemoteRepoInfo(repo_type="remote", repo_name="test")
         legacy_repo_creds = RemoteRepoCreds(
-            protocol=RepoProtocol.HTTPS,
             clone_url="https://git.example.com/repo.git",
             private_key=None,
             oauth_token="legacy-oauth-token",
@@ -371,7 +360,6 @@ class TestInitRemoteRepo:
             creds=legacy_repo_creds.dict(),
         )
         our_repo_creds = RemoteRepoCreds(
-            protocol=RepoProtocol.HTTPS,
             clone_url="https://git.example.com/repo.git",
             private_key=None,
             oauth_token="our-oauth-token",
@@ -384,7 +372,6 @@ class TestInitRemoteRepo:
         )
         another_user = await _create_user(session, project, name="another-user")
         another_user_repo_creds = RemoteRepoCreds(
-            protocol=RepoProtocol.HTTPS,
             clone_url="https://git.example.com/repo.git",
             private_key=None,
             oauth_token="another-oauth-token",

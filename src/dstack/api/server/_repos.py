@@ -6,7 +6,6 @@ from dstack._internal.core.models.repos import AnyRepoInfo, RemoteRepoCreds, Rep
 from dstack._internal.server.schemas.repos import (
     DeleteReposRequest,
     GetRepoRequest,
-    RemoteRepoCredsDto,
     SaveRepoCredsRequest,
 )
 from dstack.api.server._group import APIClientGroup
@@ -32,9 +31,7 @@ class ReposAPIClient(APIClientGroup):
         body = SaveRepoCredsRequest(
             repo_id=repo_id,
             repo_info=repo_info,
-            repo_creds=RemoteRepoCredsDto.from_remote_repo_creds(repo_creds)
-            if repo_creds
-            else None,
+            repo_creds=repo_creds,
         )
         self._request(f"/api/project/{project_name}/repos/init", body=body.json())
 
