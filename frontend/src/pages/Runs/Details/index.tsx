@@ -5,7 +5,17 @@ import { get as _get } from 'lodash';
 import { format } from 'date-fns';
 import Button from '@cloudscape-design/components/button';
 
-import { Box, ColumnLayout, Container, ContentLayout, DetailsHeader, Header, Loader, StatusIndicator } from 'components';
+import {
+    Box,
+    ColumnLayout,
+    Container,
+    ContentLayout,
+    DetailsHeader,
+    Header,
+    Loader,
+    NavigateLink,
+    StatusIndicator,
+} from 'components';
 
 import { DATE_TIME_FORMAT } from 'consts';
 import { useBreadcrumbs, useNotifications } from 'hooks';
@@ -260,6 +270,24 @@ export const RunDetails: React.FC = () => {
                                     <Box variant="awsui-key-label">{t('projects.run.cost')}</Box>
                                     <div>${runData.cost}</div>
                                 </div>
+
+                                {runData.jobs.length === 1 && (
+                                    <div>
+                                        <Box variant="awsui-key-label">{t('projects.run.metrics.title')}</Box>
+
+                                        <div>
+                                            <NavigateLink
+                                                href={ROUTES.PROJECT.DETAILS.RUNS.DETAILS.JOBS.DETAILS.METRICS.FORMAT(
+                                                    paramProjectName,
+                                                    paramRunId,
+                                                    runData.jobs[0].job_spec.job_name,
+                                                )}
+                                            >
+                                                {t('projects.run.metrics.show_metrics')}
+                                            </NavigateLink>
+                                        </div>
+                                    </div>
+                                )}
                             </ColumnLayout>
                         </Container>
 

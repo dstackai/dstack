@@ -29,7 +29,7 @@ export const runApi = createApi({
         prepareHeaders: fetchBaseQueryHeaders,
     }),
 
-    tagTypes: ['Runs', 'Models'],
+    tagTypes: ['Runs', 'Models', 'Metrics'],
 
     endpoints: (builder) => ({
         getRuns: builder.query<IRun[], TRunsRequestParams>({
@@ -142,6 +142,18 @@ export const runApi = createApi({
             providesTags: (result) =>
                 result ? [...result.map(({ id }) => ({ type: 'Models' as const, id: id })), 'Models'] : ['Models'],
         }),
+
+        getMetrics: builder.query<{ metrics: IMetricsItem[] }, TJobMetricsRequestParams>({
+            query: ({ project_name, run_name, ...params }) => {
+                return {
+                    url: API.PROJECTS.JOB_METRICS(project_name, run_name),
+                    method: 'GET',
+                    params,
+                };
+            },
+
+            providesTags: ['Metrics'],
+        }),
     }),
 });
 
@@ -152,4 +164,5 @@ export const {
     useStopRunsMutation,
     useDeleteRunsMutation,
     useLazyGetModelsQuery,
+    useGetMetricsQuery,
 } = runApi;

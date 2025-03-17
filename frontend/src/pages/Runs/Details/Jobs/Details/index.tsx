@@ -2,7 +2,17 @@ import React, { useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
 
-import { Box, ColumnLayout, Container, ContentLayout, DetailsHeader, Header, Loader, StatusIndicator } from 'components';
+import {
+    Box,
+    ColumnLayout,
+    Container,
+    ContentLayout,
+    DetailsHeader,
+    Header,
+    Loader,
+    NavigateLink,
+    StatusIndicator,
+} from 'components';
 
 import { useBreadcrumbs } from 'hooks';
 import { riseRouterException } from 'libs';
@@ -75,7 +85,7 @@ export const JobDetails: React.FC = () => {
             href: ROUTES.RUNS.LIST,
         },
         {
-            text: paramRunId,
+            text: runData?.run_spec.run_name ?? '',
             href: ROUTES.PROJECT.DETAILS.RUNS.DETAILS.FORMAT(paramProjectName, paramRunId),
         },
         {
@@ -148,6 +158,22 @@ export const JobDetails: React.FC = () => {
                                 <div>
                                     <Box variant="awsui-key-label">{t('projects.run.price')}</Box>
                                     <div>{getJobListItemPrice(jobData)}</div>
+                                </div>
+
+                                <div>
+                                    <Box variant="awsui-key-label">{t('projects.run.metrics.title')}</Box>
+
+                                    <div>
+                                        <NavigateLink
+                                            href={ROUTES.PROJECT.DETAILS.RUNS.DETAILS.JOBS.DETAILS.METRICS.FORMAT(
+                                                paramProjectName,
+                                                paramRunId,
+                                                paramJobName,
+                                            )}
+                                        >
+                                            {t('projects.run.metrics.show_metrics')}
+                                        </NavigateLink>
+                                    </div>
                                 </div>
                             </ColumnLayout>
                         </Container>
