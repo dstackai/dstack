@@ -169,12 +169,10 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 		select {
 		case <-timeoutCtx.Done():
 			log.Error(ctx, "Max duration exceeded", "max_duration", ex.jobSpec.MaxDuration)
-			// We do not set "max_duration_exceeded" termination reason yet for backward compatibility
-			// TODO: Set it several releases after 0.18.36
 			ex.SetJobStateWithTerminationReason(
 				ctx,
 				types.JobStateTerminated,
-				types.TerminationReasonContainerExitedWithError,
+				types.TerminationReasonMaxDurationExceeded,
 				"Max duration exceeded",
 			)
 			return gerrors.Wrap(err)
