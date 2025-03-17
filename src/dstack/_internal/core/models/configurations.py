@@ -205,7 +205,10 @@ class BaseRunConfigurationWithCommands(BaseRunConfiguration):
 
 
 class DevEnvironmentConfigurationParams(CoreModel):
-    ide: Annotated[Literal["vscode"], Field(description="The IDE to run")]
+    ide: Annotated[
+        Union[Literal["vscode"], Literal["cursor"]],
+        Field(description="The IDE to run. Supported values include `vscode` and `cursor`"),
+    ]
     version: Annotated[Optional[str], Field(description="The version of the IDE")] = None
     init: Annotated[CommandsList, Field(description="The bash commands to run on startup")] = []
     inactivity_duration: Annotated[

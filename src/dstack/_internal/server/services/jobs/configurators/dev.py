@@ -1,9 +1,11 @@
 from typing import List, Optional
 
+from dstack._internal.core.errors import ServerClientError
 from dstack._internal.core.models.configurations import PortMapping, RunConfigurationType
 from dstack._internal.core.models.profiles import SpotPolicy
 from dstack._internal.core.models.runs import RunSpec
 from dstack._internal.server.services.jobs.configurators.base import JobConfigurator
+from dstack._internal.server.services.jobs.configurators.extensions.cursor import CursorDesktop
 from dstack._internal.server.services.jobs.configurators.extensions.vscode import VSCodeDesktop
 
 INSTALL_IPYKERNEL = (
@@ -16,7 +18,13 @@ class DevEnvironmentJobConfigurator(JobConfigurator):
     TYPE: RunConfigurationType = RunConfigurationType.DEV_ENVIRONMENT
 
     def __init__(self, run_spec: RunSpec):
-        self.ide = VSCodeDesktop(
+        if run_spec.configuration.ide == "vscode":
+            __class = VSCodeDesktop
+        elif run_spec.configuration.ide == "cursor":
+            __class = CursorDesktop
+        else:
+            raise ServerClientError(f"Unsupported IDE: {run_spec.configuration.ide}")
+        self.ide = __class(
             run_name=run_spec.run_name,
             version=run_spec.configuration.version,
             extensions=["ms-python.python", "ms-toolsai.jupyter"],
