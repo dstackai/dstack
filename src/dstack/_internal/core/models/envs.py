@@ -102,10 +102,11 @@ class Env(BaseModel):
     def copy(self, **kwargs) -> Self:
         # Env.copy() is tricky because it copies only the hidden top-level {"__root__": {...}}
         # structure, not the actual nested dict representing the env itself.
-        # To avoid possible bugs, we prohibit shallow copying altogether.
+        # So we copy __root__ explicitly in case of a shallow copy.
+        new_copy = super().copy(**kwargs)
         if not kwargs.get("deep", False):
-            raise TypeError(f"shallow copying of {self.__class__.__name__} is prohibited")
-        return super().copy(**kwargs)
+            new_copy.__root__ = new_copy.__root__.copy()
+        return new_copy
 
     def as_dict(self) -> Dict[str, str]:
         """

@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import List, Optional, Union, overload
+from typing import Any, Dict, List, Optional, Union, overload
 
 from pydantic import Field, root_validator, validator
 from typing_extensions import Annotated, Literal
@@ -240,6 +240,22 @@ class ProfileParams(CoreModel):
         Optional[UtilizationPolicy],
         Field(description="Run termination policy based on utilization"),
     ] = None
+
+    # # Deprecated and unused. Left for compatibility with 0.18 clients.
+    pool_name: Annotated[Optional[str], Field(exclude=True)] = None
+    instance_name: Annotated[Optional[str], Field(exclude=True)] = None
+    retry_policy: Annotated[Optional[ProfileRetryPolicy], Field(exclude=True)] = None
+    termination_policy: Annotated[Optional[TerminationPolicy], Field(exclude=True)] = None
+    termination_idle_time: Annotated[Optional[Union[str, int]], Field(exclude=True)] = None
+
+    class Config:
+        @staticmethod
+        def schema_extra(schema: Dict[str, Any]) -> None:
+            del schema["properties"]["pool_name"]
+            del schema["properties"]["instance_name"]
+            del schema["properties"]["retry_policy"]
+            del schema["properties"]["termination_policy"]
+            del schema["properties"]["termination_idle_time"]
 
     _validate_max_duration = validator("max_duration", pre=True, allow_reuse=True)(
         parse_max_duration
