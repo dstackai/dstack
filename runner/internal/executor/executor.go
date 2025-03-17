@@ -235,8 +235,6 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 	gpus_num := nodes_num * gpus_per_node_num
 
 	jobEnvs := map[string]string{
-		"RUN_NAME":              ex.run.RunName, // deprecated, remove in 0.19
-		"REPO_ID":               ex.run.RepoId,  // deprecated, remove in 0.19
 		"DSTACK_RUN_NAME":       ex.run.RunName,
 		"DSTACK_REPO_ID":        ex.run.RepoId,
 		"DSTACK_NODES_IPS":      strings.Join(ex.clusterInfo.JobIPs, "\n"),
