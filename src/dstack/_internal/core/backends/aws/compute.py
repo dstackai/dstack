@@ -357,7 +357,7 @@ class AWSCompute(
             **aws_resources.create_instances_struct(
                 disk_size=10,
                 image_id=aws_resources.get_gateway_image_id(ec2_client),
-                instance_type="t2.micro",
+                instance_type="t3.micro",
                 iam_instance_profile=None,
                 user_data=get_gateway_user_data(configuration.ssh_key_pub),
                 tags=tags,
