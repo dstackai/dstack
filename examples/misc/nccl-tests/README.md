@@ -39,7 +39,7 @@ commands:
       done
       # Run NCCL Tests
       ${MPIRUN} \
-        -n $((DSTACK_NODES_NUM * DSTACK_GPUS_PER_NODE)) -N ${DSTACK_GPUS_PER_NODE} \
+        -n ${DSTACK_GPUS_NUM} -N ${DSTACK_GPUS_PER_NODE} \
         --mca btl_tcp_if_exclude lo,docker0 \
         --bind-to none \
         ./all_reduce_perf -b 8 -e 8G -f 2 -g 1
