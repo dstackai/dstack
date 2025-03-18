@@ -179,12 +179,16 @@ async def set_project_members(
     # FIXME: potentially long write transaction
     # clear_project_members() issues DELETE without commit
     await clear_project_members(session=session, project=project)
-    usernames = [m.username for m in members]
-    res = await session.execute(select(UserModel).where(UserModel.name.in_(usernames)))
+    names = [m.username for m in members]
+    res = await session.execute(
+        select(UserModel).where((UserModel.name.in_(names)) | (UserModel.email.in_(names)))
+    )
     users = res.scalars().all()
+    # Create lookup maps for both username and email
     username_to_user = {user.name: user for user in users}
+    email_to_user = {user.email: user for user in users if user.email}
     for i, member in enumerate(members):
-        user_to_add = username_to_user.get(member.username)
+        user_to_add = username_to_user.get(member.username) or email_to_user.get(member.username)
         if user_to_add is None:
             continue
         await add_project_member(

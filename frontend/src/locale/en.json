@@ -576,7 +576,8 @@
     "required": "This is required field"
   },
   "users_autosuggest": {
-    "placeholder": "Add member",
+    "placeholder": "Enter username or email to add member",
+    "entered_text": "Add member",
     "loading": "Loading users",
     "no_match": "No matches found"
   },
