@@ -165,7 +165,7 @@ Both vLLM and SGLang demonstrated stable TTFT across increasing output token len
 
 SGLang and TensorRT-LLM demonstrated stable TPOT across increasing output token lengths.
 
-<img src="https://github.com/dstackai/benchmarks/blob/deepseek-r1-benchmark/Deepseek-R1/images/tpot-vs-output-length.png" />
+<img src="https://github.com/dstackai/benchmarks/raw/deepseek-r1-benchmark/Deepseek-R1/images/tpot-vs-output-length.png" />
 
 vLLM maintained the lowest TPOT up to 3200 tokens but showed a sudden increase at 6400 tokens, likely due to memory pressure.
 
