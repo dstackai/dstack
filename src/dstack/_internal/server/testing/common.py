@@ -329,13 +329,20 @@ def get_job_provisioning_data(
     backend: BackendType = BackendType.AWS,
     region: str = "us-east-1",
     gpu_count: int = 0,
+    gpu_memory_gib: float = 16,
     cpu_count: int = 1,
     memory_gib: float = 0.5,
     spot: bool = False,
     hostname: str = "127.0.0.4",
     internal_ip: Optional[str] = "127.0.0.4",
 ) -> JobProvisioningData:
-    gpus = [Gpu(name="T4", memory_mib=16384, vendor=gpuhunt.AcceleratorVendor.NVIDIA)] * gpu_count
+    gpus = [
+        Gpu(
+            name="T4",
+            memory_mib=int(gpu_memory_gib * 1024),
+            vendor=gpuhunt.AcceleratorVendor.NVIDIA,
+        )
+    ] * gpu_count
     return JobProvisioningData(
         backend=backend,
         instance_type=InstanceType(
@@ -597,6 +604,7 @@ def get_instance_offer_with_availability(
     backend: BackendType = BackendType.AWS,
     region: str = "eu-west",
     gpu_count: int = 0,
+    gpu_memory_gib: float = 16,
     cpu_count: int = 2,
     memory_gib: float = 12,
     disk_gib: float = 100.0,
@@ -605,7 +613,13 @@ def get_instance_offer_with_availability(
     total_blocks: int = 1,
     availability_zones: Optional[List[str]] = None,
 ):
-    gpus = [Gpu(name="T4", memory_mib=16384, vendor=gpuhunt.AcceleratorVendor.NVIDIA)] * gpu_count
+    gpus = [
+        Gpu(
+            name="T4",
+            memory_mib=int(gpu_memory_gib * 1024),
+            vendor=gpuhunt.AcceleratorVendor.NVIDIA,
+        )
+    ] * gpu_count
     return InstanceOfferWithAvailability(
         backend=backend,
         instance=InstanceType(

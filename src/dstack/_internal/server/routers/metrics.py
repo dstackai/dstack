@@ -40,14 +40,16 @@ async def get_job_metrics(
     By default, returns one latest sample. To control time window/number of samples, use
     `limit`, `after`, `before`.
 
-    Supported metrics: [
-        "cpu_usage_percent",
-        "memory_usage_bytes",
-        "memory_working_set_bytes",
-        "gpus_detected_num",
-        "gpu_memory_usage_bytes_gpu{i}",
-        "gpu_util_percent_gpu{i}"
-    ]
+    Supported metrics (all optional):
+    * `cpus_detected_num`
+    * `cpu_usage_percent`
+    * `memory_total_bytes`
+    * `memory_usage_bytes`
+    * `memory_working_set_bytes`
+    * `gpus_detected_num`
+    * `gpu_memory_total_bytes`
+    * `gpu_memory_usage_bytes_gpu{i}`
+    * `gpu_util_percent_gpu{i}`
     """
     _, project = user_project
 
