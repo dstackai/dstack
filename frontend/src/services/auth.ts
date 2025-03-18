@@ -60,14 +60,15 @@ export const authApi = createApi({
             },
         }),
 
-        entraAuthorize: builder.mutation<{ authorization_url: string }, void>({
-            query: () => ({
+        entraAuthorize: builder.mutation<{ authorization_url: string }, { base_url: string }>({
+            query: (body) => ({
                 url: API.AUTH.ENTRA.AUTHORIZE(),
                 method: 'POST',
+                body,
             }),
         }),
 
-        entraCallback: builder.mutation<IUserWithCreds, { code: string; state: string }>({
+        entraCallback: builder.mutation<IUserWithCreds, { code: string; state: string; base_url: string }>({
             query: (body) => ({
                 url: API.AUTH.ENTRA.CALLBACK(),
                 method: 'POST',
