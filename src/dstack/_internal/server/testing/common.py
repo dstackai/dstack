@@ -329,13 +329,17 @@ def get_job_provisioning_data(
     backend: BackendType = BackendType.AWS,
     region: str = "us-east-1",
     gpu_count: int = 0,
+    gpu_name: str = "T4",
     cpu_count: int = 1,
     memory_gib: float = 0.5,
     spot: bool = False,
     hostname: str = "127.0.0.4",
     internal_ip: Optional[str] = "127.0.0.4",
+    price: float = 10.5,
 ) -> JobProvisioningData:
-    gpus = [Gpu(name="T4", memory_mib=16384, vendor=gpuhunt.AcceleratorVendor.NVIDIA)] * gpu_count
+    gpus = [
+        Gpu(name=gpu_name, memory_mib=16384, vendor=gpuhunt.AcceleratorVendor.NVIDIA)
+    ] * gpu_count
     return JobProvisioningData(
         backend=backend,
         instance_type=InstanceType(
@@ -348,7 +352,7 @@ def get_job_provisioning_data(
         hostname=hostname,
         internal_ip=internal_ip,
         region=region,
-        price=10.5,
+        price=price,
         username="ubuntu",
         ssh_port=22,
         dockerized=dockerized,
@@ -451,11 +455,14 @@ async def create_fleet(
     fleet_id: Optional[UUID] = None,
     status: FleetStatus = FleetStatus.ACTIVE,
     deleted: bool = False,
+    name: Optional[str] = None,
 ) -> FleetModel:
     if fleet_id is None:
         fleet_id = uuid.uuid4()
     if spec is None:
         spec = get_fleet_spec()
+    if name is not None:
+        spec.configuration.name = name
     fm = FleetModel(
         id=fleet_id,
         project=project,
@@ -518,6 +525,7 @@ async def create_instance(
     busy_blocks: int = 0,
     name: str = "test_instance",
     volumes: Optional[List[VolumeModel]] = None,
+    price: float = 1.0,
 ) -> InstanceModel:
     if instance_id is None:
         instance_id = uuid.uuid4()
@@ -560,7 +568,7 @@ async def create_instance(
         finished_at=finished_at,
         job_provisioning_data=job_provisioning_data.json(),
         offer=offer.json(),
-        price=1,
+        price=price,
         region=region,
         backend=backend,
         termination_policy=termination_policy,
@@ -597,6 +605,7 @@ def get_instance_offer_with_availability(
     backend: BackendType = BackendType.AWS,
     region: str = "eu-west",
     gpu_count: int = 0,
+    gpu_name: str = "T4",
     cpu_count: int = 2,
     memory_gib: float = 12,
     disk_gib: float = 100.0,
@@ -604,12 +613,16 @@ def get_instance_offer_with_availability(
     blocks: int = 1,
     total_blocks: int = 1,
     availability_zones: Optional[List[str]] = None,
+    price: float = 1.0,
+    instance_type: str = "instance",
 ):
-    gpus = [Gpu(name="T4", memory_mib=16384, vendor=gpuhunt.AcceleratorVendor.NVIDIA)] * gpu_count
+    gpus = [
+        Gpu(name=gpu_name, memory_mib=16384, vendor=gpuhunt.AcceleratorVendor.NVIDIA)
+    ] * gpu_count
     return InstanceOfferWithAvailability(
         backend=backend,
         instance=InstanceType(
-            name="instance",
+            name=instance_type,
             resources=Resources(
                 cpus=cpu_count,
                 memory_mib=int(memory_gib * 1024),
@@ -620,7 +633,7 @@ def get_instance_offer_with_availability(
             ),
         ),
         region=region,
-        price=1,
+        price=price,
         availability=InstanceAvailability.AVAILABLE,
         availability_zones=availability_zones,
         blocks=blocks,
