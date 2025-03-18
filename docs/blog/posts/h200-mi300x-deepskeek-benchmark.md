@@ -47,13 +47,17 @@ who provided access to the necessary hardware.
 #### Online inference
 
 We utilized SGLang's [`Deepseek-R1/bench_serving.py` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/benchmarks/tree/main/Deepseek-R1/bench_serving.py){:target="_blank"} 
-script, modified to incorporate TensorRT-LLM. Tests were conducted across multiple request concurrencies and output token lengths, with input token length fixed at 3200.
+script, modified to incorporate TensorRT-LLM. 
+
+Tests were conducted across multiple request concurrencies and output token lengths, with input token length fixed at 3200.
 
 | Request Concurrencies  | Output Token Lengths | Prefix-Cached  |
 |------------------------|----------------------|----------------|
 | 4,8,16,...,128         | 800                  | No             |
 | 128                    | 1600, 3200, 6400     | No             |
 | 128                    | 800                  | Yes            |
+
+To test prefix caching ability, about 62.5% of each ~3200-token prompt (i.e., 2000 out of 3200 tokens) is a repeated prefix across multiple requests.
 
 #### Offline Inference
 
@@ -196,6 +200,9 @@ TPOT increased after prefix caching, which requires further investigation.
    However, the TensorRT-LLM team recommends using the TorchFlow-based approach for deployment.
 2. The impact of dynamic batching on inference efficiency was not tested.
 3. vLLM's prefix caching support for MI300X is a work in progress and can be tracked [here :material-arrow-top-right-thin:{ .external }](https://github.com/ROCm/vllm/issues/457){:target="_blank"}.
+4. The inference backends are being optimized for the DeepSeek-R1 model. Given these continuous updates, the current
+   results reflect only the performance tested at the time of the benchmark. Overall, performance for all backends is
+   expected to improve as more optimizations are made by the backend teams.
 
 ## Source code
 
