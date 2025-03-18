@@ -186,7 +186,7 @@ TPOT increased after prefix caching, which requires further investigation.
     <img src="https://github.com/dstackai/benchmarks/raw/deepseek-r1-benchmark/Deepseek-R1/images/prefix-cache-ttft-comparison.png" />
 === "TPOT"
     <img src="https://github.com/dstackai/benchmarks/raw/deepseek-r1-benchmark/Deepseek-R1/images/prefix-cache-tpot-comparison.png" />
-=== "End-to-end Latency"
+=== "Latency"
     <img src="https://github.com/dstackai/benchmarks/raw/deepseek-r1-benchmark/Deepseek-R1/images/prefix-cache-end-to-end-latency-comparison.png" />
 
 ## Limitations
