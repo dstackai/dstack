@@ -1,6 +1,6 @@
 import re
 from enum import Enum
-from typing import Any, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 from pydantic import Field, ValidationError, conint, constr, root_validator, validator
 from typing_extensions import Annotated, Literal
@@ -425,4 +425,9 @@ class DstackConfiguration(CoreModel):
     ]
 
     class Config:
-        schema_extra = {"$schema": "http://json-schema.org/draft-07/schema#"}
+        @staticmethod
+        def schema_extra(schema: Dict[str, Any]):
+            schema["$schema"] = "http://json-schema.org/draft-07/schema#"
+            # Allow additionalProperties so that vscode and others not supporting
+            # top-level oneOf do not warn about properties being invalid.
+            schema["additionalProperties"] = True
