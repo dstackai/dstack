@@ -44,7 +44,7 @@ who provided access to the necessary hardware.
 
 ### Benchmark methodology
 
-#### Online inference
+**Online inference**
 
 We utilized SGLang's [`Deepseek-R1/bench_serving.py` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/benchmarks/tree/main/Deepseek-R1/bench_serving.py){:target="_blank"} 
 script, modified to incorporate TensorRT-LLM. 
@@ -59,7 +59,7 @@ Tests were conducted across multiple request concurrencies and output token leng
 
 To test prefix caching ability, about 62.5% of each ~3200-token prompt (i.e., 2000 out of 3200 tokens) is a repeated prefix across multiple requests.
 
-#### Offline Inference
+**Offline inference**
 
 For offline inference, we used vLLM’s [`benchmark_throughput.py` :material-arrow-top-right-thin:{ .external }](https://github.com/vllm-project/vllm/blob/main/benchmarks/benchmark_throughput.py){:target="_blank"},
 modified for SGLang. TensorRT-LLM was tested using a custom 
