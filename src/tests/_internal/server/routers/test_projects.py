@@ -505,6 +505,62 @@ class TestSetProjectMembers:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_sets_project_members_by_email(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        project = await create_project(
+            session=session,
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
+        admin = await create_user(
+            session=session,
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+            global_role=GlobalRole.ADMIN,
+        )
+        user1 = await create_user(
+            session=session,
+            name="user1",
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+            email="testemail@example.com",
+        )
+        members = [
+            {
+                "username": user1.email,
+                "project_role": ProjectRole.ADMIN,
+            },
+        ]
+        body = {"members": members}
+        response = await client.post(
+            f"/api/projects/{project.name}/set_members",
+            headers=get_auth_headers(admin.token),
+            json=body,
+        )
+        assert response.status_code == 200, response.json()
+        assert response.json()["members"] == [
+            {
+                "user": {
+                    "id": str(user1.id),
+                    "username": user1.name,
+                    "created_at": "2023-01-02T03:04:00+00:00",
+                    "global_role": user1.global_role,
+                    "email": user1.email,
+                    "active": True,
+                    "permissions": {
+                        "can_create_projects": True,
+                    },
+                },
+                "project_role": ProjectRole.ADMIN,
+                "permissions": {
+                    "can_manage_ssh_fleets": True,
+                },
+            },
+        ]
+        res = await session.execute(select(MemberModel))
+        members = res.scalars().all()
+        assert len(members) == 1
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_manager_cannot_set_project_admins(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
