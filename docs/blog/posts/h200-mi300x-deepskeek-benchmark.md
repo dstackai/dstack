@@ -220,7 +220,7 @@ All source code and findings are available in
 
 ### Vultr
 
-[Vultr :material-arrow-top-right-thin:{ .external }](https://www.vultr.com/){:target="_blank"} provided access to 8x NVIDIA H200 GPUs. We are truly thankful for their support.
+[Vultr :material-arrow-top-right-thin:{ .external }](https://www.vultr.com/){:target="_blank"} provided access to 8x AMD MI300X GPUs. We are truly thankful for their support.
 
 If you're looking for top-tier bare metal compute with AMD GPUs, we highly recommend Vultr. With `dstack`, provisioning
 and accessing compute via `dstack` is seamless and straightforward.
