@@ -19,7 +19,7 @@ import {
 
 import { copyToClipboard } from 'libs';
 
-import { TRoleSelectOption } from './types';
+import { TActiveSelectOption, TRoleSelectOption } from './types';
 
 export interface Props {
     initialValues?: IUserWithCreds;
@@ -44,9 +44,14 @@ export const UserForm: React.FC<Props> = ({
     const isEditing = !!initialValues;
 
     const { handleSubmit, control } = useForm<IUser>({
-        defaultValues: initialValues ?? {
-            global_role: 'user',
-        },
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore
+        defaultValues: initialValues
+            ? { ...initialValues, active: initialValues.active ? 'active' : 'inactive' }
+            : {
+                  global_role: 'user',
+                  active: 'active',
+              },
     });
 
     const roleSelectOptions: TRoleSelectOption[] = [
@@ -54,12 +59,22 @@ export const UserForm: React.FC<Props> = ({
         { label: t('roles.user'), value: 'user' },
     ];
 
+    const activeSelectOptions: TActiveSelectOption[] = [
+        { label: t('users.activated'), value: 'active' },
+        { label: t('users.deactivated'), value: 'inactive' },
+    ];
+
     const onCopyToken = () => {
         copyToClipboard(initialValues?.creds.token ?? '');
     };
 
     const onSubmit = (data: IUser) => {
-        onSubmitProp(data);
+        onSubmitProp({
+            ...data,
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+            // @ts-ignore
+            active: data.active === 'active',
+        });
     };
 
     const isDisabledEmailAndRoleField = () => {
@@ -122,6 +137,15 @@ export const UserForm: React.FC<Props> = ({
                                 control={control}
                                 name="global_role"
                                 options={roleSelectOptions}
+                                disabled={isDisabledEmailAndRoleField()}
+                            />
+
+                            <FormSelect
+                                label={t('users.active')}
+                                description={t('users.active_description')}
+                                control={control}
+                                name="active"
+                                options={activeSelectOptions}
                                 disabled={isDisabledEmailAndRoleField()}
                             />
                         </ColumnLayout>
