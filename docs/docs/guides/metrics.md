@@ -1,9 +1,11 @@
 # Prometheus metrics
 
-If enabled, `dstack` collects and exports the following Prometheus metrics.
+If enabled, `dstack` collects and exports Prometheus metrics. Metrics are available at the `/metrics` path.
 
-> [!NOTE]
-> *string?* denotes optional string.
+By default, metrics are disabled. To enable, set the `DSTACK_ENABLE_PROMETHEUS_METRICS` variable.
+
+!!! info "Convention"
+    *type?* denotes an optional type. If a type is optional, an empty string is a valid value.
 
 ## Instance metrics
 
@@ -48,9 +50,18 @@ If enabled, `dstack` collects and exports the following Prometheus metrics.
 
 ## NVIDIA DCGM job metrics
 
-Only on supported backends. Check [`dcgm/exporter.go`](https://github.com/dstackai/dstack/blob/master/runner/internal/shim/dcgm/exporter.go) for the list of metrics.
+A fixed subset of NVIDIA GPU metrics from [DCGM Exporter :material-arrow-top-right-thin:{ .external }](https://docs.nvidia.com/datacenter/dcgm/latest/gpu-telemetry/dcgm-exporter.html){:target="_blank"} on supported cloud backends — AWS, Azure, GCP, OCI — and SSH fleets.
 
-| Label | Type | Example |
+??? info "SSH fleets"
+    In order for DCGM metrics to work, the following packages must be installed on the instances:
+
+    * `datacenter-gpu-manager-4-core`
+    * `datacenter-gpu-manager-4-proprietary`
+    * `datacenter-gpu-manager-exporter`
+
+Check [`dcgm/exporter.go`](https://github.com/dstackai/dstack/blob/master/runner/internal/shim/dcgm/exporter.go) for the list of metrics.
+
+| Label | Type | Examples |
 |---|---|---|
 | `dstack_project_name` | *string* | `main` |
 | `dstack_user_name` | *string* | `alice` |

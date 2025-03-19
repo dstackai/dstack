@@ -225,6 +225,7 @@ nav:
       - Guides:
           - Protips: docs/guides/protips.md
           - Server deployment: docs/guides/server-deployment.md
+          - Metrics: docs/guides/metrics.md
           - Troubleshooting: docs/guides/troubleshooting.md
           - Administration: docs/guides/administration.md
       - Reference:

@@ -202,24 +202,6 @@ To store logs using GCP Logging, set the `DSTACK_SERVER_GCP_LOGGING_PROJECT` env
 
     </div>
 
-## Metrics
-
-If enabled, `dstack` collects and exports Prometheus metrics. Metrics are available at the `/metrics` path.
-
-By default, metrics are disabled. To enable, set the `DSTACK_ENABLE_PROMETHEUS_METRICS` variable.
-
-Currently, `dstack` collects the following metrics:
-
-* Instance metrics: cost, usage
-* Job metrics: cost, usage
-* A fixed subset of NVIDIA GPU metrics from [DCGM Exporter :material-arrow-top-right-thin:{ .external }](https://docs.nvidia.com/datacenter/dcgm/latest/gpu-telemetry/dcgm-exporter.html){:target="_blank"} on supported cloud backends — AWS, Azure, GCP, OCI — and SSH fleets.
-On supported cloud backends the required packages are already installed.
-If you use SSH fleets, install `datacenter-gpu-manager-4-core`, `datacenter-gpu-manager-4-proprietary` and `datacenter-gpu-manager-exporter`.
-
-Each sample includes a set of `dstack_*` labels, e.g., `dstack_project_name="main"`, `dstack_run_name="vllm-llama32"`.
-
-For the detailed list of metrics and labels see the [documentation :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/contributing/METRICS.md){:target="_blank"}.
-
 ## Encryption
 
 By default, `dstack` stores data in plaintext. To enforce encryption, you 
