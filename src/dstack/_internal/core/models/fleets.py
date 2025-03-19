@@ -19,6 +19,7 @@ from dstack._internal.core.models.profiles import (
     parse_idle_duration,
 )
 from dstack._internal.core.models.resources import Range, ResourcesSpec
+from dstack._internal.utils.json_schema import add_extra_schema_types
 
 
 class FleetStatus(str, Enum):
@@ -221,6 +222,14 @@ class InstanceGroupParams(CoreModel):
             description="Time to wait before terminating idle instances. Defaults to `5m` for runs and `3d` for fleets. Use `off` for unlimited duration"
         ),
     ] = None
+
+    class Config:
+        @staticmethod
+        def schema_extra(schema: Dict[str, Any], model: Type):
+            add_extra_schema_types(
+                schema["properties"]["nodes"],
+                extra_types=[{"type": "integer"}, {"type": "string"}],
+            )
 
     _validate_idle_duration = validator("idle_duration", pre=True, allow_reuse=True)(
         parse_idle_duration

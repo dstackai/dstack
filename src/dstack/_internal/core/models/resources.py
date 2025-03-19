@@ -8,6 +8,7 @@ from typing_extensions import Annotated
 
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.utils.common import pretty_resources
+from dstack._internal.utils.json_schema import add_extra_schema_types
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -128,6 +129,22 @@ DEFAULT_GPU_COUNT = Range[int](min=1, max=1)
 
 
 class GPUSpec(CoreModel):
+    class Config:
+        @staticmethod
+        def schema_extra(schema: Dict[str, Any]):
+            add_extra_schema_types(
+                schema["properties"]["count"],
+                extra_types=[{"type": "integer"}, {"type": "string"}],
+            )
+            add_extra_schema_types(
+                schema["properties"]["memory"],
+                extra_types=[{"type": "integer"}, {"type": "string"}],
+            )
+            add_extra_schema_types(
+                schema["properties"]["total_memory"],
+                extra_types=[{"type": "integer"}, {"type": "string"}],
+            )
+
     vendor: Annotated[
         Optional[gpuhunt.AcceleratorVendor],
         Field(
@@ -233,6 +250,14 @@ class GPUSpec(CoreModel):
 
 
 class DiskSpec(CoreModel):
+    class Config:
+        @staticmethod
+        def schema_extra(schema: Dict[str, Any]):
+            add_extra_schema_types(
+                schema["properties"]["size"],
+                extra_types=[{"type": "integer"}, {"type": "string"}],
+            )
+
     size: Annotated[Range[Memory], Field(description="Disk size")]
 
     @classmethod
@@ -254,11 +279,26 @@ class ResourcesSpec(CoreModel):
     class Config:
         @staticmethod
         def schema_extra(schema: Dict[str, Any]):
-            schema.clear()
-            # replace strict schema with a more permissive one
-            ref_template = "#/definitions/ResourcesSpecRequest/definitions/{model}"
-            for field, value in ResourcesSpecSchema.schema(ref_template=ref_template).items():
-                schema[field] = value
+            add_extra_schema_types(
+                schema["properties"]["cpu"],
+                extra_types=[{"type": "integer"}, {"type": "string"}],
+            )
+            add_extra_schema_types(
+                schema["properties"]["memory"],
+                extra_types=[{"type": "integer"}, {"type": "string"}],
+            )
+            add_extra_schema_types(
+                schema["properties"]["shm_size"],
+                extra_types=[{"type": "integer"}, {"type": "string"}],
+            )
+            add_extra_schema_types(
+                schema["properties"]["gpu"],
+                extra_types=[{"type": "integer"}, {"type": "string"}],
+            )
+            add_extra_schema_types(
+                schema["properties"]["disk"],
+                extra_types=[{"type": "integer"}, {"type": "string"}],
+            )
 
     cpu: Annotated[Range[int], Field(description="The number of CPU cores")] = DEFAULT_CPU_COUNT
     memory: Annotated[Range[Memory], Field(description="The RAM size (e.g., `8GB`)")] = (
@@ -290,74 +330,3 @@ class ResourcesSpec(CoreModel):
             resources.update(disk_size=self.disk.size)
         res = pretty_resources(**resources)
         return res
-
-
-IntRangeLike = Union[Range[Union[int, str]], int, str]
-MemoryRangeLike = Union[Range[Union[Memory, float, int, str]], float, int, str]
-MemoryLike = Union[Memory, float, int, str]
-GPULike = Union[GPUSpec, "GPUSpecSchema", int, str]
-DiskLike = Union[DiskSpec, "DiskSpecSchema", float, int, str]
-ComputeCapabilityLike = Union[ComputeCapability, float, str]
-
-
-class GPUSpecSchema(CoreModel):
-    vendor: Annotated[
-        Optional[gpuhunt.AcceleratorVendor],
-        Field(
-            description="The vendor of the GPU/accelerator, one of: `nvidia`, `amd`, `google` (alias: `tpu`), `intel`"
-        ),
-    ] = None
-    name: Annotated[
-        Optional[Union[List[str], str]], Field(description="The GPU name or list of names")
-    ] = None
-    count: Annotated[IntRangeLike, Field(description="The number of GPUs")] = DEFAULT_GPU_COUNT
-    memory: Annotated[
-        Optional[MemoryRangeLike],
-        Field(
-            description="The RAM size (e.g., `16GB`). Can be set to a range (e.g. `16GB..`, or `16GB..80GB`)"
-        ),
-    ] = None
-    total_memory: Annotated[
-        Optional[MemoryRangeLike],
-        Field(
-            description="The total RAM size (e.g., `32GB`). Can be set to a range (e.g. `16GB..`, or `16GB..80GB`)"
-        ),
-    ] = None
-    compute_capability: Annotated[
-        Optional[ComputeCapabilityLike],
-        Field(description="The minimum compute capability of the GPU (e.g., `7.5`)"),
-    ] = None
-
-
-class DiskSpecSchema(CoreModel):
-    size: Annotated[
-        MemoryRangeLike,
-        Field(
-            description="The disk size. Can be set to a range (e.g., `100GB..` or `100GB..200GB`)"
-        ),
-    ]
-
-
-class ResourcesSpecSchema(CoreModel):
-    cpu: Annotated[Optional[IntRangeLike], Field(description="The number of CPU cores")] = (
-        DEFAULT_CPU_COUNT
-    )
-    memory: Annotated[
-        Optional[MemoryRangeLike],
-        Field(description="The RAM size (e.g., `8GB`)"),
-    ] = DEFAULT_MEMORY_SIZE
-    shm_size: Annotated[
-        Optional[MemoryLike],
-        Field(
-            description="The size of shared memory (e.g., `8GB`). "
-            "If you are using parallel communicating processes (e.g., dataloaders in PyTorch), "
-            "you may need to configure this"
-        ),
-    ] = None
-    gpu: Annotated[
-        Optional[GPULike],
-        Field(
-            description="The GPU requirements. Can be set to a number, a string (e.g. `A100`, `80GB:2`, etc.), or an object"
-        ),
-    ] = None
-    disk: Annotated[Optional[DiskLike], Field(description="The disk resources")] = DEFAULT_DISK
