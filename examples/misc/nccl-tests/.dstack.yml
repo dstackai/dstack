@@ -1,7 +1,7 @@
 type: task
 name: nccl-tests
 
-image: un1def/aws-efa-test
+image: dstackai/efa
 nodes: 2
 
 env:

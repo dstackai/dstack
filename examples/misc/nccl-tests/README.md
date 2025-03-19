@@ -15,7 +15,7 @@ This configuration runs AllReduce test on 2 nodes with 4 GPUs each (8 processes 
 type: task
 name: nccl-tests
 
-image: un1def/aws-efa-test
+image: dstackai/efa
 nodes: 2
 
 env:
