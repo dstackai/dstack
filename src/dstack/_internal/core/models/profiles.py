@@ -241,7 +241,7 @@ class ProfileParams(CoreModel):
         Field(description="Run termination policy based on utilization"),
     ] = None
 
-    # # Deprecated and unused. Left for compatibility with 0.18 clients.
+    # Deprecated and unused. Left for compatibility with 0.18 clients.
     pool_name: Annotated[Optional[str], Field(exclude=True)] = None
     instance_name: Annotated[Optional[str], Field(exclude=True)] = None
     retry_policy: Annotated[Optional[ProfileRetryPolicy], Field(exclude=True)] = None

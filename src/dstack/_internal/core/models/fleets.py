@@ -16,6 +16,7 @@ from dstack._internal.core.models.profiles import (
     ProfileParams,
     ProfileRetry,
     SpotPolicy,
+    TerminationPolicy,
     parse_idle_duration,
 )
 from dstack._internal.core.models.resources import Range, ResourcesSpec
@@ -223,9 +224,15 @@ class InstanceGroupParams(CoreModel):
         ),
     ] = None
 
+    # Deprecated and unused. Left for compatibility with 0.18 clients.
+    termination_policy: Annotated[Optional[TerminationPolicy], Field(exclude=True)] = None
+    termination_idle_time: Annotated[Optional[Union[str, int]], Field(exclude=True)] = None
+
     class Config:
         @staticmethod
         def schema_extra(schema: Dict[str, Any], model: Type):
+            del schema["properties"]["termination_policy"]
+            del schema["properties"]["termination_idle_time"]
             add_extra_schema_types(
                 schema["properties"]["nodes"],
                 extra_types=[{"type": "integer"}, {"type": "string"}],
