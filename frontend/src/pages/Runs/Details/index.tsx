@@ -22,6 +22,7 @@ import {
     getRunListItemPrice,
     getRunListItemRegion,
     getRunListItemResources,
+    getRunListItemServiceUrl,
     getRunListItemSpot,
 } from '../List/helpers';
 import { isAvailableAbortingForRun, isAvailableDeletingForRun, isAvailableStoppingForRun } from '../utils';
@@ -261,6 +262,15 @@ export const RunDetails: React.FC = () => {
                                     <div>${runData.cost}</div>
                                 </div>
                             </ColumnLayout>
+
+                            {getRunListItemServiceUrl(runData) && (
+                                <ColumnLayout columns={1} variant="text-grid">
+                                    <div>
+                                        <Box variant="awsui-key-label">{t('projects.run.gateway')}</Box>
+                                        <div>{getRunListItemServiceUrl(runData)}</div>
+                                    </div>
+                                </ColumnLayout>
+                            )}
                         </Container>
 
                         {runData.jobs.length === 1 && (

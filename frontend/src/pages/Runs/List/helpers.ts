@@ -84,3 +84,7 @@ export const getRunListItemBackend = (run: IRun) => {
 
     return run.latest_job_submission?.job_provisioning_data?.backend ?? '-';
 };
+
+export const getRunListItemServiceUrl = (run: IRun) => {
+    return run.service?.url ?? null;
+};
