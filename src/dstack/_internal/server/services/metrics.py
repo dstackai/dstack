@@ -152,8 +152,8 @@ def _calculate_job_metrics(job_model: JobModel, points: Sequence[JobMetricsPoint
 def _make_constant_metric(name: str, timestamps: list[datetime], value: float) -> Metric:
     return Metric(
         name=name,
-        timestamps=[timestamps[0], timestamps[-1]] if len(timestamps) > 1 else [timestamps[0]],
-        values=[value, value] if len(timestamps) > 1 else [value],
+        timestamps=timestamps,
+        values=[value] * len(timestamps),
     )
 
 
