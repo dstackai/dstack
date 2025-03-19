@@ -26,7 +26,7 @@ async def get_prometheus_metrics(
     return await prometheus.get_metrics(session=session)
 
 
-@router.get("/metrics/project/{project_name}")
+@router.get("/metrics/project/{project_name}", deprecated=True)
 async def get_project_prometheus_metrics(
     session: Annotated[AsyncSession, Depends(get_session)],
     project: Annotated[ProjectModel, Depends(Project())],
