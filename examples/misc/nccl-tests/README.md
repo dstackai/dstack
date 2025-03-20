@@ -2,12 +2,9 @@
 
 This example shows how to run distributed [NCCL Tests :material-arrow-top-right-thin:{ .external }](https://github.com/NVIDIA/nccl-tests){:target="_blank"} with MPI using `dstack`.
 
-??? info "AWS EFA"
-    The used image is optimized for AWS [EFA :material-arrow-top-right-thin:{ .external }](https://aws.amazon.com/hpc/efa/){:target="_blank"} but works with regular TCP/IP network adapters as well.
+## Running as a task
 
-## Configuration
-
-This configuration runs AllReduce test on 2 nodes with 4 GPUs each (8 processes total), but you can adjust both `nodes` and `resources.gpu` without modifying the script.
+Here's an example of a task that runs AllReduce test on 2 nodes, each with 4 GPUs (8 processes in total).
 
 <div editor-title="examples/misc/nccl-tests/.dstack.yml">
 
@@ -15,12 +12,11 @@ This configuration runs AllReduce test on 2 nodes with 4 GPUs each (8 processes 
 type: task
 name: nccl-tests
 
-image: un1def/aws-efa-test
 nodes: 2
 
+image: dstackai/efa
 env:
   - NCCL_DEBUG=INFO
-
 commands:
   - |
     # We use FIFO for inter-node communication
@@ -39,7 +35,7 @@ commands:
       done
       # Run NCCL Tests
       ${MPIRUN} \
-        -n $((DSTACK_NODES_NUM * DSTACK_GPUS_PER_NODE)) -N ${DSTACK_GPUS_PER_NODE} \
+        -n ${DSTACK_GPUS_NUM} -N ${DSTACK_GPUS_PER_NODE} \
         --mca btl_tcp_if_exclude lo,docker0 \
         --bind-to none \
         ./all_reduce_perf -b 8 -e 8G -f 2 -g 1
@@ -59,7 +55,18 @@ resources:
 
 </div>
 
-### Running a configuration
+The script orchestrates distributed execution across multiple nodes using MPI. The master node (identified by
+`DSTACK_NODE_RANK=0`) generates a hostfile listing all node IPs and continuously checks until all worker nodes are
+accessible via MPI. Once confirmed, it executes the `all_reduce_perf` benchmark across all available GPUs.
+
+Worker nodes use a FIFO pipe to block execution until they receive a termination signal from the master
+node. This ensures worker nodes remain active during the test and only exit once the master node completes the
+benchmark.
+
+> The `dstackai/efa` image is optimized for [AWS EFA :material-arrow-top-right-thin:{ .external }](https://aws.amazon.com/hpc/efa/){:target="_blank"}
+> but also works with regular TCP/IP network adapters as well as InfiniBand.
+
+### Apply a configuration
 
 To run a configuration, use the [`dstack apply`](https://dstack.ai/docs/reference/cli/dstack/apply/) command.
 
