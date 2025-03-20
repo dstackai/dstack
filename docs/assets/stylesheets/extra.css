@@ -201,6 +201,8 @@
 .md-typeset__scrollwrap {
     margin-top: 0;
     margin-bottom: 0;
+    margin-block-start: 1em;
+    margin-block-end: 1em;
 }
 
 .md-typeset__table {
