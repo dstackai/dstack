@@ -1,12 +1,11 @@
 type: task
 name: nccl-tests
 
-image: dstackai/efa
 nodes: 2
 
+image: dstackai/efa
 env:
   - NCCL_DEBUG=INFO
-
 commands:
   - |
     # We use FIFO for inter-node communication
