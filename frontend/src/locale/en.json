@@ -351,7 +351,7 @@
       "artifacts": "Artifacts",
       "artifacts_count": "Artifacts",
       "hub_user_name": "User",
-      "gateway": "Gateway",
+      "service_url": "Service URL",
       "statuses": {
         "pending": "Pending",
         "submitted": "Submitted",

@@ -47,6 +47,8 @@ export const RunDetails: React.FC = () => {
         id: paramRunId,
     });
 
+    const serviceUrl = runData ? getRunListItemServiceUrl(runData) : null;
+
     useEffect(() => {
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-ignore
@@ -263,11 +265,13 @@ export const RunDetails: React.FC = () => {
                                 </div>
                             </ColumnLayout>
 
-                            {getRunListItemServiceUrl(runData) && (
+                            {serviceUrl && (
                                 <ColumnLayout columns={1} variant="text-grid">
                                     <div>
-                                        <Box variant="awsui-key-label">{t('projects.run.gateway')}</Box>
-                                        <div>{getRunListItemServiceUrl(runData)}</div>
+                                        <Box variant="awsui-key-label">{t('projects.run.service_url')}</Box>
+                                        <div>
+                                            <a href={serviceUrl}>{serviceUrl}</a>
+                                        </div>
                                     </div>
                                 </ColumnLayout>
                             )}
