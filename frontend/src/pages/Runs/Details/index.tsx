@@ -22,6 +22,7 @@ import {
     getRunListItemPrice,
     getRunListItemRegion,
     getRunListItemResources,
+    getRunListItemServiceUrl,
     getRunListItemSpot,
 } from '../List/helpers';
 import { isAvailableAbortingForRun, isAvailableDeletingForRun, isAvailableStoppingForRun } from '../utils';
@@ -45,6 +46,8 @@ export const RunDetails: React.FC = () => {
         project_name: paramProjectName,
         id: paramRunId,
     });
+
+    const serviceUrl = runData ? getRunListItemServiceUrl(runData) : null;
 
     useEffect(() => {
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -261,6 +264,17 @@ export const RunDetails: React.FC = () => {
                                     <div>${runData.cost}</div>
                                 </div>
                             </ColumnLayout>
+
+                            {serviceUrl && (
+                                <ColumnLayout columns={1} variant="text-grid">
+                                    <div>
+                                        <Box variant="awsui-key-label">{t('projects.run.service_url')}</Box>
+                                        <div>
+                                            <a href={serviceUrl}>{serviceUrl}</a>
+                                        </div>
+                                    </div>
+                                </ColumnLayout>
+                            )}
                         </Container>
 
                         {runData.jobs.length === 1 && (

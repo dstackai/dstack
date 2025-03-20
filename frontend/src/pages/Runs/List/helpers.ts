@@ -2,6 +2,7 @@ import { groupBy as _groupBy } from 'lodash';
 
 import { finishedJobs } from '../constants';
 import { getJobStatus } from '../Details/Jobs/List/helpers';
+import { getBaseUrl } from 'App/helpers';
 
 export const getGroupedRunsByProjectAndRepoID = (runs: IRun[]) => {
     return _groupBy(runs, ({ project_name }) => project_name);
@@ -83,4 +84,10 @@ export const getRunListItemBackend = (run: IRun) => {
     }
 
     return run.latest_job_submission?.job_provisioning_data?.backend ?? '-';
+};
+
+export const getRunListItemServiceUrl = (run: IRun) => {
+    const url = run.service?.url;
+    if (!url) return null;
+    return url.startsWith('/') ? `${getBaseUrl()}${url}` : url;
 };
