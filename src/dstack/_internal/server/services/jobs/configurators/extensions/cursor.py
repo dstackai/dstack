@@ -35,7 +35,7 @@ class CursorDesktop:
 
     def get_print_readme_commands(self) -> List[str]:
         return [
-            "echo To open in VS Code Desktop, use link below:",
+            "echo To open in Cursor, use link below:",
             "echo ''",
             f"echo '  cursor://vscode-remote/ssh-remote+{self.run_name}/workflow'",  # TODO use $REPO_DIR
             "echo ''",
