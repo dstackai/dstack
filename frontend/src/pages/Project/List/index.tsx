@@ -76,7 +76,7 @@ export const ProjectList: React.FC = () => {
                 const filteringTextLowerCase = filteringText.toLowerCase();
 
                 return SEARCHABLE_COLUMNS.map((key) => _get(projectItem, key)).some(
-                    (value) => typeof value === 'string' && value.toLowerCase().indexOf(filteringTextLowerCase) > -1,
+                    (value) => typeof value === 'string' && value.trim().toLowerCase().indexOf(filteringTextLowerCase) > -1,
                 );
             },
         },

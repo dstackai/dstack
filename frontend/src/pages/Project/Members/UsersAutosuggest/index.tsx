@@ -35,7 +35,7 @@ export const UserAutosuggest: React.FC<Props> = ({ optionsFilter, onSelect: onSe
     return (
         <Autosuggest
             value={value}
-            enteredTextLabel={(text) => `${t('users_autosuggest.placeholder')} ${text}`}
+            enteredTextLabel={(text) => `${t('users_autosuggest.entered_text')} ${text}`}
             onChange={({ detail }) => setValue(detail.value)}
             options={filteredOptions}
             statusType={isUsersLoading ? 'loading' : undefined}

@@ -13,9 +13,7 @@ from dstack._internal.cli.commands.fleet import FleetCommand
 from dstack._internal.cli.commands.gateway import GatewayCommand
 from dstack._internal.cli.commands.init import InitCommand
 from dstack._internal.cli.commands.logs import LogsCommand
-from dstack._internal.cli.commands.pool import PoolCommand
 from dstack._internal.cli.commands.ps import PsCommand
-from dstack._internal.cli.commands.run import RunCommand
 from dstack._internal.cli.commands.server import ServerCommand
 from dstack._internal.cli.commands.stats import StatsCommand
 from dstack._internal.cli.commands.stop import StopCommand
@@ -40,7 +38,7 @@ def main():
     parser = argparse.ArgumentParser(
         description=(
             "Not sure where to start? Call [code]dstack init[/].\n"
-            "Define a [code].dstack.yml[/] configuration file and run it via [code]dstack run[/]\n"
+            "Define a [code].dstack.yml[/] configuration file and run it via [code]dstack apply[/]\n"
         ),
         formatter_class=RichHelpFormatter,
         epilog=(
@@ -65,11 +63,9 @@ def main():
     DeleteCommand.register(subparsers)
     FleetCommand.register(subparsers)
     GatewayCommand.register(subparsers)
-    PoolCommand.register(subparsers)
     InitCommand.register(subparsers)
     LogsCommand.register(subparsers)
     PsCommand.register(subparsers)
-    RunCommand.register(subparsers)
     ServerCommand.register(subparsers)
     StatsCommand.register(subparsers)
     StopCommand.register(subparsers)

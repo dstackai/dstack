@@ -20,7 +20,6 @@ from dstack._internal.core.models.profiles import (
     CreationPolicy,
     Profile,
     ProfileParams,
-    ProfileRetryPolicy,
     RetryEvent,
     SpotPolicy,
     UtilizationPolicy,
@@ -178,6 +177,11 @@ class Gateway(CoreModel):
     options: dict = {}
 
 
+class JobSSHKey(CoreModel):
+    private: str
+    public: str
+
+
 class JobSpec(CoreModel):
     replica_num: int = 0  # default value for backward compatibility
     job_num: int
@@ -198,9 +202,7 @@ class JobSpec(CoreModel):
     requirements: Requirements
     retry: Optional[Retry]
     volumes: Optional[List[MountPoint]] = None
-    # For backward compatibility with 0.18.x when retry_policy was required.
-    # TODO: remove in 0.19
-    retry_policy: ProfileRetryPolicy = ProfileRetryPolicy(retry=False)
+    ssh_key: Optional[JobSSHKey] = None
     working_dir: Optional[str]
 
 
@@ -306,7 +308,7 @@ class RunSpec(CoreModel):
     run_name: Annotated[
         Optional[str],
         Field(description="The run name. If not set, the run name is generated automatically."),
-    ]
+    ] = None
     repo_id: Annotated[
         Optional[str],
         Field(
@@ -316,15 +318,18 @@ class RunSpec(CoreModel):
                 " If not specified, a default virtual repo is used."
             )
         ),
-    ]
+    ] = None
     repo_data: Annotated[
         Optional[AnyRunRepoData],
         Field(
             discriminator="repo_type",
             description="The repo data such as the current branch and commit.",
         ),
-    ]
-    repo_code_hash: Annotated[Optional[str], Field(description="The hash of the repo diff")]
+    ] = None
+    repo_code_hash: Annotated[
+        Optional[str],
+        Field(description="The hash of the repo diff. Can be omitted if there is no repo diff."),
+    ] = None
     working_dir: Annotated[
         Optional[str],
         Field(
@@ -334,7 +339,7 @@ class RunSpec(CoreModel):
                 ' Defaults to `"."`.'
             )
         ),
-    ]
+    ] = None
     configuration_path: Annotated[
         Optional[str],
         Field(
@@ -343,9 +348,9 @@ class RunSpec(CoreModel):
                 " It can be omitted when using the programmatic API."
             )
         ),
-    ]
+    ] = None
     configuration: Annotated[AnyRunConfiguration, Field(discriminator="type")]
-    profile: Annotated[Optional[Profile], Field(description="The profile parameters")]
+    profile: Annotated[Optional[Profile], Field(description="The profile parameters")] = None
     ssh_key_pub: Annotated[
         str,
         Field(
@@ -452,9 +457,7 @@ class RunPlan(CoreModel):
     run_spec: RunSpec
     job_plans: List[JobPlan]
     current_resource: Optional[Run] = None
-    # Optional for backward-compatibility with 0.18.x servers
-    # TODO: make required in 0.19
-    action: Optional[ApplyAction] = None
+    action: ApplyAction
 
 
 class ApplyRunPlanInput(CoreModel):
@@ -468,11 +471,6 @@ class ApplyRunPlanInput(CoreModel):
             )
         ),
     ] = None
-
-
-class PoolInstanceOffers(CoreModel):
-    pool_name: str
-    instances: List[InstanceOfferWithAvailability]
 
 
 def get_policy_map(spot_policy: Optional[SpotPolicy], default: SpotPolicy) -> Optional[bool]:

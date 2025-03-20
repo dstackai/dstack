@@ -64,6 +64,7 @@ class SubmitBody(CoreModel):
                 "gateway",
                 "single_branch",
                 "max_duration",
+                "ssh_key",
                 "working_dir",
             }
         ),

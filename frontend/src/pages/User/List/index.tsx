@@ -17,7 +17,7 @@ import {
 
 import { DATE_TIME_FORMAT } from 'consts';
 import { useAppSelector, useBreadcrumbs, useCollection, useNotifications } from 'hooks';
-import { getServerError } from 'libs';
+import { getServerError, includeSubString } from 'libs';
 import { ROUTES } from 'routes';
 import { useDeleteUsersMutation, useGetUserListQuery } from 'services/user';
 
@@ -101,6 +101,8 @@ export const UserList: React.FC = () => {
         filtering: {
             empty: renderEmptyMessage(),
             noMatch: renderNoMatchMessage(() => actions.setFiltering('')),
+            filteringFunction: (user, filteringText) =>
+                includeSubString(user.username, filteringText) || includeSubString(user.email ?? '', filteringText),
         },
         pagination: { pageSize: 20 },
         selection: {},

@@ -1,0 +1,16 @@
+from dstack._internal.core.backends.base.backend import Backend
+from dstack._internal.core.backends.{{ backend_name|lower }}.compute import {{ backend_name }}Compute
+from dstack._internal.core.backends.{{ backend_name|lower }}.models import {{ backend_name }}Config
+from dstack._internal.core.models.backends.base import BackendType
+
+
+class {{ backend_name }}Backend(Backend):
+    TYPE = BackendType.{{ backend_name|upper }}
+    COMPUTE_CLASS = {{ backend_name }}Compute
+
+    def __init__(self, config: {{ backend_name }}Config):
+        self.config = config
+        self._compute = {{ backend_name }}Compute(self.config)
+
+    def compute(self) -> {{ backend_name }}Compute:
+        return self._compute

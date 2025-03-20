@@ -27,7 +27,6 @@ from dstack._internal.server.routers import (
     instances,
     logs,
     metrics,
-    pools,
     projects,
     prometheus,
     repos,
@@ -184,8 +183,6 @@ def register_routes(app: FastAPI, ui: bool = True):
     app.include_router(volumes.project_router)
     app.include_router(service_proxy.router, prefix="/proxy/services", tags=["service-proxy"])
     app.include_router(model_proxy.router, prefix="/proxy/models", tags=["model-proxy"])
-    app.include_router(pools.root_router)
-    app.include_router(pools.router)
     app.include_router(prometheus.router)
 
     @app.exception_handler(ForbiddenError)

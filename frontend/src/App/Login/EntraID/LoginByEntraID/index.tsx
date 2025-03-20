@@ -9,6 +9,7 @@ import { useEntraAuthorizeMutation } from 'services/auth';
 
 import { ReactComponent as EntraIdIcon } from 'assets/icons/entraID.svg';
 import styles from './styles.module.scss';
+import { getBaseUrl } from 'App/helpers';
 
 export const LoginByEntraID: React.FC<{ className?: string }> = ({ className }) => {
     const { t } = useTranslation();
@@ -16,7 +17,7 @@ export const LoginByEntraID: React.FC<{ className?: string }> = ({ className }) 
     const [entraAuthorize, { isLoading }] = useEntraAuthorizeMutation();
 
     const signInClick = () => {
-        entraAuthorize()
+        entraAuthorize({ base_url: getBaseUrl() })
             .unwrap()
             .then((data) => {
                 goToUrl(data.authorization_url);

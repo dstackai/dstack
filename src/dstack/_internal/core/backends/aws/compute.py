@@ -8,20 +8,25 @@ from pydantic import ValidationError
 
 import dstack._internal.core.backends.aws.resources as aws_resources
 from dstack._internal import settings
-from dstack._internal.core.backends.aws.config import AWSConfig
+from dstack._internal.core.backends.aws.models import AWSAccessKeyCreds, AWSConfig
 from dstack._internal.core.backends.base.compute import (
     Compute,
+    ComputeWithCreateInstanceSupport,
+    ComputeWithGatewaySupport,
+    ComputeWithMultinodeSupport,
+    ComputeWithPlacementGroupSupport,
+    ComputeWithPrivateGatewaySupport,
+    ComputeWithReservationSupport,
+    ComputeWithVolumeSupport,
     generate_unique_gateway_instance_name,
     generate_unique_instance_name,
     generate_unique_volume_name,
     get_gateway_user_data,
-    get_job_instance_name,
     get_user_data,
     merge_tags,
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.errors import ComputeError, NoCapacityError, PlacementGroupInUseError
-from dstack._internal.core.models.backends.aws import AWSAccessKeyCreds
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import CoreModel, is_core_model_instance
 from dstack._internal.core.models.gateways import (
@@ -33,11 +38,10 @@ from dstack._internal.core.models.instances import (
     InstanceConfiguration,
     InstanceOffer,
     InstanceOfferWithAvailability,
-    SSHKey,
 )
 from dstack._internal.core.models.placement import PlacementGroup, PlacementGroupProvisioningData
 from dstack._internal.core.models.resources import Memory, Range
-from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
+from dstack._internal.core.models.runs import JobProvisioningData, Requirements
 from dstack._internal.core.models.volumes import (
     Volume,
     VolumeAttachmentData,
@@ -62,7 +66,16 @@ class AWSVolumeBackendData(CoreModel):
     iops: int
 
 
-class AWSCompute(Compute):
+class AWSCompute(
+    ComputeWithCreateInstanceSupport,
+    ComputeWithMultinodeSupport,
+    ComputeWithReservationSupport,
+    ComputeWithPlacementGroupSupport,
+    ComputeWithGatewaySupport,
+    ComputeWithPrivateGatewaySupport,
+    ComputeWithVolumeSupport,
+    Compute,
+):
     def __init__(self, config: AWSConfig):
         super().__init__()
         self.config = config
@@ -270,44 +283,6 @@ class AWSCompute(Compute):
                 continue
         raise NoCapacityError()
 
-    def run_job(
-        self,
-        run: Run,
-        job: Job,
-        instance_offer: InstanceOfferWithAvailability,
-        project_ssh_public_key: str,
-        project_ssh_private_key: str,
-        volumes: List[Volume],
-    ) -> JobProvisioningData:
-        # TODO: run_job is the same for vm-based backends, refactor
-        instance_config = InstanceConfiguration(
-            project_name=run.project_name,
-            instance_name=get_job_instance_name(run, job),  # TODO: generate name
-            ssh_keys=[
-                SSHKey(public=project_ssh_public_key.strip()),
-            ],
-            user=run.user,
-            volumes=volumes,
-            reservation=run.run_spec.configuration.reservation,
-        )
-        instance_offer = instance_offer.copy()
-        if len(volumes) > 0:
-            volume = volumes[0]
-            if (
-                volume.provisioning_data is not None
-                and volume.provisioning_data.availability_zone is not None
-            ):
-                if instance_offer.availability_zones is None:
-                    instance_offer.availability_zones = [
-                        volume.provisioning_data.availability_zone
-                    ]
-                instance_offer.availability_zones = [
-                    z
-                    for z in instance_offer.availability_zones
-                    if z == volume.provisioning_data.availability_zone
-                ]
-        return self.create_instance(instance_offer, instance_config)
-
     def create_placement_group(
         self,
         placement_group: PlacementGroup,
@@ -382,7 +357,7 @@ class AWSCompute(Compute):
             **aws_resources.create_instances_struct(
                 disk_size=10,
                 image_id=aws_resources.get_gateway_image_id(ec2_client),
-                instance_type="t2.micro",
+                instance_type="t3.micro",
                 iam_instance_profile=None,
                 user_data=get_gateway_user_data(configuration.ssh_key_pub),
                 tags=tags,

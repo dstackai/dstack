@@ -85,28 +85,11 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
             )
         profile = load_profile(Path.cwd(), configurator_args.profile)
         with console.status("Getting apply plan..."):
-            run_plan = self.api.runs.get_plan(
+            run_plan = self.api.runs.get_run_plan(
                 configuration=conf,
                 repo=repo,
                 configuration_path=configuration_path,
-                backends=profile.backends,
-                regions=profile.regions,
-                instance_types=profile.instance_types,
-                reservation=profile.reservation,
-                spot_policy=profile.spot_policy,
-                retry_policy=profile.retry_policy,
-                utilization_policy=profile.utilization_policy,
-                max_duration=profile.max_duration,
-                stop_duration=profile.stop_duration,
-                max_price=profile.max_price,
-                working_dir=conf.working_dir,
-                run_name=conf.name,
-                pool_name=profile.pool_name,
-                instance_name=profile.instance_name,
-                creation_policy=profile.creation_policy,
-                termination_policy=profile.termination_policy,
-                termination_policy_idle=profile.termination_idle_time,
-                idle_duration=profile.idle_duration,
+                profile=profile,
             )
 
         print_run_plan(run_plan, offers_limit=configurator_args.max_offers)
@@ -165,8 +148,8 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
 
         try:
             with console.status("Applying plan..."):
-                run = self.api.runs.exec_plan(
-                    run_plan, repo, reserve_ports=not command_args.detach
+                run = self.api.runs.apply_plan(
+                    run_plan=run_plan, repo=repo, reserve_ports=not command_args.detach
                 )
         except ServerClientError as e:
             raise CLIError(e.msg)
@@ -459,6 +442,14 @@ class DevEnvironmentConfigurator(RunWithPortsConfigurator):
                     "Fix by opening [code]Command Palette[/code], executing [code]Shell Command: "
                     "Install 'code' command in PATH[/code], and restarting terminal.[/]\n"
                 )
+        if conf.ide == "cursor" and conf.version is None:
+            conf.version = _detect_cursor_version()
+            if conf.version is None:
+                console.print(
+                    "[secondary]Unable to detect the Cursor version and pre-install extensions. "
+                    "Fix by opening [code]Command Palette[/code], executing [code]Shell Command: "
+                    "Install 'cursor' command in PATH[/code], and restarting terminal.[/]\n"
+                )
 
 
 class ServiceConfigurator(BaseRunConfigurator):
@@ -488,6 +479,16 @@ def _unique_ports_constraint(ports: List[int]):
 
 
 def _detect_vscode_version(exe: str = "code") -> Optional[str]:
+    try:
+        run = subprocess.run([exe, "--version"], capture_output=True)
+    except FileNotFoundError:
+        return None
+    if run.returncode == 0:
+        return run.stdout.decode().split("\n")[1].strip()
+    return None
+
+
+def _detect_cursor_version(exe: str = "cursor") -> Optional[str]:
     try:
         run = subprocess.run([exe, "--version"], capture_output=True)
     except FileNotFoundError:

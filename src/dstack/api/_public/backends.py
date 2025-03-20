@@ -1,6 +1,6 @@
 from typing import List
 
-from dstack._internal.core.models.backends import BackendInfo
+from dstack._internal.core.backends.models import BackendInfo
 from dstack.api.server import APIClient
 
 

@@ -7,19 +7,22 @@ from sqlalchemy import func as safunc
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
-from dstack._internal.core.errors import ForbiddenError, ResourceExistsError, ServerClientError
-from dstack._internal.core.models.backends import BackendInfo
-from dstack._internal.core.models.backends.dstack import (
-    DstackBaseBackendConfigInfo,
-    DstackConfigInfo,
+from dstack._internal.core.backends.configurators import get_configurator
+from dstack._internal.core.backends.dstack.models import (
+    DstackBackendConfig,
+    DstackBaseBackendConfig,
 )
+from dstack._internal.core.backends.models import BackendInfo
+from dstack._internal.core.errors import ForbiddenError, ResourceExistsError, ServerClientError
 from dstack._internal.core.models.common import is_core_model_instance
 from dstack._internal.core.models.projects import Member, MemberPermissions, Project
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.models import MemberModel, ProjectModel, UserModel
 from dstack._internal.server.schemas.projects import MemberSetting
 from dstack._internal.server.services import users
-from dstack._internal.server.services.backends import get_configurator
+from dstack._internal.server.services.backends import (
+    get_backend_config_from_backend_model,
+)
 from dstack._internal.server.services.permissions import get_default_permissions
 from dstack._internal.server.settings import DEFAULT_PROJECT_NAME
 from dstack._internal.utils.common import get_current_datetime, run_async
@@ -176,12 +179,16 @@ async def set_project_members(
     # FIXME: potentially long write transaction
     # clear_project_members() issues DELETE without commit
     await clear_project_members(session=session, project=project)
-    usernames = [m.username for m in members]
-    res = await session.execute(select(UserModel).where(UserModel.name.in_(usernames)))
+    names = [m.username for m in members]
+    res = await session.execute(
+        select(UserModel).where((UserModel.name.in_(names)) | (UserModel.email.in_(names)))
+    )
     users = res.scalars().all()
+    # Create lookup maps for both username and email
     username_to_user = {user.name: user for user in users}
+    email_to_user = {user.email: user for user in users if user.email}
     for i, member in enumerate(members):
-        user_to_add = username_to_user.get(member.username)
+        user_to_add = username_to_user.get(member.username) or email_to_user.get(member.username)
         if user_to_add is None:
             continue
         await add_project_member(
@@ -376,20 +383,22 @@ def project_model_to_project(
                     b.type.value,
                 )
                 continue
-            config_info = configurator.get_config_info(model=b, include_creds=False)
-            if is_core_model_instance(config_info, DstackConfigInfo):
-                for backend_type in config_info.base_backends:
+            backend_config = get_backend_config_from_backend_model(
+                configurator, b, include_creds=False
+            )
+            if is_core_model_instance(backend_config, DstackBackendConfig):
+                for backend_type in backend_config.base_backends:
                     backends.append(
                         BackendInfo(
                             name=backend_type,
-                            config=DstackBaseBackendConfigInfo(type=backend_type),
+                            config=DstackBaseBackendConfig(type=backend_type),
                         )
                     )
             else:
                 backends.append(
                     BackendInfo(
                         name=b.type,
-                        config=config_info,
+                        config=backend_config,
                     )
                 )
     return Project(

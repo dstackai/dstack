@@ -12,17 +12,20 @@ import dstack._internal.core.backends.gcp.auth as auth
 import dstack._internal.core.backends.gcp.resources as gcp_resources
 from dstack._internal.core.backends.base.compute import (
     Compute,
+    ComputeWithCreateInstanceSupport,
+    ComputeWithGatewaySupport,
+    ComputeWithMultinodeSupport,
+    ComputeWithVolumeSupport,
     generate_unique_gateway_instance_name,
     generate_unique_instance_name,
     generate_unique_volume_name,
     get_gateway_user_data,
-    get_job_instance_name,
     get_shim_commands,
     get_user_data,
     merge_tags,
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
-from dstack._internal.core.backends.gcp.config import GCPConfig
+from dstack._internal.core.backends.gcp.models import GCPConfig
 from dstack._internal.core.errors import (
     ComputeError,
     ComputeResourceNotFoundError,
@@ -42,10 +45,9 @@ from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
     InstanceType,
     Resources,
-    SSHKey,
 )
 from dstack._internal.core.models.resources import Memory, Range
-from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
+from dstack._internal.core.models.runs import JobProvisioningData, Requirements
 from dstack._internal.core.models.volumes import (
     Volume,
     VolumeAttachmentData,
@@ -69,7 +71,13 @@ class GCPVolumeDiskBackendData(CoreModel):
     disk_type: str
 
 
-class GCPCompute(Compute):
+class GCPCompute(
+    ComputeWithCreateInstanceSupport,
+    ComputeWithMultinodeSupport,
+    ComputeWithGatewaySupport,
+    ComputeWithVolumeSupport,
+    Compute,
+):
     def __init__(self, config: GCPConfig):
         super().__init__()
         self.config = config
@@ -362,44 +370,6 @@ class GCPCompute(Compute):
         raise ProvisioningError(
             f"Failed to get instance IP address. Instance status: {instance.status}"
         )
-
-    def run_job(
-        self,
-        run: Run,
-        job: Job,
-        instance_offer: InstanceOfferWithAvailability,
-        project_ssh_public_key: str,
-        project_ssh_private_key: str,
-        volumes: List[Volume],
-    ) -> JobProvisioningData:
-        # TODO: run_job is the same for vm-based backends, refactor
-        instance_config = InstanceConfiguration(
-            project_name=run.project_name,
-            instance_name=get_job_instance_name(run, job),  # TODO: generate name
-            ssh_keys=[
-                SSHKey(public=project_ssh_public_key.strip()),
-            ],
-            user=run.user,
-            volumes=volumes,
-            reservation=run.run_spec.configuration.reservation,
-        )
-        instance_offer = instance_offer.copy()
-        if len(volumes) > 0:
-            volume = volumes[0]
-            if (
-                volume.provisioning_data is not None
-                and volume.provisioning_data.availability_zone is not None
-            ):
-                if instance_offer.availability_zones is None:
-                    instance_offer.availability_zones = [
-                        volume.provisioning_data.availability_zone
-                    ]
-                instance_offer.availability_zones = [
-                    z
-                    for z in instance_offer.availability_zones
-                    if z == volume.provisioning_data.availability_zone
-                ]
-        return self.create_instance(instance_offer, instance_config)
 
     def create_gateway(
         self,

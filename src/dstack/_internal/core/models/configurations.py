@@ -1,6 +1,6 @@
 import re
 from enum import Enum
-from typing import Any, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 from pydantic import Field, ValidationError, conint, constr, root_validator, validator
 from typing_extensions import Annotated, Literal
@@ -11,8 +11,6 @@ from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.fleets import FleetConfiguration
 from dstack._internal.core.models.gateways import GatewayConfiguration
 from dstack._internal.core.models.profiles import ProfileParams, parse_off_duration
-from dstack._internal.core.models.repos.base import Repo
-from dstack._internal.core.models.repos.virtual import VirtualRepo
 from dstack._internal.core.models.resources import Range, ResourcesSpec
 from dstack._internal.core.models.services import AnyModel, OpenAIChatModel
 from dstack._internal.core.models.unix import UnixUser
@@ -93,7 +91,9 @@ class BaseRunConfiguration(CoreModel):
         Optional[str],
         Field(description="The run name. If not specified, a random name is generated"),
     ] = None
-    image: Annotated[Optional[str], Field(description="The name of the Docker image to run")]
+    image: Annotated[Optional[str], Field(description="The name of the Docker image to run")] = (
+        None
+    )
     user: Annotated[
         Optional[str],
         Field(
@@ -104,7 +104,7 @@ class BaseRunConfiguration(CoreModel):
         ),
     ] = None
     privileged: Annotated[bool, Field(description="Run the container in privileged mode")] = False
-    entrypoint: Annotated[Optional[str], Field(description="The Docker entrypoint")]
+    entrypoint: Annotated[Optional[str], Field(description="The Docker entrypoint")] = None
     working_dir: Annotated[
         Optional[str],
         Field(
@@ -119,17 +119,17 @@ class BaseRunConfiguration(CoreModel):
     home_dir: str = "/root"
     registry_auth: Annotated[
         Optional[RegistryAuth], Field(description="Credentials for pulling a private Docker image")
-    ]
+    ] = None
     python: Annotated[
         Optional[PythonVersion],
         Field(description="The major version of Python. Mutually exclusive with `image`"),
-    ]
+    ] = None
     nvcc: Annotated[
         Optional[bool],
         Field(
             description="Use image with NVIDIA CUDA Compiler (NVCC) included. Mutually exclusive with `image`"
         ),
-    ]
+    ] = None
     single_branch: Annotated[
         Optional[bool],
         Field(
@@ -178,9 +178,6 @@ class BaseRunConfiguration(CoreModel):
         UnixUser.parse(v)
         return v
 
-    def get_repo(self) -> Repo:
-        return VirtualRepo()
-
 
 class BaseRunConfigurationWithPorts(BaseRunConfiguration):
     ports: Annotated[
@@ -208,8 +205,11 @@ class BaseRunConfigurationWithCommands(BaseRunConfiguration):
 
 
 class DevEnvironmentConfigurationParams(CoreModel):
-    ide: Annotated[Literal["vscode"], Field(description="The IDE to run")]
-    version: Annotated[Optional[str], Field(description="The version of the IDE")]
+    ide: Annotated[
+        Union[Literal["vscode"], Literal["cursor"]],
+        Field(description="The IDE to run. Supported values include `vscode` and `cursor`"),
+    ]
+    version: Annotated[Optional[str], Field(description="The version of the IDE")] = None
     init: Annotated[CommandsList, Field(description="The bash commands to run on startup")] = []
     inactivity_duration: Annotated[
         Optional[Union[Literal["off"], int, bool, str]],
@@ -225,7 +225,7 @@ class DevEnvironmentConfigurationParams(CoreModel):
                 " Defaults to `off`"
             )
         ),
-    ]
+    ] = None
 
     @validator("inactivity_duration", pre=True, allow_reuse=True)
     def parse_inactivity_duration(
@@ -425,4 +425,9 @@ class DstackConfiguration(CoreModel):
     ]
 
     class Config:
-        schema_extra = {"$schema": "http://json-schema.org/draft-07/schema#"}
+        @staticmethod
+        def schema_extra(schema: Dict[str, Any]):
+            schema["$schema"] = "http://json-schema.org/draft-07/schema#"
+            # Allow additionalProperties so that vscode and others not supporting
+            # top-level oneOf do not warn about properties being invalid.
+            schema["additionalProperties"] = True

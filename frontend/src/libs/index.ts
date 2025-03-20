@@ -104,3 +104,7 @@ export const isValidUrl = (urlString: string) => {
         return false;
     }
 };
+
+export const includeSubString = (value: string, query: string) => {
+    return value.toLowerCase().includes(query.trim().toLowerCase());
+};

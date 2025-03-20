@@ -1,36 +1,22 @@
 from datetime import datetime
-from typing import Any, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 from uuid import UUID
 
 from pydantic import parse_obj_as
 
-from dstack._internal.core.models.common import is_core_model_instance
-from dstack._internal.core.models.configurations import (
-    STRIP_PREFIX_DEFAULT,
-    DevEnvironmentConfiguration,
-    ServiceConfiguration,
-)
-from dstack._internal.core.models.pools import Instance
-from dstack._internal.core.models.profiles import Profile
 from dstack._internal.core.models.runs import (
     ApplyRunPlanInput,
-    PoolInstanceOffers,
-    Requirements,
     Run,
     RunPlan,
     RunSpec,
 )
-from dstack._internal.core.models.volumes import InstanceMountPoint
 from dstack._internal.server.schemas.runs import (
     ApplyRunPlanRequest,
-    CreateInstanceRequest,
     DeleteRunsRequest,
-    GetOffersRequest,
     GetRunPlanRequest,
     GetRunRequest,
     ListRunsRequest,
     StopRunsRequest,
-    SubmitRunRequest,
 )
 from dstack.api.server._group import APIClientGroup
 
@@ -62,8 +48,7 @@ class RunsAPIClient(APIClientGroup):
 
     def get(self, project_name: str, run_name: str) -> Run:
         body = GetRunRequest(run_name=run_name)
-        # dstack versions prior to 0.18.34 don't support id field, and we don't use it here either
-        json_body = body.json(exclude={"id"})
+        json_body = body.json()
         resp = self._request(f"/api/project/{project_name}/runs/get", body=json_body)
         return parse_obj_as(Run.__response__, resp.json())
 
@@ -89,14 +74,6 @@ class RunsAPIClient(APIClientGroup):
         )
         return parse_obj_as(Run.__response__, resp.json())
 
-    def submit(self, project_name: str, run_spec: RunSpec) -> Run:
-        body = SubmitRunRequest(run_spec=run_spec)
-        resp = self._request(
-            f"/api/project/{project_name}/runs/submit",
-            body=body.json(exclude=_get_run_spec_excludes(run_spec)),
-        )
-        return parse_obj_as(Run.__response__, resp.json())
-
     def stop(self, project_name: str, runs_names: List[str], abort: bool):
         body = StopRunsRequest(runs_names=runs_names, abort=abort)
         self._request(f"/api/project/{project_name}/runs/stop", body=body.json())
@@ -105,91 +82,35 @@ class RunsAPIClient(APIClientGroup):
         body = DeleteRunsRequest(runs_names=runs_names)
         self._request(f"/api/project/{project_name}/runs/delete", body=body.json())
 
-    # FIXME: get_offers and create_instance do not belong runs api
 
-    def get_offers(
-        self, project_name: str, profile: Profile, requirements: Requirements
-    ) -> PoolInstanceOffers:
-        body = GetOffersRequest(profile=profile, requirements=requirements)
-        resp = self._request(f"/api/project/{project_name}/runs/get_offers", body=body.json())
-        return parse_obj_as(PoolInstanceOffers.__response__, resp.json())
-
-    def create_instance(
-        self,
-        project_name: str,
-        profile: Profile,
-        requirements: Requirements,
-    ) -> Instance:
-        body = CreateInstanceRequest(profile=profile, requirements=requirements)
-        resp = self._request(f"/api/project/{project_name}/runs/create_instance", body=body.json())
-        return parse_obj_as(Instance.__response__, resp.json())
-
-
-def _get_apply_plan_excludes(plan: ApplyRunPlanInput) -> Optional[dict]:
+def _get_apply_plan_excludes(plan: ApplyRunPlanInput) -> Optional[Dict]:
+    """
+    Returns `plan` exclude mapping to exclude certain fields from the request.
+    Use this method to exclude new fields when they are not set to keep
+    clients backward-compatibility with older servers.
+    """
     run_spec_excludes = _get_run_spec_excludes(plan.run_spec)
     if run_spec_excludes is not None:
         return {"plan": run_spec_excludes}
     return None
 
 
-def _get_run_spec_excludes(run_spec: RunSpec) -> Optional[dict]:
+def _get_run_spec_excludes(run_spec: RunSpec) -> Optional[Dict]:
+    """
+    Returns `run_spec` exclude mapping to exclude certain fields from the request.
+    Use this method to exclude new fields when they are not set to keep
+    clients backward-compatibility with older servers.
+    """
     spec_excludes: dict[str, Any] = {}
     configuration_excludes: dict[str, Any] = {}
     profile_excludes: set[str] = set()
-    configuration = run_spec.configuration
-    profile = run_spec.profile
-
-    # client >= 0.18.18 / server <= 0.18.17 compatibility tweak
-    if not configuration.privileged:
-        configuration_excludes["privileged"] = True
-    # client >= 0.18.23 / server <= 0.18.22 compatibility tweak
-    if configuration.type == "service" and configuration.gateway is None:
-        configuration_excludes["gateway"] = True
-    # client >= 0.18.30 / server <= 0.18.29 compatibility tweak
-    if run_spec.configuration.user is None:
-        configuration_excludes["user"] = True
-    # client >= 0.18.30 / server <= 0.18.29 compatibility tweak
-    if configuration.reservation is None:
-        configuration_excludes["reservation"] = True
-    if profile is not None and profile.reservation is None:
-        profile_excludes.add("reservation")
-    if configuration.idle_duration is None:
-        configuration_excludes["idle_duration"] = True
-    if profile is not None and profile.idle_duration is None:
-        profile_excludes.add("idle_duration")
-    # client >= 0.18.38 / server <= 0.18.37 compatibility tweak
-    if configuration.stop_duration is None:
-        configuration_excludes["stop_duration"] = True
-    if profile is not None and profile.stop_duration is None:
-        profile_excludes.add("stop_duration")
-    # client >= 0.18.40 / server <= 0.18.39 compatibility tweak
-    if (
-        is_core_model_instance(configuration, ServiceConfiguration)
-        and configuration.strip_prefix == STRIP_PREFIX_DEFAULT
-    ):
-        configuration_excludes["strip_prefix"] = True
-    if configuration.single_branch is None:
-        configuration_excludes["single_branch"] = True
-    if all(
-        not is_core_model_instance(v, InstanceMountPoint) or not v.optional
-        for v in configuration.volumes
-    ):
-        configuration_excludes["volumes"] = {"__all__": {"optional"}}
-    # client >= 0.18.41 / server <= 0.18.40 compatibility tweak
-    if configuration.availability_zones is None:
-        configuration_excludes["availability_zones"] = True
-    if profile is not None and profile.availability_zones is None:
-        profile_excludes.add("availability_zones")
-    if (
-        is_core_model_instance(configuration, DevEnvironmentConfiguration)
-        and configuration.inactivity_duration is None
-    ):
-        configuration_excludes["inactivity_duration"] = True
-    if configuration.utilization_policy is None:
-        configuration_excludes["utilization_policy"] = True
-    if profile is not None and profile.utilization_policy is None:
-        profile_excludes.add("utilization_policy")
-
+    # configuration = run_spec.configuration
+    # profile = run_spec.profile
+    # Fields can be excluded like this:
+    # if configuration.availability_zones is None:
+    #     configuration_excludes["availability_zones"] = True
+    # if profile is not None and profile.availability_zones is None:
+    #     profile_excludes.add("availability_zones")
     if configuration_excludes:
         spec_excludes["configuration"] = configuration_excludes
     if profile_excludes:

@@ -10,7 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 import dstack._internal.server.services.backends as backends_services
-from dstack._internal.core.backends.base import Backend
+from dstack._internal.core.backends.base.backend import Backend
+from dstack._internal.core.backends.base.compute import ComputeWithVolumeSupport
 from dstack._internal.core.consts import DSTACK_RUNNER_HTTP_PORT, DSTACK_SHIM_HTTP_PORT
 from dstack._internal.core.errors import (
     BackendError,
@@ -42,6 +43,7 @@ from dstack._internal.server.models import (
 )
 from dstack._internal.server.services import services
 from dstack._internal.server.services import volumes as volumes_services
+from dstack._internal.server.services.instances import get_instance_ssh_private_keys
 from dstack._internal.server.services.jobs.configurators.base import (
     JobConfigurator,
     interpolate_job_volumes,
@@ -50,7 +52,6 @@ from dstack._internal.server.services.jobs.configurators.dev import DevEnvironme
 from dstack._internal.server.services.jobs.configurators.service import ServiceJobConfigurator
 from dstack._internal.server.services.jobs.configurators.task import TaskJobConfigurator
 from dstack._internal.server.services.logging import fmt
-from dstack._internal.server.services.pools import get_instance_ssh_private_keys
 from dstack._internal.server.services.runner import client
 from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
 from dstack._internal.server.services.volumes import (
@@ -461,24 +462,26 @@ async def _detach_volume_from_job_instance(
     if volume.provisioning_data is None or not volume.provisioning_data.detachable:
         # Backends without `detach_volume` detach volumes automatically
         return detached
+    compute = backend.compute()
+    assert isinstance(compute, ComputeWithVolumeSupport)
     try:
         if job_model.volumes_detached_at is None:
             # We haven't tried detaching volumes yet, try soft detach first
             await run_async(
-                backend.compute().detach_volume,
+                compute.detach_volume,
                 volume=volume,
                 instance_id=jpd.instance_id,
                 force=False,
             )
             # For some backends, the volume may be detached immediately
             detached = await run_async(
-                backend.compute().is_volume_detached,
+                compute.is_volume_detached,
                 volume=volume,
                 instance_id=jpd.instance_id,
             )
         else:
             detached = await run_async(
-                backend.compute().is_volume_detached,
+                compute.is_volume_detached,
                 volume=volume,
                 instance_id=jpd.instance_id,
             )
@@ -489,7 +492,7 @@ async def _detach_volume_from_job_instance(
                     instance_model.name,
                 )
                 await run_async(
-                    backend.compute().detach_volume,
+                    compute.detach_volume,
                     volume=volume,
                     instance_id=jpd.instance_id,
                     force=True,

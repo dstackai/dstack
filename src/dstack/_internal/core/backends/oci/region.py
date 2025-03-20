@@ -5,7 +5,7 @@ from typing import Any, Dict, Iterable, List, Mapping, Set
 import oci
 
 from dstack._internal.core.backends.oci.auth import get_client_config
-from dstack._internal.core.models.backends.oci import AnyOCICreds
+from dstack._internal.core.backends.oci.models import AnyOCICreds
 
 
 class OCIRegionClient:

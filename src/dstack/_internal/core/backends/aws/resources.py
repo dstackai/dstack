@@ -5,8 +5,8 @@ import botocore.client
 import botocore.exceptions
 
 import dstack.version as version
+from dstack._internal.core.backends.aws.models import AWSOSImageConfig
 from dstack._internal.core.errors import BackendError, ComputeError, ComputeResourceNotFoundError
-from dstack._internal.core.models.backends.aws import AWSOSImageConfig
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)

@@ -16,6 +16,7 @@ from dstack._internal.core.backends import (
 )
 from dstack._internal.core.backends.base.compute import (
     Compute,
+    ComputeWithGatewaySupport,
     get_dstack_gateway_wheel,
     get_dstack_runner_version,
 )
@@ -38,6 +39,7 @@ from dstack._internal.server import settings
 from dstack._internal.server.db import get_db
 from dstack._internal.server.models import GatewayComputeModel, GatewayModel, ProjectModel
 from dstack._internal.server.services.backends import (
+    check_backend_type_available,
     get_project_backend_by_type_or_error,
     get_project_backend_with_model_by_type_or_error,
 )
@@ -91,6 +93,7 @@ async def create_gateway_compute(
     configuration: GatewayConfiguration,
     backend_id: Optional[uuid.UUID] = None,
 ) -> GatewayComputeModel:
+    assert isinstance(backend_compute, ComputeWithGatewaySupport)
     private_bytes, public_bytes = generate_rsa_key_pair_bytes()
     gateway_ssh_private_key = private_bytes.decode()
     gateway_ssh_public_key = public_bytes.decode()
@@ -228,6 +231,8 @@ async def delete_gateways(
             backend = await get_project_backend_by_type_or_error(
                 project=project, backend_type=gateway_model.backend.type
             )
+            compute = backend.compute()
+            assert isinstance(compute, ComputeWithGatewaySupport)
             gateway_compute_configuration = get_gateway_compute_configuration(gateway_model)
             if (
                 gateway_model.gateway_compute is not None
@@ -236,7 +241,7 @@ async def delete_gateways(
                 logger.info("Deleting gateway compute for %s...", gateway_model.name)
                 try:
                     await run_async(
-                        backend.compute().terminate_gateway,
+                        compute.terminate_gateway,
                         gateway_model.gateway_compute.instance_id,
                         gateway_compute_configuration,
                         gateway_model.gateway_compute.backend_data,
@@ -533,10 +538,12 @@ def gateway_model_to_gateway(gateway_model: GatewayModel) -> Gateway:
 
 
 def _validate_gateway_configuration(configuration: GatewayConfiguration):
+    check_backend_type_available(configuration.backend)
     if configuration.backend not in BACKENDS_WITH_GATEWAY_SUPPORT:
         raise ServerClientError(
-            f"Gateways are not supported for {configuration.backend.value} backend. "
-            f"Supported backends: {[b.value for b in BACKENDS_WITH_GATEWAY_SUPPORT]}."
+            f"Gateways are not supported for {configuration.backend.value} backend."
+            " Available backends with gateway support:"
+            f" {[b.value for b in BACKENDS_WITH_GATEWAY_SUPPORT]}."
         )
 
     if configuration.name is not None:
@@ -548,7 +555,8 @@ def _validate_gateway_configuration(configuration: GatewayConfiguration):
     ):
         raise ServerClientError(
             f"Private gateways are not supported for {configuration.backend.value} backend. "
-            f"Supported backends: {[b.value for b in BACKENDS_WITH_PRIVATE_GATEWAY_SUPPORT]}."
+            " Available backends with private gateway support:"
+            f" {[b.value for b in BACKENDS_WITH_PRIVATE_GATEWAY_SUPPORT]}."
         )
 
     if configuration.certificate is not None:

@@ -3,8 +3,9 @@ import uuid
 from datetime import timedelta
 from typing import List, Optional
 
-from dstack._internal.core.backends.base import Compute
+from dstack._internal.core.backends.base.backend import Compute
 from dstack._internal.core.backends.base.compute import (
+    ComputeWithVolumeSupport,
     generate_unique_instance_name,
     generate_unique_volume_name,
     get_docker_commands,
@@ -12,7 +13,7 @@ from dstack._internal.core.backends.base.compute import (
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.runpod.api_client import RunpodApiClient
-from dstack._internal.core.backends.runpod.config import RunpodConfig
+from dstack._internal.core.backends.runpod.models import RunpodConfig
 from dstack._internal.core.consts import DSTACK_RUNNER_SSH_PORT
 from dstack._internal.core.errors import (
     BackendError,
@@ -39,7 +40,10 @@ MAX_RESOURCE_NAME_LEN = 60
 CONTAINER_REGISTRY_AUTH_CLEANUP_INTERVAL = 60 * 60 * 24  # 24 hour
 
 
-class RunpodCompute(Compute):
+class RunpodCompute(
+    ComputeWithVolumeSupport,
+    Compute,
+):
     _last_cleanup_time = None
 
     def __init__(self, config: RunpodConfig):

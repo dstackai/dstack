@@ -20,6 +20,8 @@ from dstack._internal.core.backends.base.compute import (
     DSTACK_RUNNER_BINARY_PATH,
     DSTACK_SHIM_BINARY_PATH,
     DSTACK_WORKING_DIR,
+    ComputeWithCreateInstanceSupport,
+    ComputeWithPlacementGroupSupport,
     get_shim_env,
     get_shim_pre_start_commands,
 )
@@ -76,18 +78,18 @@ from dstack._internal.server.services.fleets import (
     fleet_model_to_fleet,
     get_create_instance_offers,
 )
-from dstack._internal.server.services.locking import get_locker
-from dstack._internal.server.services.offers import is_divisible_into_blocks
-from dstack._internal.server.services.placement import (
-    get_fleet_placement_groups,
-    placement_group_model_to_placement_group,
-)
-from dstack._internal.server.services.pools import (
+from dstack._internal.server.services.instances import (
     get_instance_configuration,
     get_instance_profile,
     get_instance_provisioning_data,
     get_instance_requirements,
     get_instance_ssh_private_keys,
+)
+from dstack._internal.server.services.locking import get_locker
+from dstack._internal.server.services.offers import is_divisible_into_blocks
+from dstack._internal.server.services.placement import (
+    get_fleet_placement_groups,
+    placement_group_model_to_placement_group,
 )
 from dstack._internal.server.services.runner import client as runner_client
 from dstack._internal.server.services.runner.client import HealthStatus
@@ -530,12 +532,15 @@ async def _create_instance(session: AsyncSession, instance: InstanceModel) -> No
     for backend, instance_offer in offers:
         if instance_offer.backend not in BACKENDS_WITH_CREATE_INSTANCE_SUPPORT:
             continue
+        compute = backend.compute()
+        assert isinstance(compute, ComputeWithCreateInstanceSupport)
         instance_offer = _get_instance_offer_for_instance(instance_offer, instance)
         if (
             instance_offer.backend in BACKENDS_WITH_PLACEMENT_GROUPS_SUPPORT
             and instance.fleet
             and instance_configuration.placement_group_name
         ):
+            assert isinstance(compute, ComputeWithPlacementGroupSupport)
             placement_group_model = _create_placement_group_if_does_not_exist(
                 session=session,
                 fleet_model=instance.fleet,
@@ -546,7 +551,7 @@ async def _create_instance(session: AsyncSession, instance: InstanceModel) -> No
             )
             if placement_group_model is not None:
                 placement_group = placement_group_model_to_placement_group(placement_group_model)
-                pgpd = await run_async(backend.compute().create_placement_group, placement_group)
+                pgpd = await run_async(compute.create_placement_group, placement_group)
                 placement_group_model.provisioning_data = pgpd.json()
                 session.add(placement_group_model)
                 placement_groups.append(placement_group)
@@ -559,7 +564,7 @@ async def _create_instance(session: AsyncSession, instance: InstanceModel) -> No
         )
         try:
             job_provisioning_data = await run_async(
-                backend.compute().create_instance,
+                compute.create_instance,
                 instance_offer,
                 instance_configuration,
             )

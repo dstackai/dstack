@@ -1,4 +1,6 @@
-from typing import List
+from typing import Annotated, List
+
+from pydantic import Field
 
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.users import ProjectRole
@@ -13,7 +15,10 @@ class DeleteProjectsRequest(CoreModel):
 
 
 class MemberSetting(CoreModel):
-    username: str
+    username: Annotated[
+        str,
+        Field(description="The username or email of the user"),
+    ]
     project_role: ProjectRole
 
 

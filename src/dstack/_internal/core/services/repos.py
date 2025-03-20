@@ -10,7 +10,6 @@ from git.exc import GitCommandError
 from dstack._internal.core.errors import DstackError
 from dstack._internal.core.models.config import RepoConfig
 from dstack._internal.core.models.repos import LocalRepo, RemoteRepo, RemoteRepoCreds
-from dstack._internal.core.models.repos.base import RepoProtocol
 from dstack._internal.core.models.repos.remote import GitRepoURL
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.path import PathLike
@@ -41,7 +40,6 @@ def get_local_repo_credentials(
     r = requests.get(f"{url.as_https()}/info/refs?service=git-upload-pack", timeout=10)
     if r.status_code == 200:
         return RemoteRepoCreds(
-            protocol=RepoProtocol.HTTPS,
             clone_url=url.as_https(),
             private_key=None,
             oauth_token=None,
@@ -93,7 +91,6 @@ def check_remote_repo_credentials_https(url: GitRepoURL, oauth_token: str) -> Re
             f"Can't access `{url.as_https()}` using the `{masked}` token"
         )
     return RemoteRepoCreds(
-        protocol=RepoProtocol.HTTPS,
         clone_url=url.as_https(),
         oauth_token=oauth_token,
         private_key=None,
@@ -123,7 +120,6 @@ def check_remote_repo_credentials_ssh(url: GitRepoURL, identity_file: PathLike) 
         )
 
     return RemoteRepoCreds(
-        protocol=RepoProtocol.SSH,
         clone_url=url.as_ssh(),
         private_key=private_key,
         oauth_token=None,

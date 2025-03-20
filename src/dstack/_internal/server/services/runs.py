@@ -52,7 +52,6 @@ from dstack._internal.server import settings
 from dstack._internal.server.db import get_db
 from dstack._internal.server.models import (
     JobModel,
-    PoolModel,
     ProjectModel,
     RepoModel,
     RunModel,
@@ -61,6 +60,12 @@ from dstack._internal.server.models import (
 from dstack._internal.server.services import repos as repos_services
 from dstack._internal.server.services import services
 from dstack._internal.server.services.docker import is_valid_docker_volume_target
+from dstack._internal.server.services.instances import (
+    filter_pool_instances,
+    get_instance_offer,
+    get_pool_instances,
+    get_shared_pool_instances_with_offers,
+)
 from dstack._internal.server.services.jobs import (
     check_can_attach_job_volumes,
     delay_job_instance_termination,
@@ -74,13 +79,6 @@ from dstack._internal.server.services.jobs import (
 from dstack._internal.server.services.locking import get_locker, string_to_lock_id
 from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.offers import get_offers_by_requirements
-from dstack._internal.server.services.pools import (
-    filter_pool_instances,
-    get_instance_offer,
-    get_or_create_pool_by_name,
-    get_pool_instances,
-    get_shared_pool_instances_with_offers,
-)
 from dstack._internal.server.services.projects import list_project_models, list_user_project_models
 from dstack._internal.server.services.users import get_user_model_by_name
 from dstack._internal.utils.logging import get_logger
@@ -308,12 +306,9 @@ async def get_plan(
         job_num=0,
     )
 
-    pool = await get_or_create_pool_by_name(
-        session=session, project=project, pool_name=profile.pool_name
-    )
     pool_offers = await _get_pool_offers(
         session=session,
-        pool=pool,
+        project=project,
         run_spec=run_spec,
         job=jobs[0],
         volumes=volumes,
@@ -342,8 +337,11 @@ async def get_plan(
         job_offers.extend(offer for _, offer in offers)
         job_offers.sort(key=lambda offer: not offer.availability.is_available())
 
+        job_spec = job.job_spec
+        _remove_job_spec_sensitive_info(job_spec)
+
         job_plan = JobPlan(
-            job_spec=job.job_spec,
+            job_spec=job_spec,
             offers=job_offers[:50],
             total_offers=len(job_offers),
             max_price=max((offer.price for offer in job_offers), default=None),
@@ -619,7 +617,10 @@ async def delete_runs(
 
 
 def run_model_to_run(
-    run_model: RunModel, include_job_submissions: bool = True, return_in_api: bool = False
+    run_model: RunModel,
+    include_job_submissions: bool = True,
+    return_in_api: bool = False,
+    include_sensitive: bool = False,
 ) -> Run:
     jobs: List[Job] = []
     run_jobs = sorted(run_model.jobs, key=lambda j: (j.replica_num, j.job_num, j.submission_num))
@@ -634,6 +635,8 @@ def run_model_to_run(
             for job_model in job_submissions:
                 if job_spec is None:
                     job_spec = JobSpec.__response__.parse_raw(job_model.job_spec_data)
+                    if not include_sensitive:
+                        _remove_job_spec_sensitive_info(job_spec)
                 if include_job_submissions:
                     job_submission = job_model_to_job_submission(job_model)
                     if return_in_api:
@@ -680,7 +683,7 @@ def run_model_to_run(
 
 async def _get_pool_offers(
     session: AsyncSession,
-    pool: PoolModel,
+    project: ProjectModel,
     run_spec: RunSpec,
     job: Job,
     volumes: List[List[Volume]],
@@ -688,7 +691,8 @@ async def _get_pool_offers(
     pool_offers: list[InstanceOfferWithAvailability] = []
 
     detaching_instances_ids = await get_instances_ids_with_detaching_volumes(session)
-    pool_instances = [i for i in get_pool_instances(pool) if i.id not in detaching_instances_ids]
+    pool_instances = await get_pool_instances(session, project)
+    pool_instances = [i for i in pool_instances if i.id not in detaching_instances_ids]
     multinode = job.job_spec.jobs_per_replica > 1
 
     if not multinode:
@@ -1046,3 +1050,7 @@ async def retry_run_replica_jobs(
         # dirty hack to avoid passing all job submissions
         new_job_model.submission_num = job_model.submission_num + 1
         session.add(new_job_model)
+
+
+def _remove_job_spec_sensitive_info(spec: JobSpec):
+    spec.ssh_key = None

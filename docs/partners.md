@@ -12,113 +12,135 @@ hide:
 }
 </style>
 
-> `dstack` sets a new standard for managing AI infrastructure by building an open-source, streamlined alternative to
-> Kubernetes and Slurm, aimed at accelerating and democratizing AI development across any cloud and hardware
-> providers.
+> Here are the cloud GPU providers that `dstack` integrates with and collaborates with.
 
-## Cloud providers
+## NVIDIA
 
-Here are some cloud providers `dstack` integrates with and collaborates:
-
-<div class="providers tx-landing__highlights_grid featured">
-    <a href="https://aws.amazon.com/" class="feature-cell" target="_blank">
-        <img width="52" style="padding: 10px 0 2px" src="/assets/images/aws-logo.svg">
+<div class="nvidia providers tx-landing__highlights_grid featured">
+    <span class="feature-cell" target="_blank">
+        <img width="50" style="padding: 10px 0 2px" src="/assets/images/aws-logo.svg">
         <h3>
             Amazon Web Services
         </h3>
-    </a>
+    </span>
 
-    <a href="https://azure.microsoft.com/" class="feature-cell" target="_blank">
-        <img width="42" src="/assets/images/azure-logo.svg">
+    <span class="feature-cell" target="_blank">
+        <img width="40" src="/assets/images/azure-logo.svg">
         <h3>
             Microsoft Azure
         </h3>
-    </a>
+    </span>
 
-    <a href="https://cloud.google.com/" class="feature-cell" target="_blank">
+    <span class="feature-cell" target="_blank">
+        <img width="42" src="/assets/images/gcp-logo.svg">
+        <h3>
+            Google Cloud Platform
+        </h3>
+    </span>
+
+    <span class="feature-cell" target="_blank">
+        <img width="37" src="/assets/images/lambda-logo.svg">
+        <h3>
+            Lambda
+        </h3>
+    </span>
+
+    <span class="feature-cell" target="_blank">
+        <img width="39" padding="padding: 4px 0" src="/assets/images/vultr-logo.svg">
+        <h3>
+            Vultr
+        </h3>
+    </span>
+
+    <span class="feature-cell" target="_blank">
+        <img width="37" src="/assets/images/runpod-logo.svg">
+        <h3>
+            RunPod
+        </h3>
+    </span>
+
+    <span class="feature-cell" target="_blank">
+        <img width="44" style="padding: 4px 0 2px" src="/assets/images/oci-logo.svg">
+        <h3>
+            Oracle Cloud Infrastructure
+        </h3>
+    </span>
+
+    <span class="feature-cell" target="_blank">
+        <img width="37" style="padding: 4px 0" src="/assets/images/vastai-logo.svg">
+        <h3>
+            Vast.ai
+        </h3>
+    </span>
+
+    <span class="feature-cell" target="_blank">
+        <img width="35" style="padding: 4px 0 2px" src="/assets/images/cudo-logo.svg">
+        <h3>
+            CUDO
+        </h3>
+    </span>    
+
+    <span class="feature-cell" target="_blank">
+        <img width="35" style="padding: 0" src="/assets/images/tensordock-logo.svg">
+        <h3>
+            TensorDock
+        </h3>
+    </span>
+
+    <span class="feature-cell" target="_blank">
+        <img width="53" style="margin: 15px -4px;" src="/assets/images/datacrunch-logo.svg">
+        <h3>
+            DataCrunch
+        </h3>
+    </span>
+</div>
+
+## AMD
+
+<div class="amd providers tx-landing__highlights_grid featured">
+    <span class="feature-cell" target="_blank">
+        <img width="39" padding="padding: 4px 0" src="/assets/images/vultr-logo.svg">
+        <h3>
+            Vultr
+        </h3>
+    </span>
+
+    <span class="feature-cell" target="_blank">
+        <img width="55" style="margin: 10px 0" src="/assets/images/hotaisle-logo.svg">
+        <h3>
+            Hot Aisle
+        </h3>
+    </span>
+
+    <span class="feature-cell" target="_blank">
+        <img width="40" padding="padding: 4px 0" src="/assets/images/tensorwave-logo.svg">
+        <h3>
+            TensorWave
+        </h3>
+    </span>
+</div>
+
+[//]: # (## Google TPU)
+
+<!--
+<div class="tpu providers tx-landing__highlights_grid featured">
+    <span class="feature-cell" target="_blank">
         <img width="45" src="/assets/images/gcp-logo.svg">
         <h3>
             Google Cloud Platform
         </h3>
-    </a>
-
-    <a href="https://lambdalabs.com/" class="feature-cell" target="_blank">
-        <img width="40" src="/assets/images/lambda-logo.svg">
-        <h3>
-            Lambda
-        </h3>
-    </a>
-
-    <a href="https://www.runpod.io/" class="feature-cell" target="_blank">
-        <img width="40" src="/assets/images/runpod-logo.svg">
-        <h3>
-            RunPod
-        </h3>
-    </a>
-
-    <a href="https://www.vultr.com/" class="feature-cell" target="_blank">
-        <img width="40" padding="padding: 4px 0" src="/assets/images/vultr-logo.svg">
-        <h3>
-            Vultr
-        </h3>
-    </a>
+    </span>
 </div>
+-->
 
-<div class="providers tx-landing__highlights_grid other">
-   <a href="https://vast.ai/" class="feature-cell" target="_blank">
-        <img width="36" style="padding: 4px 0" src="/assets/images/vastai-logo.svg">
-        <h3>
-            Vast.ai
-        </h3>
-    </a>
+## Join the ecosystem
 
-    <a href="https://www.oracle.com/cloud/" class="feature-cell" target="_blank">
-        <img width="41" style="padding: 4px 0 2px" src="/assets/images/oci-logo.svg">
-        <h3>
-            OCI
-        </h3>
-    </a>
+Are you interested in integrating and collaborating with us to become part of the ecosystem?
 
-    <a href="https://www.cudocompute.com/" class="feature-cell" target="_blank">
-        <img width="41" style="padding: 4px 0 2px" src="/assets/images/cudo-logo.svg">
-        <h3>
-            CUDO
-        </h3>
-    </a>    
-
-    <a href="https://tensordock.com/" class="feature-cell" target="_blank">
-        <img width="34" style="padding: 4px 0" src="/assets/images/tensordock-logo.svg">
-        <h3>
-            TensorDock
-        </h3>
-    </a>
-
-    <a href="https://datacrunch.io/" class="feature-cell" target="_blank">
-        <img width="38" style="margin: 15px -4px;" src="/assets/images/datacrunch-logo.svg">
-        <h3>
-            DataCrunch
-        </h3>
-    </a>
-</div>
-
-## Bare metal providers
-
-Here are some of the bare metal providers `dstack` collaborates with:
-
-<div class="providers tx-landing__highlights_grid other">
-    <a href="https://hotaisle.xyz/" class="feature-cell" target="_blank">
-        <img width="30" style="margin: 4px 0" src="/assets/images/hotaisle-logo.svg">
-        <h3>
-            Hot Aisle
-        </h3>
-    </a>
-</div>
-
-## Become a partner
-
-Are you interested in collaborating or integrating with us to become part of the ecosystem?
-
-<a href="https://calendly.com/dstackai/discovery-call" target="_blank"
-   class="md-button md-button-secondary external">
+<a href="https://github.com/dstackai/dstack/blob/master/contributing/BACKENDS.md" target="_blank"
+   class="md-button md-button-secondary github external">
+    Integration
+</a>&nbsp;&nbsp;<a href="https://calendly.com/dstackai/discovery-call" target="_blank"
+   class="md-button md-button--primary sky external">
     Talk to us
 </a>

@@ -12,6 +12,7 @@ import { useEntraCallbackMutation } from 'services/auth';
 import { AuthErrorMessage } from 'App/AuthErrorMessage';
 import { Loading } from 'App/Loading';
 import { setAuthData } from 'App/slice';
+import { getBaseUrl } from 'App/helpers';
 
 export const LoginByEntraIDCallback: React.FC = () => {
     const { t } = useTranslation();
@@ -26,7 +27,7 @@ export const LoginByEntraIDCallback: React.FC = () => {
 
     const checkCode = () => {
         if (code && state) {
-            entraCallback({ code, state })
+            entraCallback({ code, state, base_url: getBaseUrl() })
                 .unwrap()
                 .then(({ creds: { token } }) => {
                     dispatch(setAuthData({ token }));

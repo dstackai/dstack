@@ -15,7 +15,6 @@ from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.testing.common import (
     create_fleet,
     create_instance,
-    create_pool,
     create_project,
     create_user,
     get_auth_headers,
@@ -59,11 +58,6 @@ class TestListInstances:
         await add_project_member(
             session, project=projects[2], user=users[1], project_role=ProjectRole.USER
         )
-        pools = [
-            await create_pool(session, projects[0]),
-            await create_pool(session, projects[1]),
-            await create_pool(session, projects[2]),
-        ]
         fleets = [
             await create_fleet(
                 session,
@@ -88,7 +82,6 @@ class TestListInstances:
             await create_instance(
                 session=session,
                 project=projects[0],
-                pool=pools[0],
                 fleet=fleets[0],
                 created_at=dt.datetime(2024, 1, 1, tzinfo=dt.timezone.utc),
                 name="fleet0-0",
@@ -96,7 +89,6 @@ class TestListInstances:
             await create_instance(
                 session=session,
                 project=projects[1],
-                pool=pools[1],
                 fleet=fleets[1],
                 created_at=dt.datetime(2024, 1, 2, tzinfo=dt.timezone.utc),
                 name="fleet1-0",
@@ -104,7 +96,6 @@ class TestListInstances:
             await create_instance(
                 session=session,
                 project=projects[2],
-                pool=pools[2],
                 fleet=fleets[2],
                 created_at=dt.datetime(2024, 1, 3, tzinfo=dt.timezone.utc),
                 name="fleet2-0",
@@ -112,7 +103,6 @@ class TestListInstances:
             await create_instance(
                 session=session,
                 project=projects[2],
-                pool=pools[2],
                 fleet=fleets[2],
                 created_at=dt.datetime(2024, 1, 4, tzinfo=dt.timezone.utc),
                 instance_num=1,

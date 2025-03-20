@@ -15,13 +15,13 @@ to configure [backends](../../concepts/backends.md) and other [sever-level setti
     overrides:
         show_root_heading: false
         backends:
-            type: 'Union[AWSConfigInfoWithCreds, AzureConfigInfoWithCreds, GCPConfigInfoWithCreds, LambdaConfigInfoWithCreds, TensorDockConfigInfoWithCreds, VastAIConfigInfoWithCreds, KubernetesConfig]'
+            type: 'Union[AWSBackendConfigWithCreds, AzureBackendConfigWithCreds, GCPBackendConfigWithCreds, LambdaBackendConfigWithCreds, RunpodBackendConfigWithCreds, TensorDockBackendConfigWithCreds, VastAIBackendConfigWithCreds, KubernetesConfig]'
 
 #### `projects[n].backends` { #backends data-toc-label="backends" }
 
 ##### `projects[n].backends[type=aws]` { #aws data-toc-label="aws" }
 
-#SCHEMA# dstack._internal.server.services.config.AWSConfig
+#SCHEMA# dstack._internal.core.backends.aws.models.AWSBackendConfigWithCreds
     overrides:
         show_root_heading: false
         type:
@@ -31,14 +31,14 @@ to configure [backends](../../concepts/backends.md) and other [sever-level setti
 ###### `projects[n].backends[type=aws].creds` { #aws-creds data-toc-label="creds" }
 
 === "Access key"
-    #SCHEMA# dstack._internal.core.models.backends.aws.AWSAccessKeyCreds
+    #SCHEMA# dstack._internal.core.backends.aws.models.AWSAccessKeyCreds
         overrides:
             show_root_heading: false
             type:
                 required: true
 
 === "Default"
-    #SCHEMA# dstack._internal.core.models.backends.aws.AWSDefaultCreds
+    #SCHEMA# dstack._internal.core.backends.aws.models.AWSDefaultCreds
         overrides:
             show_root_heading: false
             type:
@@ -46,7 +46,7 @@ to configure [backends](../../concepts/backends.md) and other [sever-level setti
 
 ###### `projects[n].backends[type=aws].os_images` { #aws-os_images data-toc-label="os_images" }
 
-#SCHEMA# dstack._internal.core.models.backends.aws.AWSOSImageConfig
+#SCHEMA# dstack._internal.core.backends.aws.models.AWSOSImageConfig
     overrides:
         show_root_heading: false
         type:
@@ -55,7 +55,7 @@ to configure [backends](../../concepts/backends.md) and other [sever-level setti
 
 ###### `projects[n].backends[type=aws].os_images.cpu` { #aws-os_images-cpu data-toc-label="cpu" }
 
-#SCHEMA# dstack._internal.core.models.backends.aws.AWSOSImage
+#SCHEMA# dstack._internal.core.backends.aws.models.AWSOSImage
     overrides:
         show_root_heading: false
         type:
@@ -63,7 +63,7 @@ to configure [backends](../../concepts/backends.md) and other [sever-level setti
 
 ###### `projects[n].backends[type=aws].os_images.nvidia` { #aws-os_images-nvidia data-toc-label="nvidia" }
 
-#SCHEMA# dstack._internal.core.models.backends.aws.AWSOSImage
+#SCHEMA# dstack._internal.core.backends.aws.models.AWSOSImage
     overrides:
         show_root_heading: false
         type:
@@ -71,7 +71,7 @@ to configure [backends](../../concepts/backends.md) and other [sever-level setti
 
 ##### `projects[n].backends[type=azure]` { #azure data-toc-label="azure" }
 
-#SCHEMA# dstack._internal.server.services.config.AzureConfig
+#SCHEMA# dstack._internal.core.backends.azure.models.AzureBackendConfigWithCreds
     overrides:
         show_root_heading: false
         type:
@@ -81,14 +81,14 @@ to configure [backends](../../concepts/backends.md) and other [sever-level setti
 ###### `projects[n].backends[type=azure].creds` { #azure-creds data-toc-label="creds" }
 
 === "Client"
-    #SCHEMA# dstack._internal.core.models.backends.azure.AzureClientCreds
+    #SCHEMA# dstack._internal.core.backends.azure.models.AzureClientCreds
         overrides:
             show_root_heading: false
             type:
                 required: true
 
 === "Default"
-    #SCHEMA# dstack._internal.core.models.backends.azure.AzureDefaultCreds
+    #SCHEMA# dstack._internal.core.backends.azure.models.AzureDefaultCreds
         overrides:
             show_root_heading: false
             type:
@@ -96,7 +96,7 @@ to configure [backends](../../concepts/backends.md) and other [sever-level setti
 
 ##### `projects[n].backends[type=gcp]` { #gcp data-toc-label="gcp" }
 
-#SCHEMA# dstack._internal.server.services.config.GCPConfig
+#SCHEMA# dstack._internal.core.backends.gcp.models.GCPBackendConfigWithCreds
     overrides:
         show_root_heading: false
         type:
@@ -106,7 +106,7 @@ to configure [backends](../../concepts/backends.md) and other [sever-level setti
 ###### `projects[n].backends[type=gcp].creds` { #gcp-creds data-toc-label="creds" }
 
 === "Service account"
-    #SCHEMA# dstack._internal.server.services.config.GCPServiceAccountCreds
+    #SCHEMA# dstack._internal.core.backends.gcp.models.GCPServiceAccountFileCreds
         overrides:
             show_root_heading: false
             type:
@@ -120,7 +120,7 @@ to configure [backends](../../concepts/backends.md) and other [sever-level setti
         ```
 
 === "Default"
-    #SCHEMA# dstack._internal.server.services.config.GCPDefaultCreds
+    #SCHEMA# dstack._internal.core.backends.gcp.models.GCPDefaultCreds
         overrides:
             show_root_heading: false
             type:
@@ -128,7 +128,7 @@ to configure [backends](../../concepts/backends.md) and other [sever-level setti
 
 ##### `projects[n].backends[type=lambda]` { #lambda data-toc-label="lambda" }
 
-#SCHEMA# dstack._internal.server.services.config.LambdaConfig
+#SCHEMA# dstack._internal.core.backends.lambdalabs.models.LambdaBackendConfigWithCreds
     overrides:
         show_root_heading: false
         type:
@@ -137,7 +137,7 @@ to configure [backends](../../concepts/backends.md) and other [sever-level setti
 
 ###### `projects[n].backends[type=lambda].creds` { #lambda-creds data-toc-label="creds" }
 
-#SCHEMA# dstack._internal.core.models.backends.lambdalabs.LambdaAPIKeyCreds
+#SCHEMA# dstack._internal.core.backends.lambdalabs.models.LambdaAPIKeyCreds
     overrides:
         show_root_heading: false
         type:
@@ -145,7 +145,7 @@ to configure [backends](../../concepts/backends.md) and other [sever-level setti
 
 ##### `projects[n].backends[type=runpod]` { #runpod data-toc-label="runpod" }
 
-#SCHEMA# dstack._internal.server.services.config.RunpodConfig
+#SCHEMA# dstack._internal.core.backends.runpod.models.RunpodBackendConfigWithCreds
     overrides:
         show_root_heading: false
         type:
@@ -154,7 +154,7 @@ to configure [backends](../../concepts/backends.md) and other [sever-level setti
 
 ###### `projects[n].backends[type=runpod].creds` { #runpod-creds data-toc-label="creds" }
 
-#SCHEMA# dstack._internal.core.models.backends.runpod.RunpodAPIKeyCreds
+#SCHEMA# dstack._internal.core.backends.runpod.models.RunpodAPIKeyCreds
     overrides:
         show_root_heading: false
         type:
@@ -162,7 +162,7 @@ to configure [backends](../../concepts/backends.md) and other [sever-level setti
 
 ##### `projects[n].backends[type=vastai]` { #vastai data-toc-label="vastai" }
 
-#SCHEMA# dstack._internal.server.services.config.VastAIConfig
+#SCHEMA# dstack._internal.core.backends.vastai.models.VastAIBackendConfigWithCreds
     overrides:
         show_root_heading: false
         type:
@@ -171,7 +171,7 @@ to configure [backends](../../concepts/backends.md) and other [sever-level setti
 
 ###### `projects[n].backends[type=vastai].creds` { #vastai-creds data-toc-label="creds" }
 
-#SCHEMA# dstack._internal.core.models.backends.vastai.VastAIAPIKeyCreds
+#SCHEMA# dstack._internal.core.backends.vastai.models.VastAIAPIKeyCreds
     overrides:
         show_root_heading: false
         type:
@@ -179,7 +179,7 @@ to configure [backends](../../concepts/backends.md) and other [sever-level setti
 
 ##### `projects[n].backends[type=tensordock]` { #tensordock data-toc-label="tensordock" }
 
-#SCHEMA# dstack._internal.server.services.config.TensorDockConfig
+#SCHEMA# dstack._internal.core.backends.tensordock.models.TensorDockBackendConfigWithCreds
     overrides:
         show_root_heading: false
         type:
@@ -188,7 +188,7 @@ to configure [backends](../../concepts/backends.md) and other [sever-level setti
 
 ###### `projects[n].backends[type=tensordock].creds` { #tensordock-creds data-toc-label="creds" }
 
-#SCHEMA# dstack._internal.core.models.backends.tensordock.TensorDockAPIKeyCreds
+#SCHEMA# dstack._internal.core.backends.tensordock.models.TensorDockAPIKeyCreds
     overrides:
         show_root_heading: false
         type:
@@ -196,7 +196,7 @@ to configure [backends](../../concepts/backends.md) and other [sever-level setti
 
 ##### `projects[n].backends[type=oci]` { #oci data-toc-label="oci" }
 
-#SCHEMA# dstack._internal.server.services.config.OCIConfig
+#SCHEMA# dstack._internal.core.backends.oci.models.OCIBackendConfigWithCreds
     overrides:
         show_root_heading: false
         type:
@@ -206,14 +206,14 @@ to configure [backends](../../concepts/backends.md) and other [sever-level setti
 ###### `projects[n].backends[type=oci].creds` { #oci-creds data-toc-label="creds" }
 
 === "Client"
-    #SCHEMA# dstack._internal.core.models.backends.oci.OCIClientCreds
+    #SCHEMA# dstack._internal.core.backends.oci.models.OCIClientCreds
         overrides:
             show_root_heading: false
             type:
                 required: true
 
 === "Default"
-    #SCHEMA# dstack._internal.core.models.backends.oci.OCIDefaultCreds
+    #SCHEMA# dstack._internal.core.backends.oci.models.OCIDefaultCreds
         overrides:
             show_root_heading: false
             type:
@@ -221,7 +221,7 @@ to configure [backends](../../concepts/backends.md) and other [sever-level setti
 
 ##### `projects[n].backends[type=cudo]` { #cudo data-toc-label="cudo" }
 
-#SCHEMA# dstack._internal.server.services.config.CudoConfig
+#SCHEMA# dstack._internal.core.backends.cudo.models.CudoBackendConfigWithCreds
     overrides:
         show_root_heading: false
         type:
@@ -230,7 +230,7 @@ to configure [backends](../../concepts/backends.md) and other [sever-level setti
 
 ###### `projects[n].backends[type=cudo].creds` { #cudo-creds data-toc-label="creds" }
 
-#SCHEMA# dstack._internal.core.models.backends.cudo.CudoAPIKeyCreds
+#SCHEMA# dstack._internal.core.backends.cudo.models.CudoAPIKeyCreds
     overrides:
         show_root_heading: false
         type:
@@ -238,7 +238,7 @@ to configure [backends](../../concepts/backends.md) and other [sever-level setti
 
 ##### `projects[n].backends[type=datacrunch]` { #datacrunch data-toc-label="datacrunch" }
 
-#SCHEMA# dstack._internal.server.services.config.DataCrunchConfig
+#SCHEMA# dstack._internal.core.backends.datacrunch.models.DataCrunchBackendConfigWithCreds
     overrides:
         show_root_heading: false
         type:
@@ -247,7 +247,7 @@ to configure [backends](../../concepts/backends.md) and other [sever-level setti
 
 ###### `projects[n].backends[type=datacrunch].creds` { #datacrunch-creds data-toc-label="creds" }
 
-#SCHEMA# dstack._internal.core.models.backends.datacrunch.DataCrunchAPIKeyCreds
+#SCHEMA# dstack._internal.core.backends.datacrunch.models.DataCrunchAPIKeyCreds
     overrides:
         show_root_heading: false
         type:
@@ -255,7 +255,7 @@ to configure [backends](../../concepts/backends.md) and other [sever-level setti
 
 ##### `projects[n].backends[type=kubernetes]` { #kubernetes data-toc-label="kubernetes" }
 
-#SCHEMA# dstack._internal.server.services.config.KubernetesConfig
+#SCHEMA# dstack._internal.core.backends.kubernetes.models.KubernetesBackendConfigWithCreds
     overrides:
         show_root_heading: false
         type:
@@ -264,7 +264,7 @@ to configure [backends](../../concepts/backends.md) and other [sever-level setti
 
 ###### `projects[n].backends[type=kubernetes].kubeconfig` { #kubernetes-kubeconfig data-toc-label="kubeconfig" }
 
-##SCHEMA# dstack._internal.server.services.config.KubeconfigConfig
+#SCHEMA# dstack._internal.core.backends.kubernetes.models.KubeconfigFileConfig
     overrides:
         show_root_heading: false
 
@@ -277,13 +277,13 @@ to configure [backends](../../concepts/backends.md) and other [sever-level setti
 
 ###### `projects[n].backends[type=kubernetes].networking` { #kubernetes-networking data-toc-label="networking" }
 
-##SCHEMA# dstack._internal.core.models.backends.kubernetes.KubernetesNetworkingConfig
+#SCHEMA# dstack._internal.core.backends.kubernetes.models.KubernetesNetworkingConfig
     overrides:
         show_root_heading: false
 
 ##### `projects[n].backends[type=vultr]` { #vultr data-toc-label="vultr" }
 
-#SCHEMA# dstack._internal.server.services.config.VultrConfig
+#SCHEMA# dstack._internal.core.backends.vultr.models.VultrBackendConfigWithCreds
     overrides:
         show_root_heading: false
         type:
@@ -292,7 +292,7 @@ to configure [backends](../../concepts/backends.md) and other [sever-level setti
 
 ###### `projects[n].backends[type=vultr].creds` { #vultr-creds data-toc-label="creds" }
 
-#SCHEMA# dstack._internal.core.models.backends.vultr.VultrAPIKeyCreds
+#SCHEMA# dstack._internal.core.backends.vultr.models.VultrAPIKeyCreds
     overrides:
         show_root_heading: false
         type:

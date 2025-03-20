@@ -43,6 +43,7 @@ from dstack._internal.server.models import (
 from dstack._internal.server.schemas.runner import TaskStatus
 from dstack._internal.server.services import logs as logs_services
 from dstack._internal.server.services import services
+from dstack._internal.server.services.instances import get_instance_ssh_private_keys
 from dstack._internal.server.services.jobs import (
     find_job,
     get_job_attached_volumes,
@@ -52,7 +53,6 @@ from dstack._internal.server.services.jobs import (
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.metrics import get_job_metrics
-from dstack._internal.server.services.pools import get_instance_ssh_private_keys
 from dstack._internal.server.services.repos import (
     get_code_model,
     get_repo_creds,
@@ -127,7 +127,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
     run_model = res.unique().scalar_one()
     repo_model = run_model.repo
     project = run_model.project
-    run = run_model_to_run(run_model)
+    run = run_model_to_run(run_model, include_sensitive=True)
     job_submission = job_model_to_job_submission(job_model)
     job_provisioning_data = job_submission.job_provisioning_data
     if job_provisioning_data is None:
@@ -743,20 +743,29 @@ def _get_cluster_info(
 
 
 async def _get_job_code(
-    session: AsyncSession, project: ProjectModel, repo: RepoModel, code_hash: str
+    session: AsyncSession, project: ProjectModel, repo: RepoModel, code_hash: Optional[str]
 ) -> bytes:
+    if code_hash is None:
+        return b""
     code_model = await get_code_model(session=session, repo=repo, code_hash=code_hash)
     if code_model is None:
         return b""
-    storage = get_default_storage()
-    if storage is None or code_model.blob is not None:
+    if code_model.blob is not None:
         return code_model.blob
+    storage = get_default_storage()
+    if storage is None:
+        return b""
     blob = await common_utils.run_async(
         storage.get_code,
         project.name,
         repo.name,
         code_hash,
     )
+    if blob is None:
+        logger.error(
+            "Failed to get repo code hash %s from storage for repo %s", code_hash, repo.name
+        )
+        return b""
     return blob
 
 

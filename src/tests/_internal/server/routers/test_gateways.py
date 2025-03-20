@@ -13,6 +13,7 @@ from dstack._internal.server.services.gateways import (
 )
 from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.testing.common import (
+    ComputeMockSpec,
     create_backend,
     create_gateway,
     create_gateway_compute,
@@ -174,7 +175,14 @@ class TestCreateGateway:
         backend = await create_backend(session, project.id, backend_type=BackendType.AWS)
         response = await client.post(
             f"/api/project/{project.name}/gateways/create",
-            json={"name": "test", "backend_type": "aws", "region": "us"},
+            json={
+                "configuration": {
+                    "type": "gateway",
+                    "name": "test",
+                    "backend": "aws",
+                    "region": "us",
+                },
+            },
             headers=get_auth_headers(user.token),
         )
         assert response.status_code == 200
@@ -217,7 +225,14 @@ class TestCreateGateway:
             g.return_value = "random-name"
             response = await client.post(
                 f"/api/project/{project.name}/gateways/create",
-                json={"name": None, "backend_type": "aws", "region": "us"},
+                json={
+                    "configuration": {
+                        "type": "gateway",
+                        "name": None,
+                        "backend": "aws",
+                        "region": "us",
+                    },
+                },
                 headers=get_auth_headers(user.token),
             )
             g.assert_called_once()
@@ -258,7 +273,14 @@ class TestCreateGateway:
         )
         response = await client.post(
             f"/api/project/{project.name}/gateways/create",
-            json={"name": "test", "backend_type": "aws", "region": "us"},
+            json={
+                "configuration": {
+                    "type": "gateway",
+                    "name": "test",
+                    "backend": "aws",
+                    "region": "us",
+                },
+            },
             headers=get_auth_headers(user.token),
         )
         assert response.status_code == 400
@@ -437,8 +459,10 @@ class TestDeleteGateway:
             "dstack._internal.server.services.gateways.get_project_backend_by_type_or_error"
         ) as m:
             aws = Mock()
+            aws.compute.return_value = Mock(spec=ComputeMockSpec)
             aws.compute.return_value.terminate_gateway.return_value = None  # success
             gcp = Mock()
+            gcp.compute.return_value = Mock(spec=ComputeMockSpec)
             gcp.compute.return_value.terminate_gateway.side_effect = DstackError()  # fail
 
             def get_backend(project, backend_type):

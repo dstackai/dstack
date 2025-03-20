@@ -1,11 +1,5 @@
 build {
-  source "source.yandex.nebius" {
-    name = "nebius-cuda"
-    image_description   = "Ubuntu 22.04 with CUDA, Docker and dstackai/base:cuda images"
-    image_family        = "dstack-cuda"
-    image_name          = "${local.image_name}-cuda"
-  }
-  # TODO(egor-s) add other sources
+  # TODO: transition to this generic template from legacy per-backend JSON templates
 
   provisioner "shell" {
     inline = ["cloud-init status --long --wait"]

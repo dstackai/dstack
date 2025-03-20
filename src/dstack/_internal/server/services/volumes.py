@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
 from dstack._internal.core.backends import BACKENDS_WITH_VOLUMES_SUPPORT
+from dstack._internal.core.backends.base.compute import ComputeWithVolumeSupport
 from dstack._internal.core.errors import (
     BackendNotAvailable,
     ResourceExistsError,
@@ -32,11 +33,11 @@ from dstack._internal.server.models import (
     VolumeModel,
 )
 from dstack._internal.server.services import backends as backends_services
+from dstack._internal.server.services.instances import get_instance_provisioning_data
 from dstack._internal.server.services.locking import (
     get_locker,
     string_to_lock_id,
 )
-from dstack._internal.server.services.pools import get_instance_provisioning_data
 from dstack._internal.server.services.projects import list_project_models, list_user_project_models
 from dstack._internal.utils import common, random_names
 from dstack._internal.utils.logging import get_logger
@@ -375,10 +376,11 @@ async def generate_volume_name(session: AsyncSession, project: ProjectModel) -> 
 def _validate_volume_configuration(configuration: VolumeConfiguration):
     if configuration.volume_id is None and configuration.size is None:
         raise ServerClientError("Volume must specify either volume_id or size")
+    backends_services.check_backend_type_available(configuration.backend)
     if configuration.backend not in BACKENDS_WITH_VOLUMES_SUPPORT:
         raise ServerClientError(
-            f"Volumes are not supported for {configuration.backend.value} backend. "
-            f"Supported backends: {[b.value for b in BACKENDS_WITH_VOLUMES_SUPPORT]}."
+            f"Volumes are not supported for {configuration.backend.value} backend."
+            f" Available backends with volumes support: {[b.value for b in BACKENDS_WITH_VOLUMES_SUPPORT]}."
         )
     if configuration.name is not None:
         validate_dstack_resource_name(configuration.name)
@@ -409,7 +411,9 @@ async def _delete_volume(session: AsyncSession, project: ProjectModel, volume_mo
         )
         return
 
+    compute = backend.compute()
+    assert isinstance(compute, ComputeWithVolumeSupport)
     await common.run_async(
-        backend.compute().delete_volume,
+        compute.delete_volume,
         volume=volume,
     )

@@ -6,28 +6,29 @@ from typing import Dict, List, Optional
 
 from dstack._internal.core.backends.base.compute import (
     Compute,
+    ComputeWithCreateInstanceSupport,
     generate_unique_instance_name,
-    get_job_instance_name,
     get_shim_commands,
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.lambdalabs.api_client import LambdaAPIClient
-from dstack._internal.core.backends.lambdalabs.config import LambdaConfig
+from dstack._internal.core.backends.lambdalabs.models import LambdaConfig
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceConfiguration,
     InstanceOffer,
     InstanceOfferWithAvailability,
-    SSHKey,
 )
-from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
-from dstack._internal.core.models.volumes import Volume
+from dstack._internal.core.models.runs import JobProvisioningData, Requirements
 
 MAX_INSTANCE_NAME_LEN = 60
 
 
-class LambdaCompute(Compute):
+class LambdaCompute(
+    ComputeWithCreateInstanceSupport,
+    Compute,
+):
     def __init__(self, config: LambdaConfig):
         super().__init__()
         self.config = config
@@ -101,28 +102,6 @@ class LambdaCompute(Compute):
                 daemon=True,
             )
             thread.start()
-
-    def run_job(
-        self,
-        run: Run,
-        job: Job,
-        instance_offer: InstanceOfferWithAvailability,
-        project_ssh_public_key: str,
-        project_ssh_private_key: str,
-        volumes: List[Volume],
-    ) -> JobProvisioningData:
-        instance_config = InstanceConfiguration(
-            project_name=run.project_name,
-            instance_name=get_job_instance_name(run, job),  # TODO: generate name
-            ssh_keys=[
-                SSHKey(
-                    public=project_ssh_public_key.strip(), private=project_ssh_private_key.strip()
-                ),
-                SSHKey(public=run.run_spec.ssh_key_pub.strip()),
-            ],
-            user=run.user,
-        )
-        return self.create_instance(instance_offer, instance_config)
 
     def terminate_instance(
         self, instance_id: str, region: str, backend_data: Optional[str] = None

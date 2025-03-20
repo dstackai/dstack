@@ -1,4 +1,4 @@
-from typing import List
+from typing import Dict, List
 
 from pydantic import parse_obj_as
 
@@ -38,9 +38,14 @@ class VolumesAPIClient(APIClientGroup):
         self._request(f"/api/project/{project_name}/volumes/delete", body=body.json())
 
 
-def _get_volume_configuration_excludes(configuration: VolumeConfiguration) -> dict:
+def _get_volume_configuration_excludes(configuration: VolumeConfiguration) -> Dict:
+    """
+    Returns `configuration` exclude mapping to exclude certain fields from the request.
+    Use this method to exclude new fields when they are not set to keep
+    clients backward-compatibility with older servers.
+    """
     configuration_excludes = {}
-    # client >= 0.18.41 / server <= 0.18.40 compatibility tweak
-    if configuration.availability_zone is None:
-        configuration_excludes["availability_zone"] = True
+    # Fields can be excluded like this:
+    # if configuration.availability_zone is None:
+    #     configuration_excludes["availability_zone"] = True
     return {"configuration": configuration_excludes}

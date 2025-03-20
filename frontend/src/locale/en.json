@@ -359,6 +359,7 @@
       "artifacts": "Artifacts",
       "artifacts_count": "Artifacts",
       "hub_user_name": "User",
+      "service_url": "Service URL",
       "statuses": {
         "pending": "Pending",
         "submitted": "Submitted",
@@ -520,6 +521,10 @@
     "token": "Token",
     "token_description": "Specify use your personal access token",
     "global_role": "Global role",
+    "active": "Active",
+    "active_description": "Specify user activation",
+    "activated": "Activated",
+    "deactivated": "Deactivated",
     "email": "Email",
     "created_at": "Created at",
     "account": "User",
@@ -584,7 +589,8 @@
     "required": "This is required field"
   },
   "users_autosuggest": {
-    "placeholder": "Add member",
+    "placeholder": "Enter username or email to add member",
+    "entered_text": "Add member",
     "loading": "Loading users",
     "no_match": "No matches found"
   },

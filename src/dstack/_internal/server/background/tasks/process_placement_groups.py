@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
+from dstack._internal.core.backends.base.compute import ComputeWithPlacementGroupSupport
 from dstack._internal.core.errors import PlacementGroupInUseError
 from dstack._internal.server.db import get_session_ctx
 from dstack._internal.server.models import PlacementGroupModel, ProjectModel
@@ -81,8 +82,10 @@ async def _delete_placement_group(placement_group_model: PlacementGroupModel):
             "Failed to delete placement group %s. Backend not available.", placement_group.name
         )
         return
+    compute = backend.compute()
+    assert isinstance(compute, ComputeWithPlacementGroupSupport)
     try:
-        await run_async(backend.compute().delete_placement_group, placement_group)
+        await run_async(compute.delete_placement_group, placement_group)
     except PlacementGroupInUseError:
         logger.info(
             "Placement group %s is still in use. Skipping deletion for now.", placement_group.name

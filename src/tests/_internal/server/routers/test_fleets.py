@@ -27,7 +27,6 @@ from dstack._internal.server.testing.common import (
     create_fleet,
     create_instance,
     create_job,
-    create_pool,
     create_project,
     create_repo,
     create_run,
@@ -346,8 +345,6 @@ class TestCreateFleet:
                     "retry": None,
                     "max_price": None,
                     "idle_duration": None,
-                    "termination_policy": None,
-                    "termination_idle_time": None,
                     "type": "fleet",
                     "name": "test-fleet",
                     "reservation": None,
@@ -360,16 +357,11 @@ class TestCreateFleet:
                     "instance_types": None,
                     "spot_policy": None,
                     "retry": None,
-                    "retry_policy": None,
                     "max_duration": None,
                     "stop_duration": None,
                     "max_price": None,
-                    "pool_name": None,
-                    "instance_name": None,
                     "creation_policy": None,
                     "idle_duration": None,
-                    "termination_policy": None,
-                    "termination_idle_time": None,
                     "utilization_policy": None,
                     "name": "",
                     "default": False,
@@ -394,7 +386,6 @@ class TestCreateFleet:
                     "unreachable": False,
                     "termination_reason": None,
                     "created": "2023-01-02T03:04:00+00:00",
-                    "pool_name": None,
                     "backend": None,
                     "region": None,
                     "availability_zone": None,
@@ -472,8 +463,6 @@ class TestCreateFleet:
                     "retry": None,
                     "max_price": None,
                     "idle_duration": None,
-                    "termination_policy": None,
-                    "termination_idle_time": None,
                     "type": "fleet",
                     "name": spec.configuration.name,
                     "reservation": None,
@@ -486,16 +475,11 @@ class TestCreateFleet:
                     "instance_types": None,
                     "spot_policy": None,
                     "retry": None,
-                    "retry_policy": None,
                     "max_duration": None,
                     "stop_duration": None,
                     "max_price": None,
-                    "pool_name": None,
-                    "instance_name": None,
                     "creation_policy": None,
                     "idle_duration": None,
-                    "termination_policy": None,
-                    "termination_idle_time": None,
                     "utilization_policy": None,
                     "name": "",
                     "default": False,
@@ -526,7 +510,6 @@ class TestCreateFleet:
                     "fleet_id": "1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e",
                     "fleet_name": spec.configuration.name,
                     "instance_num": 0,
-                    "pool_name": None,
                     "job_name": None,
                     "hostname": "1.1.1.1",
                     "status": "pending",
@@ -627,12 +610,10 @@ class TestDeleteFleets:
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
-        pool = await create_pool(session=session, project=project)
         fleet = await create_fleet(session=session, project=project)
         instance = await create_instance(
             session=session,
             project=project,
-            pool=pool,
         )
         fleet.instances.append(instance)
         await session.commit()
@@ -654,7 +635,6 @@ class TestDeleteFleets:
     ):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
-        pool = await create_pool(session=session, project=project)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
@@ -676,7 +656,6 @@ class TestDeleteFleets:
         instance = await create_instance(
             session=session,
             project=project,
-            pool=pool,
             status=InstanceStatus.BUSY,
             job=job,
         )
@@ -744,18 +723,15 @@ class TestDeleteFleetInstances:
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
-        pool = await create_pool(session=session, project=project)
         fleet = await create_fleet(session=session, project=project)
         instance1 = await create_instance(
             session=session,
             project=project,
-            pool=pool,
             instance_num=1,
         )
         instance2 = await create_instance(
             session=session,
             project=project,
-            pool=pool,
             instance_num=2,
         )
         fleet.instances.append(instance1)
@@ -785,7 +761,6 @@ class TestDeleteFleetInstances:
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
-        pool = await create_pool(session=session, project=project)
         fleet = await create_fleet(session=session, project=project)
         repo = await create_repo(
             session=session,
@@ -804,7 +779,6 @@ class TestDeleteFleetInstances:
         instance = await create_instance(
             session=session,
             project=project,
-            pool=pool,
             instance_num=1,
             status=InstanceStatus.BUSY,
             job=job,

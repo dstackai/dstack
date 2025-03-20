@@ -28,7 +28,7 @@ The `task` configuration type allows running [tasks](../../concepts/tasks.md).
 
 ### `resources`
 
-#SCHEMA# dstack._internal.core.models.resources.ResourcesSpecSchema
+#SCHEMA# dstack._internal.core.models.resources.ResourcesSpec
     overrides:
       show_root_heading: false
       type:
@@ -37,7 +37,7 @@ The `task` configuration type allows running [tasks](../../concepts/tasks.md).
 
 #### `resouces.gpu` { #resources-gpu data-toc-label="gpu" }
 
-#SCHEMA# dstack._internal.core.models.resources.GPUSpecSchema
+#SCHEMA# dstack._internal.core.models.resources.GPUSpec
     overrides:
       show_root_heading: false
       type:
@@ -45,7 +45,7 @@ The `task` configuration type allows running [tasks](../../concepts/tasks.md).
 
 #### `resouces.disk` { #resources-disk data-toc-label="disk" }
 
-#SCHEMA# dstack._internal.core.models.resources.DiskSpecSchema
+#SCHEMA# dstack._internal.core.models.resources.DiskSpec
     overrides:
       show_root_heading: false
       type:

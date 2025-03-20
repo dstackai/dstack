@@ -8,6 +8,16 @@ from uuid import UUID
 import gpuhunt
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from dstack._internal.core.backends.base.compute import (
+    Compute,
+    ComputeWithCreateInstanceSupport,
+    ComputeWithGatewaySupport,
+    ComputeWithMultinodeSupport,
+    ComputeWithPlacementGroupSupport,
+    ComputeWithPrivateGatewaySupport,
+    ComputeWithReservationSupport,
+    ComputeWithVolumeSupport,
+)
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import NetworkMode
 from dstack._internal.core.models.configurations import (
@@ -35,8 +45,7 @@ from dstack._internal.core.models.placement import (
     PlacementStrategy,
 )
 from dstack._internal.core.models.profiles import (
-    DEFAULT_POOL_NAME,
-    DEFAULT_POOL_TERMINATION_IDLE_TIME,
+    DEFAULT_FLEET_TERMINATION_IDLE_TIME,
     Profile,
     TerminationPolicy,
 )
@@ -71,7 +80,6 @@ from dstack._internal.server.models import (
     JobModel,
     JobPrometheusMetrics,
     PlacementGroupModel,
-    PoolModel,
     ProjectModel,
     RepoCredsModel,
     RepoModel,
@@ -181,9 +189,6 @@ async def create_repo(
     if info is None:
         info = {
             "repo_type": "remote",
-            "repo_host_name": "",
-            "repo_port": None,
-            "repo_user_name": "",
             "repo_name": "dstack",
         }
     repo = RepoModel(
@@ -206,7 +211,6 @@ async def create_repo_creds(
 ) -> RepoCredsModel:
     if creds is None:
         creds = {
-            "protocol": "https",
             "clone_url": "https://github.com/dstackai/dstack.git",
             "private_key": None,
             "oauth_token": "test_token",
@@ -325,13 +329,22 @@ def get_job_provisioning_data(
     backend: BackendType = BackendType.AWS,
     region: str = "us-east-1",
     gpu_count: int = 0,
+    gpu_memory_gib: float = 16,
+    gpu_name: str = "T4",
     cpu_count: int = 1,
     memory_gib: float = 0.5,
     spot: bool = False,
     hostname: str = "127.0.0.4",
     internal_ip: Optional[str] = "127.0.0.4",
+    price: float = 10.5,
 ) -> JobProvisioningData:
-    gpus = [Gpu(name="T4", memory_mib=16384, vendor=gpuhunt.AcceleratorVendor.NVIDIA)] * gpu_count
+    gpus = [
+        Gpu(
+            name=gpu_name,
+            memory_mib=int(gpu_memory_gib * 1024),
+            vendor=gpuhunt.AcceleratorVendor.NVIDIA,
+        )
+    ] * gpu_count
     return JobProvisioningData(
         backend=backend,
         instance_type=InstanceType(
@@ -344,7 +357,7 @@ def get_job_provisioning_data(
         hostname=hostname,
         internal_ip=internal_ip,
         region=region,
-        price=10.5,
+        price=price,
         username="ubuntu",
         ssh_port=22,
         dockerized=dockerized,
@@ -439,22 +452,6 @@ def get_gateway_compute_configuration(
     )
 
 
-async def create_pool(
-    session: AsyncSession,
-    project: ProjectModel,
-    pool_name: Optional[str] = None,
-) -> PoolModel:
-    pool_name = pool_name if pool_name is not None else DEFAULT_POOL_NAME
-    pool = PoolModel(
-        name=pool_name,
-        project=project,
-        project_id=project.id,
-    )
-    session.add(pool)
-    await session.commit()
-    return pool
-
-
 async def create_fleet(
     session: AsyncSession,
     project: ProjectModel,
@@ -463,11 +460,14 @@ async def create_fleet(
     fleet_id: Optional[UUID] = None,
     status: FleetStatus = FleetStatus.ACTIVE,
     deleted: bool = False,
+    name: Optional[str] = None,
 ) -> FleetModel:
     if fleet_id is None:
         fleet_id = uuid.uuid4()
     if spec is None:
         spec = get_fleet_spec()
+    if name is not None:
+        spec.configuration.name = name
     fm = FleetModel(
         id=fleet_id,
         project=project,
@@ -507,7 +507,6 @@ def get_fleet_configuration(
 async def create_instance(
     session: AsyncSession,
     project: ProjectModel,
-    pool: PoolModel,
     fleet: Optional[FleetModel] = None,
     status: InstanceStatus = InstanceStatus.IDLE,
     unreachable: bool = False,
@@ -522,7 +521,7 @@ async def create_instance(
     instance_num: int = 0,
     backend: BackendType = BackendType.DATACRUNCH,
     termination_policy: Optional[TerminationPolicy] = None,
-    termination_idle_time: int = DEFAULT_POOL_TERMINATION_IDLE_TIME,
+    termination_idle_time: int = DEFAULT_FLEET_TERMINATION_IDLE_TIME,
     region: str = "eu-west",
     remote_connection_info: Optional[RemoteConnectionInfo] = None,
     offer: Optional[InstanceOfferWithAvailability] = None,
@@ -531,6 +530,7 @@ async def create_instance(
     busy_blocks: int = 0,
     name: str = "test_instance",
     volumes: Optional[List[VolumeModel]] = None,
+    price: float = 1.0,
 ) -> InstanceModel:
     if instance_id is None:
         instance_id = uuid.uuid4()
@@ -564,7 +564,6 @@ async def create_instance(
         id=instance_id,
         name=name,
         instance_num=instance_num,
-        pool=pool,
         fleet=fleet,
         project=project,
         status=status,
@@ -574,7 +573,7 @@ async def create_instance(
         finished_at=finished_at,
         job_provisioning_data=job_provisioning_data.json(),
         offer=offer.json(),
-        price=1,
+        price=price,
         region=region,
         backend=backend,
         termination_policy=termination_policy,
@@ -611,6 +610,8 @@ def get_instance_offer_with_availability(
     backend: BackendType = BackendType.AWS,
     region: str = "eu-west",
     gpu_count: int = 0,
+    gpu_name: str = "T4",
+    gpu_memory_gib: float = 16,
     cpu_count: int = 2,
     memory_gib: float = 12,
     disk_gib: float = 100.0,
@@ -618,12 +619,20 @@ def get_instance_offer_with_availability(
     blocks: int = 1,
     total_blocks: int = 1,
     availability_zones: Optional[List[str]] = None,
+    price: float = 1.0,
+    instance_type: str = "instance",
 ):
-    gpus = [Gpu(name="T4", memory_mib=16384, vendor=gpuhunt.AcceleratorVendor.NVIDIA)] * gpu_count
+    gpus = [
+        Gpu(
+            name=gpu_name,
+            memory_mib=int(gpu_memory_gib * 1024),
+            vendor=gpuhunt.AcceleratorVendor.NVIDIA,
+        )
+    ] * gpu_count
     return InstanceOfferWithAvailability(
         backend=backend,
         instance=InstanceType(
-            name="instance",
+            name=instance_type,
             resources=Resources(
                 cpus=cpu_count,
                 memory_mib=int(memory_gib * 1024),
@@ -634,7 +643,7 @@ def get_instance_offer_with_availability(
             ),
         ),
         region=region,
-        price=1,
+        price=price,
         availability=InstanceAvailability.AVAILABLE,
         availability_zones=availability_zones,
         blocks=blocks,
@@ -947,3 +956,20 @@ class AsyncContextManager:
 
     async def __aexit__(self, exc_type, exc, traceback):
         pass
+
+
+class ComputeMockSpec(
+    Compute,
+    ComputeWithCreateInstanceSupport,
+    ComputeWithMultinodeSupport,
+    ComputeWithReservationSupport,
+    ComputeWithPlacementGroupSupport,
+    ComputeWithGatewaySupport,
+    ComputeWithPrivateGatewaySupport,
+    ComputeWithVolumeSupport,
+):
+    """
+    Can be used to create Compute mocks that pass all isinstance asserts.
+    """
+
+    pass

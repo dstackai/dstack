@@ -11,12 +11,12 @@ from oci.object_storage.models import Bucket
 from oci.work_requests.models import WorkRequest
 
 from dstack._internal.core.backends.oci import resources
+from dstack._internal.core.backends.oci.models import OCIDefaultCreds
 from dstack._internal.core.backends.oci.region import (
     OCIRegionClient,
     get_subscribed_regions,
     make_region_clients_map,
 )
-from dstack._internal.core.models.backends.oci import OCIDefaultCreds
 
 WORK_REQUEST_UPDATE_INTERVAL_SECS = 15
 MAX_IMAGE_IMPORT_OR_EXPORT_SECS = 40 * 60

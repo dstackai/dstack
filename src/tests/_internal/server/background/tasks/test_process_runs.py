@@ -21,7 +21,6 @@ from dstack._internal.server.models import RunModel
 from dstack._internal.server.testing.common import (
     create_instance,
     create_job,
-    create_pool,
     create_project,
     create_repo,
     create_run,
@@ -42,9 +41,6 @@ async def make_run(
         session=session,
         project_id=project.id,
     )
-    project.default_pool = await create_pool(
-        session=session, project=project, pool_name="default-pool"
-    )
     run_name = "test-run"
     profile = Profile(
         name="test-profile",
@@ -60,7 +56,7 @@ async def make_run(
             replicas=parse_obj_as(Range[int], replicas),
         ),
     )
-    return await create_run(
+    run = await create_run(
         session=session,
         project=project,
         repo=repo,
@@ -69,6 +65,8 @@ async def make_run(
         run_spec=run_spec,
         status=status,
     )
+    run.project = project
+    return run
 
 
 class TestProcessRuns:
@@ -117,11 +115,9 @@ class TestProcessRuns:
     async def test_terminate_run_jobs(self, test_db, session: AsyncSession):
         run = await make_run(session, status=RunStatus.TERMINATING)
         run.termination_reason = RunTerminationReason.JOB_FAILED
-        pool = await create_pool(session=session, project=run.project)
         instance = await create_instance(
             session=session,
             project=run.project,
-            pool=pool,
             status=InstanceStatus.BUSY,
         )
         job = await create_job(
@@ -146,9 +142,7 @@ class TestProcessRuns:
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_retry_running_to_pending(self, test_db, session: AsyncSession):
         run = await make_run(session, status=RunStatus.RUNNING)
-        instance = await create_instance(
-            session, project=run.project, pool=run.project.default_pool, spot=True
-        )
+        instance = await create_instance(session, project=run.project, spot=True)
         await create_job(
             session=session,
             run=run,
@@ -169,9 +163,7 @@ class TestProcessRuns:
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_retry_running_to_failed(self, test_db, session: AsyncSession):
         run = await make_run(session, status=RunStatus.RUNNING)
-        instance = await create_instance(
-            session, project=run.project, pool=run.project.default_pool, spot=True
-        )
+        instance = await create_instance(session, project=run.project, spot=True)
         # job exited with non-zero code
         await create_job(
             session=session,
@@ -237,9 +229,7 @@ class TestProcessRunsReplicas:
             submitted_at=run.submitted_at,
             last_processed_at=run.submitted_at,
             replica_num=0,
-            instance=await create_instance(
-                session, project=run.project, pool=run.project.default_pool, spot=True
-            ),
+            instance=await create_instance(session, project=run.project, spot=True),
             job_provisioning_data=get_job_provisioning_data(),
         )
         await create_job(
@@ -250,9 +240,7 @@ class TestProcessRunsReplicas:
             submitted_at=run.submitted_at,
             last_processed_at=run.submitted_at,
             replica_num=1,
-            instance=await create_instance(
-                session, project=run.project, pool=run.project.default_pool, spot=True
-            ),
+            instance=await create_instance(session, project=run.project, spot=True),
             job_provisioning_data=get_job_provisioning_data(),
         )
         with patch("dstack._internal.utils.common.get_current_datetime") as datetime_mock:
@@ -273,9 +261,7 @@ class TestProcessRunsReplicas:
             submitted_at=run.submitted_at,
             last_processed_at=run.last_processed_at,
             replica_num=0,
-            instance=await create_instance(
-                session, project=run.project, pool=run.project.default_pool, spot=True
-            ),
+            instance=await create_instance(session, project=run.project, spot=True),
             job_provisioning_data=get_job_provisioning_data(),
         )
         await create_job(

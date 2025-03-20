@@ -6,7 +6,6 @@ from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.path import PathLike
 from dstack.api._public.backends import BackendCollection
-from dstack.api._public.pools import PoolCollection
 from dstack.api._public.repos import RepoCollection, get_ssh_keypair
 from dstack.api._public.runs import RunCollection
 from dstack.api.server import APIClient
@@ -16,12 +15,14 @@ logger = get_logger(__name__)
 
 class Client:
     """
-    High-level API client for interacting with dstack server
+    High-level API client for interacting with the `dstack` server
 
     Attributes:
+        project: The project name.
         runs: Operations with runs.
         repos: Operations with repositories.
         backends: Operations with backends.
+        client: Low-level API client that supports all API endpoints.
     """
 
     def __init__(
@@ -41,7 +42,6 @@ class Client:
         self._repos = RepoCollection(api_client, project_name)
         self._backends = BackendCollection(api_client, project_name)
         self._runs = RunCollection(api_client, project_name, self)
-        self._pool = PoolCollection(api_client, project_name)
         if ssh_identity_file:
             self.ssh_identity_file = str(ssh_identity_file)
         else:
@@ -58,13 +58,13 @@ class Client:
         Creates a Client using the default configuration from `~/.dstack/config.yml` if it exists.
 
         Args:
-            project_name: The name of the project, required if `server_url` and `user_token` are specified
-            server_url: The dstack server URL (e.g. `http://localhost:3000/` or `https://sky.dstack.ai`)
-            user_token: The dstack user token
-            ssh_identity_file: The private SSH key path for SSH tunneling
+            project_name: The name of the project. required if `server_url` and `user_token` are specified.
+            server_url: The dstack server URL (e.g. `http://localhost:3000/` or `https://sky.dstack.ai`).
+            user_token: The dstack user token.
+            ssh_identity_file: The private SSH key path for SSH tunneling.
 
         Returns:
-            A client instance
+            A client instance.
         """
         if server_url is not None and user_token is not None:
             if project_name is None:
@@ -79,6 +79,14 @@ class Client:
         )
 
     @property
+    def project(self) -> str:
+        return self._project
+
+    @property
+    def runs(self) -> RunCollection:
+        return self._runs
+
+    @property
     def repos(self) -> RepoCollection:
         return self._repos
 
@@ -87,17 +95,5 @@ class Client:
         return self._backends
 
     @property
-    def runs(self) -> RunCollection:
-        return self._runs
-
-    @property
     def client(self) -> APIClient:
         return self._client
-
-    @property
-    def project(self) -> str:
-        return self._project
-
-    @property
-    def pool(self) -> PoolCollection:
-        return self._pool

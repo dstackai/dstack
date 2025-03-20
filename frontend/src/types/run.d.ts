@@ -133,6 +133,7 @@ declare interface ITaskConfiguration {
 
 declare interface IServiceConfiguration {
     type: 'service';
+    gateway: string | null;
 }
 declare interface IRunSpec {
     configuration: IDevEnvironmentConfiguration | ITaskConfiguration | IServiceConfiguration;

@@ -21,6 +21,7 @@ from dstack._internal.core.models.profiles import (
 from dstack._internal.core.models.runs import (
     AppSpec,
     JobSpec,
+    JobSSHKey,
     Requirements,
     Retry,
     RunSpec,
@@ -30,6 +31,7 @@ from dstack._internal.core.models.volumes import MountPoint, VolumeMountPoint
 from dstack._internal.core.services.profiles import get_retry
 from dstack._internal.core.services.ssh.ports import filter_reserved_ports
 from dstack._internal.server.services.docker import ImageConfig, get_image_config
+from dstack._internal.utils import crypto
 from dstack._internal.utils.common import run_async
 from dstack._internal.utils.interpolator import InterpolatorError, VariablesInterpolator
 
@@ -57,6 +59,8 @@ class JobConfigurator(ABC):
     TYPE: RunConfigurationType
 
     _image_config: Optional[ImageConfig] = None
+    # JobSSHKey should be shared for all jobs in a replica for inter-node communitation.
+    _job_ssh_key: Optional[JobSSHKey] = None
 
     def __init__(self, run_spec: RunSpec):
         self.run_spec = run_spec
@@ -123,6 +127,7 @@ class JobConfigurator(ABC):
             retry=self._retry(),
             working_dir=self._working_dir(),
             volumes=self._volumes(job_num),
+            ssh_key=self._ssh_key(jobs_per_replica),
         )
         return job_spec
 
@@ -237,6 +242,17 @@ class JobConfigurator(ABC):
 
     def _volumes(self, job_num: int) -> List[MountPoint]:
         return interpolate_job_volumes(self.run_spec.configuration.volumes, job_num)
+
+    def _ssh_key(self, jobs_per_replica: int) -> Optional[JobSSHKey]:
+        if jobs_per_replica < 2:
+            return None
+        if self._job_ssh_key is None:
+            private, public = crypto.generate_rsa_key_pair_bytes(comment="dstack_job")
+            self._job_ssh_key = JobSSHKey(
+                private=private.decode(),
+                public=public.decode(),
+            )
+        return self._job_ssh_key
 
 
 def interpolate_job_volumes(

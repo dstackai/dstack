@@ -14,6 +14,9 @@ from dstack._internal.server.testing.common import (
     create_run,
     create_user,
     get_auth_headers,
+    get_instance_offer_with_availability,
+    get_job_provisioning_data,
+    get_job_runtime_data,
 )
 
 pytestmark = pytest.mark.usefixtures("image_config_mock")
@@ -51,9 +54,18 @@ class TestGetJobMetrics:
             repo=repo,
             user=user,
         )
+        jpd = get_job_provisioning_data(
+            cpu_count=128, memory_gib=256, gpu_count=2, gpu_memory_gib=32
+        )
+        offer = get_instance_offer_with_availability(
+            cpu_count=64, memory_gib=128, gpu_count=1, gpu_memory_gib=32
+        )
+        jrd = get_job_runtime_data(offer=offer)
         job = await create_job(
             session=session,
             run=run,
+            job_provisioning_data=jpd,
+            job_runtime_data=jrd,
         )
         await create_job_metrics_point(
             session=session,
@@ -109,9 +121,24 @@ class TestGetJobMetrics:
                     "values": [512],
                 },
                 {
+                    "name": "cpus_detected_num",
+                    "timestamps": ["2023-01-02T03:04:25+00:00"],
+                    "values": [64],
+                },
+                {
+                    "name": "memory_total_bytes",
+                    "timestamps": ["2023-01-02T03:04:25+00:00"],
+                    "values": [137438953472],
+                },
+                {
                     "name": "gpus_detected_num",
                     "timestamps": ["2023-01-02T03:04:25+00:00"],
                     "values": [1],
+                },
+                {
+                    "name": "gpu_memory_total_bytes",
+                    "timestamps": ["2023-01-02T03:04:25+00:00"],
+                    "values": [34359738368],
                 },
                 {
                     "name": "gpu_memory_usage_bytes_gpu0",

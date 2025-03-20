@@ -3,14 +3,14 @@ from typing import List, Optional
 import gpuhunt
 from gpuhunt.providers.vastai import VastAIProvider
 
-from dstack._internal.core.backends.base import Compute
+from dstack._internal.core.backends.base.backend import Compute
 from dstack._internal.core.backends.base.compute import (
     generate_unique_instance_name_for_job,
     get_docker_commands,
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.vastai.api_client import VastAIAPIClient
-from dstack._internal.core.backends.vastai.config import VastAIConfig
+from dstack._internal.core.backends.vastai.models import VastAIConfig
 from dstack._internal.core.consts import DSTACK_RUNNER_SSH_PORT
 from dstack._internal.core.errors import ProvisioningError
 from dstack._internal.core.models.backends.base import BackendType

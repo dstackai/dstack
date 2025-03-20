@@ -6,13 +6,14 @@ import oci
 
 from dstack._internal.core.backends.base.compute import (
     Compute,
+    ComputeWithCreateInstanceSupport,
+    ComputeWithMultinodeSupport,
     generate_unique_instance_name,
-    get_job_instance_name,
     get_user_data,
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.oci import resources
-from dstack._internal.core.backends.oci.config import OCIConfig
+from dstack._internal.core.backends.oci.models import OCIConfig
 from dstack._internal.core.backends.oci.region import make_region_clients_map
 from dstack._internal.core.errors import NoCapacityError
 from dstack._internal.core.models.backends.base import BackendType
@@ -21,11 +22,9 @@ from dstack._internal.core.models.instances import (
     InstanceConfiguration,
     InstanceOffer,
     InstanceOfferWithAvailability,
-    SSHKey,
 )
 from dstack._internal.core.models.resources import Memory, Range
-from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
-from dstack._internal.core.models.volumes import Volume
+from dstack._internal.core.models.runs import JobProvisioningData, Requirements
 
 SUPPORTED_SHAPE_FAMILIES = [
     "VM.Standard2.",
@@ -46,7 +45,11 @@ SUPPORTED_SHAPE_FAMILIES = [
 CONFIGURABLE_DISK_SIZE = Range[Memory](min=Memory.parse("50GB"), max=Memory.parse("32TB"))
 
 
-class OCICompute(Compute):
+class OCICompute(
+    ComputeWithCreateInstanceSupport,
+    ComputeWithMultinodeSupport,
+    Compute,
+):
     def __init__(self, config: OCIConfig):
         super().__init__()
         self.config = config
@@ -91,23 +94,6 @@ class OCICompute(Compute):
             )
 
         return offers_with_availability
-
-    def run_job(
-        self,
-        run: Run,
-        job: Job,
-        instance_offer: InstanceOfferWithAvailability,
-        project_ssh_public_key: str,
-        project_ssh_private_key: str,
-        volumes: List[Volume],
-    ) -> JobProvisioningData:
-        instance_config = InstanceConfiguration(
-            project_name=run.project_name,
-            instance_name=get_job_instance_name(run, job),
-            ssh_keys=[SSHKey(public=project_ssh_public_key.strip())],
-            user=run.user,
-        )
-        return self.create_instance(instance_offer, instance_config)
 
     def terminate_instance(
         self, instance_id: str, region: str, backend_data: Optional[str] = None

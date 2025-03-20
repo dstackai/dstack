@@ -7,8 +7,11 @@ from typing import Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from dstack._internal.core.models.instances import Resources
 from dstack._internal.core.models.metrics import JobMetrics, Metric
 from dstack._internal.server.models import JobMetricsPoint, JobModel
+from dstack._internal.server.services.jobs import get_job_provisioning_data, get_job_runtime_data
+from dstack._internal.utils.common import get_or_error
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -47,16 +50,33 @@ async def get_job_metrics(
     # we need at least 2 points to calculate cpu_usage_percent
     if len(points) < 2:
         return JobMetrics(metrics=[])
-    return _calculate_job_metrics(points)
+    return _calculate_job_metrics(job_model, points)
 
 
-def _calculate_job_metrics(points: Sequence[JobMetricsPoint]) -> JobMetrics:
+def _calculate_job_metrics(job_model: JobModel, points: Sequence[JobMetricsPoint]) -> JobMetrics:
     timestamps: list[datetime] = []
     cpu_usage_points: list[int] = []
     memory_usage_points: list[int] = []
     memory_working_set_points: list[int] = []
     gpus_memory_usage_points: defaultdict[int, list[int]] = defaultdict(list)
     gpus_util_points: defaultdict[int, list[int]] = defaultdict(list)
+
+    cpus_detected_num: Optional[int] = None
+    memory_total: Optional[int] = None
+    gpu_memory_total: Optional[int] = None
+    resources: Optional[Resources] = None
+    jrd = get_job_runtime_data(job_model)
+    if jrd is not None and jrd.offer is not None:
+        resources = jrd.offer.instance.resources
+    else:
+        jpd = get_job_provisioning_data(job_model)
+        if jpd is not None:
+            resources = jpd.instance_type.resources
+    if resources is not None:
+        cpus_detected_num = resources.cpus
+        memory_total = resources.memory_mib * 1024 * 1024
+        if len(resources.gpus) > 0:
+            gpu_memory_total = resources.gpus[0].memory_mib * 1024 * 1024
 
     gpus_detected_num: Optional[int] = None
     gpus_detected_num_mismatch: bool = False
@@ -93,6 +113,10 @@ def _calculate_job_metrics(points: Sequence[JobMetricsPoint]) -> JobMetrics:
             values=memory_working_set_points,
         ),
     ]
+    if cpus_detected_num is not None:
+        metrics.append(_make_constant_metric("cpus_detected_num", timestamps, cpus_detected_num))
+    if memory_total is not None:
+        metrics.append(_make_constant_metric("memory_total_bytes", timestamps, memory_total))
     if gpus_detected_num_mismatch:
         # If number of GPUs changed in the time window, skip GPU metrics altogether, otherwise
         # results can be unpredictable (e.g, one GPU takes place of another, as they are
@@ -100,18 +124,12 @@ def _calculate_job_metrics(points: Sequence[JobMetricsPoint]) -> JobMetrics:
         logger.warning("gpus_detected_num mismatch, skipping GPU metrics")
     else:
         metrics.append(
-            # As gpus_detected_num expected to be constant, we add only two points — the latest
-            # and the earliest in the batch
-            Metric(
-                name="gpus_detected_num",
-                timestamps=[timestamps[0], timestamps[-1]]
-                if len(timestamps) > 1
-                else [timestamps[0]],
-                values=[gpus_detected_num, gpus_detected_num]
-                if len(timestamps) > 1
-                else [gpus_detected_num],
-            )
+            _make_constant_metric("gpus_detected_num", timestamps, get_or_error(gpus_detected_num))
         )
+        if gpu_memory_total is not None:
+            metrics.append(
+                _make_constant_metric("gpu_memory_total_bytes", timestamps, gpu_memory_total)
+            )
         for index, gpu_memory_usage_points in gpus_memory_usage_points.items():
             metrics.append(
                 Metric(
@@ -129,6 +147,14 @@ def _calculate_job_metrics(points: Sequence[JobMetricsPoint]) -> JobMetrics:
                 )
             )
     return JobMetrics(metrics=metrics)
+
+
+def _make_constant_metric(name: str, timestamps: list[datetime], value: float) -> Metric:
+    return Metric(
+        name=name,
+        timestamps=timestamps,
+        values=[value] * len(timestamps),
+    )
 
 
 def _get_cpu_usage(last_point: JobMetricsPoint, prev_point: JobMetricsPoint) -> int:

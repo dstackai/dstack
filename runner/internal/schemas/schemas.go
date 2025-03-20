@@ -54,6 +54,7 @@ type JobSpec struct {
 	Env            map[string]string `json:"env"`
 	SingleBranch   bool              `json:"single_branch"`
 	MaxDuration    int               `json:"max_duration"`
+	SSHKey         *SSHKey           `json:"ssh_key"`
 	WorkingDir     *string           `json:"working_dir"`
 }
 
@@ -61,6 +62,11 @@ type ClusterInfo struct {
 	JobIPs      []string `json:"job_ips"`
 	MasterJobIP string   `json:"master_job_ip"`
 	GPUSPerJob  int      `json:"gpus_per_job"`
+}
+
+type SSHKey struct {
+	Private string `json:"private"`
+	Public  string `json:"public"`
 }
 
 type RepoCredentials struct {

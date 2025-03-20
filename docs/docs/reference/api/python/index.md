@@ -14,6 +14,7 @@ from dstack.api import Task, GPU, Client, Resources
 client = Client.from_config()
 
 task = Task(
+    name="my-awesome-run",  # If not specified, a random name is assigned 
     image="ghcr.io/huggingface/text-generation-inference:latest",
     env={"MODEL_ID": "TheBloke/Llama-2-13B-chat-GPTQ"},
     commands=[
@@ -23,8 +24,7 @@ task = Task(
     resources=Resources(gpu=GPU(memory="24GB")),
 )
 
-run = client.runs.submit(
-    run_name="my-awesome-run",  # If not specified, a random name is assigned 
+run = client.runs.apply_configuration(
     configuration=task,
     repo=None, # Specify to mount additional files
 )
@@ -42,10 +42,9 @@ finally:
 ```
 
 !!! info "NOTE:"
-    1. The `configuration` argument in the `submit` method can be either `dstack.api.Task` or `dstack.api.Service`. 
-    2. If you create `dstack.api.Task` or `dstack.api.Service`, you may specify the `image` argument. If `image` isn't
-       specified, the default image will be used. For a private Docker registry, ensure you also pass the `registry_auth` argument.
-    3. The `repo` argument in the `submit` method allows the mounting of a local folder, a remote repo, or a
+    1. The `configuration` argument in the `apply_configuration` method can be either `dstack.api.Task`, `dstack.api.Service`, or `dstack.api.DevEnvironment`. 
+    2. When you create `dstack.api.Task`, `dstack.api.Service`, or `dstack.api.DevEnvironment`, you can specify the `image` argument. If `image` isn't specified, the default image will be used. For a private Docker registry, ensure you also pass the `registry_auth` argument.
+    3. The `repo` argument in the `apply_configuration` method allows the mounting of a local folder, a remote repo, or a
        programmatically created repo. In this case, the `commands` argument can refer to the files within this repo.
     4. The `attach` method waits for the run to start and, for `dstack.api.Task` sets up an SSH tunnel and forwards
     configured `ports` to `localhost`.
@@ -106,6 +105,17 @@ finally:
       heading_level: 4
       item_id_mapping:
         scaling: dstack.api.Scaling
+        registry_auth: dstack.api.RegistryAuth
+        resources: dstack.api.Resources
+
+### `dstack.api.DevEnvironment` { #dstack.api.DevEnvironment data-toc-label="DevEnvironment" }
+
+#SCHEMA# dstack.api.DevEnvironment
+    overrides:
+      show_root_heading: false
+      show_root_toc_entry: false
+      heading_level: 4
+      item_id_mapping:
         registry_auth: dstack.api.RegistryAuth
         resources: dstack.api.Resources
 

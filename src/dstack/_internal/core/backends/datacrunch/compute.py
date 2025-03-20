@@ -1,24 +1,23 @@
 from typing import Dict, List, Optional
 
-from dstack._internal.core.backends.base import Compute
+from dstack._internal.core.backends.base.backend import Compute
 from dstack._internal.core.backends.base.compute import (
+    ComputeWithCreateInstanceSupport,
     generate_unique_instance_name,
     get_shim_commands,
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.datacrunch.api_client import DataCrunchAPIClient
-from dstack._internal.core.backends.datacrunch.config import DataCrunchConfig
+from dstack._internal.core.backends.datacrunch.models import DataCrunchConfig
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceConfiguration,
     InstanceOffer,
     InstanceOfferWithAvailability,
-    SSHKey,
 )
 from dstack._internal.core.models.resources import Memory, Range
-from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
-from dstack._internal.core.models.volumes import Volume
+from dstack._internal.core.models.runs import JobProvisioningData, Requirements
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger("datacrunch.compute")
@@ -33,7 +32,10 @@ IMAGE_SIZE = Memory.parse("50GB")
 CONFIGURABLE_DISK_SIZE = Range[Memory](min=IMAGE_SIZE, max=None)
 
 
-class DataCrunchCompute(Compute):
+class DataCrunchCompute(
+    ComputeWithCreateInstanceSupport,
+    Compute,
+):
     def __init__(self, config: DataCrunchConfig):
         super().__init__()
         self.config = config
@@ -147,25 +149,6 @@ class DataCrunchCompute(Compute):
             ssh_proxy=None,
             backend_data=None,
         )
-
-    def run_job(
-        self,
-        run: Run,
-        job: Job,
-        instance_offer: InstanceOfferWithAvailability,
-        project_ssh_public_key: str,
-        project_ssh_private_key: str,
-        volumes: List[Volume],
-    ) -> JobProvisioningData:
-        instance_config = InstanceConfiguration(
-            project_name=run.project_name,
-            instance_name=job.job_spec.job_name,  # TODO: generate name
-            ssh_keys=[
-                SSHKey(public=project_ssh_public_key.strip()),
-            ],
-            user=run.user,
-        )
-        return self.create_instance(instance_offer, instance_config)
 
     def terminate_instance(
         self, instance_id: str, region: str, backend_data: Optional[str] = None

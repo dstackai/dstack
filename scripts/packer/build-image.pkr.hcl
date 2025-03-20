@@ -1,10 +1,5 @@
 build {
-  source "source.yandex.nebius" {
-    image_description   = "Ubuntu 22.04 with Docker and dstackai/base images"
-    image_family        = "dstack"
-    image_name          = local.image_name
-  }
-  # TODO(egor-s) add other sources
+  # TODO: transition to this generic template from legacy per-backend JSON templates
 
   provisioner "shell" {
     inline = ["cloud-init status --long --wait"]

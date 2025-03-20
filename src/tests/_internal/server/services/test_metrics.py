@@ -12,6 +12,7 @@ from dstack._internal.server.testing.common import (
     create_repo,
     create_run,
     create_user,
+    get_job_provisioning_data,
 )
 
 
@@ -129,9 +130,13 @@ class TestGetMetrics:
             repo=repo,
             user=user,
         )
+        jpd = get_job_provisioning_data(
+            cpu_count=64, memory_gib=128, gpu_count=2, gpu_memory_gib=32
+        )
         job = await create_job(
             session=session,
             run=run,
+            job_provisioning_data=jpd,
         )
         for dt, _cpu, _mem, _mem_ws, _gpu0_mem, _gpu0_util, _gpu1_mem, _gpu1_util in self.points:
             await create_job_metrics_point(
@@ -151,11 +156,10 @@ class TestGetMetrics:
             Metric(name="cpu_usage_percent", timestamps=ts, values=cpu),
             Metric(name="memory_usage_bytes", timestamps=ts, values=mem),
             Metric(name="memory_working_set_bytes", timestamps=ts, values=mem_ws),
-            Metric(
-                name="gpus_detected_num",
-                timestamps=[ts[0], ts[-1]] if len(ts) > 1 else ts,
-                values=[2, 2] if len(ts) > 1 else [2],
-            ),
+            Metric(name="cpus_detected_num", timestamps=ts, values=[64] * len(ts)),
+            Metric(name="memory_total_bytes", timestamps=ts, values=[137438953472] * len(ts)),
+            Metric(name="gpus_detected_num", timestamps=ts, values=[2] * len(ts)),
+            Metric(name="gpu_memory_total_bytes", timestamps=ts, values=[34359738368] * len(ts)),
             Metric(name="gpu_memory_usage_bytes_gpu0", timestamps=ts, values=gpu0_mem),
             Metric(name="gpu_memory_usage_bytes_gpu1", timestamps=ts, values=gpu1_mem),
             Metric(name="gpu_util_percent_gpu0", timestamps=ts, values=gpu0_util),

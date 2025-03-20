@@ -1,0 +1,46 @@
+name: Build EFA Docker image
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_name:
+        description: "Docker image name"
+        required: true
+        default: "dstackai/efa"
+      dstack_revision:
+        description: "Docker image revision"
+        required: true
+        default: 0
+
+jobs:
+  build-efa:
+    defaults:
+      run:
+        working-directory: docker/efa
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Build and upload to DockerHub
+        run: |
+          IMAGE_NAME=${{ inputs.image_name }}
+          BUILD_DATE=$(date --utc --iso-8601=seconds)Z
+          docker buildx build . \
+            --load \
+            --provenance=false \
+            --platform linux/amd64 \
+            --build-arg IMAGE_NAME=${IMAGE_NAME} \
+            --build-arg DSTACK_REVISION=${{ inputs.dstack_revision }} \
+            --build-arg BUILD_DATE=${BUILD_DATE} \
+            --tag ${IMAGE_NAME}:latest
+          VERSION=$(docker inspect --format '{{ index .Config.Labels "org.opencontainers.image.version" }}' ${IMAGE_NAME})
+          docker tag ${IMAGE_NAME}:latest ${IMAGE_NAME}:${VERSION}
+          docker push ${IMAGE_NAME}:${VERSION}
+          docker push ${IMAGE_NAME}:latest

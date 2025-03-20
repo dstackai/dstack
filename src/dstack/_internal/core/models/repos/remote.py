@@ -3,7 +3,7 @@ import re
 import subprocess
 import time
 from dataclasses import dataclass
-from typing import BinaryIO, Callable, Dict, Optional
+from typing import Annotated, Any, BinaryIO, Callable, Dict, Optional
 
 import git
 import pydantic
@@ -12,7 +12,7 @@ from typing_extensions import Literal
 
 from dstack._internal.core.errors import DstackError
 from dstack._internal.core.models.common import CoreModel
-from dstack._internal.core.models.repos.base import BaseRepoInfo, Repo, RepoProtocol
+from dstack._internal.core.models.repos.base import BaseRepoInfo, Repo
 from dstack._internal.utils.hash import get_sha256, slugify
 from dstack._internal.utils.path import PathLike
 from dstack._internal.utils.ssh import get_host_config
@@ -25,20 +25,34 @@ class RepoError(DstackError):
 
 
 class RemoteRepoCreds(CoreModel):
-    protocol: RepoProtocol  # TODO: remove in 0.19
     clone_url: str
     private_key: Optional[str]
     oauth_token: Optional[str]
+
+    # TODO: remove in 0.20. Left for compatibility with CLI <=0.18.44
+    protocol: Annotated[Optional[str], Field(exclude=True)] = None
+
+    class Config:
+        @staticmethod
+        def schema_extra(schema: Dict[str, Any]) -> None:
+            del schema["properties"]["protocol"]
 
 
 class RemoteRepoInfo(BaseRepoInfo):
     repo_type: Literal["remote"] = "remote"
     repo_name: str
 
-    # TODO: remove in 0.19
-    repo_host_name: str = ""
-    repo_port: Optional[int] = None
-    repo_user_name: str = ""
+    # TODO: remove in 0.20. Left for compatibility with CLI <=0.18.44
+    repo_host_name: Annotated[Optional[str], Field(exclude=True)] = None
+    repo_port: Annotated[Optional[int], Field(exclude=True)] = None
+    repo_user_name: Annotated[Optional[str], Field(exclude=True)] = None
+
+    class Config:
+        @staticmethod
+        def schema_extra(schema: Dict[str, Any]) -> None:
+            del schema["properties"]["repo_host_name"]
+            del schema["properties"]["repo_port"]
+            del schema["properties"]["repo_user_name"]
 
 
 class RemoteRunRepoData(RemoteRepoInfo):
@@ -84,7 +98,7 @@ class RemoteRepo(Repo):
     Finally, you can pass the repo object to the run:
 
     ```python
-    run = client.runs.submit(
+    run = client.runs.apply_configuration(
         configuration=...,
         repo=repo,
     )
@@ -100,10 +114,10 @@ class RemoteRepo(Repo):
         Creates an instance of a remote repo from a local path.
 
         Args:
-            repo_dir: The path to a local folder
+            repo_dir: The path to a local folder.
 
         Returns:
-            A remote repo instance
+            A remote repo instance.
         """
         return RemoteRepo(local_repo_dir=repo_dir)
 
@@ -115,12 +129,12 @@ class RemoteRepo(Repo):
         Creates an instance of a remote repo from a URL.
 
         Args:
-            repo_url: The URL of a remote Git repo
+            repo_url: The URL of a remote Git repo.
             repo_branch: The name of the remote branch. Must be specified if `hash` is not specified.
             repo_hash: The hash of the revision. Must be specified if `branch` is not specified.
 
         Returns:
-            A remote repo instance
+            A remote repo instance.
         """
         if repo_branch is None and repo_hash is None:
             raise ValueError("Either `repo_branch` or `repo_hash` must be specified.")

@@ -30,7 +30,7 @@ class VirtualRepo(Repo):
     virtual_repo.add_file_from_package(package=some_package, path="requirements.txt")
     virtual_repo.add_file_from_package(package=some_package, path="train.py")
 
-    run = client.runs.submit(
+    run = client.runs.apply_configuration(
         configuration=...,
         repo=virtual_repo,
     )
