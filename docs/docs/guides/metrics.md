@@ -2,7 +2,7 @@
 
 ## Prometheus
 
-When enabled, `dstack` is able to collect various from fleets and runs and export them 
+When enabled, `dstack` is able to collect various metrics from fleets and runs and export them 
 to Prometheus.  
 
 ### Setup
