@@ -6,30 +6,25 @@
 git clone https://github.com/dstackai/dstack
 cd dstack
 ```
-   
-## 2. (Recommended) Create a virtual environment:
+
+## 2. Install uv:
+
+https://docs.astral.sh/uv/getting-started/installation/
 
 ```shell
-python3 -m venv venv
-source venv/bin/activate
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
-   
-## 3. Install `dstack` in editable mode:
+
+## 3. Install `dstack` with all extras and dev dependencies:
 
 ```shell
-pip install -e '.[all]'
+uv sync --all-extras
 ```
-   
-## 4. Install dev dependencies:
 
-```shell
-pip install -r requirements_dev.txt
-```
-   
 ## 5. (Recommended) Install pre-commits:
 
 ```shell
-pre-commit install
+uv run pre-commit install
 ```
 
 ## 6. Frontend
