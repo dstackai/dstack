@@ -1,0 +1,30 @@
+type: service
+name: deepseek-r1
+# Use Docker image built using https://github.com/NVIDIA/TensorRT-LLM.git main branch
+image: dstackai/tensorrt_llm:latest 
+env:
+  - MAX_BATCH_SIZE=256
+  - MAX_NUM_TOKENS=16384
+  - MAX_SEQ_LENGTH=16384
+
+commands:
+  - git lfs install
+  - git clone https://huggingface.co/deepseek-ai/DeepSeek-R1 deepseek
+  - trtllm-serve
+          --backend pytorch
+          --max_batch_size $MAX_BATCH_SIZE
+          --max_num_tokens $MAX_NUM_TOKENS
+          --max_seq_len $MAX_SEQ_LENGTH
+          --tp_size $DSTACK_GPUS_NUM
+          --ep_size 4
+          --pp_size 1
+          deepseek
+
+port: 8000
+
+model: deepseek-ai/DeepSeek-R1
+
+resources:
+  gpu: 8:H200
+  shm_size: 32GB
+  disk: 2000GB..
