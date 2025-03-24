@@ -39,8 +39,7 @@ export const RunMetrics: React.FC = () => {
         project_name: paramProjectName,
         run_name: runData?.run_spec.run_name ?? '',
         job_num: jobData?.job_spec.job_num ?? 0,
-        // after: '2025-03-24T16:44:02.132030+00:00',
-        // after: '2025-03-24T18:44:02.132030+00:00',
+        limit: 1000,
     });
 
     useBreadcrumbs([
