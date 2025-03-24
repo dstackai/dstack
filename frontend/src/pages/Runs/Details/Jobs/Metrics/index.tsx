@@ -42,6 +42,8 @@ export const RunMetrics: React.FC = () => {
         limit: 1000,
     });
 
+    const statusType = isLoading || isLoadingRun ? 'loading' : 'finished';
+
     useBreadcrumbs([
         {
             text: t('navigation.project_other'),
@@ -106,83 +108,77 @@ export const RunMetrics: React.FC = () => {
         <ContentLayout
             header={<DetailsHeader title={`${t('projects.run.metrics.title')} ${runData?.run_spec.run_name ?? ''}`} />}
         >
-            {isLoadingRun && (
-                <Container>
-                    <Loader />
+            <SpaceBetween size="xxl" direction="vertical">
+                <Container header={<Header variant="h2">{t('projects.run.metrics.cpu_utilization')}</Header>}>
+                    <LineChart
+                        statusType={statusType}
+                        series={totalCPUChartProps.series}
+                        yTitle="Load"
+                        {...defaultChartProps}
+                        xDomain={totalCPUChartProps.xDomain}
+                        i18nStrings={{
+                            xTickFormatter: formatTime,
+                            yTickFormatter: formatPercent,
+                        }}
+                        yDomain={[0, 100]}
+                        hideFilter
+                        hideLegend
+                        xScaleType="time"
+                    />
                 </Container>
-            )}
 
-            {runData && (
-                <>
-                    <SpaceBetween size="xxl" direction="vertical">
-                        <Container header={<Header variant="h2">{t('projects.run.metrics.cpu_utilization')}</Header>}>
-                            <LineChart
-                                series={totalCPUChartProps.series}
-                                yTitle="Load"
-                                {...defaultChartProps}
-                                xDomain={totalCPUChartProps.xDomain}
-                                i18nStrings={{
-                                    xTickFormatter: formatTime,
-                                    yTickFormatter: formatPercent,
-                                }}
-                                yDomain={[0, 100]}
-                                hideFilter
-                                hideLegend
-                                xScaleType="time"
-                            />
-                        </Container>
+                <Container header={<Header variant="h2">{t('projects.run.metrics.memory_used')}</Header>}>
+                    <LineChart
+                        statusType={statusType}
+                        series={totalMemoryChartProps.series}
+                        yTitle="Memory used"
+                        {...defaultChartProps}
+                        xDomain={totalMemoryChartProps.xDomain}
+                        i18nStrings={{
+                            xTickFormatter: formatTime,
+                            yTickFormatter: bytesFormatter,
+                        }}
+                        yDomain={[0, 128 * GByte]}
+                        hideFilter
+                        hideLegend
+                        xScaleType="time"
+                    />
+                </Container>
 
-                        <Container header={<Header variant="h2">{t('projects.run.metrics.memory_used')}</Header>}>
-                            <LineChart
-                                series={totalMemoryChartProps.series}
-                                yTitle="Memory used"
-                                {...defaultChartProps}
-                                xDomain={totalMemoryChartProps.xDomain}
-                                i18nStrings={{
-                                    xTickFormatter: formatTime,
-                                    yTickFormatter: bytesFormatter,
-                                }}
-                                yDomain={[0, 128 * GByte]}
-                                hideFilter
-                                hideLegend
-                                xScaleType="time"
-                            />
-                        </Container>
+                <Container header={<Header variant="h2">{t('projects.run.metrics.per_each_cpu_utilization')}</Header>}>
+                    <LineChart
+                        statusType={statusType}
+                        series={eachCPUChartProps.series}
+                        yTitle="Load"
+                        {...defaultChartProps}
+                        xDomain={eachCPUChartProps.xDomain}
+                        i18nStrings={{
+                            xTickFormatter: formatTime,
+                            yTickFormatter: formatPercent,
+                            filterPlaceholder: 'Filter data',
+                        }}
+                        yDomain={[0, 100]}
+                        xScaleType="time"
+                    />
+                </Container>
 
-                        <Container header={<Header variant="h2">{t('projects.run.metrics.per_each_cpu_utilization')}</Header>}>
-                            <LineChart
-                                series={eachCPUChartProps.series}
-                                yTitle="Load"
-                                {...defaultChartProps}
-                                xDomain={eachCPUChartProps.xDomain}
-                                i18nStrings={{
-                                    xTickFormatter: formatTime,
-                                    yTickFormatter: formatPercent,
-                                    filterPlaceholder: 'Filter data',
-                                }}
-                                yDomain={[0, 100]}
-                                xScaleType="time"
-                            />
-                        </Container>
-
-                        <Container header={<Header variant="h2">{t('projects.run.metrics.per_each_memory_used')}</Header>}>
-                            <LineChart
-                                series={eachMemoryChartProps.series}
-                                yTitle="Memory used"
-                                {...defaultChartProps}
-                                xDomain={eachMemoryChartProps.xDomain}
-                                i18nStrings={{
-                                    xTickFormatter: formatTime,
-                                    yTickFormatter: bytesFormatter,
-                                    filterPlaceholder: 'Filter data',
-                                }}
-                                yDomain={[0, 128 * GByte]}
-                                xScaleType="time"
-                            />
-                        </Container>
-                    </SpaceBetween>
-                </>
-            )}
+                <Container header={<Header variant="h2">{t('projects.run.metrics.per_each_memory_used')}</Header>}>
+                    <LineChart
+                        statusType={statusType}
+                        series={eachMemoryChartProps.series}
+                        yTitle="Memory used"
+                        {...defaultChartProps}
+                        xDomain={eachMemoryChartProps.xDomain}
+                        i18nStrings={{
+                            xTickFormatter: formatTime,
+                            yTickFormatter: bytesFormatter,
+                            filterPlaceholder: 'Filter data',
+                        }}
+                        yDomain={[0, 128 * GByte]}
+                        xScaleType="time"
+                    />
+                </Container>
+            </SpaceBetween>
         </ContentLayout>
     );
 };
