@@ -7,11 +7,11 @@ import { Box, Container, ContentLayout, DetailsHeader, Header, LineChart, Loader
 import { useBreadcrumbs } from 'hooks';
 import { riseRouterException } from 'libs';
 import { ROUTES } from 'routes';
-import { useGetMetricsQuery, useGetRunQuery } from 'services/run';
+import { useGetRunQuery } from 'services/run';
 
 import { GByte } from './consts';
 import { bytesFormatter, formatPercent, formatTime } from './helpers';
-import { eachCPUSeries, eachMemorySeries, totalCPUSeries, totalMemorySeries } from './mock';
+import { useMetricsData } from './useMetricsData';
 
 export const RunMetrics: React.FC = () => {
     const { t } = useTranslation();
@@ -35,18 +35,13 @@ export const RunMetrics: React.FC = () => {
         return runData.jobs.find((job) => job.job_spec.job_name === paramJobName) ?? null;
     }, [runData]);
 
-    const { data: metricsData } = useGetMetricsQuery(
-        {
-            project_name: paramProjectName,
-            run_name: runData?.run_spec.run_name ?? '',
-            job_num: jobData?.job_spec.job_num ?? 0,
-        },
-        {
-            skip: !runData,
-        },
-    );
-
-    console.log({ metricsData });
+    const { totalCPUChartProps, totalMemoryChartProps, eachCPUChartProps, eachMemoryChartProps, isLoading } = useMetricsData({
+        project_name: paramProjectName,
+        run_name: runData?.run_spec.run_name ?? '',
+        job_num: jobData?.job_spec.job_num ?? 0,
+        // after: '2025-03-24T16:44:02.132030+00:00',
+        // after: '2025-03-24T18:44:02.132030+00:00',
+    });
 
     useBreadcrumbs([
         {
@@ -123,13 +118,10 @@ export const RunMetrics: React.FC = () => {
                     <SpaceBetween size="xxl" direction="vertical">
                         <Container header={<Header variant="h2">{t('projects.run.metrics.cpu_utilization')}</Header>}>
                             <LineChart
-                                series={totalCPUSeries}
+                                series={totalCPUChartProps.series}
                                 yTitle="Load"
                                 {...defaultChartProps}
-                                xDomain={[
-                                    totalCPUSeries[0].data[0].x,
-                                    totalCPUSeries[0].data[totalCPUSeries[0].data.length - 1].x,
-                                ]}
+                                xDomain={totalCPUChartProps.xDomain}
                                 i18nStrings={{
                                     xTickFormatter: formatTime,
                                     yTickFormatter: formatPercent,
@@ -143,13 +135,10 @@ export const RunMetrics: React.FC = () => {
 
                         <Container header={<Header variant="h2">{t('projects.run.metrics.memory_used')}</Header>}>
                             <LineChart
-                                series={totalMemorySeries}
+                                series={totalMemoryChartProps.series}
                                 yTitle="Memory used"
                                 {...defaultChartProps}
-                                xDomain={[
-                                    totalCPUSeries[0].data[0].x,
-                                    totalCPUSeries[0].data[totalCPUSeries[0].data.length - 1].x,
-                                ]}
+                                xDomain={totalMemoryChartProps.xDomain}
                                 i18nStrings={{
                                     xTickFormatter: formatTime,
                                     yTickFormatter: bytesFormatter,
@@ -163,13 +152,10 @@ export const RunMetrics: React.FC = () => {
 
                         <Container header={<Header variant="h2">{t('projects.run.metrics.per_each_cpu_utilization')}</Header>}>
                             <LineChart
-                                series={eachCPUSeries}
+                                series={eachCPUChartProps.series}
                                 yTitle="Load"
                                 {...defaultChartProps}
-                                xDomain={[
-                                    totalCPUSeries[0].data[0].x,
-                                    totalCPUSeries[0].data[totalCPUSeries[0].data.length - 1].x,
-                                ]}
+                                xDomain={eachCPUChartProps.xDomain}
                                 i18nStrings={{
                                     xTickFormatter: formatTime,
                                     yTickFormatter: formatPercent,
@@ -182,13 +168,10 @@ export const RunMetrics: React.FC = () => {
 
                         <Container header={<Header variant="h2">{t('projects.run.metrics.per_each_memory_used')}</Header>}>
                             <LineChart
-                                series={eachMemorySeries}
+                                series={eachMemoryChartProps.series}
                                 yTitle="Memory used"
                                 {...defaultChartProps}
-                                xDomain={[
-                                    totalCPUSeries[0].data[0].x,
-                                    totalCPUSeries[0].data[totalCPUSeries[0].data.length - 1].x,
-                                ]}
+                                xDomain={eachMemoryChartProps.xDomain}
                                 i18nStrings={{
                                     xTickFormatter: formatTime,
                                     yTickFormatter: bytesFormatter,

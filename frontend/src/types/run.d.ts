@@ -174,5 +174,5 @@ declare interface IRun {
 declare interface IMetricsItem {
     name: string;
     timestamps: string[];
-    values: string[];
+    values: number[];
 }

@@ -52,6 +52,7 @@ export type { ChatBubbleProps } from '@cloudscape-design/chat-components/chat-bu
 export { default as Avatar } from '@cloudscape-design/chat-components/avatar';
 export type { AvatarProps } from '@cloudscape-design/chat-components/avatar';
 export { default as LineChart } from '@cloudscape-design/components/line-chart';
+export type { LineChartProps } from '@cloudscape-design/components/line-chart/interfaces';
 export type { ModalProps } from '@cloudscape-design/components/modal';
 export type { TilesProps } from '@cloudscape-design/components/tiles';
 
