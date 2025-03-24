@@ -8,7 +8,7 @@ import pytest
 from freezegun import freeze_time
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dstack._internal.core.errors import BackendError
+from dstack._internal.core.errors import BackendError, ProvisioningError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     Gpu,
@@ -35,6 +35,8 @@ from dstack._internal.server.testing.common import (
     create_repo,
     create_run,
     create_user,
+    get_instance_offer_with_availability,
+    get_job_provisioning_data,
     get_remote_connection_info,
 )
 from dstack._internal.utils.common import get_current_datetime
@@ -556,6 +558,68 @@ class TestCreateInstance:
         assert instance.status == InstanceStatus.PROVISIONING
         assert instance.total_blocks == expected_blocks
         assert instance.busy_blocks == 0
+
+    @pytest.mark.parametrize("err", [RuntimeError("Unexpected"), ProvisioningError("Expected")])
+    async def test_tries_second_offer_if_first_fails(self, session: AsyncSession, err: Exception):
+        project = await create_project(session=session)
+        instance = await create_instance(
+            session=session, project=project, status=InstanceStatus.PENDING
+        )
+        aws_mock = Mock()
+        aws_mock.TYPE = BackendType.AWS
+        offer = get_instance_offer_with_availability(backend=BackendType.AWS, price=1.0)
+        aws_mock.compute.return_value = Mock(spec=ComputeMockSpec)
+        aws_mock.compute.return_value.get_offers_cached.return_value = [offer]
+        aws_mock.compute.return_value.create_instance.side_effect = err
+        gcp_mock = Mock()
+        gcp_mock.TYPE = BackendType.GCP
+        offer = get_instance_offer_with_availability(backend=BackendType.GCP, price=2.0)
+        gcp_mock.compute.return_value = Mock(spec=ComputeMockSpec)
+        gcp_mock.compute.return_value.get_offers_cached.return_value = [offer]
+        gcp_mock.compute.return_value.create_instance.return_value = get_job_provisioning_data(
+            backend=offer.backend, region=offer.region, price=offer.price
+        )
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            m.return_value = [aws_mock, gcp_mock]
+            await process_instances()
+
+        await session.refresh(instance)
+        assert instance.status == InstanceStatus.PROVISIONING
+        aws_mock.compute.return_value.create_instance.assert_called_once()
+        assert instance.backend == BackendType.GCP
+
+    @pytest.mark.parametrize("err", [RuntimeError("Unexpected"), ProvisioningError("Expected")])
+    async def test_fails_if_all_offers_fail(self, session: AsyncSession, err: Exception):
+        project = await create_project(session=session)
+        instance = await create_instance(
+            session=session, project=project, status=InstanceStatus.PENDING
+        )
+        aws_mock = Mock()
+        aws_mock.TYPE = BackendType.AWS
+        offer = get_instance_offer_with_availability(backend=BackendType.AWS, price=1.0)
+        aws_mock.compute.return_value = Mock(spec=ComputeMockSpec)
+        aws_mock.compute.return_value.get_offers_cached.return_value = [offer]
+        aws_mock.compute.return_value.create_instance.side_effect = err
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            m.return_value = [aws_mock]
+            await process_instances()
+
+        await session.refresh(instance)
+        assert instance.status == InstanceStatus.TERMINATED
+        assert instance.termination_reason == "All offers failed"
+
+    async def test_fails_if_no_offers(self, session: AsyncSession):
+        project = await create_project(session=session)
+        instance = await create_instance(
+            session=session, project=project, status=InstanceStatus.PENDING
+        )
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            m.return_value = []
+            await process_instances()
+
+        await session.refresh(instance)
+        assert instance.status == InstanceStatus.TERMINATED
+        assert instance.termination_reason == "No offers found"
 
 
 @pytest.mark.asyncio
