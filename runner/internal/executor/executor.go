@@ -261,6 +261,7 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 	}
 	cmd.WaitDelay = ex.killDelay // kills the process if it doesn't exit in time
 
+	cmd.Dir = ex.workingDir
 	if ex.jobSpec.WorkingDir != nil {
 		workingDir, err := joinRelPath(ex.workingDir, *ex.jobSpec.WorkingDir)
 		if err != nil {
