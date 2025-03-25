@@ -1034,19 +1034,19 @@ func configureGpus(config *container.Config, hostConfig *container.HostConfig, v
 		)
 		hostConfig.Mounts = append(
 			hostConfig.Mounts,
-			mount.Mount{Type: mount.TypeBind, Source: "/var/lib/nvidia/lib64", Target: "/var/lib/nvidia/lib64"},
+			mount.Mount{Type: mount.TypeBind, Source: "/var/lib/nvidia/lib64", Target: "/usr/local/nvidia/lib64"},
 		)
 		hostConfig.Mounts = append(
 			hostConfig.Mounts,
-			mount.Mount{Type: mount.TypeBind, Source: "/var/lib/nvidia/bin", Target: "/var/lib/nvidia/bin"},
+			mount.Mount{Type: mount.TypeBind, Source: "/var/lib/nvidia/bin", Target: "/usr/local/nvidia/bin"},
+		)
+		hostConfig.Mounts = append(
+			hostConfig.Mounts,
+			mount.Mount{Type: mount.TypeBind, Source: "/var/lib/tcpx/lib64", Target: "/usr/local/tcpx/lib64"},
 		)
 		hostConfig.Mounts = append(
 			hostConfig.Mounts,
 			mount.Mount{Type: mount.TypeBind, Source: "/run/tcpx", Target: "/run/tcpx"},
-		)
-		hostConfig.Mounts = append(
-			hostConfig.Mounts,
-			mount.Mount{Type: mount.TypeBind, Source: "/var/lib/tcpx/lib64", Target: "/var/lib/tcpx/lib64"},
 		)
 	case host.GpuVendorAmd:
 		// All options are listed here: https://hub.docker.com/r/rocm/pytorch
