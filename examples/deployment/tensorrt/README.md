@@ -27,7 +27,7 @@ To run DeepSeek-R1 (671B) TensorRT-LLM recommends PyTorch backend.Here's an exam
 ```yaml
 type: service
 name: deepseek-r1
-# Use Docker image built using https://github.com/NVIDIA/TensorRT-LLM.git main branch
+# Use dstack task in examples/deployment/tensorrt/build.trtllm.yml to build docker image.
 image: dstackai/tensorrt_llm:latest 
 env:
   - MAX_BATCH_SIZE=256
