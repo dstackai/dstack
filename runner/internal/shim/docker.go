@@ -1034,11 +1034,15 @@ func configureGpus(config *container.Config, hostConfig *container.HostConfig, v
 		)
 		hostConfig.Mounts = append(
 			hostConfig.Mounts,
-			mount.Mount{Type: mount.TypeBind, Source: "/run/tcpx", Target: "/run/tcpx"},
+			mount.Mount{Type: mount.TypeBind, Source: "/var/lib/nvidia/lib64", Target: "/var/lib/nvidia/lib64"},
 		)
 		hostConfig.Mounts = append(
 			hostConfig.Mounts,
-			mount.Mount{Type: mount.TypeBind, Source: "/var/lib/nvidia/lib64", Target: "/var/lib/nvidia/lib64"},
+			mount.Mount{Type: mount.TypeBind, Source: "/var/lib/nvidia/bin", Target: "/var/lib/nvidia/bin"},
+		)
+		hostConfig.Mounts = append(
+			hostConfig.Mounts,
+			mount.Mount{Type: mount.TypeBind, Source: "/run/tcpx", Target: "/run/tcpx"},
 		)
 		hostConfig.Mounts = append(
 			hostConfig.Mounts,
