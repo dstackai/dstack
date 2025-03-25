@@ -18,9 +18,22 @@ import (
 
 // todo test get history
 
-func TestExecutor_WorkingDir(t *testing.T) {
+func TestExecutor_WorkingDir_Current(t *testing.T) {
 	var b bytes.Buffer
 	ex := makeTestExecutor(t)
+	workingDir := "."
+	ex.jobSpec.WorkingDir = &workingDir
+	ex.jobSpec.Commands = append(ex.jobSpec.Commands, "pwd")
+
+	err := ex.execJob(context.TODO(), io.Writer(&b))
+	assert.NoError(t, err)
+	assert.Equal(t, ex.workingDir+"\r\n", b.String())
+}
+
+func TestExecutor_WorkingDir_Nil(t *testing.T) {
+	var b bytes.Buffer
+	ex := makeTestExecutor(t)
+	ex.jobSpec.WorkingDir = nil
 	ex.jobSpec.Commands = append(ex.jobSpec.Commands, "pwd")
 
 	err := ex.execJob(context.TODO(), io.Writer(&b))

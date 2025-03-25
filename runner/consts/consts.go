@@ -22,7 +22,7 @@ const (
 	// NOTE: RunnerRuntimeDir would be a more appropriate name, but it's called tempDir
 	// throughout runner's codebase
 	RunnerTempDir = "/tmp/runner"
-	// Currently, it's a directory where autorized_keys, git credentials, etc. are placed
+	// Currently, it's a directory where authorized_keys, git credentials, etc. are placed
 	// The current user's homedir (as of 2024-12-28, it's always root) should be used
 	// instead of the hardcoded value
 	RunnerHomeDir = "/root"

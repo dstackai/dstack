@@ -16,9 +16,8 @@ import (
 )
 
 type Server struct {
-	srv        *http.Server
-	tempDir    string
-	workingDir string
+	srv     *http.Server
+	tempDir string
 
 	shutdownCh   chan interface{} // server closes this chan on shutdown
 	jobBarrierCh chan interface{} // only server listens on this chan
@@ -45,8 +44,7 @@ func NewServer(tempDir string, homeDir string, workingDir string, address string
 			Addr:    address,
 			Handler: r,
 		},
-		tempDir:    tempDir,
-		workingDir: workingDir,
+		tempDir: tempDir,
 
 		shutdownCh:   make(chan interface{}),
 		jobBarrierCh: make(chan interface{}),
