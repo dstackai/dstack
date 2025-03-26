@@ -23,7 +23,11 @@ commands:
     FIFO=/tmp/dstack_job
     if [ ${DSTACK_NODE_RANK} -eq 0 ]; then
       cd /root/nccl-tests/build
-      echo "${DSTACK_NODES_IPS}" > hostfile
+      # Generate hostfile for mpirun
+      : > hostfile
+      for ip in ${DSTACK_NODES_IPS}; do
+        echo "${ip} slots=${DSTACK_GPUS_PER_NODE}" >> hostfile
+      done
       MPIRUN='mpirun --allow-run-as-root --hostfile hostfile'
       # Wait for other nodes
       while true; do
@@ -36,6 +40,8 @@ commands:
       # Run NCCL Tests
       ${MPIRUN} \
         -n ${DSTACK_GPUS_NUM} -N ${DSTACK_GPUS_PER_NODE} \
+        --mca pml ^cm \
+        --mca btl tcp,self \
         --mca btl_tcp_if_exclude lo,docker0 \
         --bind-to none \
         ./all_reduce_perf -b 8 -e 8G -f 2 -g 1
