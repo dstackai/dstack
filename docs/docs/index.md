@@ -11,7 +11,7 @@ for AI workloads both in the cloud and on-prem, speeding up the development, tra
 
 ## How does it work?
 
-![](https://raw.githubusercontent.com/dstackai/static-assets/refs/heads/main/static-assets/images/dstack-architecture-diagram-v6.svg)
+<img src="https://raw.githubusercontent.com/dstackai/static-assets/4aa9124edcaee397d9dd25d4b5aa8d8e82441852/static-assets/images/dstack-diagram.svg" />
 
 #### 1. Set up the server
 
@@ -46,35 +46,6 @@ port-forwarding, ingress, and more.
 `dstack` streamlines infrastructure management and container usage, enabling AI teams to work with any frameworks across
 cloud platforms or on-premise servers.
 
-## How does it compare to other tools?
-
-??? info "How does dstack compare to Kubernetes?"
-    `dstack` is more lightweight, and is designed specifically for AI, enabling AI engineers to handle development, training, and 
-    deployment without needing extra tools or Ops support. 
-
-    With `dstack`, you don't need Kubeflow or other ML platforms on top—everything is available out of the box.
-
-    Additionally, `dstack` is much easier to use with on-prem servers—just provide hostnames and SSH credentials, 
-    and `dstack` will automatically create a fleet ready for use with development environments, tasks, and services.
-
-??? info "Can dstack and Kubernetes be used together?"
-    For AI development, it’s more efficient to use `dstack` directly with your cloud accounts or on-prem servers&mdash;without Kubernetes.
-
-    However, if you prefer, you can set up the `dstack` server with a Kubernetes backend to provision through Kubernetes.
-
-    Does your Ops team insist on using Kubernetes for production-grade deployment? You can use `dstack` and
-    Kubernetes side by side; `dstack` for development and Kubernetes for production-grade deployment.
-
-??? info "How does dstack compare to KubeFlow?" 
-    `dstack` can be used entirely instead of Kubeflow. It covers everything that Kubeflow does, and much more on top, 
-    including development environments, services, and additional features.
-
-    `dstack` is easier to set up with on-premises servers, doesn't require Kubernetes, and works with multiple cloud 
-    providers out of the box.
-
-??? info "How does dstack compare to Slurm?"
-    `dstack` can be used entirely instead of Slurm. It covers everything that Slurm does, and a lot more on top, including
-    dev environments, services, out-of-the-box cloud support, easier setup with on-premises servers, and much more.
 
 [//]: # (??? info "Cloud platforms")
 [//]: # (    TBA)

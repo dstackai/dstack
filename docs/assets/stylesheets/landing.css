@@ -22,14 +22,14 @@
 }
 
 /*.tx-landing__hero_text h1*/ .gradient {
-    background: linear-gradient(90deg, #4631C8 -1.29%, #CD4AE2 88.05%, #FFD43C 111.26%);
+    background: linear-gradient(90deg, #4631C8 -1.29%, #CD4AE2 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     padding-right: 4px;
     margin-right: -4px;
 }
 
-.tx-landing__hero_text .highlight, .tx-faq__item-body .highlight {
+.highlight {
     display: inline-block;
     border-radius: 3px;
     padding: 1px 5px;
