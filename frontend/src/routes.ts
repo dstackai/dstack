@@ -36,15 +36,6 @@ export const ROUTES = {
                                     runId,
                                     jobName,
                                 }),
-                            METRICS: {
-                                TEMPLATE: `/projects/:projectName/runs/:runId/jobs/:jobName/metrics`,
-                                FORMAT: (projectName: string, runId: string, jobName: string) =>
-                                    buildRoute(ROUTES.PROJECT.DETAILS.RUNS.DETAILS.JOBS.DETAILS.METRICS.TEMPLATE, {
-                                        projectName,
-                                        runId,
-                                        jobName,
-                                    }),
-                            },
                         },
                     },
                 },

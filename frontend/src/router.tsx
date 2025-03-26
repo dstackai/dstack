@@ -97,11 +97,6 @@ export const router = createBrowserRouter([
                 element: <JobDetails />,
             },
             {
-                path: ROUTES.PROJECT.DETAILS.RUNS.DETAILS.JOBS.DETAILS.METRICS.TEMPLATE,
-                element: <RunMetrics />,
-            },
-
-            {
                 path: ROUTES.PROJECT.ADD,
                 element: <ProjectAdd />,
             },
