@@ -1,19 +1,15 @@
-# Metrics
+# Monitoring
 
 ## Prometheus
 
-When enabled, `dstack` is able to collect various metrics from fleets and runs and export them
-to Prometheus.
-
-### Setup
-
-To enable collecting and exporting metrics to Prometheus,
-set the `DSTACK_ENABLE_PROMETHEUS_METRICS` environment variable, and point Prometheus to collect metrics
-from the `<dstack server URL>/metrics` endpoint.
+To collect and export fleet and run metrics to Prometheus, enable the
+`DSTACK_ENABLE_PROMETHEUS_METRICS` environment variable and configure Prometheus to fetch metrics from
+`<dstack server URL>/metrics`.
 
 ??? info "NVIDIA DCGM"
-    NVIDIA DCGM metrics are automatically collected for AWS, Azure, GCP, and OCI backends, as well as for SSH fleets.
-
+    NVIDIA DCGM metrics are automatically collected for `aws`, `azure`, `gcp`, and `oci` backends, 
+    as well as for [SSH fleets](../concepts/fleets.md#ssh).
+    
     To ensure NVIDIA DCGM metrics are collected from SSH fleets, ensure the `datacenter-gpu-manager-4-core`,
     `datacenter-gpu-manager-4-proprietary`, and `datacenter-gpu-manager-exporter` packages are installed on the hosts.
 
@@ -46,12 +42,12 @@ time, price, GPU name, and more.
 Run metrics include run counters for each user in each project.
 
 === "Metrics"
-    | Name                                 | Type      | Description            | Examples    |
-    |--------------------------------------|-----------|------------------------|-------------|
-    | `dstack_run_count_total`             | *counter* | Total runs count       | `537`       |
-    | `dstack_run_count_terminated_total`  | *counter* | Terminated runs count  | `118`       |
-    | `dstack_run_count_failed_total`      | *counter* | Failed runs count      | `27`        |
-    | `dstack_run_count_done_total`        | *counter* | Done runs count        | `218`       |
+    | Name                                | Type      | Description                   | Examples |
+    |-------------------------------------|-----------|-------------------------------|----------|
+    | `dstack_run_count_total`            | *counter* | The total number of runs      | `537`    |
+    | `dstack_run_count_terminated_total` | *counter* | The number of terminated runs | `118`    |
+    | `dstack_run_count_failed_total`     | *counter* | The number of failed runs     | `27`     |
+    | `dstack_run_count_done_total`       | *counter* | The number of successful runs | `218`    |
 
 === "Labels"
 
@@ -60,10 +56,13 @@ Run metrics include run counters for each user in each project.
     | `dstack_project_name` | *string*  | Project name  | `main`      |
     | `dstack_user_name`    | *string*  | User name     | `alice`     |
 
-### Run jobs
+### Jobs
 
-Run job metrics include metrics for each job within a run.
-This includes information such as job runtime, price, GPU name, DCGM metrics, and more.
+A run consists of one or more jobs, each mapped to an individual container.
+For distributed workloads or auto-scalable services, a run spans multiple jobs.
+
+Job metrics provide detailed insights into each job within a run, including execution time, cost, GPU model, DCGM
+telemetry, and more.
 
 === "Metrics"
 
@@ -128,7 +127,7 @@ This includes information such as job runtime, price, GPU name, DCGM metrics, an
     | `DCGM_FI_PROF_NVLINK_TX_BYTES`                  | *counter* | The number of bytes of active NvLink tx (transmit) data including both header and payload  |                |
 
 === "Labels"
-    | Label                 | Type      |                        | Examples                               |
+    | Label                 | Type      | Description            | Examples                               |
     |-----------------------|-----------|:-----------------------|----------------------------------------|
     | `dstack_project_name` | *string*  | Project name           | `main`                                 |
     | `dstack_user_name`    | *string*  | User name              | `alice`                                |

@@ -300,8 +300,14 @@ commands:
 
 </div>
 
+!!! info "Privileged mode"
+    To enable privileged mode, set [`privileged`](../reference/dstack.yml/task.md#privileged) to `true`.
+    This mode allows using [Docker and Docker Compose](../guides/protips.md#docker-and-docker-compose) inside `dstack` runs.
+
+    Not supported with `runpod`, `vastai`, and `kubernetes`.
+
 ??? info "Private registry"
-    Use the `registry_auth` property to provide credentials for a private Docker registry.
+    Use the [`registry_auth`](../reference/dstack.yml/task.md#registry_auth) property to provide credentials for a private Docker registry.
 
     ```yaml
     type: dev-environment
@@ -320,11 +326,6 @@ commands:
       - pip install -r fine-tuning/qlora/requirements.txt
       - python fine-tuning/qlora/train.py
     ```
-
-??? info "Privileged mode"
-    All backends except `runpod`, `vastai`, and `kubernetes` support running containers in privileged mode.
-    This mode enables features like using [Docker and Docker Compose](../guides/protips.md#docker-and-docker-compose) 
-    inside `dstack` runs.
 
 ### Environment variables
 
@@ -417,6 +418,6 @@ retry:
 --8<-- "docs/concepts/snippets/manage-runs.ext"
 
 !!! info "What's next?"
-    1. Read about [dev environments](dev-environments.md), [services](services.md), and [repos](repos.md)
+    1. Read about [dev environments](dev-environments.md), [services](services.md), and [repos](../guides/repos.md)
     2. Learn how to manage [fleets](fleets.md)
     3. Check the [Axolotl](/examples/fine-tuning/axolotl) example
