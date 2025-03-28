@@ -38,7 +38,7 @@ hide:
            NIM
        </h3>
        <p>
-            Deploy Llama 3.1 with NIM
+            Deploy DeepSeek-R1-Distill with NIM
         </p>
     </a>
 </div>
