@@ -41,6 +41,15 @@ hide:
             Deploy Llama 3.1 with NIM
         </p>
     </a>
+    <a href="/examples/deployment/trtllm"
+       class="feature-cell">
+       <h3>
+           TensorRT-LLM
+       </h3>
+       <p>
+            Deploy DeepSeek-R1 with TensorRT-LLM
+        </p>
+    </a>
 </div>
 
 ## Fine-tuning

@@ -263,6 +263,7 @@ nav:
         - vLLM: examples/deployment/vllm/index.md
         - TGI:  examples/deployment/tgi/index.md
         - NIM: examples/deployment/nim/index.md
+        - TensorRT-LLM: examples/deployment/trtllm/index.md
     - Fine-tuning:
         - Axolotl: examples/fine-tuning/axolotl/index.md
         - TRL: examples/fine-tuning/trl/index.md
