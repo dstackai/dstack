@@ -995,58 +995,19 @@ func configureGpus(config *container.Config, hostConfig *container.HostConfig, v
 	// AMD: ids are DRI render node paths, e.g., /dev/dri/renderD128
 	switch vendor {
 	case host.GpuVendorNvidia:
-		// hostConfig.Resources.DeviceRequests = append(
-		// 	hostConfig.Resources.DeviceRequests,
-		// 	container.DeviceRequest{
-		// 		// Request all capabilities to maximize compatibility with all sorts of GPU workloads.
-		// 		// Default capabilities: utility, compute.
-		// 		// https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/1.16.0/docker-specialized.html
-		// 		Capabilities: [][]string{{"gpu", "utility", "compute", "graphics", "video", "display", "compat32"}},
-		// 		DeviceIDs:    ids,
-		// 	},
-		// )
-		for i := range 8 {
-			devPath := fmt.Sprintf("/dev/nvidia%d", i)
-			hostConfig.Resources.Devices = append(
-				hostConfig.Resources.Devices,
-				container.DeviceMapping{
-					PathOnHost:        devPath,
-					PathInContainer:   devPath,
-					CgroupPermissions: "rwm",
-				},
-			)
-		}
-		hostConfig.Resources.Devices = append(
-			hostConfig.Resources.Devices,
-			container.DeviceMapping{
-				PathOnHost:        "/dev/nvidia-uvm",
-				PathInContainer:   "/dev/nvidia-uvm",
-				CgroupPermissions: "rwm",
-			},
-		)
-		hostConfig.Resources.Devices = append(
-			hostConfig.Resources.Devices,
-			container.DeviceMapping{
-				PathOnHost:        "/dev/nvidiactl",
-				PathInContainer:   "/dev/nvidiactl",
-				CgroupPermissions: "rwm",
+		hostConfig.Resources.DeviceRequests = append(
+			hostConfig.Resources.DeviceRequests,
+			container.DeviceRequest{
+				// Request all capabilities to maximize compatibility with all sorts of GPU workloads.
+				// Default capabilities: utility, compute.
+				// https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/1.16.0/docker-specialized.html
+				Capabilities: [][]string{{"gpu", "utility", "compute", "graphics", "video", "display", "compat32"}},
+				DeviceIDs:    ids,
 			},
 		)
 		hostConfig.Mounts = append(
 			hostConfig.Mounts,
-			mount.Mount{Type: mount.TypeBind, Source: "/var/lib/nvidia/lib64", Target: "/usr/local/nvidia/lib64"},
-		)
-		hostConfig.Mounts = append(
-			hostConfig.Mounts,
-			mount.Mount{Type: mount.TypeBind, Source: "/var/lib/nvidia/bin", Target: "/usr/local/nvidia/bin"},
-		)
-		hostConfig.Mounts = append(
-			hostConfig.Mounts,
-			mount.Mount{Type: mount.TypeBind, Source: "/var/lib/tcpx/lib64", Target: "/usr/local/tcpx/lib64"},
-		)
-		hostConfig.Mounts = append(
-			hostConfig.Mounts,
-			mount.Mount{Type: mount.TypeBind, Source: "/run/tcpx", Target: "/run/tcpx"},
+			mount.Mount{Type: mount.TypeBind, Source: "/dev/aperture_devices", Target: "/dev/aperture_devices"},
 		)
 	case host.GpuVendorAmd:
 		// All options are listed here: https://hub.docker.com/r/rocm/pytorch
