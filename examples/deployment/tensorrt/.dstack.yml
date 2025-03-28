@@ -1,7 +1,7 @@
 type: service
-name: deepseek-r1
-# Use Docker image built using https://github.com/NVIDIA/TensorRT-LLM.git main branch
-image: dstackai/tensorrt_llm:latest 
+name: deepseek-r1-serve
+# To build latest tensorrt_llm image use task in examples/deployment/tensorrt/build.trtllm.yml to build docker image.
+image: dstackai/tensorrt_llm:9b931c0f6305aefa3660e6fb84a76a42c0eef167 
 env:
   - MAX_BATCH_SIZE=256
   - MAX_NUM_TOKENS=16384
