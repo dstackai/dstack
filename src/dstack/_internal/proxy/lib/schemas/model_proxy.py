@@ -57,11 +57,11 @@ class ChatCompletionsResponse(CoreModel):
 
 
 class ChatCompletionsChunk(CoreModel):
-    id: Optional[str] = None
+    id: str
     choices: List[ChatCompletionsChunkChoice]
-    created: Optional[int] = None
+    created: int
     model: str
-    system_fingerprint: Optional[str] = ""
+    system_fingerprint: str = ""
     object: Literal["chat.completion.chunk"] = "chat.completion.chunk"
 
 
