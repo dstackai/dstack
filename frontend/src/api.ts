@@ -85,6 +85,10 @@ export const API = {
 
         // Fleets
         VOLUMES_DELETE: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/volumes/delete`,
+
+        // METRICS
+        JOB_METRICS: (projectName: IProject['project_name'], runName: IRun['run_spec']['run_name']) =>
+            `${API.BASE()}/project/${projectName}/metrics/job/${runName}`,
     },
 
     BACKENDS: {

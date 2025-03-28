@@ -7,7 +7,11 @@ export const getJobListItemResources = (job: IJob) => {
 };
 
 export const getJobListItemSpot = (job: IJob) => {
-    return job.job_submissions?.[job.job_submissions.length - 1]?.job_provisioning_data?.instance_type?.resources?.spot?.toString() ?? '-';
+    return (
+        job.job_submissions?.[
+            job.job_submissions.length - 1
+        ]?.job_provisioning_data?.instance_type?.resources?.spot?.toString() ?? '-'
+    );
 };
 
 export const getJobListItemPrice = (job: IJob) => {

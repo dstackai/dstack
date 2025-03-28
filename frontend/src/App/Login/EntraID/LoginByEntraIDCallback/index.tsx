@@ -10,9 +10,9 @@ import { ROUTES } from 'routes';
 import { useEntraCallbackMutation } from 'services/auth';
 
 import { AuthErrorMessage } from 'App/AuthErrorMessage';
+import { getBaseUrl } from 'App/helpers';
 import { Loading } from 'App/Loading';
 import { setAuthData } from 'App/slice';
-import { getBaseUrl } from 'App/helpers';
 
 export const LoginByEntraIDCallback: React.FC = () => {
     const { t } = useTranslation();
