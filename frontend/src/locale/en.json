@@ -340,10 +340,10 @@
       "metrics": {
         "title": "Metrics",
         "show_metrics": "Show metrics",
-        "cpu_utilization": "Total CPU utilization %",
-        "memory_used": "Total Memory Used",
-        "per_each_cpu_utilization": "CPU utilization %",
-        "per_each_memory_used": "Memory Used"
+        "cpu_utilization": "CPU utilization %",
+        "memory_used": "System memory used",
+        "per_each_cpu_utilization": "GPU utilization %",
+        "per_each_memory_used": "GPU memory used"
       },
       "jobs": "Jobs",
       "job_name": "Job Name",

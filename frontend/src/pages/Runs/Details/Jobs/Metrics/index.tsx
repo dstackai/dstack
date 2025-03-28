@@ -80,11 +80,11 @@ export const RunMetrics: React.FC = () => {
                     yTitle="Load"
                     {...defaultChartProps}
                     xDomain={totalCPUChartProps.xDomain}
+                    yDomain={totalCPUChartProps.yDomain}
                     i18nStrings={{
                         xTickFormatter: formatTime,
                         yTickFormatter: formatPercent,
                     }}
-                    yDomain={[0, 100]}
                     hideFilter
                     hideLegend
                     xScaleType="time"
@@ -98,11 +98,11 @@ export const RunMetrics: React.FC = () => {
                     yTitle="Memory used"
                     {...defaultChartProps}
                     xDomain={totalMemoryChartProps.xDomain}
+                    yDomain={totalMemoryChartProps.yDomain}
                     i18nStrings={{
                         xTickFormatter: formatTime,
                         yTickFormatter: bytesFormatter,
                     }}
-                    yDomain={[0, 128 * GByte]}
                     hideFilter
                     hideLegend
                     xScaleType="time"
@@ -116,12 +116,12 @@ export const RunMetrics: React.FC = () => {
                     yTitle="Load"
                     {...defaultChartProps}
                     xDomain={eachCPUChartProps.xDomain}
+                    yDomain={eachCPUChartProps.yDomain}
                     i18nStrings={{
                         xTickFormatter: formatTime,
                         yTickFormatter: formatPercent,
                         filterPlaceholder: 'Filter data',
                     }}
-                    yDomain={[0, 100]}
                     xScaleType="time"
                 />
             </Container>
@@ -133,12 +133,12 @@ export const RunMetrics: React.FC = () => {
                     yTitle="Memory used"
                     {...defaultChartProps}
                     xDomain={eachMemoryChartProps.xDomain}
+                    yDomain={eachMemoryChartProps.yDomain}
                     i18nStrings={{
                         xTickFormatter: formatTime,
                         yTickFormatter: bytesFormatter,
                         filterPlaceholder: 'Filter data',
                     }}
-                    yDomain={[0, 128 * GByte]}
                     xScaleType="time"
                 />
             </Container>

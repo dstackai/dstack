@@ -29,34 +29,46 @@ export const bytesFormatter = (bytes: number, hasPostfix = true) => {
 
 type GetSeriesDataArgs = {
     metricItem: IMetricsItem;
+    yValueFormater?: (value: IMetricsItem['values'][number], index: number) => IMetricsItem['values'][number];
 };
 
-export const getSeriesData = ({ metricItem }: GetSeriesDataArgs) => {
+export const getSeriesData = ({ metricItem, yValueFormater = (value) => value }: GetSeriesDataArgs) => {
     return metricItem.timestamps.map((time, index) => ({
         x: new Date(time),
-        y: metricItem.values[index],
+        y: yValueFormater(metricItem.values[index], index),
     }));
 };
 
-type GetChartPropsArgs = {
+type GetChartPropsArgs = Pick<GetSeriesDataArgs, 'yValueFormater'> & {
     renderTitle: (index: number) => string;
     type?: string;
     valueFormatter?: (value: number) => void;
     metricItems: IMetricsItem[];
+    customSeries?: unknown[];
+    yDomain?: number[];
 };
 
-export const getChartProps = ({ metricItems, renderTitle, type = 'line', valueFormatter }: GetChartPropsArgs) => {
+export const getChartProps = ({
+    metricItems,
+    renderTitle,
+    type = 'line',
+    valueFormatter,
+    yValueFormater,
+    customSeries = [],
+    yDomain = [],
+}: GetChartPropsArgs) => {
     const series = metricItems.map((metricItem, index) => ({
         title: renderTitle(index),
         type,
         valueFormatter,
-        data: getSeriesData({ metricItem }),
+        data: getSeriesData({ metricItem, yValueFormater }),
     }));
 
     const firstSeries = series?.[0]?.data;
 
     return {
-        series,
+        series: [...series, ...customSeries],
         xDomain: [firstSeries?.[0]?.x, firstSeries?.[firstSeries.length - 1]?.x],
+        yDomain,
     };
 };
