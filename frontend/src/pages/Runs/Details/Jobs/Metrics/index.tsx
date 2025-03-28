@@ -7,7 +7,6 @@ import { Box, ColumnLayout, Container, Header, LineChart } from 'components';
 import { riseRouterException } from 'libs';
 import { useGetRunQuery } from 'services/run';
 
-import { GByte } from './consts';
 import { bytesFormatter, formatPercent, formatTime } from './helpers';
 import { useMetricsData } from './useMetricsData';
 

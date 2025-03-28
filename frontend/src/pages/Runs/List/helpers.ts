@@ -1,8 +1,9 @@
 import { groupBy as _groupBy } from 'lodash';
 
+import { getBaseUrl } from 'App/helpers';
+
 import { finishedJobs } from '../constants';
 import { getJobStatus } from '../Details/Jobs/List/helpers';
-import { getBaseUrl } from 'App/helpers';
 
 export const getGroupedRunsByProjectAndRepoID = (runs: IRun[]) => {
     return _groupBy(runs, ({ project_name }) => project_name);

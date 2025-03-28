@@ -1,5 +1,4 @@
-import type { LineChartProps } from '../../../../../components';
-import { ALL_CPU_USAGE, GByte, kByte, MByte } from './consts';
+import { GByte, kByte, MByte } from './consts';
 
 export const formatTime = (date: Date) => {
     return date.toLocaleTimeString('en-US', {

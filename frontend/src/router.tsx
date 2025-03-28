@@ -22,7 +22,6 @@ import { CreditsHistoryAdd, UserAdd, UserDetails, UserEdit, UserList } from 'pag
 import { UserBilling, UserProjects, UserSettings } from 'pages/User/Details';
 
 import { AuthErrorMessage } from './App/AuthErrorMessage';
-import { RunMetrics } from './pages/Runs/Details/Jobs/Metrics';
 import { VolumeList } from './pages/Volumes';
 import { ROUTES } from './routes';
 
