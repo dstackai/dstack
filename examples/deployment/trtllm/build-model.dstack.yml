@@ -36,8 +36,8 @@ commands:
   - python3 tensorrtllm_backend/tools/fill_template.py -i triton_model_repo/tensorrt_llm/config.pbtxt triton_backend:tensorrtllm,triton_max_batch_size:${TRITON_MAX_BATCH_SIZE},decoupled_mode:${DECOUPLED_MODE},engine_dir:tllm_engine_${DSTACK_GPUS_NUM}gpu_bf16,max_queue_delay_microseconds:${MAX_QUEUE_DELAY_MS},batching_strategy:inflight_fused_batching,max_queue_size:${MAX_QUEUE_SIZE},encoder_input_features_data_type:TYPE_BF16,logits_datatype:TYPE_BF16
   - python3 tensorrtllm_backend/tools/fill_template.py -i triton_model_repo/postprocessing/config.pbtxt tokenizer_dir:tokenizer_dir,triton_max_batch_size:${TRITON_MAX_BATCH_SIZE},postprocessing_instance_count:${INSTANCE_COUNT},max_queue_size:${MAX_QUEUE_SIZE}
   - python3 tensorrtllm_backend/tools/fill_template.py -i triton_model_repo/tensorrt_llm_bls/config.pbtxt triton_max_batch_size:${TRITON_MAX_BATCH_SIZE},decoupled_mode:${DECOUPLED_MODE},bls_instance_count:${INSTANCE_COUNT},logits_datatype:TYPE_BF16
-  - aws s3 sync triton_model_repo s3://${S3_BUCKET_NAME}/triton_model_repo
-  - aws s3 sync tllm_engine_${DSTACK_GPUS_NUM}gpu_bf16 s3://${S3_BUCKET_NAME}/tllm_engine_${DSTACK_GPUS_NUM}gpu_bf16
+  - aws s3 sync triton_model_repo s3://${S3_BUCKET_NAME}/triton_model_repo --acl public-read
+  - aws s3 sync tllm_engine_${DSTACK_GPUS_NUM}gpu_bf16 s3://${S3_BUCKET_NAME}/tllm_engine_${DSTACK_GPUS_NUM}gpu_bf16 --acl public-read
   
 
 resources:

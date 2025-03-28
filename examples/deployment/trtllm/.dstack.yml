@@ -1,6 +1,6 @@
 type: service
-name: deepseek-r1-serve
-# To build latest tensorrt_llm image use task in examples/deployment/tensorrt/build.trtllm.yml to build docker image.
+name: serve-deepseek
+# To build latest trtllm image use task in examples/deployment/tensorrt/build.trtllm.yml to build docker image.
 image: dstackai/tensorrt_llm:9b931c0f6305aefa3660e6fb84a76a42c0eef167 
 env:
   - MAX_BATCH_SIZE=256
@@ -11,7 +11,7 @@ env:
 
 commands:
   - git lfs install
-  - git clone https://huggingface.co/deepseek-ai/DeepSeek-R1 deepseek
+  - git clone https://huggingface.co/deepseek-ai/DeepSeek-R1 DeepSeek-R1
   - trtllm-serve
           --backend pytorch
           --max_batch_size $MAX_BATCH_SIZE
@@ -20,7 +20,7 @@ commands:
           --tp_size $DSTACK_GPUS_NUM
           --ep_size $EXPERT_PARALLEL
           --pp_size $PIPELINE_PARALLEL
-          deepseek
+          DeepSeek-R1
 
 port: 8000
 

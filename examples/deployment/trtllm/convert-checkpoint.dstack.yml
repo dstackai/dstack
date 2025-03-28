@@ -1,5 +1,5 @@
 type: task
-name: convert-checkpoint
+name: convert-trtllm-checkpoint
 
 image: nvcr.io/nvidia/tritonserver:25.01-trtllm-python-py3
 
@@ -28,7 +28,7 @@ commands:
   - curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
   - unzip awscliv2.zip
   - ./aws/install
-  - aws s3 sync tllm_checkpoint_${DSTACK_GPUS_NUM}gpu_bf16 s3://${S3_BUCKET_NAME}/tllm_checkpoint_${DSTACK_GPUS_NUM}gpu_bf16
+  - aws s3 sync tllm_checkpoint_${DSTACK_GPUS_NUM}gpu_bf16 s3://${S3_BUCKET_NAME}/tllm_checkpoint_${DSTACK_GPUS_NUM}gpu_bf16 --acl public-read
 
 resources:
   gpu: A100:40GB

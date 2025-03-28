@@ -1,5 +1,5 @@
 type: task
-name: vscode-dind
+name: build-trtllm-image
 
 privileged: true
 image: dstackai/dind

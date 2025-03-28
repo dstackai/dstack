@@ -28,36 +28,36 @@ The detailed process for serving both models is outlined below.
 The latest release of TensorRT-LLM does not yet support DeepSeek-R1-671B. To serve this model, you'll need to build a Docker image from the main branch of TensorRT-LLM.
 
 The task for building the image is defined in
-[examples/deployment/tensorrt/build.trtllm-image.yml :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/deployment/tensorrt/build.trtllm-image.yml)
+[examples/deployment/trtllm/trtllm-image.dstack.yml :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/deployment/trtllm/trtllm-image.dstack.yml)
 
 ### DeepSeek-R1-Distill-Llama-8B
 We have followed below steps for deployment.
 
 1. **Convert the Hugging Face model to a TensorRT checkpoint**  
    The conversion task is defined in  
-   [`examples/deployment/tensorrt/convert.checkpoint.yml` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/deployment/tensorrt/convert.checkpoint.yml),  
+   [`examples/deployment/trtllm/convert-checkpoint.dstack.yml` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/deployment/trtllm/convert-checkpoint.dstack.yml),  
    which also uploads the checkpoint to S3.
 
 2. **Build the TensorRT engine and prepare the model repository**  
    This step generates the TensorRT engine from the checkpoint and creates the required model repository for Triton.  
    The corresponding task is located in  
-   [`examples/deployment/tensorrt/build.trtllm-model.yml` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/deployment/tensorrt/build.trtllm-model.yml),  
+   [`examples/deployment/trtllm/build-model.dstack.yml` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/deployment/trtllm/build-model.dstack.yml),  
    and the output is stored in S3.
 
 3. **Launch the Triton server with the TensorRT-LLM model**  
    The service definition for deploying the model via Triton is provided in  
-   [`examples/deployment/tensorrt/distill.serve.yml` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/deployment/tensorrt/distill.serve.yml).
+   [`examples/deployment/trtllm/serve-distill.dstack.yml` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/deployment/trtllm/serve-distill.dstack.yml).
 
 Here are the examples of serving DeepSeek models.
 
 === "DeepSeek-R1-671B"
   
-    <div editor-title="examples/deployment/tensorrt/.dstack.yml">
+    <div editor-title="examples/deployment/trtllm/.dstack.yml">
 
     ```yaml
     type: service
-    name: deepseek-r1-serve
-    # To build latest tensorrt_llm image use task in examples/deployment/tensorrt/build.trtllm.yml to build docker image.
+    name: serve-deepseek
+    # To build latest trtllm image use task in examples/deployment/trtllm/build.trtllm.yml to build docker image.
     image: dstackai/tensorrt_llm:9b931c0f6305aefa3660e6fb84a76a42c0eef167 
     env:
       - MAX_BATCH_SIZE=256
@@ -91,11 +91,11 @@ Here are the examples of serving DeepSeek models.
 
 === "DeepSeek-R1-Distill-Llama-8B"
 
-    <div editor-title="examples/deployment/tensorrt/distill.serve.yml">
+    <div editor-title="examples/deployment/trtllm/serve-distill.dstack.yml">
 
     ```yaml
     type: service
-    name: deepseek-distill-serve
+    name: serve-distill-deepseek
 
     image: nvcr.io/nvidia/tritonserver:25.01-trtllm-python-py3
 
@@ -133,7 +133,7 @@ To run a configuration to deploy DeepSeek-R1-671B, use the [`dstack apply`](http
 <div class="termy">
 
 ```shell
-$ dstack apply -f examples/deployment/tensorrt/.dstack.yml
+$ dstack apply -f examples/deployment/trtllm/.dstack.yml
 
  #  BACKEND  REGION             RESOURCES                        SPOT  PRICE       
  1  vastai   is-iceland         192xCPU, 2063GB, 8xH200 (141GB)  yes   $25.62   
@@ -180,7 +180,7 @@ is available at `https://gateway.<gateway domain>/`.
 ## Source code
 
 The source-code of this example can be found in 
-[`examples/deployment/tensorrt` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/deployment/tensorrt){:target="_blank"}.
+[`examples/deployment/trtllm` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/deployment/trtllm){:target="_blank"}.
 
 ## What's next?
 
