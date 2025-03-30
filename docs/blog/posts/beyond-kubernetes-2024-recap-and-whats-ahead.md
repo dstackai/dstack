@@ -8,7 +8,8 @@ categories:
   - AMD
   - NVIDIA
   - Volumes
-  - Fleets
+  - Cloud fleets
+  - SSH fleets
 ---
 
 # Beyond Kubernetes: 2024 recap and what's ahead for AI infra 
