@@ -312,7 +312,7 @@ The GPU vendor is indicated by one of the following case-insensitive values:
 
 While `dstack` allows the use of any third-party monitoring tools (e.g., Weights and Biases), you can also
 monitor container metrics such as CPU, memory, and GPU usage using the [built-in
-`dstack stats` CLI command](../../blog/posts/monitoring-gpu-usage.md) or the corresponding API.
+`dstack stats` CLI command](../../blog/posts/dstack-stats.md) or the corresponding API.
 
 ## Service quotas
 

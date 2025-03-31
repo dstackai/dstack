@@ -1,8 +1,8 @@
 ---
-title: "Monitoring GPU usage and other container metrics"
+title: "Monitoring basic GPU metrics via dstack stats"
 date: 2024-10-22
 description: "dstack introduces a new CLI command (and API) for monitoring container metrics, incl. GPU usage for NVIDIA, AMD, and other accelerators."  
-slug: monitoring-gpu-usage
+slug: dstack-stats
 image: https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-stats-v2.png?raw=true
 categories:
   - AMD
@@ -10,7 +10,7 @@ categories:
   - Monitoring
 ---
 
-# Monitoring GPU usage and other container metrics
+# Monitoring basic GPU metrics via dstack stats
 
 ## How it works { style="display:none"}
 

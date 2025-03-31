@@ -1,16 +1,14 @@
 ---
-title: Orchestrating GPUs in data centers and private clouds
+title: Introducing GPU blocks and proxy jump for SSH fleets
 date: 2025-02-18
 description: "TBA"  
-slug: data-centers-and-private-clouds
+slug: gpu-blocks-and-proxy-jump
 image: https://github.com/dstackai/static-assets/blob/main/static-assets/images/data-centers-and-private-clouds.png?raw=true
 categories:
-  - Fleets
-  - Data centers
-  - Private clouds
+  - SSH fleets
 ---
 
-# Orchestrating GPUs in data centers and private clouds
+# Introducing GPU blocks and proxy jump for SSH fleets
 
 Recent breakthroughs in open-source AI have made AI infrastructure accessible beyond public clouds, driving demand for
 running AI workloads in on-premises data centers and private clouds. 

@@ -2,7 +2,7 @@
 title: Auto-shutdown for inactive dev environments—no idle GPUs
 date: 2025-02-19
 description: "dstack introduces a new feature that automatically detects and shuts down inactive dev environments, helping you avoid wasted GPU costs."  
-slug: inactive-dev-environments-auto-shutdown
+slug: inactivity-duration
 image: https://github.com/dstackai/static-assets/blob/main/static-assets/images/inactive-dev-environments-auto-shutdown.png?raw=true
 categories:
   - Dev environments
