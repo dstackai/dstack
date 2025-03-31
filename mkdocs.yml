@@ -130,6 +130,7 @@ plugins:
         'blog/monitoring-gpu-usage.md': 'blog/posts/dstack-stats.md'
         'blog/inactive-dev-environments-auto-shutdown.md': 'blog/posts/inactivity-duration.md'
         'blog/data-centers-and-private-clouds.md': 'blog/posts/gpu-blocks-and-proxy-jump.md'
+        'blog/distributed-training-with-aws-efa.md': 'blog/posts/efa.md'
   - typeset
   - gen-files:
       scripts:  # always relative to mkdocs.yml
