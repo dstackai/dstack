@@ -64,7 +64,7 @@ Submit the run vscode? [y/n]: y
 Launching `vscode`...
 ---> 100%
 
-To open in VS Code Desktop, use this link:
+To open in Cursor, use this link:
   cursor://vscode-remote/ssh-remote+vscode/workflow
 ```
 
