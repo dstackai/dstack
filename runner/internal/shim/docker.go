@@ -1009,6 +1009,14 @@ func configureGpus(config *container.Config, hostConfig *container.HostConfig, v
 			hostConfig.Mounts,
 			mount.Mount{Type: mount.TypeBind, Source: "/dev/aperture_devices", Target: "/dev/aperture_devices"},
 		)
+		hostConfig.Mounts = append(
+			hostConfig.Mounts,
+			mount.Mount{Type: mount.TypeBind, Source: "/var/lib/tcpxo/lib64", Target: "/var/lib/tcpxo/lib64"},
+		)
+		hostConfig.Mounts = append(
+			hostConfig.Mounts,
+			mount.Mount{Type: mount.TypeBind, Source: "/var/lib/fastrak/lib64", Target: "/var/lib/fastrak/lib64"},
+		)
 	case host.GpuVendorAmd:
 		// All options are listed here: https://hub.docker.com/r/rocm/pytorch
 		// Only --device are mandatory, other seem to be performance-related.
