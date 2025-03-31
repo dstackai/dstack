@@ -39,11 +39,11 @@ from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
-DSTACK_WORKING_DIR = "/root/.dstack"
+DSTACK_WORKING_DIR = "/etc/.dstack"
 DSTACK_SHIM_BINARY_NAME = "dstack-shim"
-DSTACK_SHIM_BINARY_PATH = f"/usr/local/bin/{DSTACK_SHIM_BINARY_NAME}"
+DSTACK_SHIM_BINARY_PATH = f"/etc/{DSTACK_SHIM_BINARY_NAME}"
 DSTACK_RUNNER_BINARY_NAME = "dstack-runner"
-DSTACK_RUNNER_BINARY_PATH = f"/usr/local/bin/{DSTACK_RUNNER_BINARY_NAME}"
+DSTACK_RUNNER_BINARY_PATH = f"/etc/{DSTACK_RUNNER_BINARY_NAME}"
 
 
 class Compute(ABC):
@@ -525,7 +525,7 @@ def get_run_shim_script(is_privileged: bool, pjrt_device: Optional[str]) -> List
     pjrt_device_env = f"--pjrt-device={pjrt_device}" if pjrt_device else ""
 
     return [
-        f"nohup dstack-shim {privileged_flag} {pjrt_device_env} &",
+        f"nohup {DSTACK_SHIM_BINARY_PATH} {privileged_flag} {pjrt_device_env} &",
     ]
 
 

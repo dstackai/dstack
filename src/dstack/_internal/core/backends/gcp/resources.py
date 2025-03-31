@@ -8,7 +8,6 @@ from google.api_core.extended_operation import ExtendedOperation
 from google.api_core.operation import Operation
 from google.cloud import tpu_v2
 
-import dstack.version as version
 from dstack._internal.core.errors import BackendError, ComputeError
 from dstack._internal.core.models.instances import Gpu
 from dstack._internal.utils.common import remove_prefix
@@ -119,24 +118,14 @@ def create_instance_struct(
     subnetwork: Optional[str] = None,
     allocate_public_ip: bool = True,
 ) -> compute_v1.Instance:
-    network_interface = compute_v1.NetworkInterface()
-    network_interface.network = network
-    if subnetwork is not None:
-        network_interface.subnetwork = subnetwork
-
-    if allocate_public_ip:
-        access = compute_v1.AccessConfig()
-        access.type_ = compute_v1.AccessConfig.Type.ONE_TO_ONE_NAT.name
-        access.name = "External NAT"
-        access.network_tier = access.NetworkTier.PREMIUM.name
-        network_interface.access_configs = [access]
-    else:
-        network_interface.access_configs = []
-
     instance = compute_v1.Instance()
-    instance.network_interfaces = [network_interface]
     instance.name = instance_name
     instance.machine_type = f"zones/{zone}/machineTypes/{machine_type}"
+    instance.network_interfaces = _get_network_interfaces(
+        network=network,
+        subnetwork=subnetwork,
+        allocate_public_ip=allocate_public_ip,
+    )
 
     disk = compute_v1.AttachedDisk()
     disk.auto_delete = True
@@ -187,14 +176,45 @@ def create_instance_struct(
     return instance
 
 
-def get_image_id(cuda: bool) -> str:
-    if not cuda:
-        image_name = f"dstack-{version.base_image}"
+def _get_network_interfaces(
+    network: str,
+    subnetwork: Optional[str],
+    allocate_public_ip: bool,
+) -> List[compute_v1.NetworkInterface]:
+    network_interface = compute_v1.NetworkInterface()
+    network_interface.network = network
+    if subnetwork is not None:
+        network_interface.subnetwork = subnetwork
+    if allocate_public_ip:
+        access = compute_v1.AccessConfig()
+        access.type_ = compute_v1.AccessConfig.Type.ONE_TO_ONE_NAT.name
+        access.name = "External NAT"
+        access.network_tier = access.NetworkTier.PREMIUM.name
+        network_interface.access_configs = [access]
     else:
-        image_name = f"dstack-cuda-{version.base_image}"
-    image_name = image_name.replace(".", "-")
+        network_interface.access_configs = []
 
-    return f"projects/dstack/global/images/{image_name}"
+    network_interfaces = [network_interface]
+    for i in range(1, 9):
+        network_interfaces.append(
+            compute_v1.NetworkInterface(
+                network=f"projects/dstack/global/networks/dstack-test-data-net-{i}",
+                subnetwork=f"projects/dstack/regions/europe-west4/subnetworks/dstack-test-data-sub-{i}",
+            )
+        )
+    return network_interfaces
+
+
+def get_image_id(cuda: bool) -> str:
+    # if not cuda:
+    #     image_name = f"dstack-{version.base_image}"
+    # else:
+    #     image_name = f"dstack-cuda-{version.base_image}"
+    # image_name = image_name.replace(".", "-")
+
+    # return f"projects/dstack/global/images/{image_name}"
+    # return "projects/cos-cloud/global/images/cos-105-17412-535-78" # TCPX
+    return "projects/dstack/global/images/slurm-a3mega-20250327t101736z-cloudinit"  # TCPXO
 
 
 def get_gateway_image_id() -> str:
