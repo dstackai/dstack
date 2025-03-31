@@ -21,7 +21,7 @@ we’ve expanded compatibility. With this update, dev environments now offer eff
 
 <!-- more -->
 
-To access a dev environment via Cursor, set the `ide` property in your configuration to `cursors`.
+To access a dev environment via Cursor, set the `ide` property in your configuration to `cursor`.
 
 <div editor-title=".dstack.yml"> 
 
