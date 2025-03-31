@@ -15,6 +15,7 @@ from dstack._internal.core.backends.base.compute import (
     ComputeWithCreateInstanceSupport,
     ComputeWithGatewaySupport,
     ComputeWithMultinodeSupport,
+    ComputeWithPlacementGroupSupport,
     ComputeWithVolumeSupport,
     generate_unique_gateway_instance_name,
     generate_unique_instance_name,
@@ -46,6 +47,7 @@ from dstack._internal.core.models.instances import (
     InstanceType,
     Resources,
 )
+from dstack._internal.core.models.placement import PlacementGroup, PlacementGroupProvisioningData
 from dstack._internal.core.models.resources import Memory, Range
 from dstack._internal.core.models.runs import JobProvisioningData, Requirements
 from dstack._internal.core.models.volumes import (
@@ -74,6 +76,7 @@ class GCPVolumeDiskBackendData(CoreModel):
 class GCPCompute(
     ComputeWithCreateInstanceSupport,
     ComputeWithMultinodeSupport,
+    ComputeWithPlacementGroupSupport,
     ComputeWithGatewaySupport,
     ComputeWithVolumeSupport,
     Compute,
@@ -89,6 +92,9 @@ class GCPCompute(
         self.routers_client = compute_v1.RoutersClient(credentials=self.credentials)
         self.tpu_client = tpu_v2.TpuClient(credentials=self.credentials)
         self.disk_client = compute_v1.DisksClient(credentials=self.credentials)
+        self.resource_policies_client = compute_v1.ResourcePoliciesClient(
+            credentials=self.credentials
+        )
 
     def get_offers(
         self, requirements: Optional[Requirements] = None
@@ -282,6 +288,7 @@ class GCPCompute(
                 network=self.config.vpc_resource_name,
                 subnetwork=subnetwork,
                 allocate_public_ip=allocate_public_ip,
+                placement_policy=f"projects/{self.config.project_id}/regions/{instance_offer.region}/resourcePolicies/{instance_config.placement_group_name}",
             )
             try:
                 # GCP needs some time to return an error in case of no capacity (< 30s).
@@ -373,6 +380,39 @@ class GCPCompute(
         raise ProvisioningError(
             f"Failed to get instance IP address. Instance status: {instance.status}"
         )
+
+    def create_placement_group(
+        self,
+        placement_group: PlacementGroup,
+    ) -> PlacementGroupProvisioningData:
+        policy = compute_v1.ResourcePolicy(
+            name=placement_group.name,
+            region=placement_group.configuration.region,
+            group_placement_policy=compute_v1.ResourcePolicyGroupPlacementPolicy(
+                availability_domain_count=1,
+                collocation="COLLOCATED",
+            ),
+        )
+        self.resource_policies_client.insert(
+            project=self.config.project_id,
+            region=placement_group.configuration.region,
+            resource_policy_resource=policy,
+        )
+        return PlacementGroupProvisioningData(backend=BackendType.GCP)
+
+    def delete_placement_group(
+        self,
+        placement_group: PlacementGroup,
+    ):
+        try:
+            operation = self.resource_policies_client.delete(
+                project=self.config.project_id,
+                region=placement_group.configuration.region,
+                resource_policy=placement_group.name,
+            )
+            operation.result()  # Wait for operation to complete
+        except google.api_core.exceptions.NotFound:
+            logger.debug("Placement group %s not found", placement_group.name)
 
     def create_gateway(
         self,

@@ -117,6 +117,7 @@ def create_instance_struct(
     network: str = "global/networks/default",
     subnetwork: Optional[str] = None,
     allocate_public_ip: bool = True,
+    placement_policy: Optional[str] = None,
 ) -> compute_v1.Instance:
     instance = compute_v1.Instance()
     instance.name = instance_name
@@ -148,6 +149,9 @@ def create_instance_struct(
     ):
         # Attachable GPUs, H100, A100, and L4
         instance.scheduling.on_host_maintenance = "TERMINATE"
+
+    if placement_policy is not None:
+        instance.resource_policies = [placement_policy]
 
     if spot:
         instance.scheduling = compute_v1.Scheduling()
