@@ -21,3 +21,4 @@ build/
 .fleet
 .env
 .aider*
+uv.lock

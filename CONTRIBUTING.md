@@ -28,8 +28,8 @@ If you make a non-trivial change to `dstack`, we recommend you learn about `dsta
 
 We use [`ruff`](https://docs.astral.sh/ruff/) to format Python code and to sort Python imports. Before committing your changes, run:
 
-1. `ruff check --fix`
-2. `ruff format`
+1. `uv run ruff check --fix`
+2. `uv run ruff format`
 
 > There are also helper pre-commits installed for [`ruff`](https://docs.astral.sh/ruff/integrations/#pre-commit) that make commits fail if the code is not formatted or the imports are not sorted. They also change the code as required so that you can review the changes and commit again.
 
@@ -40,14 +40,14 @@ To run Python tests, first ensure you've install dev dependencies as described i
 Then you can do:
 
 ```shell
-pytest src/tests
+uv run pytest src/tests
 ```
 
 (Optionally) By default, tests run against SQLite.
 Use the `--runpostgres` flag to run the tests against Postgres as well:
 
 ```shell
-pytest src/tests --runpostgres
+uv run pytest src/tests --runpostgres
 ```
 
 ## Add a new backend
