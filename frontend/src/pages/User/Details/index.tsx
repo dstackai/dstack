@@ -64,20 +64,17 @@ export const UserDetails: React.FC = () => {
             id: UserDetailsTabTypeEnum.SETTINGS,
             href: ROUTES.USER.DETAILS.FORMAT(paramUserName),
         },
+        process.env.UI_VERSION === 'sky' && {
+            label: t('billing.title'),
+            id: UserDetailsTabTypeEnum.BILLING,
+            href: ROUTES.USER.BILLING.LIST.FORMAT(paramUserName),
+        },
         {
             label: t('users.projects'),
             id: UserDetailsTabTypeEnum.PROJECTS,
             href: ROUTES.USER.PROJECTS.FORMAT(paramUserName),
         },
-    ];
-
-    if (process.env.UI_VERSION === 'sky') {
-        tabs.push({
-            label: t('billing.title'),
-            id: UserDetailsTabTypeEnum.BILLING,
-            href: ROUTES.USER.BILLING.LIST.FORMAT(paramUserName),
-        });
-    }
+    ].filter(Boolean);
 
     return (
         <>
