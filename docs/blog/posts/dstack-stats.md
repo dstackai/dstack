@@ -15,7 +15,7 @@ categories:
 ## How it works { style="display:none"}
 
 While it's possible to use third-party monitoring tools with `dstack`, it is often more convenient to debug your run and
-track metrics out of the box. That's why, with the latest release, `dstack` introduced [`dstack stats`](../../docs/reference/cli/dstack/stats.md), a new CLI (and API)
+track metrics out of the box. That's why, with the latest release, `dstack` introduced [`dstack stats`](../../docs/reference/cli/dstack/metrics.md), a new CLI (and API)
 for monitoring container metrics, including GPU usage for `NVIDIA`, `AMD`, and other accelerators.
 
 <img src="https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-stats-v2.png?raw=true" width="725"/>
