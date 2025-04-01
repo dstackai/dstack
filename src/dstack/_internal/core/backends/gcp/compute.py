@@ -31,6 +31,7 @@ from dstack._internal.core.errors import (
     ComputeError,
     ComputeResourceNotFoundError,
     NoCapacityError,
+    PlacementGroupInUseError,
     ProvisioningError,
 )
 from dstack._internal.core.models.backends.base import BackendType
@@ -189,6 +190,13 @@ class GCPCompute(
             config=self.config,
             region=instance_offer.region,
         )
+        placement_policy = None
+        if instance_config.placement_group_name is not None:
+            placement_policy = gcp_resources.get_placement_policy_resource_name(
+                project_id=self.config.project_id,
+                region=instance_offer.region,
+                placement_policy=instance_config.placement_group_name,
+            )
         labels = {
             "owner": "dstack",
             "dstack_project": instance_config.project_name.lower(),
@@ -288,7 +296,7 @@ class GCPCompute(
                 network=self.config.vpc_resource_name,
                 subnetwork=subnetwork,
                 allocate_public_ip=allocate_public_ip,
-                placement_policy=f"projects/{self.config.project_id}/regions/{instance_offer.region}/resourcePolicies/{instance_config.placement_group_name}",
+                placement_policy=placement_policy,
             )
             try:
                 # GCP needs some time to return an error in case of no capacity (< 30s).
@@ -413,6 +421,10 @@ class GCPCompute(
             operation.result()  # Wait for operation to complete
         except google.api_core.exceptions.NotFound:
             logger.debug("Placement group %s not found", placement_group.name)
+        except google.api_core.exceptions.BadRequest as e:
+            if "is already being used by" in e.message:
+                raise PlacementGroupInUseError()
+            raise
 
     def create_gateway(
         self,
@@ -797,57 +809,6 @@ def _unique_instance_name(instance: InstanceType) -> str:
     return f"{name}-{gpu.name}-{gpu.memory_mib}"
 
 
-def _get_tpu_startup_script(authorized_keys: List[str]) -> str:
-    commands = get_shim_commands(
-        authorized_keys=authorized_keys, is_privileged=True, pjrt_device="TPU"
-    )
-    startup_script = " ".join([" && ".join(commands)])
-    startup_script = "#! /bin/bash\n" + startup_script
-    return startup_script
-
-
-def _is_tpu(instance_name: str) -> bool:
-    parts = instance_name.split("-")
-    if len(parts) == 2:
-        version, cores = parts
-        if version in TPU_VERSIONS and cores.isdigit():
-            return True
-    return False
-
-
-def _get_tpu_runtime_version(instance_name: str) -> str:
-    tpu_version = _get_tpu_version(instance_name)
-    if tpu_version == "v6e":
-        return "v2-alpha-tpuv6e"
-    elif tpu_version == "v5litepod":
-        return "v2-alpha-tpuv5-lite"
-    return "tpu-ubuntu2204-base"
-
-
-def _get_tpu_version(instance_name: str) -> str:
-    return instance_name.split("-")[0]
-
-
-def _is_single_host_tpu(instance_name: str) -> bool:
-    parts = instance_name.split("-")
-    if len(parts) != 2:
-        logger.info("Skipping unknown TPU: %s", instance_name)
-        return False
-    tpu_version, tensor_cores = parts
-    try:
-        tensor_cores = int(tensor_cores)
-    except ValueError:
-        logger.info("Skipping TPU due to invalid number of tensor cores: %s", tensor_cores)
-        return False
-    if tpu_version in ["v2", "v3", "v5p", "v5litepod", "v6e"]:
-        return tensor_cores <= 8
-    elif tpu_version == "v4":
-        return False
-    else:
-        logger.info("Skipping unknown TPU: %s", instance_name)
-        return False
-
-
 def _get_backend_specific_commands_tcpx() -> List[str]:
     return [
         "cos-extensions install gpu -- --version=latest",
@@ -914,6 +875,57 @@ def _get_volume_price(size: int) -> float:
     # https://cloud.google.com/compute/disks-image-pricing#persistentdisk
     # The price is different in different regions. Take max across supported regions.
     return size * 0.12
+
+
+def _get_tpu_startup_script(authorized_keys: List[str]) -> str:
+    commands = get_shim_commands(
+        authorized_keys=authorized_keys, is_privileged=True, pjrt_device="TPU"
+    )
+    startup_script = " ".join([" && ".join(commands)])
+    startup_script = "#! /bin/bash\n" + startup_script
+    return startup_script
+
+
+def _is_tpu(instance_name: str) -> bool:
+    parts = instance_name.split("-")
+    if len(parts) == 2:
+        version, cores = parts
+        if version in TPU_VERSIONS and cores.isdigit():
+            return True
+    return False
+
+
+def _get_tpu_runtime_version(instance_name: str) -> str:
+    tpu_version = _get_tpu_version(instance_name)
+    if tpu_version == "v6e":
+        return "v2-alpha-tpuv6e"
+    elif tpu_version == "v5litepod":
+        return "v2-alpha-tpuv5-lite"
+    return "tpu-ubuntu2204-base"
+
+
+def _get_tpu_version(instance_name: str) -> str:
+    return instance_name.split("-")[0]
+
+
+def _is_single_host_tpu(instance_name: str) -> bool:
+    parts = instance_name.split("-")
+    if len(parts) != 2:
+        logger.info("Skipping unknown TPU: %s", instance_name)
+        return False
+    tpu_version, tensor_cores = parts
+    try:
+        tensor_cores = int(tensor_cores)
+    except ValueError:
+        logger.info("Skipping TPU due to invalid number of tensor cores: %s", tensor_cores)
+        return False
+    if tpu_version in ["v2", "v3", "v5p", "v5litepod", "v6e"]:
+        return tensor_cores <= 8
+    elif tpu_version == "v4":
+        return False
+    else:
+        logger.info("Skipping unknown TPU: %s", instance_name)
+        return False
 
 
 def _get_tpu_data_disks(

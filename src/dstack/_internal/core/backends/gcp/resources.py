@@ -434,3 +434,11 @@ def wait_for_operation(operation: Operation, verbose_name: str = "operation", ti
 
 def full_resource_name_to_name(full_resource_name: str) -> str:
     return full_resource_name.split("/")[-1]
+
+
+def get_placement_policy_resource_name(
+    project_id: str,
+    region: str,
+    placement_policy: str,
+) -> str:
+    return f"projects/{project_id}/regions/{region}/resourcePolicies/{placement_policy}"
