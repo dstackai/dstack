@@ -34,6 +34,7 @@ BASE_DEPS = [
     "cryptography",
     "packaging",
     "python-dateutil",
+    "cachetools",
     "gitpython",
     "jsonschema",
     "paramiko>=3.2.0",
@@ -74,7 +75,6 @@ SERVER_DEPS = GATEWAY_AND_SERVER_COMMON_DEPS + [
     "sentry-sdk[fastapi]",
     "alembic-postgresql-enum",
     "asyncpg",
-    "cachetools",
     "python-json-logger>=3.1.0",
     "prometheus-client",
     "grpcio>=1.50",  # indirect
