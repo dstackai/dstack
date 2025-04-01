@@ -41,6 +41,15 @@ hide:
             Deploy Llama 3.1 with NIM
         </p>
     </a>
+    <a href="/examples/deployment/sglang" 
+       class="feature-cell">
+       <h3>
+           SGLang
+       </h3>
+       <p>
+           Deploy DeepSeek-R1-Distill-Llama 8B & 70B with SGLang
+      </p>
+    </a>
 </div>
 
 ## Fine-tuning
