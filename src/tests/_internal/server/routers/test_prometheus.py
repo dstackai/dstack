@@ -28,6 +28,7 @@ from dstack._internal.server.testing.common import (
     create_repo,
     create_run,
     create_user,
+    get_auth_headers,
     get_instance_offer_with_availability,
     get_job_provisioning_data,
     get_job_runtime_data,
@@ -38,6 +39,7 @@ from dstack._internal.server.testing.common import (
 @pytest.fixture
 def enable_metrics(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr("dstack._internal.server.settings.ENABLE_PROMETHEUS_METRICS", True)
+    monkeypatch.setattr("dstack._internal.server.routers.prometheus._auth._token", None)
 
 
 FAKE_NOW = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
@@ -288,6 +290,25 @@ class TestGetPrometheusMetrics:
         monkeypatch.setattr("dstack._internal.server.settings.ENABLE_PROMETHEUS_METRICS", False)
         response = await client.get("/metrics")
         assert response.status_code == 404
+
+    @pytest.mark.parametrize("token", [None, "foo"])
+    async def test_returns_403_if_not_authenticated(
+        self, monkeypatch: pytest.MonkeyPatch, client: AsyncClient, token: Optional[str]
+    ):
+        monkeypatch.setattr("dstack._internal.server.routers.prometheus._auth._token", "secret")
+        if token is not None:
+            headers = get_auth_headers(token)
+        else:
+            headers = None
+        response = await client.get("/metrics", headers=headers)
+        assert response.status_code == 403
+
+    async def test_returns_200_if_token_is_valid(
+        self, monkeypatch: pytest.MonkeyPatch, client: AsyncClient
+    ):
+        monkeypatch.setattr("dstack._internal.server.routers.prometheus._auth._token", "secret")
+        response = await client.get("/metrics", headers=get_auth_headers("secret"))
+        assert response.status_code == 200
 
 
 async def _create_project(session: AsyncSession, name: str, user: UserModel) -> ProjectModel:

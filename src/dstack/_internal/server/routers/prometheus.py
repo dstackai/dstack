@@ -1,3 +1,4 @@
+import os
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
@@ -6,12 +7,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.server import settings
 from dstack._internal.server.db import get_session
+from dstack._internal.server.security.permissions import OptionalServiceAccount
 from dstack._internal.server.services import prometheus
 from dstack._internal.server.utils.routers import error_not_found
+
+_auth = OptionalServiceAccount(os.getenv("DSTACK_PROMETHEUS_AUTH_TOKEN"))
 
 router = APIRouter(
     tags=["prometheus"],
     default_response_class=PlainTextResponse,
+    dependencies=[Depends(_auth)],
 )
 
 
