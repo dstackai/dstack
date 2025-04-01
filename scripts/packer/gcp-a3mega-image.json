@@ -1,0 +1,28 @@
+{
+  "variables": {
+    "image_version": ""
+  },
+  "builders": [
+    {
+      "type": "googlecompute",
+      "project_id": "dstack",
+      "source_image": "dstack-a3mega-20250401t065024z",
+      "image_name": "dstack-a3mega-{{user `image_version`}}",
+      "instance_name": "dstack-a3mega-{{user `image_version`}}",
+      "image_description": "dstack VM image for A3 Mega instances with pre-pulled Docker images. The source image is based on https://cloud.google.com/cluster-toolkit/docs/deploy/deploy-a3-mega-cluster.",
+      "ssh_username": "ubuntu",
+      "zone": "us-central1-a",
+      "disk_size": 100
+    }
+  ],
+  "provisioners": [
+    {
+      "type": "shell",
+      "inline": [
+        "gcloud -q auth configure-docker us-docker.pkg.dev",
+        "docker pull us-docker.pkg.dev/gce-ai-infra/gpudirect-tcpxo/tcpgpudmarxd-dev:v1.0.14",
+        "docker pull us-docker.pkg.dev/gce-ai-infra/gpudirect-tcpxo/nccl-plugin-gpudirecttcpx-dev:v1.0.8-1"
+      ]
+    }
+  ]
+}
