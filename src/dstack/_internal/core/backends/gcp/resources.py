@@ -209,22 +209,6 @@ def _get_network_interfaces(
     return network_interfaces
 
 
-def get_image_id(cuda: bool) -> str:
-    # if not cuda:
-    #     image_name = f"dstack-{version.base_image}"
-    # else:
-    #     image_name = f"dstack-cuda-{version.base_image}"
-    # image_name = image_name.replace(".", "-")
-
-    # return f"projects/dstack/global/images/{image_name}"
-    # return "projects/cos-cloud/global/images/cos-105-17412-535-78" # TCPX
-    return "projects/dstack/global/images/slurm-a3mega-20250327t101736z-cloudinit"  # TCPXO
-
-
-def get_gateway_image_id() -> str:
-    return "projects/ubuntu-os-cloud/global/images/ubuntu-2204-jammy-v20230714"
-
-
 def get_vpc_subnet_or_error(
     subnetworks_client: compute_v1.SubnetworksClient,
     vpc_project_id: str,

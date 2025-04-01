@@ -10,6 +10,7 @@ from gpuhunt import KNOWN_TPUS
 
 import dstack._internal.core.backends.gcp.auth as auth
 import dstack._internal.core.backends.gcp.resources as gcp_resources
+from dstack import version
 from dstack._internal.core.backends.base.compute import (
     Compute,
     ComputeWithCreateInstanceSupport,
@@ -26,6 +27,7 @@ from dstack._internal.core.backends.base.compute import (
     merge_tags,
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
+from dstack._internal.core.backends.gcp.features import tcpx as tcpx_features
 from dstack._internal.core.backends.gcp.models import GCPConfig
 from dstack._internal.core.errors import (
     ComputeError,
@@ -273,8 +275,9 @@ class GCPCompute(
             request.project = self.config.project_id
             request.instance_resource = gcp_resources.create_instance_struct(
                 disk_size=disk_size,
-                image_id=gcp_resources.get_image_id(
-                    len(instance_offer.instance.resources.gpus) > 0,
+                image_id=_get_image_id(
+                    instance_type_name=instance_offer.instance.name,
+                    cuda=len(instance_offer.instance.resources.gpus) > 0,
                 ),
                 machine_type=instance_offer.instance.name,
                 accelerators=gcp_resources.get_accelerators(
@@ -285,7 +288,9 @@ class GCPCompute(
                 spot=instance_offer.instance.resources.spot,
                 user_data=get_user_data(
                     authorized_keys,
-                    backend_specific_commands=_get_backend_specific_commands_tcpxo(),
+                    backend_specific_commands=_get_backend_specific_commands(
+                        instance_offer.instance.name
+                    ),
                 ),
                 authorized_keys=authorized_keys,
                 labels=labels,
@@ -467,7 +472,7 @@ class GCPCompute(
         request.project = self.config.project_id
         request.instance_resource = gcp_resources.create_instance_struct(
             disk_size=10,
-            image_id=gcp_resources.get_gateway_image_id(),
+            image_id=_get_gateway_image_id(),
             machine_type="e2-small",
             accelerators=[],
             spot=False,
@@ -809,66 +814,25 @@ def _unique_instance_name(instance: InstanceType) -> str:
     return f"{name}-{gpu.name}-{gpu.memory_mib}"
 
 
-def _get_backend_specific_commands_tcpx() -> List[str]:
-    return [
-        "cos-extensions install gpu -- --version=latest",
-        "sudo mount --bind /var/lib/nvidia /var/lib/nvidia",
-        "sudo mount -o remount,exec /var/lib/nvidia",
-        (
-            "docker run "
-            "--detach "
-            "--pull=always"
-            "--name receive-datapath-manager "
-            "--privileged "
-            "--cap-add=NET_ADMIN --network=host "
-            "--volume /var/lib/nvidia/lib64:/usr/local/nvidia/lib64 "
-            "--device /dev/nvidia0:/dev/nvidia0 --device /dev/nvidia1:/dev/nvidia1 "
-            "--device /dev/nvidia2:/dev/nvidia2 --device /dev/nvidia3:/dev/nvidia3 "
-            "--device /dev/nvidia4:/dev/nvidia4 --device /dev/nvidia5:/dev/nvidia5 "
-            "--device /dev/nvidia6:/dev/nvidia6 --device /dev/nvidia7:/dev/nvidia7 "
-            "--device /dev/nvidia-uvm:/dev/nvidia-uvm --device /dev/nvidiactl:/dev/nvidiactl "
-            "--env LD_LIBRARY_PATH=/usr/local/nvidia/lib64 "
-            "--volume /run/tcpx:/run/tcpx "
-            "--entrypoint /tcpgpudmarxd/build/app/tcpgpudmarxd "
-            "us-docker.pkg.dev/gce-ai-infra/gpudirect-tcpx/tcpgpudmarxd "
-            '--gpu_nic_preset a3vm --gpu_shmem_type fd --uds_path "/run/tcpx" --setup_param "--verbose 128 2 0"'
-        ),
-        "sudo iptables -I INPUT -p tcp -m tcp -j ACCEPT",
-        "docker run --rm -v /var/lib:/var/lib us-docker.pkg.dev/gce-ai-infra/gpudirect-tcpx/nccl-plugin-gpudirecttcpx install --install-nccl",
-        "sudo mount --bind /var/lib/tcpx /var/lib/tcpx",
-        "sudo mount -o remount,exec /var/lib/tcpx",
-    ]
+def _get_image_id(instance_type_name: str, cuda: bool) -> str:
+    if instance_type_name == "a3-megagpu-8g":
+        image_name = "dstack-a3mega-2"
+    elif cuda:
+        image_name = f"dstack-cuda-{version.base_image}"
+    else:
+        image_name = f"dstack-{version.base_image}"
+    image_name = image_name.replace(".", "-")
+    return f"projects/dstack/global/images/{image_name}"
 
 
-def _get_backend_specific_commands_tcpxo() -> List[str]:
-    return [
-        "modprobe import-helper",
-        "gcloud -q auth configure-docker us-docker.pkg.dev",
-        # Install the nccl, nccl-net lib into /var/lib/tcpxo/lib64/.
-        (
-            "docker run --rm --name nccl-installer "
-            "--network=host "
-            "--volume /var/lib:/var/lib "
-            "us-docker.pkg.dev/gce-ai-infra/gpudirect-tcpxo/nccl-plugin-gpudirecttcpx-dev:v1.0.8-1 "
-            "install --install-nccl"
-        ),
-        # Start FasTrak receive-datapath-manager
-        (
-            "docker run "
-            "--detach "
-            "--pull=always "
-            "--name receive-datapath-manager "
-            "--cap-add=NET_ADMIN "
-            "--network=host "
-            "--privileged "
-            "--gpus all "
-            "--volume /usr/lib32:/usr/local/nvidia/lib64 "
-            "--volume /dev/dmabuf_import_helper:/dev/dmabuf_import_helper "
-            "--env LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu "
-            "us-docker.pkg.dev/gce-ai-infra/gpudirect-tcpxo/tcpgpudmarxd-dev:v1.0.14 "
-            "--num_hops=2 --num_nics=8 --uid= --alsologtostderr"
-        ),
-    ]
+def _get_gateway_image_id() -> str:
+    return "projects/ubuntu-os-cloud/global/images/ubuntu-2204-jammy-v20230714"
+
+
+def _get_backend_specific_commands(instance_type_name: str) -> List[str]:
+    if instance_type_name == "a3-megagpu-8g":
+        return tcpx_features.get_backend_specific_commands_tcpxo()
+    return []
 
 
 def _get_volume_price(size: int) -> float:
