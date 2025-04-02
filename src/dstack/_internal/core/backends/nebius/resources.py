@@ -56,7 +56,7 @@ def wrap_capacity_errors() -> Generator[None, None, None]:
     try:
         yield
     except RequestError as e:
-        if e.status.code == StatusCode.RESOURCE_EXHAUSTED:
+        if e.status.code == StatusCode.RESOURCE_EXHAUSTED or "Quota limit exceeded" in str(e):
             raise NoCapacityError(e)
         raise
 
