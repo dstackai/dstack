@@ -6,20 +6,6 @@ class DstackError(Exception):
     pass
 
 
-class WorkRemains(DstackError):
-    """
-    Used by functions to signal that they have done some of their work,
-    but need to be called again after some time to continue the work.
-    """
-
-    def __init__(self, details: str) -> None:
-        """
-        Args:
-            details: what has been done and/or what remains to be done
-        """
-        return super().__init__(details)
-
-
 class ServerError(DstackError):
     pass
 
@@ -114,6 +100,20 @@ class ComputeResourceNotFoundError(ComputeError):
 
 class PlacementGroupInUseError(ComputeError):
     pass
+
+
+class NotYetTerminated(ComputeError):
+    """
+    Used by Compute.terminate_instance to signal that instance termination is not complete
+    and the method should be called again after some time to continue termination.
+    """
+
+    def __init__(self, details: str) -> None:
+        """
+        Args:
+            details: some details about the termination status
+        """
+        return super().__init__(details)
 
 
 class CLIError(DstackError):

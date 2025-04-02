@@ -19,7 +19,7 @@ from dstack._internal.core.backends.base.compute import (
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.nebius import resources
 from dstack._internal.core.backends.nebius.models import NebiusConfig, NebiusServiceAccountCreds
-from dstack._internal.core.errors import BackendError, ProvisioningError, WorkRemains
+from dstack._internal.core.errors import BackendError, NotYetTerminated, ProvisioningError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.instances import (
@@ -209,13 +209,13 @@ class NebiusCompute(
         if instance is not None:
             if instance.status.state != instance.status.InstanceState.DELETING:
                 resources.delete_instance(self._sdk, instance_id)
-                raise WorkRemains(
+                raise NotYetTerminated(
                     "Requested instance deletion."
                     " Will wait for deletion before deleting the boot disk."
                     f" Instance state was: {instance.status.state.name}"
                 )
             else:
-                raise WorkRemains(
+                raise NotYetTerminated(
                     "Waiting for instance deletion before deleting the boot disk."
                     f" Instance state: {instance.status.state.name}"
                 )
