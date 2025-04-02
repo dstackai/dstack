@@ -1,4 +1,5 @@
 import json
+import sys
 from datetime import datetime, timezone
 from unittest.mock import Mock, patch
 
@@ -62,6 +63,7 @@ class TestListBackendTypes:
             "gcp",
             "kubernetes",
             "lambda",
+            *(["nebius"] if sys.version_info >= (3, 10) else []),
             "oci",
             "runpod",
             "tensordock",

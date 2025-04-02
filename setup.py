@@ -49,7 +49,7 @@ BASE_DEPS = [
     "python-multipart>=0.0.16",
     "filelock",
     "psutil",
-    "gpuhunt>=0.1.0,<0.2.0",
+    "gpuhunt>=0.1.1,<0.2.0",
     "argcomplete>=3.5.0",
 ]
 
@@ -110,10 +110,23 @@ KUBERNETES_DEPS = ["kubernetes"]
 
 LAMBDA_DEPS = AWS_DEPS
 
+# Nebius requires Python 3.10. On 3.9:
+# `pip install dstack[nebius]` is expected to fail
+# `pip install dstack[all]` is expected to ignore Nebius
+NEBIUS_DEPS = ["nebius>=0.2.19,<0.3"]
+MAYBE_NEBIUS_DEPS = ['nebius>=0.2.19,<0.3; python_version>="3.10"']
+
 OCI_DEPS = ["oci"]
 
 ALL_DEPS = (
-    SERVER_DEPS + AWS_DEPS + AZURE_DEPS + GCP_DEPS + DATACRUNCH_DEPS + KUBERNETES_DEPS + OCI_DEPS
+    SERVER_DEPS
+    + AWS_DEPS
+    + AZURE_DEPS
+    + GCP_DEPS
+    + DATACRUNCH_DEPS
+    + KUBERNETES_DEPS
+    + MAYBE_NEBIUS_DEPS
+    + OCI_DEPS
 )
 
 setup(
@@ -155,6 +168,7 @@ setup(
         "gcp": SERVER_DEPS + GCP_DEPS,
         "kubernetes": SERVER_DEPS + KUBERNETES_DEPS,
         "lambda": SERVER_DEPS + LAMBDA_DEPS,
+        "nebius": SERVER_DEPS + NEBIUS_DEPS,
         "oci": SERVER_DEPS + OCI_DEPS,
     },
     classifiers=[

@@ -6,6 +6,20 @@ class DstackError(Exception):
     pass
 
 
+class WorkRemains(DstackError):
+    """
+    Used by functions to signal that they have done some of their work,
+    but need to be called again after some time to continue the work.
+    """
+
+    def __init__(self, details: str) -> None:
+        """
+        Args:
+            details: what has been done and/or what remains to be done
+        """
+        return super().__init__(details)
+
+
 class ServerError(DstackError):
     pass
 

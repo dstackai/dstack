@@ -64,6 +64,15 @@ except ImportError:
     pass
 
 try:
+    from dstack._internal.core.backends.nebius.configurator import (
+        NebiusConfigurator,
+    )
+
+    _CONFIGURATOR_CLASSES.append(NebiusConfigurator)
+except ImportError:
+    pass
+
+try:
     from dstack._internal.core.backends.oci.configurator import OCIConfigurator
 
     _CONFIGURATOR_CLASSES.append(OCIConfigurator)
