@@ -2,7 +2,7 @@
 title: "Supporting MPI and NCCL/RCCL tests"
 date: 2025-04-02
 description: "TBA"
-slug: cursor
+slug: mpi
 image: https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-mpi-v2.png?raw=true
 categories:
   - SSH fleets
