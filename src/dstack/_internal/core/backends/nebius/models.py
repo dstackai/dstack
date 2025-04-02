@@ -16,7 +16,14 @@ class NebiusServiceAccountCreds(CoreModel):
         Optional[str], Field(description=("Path to the service account private key"))
     ] = None
     private_key_content: Annotated[
-        str, Field(description=("Content of the service account private key"))
+        str,
+        Field(
+            description=(
+                "Content of the service account private key. When configuring via"
+                " `server/config.yml`, it's automatically filled from `private_key_file`."
+                " When configuring via UI, it has to be specified explicitly."
+            )
+        ),
     ]
 
 
@@ -30,7 +37,14 @@ class NebiusServiceAccountFileCreds(CoreModel):
         Optional[str], Field(description=("Path to the service account private key"))
     ] = None
     private_key_content: Annotated[
-        Optional[str], Field(description=("Content of the service account private key"))
+        Optional[str],
+        Field(
+            description=(
+                "Content of the service account private key. When configuring via"
+                " `server/config.yml`, it's automatically filled from `private_key_file`."
+                " When configuring via UI, it has to be specified explicitly."
+            )
+        ),
     ] = None
 
     @root_validator

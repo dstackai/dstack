@@ -596,6 +596,56 @@ projects:
 
 </div>
 
+### Nebius
+
+Log into your [Nebius AI Cloud :material-arrow-top-right-thin:{ .external }](https://console.eu.nebius.com/) account, navigate to Access, and select Service Accounts. Create a service account, add it to the editors group, and upload its authorized key.
+
+Then configure the backend:
+
+<div editor-title="~/.dstack/server/config.yml">
+
+```yaml
+projects:
+- name: main
+  backends:
+  - type: nebius
+    creds:
+      type: service_account
+      service_account_id: serviceaccount-e00dhnv9ftgb3cqmej
+      public_key_id: publickey-e00ngaex668htswqy4
+      private_key_file: ~/path/to/key.pem
+```
+
+</div>
+
+??? info "Configuring in the UI"
+    If you are configuring the backend in the `dstack` UI, specify the contents of the private key file in `private_key_content`.
+
+    <div editor-title="~/.dstack/server/config.yml">
+
+    ```yaml
+    type: nebius
+    creds:
+      type: service_account
+      service_account_id: serviceaccount-e00dhnv9ftgb3cqmej
+      public_key_id: publickey-e00ngaex668htswqy4
+      private_key_content: |
+        -----BEGIN PRIVATE KEY-----
+        MIIJQQIBADANBgkqhkiG9w0BAQEFAASCCSswggknAgEAAoICAQChwQ5OOhy60N7m
+        cPx/9M0oRUyJdRRv2nCALbdU/wSDOo8o5N7sP63zCaxXPeKwLNEzneMd/U0gWSv2
+        [...]
+        8y1qYDPKQ8LR+DPCUmyhM2I8t6673Vz3GrtEjkLhgQo/KqOVb3yiBFVfkA5Jov5s
+        kO7y4T0ynsI8b6wlhCukQTLpIYJ5
+        -----END PRIVATE KEY-----
+    ```
+
+    </div>
+
+!!! info "Python version"
+    Nebius is only supported if `dstack server` is running on Python 3.10 or higher.
+
+
+
 ### RunPod
 
 Log into your [RunPod :material-arrow-top-right-thin:{ .external }](https://www.runpod.io/console/) console, click Settings in the sidebar, expand the `API Keys` section, and click
