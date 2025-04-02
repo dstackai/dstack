@@ -1,11 +1,11 @@
 ---
 title: NVIDIA NIM
-description: "This example shows how to deploy Llama 3.1 to any cloud or on-premises environment using NVIDIA NIM and dstack."
+description: "This example shows how to deploy DeepSeek-R1-Distill-Llama-8B to any cloud or on-premises environment using NVIDIA NIM and dstack."
 ---
 
 # NVIDIA NIM 
 
-This example shows how to deploy LLama 3.1 using [NVIDIA NIM :material-arrow-top-right-thin:{ .external }](https://docs.nvidia.com/nim/large-language-models/latest/getting-started.html){:target="_blank"} and `dstack`.
+This example shows how to deploy DeepSeek-R1-Distill-Llama-8B using [NVIDIA NIM :material-arrow-top-right-thin:{ .external }](https://docs.nvidia.com/nim/large-language-models/latest/getting-started.html){:target="_blank"} and `dstack`.
 
 ??? info "Prerequisites"
     Once `dstack` is [installed](https://dstack.ai/docs/installation), go ahead clone the repo, and run `dstack init`.
@@ -22,15 +22,15 @@ This example shows how to deploy LLama 3.1 using [NVIDIA NIM :material-arrow-top
 
 ## Deployment
 
-Here's an example of a service that deploys Llama 3.1 8B using vLLM.
+Here's an example of a service that deploys DeepSeek-R1-Distill-Llama-8B using NIM.
 
 <div editor-title="examples/deployment/nim/.dstack.yml">
 
 ```yaml
 type: service
-name: llama31
+name: serve-distill-deepseek
 
-image: nvcr.io/nim/meta/llama-3.1-8b-instruct:latest
+image: nvcr.io/nim/deepseek-ai/deepseek-r1-distill-llama-8b
 env:
   - NGC_API_KEY
   - NIM_MAX_MODEL_LEN=4096
@@ -39,19 +39,21 @@ registry_auth:
   password: ${{ env.NGC_API_KEY }}
 port: 8000
 # Register the model
-model: meta/llama-3.1-8b-instruct
+model: deepseek-ai/deepseek-r1-distill-llama-8b
 
 # Uncomment to leverage spot instances
 #spot_policy: auto
 
 # Cache downloaded models
 volumes:
-  - /root/.cache/nim:/opt/nim/.cache
+  - instance_path: /root/.cache/nim
+    path: /opt/nim/.cache
+    optional: true
 
 resources:
-  gpu: 24GB
+  gpu: A100:40GB
   # Uncomment if using multiple GPUs
-  #shm_size: 24GB
+  #shm_size: 16GB
 ```
 </div>
 
@@ -65,12 +67,12 @@ To run a configuration, use the [`dstack apply`](https://dstack.ai/docs/referenc
 $ NGC_API_KEY=...
 $ dstack apply -f examples/deployment/nim/.dstack.yml
 
- #  BACKEND  REGION             RESOURCES                 SPOT  PRICE       
- 1  gcp      asia-northeast3    4xCPU, 16GB, 1xL4 (24GB)  yes   $0.17   
- 2  gcp      asia-east1         4xCPU, 16GB, 1xL4 (24GB)  yes   $0.21   
- 3  gcp      asia-northeast3    8xCPU, 32GB, 1xL4 (24GB)  yes   $0.21 
+ #  BACKEND  REGION    RESOURCES                  SPOT  PRICE       
+ 1  vultr    ewr       6xCPU, 60GB, 1xA100 (40GB) no    $1.199   
+ 2  vultr    ewr       6xCPU, 60GB, 1xA100 (40GB) no    $1.199  
+ 3  vultr    nrt       6xCPU, 60GB, 1xA100 (40GB) no    $1.199 
 
-Submit the run llama3-nim-task? [y/n]: y
+Submit the run serve-distill-deepseek? [y/n]: y
 
 Provisioning...
 ---> 100%
@@ -116,7 +118,4 @@ The source-code of this example can be found in
 ## What's next?
 
 1. Check [services](https://dstack.ai/docs/services)
-2. Browse the [Llama 3.1](https://dstack.ai/examples/llms/llama31/), [TGI](https://dstack.ai/examples/deployment/tgi/), 
-   and [vLLM](https://dstack.ai/examples/deployment/vllm/) examples
-3. See also [AMD](https://dstack.ai/examples/accelerators/amd/) and
-   [TPU](https://dstack.ai/examples/accelerators/tpu/)
+2. Browse the [DeepSeek AI NIM](https://build.nvidia.com/deepseek-ai)

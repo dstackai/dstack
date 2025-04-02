@@ -1,7 +1,7 @@
 type: service
-name: qwen-nim
+name: serve-distill-deepseek
 
-image: nvcr.io/nim/qwen/qwen-2.5-7b-instruct:latest
+image: nvcr.io/nim/deepseek-ai/deepseek-r1-distill-llama-8b
 env:
   - NGC_API_KEY
   - NIM_MAX_MODEL_LEN=4096
@@ -10,7 +10,7 @@ registry_auth:
   password: ${{ env.NGC_API_KEY }}
 port: 8000
 # Register the model
-model: qwen/qwen-2.5-7b-instruct
+model: deepseek-ai/deepseek-r1-distill-llama-8b
 
 # Uncomment to leverage spot instances
 #spot_policy: auto
@@ -22,6 +22,6 @@ volumes:
     optional: true
 
 resources:
-  gpu: 24GB
+  gpu: A100:40GB
   # Uncomment if using multiple GPUs
-  shm_size: 16GB
+  #shm_size: 16GB

@@ -38,7 +38,7 @@ hide:
            NIM
        </h3>
        <p>
-            Deploy Llama 3.1 with NIM
+            Deploy DeepSeek R1 Distill Llama 8B with NIM
         </p>
     </a>
     <a href="/examples/deployment/sglang" 
