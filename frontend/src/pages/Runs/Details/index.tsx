@@ -40,7 +40,7 @@ export const RunDetails: React.FC = () => {
     const { t } = useTranslation();
     const navigate = useNavigate();
     const params = useParams();
-    const [codeTab, setCodeTab] = useState<CodeTab>(CodeTab.Metrics);
+    const [codeTab, setCodeTab] = useState<CodeTab>(CodeTab.Details);
     const paramProjectName = params.projectName ?? '';
     const paramRunId = params.runId ?? '';
     const [pushNotification] = useNotifications();
