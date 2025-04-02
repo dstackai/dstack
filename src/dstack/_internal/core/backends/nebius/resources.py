@@ -1,4 +1,5 @@
 import logging
+import time
 from collections.abc import Container as ContainerT
 from collections.abc import Generator
 from contextlib import contextmanager
@@ -39,15 +40,25 @@ from nebius.sdk import SDK
 
 from dstack._internal.core.backends.nebius.models import NebiusServiceAccountCreds
 from dstack._internal.core.errors import BackendError, NoCapacityError
+from dstack._internal.utils.event_loop import DaemonEventLoop
 
+#
+# Guidelines on using the Nebius SDK:
+#
+# Do not use Request.wait() or other sync SDK methods, they suffer from deadlocks.
+# Instead, use async methods and await them with LOOP.await_()
+LOOP = DaemonEventLoop()
+# Pass a timeout to all methods to avoid infinite waiting
 REQUEST_TIMEOUT = 10
+# Pass REQUEST_MD to all methods to avoid infinite retries in case of invalid credentials
 REQUEST_MD = options_to_metadata(
     {
-        OPTION_RENEW_SYNCHRONOUS: "true",  # disable infinite retries in case of invalid creds
+        OPTION_RENEW_SYNCHRONOUS: "true",
         OPTION_RENEW_REQUEST_TIMEOUT: "5",
     }
 )
-# disable log messages about errors such as invalid creds or expired timeouts
+
+# disables log messages about errors such as invalid creds or expired timeouts
 logging.getLogger("nebius").setLevel(logging.CRITICAL)
 
 
@@ -81,22 +92,34 @@ def make_sdk(creds: NebiusServiceAccountCreds) -> SDK:
         )
 
 
+def wait_for_operation(
+    op: SDKOperation[Operation],
+    timeout: float,
+    interval: float = 1,
+) -> None:
+    # Re-implementation of SDKOperation.wait() to avoid https://github.com/nebius/pysdk/issues/74
+    deadline = time.monotonic() + timeout
+    while not op.done():
+        if time.monotonic() + interval > deadline:
+            raise TimeoutError(f"Operation {op.id} wait timeout")
+        time.sleep(interval)
+        LOOP.await_(op.update(timeout=REQUEST_TIMEOUT, metadata=REQUEST_MD))
+
+
 def get_region_to_project_id_map(sdk: SDK) -> dict[str, str]:
-    tenants = (
-        TenantServiceClient(sdk)
-        .list(ListTenantsRequest(), timeout=REQUEST_TIMEOUT, metadata=REQUEST_MD)
-        .wait()
+    tenants = LOOP.await_(
+        TenantServiceClient(sdk).list(
+            ListTenantsRequest(), timeout=REQUEST_TIMEOUT, metadata=REQUEST_MD
+        )
     )
     if len(tenants.items) != 1:
         raise ValueError(f"Expected to find 1 tenant, found {(len(tenants.items))}")
-    projects = (
-        ProjectServiceClient(sdk)
-        .list(
+    projects = LOOP.await_(
+        ProjectServiceClient(sdk).list(
             ListProjectsRequest(parent_id=tenants.items[0].metadata.id, page_size=999),
             timeout=REQUEST_TIMEOUT,
             metadata=REQUEST_MD,
         )
-        .wait()
     )
     result = {}
     for project in projects.items:
@@ -106,14 +129,12 @@ def get_region_to_project_id_map(sdk: SDK) -> dict[str, str]:
 
 
 def get_default_subnet(sdk: SDK, project_id: str) -> Subnet:
-    subnets = (
-        SubnetServiceClient(sdk)
-        .list(
+    subnets = LOOP.await_(
+        SubnetServiceClient(sdk).list(
             ListSubnetsRequest(parent_id=project_id, page_size=999),
             timeout=REQUEST_TIMEOUT,
             metadata=REQUEST_MD,
         )
-        .wait()
     )
     for subnet in subnets.items:
         if subnet.metadata.name.startswith("default-subnet"):
@@ -137,13 +158,15 @@ def create_disk(
         ),
     )
     with wrap_capacity_errors():
-        return client.create(request, timeout=REQUEST_TIMEOUT, metadata=REQUEST_MD).wait()
+        return LOOP.await_(client.create(request, timeout=REQUEST_TIMEOUT, metadata=REQUEST_MD))
 
 
 def delete_disk(sdk: SDK, disk_id: str) -> None:
-    DiskServiceClient(sdk).delete(
-        DeleteDiskRequest(id=disk_id), timeout=REQUEST_TIMEOUT, metadata=REQUEST_MD
-    ).wait()
+    LOOP.await_(
+        DiskServiceClient(sdk).delete(
+            DeleteDiskRequest(id=disk_id), timeout=REQUEST_TIMEOUT, metadata=REQUEST_MD
+        )
+    )
 
 
 def create_instance(
@@ -180,22 +203,20 @@ def create_instance(
         ),
     )
     with wrap_capacity_errors():
-        return client.create(request, timeout=REQUEST_TIMEOUT, metadata=REQUEST_MD).wait()
+        return LOOP.await_(client.create(request, timeout=REQUEST_TIMEOUT, metadata=REQUEST_MD))
 
 
 def get_instance(sdk: SDK, instance_id: str) -> Instance:
-    return (
-        InstanceServiceClient(sdk)
-        .get(GetInstanceRequest(id=instance_id), timeout=REQUEST_TIMEOUT, metadata=REQUEST_MD)
-        .wait()
+    return LOOP.await_(
+        InstanceServiceClient(sdk).get(
+            GetInstanceRequest(id=instance_id), timeout=REQUEST_TIMEOUT, metadata=REQUEST_MD
+        )
     )
 
 
 def delete_instance(sdk: SDK, instance_id: str) -> SDKOperation[Operation]:
-    return (
-        InstanceServiceClient(sdk)
-        .delete(
+    return LOOP.await_(
+        InstanceServiceClient(sdk).delete(
             DeleteInstanceRequest(id=instance_id), timeout=REQUEST_TIMEOUT, metadata=REQUEST_MD
         )
-        .wait()
     )

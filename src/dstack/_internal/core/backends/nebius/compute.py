@@ -40,7 +40,7 @@ CONFIGURABLE_DISK_SIZE = Range[Memory](
 WAIT_FOR_DISK_TIMEOUT = 20
 WAIT_FOR_INSTANCE_TIMEOUT = 30
 WAIT_FOR_INSTANCE_UPDATE_INTERVAL = 2.5
-DELETE_INSTANCE_TIMEOUT = 20
+DELETE_INSTANCE_TIMEOUT = 25
 DOCKER_DAEMON_CONFIG = {
     "runtimes": {"nvidia": {"args": [], "path": "nvidia-container-runtime"}},
     # Workaround for https://github.com/NVIDIA/nvidia-container-toolkit/issues/48
@@ -132,7 +132,7 @@ class NebiusCompute(
         create_instance_op = None
         try:
             logger.debug("Blocking until disk %s is created", create_disk_op.resource_id)
-            create_disk_op.sync_wait(timeout=WAIT_FOR_DISK_TIMEOUT)
+            resources.wait_for_operation(create_disk_op, timeout=WAIT_FOR_DISK_TIMEOUT)
             if not create_disk_op.successful():
                 raw_op = create_disk_op.raw()
                 raise ProvisioningError(
@@ -160,7 +160,9 @@ class NebiusCompute(
                         delete_instance_op = resources.delete_instance(
                             self._sdk, create_instance_op.resource_id
                         )
-                    delete_instance_op.sync_wait(timeout=DELETE_INSTANCE_TIMEOUT)
+                    resources.wait_for_operation(
+                        delete_instance_op, timeout=DELETE_INSTANCE_TIMEOUT
+                    )
                 except Exception as e:
                     logger.exception(
                         "Could not delete instance %s: %s", create_instance_op.resource_id, e
@@ -258,7 +260,9 @@ def _wait_for_instance(sdk: SDK, op: SDKOperation[Operation]) -> None:
             op.status(),
         )
         time.sleep(WAIT_FOR_INSTANCE_UPDATE_INTERVAL)
-        op.sync_update(timeout=resources.REQUEST_TIMEOUT)
+        resources.LOOP.await_(
+            op.update(timeout=resources.REQUEST_TIMEOUT, metadata=resources.REQUEST_MD)
+        )
 
 
 def _supported_instances(offer: InstanceOffer) -> bool:
