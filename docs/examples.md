@@ -167,11 +167,11 @@ hide:
     <a href="/examples/misc/nccl-tests"
        class="feature-cell sky">
         <h3>
-            NCCL Tests
+            NCCL tests
         </h3>
 
         <p>
-            Run multi-node NCCL Tests with MPI
+            Run multi-node NCCL tests with MPI
         </p>
     </a>
 </div>
