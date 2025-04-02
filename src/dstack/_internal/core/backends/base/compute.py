@@ -39,11 +39,11 @@ from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
-DSTACK_WORKING_DIR = "/etc/.dstack"
+DSTACK_WORKING_DIR = "/root/.dstack"
 DSTACK_SHIM_BINARY_NAME = "dstack-shim"
-DSTACK_SHIM_BINARY_PATH = f"/etc/{DSTACK_SHIM_BINARY_NAME}"
+DSTACK_SHIM_BINARY_PATH = f"/usr/local/bin/{DSTACK_SHIM_BINARY_NAME}"
 DSTACK_RUNNER_BINARY_NAME = "dstack-runner"
-DSTACK_RUNNER_BINARY_PATH = f"/etc/{DSTACK_RUNNER_BINARY_NAME}"
+DSTACK_RUNNER_BINARY_PATH = f"/usr/local/bin/{DSTACK_RUNNER_BINARY_NAME}"
 
 
 class Compute(ABC):
