@@ -477,6 +477,8 @@ gcloud projects list --format="json(projectId)"
     compute.networks.updatePolicy
     compute.regions.get
     compute.regions.list
+    compute.resourcePolicies.create
+    compute.resourcePolicies.delete
     compute.routers.list
     compute.subnetworks.list
     compute.subnetworks.use
