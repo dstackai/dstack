@@ -23,7 +23,7 @@ system environment variables—such as `DSTACK_NODE_RANK`, `DSTACK_MASTER_NODE_I
 
 <img src="https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-mpi-v2.png?raw=true" width="630"/>
 
-One use case `dstack` hasn’t supported until now is Open MPI, as it requires a scheduled environment or
+One use case `dstack` hasn’t supported until now is MPI, as it requires a scheduled environment or
 direct SSH connections between containers. Since `mpirun` is essential for running NCCL/RCCL tests—crucial for large-scale
 cluster usage—we’ve added support for it.
 
