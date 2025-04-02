@@ -1,7 +1,7 @@
 import concurrent.futures
 import json
 from collections import defaultdict
-from typing import Callable, Dict, List, Literal, Optional
+from typing import Callable, Dict, List, Literal, Optional, Tuple
 
 import google.api_core.exceptions
 import google.cloud.compute_v1 as compute_v1
@@ -192,6 +192,12 @@ class GCPCompute(
             config=self.config,
             region=instance_offer.region,
         )
+        extra_subnets = _get_extra_subnets(
+            subnetworks_client=self.subnetworks_client,
+            config=self.config,
+            region=instance_offer.region,
+            instance_type_name=instance_offer.instance.name,
+        )
         placement_policy = None
         if instance_config.placement_group_name is not None:
             placement_policy = gcp_resources.get_placement_policy_resource_name(
@@ -300,6 +306,7 @@ class GCPCompute(
                 service_account=self.config.vm_service_account,
                 network=self.config.vpc_resource_name,
                 subnetwork=subnetwork,
+                extra_subnetworks=extra_subnets,
                 allocate_public_ip=allocate_public_ip,
                 placement_policy=placement_policy,
             )
@@ -741,21 +748,6 @@ class GCPCompute(
         )
 
 
-def _get_vpc_subnet(
-    subnetworks_client: compute_v1.SubnetworksClient,
-    config: GCPConfig,
-    region: str,
-) -> Optional[str]:
-    if config.vpc_name is None:
-        return None
-    return gcp_resources.get_vpc_subnet_or_error(
-        subnetworks_client=subnetworks_client,
-        vpc_project_id=config.vpc_project_id or config.project_id,
-        vpc_name=config.vpc_name,
-        region=region,
-    )
-
-
 def _supported_instances_and_zones(
     regions: List[str],
 ) -> Optional[Callable[[InstanceOffer], bool]]:
@@ -812,6 +804,47 @@ def _unique_instance_name(instance: InstanceType) -> str:
         return name
     gpu = instance.resources.gpus[0]
     return f"{name}-{gpu.name}-{gpu.memory_mib}"
+
+
+def _get_vpc_subnet(
+    subnetworks_client: compute_v1.SubnetworksClient,
+    config: GCPConfig,
+    region: str,
+) -> Optional[str]:
+    if config.vpc_name is None:
+        return None
+    return gcp_resources.get_vpc_subnet_or_error(
+        subnetworks_client=subnetworks_client,
+        vpc_project_id=config.vpc_project_id or config.project_id,
+        vpc_name=config.vpc_name,
+        region=region,
+    )
+
+
+def _get_extra_subnets(
+    subnetworks_client: compute_v1.SubnetworksClient,
+    config: GCPConfig,
+    region: str,
+    instance_type_name: str,
+) -> List[Tuple[str, str]]:
+    if config.extra_vpcs is None:
+        return []
+    if instance_type_name != "a3-megagpu-8g":
+        return []
+    extra_subnets = []
+    for vpc_name in config.extra_vpcs:
+        subnet = gcp_resources.get_vpc_subnet_or_error(
+            subnetworks_client=subnetworks_client,
+            vpc_project_id=config.vpc_project_id or config.project_id,
+            vpc_name=vpc_name,
+            region=region,
+        )
+        vpc_resource_name = gcp_resources.vpc_name_to_vpc_resource_name(
+            project_id=config.vpc_project_id or config.project_id,
+            vpc_name=vpc_name,
+        )
+        extra_subnets.append((vpc_resource_name, subnet))
+    return extra_subnets[:8]
 
 
 def _get_image_id(instance_type_name: str, cuda: bool) -> str:

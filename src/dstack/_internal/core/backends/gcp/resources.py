@@ -1,6 +1,6 @@
 import concurrent.futures
 import re
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import google.api_core.exceptions
 import google.cloud.compute_v1 as compute_v1
@@ -116,6 +116,7 @@ def create_instance_struct(
     service_account: Optional[str] = None,
     network: str = "global/networks/default",
     subnetwork: Optional[str] = None,
+    extra_subnetworks: Optional[List[Tuple[str, str]]] = None,
     allocate_public_ip: bool = True,
     placement_policy: Optional[str] = None,
 ) -> compute_v1.Instance:
@@ -126,6 +127,7 @@ def create_instance_struct(
         network=network,
         subnetwork=subnetwork,
         allocate_public_ip=allocate_public_ip,
+        extra_subnetworks=extra_subnetworks,
     )
 
     disk = compute_v1.AttachedDisk()
@@ -184,6 +186,7 @@ def _get_network_interfaces(
     network: str,
     subnetwork: Optional[str],
     allocate_public_ip: bool,
+    extra_subnetworks: Optional[List[Tuple[str, str]]],
 ) -> List[compute_v1.NetworkInterface]:
     network_interface = compute_v1.NetworkInterface()
     network_interface.network = network
@@ -199,11 +202,11 @@ def _get_network_interfaces(
         network_interface.access_configs = []
 
     network_interfaces = [network_interface]
-    for i in range(1, 9):
+    for network, subnetwork in extra_subnetworks or []:
         network_interfaces.append(
             compute_v1.NetworkInterface(
-                network=f"projects/dstack/global/networks/dstack-test-data-net-{i}",
-                subnetwork=f"projects/dstack/regions/europe-west4/subnetworks/dstack-test-data-sub-{i}",
+                network=network,
+                subnetwork=subnetwork,
             )
         )
     return network_interfaces
@@ -418,6 +421,10 @@ def wait_for_operation(operation: Operation, verbose_name: str = "operation", ti
 
 def full_resource_name_to_name(full_resource_name: str) -> str:
     return full_resource_name.split("/")[-1]
+
+
+def vpc_name_to_vpc_resource_name(project_id: str, vpc_name: str) -> str:
+    return f"projects/{project_id}/global/networks/{vpc_name}"
 
 
 def get_placement_policy_resource_name(
