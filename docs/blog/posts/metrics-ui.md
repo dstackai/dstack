@@ -1,24 +1,24 @@
 ---
-title: "Built-in UI for monitoring basic GPU metrics"
+title: "Built-in UI for monitoring essential GPU metrics"
 date: 2025-04-03
 description: "TBA"
 slug: metrics-ui
-image: https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-metrics-ui-v2-min.png?raw=true
+image: https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-metrics-ui-v3-min.png?raw=true
 categories:
   - Monitoring
   - AMD
   - NVIDIA
 ---
 
-# Built-in UI for monitoring basic GPU metrics
+# Built-in UI for monitoring essential GPU metrics
 
 AI workloads generate vast amounts of metrics, making it essential to have efficient monitoring tools. While our recent
 update introduced the ability to export available metrics to Prometheus for maximum flexibility, there are times when
 users need to quickly access essential metrics without the need to switch to an external tool.
 
-<img src="https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-metrics-ui-v2-min.png?raw=true" width="630"/>
+<img src="https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-metrics-ui-v3-min.png?raw=true" width="630"/>
 
-Previously, we introduced a [CLI command](dstack-metrics.md) that allows users to view basic GPU metrics for both NVIDIA
+Previously, we introduced a [CLI command](dstack-metrics.md) that allows users to view essential GPU metrics for both NVIDIA
 and AMD hardware. Now, with this latest update, we’re excited to announce the addition of a built-in dashboard within
 the `dstack` control plane.
 
