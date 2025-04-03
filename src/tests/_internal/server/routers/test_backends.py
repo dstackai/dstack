@@ -1,4 +1,5 @@
 import json
+import sys
 from datetime import datetime, timezone
 from unittest.mock import Mock, patch
 
@@ -25,7 +26,14 @@ from dstack._internal.server.testing.common import (
     get_auth_headers,
     get_volume_provisioning_data,
 )
+from dstack._internal.utils.crypto import generate_rsa_key_pair_bytes
 
+FAKE_NEBIUS_SERVICE_ACCOUNT_CREDS = {
+    "type": "service_account",
+    "service_account_id": "serviceaccount-e00test",
+    "public_key_id": "publickey-e00test",
+    "private_key_content": generate_rsa_key_pair_bytes()[0].decode(),
+}
 FAKE_OCI_CLIENT_CREDS = {
     "type": "client",
     "user": "ocid1.user.oc1..aaaaaaaa",
@@ -62,6 +70,7 @@ class TestListBackendTypes:
             "gcp",
             "kubernetes",
             "lambda",
+            *(["nebius"] if sys.version_info >= (3, 10) else []),
             "oci",
             "runpod",
             "tensordock",
@@ -181,6 +190,113 @@ class TestCreateBackend:
         assert response.status_code == 200, response.json()
         res = await session.execute(select(BackendModel))
         assert len(res.scalars().all()) == 1
+
+    @pytest.mark.asyncio
+    @pytest.mark.skipif(sys.version_info < (3, 10), reason="Nebius requires Python 3.10")
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    class TestNebius:
+        async def test_creates(self, test_db, session: AsyncSession, client: AsyncClient):
+            user = await create_user(session=session, global_role=GlobalRole.USER)
+            project = await create_project(session=session, owner=user)
+            await add_project_member(
+                session=session, project=project, user=user, project_role=ProjectRole.ADMIN
+            )
+            body = {
+                "type": "nebius",
+                "creds": FAKE_NEBIUS_SERVICE_ACCOUNT_CREDS,
+            }
+            with patch(
+                "dstack._internal.core.backends.nebius.resources.get_region_to_project_id_map"
+            ) as get_region_to_project_id_map:
+                get_region_to_project_id_map.return_value = {"eu-north1": "project-e00test"}
+                response = await client.post(
+                    f"/api/project/{project.name}/backends/create",
+                    headers=get_auth_headers(user.token),
+                    json=body,
+                )
+            assert response.status_code == 200, response.json()
+            res = await session.execute(select(BackendModel))
+            assert len(res.scalars().all()) == 1
+
+        async def test_not_creates_with_invalid_creds(
+            self, test_db, session: AsyncSession, client: AsyncClient
+        ):
+            user = await create_user(session=session, global_role=GlobalRole.USER)
+            project = await create_project(session=session, owner=user)
+            await add_project_member(
+                session=session, project=project, user=user, project_role=ProjectRole.ADMIN
+            )
+            body = {
+                "type": "nebius",
+                "creds": FAKE_NEBIUS_SERVICE_ACCOUNT_CREDS,
+            }
+            with patch(
+                "dstack._internal.core.backends.nebius.resources.get_region_to_project_id_map"
+            ) as get_region_to_project_id_map:
+                get_region_to_project_id_map.side_effect = ValueError()
+                response = await client.post(
+                    f"/api/project/{project.name}/backends/create",
+                    headers=get_auth_headers(user.token),
+                    json=body,
+                )
+            assert response.status_code == 400, response.json()
+            res = await session.execute(select(BackendModel))
+            assert len(res.scalars().all()) == 0
+
+        async def test_creates_with_regions(
+            self, test_db, session: AsyncSession, client: AsyncClient
+        ):
+            user = await create_user(session=session, global_role=GlobalRole.USER)
+            project = await create_project(session=session, owner=user)
+            await add_project_member(
+                session=session, project=project, user=user, project_role=ProjectRole.ADMIN
+            )
+            body = {
+                "type": "nebius",
+                "creds": FAKE_NEBIUS_SERVICE_ACCOUNT_CREDS,
+                "regions": ["eu-north1"],
+            }
+            with patch(
+                "dstack._internal.core.backends.nebius.resources.get_region_to_project_id_map"
+            ) as get_region_to_project_id_map:
+                get_region_to_project_id_map.return_value = {
+                    "eu-north1": "project-e00test",
+                    "eu-west1": "project-e01test",
+                }
+                response = await client.post(
+                    f"/api/project/{project.name}/backends/create",
+                    headers=get_auth_headers(user.token),
+                    json=body,
+                )
+            assert response.status_code == 200, response.json()
+            res = await session.execute(select(BackendModel))
+            assert len(res.scalars().all()) == 1
+
+        async def test_not_creates_with_invalid_regions(
+            self, test_db, session: AsyncSession, client: AsyncClient
+        ):
+            user = await create_user(session=session, global_role=GlobalRole.USER)
+            project = await create_project(session=session, owner=user)
+            await add_project_member(
+                session=session, project=project, user=user, project_role=ProjectRole.ADMIN
+            )
+            body = {
+                "type": "nebius",
+                "creds": FAKE_NEBIUS_SERVICE_ACCOUNT_CREDS,
+                "regions": ["xx-xxxx1"],
+            }
+            with patch(
+                "dstack._internal.core.backends.nebius.resources.get_region_to_project_id_map"
+            ) as get_region_to_project_id_map:
+                get_region_to_project_id_map.return_value = {"eu-north1": "project-e00test"}
+                response = await client.post(
+                    f"/api/project/{project.name}/backends/create",
+                    headers=get_auth_headers(user.token),
+                    json=body,
+                )
+            assert response.status_code == 400, response.json()
+            res = await session.execute(select(BackendModel))
+            assert len(res.scalars().all()) == 0
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)

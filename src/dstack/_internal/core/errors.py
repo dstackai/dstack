@@ -102,6 +102,20 @@ class PlacementGroupInUseError(ComputeError):
     pass
 
 
+class NotYetTerminated(ComputeError):
+    """
+    Used by Compute.terminate_instance to signal that instance termination is not complete
+    and the method should be called again after some time to continue termination.
+    """
+
+    def __init__(self, details: str) -> None:
+        """
+        Args:
+            details: some details about the termination status
+        """
+        return super().__init__(details)
+
+
 class CLIError(DstackError):
     pass
 

@@ -34,6 +34,11 @@ from dstack._internal.core.backends.lambdalabs.models import (
     LambdaBackendConfig,
     LambdaBackendConfigWithCreds,
 )
+from dstack._internal.core.backends.nebius.models import (
+    NebiusBackendConfig,
+    NebiusBackendConfigWithCreds,
+    NebiusBackendFileConfigWithCreds,
+)
 from dstack._internal.core.backends.oci.models import (
     OCIBackendConfig,
     OCIBackendConfigWithCreds,
@@ -65,6 +70,7 @@ AnyBackendConfigWithoutCreds = Union[
     GCPBackendConfig,
     KubernetesBackendConfig,
     LambdaBackendConfig,
+    NebiusBackendConfig,
     OCIBackendConfig,
     RunpodBackendConfig,
     TensorDockBackendConfig,
@@ -86,6 +92,7 @@ AnyBackendConfigWithCreds = Union[
     KubernetesBackendConfigWithCreds,
     LambdaBackendConfigWithCreds,
     OCIBackendConfigWithCreds,
+    NebiusBackendConfigWithCreds,
     RunpodBackendConfigWithCreds,
     TensorDockBackendConfigWithCreds,
     VastAIBackendConfigWithCreds,
@@ -105,6 +112,7 @@ AnyBackendFileConfigWithCreds = Union[
     KubernetesBackendFileConfigWithCreds,
     LambdaBackendConfigWithCreds,
     OCIBackendConfigWithCreds,
+    NebiusBackendFileConfigWithCreds,
     RunpodBackendConfigWithCreds,
     TensorDockBackendConfigWithCreds,
     VastAIBackendConfigWithCreds,
