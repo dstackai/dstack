@@ -175,7 +175,7 @@ The networking bandwidth should be close to the maximum bandwidth supported by G
 
 ## Run NCCL workloads with GPUDirect-TCPXO support
 
-To take full advantage of GPUDirect-TCPXO in your workloads, you need properly setup the [NCCL environment variables](https://cloud.google.com/kubernetes-engine/docs/how-to/gpu-bandwidth-gpudirect-tcpx-autopilot#environment-variables-nccl).
+To take full advantage of GPUDirect-TCPXO in your workloads, you need properly set up the [NCCL environment variables](https://cloud.google.com/kubernetes-engine/docs/how-to/gpu-bandwidth-gpudirect-tcpx-autopilot#environment-variables-nccl).
 This can be done with the following commands in your run configuration:
 
 <div editor-title="task.dstack.yml">
