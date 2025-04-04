@@ -136,19 +136,19 @@ nThread 1 nGpus 1 minBytes 8388608 maxBytes 8589934592 step: 2(factor) warmup it
                                                              out-of-place                       in-place          
       size         count      type   redop    root     time   algbw   busbw #wrong     time   algbw   busbw #wrong
        (B)    (elements)                               (us)  (GB/s)  (GB/s)            (us)  (GB/s)  (GB/s)       
-     8388608        131072     float    none      -1    394.2   21.28   19.95    N/A    392.7   21.36   20.03    N/A
-    16777216        262144     float    none      -1    437.8   38.32   35.92    N/A    434.1   38.65   36.24    N/A
-    33554432        524288     float    none      -1    479.5   69.98   65.61    N/A    479.9   69.92   65.55    N/A
-    67108864       1048576     float    none      -1    755.8   88.79   83.24    N/A    771.9   86.94   81.51    N/A
-   134217728       2097152     float    none      -1   1125.3  119.27  111.81    N/A   1121.8  119.64  112.16    N/A
-   268435456       4194304     float    none      -1   1741.3  154.16  144.53    N/A   1742.2  154.08  144.45    N/A
-   536870912       8388608     float    none      -1   2854.9  188.05  176.30    N/A   2869.8  187.08  175.38    N/A
-  1073741824      16777216     float    none      -1   5536.1  193.95  181.83    N/A   5528.8  194.21  182.07    N/A
-  2147483648      33554432     float    none      -1    10853  197.88  185.51    N/A    10830  198.29  185.90    N/A
-  4294967296      67108864     float    none      -1    21491  199.85  187.36    N/A    21466  200.09  187.58    N/A
-  8589934592     134217728     float    none      -1    42770  200.84  188.29    N/A    42752  200.93  188.37    N/A
+     8388608        131072     float    none      -1    166.6   50.34   47.19    N/A    164.1   51.11   47.92    N/A
+    16777216        262144     float    none      -1    204.6   82.01   76.89    N/A    203.8   82.30   77.16    N/A
+    33554432        524288     float    none      -1    284.0  118.17  110.78    N/A    281.7  119.12  111.67    N/A
+    67108864       1048576     float    none      -1    447.4  150.00  140.62    N/A    443.5  151.31  141.86    N/A
+   134217728       2097152     float    none      -1    808.3  166.05  155.67    N/A    801.9  167.38  156.92    N/A
+   268435456       4194304     float    none      -1   1522.1  176.36  165.34    N/A   1518.7  176.76  165.71    N/A
+   536870912       8388608     float    none      -1   2892.3  185.62  174.02    N/A   2894.4  185.49  173.89    N/A
+  1073741824      16777216     float    none      -1   5532.7  194.07  181.94    N/A   5530.7  194.14  182.01    N/A
+  2147483648      33554432     float    none      -1    10863  197.69  185.34    N/A    10837  198.17  185.78    N/A
+  4294967296      67108864     float    none      -1    21481  199.94  187.45    N/A    21466  200.08  187.58    N/A
+  8589934592     134217728     float    none      -1    42713  201.11  188.54    N/A    42701  201.16  188.59    N/A
 Out of bounds values : 0 OK
-Avg bus bandwidth    : 125.436 
+Avg bus bandwidth    : 146.948 
 
 Done
 ```
@@ -170,7 +170,7 @@ nodes: 2
 commands:
   - |
     NCCL_LIB_DIR="/var/lib/tcpxo/lib64"
-    source ${NCCL_LIB_DIR}/nccl-env-profile.sh
+    source ${NCCL_LIB_DIR}/nccl-env-profile-ll128.sh
     export NCCL_FASTRAK_CTRL_DEV=enp0s12
     export NCCL_FASTRAK_IFNAME=enp6s0,enp7s0,enp13s0,enp14s0,enp134s0,enp135s0,enp141s0,enp142s0
     export NCCL_SOCKET_IFNAME=enp0s12

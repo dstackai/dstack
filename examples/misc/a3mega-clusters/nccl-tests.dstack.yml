@@ -7,7 +7,7 @@ commands:
   - |
     # Setup TCPXO NCCL env variables
     NCCL_LIB_DIR="/var/lib/tcpxo/lib64"
-    source ${NCCL_LIB_DIR}/nccl-env-profile.sh
+    source ${NCCL_LIB_DIR}/nccl-env-profile-ll128.sh
     export NCCL_FASTRAK_CTRL_DEV=enp0s12
     export NCCL_FASTRAK_IFNAME=enp6s0,enp7s0,enp13s0,enp14s0,enp134s0,enp135s0,enp141s0,enp142s0
     export NCCL_SOCKET_IFNAME=enp0s12
