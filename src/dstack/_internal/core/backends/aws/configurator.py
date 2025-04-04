@@ -34,6 +34,7 @@ from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
+# where dstack OS images are published
 REGIONS = [
     ("US East, N. Virginia", "us-east-1"),
     ("US East, Ohio", "us-east-2"),
