@@ -849,7 +849,7 @@ def _get_extra_subnets(
 
 def _get_image_id(instance_type_name: str, cuda: bool) -> str:
     if instance_type_name == "a3-megagpu-8g":
-        image_name = "dstack-a3mega-2"
+        image_name = "dstack-a3mega-5"
     elif cuda:
         image_name = f"dstack-cuda-{version.base_image}"
     else:

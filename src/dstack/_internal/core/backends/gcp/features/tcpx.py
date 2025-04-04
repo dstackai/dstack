@@ -7,7 +7,9 @@ def get_backend_specific_commands_tcpxo() -> List[str]:
         "gcloud -q auth configure-docker us-docker.pkg.dev",
         # Install the nccl, nccl-net lib into /var/lib/tcpxo/lib64/.
         (
-            "docker run --rm --name nccl-installer "
+            "docker run --rm "
+            "--name nccl-installer "
+            "--pull=never "
             "--network=host "
             "--volume /var/lib:/var/lib "
             "us-docker.pkg.dev/gce-ai-infra/gpudirect-tcpxo/nccl-plugin-gpudirecttcpx-dev:v1.0.8-1 "
@@ -16,9 +18,9 @@ def get_backend_specific_commands_tcpxo() -> List[str]:
         # Start FasTrak receive-datapath-manager
         (
             "docker run "
-            "--detach "
-            "--pull=always "
             "--name receive-datapath-manager "
+            "--detach "
+            "--pull=never "
             "--cap-add=NET_ADMIN "
             "--network=host "
             "--privileged "

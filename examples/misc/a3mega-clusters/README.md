@@ -1,12 +1,12 @@
-# A3 Mega GCP clusters
+# GCP A3 Mega clusters
 
-This example shows how to set up an A3 Mega GCP cluster with [GPUDirect-TCPXO](https://cloud.google.com/kubernetes-engine/docs/how-to/gpu-bandwidth-gpudirect-tcpx-autopilot)
+This example shows how to set up a GCP A3 Mega cluster with [GPUDirect-TCPXO](https://cloud.google.com/kubernetes-engine/docs/how-to/gpu-bandwidth-gpudirect-tcpx-autopilot)
 optimized NCCL communication and run [NCCL Tests](https://github.com/NVIDIA/nccl-tests) on it using `dstack`.
 
 ## Overview
 
 GCP's A3 Mega instances are 8xH100 VMs that have 1800Gbps maximum network bandwidth,
-which is the best among H100 GCP instances. To get that network performance, you need
+which is the best among GCP H100 instances. To get that network performance, you need
 to set up GPUDirect-TCPXO – the GCP technology for GPU RDMA over TCP. This involves:
 
 * Setting up eight extra data NICs on every node, each NIC in a separate VPC.
@@ -14,13 +14,12 @@ to set up GPUDirect-TCPXO – the GCP technology for GPU RDMA over TCP. This inv
 * Launching an RXDM service container.
 * Installing the GPUDirect-TCPXO NCCL plugin.
 
-`dstack` hides most of the setup complexity and provides optimized A3 Mega GCP clusters out-of-the-box.
+`dstack` hides most of the setup complexity and provides optimized A3 Mega clusters out-of-the-box.
 
 ## Configure GCP backend
 
 First configure the `gcp` backend for the GPUDirect-TCPXO support.
-You need to specify eight `extra_vpcs` to use for data NICs.
-You also need to specify `vm_service_account` that's authorized to pull GPUDirect-related Docker images:
+You need to specify eight `extra_vpcs` to use for data NICs:
 
 <div editor-title="~/.dstack/server/config.yml">
 
@@ -40,7 +39,6 @@ projects:
         - dstack-gpu-data-net-7
         - dstack-gpu-data-net-8
       regions: [europe-west4]
-      vm_service_account: a3mega-sa@$MYPROJECT.iam.gserviceaccount.com # Replace $MYPROJECT
       creds:
         type: default
 ```
@@ -70,20 +68,6 @@ projects:
       --rules=tcp:0-65535,udp:0-65535,icmp \
       --source-ranges=192.168.0.0/16
     done
-    ```
-
-??? info "Create Service Account"
-    Create a VM service account that allows VMs to access the `pkg.dev` registry:
-    
-    ```shell
-    PROJECT_ID=$(gcloud config get-value project)
-
-    gcloud iam service-accounts create a3mega-sa \
-        --display-name "Service Account for pulling GCR images"
-
-    gcloud projects add-iam-policy-binding $PROJECT_ID \
-        --member="serviceAccount:a3mega-sa@${PROJECT_ID}.iam.gserviceaccount.com" \
-        --role="roles/artifactregistry.reader"
     ```
 
 ## Create A3 Mega fleet
