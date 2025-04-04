@@ -337,6 +337,14 @@
       "provider_name": "Provider",
       "status": "Status",
       "submitted_at": "Submitted",
+      "metrics": {
+        "title": "Metrics",
+        "show_metrics": "Show metrics",
+        "cpu_utilization": "CPU utilization %",
+        "memory_used": "System memory used",
+        "per_each_cpu_utilization": "GPU utilization %",
+        "per_each_memory_used": "GPU memory used"
+      },
       "jobs": "Jobs",
       "job_name": "Job Name",
       "cost": "Cost",

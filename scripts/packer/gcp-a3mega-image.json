@@ -1,0 +1,32 @@
+{
+  "variables": {
+    "image_version": ""
+  },
+  "builders": [
+    {
+      "type": "googlecompute",
+      "project_id": "dstack",
+      "source_image": "dstack-a3mega-20250401t065024z",
+      "image_name": "dstack-a3mega-{{user `image_version`}}",
+      "instance_name": "dstack-a3mega-{{user `image_version`}}",
+      "image_description": "dstack VM image for A3 Mega instances with pre-pulled Docker images. The source image is based on https://cloud.google.com/cluster-toolkit/docs/deploy/deploy-a3-mega-cluster.",
+      "ssh_username": "ubuntu",
+      "zone": "us-central1-a",
+      "disk_size": 100
+    }
+  ],
+  "provisioners": [
+    {
+      "type": "shell",
+      "inline": [
+        "sudo rm /etc/apt/sources.list.d/ar_us_apt_pkg_dev_projects_gce_ai_infra.list",
+        "sudo apt-get update",
+        "sudo apt-get install -y --no-install-recommends datacenter-gpu-manager-4-proprietary datacenter-gpu-manager-exporter",
+        "sudo systemctl disable google-cloud-ops-agent.service",
+        "gcloud -q auth configure-docker us-docker.pkg.dev",
+        "docker pull us-docker.pkg.dev/gce-ai-infra/gpudirect-tcpxo/tcpgpudmarxd-dev:v1.0.14",
+        "docker pull us-docker.pkg.dev/gce-ai-infra/gpudirect-tcpxo/nccl-plugin-gpudirecttcpx-dev:v1.0.8-1"
+      ]
+    }
+  ]
+}

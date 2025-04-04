@@ -1,0 +1,7 @@
+type: fleet
+name: a3mega-cluster
+nodes: 2
+placement: cluster
+instance_types:
+  - a3-megagpu-8g
+spot_policy: auto

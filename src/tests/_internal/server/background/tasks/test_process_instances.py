@@ -8,7 +8,7 @@ import pytest
 from freezegun import freeze_time
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dstack._internal.core.errors import BackendError, ProvisioningError
+from dstack._internal.core.errors import BackendError, NotYetTerminated, ProvisioningError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     Gpu,
@@ -384,7 +384,9 @@ class TestTerminate:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    @pytest.mark.parametrize("error", [BackendError("err"), RuntimeError("err")])
+    @pytest.mark.parametrize(
+        "error", [BackendError("err"), RuntimeError("err"), NotYetTerminated("")]
+    )
     async def test_terminate_retry(self, test_db, session: AsyncSession, error: Exception):
         project = await create_project(session=session)
         instance = await create_instance(

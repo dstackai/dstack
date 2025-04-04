@@ -39,7 +39,7 @@ from dstack._internal.core.backends.remote.provisioning import (
 from dstack._internal.core.consts import DSTACK_SHIM_HTTP_PORT
 
 # FIXME: ProvisioningError is a subclass of ComputeError and should not be used outside of Compute
-from dstack._internal.core.errors import BackendError, ProvisioningError
+from dstack._internal.core.errors import BackendError, NotYetTerminated, ProvisioningError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.fleets import InstanceGroupPlacement
 from dstack._internal.core.models.instances import (
@@ -846,12 +846,17 @@ async def _terminate(instance: InstanceModel) -> None:
                         instance.first_termination_retry_at = get_current_datetime()
                     instance.last_termination_retry_at = get_current_datetime()
                     if _next_termination_retry_at(instance) < _get_termination_deadline(instance):
-                        logger.warning(
-                            "Failed to terminate instance %s. Will retry. Error: %r",
-                            instance.name,
-                            e,
-                            exc_info=not isinstance(e, BackendError),
-                        )
+                        if isinstance(e, NotYetTerminated):
+                            logger.debug(
+                                "Instance %s termination in progress: %s", instance.name, e
+                            )
+                        else:
+                            logger.warning(
+                                "Failed to terminate instance %s. Will retry. Error: %r",
+                                instance.name,
+                                e,
+                                exc_info=not isinstance(e, BackendError),
+                            )
                         return
                     logger.error(
                         "Failed all attempts to terminate instance %s."

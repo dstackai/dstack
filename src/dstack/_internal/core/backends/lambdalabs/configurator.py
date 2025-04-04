@@ -29,6 +29,7 @@ REGIONS = [
     "us-west-3",
     "us-east-1",
     "us-east-2",
+    "us-east-3",
     "europe-central-1",
     "asia-south-1",
     "me-west-1",

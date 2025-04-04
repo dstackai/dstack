@@ -199,3 +199,5 @@ class GCPConfigurator(Configurator):
             )
         except BackendError as e:
             raise ServerClientError(e.args[0])
+        # Not checking config.extra_vpc so that users are not required to configure subnets for all regions
+        # but only for regions they intend to use. Validation will be done on provisioning.

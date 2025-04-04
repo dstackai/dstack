@@ -20,6 +20,16 @@ declare type TStopRunsRequestParams = {
     abort: boolean;
 };
 
+declare type TJobMetricsRequestParams = {
+    project_name: IProject['project_name'];
+    run_name: string;
+    replica_num?: number;
+    job_num: number;
+    limit?: number;
+    after?: string;
+    before?: string;
+};
+
 declare type TJobStatus =
     | 'pending'
     | 'submitted'
@@ -159,4 +169,10 @@ declare interface IRun {
     latest_job_submission?: IJobSubmission;
     cost: number;
     service: IRunService | null;
+}
+
+declare interface IMetricsItem {
+    name: string;
+    timestamps: string[];
+    values: number[];
 }

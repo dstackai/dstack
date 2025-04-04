@@ -38,8 +38,17 @@ hide:
            NIM
        </h3>
        <p>
-            Deploy Llama 3.1 with NIM
+            Deploy DeepSeek R1 Distill Llama 8B with NIM
         </p>
+    </a>
+    <a href="/examples/deployment/sglang" 
+       class="feature-cell">
+       <h3>
+           SGLang
+       </h3>
+       <p>
+           Deploy DeepSeek-R1-Distill-Llama 8B & 70B with SGLang
+      </p>
     </a>
 </div>
 
@@ -158,11 +167,11 @@ hide:
     <a href="/examples/misc/nccl-tests"
        class="feature-cell sky">
         <h3>
-            NCCL Tests
+            NCCL tests
         </h3>
 
         <p>
-            Run multi-node NCCL Tests with MPI
+            Run multi-node NCCL tests with MPI
         </p>
     </a>
 </div>
