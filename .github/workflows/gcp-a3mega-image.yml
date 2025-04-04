@@ -1,0 +1,38 @@
+name: Build GCP A3 Mega VM image
+
+on:
+  - workflow_dispatch
+
+env:
+  PACKER_VERSION: "1.9.2"
+  IMAGE_VERSION: ${{ github.run_number }}
+jobs:
+  build-gcp-images:
+    defaults:
+      run:
+        working-directory: scripts/packer
+    runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: 'projects/531508670106/locations/global/workloadIdentityPools/github-identity-pool/providers/github-id-provider'
+          service_account: 'github-actions@dstack.iam.gserviceaccount.com'
+          create_credentials_file: true
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+      - name: Download packer
+        run: |
+          wget https://releases.hashicorp.com/packer/${{ env.PACKER_VERSION }}/packer_${{ env.PACKER_VERSION }}_linux_amd64.zip
+          unzip packer_${{ env.PACKER_VERSION }}_linux_amd64.zip
+          chmod +x packer
+      - name: Run packer
+        run: |
+          ./packer build -var image_version=${{ env.IMAGE_VERSION }} gcp-a3mega-image.json
+      - name: Publish image
+        run: |
+          gcloud compute images add-iam-policy-binding dstack-a3mega-${{ env.IMAGE_VERSION }} --member='allAuthenticatedUsers' --role='roles/compute.imageUser'
