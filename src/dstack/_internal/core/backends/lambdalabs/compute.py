@@ -39,7 +39,7 @@ class LambdaCompute(
     ) -> List[InstanceOfferWithAvailability]:
         offers = get_catalog_offers(
             backend=BackendType.LAMBDA,
-            locations=self.config.regions,
+            locations=self.config.regions or None,
             requirements=requirements,
         )
         offers_with_availability = self._get_offers_with_availability(offers)
@@ -90,7 +90,7 @@ class LambdaCompute(
         if instance_info is not None and instance_info["status"] != "booting":
             provisioning_data.hostname = instance_info["ip"]
             commands = get_shim_commands(authorized_keys=[project_ssh_public_key])
-            # shim is asssumed to be run under root
+            # shim is assumed to be run under root
             launch_command = "sudo sh -c '" + "&& ".join(commands) + "'"
             thread = Thread(
                 target=_start_runner,
@@ -119,8 +119,6 @@ class LambdaCompute(
         }
         availability_offers = []
         for offer in offers:
-            if offer.region not in self.config.regions:
-                continue
             availability = InstanceAvailability.NOT_AVAILABLE
             if offer.region in instance_availability.get(offer.instance.name, []):
                 availability = InstanceAvailability.AVAILABLE
