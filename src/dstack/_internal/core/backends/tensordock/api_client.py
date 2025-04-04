@@ -8,7 +8,7 @@ from dstack._internal.core.models.instances import InstanceType
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
-REQUEST_TIMEOUT = 12
+REQUEST_TIMEOUT = 20
 
 
 class TensorDockAPIClient:
@@ -80,7 +80,7 @@ class TensorDockAPIClient:
         data["password"] = form["password"]
         return data
 
-    def delete_single(self, instance_id: str):
+    def delete_single_if_exists(self, instance_id: str):
         logger.debug("Deleting instance %s", instance_id)
         resp = self.s.post(
             self._url("/client/delete/single"),
@@ -91,10 +91,11 @@ class TensorDockAPIClient:
             },
             timeout=REQUEST_TIMEOUT,
         )
-        resp.raise_for_status()
         try:
             data = resp.json()
-            if not data["success"]:
+            if "already terminated" in data.get("error", ""):
+                return
+            if not data.get("success"):
                 raise BackendError(data)
         except ValueError:  # json parsing error
             raise BackendError(resp.text)
