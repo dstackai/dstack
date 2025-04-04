@@ -67,9 +67,15 @@ def pretty_date(time: datetime) -> str:
     if diff.days < 7:
         return str(diff.days) + " days ago"
     if diff.days < 31:
-        return str(round(diff.days / 7)) + " weeks ago"
+        weeks = round(diff.days / 7)
+        if weeks == 1:
+            return str(weeks) + " week ago"
+        return str(weeks) + " weeks ago"
     if diff.days < 365:
-        return str(round(diff.days / 30)) + " months ago"
+        months = round(diff.days / 30)
+        if months == 1:
+            return str(months) + " month ago"
+        return str(months) + " months ago"
     years = round(diff.days / 365)
     if years == 1:
         return str(years) + " year ago"
