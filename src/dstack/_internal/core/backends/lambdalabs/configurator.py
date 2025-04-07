@@ -19,26 +19,6 @@ from dstack._internal.core.models.backends.base import (
     BackendType,
 )
 
-REGIONS = [
-    "us-south-1",
-    "us-south-2",
-    "us-south-3",
-    "us-west-2",
-    "us-west-1",
-    "us-midwest-1",
-    "us-west-3",
-    "us-east-1",
-    "us-east-2",
-    "us-east-3",
-    "europe-central-1",
-    "asia-south-1",
-    "me-west-1",
-    "asia-northeast-1",
-    "asia-northeast-2",
-]
-
-DEFAULT_REGION = "us-east-1"
-
 
 class LambdaConfigurator(Configurator):
     TYPE = BackendType.LAMBDA
@@ -50,8 +30,6 @@ class LambdaConfigurator(Configurator):
     def create_backend(
         self, project_name: str, config: LambdaBackendConfigWithCreds
     ) -> BackendRecord:
-        if config.regions is None:
-            config.regions = REGIONS
         return BackendRecord(
             config=LambdaStoredConfig(
                 **LambdaBackendConfig.__response__.parse_obj(config).dict()
