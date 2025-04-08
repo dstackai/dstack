@@ -67,20 +67,35 @@ class TestPrettyDate:
         past_time = now - timedelta(days=5)
         assert pretty_date(past_time) == "5 days ago"
 
+    def test_week_ago(self):
+        now = datetime.now(tz=timezone.utc)
+        past_time = now - timedelta(days=7)
+        assert pretty_date(past_time) == "1 week ago"
+
     def test_weeks_ago(self):
         now = datetime.now(tz=timezone.utc)
         past_time = now - timedelta(days=21)
         assert pretty_date(past_time) == "3 weeks ago"
+
+    def test_month_ago(self):
+        now = datetime.now(tz=timezone.utc)
+        past_time = now - timedelta(days=31)
+        assert pretty_date(past_time) == "1 month ago"
 
     def test_months_ago(self):
         now = datetime.now(tz=timezone.utc)
         past_time = now - timedelta(days=90)
         assert pretty_date(past_time) == "3 months ago"
 
-    def test_years_ago(self):
+    def test_year_ago(self):
         now = datetime.now(tz=timezone.utc)
         past_time = now - timedelta(days=400)
         assert pretty_date(past_time) == "1 year ago"
+
+    def test_years_ago(self):
+        now = datetime.now(tz=timezone.utc)
+        past_time = now - timedelta(days=700)
+        assert pretty_date(past_time) == "2 years ago"
 
     def test_future_time(self):
         now = datetime.now(tz=timezone.utc)

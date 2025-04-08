@@ -1,8 +1,12 @@
 import json
 
+from datacrunch import DataCrunchClient
+from datacrunch.exceptions import APIException
+
 from dstack._internal.core.backends.base.configurator import (
     BackendRecord,
     Configurator,
+    raise_invalid_credentials_error,
 )
 from dstack._internal.core.backends.datacrunch.backend import DataCrunchBackend
 from dstack._internal.core.backends.datacrunch.models import (
@@ -17,13 +21,6 @@ from dstack._internal.core.models.backends.base import (
     BackendType,
 )
 
-REGIONS = [
-    "FIN-01",
-    "ICE-01",
-]
-
-DEFAULT_REGION = "FIN-01"
-
 
 class DataCrunchConfigurator(Configurator):
     TYPE = BackendType.DATACRUNCH
@@ -32,14 +29,11 @@ class DataCrunchConfigurator(Configurator):
     def validate_config(
         self, config: DataCrunchBackendConfigWithCreds, default_creds_enabled: bool
     ):
-        # FIXME: validate datacrunch creds
-        return
+        self._validate_creds(config.creds)
 
     def create_backend(
         self, project_name: str, config: DataCrunchBackendConfigWithCreds
     ) -> BackendRecord:
-        if config.regions is None:
-            config.regions = REGIONS
         return BackendRecord(
             config=DataCrunchStoredConfig(
                 **DataCrunchBackendConfig.__response__.parse_obj(config).dict()
@@ -64,3 +58,14 @@ class DataCrunchConfigurator(Configurator):
             **json.loads(record.config),
             creds=DataCrunchCreds.parse_raw(record.auth),
         )
+
+    def _validate_creds(self, creds: DataCrunchCreds):
+        try:
+            DataCrunchClient(
+                client_id=creds.client_id,
+                client_secret=creds.client_secret,
+            )
+        except APIException as e:
+            if e.code == "unauthorized_request":
+                raise_invalid_credentials_error(fields=[["creds", "api_key"]])
+            raise
