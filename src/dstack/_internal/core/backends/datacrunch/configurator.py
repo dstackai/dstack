@@ -29,15 +29,7 @@ class DataCrunchConfigurator(Configurator):
     def validate_config(
         self, config: DataCrunchBackendConfigWithCreds, default_creds_enabled: bool
     ):
-        try:
-            DataCrunchClient(
-                client_id=config.creds.client_id,
-                client_secret=config.creds.client_secret,
-            )
-        except APIException as e:
-            if e.code == "unauthorized_request":
-                raise_invalid_credentials_error(fields=[["creds", "api_key"]])
-            raise
+        self._validate_creds(config.creds)
 
     def create_backend(
         self, project_name: str, config: DataCrunchBackendConfigWithCreds
@@ -66,3 +58,14 @@ class DataCrunchConfigurator(Configurator):
             **json.loads(record.config),
             creds=DataCrunchCreds.parse_raw(record.auth),
         )
+
+    def _validate_creds(self, creds: DataCrunchCreds):
+        try:
+            DataCrunchClient(
+                client_id=creds.client_id,
+                client_secret=creds.client_secret,
+            )
+        except APIException as e:
+            if e.code == "unauthorized_request":
+                raise_invalid_credentials_error(fields=[["creds", "api_key"]])
+            raise
