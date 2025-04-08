@@ -1,5 +1,9 @@
 from typing import Dict, List, Optional
 
+from datacrunch import DataCrunchClient
+from datacrunch.exceptions import APIException
+from datacrunch.instances.instances import Instance
+
 from dstack._internal.core.backends.base.backend import Compute
 from dstack._internal.core.backends.base.compute import (
     ComputeWithCreateInstanceSupport,
@@ -7,8 +11,8 @@ from dstack._internal.core.backends.base.compute import (
     get_shim_commands,
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
-from dstack._internal.core.backends.datacrunch.api_client import DataCrunchAPIClient
 from dstack._internal.core.backends.datacrunch.models import DataCrunchConfig
+from dstack._internal.core.errors import NoCapacityError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
@@ -19,6 +23,7 @@ from dstack._internal.core.models.instances import (
 from dstack._internal.core.models.resources import Memory, Range
 from dstack._internal.core.models.runs import JobProvisioningData, Requirements
 from dstack._internal.utils.logging import get_logger
+from dstack._internal.utils.ssh import get_public_key_fingerprint
 
 logger = get_logger("datacrunch.compute")
 
@@ -39,7 +44,10 @@ class DataCrunchCompute(
     def __init__(self, config: DataCrunchConfig):
         super().__init__()
         self.config = config
-        self.api_client = DataCrunchAPIClient(config.creds.client_id, config.creds.client_secret)
+        self.client = DataCrunchClient(
+            client_id=self.config.creds.client_id,
+            client_secret=self.config.creds.client_secret,
+        )
 
     def get_offers(
         self, requirements: Optional[Requirements] = None
@@ -56,7 +64,7 @@ class DataCrunchCompute(
     def _get_offers_with_availability(
         self, offers: List[InstanceOffer]
     ) -> List[InstanceOfferWithAvailability]:
-        raw_availabilities: List[Dict] = self.api_client.client.instances.get_availabilities()
+        raw_availabilities: List[Dict] = self.client.instances.get_availabilities()
 
         region_availabilities = {}
         for location in raw_availabilities:
@@ -89,38 +97,26 @@ class DataCrunchCompute(
         for ssh_public_key in public_keys:
             ssh_ids.append(
                 # datacrunch allows you to use the same name
-                self.api_client.get_or_create_ssh_key(
+                _get_or_create_ssh_key(
+                    client=self.client,
                     name=f"dstack-{instance_config.instance_name}.key",
                     public_key=ssh_public_key,
                 )
             )
 
         commands = get_shim_commands(authorized_keys=public_keys)
-
         startup_script = " ".join([" && ".join(commands)])
         script_name = f"dstack-{instance_config.instance_name}.sh"
-
-        logger.debug("startup script:", startup_script)
-
-        startup_script_ids = self.api_client.get_or_create_startup_scrpit(
-            name=script_name, script=startup_script
+        startup_script_ids = _get_or_create_startup_scrpit(
+            client=self.client,
+            name=script_name,
+            script=startup_script,
         )
 
         disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
 
-        instance = self.api_client.deploy_instance(
-            instance_type=instance_offer.instance.name,
-            ssh_key_ids=ssh_ids,
-            startup_script_id=startup_script_ids,
-            hostname=instance_name,
-            description=instance_name,
-            image=IMAGE_ID,
-            disk_size=disk_size,
-            location=instance_offer.region,
-        )
-
         logger.debug(
-            "deploy_instance",
+            "Deploying datacrunch instance",
             {
                 "instance_type": instance_offer.instance.name,
                 "ssh_key_ids": ssh_ids,
@@ -132,7 +128,18 @@ class DataCrunchCompute(
                 "location": instance_offer.region,
             },
         )
-
+        instance = _deploy_instance(
+            client=self.client,
+            instance_type=instance_offer.instance.name,
+            ssh_key_ids=ssh_ids,
+            startup_script_id=startup_script_ids,
+            hostname=instance_name,
+            description=instance_name,
+            image=IMAGE_ID,
+            disk_size=disk_size,
+            is_spot=instance_offer.instance.resources.spot,
+            location=instance_offer.region,
+        )
         return JobProvisioningData(
             backend=instance_offer.backend,
             instance_type=instance_offer.instance,
@@ -150,8 +157,14 @@ class DataCrunchCompute(
 
     def terminate_instance(
         self, instance_id: str, region: str, backend_data: Optional[str] = None
-    ) -> None:
-        self.api_client.delete_instance(instance_id)
+    ):
+        try:
+            self.client.instances.action(id_list=[instance_id], action="delete")
+        except APIException as e:
+            if e.message == "Invalid instance id":
+                logger.debug("Skipping instance %s termination. Instance not found.", instance_id)
+                return
+            raise
 
     def update_provisioning_data(
         self,
@@ -159,6 +172,71 @@ class DataCrunchCompute(
         project_ssh_public_key: str,
         project_ssh_private_key: str,
     ):
-        instance = self.api_client.get_instance_by_id(provisioning_data.instance_id)
+        instance = _get_instance_by_id(self.client, provisioning_data.instance_id)
         if instance is not None and instance.status == "running":
             provisioning_data.hostname = instance.ip
+
+
+def _get_or_create_ssh_key(client: DataCrunchClient, name: str, public_key: str) -> str:
+    fingerprint = get_public_key_fingerprint(public_key)
+    keys = client.ssh_keys.get()
+    found_keys = [key for key in keys if fingerprint == get_public_key_fingerprint(key.public_key)]
+    if found_keys:
+        key = found_keys[0]
+        return key.id
+    key = client.ssh_keys.create(name, public_key)
+    return key.id
+
+
+def _get_or_create_startup_scrpit(client: DataCrunchClient, name: str, script: str) -> str:
+    scripts = client.startup_scripts.get()
+    found_scripts = [startup_script for startup_script in scripts if script == startup_script]
+    if found_scripts:
+        startup_script = found_scripts[0]
+        return startup_script.id
+
+    startup_script = client.startup_scripts.create(name, script)
+    return startup_script.id
+
+
+def _get_instance_by_id(
+    client: DataCrunchClient,
+    instance_id: str,
+) -> Optional[Instance]:
+    try:
+        return client.instances.get_by_id(instance_id)
+    except APIException as e:
+        if e.message == "Invalid instance id":
+            return None
+        raise
+
+
+def _deploy_instance(
+    client: DataCrunchClient,
+    instance_type: str,
+    image: str,
+    ssh_key_ids: List[str],
+    hostname: str,
+    description: str,
+    startup_script_id: str,
+    disk_size: int,
+    is_spot: bool,
+    location: str,
+) -> Instance:
+    try:
+        instance = client.instances.create(
+            instance_type=instance_type,
+            image=image,
+            ssh_key_ids=ssh_key_ids,
+            hostname=hostname,
+            description=description,
+            startup_script_id=startup_script_id,
+            is_spot=is_spot,
+            location=location,
+            os_volume={"name": "OS volume", "size": disk_size},
+        )
+    except APIException as e:
+        # FIXME: Catch only no capacity errors
+        raise NoCapacityError(f"DataCrunch API error: {e.message}")
+
+    return instance
