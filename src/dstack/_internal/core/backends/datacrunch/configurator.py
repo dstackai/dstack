@@ -17,13 +17,6 @@ from dstack._internal.core.models.backends.base import (
     BackendType,
 )
 
-REGIONS = [
-    "FIN-01",
-    "ICE-01",
-]
-
-DEFAULT_REGION = "FIN-01"
-
 
 class DataCrunchConfigurator(Configurator):
     TYPE = BackendType.DATACRUNCH
@@ -38,8 +31,6 @@ class DataCrunchConfigurator(Configurator):
     def create_backend(
         self, project_name: str, config: DataCrunchBackendConfigWithCreds
     ) -> BackendRecord:
-        if config.regions is None:
-            config.regions = REGIONS
         return BackendRecord(
             config=DataCrunchStoredConfig(
                 **DataCrunchBackendConfig.__response__.parse_obj(config).dict()

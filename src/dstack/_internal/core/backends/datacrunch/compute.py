@@ -62,8 +62,6 @@ class DataCrunchCompute(
         for location in raw_availabilities:
             location_code = location["location_code"]
             availabilities = location["availabilities"]
-            if location_code not in self.config.regions:
-                continue
             for name in availabilities:
                 key = (name, location_code)
                 region_availabilities[key] = InstanceAvailability.AVAILABLE
