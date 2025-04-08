@@ -162,6 +162,7 @@ declare interface IRun {
     project_name: string;
     user: string;
     submitted_at: string;
+    terminated_at: string;
     status: TJobStatus;
     error?: string;
     jobs: IJob[];

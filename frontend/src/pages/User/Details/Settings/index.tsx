@@ -36,10 +36,6 @@ export const Settings: React.FC = () => {
             text: paramUserName,
             href: ROUTES.USER.DETAILS.FORMAT(paramUserName),
         },
-        {
-            text: t('common.settings'),
-            href: ROUTES.USER.DETAILS.FORMAT(paramUserName),
-        },
     ]);
 
     const editUserHandler = () => {
