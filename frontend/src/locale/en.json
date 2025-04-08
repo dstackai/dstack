@@ -337,6 +337,7 @@
       "provider_name": "Provider",
       "status": "Status",
       "submitted_at": "Submitted",
+      "finished_at": "Finished",
       "metrics": {
         "title": "Metrics",
         "show_metrics": "Show metrics",

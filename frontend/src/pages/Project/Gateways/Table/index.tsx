@@ -1,16 +1,18 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Button, ButtonWithConfirmation, Header, ListEmptyMessage, SpaceBetween, Table } from 'components';
+import { Button, ButtonWithConfirmation, Header, InfoLink, ListEmptyMessage, SpaceBetween, Table } from 'components';
 
-import { useCollection } from 'hooks';
+import { useCollection, useHelpPanel } from 'hooks';
 
+import { GATEWAYS_INFO } from './constants';
 import { useColumnsDefinitions } from './hooks';
 
 import { IProps } from './types';
 
 export const GatewaysTable: React.FC<IProps> = ({ gateways, addItem, deleteItem, editItem, isDisabledDelete }) => {
     const { t } = useTranslation();
+    const [openHelpPanel] = useHelpPanel();
 
     const renderEmptyMessage = (): React.ReactNode => {
         return (
@@ -60,6 +62,7 @@ export const GatewaysTable: React.FC<IProps> = ({ gateways, addItem, deleteItem,
             header={
                 <Header
                     counter={renderCounter()}
+                    info={<InfoLink onFollow={() => openHelpPanel(GATEWAYS_INFO)} />}
                     actions={
                         <SpaceBetween size="xs" direction="horizontal">
                             {/* Disallow adding/editing gateways while custom backends are not supported */}
