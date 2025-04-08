@@ -49,6 +49,14 @@ hide:
        <p>
            Deploy DeepSeek-R1-Distill-Llama 8B & 70B with SGLang
       </p>
+    <a href="/examples/deployment/trtllm"
+       class="feature-cell">
+       <h3>
+           TensorRT-LLM
+       </h3>
+       <p>
+            Deploy DeepSeek-R1 with TensorRT-LLM
+        </p>
     </a>
 </div>
 
