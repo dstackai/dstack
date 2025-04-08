@@ -116,9 +116,10 @@ plugins:
         'docs/tasks.md': 'docs/concepts/tasks.md'
         'docs/services.md': 'docs/concepts/services.md'
         'docs/fleets.md': 'docs/concepts/fleets.md'
-        'docs/examples/index.md': 'examples.md'
-        'docs/examples/llms/llama31.md': 'examples/llms/llama31/index.md'
-        'docs/examples/llms/llama32.md': 'examples/llms/llama32/index.md'
+        'docs/examples/llms/llama31.md': 'examples/llms/llama/index.md'
+        'docs/examples/llms/llama32.md': 'examples/llms/llama/index.md'
+        'examples/llms/llama31/index.md': 'examples/llms/llama/index.md'
+        'examples/llms/llama32/index.md': 'examples/llms/llama/index.md'
         'docs/examples/accelerators/amd/index.md': 'examples/accelerators/amd/index.md'
         'docs/examples/deployment/nim/index.md': 'examples/deployment/nim/index.md'
         'docs/examples/deployment/vllm/index.md': 'examples/deployment/vllm/index.md'
@@ -279,8 +280,7 @@ nav:
         - TPU: examples/accelerators/tpu/index.md
     - LLMs:
         - Deepseek: examples/llms/deepseek/index.md
-        - Llama 3.1: examples/llms/llama31/index.md
-        - Llama 3.2: examples/llms/llama32/index.md
+        - Llama: examples/llms/llama/index.md
     - Misc:
         - Docker Compose: examples/misc/docker-compose/index.md
         - NCCL Tests: examples/misc/nccl-tests/index.md
