@@ -29,9 +29,6 @@ logger = get_logger("datacrunch.compute")
 
 MAX_INSTANCE_NAME_LEN = 60
 
-# Ubuntu 22.04 + CUDA 12.0 + Docker
-# from API https://datacrunch.stoplight.io/docs/datacrunch-public/c46ab45dbc508-get-all-image-types
-IMAGE_ID = "2088da25-bb0d-41cc-a191-dccae45d96fd"
 IMAGE_SIZE = Memory.parse("50GB")
 
 CONFIGURABLE_DISK_SIZE = Range[Memory](min=IMAGE_SIZE, max=None)
@@ -114,6 +111,7 @@ class DataCrunchCompute(
         )
 
         disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
+        image_id = _get_vm_image_id(instance_offer)
 
         logger.debug(
             "Deploying datacrunch instance",
@@ -123,7 +121,7 @@ class DataCrunchCompute(
                 "startup_script_id": startup_script_ids,
                 "hostname": instance_name,
                 "description": instance_name,
-                "image": IMAGE_ID,
+                "image": image_id,
                 "disk_size": disk_size,
                 "location": instance_offer.region,
             },
@@ -135,7 +133,7 @@ class DataCrunchCompute(
             startup_script_id=startup_script_ids,
             hostname=instance_name,
             description=instance_name,
-            image=IMAGE_ID,
+            image=image_id,
             disk_size=disk_size,
             is_spot=instance_offer.instance.resources.spot,
             location=instance_offer.region,
@@ -175,6 +173,18 @@ class DataCrunchCompute(
         instance = _get_instance_by_id(self.client, provisioning_data.instance_id)
         if instance is not None and instance.status == "running":
             provisioning_data.hostname = instance.ip
+
+
+def _get_vm_image_id(instance_offer: InstanceOfferWithAvailability) -> str:
+    # https://api.datacrunch.io/v1/images
+    if (
+        len(instance_offer.instance.resources.gpus) > 0
+        and instance_offer.instance.resources.gpus[0].name == "V100"
+    ):
+        # Ubuntu 22.04 + CUDA 12.0 + Docker
+        return "2088da25-bb0d-41cc-a191-dccae45d96fd"
+    # Ubuntu 24.04 + CUDA 12.8 Open + Docker
+    return "77777777-4f48-4249-82b3-f199fb9b701b"
 
 
 def _get_or_create_ssh_key(client: DataCrunchClient, name: str, public_key: str) -> str:
