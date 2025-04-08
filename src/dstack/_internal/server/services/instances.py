@@ -145,6 +145,9 @@ def filter_pool_instances(
     backend_types = profile.backends
     regions = profile.regions
     zones = profile.availability_zones
+    fleet_names = profile.fleet
+    if isinstance(fleet_names, str):
+        fleet_names = [fleet_names]
 
     if volumes:
         mount_point_volumes = volumes[0]
@@ -180,6 +183,9 @@ def filter_pool_instances(
         if fleet_model is not None and instance.fleet_id != fleet_model.id:
             continue
         if instance.unreachable:
+            continue
+        fleet = instance.fleet
+        if fleet_names is not None and (fleet is None or fleet.name not in fleet_names):
             continue
         if status is not None and instance.status != status:
             continue
@@ -268,10 +274,12 @@ async def get_pool_instances(
     project: ProjectModel,
 ) -> List[InstanceModel]:
     res = await session.execute(
-        select(InstanceModel).where(
+        select(InstanceModel)
+        .where(
             InstanceModel.project_id == project.id,
             InstanceModel.deleted == False,
         )
+        .options(joinedload(InstanceModel.fleet))
     )
     instance_models = list(res.unique().scalars().all())
     return instance_models

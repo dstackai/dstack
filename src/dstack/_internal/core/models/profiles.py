@@ -240,6 +240,10 @@ class ProfileParams(CoreModel):
         Optional[UtilizationPolicy],
         Field(description="Run termination policy based on utilization"),
     ] = None
+    fleet: Annotated[
+        Optional[Union[str, list[str]]],
+        Field(description="The fleet name or the list of fleet names considered for reuse"),
+    ] = None
 
     # Deprecated and unused. Left for compatibility with 0.18 clients.
     pool_name: Annotated[Optional[str], Field(exclude=True)] = None

@@ -64,11 +64,9 @@ def _get_fleet_spec_excludes(fleet_spec: FleetSpec) -> Optional[Dict]:
     spec_excludes: Dict[str, Any] = {}
     configuration_excludes: Dict[str, Any] = {}
     profile_excludes: set[str] = set()
-    # Fields can be excluded like this:
-    # if fleet_spec.configuration.availability_zones is None:
-    #     configuration_excludes["availability_zones"] = True
-    # if fleet_spec.profile is not None and fleet_spec.profile.availability_zones is None:
-    #     profile_excludes.add("availability_zones")
+    profile = fleet_spec.profile
+    if profile.fleet is None:
+        profile_excludes.add("fleet")
     if configuration_excludes:
         spec_excludes["configuration"] = configuration_excludes
     if profile_excludes:

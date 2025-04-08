@@ -65,6 +65,13 @@ def register_profile_args(parser: argparse.ArgumentParser):
     )
 
     fleets_group = parser.add_argument_group("Fleets")
+    fleets_group.add_argument(
+        "--fleet",
+        action="append",
+        metavar="NAME",
+        dest="fleets",
+        help="Consider only instances from the specified fleet(s) for reuse",
+    )
     fleets_group_exc = fleets_group.add_mutually_exclusive_group()
     fleets_group_exc.add_argument(
         "-R",
@@ -147,6 +154,8 @@ def apply_profile_args(
     if args.max_duration is not None:
         profile_settings.max_duration = args.max_duration
 
+    if args.fleets:
+        profile_settings.fleet = args.fleets
     if args.idle_duration is not None:
         profile_settings.idle_duration = args.idle_duration
     elif args.dont_destroy:

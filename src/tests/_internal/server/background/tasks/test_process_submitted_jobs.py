@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from typing import Union
 from unittest.mock import Mock, patch
 
 import pytest
@@ -535,6 +536,49 @@ class TestProcessSubmittedJobs:
         )
         assert instance.total_blocks == 4
         assert instance.busy_blocks == 2
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ["fleet_names", "expected_fleet_name"],
+        [
+            ["c", "c"],
+            # When more than one fleet is requested, the cheapest one is selected
+            [["c", "b"], "b"],
+        ],
+    )
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_assigns_job_to_specific_fleet(
+        self,
+        test_db,
+        session: AsyncSession,
+        fleet_names: Union[str, list[str]],
+        expected_fleet_name: str,
+    ):
+        project = await create_project(session)
+        user = await create_user(session)
+        repo = await create_repo(session=session, project_id=project.id)
+        fleet_a = await create_fleet(session=session, project=project, name="a")
+        await create_instance(session=session, project=project, fleet=fleet_a, price=1.0)
+        fleet_b = await create_fleet(session=session, project=project, name="b")
+        await create_instance(session=session, project=project, fleet=fleet_b, price=2.0)
+        fleet_c = await create_fleet(session=session, project=project, name="c")
+        await create_instance(session=session, project=project, fleet=fleet_c, price=3.0)
+        run_spec = get_run_spec(run_name="test-run", repo_id=repo.name)
+        run_spec.configuration.fleet = fleet_names
+        run = await create_run(
+            session=session, project=project, repo=repo, user=user, run_spec=run_spec
+        )
+        job = await create_job(session=session, run=run)
+
+        await process_submitted_jobs()
+
+        await session.refresh(job)
+        res = await session.execute(select(JobModel).options(joinedload(JobModel.instance)))
+        job = res.unique().scalar_one()
+        assert job.status == JobStatus.SUBMITTED
+        assert job.instance is not None
+        assert job.instance.fleet is not None
+        assert job.instance.fleet.name == expected_fleet_name
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
