@@ -145,9 +145,6 @@ def filter_pool_instances(
     backend_types = profile.backends
     regions = profile.regions
     zones = profile.availability_zones
-    fleet_names = profile.fleet
-    if isinstance(fleet_names, str):
-        fleet_names = [fleet_names]
 
     if volumes:
         mount_point_volumes = volumes[0]
@@ -185,7 +182,7 @@ def filter_pool_instances(
         if instance.unreachable:
             continue
         fleet = instance.fleet
-        if fleet_names is not None and (fleet is None or fleet.name not in fleet_names):
+        if profile.fleets is not None and (fleet is None or fleet.name not in profile.fleets):
             continue
         if status is not None and instance.status != status:
             continue

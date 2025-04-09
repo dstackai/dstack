@@ -155,7 +155,7 @@ def apply_profile_args(
         profile_settings.max_duration = args.max_duration
 
     if args.fleets:
-        profile_settings.fleet = args.fleets
+        profile_settings.fleets = args.fleets
     if args.idle_duration is not None:
         profile_settings.idle_duration = args.idle_duration
     elif args.dont_destroy:
