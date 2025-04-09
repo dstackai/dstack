@@ -212,6 +212,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
                     InstanceModel.deleted == False,
                     InstanceModel.total_blocks > InstanceModel.busy_blocks,
                 )
+                .options(joinedload(InstanceModel.fleet))
                 .execution_options(populate_existing=True)
             )
             pool_instances = list(res.unique().scalars().all())

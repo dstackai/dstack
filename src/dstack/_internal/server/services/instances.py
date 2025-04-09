@@ -181,6 +181,9 @@ def filter_pool_instances(
             continue
         if instance.unreachable:
             continue
+        fleet = instance.fleet
+        if profile.fleets is not None and (fleet is None or fleet.name not in profile.fleets):
+            continue
         if status is not None and instance.status != status:
             continue
         jpd = get_instance_provisioning_data(instance)
@@ -268,10 +271,12 @@ async def get_pool_instances(
     project: ProjectModel,
 ) -> List[InstanceModel]:
     res = await session.execute(
-        select(InstanceModel).where(
+        select(InstanceModel)
+        .where(
             InstanceModel.project_id == project.id,
             InstanceModel.deleted == False,
         )
+        .options(joinedload(InstanceModel.fleet))
     )
     instance_models = list(res.unique().scalars().all())
     return instance_models
