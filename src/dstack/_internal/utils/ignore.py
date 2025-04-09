@@ -20,6 +20,8 @@ class GitIgnore:
         self.load_recursive()
 
     def load_ignore_file(self, path: str, ignore_file: Path):
+        if path != "." and not path.startswith("./"):
+            path = "./" + path
         if path not in self.ignore_globs:
             self.ignore_globs[path] = []
         with ignore_file.open("r") as f:
