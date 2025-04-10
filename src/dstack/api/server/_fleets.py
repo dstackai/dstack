@@ -66,7 +66,7 @@ def _get_fleet_spec_excludes(fleet_spec: FleetSpec) -> Optional[Dict]:
     profile_excludes: set[str] = set()
     profile = fleet_spec.profile
     if profile.fleets is None:
-        profile_excludes.add("fleet")
+        profile_excludes.add("fleets")
     if configuration_excludes:
         spec_excludes["configuration"] = configuration_excludes
     if profile_excludes:
