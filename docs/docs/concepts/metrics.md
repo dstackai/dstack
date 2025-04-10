@@ -1,4 +1,4 @@
-# Monitoring
+# Metrics
 
 ## Prometheus
 

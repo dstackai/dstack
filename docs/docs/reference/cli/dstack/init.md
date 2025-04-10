@@ -1,6 +1,6 @@
 # dstack init
 
-This command initializes the current directory as a `dstack` [repo](../../../guides/repos.md).
+This command initializes the current directory as a `dstack` [repo](../../../concepts/repos.md).
 
 **Git credentials**
 

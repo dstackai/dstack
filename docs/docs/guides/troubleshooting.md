@@ -38,7 +38,7 @@ If you have configured a backend and still can't use it, check the output of `ds
 for backend configuration errors.
 
 > **Tip**: You can find a list of successfully configured backends
-> on the [project settings page](../guides/administration.md#backends) in the UI.
+> on the [project settings page](../concepts/projects.md#backends) in the UI.
 
 #### Cause 2: Requirements mismatch
 
@@ -113,7 +113,7 @@ If you are using
 [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"},
 you will not see marketplace offers until you top up your balance.
 Alternatively, you can configure your own cloud accounts
-on the [project settings page](../guides/administration.md#backends)
+on the [project settings page](../concepts/projects.md#backends)
 or use [SSH fleets](../concepts/fleets.md#ssh).
 
 ### Provisioning fails
