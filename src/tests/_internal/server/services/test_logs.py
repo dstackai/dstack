@@ -72,7 +72,7 @@ class TestCloudWatchLogStorage:
         mock.get_log_events.return_value = {
             "events": [],
             "nextBackwardToken": "bwd",
-            "nextFormartToken": "fwd",
+            "nextForwardToken": "fwd",
         }
         return mock
 
@@ -183,6 +183,7 @@ class TestCloudWatchLogStorage:
             {"timestamp": 1696586513234, "message": "SGVsbG8="},
             {"timestamp": 1696586513235, "message": "V29ybGQ="},
         ]
+        poll_logs_request.limit = 2
         job_submission_logs = log_storage.poll_logs(project, poll_logs_request)
 
         assert job_submission_logs.logs == [
@@ -199,20 +200,21 @@ class TestCloudWatchLogStorage:
         ]
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("descending", [False, True])
     async def test_poll_logs_empty_response(
         self,
         project: ProjectModel,
         log_storage: CloudWatchLogStorage,
         mock_client: Mock,
         poll_logs_request: PollLogsRequest,
+        descending: bool,
     ):
-        # Check that we don't use the workaround when descending=False -> startFromHead=True
-        # https://github.com/dstackai/dstack/issues/1647
         mock_client.get_log_events.return_value["events"] = []
+        poll_logs_request.descending = descending
         job_submission_logs = log_storage.poll_logs(project, poll_logs_request)
 
         assert job_submission_logs.logs == []
-        mock_client.get_log_events.assert_called_once()
+        assert mock_client.get_log_events.call_count == 2
 
     @pytest.mark.asyncio
     async def test_poll_logs_descending_non_empty_response_on_first_call(
@@ -227,6 +229,7 @@ class TestCloudWatchLogStorage:
             {"timestamp": 1696586513235, "message": "V29ybGQ="},
         ]
         poll_logs_request.descending = True
+        poll_logs_request.limit = 2
         job_submission_logs = log_storage.poll_logs(project, poll_logs_request)
 
         assert job_submission_logs.logs == [
@@ -243,7 +246,7 @@ class TestCloudWatchLogStorage:
         ]
 
     @pytest.mark.asyncio
-    async def test_poll_logs_descending_two_first_calls_return_empty_response(
+    async def test_poll_logs_descending_some_responses_are_empty(
         self,
         project: ProjectModel,
         log_storage: CloudWatchLogStorage,
@@ -251,8 +254,10 @@ class TestCloudWatchLogStorage:
         poll_logs_request: PollLogsRequest,
     ):
         # The first two calls return empty event lists, though the token is not the same, meaning
-        # there are more events.
-        # https://github.com/dstackai/dstack/issues/1647
+        # there are more events, see: https://github.com/dstackai/dstack/issues/1647
+        # As the third call returns less events than requested (2 < 3), we continue to poll until
+        # accumulate enough events (2 + 2) and return exactly the requested number of events (3),
+        # see: https://github.com/dstackai/dstack/issues/2500
         mock_client.get_log_events.side_effect = [
             {
                 "events": [],
@@ -272,8 +277,22 @@ class TestCloudWatchLogStorage:
                 "nextBackwardToken": "bwd3",
                 "nextForwardToken": "fwd",
             },
+            {
+                "events": [],
+                "nextBackwardToken": "bwd4",
+                "nextForwardToken": "fwd",
+            },
+            {
+                "events": [
+                    {"timestamp": 1696586513232, "message": "aW5pdCAx"},
+                    {"timestamp": 1696586513233, "message": "aW5pdCAy"},
+                ],
+                "nextBackwardToken": "bwd5",
+                "nextForwardToken": "fwd",
+            },
         ]
         poll_logs_request.descending = True
+        poll_logs_request.limit = 3
         job_submission_logs = log_storage.poll_logs(project, poll_logs_request)
 
         assert job_submission_logs.logs == [
@@ -287,8 +306,13 @@ class TestCloudWatchLogStorage:
                 log_source=LogEventSource.STDOUT,
                 message="SGVsbG8=",
             ),
+            LogEvent(
+                timestamp=datetime(2023, 10, 6, 10, 1, 53, 233000, tzinfo=timezone.utc),
+                log_source=LogEventSource.STDOUT,
+                message="aW5pdCAy",
+            ),
         ]
-        assert mock_client.get_log_events.call_count == 3
+        assert mock_client.get_log_events.call_count == 5
 
     @pytest.mark.asyncio
     async def test_poll_logs_descending_empty_response_with_same_token(
@@ -352,7 +376,7 @@ class TestCloudWatchLogStorage:
         job_submission_logs = log_storage.poll_logs(project, poll_logs_request)
 
         assert job_submission_logs.logs == []
-        assert mock_client.get_log_events.call_count == 11  # initial call + 10 tries
+        assert mock_client.get_log_events.call_count == 10
 
     @pytest.mark.asyncio
     async def test_poll_logs_request_params_asc_no_diag_no_dates(
@@ -366,11 +390,13 @@ class TestCloudWatchLogStorage:
         poll_logs_request.limit = 5
         poll_logs_request.diagnose = False
         log_storage.poll_logs(project, poll_logs_request)
-        mock_client.get_log_events.assert_called_once_with(
+        assert mock_client.get_log_events.call_count == 2
+        mock_client.get_log_events.assert_called_with(
             logGroupName="test-group",
             logStreamName="test-proj/test-run/1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e/job",
             limit=5,
             startFromHead=True,
+            nextToken="fwd",
         )
 
     @pytest.mark.asyncio
@@ -394,13 +420,15 @@ class TestCloudWatchLogStorage:
         poll_logs_request.limit = 10
         poll_logs_request.diagnose = True
         log_storage.poll_logs(project, poll_logs_request)
-        mock_client.get_log_events.assert_called_once_with(
+        assert mock_client.get_log_events.call_count == 2
+        mock_client.get_log_events.assert_called_with(
             logGroupName="test-group",
             logStreamName="test-proj/test-run/1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e/runner",
             limit=10,
             startFromHead=False,
             startTime=1696586513235,
             endTime=1696672913234,
+            nextToken="bwd",
         )
 
     @pytest.mark.asyncio
