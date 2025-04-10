@@ -1,4 +1,4 @@
-# Administration
+# Projects
 
 Projects enable the isolation of different teams and their resources. Each project can configure its own backends and
 control which users have access to it.

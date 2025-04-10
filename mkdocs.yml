@@ -11,7 +11,7 @@ repo_name: dstackai/dstack
 edit_uri: edit/master/docs/
 
 #Copyright
-copyright: © 2024 dstack
+copyright: © 2025 dstack
 
 # Configuration
 theme:
@@ -43,7 +43,7 @@ theme:
   #          name: Switch to light mode
   features:
     - content.tooltips
-    #    - navigation.path
+    - navigation.path
     - content.code.copy
     - content.action.edit
     #    - navigation.indexes
@@ -74,13 +74,6 @@ plugins:
   - search
   - redirects:
       redirect_maps:
-        'examples/tgi.md': 'https://github.com/dstackai/dstack/blob/master/examples/deployment/tgi/README.md'
-        'examples/vllm.md': 'https://github.com/dstackai/dstack/blob/master/examples/deployment/vllm/README.md'
-        'examples/olama.md': 'https://github.com/dstackai/dstack/blob/master/examples/deployment/olama/README.md'
-        'examples/tae.md': 'https://github.com/dstackai/dstack/blob/master/examples/deployment/tae/README.md'
-        'examples/infinity.md': 'https://github.com/dstackai/dstack/blob/master/examples/deployment/infinity/README.md'
-        'examples/qlora.md': 'https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/qlora/README.md'
-        'examples/mixtral.md': 'https://github.com/dstackai/dstack/blob/master/examples/llms/mixtral/README.md'
         'blog/2024/02/08/resources-authentication-and-more.md': 'https://github.com/dstackai/dstack/releases/0.15.0'
         'blog/2024/01/19/openai-endpoints-preview.md': 'https://github.com/dstackai/dstack/releases/0.14.0'
         'blog/2023/12/22/disk-size-cuda-12-1-mixtral-and-more.md': 'https://github.com/dstackai/dstack/releases/0.13.0'
@@ -93,30 +86,10 @@ plugins:
         'blog/2023/05/22/azure-support-better-ui-and-more.md': 'https://github.com/dstackai/dstack/releases/0.9.1'
         'blog/2023/03/13/gcp-support-just-landed.md': 'https://github.com/dstackai/dstack/releases/0.2'
         'blog/dstack-research.md': 'https://dstack.ai/#get-started'
-        'changelog/0.2.md': 'https://github.com/dstackai/dstack/releases/0.2'
-        'changelog/0.9.1.md': 'https://github.com/dstackai/dstack/releases/0.9.1'
-        'changelog/0.10.5.md': 'https://github.com/dstackai/dstack/releases/0.10.5'
-        'changelog/0.10.7.md': 'https://github.com/dstackai/dstack/releases/0.10.7'
-        'changelog/0.11.0.md': 'https://github.com/dstackai/dstack/releases/0.11'
-        'changelog/0.12.0.md': 'https://github.com/dstackai/dstack/releases/0.12.0'
-        'changelog/0.12.2.md': 'https://github.com/dstackai/dstack/releases/0.12.2'
-        'changelog/0.12.3.md': 'https://github.com/dstackai/dstack/releases/0.12.3'
-        'changelog/0.13.0.md': 'https://github.com/dstackai/dstack/releases/0.13.0'
-        'changelog/0.14.0.md': 'https://github.com/dstackai/dstack/releases/0.14.0'
-        'changelog/0.15.0.md': 'https://github.com/dstackai/dstack/releases/0.15.0'
-        'changelog/0.15.1.md': 'https://github.com/dstackai/dstack/releases/0.15.1'
-        'changelog/0.16.0.md': 'https://github.com/dstackai/dstack/releases/0.16.0'
-        'changelog/0.16.1.md': 'https://github.com/dstackai/dstack/releases/0.16.1'
-        'changelog/0.17.0.md': 'https://github.com/dstackai/dstack/releases/0.17.0'
-        'changelog/0.18.0.md': 'https://github.com/dstackai/dstack/releases/0.18.0'
-        'docs/concepts/projects.md': 'docs/guides/administration.md'
-        'docs/concepts/repos.md': 'docs/guides/repos.md'
-        'docs/guides/metrics.md': 'docs/guides/monitoring.md'
         'docs/dev-environments.md': 'docs/concepts/dev-environments.md'
         'docs/tasks.md': 'docs/concepts/tasks.md'
         'docs/services.md': 'docs/concepts/services.md'
         'docs/fleets.md': 'docs/concepts/fleets.md'
-        'docs/examples/index.md': 'examples.md'
         'docs/examples/llms/llama31.md': 'examples/llms/llama31/index.md'
         'docs/examples/llms/llama32.md': 'examples/llms/llama32/index.md'
         'docs/examples/accelerators/amd/index.md': 'examples/accelerators/amd/index.md'
@@ -125,7 +98,6 @@ plugins:
         'docs/examples/deployment/tgi/index.md': 'examples/deployment/tgi/index.md'
         'providers.md': 'partners.md'
         'backends.md': 'partners.md'
-        'developers.md': 'community.md'
         'blog/ambassador-program.md': 'blog/archive/ambassador-program.md'
         'blog/monitoring-gpu-usage.md': 'blog/posts/dstack-metrics.md'
         'blog/inactive-dev-environments-auto-shutdown.md': 'blog/posts/inactivity-duration.md'
@@ -199,12 +171,12 @@ extra:
     provider: google
     property: G-JX21114P7B
   social:
-    - icon: /fontawesome/brands/github
-      link: https://github.com/dstackai/dstack
     - icon: /fontawesome/brands/python
       link: https://pypi.org/project/dstack
     - icon: /fontawesome/brands/docker
       link: https://hub.docker.com/r/dstackai/dstack
+    - icon: /fontawesome/brands/github
+      link: https://github.com/dstackai/dstack
     - icon: /fontawesome/brands/discord
       link: https://discord.gg/u8SmfwPpMd
     - icon: /simple/x
@@ -222,71 +194,71 @@ nav:
           - Installation: docs/installation/index.md
           - Quickstart: docs/quickstart.md
       - Concepts:
-          - Backends: docs/concepts/backends.md
           - Dev environments: docs/concepts/dev-environments.md
           - Tasks: docs/concepts/tasks.md
           - Services: docs/concepts/services.md
           - Fleets: docs/concepts/fleets.md
           - Volumes: docs/concepts/volumes.md
+          - Repos: docs/concepts/repos.md
+          - Metrics: docs/concepts/metrics.md
+          - Backends: docs/concepts/backends.md
+          - Projects: docs/concepts/projects.md
           - Gateways: docs/concepts/gateways.md
       - Guides:
           - Protips: docs/guides/protips.md
-          - Repos: docs/guides/repos.md
           - Server deployment: docs/guides/server-deployment.md
-          - Monitoring: docs/guides/monitoring.md
           - Troubleshooting: docs/guides/troubleshooting.md
-          - Administration: docs/guides/administration.md
       - Reference:
-          - .dstack.yml:
-              - dev-environment: docs/reference/dstack.yml/dev-environment.md
-              - task: docs/reference/dstack.yml/task.md
-              - service: docs/reference/dstack.yml/service.md
-              - fleet: docs/reference/dstack.yml/fleet.md
-              - gateway: docs/reference/dstack.yml/gateway.md
-              - volume: docs/reference/dstack.yml/volume.md
-          - server/config.yml: docs/reference/server/config.yml.md
-          - CLI:
-              - dstack server: docs/reference/cli/dstack/server.md
-              - dstack init: docs/reference/cli/dstack/init.md
-              - dstack apply: docs/reference/cli/dstack/apply.md
-              - dstack delete: docs/reference/cli/dstack/delete.md
-              - dstack ps: docs/reference/cli/dstack/ps.md
-              - dstack stop: docs/reference/cli/dstack/stop.md
-              - dstack attach: docs/reference/cli/dstack/attach.md
-              - dstack logs: docs/reference/cli/dstack/logs.md
-              - dstack metrics: docs/reference/cli/dstack/metrics.md
-              - dstack config: docs/reference/cli/dstack/config.md
-              - dstack fleet: docs/reference/cli/dstack/fleet.md
-              - dstack volume: docs/reference/cli/dstack/volume.md
-              - dstack gateway: docs/reference/cli/dstack/gateway.md
-          - API:
-              - Python API: docs/reference/api/python/index.md
-              - REST API: docs/reference/api/rest/index.md
-          - Environment variables: docs/reference/environment-variables.md
+        - .dstack.yml:
+            - dev-environment: docs/reference/dstack.yml/dev-environment.md
+            - task: docs/reference/dstack.yml/task.md
+            - service: docs/reference/dstack.yml/service.md
+            - fleet: docs/reference/dstack.yml/fleet.md
+            - gateway: docs/reference/dstack.yml/gateway.md
+            - volume: docs/reference/dstack.yml/volume.md
+        - server/config.yml: docs/reference/server/config.yml.md
+        - CLI:
+            - dstack server: docs/reference/cli/dstack/server.md
+            - dstack init: docs/reference/cli/dstack/init.md
+            - dstack apply: docs/reference/cli/dstack/apply.md
+            - dstack delete: docs/reference/cli/dstack/delete.md
+            - dstack ps: docs/reference/cli/dstack/ps.md
+            - dstack stop: docs/reference/cli/dstack/stop.md
+            - dstack attach: docs/reference/cli/dstack/attach.md
+            - dstack logs: docs/reference/cli/dstack/logs.md
+            - dstack metrics: docs/reference/cli/dstack/metrics.md
+            - dstack config: docs/reference/cli/dstack/config.md
+            - dstack fleet: docs/reference/cli/dstack/fleet.md
+            - dstack volume: docs/reference/cli/dstack/volume.md
+            - dstack gateway: docs/reference/cli/dstack/gateway.md
+        - API:
+            - Python API: docs/reference/api/python/index.md
+            - REST API: docs/reference/api/rest/index.md
+        - Environment variables: docs/reference/environment-variables.md
   - Examples:
     - examples.md
+    - Fine-tuning:
+        - TRL: examples/fine-tuning/trl/index.md
+        - Axolotl: examples/fine-tuning/axolotl/index.md
     - Deployment:
+        - SGLang: examples/deployment/sglang/index.md
         - vLLM: examples/deployment/vllm/index.md
         - TGI:  examples/deployment/tgi/index.md
         - NIM: examples/deployment/nim/index.md
-        - SGLang: examples/deployment/sglang/index.md
-    - Fine-tuning:
-        - Axolotl: examples/fine-tuning/axolotl/index.md
-        - TRL: examples/fine-tuning/trl/index.md
-    - Accelerators:
-        - AMD: examples/accelerators/amd/index.md
-        - Intel Gaudi: examples/accelerators/intel/index.md
-        - TPU: examples/accelerators/tpu/index.md
     - LLMs:
         - Deepseek: examples/llms/deepseek/index.md
         - Llama 3.1: examples/llms/llama31/index.md
         - Llama 3.2: examples/llms/llama32/index.md
+    - Accelerators:
+        - AMD: examples/accelerators/amd/index.md
+        - Intel Gaudi: examples/accelerators/intel/index.md
+        - TPU: examples/accelerators/tpu/index.md
     - Misc:
         - Docker Compose: examples/misc/docker-compose/index.md
         - NCCL Tests: examples/misc/nccl-tests/index.md
         - A3 Mega: examples/misc/a3mega-clusters/index.md
 #  - Community: community.md
-  - Partners: partners.md
+#  - Partners: partners.md
   - Blog:
       - blog/index.md
   - Discord: https://discord.gg/u8SmfwPpMd" target="_blank
