@@ -161,13 +161,18 @@ To request multiple GPUs, specify the quantity after the GPU name, separated by 
     
     ```yaml
     type: task
+    # The name is optional, if not specified, generated randomly
     name: axolotl-amd-llama31-train
-    
+
     # Using RunPod's ROCm Docker image
     image: runpod/pytorch:2.1.2-py3.10-rocm6.0.2-ubuntu22.04
     # Required environment variables
     env:
       - HF_TOKEN
+      - WANDB_API_KEY
+      - WANDB_PROJECT
+      - WANDB_NAME
+      - HUB_MODEL_ID
     # Commands of the task
     commands:
       - export PATH=/opt/conda/envs/py_3.10/bin:$PATH
@@ -177,6 +182,8 @@ To request multiple GPUs, specify the quantity after the GPU name, separated by 
       - cd axolotl
       - git checkout d4f6c65
       - pip install -e .
+      - pip uninstall pynvml -y
+      - pip install pynvml==11.5.3
       - cd ..
       - wget https://dstack-binaries.s3.amazonaws.com/flash_attn-2.0.4-cp310-cp310-linux_x86_64.whl
       - pip install flash_attn-2.0.4-cp310-cp310-linux_x86_64.whl
@@ -190,10 +197,10 @@ To request multiple GPUs, specify the quantity after the GPU name, separated by 
       - make
       - pip install .
       - cd ..
-      - accelerate launch -m axolotl.cli.train axolotl/examples/llama-3/fft-8b.yaml
-    
-    # Uncomment to leverage spot instances
-    #spot_policy: auto
+      - accelerate launch -m axolotl.cli.train -- axolotl/examples/llama-3/fft-8b.yaml 
+              --wandb-project "$WANDB_PROJECT" 
+              --wandb-name "$WANDB_NAME" 
+              --hub-model-id "$HUB_MODEL_ID"
 
     resources:
       gpu: MI300X
@@ -216,6 +223,10 @@ cloud resources and run the configuration.
 
 ```shell
 $ HF_TOKEN=...
+$ WANDB_API_KEY=...
+$ WANDB_PROJECT=...
+$ WANDB_NAME=...
+$ HUB_MODEL_ID=...
 $ dstack apply -f examples/deployment/vllm/amd/.dstack.yml
 ```
 

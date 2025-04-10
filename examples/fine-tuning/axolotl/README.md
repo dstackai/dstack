@@ -1,7 +1,7 @@
 # Axolotl
 
 This example shows how use [Axolotl :material-arrow-top-right-thin:{ .external }](https://github.com/OpenAccess-AI-Collective/axolotl){:target="_blank"} 
-with `dstack` to fine-tune Llama3 8B using FSDP and QLoRA.
+with `dstack` to fine-tune 4-bit Quantized [Llama-4-Scout-17B-16E :material-arrow-top-right-thin:{ .external }](https://huggingface.co/axolotl-quants/Llama-4-Scout-17B-16E-Linearized-bnb-nf4-bf16){:target="_blank"} using FSDP and QLoRA.
 
 ??? info "Prerequisites"
     Once `dstack` is [installed](https://dstack.ai/docs/installation), go ahead clone the repo, and run `dstack init`.
@@ -18,44 +18,45 @@ with `dstack` to fine-tune Llama3 8B using FSDP and QLoRA.
 
 ## Training configuration recipe
 
-Axolotl reads the model, LoRA, and dataset arguments, as well as trainer configuration from a YAML file. This file can
-be found at [`examples/fine-tuning/axolotl/config.yaml` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/axolotl/config.yaml){:target="_blank"}.
-You can modify it as needed.
+Axolotl reads the model, QLoRA, and dataset arguments, as well as trainer configuration from a [`scout-qlora-fsdp1.yaml` :material-arrow-top-right-thin:{ .external }](https://github.com/axolotl-ai-cloud/axolotl/blob/main/examples/llama-4/scout-qlora-fsdp1.yaml){:target="_blank"} file. The configuration uses 4-bit axolotl quantized version of `meta-llama/Llama-4-Scout-17B-16E`, requiring only ~43GB VRAM/GPU with 4K context length.
 
-> Before you proceed with training, make sure to update the `hub_model_id` in [`examples/fine-tuning/axolotl/config.yaml` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/alignment-handbook/config.yaml){:target="_blank"}
-> with your HuggingFace username.
 
 ## Single-node training
 
 The easiest way to run a training script with `dstack` is by creating a task configuration file.
-This file can be found at [`examples/fine-tuning/axolotl/train.dstack.yml` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/axolotl/train.dstack.yml){:target="_blank"}.
+This file can be found at [`examples/fine-tuning/axolotl/.dstack.yml` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/axolotl/.dstack.yaml){:target="_blank"}.
 
 <div editor-title="examples/fine-tuning/axolotl/.dstack.yml">
 
 ```yaml
 type: task
+# The name is optional, if not specified, generated randomly
 name: axolotl-train
 
 # Using the official Axolotl's Docker image
-image: winglian/axolotl-cloud:main-20240429-py3.11-cu121-2.2.1
+image: axolotlai/axolotl:main-latest
 
 # Required environment variables
 env:
   - HF_TOKEN
   - WANDB_API_KEY
+  - WANDB_PROJECT
+  - WANDB_NAME
+  - HUB_MODEL_ID
 # Commands of the task
 commands:
-  - accelerate launch -m axolotl.cli.train examples/fine-tuning/axolotl/config.yaml
-
-# Uncomment to leverage spot instances
-#spot_policy: auto
+  - wget https://raw.githubusercontent.com/axolotl-ai-cloud/axolotl/main/examples/llama-4/scout-qlora-fsdp1.yaml
+  - axolotl train scout-qlora-fsdp1.yaml 
+            --wandb-project $WANDB_PROJECT 
+            --wandb-name $WANDB_NAME 
+            --hub-model-id $HUB_MODEL_ID
 
 resources:
-  gpu:
-    # 24GB or more vRAM
-    memory: 24GB..
-    # Two or more GPU
-    count: 2..
+  # Two GPU (required by FSDP)
+  gpu: H100:2
+  # Shared memory size for inter-process communication
+  shm_size: 24GB
+  disk: 500GB..
 ```
 
 </div>
@@ -75,6 +76,9 @@ cloud resources and run the configuration.
 ```shell
 $ HF_TOKEN=...
 $ WANDB_API_KEY=...
+$ WANDB_PROJECT=...
+$ WANDB_NAME=...
+$ HUB_MODEL_ID=...
 $ dstack apply -f examples/fine-tuning/axolotl/.dstack.yml
 ```
 
