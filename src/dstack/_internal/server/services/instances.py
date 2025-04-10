@@ -176,6 +176,12 @@ def filter_pool_instances(
             regions = [master_job_provisioning_data.region]
         regions = [r for r in regions if r == master_job_provisioning_data.region]
 
+    if regions is not None:
+        regions = [r.lower() for r in regions]
+    instance_types = profile.instance_types
+    if instance_types is not None:
+        instance_types = [i.lower() for i in instance_types]
+
     for instance in pool_instances:
         if fleet_model is not None and instance.fleet_id != fleet_model.id:
             continue
@@ -190,12 +196,9 @@ def filter_pool_instances(
         if jpd is not None:
             if backend_types is not None and jpd.get_base_backend() not in backend_types:
                 continue
-            if regions is not None and jpd.region not in regions:
+            if regions is not None and jpd.region.lower() not in regions:
                 continue
-            if (
-                profile.instance_types is not None
-                and jpd.instance_type.name not in profile.instance_types
-            ):
+            if instance_types is not None and jpd.instance_type.name.lower() not in instance_types:
                 continue
             if (
                 jpd.availability_zone is not None
