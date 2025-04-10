@@ -284,6 +284,7 @@ nav:
     - Misc:
         - Docker Compose: examples/misc/docker-compose/index.md
         - NCCL Tests: examples/misc/nccl-tests/index.md
+        - A3 Mega: examples/misc/a3mega-clusters/index.md
 #  - Community: community.md
   - Partners: partners.md
   - Blog:

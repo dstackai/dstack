@@ -174,4 +174,14 @@ hide:
             Run multi-node NCCL tests with MPI
         </p>
     </a>
+    <a href="/examples/misc/a3mega-clusters"
+       class="feature-cell sky">
+        <h3>
+            A3 Mega
+        </h3>
+
+        <p>
+            Set up GCP A3 Mega clusters with optimized networking
+        </p>
+    </a>
 </div>
