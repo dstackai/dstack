@@ -30,6 +30,7 @@ async def register_service(
         run_name=body.run_name.lower(),
         domain=body.domain.lower(),
         https=body.https,
+        rate_limits=body.rate_limits,
         auth=body.auth,
         client_max_body_size=body.client_max_body_size,
         model=body.options.openai.model if body.options.openai is not None else None,

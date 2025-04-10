@@ -3,6 +3,7 @@ import subprocess
 import tempfile
 from asyncio import Lock
 from pathlib import Path
+from typing import Optional
 
 import jinja2
 from pydantic import BaseModel
@@ -38,6 +39,22 @@ class ReplicaConfig(BaseModel):
     socket: Path
 
 
+class LimitReqZoneConfig(BaseModel):
+    name: str
+    key: str
+    rpm: int
+
+
+class LimitReqConfig(BaseModel):
+    zone: str
+    burst: int
+
+
+class LocationConfig(BaseModel):
+    prefix: str
+    limit_req: Optional[LimitReqConfig]
+
+
 class ServiceConfig(SiteConfig):
     type: Literal["service"] = "service"
     project_name: str
@@ -45,6 +62,8 @@ class ServiceConfig(SiteConfig):
     auth: bool
     client_max_body_size: int
     access_log_path: Path
+    limit_req_zones: list[LimitReqZoneConfig]
+    locations: list[LocationConfig]
     replicas: list[ReplicaConfig]
 
 

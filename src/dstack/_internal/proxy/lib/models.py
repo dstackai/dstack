@@ -28,11 +28,32 @@ class Replica(ImmutableModel):
     ssh_head_proxy_private_key: Optional[str] = None
 
 
+class ClientIPAddressPartitioning((ImmutableModel)):
+    type: Literal["ip_address"] = "ip_address"
+
+
+class HeaderValuePartitioning(ImmutableModel):
+    type: Literal["header"] = "header"
+    header: str
+
+
+class RateLimit(ImmutableModel):
+    # TODO: validators: rps > 1/60, burst >= 0, valid prefix, no duplicate prefixes, valid header
+    key: Annotated[
+        Union[ClientIPAddressPartitioning, HeaderValuePartitioning], Field(discriminator="type")
+    ]
+    rps: float
+    burst: int
+    prefix: str
+
+
+# TODO: add hashability test?
 class Service(ImmutableModel):
     project_name: str
     run_name: str
     domain: Optional[str]  # only used on gateways
     https: Optional[bool]  # only used on gateways
+    rate_limits: tuple[RateLimit, ...] = ()  # only used on gateways
     auth: bool
     client_max_body_size: int  # only enforced on gateways
     strip_prefix: bool = True  # only used in-server
@@ -51,15 +72,7 @@ class Service(ImmutableModel):
         return self.https
 
     def with_replicas(self, new_replicas: Iterable[Replica]) -> "Service":
-        return Service(
-            project_name=self.project_name,
-            run_name=self.run_name,
-            domain=self.domain,
-            https=self.https,
-            auth=self.auth,
-            client_max_body_size=self.client_max_body_size,
-            replicas=tuple(new_replicas),
-        )
+        return Service(**{**self.dict(), "replicas": tuple(new_replicas)})
 
     def find_replica(self, replica_id: str) -> Optional[Replica]:
         for replica in self.replicas:

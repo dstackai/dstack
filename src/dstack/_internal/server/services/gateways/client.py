@@ -7,6 +7,7 @@ from pydantic import parse_obj_as
 
 from dstack._internal.core.consts import DSTACK_RUNNER_SSH_PORT
 from dstack._internal.core.errors import GatewayError
+from dstack._internal.core.models.configurations import RateLimit
 from dstack._internal.core.models.instances import SSHConnectionParams
 from dstack._internal.core.models.runs import JobSubmission, Run
 from dstack._internal.proxy.gateway.schemas.stats import ServiceStats
@@ -42,6 +43,7 @@ class GatewayClient:
         auth: bool,
         client_max_body_size: int,
         options: dict,
+        rate_limits: list[RateLimit],
         ssh_private_key: str,
     ):
         if "openai" in options:
@@ -55,6 +57,7 @@ class GatewayClient:
             "auth": auth,
             "client_max_body_size": client_max_body_size,
             "options": options,
+            "rate_limits": [limit.dict() for limit in rate_limits],
             "ssh_private_key": ssh_private_key,
         }
         resp = await self._client.post(

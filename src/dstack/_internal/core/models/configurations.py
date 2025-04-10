@@ -85,6 +85,25 @@ class ScalingSpec(CoreModel):
     ] = Duration.parse("10m")
 
 
+class ClientIPAddressPartitioningKey(CoreModel):
+    type: Literal["ip_address"] = "ip_address"
+
+
+class HeaderValuePartitioningKey(CoreModel):
+    type: Literal["header"] = "header"
+    header: str
+
+
+class RateLimit(CoreModel):
+    prefix: str = "/"
+    key: Annotated[
+        Union[ClientIPAddressPartitioningKey, HeaderValuePartitioningKey],
+        Field(discriminator="type"),
+    ] = ClientIPAddressPartitioningKey()
+    rps: float
+    burst: int = 0
+
+
 class BaseRunConfiguration(CoreModel):
     type: Literal["none"]
     name: Annotated[
@@ -306,6 +325,7 @@ class ServiceConfigurationParams(CoreModel):
         Optional[ScalingSpec],
         Field(description="The auto-scaling rules. Required if `replicas` is set to a range"),
     ] = None
+    rate_limits: Annotated[list[RateLimit], Field(description="Rate limiting rules")] = []
 
     @validator("port")
     def convert_port(cls, v) -> PortMapping:

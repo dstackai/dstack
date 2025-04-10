@@ -109,6 +109,7 @@ async def _register_service_in_gateway(
                 auth=run_spec.configuration.auth,
                 client_max_body_size=settings.DEFAULT_SERVICE_CLIENT_MAX_BODY_SIZE,
                 options=service_spec.options,
+                rate_limits=run_spec.configuration.rate_limits,
                 ssh_private_key=run_model.project.ssh_private_key,
             )
         logger.info("%s: service is registered as %s", fmt(run_model), service_spec.url)
@@ -126,13 +127,18 @@ def _register_service_in_server(run_model: RunModel, run_spec: RunSpec) -> Servi
         # Note: if the user sets `https: <default-value>`, it will be ignored silently
         # TODO: in 0.19, make `https` Optional to be able to tell if it was set or omitted
         raise ServerClientError(
-            "The `https` configuration property is not applicable when running services without a gateway. "
-            "Please configure a gateway or remove the `https` property from the service configuration"
+            "The `https` configuration property is not applicable when running services without a gateway."
+            " Please configure a gateway or remove the `https` property from the service configuration"
         )
     if run_spec.configuration.replicas.min != run_spec.configuration.replicas.max:
         raise ServerClientError(
-            "Auto-scaling is not yet supported when running services without a gateway. "
-            "Please configure a gateway or set `replicas` to a fixed value in the service configuration"
+            "Auto-scaling is not supported when running services without a gateway."
+            " Please configure a gateway or set `replicas` to a fixed value in the service configuration"
+        )
+    if run_spec.configuration.rate_limits:
+        raise ServerClientError(
+            "Rate limits are not supported when running services without a gateway."
+            " Please configure a gateway or remove `rate_limits` from the service configuration"
         )
     return get_service_spec(
         configuration=run_spec.configuration,
