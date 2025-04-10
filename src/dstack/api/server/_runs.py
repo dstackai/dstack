@@ -107,9 +107,9 @@ def _get_run_spec_excludes(run_spec: RunSpec) -> Optional[Dict]:
     configuration = run_spec.configuration
     profile = run_spec.profile
     if configuration.fleets is None:
-        configuration_excludes["fleet"] = True
+        configuration_excludes["fleets"] = True
     if profile is not None and profile.fleets is None:
-        profile_excludes.add("fleet")
+        profile_excludes.add("fleets")
     if configuration_excludes:
         spec_excludes["configuration"] = configuration_excludes
     if profile_excludes:
