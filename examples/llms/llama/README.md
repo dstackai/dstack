@@ -1,6 +1,6 @@
 # Llama
 
-This example walks you through how to deploy [Llama-4-Scout-17B-16E :material-arrow-top-right-thin:{ .external }](https://huggingface.co/meta-llama/Llama-4-Scout-17B-16E-Instruct){:target="_blank"} model with `dstack`.
+This example walks you through how to deploy Llama 4 Scout model with `dstack`.
 
 ??? info "Prerequisites"
     Once `dstack` is [installed](https://dstack.ai/docs/installation), go ahead clone the repo, and run `dstack init`.
@@ -17,7 +17,10 @@ This example walks you through how to deploy [Llama-4-Scout-17B-16E :material-ar
 
 ## Deployment
 
-Here's an example of a service that deploys `Llama-4-Scout-17B-16E-Instruct` using [SGLang :material-arrow-top-right-thin:{ .external }](https://github.com/sgl-project/sglang){:target="_blank"} and [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/vllm-project/vllm){:target="_blank"} with NVIDIA `H200` GPUs.
+Here's an example of a service that deploys 
+[`Llama-4-Scout-17B-16E-Instruct` :material-arrow-top-right-thin:{ .external }](https://huggingface.co/meta-llama/Llama-4-Scout-17B-16E-Instruct){:target="_blank"} 
+using [SGLang :material-arrow-top-right-thin:{ .external }](https://github.com/sgl-project/sglang){:target="_blank"} and [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/vllm-project/vllm){:target="_blank"} 
+with NVIDIA `H200` GPUs.
 
 === "SGLang"
 
@@ -81,7 +84,11 @@ Here's an example of a service that deploys `Llama-4-Scout-17B-16E-Instruct` usi
       disk: 500GB..
     ```
     </div>
-Note: With vLLM add --override-generation-config='{"attn_temperature_tuning": true}' to improve accuracy for contexts longer than 32K tokens ([source](https://blog.vllm.ai/2025/04/05/llama4.html)).
+
+!!! info "NOTE:"
+    With vLLM, add `--override-generation-config='{"attn_temperature_tuning": true}'` to 
+    improve accuracy for [contexts longer than 32K tokens :material-arrow-top-right-thin:{ .external }](https://blog.vllm.ai/2025/04/05/llama4.html){:target="_blank"}.
+
 ### Memory requirements
 
 Below are the approximate memory requirements for loading the model. 
@@ -160,4 +167,5 @@ The source-code of this example can be found in
 
 1. Check [dev environments](https://dstack.ai/docs/dev-environments), [tasks](https://dstack.ai/docs/tasks), 
    [services](https://dstack.ai/docs/services), and [protips](https://dstack.ai/docs/protips).
-2. Browse [Llama 4 in Sglang :material-arrow-top-right-thin:{ .external }](https://github.com/sgl-project/sglang/blob/main/docs/references/llama4.md) and [Llama 4 in vLLM :material-arrow-top-right-thin:{ .external }](https://blog.vllm.ai/2025/04/05/llama4.html)
+2. Browse [Llama 4 with SGLang :material-arrow-top-right-thin:{ .external }](https://github.com/sgl-project/sglang/blob/main/docs/references/llama4.md) 
+   and [Llama 4 with vLLM :material-arrow-top-right-thin:{ .external }](https://blog.vllm.ai/2025/04/05/llama4.html).
