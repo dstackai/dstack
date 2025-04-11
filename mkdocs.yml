@@ -116,7 +116,6 @@ plugins:
         'docs/tasks.md': 'docs/concepts/tasks.md'
         'docs/services.md': 'docs/concepts/services.md'
         'docs/fleets.md': 'docs/concepts/fleets.md'
-        'docs/examples/index.md': 'examples.md'
         'docs/examples/llms/llama31.md': 'examples/llms/llama/index.md'
         'docs/examples/llms/llama32.md': 'examples/llms/llama/index.md'
         'examples/llms/llama31/index.md': 'examples/llms/llama/index.md'
