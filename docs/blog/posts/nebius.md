@@ -2,7 +2,7 @@
 title: Supporting GPU provisioning and orchestration on Nebius
 date: 2025-04-11
 description: "TBA"  
-slug: nebius.md
+slug: nebius
 image: https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-nebius-v2.png?raw=true
 categories:
   - Cloud fleets
