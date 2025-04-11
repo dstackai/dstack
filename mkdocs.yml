@@ -239,14 +239,14 @@ nav:
         - Environment variables: docs/reference/environment-variables.md
   - Examples:
     - examples.md
+    - Fine-tuning:
+        - TRL: examples/fine-tuning/trl/index.md
+        - Axolotl: examples/fine-tuning/axolotl/index.md
     - Deployment:
         - SGLang: examples/deployment/sglang/index.md
         - vLLM: examples/deployment/vllm/index.md
         - TGI:  examples/deployment/tgi/index.md
         - NIM: examples/deployment/nim/index.md
-    - Fine-tuning:
-        - TRL: examples/fine-tuning/trl/index.md
-        - Axolotl: examples/fine-tuning/axolotl/index.md
     - LLMs:
         - Deepseek: examples/llms/deepseek/index.md
         - Llama: examples/llms/llama/index.md
