@@ -1,0 +1,24 @@
+type: service
+name: llama4-scout
+
+image: vllm/vllm-openai
+env:
+  - HF_TOKEN
+  - MODEL_ID=meta-llama/Llama-4-Scout-17B-16E-Instruct
+  - VLLM_DISABLE_COMPILE_CACHE=1
+  - MAX_MODEL_LEN=256000
+commands:
+   - |
+     vllm serve $MODEL_ID \
+       --tensor-parallel-size $DSTACK_GPUS_NUM \
+       --max-model-len $MAX_MODEL_LEN \
+       --kv-cache-dtype fp8 \
+       --override-generation-config='{"attn_temperature_tuning": true}'
+
+port: 8000
+# Register the model
+model: meta-llama/Llama-4-Scout-17B-16E-Instruct
+
+resources:
+  gpu: H200:2
+  disk: 500GB..
