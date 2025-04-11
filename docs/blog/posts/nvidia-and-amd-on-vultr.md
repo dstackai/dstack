@@ -5,6 +5,7 @@ description: "Introducing integration with Vultr: The new integration allows Vul
 slug: nvidia-and-amd-on-vultr.md
 image: https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-vultr.png?raw=true
 categories:
+  - Cloud fleets
   - NVIDIA
   - AMD
 ---

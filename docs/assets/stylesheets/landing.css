@@ -251,7 +251,8 @@
     vertical-align: middle;
 }
 
-.md-typeset .md-button .icon, .md-typeset .md-link .icon {
+.md-typeset .md-button .icon,
+.md-typeset .md-post__action .icon {
     display: inline-block;
     position: relative;
     width: 15px;
