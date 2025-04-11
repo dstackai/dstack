@@ -206,8 +206,8 @@ jobs:
       name: Set latest variable
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v5
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
         with:
           python-version: 3.11
       - name: Download frontend build
@@ -215,10 +215,6 @@ jobs:
         with:
           name: frontend-build
           path: src/dstack/_internal/server/statics
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install wheel twine packaging
       - name: Set output
         id: set_latest
         run: |
@@ -233,8 +229,8 @@ jobs:
           echo "__is_release__ = True" >> src/dstack/version.py
           echo $BASE_IMAGE >> src/dstack/version.py
           cp README.md src
-          python setup.py sdist bdist_wheel -v
-          python -m twine upload --repository pypi --username ${{ secrets.PYPI_USERNAME }} --password ${{ secrets.PYPI_PASSWORD }} dist/*        
+          uv build
+          uv publish --username ${{ secrets.PYPI_USERNAME }} --password ${{ secrets.PYPI_PASSWORD }}   
 
   update-get-dstack-tag:
     needs: [pypi-upload]
