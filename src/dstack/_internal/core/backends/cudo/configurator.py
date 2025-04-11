@@ -17,17 +17,6 @@ from dstack._internal.core.backends.cudo.models import (
 )
 from dstack._internal.core.models.backends.base import BackendType
 
-REGIONS = [
-    "no-luster-1",
-    "se-smedjebacken-1",
-    "gb-london-1",
-    "se-stockholm-1",
-    "us-newyork-1",
-    "us-santaclara-1",
-]
-
-DEFAULT_REGION = "no-luster-1"
-
 
 class CudoConfigurator(Configurator):
     TYPE = BackendType.CUDO
@@ -39,8 +28,6 @@ class CudoConfigurator(Configurator):
     def create_backend(
         self, project_name: str, config: CudoBackendConfigWithCreds
     ) -> BackendRecord:
-        if config.regions is None:
-            config.regions = REGIONS
         return BackendRecord(
             config=CudoStoredConfig(
                 **CudoBackendConfig.__response__.parse_obj(config).dict()

@@ -11,23 +11,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: astral-sh/setup-uv@v5
         with:
           python-version: 3.11
       - name: Install dstack
         run: |
           if [ -n "${{ inputs.release_tag }}" ]; then
-            pip install "dstack[server]==${{ inputs.release_tag }}"
+            uv pip install "dstack[server]==${{ inputs.release_tag }}"
           else
-            pip install -e .[server]
+            uv sync --extra server
           fi
       - name: Build
         run: |
-          pip install pillow cairosvg
+          uv pip install pillow cairosvg
           sudo apt-get install -y libcairo2-dev libfreetype6-dev libffi-dev libjpeg-dev libpng-dev libz-dev
-          pip install mkdocs-material "mkdocs-material[imaging]" mkdocs-material-extensions mkdocs-redirects mkdocs-gen-files "mkdocstrings[python]" mkdocs-render-swagger-plugin --upgrade
-          pip install git+https://${{ secrets.GH_TOKEN }}@github.com/squidfunk/mkdocs-material-insiders.git
-          mkdocs build -s
+          uv pip install mkdocs-material "mkdocs-material[imaging]" mkdocs-material-extensions mkdocs-redirects mkdocs-gen-files "mkdocstrings[python]" mkdocs-render-swagger-plugin --upgrade
+          uv pip install git+https://${{ secrets.GH_TOKEN }}@github.com/squidfunk/mkdocs-material-insiders.git
+          uv run mkdocs build -s
       - name: Deploy
         uses: JamesIves/github-pages-deploy-action@v4.6.4
         with:

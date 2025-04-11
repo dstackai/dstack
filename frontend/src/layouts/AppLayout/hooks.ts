@@ -22,6 +22,7 @@ export const useSideNavigation = () => {
 
     const isPoolDetails = Boolean(useMatch(ROUTES.FLEETS.DETAILS.TEMPLATE));
     const billingUrl = ROUTES.USER.BILLING.LIST.FORMAT(userName);
+    const userProjectsUrl = ROUTES.USER.PROJECTS.FORMAT(userName);
 
     const generalLinks = [
         { type: 'link', text: t('navigation.runs'), href: ROUTES.RUNS.LIST },
@@ -48,6 +49,11 @@ export const useSideNavigation = () => {
             type: 'link',
             text: t('navigation.billing'),
             href: billingUrl,
+        },
+        {
+            type: 'link',
+            text: t('users.projects'),
+            href: userProjectsUrl,
         },
     ].filter(Boolean);
 
@@ -93,7 +99,8 @@ export const useSideNavigation = () => {
 
         {
             type: 'link',
-            text: `dstack version: ${serverInfoData?.server_version}`,
+            href: '#version',
+            text: `dstack version: ${serverInfoData?.server_version ?? 'No version'}`,
         },
     ].filter(Boolean) as SideNavigationProps['items'];
 

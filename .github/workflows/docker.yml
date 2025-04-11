@@ -34,7 +34,7 @@ on:
 
 env:
   PACKER_VERSION: "1.9.2"
-  BUILD_PREFIX: ${{ inputs.staging && format('stgn-{0}-', github.run_number) || '' }}  # staging ? prefix : ''
+  BUILD_PREFIX: ${{ inputs.staging && format('stgn-{0}-', github.run_number) || '' }} # staging ? prefix : ''
 
 jobs:
   build-docker:
@@ -45,23 +45,23 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python: [ "3.9", "3.10", "3.11", "3.12", "3.13" ]
+        python: ["3.9", "3.10", "3.11", "3.12", "3.13"]
     steps:
-     - name: Checkout repository
-       uses: actions/checkout@v4
-     - name: Set up Docker Buildx
-       uses: docker/setup-buildx-action@v3
-     - name: Login to DockerHub
-       uses: docker/login-action@v3
-       with:
-         username: ${{ secrets.DOCKERHUB_USERNAME }}
-         password: ${{ secrets.DOCKERHUB_TOKEN }}
-     - name: Set up QEMU
-       uses: docker/setup-qemu-action@v3
-     - name: Build and upload to DockerHub
-       run: |
-         docker buildx build --platform linux/amd64 --build-arg PYTHON=${{ matrix.python }} --push --provenance=false --tag dstackai/base:py${{ matrix.python }}-${{ inputs.image_version }}-cuda-12.1 -f base/Dockerfile .
-         docker buildx build --platform linux/amd64 --build-arg PYTHON=${{ matrix.python }} --build-arg VERSION=${{ inputs.image_version }} --push --provenance=false --tag dstackai/base:py${{ matrix.python }}-${{ inputs.image_version }}-cuda-12.1-devel -f base/devel.Dockerfile .
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Build and upload to DockerHub
+        run: |
+          docker buildx build --platform linux/amd64 --build-arg PYTHON=${{ matrix.python }} --push --provenance=false --tag dstackai/base:py${{ matrix.python }}-${{ inputs.image_version }}-cuda-12.1 -f base/Dockerfile .
+          docker buildx build --platform linux/amd64 --build-arg PYTHON=${{ matrix.python }} --build-arg VERSION=${{ inputs.image_version }} --push --provenance=false --tag dstackai/base:py${{ matrix.python }}-${{ inputs.image_version }}-cuda-12.1-devel -f base/devel.Dockerfile .
 
   build-aws-images:
     needs: build-docker
@@ -75,7 +75,7 @@ jobs:
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
     strategy:
       matrix:
-        variant: [ "", "-cuda" ]
+        variant: ["", "-cuda"]
     steps:
       - uses: actions/checkout@v4
       - name: Download packer
@@ -87,7 +87,7 @@ jobs:
         run: |
           ./packer build -var-file=versions.json $PROD_VARS -var image_version=${{ inputs.image_version }} -var build_prefix=$BUILD_PREFIX aws-image${{ matrix.variant }}.json
         env:
-          PROD_VARS: ${{ !inputs.staging && '-var-file=aws-vars-prod.json' || '' }}  # production ? var-file : ''
+          PROD_VARS: ${{ !inputs.staging && '-var-file=aws-vars-prod.json' || '' }} # production ? var-file : ''
 
   build-azure-images:
     needs: build-docker
@@ -104,7 +104,7 @@ jobs:
       VERSION: ${{ github.run_number }}
     strategy:
       matrix:
-        variant: [ "", "-cuda", "-grid" ]
+        variant: ["", "-cuda", "-grid"]
     steps:
       - uses: actions/checkout@v4
       - uses: Azure/login@v2
@@ -135,17 +135,17 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        variant: [ "", "-cuda" ]
+        variant: ["", "-cuda"]
     permissions:
-      contents: 'read'
-      id-token: 'write'
+      contents: "read"
+      id-token: "write"
     steps:
       - uses: actions/checkout@v4
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: 'projects/531508670106/locations/global/workloadIdentityPools/github-identity-pool/providers/github-id-provider'
-          service_account: 'github-actions@dstack.iam.gserviceaccount.com'
+          workload_identity_provider: "projects/531508670106/locations/global/workloadIdentityPools/github-identity-pool/providers/github-id-provider"
+          service_account: "github-actions@dstack.iam.gserviceaccount.com"
           create_credentials_file: true
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
@@ -175,7 +175,7 @@ jobs:
       OCI_REGION: eu-frankfurt-1
     strategy:
       matrix:
-        variant: [ "", "-cuda" ]
+        variant: ["", "-cuda"]
     steps:
       - uses: actions/checkout@v4
       - name: Setup OCI config
@@ -211,23 +211,23 @@ jobs:
             -var oci_subnet_ocid=$OCI_SUBNET \
             -var oci_availability_domain=$OCI_AVAILABILITY_DOMAIN \
             oci-image${{ matrix.variant }}.json
-      - uses: actions/setup-python@v5
+      - uses: astral-sh/setup-uv@v5
         with:
-          python-version: '3.12'
+          python-version: "3.12"
       - name: Install dependencies for publishing
         run: |
-          pip install .[oci]
+          uv sync --extra oci
       - name: Copy image to target regions
         if: ${{ !inputs.staging }}
         run: |
-          python scripts/oci_image_tools.py copy \
+          uv run scripts/oci_image_tools.py copy \
             --image ${BUILD_PREFIX}dstack${{ matrix.variant }}-${{ inputs.image_version }} \
             --from $OCI_REGION \
             --compartment $OCI_COMPARTMENT
       - name: Publish image in OCI Marketplace
         if: ${{ !inputs.staging }}
         run: |
-          python scripts/oci_image_tools.py publish \
+          uv run scripts/oci_image_tools.py publish \
             --image ${BUILD_PREFIX}dstack${{ matrix.variant }}-${{ inputs.image_version }} \
             --compartment $OCI_COMPARTMENT \
             --version ${{ inputs.image_version }} \

@@ -2,9 +2,7 @@ package repo
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"os"
 
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"github.com/dstackai/dstack/runner/internal/log"
@@ -67,14 +65,9 @@ func (m *Manager) WithSSHAuth(pem, password string) *Manager {
 
 func (m *Manager) Checkout() error {
 	log.Info(m.ctx, "git checkout", "auth", fmt.Sprintf("%T", (&m.clo).Auth))
-	if _, err := os.Stat(m.localPath); err == nil {
-		if err = os.RemoveAll(m.localPath); err != nil {
-			log.Error(m.ctx, "Failed clear directory")
-		}
-	}
 	ref, err := git.PlainClone(m.localPath, false, &m.clo)
-	if err != nil && !errors.Is(err, git.ErrRepositoryAlreadyExists) {
-		return err
+	if err != nil {
+		return gerrors.Wrap(err)
 	}
 	if ref != nil {
 		branchRef, err := ref.Reference(m.clo.ReferenceName, true)
@@ -87,54 +80,16 @@ func (m *Manager) Checkout() error {
 		} else {
 			cho.Hash = plumbing.NewHash(m.hash)
 		}
-
 		workTree, err := ref.Worktree()
 		if err != nil {
-			return err
+			return gerrors.Wrap(err)
 		}
 		err = workTree.Checkout(&cho)
 		if err != nil {
-			return err
-		}
-
-	} else {
-		log.Warning(m.ctx, "git clone ref==nil")
-	}
-
-	return nil
-}
-
-func (m *Manager) CheckoutBranch(branch string) error {
-	log.Info(m.ctx, "git checkout", "auth", fmt.Sprintf("%T", (&m.clo).Auth))
-	ref, err := git.PlainClone(m.localPath, false, &m.clo)
-	if err != nil && !errors.Is(err, git.ErrRepositoryAlreadyExists) {
-		return err
-	}
-	if ref != nil {
-		workTree, err := ref.Worktree()
-		if err != nil {
-			return err
-		}
-		cho := git.CheckoutOptions{Branch: plumbing.NewBranchReferenceName(branch)}
-		err = workTree.Checkout(&cho)
-		if err != nil {
-			return err
+			return gerrors.Wrap(err)
 		}
 	} else {
 		log.Warning(m.ctx, "git clone ref==nil")
-	}
-
-	return nil
-}
-
-func (m *Manager) CheckoutMaster() error {
-	clo := git.CloneOptions{
-		URL: m.clo.URL,
-	}
-	log.Info(m.ctx, "git checkout", "auth", fmt.Sprintf("%T", clo.Auth))
-	_, err := git.PlainClone(m.localPath, false, &clo)
-	if err != nil {
-		return err
 	}
 
 	return nil

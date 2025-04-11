@@ -473,7 +473,7 @@ If you'd like `dstack` to automatically retry, configure the
 --8<-- "docs/concepts/snippets/manage-runs.ext"
 
 !!! info "What's next?"
-    1. Read about [dev environments](dev-environments.md), [tasks](tasks.md), and [repos](../guides/repos.md)
+    1. Read about [dev environments](dev-environments.md), [tasks](tasks.md), and [repos](repos.md)
     2. Learn how to manage [fleets](fleets.md)
     3. See how to set up [gateways](gateways.md)
     4. Check the [TGI :material-arrow-top-right-thin:{ .external }](../../examples/deployment/tgi/index.md){:target="_blank"},

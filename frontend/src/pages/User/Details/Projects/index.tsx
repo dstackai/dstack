@@ -2,9 +2,9 @@ import React, { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
 
-import { Header, ListEmptyMessage, NavigateLink, Pagination, Table } from 'components';
+import { ListEmptyMessage, NavigateLink, Pagination, Table } from 'components';
 
-import { useCollection } from 'hooks';
+import { useBreadcrumbs, useCollection } from 'hooks';
 import { ROUTES } from 'routes';
 import { useGetProjectsQuery } from 'services/project';
 
@@ -14,6 +14,17 @@ export const UserProjectList: React.FC = () => {
     const paramUserName = params.userName ?? '';
 
     const { isLoading, isFetching, data } = useGetProjectsQuery();
+
+    useBreadcrumbs([
+        {
+            text: t('navigation.account'),
+            href: ROUTES.USER.LIST,
+        },
+        {
+            text: paramUserName,
+            href: ROUTES.USER.DETAILS.FORMAT(paramUserName),
+        },
+    ]);
 
     const renderEmptyMessage = (): React.ReactNode => {
         return (
@@ -42,12 +53,6 @@ export const UserProjectList: React.FC = () => {
         selection: {},
     });
 
-    const renderCounter = () => {
-        if (!filteredData?.length) return '';
-
-        return `(${filteredData.length})`;
-    };
-
     const columns = [
         {
             id: 'project_name',
@@ -65,11 +70,6 @@ export const UserProjectList: React.FC = () => {
             items={items}
             loading={isLoading || isFetching}
             loadingText={t('common.loading')}
-            header={
-                <Header variant="awsui-h1-sticky" counter={renderCounter()}>
-                    {t('users.projects')}
-                </Header>
-            }
             pagination={<Pagination {...paginationProps} disabled={isLoading} />}
         />
     );

@@ -831,8 +831,6 @@ def _validate_run_spec_and_set_defaults(run_spec: RunSpec):
     for mount_point in run_spec.configuration.volumes:
         if not is_valid_docker_volume_target(mount_point.path):
             raise ServerClientError(f"Invalid volume mount path: {mount_point.path}")
-        if mount_point.path.startswith("/workflow"):
-            raise ServerClientError("Mounting volumes inside /workflow is not supported")
     if run_spec.repo_id is None and run_spec.repo_data is not None:
         raise ServerClientError("repo_data must not be set if repo_id is not set")
     if run_spec.repo_id is not None and run_spec.repo_data is None:

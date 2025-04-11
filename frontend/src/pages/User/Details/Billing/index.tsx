@@ -48,10 +48,6 @@ export const Billing: React.FC = () => {
             text: paramUserName,
             href: ROUTES.USER.DETAILS.FORMAT(paramUserName),
         },
-        {
-            text: t('billing.title'),
-            href: ROUTES.USER.BILLING.LIST.FORMAT(paramUserName),
-        },
     ]);
 
     useEffect(() => {

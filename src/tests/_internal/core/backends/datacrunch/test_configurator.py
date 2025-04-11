@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from dstack._internal.core.backends.datacrunch.configurator import (
     DataCrunchConfigurator,
 )
@@ -13,5 +15,7 @@ class TestDataCrunchConfigurator:
             creds=DataCrunchCreds(client_id="valid", client_secret="valid"),
             regions=["FIN-01"],
         )
-        # Currently no validation is implemented
-        DataCrunchConfigurator().validate_config(config, default_creds_enabled=True)
+        with patch(
+            "dstack._internal.core.backends.datacrunch.configurator.DataCrunchConfigurator._validate_creds"
+        ):
+            DataCrunchConfigurator().validate_config(config, default_creds_enabled=True)

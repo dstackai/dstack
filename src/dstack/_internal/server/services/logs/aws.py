@@ -86,28 +86,22 @@ class CloudWatchLogStorage(LogStorage):
                     raise
                 logger.debug("Stream %s not found, returning dummy response", stream)
                 cw_events = []
-        cw_events_iter: Iterator[_CloudWatchLogEvent]
-        if request.descending:
-            # Regardless of the startFromHead value log events are arranged in chronological order,
-            # from earliest to latest.
-            cw_events_iter = reversed(cw_events)
-        else:
-            cw_events_iter = iter(cw_events)
         logs = [
             LogEvent(
                 timestamp=unix_time_ms_to_datetime(cw_event["timestamp"]),
                 log_source=LogEventSource.STDOUT,
                 message=cw_event["message"],
             )
-            for cw_event in cw_events_iter
+            for cw_event in cw_events
         ]
         return JobSubmissionLogs(logs=logs)
 
     def _get_log_events(self, stream: str, request: PollLogsRequest) -> List[_CloudWatchLogEvent]:
+        limit = request.limit
         parameters = {
             "logGroupName": self._group,
             "logStreamName": stream,
-            "limit": request.limit,
+            "limit": limit,
         }
         start_from_head = not request.descending
         parameters["startFromHead"] = start_from_head
@@ -119,25 +113,32 @@ class CloudWatchLogStorage(LogStorage):
             # No need to substract one millisecond in this case, though, seems that endTime is
             # exclusive, that is, time interval boundaries are [startTime, entTime)
             parameters["endTime"] = datetime_to_unix_time_ms(request.end_time)
-        response = self._client.get_log_events(**parameters)
-        events: List[_CloudWatchLogEvent] = response["events"]
-        if start_from_head or events:
-            return events
-        # Workaround for https://github.com/boto/boto3/issues/3718
-        # Required only when startFromHead = false (the default value).
-        next_token: str = response["nextBackwardToken"]
+        # "Partially full or empty pages don't necessarily mean that pagination is finished.
+        # As long as the nextBackwardToken or nextForwardToken returned is NOT equal to the
+        # nextToken that you passed into the API call, there might be more log events available."
+        events: List[_CloudWatchLogEvent] = []
+        next_token: Optional[str] = None
+        next_token_key = "nextForwardToken" if start_from_head else "nextBackwardToken"
         # Limit max tries to avoid a possible infinite loop if the API is misbehaving
         tries_left = 10
         while tries_left:
-            parameters["nextToken"] = next_token
+            if next_token is not None:
+                parameters["nextToken"] = next_token
             response = self._client.get_log_events(**parameters)
-            events = response["events"]
-            if events or response["nextBackwardToken"] == next_token:
+            if start_from_head:
+                events.extend(response["events"])
+            else:
+                # Regardless of the startFromHead value log events are arranged in
+                # chronological order, from earliest to latest.
+                events.extend(reversed(response["events"]))
+            if len(events) >= limit:
+                return events[:limit]
+            if response[next_token_key] == next_token:
                 return events
-            next_token = response["nextBackwardToken"]
+            next_token = response[next_token_key]
             tries_left -= 1
-        logger.warning("too many empty responses from stream %s, returning dummy response", stream)
-        return []
+        logger.warning("too many requests to stream %s, returning partial response", stream)
+        return events
 
     def write_logs(
         self,

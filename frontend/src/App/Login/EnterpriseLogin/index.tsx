@@ -23,6 +23,7 @@ export const EnterpriseLogin: React.FC = () => {
     const entraEnabled = entraData?.enabled;
 
     const isLoading = isLoadingOkta || isLoadingEntra;
+    const isShowTokenForm = !oktaEnabled && !entraEnabled;
 
     return (
         <UnauthorizedLayout>
@@ -32,11 +33,11 @@ export const EnterpriseLogin: React.FC = () => {
                         {t('auth.sign_in_to_dstack_enterprise')}
                     </Box>
 
-                    {!isLoading && !oktaEnabled && <LoginByTokenForm />}
+                    {!isLoading && isShowTokenForm && <LoginByTokenForm />}
                     {!isLoadingOkta && oktaEnabled && <LoginByOkta className={styles.okta} />}
                     {!isLoadingEntra && entraEnabled && <LoginByEntraID className={styles.entra} />}
 
-                    {!isLoading && (oktaEnabled || entraEnabled) && (
+                    {!isLoading && !isShowTokenForm && (
                         <Box color="text-body-secondary">
                             <NavigateLink href={ROUTES.AUTH.TOKEN}>{t('auth.login_by_token')}</NavigateLink>
                         </Box>

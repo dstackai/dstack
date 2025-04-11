@@ -18,13 +18,9 @@
 
 [class^='awsui_navigation'] {
     [class^='awsui_list-container'] {
-        [class*='awsui_list-variant-root--last'] {
-            [class^='awsui_list-item']:last-child {
-                a {
-                    pointer-events: none;
-                    color: awsui.$color-text-status-inactive !important;
-                }
-            }
+        a[href='#version'] {
+            pointer-events: none;
+            color: awsui.$color-text-status-inactive !important;
         }
     }
 }

@@ -114,9 +114,6 @@ volumes:
 Once you run this configuration, the contents of the volume will be attached to `/volume_data` inside the dev environment, 
 and its contents will persist across runs.
 
-> Currently, `dstack` does not allow attaching volumes to `/workflow` or any of its subdirectories because this folder is
-> reserved for fetching the repository
-
 ??? info "Multiple regions or backends"
     If you're unsure in advance which region or backend you'd like to use (or which is available),
     you can specify multiple volumes for the same path.

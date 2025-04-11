@@ -53,12 +53,16 @@ def check_vpc(
     if shared_vpc_project_id:
         vpc_project_id = shared_vpc_project_id
     try:
+        usable_subnets = list_project_usable_subnets(
+            subnetworks_client=subnetworks_client, project_id=vpc_project_id
+        )
         for region in regions:
             get_vpc_subnet_or_error(
                 subnetworks_client=subnetworks_client,
                 vpc_project_id=vpc_project_id,
                 vpc_name=vpc_name,
                 region=region,
+                usable_subnets=usable_subnets,
             )
     except google.api_core.exceptions.NotFound:
         raise ComputeError(f"Failed to find VPC project {vpc_project_id}")
@@ -212,18 +216,28 @@ def _get_network_interfaces(
     return network_interfaces
 
 
+def list_project_usable_subnets(
+    subnetworks_client: compute_v1.SubnetworksClient,
+    project_id: str,
+) -> List[compute_v1.UsableSubnetwork]:
+    request = compute_v1.ListUsableSubnetworksRequest(project=project_id)
+    return [s for s in subnetworks_client.list_usable(request=request)]
+
+
 def get_vpc_subnet_or_error(
     subnetworks_client: compute_v1.SubnetworksClient,
     vpc_project_id: str,
     vpc_name: str,
     region: str,
+    usable_subnets: Optional[List[compute_v1.UsableSubnetwork]] = None,
 ) -> str:
     """
     Returns resource name of any usable subnet in a given VPC
     (e.g. "projects/example-project/regions/europe-west4/subnetworks/example-subnet")
     """
-    request = compute_v1.ListUsableSubnetworksRequest(project=vpc_project_id)
-    for subnet in subnetworks_client.list_usable(request=request):
+    if usable_subnets is None:
+        usable_subnets = list_project_usable_subnets(subnetworks_client, vpc_project_id)
+    for subnet in usable_subnets:
         network_name = subnet.network.split("/")[-1]
         subnet_url = subnet.subnetwork
         subnet_resource_name = remove_prefix(subnet_url, "https://www.googleapis.com/compute/v1/")

@@ -41,6 +41,7 @@ class CudoCompute(
     ) -> List[InstanceOfferWithAvailability]:
         offers = get_catalog_offers(
             backend=BackendType.CUDO,
+            locations=self.config.regions,
             requirements=requirements,
         )
         offers = [
@@ -48,6 +49,7 @@ class CudoCompute(
                 **offer.dict(), availability=InstanceAvailability.AVAILABLE
             )
             for offer in offers
+            # in-hyderabad-1 is known to have provisioning issues
             if offer.region not in ["in-hyderabad-1"]
         ]
         return offers

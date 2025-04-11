@@ -212,6 +212,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
                     InstanceModel.deleted == False,
                     InstanceModel.total_blocks > InstanceModel.busy_blocks,
                 )
+                .options(joinedload(InstanceModel.fleet))
                 .execution_options(populate_existing=True)
             )
             pool_instances = list(res.unique().scalars().all())
@@ -612,7 +613,7 @@ def _get_offer_mount_point_volume(
     for volume in volumes:
         if (
             volume.configuration.backend != offer.backend
-            or volume.configuration.region != offer.region
+            or volume.configuration.region.lower() != offer.region.lower()
         ):
             continue
         return volume
@@ -640,7 +641,7 @@ async def _attach_volumes(
             try:
                 if (
                     job_provisioning_data.get_base_backend() != volume.configuration.backend
-                    or job_provisioning_data.region != volume.configuration.region
+                    or job_provisioning_data.region.lower() != volume.configuration.region.lower()
                 ):
                     continue
                 if volume.provisioning_data is not None and volume.provisioning_data.attachable:

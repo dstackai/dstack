@@ -339,5 +339,5 @@ retry:
 --8<-- "docs/concepts/snippets/manage-runs.ext"
 
 !!! info "What's next?"
-    1. Read about [tasks](tasks.md), [services](services.md), and [repos](../guides/repos.md)
+    1. Read about [tasks](tasks.md), [services](services.md), and [repos](repos.md)
     2. Learn how to manage [fleets](fleets.md)

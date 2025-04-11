@@ -668,15 +668,15 @@ def _get_job_mount_point_attached_volume(
     for volume in volumes:
         if (
             volume.configuration.backend != job_provisioning_data.get_base_backend()
-            or volume.configuration.region != job_provisioning_data.region
+            or volume.configuration.region.lower() != job_provisioning_data.region.lower()
         ):
             continue
         if (
             volume.provisioning_data is not None
             and volume.provisioning_data.availability_zone is not None
             and job_provisioning_data.availability_zone is not None
-            and volume.provisioning_data.availability_zone
-            != job_provisioning_data.availability_zone
+            and volume.provisioning_data.availability_zone.lower()
+            != job_provisioning_data.availability_zone.lower()
         ):
             continue
         return volume

@@ -12,4 +12,4 @@ ide: vscode
 spot_policy: auto
 
 resources:
-  gpu: 24GB
+  gpu: 1

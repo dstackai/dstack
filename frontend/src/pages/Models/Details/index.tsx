@@ -433,12 +433,12 @@ export const ModelDetails: React.FC = () => {
                                     activeTabId={codeTab}
                                     tabs={[
                                         {
-                                            label: 'Python',
+                                            label: 'python',
                                             id: CodeTab.Python,
                                             content: <Code>{pythonCode}</Code>,
                                         },
                                         {
-                                            label: 'Curl',
+                                            label: 'curl',
                                             id: CodeTab.Curl,
                                             content: <Code>{curlCode}</Code>,
                                         },

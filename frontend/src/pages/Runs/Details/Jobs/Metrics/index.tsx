@@ -10,7 +10,7 @@ import { useGetRunQuery } from 'services/run';
 import { bytesFormatter, formatPercent, formatTime } from './helpers';
 import { useMetricsData } from './useMetricsData';
 
-export const RunMetrics: React.FC = () => {
+export const JobMetrics: React.FC = () => {
     const { t } = useTranslation();
     const params = useParams();
     const paramProjectName = params.projectName ?? '';

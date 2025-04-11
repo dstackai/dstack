@@ -9,11 +9,36 @@
 {% if nav.homepage %}
   {% set depth = depth + 1 %}
 {% endif %}
-{% if depth > 1 %}
+{% macro arender_content(nav_item) %}
+  <span class="md-ellipsis">
+    {{ nav_item.title }}
+  </span>
+{% endmacro %}
+{% macro arender(nav_item, ref = nav_item) %}
+  {% if nav_item.children %}
+    {% set first = nav_item.children | first %}
+    {% if first.children %}
+      {{ arender(first, ref) }}
+    {% else %}
+      <li class="md-path__item">
+<!--        <a href="{{ first.url | url }}" class="md-path__link">-->
+        {{ arender_content(ref) }}
+<!--        </a>-->
+      </li>
+    {% endif %}
+  {% else %}
+    <li class="md-path__item">
+<!--      <a href="{{ nav_item.url | url }}" class="md-path__link">-->
+      {{ arender_content(ref) }}
+<!--      </a>-->
+    </li>
+  {% endif %}
+{% endmacro %}
+{% if depth > 1 and page.ancestors | length > 1 %}
   <nav class="md-path" aria-label="{{ lang.t('nav') }}" {{ hidden }}>
     <ol class="md-path__list">
       {% for nav_item in page.ancestors | reverse %}
-        {{ item.render(nav_item) }}
+        {{ arender(nav_item) }}
       {% endfor %}
     </ol>
   </nav>

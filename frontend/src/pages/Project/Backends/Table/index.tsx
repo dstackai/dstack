@@ -49,7 +49,6 @@ export const BackendsTable: React.FC<IProps> = ({
 
     const { columns } = useColumnsDefinitions({
         ...(editBackend ? { onEditClick: (backend) => editBackend(backend) } : {}),
-        ...(deleteBackends ? { onDeleteClick: (backend) => deleteBackends([backend]) } : {}),
     });
 
     const renderCounter = () => {

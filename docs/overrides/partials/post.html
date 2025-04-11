@@ -1,0 +1,69 @@
+{#-
+  This file was automatically generated - do not edit
+-#}
+<article class="md-post md-post--excerpt">
+  <header class="md-post__header">
+    {% if post.authors %}
+      <nav class="md-post__authors md-typeset">
+        {% for author in post.authors %}
+          <span class="md-author">
+            <img src="{{ author.avatar | url }}" alt="{{ author.name }}">
+          </span>
+        {% endfor %}
+      </nav>
+    {% endif %}
+    <div class="md-post__meta md-meta">
+      <ul class="md-meta__list">
+        <li class="md-meta__item">
+          <time datetime="{{ post.config.date.created }}">
+            {{- post.config.date.created | date -}}
+          </time>
+          {#- Collapse whitespace -#}
+        </li>
+        {% if post.categories %}
+          <li class="md-meta__item">
+            {{ lang.t("blog.categories.in") }}
+            {% for category in post.categories %}
+              <a href="{{ category.url | url }}" class="md-meta__link">
+                {{- category.title -}}
+              </a>
+              {%- if loop.revindex > 1 %}, {% endif -%}
+            {% endfor -%}
+          </li>
+        {% endif %}
+        {% if post.config.readtime %}
+          {% set time = post.config.readtime %}
+          <li class="md-meta__item">
+            {% if time == 1 %}
+              {{ lang.t("readtime.one") }}
+            {% else %}
+              {{ lang.t("readtime.other") | replace("#", time) }}
+            {% endif %}
+          </li>
+        {% endif %}
+        {% if post.config.pin %}
+          <span class="md-pin"></span>
+        {% endif %}
+      </ul>
+      {% if post.config.draft %}
+        <span class="md-draft">
+          {{ lang.t("blog.draft") }}
+        </span>
+      {% endif %}
+    </div>
+  </header>
+  <div class="md-post__content md-typeset">
+    {{ post.content }}
+    {% if post.more %}
+      <nav class="md-post__action">
+        <a href="{{ post.url | url }}">
+            <span>{{ lang.t("blog.continue") }}</span>
+            <span class="icon"><svg viewBox="0 0 13 10" xmlns="http://www.w3.org/2000/svg"><path d="M12.823 4.164L8.954.182a.592.592 0 0 0-.854 0 .635.635 0 0 0 0 .88l2.836 2.92H.604A.614.614 0 0 0 0 4.604c0 .344.27.622.604.622h10.332L8.1 8.146a.635.635 0 0 0 0 .88.594.594 0 0 0 .854 0l3.869-3.982a.635.635 0 0 0 0-.88z" fill-rule="nonzero" fill="currentColor" class="fill-main"></path></svg></span>
+        </a>
+      </nav>
+    {% endif %}
+    {% if post.config.pin %}
+      <hr>
+    {% endif %}
+  </div>
+</article>
