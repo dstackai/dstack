@@ -118,7 +118,11 @@ server = [
     "prometheus-client",
     "grpcio>=1.50",
 ]
-aws = ["boto3", "botocore"]
+aws = [
+    "boto3",
+    "botocore",
+    "dstack[server]",
+]
 azure = [
     "azure-identity>=1.12.0",
     "azure-mgmt-subscription>=3.1.1",
@@ -126,6 +130,7 @@ azure = [
     "azure-mgmt-network>=23.0.0,<28.0.0",
     "azure-mgmt-resource>=22.0.0",
     "azure-mgmt-authorization>=3.0.0",
+    "dstack[server]",
 ]
 gcp = [
     "google-auth>=2.3.0",
@@ -135,12 +140,29 @@ gcp = [
     "google-api-python-client>=2.80.0",
     "google-cloud-billing>=1.11.0",
     "google-cloud-tpu>=1.18.3",
+    "dstack[server]",
 ]
-datacrunch = ["datacrunch"]
-kubernetes = ["kubernetes"]
-lambda = ["boto3", "botocore"]
-oci = ["oci"]
-nebius = ["nebius>=0.2.19,<0.3; python_version >= '3.10'"]
+datacrunch = [
+    "datacrunch",
+    "dstack[server]",
+]
+kubernetes = [
+    "kubernetes",
+    "dstack[server]",
+]
+lambda = [
+    "boto3",
+    "botocore",
+    "dstack[server]",
+]
+oci = [
+    "oci",
+    "dstack[server]",
+]
+nebius = [
+    "nebius>=0.2.19,<0.3; python_version >= '3.10'",
+    "dstack[server]",
+]
 all = [
     "dstack[gateway,server,aws,azure,gcp,datacrunch,kubernetes,lambda,nebius,oci]",
 ]
