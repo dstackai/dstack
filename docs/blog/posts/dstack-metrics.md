@@ -1,8 +1,8 @@
 ---
-title: "Monitoring GPU usage and other container metrics"
+title: "Monitoring essential GPU metrics via CLI"
 date: 2024-10-22
 description: "dstack introduces a new CLI command (and API) for monitoring container metrics, incl. GPU usage for NVIDIA, AMD, and other accelerators."  
-slug: monitoring-gpu-usage
+slug: dstack-metrics
 image: https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-stats-v2.png?raw=true
 categories:
   - AMD
@@ -10,17 +10,19 @@ categories:
   - Monitoring
 ---
 
-# Monitoring GPU usage and other container metrics
+# Monitoring essential GPU metrics via CLI
 
 ## How it works { style="display:none"}
 
 While it's possible to use third-party monitoring tools with `dstack`, it is often more convenient to debug your run and
-track metrics out of the box. That's why, with the latest release, `dstack` introduced [`dstack stats`](../../docs/reference/cli/dstack/stats.md), a new CLI (and API)
+track metrics out of the box. That's why, with the latest release, `dstack` introduced [`dstack stats`](../../docs/reference/cli/dstack/metrics.md), a new CLI (and API)
 for monitoring container metrics, including GPU usage for `NVIDIA`, `AMD`, and other accelerators.
 
 <img src="https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-stats-v2.png?raw=true" width="725"/>
 
 <!-- more -->
+
+> Note, the `dstack stats` command has been renamed to `dstack metrics`. The old name is also supported by deprecated.
 
 The command is similar to `kubectl top` (in terms of semantics) and `docker stats` (in terms of the CLI interface). The key
 difference is that `dstack stats` includes GPU VRAM usage and GPU utilization percentage. 

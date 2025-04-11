@@ -17,6 +17,7 @@ dependencies = [
     "cryptography",
     "packaging",
     "python-dateutil",
+    "cachetools",
     "gitpython",
     "jsonschema",
     "paramiko>=3.2.0",
@@ -31,7 +32,7 @@ dependencies = [
     "python-multipart>=0.0.16",
     "filelock",
     "psutil",
-    "gpuhunt>=0.1.0,<0.2.0",
+    "gpuhunt>=0.1.2,<0.2.0",
     "argcomplete>=3.5.0",
 ]
 
@@ -113,7 +114,6 @@ server = [
     "sentry-sdk[fastapi]",
     "alembic-postgresql-enum",
     "asyncpg",
-    "cachetools",
     "python-json-logger>=3.1.0",
     "prometheus-client",
     "grpcio>=1.50",
@@ -140,4 +140,7 @@ datacrunch = ["datacrunch"]
 kubernetes = ["kubernetes"]
 lambda = ["boto3", "botocore"]
 oci = ["oci"]
-all = ["dstack[gateway,server,aws,azure,gcp,datacrunch,kubernetes,lambda,oci]"]
+nebius = ["nebius>=0.2.19,<0.3; python_version >= '3.10'"]
+all = [
+    "dstack[gateway,server,aws,azure,gcp,datacrunch,kubernetes,lambda,nebius,oci]",
+]

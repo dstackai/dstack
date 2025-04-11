@@ -12,6 +12,7 @@ export const DEFAULT_PREFERENCES: CollectionPreferencesProps.Preferences = {
         { id: 'error', visible: true },
         { id: 'cost', visible: true },
         // hidden by default
+        { id: 'finished_at', visible: false },
         { id: 'project', visible: false },
         { id: 'hub_user_name', visible: false },
         { id: 'repo', visible: false },

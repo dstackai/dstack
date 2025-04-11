@@ -1,6 +1,6 @@
-# NCCL Tests
+# NCCL tests
 
-This example shows how to run distributed [NCCL Tests :material-arrow-top-right-thin:{ .external }](https://github.com/NVIDIA/nccl-tests){:target="_blank"} with MPI using `dstack`.
+This example shows how to run distributed [NCCL tests :material-arrow-top-right-thin:{ .external }](https://github.com/NVIDIA/nccl-tests){:target="_blank"} with MPI using `dstack`.
 
 ## Running as a task
 
@@ -23,7 +23,11 @@ commands:
     FIFO=/tmp/dstack_job
     if [ ${DSTACK_NODE_RANK} -eq 0 ]; then
       cd /root/nccl-tests/build
-      echo "${DSTACK_NODES_IPS}" > hostfile
+      # Generate hostfile for mpirun
+      : > hostfile
+      for ip in ${DSTACK_NODES_IPS}; do
+        echo "${ip} slots=${DSTACK_GPUS_PER_NODE}" >> hostfile
+      done
       MPIRUN='mpirun --allow-run-as-root --hostfile hostfile'
       # Wait for other nodes
       while true; do
@@ -33,9 +37,11 @@ commands:
         echo 'Waiting for nodes...'
         sleep 5
       done
-      # Run NCCL Tests
+      # Run NCCL tests
       ${MPIRUN} \
         -n ${DSTACK_GPUS_NUM} -N ${DSTACK_GPUS_PER_NODE} \
+        --mca pml ^cm \
+        --mca btl tcp,self \
         --mca btl_tcp_if_exclude lo,docker0 \
         --bind-to none \
         ./all_reduce_perf -b 8 -e 8G -f 2 -g 1
@@ -56,15 +62,17 @@ resources:
 </div>
 
 The script orchestrates distributed execution across multiple nodes using MPI. The master node (identified by
-`DSTACK_NODE_RANK=0`) generates a hostfile listing all node IPs and continuously checks until all worker nodes are
-accessible via MPI. Once confirmed, it executes the `all_reduce_perf` benchmark across all available GPUs.
+`DSTACK_NODE_RANK=0`) generates `hostfile` listing all node IPs and continuously checks until all worker nodes are
+accessible via MPI. Once confirmed, it executes the `/root/nccl-tests/build/all_reduce_perf` benchmark script across all available GPUs.
 
 Worker nodes use a FIFO pipe to block execution until they receive a termination signal from the master
 node. This ensures worker nodes remain active during the test and only exit once the master node completes the
 benchmark.
 
-> The `dstackai/efa` image is optimized for [AWS EFA :material-arrow-top-right-thin:{ .external }](https://aws.amazon.com/hpc/efa/){:target="_blank"}
-> but also works with regular TCP/IP network adapters as well as InfiniBand.
+> The `dstackai/efa` image used in the example comes with MPI and NCCL tests pre-installed. While it is optimized for
+> [AWS EFA :material-arrow-top-right-thin:{ .external }](https://aws.amazon.com/hpc/efa/){:target="_blank"}, it can also
+> be used with regular TCP/IP network adapters and InfiniBand. 
+> See the [source code :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/docker/efa) for the image.
 
 ### Apply a configuration
 
@@ -84,3 +92,13 @@ Submit the run nccl-tests? [y/n]: y
 ```
 
 </div>
+
+## Source code
+
+The source-code of this example can be found in 
+[`examples/misc/nccl-tests` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/misc/nccl-tests).
+
+## What's next?
+
+1. Check [dev environments](https://dstack.ai/docs/dev-environments), [tasks](https://dstack.ai/docs/tasks), 
+   [services](https://dstack.ai/docs/services), and [fleets](https://dstack.ai/docs/concepts/fleets).

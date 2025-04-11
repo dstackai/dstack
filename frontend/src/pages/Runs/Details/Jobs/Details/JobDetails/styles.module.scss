@@ -1,0 +1,22 @@
+.details {
+    height: calc(100vh - 272px);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+
+    & > [class^="awsui_layout"] {
+        height: 100%;
+        & > [class^="awsui_content"] {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            height: 100%;
+        }
+    }
+}
+
+.logs {
+    flex-grow: 1;
+    min-height: 0;
+    max-height: calc(100vh - 380px);
+}

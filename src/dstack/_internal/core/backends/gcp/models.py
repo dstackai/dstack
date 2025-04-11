@@ -33,7 +33,19 @@ class GCPBackendConfig(CoreModel):
     regions: Annotated[
         Optional[List[str]], Field(description="The list of GCP regions. Omit to use all regions")
     ] = None
-    vpc_name: Annotated[Optional[str], Field(description="The name of a custom VPC")] = None
+    vpc_name: Annotated[
+        Optional[str],
+        Field(description="The name of a custom VPC. If not specified, the default VPC is used"),
+    ] = None
+    extra_vpcs: Annotated[
+        Optional[List[str]],
+        Field(
+            description=(
+                "The names of additional VPCs used for GPUDirect. Specify eight VPCs to maximize bandwidth."
+                " Each VPC must have a subnet and a firewall rule allowing internal traffic across all subnets"
+            )
+        ),
+    ] = None
     vpc_project_id: Annotated[
         Optional[str],
         Field(description="The shared VPC hosted project ID. Required for shared VPC only"),

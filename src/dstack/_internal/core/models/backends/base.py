@@ -12,6 +12,7 @@ class BackendType(str, enum.Enum):
         DATACRUNCH (BackendType): DataCrunch
         KUBERNETES (BackendType): Kubernetes
         LAMBDA (BackendType): Lambda Cloud
+        NEBIUS (BackendType): Nebius AI Cloud
         OCI (BackendType): Oracle Cloud Infrastructure
         RUNPOD (BackendType): Runpod Cloud
         TENSORDOCK (BackendType): TensorDock Marketplace
@@ -29,6 +30,7 @@ class BackendType(str, enum.Enum):
     LAMBDA = "lambda"
     LOCAL = "local"
     REMOTE = "remote"  # TODO: replace for LOCAL
+    NEBIUS = "nebius"
     OCI = "oci"
     RUNPOD = "runpod"
     TENSORDOCK = "tensordock"

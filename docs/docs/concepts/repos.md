@@ -81,6 +81,13 @@ $ dstack apply -f .dstack.yml --no-repo
 
 </div>
 
+## Store the repo on a volume
+
+You can use [Volumes](../concepts/volumes.md) to persist repo changes without pushing them to the Git remote.
+Attach a volume to the repo directory (`/workflow`) or any of its subdirectories.
+`dstack` will clone the repo to the volume on the first run.
+On subsequent runs, `dstack` will use the repo contents from the volume instead of cloning the repo.
+
 ## What's next?
 
-1. Read about [dev environments](dev-environments.md), [tasks](tasks.md), [services](services.md)
+1. Read about [dev environments](../concepts/dev-environments.md), [tasks](../concepts/tasks.md), [services](../concepts/services.md)

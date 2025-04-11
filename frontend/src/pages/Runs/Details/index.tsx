@@ -1,36 +1,25 @@
 import React, { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate, useParams } from 'react-router-dom';
-import { get as _get } from 'lodash';
-import { format } from 'date-fns';
+import { Outlet, useNavigate, useParams } from 'react-router-dom';
 import Button from '@cloudscape-design/components/button';
 
-import { Box, ColumnLayout, Container, ContentLayout, DetailsHeader, Header, Loader, StatusIndicator } from 'components';
+import { ContentLayout, DetailsHeader, Tabs } from 'components';
 
-import { DATE_TIME_FORMAT } from 'consts';
 import { useBreadcrumbs, useNotifications } from 'hooks';
 import { getServerError, riseRouterException } from 'libs';
-import { getStatusIconType } from 'libs/run';
 import { ROUTES } from 'routes';
 import { useDeleteRunsMutation, useGetRunQuery, useStopRunsMutation } from 'services/run';
 
-import { JobList } from './Jobs/List';
-import { getJobSubmissionId } from './Logs/helpers';
-import {
-    getRunListItemBackend,
-    getRunListItemInstanceId,
-    getRunListItemPrice,
-    getRunListItemRegion,
-    getRunListItemResources,
-    getRunListItemServiceUrl,
-    getRunListItemSpot,
-} from '../List/helpers';
 import { isAvailableAbortingForRun, isAvailableDeletingForRun, isAvailableStoppingForRun } from '../utils';
-import { Logs } from './Logs';
 
 import styles from './styles.module.scss';
 
-export const RunDetails: React.FC = () => {
+enum CodeTab {
+    Details = 'details',
+    Metrics = 'metrics',
+}
+
+export const RunDetailsPage: React.FC = () => {
     const { t } = useTranslation();
     const navigate = useNavigate();
     const params = useParams();
@@ -38,16 +27,10 @@ export const RunDetails: React.FC = () => {
     const paramRunId = params.runId ?? '';
     const [pushNotification] = useNotifications();
 
-    const {
-        data: runData,
-        isLoading: isLoadingRun,
-        error: runError,
-    } = useGetRunQuery({
+    const { data: runData, error: runError } = useGetRunQuery({
         project_name: paramProjectName,
         id: paramRunId,
     });
-
-    const serviceUrl = runData ? getRunListItemServiceUrl(runData) : null;
 
     useEffect(() => {
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -166,131 +149,27 @@ export const RunDetails: React.FC = () => {
                     />
                 }
             >
-                {isLoadingRun && (
-                    <Container>
-                        <Loader />
-                    </Container>
-                )}
+                <>
+                    {runData?.jobs.length === 1 && (
+                        <Tabs
+                            withNavigation
+                            tabs={[
+                                {
+                                    label: 'Details',
+                                    id: CodeTab.Details,
+                                    href: ROUTES.PROJECT.DETAILS.RUNS.DETAILS.FORMAT(paramProjectName, paramRunId),
+                                },
+                                {
+                                    label: 'Metrics',
+                                    id: CodeTab.Metrics,
+                                    href: ROUTES.PROJECT.DETAILS.RUNS.DETAILS.METRICS.FORMAT(paramProjectName, paramRunId),
+                                },
+                            ]}
+                        />
+                    )}
 
-                {runData && (
-                    <>
-                        <Container header={<Header variant="h2">{t('common.general')}</Header>}>
-                            <ColumnLayout columns={4} variant="text-grid">
-                                <div>
-                                    <Box variant="awsui-key-label">{t('projects.run.project')}</Box>
-                                    <div>{runData.project_name}</div>
-                                </div>
-
-                                <div>
-                                    <Box variant="awsui-key-label">{t('projects.run.repo')}</Box>
-
-                                    <div>
-                                        {_get(
-                                            runData.run_spec.repo_data,
-                                            'repo_name',
-                                            _get(runData.run_spec.repo_data, 'repo_dir', '-'),
-                                        )}
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <Box variant="awsui-key-label">{t('projects.run.hub_user_name')}</Box>
-                                    <div>{runData.user}</div>
-                                </div>
-
-                                <div>
-                                    <Box variant="awsui-key-label">{t('projects.run.configuration')}</Box>
-                                    <div>{runData.run_spec.configuration_path}</div>
-                                </div>
-
-                                <div>
-                                    <Box variant="awsui-key-label">{t('projects.run.submitted_at')}</Box>
-                                    <div>{format(new Date(runData.submitted_at), DATE_TIME_FORMAT)}</div>
-                                </div>
-
-                                <div>
-                                    <Box variant="awsui-key-label">{t('projects.run.status')}</Box>
-                                    <div>
-                                        <StatusIndicator type={getStatusIconType(runData.status)}>
-                                            {t(`projects.run.statuses.${runData.status}`)}
-                                        </StatusIndicator>
-                                    </div>
-                                </div>
-
-                                {getRunListItemBackend(runData) && (
-                                    <div>
-                                        <Box variant="awsui-key-label">{t('projects.run.backend')}</Box>
-                                        <div>{getRunListItemBackend(runData)}</div>
-                                    </div>
-                                )}
-
-                                {getRunListItemRegion(runData) && (
-                                    <div>
-                                        <Box variant="awsui-key-label">{t('projects.run.region')}</Box>
-                                        <div>{getRunListItemRegion(runData)}</div>
-                                    </div>
-                                )}
-
-                                {getRunListItemInstanceId(runData) && (
-                                    <div>
-                                        <Box variant="awsui-key-label">{t('projects.run.instance_id')}</Box>
-                                        <div>{getRunListItemInstanceId(runData)}</div>
-                                    </div>
-                                )}
-
-                                {getRunListItemResources(runData) && (
-                                    <div>
-                                        <Box variant="awsui-key-label">{t('projects.run.resources')}</Box>
-                                        <div>{getRunListItemResources(runData)}</div>
-                                    </div>
-                                )}
-
-                                {getRunListItemSpot(runData) && (
-                                    <div>
-                                        <Box variant="awsui-key-label">{t('projects.run.spot')}</Box>
-                                        <div>{getRunListItemSpot(runData)}</div>
-                                    </div>
-                                )}
-
-                                {getRunListItemPrice(runData) && (
-                                    <div>
-                                        <Box variant="awsui-key-label">{t('projects.run.price')}</Box>
-                                        <div>{getRunListItemPrice(runData)}</div>
-                                    </div>
-                                )}
-
-                                <div>
-                                    <Box variant="awsui-key-label">{t('projects.run.cost')}</Box>
-                                    <div>${runData.cost}</div>
-                                </div>
-                            </ColumnLayout>
-
-                            {serviceUrl && (
-                                <ColumnLayout columns={1} variant="text-grid">
-                                    <div>
-                                        <Box variant="awsui-key-label">{t('projects.run.service_url')}</Box>
-                                        <div>
-                                            <a href={serviceUrl}>{serviceUrl}</a>
-                                        </div>
-                                    </div>
-                                </ColumnLayout>
-                            )}
-                        </Container>
-
-                        {runData.jobs.length === 1 && (
-                            <Logs
-                                projectName={paramProjectName}
-                                runName={runData?.run_spec?.run_name ?? ''}
-                                jobSubmissionId={getJobSubmissionId(runData)}
-                                className={styles.logs}
-                            />
-                        )}
-
-                        {runData.jobs.length > 1 && (
-                            <JobList projectName={paramProjectName} runId={paramRunId} jobs={runData.jobs} />
-                        )}
-                    </>
-                )}
+                    <Outlet />
+                </>
             </ContentLayout>
         </div>
     );

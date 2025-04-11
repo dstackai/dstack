@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Annotated, Optional, Tuple
 
 from fastapi import Depends, HTTPException, Security
 from fastapi.security import HTTPBearer
@@ -97,6 +97,24 @@ class ProjectMember:
         token: HTTPAuthorizationCredentials = Security(HTTPBearer()),
     ) -> Tuple[UserModel, ProjectModel]:
         return await get_project_member(session, project_name, token.credentials)
+
+
+class OptionalServiceAccount:
+    def __init__(self, token: Optional[str]) -> None:
+        self._token = token
+
+    async def __call__(
+        self,
+        token: Annotated[
+            Optional[HTTPAuthorizationCredentials], Security(HTTPBearer(auto_error=False))
+        ],
+    ) -> None:
+        if self._token is None:
+            return
+        if token is None:
+            raise error_forbidden()
+        if token.credentials != self._token:
+            raise error_invalid_token()
 
 
 async def get_project_member(

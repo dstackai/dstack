@@ -94,6 +94,9 @@ class Compute(ABC):
         """
         Terminates an instance by `instance_id`.
         If the instance does not exist, it should not raise errors but return silently.
+
+        Should return ASAP. If required to wait for some operation, raise `NotYetTerminated`.
+        In this case, the method will be called again after a few seconds.
         """
         pass
 
@@ -525,7 +528,7 @@ def get_run_shim_script(is_privileged: bool, pjrt_device: Optional[str]) -> List
     pjrt_device_env = f"--pjrt-device={pjrt_device}" if pjrt_device else ""
 
     return [
-        f"nohup dstack-shim {privileged_flag} {pjrt_device_env} &",
+        f"nohup {DSTACK_SHIM_BINARY_PATH} {privileged_flag} {pjrt_device_env} &",
     ]
 
 

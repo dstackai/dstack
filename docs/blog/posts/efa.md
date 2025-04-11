@@ -2,10 +2,10 @@
 title: Efficient distributed training with AWS EFA
 date: 2025-02-20
 description: "The latest release of dstack allows you to use AWS EFA for your distributed training tasks."  
-slug: distributed-training-with-aws-efa
+slug: efa
 image: https://github.com/dstackai/static-assets/blob/main/static-assets/images/distributed-training-with-aws-efa-v2.png?raw=true
 categories:
-  - Fleets
+  - Cloud fleets
 ---
 
 # Efficient distributed training with AWS EFA

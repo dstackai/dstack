@@ -39,7 +39,7 @@ from dstack._internal.core.backends.remote.provisioning import (
 from dstack._internal.core.consts import DSTACK_SHIM_HTTP_PORT
 
 # FIXME: ProvisioningError is a subclass of ComputeError and should not be used outside of Compute
-from dstack._internal.core.errors import BackendError, ProvisioningError
+from dstack._internal.core.errors import BackendError, NotYetTerminated, ProvisioningError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.fleets import InstanceGroupPlacement
 from dstack._internal.core.models.instances import (
@@ -64,6 +64,7 @@ from dstack._internal.core.models.runs import (
     Retry,
 )
 from dstack._internal.core.services.profiles import get_retry
+from dstack._internal.server import settings as server_settings
 from dstack._internal.server.background.tasks.common import get_provisioning_timeout
 from dstack._internal.server.db import get_session_ctx
 from dstack._internal.server.models import (
@@ -529,7 +530,9 @@ async def _create_instance(session: AsyncSession, instance: InstanceModel) -> No
             session=session, fleet_id=instance.fleet_id
         )
 
-    for backend, instance_offer in offers:
+    # Limit number of offers tried to prevent long-running processing
+    # in case all offers fail.
+    for backend, instance_offer in offers[: server_settings.MAX_OFFERS_TRIED]:
         if instance_offer.backend not in BACKENDS_WITH_CREATE_INSTANCE_SUPPORT:
             continue
         compute = backend.compute()
@@ -578,8 +581,13 @@ async def _create_instance(session: AsyncSession, instance: InstanceModel) -> No
                 extra={"instance_name": instance.name},
             )
             continue
-        except NotImplementedError:
-            # skip a backend without create_instance support, continue with next backend and offer
+        except Exception:
+            logger.exception(
+                "Got exception when launching %s in %s/%s",
+                instance_offer.instance.name,
+                instance_offer.backend.value,
+                instance_offer.region,
+            )
             continue
 
         instance.status = InstanceStatus.PROVISIONING
@@ -607,10 +615,11 @@ async def _create_instance(session: AsyncSession, instance: InstanceModel) -> No
 
     if not should_retry:
         instance.status = InstanceStatus.TERMINATED
-        instance.termination_reason = "No offers found"
+        instance.termination_reason = "All offers failed" if offers else "No offers found"
         logger.info(
-            "No offers found. Terminated instance %s",
+            "Terminated instance %s: %s",
             instance.name,
+            instance.termination_reason,
             extra={
                 "instance_name": instance.name,
                 "instance_status": InstanceStatus.TERMINATED.value,
@@ -837,12 +846,17 @@ async def _terminate(instance: InstanceModel) -> None:
                         instance.first_termination_retry_at = get_current_datetime()
                     instance.last_termination_retry_at = get_current_datetime()
                     if _next_termination_retry_at(instance) < _get_termination_deadline(instance):
-                        logger.warning(
-                            "Failed to terminate instance %s. Will retry. Error: %r",
-                            instance.name,
-                            e,
-                            exc_info=not isinstance(e, BackendError),
-                        )
+                        if isinstance(e, NotYetTerminated):
+                            logger.debug(
+                                "Instance %s termination in progress: %s", instance.name, e
+                            )
+                        else:
+                            logger.warning(
+                                "Failed to terminate instance %s. Will retry. Error: %r",
+                                instance.name,
+                                e,
+                                exc_info=not isinstance(e, BackendError),
+                            )
                         return
                     logger.error(
                         "Failed all attempts to terminate instance %s."

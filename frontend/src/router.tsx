@@ -16,12 +16,13 @@ import { ModelDetails } from 'pages/Models/Details';
 import { ProjectAdd, ProjectDetails, ProjectList, ProjectSettings } from 'pages/Project';
 import { BackendAdd, BackendEdit } from 'pages/Project/Backends';
 import { AddGateway, EditGateway } from 'pages/Project/Gateways';
-import { RunDetails, RunList } from 'pages/Runs';
-import { JobDetails } from 'pages/Runs/Details/Jobs/Details';
+import { JobMetrics, RunDetails, RunDetailsPage, RunList } from 'pages/Runs';
+import { JobDetailsPage } from 'pages/Runs/Details/Jobs/Details';
 import { CreditsHistoryAdd, UserAdd, UserDetails, UserEdit, UserList } from 'pages/User';
 import { UserBilling, UserProjects, UserSettings } from 'pages/User/Details';
 
 import { AuthErrorMessage } from './App/AuthErrorMessage';
+import { JobDetails } from './pages/Runs/Details/Jobs/Details/JobDetails';
 import { VolumeList } from './pages/Volumes';
 import { ROUTES } from './routes';
 
@@ -85,17 +86,36 @@ export const router = createBrowserRouter([
                         path: ROUTES.PROJECT.GATEWAY.EDIT.TEMPLATE,
                         element: <EditGateway />,
                     },
-                ].filter(Boolean),
+                ],
             },
             {
                 path: ROUTES.PROJECT.DETAILS.RUNS.DETAILS.TEMPLATE,
-                element: <RunDetails />,
+                element: <RunDetailsPage />,
+                children: [
+                    {
+                        index: true,
+                        element: <RunDetails />,
+                    },
+                    {
+                        path: ROUTES.PROJECT.DETAILS.RUNS.DETAILS.METRICS.TEMPLATE,
+                        element: <JobMetrics />,
+                    },
+                ],
             },
             {
                 path: ROUTES.PROJECT.DETAILS.RUNS.DETAILS.JOBS.DETAILS.TEMPLATE,
-                element: <JobDetails />,
+                element: <JobDetailsPage />,
+                children: [
+                    {
+                        index: true,
+                        element: <JobDetails />,
+                    },
+                    {
+                        path: ROUTES.PROJECT.DETAILS.RUNS.DETAILS.JOBS.DETAILS.METRICS.TEMPLATE,
+                        element: <JobMetrics />,
+                    },
+                ],
             },
-
             {
                 path: ROUTES.PROJECT.ADD,
                 element: <ProjectAdd />,

@@ -1,4 +1,4 @@
-# dstack stats
+# dstack metrics
 
 This command shows run hardware metrics such as CPU, memory, and GPU utilization.
 
@@ -7,7 +7,7 @@ This command shows run hardware metrics such as CPU, memory, and GPU utilization
 <div class="termy">
 
 ```shell
-$ dstack stats --help
+$ dstack metrics --help
 #GENERATE#
 ```
 

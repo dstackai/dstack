@@ -379,9 +379,14 @@ If you want, you can specify your own Docker image via `image`.
 
 </div>
 
+!!! info "Privileged mode"
+    To enable privileged mode, set [`privileged`](../reference/dstack.yml/service.md#privileged) to `true`.
+    This mode allows using [Docker and Docker Compose](../guides/protips.md#docker-and-docker-compose) inside `dstack` runs.
+
+    Not supported with `runpod`, `vastai`, and `kubernetes`.
+
 ??? info "Private registry"
-    
-    Use the `registry_auth` property to provide credentials for a private Docker registry.
+    Use the [`registry_auth`](../reference/dstack.yml/service.md#registry_auth) property to provide credentials for a private Docker registry.
 
     ```yaml
     type: service
@@ -401,11 +406,6 @@ If you want, you can specify your own Docker image via `image`.
     # The port of the service
     port: 8000
     ```
-
-??? info "Privileged mode"
-    All backends except `runpod`, `vastai`, and `kubernetes` support running containers in privileged mode.
-    This mode enables features like using [Docker and Docker Compose](../guides/protips.md#docker-and-docker-compose) 
-    inside `dstack` runs.
 
 ### Environment variables
 

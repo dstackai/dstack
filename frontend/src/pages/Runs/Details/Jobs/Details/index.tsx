@@ -1,48 +1,29 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useParams } from 'react-router-dom';
+import { Outlet, useParams } from 'react-router-dom';
 
-import { Box, ColumnLayout, Container, ContentLayout, DetailsHeader, Header, Loader, StatusIndicator } from 'components';
+import { ContentLayout, DetailsHeader, Tabs } from 'components';
 
 import { useBreadcrumbs } from 'hooks';
 import { riseRouterException } from 'libs';
 import { ROUTES } from 'routes';
 import { useGetRunQuery } from 'services/run';
 
-import { getStatusIconType } from '../../../../../libs/run';
-import { Logs } from '../../Logs';
-import {
-    getJobListItemBackend,
-    getJobListItemInstance,
-    getJobListItemPrice,
-    getJobListItemRegion,
-    getJobListItemResources,
-    getJobListItemSpot,
-    getJobStatus,
-    getJobSubmittedAt,
-    getJobTerminationReason,
-} from '../List/helpers';
-
 import styles from './styles.module.scss';
 
-const getJobSubmissionId = (job?: IJob): string | undefined => {
-    if (!job) return;
+enum CodeTab {
+    Details = 'details',
+    Metrics = 'metrics',
+}
 
-    return job.job_submissions[job.job_submissions.length - 1]?.id;
-};
-
-export const JobDetails: React.FC = () => {
+export const JobDetailsPage: React.FC = () => {
     const { t } = useTranslation();
     const params = useParams();
     const paramProjectName = params.projectName ?? '';
     const paramRunId = params.runId ?? '';
     const paramJobName = params.jobName ?? '';
 
-    const {
-        data: runData,
-        isLoading: isLoadingRun,
-        error: runError,
-    } = useGetRunQuery({
+    const { data: runData, error: runError } = useGetRunQuery({
         project_name: paramProjectName,
         id: paramRunId,
     });
@@ -54,12 +35,6 @@ export const JobDetails: React.FC = () => {
             riseRouterException();
         }
     }, [runError]);
-
-    const jobData = useMemo<IJob | null>(() => {
-        if (!runData) return null;
-
-        return runData.jobs.find((job) => job.job_spec.job_name === paramJobName) ?? null;
-    }, [runData]);
 
     useBreadcrumbs([
         {
@@ -75,7 +50,7 @@ export const JobDetails: React.FC = () => {
             href: ROUTES.RUNS.LIST,
         },
         {
-            text: paramRunId,
+            text: runData?.run_spec.run_name ?? '',
             href: ROUTES.PROJECT.DETAILS.RUNS.DETAILS.FORMAT(paramProjectName, paramRunId),
         },
         {
@@ -91,75 +66,31 @@ export const JobDetails: React.FC = () => {
     return (
         <div className={styles.page}>
             <ContentLayout header={<DetailsHeader title={paramJobName} />}>
-                {isLoadingRun && (
-                    <Container>
-                        <Loader />
-                    </Container>
-                )}
+                <Tabs
+                    withNavigation
+                    tabs={[
+                        {
+                            label: 'Details',
+                            id: CodeTab.Details,
+                            href: ROUTES.PROJECT.DETAILS.RUNS.DETAILS.JOBS.DETAILS.FORMAT(
+                                paramProjectName,
+                                paramRunId,
+                                paramJobName,
+                            ),
+                        },
+                        {
+                            label: 'Metrics',
+                            id: CodeTab.Metrics,
+                            href: ROUTES.PROJECT.DETAILS.RUNS.DETAILS.JOBS.DETAILS.METRICS.FORMAT(
+                                paramProjectName,
+                                paramRunId,
+                                paramJobName,
+                            ),
+                        },
+                    ]}
+                />
 
-                {jobData && (
-                    <>
-                        <Container header={<Header variant="h2">{t('common.general')}</Header>}>
-                            <ColumnLayout columns={4} variant="text-grid">
-                                <div>
-                                    <Box variant="awsui-key-label">{t('projects.run.submitted_at')}</Box>
-                                    <div>{getJobSubmittedAt(jobData)}</div>
-                                </div>
-
-                                <div>
-                                    <Box variant="awsui-key-label">{t('projects.run.status')}</Box>
-                                    <div>
-                                        <StatusIndicator type={getStatusIconType(getJobStatus(jobData))}>
-                                            {t(`projects.run.statuses.${getJobStatus(jobData)}`)}
-                                        </StatusIndicator>
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <Box variant="awsui-key-label">{t('projects.run.termination_reason')}</Box>
-                                    <div>{getJobTerminationReason(jobData)}</div>
-                                </div>
-
-                                <div>
-                                    <Box variant="awsui-key-label">{t('projects.run.backend')}</Box>
-                                    <div>{getJobListItemBackend(jobData)}</div>
-                                </div>
-
-                                <div>
-                                    <Box variant="awsui-key-label">{t('projects.run.region')}</Box>
-                                    <div>{getJobListItemRegion(jobData)}</div>
-                                </div>
-
-                                <div>
-                                    <Box variant="awsui-key-label">{t('projects.run.instance')}</Box>
-                                    <div>{getJobListItemInstance(jobData)}</div>
-                                </div>
-
-                                <div>
-                                    <Box variant="awsui-key-label">{t('projects.run.resources')}</Box>
-                                    <div>{getJobListItemResources(jobData)}</div>
-                                </div>
-
-                                <div>
-                                    <Box variant="awsui-key-label">{t('projects.run.spot')}</Box>
-                                    <div>{getJobListItemSpot(jobData)}</div>
-                                </div>
-
-                                <div>
-                                    <Box variant="awsui-key-label">{t('projects.run.price')}</Box>
-                                    <div>{getJobListItemPrice(jobData)}</div>
-                                </div>
-                            </ColumnLayout>
-                        </Container>
-
-                        <Logs
-                            projectName={paramProjectName}
-                            runName={runData?.run_spec?.run_name ?? ''}
-                            jobSubmissionId={getJobSubmissionId(jobData)}
-                            className={styles.logs}
-                        />
-                    </>
-                )}
+                <Outlet />
             </ContentLayout>
         </div>
     );
