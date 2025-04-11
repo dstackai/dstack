@@ -69,7 +69,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install dependencies
-        run: uv sync --all-extras --frozen
+        run: uv sync --all-extras
       - name: Download frontend build
         uses: actions/download-artifact@v4
         with:
@@ -214,7 +214,7 @@ jobs:
       - name: Install AWS
         run: uv tool install awscli
       - name: Install dstack
-        run: uv sync --frozen
+        run: uv sync
       - name: Generate json schema
         run: |
           uv run python -c "from dstack._internal.core.models.configurations import DstackConfiguration; print(DstackConfiguration.schema_json(indent=2))" > configuration.json
@@ -267,7 +267,7 @@ jobs:
           python-version: 3.11
       - name: Install dstack
         run: |
-          uv sync --extra server --frozen
+          uv sync --extra server
       # Move these deps into an extra and install that way
       - name: Build
         run: |
