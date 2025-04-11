@@ -76,6 +76,7 @@ dev = [
     "pre-commit>=4.2.0",
     "pytest-asyncio>=0.23.8",
     "pytest-httpbin>=2.1.0",
+    "httpbin>=0.10.2", # indirect to make compatible with Werkzeug 3
     "pytest~=7.2",
     "pytest-socket>=0.7.0",
     "requests-mock>=1.12.1",
