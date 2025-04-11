@@ -180,8 +180,12 @@ jobs:
     needs: [runner-compile, gateway-build, python-test]
     runs-on: ubuntu-latest
     steps:
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: 3.11
       - name: Install AWS
-        run: pip install awscli
+        run: uv tool install awscli
       - name: Download Runner
         uses: actions/download-artifact@v4
         with:
@@ -239,8 +243,12 @@ jobs:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
     steps:
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: 3.11
       - name: Install AWS
-        run: pip install awscli
+        run: uv tool install awscli
       - run: |
           VERSION=${GITHUB_REF#refs/tags/}
           echo $VERSION | aws s3 cp - s3://get-dstack/cli/latest-version --acl public-read
