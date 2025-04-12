@@ -90,15 +90,10 @@ plugins:
         'docs/tasks.md': 'docs/concepts/tasks.md'
         'docs/services.md': 'docs/concepts/services.md'
         'docs/fleets.md': 'docs/concepts/fleets.md'
-<<<<<<< HEAD
         'docs/examples/llms/llama31.md': 'examples/llms/llama/index.md'
         'docs/examples/llms/llama32.md': 'examples/llms/llama/index.md'
         'examples/llms/llama31/index.md': 'examples/llms/llama/index.md'
         'examples/llms/llama32/index.md': 'examples/llms/llama/index.md'
-=======
-        'docs/examples/llms/llama31.md': 'examples/llms/llama31/index.md'
-        'docs/examples/llms/llama32.md': 'examples/llms/llama32/index.md'
->>>>>>> 77c61ad9 ([Landing] Refactoring (WIP) (#2495))
         'docs/examples/accelerators/amd/index.md': 'examples/accelerators/amd/index.md'
         'docs/examples/deployment/nim/index.md': 'examples/deployment/nim/index.md'
         'docs/examples/deployment/vllm/index.md': 'examples/deployment/vllm/index.md'
@@ -254,16 +249,11 @@ nav:
         - NIM: examples/deployment/nim/index.md
     - LLMs:
         - Deepseek: examples/llms/deepseek/index.md
-<<<<<<< HEAD
         - Llama: examples/llms/llama/index.md
-=======
-        - Llama 3.1: examples/llms/llama31/index.md
-        - Llama 3.2: examples/llms/llama32/index.md
     - Accelerators:
         - AMD: examples/accelerators/amd/index.md
         - Intel Gaudi: examples/accelerators/intel/index.md
         - TPU: examples/accelerators/tpu/index.md
->>>>>>> 77c61ad9 ([Landing] Refactoring (WIP) (#2495))
     - Misc:
         - Docker Compose: examples/misc/docker-compose/index.md
         - NCCL Tests: examples/misc/nccl-tests/index.md
