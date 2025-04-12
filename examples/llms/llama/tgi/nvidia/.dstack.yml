@@ -1,0 +1,19 @@
+type: service
+name: llama4-scout
+
+image: ghcr.io/huggingface/text-generation-inference:latest
+env:
+  - HF_TOKEN
+  - MODEL_ID=meta-llama/Llama-4-Scout-17B-16E-Instruct
+  - MAX_INPUT_LENGTH=4000
+  - MAX_TOTAL_TOKENS=4096
+commands:
+  - NUM_SHARD=$DSTACK_GPUS_NUM text-generation-launcher
+
+port: 8000
+## Register the model
+model: meta-llama/Llama-4-Scout-17B-16E-Instruct
+
+resources:
+  gpu: H200:2
+  disk: 500GB..
