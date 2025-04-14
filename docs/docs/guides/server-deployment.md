@@ -1,8 +1,9 @@
-The `dstack` server can run anywhere: on your laptop, a dedicated server, or in the cloud.
+The `dstack` server can run on your laptop or any environment with access to the cloud and on-prem clusters you plan to use.
 
-You can run the server either through `pip` or using Docker.
+The minimum hardware requirements for running the server are 1 CPU and 1GB of RAM.
 
 === "pip"
+    > The server can be set up via `pip` on Linux, macOS, and Windows (via WSL 2). It requires Git and OpenSSH.
 
     <div class="termy">
     
@@ -18,11 +19,26 @@ You can run the server either through `pip` or using Docker.
     
     </div>
 
-    > The server can be set up via `pip` on Linux, macOS, and Windows (via WSL 2).
-    > It requires Git and OpenSSH.
-    > The minimum hardware requirements are 1 CPU and 1GB of RAM.
+=== "uv"
+
+    > The server can be set up via `uv` on Linux, macOS, and Windows (via WSL 2). It requires Git and OpenSSH.
+
+    <div class="termy">
+    
+    ```shell
+    $ uv tool install 'dstack[all]' -U
+    $ dstack server
+
+    Applying ~/.dstack/server/config.yml...
+
+    The admin token is "bbae0f28-d3dd-4820-bf61-8f4bb40815da"
+    The server is running at http://127.0.0.1:3000/
+    ```
+    
+    </div>
 
 === "Docker"
+     > To deploy the server most reliably, it's recommended to use `dstackai/dstack` Docker image.
 
     <div class="termy">
     
