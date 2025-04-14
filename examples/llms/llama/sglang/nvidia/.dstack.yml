@@ -1,6 +1,6 @@
-type: dev-environment
+type: service
 name: llama4-scout
-ide: vscode
+
 image: lmsysorg/sglang
 env:
   - HF_TOKEN

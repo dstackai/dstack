@@ -17,6 +17,48 @@ This example walks you through how to deploy Llama 4 Scout model with `dstack`.
 
 ## Deployment
 
+### AMD
+Here's an example of a service that deploys 
+[`Llama-4-Scout-17B-16E-Instruct` :material-arrow-top-right-thin:{ .external }](https://huggingface.co/meta-llama/Llama-4-Scout-17B-16E-Instruct){:target="_blank"} 
+using [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/vllm-project/vllm){:target="_blank"} 
+with AMD `MI300X` GPUs.
+
+<div editor-title="examples/llms/llama/vllm/amd/.dstack.yml">
+
+```yaml
+type: service
+name: llama4-scout
+
+image: rocm/vllm-dev:llama4-20250407
+env:
+  - HF_TOKEN
+  - MODEL_ID=meta-llama/Llama-4-Scout-17B-16E-Instruct
+  - VLLM_WORKER_MULTIPROC_METHOD=spawn
+  - VLLM_USE_MODELSCOPE=False
+  - VLLM_USE_TRITON_FLASH_ATTN=0 
+  - MAX_MODEL_LEN=256000
+
+commands:
+   - |
+     vllm serve $MODEL_ID \
+       --tensor-parallel-size $DSTACK_GPUS_NUM \
+       --max-model-len $MAX_MODEL_LEN \
+       --kv-cache-dtype fp8 \
+       --max-num-seqs 64 \
+       --override-generation-config='{"attn_temperature_tuning": true}'
+
+   
+port: 8000
+# Register the model
+model: meta-llama/Llama-4-Scout-17B-16E-Instruct
+
+resources:
+  gpu: Mi300x:2
+  disk: 500GB..
+```
+</div>
+
+### NVIDIA
 Here's an example of a service that deploys 
 [`Llama-4-Scout-17B-16E-Instruct` :material-arrow-top-right-thin:{ .external }](https://huggingface.co/meta-llama/Llama-4-Scout-17B-16E-Instruct){:target="_blank"} 
 using [SGLang :material-arrow-top-right-thin:{ .external }](https://github.com/sgl-project/sglang){:target="_blank"} and [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/vllm-project/vllm){:target="_blank"} 
@@ -167,5 +209,4 @@ The source-code of this example can be found in
 
 1. Check [dev environments](https://dstack.ai/docs/dev-environments), [tasks](https://dstack.ai/docs/tasks), 
    [services](https://dstack.ai/docs/services), and [protips](https://dstack.ai/docs/protips).
-2. Browse [Llama 4 with SGLang :material-arrow-top-right-thin:{ .external }](https://github.com/sgl-project/sglang/blob/main/docs/references/llama4.md) 
-   and [Llama 4 with vLLM :material-arrow-top-right-thin:{ .external }](https://blog.vllm.ai/2025/04/05/llama4.html).
+2. Browse [Llama 4 with SGLang :material-arrow-top-right-thin:{ .external }](https://github.com/sgl-project/sglang/blob/main/docs/references/llama4.md), [Llama 4 with vLLM :material-arrow-top-right-thin:{ .external }](https://blog.vllm.ai/2025/04/05/llama4.html) and [Llama 4 with AMD :material-arrow-top-right-thin:{ .external }](https://rocm.blogs.amd.com/artificial-intelligence/llama4-day-0-support/README.html).
