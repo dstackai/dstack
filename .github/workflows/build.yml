@@ -28,10 +28,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
         with:
           python-version: 3.11
-      - run: python -m pip install pre-commit
+      - run: uv tool install pre-commit
       - run: pre-commit run -a --show-diff-on-failure
 
   frontend-build:
