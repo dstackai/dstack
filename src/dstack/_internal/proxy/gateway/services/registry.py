@@ -9,6 +9,9 @@ from dstack._internal.core.models.instances import SSHConnectionParams
 from dstack._internal.proxy.gateway import models as gateway_models
 from dstack._internal.proxy.gateway.repo.repo import GatewayProxyRepo
 from dstack._internal.proxy.gateway.services.nginx import (
+    LimitReqConfig,
+    LimitReqZoneConfig,
+    LocationConfig,
     ModelEntrypointConfig,
     Nginx,
     ReplicaConfig,
@@ -33,6 +36,7 @@ async def register_service(
     run_name: str,
     domain: str,
     https: bool,
+    rate_limits: tuple[models.RateLimit, ...],
     auth: bool,
     client_max_body_size: int,
     model: Optional[schemas.AnyModel],
@@ -46,6 +50,7 @@ async def register_service(
         run_name=run_name,
         domain=domain,
         https=https,
+        rate_limits=rate_limits,
         auth=auth,
         client_max_body_size=client_max_body_size,
         replicas=(),
@@ -297,6 +302,27 @@ async def stop_replica_connections(
 async def get_nginx_service_config(
     service: models.Service, replicas: Iterable[ReplicaConfig]
 ) -> ServiceConfig:
+    limit_req_zones: list[LimitReqZoneConfig] = []
+    locations: list[LocationConfig] = []
+    for i, rate_limit in enumerate(service.rate_limits):
+        zone_name = f"{i}.{service.domain_safe}"
+        if isinstance(rate_limit.key, models.IPAddressPartitioningKey):
+            key = "$binary_remote_addr"
+        elif isinstance(rate_limit.key, models.HeaderPartitioningKey):
+            key = f"$http_{rate_limit.key.header.lower().replace('-', '_')}"
+        else:
+            raise TypeError(f"Unexpected key type {type(rate_limit.key)}")
+        limit_req_zones.append(
+            LimitReqZoneConfig(name=zone_name, key=key, rpm=round(rate_limit.rps * 60))
+        )
+        locations.append(
+            LocationConfig(
+                prefix=rate_limit.prefix,
+                limit_req=LimitReqConfig(zone=zone_name, burst=rate_limit.burst),
+            )
+        )
+    if not any(location.prefix == "/" for location in locations):
+        locations.append(LocationConfig(prefix="/", limit_req=None))
     return ServiceConfig(
         domain=service.domain_safe,
         https=service.https_safe,
@@ -305,6 +331,8 @@ async def get_nginx_service_config(
         auth=service.auth,
         client_max_body_size=service.client_max_body_size,
         access_log_path=ACCESS_LOG_PATH,
+        limit_req_zones=limit_req_zones,
+        locations=locations,
         replicas=sorted(replicas, key=lambda r: r.id),  # sort for reproducible configs
     )
 

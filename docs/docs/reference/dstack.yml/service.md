@@ -74,6 +74,38 @@ The `service` configuration type allows running [services](../../concepts/servic
       type:
         required: true
 
+### `rate_limits`
+
+#### `rate_limits[n]`
+
+#SCHEMA# dstack._internal.core.models.configurations.RateLimit
+    overrides:
+      show_root_heading: false
+      type:
+        required: true
+
+##### `rate_limits[n].key` { data-toc-label="key" }
+
+=== "IP address"
+
+    Partition requests by client IP address.
+
+    #SCHEMA# dstack._internal.core.models.configurations.IPAddressPartitioningKey
+        overrides:
+          show_root_heading: false
+          type:
+            required: true
+
+=== "Header"
+
+    Partition requests by the value of a header.
+
+    #SCHEMA# dstack._internal.core.models.configurations.HeaderPartitioningKey
+        overrides:
+          show_root_heading: false
+          type:
+            required: true
+
 ### `retry`
 
 #SCHEMA# dstack._internal.core.models.profiles.ProfileRetry

@@ -3,6 +3,7 @@ from typing import Annotated, Literal, Optional, Union
 from pydantic import BaseModel, Field
 
 from dstack._internal.core.models.instances import SSHConnectionParams
+from dstack._internal.proxy.lib.models import RateLimit
 
 
 class BaseChatModel(BaseModel):
@@ -42,6 +43,7 @@ class RegisterServiceRequest(BaseModel):
     client_max_body_size: int
     options: Options
     ssh_private_key: str
+    rate_limits: tuple[RateLimit, ...] = ()
 
 
 class RegisterReplicaRequest(BaseModel):

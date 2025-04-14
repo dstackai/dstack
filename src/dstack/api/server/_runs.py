@@ -4,6 +4,8 @@ from uuid import UUID
 
 from pydantic import parse_obj_as
 
+from dstack._internal.core.models.common import is_core_model_instance
+from dstack._internal.core.models.configurations import ServiceConfiguration
 from dstack._internal.core.models.runs import (
     ApplyRunPlanInput,
     Run,
@@ -106,10 +108,17 @@ def _get_run_spec_excludes(run_spec: RunSpec) -> Optional[Dict]:
     profile_excludes: set[str] = set()
     configuration = run_spec.configuration
     profile = run_spec.profile
+
     if configuration.fleets is None:
         configuration_excludes["fleets"] = True
     if profile is not None and profile.fleets is None:
         profile_excludes.add("fleets")
+    if (
+        is_core_model_instance(configuration, ServiceConfiguration)
+        and not configuration.rate_limits
+    ):
+        configuration_excludes["rate_limits"] = True
+
     if configuration_excludes:
         spec_excludes["configuration"] = configuration_excludes
     if profile_excludes:
