@@ -1,5 +1,6 @@
 import hashlib
 import os
+import re
 import uuid
 from datetime import timezone
 from typing import Awaitable, Callable, List, Optional, Tuple
@@ -8,7 +9,7 @@ from sqlalchemy import delete, select, update
 from sqlalchemy import func as safunc
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dstack._internal.core.errors import ResourceExistsError
+from dstack._internal.core.errors import ResourceExistsError, ServerClientError
 from dstack._internal.core.models.users import (
     GlobalRole,
     User,
@@ -78,6 +79,7 @@ async def create_user(
     active: bool = True,
     token: Optional[str] = None,
 ) -> UserModel:
+    validate_username(username)
     user_model = await get_user_model_by_name(session=session, username=username, ignore_case=True)
     if user_model is not None:
         raise ResourceExistsError()
@@ -223,6 +225,15 @@ def get_user_permissions(user_model: UserModel) -> UserPermissions:
     return UserPermissions(
         can_create_projects=can_create_projects,
     )
+
+
+def validate_username(username: str):
+    if not is_valid_username(username):
+        raise ServerClientError("Username should match regex '^[a-zA-Z0-9-_]{1,60}$'")
+
+
+def is_valid_username(username: str) -> bool:
+    return re.match("^[a-zA-Z0-9-_]{1,60}$", username) is not None
 
 
 _CREATE_USER_HOOKS = []
