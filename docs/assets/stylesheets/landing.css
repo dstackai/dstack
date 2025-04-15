@@ -495,7 +495,7 @@
             border-left: 0.5px dotted rgba(0, 0, 0, 0.75);
         }
 
-        &:nth-child(n+7) {
+        &:nth-child(n+8) {
             border-bottom: 0.5px dotted rgba(0, 0, 0, 0.75);
         }
 
@@ -921,11 +921,11 @@
     }
 
     .supported_clouds_item {
-        &:nth-child(4), &:nth-child(8), &:nth-child(n-1) {
+        &:nth-child(4), &:nth-child(n-1) {
             border-right: 0.5px dotted black;
         }
 
-        &:nth-child(n+8) {
+        &:nth-child(n+9) {
             border-bottom: 0.5px dotted black;
         }
     }
