@@ -236,6 +236,30 @@ class TestCreateUser:
         )
         assert len(res.scalars().all()) == 1
 
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @freeze_time(datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
+    async def test_returns_400_if_username_invalid(
+        self,
+        test_db,
+        session: AsyncSession,
+        client: AsyncClient,
+        username: str,
+    ):
+        user = await create_user(
+            name="admin",
+            session=session,
+        )
+        response = await client.post(
+            "/api/users/create",
+            headers=get_auth_headers(user.token),
+            json={
+                "username": "Invalid#$username",
+                "global_role": GlobalRole.USER,
+            },
+        )
+        assert response.status_code == 400
+
 
 class TestDeleteUsers:
     @pytest.mark.asyncio
