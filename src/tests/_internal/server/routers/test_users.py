@@ -244,7 +244,6 @@ class TestCreateUser:
         test_db,
         session: AsyncSession,
         client: AsyncClient,
-        username: str,
     ):
         user = await create_user(
             name="admin",
