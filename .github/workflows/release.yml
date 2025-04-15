@@ -52,7 +52,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [macos-latest, ubuntu-latest, windows-latest]
+        os: [dstackai-ubuntu-latest-32-cores, macos-latest, windows-latest]
         python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
@@ -259,7 +259,7 @@ jobs:
     defaults:
       run:
         working-directory: docker/server
-    runs-on: ubuntu-latest
+    runs-on: dstackai-ubuntu-latest-32-cores
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
