@@ -84,11 +84,11 @@ jobs:
           if [ "${{ matrix.os }}" != "macos-latest" ]; then
             RUNPOSTGRES="--runpostgres"
           fi
-          uv run pytest src/tests --runui $RUNPOSTGRES
+          uv run pytest -n auto src/tests --runui $RUNPOSTGRES
       - name: Run pytest on Windows
         if: matrix.os == 'windows-latest'
         run: |
-          uv run pytest src/tests --runui --runpostgres
+          uv run pytest -n auto src/tests --runui --runpostgres
 
   update-get-dstack:
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
