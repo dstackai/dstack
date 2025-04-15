@@ -27,7 +27,7 @@ jobs:
       - run: pre-commit run -a --show-diff-on-failure
 
   frontend-build:
-    runs-on: ubuntu-latest
+    runs-on: dstackai-ubuntu-latest-32-cores
     defaults:
       run:
         working-directory: frontend
