@@ -84,6 +84,7 @@ dev = [
     "freezegun>=1.5.1",
     "ruff>=0.11.2",
     "testcontainers>=4.9.2",
+    "pytest-xdist>=3.6.1",
 ]
 
 [project.optional-dependencies]
