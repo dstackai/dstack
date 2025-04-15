@@ -36,7 +36,7 @@ jobs:
       - run: pre-commit run -a --show-diff-on-failure
 
   frontend-build:
-    runs-on: dstackai-ubuntu-latest-32-cores
+    runs-on: dstack-ubuntu-latest-32-cores
     defaults:
       run:
         working-directory: frontend
@@ -61,7 +61,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [dstackai-ubuntu-latest-32-cores, macos-latest, windows-latest]
+        os: [dstack-ubuntu-latest-32-cores, macos-latest, windows-latest]
         python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
