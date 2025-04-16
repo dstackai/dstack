@@ -1,5 +1,5 @@
 type: task
-name: build-trtllm-model
+name: build-model
 
 image: nvcr.io/nvidia/tritonserver:25.01-trtllm-python-py3
 

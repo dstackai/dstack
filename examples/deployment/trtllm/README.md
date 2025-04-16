@@ -4,7 +4,9 @@ description: "This example shows how to deploy Deepseek models to any cloud or o
 ---
 
 # TensorRT-LLM
-This example shows how to deploy Deepseek-R1(671B) using [TensorRT-LLM :material-arrow-top-right-thin:{ .external }](https://github.com/NVIDIA/TensorRT-LLM){:target="_blank"} and `dstack`.
+
+This example shows how to deploy both DeepSeek R1 and its distilled version
+using [TensorRT-LLM :material-arrow-top-right-thin:{ .external }](https://github.com/NVIDIA/TensorRT-LLM){:target="_blank"} and `dstack`.
 
 ??? info "Prerequisites"
     Once `dstack` is [installed](https://dstack.ai/docs/installation), go ahead clone the repo, and run `dstack init`.
@@ -20,29 +22,29 @@ This example shows how to deploy Deepseek-R1(671B) using [TensorRT-LLM :material
     </div>
 
 ## Deployment
-To serve DeepSeek-R1-671B, TensorRT-LLM recommends (See [link](https://github.com/NVIDIA/TensorRT-LLM/issues/2863#issuecomment-2705755645)) using the PyTorch backend, which also supports DeepSeek-V3 specific features like Flash MLA, while DeepSeek-R1-Distill-Llama-8B requires the TensorRT-LLM backend.
 
-The detailed process for serving both models is outlined below.
+### DeepSeek R1
 
-### DeepSeek-R1-671B
-The latest release of TensorRT-LLM does not yet support DeepSeek-R1-671B. To serve this model, you'll need to build a Docker image from the main branch of TensorRT-LLM.
+We normally use Triton with the TensorRT-LLM backend to serve models. While this works for the distilled Llama-based
+version, DeepSeek R1 isn’t yet compatible. So, for DeepSeek R1, we’ll use `trtllm-serve` with the PyTorch backend instead.
+
+To use `trtllm-serve`, we first need to build the TensorRT-LLM Docker image from the `main` branch.
 
 #### Build a Docker image
-Below is the task configuration to build TensorRT-LLM Docker image.
-<div editor-title="examples/deployment/trtllm/trtllm-image.dstack.yml">
+
+Here’s the task config that builds the image and pushes it using the provided Docker credentials.
+
+<div editor-title="examples/deployment/trtllm/build-image.dstack.yml">
 
 ```yaml
 type: task
-name: build-trtllm-image
+name: build-image
 
 privileged: true
 image: dstackai/dind
-
-
 env:
   - DOCKER_USERNAME
   - DOCKER_PASSWORD
-
 commands:
   - start-dockerd
   - apt update && apt-get install -y build-essential make git git-lfs
@@ -51,7 +53,7 @@ commands:
   - cd TensorRT-LLM
   - git submodule update --init --recursive
   - git lfs pull
-  # Restrict the compilation to Hopper architectures.
+  # Limit compilation to Hopper for a smaller image
   - make -C docker release_build CUDA_ARCHS="90-real"
   - docker tag tensorrt_llm/release:latest $DOCKER_USERNAME/tensorrt_llm:latest
   - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
@@ -63,41 +65,40 @@ resources:
 ```
 </div>
 
-To run the above task configuration, use the [`dstack apply`](https://dstack.ai/docs/reference/cli/dstack/apply.md) command.
+To run it, pass the task configuration to `dstack apply`.
 
 <div class="termy">
 
 ```shell
-$ dstack apply -f examples/deployment/trtllm/trtllm-image.dstack.yml
+$ dstack apply -f examples/deployment/trtllm/build-image.dstack.yml
 
  #  BACKEND  REGION             RESOURCES               SPOT  PRICE       
  1  cudo     ca-montreal-2      8xCPU, 25GB, (500.0GB)  yes   $0.1073   
 
-Submit the run build-trtllm-image? [y/n]: y
+Submit the run build-image? [y/n]: y
 
 Provisioning...
 ---> 100%
 ```
 </div>
 
-
 #### Deploy the model
 
-Below is the service configuration to deploy DeepSeek-R1-671B.
+Below is the service configuration that deploys DeepSeek R1 using the built TensorRT-LLM image.
 
-<div editor-title="examples/deployment/trtllm/.dstack.yml">
+<div editor-title="examples/deployment/trtllm/serve-r1.dstack.yml">
 
     ```yaml
     type: service
-    name: serve-deepseek
-    # To build latest trtllm image use task in examples/deployment/trtllm/build.trtllm.yml to build docker image.
+    name: serve-r1
+
+    # Specify the image built with `examples/deployment/trtllm/build-image.dstack.yml`
     image: dstackai/tensorrt_llm:9b931c0f6305aefa3660e6fb84a76a42c0eef167 
     env:
       - MAX_BATCH_SIZE=256
       - MAX_NUM_TOKENS=16384
       - MAX_SEQ_LENGTH=16384
       - HF_HUB_ENABLE_HF_TRANSFER=1
-
     commands:
       - pip install -U "huggingface_hub[cli]"
       - pip install hf_transfer
@@ -111,31 +112,28 @@ Below is the service configuration to deploy DeepSeek-R1-671B.
               --ep_size 4
               --pp_size 1
               DeepSeek-R1
-
     port: 8000
-
     model: deepseek-ai/DeepSeek-R1
 
     resources:
       gpu: 8:H200
       shm_size: 32GB
       disk: 2000GB..
-
     ```
     </div>
 
 
-To run the above configuration, use the [`dstack apply`](https://dstack.ai/docs/reference/cli/dstack/apply.md) command. 
+To run it, pass the configuration to `dstack apply`. 
 
 <div class="termy">
 
 ```shell
-$ dstack apply -f examples/deployment/trtllm/.dstack.yml
+$ dstack apply -f examples/deployment/trtllm/serve-r1.dstack.yml
 
  #  BACKEND  REGION             RESOURCES                        SPOT  PRICE       
  1  vastai   is-iceland         192xCPU, 2063GB, 8xH200 (141GB)  yes   $25.62   
 
-Submit the run serve-deepseek? [y/n]: y
+Submit the run serve-r1? [y/n]: y
 
 Provisioning...
 ---> 100%
@@ -143,21 +141,22 @@ Provisioning...
 </div>
 
 
-### DeepSeek-R1-Distill-Llama-8B
-To deploy DeepSeek-R1-Distill-Llama-8B, follow the steps below.
+### DeepSeek R1 Distill Llama 8B
+
+To deploy DeepSeek R1 Distill Llama 8B, follow the steps below.
 
 #### Convert and upload checkpoints
 
-Below is the task configuration to convert Hugging Face model into a TensorRT-LLM checkpoint and upload it to an S3 bucket.
+Here’s the task config that converts a Hugging Face model to a TensorRT-LLM checkpoint format 
+and uploads it to S3 using the provided AWS credentials.
 
-<div editor-title="examples/deployment/trtllm/convert-checkpoint.dstack.yml">
+<div editor-title="examples/deployment/trtllm/convert-model.dstack.yml">
 
     ```yaml
     type: task
-    name: convert-trtllm-checkpoint
+    name: convert-model
 
     image: nvcr.io/nvidia/tritonserver:25.01-trtllm-python-py3
-
     env:
       - HF_TOKEN
       - MODEL_REPO=https://huggingface.co/deepseek-ai/DeepSeek-R1-Distill-Llama-8B
@@ -165,7 +164,6 @@ Below is the task configuration to convert Hugging Face model into a TensorRT-LL
       - AWS_ACCESS_KEY_ID
       - AWS_SECRET_ACCESS_KEY
       - AWS_DEFAULT_REGION
-
     commands:
       # nvcr.io/nvidia/tritonserver:25.01-trtllm-python-py3 container uses TensorRT-LLM version 0.17.0,
       # therefore we are using branch v0.17.0 
@@ -192,17 +190,17 @@ Below is the task configuration to convert Hugging Face model into a TensorRT-LL
     </div>
 
 
-To run the above configuration, use the [`dstack apply`](https://dstack.ai/docs/reference/cli/dstack/apply.md) command. 
+To run it, pass the configuration to `dstack apply`. 
 
 <div class="termy">
 
 ```shell
-$ dstack apply -f examples/deployment/trtllm/convert-checkpoint.dstack.yml
+$ dstack apply -f examples/deployment/trtllm/convert-model.dstack.yml
 
  #  BACKEND  REGION       RESOURCES                    SPOT  PRICE       
  1  vastai   us-iowa      12xCPU, 85GB, 1xA100 (40GB)  yes   $0.66904  
 
-Submit the run convert-trtllm-checkpoint? [y/n]: y
+Submit the run convert-model? [y/n]: y
 
 Provisioning...
 ---> 100%
@@ -212,16 +210,15 @@ Provisioning...
 
 #### Build and upload the model
 
-Below is the task configuration to build a TensorRT-LLM model and upload it to an S3 bucket.
+Here’s the task config that builds a TensorRT-LLM model and uploads it to S3 with the provided AWS credentials.
+
 <div editor-title="build-model.dstack.yml">
 
     ```yaml
       type: task
-      name: build-trtllm-model
+      name: build-model
 
       image: nvcr.io/nvidia/tritonserver:25.01-trtllm-python-py3
-
-
       env:
         - MODEL=deepseek-ai/DeepSeek-R1-Distill-Llama-8B
         - S3_BUCKET_NAME
@@ -236,7 +233,6 @@ Below is the task configuration to build a TensorRT-LLM model and upload it to a
         - MAX_QUEUE_DELAY_MS=0
         - MAX_QUEUE_SIZE=0
         - DECOUPLED_MODE=true # Set true for streaming
-
       commands:
         - huggingface-cli download $MODEL --exclude '*.safetensors' --local-dir tokenizer_dir
         - curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
@@ -256,15 +252,13 @@ Below is the task configuration to build a TensorRT-LLM model and upload it to a
         - python3 tensorrtllm_backend/tools/fill_template.py -i triton_model_repo/tensorrt_llm_bls/config.pbtxt triton_max_batch_size:${TRITON_MAX_BATCH_SIZE},decoupled_mode:${DECOUPLED_MODE},bls_instance_count:${INSTANCE_COUNT},logits_datatype:TYPE_BF16
         - aws s3 sync triton_model_repo s3://${S3_BUCKET_NAME}/triton_model_repo --acl public-read
         - aws s3 sync tllm_engine_${DSTACK_GPUS_NUM}gpu_bf16 s3://${S3_BUCKET_NAME}/tllm_engine_${DSTACK_GPUS_NUM}gpu_bf16 --acl public-read
-        
 
       resources:
         gpu: A100:40GB
-
     ```
     </div>
 
-To run the above configuration, use the [`dstack apply`](https://dstack.ai/docs/reference/cli/dstack/apply.md) command. 
+To run it, pass the configuration to `dstack apply`. 
 
 <div class="termy">
 
@@ -274,7 +268,7 @@ $ dstack apply -f examples/deployment/trtllm/build-model.dstack.yml
  #  BACKEND  REGION       RESOURCES                    SPOT  PRICE       
  1  vastai   us-iowa      12xCPU, 85GB, 1xA100 (40GB)  yes   $0.66904  
 
-Submit the run build-trtllm-model? [y/n]: y
+Submit the run build-model? [y/n]: y
 
 Provisioning...
 ---> 100%
@@ -282,16 +276,16 @@ Provisioning...
 </div>
 
 #### Deploy the model
-Below is the service configuration to deploy DeepSeek-R1-Distill-Llama-8B
 
-<div editor-title="build-model.dstack.yml">
+Below is the service configuration that deploys DeepSeek R1 Distill Llama 8B.
+
+<div editor-title="serve-distill.dstack.yml">
 
 ```yaml
     type: service
-    name: serve-distill-deepseek
+    name: serve-distill
 
     image: nvcr.io/nvidia/tritonserver:25.01-trtllm-python-py3
-
     env:
       - MODEL=deepseek-ai/DeepSeek-R1-Distill-Llama-8B
       - S3_BUCKET_NAME
@@ -307,10 +301,7 @@ Below is the service configuration to deploy DeepSeek-R1-Distill-Llama-8B
       - aws s3 sync s3://${S3_BUCKET_NAME}/tllm_engine_1gpu_bf16 ./tllm_engine_1gpu_bf16
       - git clone https://github.com/triton-inference-server/server.git
       - python3 server/python/openai/openai_frontend/main.py --model-repository s3://${S3_BUCKET_NAME}/triton_model_repo  --tokenizer tokenizer_dir --openai-port 8000  
-
-
     port: 8000
-
     model: ensemble
 
     resources:
@@ -319,7 +310,7 @@ Below is the service configuration to deploy DeepSeek-R1-Distill-Llama-8B
 ```
 </div>
 
-To run the above configuration, use the [`dstack apply`](https://dstack.ai/docs/reference/cli/dstack/apply.md) command. 
+To run it, pass the configuration to `dstack apply`. 
 
 <div class="termy">
 
@@ -329,7 +320,7 @@ $ dstack apply -f examples/deployment/trtllm/serve-distill.dstack.yml
  #  BACKEND  REGION       RESOURCES                    SPOT  PRICE       
  1  vastai   us-iowa      12xCPU, 85GB, 1xA100 (40GB)  yes   $0.66904  
 
-Submit the run serve-distill-deepseek? [y/n]: y
+Submit the run serve-distill? [y/n]: y
 
 Provisioning...
 ---> 100%
@@ -337,6 +328,7 @@ Provisioning...
 </div>
 
 ## Access the endpoint
+
 If no gateway is created, the model will be available via the OpenAI-compatible endpoint 
 at `<dstack server URL>/proxy/models/<project name>/`.
 
@@ -377,5 +369,5 @@ The source-code of this example can be found in
 ## What's next?
 
 1. Check [services](https://dstack.ai/docs/services)
-2. Browse the [Tensorrt-LLM DeepSeek-V3 with PyTorch Backend](https://github.com/NVIDIA/TensorRT-LLM/tree/main/examples/deepseek_v3), [Prepare Model Repository](https://github.com/triton-inference-server/tensorrtllm_backend?tab=readme-ov-file#prepare-the-model-repository)
-3. See also [Running OpenAI API compatible server with TensorRT-LLM](https://nvidia.github.io/TensorRT-LLM/commands/trtllm-serve.html#trtllm-serve)
+2. Browse [Tensorrt-LLM DeepSeek-R1 with PyTorch Backend :material-arrow-top-right-thin:{ .external }](https://github.com/NVIDIA/TensorRT-LLM/tree/main/examples/deepseek_v3){:target="_blank"} and [Prepare the Model Repository :material-arrow-top-right-thin:{ .external }](https://github.com/triton-inference-server/tensorrtllm_backend?tab=readme-ov-file#prepare-the-model-repository){:target="_blank"}
+3. See also [`trtllm-serve` :material-arrow-top-right-thin:{ .external }](https://nvidia.github.io/TensorRT-LLM/commands/trtllm-serve.html#trtllm-serve){:target="_blank"}

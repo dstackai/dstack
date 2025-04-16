@@ -1,6 +1,7 @@
 type: service
-name: serve-deepseek
-# To build latest trtllm image use task in examples/deployment/tensorrt/build.trtllm.yml to build docker image.
+name: serve-r1
+
+# Specify the image built with `examples/deployment/trtllm/build-image.dstack.yml`
 image: dstackai/tensorrt_llm:9b931c0f6305aefa3660e6fb84a76a42c0eef167 
 env:
   - MAX_BATCH_SIZE=256
@@ -9,7 +10,6 @@ env:
   - EXPERT_PARALLEL=4
   - PIPELINE_PARALLEL=1
   - HF_HUB_ENABLE_HF_TRANSFER=1
-
 commands:
   - pip install -U "huggingface_hub[cli]"
   - pip install hf_transfer
@@ -23,9 +23,7 @@ commands:
           --ep_size $EXPERT_PARALLEL
           --pp_size $PIPELINE_PARALLEL
           DeepSeek-R1
-
 port: 8000
-
 model: deepseek-ai/DeepSeek-R1
 
 resources:

@@ -14,6 +14,15 @@ hide:
 
 ## Deployment
 <div class="tx-landing__highlights_grid">
+    <a href="/examples/deployment/sglang" 
+       class="feature-cell">
+       <h3>
+           SGLang
+       </h3>
+       <p>
+           Deploy DeepSeek distilled models with SGLang
+      </p>
+    </a>
     <a href="/examples/deployment/vllm" 
        class="feature-cell">
        <h3>
@@ -38,24 +47,16 @@ hide:
            NIM
        </h3>
        <p>
-            Deploy DeepSeek R1 Distill Llama 8B with NIM
+            Deploy a DeepSeek distilled model with NIM
         </p>
     </a>
-    <a href="/examples/deployment/sglang" 
-       class="feature-cell">
-       <h3>
-           SGLang
-       </h3>
-       <p>
-           Deploy DeepSeek-R1-Distill-Llama 8B & 70B with SGLang
-      </p>
     <a href="/examples/deployment/trtllm"
        class="feature-cell">
        <h3>
            TensorRT-LLM
        </h3>
        <p>
-            Deploy DeepSeek-R1 with TensorRT-LLM
+            Deploy DeepSeek R1 and its distilled version with TensorRT-LLM
         </p>
     </a>
 </div>

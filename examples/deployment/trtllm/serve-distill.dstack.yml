@@ -1,5 +1,5 @@
 type: service
-name: serve-distill-deepseek
+name: serve-distill
 
 image: nvcr.io/nvidia/tritonserver:25.01-trtllm-python-py3
 
