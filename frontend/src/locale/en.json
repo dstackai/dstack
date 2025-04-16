@@ -3,7 +3,7 @@
   "common": {
     "loading": "Loading",
     "add": "Add",
-    "yes": "Yes!",
+    "yes": "Yes",
     "no": "No",
     "create": "Create {{text}}",
     "edit": "Edit",
