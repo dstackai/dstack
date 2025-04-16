@@ -171,7 +171,7 @@ To request multiple GPUs, specify the quantity after the GPU name, separated by 
       - HF_TOKEN
       - WANDB_API_KEY
       - WANDB_PROJECT
-      - WANDB_NAME
+      - WANDB_NAME=axolotl-amd-llama31-train
       - HUB_MODEL_ID
     # Commands of the task
     commands:
@@ -182,6 +182,7 @@ To request multiple GPUs, specify the quantity after the GPU name, separated by 
       - cd axolotl
       - git checkout d4f6c65
       - pip install -e .
+      # Latest pynvml is not compatible with axolotl commit d4f6c65, so we need to fall back to version 11.5.3
       - pip uninstall pynvml -y
       - pip install pynvml==11.5.3
       - cd ..
@@ -208,7 +209,7 @@ To request multiple GPUs, specify the quantity after the GPU name, separated by 
     ```
     </div>
 
-    Note, to support ROCm, we need to checkout to commit `d4f6c65`. You can find the installation instruction in [rocm-blogs :material-arrow-top-right-thin:{ .external }](https://github.com/ROCm/rocm-blogs/blob/release/blogs/artificial-intelligence/axolotl/src/Dockerfile.rocm){:target="_blank"}.
+    Note, to support ROCm, we need to checkout to commit `d4f6c65`. This commit eliminates the need to manually modify the Axolotl source code to make xformers compatible with ROCm, as described in the [xformers workaround :material-arrow-top-right-thin:{ .external }](https://docs.axolotl.ai/docs/amd_hpc.html#apply-xformers-workaround). This installation approach is also followed for building Axolotl ROCm docker image. [(See Dockerfile) :material-arrow-top-right-thin:{ .external }](https://github.com/ROCm/rocm-blogs/blob/release/blogs/artificial-intelligence/axolotl/src/Dockerfile.rocm){:target="_blank"}.
 
     > To speed up installation of `flash-attention` and `xformers `, we use pre-built binaries uploaded to S3. 
     > You can find the tasks that build and upload the binaries
@@ -225,7 +226,7 @@ cloud resources and run the configuration.
 $ HF_TOKEN=...
 $ WANDB_API_KEY=...
 $ WANDB_PROJECT=...
-$ WANDB_NAME=...
+$ WANDB_NAME=axolotl-amd-llama31-train
 $ HUB_MODEL_ID=...
 $ dstack apply -f examples/deployment/vllm/amd/.dstack.yml
 ```

@@ -7,7 +7,7 @@ env:
   - HF_TOKEN
   - WANDB_API_KEY
   - WANDB_PROJECT
-  - WANDB_NAME
+  - WANDB_NAME=axolotl-amd-llama31-train
   - HUB_MODEL_ID
 # Commands of the task
 commands:
@@ -18,6 +18,7 @@ commands:
   - cd axolotl
   - git checkout d4f6c65
   - pip install -e .
+  # Latest pynvml is not compatible with axolotl commit d4f6c65, so we need to fall back to version 11.5.3
   - pip uninstall pynvml -y
   - pip install pynvml==11.5.3
   - cd ..

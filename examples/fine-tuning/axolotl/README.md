@@ -31,7 +31,7 @@ This file can be found at [`examples/fine-tuning/axolotl/.dstack.yml` :material-
 ```yaml
 type: task
 # The name is optional, if not specified, generated randomly
-name: axolotl-train
+name: axolotl-nvidia-llama-scout-train
 
 # Using the official Axolotl's Docker image
 image: axolotlai/axolotl:main-latest
@@ -41,7 +41,7 @@ env:
   - HF_TOKEN
   - WANDB_API_KEY
   - WANDB_PROJECT
-  - WANDB_NAME
+  - WANDB_NAME=axolotl-nvidia-llama-scout-train
   - HUB_MODEL_ID
 # Commands of the task
 commands:
@@ -77,7 +77,7 @@ cloud resources and run the configuration.
 $ HF_TOKEN=...
 $ WANDB_API_KEY=...
 $ WANDB_PROJECT=...
-$ WANDB_NAME=...
+$ WANDB_NAME=axolotl-nvidia-llama-scout-train
 $ HUB_MODEL_ID=...
 $ dstack apply -f examples/fine-tuning/axolotl/.dstack.yml
 ```
