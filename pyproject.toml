@@ -54,9 +54,6 @@ dstack = "dstack._internal.cli.main:main"
 [tool.hatch.version]
 path = "src/dstack/version.py"
 
-[tool.hatch.version.raw-options]
-version_scheme = "no-guess-dev"
-
 [tool.hatch.build.targets.wheel.shared-data]
 "src/dstack/_internal/proxy/gateway/resources" = "dstack/_internal/proxy/gateway/resources"
 "src/dstack/_internal/server/statics" = "dstack/_internal/server/statics"
