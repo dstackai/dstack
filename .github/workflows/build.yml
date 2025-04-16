@@ -47,7 +47,7 @@ jobs:
         with:
           node-version: 18
       - name: Install packages
-        run: npm install
+        run: npm ci
       - name: Build dist
         run: npm run build
       - name: Upload dist
