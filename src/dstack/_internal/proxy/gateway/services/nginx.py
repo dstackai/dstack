@@ -58,7 +58,6 @@ class LocationConfig(BaseModel):
 class ServiceConfig(SiteConfig):
     type: Literal["service"] = "service"
     project_name: str
-    run_name: str
     auth: bool
     client_max_body_size: int
     access_log_path: Path

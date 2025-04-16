@@ -327,7 +327,6 @@ async def get_nginx_service_config(
         domain=service.domain_safe,
         https=service.https_safe,
         project_name=service.project_name,
-        run_name=service.run_name,
         auth=service.auth,
         client_max_body_size=service.client_max_body_size,
         access_log_path=ACCESS_LOG_PATH,
