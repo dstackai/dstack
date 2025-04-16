@@ -1,0 +1,29 @@
+type: service
+name: llama4-scout
+
+image: rocm/vllm-dev:llama4-20250407
+env:
+  - HF_TOKEN
+  - MODEL_ID=meta-llama/Llama-4-Scout-17B-16E-Instruct
+  - VLLM_WORKER_MULTIPROC_METHOD=spawn
+  - VLLM_USE_MODELSCOPE=False
+  - VLLM_USE_TRITON_FLASH_ATTN=0 
+  - MAX_MODEL_LEN=256000
+
+commands:
+   - |
+     vllm serve $MODEL_ID \
+       --tensor-parallel-size $DSTACK_GPUS_NUM \
+       --max-model-len $MAX_MODEL_LEN \
+       --kv-cache-dtype fp8 \
+       --max-num-seqs 64 \
+       --override-generation-config='{"attn_temperature_tuning": true}'
+
+   
+port: 8000
+# Register the model
+model: meta-llama/Llama-4-Scout-17B-16E-Instruct
+
+resources:
+  gpu: Mi300x:2
+  disk: 500GB..
