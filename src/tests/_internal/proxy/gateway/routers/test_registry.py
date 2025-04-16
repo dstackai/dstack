@@ -112,7 +112,7 @@ class TestRegisterService:
         # no auth
         assert "auth_request /_dstack_auth;" not in conf
         # no replicas
-        assert "upstream test-run" not in conf
+        assert "upstream" not in conf
         assert "return 503;" in conf
 
     async def test_register_with_https(self, tmp_path: Path, system_mocks: Mocks) -> None:
@@ -275,7 +275,7 @@ class TestRegisterReplica:
         )
         assert resp.status_code == 200
         conf = (tmp_path / "443-test-run.gtw.test.conf").read_text()
-        assert "upstream test-run" not in conf
+        assert "upstream" not in conf
         # register 2 replicas
         resp = await client.post(
             "/api/registry/test-proj/services/test-run/replicas/register",
@@ -290,7 +290,7 @@ class TestRegisterReplica:
         assert resp.status_code == 200
         assert resp.json() == {"status": "ok"}
         conf = (tmp_path / "443-test-run.gtw.test.conf").read_text()
-        assert "upstream test-run" in conf
+        assert "upstream test-run.gtw.test.upstream" in conf
         assert (m1 := re.search(r"server unix:/(.+)/replica.sock;  # replica xxx-xxx", conf))
         assert (m2 := re.search(r"server unix:/(.+)/replica.sock;  # replica yyy-yyy", conf))
         assert m1.group(1) != m2.group(1)

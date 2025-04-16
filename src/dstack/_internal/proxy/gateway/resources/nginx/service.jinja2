@@ -3,7 +3,7 @@ limit_req_zone {{ zone.key }} zone={{ zone.name }}:10m rate={{ zone.rpm }}r/m;
 {% endfor %}
 
 {% if replicas %}
-upstream {{ run_name }} {
+upstream {{ domain }}.upstream {
     {% for replica in replicas %}
     server unix:{{ replica.socket }};  # replica {{ replica.id }}
     {% endfor %}
@@ -37,7 +37,7 @@ server {
 
     {% if replicas %}
     location @websocket {
-        proxy_pass http://{{ run_name }};
+        proxy_pass http://{{ domain }}.upstream;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header Host $host;
         proxy_http_version 1.1;
@@ -46,7 +46,7 @@ server {
         proxy_read_timeout 300s;
     }
     location @ {
-        proxy_pass http://{{ run_name }};
+        proxy_pass http://{{ domain }}.upstream;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header Host $host;
         proxy_read_timeout 300s;
