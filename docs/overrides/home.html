@@ -16,90 +16,69 @@
 </script>
 <script src="https://unpkg.com/typed.js@2.1.0/dist/typed.umd.js"></script>
 <script>
-        var typed = new Typed('#typed', {
-          strings: ['for AI teams', 'for training', `for deployment of AI models`, `that works with on-prem`,
-          'that works with any cloud'],
-          backDelay: 5000,
-          typeSpeed: 150,
-          backSpeed: 100,
-          loop: true,
-        });
+    var typed = new Typed('#typed', {
+        strings: ['for AI teams', 'for training', `for deployment of AI models`, `that works with on-prem`,
+            'that works with any cloud'],
+        backDelay: 5000,
+        typeSpeed: 150,
+        backSpeed: 100,
+        loop: true,
+    });
 </script>
 <script type="text/javascript">
-    /*
-        new Termynal('#tx-landing__major_feature_training_terminal',
-            {
-                lineData: [
-                    {type: 'input', value: 'dstack run . -f llama-2/train.dstack.yml --gpu 40GB -y'},
-                    {delay: 0, value: ' ', class: 'newline'},
-                    {
-                        delay: 0,
-                        value: 'RUN            BACKEND  RESOURCES                      SPOT PRICE',
-                        class: 'newline'
-                    },
-                    {
-                        delay: 0,
-                        value: 'wet-mangust-7  gcp      12xCPUs, 85GB, 1xA100 (40GB)   yes  $1.20582',
-                        class: 'newline'
-                    },
-                    {delay: 0, value: ' ', class: 'newline'},
-                    {delay: 1000, value: 'Provisioning...', class: 'newline'},
-                    {type: 'progress', progressPercent: 100, typeDelay: 200},
-                    {delay: 0, value: ' ', class: 'newline'},
-                    {
-                        delay: 5000,
-                        value: 'Epoch 0:  100% 1719/1719 [00:18<00:00, 92.32it/s, loss=0.0981, acc=0.969]\n',
-                        class: 'newline'
-                    },
-                    {
-                        delay: 5000,
-                        value: 'Epoch 1:  100% 1719/1719 [00:18<00:00, 92.32it/s, loss=0.0981, acc=0.969]\n',
-                        class: 'newline'
-                    },
-                    {
-                        delay: 5000,
-                        value: 'Epoch 2:  100% 1719/1719 [00:18<00:00, 92.32it/s, loss=0.0981, acc=0.969]\n',
-                        class: 'newline'
-                    },
-                    {delay: 0, value: ' ', class: 'newline'},
-                ]
-            }
-        );
-        new Termynal('#tx-landing__major_feature_inference_terminal',
-            {
-                lineData: [
-                    {type: 'input', value: 'dstack run . -f llama-2/serve.dstack.yml --gpu 40GB -y'},
-                    {delay: 0, value: ' ', class: 'newline'},
-                    {
-                        delay: 0,
-                        value: 'RUN            BACKEND  RESOURCES                      SPOT PRICE',
-                        class: 'newline'
-                    },
-                    {
-                        delay: 0,
-                        value: 'wet-mangust-8  gcp      12xCPUs, 85GB, 1xA100 (40GB)   yes  $1.20582',
-                        class: 'newline'
-                    },
-                    {delay: 0, value: ' ', class: 'newline'},
-                    {delay: 1000, value: 'Provisioning...', class: 'newline'},
-                    {type: 'progress', progressPercent: 100, typeDelay: 200},
-                    {delay: 0, value: ' ', class: 'newline'},
-                    {
-                        delay: 0,
-                        value: 'Serving HTTP on https://wet-mangust-8.mydomain.com',
-                        class: 'newline'
-                    },
-                    {delay: 0, value: ' ', class: 'newline'},
-                    {
-                        delay: 0,
-                        value: 'To exit, press Ctrl+C.',
-                        class: 'newline'
-                    },
-                    {delay: 0, value: ' ', class: 'newline'},
-                ]
-            }
-        );
-    */
+    new Termynal('#get-started-code-snippet',
+        {
+            lineData: [
+                {type: 'input', value: 'pip install "dstack[all]"'},
+                {delay: 0, value: 'Downloading dstack-0.19.2-py3-none-any.whl', class: 'newline'},
+                {type: 'progress', progressPercent: 100, typeDelay: 50},
+                {delay: 0, value: ' ', class: 'newline'},
+                {type: 'input', value: 'dstack server'},
+                {delay: 0, value: ' ', class: 'newline'},
+                {delay: 3000, value: 'Applying ~/.dstack/server/config.yml...', class: 'newline'},
+                {delay: 0, value: 'The admin token is d7ad7f92-9f35-470d-be0e-c7645ce71a4c', class: 'newline'},
+                {delay: 0, value: 'The dstack server 0.19.2 is running at http://127.0.0.1:3000', class: 'newline'},
+                {delay: 0, value: ' ', class: 'newline'},
+                {delay: 0, value: ' ', class: 'newline'},
+                {delay: 0, value: ' ', class: 'newline'},
+            ]
+        }
+    );
+    /*new Termynal('#tx-landing__major_feature_inference_terminal',
+        {
+            lineData: [
+                {type: 'input', value: 'dstack run . -f llama-2/serve.dstack.yml --gpu 40GB -y'},
+                {delay: 0, value: ' ', class: 'newline'},
+                {
+                    delay: 0,
+                    value: 'RUN            BACKEND  RESOURCES                      SPOT PRICE',
+                    class: 'newline'
+                },
+                {
+                    delay: 0,
+                    value: 'wet-mangust-8  gcp      12xCPUs, 85GB, 1xA100 (40GB)   yes  $1.20582',
+                    class: 'newline'
+                },
+                {delay: 0, value: ' ', class: 'newline'},
+                {delay: 1000, value: 'Provisioning...', class: 'newline'},
+                {type: 'progress', progressPercent: 100, typeDelay: 200},
+                {delay: 0, value: ' ', class: 'newline'},
+                {
+                    delay: 0,
+                    value: 'Serving HTTP on https://wet-mangust-8.mydomain.com',
+                    class: 'newline'
+                },
+                {delay: 0, value: ' ', class: 'newline'},
+                {
+                    delay: 0,
+                    value: 'To exit, press Ctrl+C.',
+                    class: 'newline'
+                },
+                {delay: 0, value: ' ', class: 'newline'},
+            ]
+        }
+    );
+*/
 </script>
 {% endblock %}
 
@@ -110,26 +89,28 @@
             <div class="tx-landing__hero_text">
                 <h1>Simplified AI workload orchestration</h1>
 
-                <p><span class="highlight">dstack</span> is an open-source alternative to Kubernetes and Slurm, designed
-                    to simplify AI development for ML engineers. It streamlines AI workloads and GPU orchestration
-                    across top clouds and on-prem clusters.</p>
+                <p><span class="highlight">dstack</span> is an open-source alternative to
+                    <span class="highlight">Kubernetes</span> and <span class="highlight">Slurm</span>, designed
+                    to simplify GPU allocation and AI workload orchestration
+                    for ML teams across top clouds, on-prem clusters, and accelerators.</p>
             </div>
 
             <div class="tx-landing__hero_buttons">
                 <div class="tx-landing__hero_button_container">
-<!--                    <a href="javascript:void(0)" -->
-<!--                       onclick="document.querySelector('#get-started').scrollIntoView({behavior: 'smooth'});"-->
-                    <a href="/docs/installation"
+                    <a href="/docs/quickstart"
                        class="md-button md-button--primary"
-                       style="min-width: 225px; margin-right: 10px">
-                        <span>Install open-source</span>
+                       style="min-width: 225px;  margin-right: 10px">
+                        <span>Get started</span>
                         <!--<span class="icon"><svg viewBox="0 0 13 10" xmlns="http://www.w3.org/2000/svg"><path d="M12.823 4.164L8.954.182a.592.592 0 0 0-.854 0 .635.635 0 0 0 0 .88l2.836 2.92H.604A.614.614 0 0 0 0 4.604c0 .344.27.622.604.622h10.332L8.1 8.146a.635.635 0 0 0 0 .88.594.594 0 0 0 .854 0l3.869-3.982a.635.635 0 0 0 0-.88z" fill-rule="nonzero" fill="currentColor" class="fill-main"></path></svg></span>-->
                     </a>
 
-                    <a href="https://calendly.com/dstackai/discovery-call" class="md-button md-button-secondary external"
-                       style="min-width: 225px" target="_blank">
-                        Talk to us
+                    <a href="/docs/" class="md-button md-button-secondary"
+                       style="min-width: 225px">
+                        Documentation
                     </a>
+
+<!--                    <a href="javascript:void(0)"-->
+<!--                       onclick="document.querySelector('#get-started').scrollIntoView({behavior: 'smooth'});"-->
                 </div>
             </div>
 
@@ -142,29 +123,86 @@
         <div class="tx-landing__major_feature">
             <div class="section">
                 <div class="block margin">
-                    <h2>AI-native container orchestration</h2>
+                    <h2>Efficient cloud GPU provisioning and utilization</h2>
                     <p>
-                        Designed for ML engineers, it simplifies development, training, cluster management, and
-                        inference.
-                    </p>
-
-                    <p><span class="highlight">dstack</span> optimizes GPU provisioning, container orchestration,
-                        job scheduling, metrics monitoring, and cost efficiency.</p>
-
-                    <p>
-                        <span class="highlight">dstack</span> integrates natively with top GPU clouds and runs
-                        seamlessly on private clouds and data centers.
+                        <span class="highlight">dstack</span> natively integrates with top GPU clouds, streamlining the
+                        provisioning, allocation, and utilization of cloud GPUs and high-performance interconnected
+                        clusters.
                     </p>
 
                     <p>
-                        <a href="/docs/" target="_blank"
-                           class="md-button md-button-secondary">Documentation</a>
+                        <span class="highlight">dstack</span> provides a unified interface on top of GPU
+                        clouds, simplifying development, training, and deployment for ML teams.
+                    </p>
+
+                    <p>
+                        <a href="/docs/concepts/backends" target="_blank"
+                           class="md-button md-button-secondary small">Backends</a>
                     </p>
                 </div>
 
-                <div class="block large">
-                    <img src="https://raw.githubusercontent.com/dstackai/static-assets/4aa9124edcaee397d9dd25d4b5aa8d8e82441852/static-assets/images/dstack-diagram.svg"
-                         width="800" style="border-radius: 10px">
+                <div class="supported_clouds_block block large">
+                    <div class="supported_clouds">
+                        <span class="supported_clouds_item">
+                            <img width="52" style="padding-top: 8px" src="/assets/images/aws-logo.svg">
+                            <div class="plans_card__service-name">AWS</div>
+                        </span>
+
+                        <span class="supported_clouds_item">
+                            <img width="43" style="margin: 2px 0" src="/assets/images/gcp-logo.svg">
+                            <div class="plans_card__service-name">GCP</div>
+                        </span>
+
+                        <span class="supported_clouds_item">
+                            <img width="37" src="/assets/images/lambda-logo.svg">
+                            <div class="plans_card__service-name">Lambda</div>
+                        </span>
+
+                        <span class="supported_clouds_item">
+                            <img width="43" style="margin: -2px 0" src="/assets/images/nebius-logo.svg">
+                            <div class="plans_card__service-name">Nebius</div>
+                        </span>
+
+                        <span class="supported_clouds_item">
+                            <img width="41" src="/assets/images/runpod-logo.svg">
+                            <div class="plans_card__service-name">RunPod</div>
+                        </span>
+
+                        <span class="supported_clouds_item">
+                            <img width="41" src="/assets/images/vultr-logo.svg">
+                            <div class="plans_card__service-name">Vultr</div>
+                        </span>
+
+                        <span class="supported_clouds_item">
+                            <img width="41" src="/assets/images/vastai-logo.svg">
+                            <div class="plans_card__service-name">Vast.ai</div>
+                        </span>
+
+                        <span class="supported_clouds_item">
+                            <img width="38" src="/assets/images/tensordock-logo.svg">
+                            <div class="plans_card__service-name">TensorDock</div>
+                        </span>
+
+                        <span class="supported_clouds_item">
+                            <img width="38" src="/assets/images/cudo-logo.svg">
+                            <div class="plans_card__service-name">CUDO</div>
+                        </span>
+
+                        <span class="supported_clouds_item">
+                            <img width="39" src="/assets/images/azure-logo.svg">
+                            <div class="plans_card__service-name">Azure</div>
+                        </span>
+
+                        <span class="supported_clouds_item">
+                            <img width="53" style="margin: 2px 0" src="/assets/images/oci-logo.svg">
+                            <div class="plans_card__service-name">OCI</div>
+                        </span>
+
+                        <span class="supported_clouds_item">
+                            <img width="53" style="margin: 9px 0" src="/assets/images/datacrunch-logo.svg">
+                            <div class="plans_card__service-name">DataCrunch</div>
+                        </span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -172,53 +210,42 @@
         <div class="tx-landing__major_feature">
             <div class="section">
                 <div class="block large margin">
-                    <img src="https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-dev-environment.gif"
-                         width="800" style="border-radius: 10px">
+                    <img src="https://github.com/dstackai/static-assets/blob/main/static-assets/images/ssh-fleet.gif?raw=true"
+                         width="800" style="border-radius: 3px">
                 </div>
 
                 <div class="block margin">
-                    <h2>IDEs & notebooks</h2>
-                    <p>
-                        <span class="highlight">Dev environments</span> allow you to provision a remote machine, set up with your code and favorite
-                        IDE, with just one command.
-                    </p>
+                    <h2>Orchestrating workloads on existing clusters</h2>
+                    <p>Whether you have an on-prem cluster of GPU-equipped bare-metal machines or a pre-provisioned
+                        cluster of GPU-enabled VMs, you just need to list the hostnames and SSH credentials of the hosts
+                        to add the cluster as a fleet for running any AI workload.</p>
 
                     <p>
-                        <span class="highlight">Dev environments</span> are perfect for interactively running code
-                        using your favorite IDE or notebook before scheduling a task or deploying a service.
+                        <a href="/docs/concepts/fleets#ssh" target="_blank"
+                           class="md-button md-button-secondary small">SSH fleets</a>
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="tx-landing__major_feature">
+            <div class="section">
+                <div class="block margin">
+                    <h2>Launching containerized dev environments</h2>
+                    <p>
+                        Before running training jobs or deploying model endpoints, ML engineers often experiment with
+                        their code in a desktop IDE while using cloud or on-prem GPU machines.
+                        Dev environments simplify and streamline this process.
                     </p>
 
                     <p>
                         <a href="/docs/dev-environments" target="_blank"
-                           class="md-button md-button-secondary small">Learn more</a>
-                    </p>
-                </div>
-            </div>
-        </div>
-
-        <div class="tx-landing__major_feature">
-            <div class="section">
-                <div class="block margin">
-                    <h2>Training & fine-tuning</h2>
-
-                    <p>
-                        <span class="highlight">Tasks</span> allow you to schedule jobs or run web apps.
-                        <span class="highlight">Tasks</span> can run on single nodes or be distributed across clusters.
-                        You can configure dependencies, resources, ports, and more.
-                    </p>
-
-                    <p><span class="highlight">Tasks</span> are ideal for training and fine-tuning jobs, running apps,
-                        or executing batch jobs, including those using Spark and Ray.</p>
-
-                    <p>
-                        <a href="/docs/tasks" target="_blank"
-                           class="md-button md-button-secondary small">Learn more</a>
+                           class="md-button md-button-secondary small">Dev environments</a>
                     </p>
                 </div>
 
                 <div class="block large">
-                    <img src="https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-task.gif"
-                         width="800" style="border-radius: 10px">
+                    <img src="https://github.com/dstackai/static-assets/blob/main/static-assets/images/dev-environment.gif?raw=true"
+                         width="800" style="border-radius: 3px">
                 </div>
             </div>
         </div>
@@ -226,21 +253,22 @@
         <div class="tx-landing__major_feature">
             <div class="section">
                 <div class="block large margin">
-                    <img src="https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-service-openai.gif"
-                         width="800" style="border-radius: 10px">
+                    <img src="https://github.com/dstackai/static-assets/blob/main/static-assets/images/task.gif?raw=true"
+                         width="800" style="border-radius: 3px">
                 </div>
 
-                <div class="block">
-                    <h2>Scalable inference</h2>
-
-                    <p><span class="highlight">Services</span> let you deploy models or web apps as private or public auto-scalable endpoints.
-                        You can configure dependencies, resources, authorization, auto-scaling rules, and more.</p>
-
-                    <p>Once deployed, the endpoint can be accessed by anyone on the team.</p>
+                <div class="block margin">
+                    <h2>Scheduling jobs on clusters and single instances</h2>
 
                     <p>
-                        <a href="/docs/services" target="_blank"
-                           class="md-button md-button-secondary small">Learn more</a>
+                        Tasks simplify the process of scheduling jobs on either optimized clusters or individual
+                        instances. They can be used for pre-training or fine-tuning models, as well as for running any
+                        AI or data workloads that require efficient GPU utilization.
+                    </p>
+
+                    <p>
+                        <a href="/docs/concepts/tasks" target="_blank"
+                           class="md-button md-button-secondary small">Tasks</a>
                     </p>
                 </div>
             </div>
@@ -249,30 +277,30 @@
         <div class="tx-landing__major_feature">
             <div class="section">
                 <div class="block margin">
-                    <h2>Managing clusters</h2>
-
-                    <p><span class="highlight">Fleets</span> streamline provisioning and management of cloud and on-prem
-                        clusters, ensuring optimal performance for AI workloads.</p>
-
-                    <p>Once created, a <span class="highlight">Fleet</span> enable teams to run <span class="highlight">Dev environments</span>,
-                        <span class="highlight">Tasks</span>, and <span class="highlight">Services</span>.</p>
+                    <h2>Deploying auto-scaling model endpoints</h2>
 
                     <p>
-                        <a href="/docs/fleets" target="_blank"
-                           class="md-button md-button-secondary small">Learn more</a>
+                        With <span class="highlight">dstack</span>, you can easily deploy any model as a secure,
+                        auto-scaling OpenAI-compatible endpoint, all while using your custom code, Docker image, and
+                        serving framework.
+                    </p>
+
+                    <p>
+                        <a href="/docs/concepts/services" target="_blank"
+                           class="md-button md-button-secondary small">Services</a>
                     </p>
                 </div>
 
                 <div class="block large">
-                    <img src="https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-cloud-ssh-fleet-1.gif"
-                         width="800" style="border-radius: 10px">
+                    <img src="https://github.com/dstackai/static-assets/blob/main/static-assets/images/service.gif?raw=true"
+                         width="800" style="border-radius: 3px">
                 </div>
             </div>
         </div>
 
         <div class="tx-landing__bottom_cta">
             <div class="tx-landing__highlights_text">
-                <h2>ML engineers <span class="heart"></span> dstack</h2>
+                <h2>Loved by world-class ML teams</h2>
 
                 <div class="tx-landing__quotes_grid">
                     <div class="cell">
@@ -284,7 +312,8 @@
                         <h4>ML Engineer @Mobius Labs</h4>
 
                         <p>
-                            Thanks to <span class="highlight">dstack</span>, my team can quickly tap into affordable GPUs and streamline our workflows
+                            Thanks to <span class="highlight">dstack</span>, my team can quickly tap into affordable
+                            GPUs and streamline our workflows
                             from testing and development to full-scale application deployment.
                         </p>
                     </div>
@@ -298,7 +327,8 @@
                         <h4>ML Engineer @Stealth</h4>
 
                         <p>
-                            Thanks to <span class="highlight">dstack</span>, I get the convenience of having a personal Slurm cluster
+                            Thanks to <span class="highlight">dstack</span>, I get the convenience of having a personal
+                            Slurm cluster
                             and using budget-friendly cloud GPUs, without paying the super-high premiums charged by the
                             big three.
                         </p>
@@ -313,7 +343,8 @@
                         <h4>ML Engineer @Argilla</h4>
 
                         <p>
-                            With <span class="highlight">dstack</span> it's incredibly easy to define a configuration within a
+                            With <span class="highlight">dstack</span> it's incredibly easy to define a configuration
+                            within a
                             repository
                             and run it without worrying about GPU availability. It lets you focus on
                             data and your research.
@@ -329,7 +360,8 @@
                         <h4>ML Researcher @ETRI</h4>
 
                         <p>
-                            Thanks to <span class="highlight">dstack</span>, I can effortlessly access the top GPU options across
+                            Thanks to <span class="highlight">dstack</span>, I can effortlessly access the top GPU
+                            options across
                             different clouds,
                             saving me time and money while pushing my AI work forward.
                         </p>
@@ -369,14 +401,29 @@
             </div>
         </div>
 
-        <span id="get-started"></span>
-
-        <div class="tx-landing__plans">
+        <!--<div class="tx-landing__plans">
             <div class="tx-landing__highlights_text">
                 <h2>Get started in under a minute</h2>
             </div>
 
-            <div class="tx-landing__plans_cards">
+            <div>
+                <div id="get-started-code-snippet" style="max-width: 700px">
+
+                </div>
+
+                <div>
+                    <p>
+                        Have questions, or need help?
+                        <br>
+                        <a href="/docs/installation"
+                           class="md-button md-button-secondary external">
+                            Get started
+                        </a>
+                    </p>
+                </div>
+            </div>
+
+            &lt;!&ndash;<div class="tx-landing__plans_cards">
                 <div class="plans_card open_source">
                     <div class="plans_card__title">Open-source</div>
                     <div class="plans_card__subtitle-2">
@@ -466,7 +513,7 @@
                         </div>
 
                         <a href="/docs/installation"
-                           class="md-button md-button--primary">Install open-source</a>
+                           class="md-button md-button&#45;&#45;primary">Install open-source</a>
                         <div class="plans_card__buttons_subtitle">MPL-2.0 licence</div>
                     </div>
                 </div>
@@ -481,7 +528,7 @@
                         Get the cheapest GPUs from the marketplace.
                     </div>
 
-                    <!--TODO: Add pricing link -->
+                    &lt;!&ndash;TODO: Add pricing link &ndash;&gt;
 
                     <div class="plans_card__services">
                         <a href="javascript:void()" class="plans_card__service-item">
@@ -496,16 +543,55 @@
                                 <div class="item">Multiple tenancies</div>
                                 <div class="item">Control plane</div>
                                 <div class="item">CLI & API</div>
-                                <!--<div class="item crown">GPU marketplace</div>-->
+                                &lt;!&ndash;<div class="item crown">GPU marketplace</div>&ndash;&gt;
                             </div>
                         </div>
 
                         <a href="https://sky.dstack.ai" target="_blank"
-                           class="md-button md-button--primary sky external">
+                           class="md-button md-button&#45;&#45;primary sky external">
                             <span>Sign up free</span>
-                            <!--<span class="icon"><svg viewBox="0 0 13 10" xmlns="http://www.w3.org/2000/svg"><path d="M12.823 4.164L8.954.182a.592.592 0 0 0-.854 0 .635.635 0 0 0 0 .88l2.836 2.92H.604A.614.614 0 0 0 0 4.604c0 .344.27.622.604.622h10.332L8.1 8.146a.635.635 0 0 0 0 .88.594.594 0 0 0 .854 0l3.869-3.982a.635.635 0 0 0 0-.88z" fill-rule="nonzero" fill="currentColor" class="fill-main"></path></svg></span>-->
+                            &lt;!&ndash;<span class="icon"><svg viewBox="0 0 13 10" xmlns="http://www.w3.org/2000/svg"><path d="M12.823 4.164L8.954.182a.592.592 0 0 0-.854 0 .635.635 0 0 0 0 .88l2.836 2.92H.604A.614.614 0 0 0 0 4.604c0 .344.27.622.604.622h10.332L8.1 8.146a.635.635 0 0 0 0 .88.594.594 0 0 0 .854 0l3.869-3.982a.635.635 0 0 0 0-.88z" fill-rule="nonzero" fill="currentColor" class="fill-main"></path></svg></span>&ndash;&gt;
                         </a>
                         <div class="plans_card__buttons_subtitle">Already have an account? <a href="https://sky.dstack.ai" target="_blank" class="tx-footer__section-link external">Sign in</a></div>
+                    </div>
+                </div>
+            </div>&ndash;&gt;
+        </div>-->
+
+        <span id="get-started"></span>
+
+        <br><br><br>
+
+        <div class="tx-landing__highlights_text">
+            <h2>Get up and running in less than a minute</h2>
+        </div>
+
+        <div class="tx-landing__major_feature">
+            <div class="section">
+                <div class="block margin">
+                    <p>Install <span class="highlight">dstack</span> on your laptop via <span class="highlight">pip</span>
+                        and start it using the CLI, or deploy it anywhere with the <span class="highlight">dstackai/dstack</span> Docker image.</p>
+
+                    <p>Configure the <span class="highlight">dstack</span> server with cloud accounts or connect it to on-prem clusters once it's running.</p>
+
+                    <p>
+                        <a href="/docs/quickstart"
+                           class="md-button md-button--primary"
+                           style="min-width: 225px; margin-right: 10px">
+                            <span>Get started</span>
+                            <!--<span class="icon"><svg viewBox="0 0 13 10" xmlns="http://www.w3.org/2000/svg"><path d="M12.823 4.164L8.954.182a.592.592 0 0 0-.854 0 .635.635 0 0 0 0 .88l2.836 2.92H.604A.614.614 0 0 0 0 4.604c0 .344.27.622.604.622h10.332L8.1 8.146a.635.635 0 0 0 0 .88.594.594 0 0 0 .854 0l3.869-3.982a.635.635 0 0 0 0-.88z" fill-rule="nonzero" fill="currentColor" class="fill-main"></path></svg></span>-->
+                        </a>
+
+                        <a href="/docs/" class="md-button md-button-secondary"
+                           style="min-width: 225px">
+                            Documentation
+                        </a>
+                    </p>
+                </div>
+
+                <div class="block large" style="width: 700px">
+                    <div id="get-started-code-snippet">
+
                     </div>
                 </div>
             </div>
@@ -529,15 +615,18 @@
                             To efficiently support GPU workloads, Kubernetes typically requires custom operators, and it
                             may not offer the most intuitive interface for ML engineers.</p>
 
-                        <p><span class="highlight">dstack</span> takes a different approach, focusing on container orchestration specifically for AI
+                        <p><span class="highlight">dstack</span> takes a different approach, focusing on container
+                            orchestration specifically for AI
                             workloads, with the goal of making life easier for ML engineers.</p>
 
-                        <p>Designed to be lightweight, <span class="highlight">dstack</span> provides a simpler, more intuitive interface for
+                        <p>Designed to be lightweight, <span class="highlight">dstack</span> provides a simpler, more
+                            intuitive interface for
                             development,
                             training, and inference. It also enables more flexible and cost-effective provisioning
                             and management of clusters.</p>
 
-                        <p>For optimal flexibility, <span class="highlight">dstack</span> and Kubernetes can complement each other: dstack can handle
+                        <p>For optimal flexibility, <span class="highlight">dstack</span> and Kubernetes can complement
+                            each other: dstack can handle
                             development, while Kubernetes manages production deployments.</p>
                     </div>
                 </div>
@@ -554,9 +643,11 @@
                             Slurm excels at job scheduling across pre-configured clusters.
                         </p>
 
-                        <p><span class="highlight">dstack</span> goes beyond scheduling, providing a full suite of features tailored to ML teams,
+                        <p><span class="highlight">dstack</span> goes beyond scheduling, providing a full suite of
+                            features tailored to ML teams,
                             including cluster management, dynamic compute provisioning, development environments, and
-                            advanced monitoring. This makes <span class="highlight">dstack</span> a more comprehensive solution for AI workloads,
+                            advanced monitoring. This makes <span class="highlight">dstack</span> a more comprehensive
+                            solution for AI workloads,
                             whether in the cloud or on-prem.
                         </p>
                     </div>
@@ -581,7 +672,8 @@
                         </p>
 
                         <p>
-                            For ML teams seeking a more streamlined, AI-native development platform, <span class="highlight">dstack</span>
+                            For ML teams seeking a more streamlined, AI-native development platform, <span
+                                class="highlight">dstack</span>
                             provides an alternative to Kubernetes and Slurm, removing the need for
                             MLOps or custom solutions.
                         </p>
@@ -594,15 +686,94 @@
             <p>
                 Have questions, or need help?
                 <br>
-                <a href="https://calendly.com/dstackai/discovery-call" target="_blank"
-                   class="md-button md-button-secondary external">
-                    Talk to us
-                </a>
                 <a href="https://discord.gg/u8SmfwPpMd" target="_blank"
-                   class="md-button md-button-secondary discord external">
+                   class="md-button md-button-secondary discord external small"
+                   style="min-width: 175px;">
                     Discord
                 </a>
+                <a href="https://calendly.com/dstackai/discovery-call" target="_blank"
+                   class="md-button md-button-secondary external small"
+                   style="min-width: 175px;">
+                    Talk to us
+                </a>
             </p>
+        </div>
+
+        <br><br><br>
+
+        <div class="tx-landing__bottom_sky_cta">
+            <h2>dstack Sky</h2>
+
+            <div class="tx-landing__bottom_sky_cta_panel">
+                <div class="tx-landing__bottom_sky_cta_text">
+                    <p>Don't want to host the <span class="highlight">dstack</span> server or want to get the cheapest GPUs from the marketplace?</p>
+
+                    <!--<div class="plans_card__services">
+                        <a href="/docs/reference/server/config.yml#aws" class="plans_card__service-item">
+                            <img width="32" src="/assets/images/aws-logo.svg" title
+                                 style="padding-top: 5px">
+                            <div class="plans_card__service-name">AWS</div>
+                        </a>
+
+                        <a href="/docs/reference/server/config.yml#azure" class="plans_card__service-item">
+                            <img width="20" height="24" src="/assets/images/azure-logo.svg" title>
+                            <div class="plans_card__service-name">Azure</div>
+                        </a>
+
+                        <a href="/docs/reference/server/config.yml#gcp" class="plans_card__service-item">
+                            <img width="25" height="24" src="/assets/images/gcp-logo.svg" title>
+                            <div class="plans_card__service-name">GCP</div>
+                        </a>
+
+                        <a href="/docs/reference/server/config.yml#lambda" class="plans_card__service-item">
+                            <img width="20" height="23" src="/assets/images/lambda-logo.svg" title>
+                            <div class="plans_card__service-name">Lambda</div>
+                        </a>
+
+                        <a href="/docs/reference/server/config.yml#runpod" class="plans_card__service-item">
+                            <img width="22" height="24" src="/assets/images/runpod-logo.svg">
+                            <div class="plans_card__service-name">RunPod</div>
+                        </a>
+
+                        <a href="/docs/reference/server/config.yml#runpod" class="plans_card__service-item">
+                            <img width="22" height="24" src="/assets/images/vultr-logo.svg">
+                            <div class="plans_card__service-name">Vultr</div>
+                        </a>
+
+                        <a href="/docs/reference/server/config.yml#vastai" class="plans_card__service-item">
+                            <img width="22" height="24" src="/assets/images/vastai-logo.svg" title>
+                            <div class="plans_card__service-name">Vast.ai</div>
+                        </a>
+
+                        <a href="/docs/reference/server/config.yml#tensordock" class="plans_card__service-item">
+                            <img width="20" height="23" src="/assets/images/tensordock-logo.svg">
+                            <div class="plans_card__service-name">TensorDock</div>
+                        </a>
+
+                        <a href="/docs/reference/server/config.yml#cudo" class="plans_card__service-item">
+                            <img width="22" height="24" src="/assets/images/cudo-logo.svg">
+                            <div class="plans_card__service-name">CUDO</div>
+                        </a>
+
+                        <a href="/docs/reference/server/config.yml#oci" class="plans_card__service-item">
+                            <img width="25" height="24" src="/assets/images/oci-logo.svg">
+                            <div class="plans_card__service-name">OCI</div>
+                        </a>
+                    </div>-->
+                </div>
+                <div class="tx-landing__bottom_sky_cta_button_panel">
+                    <div>
+                        <a href="https://sky.dstack.ai" target="_blank"
+                           class="md-button md-button--primary sky external">
+                            <span>Sign up free</span>
+                        </a>
+                    </div>
+
+                    <div class="tx-landing__bottom_sky_cta_button_subheader">
+                        Already have an account? <a href="https://sky.dstack.ai" target="_blank" class="tx-footer__section-link external">Sign in</a>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </section>

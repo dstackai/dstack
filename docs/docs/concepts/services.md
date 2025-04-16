@@ -100,7 +100,7 @@ If [authorization](#authorization) is not disabled, the service endpoint require
 
     However, you'll need a gateway in the following cases:
 
-    * To use auto-scaling
+    * To use auto-scaling or rate limits
     * To enable HTTPS for the endpoint and map it to your domain
     * If your service requires WebSockets
     * If your service cannot work with a [path prefix](#path-prefix)
@@ -161,8 +161,7 @@ case `dstack` adjusts the number of replicas (scales up or down) automatically b
 
 Setting the minimum number of replicas to `0` allows the service to scale down to zero when there are no requests.
 
->The `scaling` property currently requires creating a [gateway](gateways.md).
-This requirement is expected to be removed soon.
+> The `scaling` property requires creating a [gateway](gateways.md).
 
 ### Model
 
@@ -237,6 +236,60 @@ set [`strip_prefix`](../reference/dstack.yml/service.md#strip_prefix) to `false`
 
 If your app cannot be configured to work with a path prefix, you can host it
 on a dedicated domain name by setting up a [gateway](gateways.md).
+
+### Rate Limits { #rate-limits }
+
+If you have a [gateway](gateways.md), you can configure rate limits for your service
+using the [`rate_limits`](../reference/dstack.yml/service.md#rate_limits) property.
+
+<div editor-title="service.dstack.yml"> 
+
+```yaml
+type: service
+image: my-app:latest
+port: 80
+
+rate_limits:
+# For /api/auth/* - 1 request per second, no bursts
+- prefix: /api/auth/
+  rps: 1
+# For other URLs - 4 requests per second + bursts of up to 9 requests
+- rps: 4
+  burst: 9
+```
+
+</div>
+
+The limit is specified in requests per second, but requests are tracked with millisecond
+granularity. For example, `rps: 4` means at most 1 request every 250 milliseconds.
+For most applications, it is recommended to set the `burst` property, which allows
+temporary bursts, but keeps the average request rate at the limit specified in `rps`.
+
+Rate limits are applied to the entire service regardless of the number of replicas.
+They are applied to each client separately, as determined by the client's IP address.
+If a client violates a limit, it receives an error with status code `429`.
+
+??? info "Partitioning key"
+    Instead of partitioning requests by client IP address,
+    you can choose to partition by the value of a header.
+
+    <div editor-title="service.dstack.yml"> 
+
+    ```yaml
+    type: service
+    image: my-app:latest
+    port: 80
+
+    rate_limits:
+    - rps: 4
+      burst: 9
+      # Apply to each user, as determined by the `Authorization` header
+      key:
+        type: header
+        header: Authorization
+    ```
+
+    </div>
 
 ### Resources
 
@@ -473,7 +526,7 @@ If you'd like `dstack` to automatically retry, configure the
 --8<-- "docs/concepts/snippets/manage-runs.ext"
 
 !!! info "What's next?"
-    1. Read about [dev environments](dev-environments.md), [tasks](tasks.md), and [repos](../guides/repos.md)
+    1. Read about [dev environments](dev-environments.md), [tasks](tasks.md), and [repos](repos.md)
     2. Learn how to manage [fleets](fleets.md)
     3. See how to set up [gateways](gateways.md)
     4. Check the [TGI :material-arrow-top-right-thin:{ .external }](../../examples/deployment/tgi/index.md){:target="_blank"},

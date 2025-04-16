@@ -101,7 +101,8 @@ async def get_offers_by_requirements(
         offers = [(b, o) for b, o in offers if o.backend in backend_types]
 
     if regions is not None:
-        offers = [(b, o) for b, o in offers if o.region in regions]
+        regions = [r.lower() for r in regions]
+        offers = [(b, o) for b, o in offers if o.region.lower() in regions]
 
     if availability_zones is not None:
         new_offers = []
@@ -116,7 +117,8 @@ async def get_offers_by_requirements(
         offers = new_offers
 
     if profile.instance_types is not None:
-        offers = [(b, o) for b, o in offers if o.instance.name in profile.instance_types]
+        instance_types = [i.lower() for i in profile.instance_types]
+        offers = [(b, o) for b, o in offers if o.instance.name.lower() in instance_types]
 
     if blocks == 1:
         return offers

@@ -46,7 +46,14 @@ hide:
     </span>
 
     <span class="feature-cell" target="_blank">
-        <img width="39" padding="padding: 4px 0" src="/assets/images/vultr-logo.svg">
+        <img width="37" src="/assets/images/nebius-logo.svg">
+        <h3>
+            Nebius
+        </h3>
+    </span>
+
+    <span class="feature-cell" target="_blank">
+        <img width="45" padding="padding: 0 0" src="/assets/images/vultr-logo.svg">
         <h3>
             Vultr
         </h3>
@@ -88,7 +95,7 @@ hide:
     </span>
 
     <span class="feature-cell" target="_blank">
-        <img width="53" style="margin: 15px -4px;" src="/assets/images/datacrunch-logo.svg">
+        <img width="52" style="margin: 10px -4px;" src="/assets/images/datacrunch-logo.svg">
         <h3>
             DataCrunch
         </h3>
@@ -139,8 +146,8 @@ Are you interested in integrating and collaborating with us to become part of th
 
 <a href="https://github.com/dstackai/dstack/blob/master/contributing/BACKENDS.md" target="_blank"
    class="md-button md-button-secondary github external">
-    Integration
+    Contribute
 </a>&nbsp;&nbsp;<a href="https://calendly.com/dstackai/discovery-call" target="_blank"
-   class="md-button md-button--primary sky external">
+   class="md-button md-button-secondary external">
     Talk to us
 </a>

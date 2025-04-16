@@ -434,6 +434,10 @@ def _process_provisioning_with_shim(
     for volume, volume_mount in zip(volumes, volume_mounts):
         volume_mount.name = volume.name
 
+    instance_mounts += _get_instance_specific_mounts(
+        job_provisioning_data.backend, job_provisioning_data.instance_type.name
+    )
+
     container_user = "root"
 
     job_runtime_data = get_job_runtime_data(job_model)
@@ -825,3 +829,19 @@ def _submit_job_to_runner(
     # do not log here, because the runner will send a new status
 
     return True
+
+
+def _get_instance_specific_mounts(
+    backend_type: BackendType, instance_type_name: str
+) -> List[InstanceMountPoint]:
+    if backend_type == BackendType.GCP and instance_type_name == "a3-megagpu-8g":
+        return [
+            InstanceMountPoint(
+                instance_path="/dev/aperture_devices", path="/dev/aperture_devices"
+            ),
+            InstanceMountPoint(instance_path="/var/lib/tcpxo/lib64", path="/var/lib/tcpxo/lib64"),
+            InstanceMountPoint(
+                instance_path="/var/lib/fastrak/lib64", path="/var/lib/fastrak/lib64"
+            ),
+        ]
+    return []

@@ -11,6 +11,7 @@ import {
     Container,
     Header,
     Hotspot,
+    InfoLink,
     Loader,
     Popover,
     SelectCSD,
@@ -19,7 +20,7 @@ import {
 } from 'components';
 import { HotspotIds } from 'layouts/AppLayout/TutorialPanel/constants';
 
-import { useBreadcrumbs, useNotifications } from 'hooks';
+import { useBreadcrumbs, useHelpPanel, useNotifications } from 'hooks';
 import { riseRouterException } from 'libs';
 import { ROUTES } from 'routes';
 import { useGetProjectQuery, useUpdateProjectMembersMutation } from 'services/project';
@@ -33,6 +34,7 @@ import { useBackendsTable } from '../../Backends/hooks';
 import { BackendsTable } from '../../Backends/Table';
 import { GatewaysTable } from '../../Gateways';
 import { useGatewaysTable } from '../../Gateways/hooks';
+import { CLI_INFO } from './constants';
 
 import styles from './styles.module.scss';
 
@@ -41,7 +43,9 @@ export const ProjectSettings: React.FC = () => {
     const params = useParams();
     const navigate = useNavigate();
     const paramProjectName = params.projectName ?? '';
+    const [openHelpPanel] = useHelpPanel();
     const [configCliCommand, copyCliCommand] = useConfigProjectCliCommand({ projectName: paramProjectName });
+
     const { isAvailableDeletingPermission, isProjectManager, isProjectAdmin, isAvailableProjectManaging } =
         useCheckAvailableProjectPermission();
 
@@ -132,22 +136,7 @@ export const ProjectSettings: React.FC = () => {
                 <SpaceBetween size="l">
                     <Container
                         header={
-                            <Header
-                                variant="h2"
-                                actions={
-                                    <Popover
-                                        dismissButton={false}
-                                        position="top"
-                                        size="small"
-                                        triggerType="custom"
-                                        content={<StatusIndicator type="success">{t('common.copied')}</StatusIndicator>}
-                                    >
-                                        <Button formAction="none" iconName="copy" variant="normal" onClick={copyCliCommand}>
-                                            {t('common.copy')}
-                                        </Button>
-                                    </Popover>
-                                }
-                            >
+                            <Header variant="h2" info={<InfoLink onFollow={() => openHelpPanel(CLI_INFO)} />}>
                                 {t('projects.edit.cli')}
                             </Header>
                         }
@@ -157,9 +146,28 @@ export const ProjectSettings: React.FC = () => {
                                 Run the following commands to set up the CLI for this project
                             </Box>
 
-                            <Hotspot hotspotId={HotspotIds.CONFIGURE_CLI_COMMAND}>
-                                <Code>{configCliCommand}</Code>
-                            </Hotspot>
+                            <div className={styles.codeWrapper}>
+                                <Hotspot hotspotId={HotspotIds.CONFIGURE_CLI_COMMAND}>
+                                    <Code className={styles.code}>{configCliCommand}</Code>
+
+                                    <div className={styles.copy}>
+                                        <Popover
+                                            dismissButton={false}
+                                            position="top"
+                                            size="small"
+                                            triggerType="custom"
+                                            content={<StatusIndicator type="success">{t('common.copied')}</StatusIndicator>}
+                                        >
+                                            <Button
+                                                formAction="none"
+                                                iconName="copy"
+                                                variant="normal"
+                                                onClick={copyCliCommand}
+                                            />
+                                        </Popover>
+                                    </div>
+                                </Hotspot>
+                            </div>
                         </SpaceBetween>
                     </Container>
 

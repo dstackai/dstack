@@ -17,7 +17,7 @@ Effective AI infrastructure management requires full visibility into compute per
 detailed insights into container- and GPU-level performance, while managers rely on cost metrics to track resource usage
 across projects.
 
-While `dstack` provides key metrics through its UI and [`dstack metrics`](dstack-stats.md) CLI, teams often need more granular data and prefer
+While `dstack` provides key metrics through its UI and [`dstack metrics`](dstack-metrics.md) CLI, teams often need more granular data and prefer
 using their own monitoring tools. To support this, we’ve introduced a new endpoint that allows real-time exporting all collected
 metrics—covering fleets and runs—directly to Prometheus.
 
@@ -46,7 +46,7 @@ Overall, `dstack` collects three groups of metrics:
 | **Runs**   | Run metrics include run counters for each user in each project.                                                                                                   |
 | **Jobs**   | A run consists of one or more jobs, each mapped to a container. Job metrics offer insights into execution time, cost, GPU model, NVIDIA DCGM telemetry, and more. |
 
-For a full list of available metrics and labels, check out the [Monitoring](../../docs/guides/monitoring.md) guide.
+For a full list of available metrics and labels, check out [Metrics](../../docs/concepts/metrics.md).
 
 ??? info "NVIDIA"
     NVIDIA DCGM metrics are automatically collected for `aws`, `azure`, `gcp`, and `oci` backends,
@@ -57,10 +57,10 @@ For a full list of available metrics and labels, check out the [Monitoring](../.
 
 ??? info "AMD"
     AMD device metrics are not yet collected for any backends. This support will be available soon. For now, AMD metrics are
-    only accessible through the UI and the [`dstack metrics`](dstack-stats.md) CLI.
+    only accessible through the UI and the [`dstack metrics`](dstack-metrics.md) CLI.
 
 !!! info "What's next?"
-    1. See the [Monitoring](../../docs/guides/monitoring.md) guide
+    1. See [Metrics](../../docs/concepts/metrics.md)
     1. Check [dev environments](../../docs/concepts/dev-environments.md),
        [tasks](../../docs/concepts/tasks.md), [services](../../docs/concepts/services.md),
        and [fleets](../../docs/concepts/fleets.md)

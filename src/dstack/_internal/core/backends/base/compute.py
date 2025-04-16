@@ -528,7 +528,7 @@ def get_run_shim_script(is_privileged: bool, pjrt_device: Optional[str]) -> List
     pjrt_device_env = f"--pjrt-device={pjrt_device}" if pjrt_device else ""
 
     return [
-        f"nohup dstack-shim {privileged_flag} {pjrt_device_env} &",
+        f"nohup {DSTACK_SHIM_BINARY_PATH} {privileged_flag} {pjrt_device_env} &",
     ]
 
 

@@ -1,8 +1,7 @@
 # Gateways
 
 Gateways manage the ingress traffic of running [services](services.md),
-provide an HTTPS endpoint mapped to your domain,
-and handle auto-scaling.
+provide an HTTPS endpoint mapped to your domain, handle auto-scaling and rate limits.
 
 > If you're using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"},
 > the gateway is already set up for you.

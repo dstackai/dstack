@@ -1,4 +1,5 @@
 import re
+from collections import Counter
 from enum import Enum
 from typing import Any, Dict, List, Optional, Union
 
@@ -18,6 +19,7 @@ from dstack._internal.core.models.volumes import MountPoint, VolumeConfiguration
 
 CommandsList = List[str]
 ValidPort = conint(gt=0, le=65536)
+MAX_INT64 = 2**63 - 1
 SERVICE_HTTPS_DEFAULT = True
 STRIP_PREFIX_DEFAULT = True
 
@@ -83,6 +85,70 @@ class ScalingSpec(CoreModel):
     scale_down_delay: Annotated[
         Duration, Field(description="The delay in seconds before scaling down")
     ] = Duration.parse("10m")
+
+
+class IPAddressPartitioningKey(CoreModel):
+    type: Annotated[Literal["ip_address"], Field(description="Partitioning type")] = "ip_address"
+
+
+class HeaderPartitioningKey(CoreModel):
+    type: Annotated[Literal["header"], Field(description="Partitioning type")] = "header"
+    header: Annotated[
+        str,
+        Field(
+            description="Name of the header to use for partitioning",
+            regex=r"^[a-zA-Z0-9-_]+$",  # prevent Nginx config injection
+            max_length=500,  # chosen randomly, Nginx limit is higher
+        ),
+    ]
+
+
+class RateLimit(CoreModel):
+    prefix: Annotated[
+        str,
+        Field(
+            description=(
+                "URL path prefix to which this limit is applied."
+                " If an incoming request matches several prefixes, the longest prefix is applied"
+            ),
+            max_length=4094,  # Nginx limit
+            regex=r"^/[^\s\\{}]*$",  # prevent Nginx config injection
+        ),
+    ] = "/"
+    key: Annotated[
+        Union[IPAddressPartitioningKey, HeaderPartitioningKey],
+        Field(
+            discriminator="type",
+            description=(
+                "The partitioning key. Each incoming request belongs to a partition"
+                " and rate limits are applied per partition."
+                " Defaults to partitioning by client IP address"
+            ),
+        ),
+    ] = IPAddressPartitioningKey()
+    rps: Annotated[
+        float,
+        Field(
+            description=(
+                "Max allowed number of requests per second."
+                " Requests are tracked at millisecond granularity."
+                " For example, `rps: 10` means at most 1 request per 100ms"
+            ),
+            # should fit into Nginx limits after being converted to requests per minute
+            ge=1 / 60,
+            le=MAX_INT64 // 60,
+        ),
+    ]
+    burst: Annotated[
+        int,
+        Field(
+            ge=0,
+            le=MAX_INT64,  # Nginx limit
+            description=(
+                "Max number of requests that can be passed to the service ahead of the rate limit"
+            ),
+        ),
+    ] = 0
 
 
 class BaseRunConfiguration(CoreModel):
@@ -306,6 +372,7 @@ class ServiceConfigurationParams(CoreModel):
         Optional[ScalingSpec],
         Field(description="The auto-scaling rules. Required if `replicas` is set to a range"),
     ] = None
+    rate_limits: Annotated[list[RateLimit], Field(description="Rate limiting rules")] = []
 
     @validator("port")
     def convert_port(cls, v) -> PortMapping:
@@ -357,6 +424,17 @@ class ServiceConfigurationParams(CoreModel):
         if replicas.min == replicas.max and scaling:
             raise ValueError("To use `scaling`, `replicas` must be set to a range.")
         return values
+
+    @validator("rate_limits")
+    def validate_rate_limits(cls, v: list[RateLimit]) -> list[RateLimit]:
+        counts = Counter(limit.prefix for limit in v)
+        duplicates = [prefix for prefix, count in counts.items() if count > 1]
+        if duplicates:
+            raise ValueError(
+                f"Prefixes {duplicates} are used more than once."
+                " Each rate limit should have a unique path prefix"
+            )
+        return v
 
 
 class ServiceConfiguration(

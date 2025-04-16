@@ -79,8 +79,7 @@ def _get_last_check_path() -> Path:
 
 
 def check_for_updates():
-    current_version = version.__version__
-    if current_version:
+    if version.__is_release__:
         if _is_last_check_time_outdated():
             logger.debug("Checking for updates...")
             _check_version()

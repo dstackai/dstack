@@ -1,0 +1,23 @@
+type: service
+name: llama4-scout
+
+image: lmsysorg/sglang
+env:
+  - HF_TOKEN
+  - MODEL_ID=meta-llama/Llama-4-Scout-17B-16E-Instruct
+  - CONTEXT_LEN=256000
+commands:
+  - python3 -m sglang.launch_server
+      --model-path $MODEL_ID
+      --tp $DSTACK_GPUS_NUM
+      --context-length $CONTEXT_LEN
+      --port 8000
+      --kv-cache-dtype fp8_e5m2
+
+port: 8000
+## Register the model
+model: meta-llama/Llama-4-Scout-17B-16E-Instruct
+
+resources:
+  gpu: H200:2
+  disk: 500GB..

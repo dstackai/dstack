@@ -9,16 +9,21 @@ To use the open-source version of `dstack` with your own cloud accounts or on-pr
 > If you don't want to host the `dstack` server (or want to access GPU marketplace),
 > skip installation and proceed to [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"}.
 
+## Set up the server
+
 ### (Optional) Configure backends
 
-To use `dstack` with cloud providers, configure [backends](../concepts/backends.md).
+To use `dstack` with cloud providers, configure backends
+via the `~/.dstack/server/config.yml` file.
 
-> For using `dstack` with on-prem servers, create [SSH fleets](../concepts/fleets.md#ssh) instead.
+For more details on how to configure backends, check [Backends](../concepts/backends.md).
 
-## Start the server
+> For using `dstack` with on-prem servers, create [SSH fleets](../concepts/fleets.md#ssh) 
+> once the server is up.
 
-The server can run on your laptop, a dedicated server, a private cloud VPC, or any location with access to your
-cloud or on-prem clusters.
+### Start the server
+
+The server can run on your laptop or any environment with access to the cloud and on-prem clusters you plan to use.
 
 === "pip"
 
@@ -29,6 +34,25 @@ cloud or on-prem clusters.
     
     ```shell
     $ pip install "dstack[all]" -U
+    $ dstack server
+
+    Applying ~/.dstack/server/config.yml...
+
+    The admin token is "bbae0f28-d3dd-4820-bf61-8f4bb40815da"
+    The server is running at http://127.0.0.1:3000/
+    ```
+    
+    </div>
+
+=== "uv"
+
+    > The server can be set up via `uv` on Linux, macOS, and Windows (via WSL 2).
+    > It requires Git and OpenSSH.
+
+    <div class="termy">
+    
+    ```shell
+    $ uv tool install "dstack[all]" -U
     $ dstack server
 
     Applying ~/.dstack/server/config.yml...
@@ -58,15 +82,34 @@ cloud or on-prem clusters.
 
 !!! info "Server deployment"
     For more details on server deployment options, see the
-    [server deployment](../guides/server-deployment.md) guide.
+    [Server deployment](../guides/server-deployment.md) guide.
 
 ## Set up the CLI
 
-Once it's up, you can use either the CLI or the API.
+Once the server is up, you can access it via the `dstack` CLI. 
 
-> The CLI can be set up on Linux, macOS, and Windows. It requires
-> Git and OpenSSH.
+> The CLI can be set up via `pip` or `uv` on Linux, macOS, and Windows. It requires Git and OpenSSH.
+
+=== "pip"
+
+    <div class="termy">
     
+    ```shell
+    $ pip install dstack -U
+    ```
+
+    </div>
+
+=== "uv"
+
+    <div class="termy">
+    
+    ```shell
+    $ uv tool install dstack -U
+    ```
+
+    </div>
+
 ??? info "Windows"
     To use the CLI on Windows, ensure you've installed Git and OpenSSH via 
     [Git for Windows:material-arrow-top-right-thin:{ .external }](https://git-scm.com/download/win){:target="_blank"}. 
@@ -82,8 +125,8 @@ with the server address, user token, and project name:
 <div class="termy">
 
 ```shell
-$ pip install dstack
-$ dstack config --url http://127.0.0.1:3000 \
+$ dstack config \
+    --url http://127.0.0.1:3000 \
     --project main \
     --token bbae0f28-d3dd-4820-bf61-8f4bb40815da
     
@@ -94,7 +137,7 @@ Configuration is updated at ~/.dstack/config.yml
 
 This configuration is stored in `~/.dstack/config.yml`.
 
-### (Optional) CLI Autocompletion
+### (Optional) Enable shell autocompletion
 
 `dstack` supports shell autocompletion for `bash` and `zsh`.
 
@@ -162,8 +205,8 @@ This configuration is stored in `~/.dstack/config.yml`.
     
 
 !!! info "What's next?"
-    1. Check the [server/config.yml reference](../reference/server/config.yml.md) on how to configure backends
-    2. Check [SSH fleets](../concepts/fleets.md#ssh) to learn about running on your on-prem servers
-    3. Follow [quickstart](../quickstart.md)
+    1. Follow [Quickstart](../quickstart.md)
+    2. See [Backends](../concepts/backends.md)
+    3. Check the [server deployment](../guides/server-deployment.md) guide
     4. Browse [examples](/examples)
     5. Join the community via [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd)

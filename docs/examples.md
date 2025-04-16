@@ -138,24 +138,14 @@ hide:
             Deploy and train Deepseek models
         </p>
     </a>
-    <a href="/examples/llms/llama31"
+    <a href="/examples/llms/llama"
        class="feature-cell sky">
         <h3>
-            Llama 3.1
+            Llama
         </h3>
 
         <p>
-            Deploy and fine-tune Llama 3.1
-        </p>
-    </a>
-    <a href="/examples/llms/llama32"
-       class="feature-cell sky">
-        <h3>
-            Llama 3.2
-        </h3>
-
-        <p>
-            Deploy Llama 3.2 vision models
+            Deploy Llama 4 models
         </p>
     </a>
 </div>
@@ -181,6 +171,16 @@ hide:
 
         <p>
             Run multi-node NCCL tests with MPI
+        </p>
+    </a>
+    <a href="/examples/misc/a3mega-clusters"
+       class="feature-cell sky">
+        <h3>
+            A3 Mega
+        </h3>
+
+        <p>
+            Set up GCP A3 Mega clusters with optimized networking
         </p>
     </a>
 </div>

@@ -1,5 +1,6 @@
 import logging
 import time
+from collections import defaultdict
 from collections.abc import Container as ContainerT
 from collections.abc import Generator
 from contextlib import contextmanager
@@ -30,6 +31,7 @@ from nebius.api.nebius.compute.v1 import (
     SourceImageFamily,
 )
 from nebius.api.nebius.iam.v1 import (
+    Container,
     ListProjectsRequest,
     ListTenantsRequest,
     ProjectServiceClient,
@@ -41,6 +43,7 @@ from nebius.sdk import SDK
 from dstack._internal.core.backends.nebius.models import NebiusServiceAccountCreds
 from dstack._internal.core.errors import BackendError, NoCapacityError
 from dstack._internal.utils.event_loop import DaemonEventLoop
+from dstack._internal.utils.logging import get_logger
 
 #
 # Guidelines on using the Nebius SDK:
@@ -60,6 +63,7 @@ REQUEST_MD = options_to_metadata(
 
 # disables log messages about errors such as invalid creds or expired timeouts
 logging.getLogger("nebius").setLevel(logging.CRITICAL)
+logger = get_logger(__name__)
 
 
 @contextmanager
@@ -114,18 +118,32 @@ def get_region_to_project_id_map(sdk: SDK) -> dict[str, str]:
     )
     if len(tenants.items) != 1:
         raise ValueError(f"Expected to find 1 tenant, found {(len(tenants.items))}")
+    tenant_id = tenants.items[0].metadata.id
     projects = LOOP.await_(
         ProjectServiceClient(sdk).list(
-            ListProjectsRequest(parent_id=tenants.items[0].metadata.id, page_size=999),
+            ListProjectsRequest(parent_id=tenant_id, page_size=999),
             timeout=REQUEST_TIMEOUT,
             metadata=REQUEST_MD,
         )
     )
-    result = {}
+    region_to_projects: defaultdict[str, list[Container]] = defaultdict(list)
     for project in projects.items:
-        if project.metadata.name == f"default-project-{project.status.region}":
-            result[project.status.region] = project.metadata.id
-    return result
+        region_to_projects[project.status.region].append(project)
+    region_to_project_id = {}
+    for region, region_projects in region_to_projects.items():
+        if len(region_projects) != 1:
+            # Currently, there can only be one project per region.
+            # This condition is implemented just in case Nebius suddenly allows more projects.
+            region_projects = [
+                p for p in region_projects if p.metadata.name.startswith("default-project")
+            ]
+            if len(region_projects) != 1:
+                logger.warning(
+                    "Could not find the default project in region %s, tenant %s", region, tenant_id
+                )
+                continue
+        region_to_project_id[region] = region_projects[0].metadata.id
+    return region_to_project_id
 
 
 def get_default_subnet(sdk: SDK, project_id: str) -> Subnet:

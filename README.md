@@ -14,10 +14,8 @@
 
 </div>
 
-`dstack` is a streamlined alternative to Kubernetes and Slurm, specifically designed for AI. It simplifies container orchestration
-for AI workloads both in the cloud and on-prem, speeding up the development, training, and deployment of AI models.
-
-`dstack` is easy to use with any cloud provider as well as on-prem servers.
+`dstack` is an open-source alternative to Kubernetes and Slurm, designed to simplify GPU allocation and AI workload
+orchestration for ML teams across top clouds and on-prem clusters.
 
 #### Accelerators
 
@@ -36,41 +34,72 @@ for AI workloads both in the cloud and on-prem, speeding up the development, tra
 
 > Before using `dstack` through CLI or API, set up a `dstack` server. If you already have a running `dstack` server, you only need to [set up the CLI](#set-up-the-cli).
 
-### (Optional) Configure backends
+### Set up the server
 
-To use `dstack` with cloud providers, configure [backends](https://dstack.ai/docs/concepts/backends).
+#### (Optional) Configure backends
 
-For using `dstack` with on-prem servers, create [SSH fleets](https://dstack.ai/docs/concepts/fleets#ssh) instead.
+To use `dstack` with cloud providers, configure backends
+via the `~/.dstack/server/config.yml` file.
 
-### Start the server
+For more details on how to configure backends, check [Backends](https://dstack.ai/docs/concepts/backends).
 
-Once the backends are configured, proceed to start the server:
+> For using `dstack` with on-prem servers, create [SSH fleets](https://dstack.ai/docs/concepts/fleets#ssh) 
+> once the server is up.
 
-<div class="termy">
+#### Start the server
+
+You can install the server on Linux, macOS, and Windows (via WSL 2). It requires Git and
+OpenSSH.
+
+##### pip
 
 ```shell
 $ pip install "dstack[all]" -U
-$ dstack server
+```
 
+##### uv
+
+```shell
+$ uv tool install "dstack[all]" -U
+```
+
+Once it's installed, go ahead and start the server.
+
+```shell
+$ dstack server
 Applying ~/.dstack/server/config.yml...
 
 The admin token is "bbae0f28-d3dd-4820-bf61-8f4bb40815da"
 The server is running at http://127.0.0.1:3000/
 ```
 
-</div>
-
 For more details on server configuration options, see the
-[server deployment guide](https://dstack.ai/docs/guides/server-deployment).
+[Server deployment](https://dstack.ai/docs/guides/server-deployment) guide.
 
 ### Set up the CLI
+
+Once the server is up, you can access it via the `dstack` CLI. 
+
+The CLI can be installed on Linux, macOS, and Windows. It requires Git and OpenSSH.
+
+##### pip
+
+```shell
+$ pip install dstack -U
+```
+
+##### uv
+
+```shell
+$ uv tool install dstack -U
+```
 
 To point the CLI to the `dstack` server, configure it
 with the server address, user token, and project name:
 
 ```shell
-$ pip install dstack
-$ dstack config --url http://127.0.0.1:3000 \
+$ dstack config \
+    --url http://127.0.0.1:3000 \
     --project main \
     --token bbae0f28-d3dd-4820-bf61-8f4bb40815da
     
@@ -99,13 +128,11 @@ Apply the configuration either via the `dstack apply` CLI command or through a p
 `dstack` automatically manages provisioning, job queuing, auto-scaling, networking, volumes, run failures,
 out-of-capacity errors, port-forwarding, and more &mdash; across clouds and on-prem clusters.
 
-## More information
+## Useful links
 
-For additional information and examples, see the following links:
+For additional information, see the following links:
 
 * [Docs](https://dstack.ai/docs)
-* [Examples](https://dstack.ai/examples)
-* [Providers](https://dstack.ai/providers)
 * [Discord](https://discord.gg/u8SmfwPpMd)
 
 ## Contributing

@@ -1,0 +1,170 @@
+[project]
+name = "dstack"
+dynamic = ["version", "readme"]
+authors = [{ name = "Andrey Cheptsov", email = "andrey@dstack.ai" }]
+description = "dstack is an open-source orchestration engine for running AI workloads on any cloud or on-premises."
+requires-python = ">=3.9"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "License :: OSI Approved :: Mozilla Public License 2.0 (MPL 2.0)",
+    "Programming Language :: Python :: 3",
+]
+dependencies = [
+    "pyyaml",
+    "requests",
+    "typing-extensions>=4.0.0",
+    "cryptography",
+    "packaging",
+    "python-dateutil",
+    "cachetools",
+    "gitpython",
+    "jsonschema",
+    "paramiko>=3.2.0",
+    "cursor",
+    "rich",
+    "rich-argparse",
+    "tqdm",
+    "simple-term-menu",
+    "pydantic>=1.10.10,<2.0.0",
+    "pydantic-duality>=1.2.4",
+    "websocket-client",
+    "python-multipart>=0.0.16",
+    "filelock",
+    "psutil",
+    "gpuhunt>=0.1.2,<0.2.0",
+    "argcomplete>=3.5.0",
+]
+
+[project.urls]
+Homepage = "https://dstack.ai"
+Source = "https://github.com/dstackai/dstack"
+Documentation = "https://dstack.ai/docs"
+Issues = "https://github.com/dstackai/dstack/issues"
+Changelog = "https://github.com/dstackai/dstack/releases"
+Discord = "https://discord.gg/u8SmfwPpMd"
+
+[build-system]
+requires = ["hatchling", "hatch-fancy-pypi-readme"]
+build-backend = "hatchling.build"
+
+[project.scripts]
+dstack = "dstack._internal.cli.main:main"
+
+[tool.hatch.version]
+path = "src/dstack/version.py"
+
+[tool.hatch.build.targets.wheel.shared-data]
+"src/dstack/_internal/proxy/gateway/resources" = "dstack/_internal/proxy/gateway/resources"
+"src/dstack/_internal/server/statics" = "dstack/_internal/server/statics"
+
+[tool.hatch.metadata.hooks.fancy-pypi-readme]
+content-type = "text/markdown"
+
+[[tool.hatch.metadata.hooks.fancy-pypi-readme.fragments]]
+path = "README.md"
+
+[[tool.hatch.metadata.hooks.fancy-pypi-readme.substitutions]]
+pattern = '<picture>\s*|<source[^>]*>\s*|\s*</picture>|<video[^>]*>\s*|</video>\s*|### Demo\s*'
+replacement = ''
+ignore-case = true
+
+[dependency-groups]
+dev = [
+    "build>=1.2.2.post1",
+    "httpx>=0.28.1",
+    "pre-commit>=4.2.0",
+    "pytest-asyncio>=0.23.8",
+    "pytest-httpbin>=2.1.0",
+    "httpbin>=0.10.2", # indirect to make compatible with Werkzeug 3
+    "pytest~=7.2",
+    "pytest-socket>=0.7.0",
+    "requests-mock>=1.12.1",
+    "openai>=1.68.2",
+    "freezegun>=1.5.1",
+    "ruff>=0.11.2",
+    "testcontainers>=4.9.2",
+    "pytest-xdist>=3.6.1",
+]
+
+[project.optional-dependencies]
+gateway = [
+    "fastapi",
+    "starlette>=0.26.0",
+    "uvicorn",
+    "aiorwlock",
+    "aiocache",
+    "httpx",
+    "jinja2",
+]
+server = [
+    "fastapi",
+    "starlette>=0.26.0",
+    "uvicorn",
+    "aiorwlock",
+    "aiocache",
+    "httpx",
+    "jinja2",
+    "watchfiles",
+    "sqlalchemy[asyncio]>=2.0.0",
+    "sqlalchemy_utils>=0.40.0",
+    "alembic>=1.10.2",
+    "apscheduler<4",
+    "aiosqlite",
+    "docker>=6.0.0",
+    "python-dxf==12.1.0",
+    "sentry-sdk[fastapi]",
+    "alembic-postgresql-enum",
+    "asyncpg",
+    "python-json-logger>=3.1.0",
+    "prometheus-client",
+    "grpcio>=1.50",
+]
+aws = [
+    "boto3",
+    "botocore",
+    "dstack[server]",
+]
+azure = [
+    "azure-identity>=1.12.0",
+    "azure-mgmt-subscription>=3.1.1",
+    "azure-mgmt-compute>=29.1.0",
+    "azure-mgmt-network>=23.0.0,<28.0.0",
+    "azure-mgmt-resource>=22.0.0",
+    "azure-mgmt-authorization>=3.0.0",
+    "dstack[server]",
+]
+gcp = [
+    "google-auth>=2.3.0",
+    "google-cloud-storage>=2.0.0",
+    "google-cloud-compute>=1.5.0",
+    "google-cloud-logging>=2.0.0",
+    "google-api-python-client>=2.80.0",
+    "google-cloud-billing>=1.11.0",
+    "google-cloud-tpu>=1.18.3",
+    "dstack[server]",
+]
+datacrunch = [
+    "datacrunch",
+    "dstack[server]",
+]
+kubernetes = [
+    "kubernetes",
+    "dstack[server]",
+]
+lambda = [
+    "boto3",
+    "botocore",
+    "dstack[server]",
+]
+oci = [
+    "oci",
+    "dstack[server]",
+]
+nebius = [
+    "nebius>=0.2.19,<0.3; python_version >= '3.10'",
+    "dstack[server]",
+]
+all = [
+    "dstack[gateway,server,aws,azure,gcp,datacrunch,kubernetes,lambda,nebius,oci]",
+]

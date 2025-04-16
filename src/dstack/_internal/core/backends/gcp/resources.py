@@ -1,6 +1,6 @@
 import concurrent.futures
 import re
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import google.api_core.exceptions
 import google.cloud.compute_v1 as compute_v1
@@ -8,7 +8,6 @@ from google.api_core.extended_operation import ExtendedOperation
 from google.api_core.operation import Operation
 from google.cloud import tpu_v2
 
-import dstack.version as version
 from dstack._internal.core.errors import BackendError, ComputeError
 from dstack._internal.core.models.instances import Gpu
 from dstack._internal.utils.common import remove_prefix
@@ -54,12 +53,16 @@ def check_vpc(
     if shared_vpc_project_id:
         vpc_project_id = shared_vpc_project_id
     try:
+        usable_subnets = list_project_usable_subnets(
+            subnetworks_client=subnetworks_client, project_id=vpc_project_id
+        )
         for region in regions:
             get_vpc_subnet_or_error(
                 subnetworks_client=subnetworks_client,
                 vpc_project_id=vpc_project_id,
                 vpc_name=vpc_name,
                 region=region,
+                usable_subnets=usable_subnets,
             )
     except google.api_core.exceptions.NotFound:
         raise ComputeError(f"Failed to find VPC project {vpc_project_id}")
@@ -117,26 +120,19 @@ def create_instance_struct(
     service_account: Optional[str] = None,
     network: str = "global/networks/default",
     subnetwork: Optional[str] = None,
+    extra_subnetworks: Optional[List[Tuple[str, str]]] = None,
     allocate_public_ip: bool = True,
+    placement_policy: Optional[str] = None,
 ) -> compute_v1.Instance:
-    network_interface = compute_v1.NetworkInterface()
-    network_interface.network = network
-    if subnetwork is not None:
-        network_interface.subnetwork = subnetwork
-
-    if allocate_public_ip:
-        access = compute_v1.AccessConfig()
-        access.type_ = compute_v1.AccessConfig.Type.ONE_TO_ONE_NAT.name
-        access.name = "External NAT"
-        access.network_tier = access.NetworkTier.PREMIUM.name
-        network_interface.access_configs = [access]
-    else:
-        network_interface.access_configs = []
-
     instance = compute_v1.Instance()
-    instance.network_interfaces = [network_interface]
     instance.name = instance_name
     instance.machine_type = f"zones/{zone}/machineTypes/{machine_type}"
+    instance.network_interfaces = _get_network_interfaces(
+        network=network,
+        subnetwork=subnetwork,
+        allocate_public_ip=allocate_public_ip,
+        extra_subnetworks=extra_subnetworks,
+    )
 
     disk = compute_v1.AttachedDisk()
     disk.auto_delete = True
@@ -159,6 +155,9 @@ def create_instance_struct(
     ):
         # Attachable GPUs, H100, A100, and L4
         instance.scheduling.on_host_maintenance = "TERMINATE"
+
+    if placement_policy is not None:
+        instance.resource_policies = [placement_policy]
 
     if spot:
         instance.scheduling = compute_v1.Scheduling()
@@ -187,18 +186,42 @@ def create_instance_struct(
     return instance
 
 
-def get_image_id(cuda: bool) -> str:
-    if not cuda:
-        image_name = f"dstack-{version.base_image}"
+def _get_network_interfaces(
+    network: str,
+    subnetwork: Optional[str],
+    allocate_public_ip: bool,
+    extra_subnetworks: Optional[List[Tuple[str, str]]],
+) -> List[compute_v1.NetworkInterface]:
+    network_interface = compute_v1.NetworkInterface()
+    network_interface.network = network
+    if subnetwork is not None:
+        network_interface.subnetwork = subnetwork
+    if allocate_public_ip:
+        access = compute_v1.AccessConfig()
+        access.type_ = compute_v1.AccessConfig.Type.ONE_TO_ONE_NAT.name
+        access.name = "External NAT"
+        access.network_tier = access.NetworkTier.PREMIUM.name
+        network_interface.access_configs = [access]
     else:
-        image_name = f"dstack-cuda-{version.base_image}"
-    image_name = image_name.replace(".", "-")
+        network_interface.access_configs = []
 
-    return f"projects/dstack/global/images/{image_name}"
+    network_interfaces = [network_interface]
+    for network, subnetwork in extra_subnetworks or []:
+        network_interfaces.append(
+            compute_v1.NetworkInterface(
+                network=network,
+                subnetwork=subnetwork,
+            )
+        )
+    return network_interfaces
 
 
-def get_gateway_image_id() -> str:
-    return "projects/ubuntu-os-cloud/global/images/ubuntu-2204-jammy-v20230714"
+def list_project_usable_subnets(
+    subnetworks_client: compute_v1.SubnetworksClient,
+    project_id: str,
+) -> List[compute_v1.UsableSubnetwork]:
+    request = compute_v1.ListUsableSubnetworksRequest(project=project_id)
+    return [s for s in subnetworks_client.list_usable(request=request)]
 
 
 def get_vpc_subnet_or_error(
@@ -206,13 +229,15 @@ def get_vpc_subnet_or_error(
     vpc_project_id: str,
     vpc_name: str,
     region: str,
+    usable_subnets: Optional[List[compute_v1.UsableSubnetwork]] = None,
 ) -> str:
     """
     Returns resource name of any usable subnet in a given VPC
     (e.g. "projects/example-project/regions/europe-west4/subnetworks/example-subnet")
     """
-    request = compute_v1.ListUsableSubnetworksRequest(project=vpc_project_id)
-    for subnet in subnetworks_client.list_usable(request=request):
+    if usable_subnets is None:
+        usable_subnets = list_project_usable_subnets(subnetworks_client, vpc_project_id)
+    for subnet in usable_subnets:
         network_name = subnet.network.split("/")[-1]
         subnet_url = subnet.subnetwork
         subnet_resource_name = remove_prefix(subnet_url, "https://www.googleapis.com/compute/v1/")
@@ -410,3 +435,15 @@ def wait_for_operation(operation: Operation, verbose_name: str = "operation", ti
 
 def full_resource_name_to_name(full_resource_name: str) -> str:
     return full_resource_name.split("/")[-1]
+
+
+def vpc_name_to_vpc_resource_name(project_id: str, vpc_name: str) -> str:
+    return f"projects/{project_id}/global/networks/{vpc_name}"
+
+
+def get_placement_policy_resource_name(
+    project_id: str,
+    region: str,
+    placement_policy: str,
+) -> str:
+    return f"projects/{project_id}/regions/{region}/resourcePolicies/{placement_policy}"

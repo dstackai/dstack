@@ -1,7 +1,7 @@
 import concurrent.futures
 import json
 from collections import defaultdict
-from typing import Callable, Dict, List, Literal, Optional
+from typing import Callable, Dict, List, Literal, Optional, Tuple
 
 import google.api_core.exceptions
 import google.cloud.compute_v1 as compute_v1
@@ -10,11 +10,13 @@ from gpuhunt import KNOWN_TPUS
 
 import dstack._internal.core.backends.gcp.auth as auth
 import dstack._internal.core.backends.gcp.resources as gcp_resources
+from dstack import version
 from dstack._internal.core.backends.base.compute import (
     Compute,
     ComputeWithCreateInstanceSupport,
     ComputeWithGatewaySupport,
     ComputeWithMultinodeSupport,
+    ComputeWithPlacementGroupSupport,
     ComputeWithVolumeSupport,
     generate_unique_gateway_instance_name,
     generate_unique_instance_name,
@@ -25,11 +27,13 @@ from dstack._internal.core.backends.base.compute import (
     merge_tags,
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
+from dstack._internal.core.backends.gcp.features import tcpx as tcpx_features
 from dstack._internal.core.backends.gcp.models import GCPConfig
 from dstack._internal.core.errors import (
     ComputeError,
     ComputeResourceNotFoundError,
     NoCapacityError,
+    PlacementGroupInUseError,
     ProvisioningError,
 )
 from dstack._internal.core.models.backends.base import BackendType
@@ -46,6 +50,7 @@ from dstack._internal.core.models.instances import (
     InstanceType,
     Resources,
 )
+from dstack._internal.core.models.placement import PlacementGroup, PlacementGroupProvisioningData
 from dstack._internal.core.models.resources import Memory, Range
 from dstack._internal.core.models.runs import JobProvisioningData, Requirements
 from dstack._internal.core.models.volumes import (
@@ -74,6 +79,7 @@ class GCPVolumeDiskBackendData(CoreModel):
 class GCPCompute(
     ComputeWithCreateInstanceSupport,
     ComputeWithMultinodeSupport,
+    ComputeWithPlacementGroupSupport,
     ComputeWithGatewaySupport,
     ComputeWithVolumeSupport,
     Compute,
@@ -89,6 +95,9 @@ class GCPCompute(
         self.routers_client = compute_v1.RoutersClient(credentials=self.credentials)
         self.tpu_client = tpu_v2.TpuClient(credentials=self.credentials)
         self.disk_client = compute_v1.DisksClient(credentials=self.credentials)
+        self.resource_policies_client = compute_v1.ResourcePoliciesClient(
+            credentials=self.credentials
+        )
 
     def get_offers(
         self, requirements: Optional[Requirements] = None
@@ -183,6 +192,19 @@ class GCPCompute(
             config=self.config,
             region=instance_offer.region,
         )
+        extra_subnets = _get_extra_subnets(
+            subnetworks_client=self.subnetworks_client,
+            config=self.config,
+            region=instance_offer.region,
+            instance_type_name=instance_offer.instance.name,
+        )
+        placement_policy = None
+        if instance_config.placement_group_name is not None:
+            placement_policy = gcp_resources.get_placement_policy_resource_name(
+                project_id=self.config.project_id,
+                region=instance_offer.region,
+                placement_policy=instance_config.placement_group_name,
+            )
         labels = {
             "owner": "dstack",
             "dstack_project": instance_config.project_name.lower(),
@@ -259,8 +281,9 @@ class GCPCompute(
             request.project = self.config.project_id
             request.instance_resource = gcp_resources.create_instance_struct(
                 disk_size=disk_size,
-                image_id=gcp_resources.get_image_id(
-                    len(instance_offer.instance.resources.gpus) > 0,
+                image_id=_get_image_id(
+                    instance_type_name=instance_offer.instance.name,
+                    cuda=len(instance_offer.instance.resources.gpus) > 0,
                 ),
                 machine_type=instance_offer.instance.name,
                 accelerators=gcp_resources.get_accelerators(
@@ -269,7 +292,12 @@ class GCPCompute(
                     gpus=instance_offer.instance.resources.gpus,
                 ),
                 spot=instance_offer.instance.resources.spot,
-                user_data=get_user_data(authorized_keys),
+                user_data=get_user_data(
+                    authorized_keys,
+                    backend_specific_commands=_get_backend_specific_commands(
+                        instance_offer.instance.name
+                    ),
+                ),
                 authorized_keys=authorized_keys,
                 labels=labels,
                 tags=[gcp_resources.DSTACK_INSTANCE_TAG],
@@ -278,7 +306,9 @@ class GCPCompute(
                 service_account=self.config.vm_service_account,
                 network=self.config.vpc_resource_name,
                 subnetwork=subnetwork,
+                extra_subnetworks=extra_subnets,
                 allocate_public_ip=allocate_public_ip,
+                placement_policy=placement_policy,
             )
             try:
                 # GCP needs some time to return an error in case of no capacity (< 30s).
@@ -371,6 +401,43 @@ class GCPCompute(
             f"Failed to get instance IP address. Instance status: {instance.status}"
         )
 
+    def create_placement_group(
+        self,
+        placement_group: PlacementGroup,
+    ) -> PlacementGroupProvisioningData:
+        policy = compute_v1.ResourcePolicy(
+            name=placement_group.name,
+            region=placement_group.configuration.region,
+            group_placement_policy=compute_v1.ResourcePolicyGroupPlacementPolicy(
+                availability_domain_count=1,
+                collocation="COLLOCATED",
+            ),
+        )
+        self.resource_policies_client.insert(
+            project=self.config.project_id,
+            region=placement_group.configuration.region,
+            resource_policy_resource=policy,
+        )
+        return PlacementGroupProvisioningData(backend=BackendType.GCP)
+
+    def delete_placement_group(
+        self,
+        placement_group: PlacementGroup,
+    ):
+        try:
+            operation = self.resource_policies_client.delete(
+                project=self.config.project_id,
+                region=placement_group.configuration.region,
+                resource_policy=placement_group.name,
+            )
+            operation.result()  # Wait for operation to complete
+        except google.api_core.exceptions.NotFound:
+            logger.debug("Placement group %s not found", placement_group.name)
+        except google.api_core.exceptions.BadRequest as e:
+            if "is already being used by" in e.message:
+                raise PlacementGroupInUseError()
+            raise
+
     def create_gateway(
         self,
         configuration: GatewayComputeConfiguration,
@@ -412,7 +479,7 @@ class GCPCompute(
         request.project = self.config.project_id
         request.instance_resource = gcp_resources.create_instance_struct(
             disk_size=10,
-            image_id=gcp_resources.get_gateway_image_id(),
+            image_id=_get_gateway_image_id(),
             machine_type="e2-small",
             accelerators=[],
             spot=False,
@@ -681,21 +748,6 @@ class GCPCompute(
         )
 
 
-def _get_vpc_subnet(
-    subnetworks_client: compute_v1.SubnetworksClient,
-    config: GCPConfig,
-    region: str,
-) -> Optional[str]:
-    if config.vpc_name is None:
-        return None
-    return gcp_resources.get_vpc_subnet_or_error(
-        subnetworks_client=subnetworks_client,
-        vpc_project_id=config.vpc_project_id or config.project_id,
-        vpc_name=config.vpc_name,
-        region=region,
-    )
-
-
 def _supported_instances_and_zones(
     regions: List[str],
 ) -> Optional[Callable[[InstanceOffer], bool]]:
@@ -754,6 +806,74 @@ def _unique_instance_name(instance: InstanceType) -> str:
     return f"{name}-{gpu.name}-{gpu.memory_mib}"
 
 
+def _get_vpc_subnet(
+    subnetworks_client: compute_v1.SubnetworksClient,
+    config: GCPConfig,
+    region: str,
+) -> Optional[str]:
+    if config.vpc_name is None:
+        return None
+    return gcp_resources.get_vpc_subnet_or_error(
+        subnetworks_client=subnetworks_client,
+        vpc_project_id=config.vpc_project_id or config.project_id,
+        vpc_name=config.vpc_name,
+        region=region,
+    )
+
+
+def _get_extra_subnets(
+    subnetworks_client: compute_v1.SubnetworksClient,
+    config: GCPConfig,
+    region: str,
+    instance_type_name: str,
+) -> List[Tuple[str, str]]:
+    if config.extra_vpcs is None:
+        return []
+    if instance_type_name != "a3-megagpu-8g":
+        return []
+    extra_subnets = []
+    for vpc_name in config.extra_vpcs:
+        subnet = gcp_resources.get_vpc_subnet_or_error(
+            subnetworks_client=subnetworks_client,
+            vpc_project_id=config.vpc_project_id or config.project_id,
+            vpc_name=vpc_name,
+            region=region,
+        )
+        vpc_resource_name = gcp_resources.vpc_name_to_vpc_resource_name(
+            project_id=config.vpc_project_id or config.project_id,
+            vpc_name=vpc_name,
+        )
+        extra_subnets.append((vpc_resource_name, subnet))
+    return extra_subnets[:8]
+
+
+def _get_image_id(instance_type_name: str, cuda: bool) -> str:
+    if instance_type_name == "a3-megagpu-8g":
+        image_name = "dstack-a3mega-5"
+    elif cuda:
+        image_name = f"dstack-cuda-{version.base_image}"
+    else:
+        image_name = f"dstack-{version.base_image}"
+    image_name = image_name.replace(".", "-")
+    return f"projects/dstack/global/images/{image_name}"
+
+
+def _get_gateway_image_id() -> str:
+    return "projects/ubuntu-os-cloud/global/images/ubuntu-2204-jammy-v20230714"
+
+
+def _get_backend_specific_commands(instance_type_name: str) -> List[str]:
+    if instance_type_name == "a3-megagpu-8g":
+        return tcpx_features.get_backend_specific_commands_tcpxo()
+    return []
+
+
+def _get_volume_price(size: int) -> float:
+    # https://cloud.google.com/compute/disks-image-pricing#persistentdisk
+    # The price is different in different regions. Take max across supported regions.
+    return size * 0.12
+
+
 def _get_tpu_startup_script(authorized_keys: List[str]) -> str:
     commands = get_shim_commands(
         authorized_keys=authorized_keys, is_privileged=True, pjrt_device="TPU"
@@ -803,12 +923,6 @@ def _is_single_host_tpu(instance_name: str) -> bool:
     else:
         logger.info("Skipping unknown TPU: %s", instance_name)
         return False
-
-
-def _get_volume_price(size: int) -> float:
-    # https://cloud.google.com/compute/disks-image-pricing#persistentdisk
-    # The price is different in different regions. Take max across supported regions.
-    return size * 0.12
 
 
 def _get_tpu_data_disks(

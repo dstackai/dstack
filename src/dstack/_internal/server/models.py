@@ -343,6 +343,9 @@ class RunModel(BaseModel):
     termination_reason: Mapped[Optional[RunTerminationReason]] = mapped_column(
         Enum(RunTerminationReason)
     )
+    # resubmission_attempt counts consecutive transitions to pending without provisioning.
+    # Can be used to choose retry delay depending on the attempt number.
+    resubmission_attempt: Mapped[int] = mapped_column(Integer, default=0)
     run_spec: Mapped[str] = mapped_column(Text)
     service_spec: Mapped[Optional[str]] = mapped_column(Text)
 

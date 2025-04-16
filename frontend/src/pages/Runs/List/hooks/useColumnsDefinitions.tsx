@@ -57,6 +57,11 @@ export const useColumnsDefinitions = () => {
             cell: (item: IRun) => format(new Date(item.submitted_at), DATE_TIME_FORMAT),
         },
         {
+            id: 'finished_at',
+            header: t('projects.run.finished_at'),
+            cell: (item: IRun) => (item.terminated_at ? format(new Date(item.terminated_at), DATE_TIME_FORMAT) : null),
+        },
+        {
             id: 'status',
             header: t('projects.run.status'),
             cell: (item: IRun) => (
