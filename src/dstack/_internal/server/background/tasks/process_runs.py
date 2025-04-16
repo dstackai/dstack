@@ -40,7 +40,6 @@ from dstack._internal.utils import common
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
-RETRY_DELAY = datetime.timedelta(seconds=15)
 
 
 async def process_runs(batch_size: int = 1):
@@ -130,11 +129,7 @@ async def _process_run(session: AsyncSession, run_model: RunModel):
 async def _process_pending_run(session: AsyncSession, run_model: RunModel):
     """Jobs are not created yet"""
     run = run_model_to_run(run_model)
-    if (
-        run.latest_job_submission is not None
-        and common.get_current_datetime() - run.latest_job_submission.last_processed_at
-        < RETRY_DELAY
-    ):
+    if not _pending_run_ready_for_resubmission(run_model, run):
         logger.debug("%s: pending run is not yet ready for resubmission", fmt(run_model))
         return
 
@@ -181,6 +176,37 @@ async def _process_pending_run(session: AsyncSession, run_model: RunModel):
 
     run_model.status = RunStatus.SUBMITTED
     logger.info("%s: run status has changed PENDING -> SUBMITTED", fmt(run_model))
+
+
+def _pending_run_ready_for_resubmission(run_model: RunModel, run: Run) -> bool:
+    if run.latest_job_submission is None:
+        # Should not be possible
+        return True
+    duration_since_processing = (
+        common.get_current_datetime() - run.latest_job_submission.last_processed_at
+    )
+    if duration_since_processing < _get_retry_delay(run_model.resubmission_attempt):
+        return False
+    return True
+
+
+# We use exponentially increasing retry delays for pending runs.
+# This prevents creation of too many job submissions for runs stuck in pending,
+# e.g. when users set retry for a long period without capacity.
+_PENDING_RETRY_DELAYS = [
+    datetime.timedelta(seconds=15),
+    datetime.timedelta(seconds=30),
+    datetime.timedelta(minutes=1),
+    datetime.timedelta(minutes=2),
+    datetime.timedelta(minutes=5),
+    datetime.timedelta(minutes=10),
+]
+
+
+def _get_retry_delay(resubmission_attempt: int) -> datetime.timedelta:
+    if resubmission_attempt - 1 < len(_PENDING_RETRY_DELAYS):
+        return _PENDING_RETRY_DELAYS[resubmission_attempt - 1]
+    return _PENDING_RETRY_DELAYS[-1]
 
 
 async def _process_active_run(session: AsyncSession, run_model: RunModel):
@@ -341,6 +367,11 @@ async def _process_active_run(session: AsyncSession, run_model: RunModel):
         )
         run_model.status = new_status
         run_model.termination_reason = termination_reason
+        # While a run goes to pending without provisioning, resubmission_attempt increases.
+        if new_status == RunStatus.PROVISIONING:
+            run_model.resubmission_attempt = 0
+        elif new_status == RunStatus.PENDING:
+            run_model.resubmission_attempt += 1
 
 
 def _should_retry_job(run: Run, job: Job, job_model: JobModel) -> Optional[datetime.timedelta]:
