@@ -191,7 +191,9 @@ $ dstack init
     </div>
 
     !!! info "Gateway"
-        To enable [auto-scaling](concepts/services.md#replicas-and-scaling), or use a custom domain with HTTPS, 
+        To enable [auto-scaling](concepts/services.md#replicas-and-scaling),
+        [rate limits](concepts/services.md#rate-limits),
+        or use a custom domain with HTTPS, 
         set up a [gateway](concepts/gateways.md) before running the service.
         If you're using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"},
         a gateway is pre-configured for you.

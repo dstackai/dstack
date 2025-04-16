@@ -76,11 +76,7 @@ def generate_schema_reference(
             # TODO: This is a dirty workaround
             if field_type:
                 if field.annotation.__name__ == "Annotated":
-                    if field_type.__name__ == "Optional":
-                        field_type = get_args(field_type)[0]
-                    if field_type.__name__ == "List":
-                        field_type = get_args(field_type)[0]
-                    if field_type.__name__ == "Union":
+                    if field_type.__name__ in ["Optional", "List", "list", "Union"]:
                         field_type = get_args(field_type)[0]
                 base_model = (
                     inspect.isclass(field_type)

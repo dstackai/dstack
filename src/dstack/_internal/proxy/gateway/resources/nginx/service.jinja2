@@ -1,3 +1,7 @@
+{% for zone in limit_req_zones %}
+limit_req_zone {{ zone.key }} zone={{ zone.name }}:10m rate={{ zone.rpm }}r/m;
+{% endfor %}
+
 {% if replicas %}
 upstream {{ run_name }} {
     {% for replica in replicas %}
@@ -9,13 +13,14 @@ upstream {{ run_name }} {
 {% endif %}
 server {
     server_name {{ domain }};
-
+    limit_req_status 429;
     access_log {{ access_log_path }} dstack_stat;
     client_max_body_size {{ client_max_body_size }};
 
-    location / {
+    {% for location in locations %}
+    location {{ location.prefix }} {
         {% if auth %}
-        auth_request /auth;
+        auth_request /_dstack_auth;
         {% endif %}
 
         {% if replicas %}
@@ -23,7 +28,12 @@ server {
         {% else %}
         return 503;
         {% endif %}
+
+        {% if location.limit_req %}
+        limit_req zone={{ location.limit_req.zone }}{% if location.limit_req.burst %} burst={{ location.limit_req.burst }} nodelay{% endif %};
+        {% endif %}
     }
+    {% endfor %}
 
     {% if replicas %}
     location @websocket {
@@ -44,7 +54,7 @@ server {
     {% endif %}
 
     {% if auth %}
-    location = /auth {
+    location = /_dstack_auth {
         internal;
         if ($remote_addr = 127.0.0.1) {
             return 200;

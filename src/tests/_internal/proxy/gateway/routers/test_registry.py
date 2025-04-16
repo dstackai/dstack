@@ -29,6 +29,7 @@ def register_service_payload(
     auth: bool = False,
     client_max_body_size: int = 1024,
     options: Optional[dict] = None,
+    rate_limits: Optional[list[dict]] = None,
 ) -> dict:
     return {
         "run_name": run_name,
@@ -37,6 +38,7 @@ def register_service_payload(
         "auth": auth,
         "client_max_body_size": client_max_body_size,
         "options": options or {},
+        "rate_limits": rate_limits or [],
         "ssh_private_key": "private-key",
     }
 
@@ -108,7 +110,7 @@ class TestRegisterService:
         assert system_mocks.run_certbot.call_count == 0
         assert "listen 443" not in conf
         # no auth
-        assert "auth_request /auth;" not in conf
+        assert "auth_request /_dstack_auth;" not in conf
         # no replicas
         assert "upstream test-run" not in conf
         assert "return 503;" in conf
@@ -135,7 +137,7 @@ class TestRegisterService:
         )
         assert resp.status_code == 200
         conf = (tmp_path / "443-test-run.gtw.test.conf").read_text()
-        assert "auth_request /auth;" in conf
+        assert "auth_request /_dstack_auth;" in conf
         assert "proxy_pass http://localhost:8000/api/auth/test-proj;" in conf
 
     async def test_register_same_name_error(self, tmp_path: Path, system_mocks: Mocks) -> None:
@@ -193,6 +195,73 @@ class TestRegisterService:
                 format_spec=OpenAIChatModelFormat(prefix="/v1"),
             )
         ]
+
+    async def test_register_with_rate_limits(self, tmp_path: Path, system_mocks: Mocks) -> None:
+        client = make_client(tmp_path)
+        resp = await client.post(
+            "/api/registry/test-proj/services/register",
+            json=register_service_payload(
+                domain="test-run.gtw.test",
+                rate_limits=[
+                    {
+                        "prefix": "/a",
+                        "key": {"type": "ip_address"},
+                        "rps": 2.5,
+                        "burst": 5,
+                    },
+                    {
+                        "prefix": "/b",
+                        "key": {"type": "header", "header": "X-Api-Key"},
+                        "rps": 1,
+                        "burst": 0,
+                    },
+                ],
+            ),
+        )
+        assert resp.status_code == 200
+        conf = (tmp_path / "443-test-run.gtw.test.conf").read_text()
+        assert (
+            "limit_req_zone $binary_remote_addr zone=0.test-run.gtw.test:10m rate=150r/m;" in conf
+        )
+        assert "limit_req_zone $http_x_api_key zone=1.test-run.gtw.test:10m rate=60r/m;" in conf
+        assert "location /a {" in conf
+        assert "location /b {" in conf
+        assert "location / {" in conf
+        assert "limit_req zone=0.test-run.gtw.test burst=5 nodelay;" in conf
+        assert "limit_req zone=1.test-run.gtw.test;" in conf
+
+    async def test_register_with_root_rate_limit(
+        self, tmp_path: Path, system_mocks: Mocks
+    ) -> None:
+        client = make_client(tmp_path)
+        resp = await client.post(
+            "/api/registry/test-proj/services/register",
+            json=register_service_payload(
+                domain="test-run.gtw.test",
+                rate_limits=[
+                    {"prefix": "/", "key": {"type": "ip_address"}, "rps": 1, "burst": 1},
+                ],
+            ),
+        )
+        assert resp.status_code == 200
+        conf = (tmp_path / "443-test-run.gtw.test.conf").read_text()
+        assert (
+            "limit_req_zone $binary_remote_addr zone=0.test-run.gtw.test:10m rate=60r/m;" in conf
+        )
+        assert "location / {" in conf
+        assert "limit_req zone=0.test-run.gtw.test burst=1 nodelay;" in conf
+
+    async def test_register_without_rate_limits(self, tmp_path: Path, system_mocks: Mocks) -> None:
+        client = make_client(tmp_path)
+        resp = await client.post(
+            "/api/registry/test-proj/services/register",
+            json=register_service_payload(domain="test-run.gtw.test", rate_limits=[]),
+        )
+        assert resp.status_code == 200
+        conf = (tmp_path / "443-test-run.gtw.test.conf").read_text()
+        assert "limit_req_zone" not in conf
+        assert "limit_req zone=" not in conf
+        assert "location / {" in conf
 
 
 @pytest.mark.asyncio
