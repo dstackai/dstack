@@ -22,7 +22,7 @@ ENV PATH="/root/.local/bin/:$PATH"
 
 COPY pyproject.toml uv.lock README.md ./
 COPY src src
-RUN SETUPTOOLS_SCM_PRETEND_VERSION=0.0.0 uv sync --extra all
+RUN uv sync --extra all
 
 COPY docker/server/entrypoint.sh entrypoint.sh
 RUN chmod 777 entrypoint.sh

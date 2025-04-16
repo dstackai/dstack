@@ -1,7 +1,7 @@
 import os
 from argparse import Namespace
 
-from dstack import version
+from dstack._internal import settings
 from dstack._internal.cli.commands import BaseCommand
 from dstack._internal.core.errors import CLIError
 
@@ -78,7 +78,7 @@ class ServerCommand(BaseCommand):
             "dstack._internal.server.main:app",
             host=args.host,
             port=args.port,
-            reload=version.__version__ is None and not reload_disabled,
+            reload=settings.DSTACK_VERSION is None and not reload_disabled,
             log_level=uvicorn_log_level,
             workers=1,
         )

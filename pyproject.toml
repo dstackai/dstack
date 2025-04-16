@@ -45,14 +45,14 @@ Changelog = "https://github.com/dstackai/dstack/releases"
 Discord = "https://discord.gg/u8SmfwPpMd"
 
 [build-system]
-requires = ["hatchling", "hatch-vcs", "hatch-fancy-pypi-readme"]
+requires = ["hatchling", "hatch-fancy-pypi-readme"]
 build-backend = "hatchling.build"
 
 [project.scripts]
 dstack = "dstack._internal.cli.main:main"
 
 [tool.hatch.version]
-source = "vcs"
+path = "src/dstack/version.py"
 
 [tool.hatch.version.raw-options]
 version_scheme = "no-guess-dev"
