@@ -223,6 +223,7 @@ jobs:
       - name: Set output
         id: set_latest
         run: |
+          uv pip install packaging
           VERSION=${GITHUB_REF#refs/tags/}
           LATEST=$(python -c "from packaging import version as pkg_version; print('' if pkg_version.parse('$VERSION').is_prerelease else '1', end='')")
           echo "LATEST=$LATEST" >> "$GITHUB_OUTPUT"
