@@ -1,0 +1,28 @@
+type: service
+name: serve-distill
+
+image: nvcr.io/nvidia/tritonserver:25.01-trtllm-python-py3
+
+env:
+  - MODEL=deepseek-ai/DeepSeek-R1-Distill-Llama-8B
+  - S3_BUCKET_NAME
+  - AWS_ACCESS_KEY_ID
+  - AWS_SECRET_ACCESS_KEY
+  - AWS_DEFAULT_REGION
+
+commands:
+  - huggingface-cli download $MODEL --exclude '*.safetensors' --local-dir tokenizer_dir
+  - curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+  - unzip awscliv2.zip
+  - ./aws/install
+  - aws s3 sync s3://${S3_BUCKET_NAME}/tllm_engine_1gpu_bf16 ./tllm_engine_1gpu_bf16
+  - git clone https://github.com/triton-inference-server/server.git
+  - python3 server/python/openai/openai_frontend/main.py --model-repository s3://${S3_BUCKET_NAME}/triton_model_repo  --tokenizer tokenizer_dir --openai-port 8000  
+
+
+port: 8000
+
+model: ensemble
+
+resources:
+  gpu: A100:40GB

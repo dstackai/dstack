@@ -1,0 +1,25 @@
+type: task
+name: build-image
+
+privileged: true
+image: dstackai/dind
+env:
+  - DOCKER_USERNAME
+  - DOCKER_PASSWORD
+commands:
+  - start-dockerd
+  - apt update && apt-get install -y build-essential make git git-lfs
+  - git lfs install
+  - git clone https://github.com/NVIDIA/TensorRT-LLM.git
+  - cd TensorRT-LLM
+  - git submodule update --init --recursive
+  - git lfs pull
+  # Limit compilation to Hopper for a smaller image
+  - make -C docker release_build CUDA_ARCHS="90-real"
+  - docker tag tensorrt_llm/release:latest $DOCKER_USERNAME/tensorrt_llm:latest
+  - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+  - docker push "$DOCKER_USERNAME/tensorrt_llm:latest"
+
+resources:
+  cpu: 8
+  disk: 500GB..

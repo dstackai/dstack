@@ -1,0 +1,44 @@
+type: task
+name: build-model
+
+image: nvcr.io/nvidia/tritonserver:25.01-trtllm-python-py3
+
+
+env:
+  - MODEL=deepseek-ai/DeepSeek-R1-Distill-Llama-8B
+  - S3_BUCKET_NAME
+  - AWS_ACCESS_KEY_ID
+  - AWS_SECRET_ACCESS_KEY
+  - AWS_DEFAULT_REGION
+  - MAX_SEQ_LEN=8192 # Sum of Max Input Length & Max Output Length
+  - MAX_INPUT_LEN=4096 
+  - MAX_BATCH_SIZE=256
+  - TRITON_MAX_BATCH_SIZE=1
+  - INSTANCE_COUNT=1
+  - MAX_QUEUE_DELAY_MS=0
+  - MAX_QUEUE_SIZE=0
+  - DECOUPLED_MODE=true # Set true for streaming
+
+commands:
+  - huggingface-cli download $MODEL --exclude '*.safetensors' --local-dir tokenizer_dir
+  - curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+  - unzip awscliv2.zip
+  - ./aws/install
+  - aws s3 sync s3://${S3_BUCKET_NAME}/tllm_checkpoint_${DSTACK_GPUS_NUM}gpu_bf16 ./tllm_checkpoint_${DSTACK_GPUS_NUM}gpu_bf16
+  - trtllm-build --checkpoint_dir tllm_checkpoint_${DSTACK_GPUS_NUM}gpu_bf16 --gemm_plugin bfloat16 --output_dir tllm_engine_${DSTACK_GPUS_NUM}gpu_bf16  --max_seq_len $MAX_SEQ_LEN --max_input_len $MAX_INPUT_LEN --max_batch_size $MAX_BATCH_SIZE --gpt_attention_plugin bfloat16 --use_paged_context_fmha enable
+  - git clone --branch v0.17.0 --single-branch https://github.com/NVIDIA/TensorRT-LLM.git
+  - python3 TensorRT-LLM/examples/run.py --engine_dir tllm_engine_${DSTACK_GPUS_NUM}gpu_bf16 --max_output_len 40 --tokenizer_dir tokenizer_dir  --input_text "What is Deep Learning?"
+  - git clone --branch v0.17.0 --depth 1 https://github.com/triton-inference-server/tensorrtllm_backend.git
+  - mkdir triton_model_repo
+  - cp -r tensorrtllm_backend/all_models/inflight_batcher_llm/* triton_model_repo/
+  - python3 tensorrtllm_backend/tools/fill_template.py -i triton_model_repo/ensemble/config.pbtxt triton_max_batch_size:${TRITON_MAX_BATCH_SIZE},logits_datatype:TYPE_BF16
+  - python3 tensorrtllm_backend/tools/fill_template.py -i triton_model_repo/preprocessing/config.pbtxt tokenizer_dir:tokenizer_dir,triton_max_batch_size:${TRITON_MAX_BATCH_SIZE},preprocessing_instance_count:${INSTANCE_COUNT}
+  - python3 tensorrtllm_backend/tools/fill_template.py -i triton_model_repo/tensorrt_llm/config.pbtxt triton_backend:tensorrtllm,triton_max_batch_size:${TRITON_MAX_BATCH_SIZE},decoupled_mode:${DECOUPLED_MODE},engine_dir:tllm_engine_${DSTACK_GPUS_NUM}gpu_bf16,max_queue_delay_microseconds:${MAX_QUEUE_DELAY_MS},batching_strategy:inflight_fused_batching,max_queue_size:${MAX_QUEUE_SIZE},encoder_input_features_data_type:TYPE_BF16,logits_datatype:TYPE_BF16
+  - python3 tensorrtllm_backend/tools/fill_template.py -i triton_model_repo/postprocessing/config.pbtxt tokenizer_dir:tokenizer_dir,triton_max_batch_size:${TRITON_MAX_BATCH_SIZE},postprocessing_instance_count:${INSTANCE_COUNT},max_queue_size:${MAX_QUEUE_SIZE}
+  - python3 tensorrtllm_backend/tools/fill_template.py -i triton_model_repo/tensorrt_llm_bls/config.pbtxt triton_max_batch_size:${TRITON_MAX_BATCH_SIZE},decoupled_mode:${DECOUPLED_MODE},bls_instance_count:${INSTANCE_COUNT},logits_datatype:TYPE_BF16
+  - aws s3 sync triton_model_repo s3://${S3_BUCKET_NAME}/triton_model_repo --acl public-read
+  - aws s3 sync tllm_engine_${DSTACK_GPUS_NUM}gpu_bf16 s3://${S3_BUCKET_NAME}/tllm_engine_${DSTACK_GPUS_NUM}gpu_bf16 --acl public-read
+  
+
+resources:
+  gpu: A100:40GB
