@@ -98,6 +98,8 @@ Below is the service configuration that deploys DeepSeek R1 using the built Tens
       - MAX_BATCH_SIZE=256
       - MAX_NUM_TOKENS=16384
       - MAX_SEQ_LENGTH=16384
+      - EXPERT_PARALLEL=4
+      - PIPELINE_PARALLEL=1
       - HF_HUB_ENABLE_HF_TRANSFER=1
     commands:
       - pip install -U "huggingface_hub[cli]"
@@ -109,8 +111,8 @@ Below is the service configuration that deploys DeepSeek R1 using the built Tens
               --max_num_tokens $MAX_NUM_TOKENS
               --max_seq_len $MAX_SEQ_LENGTH
               --tp_size $DSTACK_GPUS_NUM
-              --ep_size 4
-              --pp_size 1
+              --ep_size $EXPERT_PARALLEL
+              --pp_size $PIPELINE_PARALLEL
               DeepSeek-R1
     port: 8000
     model: deepseek-ai/DeepSeek-R1
