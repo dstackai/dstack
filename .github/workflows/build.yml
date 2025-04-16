@@ -42,13 +42,24 @@ jobs:
         working-directory: frontend
     steps:
       - uses: actions/checkout@v4
+      - name: Restore cached build
+        id: cache-build
+        uses: actions/cache@v4
+        with:
+          path: frontend/build
+          key: frontend-build-${{ hashFiles('frontend/**') }}
+          restore-keys: |
+            frontend-build-
       - name: Set up Node
+        if: steps.cache-build.outputs.cache-hit != 'true'
         uses: actions/setup-node@v4
         with:
           node-version: 18
       - name: Install packages
+        if: steps.cache-build.outputs.cache-hit != 'true'
         run: npm ci
       - name: Build dist
+        if: steps.cache-build.outputs.cache-hit != 'true'
         run: npm run build
       - name: Upload dist
         uses: actions/upload-artifact@v4
