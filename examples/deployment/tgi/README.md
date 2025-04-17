@@ -1,11 +1,11 @@
 ---
 title: HuggingFace TGI
-description: "This example shows how to deploy Llama 3.1 to any cloud or on-premises environment using HuggingFace TGI and dstack."
+description: "This example shows how to deploy Llama 4 Scout to any cloud or on-premises environment using HuggingFace TGI and dstack."
 ---
 
 # HuggingFace TGI
 
-This example shows how to deploy Llama 3.1 8B with `dstack` using [HuggingFace TGI :material-arrow-top-right-thin:{ .external }](https://huggingface.co/docs/text-generation-inference/en/index){:target="_blank"}.
+This example shows how to deploy Llama 4 Scout with `dstack` using [HuggingFace TGI :material-arrow-top-right-thin:{ .external }](https://huggingface.co/docs/text-generation-inference/en/index){:target="_blank"}.
 
 ??? info "Prerequisites"
     Once `dstack` is [installed](https://dstack.ai/docs/installation), go ahead clone the repo, and run `dstack init`.
@@ -22,37 +22,43 @@ This example shows how to deploy Llama 3.1 8B with `dstack` using [HuggingFace T
 
 ## Deployment
 
-Here's an example of a service that deploys Llama 3.1 8B using TGI.
+Here's an example of a service that deploys [`Llama-4-Scout-17B-16E-Instruct` :material-arrow-top-right-thin:{ .external }](https://huggingface.co/meta-llama/Llama-4-Scout-17B-16E-Instruct){:target="_blank"} using TGI.
 
 <div editor-title="examples/deployment/tgi/.dstack.yml">
 
 ```yaml
 type: service
-name: llama31
+name: llama4-scout
 
 image: ghcr.io/huggingface/text-generation-inference:latest
+
 env:
   - HF_TOKEN
-  - MODEL_ID=meta-llama/Meta-Llama-3.1-8B-Instruct
-  - MAX_INPUT_LENGTH=4000
-  - MAX_TOTAL_TOKENS=4096
+  - MODEL_ID=meta-llama/Llama-4-Scout-17B-16E-Instruct
+  - MAX_INPUT_LENGTH=8192
+  - MAX_TOTAL_TOKENS=16384
+  # max_batch_prefill_tokens must be >= max_input_tokens
+  - MAX_BATCH_PREFILL_TOKENS=8192
 commands:
-  - NUM_SHARD=$DSTACK_GPUS_NUM text-generation-launcher
+   # Activate the virtual environment at /usr/src/.venv/ 
+   # as required by TGI's latest image.
+   - . /usr/src/.venv/bin/activate
+   - NUM_SHARD=$DSTACK_GPUS_NUM text-generation-launcher
+
 port: 80
 # Register the model
-model: meta-llama/Meta-Llama-3.1-8B-Instruct
+model: meta-llama/Llama-4-Scout-17B-16E-Instruct
 
 # Uncomment to leverage spot instances
 #spot_policy: auto
 
-# Uncomment to cache downloaded models  
+# Uncomment to cache downloaded models
 #volumes:
 #  - /data:/data
 
 resources:
-  gpu: 24GB
-  # Uncomment if using multiple GPUs
-  #shm_size: 24GB
+  gpu: H200:2
+  disk: 500GB..
 ```
 </div>
 
@@ -66,12 +72,11 @@ To run a configuration, use the [`dstack apply`](https://dstack.ai/docs/referenc
 $ HF_TOKEN=...
 $ dstack apply -f examples/deployment/tgi/.dstack.yml
 
- #  BACKEND     REGION        RESOURCES                      SPOT  PRICE    
- 1  tensordock  unitedstates  2xCPU, 10GB, 1xRTX3090 (24GB)  no    $0.231   
- 2  tensordock  unitedstates  2xCPU, 10GB, 1xRTX3090 (24GB)  no    $0.242   
- 3  tensordock  india         2xCPU, 38GB, 1xA5000 (24GB)    no    $0.283  
+ #  BACKEND  REGION     RESOURCES                      SPOT PRICE   
+ 1  vastai   is-iceland 48xCPU, 128GB, 2xH200 (140GB)  no   $7.87   
+ 2  runpod   EU-SE-1    40xCPU, 128GB, 2xH200 (140GB)  no   $7.98 
 
-Submit a new run? [y/n]: y
+Submit the run llama4-scout? [y/n]: y
 
 Provisioning...
 ---> 100%
@@ -89,7 +94,7 @@ $ curl http://127.0.0.1:3000/proxy/models/main/chat/completions \
     -H 'Authorization: Bearer &lt;dstack token&gt;' \
     -H 'Content-Type: application/json' \
     -d '{
-      "model": "meta-llama/Meta-Llama-3.1-8B-Instruct",
+      "model": "meta-llama/Llama-4-Scout-17B-16E-Instruct",
       "messages": [
         {
           "role": "system",
@@ -117,7 +122,6 @@ The source-code of this example can be found in
 ## What's next?
 
 1. Check [services](https://dstack.ai/docs/services)
-2. Browse the [Llama 3.1](https://dstack.ai/examples/llms/llama31/), [vLLM](https://dstack.ai/examples/deployment/vllm/),
-   and [NIM](https://dstack.ai/examples/deployment/nim/) examples
+2. Browse the [Llama](https://dstack.ai/examples/llms/llama/), [vLLM](https://dstack.ai/examples/deployment/vllm/), [SgLang](https://dstack.ai/examples/deployment/sglang/) and [NIM](https://dstack.ai/examples/deployment/nim/) examples
 3. See also [AMD](https://dstack.ai/examples/accelerators/amd/) and
    [TPU](https://dstack.ai/examples/accelerators/tpu/)
