@@ -71,7 +71,7 @@ hide:
         </h3>
 
         <p>
-            Fine-tune Llama 3 on a custom dataset using Axolotl.
+            Fine-tune Llama 4 on a custom dataset using Axolotl.
         </p>
     </a>
 
