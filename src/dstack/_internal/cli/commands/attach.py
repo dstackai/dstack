@@ -69,6 +69,7 @@ class AttachCommand(APIBaseCommand):
         run = self.api.runs.get(args.run_name)
         if run is None:
             raise CLIError(f"Run {args.run_name} not found")
+        exit_code = 0
         try:
             attached = run.attach(
                 ssh_identity_file=args.ssh_identity_file,
@@ -90,35 +91,36 @@ class AttachCommand(APIBaseCommand):
                     replica_num=args.replica,
                     job_num=args.job,
                 )
-                try:
-                    for log in logs:
-                        sys.stdout.buffer.write(log)
-                        sys.stdout.buffer.flush()
-                except KeyboardInterrupt:
-                    pass
+                for log in logs:
+                    sys.stdout.buffer.write(log)
+                    sys.stdout.buffer.flush()
+                _print_finished_message_when_available(run)
+                exit_code = get_run_exit_code(run)
             else:
-                try:
-                    while True:
-                        time.sleep(10)
-                except KeyboardInterrupt:
-                    pass
+                while True:
+                    time.sleep(10)
+        except KeyboardInterrupt:
+            console.print("\nDetached")
         finally:
             run.detach()
         # TODO: Handle run resubmissions similar to dstack apply
+        exit(exit_code)
 
-        # After reading the logs, the run may not be marked as finished immediately.
-        # Give the run some time to transition to a finished state before exiting.
-        for _ in range(30):
-            run.refresh()
-            if run.status.is_finished():
-                print_finished_message(run)
-                exit(get_run_exit_code(run))
-            time.sleep(1)
+
+def _print_finished_message_when_available(run: Run) -> None:
+    # After reading the logs, the run may not be marked as finished immediately.
+    # Give the run some time to transition to a finished state before exiting.
+    for _ in range(30):
+        run.refresh()
+        if run.status.is_finished():
+            print_finished_message(run)
+            break
+        time.sleep(1)
+    else:
         console.print(
             "[error]Lost run connection. Timed out waiting for run final status."
             " Check `dstack ps` to see if it's done or failed."
         )
-        exit(1)
 
 
 _IGNORED_PORTS = [DSTACK_RUNNER_HTTP_PORT]
