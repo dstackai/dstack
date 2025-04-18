@@ -29,7 +29,7 @@ hide:
            TGI
        </h3>
        <p>
-            Deploy Llama 3.1 with TGI
+            Deploy Llama 4 with TGI
         </p>
     </a>
     <a href="/examples/deployment/nim" 
