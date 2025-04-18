@@ -555,9 +555,7 @@ def get_gateway_user_data(authorized_key: str) -> str:
     )
 
 
-def get_docker_commands(
-    authorized_keys: List[str], fix_path_in_dot_profile: bool = True
-) -> List[str]:
+def get_docker_commands(authorized_keys: list[str]) -> list[str]:
     authorized_keys_content = "\n".join(authorized_keys).strip()
     commands = [
         # save and unset ld.so variables
@@ -581,9 +579,6 @@ def get_docker_commands(
         "chmod 700 ~/.ssh",
         f"echo '{authorized_keys_content}' > ~/.ssh/authorized_keys",
         "chmod 600 ~/.ssh/authorized_keys",
-        r"""if [ -f ~/.profile ]; then sed -ie '1s@^@export PATH="'"$PATH"':$PATH"\n\n@' ~/.profile; fi"""
-        if fix_path_in_dot_profile
-        else ":",
         # regenerate host keys
         "rm -rf /etc/ssh/ssh_host_*",
         "ssh-keygen -A > /dev/null",
@@ -601,7 +596,6 @@ def get_docker_commands(
             " -o PidFile=none"
             " -o PasswordAuthentication=no"
             " -o AllowTcpForwarding=yes"
-            " -o PermitUserEnvironment=yes"
             " -o ClientAliveInterval=30"
             " -o ClientAliveCountMax=4"
         ),
