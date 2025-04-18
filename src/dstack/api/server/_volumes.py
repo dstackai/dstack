@@ -45,7 +45,6 @@ def _get_volume_configuration_excludes(configuration: VolumeConfiguration) -> Di
     clients backward-compatibility with older servers.
     """
     configuration_excludes = {}
-    # Fields can be excluded like this:
-    # if configuration.availability_zone is None:
-    #     configuration_excludes["availability_zone"] = True
+    if configuration.tags is None:
+        configuration_excludes["tags"] = True
     return {"configuration": configuration_excludes}

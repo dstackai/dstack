@@ -6,6 +6,7 @@ from typing_extensions import Annotated, Literal
 
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import CoreModel, Duration
+from dstack._internal.utils.tags import tags_validator
 
 DEFAULT_RETRY_DURATION = 3600
 
@@ -243,6 +244,16 @@ class ProfileParams(CoreModel):
     fleets: Annotated[
         Optional[list[str]], Field(description="The fleets considered for reuse")
     ] = None
+    tags: Annotated[
+        Optional[Dict[str, str]],
+        Field(
+            description=(
+                "The custom tags to associate with the resource."
+                " The tags are also propagated to the underlying backend resources."
+                " If there is a conflict with backend-level tags, does not override them"
+            )
+        ),
+    ] = None
 
     # Deprecated and unused. Left for compatibility with 0.18 clients.
     pool_name: Annotated[Optional[str], Field(exclude=True)] = None
@@ -269,6 +280,7 @@ class ProfileParams(CoreModel):
     _validate_idle_duration = validator("idle_duration", pre=True, allow_reuse=True)(
         parse_idle_duration
     )
+    _validate_tags = validator("tags", pre=True, allow_reuse=True)(tags_validator)
 
 
 class ProfileProps(CoreModel):

@@ -125,6 +125,7 @@ def get_dev_env_run_plan_dict(
                 "utilization_policy": None,
                 "reservation": None,
                 "fleets": None,
+                "tags": None,
             },
             "configuration_path": "dstack.yaml",
             "profile": {
@@ -144,6 +145,7 @@ def get_dev_env_run_plan_dict(
                 "utilization_policy": None,
                 "reservation": None,
                 "fleets": None,
+                "tags": None,
             },
             "repo_code_hash": None,
             "repo_data": {"repo_dir": "/repo", "repo_type": "local"},
@@ -277,6 +279,7 @@ def get_dev_env_run_dict(
                 "utilization_policy": None,
                 "reservation": None,
                 "fleets": None,
+                "tags": None,
             },
             "configuration_path": "dstack.yaml",
             "profile": {
@@ -296,6 +299,7 @@ def get_dev_env_run_dict(
                 "utilization_policy": None,
                 "reservation": None,
                 "fleets": None,
+                "tags": None,
             },
             "repo_code_hash": None,
             "repo_data": {"repo_dir": "/repo", "repo_type": "local"},

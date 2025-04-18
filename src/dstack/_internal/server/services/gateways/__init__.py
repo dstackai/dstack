@@ -106,6 +106,7 @@ async def create_gateway_compute(
         public_ip=configuration.public_ip,
         ssh_key_pub=gateway_ssh_public_key,
         certificate=configuration.certificate,
+        tags=configuration.tags,
     )
 
     gpd = await run_async(

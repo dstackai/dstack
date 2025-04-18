@@ -332,6 +332,16 @@ def get_accelerators(
     return [accelerator_config]
 
 
+def filter_invalid_labels(labels: Dict[str, str]) -> Dict[str, str]:
+    filtered_labels = {}
+    for k, v in labels.items():
+        if not _is_valid_label(k, v):
+            logger.warning("Skipping invalid label '%s: %s'", k, v)
+            continue
+        filtered_labels[k] = v
+    return filtered_labels
+
+
 def validate_labels(labels: Dict[str, str]):
     for k, v in labels.items():
         if not _is_valid_label(k, v):

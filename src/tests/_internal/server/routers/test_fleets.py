@@ -349,6 +349,7 @@ class TestCreateFleet:
                     "name": "test-fleet",
                     "reservation": None,
                     "blocks": 1,
+                    "tags": None,
                 },
                 "profile": {
                     "backends": None,
@@ -367,6 +368,7 @@ class TestCreateFleet:
                     "default": False,
                     "reservation": None,
                     "fleets": None,
+                    "tags": None,
                 },
                 "autocreated": False,
             },
@@ -468,6 +470,7 @@ class TestCreateFleet:
                     "name": spec.configuration.name,
                     "reservation": None,
                     "blocks": 1,
+                    "tags": None,
                 },
                 "profile": {
                     "backends": None,
@@ -486,6 +489,7 @@ class TestCreateFleet:
                     "default": False,
                     "reservation": None,
                     "fleets": None,
+                    "tags": None,
                 },
                 "autocreated": False,
             },

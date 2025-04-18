@@ -1,6 +1,6 @@
 import datetime
 from enum import Enum
-from typing import List, Optional
+from typing import Dict, List, Optional
 from uuid import UUID
 
 import gpuhunt
@@ -108,6 +108,7 @@ class InstanceConfiguration(CoreModel):
     placement_group_name: Optional[str] = None
     reservation: Optional[str] = None
     volumes: Optional[List[Volume]] = None
+    tags: Optional[Dict[str, str]] = None
 
     def get_public_keys(self) -> List[str]:
         return [ssh_key.public.strip() for ssh_key in self.ssh_keys]

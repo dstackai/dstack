@@ -211,8 +211,12 @@ class GCPCompute(
             "dstack_name": instance_config.instance_name,
             "dstack_user": instance_config.user.lower(),
         }
-        labels = {k: v for k, v in labels.items() if gcp_resources.is_valid_label_value(v)}
-        labels = merge_tags(tags=labels, backend_tags=self.config.tags)
+        labels = merge_tags(
+            base_tags=labels,
+            backend_tags=self.config.tags,
+            resource_tags=instance_config.tags,
+        )
+        labels = gcp_resources.filter_invalid_labels(labels)
         is_tpu = (
             _is_tpu(instance_offer.instance.resources.gpus[0].name)
             if instance_offer.instance.resources.gpus
@@ -471,8 +475,12 @@ class GCPCompute(
             "dstack_project": configuration.project_name.lower(),
             "dstack_name": configuration.instance_name,
         }
-        labels = {k: v for k, v in labels.items() if gcp_resources.is_valid_label_value(v)}
-        labels = merge_tags(tags=labels, backend_tags=self.config.tags)
+        labels = merge_tags(
+            base_tags=labels,
+            backend_tags=self.config.tags,
+            resource_tags=configuration.tags,
+        )
+        labels = gcp_resources.filter_invalid_labels(labels)
 
         request = compute_v1.InsertInstanceRequest()
         request.zone = zone
@@ -573,8 +581,12 @@ class GCPCompute(
             "dstack_name": volume.name,
             "dstack_user": volume.user,
         }
-        labels = {k: v for k, v in labels.items() if gcp_resources.is_valid_label_value(v)}
-        labels = merge_tags(tags=labels, backend_tags=self.config.tags)
+        labels = merge_tags(
+            base_tags=labels,
+            backend_tags=self.config.tags,
+            resource_tags=volume.configuration.tags,
+        )
+        labels = gcp_resources.filter_invalid_labels(labels)
 
         disk = compute_v1.Disk()
         disk.name = disk_name

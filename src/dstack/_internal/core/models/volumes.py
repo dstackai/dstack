@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from enum import Enum
 from pathlib import PurePosixPath
-from typing import List, Literal, Optional, Tuple, Union
+from typing import Dict, List, Literal, Optional, Tuple, Union
 
 from pydantic import Field, validator
 from typing_extensions import Annotated, Self
@@ -11,6 +11,7 @@ from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.resources import Memory
 from dstack._internal.utils.common import get_or_error
+from dstack._internal.utils.tags import tags_validator
 
 
 class VolumeStatus(str, Enum):
@@ -43,6 +44,18 @@ class VolumeConfiguration(CoreModel):
         Optional[str],
         Field(description="The volume ID. Must be specified when registering external volumes"),
     ] = None
+    tags: Annotated[
+        Optional[Dict[str, str]],
+        Field(
+            description=(
+                "The custom tags to associate with the volume."
+                " The tags are also propagated to the underlying backend resources."
+                " If there is a conflict with backend-level tags, does not override them"
+            )
+        ),
+    ] = None
+
+    _validate_tags = validator("tags", pre=True, allow_reuse=True)(tags_validator)
 
     @property
     def size_gb(self) -> int:

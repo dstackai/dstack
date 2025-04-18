@@ -448,6 +448,16 @@ def make_tags(tags: Dict[str, str]) -> List[Dict[str, str]]:
     return tags_list
 
 
+def filter_invalid_tags(tags: Dict[str, str]) -> Dict[str, str]:
+    filtered_tags = {}
+    for k, v in tags.items():
+        if not _is_valid_tag(k, v):
+            logger.warning("Skipping invalid tag '%s: %s'", k, v)
+            continue
+        filtered_tags[k] = v
+    return filtered_tags
+
+
 def validate_tags(tags: Dict[str, str]):
     for k, v in tags.items():
         if not _is_valid_tag(k, v):

@@ -1,4 +1,4 @@
-from typing import List
+from typing import Dict, List
 
 from pydantic import parse_obj_as
 
@@ -29,7 +29,10 @@ class GatewaysAPIClient(APIClientGroup):
         configuration: GatewayConfiguration,
     ) -> Gateway:
         body = CreateGatewayRequest(configuration=configuration)
-        resp = self._request(f"/api/project/{project_name}/gateways/create", body=body.json())
+        resp = self._request(
+            f"/api/project/{project_name}/gateways/create",
+            body=body.json(exclude=_get_gateway_configuration_excludes(configuration)),
+        )
         return parse_obj_as(Gateway.__response__, resp.json())
 
     def delete(self, project_name: str, gateways_names: List[str]) -> None:
@@ -48,3 +51,15 @@ class GatewaysAPIClient(APIClientGroup):
             f"/api/project/{project_name}/gateways/set_wildcard_domain", body=body.json()
         )
         return parse_obj_as(Gateway.__response__, resp.json())
+
+
+def _get_gateway_configuration_excludes(configuration: GatewayConfiguration) -> Dict:
+    """
+    Returns `configuration` exclude mapping to exclude certain fields from the request.
+    Use this method to exclude new fields when they are not set to keep
+    clients backward-compatibility with older servers.
+    """
+    configuration_excludes = {}
+    if configuration.tags is None:
+        configuration_excludes["tags"] = True
+    return {"configuration": configuration_excludes}

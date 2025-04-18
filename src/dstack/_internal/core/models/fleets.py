@@ -21,6 +21,7 @@ from dstack._internal.core.models.profiles import (
 )
 from dstack._internal.core.models.resources import Range, ResourcesSpec
 from dstack._internal.utils.json_schema import add_extra_schema_types
+from dstack._internal.utils.tags import tags_validator
 
 
 class FleetStatus(str, Enum):
@@ -249,7 +250,18 @@ class FleetProps(CoreModel):
 
 
 class FleetConfiguration(InstanceGroupParams, FleetProps):
-    pass
+    tags: Annotated[
+        Optional[Dict[str, str]],
+        Field(
+            description=(
+                "The custom tags to associate with the resource."
+                " The tags are also propagated to the underlying backend resources."
+                " If there is a conflict with backend-level tags, does not override them"
+            )
+        ),
+    ] = None
+
+    _validate_tags = validator("tags", pre=True, allow_reuse=True)(tags_validator)
 
 
 class FleetSpec(CoreModel):

@@ -5,6 +5,10 @@ from azure.mgmt import network as network_mgmt
 from azure.mgmt.network.models import Subnet
 
 from dstack._internal.core.errors import BackendError
+from dstack._internal.utils.logging import get_logger
+
+logger = get_logger(__name__)
+
 
 MAX_RESOURCE_NAME_LEN = 64
 
@@ -75,6 +79,16 @@ def _is_eligible_private_subnet(
         return True
 
     return False
+
+
+def filter_invalid_tags(tags: Dict[str, str]) -> Dict[str, str]:
+    filtered_tags = {}
+    for k, v in tags.items():
+        if not _is_valid_tag(k, v):
+            logger.warning("Skipping invalid tag '%s: %s'", k, v)
+            continue
+        filtered_tags[k] = v
+    return filtered_tags
 
 
 def validate_tags(tags: Dict[str, str]):

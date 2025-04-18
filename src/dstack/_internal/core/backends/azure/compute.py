@@ -136,13 +136,18 @@ class AzureCompute(
             location=location,
         )
 
-        tags = {
+        base_tags = {
             "owner": "dstack",
             "dstack_project": instance_config.project_name,
             "dstack_name": instance_config.instance_name,
             "dstack_user": instance_config.user,
         }
-        tags = merge_tags(tags=tags, backend_tags=self.config.tags)
+        tags = merge_tags(
+            base_tags=base_tags,
+            backend_tags=self.config.tags,
+            resource_tags=instance_config.tags,
+        )
+        tags = azure_resources.filter_invalid_tags(tags)
 
         # TODO: Support custom availability_zones.
         # Currently, VMs are regional, which means they don't have zone info.
@@ -228,14 +233,19 @@ class AzureCompute(
             location=configuration.region,
         )
 
-        tags = {
+        base_tags = {
             "owner": "dstack",
             "dstack_project": configuration.project_name,
             "dstack_name": configuration.instance_name,
         }
         if settings.DSTACK_VERSION is not None:
-            tags["dstack_version"] = settings.DSTACK_VERSION
-        tags = merge_tags(tags=tags, backend_tags=self.config.tags)
+            base_tags["dstack_version"] = settings.DSTACK_VERSION
+        tags = merge_tags(
+            base_tags=base_tags,
+            backend_tags=self.config.tags,
+            resource_tags=configuration.tags,
+        )
+        tags = azure_resources.filter_invalid_tags(tags)
 
         vm = _launch_instance(
             compute_client=self._compute_client,
