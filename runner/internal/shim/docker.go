@@ -896,7 +896,6 @@ func getSSHShellCommands(openSSHPort int, publicSSHKey string) []string {
 		"chmod 700 ~/.ssh",
 		fmt.Sprintf("echo '%s' > ~/.ssh/authorized_keys", publicSSHKey),
 		"chmod 600 ~/.ssh/authorized_keys",
-		`if [ -f ~/.profile ]; then sed -ie '1s@^@export PATH="'"$PATH"':$PATH"\n\n@' ~/.profile; fi`,
 		// regenerate host keys
 		"rm -rf /etc/ssh/ssh_host_*",
 		"ssh-keygen -A > /dev/null",
@@ -914,7 +913,6 @@ func getSSHShellCommands(openSSHPort int, publicSSHKey string) []string {
 				" -o PidFile=none"+
 				" -o PasswordAuthentication=no"+
 				" -o AllowTcpForwarding=yes"+
-				" -o PermitUserEnvironment=yes"+
 				" -o ClientAliveInterval=30"+
 				" -o ClientAliveCountMax=4",
 			openSSHPort,

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
@@ -206,4 +207,23 @@ func makeCodeTar(t *testing.T, path string) {
 		require.NoError(t, err)
 	}
 	require.NoError(t, tw.Close())
+}
+
+func TestWriteDstackProfile(t *testing.T) {
+	testCases := []string{
+		"",
+		"string 'with 'single' quotes",
+		"multi\nline\tstring",
+	}
+	tmp := t.TempDir()
+	path := tmp + "/dstack_profile"
+	script := fmt.Sprintf(`. '%s'; printf '%%s' "$VAR"`, path)
+	for _, value := range testCases {
+		env := map[string]string{"VAR": value}
+		writeDstackProfile(env, path)
+		cmd := exec.Command("/bin/sh", "-c", script)
+		out, err := cmd.Output()
+		assert.NoError(t, err)
+		assert.Equal(t, value, string(out))
+	}
 }

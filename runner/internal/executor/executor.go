@@ -310,17 +310,18 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 	// `env` interpolation feature is postponed to some future release
 	envMap.Update(ex.jobSpec.Env, false)
 
+	const profilePath = "/etc/profile"
+	const dstackProfilePath = "/tmp/dstack_profile"
+	if err := writeDstackProfile(envMap, dstackProfilePath); err != nil {
+		log.Warning(ctx, "failed to write dstack_profile", "path", dstackProfilePath, "err", err)
+	} else if err := includeDstackProfile(profilePath, dstackProfilePath); err != nil {
+		log.Warning(ctx, "failed to include dstack_profile", "path", profilePath, "err", err)
+	}
+
 	// As of 2024-11-29, ex.homeDir is always set to /root
 	rootSSHDir, err := prepareSSHDir(-1, -1, ex.homeDir)
 	if err != nil {
 		log.Warning(ctx, "failed to prepare ssh dir", "home", ex.homeDir, "err", err)
-	} else {
-		rootSSHEnvPath := filepath.Join(rootSSHDir, "environment")
-		restoreRootSSHEnv := backupFile(ctx, rootSSHEnvPath)
-		defer restoreRootSSHEnv(ctx)
-		if err := writeSSHEnvironment(envMap, -1, -1, rootSSHEnvPath); err != nil {
-			log.Warning(ctx, "failed to write SSH environment", "path", ex.homeDir, "err", err)
-		}
 	}
 	userSSHDir := ""
 	uid := -1
@@ -337,12 +338,6 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 			if err != nil {
 				log.Warning(ctx, "failed to prepare ssh dir", "home", homeDir, "err", err)
 			} else {
-				userSSHEnvPath := filepath.Join(userSSHDir, "environment")
-				restoreUserSSHEnv := backupFile(ctx, userSSHEnvPath)
-				defer restoreUserSSHEnv(ctx)
-				if err := writeSSHEnvironment(envMap, uid, gid, userSSHEnvPath); err != nil {
-					log.Warning(ctx, "failed to write SSH environment", "path", homeDir, "err", err)
-				}
 				rootSSHKeysPath := filepath.Join(rootSSHDir, "authorized_keys")
 				userSSHKeysPath := filepath.Join(userSSHDir, "authorized_keys")
 				restoreUserSSHKeys := backupFile(ctx, userSSHKeysPath)
@@ -676,53 +671,40 @@ func prepareSSHDir(uid int, gid int, homeDir string) (string, error) {
 	return sshDir, nil
 }
 
-func writeSSHEnvironment(env map[string]string, uid int, gid int, envPath string) error {
-	info, err := os.Stat(envPath)
-	if err == nil {
-		if info.IsDir() {
-			return fmt.Errorf("is a directory: %s", envPath)
-		}
-		if err = os.Chmod(envPath, 0o600); err != nil {
-			return err
-		}
-	} else if !errors.Is(err, os.ErrNotExist) {
-		return err
-	}
-
-	envFile, err := os.OpenFile(envPath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0o600)
+func writeDstackProfile(env map[string]string, path string) error {
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
 	if err != nil {
 		return err
 	}
-	defer envFile.Close()
+	defer file.Close()
 	for key, value := range env {
 		switch key {
-		case "USER", "HOME", "SHELL", "PWD", "_":
+		case "HOSTNAME", "USER", "HOME", "SHELL", "SHLVL", "PWD", "_":
 			continue
 		}
-		// sshd doesn't support multiline variable values in .ssh/environment:
-		// VAR1=line1
-		// line2
-		// line3
-		// VAR2=singleline
-		// leads to:
-		// Bad line 2 in /root/.ssh/environment
-		// Bad line 3 in /root/.ssh/environment
-		// Assuming a single trailing newline is not a big deal
-		value := strings.TrimSuffix(value, "\n")
-		// If there is any non-trailing newline, or more than one
-		// trailing newline, skip the variable
-		if strings.Contains(value, "\n") {
-			continue
-		}
-		line := fmt.Sprintf("%s=%s\n", key, value)
-		if _, err = envFile.WriteString(line); err != nil {
+		line := fmt.Sprintf("export %s='%s'\n", key, strings.ReplaceAll(value, `'`, `'"'"'`))
+		if _, err = file.WriteString(line); err != nil {
 			return err
 		}
 	}
-	if err = os.Chown(envPath, uid, gid); err != nil {
+	if err = os.Chmod(path, 0o644); err != nil {
 		return err
 	}
+	return nil
+}
 
+func includeDstackProfile(profilePath string, dstackProfilePath string) error {
+	file, err := os.OpenFile(profilePath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	if _, err = file.WriteString(fmt.Sprintf("\n. '%s'\n", dstackProfilePath)); err != nil {
+		return err
+	}
+	if err = os.Chmod(profilePath, 0o644); err != nil {
+		return err
+	}
 	return nil
 }
 
