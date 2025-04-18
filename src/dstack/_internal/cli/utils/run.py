@@ -4,7 +4,6 @@ from rich.markup import escape
 from rich.table import Table
 
 from dstack._internal.cli.utils.common import NO_OFFERS_WARNING, add_row_from_dict, console
-from dstack._internal.core.models.common import is_core_model_instance
 from dstack._internal.core.models.configurations import DevEnvironmentConfiguration
 from dstack._internal.core.models.instances import InstanceAvailability
 from dstack._internal.core.models.profiles import (
@@ -41,7 +40,7 @@ def print_run_plan(run_plan: RunPlan, offers_limit: int = 3):
         else "-"
     )
     inactivity_duration = None
-    if is_core_model_instance(run_plan.run_spec.configuration, DevEnvironmentConfiguration):
+    if isinstance(run_plan.run_spec.configuration, DevEnvironmentConfiguration):
         inactivity_duration = "-"
         if isinstance(run_plan.run_spec.configuration.inactivity_duration, int):
             inactivity_duration = format_pretty_duration(

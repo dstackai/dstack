@@ -7,7 +7,6 @@ from sqlalchemy.orm import joinedload
 
 import dstack._internal.server.services.jobs as jobs_services
 from dstack._internal.core.consts import DSTACK_RUNNER_SSH_PORT
-from dstack._internal.core.models.common import is_core_model_instance
 from dstack._internal.core.models.configurations import ServiceConfiguration
 from dstack._internal.core.models.instances import RemoteConnectionInfo, SSHConnectionParams
 from dstack._internal.core.models.runs import (
@@ -64,7 +63,7 @@ class ServerProxyRepo(BaseProxyRepo):
             return None
         run = jobs[0].run
         run_spec = RunSpec.__response__.parse_raw(run.run_spec)
-        if not is_core_model_instance(run_spec.configuration, ServiceConfiguration):
+        if not isinstance(run_spec.configuration, ServiceConfiguration):
             return None
         replicas = []
         for job in jobs:

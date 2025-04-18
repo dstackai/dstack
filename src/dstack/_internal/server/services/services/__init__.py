@@ -18,7 +18,6 @@ from dstack._internal.core.errors import (
     ServerClientError,
     SSHError,
 )
-from dstack._internal.core.models.common import is_core_model_instance
 from dstack._internal.core.models.configurations import SERVICE_HTTPS_DEFAULT, ServiceConfiguration
 from dstack._internal.core.models.gateways import GatewayConfiguration, GatewayStatus
 from dstack._internal.core.models.instances import SSHConnectionParams
@@ -38,7 +37,7 @@ logger = get_logger(__name__)
 
 
 async def register_service(session: AsyncSession, run_model: RunModel, run_spec: RunSpec):
-    assert is_core_model_instance(run_spec.configuration, ServiceConfiguration)
+    assert isinstance(run_spec.configuration, ServiceConfiguration)
 
     if isinstance(run_spec.configuration.gateway, str):
         gateway = await get_project_gateway_model_by_name(

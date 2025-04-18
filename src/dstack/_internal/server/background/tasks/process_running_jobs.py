@@ -10,7 +10,7 @@ from sqlalchemy.orm import joinedload
 from dstack._internal.core.consts import DSTACK_RUNNER_HTTP_PORT, DSTACK_SHIM_HTTP_PORT
 from dstack._internal.core.errors import GatewayError
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.common import NetworkMode, RegistryAuth, is_core_model_instance
+from dstack._internal.core.models.common import NetworkMode, RegistryAuth
 from dstack._internal.core.models.configurations import DevEnvironmentConfiguration
 from dstack._internal.core.models.instances import (
     InstanceStatus,
@@ -422,9 +422,9 @@ def _process_provisioning_with_shim(
     volume_mounts: List[VolumeMountPoint] = []
     instance_mounts: List[InstanceMountPoint] = []
     for mount in run.run_spec.configuration.volumes:
-        if is_core_model_instance(mount, VolumeMountPoint):
+        if isinstance(mount, VolumeMountPoint):
             volume_mounts.append(mount.copy())
-        elif is_core_model_instance(mount, InstanceMountPoint):
+        elif isinstance(mount, InstanceMountPoint):
             instance_mounts.append(mount)
         else:
             assert False, f"unexpected mount point: {mount!r}"
@@ -657,7 +657,7 @@ def _terminate_if_inactivity_duration_exceeded(
     run_model: RunModel, job_model: JobModel, no_connections_secs: Optional[int]
 ) -> None:
     conf = RunSpec.__response__.parse_raw(run_model.run_spec).configuration
-    if not is_core_model_instance(conf, DevEnvironmentConfiguration) or not isinstance(
+    if not isinstance(conf, DevEnvironmentConfiguration) or not isinstance(
         conf.inactivity_duration, int
     ):
         # reset in case inactivity_duration was disabled via in-place update

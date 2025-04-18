@@ -28,7 +28,7 @@ from dstack._internal.core.backends.base.compute import (
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.errors import ComputeError, NoCapacityError, PlacementGroupInUseError
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.common import CoreModel, is_core_model_instance
+from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.gateways import (
     GatewayComputeConfiguration,
     GatewayProvisioningData,
@@ -79,7 +79,7 @@ class AWSCompute(
     def __init__(self, config: AWSConfig):
         super().__init__()
         self.config = config
-        if is_core_model_instance(config.creds, AWSAccessKeyCreds):
+        if isinstance(config.creds, AWSAccessKeyCreds):
             self.session = boto3.Session(
                 aws_access_key_id=config.creds.access_key,
                 aws_secret_access_key=config.creds.secret_key,

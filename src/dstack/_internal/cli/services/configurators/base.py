@@ -5,7 +5,6 @@ from typing import List, Optional, Union, cast
 
 from dstack._internal.cli.services.args import env_var
 from dstack._internal.core.errors import ConfigurationError
-from dstack._internal.core.models.common import is_core_model_instance
 from dstack._internal.core.models.configurations import (
     AnyApplyConfiguration,
     ApplyConfigurationType,
@@ -100,7 +99,7 @@ class ApplyEnvVarsConfiguratorMixin:
         for k, v in cast(List[EnvVarTuple], configurator_args.env_vars):
             env[k] = v
         for k, v in env.items():
-            if is_core_model_instance(v, EnvSentinel):
+            if isinstance(v, EnvSentinel):
                 try:
                     env[k] = v.from_env(os.environ)
                 except ValueError as e:

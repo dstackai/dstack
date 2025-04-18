@@ -7,7 +7,7 @@ from cachetools import TTLCache, cached
 
 import dstack.version as version
 from dstack._internal.core.errors import DockerRegistryError, ServerClientError
-from dstack._internal.core.models.common import RegistryAuth, is_core_model_instance
+from dstack._internal.core.models.common import RegistryAuth
 from dstack._internal.core.models.configurations import (
     PortMapping,
     PythonVersion,
@@ -274,7 +274,7 @@ def interpolate_job_volumes(
         if isinstance(mount_point, str):
             # pydantic validator ensures strings are converted to MountPoint
             continue
-        if not is_core_model_instance(mount_point, VolumeMountPoint):
+        if not isinstance(mount_point, VolumeMountPoint):
             job_volumes.append(mount_point.copy())
             continue
         if isinstance(mount_point.name, str):

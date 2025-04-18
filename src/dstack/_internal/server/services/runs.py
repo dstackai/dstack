@@ -15,7 +15,7 @@ from dstack._internal.core.errors import (
     ResourceNotExistsError,
     ServerClientError,
 )
-from dstack._internal.core.models.common import ApplyAction, is_core_model_instance
+from dstack._internal.core.models.common import ApplyAction
 from dstack._internal.core.models.configurations import AnyRunConfiguration
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
@@ -748,7 +748,7 @@ async def _generate_run_name(
 
 def check_run_spec_requires_instance_mounts(run_spec: RunSpec) -> bool:
     return any(
-        is_core_model_instance(mp, InstanceMountPoint) and not mp.optional
+        isinstance(mp, InstanceMountPoint) and not mp.optional
         for mp in run_spec.configuration.volumes
     )
 
