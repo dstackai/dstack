@@ -249,7 +249,7 @@ class ProfileParams(CoreModel):
         Field(
             description=(
                 "The custom tags to associate with the resource."
-                " The tags also propagated to the underlying backend resources."
+                " The tags are also propagated to the underlying backend resources."
                 " If there is a conflict with backend-level tags, does not override them"
             )
         ),
