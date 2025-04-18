@@ -402,6 +402,7 @@ async def create_fleet_instance_model(
         placement_group_name=placement_group_name,
         reservation=reservation,
         blocks=spec.configuration.blocks,
+        tags=spec.configuration.tags,
     )
     return instance_model
 

@@ -173,6 +173,7 @@ class ComputeWithCreateInstanceSupport(ABC):
             ssh_keys=[SSHKey(public=project_ssh_public_key.strip())],
             volumes=volumes,
             reservation=run.run_spec.configuration.reservation,
+            tags=run.run_spec.merged_profile.tags,
         )
         instance_offer = instance_offer.copy()
         self._restrict_instance_offer_az_to_volumes_az(instance_offer, volumes)
@@ -692,9 +693,18 @@ def get_dstack_gateway_commands() -> List[str]:
     ]
 
 
-def merge_tags(tags: Dict[str, str], backend_tags: Optional[Dict[str, str]]) -> Dict[str, str]:
-    res = tags.copy()
+def merge_tags(
+    base_tags: Dict[str, str],
+    backend_tags: Optional[Dict[str, str]] = None,
+    resource_tags: Optional[Dict[str, str]] = None,
+) -> Dict[str, str]:
+    res = base_tags.copy()
+    # backend_tags have priority over resource_tags
+    # so that regular users do not override the tags set by admins
     if backend_tags is not None:
         for k, v in backend_tags.items():
+            res.setdefault(k, v)
+    if resource_tags is not None:
+        for k, v in resource_tags.items():
             res.setdefault(k, v)
     return res

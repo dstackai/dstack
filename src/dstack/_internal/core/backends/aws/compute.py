@@ -169,14 +169,19 @@ class AWSCompute(
             raise NoCapacityError("No eligible availability zones")
 
         instance_name = generate_unique_instance_name(instance_config)
-        tags = {
+        base_tags = {
             "Name": instance_name,
             "owner": "dstack",
             "dstack_project": project_name,
             "dstack_name": instance_config.instance_name,
             "dstack_user": instance_config.user,
         }
-        tags = merge_tags(tags=tags, backend_tags=self.config.tags)
+        tags = merge_tags(
+            base_tags=base_tags,
+            backend_tags=self.config.tags,
+            resource_tags=instance_config.tags,
+        )
+        tags = aws_resources.filter_invalid_tags(tags)
 
         disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
         max_efa_interfaces = _get_maximum_efa_interfaces(
@@ -326,15 +331,20 @@ class AWSCompute(
         ec2_client = self.session.client("ec2", region_name=configuration.region)
 
         instance_name = generate_unique_gateway_instance_name(configuration)
-        tags = {
+        base_tags = {
             "Name": instance_name,
             "owner": "dstack",
             "dstack_project": configuration.project_name,
             "dstack_name": configuration.instance_name,
         }
         if settings.DSTACK_VERSION is not None:
-            tags["dstack_version"] = settings.DSTACK_VERSION
-        tags = merge_tags(tags=tags, backend_tags=self.config.tags)
+            base_tags["dstack_version"] = settings.DSTACK_VERSION
+        tags = merge_tags(
+            base_tags=base_tags,
+            backend_tags=self.config.tags,
+            resource_tags=configuration.tags,
+        )
+        tags = aws_resources.filter_invalid_tags(tags)
         tags = aws_resources.make_tags(tags)
 
         vpc_id, subnets_ids = get_vpc_id_subnet_id_or_error(
@@ -522,14 +532,19 @@ class AWSCompute(
         ec2_client = self.session.client("ec2", region_name=volume.configuration.region)
 
         volume_name = generate_unique_volume_name(volume)
-        tags = {
+        base_tags = {
             "Name": volume_name,
             "owner": "dstack",
             "dstack_project": volume.project_name,
             "dstack_name": volume.name,
             "dstack_user": volume.user,
         }
-        tags = merge_tags(tags=tags, backend_tags=self.config.tags)
+        tags = merge_tags(
+            base_tags=base_tags,
+            backend_tags=self.config.tags,
+            resource_tags=volume.configuration.tags,
+        )
+        tags = aws_resources.filter_invalid_tags(tags)
 
         zones = aws_resources.get_availability_zones(
             ec2_client=ec2_client, region=volume.configuration.region

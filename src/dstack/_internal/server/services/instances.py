@@ -1,7 +1,7 @@
 import uuid
 from collections.abc import Container, Iterable
 from datetime import datetime, timezone
-from typing import List, Literal, Optional, Union
+from typing import Dict, List, Literal, Optional, Union
 
 import gpuhunt
 from sqlalchemy import and_, or_, select
@@ -411,6 +411,7 @@ async def create_instance_model(
     placement_group_name: Optional[str],
     reservation: Optional[str],
     blocks: Union[Literal["auto"], int],
+    tags: Optional[Dict[str, str]],
 ) -> InstanceModel:
     termination_policy, termination_idle_time = get_termination(
         profile, DEFAULT_FLEET_TERMINATION_IDLE_TIME
@@ -428,6 +429,7 @@ async def create_instance_model(
         instance_id=str(instance_id),
         placement_group_name=placement_group_name,
         reservation=reservation,
+        tags=tags,
     )
     instance = InstanceModel(
         id=instance_id,

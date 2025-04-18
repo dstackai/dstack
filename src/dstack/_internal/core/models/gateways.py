@@ -1,12 +1,13 @@
 import datetime
 from enum import Enum
-from typing import Optional, Union
+from typing import Dict, Optional, Union
 
-from pydantic import Field
+from pydantic import Field, validator
 from typing_extensions import Annotated, Literal
 
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import CoreModel
+from dstack._internal.utils.tags import tags_validator
 
 
 class GatewayStatus(str, Enum):
@@ -57,6 +58,18 @@ class GatewayConfiguration(CoreModel):
         Optional[AnyGatewayCertificate],
         Field(description="The SSL certificate configuration. Defaults to `type: lets-encrypt`"),
     ] = LetsEncryptGatewayCertificate()
+    tags: Annotated[
+        Optional[Dict[str, str]],
+        Field(
+            description=(
+                "The custom tags to associate with the gateway."
+                " The tags also propagated to the underlying backend resources."
+                " If there is a conflict with backend-level tags, does not override them"
+            )
+        ),
+    ] = None
+
+    _validate_tags = validator("tags", pre=True, allow_reuse=True)(tags_validator)
 
 
 class GatewaySpec(CoreModel):
@@ -88,7 +101,7 @@ class GatewayPlan(CoreModel):
     project_name: str
     user: str
     spec: GatewaySpec
-    current_resource: Optional[Gateway]
+    current_resource: Optional[Gateway] = None
 
 
 class GatewayComputeConfiguration(CoreModel):
@@ -98,7 +111,8 @@ class GatewayComputeConfiguration(CoreModel):
     region: str
     public_ip: bool
     ssh_key_pub: str
-    certificate: Optional[AnyGatewayCertificate]
+    certificate: Optional[AnyGatewayCertificate] = None
+    tags: Optional[Dict[str, str]] = None
 
 
 class GatewayProvisioningData(CoreModel):

@@ -78,6 +78,7 @@ class TestListAndGetGateways:
                     "default": False,
                     "public_ip": True,
                     "certificate": {"type": "lets-encrypt"},
+                    "tags": None,
                 },
             }
         ]
@@ -128,6 +129,7 @@ class TestListAndGetGateways:
                 "default": False,
                 "public_ip": True,
                 "certificate": {"type": "lets-encrypt"},
+                "tags": None,
             },
         }
 
@@ -207,6 +209,7 @@ class TestCreateGateway:
                 "default": True,
                 "public_ip": True,
                 "certificate": {"type": "lets-encrypt"},
+                "tags": None,
             },
         }
 
@@ -258,6 +261,7 @@ class TestCreateGateway:
                 "default": True,
                 "public_ip": True,
                 "certificate": {"type": "lets-encrypt"},
+                "tags": None,
             },
         }
 
@@ -385,6 +389,7 @@ class TestDefaultGateway:
                 "default": True,
                 "public_ip": True,
                 "certificate": {"type": "lets-encrypt"},
+                "tags": None,
             },
         }
 
@@ -506,6 +511,7 @@ class TestDeleteGateway:
                     "default": False,
                     "public_ip": True,
                     "certificate": {"type": "lets-encrypt"},
+                    "tags": None,
                 },
             }
         ]
@@ -574,6 +580,7 @@ class TestUpdateGateway:
                 "default": False,
                 "public_ip": True,
                 "certificate": {"type": "lets-encrypt"},
+                "tags": None,
             },
         }
 
