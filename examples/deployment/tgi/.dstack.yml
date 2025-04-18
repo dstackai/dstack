@@ -1,17 +1,24 @@
 type: service
-name: llama31
+name: llama4-scout
 
 image: ghcr.io/huggingface/text-generation-inference:latest
+
 env:
   - HF_TOKEN
-  - MODEL_ID=meta-llama/Meta-Llama-3.1-8B-Instruct
-  - MAX_INPUT_LENGTH=4000
-  - MAX_TOTAL_TOKENS=4096
+  - MODEL_ID=meta-llama/Llama-4-Scout-17B-16E-Instruct
+  - MAX_INPUT_LENGTH=8192
+  - MAX_TOTAL_TOKENS=16384
+  # max_batch_prefill_tokens must be >= max_input_tokens
+  - MAX_BATCH_PREFILL_TOKENS=8192
 commands:
-  - NUM_SHARD=$DSTACK_GPUS_NUM text-generation-launcher
+   # Activate the virtual environment at /usr/src/.venv/ 
+   # as required by TGI's latest image.
+   - . /usr/src/.venv/bin/activate
+   - NUM_SHARD=$DSTACK_GPUS_NUM text-generation-launcher
+
 port: 80
 # Register the model
-model: meta-llama/Meta-Llama-3.1-8B-Instruct
+model: meta-llama/Llama-4-Scout-17B-16E-Instruct
 
 # Uncomment to leverage spot instances
 #spot_policy: auto
@@ -21,6 +28,5 @@ model: meta-llama/Meta-Llama-3.1-8B-Instruct
 #  - /data:/data
 
 resources:
-  gpu: 24GB
-  # Uncomment if using multiple GPUs
-  #shm_size: 24GB
+  gpu: H200:2
+  disk: 500GB..
