@@ -13,7 +13,6 @@ from dstack._internal.core.backends.gcp.models import (
     GCPServiceAccountCreds,
 )
 from dstack._internal.core.errors import BackendAuthError
-from dstack._internal.core.models.common import is_core_model_instance
 
 
 def authenticate(creds: AnyGCPCreds, project_id: Optional[str] = None) -> Tuple[Credentials, str]:
@@ -30,7 +29,7 @@ def authenticate(creds: AnyGCPCreds, project_id: Optional[str] = None) -> Tuple[
 
 
 def get_credentials(creds: AnyGCPCreds) -> Tuple[Credentials, Optional[str]]:
-    if is_core_model_instance(creds, GCPServiceAccountCreds):
+    if isinstance(creds, GCPServiceAccountCreds):
         try:
             service_account_info = json.loads(creds.data)
             credentials = service_account.Credentials.from_service_account_info(

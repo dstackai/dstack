@@ -14,7 +14,6 @@ from dstack._internal.core.backends.dstack.models import (
 )
 from dstack._internal.core.backends.models import BackendInfo
 from dstack._internal.core.errors import ForbiddenError, ResourceExistsError, ServerClientError
-from dstack._internal.core.models.common import is_core_model_instance
 from dstack._internal.core.models.projects import Member, MemberPermissions, Project
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.models import MemberModel, ProjectModel, UserModel
@@ -386,7 +385,7 @@ def project_model_to_project(
             backend_config = get_backend_config_from_backend_model(
                 configurator, b, include_creds=False
             )
-            if is_core_model_instance(backend_config, DstackBackendConfig):
+            if isinstance(backend_config, DstackBackendConfig):
                 for backend_type in backend_config.base_backends:
                     backends.append(
                         BackendInfo(

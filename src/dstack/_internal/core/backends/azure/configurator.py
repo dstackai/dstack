@@ -46,7 +46,6 @@ from dstack._internal.core.errors import (
 from dstack._internal.core.models.backends.base import (
     BackendType,
 )
-from dstack._internal.core.models.common import is_core_model_instance
 
 LOCATIONS = [
     ("(US) Central US", "centralus"),
@@ -76,14 +75,14 @@ class AzureConfigurator(Configurator):
     BACKEND_CLASS = AzureBackend
 
     def validate_config(self, config: AzureBackendConfigWithCreds, default_creds_enabled: bool):
-        if is_core_model_instance(config.creds, AzureDefaultCreds) and not default_creds_enabled:
+        if isinstance(config.creds, AzureDefaultCreds) and not default_creds_enabled:
             raise_invalid_credentials_error(fields=[["creds"]])
-        if is_core_model_instance(config.creds, AzureClientCreds):
+        if isinstance(config.creds, AzureClientCreds):
             self._set_client_creds_tenant_id(config.creds, config.tenant_id)
         try:
             credential, _ = auth.authenticate(config.creds)
         except BackendAuthError:
-            if is_core_model_instance(config.creds, AzureClientCreds):
+            if isinstance(config.creds, AzureClientCreds):
                 raise_invalid_credentials_error(
                     fields=[
                         ["creds", "tenant_id"],
@@ -105,7 +104,7 @@ class AzureConfigurator(Configurator):
     ) -> BackendRecord:
         if config.regions is None:
             config.regions = DEFAULT_LOCATIONS
-        if is_core_model_instance(config.creds, AzureClientCreds):
+        if isinstance(config.creds, AzureClientCreds):
             self._set_client_creds_tenant_id(config.creds, config.tenant_id)
         credential, _ = auth.authenticate(config.creds)
         if config.resource_group is None:
