@@ -27,7 +27,6 @@ from dstack._internal.core.errors import ServerClientError
 from dstack._internal.core.models.backends.base import (
     BackendType,
 )
-from dstack._internal.core.models.common import is_core_model_instance
 
 # where dstack images are published
 SUPPORTED_REGIONS = frozenset(
@@ -48,7 +47,7 @@ class OCIConfigurator(Configurator):
     BACKEND_CLASS = OCIBackend
 
     def validate_config(self, config: OCIBackendConfigWithCreds, default_creds_enabled: bool):
-        if is_core_model_instance(config.creds, OCIDefaultCreds) and not default_creds_enabled:
+        if isinstance(config.creds, OCIDefaultCreds) and not default_creds_enabled:
             raise_invalid_credentials_error(
                 fields=[["creds"]],
                 details="Default credentials are forbidden by dstack settings",

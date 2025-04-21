@@ -1,10 +1,10 @@
 import re
 from enum import Enum
-from typing import Any, Type, TypeVar, Union
+from typing import Union
 
 from pydantic import Field
 from pydantic_duality import DualBaseModel
-from typing_extensions import Annotated, TypeGuard
+from typing_extensions import Annotated
 
 
 # DualBaseModel creates two classes for the model:
@@ -74,15 +74,3 @@ class ApplyAction(str, Enum):
 class NetworkMode(str, Enum):
     HOST = "host"
     BRIDGE = "bridge"
-
-
-_CM = TypeVar("_CM", bound=CoreModel)
-
-
-def is_core_model_instance(instance: Any, class_: Type[_CM]) -> TypeGuard[_CM]:
-    """
-    Implements isinstance check for CoreModel such that
-    models parsed with MyModel.__response__ pass the check against MyModel.
-    See https://github.com/dstackai/dstack/issues/1124
-    """
-    return isinstance(instance, class_) or isinstance(instance, class_.__response__)

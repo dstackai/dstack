@@ -24,7 +24,6 @@ from dstack._internal.core.errors import BackendAuthError, BackendError, ServerC
 from dstack._internal.core.models.backends.base import (
     BackendType,
 )
-from dstack._internal.core.models.common import is_core_model_instance
 
 LOCATIONS = [
     {
@@ -115,7 +114,7 @@ class GCPConfigurator(Configurator):
     BACKEND_CLASS = GCPBackend
 
     def validate_config(self, config: GCPBackendConfigWithCreds, default_creds_enabled: bool):
-        if is_core_model_instance(config.creds, GCPDefaultCreds) and not default_creds_enabled:
+        if isinstance(config.creds, GCPDefaultCreds) and not default_creds_enabled:
             raise_invalid_credentials_error(fields=[["creds"]])
         try:
             credentials, _ = auth.authenticate(creds=config.creds, project_id=config.project_id)
@@ -123,7 +122,7 @@ class GCPConfigurator(Configurator):
             details = None
             if len(e.args) > 0:
                 details = e.args[0]
-            if is_core_model_instance(config.creds, GCPServiceAccountCreds):
+            if isinstance(config.creds, GCPServiceAccountCreds):
                 raise_invalid_credentials_error(fields=[["creds", "data"]], details=details)
             else:
                 raise_invalid_credentials_error(fields=[["creds"]], details=details)

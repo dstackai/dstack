@@ -4,7 +4,7 @@ from typing import Dict, Iterable, Iterator, List, Mapping, NamedTuple, Tuple, U
 from pydantic import BaseModel, Field, validator
 from typing_extensions import Annotated, Self
 
-from dstack._internal.core.models.common import CoreModel, is_core_model_instance
+from dstack._internal.core.models.common import CoreModel
 
 # VAR_NAME=VALUE, VAR_NAME=, or VAR_NAME
 _ENV_STRING_REGEX = r"^([a-zA-Z_][a-zA-Z0-9_]*)(=.*$|$)"
@@ -118,7 +118,7 @@ class Env(BaseModel):
         unresolved: List[str] = []
         dct: Dict[str, str] = {}
         for k, v in self.items():
-            if is_core_model_instance(v, EnvSentinel):
+            if isinstance(v, EnvSentinel):
                 unresolved.append(k)
             else:
                 # cast is required since TypeGuard is for positive cases only

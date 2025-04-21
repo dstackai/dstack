@@ -15,7 +15,6 @@ from dstack._internal.core.errors import (
     ResourceExistsError,
     ServerClientError,
 )
-from dstack._internal.core.models.common import is_core_model_instance
 from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.fleets import (
     Fleet,
@@ -630,7 +629,7 @@ def _validate_fleet_spec(spec: FleetSpec):
         if spec.configuration.ssh_config.ssh_key is not None:
             _validate_ssh_key(spec.configuration.ssh_config.ssh_key)
         for host in spec.configuration.ssh_config.hosts:
-            if is_core_model_instance(host, SSHHostParams) and host.ssh_key is not None:
+            if isinstance(host, SSHHostParams) and host.ssh_key is not None:
                 _validate_ssh_key(host.ssh_key)
         _validate_internal_ips(spec.configuration.ssh_config)
 
