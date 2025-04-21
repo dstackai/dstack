@@ -104,11 +104,14 @@ class Volume(CoreModel):
     configuration: VolumeConfiguration
     external: bool
     created_at: datetime
+    last_processed_at: datetime
     status: VolumeStatus
     status_message: Optional[str] = None
     deleted: bool
+    deleted_at: Optional[datetime] = None
     volume_id: Optional[str] = None  # id of the volume in the cloud
     provisioning_data: Optional[VolumeProvisioningData] = None
+    cost: float = 0
     attachments: Optional[List[VolumeAttachment]] = None
     # attachment_data is deprecated in favor of attachments.
     # It's only set for volumes that were attached before attachments.
