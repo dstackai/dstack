@@ -26,6 +26,7 @@ class GetRunRequest(CoreModel):
 
 class GetRunPlanRequest(CoreModel):
     run_spec: RunSpec
+    max_offers: int = Field(50, ge=1, le=1000)
 
 
 class SubmitRunRequest(CoreModel):

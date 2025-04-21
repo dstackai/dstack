@@ -275,6 +275,7 @@ async def get_plan(
     project: ProjectModel,
     user: UserModel,
     run_spec: RunSpec,
+    max_offers: int = 50,
 ) -> RunPlan:
     _validate_run_spec_and_set_defaults(run_spec)
 
@@ -342,7 +343,7 @@ async def get_plan(
 
         job_plan = JobPlan(
             job_spec=job_spec,
-            offers=job_offers[:50],
+            offers=job_offers[:max_offers],
             total_offers=len(job_offers),
             max_price=max((offer.price for offer in job_offers), default=None),
         )

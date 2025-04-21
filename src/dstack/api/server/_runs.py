@@ -53,8 +53,8 @@ class RunsAPIClient(APIClientGroup):
         resp = self._request(f"/api/project/{project_name}/runs/get", body=json_body)
         return parse_obj_as(Run.__response__, resp.json())
 
-    def get_plan(self, project_name: str, run_spec: RunSpec) -> RunPlan:
-        body = GetRunPlanRequest(run_spec=run_spec)
+    def get_plan(self, project_name: str, run_spec: RunSpec, max_offers: int = 50) -> RunPlan:
+        body = GetRunPlanRequest(run_spec=run_spec, max_offers=max_offers)
         resp = self._request(
             f"/api/project/{project_name}/runs/get_plan",
             body=body.json(exclude=_get_run_spec_excludes(run_spec)),
