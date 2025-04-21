@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
 from sqlalchemy import and_, func, or_, select, update
@@ -309,22 +309,29 @@ def volume_model_to_volume(volume_model: VolumeModel) -> Volume:
                 attachment_data=get_attachment_data(volume_attachment_model),
             )
         )
-    return Volume(
+    deleted_at = None
+    if volume_model.deleted_at is not None:
+        deleted_at = volume_model.deleted_at.replace(tzinfo=timezone.utc)
+    volume = Volume(
         name=volume_model.name,
         project_name=volume_model.project.name,
         user=volume_model.user.name,
         configuration=configuration,
         external=configuration.volume_id is not None,
         created_at=volume_model.created_at.replace(tzinfo=timezone.utc),
+        last_processed_at=volume_model.last_processed_at.replace(tzinfo=timezone.utc),
         status=volume_model.status,
         status_message=volume_model.status_message,
         deleted=volume_model.deleted,
+        deleted_at=deleted_at,
         volume_id=vpd.volume_id if vpd is not None else None,
         provisioning_data=vpd,
         attachments=attachments,
         attachment_data=vad,
         id=volume_model.id,
     )
+    volume.cost = _get_volume_cost(volume)
+    return volume
 
 
 def get_volume_configuration(volume_model: VolumeModel) -> VolumeConfiguration:
@@ -416,4 +423,24 @@ async def _delete_volume(session: AsyncSession, project: ProjectModel, volume_mo
     await common.run_async(
         compute.delete_volume,
         volume=volume,
+    )
+
+
+# Clouds charge volumes assuming 30-day months, e.g. https://aws.amazon.com/ebs/pricing/
+_VOLUME_PRICING_PERIOD = timedelta(days=30)
+
+
+def _get_volume_cost(volume: Volume) -> float:
+    if volume.provisioning_data is None or volume.provisioning_data.price is None:
+        return 0.0
+    finished_at = common.get_current_datetime()
+    if volume.deleted_at:
+        finished_at = volume.deleted_at
+    elif not volume.status.is_active():
+        finished_at = volume.last_processed_at
+    volume_age = finished_at - volume.created_at
+    return (
+        volume_age.total_seconds()
+        * volume.provisioning_data.price
+        / _VOLUME_PRICING_PERIOD.total_seconds()
     )

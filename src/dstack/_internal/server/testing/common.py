@@ -692,6 +692,7 @@ async def create_volume(
     user: UserModel,
     status: VolumeStatus = VolumeStatus.SUBMITTED,
     created_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+    last_processed_at: Optional[datetime] = None,
     configuration: Optional[VolumeConfiguration] = None,
     volume_provisioning_data: Optional[VolumeProvisioningData] = None,
     deleted_at: Optional[datetime] = None,
@@ -700,12 +701,15 @@ async def create_volume(
 ) -> VolumeModel:
     if configuration is None:
         configuration = get_volume_configuration(backend=backend, region=region)
+    if last_processed_at is None:
+        last_processed_at = created_at
     vm = VolumeModel(
         project=project,
         user_id=user.id,
         name=configuration.name,
         status=status,
         created_at=created_at,
+        last_processed_at=last_processed_at,
         configuration=configuration.json(),
         volume_provisioning_data=volume_provisioning_data.json()
         if volume_provisioning_data
@@ -727,9 +731,11 @@ def get_volume(
     configuration: Optional[VolumeConfiguration] = None,
     external: bool = False,
     created_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+    last_processed_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
     status: VolumeStatus = VolumeStatus.ACTIVE,
     status_message: Optional[str] = None,
     deleted: bool = False,
+    deleted_at: Optional[datetime] = None,
     volume_id: Optional[str] = None,
     provisioning_data: Optional[VolumeProvisioningData] = None,
     attachments: Optional[List[VolumeAttachment]] = None,
@@ -748,9 +754,11 @@ def get_volume(
         configuration=configuration,
         external=external,
         created_at=created_at,
+        last_processed_at=last_processed_at,
         status=status,
         status_message=status_message,
         deleted=deleted,
+        deleted_at=deleted_at,
         volume_id=volume_id,
         provisioning_data=provisioning_data,
         attachments=attachments,
@@ -777,6 +785,7 @@ def get_volume_provisioning_data(
     volume_id: str = "vol-1234",
     size_gb: int = 100,
     availability_zone: Optional[str] = None,
+    price: Optional[float] = 1.0,
     backend_data: Optional[str] = None,
     backend: Optional[BackendType] = None,
 ) -> VolumeProvisioningData:
@@ -785,6 +794,7 @@ def get_volume_provisioning_data(
         volume_id=volume_id,
         size_gb=size_gb,
         availability_zone=availability_zone,
+        price=price,
         backend_data=backend_data,
     )
 
