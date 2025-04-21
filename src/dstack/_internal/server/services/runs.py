@@ -92,6 +92,8 @@ JOB_TERMINATION_REASONS_TO_RETRY = {
     JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
 }
 
+DEFAULT_MAX_OFFERS = 50
+
 
 async def list_user_runs(
     session: AsyncSession,
@@ -275,7 +277,7 @@ async def get_plan(
     project: ProjectModel,
     user: UserModel,
     run_spec: RunSpec,
-    max_offers: int = 50,
+    max_offers: Optional[int],
 ) -> RunPlan:
     _validate_run_spec_and_set_defaults(run_spec)
 
@@ -343,7 +345,7 @@ async def get_plan(
 
         job_plan = JobPlan(
             job_spec=job_spec,
-            offers=job_offers[:max_offers],
+            offers=job_offers[: (max_offers or DEFAULT_MAX_OFFERS)],
             total_offers=len(job_offers),
             max_price=max((offer.price for offer in job_offers), default=None),
         )
