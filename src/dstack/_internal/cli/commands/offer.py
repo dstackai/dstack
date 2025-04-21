@@ -69,7 +69,7 @@ class OfferCommand(APIBaseCommand):
         if args.format == "json":
             run_spec = RunSpec(
                 configuration=conf,
-                ssh_key_pub=Path(self.api.ssh_identity_file + ".pub").read_text().strip(),
+                ssh_key_pub="(dummy)",
                 profile=profile,
             )
             run_plan = self.api.client.runs.get_plan(
@@ -81,7 +81,7 @@ class OfferCommand(APIBaseCommand):
             with console.status("Getting offers..."):
                 run_spec = RunSpec(
                     configuration=conf,
-                    ssh_key_pub=Path(self.api.ssh_identity_file + ".pub").read_text().strip(),
+                    ssh_key_pub="(dummy)",
                     profile=profile,
                 )
                 run_plan = self.api.client.runs.get_plan(
