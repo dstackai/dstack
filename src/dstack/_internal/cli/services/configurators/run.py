@@ -92,7 +92,7 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
                 profile=profile,
             )
 
-        print_run_plan(run_plan, offers_limit=configurator_args.max_offers)
+        print_run_plan(run_plan, max_offers=configurator_args.max_offers)
 
         confirm_message = "Submit a new run?"
         stop_run_name = None

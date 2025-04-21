@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Optional, Union
 
 from rich.markup import escape
 from rich.table import Table
@@ -24,7 +24,9 @@ from dstack._internal.utils.common import (
 from dstack.api import Run
 
 
-def print_run_plan(run_plan: RunPlan, offers_limit: int = 3):
+def print_run_plan(
+    run_plan: RunPlan, max_offers: Optional[int] = None, include_run_properties: bool = True
+):
     job_plan = run_plan.job_plans[0]
 
     props = Table(box=None, show_header=False)
@@ -39,29 +41,30 @@ def print_run_plan(run_plan: RunPlan, offers_limit: int = 3):
         if job_plan.job_spec.max_duration
         else "-"
     )
-    inactivity_duration = None
-    if isinstance(run_plan.run_spec.configuration, DevEnvironmentConfiguration):
-        inactivity_duration = "-"
-        if isinstance(run_plan.run_spec.configuration.inactivity_duration, int):
-            inactivity_duration = format_pretty_duration(
-                run_plan.run_spec.configuration.inactivity_duration
-            )
-    if job_plan.job_spec.retry is None:
-        retry = "-"
-    else:
-        retry = escape(job_plan.job_spec.retry.pretty_format())
+    if include_run_properties:
+        inactivity_duration = None
+        if isinstance(run_plan.run_spec.configuration, DevEnvironmentConfiguration):
+            inactivity_duration = "-"
+            if isinstance(run_plan.run_spec.configuration.inactivity_duration, int):
+                inactivity_duration = format_pretty_duration(
+                    run_plan.run_spec.configuration.inactivity_duration
+                )
+        if job_plan.job_spec.retry is None:
+            retry = "-"
+        else:
+            retry = escape(job_plan.job_spec.retry.pretty_format())
 
-    profile = run_plan.run_spec.merged_profile
-    creation_policy = profile.creation_policy
-    # FIXME: This assumes the default idle_duration is the same for client and server.
-    # If the server changes idle_duration, old clients will see incorrect value.
-    termination_policy, termination_idle_time = get_termination(
-        profile, DEFAULT_RUN_TERMINATION_IDLE_TIME
-    )
-    if termination_policy == TerminationPolicy.DONT_DESTROY:
-        idle_duration = "-"
-    else:
-        idle_duration = format_pretty_duration(termination_idle_time)
+        profile = run_plan.run_spec.merged_profile
+        creation_policy = profile.creation_policy
+        # FIXME: This assumes the default idle_duration is the same for client and server.
+        # If the server changes idle_duration, old clients will see incorrect value.
+        termination_policy, termination_idle_time = get_termination(
+            profile, DEFAULT_RUN_TERMINATION_IDLE_TIME
+        )
+        if termination_policy == TerminationPolicy.DONT_DESTROY:
+            idle_duration = "-"
+        else:
+            idle_duration = format_pretty_duration(termination_idle_time)
 
     if req.spot is None:
         spot_policy = "auto"
@@ -76,29 +79,31 @@ def print_run_plan(run_plan: RunPlan, offers_limit: int = 3):
     props.add_row(th("Project"), run_plan.project_name)
     props.add_row(th("User"), run_plan.user)
     props.add_row(th("Configuration"), run_plan.run_spec.configuration_path)
-    props.add_row(th("Type"), run_plan.run_spec.configuration.type)
+    if include_run_properties:
+        props.add_row(th("Type"), run_plan.run_spec.configuration.type)
     props.add_row(th("Resources"), pretty_req)
     props.add_row(th("Max price"), max_price)
     props.add_row(th("Max duration"), max_duration)
-    if inactivity_duration is not None:  # None means n/a
+    if include_run_properties and inactivity_duration is not None:  # None means n/a
         props.add_row(th("Inactivity duration"), inactivity_duration)
     props.add_row(th("Spot policy"), spot_policy)
-    props.add_row(th("Retry policy"), retry)
-    props.add_row(th("Creation policy"), creation_policy)
-    props.add_row(th("Idle duration"), idle_duration)
+    if include_run_properties:
+        props.add_row(th("Retry policy"), retry)
+        props.add_row(th("Creation policy"), creation_policy)
+        props.add_row(th("Idle duration"), idle_duration)
     props.add_row(th("Reservation"), run_plan.run_spec.configuration.reservation or "-")
 
     offers = Table(box=None)
     offers.add_column("#")
     offers.add_column("BACKEND")
     offers.add_column("REGION")
-    offers.add_column("INSTANCE")
+    offers.add_column("INSTANCE TYPE")
     offers.add_column("RESOURCES")
     offers.add_column("SPOT")
     offers.add_column("PRICE")
     offers.add_column()
 
-    job_plan.offers = job_plan.offers[:offers_limit]
+    job_plan.offers = job_plan.offers[:max_offers] if max_offers else job_plan.offers
 
     for i, offer in enumerate(job_plan.offers, start=1):
         r = offer.instance.resources

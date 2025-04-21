@@ -3,18 +3,16 @@ import contextlib
 import json
 from pathlib import Path
 
-from rich.table import Table
-
 from dstack._internal.cli.commands import APIBaseCommand
 from dstack._internal.cli.services.configurators.run import (
     BaseRunConfigurator,
 )
 from dstack._internal.cli.utils.common import console
+from dstack._internal.cli.utils.run import print_run_plan
 from dstack._internal.core.models.configurations import (
     ApplyConfigurationType,
     TaskConfiguration,
 )
-from dstack._internal.core.models.instances import InstanceAvailability
 from dstack._internal.core.models.runs import RunSpec
 from dstack.api.utils import load_profile
 
@@ -113,72 +111,5 @@ class OfferCommand(APIBaseCommand):
 
             print(json.dumps(output, indent=2))
             return
-
-        props = Table(box=None, show_header=False)
-        props.add_column(no_wrap=True)  # key
-        props.add_column()  # value
-
-        req = job_plan.job_spec.requirements
-        pretty_req = req.pretty_format(resources_only=True)
-        max_price = f"${req.max_price:g}" if req.max_price else "-"
-        profile = run_plan.run_spec.merged_profile
-        if req.spot is None:
-            spot_policy = "auto"
-        elif req.spot:
-            spot_policy = "spot"
         else:
-            spot_policy = "on-demand"
-
-        def th(s: str) -> str:
-            return f"[bold]{s}[/bold]"
-
-        props.add_row(th("Project"), run_plan.project_name)
-        props.add_row(th("User"), run_plan.user)
-        props.add_row(th("Resources"), pretty_req)
-        props.add_row(th("Max price"), max_price)
-        props.add_row(th("Spot policy"), spot_policy)
-        props.add_row(th("Reservation"), run_plan.run_spec.configuration.reservation or "-")
-        console.print(props)
-        console.print()
-
-        table = Table(box=None)
-        table.add_column("#")
-        table.add_column("BACKEND")
-        table.add_column("REGION")
-        table.add_column("RESOURCES")
-        table.add_column("SPOT")
-        table.add_column("PRICE", justify="right")
-        table.add_column("")
-
-        offers = run_plan.job_plans[0].offers
-        for i, offer in enumerate(offers, 1):
-            price = f"${offer.price:.3f}"
-            availability = ""
-            if offer.availability in {
-                InstanceAvailability.NOT_AVAILABLE,
-                InstanceAvailability.NO_QUOTA,
-                InstanceAvailability.IDLE,
-                InstanceAvailability.BUSY,
-            }:
-                availability = offer.availability.value.replace("_", " ").lower()
-
-            # TODO: rename `remote` to `ssh` everywhere
-            table.add_row(
-                str(i),
-                "ssh" if offer.backend.value == "remote" else offer.backend.value,
-                offer.region,
-                offer.instance.resources.pretty_format(),
-                "yes" if offer.instance.resources.spot else "no",
-                price,
-                availability,
-            )
-
-        if job_plan.total_offers > len(job_plan.offers):
-            table.add_row("", "...", style="secondary")
-        console.print(table)
-        if job_plan.total_offers > len(job_plan.offers):
-            console.print(
-                f"[secondary]Shown {len(job_plan.offers)} of {job_plan.total_offers} offers, "
-                f"${job_plan.max_price:g} max[/]"
-            )
-        console.print()
+            print_run_plan(run_plan, include_run_properties=False)
