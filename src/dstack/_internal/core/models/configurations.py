@@ -1,6 +1,7 @@
 import re
 from collections import Counter
 from enum import Enum
+from pathlib import PurePosixPath
 from typing import Any, Dict, List, Optional, Union
 
 from pydantic import Field, ValidationError, conint, constr, root_validator, validator
@@ -210,6 +211,16 @@ class BaseRunConfiguration(CoreModel):
         Env,
         Field(description="The mapping or the list of environment variables"),
     ] = Env()
+    shell: Annotated[
+        Optional[str],
+        Field(
+            description=(
+                "The shell used to run commands."
+                " Allowed values are `sh`, `bash`, or an absolute path, e.g., `/usr/bin/zsh`."
+                " Defaults to `/bin/sh` if the `image` is specified, `/bin/bash` otherwise"
+            )
+        ),
+    ] = None
     # deprecated since 0.18.31; task, service -- no effect; dev-environment -- executed right before `init`
     setup: CommandsList = []
     resources: Annotated[
@@ -244,6 +255,17 @@ class BaseRunConfiguration(CoreModel):
         UnixUser.parse(v)
         return v
 
+    @validator("shell")
+    def validate_shell(cls, v) -> Optional[str]:
+        if v is None:
+            return None
+        if v in ["sh", "bash"]:
+            return v
+        path = PurePosixPath(v)
+        if path.is_absolute():
+            return v
+        raise ValueError("The value must be `sh`, `bash`, or an absolute path")
+
 
 class BaseRunConfigurationWithPorts(BaseRunConfiguration):
     ports: Annotated[
@@ -261,7 +283,7 @@ class BaseRunConfigurationWithPorts(BaseRunConfiguration):
 
 
 class BaseRunConfigurationWithCommands(BaseRunConfiguration):
-    commands: Annotated[CommandsList, Field(description="The bash commands to run")] = []
+    commands: Annotated[CommandsList, Field(description="The shell commands to run")] = []
 
     @root_validator
     def check_image_or_commands_present(cls, values):
@@ -276,7 +298,7 @@ class DevEnvironmentConfigurationParams(CoreModel):
         Field(description="The IDE to run. Supported values include `vscode` and `cursor`"),
     ]
     version: Annotated[Optional[str], Field(description="The version of the IDE")] = None
-    init: Annotated[CommandsList, Field(description="The bash commands to run on startup")] = []
+    init: Annotated[CommandsList, Field(description="The shell commands to run on startup")] = []
     inactivity_duration: Annotated[
         Optional[Union[Literal["off"], int, bool, str]],
         Field(

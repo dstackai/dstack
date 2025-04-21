@@ -52,6 +52,26 @@ class TestParseConfiguration:
                 )
             )
 
+    @pytest.mark.parametrize("shell", [None, "sh", "bash", "/usr/bin/zsh"])
+    def test_shell_valid(self, shell: Optional[str]):
+        conf = {
+            "type": "task",
+            "shell": shell,
+            "commands": ["sleep inf"],
+        }
+        assert parse_run_configuration(conf).shell == shell
+
+    def test_shell_invalid(self):
+        conf = {
+            "type": "task",
+            "shell": "zsh",
+            "commands": ["sleep inf"],
+        }
+        with pytest.raises(
+            ConfigurationError, match="The value must be `sh`, `bash`, or an absolute path"
+        ):
+            parse_run_configuration(conf)
+
 
 def test_registry_auth_hashable():
     """
