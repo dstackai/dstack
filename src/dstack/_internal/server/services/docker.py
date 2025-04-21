@@ -91,8 +91,7 @@ def get_image_config(image_name: str, registry_auth: Optional[RegistryAuth]) -> 
             config_resp = join_byte_stream_checked(config_stream, MAX_CONFIG_OBJECT_SIZE)
             if config_resp is None:
                 raise DockerRegistryError(
-                    "Image config object exceeds the size limit of "
-                    f"{MAX_CONFIG_OBJECT_SIZE} bytes"
+                    f"Image config object exceeds the size limit of {MAX_CONFIG_OBJECT_SIZE} bytes"
                 )
             return ImageConfigObject.__response__.parse_raw(config_resp)
 
