@@ -260,7 +260,7 @@ class RunpodCompute(
 
 
 def _get_docker_args(authorized_keys: List[str]) -> str:
-    commands = get_docker_commands(authorized_keys, False)
+    commands = get_docker_commands(authorized_keys)
     command = " && ".join(commands)
     docker_args = {"cmd": [command], "entrypoint": ["/bin/sh", "-c"]}
     docker_args_escaped = json.dumps(json.dumps(docker_args)).strip('"')
