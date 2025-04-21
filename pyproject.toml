@@ -82,7 +82,7 @@ dev = [
     "requests-mock>=1.12.1",
     "openai>=1.68.2",
     "freezegun>=1.5.1",
-    "ruff>=0.11.2",
+    "ruff==0.11.6",  # should match .pre-commit-config.yaml
     "testcontainers>=4.9.2",
     "pytest-xdist>=3.6.1",
 ]

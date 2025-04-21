@@ -420,8 +420,7 @@ def find_image_in_regions(
         )
         if image is None:
             raise ScriptError(
-                f"Image {image_name} does not exist is {region_name}, "
-                f"compartment {compartment_id}"
+                f"Image {image_name} does not exist is {region_name}, compartment {compartment_id}"
             )
         images[region_name] = image
     return images
