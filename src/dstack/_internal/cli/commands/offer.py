@@ -1,4 +1,5 @@
 import argparse
+import contextlib
 import json
 from pathlib import Path
 
@@ -66,29 +67,21 @@ class OfferCommand(APIBaseCommand):
         configurator.apply_args(conf, args, [])
         profile = load_profile(Path.cwd(), profile_name=args.profile)
 
-        if args.format == "json":
-            run_spec = RunSpec(
-                configuration=conf,
-                ssh_key_pub="(dummy)",
-                profile=profile,
-            )
+        run_spec = RunSpec(
+            configuration=conf,
+            ssh_key_pub="(dummy)",
+            profile=profile,
+        )
+        if args.format == "plain":
+            status = console.status("Getting offers...")
+        else:
+            status = contextlib.nullcontext()
+        with status:
             run_plan = self.api.client.runs.get_plan(
                 self.api.project,
                 run_spec,
                 max_offers=args.max_offers,
             )
-        else:
-            with console.status("Getting offers..."):
-                run_spec = RunSpec(
-                    configuration=conf,
-                    ssh_key_pub="(dummy)",
-                    profile=profile,
-                )
-                run_plan = self.api.client.runs.get_plan(
-                    self.api.project,
-                    run_spec,
-                    max_offers=args.max_offers,
-                )
 
         job_plan = run_plan.job_plans[0]
 
@@ -101,18 +94,10 @@ class OfferCommand(APIBaseCommand):
                 "spot": run_spec.configuration.spot_policy,
                 "reservation": run_plan.run_spec.configuration.reservation,
                 "offers": [],
+                "total_offers": job_plan.total_offers,
             }
 
             for offer in job_plan.offers:
-                availability = None
-                if offer.availability in {
-                    InstanceAvailability.NOT_AVAILABLE,
-                    InstanceAvailability.NO_QUOTA,
-                    InstanceAvailability.IDLE,
-                    InstanceAvailability.BUSY,
-                }:
-                    availability = offer.availability.value
-
                 output["offers"].append(
                     {
                         "backend": (
@@ -122,7 +107,7 @@ class OfferCommand(APIBaseCommand):
                         "resources": offer.instance.resources.dict(),
                         "spot": offer.instance.resources.spot,
                         "price": float(offer.price),
-                        "availability": availability,
+                        "availability": offer.availability.value,
                     }
                 )
 
