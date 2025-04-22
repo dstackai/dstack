@@ -30,7 +30,7 @@ commands:
 
 resources:
   gpu:
-    # 24GB or more vRAM
+    # 24GB or more VRAM
     memory: 24GB..
     # Two or more GPU
     count: 2..
