@@ -80,6 +80,8 @@ The server can run on your laptop or any environment with access to the cloud an
         
     </div>
 
+To verify that backends are properly configured, use the [`dstack offer`](../reference/cli/dstack/offer.md#list-gpu-offers) command to list available GPU offers.
+
 !!! info "Server deployment"
     For more details on server deployment options, see the
     [Server deployment](../guides/server-deployment.md) guide.
