@@ -102,6 +102,7 @@ class OfferCommand(APIBaseCommand):
                             "ssh" if offer.backend.value == "remote" else offer.backend.value
                         ),
                         "region": offer.region,
+                        "instance_type": offer.instance.name,
                         "resources": offer.instance.resources.dict(),
                         "spot": offer.instance.resources.spot,
                         "price": float(offer.price),
