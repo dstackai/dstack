@@ -53,11 +53,13 @@ class RunsAPIClient(APIClientGroup):
         resp = self._request(f"/api/project/{project_name}/runs/get", body=json_body)
         return parse_obj_as(Run.__response__, resp.json())
 
-    def get_plan(self, project_name: str, run_spec: RunSpec) -> RunPlan:
-        body = GetRunPlanRequest(run_spec=run_spec)
+    def get_plan(
+        self, project_name: str, run_spec: RunSpec, max_offers: Optional[int] = None
+    ) -> RunPlan:
+        body = GetRunPlanRequest(run_spec=run_spec, max_offers=max_offers)
         resp = self._request(
             f"/api/project/{project_name}/runs/get_plan",
-            body=body.json(exclude=_get_run_spec_excludes(run_spec)),
+            body=body.json(exclude=_get_get_plan_excludes(body)),
         )
         return parse_obj_as(RunPlan.__response__, resp.json())
 
@@ -94,6 +96,17 @@ def _get_apply_plan_excludes(plan: ApplyRunPlanInput) -> Optional[Dict]:
     if run_spec_excludes is not None:
         return {"plan": run_spec_excludes}
     return None
+
+
+def _get_get_plan_excludes(request: GetRunPlanRequest) -> Optional[Dict]:
+    """
+    Excludes new fields when they are not set to keep
+    clients backward-compatibility with older servers.
+    """
+    run_spec_excludes = _get_run_spec_excludes(request.run_spec)
+    if request.max_offers is None:
+        run_spec_excludes["max_offers"] = True
+    return run_spec_excludes
 
 
 def _get_run_spec_excludes(run_spec: RunSpec) -> Optional[Dict]:
