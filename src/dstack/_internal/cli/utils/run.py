@@ -78,19 +78,19 @@ def print_run_plan(
 
     props.add_row(th("Project"), run_plan.project_name)
     props.add_row(th("User"), run_plan.user)
-    props.add_row(th("Configuration"), run_plan.run_spec.configuration_path)
     if include_run_properties:
+        props.add_row(th("Configuration"), run_plan.run_spec.configuration_path)
         props.add_row(th("Type"), run_plan.run_spec.configuration.type)
     props.add_row(th("Resources"), pretty_req)
-    props.add_row(th("Max price"), max_price)
-    props.add_row(th("Max duration"), max_duration)
-    if include_run_properties and inactivity_duration is not None:  # None means n/a
-        props.add_row(th("Inactivity duration"), inactivity_duration)
     props.add_row(th("Spot policy"), spot_policy)
+    props.add_row(th("Max price"), max_price)
     if include_run_properties:
         props.add_row(th("Retry policy"), retry)
         props.add_row(th("Creation policy"), creation_policy)
         props.add_row(th("Idle duration"), idle_duration)
+        props.add_row(th("Max duration"), max_duration)
+        if inactivity_duration is not None:  # None means n/a
+            props.add_row(th("Inactivity duration"), inactivity_duration)
     props.add_row(th("Reservation"), run_plan.run_spec.configuration.reservation or "-")
 
     offers = Table(box=None)
