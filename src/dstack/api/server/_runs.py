@@ -118,6 +118,8 @@ def _get_run_spec_excludes(run_spec: RunSpec) -> Optional[Dict]:
         profile_excludes.add("tags")
     if isinstance(configuration, ServiceConfiguration) and not configuration.rate_limits:
         configuration_excludes["rate_limits"] = True
+    if configuration.shell is None:
+        configuration_excludes["shell"] = True
 
     if configuration_excludes:
         spec_excludes["configuration"] = configuration_excludes

@@ -1,6 +1,7 @@
 import shlex
 import sys
 from abc import ABC, abstractmethod
+from pathlib import PurePosixPath
 from typing import Dict, List, Optional, Union
 
 from cachetools import TTLCache, cached
@@ -131,16 +132,24 @@ class JobConfigurator(ABC):
         )
         return job_spec
 
+    def _shell(self) -> str:
+        shell = self.run_spec.configuration.shell
+        if shell is not None:
+            path = PurePosixPath(shell)
+            if path.is_absolute():
+                return shell
+            return str("/bin" / path)
+        if self.run_spec.configuration.image is None:  # dstackai/base
+            return "/bin/bash"
+        return "/bin/sh"
+
     async def _commands(self) -> List[str]:
         if self.run_spec.configuration.entrypoint is not None:  # docker-like format
             entrypoint = shlex.split(self.run_spec.configuration.entrypoint)
             commands = self.run_spec.configuration.commands
-        elif self.run_spec.configuration.image is None:  # dstackai/base
-            entrypoint = ["/bin/bash", "-i", "-c"]
-            commands = [_join_shell_commands(self._shell_commands())]
-        elif self._shell_commands():  # custom docker image with shell commands
-            entrypoint = ["/bin/sh", "-i", "-c"]
-            commands = [_join_shell_commands(self._shell_commands())]
+        elif shell_commands := self._shell_commands():
+            entrypoint = [self._shell(), "-i", "-c"]
+            commands = [_join_shell_commands(shell_commands)]
         else:  # custom docker image without commands
             image_config = await self._get_image_config()
             entrypoint = image_config.entrypoint or []
