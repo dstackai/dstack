@@ -28,7 +28,7 @@ The general format is: `<vendor>:<comma-sparated names>:<memory range>:<quantity
 
 Each component is optional. 
 
-Ranges amy be:
+Ranges can be:
 
 * **Closed** (e.g. `24GB..80GB` or `1..8`)
 * **Open** (e.g. `24GB..` or `1..`)
@@ -40,7 +40,7 @@ Examples:
 * `--gpu nvidia:1..8` (from one to eigth NVIDIA GPUs)
 * `--gpu A10,A100` (single NVIDIA A10 or A100 GPU)
 * `--gpu A100:80GB` (single NVIDIA A100 with 80GB vRAM)
-* `--gpu 24GB..80GB` (any GPU with from 24GB to 80GB vRAM)
+* `--gpu 24GB..80GB` (any GPU with 24GB to 80GB vRAM)
 
 <!-- TODO: Mention TPU -->
 <!-- TODO: For TPU: support https://github.com/dstackai/dstack/issues/2154 -->

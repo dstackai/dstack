@@ -286,7 +286,7 @@ The general format is: `<vendor>:<comma-sparated names>:<memory range>:<quantity
 
 Each component is optional. 
 
-Ranges amy be:
+Ranges can be:
 
 * **Closed** (e.g. `24GB..80GB` or `1..8`)
 * **Open** (e.g. `24GB..` or `1..`)
