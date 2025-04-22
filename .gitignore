@@ -20,5 +20,7 @@ build/
 .DS_Store
 .fleet
 .env
+.envrc
+.vscode
 .aider*
 uv.lock
