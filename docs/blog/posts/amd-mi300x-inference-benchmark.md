@@ -169,9 +169,9 @@ We repeated the test using a higher number of requests, ranging from 300 to 900.
 
 <img src="https://raw.githubusercontent.com/dstackai/benchmarks/refs/heads/main/amd/inference/charts_rps/mean_ttft_tgi_vllm.png" width="725" style="padding: 0 40px 0 50px"/>
 
-### vRAM consumption
+### VRAM consumption
 
-When considering vRAM consumption right after loading model weights, TGI allocates approximately 28% less vRAM compared
+When considering VRAM consumption right after loading model weights, TGI allocates approximately 28% less VRAM compared
 to vLLM.
 
 <img src="https://raw.githubusercontent.com/dstackai/benchmarks/refs/heads/main/amd/inference/gpu_vram_tgi_vllm.png" width="750" />
@@ -189,7 +189,7 @@ This difference may be related to how vLLM [pre-allocates GPU cache :material-ar
       impossible to accurately track throughput and TTFT.
     * With vLLM, we used the default backend configuration. With better tuning, we might have achieved improved performance.
 
-In general, the 8x AMD MI300X is a good fit for larger models and allows us to make the most of its vRAM, especially for
+In general, the 8x AMD MI300X is a good fit for larger models and allows us to make the most of its VRAM, especially for
 larger batches.
 
 If you’d like to support us in doing more benchmarks, please let us know.

@@ -60,5 +60,5 @@ commands:
     --bnb_4bit_compute_dtype "bfloat16"
 
 resources:
-  # Consumes ~25GB of vRAM for QLoRA fine-tuning deepseek-ai/DeepSeek-V2-Lite
+  # Consumes ~25GB of VRAM for QLoRA fine-tuning deepseek-ai/DeepSeek-V2-Lite
   gpu: 48GB

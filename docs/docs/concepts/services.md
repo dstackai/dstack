@@ -486,7 +486,7 @@ commands:
 port: 8000
 
 resources:
-  # Required GPU vRAM
+  # Required GPU VRAM
   gpu: 24GB
 ```
 

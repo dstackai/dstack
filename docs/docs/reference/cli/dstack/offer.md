@@ -39,8 +39,8 @@ Examples:
 * `--gpu nvidia` (any NVIDIA GPU)
 * `--gpu nvidia:1..8` (from one to eigth NVIDIA GPUs)
 * `--gpu A10,A100` (single NVIDIA A10 or A100 GPU)
-* `--gpu A100:80GB` (single NVIDIA A100 with 80GB vRAM)
-* `--gpu 24GB..80GB` (any GPU with 24GB to 80GB vRAM)
+* `--gpu A100:80GB` (single NVIDIA A100 with 80GB VRAM)
+* `--gpu 24GB..80GB` (any GPU with 24GB to 80GB VRAM)
 
 <!-- TODO: Mention TPU -->
 <!-- TODO: For TPU: support https://github.com/dstackai/dstack/issues/2154 -->
