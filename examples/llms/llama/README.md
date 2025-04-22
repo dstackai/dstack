@@ -200,13 +200,90 @@ is available at `https://<run name>.<gateway domain>/`.
 
 [//]: # (TODO: https://github.com/dstackai/dstack/issues/1777)
 
+## Fine-tuning
+
+Here's and example of FSDP and QLoRA fine-tuning of 4-bit Quantized [Llama-4-Scout-17B-16E :material-arrow-top-right-thin:{ .external }](https://huggingface.co/axolotl-quants/Llama-4-Scout-17B-16E-Linearized-bnb-nf4-bf16) on 2xH100 NVIDIA GPUs using [Axolotl :material-arrow-top-right-thin:{ .external }](https://github.com/OpenAccess-AI-Collective/axolotl){:target="_blank"}
+
+<div editor-title="examples/fine-tuning/axolotl/.dstack.yml">
+
+```yaml
+type: task
+# The name is optional, if not specified, generated randomly
+name: axolotl-nvidia-llama-scout-train
+
+# Using the official Axolotl's Docker image
+image: axolotlai/axolotl:main-latest
+
+# Required environment variables
+env:
+  - HF_TOKEN
+  - WANDB_API_KEY
+  - WANDB_PROJECT
+  - WANDB_NAME=axolotl-nvidia-llama-scout-train
+  - HUB_MODEL_ID
+# Commands of the task
+commands:
+  - wget https://raw.githubusercontent.com/axolotl-ai-cloud/axolotl/main/examples/llama-4/scout-qlora-fsdp1.yaml
+  - axolotl train scout-qlora-fsdp1.yaml 
+            --wandb-project $WANDB_PROJECT 
+            --wandb-name $WANDB_NAME 
+            --hub-model-id $HUB_MODEL_ID
+
+resources:
+  # Two GPU (required by FSDP)
+  gpu: H100:2
+  # Shared memory size for inter-process communication
+  shm_size: 24GB
+  disk: 500GB..
+```
+</div>
+
+The task uses Axolotl's Docker image, where Axolotl is already pre-installed.
+
+### Memory requirements
+
+Below are the approximate memory requirements for loading the model. 
+This excludes memory for the model context and CUDA kernel reservations.
+
+| Model         | Size     | Full fine-tuning   | LoRA   | QLoRA  |
+|---------------|----------|--------------------|--------|--------|
+| `Behemoth`    | **2T**   | 32TB               | 4.3TB  | 1.3TB  |
+| `Maverick`    | **400B** | 6.5TB              | 864GB  | 264GB  |
+| `Scout`       | **109B** | 1.75TB             | 236GB  | 72GB   |
+
+The memory estimates assume FP16 precision for model weights, with low-rank adaptation (LoRA/QLoRA) layers comprising 1% of the total model parameters.
+
+| Fine-tuning type | Calculation                                      |
+|------------------|--------------------------------------------------|
+| Full fine-tuning | 2T × 16 bytes = 32TB                             |
+| LoRA             | 2T × 2 bytes + 1% of 2T × 16 bytes = 4.3TB       |
+| QLoRA(4-bit)     | 2T × 0.5 bytes + 1% of 2T × 16 bytes = 1.3TB     |
+
+## Running a configuration
+
+Once the configuration is ready, run `dstack apply -f <configuration file>`, and `dstack` will automatically provision the
+cloud resources and run the configuration.
+
+<div class="termy">
+
+```shell
+$ HF_TOKEN=...
+$ WANDB_API_KEY=...
+$ WANDB_PROJECT=...
+$ WANDB_NAME=axolotl-nvidia-llama-scout-train
+$ HUB_MODEL_ID=...
+$ dstack apply -f examples/fine-tuning/axolotl/.dstack.yml
+```
+
+</div>
+
 ## Source code
 
-The source-code of this example can be found in 
-[`examples/llms/llama` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/llms/llama).
+The source-code for deployment examples can be found in 
+[`examples/llms/llama` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/llms/llama) and the source-code for the finetuning example can be found in [`examples/fine-tuning/axolotl` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/axolotl){:target="_blank"}.
 
 ## What's next?
 
 1. Check [dev environments](https://dstack.ai/docs/dev-environments), [tasks](https://dstack.ai/docs/tasks), 
    [services](https://dstack.ai/docs/services), and [protips](https://dstack.ai/docs/protips).
-2. Browse [Llama 4 with SGLang :material-arrow-top-right-thin:{ .external }](https://github.com/sgl-project/sglang/blob/main/docs/references/llama4.md), [Llama 4 with vLLM :material-arrow-top-right-thin:{ .external }](https://blog.vllm.ai/2025/04/05/llama4.html) and [Llama 4 with AMD :material-arrow-top-right-thin:{ .external }](https://rocm.blogs.amd.com/artificial-intelligence/llama4-day-0-support/README.html).
+2. Browse [Llama 4 with SGLang :material-arrow-top-right-thin:{ .external }](https://github.com/sgl-project/sglang/blob/main/docs/references/llama4.md), [Llama 4 with vLLM :material-arrow-top-right-thin:{ .external }](https://blog.vllm.ai/2025/04/05/llama4.html), [Llama 4 with AMD :material-arrow-top-right-thin:{ .external }](https://rocm.blogs.amd.com/artificial-intelligence/llama4-day-0-support/README.html) and [Axolotl :material-arrow-top-right-thin:{ .external }](https://github.com/OpenAccess-AI-Collective/axolotl){:target="_blank"}.
