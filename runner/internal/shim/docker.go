@@ -993,8 +993,6 @@ func getNetworkMode(networkMode NetworkMode) container.NetworkMode {
 }
 
 func configureGpuDevices(hostConfig *container.HostConfig, gpuDevices []GPUDevice) {
-	// NVIDIA: ids are identifiers reported by nvidia-smi, GPU-<UUID> strings
-	// AMD: ids are DRI render node paths, e.g., /dev/dri/renderD128
 	for _, gpuDevice := range gpuDevices {
 		hostConfig.Resources.Devices = append(
 			hostConfig.Resources.Devices,

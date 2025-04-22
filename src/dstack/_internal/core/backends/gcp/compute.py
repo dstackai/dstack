@@ -841,10 +841,14 @@ def _get_extra_subnets(
 ) -> List[Tuple[str, str]]:
     if config.extra_vpcs is None:
         return []
-    if instance_type_name != "a3-megagpu-8g":
+    if instance_type_name == "a3-megagpu-8g":
+        subnets_num = 8
+    elif instance_type_name in ["a3-edgegpu-8g", "a3-highgpu-8g"]:
+        subnets_num = 4
+    else:
         return []
     extra_subnets = []
-    for vpc_name in config.extra_vpcs:
+    for vpc_name in config.extra_vpcs[:subnets_num]:
         subnet = gcp_resources.get_vpc_subnet_or_error(
             subnetworks_client=subnetworks_client,
             vpc_project_id=config.vpc_project_id or config.project_id,
@@ -856,12 +860,14 @@ def _get_extra_subnets(
             vpc_name=vpc_name,
         )
         extra_subnets.append((vpc_resource_name, subnet))
-    return extra_subnets[:8]
+    return extra_subnets
 
 
 def _get_image_id(instance_type_name: str, cuda: bool) -> str:
     if instance_type_name == "a3-megagpu-8g":
         image_name = "dstack-a3mega-5"
+    elif instance_type_name in ["a3-edgegpu-8g", "a3-highgpu-8g"]:
+        return "projects/cos-cloud/global/images/cos-105-17412-535-78"
     elif cuda:
         image_name = f"dstack-cuda-{version.base_image}"
     else:
@@ -877,6 +883,8 @@ def _get_gateway_image_id() -> str:
 def _get_backend_specific_commands(instance_type_name: str) -> List[str]:
     if instance_type_name == "a3-megagpu-8g":
         return tcpx_features.get_backend_specific_commands_tcpxo()
+    if instance_type_name in ["a3-edgegpu-8g", "a3-highgpu-8g"]:
+        return tcpx_features.get_backend_specific_commands_tcpx()
     return []
 
 
