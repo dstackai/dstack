@@ -340,6 +340,7 @@ class TestProcessRunningJobs:
             volumes=[volume_model_to_volume(volume)],
             volume_mounts=[VolumeMountPoint(name="my-vol", path="/volume")],
             instance_mounts=[InstanceMountPoint(instance_path="/root/.cache", path="/cache")],
+            gpu_devices=[],
             host_ssh_user="ubuntu",
             host_ssh_keys=["user_ssh_key"],
             container_ssh_keys=[project_ssh_pub_key, "user_ssh_key"],

@@ -296,11 +296,9 @@ class GCPCompute(
                     gpus=instance_offer.instance.resources.gpus,
                 ),
                 spot=instance_offer.instance.resources.spot,
-                user_data=get_user_data(
-                    authorized_keys,
-                    backend_specific_commands=_get_backend_specific_commands(
-                        instance_offer.instance.name
-                    ),
+                user_data=_get_user_data(
+                    authorized_keys=authorized_keys,
+                    instance_type_name=instance_offer.instance.name,
                 ),
                 authorized_keys=authorized_keys,
                 labels=labels,
@@ -841,10 +839,14 @@ def _get_extra_subnets(
 ) -> List[Tuple[str, str]]:
     if config.extra_vpcs is None:
         return []
-    if instance_type_name != "a3-megagpu-8g":
+    if instance_type_name == "a3-megagpu-8g":
+        subnets_num = 8
+    elif instance_type_name in ["a3-edgegpu-8g", "a3-highgpu-8g"]:
+        subnets_num = 4
+    else:
         return []
     extra_subnets = []
-    for vpc_name in config.extra_vpcs:
+    for vpc_name in config.extra_vpcs[:subnets_num]:
         subnet = gcp_resources.get_vpc_subnet_or_error(
             subnetworks_client=subnetworks_client,
             vpc_project_id=config.vpc_project_id or config.project_id,
@@ -856,12 +858,14 @@ def _get_extra_subnets(
             vpc_name=vpc_name,
         )
         extra_subnets.append((vpc_resource_name, subnet))
-    return extra_subnets[:8]
+    return extra_subnets
 
 
 def _get_image_id(instance_type_name: str, cuda: bool) -> str:
     if instance_type_name == "a3-megagpu-8g":
         image_name = "dstack-a3mega-5"
+    elif instance_type_name in ["a3-edgegpu-8g", "a3-highgpu-8g"]:
+        return "projects/cos-cloud/global/images/cos-105-17412-535-78"
     elif cuda:
         image_name = f"dstack-cuda-{version.base_image}"
     else:
@@ -874,9 +878,37 @@ def _get_gateway_image_id() -> str:
     return "projects/ubuntu-os-cloud/global/images/ubuntu-2204-jammy-v20230714"
 
 
+def _get_user_data(authorized_keys: List[str], instance_type_name: str) -> str:
+    base_path = None
+    bin_path = None
+    backend_shim_env = None
+    if instance_type_name in ["a3-edgegpu-8g", "a3-highgpu-8g"]:
+        # In the COS image the / file system is not writable.
+        # /home and /var are writable but not executable.
+        # Only /etc is both writable and executable, so use it for shim/runner binaries.
+        # See: https://cloud.google.com/container-optimized-os/docs/concepts/disks-and-filesystem
+        base_path = bin_path = "/etc"
+        backend_shim_env = {
+            # In COS nvidia binaries are not installed on PATH by default.
+            # Set so that shim can run nvidia-smi.
+            "PATH": "/var/lib/nvidia/bin:$PATH",
+        }
+    return get_user_data(
+        authorized_keys=authorized_keys,
+        backend_specific_commands=_get_backend_specific_commands(
+            instance_type_name=instance_type_name,
+        ),
+        base_path=base_path,
+        bin_path=bin_path,
+        backend_shim_env=backend_shim_env,
+    )
+
+
 def _get_backend_specific_commands(instance_type_name: str) -> List[str]:
     if instance_type_name == "a3-megagpu-8g":
         return tcpx_features.get_backend_specific_commands_tcpxo()
+    if instance_type_name in ["a3-edgegpu-8g", "a3-highgpu-8g"]:
+        return tcpx_features.get_backend_specific_commands_tcpx()
     return []
 
 

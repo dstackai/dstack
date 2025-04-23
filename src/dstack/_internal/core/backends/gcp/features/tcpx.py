@@ -32,3 +32,34 @@ def get_backend_specific_commands_tcpxo() -> List[str]:
             "--num_hops=2 --num_nics=8 --uid= --alsologtostderr"
         ),
     ]
+
+
+def get_backend_specific_commands_tcpx() -> List[str]:
+    return [
+        "cos-extensions install gpu -- --version=latest",
+        "sudo mount --bind /var/lib/nvidia /var/lib/nvidia",
+        "sudo mount -o remount,exec /var/lib/nvidia",
+        (
+            "docker run "
+            "--detach "
+            "--pull=always "
+            "--name receive-datapath-manager "
+            "--privileged "
+            "--cap-add=NET_ADMIN --network=host "
+            "--volume /var/lib/nvidia/lib64:/usr/local/nvidia/lib64 "
+            "--device /dev/nvidia0:/dev/nvidia0 --device /dev/nvidia1:/dev/nvidia1 "
+            "--device /dev/nvidia2:/dev/nvidia2 --device /dev/nvidia3:/dev/nvidia3 "
+            "--device /dev/nvidia4:/dev/nvidia4 --device /dev/nvidia5:/dev/nvidia5 "
+            "--device /dev/nvidia6:/dev/nvidia6 --device /dev/nvidia7:/dev/nvidia7 "
+            "--device /dev/nvidia-uvm:/dev/nvidia-uvm --device /dev/nvidiactl:/dev/nvidiactl "
+            "--env LD_LIBRARY_PATH=/usr/local/nvidia/lib64 "
+            "--volume /run/tcpx:/run/tcpx "
+            "--entrypoint /tcpgpudmarxd/build/app/tcpgpudmarxd "
+            "us-docker.pkg.dev/gce-ai-infra/gpudirect-tcpx/tcpgpudmarxd "
+            '--gpu_nic_preset a3vm --gpu_shmem_type fd --uds_path "/run/tcpx" --setup_param "--verbose 128 2 0"'
+        ),
+        "sudo iptables -I INPUT -p tcp -m tcp -j ACCEPT",
+        "docker run --rm -v /var/lib:/var/lib us-docker.pkg.dev/gce-ai-infra/gpudirect-tcpx/nccl-plugin-gpudirecttcpx install --install-nccl",
+        "sudo mount --bind /var/lib/tcpx /var/lib/tcpx",
+        "sudo mount -o remount,exec /var/lib/tcpx",
+    ]

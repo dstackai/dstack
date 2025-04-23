@@ -814,7 +814,11 @@ func (d *DockerRunner) createContainer(ctx context.Context, task *Task) error {
 	hostConfig.Resources.NanoCPUs = int64(task.config.CPU * 1000000000)
 	hostConfig.Resources.Memory = task.config.Memory
 	if len(task.gpuIDs) > 0 {
-		configureGpus(containerConfig, hostConfig, d.gpuVendor, task.gpuIDs)
+		if len(task.config.GPUDevices) > 0 {
+			configureGpuDevices(hostConfig, task.config.GPUDevices)
+		} else {
+			configureGpus(containerConfig, hostConfig, d.gpuVendor, task.gpuIDs)
+		}
 	}
 	configureHpcNetworkingIfAvailable(hostConfig)
 
@@ -986,6 +990,19 @@ func getNetworkMode(networkMode NetworkMode) container.NetworkMode {
 		return container.NetworkMode(networkMode)
 	}
 	return "default"
+}
+
+func configureGpuDevices(hostConfig *container.HostConfig, gpuDevices []GPUDevice) {
+	for _, gpuDevice := range gpuDevices {
+		hostConfig.Resources.Devices = append(
+			hostConfig.Resources.Devices,
+			container.DeviceMapping{
+				PathOnHost:        gpuDevice.PathOnHost,
+				PathInContainer:   gpuDevice.PathInContainer,
+				CgroupPermissions: "rwm",
+			},
+		)
+	}
 }
 
 func configureGpus(config *container.Config, hostConfig *container.HostConfig, vendor host.GpuVendor, ids []string) {

@@ -114,6 +114,11 @@ class TaskStatus(str, Enum):
     TERMINATED = "terminated"
 
 
+class GPUDevice(CoreModel):
+    path_on_host: str
+    path_in_container: str
+
+
 class TaskInfoResponse(CoreModel):
     id: str
     status: TaskStatus
@@ -139,6 +144,7 @@ class TaskSubmitRequest(CoreModel):
     volumes: list[ShimVolumeInfo]
     volume_mounts: list[VolumeMountPoint]
     instance_mounts: list[InstanceMountPoint]
+    gpu_devices: list[GPUDevice]
     host_ssh_user: str
     host_ssh_keys: list[str]
     container_ssh_keys: list[str]
