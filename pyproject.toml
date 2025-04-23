@@ -54,9 +54,15 @@ dstack = "dstack._internal.cli.main:main"
 [tool.hatch.version]
 path = "src/dstack/version.py"
 
-[tool.hatch.build.targets.wheel.shared-data]
-"src/dstack/_internal/proxy/gateway/resources" = "dstack/_internal/proxy/gateway/resources"
-"src/dstack/_internal/server/statics" = "dstack/_internal/server/statics"
+[tool.hatch.build.targets.sdist]
+artifacts = [
+    "src/dstack/_internal/server/statics/**",
+]
+
+[tool.hatch.build.targets.wheel]
+artifacts = [
+    "src/dstack/_internal/server/statics/**",
+]
 
 [tool.hatch.metadata.hooks.fancy-pypi-readme]
 content-type = "text/markdown"
