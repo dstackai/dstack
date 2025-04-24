@@ -1,0 +1,7 @@
+type: fleet
+name: a3high-cluster
+nodes: 2
+placement: cluster
+instance_types:
+  - a3-highgpu-8g
+spot_policy: auto

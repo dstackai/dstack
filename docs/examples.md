@@ -183,4 +183,14 @@ hide:
             Set up GCP A3 Mega clusters with optimized networking
         </p>
     </a>
+    <a href="/examples/misc/a3high-clusters"
+       class="feature-cell sky">
+        <h3>
+            A3 High
+        </h3>
+
+        <p>
+            Set up GCP A3 High clusters with optimized networking
+        </p>
+    </a>
 </div>
