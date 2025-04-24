@@ -44,7 +44,7 @@ projects:
         - dstack-gpu-data-net-3
         - dstack-gpu-data-net-4
       regions: [europe-west4]
-      vm_service_account: a3mega-sa@$MYPROJECT.iam.gserviceaccount.com # Replace $MYPROJECT
+      vm_service_account: a3cluster-sa@$MYPROJECT.iam.gserviceaccount.com # Replace $MYPROJECT
       creds:
         type: default
 ```
@@ -81,10 +81,10 @@ projects:
 
     ```shell
     PROJECT_ID=$(gcloud config get-value project)
-    gcloud iam service-accounts create a3mega-sa \
+    gcloud iam service-accounts create a3cluster-sa \
         --display-name "Service Account for pulling GCR images"
     gcloud projects add-iam-policy-binding $PROJECT_ID \
-        --member="serviceAccount:a3mega-sa@${PROJECT_ID}.iam.gserviceaccount.com" \
+        --member="serviceAccount:a3cluster-sa@${PROJECT_ID}.iam.gserviceaccount.com" \
         --role="roles/artifactregistry.reader"
     ```
 
