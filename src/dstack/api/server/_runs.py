@@ -92,10 +92,15 @@ def _get_apply_plan_excludes(plan: ApplyRunPlanInput) -> Optional[Dict]:
     Use this method to exclude new fields when they are not set to keep
     clients backward-compatibility with older servers.
     """
+    apply_plan_excludes = {}
     run_spec_excludes = _get_run_spec_excludes(plan.run_spec)
     if run_spec_excludes is not None:
-        return {"plan": run_spec_excludes}
-    return None
+        apply_plan_excludes["run_spec"] = run_spec_excludes
+    if plan.current_resource is not None:
+        apply_plan_excludes["current_resource"] = {
+            "run_spec": _get_run_spec_excludes(plan.current_resource.run_spec)
+        }
+    return {"plan": apply_plan_excludes}
 
 
 def _get_get_plan_excludes(request: GetRunPlanRequest) -> Optional[Dict]:
@@ -103,10 +108,13 @@ def _get_get_plan_excludes(request: GetRunPlanRequest) -> Optional[Dict]:
     Excludes new fields when they are not set to keep
     clients backward-compatibility with older servers.
     """
+    get_plan_excludes = {}
     run_spec_excludes = _get_run_spec_excludes(request.run_spec)
+    if run_spec_excludes is not None:
+        get_plan_excludes["run_spec"] = run_spec_excludes
     if request.max_offers is None:
-        run_spec_excludes["max_offers"] = True
-    return run_spec_excludes
+        get_plan_excludes["max_offers"] = True
+    return get_plan_excludes
 
 
 def _get_run_spec_excludes(run_spec: RunSpec) -> Optional[Dict]:
@@ -139,5 +147,5 @@ def _get_run_spec_excludes(run_spec: RunSpec) -> Optional[Dict]:
     if profile_excludes:
         spec_excludes["profile"] = profile_excludes
     if spec_excludes:
-        return {"run_spec": spec_excludes}
+        return spec_excludes
     return None
