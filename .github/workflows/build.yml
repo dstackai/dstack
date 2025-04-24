@@ -164,7 +164,8 @@ jobs:
     strategy:
       matrix:
         include:
-          - { goos: "linux", goarch: "amd64", runson: "ubuntu-latest" }
+          - { goos: "linux", goarch: "amd64" }
+          - { goos: "linux", goarch: "arm64" }
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -177,7 +178,6 @@ jobs:
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
-          ACTIONSOS: ${{ matrix.runson }}
           CGO_ENABLED: 0
         run: |
           VERSION=$((${{ github.run_number }} + ${{ env.BUILD_INCREMENT }}))
