@@ -529,7 +529,11 @@ gcloud projects list --format="json(projectId)"
         ```
     
         </div>
-    
+
+        If you specify a non-default VPC, ensure it has a firewall rule
+        allowing all traffic within the VPC. This is needed for multi-node tasks to work.
+        The default VPC already permits traffic within the VPC.
+
     === "Shared VPC"
     
         <div editor-title="~/.dstack/server/config.yml">
