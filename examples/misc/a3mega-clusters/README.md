@@ -45,6 +45,11 @@ projects:
 
 </div>
 
+!!! info "Custom VPC"
+    If you specify a non-default primary VPC, ensure it has a firewall rule
+    allowing all traffic within the VPC. This is needed for MPI and NCCL to work.
+    The default VPC already permits traffic within the VPC.
+
 ??? info "Create extra VPCs"
     Create the VPC networks for GPUDirect in your project, each with a subnet and a firewall rule:
     
