@@ -85,18 +85,22 @@ You can also test the built shim and runner using standard backends (including S
 > [!NOTE]
 > To run with standard backends, both the runner and shim must be built for linux/amd64.
 
-Build the runner and shim, and upload them to S3 automatically using `just` (see [justfile](../justfile)).
+Build the runner and shim, and upload them to S3 automatically using `just` (see [`justfile`](justfile)).
+
+> [!IMPORTANT]
+> Before running any `just` commands that upload to S3, make sure to modify the `s3_bucket` and `version` 
+> variables in the [`justfile`](justfile).
 
 ```shell
 just upload
 ```
 
-To use the built shim and runner with the dstack server, pass the URLs via `DSTACK_SHIM_DOWNLOAD_URL` and `DSTACK_RUNNER_DOWNLOAD_URL`:
+To use the built shim and runner with the dstack server, pass the URLs via `DSTACK_SHIM_DOWNLOAD_URL` and `DSTACK_RUNNER_DOWNLOAD_URL`. Make sure to use the same `s3_bucket` and `version` values that you set in the [`justfile`](justfile).
 
 ```shell
-DSTACK_SHIM_DOWNLOAD_URL=https://dstack-runner-downloads-stgn.s3.eu-west-1.amazonaws.com/0.0.0/binaries/dstack-shim-linux-amd64
+DSTACK_SHIM_DOWNLOAD_URL=https://<s3_bucket>.s3.<s3_bucket_region>.amazonaws.com/<version>/binaries/dstack-shim-linux-amd64
 
-DSTACK_RUNNER_DOWNLOAD_URL=https://dstack-runner-downloads-stgn.s3.eu-west-1.amazonaws.com/0.0.0/binaries/dstack-runner-linux-amd64
+DSTACK_RUNNER_DOWNLOAD_URL=https://<s3_bucket>.s3.<s3_bucket_region>.amazonaws.com/<version>/binaries/dstack-runner-linux-amd64
 
 dstack server --log-level=debug
 ```
