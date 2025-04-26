@@ -57,7 +57,7 @@ class Resources(CoreModel):
         if self.memory_mib > 0:
             resources["memory"] = f"{self.memory_mib / 1024:.0f}GB"
         if self.disk.size_mib > 0:
-            resources["disk_size"] = f"{self.disk.size_mib / 1024:.1f}GB"
+            resources["disk_size"] = f"{self.disk.size_mib / 1024:.0f}GB"
         if self.gpus:
             gpu = self.gpus[0]
             resources["gpu_name"] = gpu.name
