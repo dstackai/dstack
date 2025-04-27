@@ -151,6 +151,14 @@ func (d *DockerRunner) restoreStateFromContainers(ctx context.Context) error {
 						gpuIDs = append(gpuIDs, device.PathOnHost)
 					}
 				}
+			case host.GpuVendorTenstorrent:
+				for _, device := range containerFull.HostConfig.Resources.Devices {
+					if strings.HasPrefix(device.PathOnHost, "/dev/tenstorrent/") {
+						// Extract the device ID from the path
+						deviceID := strings.TrimPrefix(device.PathOnHost, "/dev/tenstorrent/")
+						gpuIDs = append(gpuIDs, deviceID)
+					}
+				}
 			case host.GpuVendorIntel:
 				for _, envVar := range containerFull.Config.Env {
 					if indices, found := strings.CutPrefix(envVar, "HABANA_VISIBLE_DEVICES="); found {
