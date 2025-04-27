@@ -1008,6 +1008,7 @@ func configureGpuDevices(hostConfig *container.HostConfig, gpuDevices []GPUDevic
 func configureGpus(config *container.Config, hostConfig *container.HostConfig, vendor host.GpuVendor, ids []string) {
 	// NVIDIA: ids are identifiers reported by nvidia-smi, GPU-<UUID> strings
 	// AMD: ids are DRI render node paths, e.g., /dev/dri/renderD128
+	// Tenstorrent: ids are device indices to be used with /dev/tenstorrent/<id>
 	switch vendor {
 	case host.GpuVendorNvidia:
 		hostConfig.Resources.DeviceRequests = append(
@@ -1050,6 +1051,19 @@ func configureGpus(config *container.Config, hostConfig *container.HostConfig, v
 		// --security-opt=seccomp=unconfined
 		hostConfig.SecurityOpt = append(hostConfig.SecurityOpt, "seccomp=unconfined")
 		// TODO: in addition, for non-root user, --group-add=video, and possibly --group-add=render, are required.
+	case host.GpuVendorTenstorrent:
+		// For Tenstorrent, simply add each device
+		for _, id := range ids {
+			devicePath := fmt.Sprintf("/dev/tenstorrent/%s", id)
+			hostConfig.Resources.Devices = append(
+				hostConfig.Resources.Devices,
+				container.DeviceMapping{
+					PathOnHost:        devicePath,
+					PathInContainer:   devicePath,
+					CgroupPermissions: "rwm",
+				},
+			)
+		}
 	case host.GpuVendorIntel:
 		// All options are listed here:
 		// https://docs.habana.ai/en/latest/Installation_Guide/Additional_Installation/Docker_Installation.html

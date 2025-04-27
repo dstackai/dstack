@@ -52,7 +52,7 @@ from dstack.api.utils import load_profile
 _KNOWN_AMD_GPUS = {gpu.name.lower() for gpu in gpuhunt.KNOWN_AMD_GPUS}
 _KNOWN_NVIDIA_GPUS = {gpu.name.lower() for gpu in gpuhunt.KNOWN_NVIDIA_GPUS}
 _KNOWN_TPU_VERSIONS = {gpu.name.lower() for gpu in gpuhunt.KNOWN_TPUS}
-
+_KNOWN_TT_GPUS = {gpu.name.lower() for gpu in gpuhunt.KNOWN_TT_ACCELERATORS}
 _BIND_ADDRESS_ARG = "bind_address"
 
 logger = get_logger(__name__)
@@ -350,6 +350,7 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
         if gpu_spec.count.max == 0:
             return
         has_amd_gpu: bool
+        has_tt_gpu: bool
         vendor = gpu_spec.vendor
         if vendor is None:
             names = gpu_spec.name
@@ -362,6 +363,8 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
                         vendors.add(gpuhunt.AcceleratorVendor.NVIDIA)
                     elif name in _KNOWN_AMD_GPUS:
                         vendors.add(gpuhunt.AcceleratorVendor.AMD)
+                    elif name in _KNOWN_TT_GPUS:
+                        vendors.add(gpuhunt.AcceleratorVendor.TENSTORRENT)
                     else:
                         maybe_tpu_version, _, maybe_tpu_cores = name.partition("-")
                         if maybe_tpu_version in _KNOWN_TPU_VERSIONS and maybe_tpu_cores.isdigit():
@@ -380,15 +383,22 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
                 # to execute a run on an instance with an AMD accelerator with a default
                 # CUDA image, not a big deal.
                 has_amd_gpu = gpuhunt.AcceleratorVendor.AMD in vendors
+                has_tt_gpu = gpuhunt.AcceleratorVendor.TENSTORRENT in vendors
             else:
                 # If neither gpu.vendor nor gpu.name is set, assume Nvidia.
                 vendor = gpuhunt.AcceleratorVendor.NVIDIA
                 has_amd_gpu = False
+                has_tt_gpu = False
             gpu_spec.vendor = vendor
         else:
             has_amd_gpu = vendor == gpuhunt.AcceleratorVendor.AMD
+            has_tt_gpu = vendor == gpuhunt.AcceleratorVendor.TENSTORRENT
         if has_amd_gpu and conf.image is None:
-            raise ConfigurationError("`image` is required if `resources.gpu.vendor` is AMD.")
+            raise ConfigurationError("`image` is required if `resources.gpu.vendor` is `amd`")
+        if has_tt_gpu and conf.image is None:
+            raise ConfigurationError(
+                "`image` is required if `resources.gpu.vendor` is `tenstorrent`"
+            )
 
 
 class RunWithPortsConfigurator(BaseRunConfigurator):
