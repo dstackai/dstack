@@ -647,6 +647,25 @@ projects:
 
     </div>
 
+??? info "Projects"
+    If you have multiple projects per region, specify which ones to use, at most one per region.
+
+    <div editor-title="~/.dstack/server/config.yml">
+
+    ```yaml
+    type: nebius
+    projects:
+    - project-e00jt6t095t1ahrg4re30
+    - project-e01iahuh3cklave4ao1nv
+    creds:
+      type: service_account
+      service_account_id: serviceaccount-e00dhnv9ftgb3cqmej
+      public_key_id: publickey-e00ngaex668htswqy4
+      private_key_file: ~/path/to/key.pem
+    ```
+
+    </div>
+
 !!! info "Python version"
     Nebius is only supported if `dstack server` is running on Python 3.10 or higher.
 

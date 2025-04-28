@@ -29,20 +29,14 @@ class NebiusConfigurator(Configurator):
         assert isinstance(config.creds, NebiusServiceAccountCreds)
         try:
             sdk = resources.make_sdk(config.creds)
-            available_regions = set(resources.get_region_to_project_id_map(sdk))
+            # check that it's possible to build the projects map with configured settings
+            resources.get_region_to_project_id_map(
+                sdk, configured_regions=config.regions, configured_project_ids=config.projects
+            )
         except (ValueError, RequestError) as e:
             raise_invalid_credentials_error(
                 fields=[["creds"]],
                 details=str(e),
-            )
-        if invalid_regions := set(config.regions or []) - available_regions:
-            raise_invalid_credentials_error(
-                fields=[["regions"]],
-                details=(
-                    f"Configured regions {invalid_regions} do not exist in this Nebius tenancy."
-                    " Omit `regions` to use all regions or select some of the available regions:"
-                    f" {available_regions}"
-                ),
             )
 
     def create_backend(
