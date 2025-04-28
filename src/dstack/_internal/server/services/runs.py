@@ -279,7 +279,7 @@ async def get_plan(
     run_spec: RunSpec,
     max_offers: Optional[int],
 ) -> RunPlan:
-    effective_run_spec = RunSpec.parse_obj(run_spec)
+    effective_run_spec = RunSpec.parse_obj(run_spec.dict())
     _validate_run_spec_and_set_defaults(effective_run_spec)
 
     profile = effective_run_spec.merged_profile

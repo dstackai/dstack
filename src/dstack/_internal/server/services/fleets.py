@@ -234,7 +234,7 @@ async def get_plan(
     user: UserModel,
     spec: FleetSpec,
 ) -> FleetPlan:
-    effective_spec = FleetSpec.parse_obj(spec)
+    effective_spec = FleetSpec.parse_obj(spec.dict())
     current_fleet: Optional[Fleet] = None
     current_fleet_id: Optional[uuid.UUID] = None
     if effective_spec.configuration.name is not None:
@@ -337,7 +337,7 @@ async def create_fleet(
 
     lock_namespace = f"fleet_names_{project.name}"
     if get_db().dialect_name == "sqlite":
-        # Start new transaction to see commited changes after lock
+        # Start new transaction to see committed changes after lock
         await session.commit()
     elif get_db().dialect_name == "postgresql":
         await session.execute(
