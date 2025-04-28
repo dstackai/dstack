@@ -246,32 +246,34 @@ def _print_plan_header(plan: FleetPlan):
     def th(s: str) -> str:
         return f"[bold]{s}[/bold]"
 
+    spec = plan.get_effective_spec()
+
     configuration_table = Table(box=None, show_header=False)
     configuration_table.add_column(no_wrap=True)  # key
     configuration_table.add_column()  # value
 
     configuration_table.add_row(th("Project"), plan.project_name)
     configuration_table.add_row(th("User"), plan.user)
-    configuration_table.add_row(th("Configuration"), plan.spec.configuration_path or "?")
-    configuration_table.add_row(th("Type"), plan.spec.configuration.type)
+    configuration_table.add_row(th("Configuration"), spec.configuration_path or "?")
+    configuration_table.add_row(th("Type"), spec.configuration.type)
 
     fleet_type = "cloud"
-    nodes = plan.spec.configuration.nodes or "-"
-    placement = plan.spec.configuration.placement or InstanceGroupPlacement.ANY
-    reservation = plan.spec.configuration.reservation
+    nodes = spec.configuration.nodes or "-"
+    placement = spec.configuration.placement or InstanceGroupPlacement.ANY
+    reservation = spec.configuration.reservation
     backends = None
-    if plan.spec.configuration.backends is not None:
-        backends = ", ".join(b.value for b in plan.spec.configuration.backends)
+    if spec.configuration.backends is not None:
+        backends = ", ".join(b.value for b in spec.configuration.backends)
     regions = None
-    if plan.spec.configuration.regions is not None:
-        regions = ", ".join(plan.spec.configuration.regions)
+    if spec.configuration.regions is not None:
+        regions = ", ".join(spec.configuration.regions)
     resources = None
-    if plan.spec.configuration.resources is not None:
-        resources = plan.spec.configuration.resources.pretty_format()
-    spot_policy = plan.spec.merged_profile.spot_policy
-    if plan.spec.configuration.ssh_config is not None:
+    if spec.configuration.resources is not None:
+        resources = spec.configuration.resources.pretty_format()
+    spot_policy = spec.merged_profile.spot_policy
+    if spec.configuration.ssh_config is not None:
         fleet_type = "ssh"
-        nodes = len(plan.spec.configuration.ssh_config.hosts)
+        nodes = len(spec.configuration.ssh_config.hosts)
         resources = None
         spot_policy = None
 

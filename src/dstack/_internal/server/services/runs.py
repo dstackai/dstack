@@ -279,45 +279,44 @@ async def get_plan(
     run_spec: RunSpec,
     max_offers: Optional[int],
 ) -> RunPlan:
-    _validate_run_spec_and_set_defaults(run_spec)
+    effective_run_spec = RunSpec.parse_obj(run_spec.dict())
+    _validate_run_spec_and_set_defaults(effective_run_spec)
 
-    profile = run_spec.merged_profile
+    profile = effective_run_spec.merged_profile
     creation_policy = profile.creation_policy
 
     current_resource = None
     action = ApplyAction.CREATE
-    if run_spec.run_name is not None:
+    if effective_run_spec.run_name is not None:
         current_resource = await get_run_by_name(
             session=session,
             project=project,
-            run_name=run_spec.run_name,
+            run_name=effective_run_spec.run_name,
         )
         if (
             current_resource is not None
             and not current_resource.status.is_finished()
-            and _can_update_run_spec(current_resource.run_spec, run_spec)
+            and _can_update_run_spec(current_resource.run_spec, effective_run_spec)
         ):
             action = ApplyAction.UPDATE
 
-    # TODO(egor-s): do we need to generate all replicas here?
-    jobs = await get_jobs_from_run_spec(run_spec, replica_num=0)
+    jobs = await get_jobs_from_run_spec(effective_run_spec, replica_num=0)
 
     volumes = await get_job_configured_volumes(
         session=session,
         project=project,
-        run_spec=run_spec,
+        run_spec=effective_run_spec,
         job_num=0,
     )
 
     pool_offers = await _get_pool_offers(
         session=session,
         project=project,
-        run_spec=run_spec,
+        run_spec=effective_run_spec,
         job=jobs[0],
         volumes=volumes,
     )
-    run_name = run_spec.run_name  # preserve run_name
-    run_spec.run_name = "dry-run"  # will regenerate jobs on submission
+    effective_run_spec.run_name = "dry-run"  # will regenerate jobs on submission
 
     # Get offers once for all jobs
     offers = []
@@ -330,7 +329,7 @@ async def get_plan(
             multinode=jobs[0].job_spec.jobs_per_replica > 1,
             volumes=volumes,
             privileged=jobs[0].job_spec.privileged,
-            instance_mounts=check_run_spec_requires_instance_mounts(run_spec),
+            instance_mounts=check_run_spec_requires_instance_mounts(effective_run_spec),
         )
 
     job_plans = []
@@ -351,11 +350,12 @@ async def get_plan(
         )
         job_plans.append(job_plan)
 
-    run_spec.run_name = run_name  # restore run_name
+    effective_run_spec.run_name = run_spec.run_name  # restore run_name
     run_plan = RunPlan(
         project_name=project.name,
         user=user.name,
         run_spec=run_spec,
+        effective_run_spec=effective_run_spec,
         job_plans=job_plans,
         current_resource=current_resource,
         action=action,

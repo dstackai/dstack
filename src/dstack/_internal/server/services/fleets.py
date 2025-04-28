@@ -234,32 +234,34 @@ async def get_plan(
     user: UserModel,
     spec: FleetSpec,
 ) -> FleetPlan:
+    effective_spec = FleetSpec.parse_obj(spec.dict())
     current_fleet: Optional[Fleet] = None
     current_fleet_id: Optional[uuid.UUID] = None
-    if spec.configuration.name is not None:
+    if effective_spec.configuration.name is not None:
         current_fleet_model = await get_project_fleet_model_by_name(
-            session=session, project=project, name=spec.configuration.name
+            session=session, project=project, name=effective_spec.configuration.name
         )
         if current_fleet_model is not None:
             current_fleet = fleet_model_to_fleet(current_fleet_model)
             current_fleet_id = current_fleet_model.id
-    await _check_ssh_hosts_not_yet_added(session, spec, current_fleet_id)
+    await _check_ssh_hosts_not_yet_added(session, effective_spec, current_fleet_id)
 
     offers = []
-    if spec.configuration.ssh_config is None:
+    if effective_spec.configuration.ssh_config is None:
         offers_with_backends = await get_create_instance_offers(
             project=project,
-            profile=spec.merged_profile,
-            requirements=_get_fleet_requirements(spec),
-            fleet_spec=spec,
-            blocks=spec.configuration.blocks,
+            profile=effective_spec.merged_profile,
+            requirements=_get_fleet_requirements(effective_spec),
+            fleet_spec=effective_spec,
+            blocks=effective_spec.configuration.blocks,
         )
         offers = [offer for _, offer in offers_with_backends]
-    _remove_fleet_spec_sensitive_info(spec)
+    _remove_fleet_spec_sensitive_info(effective_spec)
     plan = FleetPlan(
         project_name=project.name,
         user=user.name,
         spec=spec,
+        effective_spec=effective_spec,
         current_resource=current_fleet,
         offers=offers[:50],
         total_offers=len(offers),
@@ -335,7 +337,7 @@ async def create_fleet(
 
     lock_namespace = f"fleet_names_{project.name}"
     if get_db().dialect_name == "sqlite":
-        # Start new transaction to see commited changes after lock
+        # Start new transaction to see committed changes after lock
         await session.commit()
     elif get_db().dialect_name == "postgresql":
         await session.execute(

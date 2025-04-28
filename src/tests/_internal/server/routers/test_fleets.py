@@ -851,6 +851,7 @@ class TestGetPlan:
             "project_name": project.name,
             "user": user.name,
             "spec": spec.dict(),
+            "effective_spec": spec.dict(),
             "current_resource": None,
             "offers": [json.loads(o.json()) for o in offers],
             "total_offers": len(offers),
