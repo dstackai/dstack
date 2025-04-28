@@ -35,7 +35,7 @@ def print_run_plan(
 
     req = job_plan.job_spec.requirements
     pretty_req = req.pretty_format(resources_only=True)
-    max_price = f"${req.max_price:.4}" if req.max_price else "-"
+    max_price = f"${req.max_price:g}" if req.max_price else "-"
     max_duration = (
         format_pretty_duration(job_plan.job_spec.max_duration)
         if job_plan.job_spec.max_duration
@@ -96,11 +96,10 @@ def print_run_plan(
     offers = Table(box=None)
     offers.add_column("#")
     offers.add_column("BACKEND")
+    offers.add_column("REGION")
     offers.add_column("INSTANCE TYPE")
-    offers.add_column("CPU", no_wrap=True)
-    offers.add_column("MEMORY", no_wrap=True)
-    offers.add_column("GPU", no_wrap=True)
-    offers.add_column("DISK", no_wrap=True)
+    offers.add_column("RESOURCES")
+    offers.add_column("SPOT")
     offers.add_column("PRICE")
     offers.add_column()
 
@@ -120,28 +119,14 @@ def print_run_plan(
         instance = offer.instance.name
         if offer.total_blocks > 1:
             instance += f" ({offer.blocks}/{offer.total_blocks})"
-
-        # Format resources into separate columns
-        cpu = f"{r.cpus}" if r.cpus > 0 else "-"
-        memory = f"{r.memory_mib / 1024:.0f}GB" if r.memory_mib > 0 else "-"
-
-        gpu = "-"
-        if r.gpus:
-            gpu = r.gpus[0]
-            gpu_str = f"{gpu.name}:{gpu.memory_mib / 1024:.0f}GB:{len(r.gpus)}"
-            gpu = gpu_str
-
-        disk = f"{r.disk.size_mib / 1024:.0f}GB" if r.disk.size_mib > 0 else "-"
-
         offers.add_row(
             f"{i}",
-            f"{offer.backend.replace('remote', 'ssh')} ({offer.region})",
+            offer.backend.replace("remote", "ssh"),
+            offer.region,
             instance,
-            cpu,
-            memory,
-            gpu,
-            disk,
-            f"${offer.price:.4}" + (" (spot)" if r.spot else ""),
+            r.pretty_format(),
+            "yes" if r.spot else "no",
+            f"${offer.price:g}",
             availability,
             style=None if i == 1 else "secondary",
         )
@@ -170,10 +155,7 @@ def get_runs_table(
     table.add_column("BACKEND", style="grey58")
     if verbose:
         table.add_column("INSTANCE", no_wrap=True)
-    table.add_column("CPU", no_wrap=True)
-    table.add_column("MEMORY", no_wrap=True)
-    table.add_column("GPU", no_wrap=True)
-    table.add_column("DISK", no_wrap=True)
+    table.add_column("RESOURCES")
     if verbose:
         table.add_column("RESERVATION", no_wrap=True)
     table.add_column("PRICE", no_wrap=True)
@@ -216,35 +198,13 @@ def get_runs_table(
                     resources = jrd.offer.instance.resources
                     if jrd.offer.total_blocks > 1:
                         instance += f" ({jrd.offer.blocks}/{jrd.offer.total_blocks})"
-
-                # Format resources into separate columns
-                cpu = f"{resources.cpus}" if resources.cpus > 0 else "-"
-                memory = (
-                    f"{resources.memory_mib / 1024:.0f}GB" if resources.memory_mib > 0 else "-"
-                )
-
-                gpu = "-"
-                if resources.gpus:
-                    gpu = resources.gpus[0]
-                    gpu_str = f"{gpu.name}:{gpu.memory_mib / 1024:.0f}GB:{len(resources.gpus)}"
-                    gpu = gpu_str
-
-                disk = (
-                    f"{resources.disk.size_mib / 1024:.0f}GB"
-                    if resources.disk.size_mib > 0
-                    else "-"
-                )
-
                 job_row.update(
                     {
                         "BACKEND": f"{jpd.backend.value.replace('remote', 'ssh')} ({jpd.region})",
                         "INSTANCE": instance,
-                        "CPU": cpu,
-                        "MEMORY": memory,
-                        "GPU": gpu,
-                        "DISK": disk,
+                        "RESOURCES": resources.pretty_format(include_spot=True),
                         "RESERVATION": jpd.reservation,
-                        "PRICE": f"${jpd.price:.4}" + (" (spot)" if resources.spot else ""),
+                        "PRICE": f"${jpd.price:.4}",
                     }
                 )
             if len(run.jobs) == 1:
