@@ -27,6 +27,7 @@ from dstack.api import Run
 def print_run_plan(
     run_plan: RunPlan, max_offers: Optional[int] = None, include_run_properties: bool = True
 ):
+    run_spec = run_plan.get_effective_run_spec()
     job_plan = run_plan.job_plans[0]
 
     props = Table(box=None, show_header=False)
@@ -43,18 +44,18 @@ def print_run_plan(
     )
     if include_run_properties:
         inactivity_duration = None
-        if isinstance(run_plan.run_spec.configuration, DevEnvironmentConfiguration):
+        if isinstance(run_spec.configuration, DevEnvironmentConfiguration):
             inactivity_duration = "-"
-            if isinstance(run_plan.run_spec.configuration.inactivity_duration, int):
+            if isinstance(run_spec.configuration.inactivity_duration, int):
                 inactivity_duration = format_pretty_duration(
-                    run_plan.run_spec.configuration.inactivity_duration
+                    run_spec.configuration.inactivity_duration
                 )
         if job_plan.job_spec.retry is None:
             retry = "-"
         else:
             retry = escape(job_plan.job_spec.retry.pretty_format())
 
-        profile = run_plan.run_spec.merged_profile
+        profile = run_spec.merged_profile
         creation_policy = profile.creation_policy
         # FIXME: This assumes the default idle_duration is the same for client and server.
         # If the server changes idle_duration, old clients will see incorrect value.
@@ -79,8 +80,8 @@ def print_run_plan(
     props.add_row(th("Project"), run_plan.project_name)
     props.add_row(th("User"), run_plan.user)
     if include_run_properties:
-        props.add_row(th("Configuration"), run_plan.run_spec.configuration_path)
-        props.add_row(th("Type"), run_plan.run_spec.configuration.type)
+        props.add_row(th("Configuration"), run_spec.configuration_path)
+        props.add_row(th("Type"), run_spec.configuration.type)
     props.add_row(th("Resources"), pretty_req)
     props.add_row(th("Spot policy"), spot_policy)
     props.add_row(th("Max price"), max_price)
@@ -91,7 +92,7 @@ def print_run_plan(
         props.add_row(th("Max duration"), max_duration)
         if inactivity_duration is not None:  # None means n/a
             props.add_row(th("Inactivity duration"), inactivity_duration)
-    props.add_row(th("Reservation"), run_plan.run_spec.configuration.reservation or "-")
+    props.add_row(th("Reservation"), run_spec.configuration.reservation or "-")
 
     offers = Table(box=None)
     offers.add_column("#")
