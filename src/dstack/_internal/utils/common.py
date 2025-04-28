@@ -113,6 +113,8 @@ def pretty_resources(
         parts.append(f"cpu={cpus}")
     if memory is not None:
         parts.append(f"mem={memory}")
+    if disk_size:
+        parts.append(f"disk={disk_size}")
     if gpu_count:
         gpu_parts = []
         gpu_parts.append(f"{gpu_name or 'gpu'}")
@@ -127,8 +129,6 @@ def pretty_resources(
 
         gpu = ":".join(gpu_parts)
         parts.append(gpu)
-    if disk_size:
-        parts.append(f"disk={disk_size}")
     return " ".join(parts)
 
 

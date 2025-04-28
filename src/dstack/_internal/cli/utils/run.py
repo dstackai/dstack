@@ -98,7 +98,7 @@ def print_run_plan(
     offers.add_column("#")
     offers.add_column("BACKEND", style="grey58", ratio=2)
     offers.add_column("RESOURCES", ratio=4)
-    offers.add_column("INSTANCE TYPE", style="grey58", ratio=2)
+    offers.add_column("INSTANCE TYPE", style="grey58", no_wrap=True, ratio=2)
     offers.add_column("PRICE", style="grey58", ratio=1)
     offers.add_column()
 
