@@ -17,6 +17,7 @@ from dstack._internal.core.errors import (
 )
 from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.fleets import (
+    ApplyFleetPlanInput,
     Fleet,
     FleetPlan,
     FleetSpec,
@@ -304,6 +305,21 @@ async def get_create_instance_offers(
         if offer.backend in BACKENDS_WITH_CREATE_INSTANCE_SUPPORT
     ]
     return offers
+
+
+async def apply_plan(
+    session: AsyncSession,
+    user: UserModel,
+    project: ProjectModel,
+    plan: ApplyFleetPlanInput,
+    force: bool,
+) -> Fleet:
+    return await create_fleet(
+        session=session,
+        project=project,
+        user=user,
+        spec=plan.spec,
+    )
 
 
 async def create_fleet(

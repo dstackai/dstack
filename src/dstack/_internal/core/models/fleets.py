@@ -312,7 +312,20 @@ class FleetPlan(CoreModel):
     project_name: str
     user: str
     spec: FleetSpec
-    current_resource: Optional[Fleet]
+    current_resource: Optional[Fleet] = None
     offers: List[InstanceOfferWithAvailability]
     total_offers: int
-    max_offer_price: Optional[float]
+    max_offer_price: Optional[float] = None
+
+
+class ApplyFleetPlanInput(CoreModel):
+    spec: FleetSpec
+    current_resource: Annotated[
+        Optional[Fleet],
+        Field(
+            description=(
+                "The expected current resource."
+                " If the resource has changed, the apply fails unless `force: true`."
+            )
+        ),
+    ] = None
