@@ -110,25 +110,26 @@ def pretty_resources(
     """
     parts = []
     if cpus is not None:
-        parts.append(f"{cpus}xCPU")
+        parts.append(f"cpu={cpus}")
     if memory is not None:
-        parts.append(f"{memory}")
+        parts.append(f"mem={memory}")
     if gpu_count:
         gpu_parts = []
+        gpu_parts.append(f"{gpu_name or 'gpu'}")
         if gpu_memory is not None:
             gpu_parts.append(f"{gpu_memory}")
+        if gpu_count is not None:
+            gpu_parts.append(f"{gpu_count}")
         if total_gpu_memory is not None:
-            gpu_parts.append(f"total {total_gpu_memory}")
+            gpu_parts.append(f"{total_gpu_memory}")
         if compute_capability is not None:
             gpu_parts.append(f"{compute_capability}")
 
-        gpu = f"{gpu_count}x{gpu_name or 'GPU'}"
-        if gpu_parts:
-            gpu += f" ({', '.join(gpu_parts)})"
+        gpu = ":".join(gpu_parts)
         parts.append(gpu)
     if disk_size:
-        parts.append(f"{disk_size} (disk)")
-    return ", ".join(parts)
+        parts.append(f"disk={disk_size}")
+    return " ".join(parts)
 
 
 def since(timestamp: str) -> datetime:

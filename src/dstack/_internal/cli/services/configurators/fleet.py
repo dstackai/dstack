@@ -312,7 +312,7 @@ def _print_plan_header(plan: FleetPlan):
             offer.instance.name,
             resources.pretty_format(),
             "yes" if resources.spot else "no",
-            f"${offer.price:g}",
+            f"${offer.price:3f}".rstrip("0").rstrip("."),
             availability,
             style=None if index == 1 else "secondary",
         )
