@@ -17,7 +17,13 @@ from dstack._internal.cli.utils.common import (
 )
 from dstack._internal.cli.utils.fleet import get_fleets_table
 from dstack._internal.cli.utils.rich import MultiItemStatus
-from dstack._internal.core.errors import ConfigurationError, ResourceNotExistsError
+from dstack._internal.core.errors import (
+    CLIError,
+    ConfigurationError,
+    ResourceNotExistsError,
+    ServerClientError,
+    URLNotFoundError,
+)
 from dstack._internal.core.models.configurations import ApplyConfigurationType
 from dstack._internal.core.models.fleets import (
     Fleet,
@@ -31,6 +37,7 @@ from dstack._internal.core.models.repos.base import Repo
 from dstack._internal.utils.common import local_time
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.ssh import convert_ssh_key_to_pem, generate_public_key, pkey_from_str
+from dstack.api._public import Client
 from dstack.api.utils import load_profile
 
 logger = get_logger(__name__)
@@ -109,11 +116,11 @@ class FleetConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
                     else:
                         time.sleep(1)
 
-        with console.status("Creating fleet..."):
-            fleet = self.api.client.fleets.create(
-                project_name=self.api.project,
-                spec=spec,
-            )
+        try:
+            with console.status("Applying plan..."):
+                fleet = _apply_plan(self.api, plan)
+        except ServerClientError as e:
+            raise CLIError(e.msg)
         if command_args.detach:
             console.print("Fleet configuration submitted. Exiting...")
             return
@@ -350,3 +357,17 @@ def _failed_provisioning(fleet: Fleet) -> bool:
         if instance.status == InstanceStatus.TERMINATED:
             return True
     return False
+
+
+def _apply_plan(api: Client, plan: FleetPlan) -> Fleet:
+    try:
+        return api.client.fleets.apply_plan(
+            project_name=api.project,
+            plan=plan,
+        )
+    except URLNotFoundError:
+        # TODO: Remove in 0.20
+        return api.client.fleets.create(
+            project_name=api.project,
+            spec=plan.spec,
+        )
