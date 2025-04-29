@@ -52,7 +52,7 @@ from dstack.api.utils import load_profile
 _KNOWN_AMD_GPUS = {gpu.name.lower() for gpu in gpuhunt.KNOWN_AMD_GPUS}
 _KNOWN_NVIDIA_GPUS = {gpu.name.lower() for gpu in gpuhunt.KNOWN_NVIDIA_GPUS}
 _KNOWN_TPU_VERSIONS = {gpu.name.lower() for gpu in gpuhunt.KNOWN_TPUS}
-_KNOWN_TT_GPUS = {gpu.name.lower() for gpu in gpuhunt.KNOWN_TT_ACCELERATORS}
+_KNOWN_TENSTORRENT_GPUS = {gpu.name.lower() for gpu in gpuhunt.KNOWN_TENSTORRENT_ACCELERATORS}
 _BIND_ADDRESS_ARG = "bind_address"
 
 logger = get_logger(__name__)
@@ -363,7 +363,7 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
                         vendors.add(gpuhunt.AcceleratorVendor.NVIDIA)
                     elif name in _KNOWN_AMD_GPUS:
                         vendors.add(gpuhunt.AcceleratorVendor.AMD)
-                    elif name in _KNOWN_TT_GPUS:
+                    elif name in _KNOWN_TENSTORRENT_GPUS:
                         vendors.add(gpuhunt.AcceleratorVendor.TENSTORRENT)
                     else:
                         maybe_tpu_version, _, maybe_tpu_cores = name.partition("-")
