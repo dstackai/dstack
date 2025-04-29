@@ -47,9 +47,10 @@ async def create_gateway(
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
 ) -> models.Gateway:
-    _, project = user_project
+    user, project = user_project
     return await gateways.create_gateway(
         session=session,
+        user=user,
         project=project,
         configuration=body.configuration,
     )

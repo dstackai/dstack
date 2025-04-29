@@ -269,6 +269,8 @@ class FleetSpec(CoreModel):
     configuration_path: Optional[str] = None
     profile: Profile
     autocreated: bool = False
+    # merged_profile stores profile parameters merged from profile and configuration.
+    # Read profile parameters from merged_profile instead of profile directly.
     # TODO: make merged_profile a computed field after migrating to pydanticV2
     merged_profile: Annotated[Profile, Field(exclude=True)] = None
 

@@ -31,13 +31,19 @@ from dstack._internal.core.models.gateways import (
     Gateway,
     GatewayComputeConfiguration,
     GatewayConfiguration,
+    GatewaySpec,
     GatewayStatus,
     LetsEncryptGatewayCertificate,
 )
 from dstack._internal.core.services import validate_dstack_resource_name
 from dstack._internal.server import settings
 from dstack._internal.server.db import get_db
-from dstack._internal.server.models import GatewayComputeModel, GatewayModel, ProjectModel
+from dstack._internal.server.models import (
+    GatewayComputeModel,
+    GatewayModel,
+    ProjectModel,
+    UserModel,
+)
 from dstack._internal.server.services.backends import (
     check_backend_type_available,
     get_project_backend_by_type_or_error,
@@ -50,6 +56,7 @@ from dstack._internal.server.services.locking import (
     get_locker,
     string_to_lock_id,
 )
+from dstack._internal.server.services.plugins import apply_plugin_policies
 from dstack._internal.server.utils.common import gather_map_async
 from dstack._internal.utils.common import get_current_datetime, run_async
 from dstack._internal.utils.crypto import generate_rsa_key_pair_bytes
@@ -129,9 +136,17 @@ async def create_gateway_compute(
 
 async def create_gateway(
     session: AsyncSession,
+    user: UserModel,
     project: ProjectModel,
     configuration: GatewayConfiguration,
 ) -> Gateway:
+    spec = apply_plugin_policies(
+        user=user.name,
+        project=project.name,
+        # Create pseudo spec until the gateway API is updated to accept spec
+        spec=GatewaySpec(configuration=configuration),
+    )
+    configuration = spec.configuration
     _validate_gateway_configuration(configuration)
 
     backend_model, _ = await get_project_backend_with_model_by_type_or_error(
@@ -140,7 +155,7 @@ async def create_gateway(
 
     lock_namespace = f"gateway_names_{project.name}"
     if get_db().dialect_name == "sqlite":
-        # Start new transaction to see commited changes after lock
+        # Start new transaction to see committed changes after lock
         await session.commit()
     elif get_db().dialect_name == "postgresql":
         await session.execute(
