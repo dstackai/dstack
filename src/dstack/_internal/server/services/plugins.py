@@ -2,6 +2,7 @@ import importlib
 import itertools
 from importlib.metadata import entry_points
 
+from dstack._internal.core.errors import ServerClientError
 from dstack._internal.utils.logging import get_logger
 from dstack.plugins import ApplyPolicy, ApplySpec, Plugin
 
@@ -61,7 +62,13 @@ def load_plugins(enabled_plugins: list[str]):
 def apply_plugin_policies(user: str, project: str, spec: ApplySpec) -> ApplySpec:
     policies = _get_apply_policies()
     for policy in policies:
-        spec = policy.on_apply(user=user, project=project, spec=spec)
+        try:
+            spec = policy.on_apply(user=user, project=project, spec=spec)
+        except ValueError as e:
+            msg = None
+            if len(e.args) > 0:
+                msg = e.args[0]
+            raise ServerClientError(msg)
     return spec
 
 
