@@ -2,7 +2,9 @@
 #
 # Run `just` to see all available commands
 #
-# IMPORTANT: Change the s3_bucket and version variables below before running any commands.
+# Configuration:
+# - DSTACK_SHIM_UPLOAD_VERSION: Version of the runner and shim to upload
+# - DSTACK_SHIM_UPLOAD_S3_BUCKET: S3 bucket to upload binaries to
 #
 # Build Process:
 # - Runner is always built for linux/amd64
@@ -23,12 +25,11 @@
 default:
     @just --list
 
-# Export version variable
-# Must be changed to a unique value to avoid conflicts with other developers using the same bucket
-export version := "0.0.0"
+# Version of the runner and shim to upload
+export version := env_var("DSTACK_SHIM_UPLOAD_VERSION")
 
-# S3 bucket name - must be set to a bucket that the developer has access to
-export s3_bucket := "dstack-runner-downloads-stgn"
+# S3 bucket to upload binaries to
+export s3_bucket := env_var("DSTACK_SHIM_UPLOAD_S3_BUCKET")
 
 # Download URLs
 export runner_download_url := "s3://" + s3_bucket + "/" + version + "/binaries/dstack-runner-linux-amd64"
