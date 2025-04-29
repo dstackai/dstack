@@ -1,5 +1,5 @@
-import importlib
 import itertools
+from importlib import import_module
 from importlib.metadata import entry_points
 
 from dstack._internal.core.errors import ServerClientError
@@ -24,8 +24,8 @@ def load_plugins(enabled_plugins: list[str]):
             )
             continue
         try:
-            module_path, class_name = entrypoint.value.rsplit(".", 1)
-            module = importlib.import_module(module_path)
+            module_path, _, class_name = entrypoint.value.partition(":")
+            module = import_module(module_path)
         except ImportError:
             logger.warning(
                 (
@@ -47,7 +47,7 @@ def load_plugins(enabled_plugins: list[str]):
             continue
         if not issubclass(plugin_class, Plugin):
             logger.warning(
-                ("Failed to load plugin %s: Plugin class %s is not a subclass of Plugin."),
+                ("Failed to load plugin %s: plugin class %s is not a subclass of Plugin."),
                 entrypoint.name,
                 class_name,
             )
