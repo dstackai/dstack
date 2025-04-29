@@ -20,6 +20,7 @@ from dstack._internal.cli.utils.rich import MultiItemStatus
 from dstack._internal.core.errors import (
     CLIError,
     ConfigurationError,
+    MethodNotAllowedError,
     ResourceNotExistsError,
     ServerClientError,
     URLNotFoundError,
@@ -367,7 +368,7 @@ def _apply_plan(api: Client, plan: FleetPlan) -> Fleet:
             project_name=api.project,
             plan=plan,
         )
-    except URLNotFoundError:
+    except (URLNotFoundError, MethodNotAllowedError):
         # TODO: Remove in 0.20
         return api.client.fleets.create(
             project_name=api.project,

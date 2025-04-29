@@ -22,6 +22,10 @@ class URLNotFoundError(ClientError):
     pass
 
 
+class MethodNotAllowedError(ClientError):
+    pass
+
+
 class ServerClientErrorCode(str, enum.Enum):
     UNSPECIFIED_ERROR = "error"
     RESOURCE_EXISTS = "resource_exists"
