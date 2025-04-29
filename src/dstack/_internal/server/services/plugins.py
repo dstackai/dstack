@@ -1,6 +1,7 @@
 import itertools
 from importlib import import_module
-from importlib.metadata import entry_points
+
+from backports.entry_points_selectable import entry_points  # backport for Python 3.9
 
 from dstack._internal.core.errors import ServerClientError
 from dstack._internal.utils.logging import get_logger
