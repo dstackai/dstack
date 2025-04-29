@@ -85,15 +85,27 @@ export const useColumnsDefinitions = () => {
                 ),
         },
         {
-            id: 'created_at',
-            header: t('volume.created_at'),
+            id: 'created',
+            header: t('volume.created'),
             cell: (item: IVolume) => format(new Date(item.created_at), DATE_TIME_FORMAT),
+        },
+        {
+            id: 'finished',
+            header: t('volume.finished'),
+            cell: (item: IVolume) => getVolumeFinised(item),
         },
         {
             id: 'price',
             header: `${t('volume.price')}`,
             cell: (item: IVolume) => {
                 return item?.provisioning_data?.price ? `$${item.provisioning_data.price.toFixed(2)}` : '-';
+            },
+        },
+        {
+            id: 'cost',
+            header: `${t('volume.cost')}`,
+            cell: (item: IVolume) => {
+                return item?.cost ? `$${item.cost.toFixed(2)}` : '-';
             },
         },
     ];
@@ -166,4 +178,15 @@ export const useVolumesDelete = () => {
     };
 
     return { isDeleting, deleteVolumes };
+};
+
+const getVolumeFinised = (volume: IVolume): string => {
+    if (!volume.deleted_at && volume.status != 'failed') {
+        return '-';
+    }
+    let finished = volume.last_processed_at
+    if (volume.deleted_at) {
+        finished = volume.deleted_at
+    }
+    return format(new Date(finished), DATE_TIME_FORMAT);
 };

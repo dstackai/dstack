@@ -9,6 +9,7 @@ from dstack._internal.core.models.fleets import Fleet, FleetPlan
 from dstack._internal.server.db import get_session
 from dstack._internal.server.models import ProjectModel, UserModel
 from dstack._internal.server.schemas.fleets import (
+    ApplyFleetPlanRequest,
     CreateFleetRequest,
     DeleteFleetInstancesRequest,
     DeleteFleetsRequest,
@@ -105,6 +106,27 @@ async def get_plan(
         spec=body.spec,
     )
     return plan
+
+
+@project_router.post("/apply")
+async def apply_plan(
+    body: ApplyFleetPlanRequest,
+    session: AsyncSession = Depends(get_session),
+    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
+) -> Fleet:
+    """
+    Creates a new fleet or updates an existing fleet.
+    Errors if the expected current resource from the plan does not match the current resource.
+    Use `force: true` to apply even if the current resource does not match.
+    """
+    user, project = user_project
+    return await fleets_services.apply_plan(
+        session=session,
+        user=user,
+        project=project,
+        plan=body.plan,
+        force=body.force,
+    )
 
 
 @project_router.post("/create")

@@ -1626,6 +1626,7 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
     padding: 0.4em 1.5em;
     font-size: 17px;
     border-radius: 3px;
+    white-space: nowrap;
 }
 
 /*[data-md-color-primary=white] .md-button:hover{

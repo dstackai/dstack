@@ -38,7 +38,7 @@ def dstack_tasks():
         dstack is installed into the main Airflow environment.
         NOT RECOMMENDED since dstack and Airflow may have conflicting dependencies.
         """
-        return f"cd {DSTACK_REPO_PATH}" " && dstack init" " && dstack apply -y -f task.dstack.yml"
+        return f"cd {DSTACK_REPO_PATH} && dstack init && dstack apply -y -f task.dstack.yml"
 
     @task.bash
     def dstack_cli_apply_venv() -> str:

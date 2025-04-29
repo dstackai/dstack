@@ -184,7 +184,7 @@ extra:
     - icon: /simple/x
       link: https://twitter.com/dstackai
     - icon: /fontawesome/brands/linkedin
-      link: https://twitter.com/dstackai
+      link: https://www.linkedin.com/company/dstackai
   status:
     new: Recently added
 # Page tree
@@ -231,6 +231,7 @@ nav:
             - dstack metrics: docs/reference/cli/dstack/metrics.md
             - dstack config: docs/reference/cli/dstack/config.md
             - dstack fleet: docs/reference/cli/dstack/fleet.md
+            - dstack offer: docs/reference/cli/dstack/offer.md
             - dstack volume: docs/reference/cli/dstack/volume.md
             - dstack gateway: docs/reference/cli/dstack/gateway.md
         - API:
@@ -259,6 +260,7 @@ nav:
         - Docker Compose: examples/misc/docker-compose/index.md
         - NCCL Tests: examples/misc/nccl-tests/index.md
         - A3 Mega: examples/misc/a3mega-clusters/index.md
+        - A3 High: examples/misc/a3high-clusters/index.md
 #  - Community: community.md
 #  - Partners: partners.md
   - Blog:

@@ -496,9 +496,10 @@
     "region": "Region",
     "backend": "Backend",
     "status": "Status",
-    "created_at": "Created at",
-    "price": "Price",
-
+    "created": "Created",
+    "finished": "Finished",
+    "price": "Price (per month)",
+    "cost": "Cost",
     "statuses": {
       "failed": "Failed",
       "submitted": "Submitted",

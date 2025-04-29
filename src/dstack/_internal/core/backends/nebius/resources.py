@@ -2,9 +2,10 @@ import logging
 import time
 from collections import defaultdict
 from collections.abc import Container as ContainerT
-from collections.abc import Generator
+from collections.abc import Generator, Iterable, Sequence
 from contextlib import contextmanager
 from tempfile import NamedTemporaryFile
+from typing import Optional
 
 from nebius.aio.authorization.options import options_to_metadata
 from nebius.aio.operation import Operation as SDKOperation
@@ -40,7 +41,11 @@ from nebius.api.nebius.iam.v1 import (
 from nebius.api.nebius.vpc.v1 import ListSubnetsRequest, Subnet, SubnetServiceClient
 from nebius.sdk import SDK
 
-from dstack._internal.core.backends.nebius.models import NebiusServiceAccountCreds
+from dstack._internal.core.backends.base.configurator import raise_invalid_credentials_error
+from dstack._internal.core.backends.nebius.models import (
+    DEFAULT_PROJECT_NAME_PREFIX,
+    NebiusServiceAccountCreds,
+)
 from dstack._internal.core.errors import BackendError, NoCapacityError
 from dstack._internal.utils.event_loop import DaemonEventLoop
 from dstack._internal.utils.logging import get_logger
@@ -110,7 +115,37 @@ def wait_for_operation(
         LOOP.await_(op.update(timeout=REQUEST_TIMEOUT, metadata=REQUEST_MD))
 
 
-def get_region_to_project_id_map(sdk: SDK) -> dict[str, str]:
+def get_region_to_project_id_map(
+    sdk: SDK, configured_regions: Optional[list[str]], configured_project_ids: Optional[list[str]]
+) -> dict[str, str]:
+    """Validate backend settings and build region->project_id map"""
+
+    projects = list_tenant_projects(sdk)
+    if configured_regions:
+        validate_regions(
+            configured=set(configured_regions), available={p.status.region for p in projects}
+        )
+    if configured_project_ids is not None:
+        return _get_region_to_configured_project_id_map(
+            projects, configured_project_ids, configured_regions
+        )
+    else:
+        return _get_region_to_default_project_id_map(projects, configured_regions)
+
+
+def validate_regions(configured: set[str], available: set[str]) -> None:
+    if invalid := set(configured) - available:
+        raise_invalid_credentials_error(
+            fields=[["regions"]],
+            details=(
+                f"Configured regions {invalid} do not exist in this Nebius tenancy."
+                " Omit `regions` to use all regions or select some of the available regions:"
+                f" {available}"
+            ),
+        )
+
+
+def list_tenant_projects(sdk: SDK) -> Sequence[Container]:
     tenants = LOOP.await_(
         TenantServiceClient(sdk).list(
             ListTenantsRequest(), timeout=REQUEST_TIMEOUT, metadata=REQUEST_MD
@@ -126,23 +161,69 @@ def get_region_to_project_id_map(sdk: SDK) -> dict[str, str]:
             metadata=REQUEST_MD,
         )
     )
+    return projects.items
+
+
+def _get_region_to_default_project_id_map(
+    all_tenant_projects: Iterable[Container], configured_regions: Optional[list[str]]
+) -> dict[str, str]:
     region_to_projects: defaultdict[str, list[Container]] = defaultdict(list)
-    for project in projects.items:
+    for project in all_tenant_projects:
         region_to_projects[project.status.region].append(project)
     region_to_project_id = {}
     for region, region_projects in region_to_projects.items():
+        if configured_regions and region not in configured_regions:
+            continue
         if len(region_projects) != 1:
-            # Currently, there can only be one project per region.
-            # This condition is implemented just in case Nebius suddenly allows more projects.
             region_projects = [
-                p for p in region_projects if p.metadata.name.startswith("default-project")
+                p
+                for p in region_projects
+                if p.metadata.name.startswith(DEFAULT_PROJECT_NAME_PREFIX)
             ]
             if len(region_projects) != 1:
-                logger.warning(
-                    "Could not find the default project in region %s, tenant %s", region, tenant_id
+                raise_invalid_credentials_error(
+                    ["regions"],
+                    (
+                        f"Could not find the default project in region {region}."
+                        " Consider setting the `projects` property in backend settings"
+                    ),
                 )
-                continue
         region_to_project_id[region] = region_projects[0].metadata.id
+    return region_to_project_id
+
+
+def _get_region_to_configured_project_id_map(
+    all_tenant_projects: Iterable[Container],
+    configured_project_ids: list[str],
+    configured_regions: Optional[list[str]],
+) -> dict[str, str]:
+    project_id_to_project = {p.metadata.id: p for p in all_tenant_projects}
+    region_to_project_id = {}
+    for project_id in configured_project_ids:
+        project = project_id_to_project.get(project_id)
+        if project is None:
+            raise_invalid_credentials_error(
+                ["projects"],
+                f"Configured project ID {project_id!r} not found in this Nebius tenancy",
+            )
+        duplicate_project_id = region_to_project_id.get(project.status.region)
+        if duplicate_project_id:
+            raise_invalid_credentials_error(
+                ["projects"],
+                (
+                    f"Configured projects {project_id} and {duplicate_project_id}"
+                    f" both belong to the same region {project.status.region}."
+                    " Only one project per region is allowed"
+                ),
+            )
+        region_to_project_id[project.status.region] = project_id
+    if configured_regions:
+        # only filter by region after validating all project IDs
+        return {
+            region: project_id
+            for region, project_id in region_to_project_id.items()
+            if region in configured_regions
+        }
     return region_to_project_id
 
 

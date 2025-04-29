@@ -86,7 +86,11 @@ class NebiusCompute(
 
     @cached_property
     def _region_to_project_id(self) -> dict[str, str]:
-        return resources.get_region_to_project_id_map(self._sdk)
+        return resources.get_region_to_project_id_map(
+            self._sdk,
+            configured_regions=self.config.regions,
+            configured_project_ids=self.config.projects,
+        )
 
     def _get_subnet_id(self, region: str) -> str:
         if region not in self._subnet_id_cache:
@@ -100,7 +104,7 @@ class NebiusCompute(
     ) -> List[InstanceOfferWithAvailability]:
         offers = get_catalog_offers(
             backend=BackendType.NEBIUS,
-            locations=self.config.regions or list(self._region_to_project_id),
+            locations=list(self._region_to_project_id),
             requirements=requirements,
             extra_filter=_supported_instances,
             configurable_disk_size=CONFIGURABLE_DISK_SIZE,

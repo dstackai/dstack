@@ -30,7 +30,7 @@ commands:
 
 resources:
   gpu:
-    # 24GB or more vRAM
+    # 24GB or more VRAM
     memory: 24GB..
     # Two or more GPU
     count: 2..
@@ -233,6 +233,9 @@ and their quantity. Examples: `nvidia` (one NVIDIA GPU), `A100` (one A100), `A10
 ??? info "Shared memory"
     If you are using parallel communicating processes (e.g., dataloaders in PyTorch), you may need to configure 
     `shm_size`, e.g. set it to `16GB`.
+
+> If you’re unsure which offers (hardware configurations) are available from the configured backends, use the
+> [`dstack offer`](../reference/cli/dstack/offer.md#list-gpu-offers) command to list them.
 
 ### Python version
 

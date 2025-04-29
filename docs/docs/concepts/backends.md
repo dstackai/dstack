@@ -529,7 +529,11 @@ gcloud projects list --format="json(projectId)"
         ```
     
         </div>
-    
+
+        If you specify a non-default VPC, ensure it has a firewall rule
+        allowing all traffic within the VPC. This is needed for multi-node tasks to work.
+        The default VPC already permits traffic within the VPC.
+
     === "Shared VPC"
     
         <div editor-title="~/.dstack/server/config.yml">
@@ -639,6 +643,25 @@ projects:
         8y1qYDPKQ8LR+DPCUmyhM2I8t6673Vz3GrtEjkLhgQo/KqOVb3yiBFVfkA5Jov5s
         kO7y4T0ynsI8b6wlhCukQTLpIYJ5
         -----END PRIVATE KEY-----
+    ```
+
+    </div>
+
+??? info "Projects"
+    If you have multiple projects per region, specify which ones to use, at most one per region.
+
+    <div editor-title="~/.dstack/server/config.yml">
+
+    ```yaml
+    type: nebius
+    projects:
+    - project-e00jt6t095t1ahrg4re30
+    - project-e01iahuh3cklave4ao1nv
+    creds:
+      type: service_account
+      service_account_id: serviceaccount-e00dhnv9ftgb3cqmej
+      public_key_id: publickey-e00ngaex668htswqy4
+      private_key_file: ~/path/to/key.pem
     ```
 
     </div>

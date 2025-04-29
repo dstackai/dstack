@@ -17,11 +17,11 @@ from dstack._internal.core.backends import (
     BACKENDS_WITH_PLACEMENT_GROUPS_SUPPORT,
 )
 from dstack._internal.core.backends.base.compute import (
-    DSTACK_RUNNER_BINARY_PATH,
-    DSTACK_SHIM_BINARY_PATH,
-    DSTACK_WORKING_DIR,
     ComputeWithCreateInstanceSupport,
     ComputeWithPlacementGroupSupport,
+    get_dstack_runner_binary_path,
+    get_dstack_shim_binary_path,
+    get_dstack_working_dir,
     get_shim_env,
     get_shim_pre_start_commands,
 )
@@ -411,23 +411,26 @@ def _deploy_instance(
         except ValueError as e:
             raise ProvisioningError(f"Invalid Env: {e}") from e
         shim_envs.update(fleet_configuration_envs)
-        upload_envs(client, DSTACK_WORKING_DIR, shim_envs)
+        dstack_working_dir = get_dstack_working_dir()
+        dstack_shim_binary_path = get_dstack_shim_binary_path()
+        dstack_runner_binary_path = get_dstack_runner_binary_path()
+        upload_envs(client, dstack_working_dir, shim_envs)
         logger.debug("The dstack-shim environment variables have been installed")
 
         # Ensure we have fresh versions of host info.json and dstack-runner
-        remove_host_info_if_exists(client, DSTACK_WORKING_DIR)
-        remove_dstack_runner_if_exists(client, DSTACK_RUNNER_BINARY_PATH)
+        remove_host_info_if_exists(client, dstack_working_dir)
+        remove_dstack_runner_if_exists(client, dstack_runner_binary_path)
 
         # Run dstack-shim as a systemd service
         run_shim_as_systemd_service(
             client=client,
-            binary_path=DSTACK_SHIM_BINARY_PATH,
-            working_dir=DSTACK_WORKING_DIR,
+            binary_path=dstack_shim_binary_path,
+            working_dir=dstack_working_dir,
             dev=settings.DSTACK_VERSION is None,
         )
 
         # Get host info
-        host_info = get_host_info(client, DSTACK_WORKING_DIR)
+        host_info = get_host_info(client, dstack_working_dir)
         logger.debug("Received a host_info %s", host_info)
 
         raw_health = get_shim_healthcheck(client)

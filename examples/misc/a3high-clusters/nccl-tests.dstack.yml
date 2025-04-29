@@ -1,0 +1,37 @@
+type: task
+name: nccl-tests
+nodes: 2
+image: us-docker.pkg.dev/gce-ai-infra/gpudirect-tcpx/nccl-plugin-gpudirecttcpx
+commands:
+  - |
+    export NCCL_DEBUG=INFO
+    export LD_LIBRARY_PATH=/usr/local/tcpx/lib64:$LD_LIBRARY_PATH
+    # We use FIFO for inter-node communication
+    FIFO=/tmp/dstack_job
+    if [ ${DSTACK_NODE_RANK} -eq 0 ]; then
+      mkdir -p /scripts/hostfiles2
+      : > /scripts/hostfiles2/hostfile8
+      for ip in ${DSTACK_NODES_IPS}; do
+        echo "${ip} slots=${DSTACK_GPUS_PER_NODE}" >> /scripts/hostfiles2/hostfile8
+      done
+      MPIRUN='mpirun --allow-run-as-root --hostfile /scripts/hostfiles2/hostfile8'
+      # Wait for other nodes
+      while true; do
+        if ${MPIRUN} -n ${DSTACK_NODES_NUM} -N 1 true >/dev/null 2>&1; then
+          break
+        fi
+        echo 'Waiting for nodes...'
+        sleep 5
+      done
+      # Run NCCL Tests
+      NCCL_GPUDIRECTTCPX_FORCE_ACK=0 /scripts/run-allgather.sh 8 eth1,eth2,eth3,eth4 8M 8GB 2
+      # Notify nodes the job is done
+      ${MPIRUN} -n ${DSTACK_NODES_NUM} -N 1 sh -c "echo done > ${FIFO}"
+    else
+      mkfifo ${FIFO}
+      # Wait for a message from the first node
+      cat ${FIFO}
+    fi
+spot_policy: auto
+resources:
+  shm_size: 16GB

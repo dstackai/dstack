@@ -274,12 +274,23 @@ To run in detached mode, use `-d` with `dstack apply`.
 
 > If you detached the CLI, you can always re-attach to a run via [`dstack attach`](../reference/cli/dstack/attach.md).
 
-## GPU
+## GPU specification
 
 `dstack` natively supports NVIDIA GPU, AMD GPU, and Google Cloud TPU accelerator chips.
 
-The `gpu` property within [`resources`](../reference/dstack.yml/dev-environment.md#resources) (or the `--gpu` option with `dstack apply`)
+The `gpu` property within [`resources`](../reference/dstack.yml/dev-environment.md#resources) (or the `--gpu` option with [`dstack apply`](../reference/cli/dstack/apply.md) or
+[`dstack offer`](../reference/cli/dstack/offer.md))
 allows specifying not only memory size but also GPU vendor, names, their memory, and quantity.
+
+The general format is: `<vendor>:<comma-sparated names>:<memory range>:<quantity range>`.
+
+Each component is optional. 
+
+Ranges can be:
+
+* **Closed** (e.g. `24GB..80GB` or `1..8`)
+* **Open** (e.g. `24GB..` or `1..`)
+* **Single values** (e.g. `1` or `24GB`).
 
 Examples:
 
@@ -308,7 +319,36 @@ The GPU vendor is indicated by one of the following case-insensitive values:
     Currently, you can't specify other than 8 TPU cores. This means only single host workloads are supported.
     Support for multiple hosts is coming soon.
 
-## Monitoring metrics
+## Offers
+
+If you're not sure which offers (hardware configurations) are available with the configured backends, use the
+[`dstack offer`](../reference/cli/dstack/offer.md#list-gpu-offers) command.
+
+<div class="termy">
+
+```shell
+$ dstack offer --gpu H100:1.. --max-offers 10
+Getting offers...
+---> 100%
+
+ #   BACKEND     REGION     INSTANCE TYPE          RESOURCES                                     SPOT  PRICE   
+ 1   datacrunch  FIN-01     1H100.80S.30V          30xCPU, 120GB, 1xH100 (80GB), 100.0GB (disk)  no    $2.19   
+ 2   datacrunch  FIN-02     1H100.80S.30V          30xCPU, 120GB, 1xH100 (80GB), 100.0GB (disk)  no    $2.19   
+ 3   datacrunch  FIN-02     1H100.80S.32V          32xCPU, 185GB, 1xH100 (80GB), 100.0GB (disk)  no    $2.19   
+ 4   datacrunch  ICE-01     1H100.80S.32V          32xCPU, 185GB, 1xH100 (80GB), 100.0GB (disk)  no    $2.19   
+ 5   runpod      US-KS-2    NVIDIA H100 PCIe       16xCPU, 251GB, 1xH100 (80GB), 100.0GB (disk)  no    $2.39   
+ 6   runpod      CA         NVIDIA H100 80GB HBM3  24xCPU, 251GB, 1xH100 (80GB), 100.0GB (disk)  no    $2.69   
+ 7   nebius      eu-north1  gpu-h100-sxm           16xCPU, 200GB, 1xH100 (80GB), 100.0GB (disk)  no    $2.95   
+ 8   runpod      AP-JP-1    NVIDIA H100 80GB HBM3  20xCPU, 251GB, 1xH100 (80GB), 100.0GB (disk)  no    $2.99   
+ 9   runpod      CA-MTL-1   NVIDIA H100 80GB HBM3  28xCPU, 251GB, 1xH100 (80GB), 100.0GB (disk)  no    $2.99   
+ 10  runpod      CA-MTL-2   NVIDIA H100 80GB HBM3  26xCPU, 125GB, 1xH100 (80GB), 100.0GB (disk)  no    $2.99   
+     ...                                                                                                                
+ Shown 10 of 99 offers, $127.816 max
+```
+
+</div>
+
+## Metrics
 
 While `dstack` allows the use of any third-party monitoring tools (e.g., Weights and Biases), you can also
 monitor container metrics such as CPU, memory, and GPU usage using the [built-in

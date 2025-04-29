@@ -45,8 +45,13 @@ projects:
 
 </div>
 
+!!! info "Custom VPC"
+    If you specify a non-default primary VPC, ensure it has a firewall rule
+    allowing all traffic within the VPC. This is needed for MPI and NCCL to work.
+    The default VPC already permits traffic within the VPC.
+
 ??? info "Create extra VPCs"
-    Create the VPC networks for GPUDirect in your project, each with a subnet and a firewall rule. Choose the GPUDirect-TCPX tab for A3 High machine types, or choose the GPUDirect-TCPXO tab for A3 Mega machine types, then complete the following instructions:
+    Create the VPC networks for GPUDirect in your project, each with a subnet and a firewall rule:
     
     ```shell
     # Specify the region where you intend to deploy the cluster

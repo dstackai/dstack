@@ -15,6 +15,7 @@ from dstack._internal.core.models.resources import Memory
 from dstack._internal.core.models.runs import ClusterInfo, JobSpec, RunSpec
 from dstack._internal.core.models.volumes import InstanceMountPoint, Volume, VolumeMountPoint
 from dstack._internal.server.schemas.runner import (
+    GPUDevice,
     HealthcheckResponse,
     LegacyPullResponse,
     LegacyStopBody,
@@ -233,6 +234,7 @@ class ShimClient:
         volumes: list[Volume],
         volume_mounts: list[VolumeMountPoint],
         instance_mounts: list[InstanceMountPoint],
+        gpu_devices: list[GPUDevice],
         host_ssh_user: str,
         host_ssh_keys: list[str],
         container_ssh_keys: list[str],
@@ -256,6 +258,7 @@ class ShimClient:
             volumes=[_volume_to_shim_volume_info(v, instance_id) for v in volumes],
             volume_mounts=volume_mounts,
             instance_mounts=instance_mounts,
+            gpu_devices=gpu_devices,
             host_ssh_user=host_ssh_user,
             host_ssh_keys=host_ssh_keys,
             container_ssh_keys=container_ssh_keys,

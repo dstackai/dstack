@@ -4,7 +4,6 @@ from uuid import UUID
 
 from pydantic import parse_obj_as
 
-from dstack._internal.core.models.common import is_core_model_instance
 from dstack._internal.core.models.configurations import ServiceConfiguration
 from dstack._internal.core.models.runs import (
     ApplyRunPlanInput,
@@ -54,11 +53,13 @@ class RunsAPIClient(APIClientGroup):
         resp = self._request(f"/api/project/{project_name}/runs/get", body=json_body)
         return parse_obj_as(Run.__response__, resp.json())
 
-    def get_plan(self, project_name: str, run_spec: RunSpec) -> RunPlan:
-        body = GetRunPlanRequest(run_spec=run_spec)
+    def get_plan(
+        self, project_name: str, run_spec: RunSpec, max_offers: Optional[int] = None
+    ) -> RunPlan:
+        body = GetRunPlanRequest(run_spec=run_spec, max_offers=max_offers)
         resp = self._request(
             f"/api/project/{project_name}/runs/get_plan",
-            body=body.json(exclude=_get_run_spec_excludes(run_spec)),
+            body=body.json(exclude=_get_get_plan_excludes(body)),
         )
         return parse_obj_as(RunPlan.__response__, resp.json())
 
@@ -91,10 +92,29 @@ def _get_apply_plan_excludes(plan: ApplyRunPlanInput) -> Optional[Dict]:
     Use this method to exclude new fields when they are not set to keep
     clients backward-compatibility with older servers.
     """
+    apply_plan_excludes = {}
     run_spec_excludes = _get_run_spec_excludes(plan.run_spec)
     if run_spec_excludes is not None:
-        return {"plan": run_spec_excludes}
-    return None
+        apply_plan_excludes["run_spec"] = run_spec_excludes
+    if plan.current_resource is not None:
+        apply_plan_excludes["current_resource"] = {
+            "run_spec": _get_run_spec_excludes(plan.current_resource.run_spec)
+        }
+    return {"plan": apply_plan_excludes}
+
+
+def _get_get_plan_excludes(request: GetRunPlanRequest) -> Optional[Dict]:
+    """
+    Excludes new fields when they are not set to keep
+    clients backward-compatibility with older servers.
+    """
+    get_plan_excludes = {}
+    run_spec_excludes = _get_run_spec_excludes(request.run_spec)
+    if run_spec_excludes is not None:
+        get_plan_excludes["run_spec"] = run_spec_excludes
+    if request.max_offers is None:
+        get_plan_excludes["max_offers"] = True
+    return get_plan_excludes
 
 
 def _get_run_spec_excludes(run_spec: RunSpec) -> Optional[Dict]:
@@ -117,16 +137,15 @@ def _get_run_spec_excludes(run_spec: RunSpec) -> Optional[Dict]:
         configuration_excludes["tags"] = True
     if profile is not None and profile.tags is None:
         profile_excludes.add("tags")
-    if (
-        is_core_model_instance(configuration, ServiceConfiguration)
-        and not configuration.rate_limits
-    ):
+    if isinstance(configuration, ServiceConfiguration) and not configuration.rate_limits:
         configuration_excludes["rate_limits"] = True
+    if configuration.shell is None:
+        configuration_excludes["shell"] = True
 
     if configuration_excludes:
         spec_excludes["configuration"] = configuration_excludes
     if profile_excludes:
         spec_excludes["profile"] = profile_excludes
     if spec_excludes:
-        return {"run_spec": spec_excludes}
+        return spec_excludes
     return None

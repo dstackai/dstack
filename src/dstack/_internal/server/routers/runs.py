@@ -100,6 +100,7 @@ async def get_plan(
         project=project,
         user=user,
         run_spec=body.run_spec,
+        max_offers=body.max_offers,
     )
     return run_plan
 

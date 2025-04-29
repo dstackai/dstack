@@ -92,7 +92,7 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
                 profile=profile,
             )
 
-        print_run_plan(run_plan, offers_limit=configurator_args.max_offers)
+        print_run_plan(run_plan, max_offers=configurator_args.max_offers)
 
         confirm_message = "Submit a new run?"
         stop_run_name = None
@@ -274,7 +274,7 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
         console.print(f"Run [code]{conf.name}[/] deleted")
 
     @classmethod
-    def register_args(cls, parser: argparse.ArgumentParser):
+    def register_args(cls, parser: argparse.ArgumentParser, default_max_offers: int = 3):
         configuration_group = parser.add_argument_group(f"{cls.TYPE.value} Options")
         configuration_group.add_argument(
             "-n",
@@ -286,7 +286,7 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
             "--max-offers",
             help="Number of offers to show in the run plan",
             type=int,
-            default=3,
+            default=default_max_offers,
         )
         cls.register_env_args(configuration_group)
         configuration_group.add_argument(

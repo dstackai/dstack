@@ -21,5 +21,6 @@ build/
 .fleet
 .env
 .envrc
+.vscode
 .aider*
 uv.lock

@@ -10,7 +10,7 @@ from sqlalchemy.orm import joinedload
 from dstack._internal.core.consts import DSTACK_RUNNER_HTTP_PORT, DSTACK_SHIM_HTTP_PORT
 from dstack._internal.core.errors import GatewayError
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.common import NetworkMode, RegistryAuth, is_core_model_instance
+from dstack._internal.core.models.common import NetworkMode, RegistryAuth
 from dstack._internal.core.models.configurations import DevEnvironmentConfiguration
 from dstack._internal.core.models.instances import (
     InstanceStatus,
@@ -40,7 +40,7 @@ from dstack._internal.server.models import (
     RepoModel,
     RunModel,
 )
-from dstack._internal.server.schemas.runner import TaskStatus
+from dstack._internal.server.schemas.runner import GPUDevice, TaskStatus
 from dstack._internal.server.services import logs as logs_services
 from dstack._internal.server.services import services
 from dstack._internal.server.services.instances import get_instance_ssh_private_keys
@@ -422,9 +422,9 @@ def _process_provisioning_with_shim(
     volume_mounts: List[VolumeMountPoint] = []
     instance_mounts: List[InstanceMountPoint] = []
     for mount in run.run_spec.configuration.volumes:
-        if is_core_model_instance(mount, VolumeMountPoint):
+        if isinstance(mount, VolumeMountPoint):
             volume_mounts.append(mount.copy())
-        elif is_core_model_instance(mount, InstanceMountPoint):
+        elif isinstance(mount, InstanceMountPoint):
             instance_mounts.append(mount)
         else:
             assert False, f"unexpected mount point: {mount!r}"
@@ -435,6 +435,10 @@ def _process_provisioning_with_shim(
         volume_mount.name = volume.name
 
     instance_mounts += _get_instance_specific_mounts(
+        job_provisioning_data.backend, job_provisioning_data.instance_type.name
+    )
+
+    gpu_devices = _get_instance_specific_gpu_devices(
         job_provisioning_data.backend, job_provisioning_data.instance_type.name
     )
 
@@ -471,6 +475,7 @@ def _process_provisioning_with_shim(
             volumes=volumes,
             volume_mounts=volume_mounts,
             instance_mounts=instance_mounts,
+            gpu_devices=gpu_devices,
             host_ssh_user=ssh_user,
             host_ssh_keys=[ssh_key] if ssh_key else [],
             container_ssh_keys=public_keys,
@@ -657,7 +662,7 @@ def _terminate_if_inactivity_duration_exceeded(
     run_model: RunModel, job_model: JobModel, no_connections_secs: Optional[int]
 ) -> None:
     conf = RunSpec.__response__.parse_raw(run_model.run_spec).configuration
-    if not is_core_model_instance(conf, DevEnvironmentConfiguration) or not isinstance(
+    if not isinstance(conf, DevEnvironmentConfiguration) or not isinstance(
         conf.inactivity_duration, int
     ):
         # reset in case inactivity_duration was disabled via in-place update
@@ -834,14 +839,60 @@ def _submit_job_to_runner(
 def _get_instance_specific_mounts(
     backend_type: BackendType, instance_type_name: str
 ) -> List[InstanceMountPoint]:
-    if backend_type == BackendType.GCP and instance_type_name == "a3-megagpu-8g":
-        return [
-            InstanceMountPoint(
-                instance_path="/dev/aperture_devices", path="/dev/aperture_devices"
-            ),
-            InstanceMountPoint(instance_path="/var/lib/tcpxo/lib64", path="/var/lib/tcpxo/lib64"),
-            InstanceMountPoint(
-                instance_path="/var/lib/fastrak/lib64", path="/var/lib/fastrak/lib64"
-            ),
-        ]
+    if backend_type == BackendType.GCP:
+        if instance_type_name == "a3-megagpu-8g":
+            return [
+                InstanceMountPoint(
+                    instance_path="/dev/aperture_devices",
+                    path="/dev/aperture_devices",
+                ),
+                InstanceMountPoint(
+                    instance_path="/var/lib/tcpxo/lib64",
+                    path="/var/lib/tcpxo/lib64",
+                ),
+                InstanceMountPoint(
+                    instance_path="/var/lib/fastrak/lib64",
+                    path="/var/lib/fastrak/lib64",
+                ),
+            ]
+        if instance_type_name in ["a3-edgegpu-8g", "a3-highgpu-8g"]:
+            return [
+                InstanceMountPoint(
+                    instance_path="/var/lib/nvidia/lib64",
+                    path="/usr/local/nvidia/lib64",
+                ),
+                InstanceMountPoint(
+                    instance_path="/var/lib/nvidia/bin",
+                    path="/usr/local/nvidia/bin",
+                ),
+                InstanceMountPoint(
+                    instance_path="/var/lib/tcpx/lib64",
+                    path="/usr/local/tcpx/lib64",
+                ),
+                InstanceMountPoint(
+                    instance_path="/run/tcpx",
+                    path="/run/tcpx",
+                ),
+            ]
     return []
+
+
+def _get_instance_specific_gpu_devices(
+    backend_type: BackendType, instance_type_name: str
+) -> List[GPUDevice]:
+    gpu_devices = []
+    if backend_type == BackendType.GCP and instance_type_name in [
+        "a3-edgegpu-8g",
+        "a3-highgpu-8g",
+    ]:
+        for i in range(8):
+            gpu_devices.append(
+                GPUDevice(path_on_host=f"/dev/nvidia{i}", path_in_container=f"/dev/nvidia{i}")
+            )
+        gpu_devices.append(
+            GPUDevice(path_on_host="/dev/nvidia-uvm", path_in_container="/dev/nvidia-uvm")
+        )
+        gpu_devices.append(
+            GPUDevice(path_on_host="/dev/nvidiactl", path_in_container="/dev/nvidiactl")
+        )
+    return gpu_devices

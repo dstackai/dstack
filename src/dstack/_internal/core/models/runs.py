@@ -162,7 +162,7 @@ class Requirements(CoreModel):
             if self.spot is not None:
                 res += f", {'spot' if self.spot else 'on-demand'}"
             if self.max_price is not None:
-                res += f" under ${self.max_price:g} per hour"
+                res += f" under ${self.max_price:3f}".rstrip("0").rstrip(".") + " per hour"
         return res
 
 
@@ -455,9 +455,15 @@ class RunPlan(CoreModel):
     project_name: str
     user: str
     run_spec: RunSpec
+    effective_run_spec: Optional[RunSpec] = None
     job_plans: List[JobPlan]
     current_resource: Optional[Run] = None
     action: ApplyAction
+
+    def get_effective_run_spec(self) -> RunSpec:
+        if self.effective_run_spec is not None:
+            return self.effective_run_spec
+        return self.run_spec
 
 
 class ApplyRunPlanInput(CoreModel):

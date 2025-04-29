@@ -33,12 +33,15 @@ declare interface IVolume {
     project_name: string,
     external: boolean,
     created_at: string,
+    last_processed_at: string,
     status: "submitted" | "provisioning" | "active" | "failed"
     status_message?: string
     deleted: boolean
+    deleted_at?: string
     volume_id?: string;
     configuration: IVolumeConfiguration,
     provisioning_data: IVolumeProvisioningData
+    cost: number
     attachment_data: {
         device_name?: string
     }

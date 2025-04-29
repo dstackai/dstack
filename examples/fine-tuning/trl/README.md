@@ -68,7 +68,7 @@ commands:
 
 resources:
 gpu:
-  # 24GB or more vRAM
+  # 24GB or more VRAM
   memory: 24GB..
   # One or more GPU
   count: 1..
@@ -150,7 +150,7 @@ commands:
 
 resources:
   gpu:
-    # 24GB or more vRAM
+    # 24GB or more VRAM
     memory: 24GB..
     # One or more GPU
     count: 1..

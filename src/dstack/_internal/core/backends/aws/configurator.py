@@ -29,7 +29,6 @@ from dstack._internal.core.errors import (
 from dstack._internal.core.models.backends.base import (
     BackendType,
 )
-from dstack._internal.core.models.common import is_core_model_instance
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -58,12 +57,12 @@ class AWSConfigurator(Configurator):
     BACKEND_CLASS = AWSBackend
 
     def validate_config(self, config: AWSBackendConfigWithCreds, default_creds_enabled: bool):
-        if is_core_model_instance(config.creds, AWSDefaultCreds) and not default_creds_enabled:
+        if isinstance(config.creds, AWSDefaultCreds) and not default_creds_enabled:
             raise_invalid_credentials_error(fields=[["creds"]])
         try:
             session = auth.authenticate(creds=config.creds, region=MAIN_REGION)
         except Exception:
-            if is_core_model_instance(config.creds, AWSAccessKeyCreds):
+            if isinstance(config.creds, AWSAccessKeyCreds):
                 raise_invalid_credentials_error(
                     fields=[
                         ["creds", "access_key"],

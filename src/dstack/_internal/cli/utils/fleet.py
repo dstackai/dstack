@@ -79,7 +79,9 @@ def get_fleets_table(
                 "BACKEND": backend,
                 "REGION": region,
                 "RESOURCES": resources,
-                "PRICE": f"${instance.price:.4}" if instance.price is not None else "",
+                "PRICE": f"${instance.price:.4f}".rstrip("0").rstrip(".")
+                if instance.price is not None
+                else "",
                 "STATUS": status,
                 "CREATED": format_date(instance.created),
                 "ERROR": error,

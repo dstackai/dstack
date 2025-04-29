@@ -20,7 +20,6 @@ from dstack._internal.core.errors import (
     SSHError,
 )
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.common import is_core_model_instance
 from dstack._internal.core.models.configurations import RunConfigurationType
 from dstack._internal.core.models.instances import InstanceStatus
 from dstack._internal.core.models.runs import (
@@ -585,7 +584,7 @@ async def get_job_configured_volume_models(
         job_volumes = interpolate_job_volumes(run_spec.configuration.volumes, job_num)
     volume_models = []
     for mount_point in job_volumes:
-        if not is_core_model_instance(mount_point, VolumeMountPoint):
+        if not isinstance(mount_point, VolumeMountPoint):
             continue
         if isinstance(mount_point.name, str):
             names = [mount_point.name]

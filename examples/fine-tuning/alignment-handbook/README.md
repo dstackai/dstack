@@ -156,7 +156,7 @@ If no `idle` instances meet the requirements, it creates a new fleet using one o
 The example folder includes two cloud fleet configurations: [`examples/fine-tuning/alignment-handbook/fleet.dstack.yml`](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/alignment-handbook/fleet.dstack.yml) (a single node with a `24GB` GPU),
 and a [`examples/fine-tuning/alignment-handbook/fleet-distrib.dstack.yml`](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/alignment-handbook/fleet-distrib.dstack.yml) (a cluster of two nodes each with a `24GB` GPU).
 
-You can update the fleet configurations to change the vRAM size, GPU model, number of GPUs per node, or number of nodes. 
+You can update the fleet configurations to change the VRAM size, GPU model, number of GPUs per node, or number of nodes. 
 
 A fleet can be provisioned with `dstack apply`:
 

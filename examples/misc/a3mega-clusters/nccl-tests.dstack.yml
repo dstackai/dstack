@@ -45,5 +45,6 @@ commands:
       # Wait for a message from the first node
       cat ${FIFO}
     fi
+spot_policy: auto
 resources:
   shm_size: 16GB

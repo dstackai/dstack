@@ -2,7 +2,7 @@ import asyncio
 import hashlib
 from asyncio import Lock
 from contextlib import asynccontextmanager
-from typing import Dict, List, Set, Tuple, TypeVar, Union
+from typing import AsyncGenerator, Dict, List, Set, Tuple, TypeVar, Union
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
@@ -49,6 +49,21 @@ async def advisory_lock_ctx(
         yield
     finally:
         if dialect_name == "postgresql":
+            await bind.execute(select(func.pg_advisory_unlock(string_to_lock_id(resource))))
+
+
+@asynccontextmanager
+async def try_advisory_lock_ctx(
+    bind: Union[AsyncConnection, AsyncSession], dialect_name: str, resource: str
+) -> AsyncGenerator[bool, None]:
+    locked = True
+    if dialect_name == "postgresql":
+        res = await bind.execute(select(func.pg_try_advisory_lock(string_to_lock_id(resource))))
+        locked = res.scalar_one()
+    try:
+        yield locked
+    finally:
+        if dialect_name == "postgresql" and locked:
             await bind.execute(select(func.pg_advisory_unlock(string_to_lock_id(resource))))
 
 
