@@ -6,6 +6,11 @@ from dstack.plugins._models import ApplySpec
 
 
 class ApplyPolicy:
+    """
+    A base apply policy class to modify specs on `dstack apply`.
+    Subclass it and return the subclass instance in `Plugin.get_apply_policies()`.
+    """
+
     def on_apply(self, user: str, project: str, spec: ApplySpec) -> ApplySpec:
         """
         Modify `spec` before it's applied.
@@ -56,5 +61,12 @@ class ApplyPolicy:
 
 
 class Plugin:
+    """
+    A base plugin class.
+    Plugins must subclass it, implement public methods,
+    and register the subclass as an entrypoint of the package
+    (https://packaging.python.org/en/latest/specifications/entry-points/).
+    """
+
     def get_apply_policies(self) -> list[ApplyPolicy]:
         return []
