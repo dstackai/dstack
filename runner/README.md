@@ -2,7 +2,7 @@
 
 For overview of `dstack-shim` and `dstack-runner`, see [/contributing/RUNNER-AND-SHIM.md](../contributing/RUNNER-AND-SHIM.md).
 
-## Development
+## Running locally
 
 Here's the steps to build `dstack-shim` and `dstack-runner` and run `dstack` with them locally:
 
@@ -40,6 +40,8 @@ Now you can call shim API:
 >>> s.submit("","", "ubuntu", None)
 ```
 
+### Local backend
+
 You can also run `dstack` end-to-end with local shim and runner by enabling the `local` backend on dstack server:
 
 ```shell
@@ -74,6 +76,38 @@ The `local` backend will submit the run to the locally started shim and runner. 
  Shown 3 of 4041 offers, $56.6266 max
 
 Continue? [y/n]:
+```
+
+## Testing remotely
+
+You can also test the built shim and runner using standard backends (including SSH fleets).
+
+> [!NOTE]
+> To run with standard backends, both the runner and shim must be built for linux/amd64.
+
+Build the runner and shim, and upload them to S3 automatically using `just` (see [`justfile`](justfile)).
+
+> [!IMPORTANT]
+> Before running any `just` commands that upload to S3, you must set the following environment variables:
+>
+> ```shell
+> export DSTACK_SHIM_UPLOAD_VERSION="your-version"
+> export DSTACK_SHIM_UPLOAD_S3_BUCKET="your-bucket"
+> ```
+>
+> These variables are required and must be set before running any upload commands.
+
+```shell
+just upload
+```
+
+To use the built shim and runner with the dstack server, pass the URLs via `DSTACK_SHIM_DOWNLOAD_URL` and `DSTACK_RUNNER_DOWNLOAD_URL`:
+
+```shell
+export DSTACK_SHIM_DOWNLOAD_URL="https://${DSTACK_SHIM_UPLOAD_S3_BUCKET}.s3.amazonaws.com/${DSTACK_SHIM_UPLOAD_VERSION}/binaries/dstack-shim-linux-amd64"
+export DSTACK_RUNNER_DOWNLOAD_URL="https://${DSTACK_SHIM_UPLOAD_S3_BUCKET}.s3.amazonaws.com/${DSTACK_SHIM_UPLOAD_VERSION}/binaries/dstack-runner-linux-amd64"
+
+dstack server --log-level=debug
 ```
 
 ## Dependencies (WIP)
