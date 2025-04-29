@@ -1,0 +1,11 @@
+type: fleet
+# The name is optional, if not specified, generated randomly
+name: mi300x-fleet
+
+# SSH credentials for the on-prem servers
+ssh_config:
+  user: root
+  identity_file: ~/.ssh/id_rsa
+  hosts:
+    - 144.202.58.28
+    - 137.220.58.52

@@ -259,6 +259,8 @@ nav:
         - TPU: examples/accelerators/tpu/index.md
         - Intel Gaudi: examples/accelerators/intel/index.md
         - Tenstorrent: examples/accelerators/tenstorrent/index.md
+    - Cluster:
+        - RCCL Tests: examples/cluster/rccl-tests/index.md
     - Misc:
         - Docker Compose: examples/misc/docker-compose/index.md
         - NCCL Tests: examples/misc/nccl-tests/index.md

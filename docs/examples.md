@@ -160,6 +160,20 @@ hide:
     </a>
 </div>
 
+## Cluster
+<div class="tx-landing__highlights_grid">
+    <a href="/examples/cluster/rccl-tests"
+       class="feature-cell sky">
+        <h3>
+            RCCL tests
+        </h3>
+
+        <p>
+            Run multi-node RCCL tests with MPI
+        </p>
+    </a>
+</div>
+
 ## Misc
 
 <div class="tx-landing__highlights_grid">
