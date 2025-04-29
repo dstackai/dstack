@@ -1,3 +1,4 @@
+import os
 from typing import Any, Dict, List, Optional, Union
 
 from rich.markup import escape
@@ -36,7 +37,7 @@ def print_run_plan(
 
     req = job_plan.job_spec.requirements
     pretty_req = req.pretty_format(resources_only=True)
-    max_price = f"${req.max_price:g}" if req.max_price else "-"
+    max_price = f"${req.max_price:3f}".rstrip("0").rstrip(".") if req.max_price else "-"
     max_duration = (
         format_pretty_duration(job_plan.job_spec.max_duration)
         if job_plan.job_spec.max_duration
@@ -94,14 +95,12 @@ def print_run_plan(
             props.add_row(th("Inactivity duration"), inactivity_duration)
     props.add_row(th("Reservation"), run_spec.configuration.reservation or "-")
 
-    offers = Table(box=None)
+    offers = Table(box=None, expand=os.get_terminal_size()[0] <= 110)
     offers.add_column("#")
-    offers.add_column("BACKEND")
-    offers.add_column("REGION")
-    offers.add_column("INSTANCE TYPE")
-    offers.add_column("RESOURCES")
-    offers.add_column("SPOT")
-    offers.add_column("PRICE")
+    offers.add_column("BACKEND", style="grey58", ratio=2)
+    offers.add_column("RESOURCES", ratio=4)
+    offers.add_column("INSTANCE TYPE", style="grey58", no_wrap=True, ratio=2)
+    offers.add_column("PRICE", style="grey58", ratio=1)
     offers.add_column()
 
     job_plan.offers = job_plan.offers[:max_offers] if max_offers else job_plan.offers
@@ -122,14 +121,12 @@ def print_run_plan(
             instance += f" ({offer.blocks}/{offer.total_blocks})"
         offers.add_row(
             f"{i}",
-            offer.backend.replace("remote", "ssh"),
-            offer.region,
+            offer.backend.replace("remote", "ssh") + " (" + offer.region + ")",
+            r.pretty_format(include_spot=True),
             instance,
-            r.pretty_format(),
-            "yes" if r.spot else "no",
-            f"${offer.price:g}",
+            f"${offer.price:.4f}".rstrip("0").rstrip("."),
             availability,
-            style=None if i == 1 else "secondary",
+            style=None if i == 1 or not include_run_properties else "secondary",
         )
     if job_plan.total_offers > len(job_plan.offers):
         offers.add_row("", "...", style="secondary")
@@ -141,7 +138,8 @@ def print_run_plan(
         if job_plan.total_offers > len(job_plan.offers):
             console.print(
                 f"[secondary] Shown {len(job_plan.offers)} of {job_plan.total_offers} offers, "
-                f"${job_plan.max_price:g} max[/]"
+                f"${job_plan.max_price:3f}".rstrip("0").rstrip(".")
+                + "max[/]"
             )
         console.print()
     else:
@@ -151,19 +149,18 @@ def print_run_plan(
 def get_runs_table(
     runs: List[Run], verbose: bool = False, format_date: DateFormatter = pretty_date
 ) -> Table:
-    table = Table(box=None)
-    table.add_column("NAME", style="bold", no_wrap=True)
-    table.add_column("BACKEND", style="grey58")
+    table = Table(box=None, expand=os.get_terminal_size()[0] <= 110)
+    table.add_column("NAME", style="bold", no_wrap=True, ratio=2)
+    table.add_column("BACKEND", style="grey58", ratio=2)
+    table.add_column("RESOURCES", ratio=3 if not verbose else 2)
     if verbose:
-        table.add_column("INSTANCE", no_wrap=True)
-    table.add_column("RESOURCES")
+        table.add_column("INSTANCE", no_wrap=True, ratio=1)
+        table.add_column("RESERVATION", no_wrap=True, ratio=1)
+    table.add_column("PRICE", style="grey58", ratio=1)
+    table.add_column("STATUS", no_wrap=True, ratio=1)
+    table.add_column("SUBMITTED", style="grey58", no_wrap=True, ratio=1)
     if verbose:
-        table.add_column("RESERVATION", no_wrap=True)
-    table.add_column("PRICE", no_wrap=True)
-    table.add_column("STATUS", no_wrap=True)
-    table.add_column("SUBMITTED", style="grey58", no_wrap=True)
-    if verbose:
-        table.add_column("ERROR", no_wrap=True)
+        table.add_column("ERROR", no_wrap=True, ratio=2)
 
     for run in runs:
         run_error = _get_run_error(run)
@@ -202,10 +199,10 @@ def get_runs_table(
                 job_row.update(
                     {
                         "BACKEND": f"{jpd.backend.value.replace('remote', 'ssh')} ({jpd.region})",
-                        "INSTANCE": instance,
                         "RESOURCES": resources.pretty_format(include_spot=True),
+                        "INSTANCE": instance,
                         "RESERVATION": jpd.reservation,
-                        "PRICE": f"${jpd.price:.4}",
+                        "PRICE": f"${jpd.price:.4f}".rstrip("0").rstrip("."),
                     }
                 )
             if len(run.jobs) == 1:

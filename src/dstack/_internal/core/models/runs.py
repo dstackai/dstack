@@ -162,7 +162,7 @@ class Requirements(CoreModel):
             if self.spot is not None:
                 res += f", {'spot' if self.spot else 'on-demand'}"
             if self.max_price is not None:
-                res += f" under ${self.max_price:g} per hour"
+                res += f" under ${self.max_price:3f}".rstrip("0").rstrip(".") + " per hour"
         return res
 
 
