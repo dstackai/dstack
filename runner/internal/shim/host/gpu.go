@@ -18,13 +18,16 @@ import (
 
 const amdSmiImage = "un1def/amd-smi:6.2.2-0"
 
+const ttSmiImage = "dstackai/tt-smi:latest"
+
 type GpuVendor string
 
 const (
-	GpuVendorNone   GpuVendor = "none"
-	GpuVendorNvidia GpuVendor = "nvidia"
-	GpuVendorAmd    GpuVendor = "amd"
-	GpuVendorIntel  GpuVendor = "intel"
+	GpuVendorNone        GpuVendor = "none"
+	GpuVendorNvidia      GpuVendor = "nvidia"
+	GpuVendorAmd         GpuVendor = "amd"
+	GpuVendorIntel       GpuVendor = "intel"
+	GpuVendorTenstorrent GpuVendor = "tenstorrent"
 )
 
 type GpuInfo struct {
@@ -57,6 +60,9 @@ func GetGpuVendor() GpuVendor {
 	if _, err := os.Stat("/dev/accel"); !errors.Is(err, os.ErrNotExist) {
 		return GpuVendorIntel
 	}
+	if _, err := os.Stat("/dev/tenstorrent"); !errors.Is(err, os.ErrNotExist) {
+		return GpuVendorTenstorrent
+	}
 	return GpuVendorNone
 }
 
@@ -68,6 +74,8 @@ func GetGpuInfo(ctx context.Context) []GpuInfo {
 		return getAmdGpuInfo(ctx)
 	case GpuVendorIntel:
 		return getIntelGpuInfo(ctx)
+	case GpuVendorTenstorrent:
+		return getTenstorrentGpuInfo(ctx)
 	case GpuVendorNone:
 		return []GpuInfo{}
 	}
@@ -192,6 +200,85 @@ func getAmdGpuInfo(ctx context.Context) []GpuInfo {
 			RenderNodePath: renderNodePath,
 		})
 	}
+	return gpus
+}
+
+type ttSmiSnapshot struct {
+	DeviceInfo []ttDeviceInfo `json:"device_info"`
+}
+
+type ttDeviceInfo struct {
+	BoardInfo ttBoardInfo `json:"board_info"`
+}
+
+type ttBoardInfo struct {
+	BoardType string `json:"board_type"`
+	BusID     string `json:"bus_id"`
+}
+
+func getTenstorrentGpuInfo(ctx context.Context) []GpuInfo {
+	gpus := []GpuInfo{}
+
+	cmd := execute.ExecTask{
+		Command: "docker",
+		Args: []string{
+			"run",
+			"--rm",
+			"--device", "/dev/tenstorrent",
+			ttSmiImage,
+			"-s",
+		},
+		StreamStdio: false,
+	}
+	res, err := cmd.Execute(ctx)
+	if err != nil {
+		log.Error(ctx, "failed to execute tt-smi", "err", err)
+		return gpus
+	}
+	if res.ExitCode != 0 {
+		log.Error(
+			ctx, "failed to execute tt-smi",
+			"exitcode", res.ExitCode, "stdout", res.Stdout, "stderr", res.Stderr,
+		)
+		return gpus
+	}
+
+	var ttSmiSnapshot ttSmiSnapshot
+	if err := json.Unmarshal([]byte(res.Stdout), &ttSmiSnapshot); err != nil {
+		log.Error(ctx, "cannot read tt-smi json", "err", err)
+		log.Debug(ctx, "tt-smi output", "stdout", res.Stdout)
+		return gpus
+	}
+
+	for i, device := range ttSmiSnapshot.DeviceInfo {
+		// Extract board type without R/L suffix
+		boardType := strings.TrimSpace(device.BoardInfo.BoardType)
+		name := boardType
+
+		// Remove " R" or " L" suffix if present
+		if strings.HasSuffix(boardType, " R") {
+			name = boardType[:len(boardType)-2]
+		} else if strings.HasSuffix(boardType, " L") {
+			name = boardType[:len(boardType)-2]
+		}
+
+		// Determine VRAM based on board type
+		vram := 0
+		if strings.HasPrefix(name, "n150") {
+			vram = 12 * 1024 // 12GB in MiB
+		} else if strings.HasPrefix(name, "n300") {
+			vram = 24 * 1024 // 24GB in MiB
+		}
+
+		gpus = append(gpus, GpuInfo{
+			Vendor: GpuVendorTenstorrent,
+			Name:   name,
+			Vram:   vram,
+			ID:     device.BoardInfo.BusID,
+			Index:  strconv.Itoa(i),
+		})
+	}
+
 	return gpus
 }
 

@@ -246,6 +246,8 @@ class GPUSpec(CoreModel):
         v = v.lower()
         if v == "tpu":
             return gpuhunt.AcceleratorVendor.GOOGLE
+        if v == "tt":
+            return gpuhunt.AcceleratorVendor.TENSTORRENT
         return gpuhunt.AcceleratorVendor.cast(v)
 
 
