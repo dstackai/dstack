@@ -125,6 +125,7 @@ server = [
     "python-json-logger>=3.1.0",
     "prometheus-client",
     "grpcio>=1.50",
+    "backports.entry-points-selectable",
 ]
 aws = [
     "boto3",

@@ -197,7 +197,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         pool_instances = list(res.unique().scalars().all())
         instances_ids = sorted([i.id for i in pool_instances])
         if get_db().dialect_name == "sqlite":
-            # Start new transaction to see commited changes after lock
+            # Start new transaction to see committed changes after lock
             await session.commit()
         async with get_locker().lock_ctx(InstanceModel.__tablename__, instances_ids):
             # If another job freed the instance but is still trying to detach volumes,

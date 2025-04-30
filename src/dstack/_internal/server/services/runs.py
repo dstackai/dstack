@@ -79,6 +79,7 @@ from dstack._internal.server.services.jobs import (
 from dstack._internal.server.services.locking import get_locker, string_to_lock_id
 from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.offers import get_offers_by_requirements
+from dstack._internal.server.services.plugins import apply_plugin_policies
 from dstack._internal.server.services.projects import list_project_models, list_user_project_models
 from dstack._internal.server.services.users import get_user_model_by_name
 from dstack._internal.utils.logging import get_logger
@@ -279,7 +280,14 @@ async def get_plan(
     run_spec: RunSpec,
     max_offers: Optional[int],
 ) -> RunPlan:
+    # Spec must be copied by parsing to calculate merged_profile
     effective_run_spec = RunSpec.parse_obj(run_spec.dict())
+    effective_run_spec = apply_plugin_policies(
+        user=user.name,
+        project=project.name,
+        spec=effective_run_spec,
+    )
+    effective_run_spec = RunSpec.parse_obj(effective_run_spec.dict())
     _validate_run_spec_and_set_defaults(effective_run_spec)
 
     profile = effective_run_spec.merged_profile
@@ -370,28 +378,36 @@ async def apply_plan(
     plan: ApplyRunPlanInput,
     force: bool,
 ) -> Run:
-    _validate_run_spec_and_set_defaults(plan.run_spec)
-    if plan.run_spec.run_name is None:
+    run_spec = plan.run_spec
+    run_spec = apply_plugin_policies(
+        user=user.name,
+        project=project.name,
+        spec=run_spec,
+    )
+    # Spec must be copied by parsing to calculate merged_profile
+    run_spec = RunSpec.parse_obj(run_spec.dict())
+    _validate_run_spec_and_set_defaults(run_spec)
+    if run_spec.run_name is None:
         return await submit_run(
             session=session,
             user=user,
             project=project,
-            run_spec=plan.run_spec,
+            run_spec=run_spec,
         )
     current_resource = await get_run_by_name(
         session=session,
         project=project,
-        run_name=plan.run_spec.run_name,
+        run_name=run_spec.run_name,
     )
     if current_resource is None or current_resource.status.is_finished():
         return await submit_run(
             session=session,
             user=user,
             project=project,
-            run_spec=plan.run_spec,
+            run_spec=run_spec,
         )
     try:
-        _check_can_update_run_spec(current_resource.run_spec, plan.run_spec)
+        _check_can_update_run_spec(current_resource.run_spec, run_spec)
     except ServerClientError:
         # The except is only needed to raise an appropriate error if run is active
         if not current_resource.status.is_finished():
@@ -409,14 +425,12 @@ async def apply_plan(
     # FIXME: potentially long write transaction
     # Avoid getting run_model after update
     await session.execute(
-        update(RunModel)
-        .where(RunModel.id == current_resource.id)
-        .values(run_spec=plan.run_spec.json())
+        update(RunModel).where(RunModel.id == current_resource.id).values(run_spec=run_spec.json())
     )
     run = await get_run_by_name(
         session=session,
         project=project,
-        run_name=plan.run_spec.run_name,
+        run_name=run_spec.run_name,
     )
     return common_utils.get_or_error(run)
 
@@ -436,7 +450,7 @@ async def submit_run(
 
     lock_namespace = f"run_names_{project.name}"
     if get_db().dialect_name == "sqlite":
-        # Start new transaction to see commited changes after lock
+        # Start new transaction to see committed changes after lock
         await session.commit()
     elif get_db().dialect_name == "postgresql":
         await session.execute(

@@ -55,6 +55,7 @@ from dstack._internal.server.services.locking import (
     get_locker,
     string_to_lock_id,
 )
+from dstack._internal.server.services.plugins import apply_plugin_policies
 from dstack._internal.server.services.projects import (
     get_member,
     get_member_permissions,
@@ -234,7 +235,14 @@ async def get_plan(
     user: UserModel,
     spec: FleetSpec,
 ) -> FleetPlan:
+    # Spec must be copied by parsing to calculate merged_profile
     effective_spec = FleetSpec.parse_obj(spec.dict())
+    effective_spec = apply_plugin_policies(
+        user=user.name,
+        project=project.name,
+        spec=effective_spec,
+    )
+    effective_spec = FleetSpec.parse_obj(effective_spec.dict())
     current_fleet: Optional[Fleet] = None
     current_fleet_id: Optional[uuid.UUID] = None
     if effective_spec.configuration.name is not None:
@@ -330,6 +338,13 @@ async def create_fleet(
     user: UserModel,
     spec: FleetSpec,
 ) -> Fleet:
+    # Spec must be copied by parsing to calculate merged_profile
+    spec = apply_plugin_policies(
+        user=user.name,
+        project=project.name,
+        spec=spec,
+    )
+    spec = FleetSpec.parse_obj(spec.dict())
     _validate_fleet_spec(spec)
 
     if spec.configuration.ssh_config is not None:
