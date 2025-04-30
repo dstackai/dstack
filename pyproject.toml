@@ -34,7 +34,6 @@ dependencies = [
     "psutil",
     "gpuhunt>=0.1.3,<0.2.0",
     "argcomplete>=3.5.0",
-    "backports.entry-points-selectable",
 ]
 
 [project.urls]
@@ -126,6 +125,7 @@ server = [
     "python-json-logger>=3.1.0",
     "prometheus-client",
     "grpcio>=1.50",
+    "backports.entry-points-selectable",
 ]
 aws = [
     "boto3",

@@ -105,6 +105,9 @@ class ExamplePolicy(ApplyPolicy):
         if spec.configuration.privileged:
             logger.warning("User %s tries to run privileged containers", user)
             raise ValueError("Running privileged containers is forbidden")
+        # Set some service-specific properties
+        if isinstance(spec.configuration, Service):  
+            spec.configuration.https = True
         return spec
 ```
 
