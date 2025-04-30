@@ -1073,6 +1073,14 @@ func configureGpus(config *container.Config, hostConfig *container.HostConfig, v
 				},
 			)
 		}
+		// Check and mount hugepages-1G if it exists
+		if _, err := os.Stat("/dev/hugepages-1G"); err == nil {
+			hostConfig.Mounts = append(hostConfig.Mounts, mount.Mount{
+				Type:   mount.TypeBind,
+				Source: "/dev/hugepages-1G",
+				Target: "/dev/hugepages-1G",
+			})
+		}
 	case host.GpuVendorIntel:
 		// All options are listed here:
 		// https://docs.habana.ai/en/latest/Installation_Guide/Additional_Installation/Docker_Installation.html
