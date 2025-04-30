@@ -564,8 +564,9 @@ func formatAndMountVolume(ctx context.Context, volume VolumeInfo) error {
 }
 
 func getVolumeMountPoint(volumeName string) string {
-	// Put volumes in data-specific dir to avoid clashes with host dirs
-	return fmt.Sprintf("/dstack-volumes/%s", volumeName)
+	// Put volumes in dstack-specific dir to avoid clashes with host dirs.
+	// /mnt/disks is used since on some VM images other places may not be writable (e.g. GCP COS).
+	return fmt.Sprintf("/mnt/disks/dstack-volumes/%s", volumeName)
 }
 
 func prepareInstanceMountPoints(taskConfig TaskConfig) error {
