@@ -205,12 +205,17 @@ def _get_network_interfaces(
     else:
         network_interface.access_configs = []
 
+    if extra_subnetworks:
+        # Multiple interfaces are set only for GPU VM that require gVNIC for best performance
+        network_interface.nic_type = compute_v1.NetworkInterface.NicType.GVNIC.name
+
     network_interfaces = [network_interface]
     for network, subnetwork in extra_subnetworks or []:
         network_interfaces.append(
             compute_v1.NetworkInterface(
                 network=network,
                 subnetwork=subnetwork,
+                nic_type=compute_v1.NetworkInterface.NicType.GVNIC.name,
             )
         )
     return network_interfaces
@@ -437,7 +442,7 @@ def wait_for_operation(operation: Operation, verbose_name: str = "operation", ti
         raise
     except Exception as e:
         # Write only debug logs here.
-        # The unexpected errors will be propagated and logged appropriatly by the caller.
+        # The unexpected errors will be propagated and logged appropriately by the caller.
         logger.debug("Error during %s: %s", verbose_name, e)
         raise operation.exception() or e
     return result
