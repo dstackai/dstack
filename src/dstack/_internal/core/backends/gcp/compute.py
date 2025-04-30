@@ -411,8 +411,10 @@ class GCPCompute(
             name=placement_group.name,
             region=placement_group.configuration.region,
             group_placement_policy=compute_v1.ResourcePolicyGroupPlacementPolicy(
-                availability_domain_count=1,
-                collocation="COLLOCATED",
+                # GCP documents only collocation="COLLOCATED"
+                # but collocation="AS_COMPACT" actually places VMs on the same host
+                # and improves networking performance. Discovered with Gemini.
+                collocation="AS_COMPACT",
             ),
         )
         self.resource_policies_client.insert(
