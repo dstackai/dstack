@@ -6,6 +6,7 @@ from typing import Callable, Dict, List, Literal, Optional, Tuple
 import google.api_core.exceptions
 import google.cloud.compute_v1 as compute_v1
 from google.cloud import tpu_v2
+from googleapiclient import discovery
 from gpuhunt import KNOWN_TPUS
 
 import dstack._internal.core.backends.gcp.auth as auth
@@ -98,6 +99,7 @@ class GCPCompute(
         self.resource_policies_client = compute_v1.ResourcePoliciesClient(
             credentials=self.credentials
         )
+        self.compute_beta_client = discovery.build("compute", "beta", credentials=self.credentials)
 
     def get_offers(
         self, requirements: Optional[Requirements] = None
@@ -407,19 +409,21 @@ class GCPCompute(
         self,
         placement_group: PlacementGroup,
     ) -> PlacementGroupProvisioningData:
-        policy = compute_v1.ResourcePolicy(
-            name=placement_group.name,
-            region=placement_group.configuration.region,
-            group_placement_policy=compute_v1.ResourcePolicyGroupPlacementPolicy(
-                availability_domain_count=1,
-                collocation="COLLOCATED",
-            ),
-        )
-        self.resource_policies_client.insert(
+        policy_body = {
+            "name": placement_group.name,
+            "region": placement_group.configuration.region,
+            "groupPlacementPolicy": {
+                "collocation": "AS_COMPACT",
+                # "availabilityDomainCount": 1,
+                # "maxDistance": 0,
+            },
+        }
+        request = self.compute_beta_client.resourcePolicies().insert(
             project=self.config.project_id,
             region=placement_group.configuration.region,
-            resource_policy_resource=policy,
+            body=policy_body,
         )
+        request.execute()
         return PlacementGroupProvisioningData(backend=BackendType.GCP)
 
     def delete_placement_group(
