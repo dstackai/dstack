@@ -206,6 +206,7 @@ nav:
           - Backends: docs/concepts/backends.md
           - Projects: docs/concepts/projects.md
           - Gateways: docs/concepts/gateways.md
+          - Plugins: docs/concepts/plugins.md
       - Guides:
           - Protips: docs/guides/protips.md
           - Server deployment: docs/guides/server-deployment.md
