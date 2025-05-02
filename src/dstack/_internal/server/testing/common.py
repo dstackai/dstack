@@ -51,7 +51,7 @@ from dstack._internal.core.models.profiles import (
 )
 from dstack._internal.core.models.repos.base import RepoType
 from dstack._internal.core.models.repos.local import LocalRunRepoData
-from dstack._internal.core.models.resources import Memory, Range, ResourcesSpec
+from dstack._internal.core.models.resources import CPUSpec, Memory, Range, ResourcesSpec
 from dstack._internal.core.models.runs import (
     JobProvisioningData,
     JobRuntimeData,
@@ -549,7 +549,7 @@ async def create_instance(
         profile = Profile(name="test_name")
 
     if requirements is None:
-        requirements = Requirements(resources=ResourcesSpec(cpu=1))
+        requirements = Requirements(resources=ResourcesSpec(cpu=CPUSpec.parse("1")))
 
     if instance_configuration is None:
         instance_configuration = get_instance_configuration()
@@ -659,20 +659,7 @@ def get_remote_connection_info(
     env: Optional[Union[Env, dict]] = None,
 ):
     if ssh_keys is None:
-        ssh_keys = [
-            SSHKey(
-                public="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIO6mJxVbNtm0zXgMLvByrhXJCmJRveSrJxLB5/OzcyCk",
-                private="""
-                    -----BEGIN OPENSSH PRIVATE KEY-----
-                    b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
-                    QyNTUxOQAAACDupicVWzbZtM14DC7wcq4VyQpiUb3kqycSwefzs3MgpAAAAJCiWa5Volmu
-                    VQAAAAtzc2gtZWQyNTUxOQAAACDupicVWzbZtM14DC7wcq4VyQpiUb3kqycSwefzs3MgpA
-                    AAAEAncHi4AhS6XdMp5Gzd+IMse/4ekyQ54UngByf0Sp0uH+6mJxVbNtm0zXgMLvByrhXJ
-                    CmJRveSrJxLB5/OzcyCkAAAACWRlZkBkZWZwYwECAwQ=
-                    -----END OPENSSH PRIVATE KEY-----
-                """,
-            )
-        ]
+        ssh_keys = [get_ssh_key()]
     if env is None:
         env = Env()
     elif isinstance(env, dict):
@@ -683,6 +670,21 @@ def get_remote_connection_info(
         ssh_user=ssh_user,
         ssh_keys=ssh_keys,
         env=env,
+    )
+
+
+def get_ssh_key() -> SSHKey:
+    return SSHKey(
+        public="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIO6mJxVbNtm0zXgMLvByrhXJCmJRveSrJxLB5/OzcyCk",
+        private="""
+                    -----BEGIN OPENSSH PRIVATE KEY-----
+                    b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
+                    QyNTUxOQAAACDupicVWzbZtM14DC7wcq4VyQpiUb3kqycSwefzs3MgpAAAAJCiWa5Volmu
+                    VQAAAAtzc2gtZWQyNTUxOQAAACDupicVWzbZtM14DC7wcq4VyQpiUb3kqycSwefzs3MgpA
+                    AAAEAncHi4AhS6XdMp5Gzd+IMse/4ekyQ54UngByf0Sp0uH+6mJxVbNtm0zXgMLvByrhXJ
+                    CmJRveSrJxLB5/OzcyCkAAAACWRlZkBkZWZwYwECAwQ=
+                    -----END OPENSSH PRIVATE KEY-----
+                """,
     )
 
 

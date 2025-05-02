@@ -14,6 +14,7 @@ from dstack._internal.core.models.repos.local import LocalRepo
 from dstack._internal.core.models.repos.remote import RemoteRepo
 from dstack._internal.core.models.repos.virtual import VirtualRepo
 from dstack._internal.core.models.resources import ComputeCapability, Memory, Range
+from dstack._internal.core.models.resources import CPUSpec as CPU
 from dstack._internal.core.models.resources import DiskSpec as Disk
 from dstack._internal.core.models.resources import GPUSpec as GPU
 from dstack._internal.core.models.resources import ResourcesSpec as Resources

@@ -62,6 +62,7 @@ from dstack._internal.server.services.projects import (
     list_project_models,
     list_user_project_models,
 )
+from dstack._internal.server.services.resources import set_resources_defaults
 from dstack._internal.utils import random_names
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.ssh import pkey_from_str
@@ -243,6 +244,7 @@ async def get_plan(
         spec=effective_spec,
     )
     effective_spec = FleetSpec.parse_obj(effective_spec.dict())
+    _validate_fleet_spec_and_set_defaults(spec)
     current_fleet: Optional[Fleet] = None
     current_fleet_id: Optional[uuid.UUID] = None
     if effective_spec.configuration.name is not None:
@@ -345,7 +347,7 @@ async def create_fleet(
         spec=spec,
     )
     spec = FleetSpec.parse_obj(spec.dict())
-    _validate_fleet_spec(spec)
+    _validate_fleet_spec_and_set_defaults(spec)
 
     if spec.configuration.ssh_config is not None:
         _check_can_manage_ssh_fleets(user=user, project=project)
@@ -652,7 +654,7 @@ def _remove_fleet_spec_sensitive_info(spec: FleetSpec):
                 host.ssh_key = None
 
 
-def _validate_fleet_spec(spec: FleetSpec):
+def _validate_fleet_spec_and_set_defaults(spec: FleetSpec):
     if spec.configuration.name is not None:
         validate_dstack_resource_name(spec.configuration.name)
     if spec.configuration.ssh_config is None and spec.configuration.nodes is None:
@@ -665,6 +667,8 @@ def _validate_fleet_spec(spec: FleetSpec):
             if isinstance(host, SSHHostParams) and host.ssh_key is not None:
                 _validate_ssh_key(host.ssh_key)
         _validate_internal_ips(spec.configuration.ssh_config)
+    if spec.configuration.resources is not None:
+        set_resources_defaults(spec.configuration.resources)
 
 
 def _validate_all_ssh_params_specified(ssh_config: SSHParams):

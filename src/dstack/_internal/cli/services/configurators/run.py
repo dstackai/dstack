@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
 
 import gpuhunt
+from pydantic import parse_obj_as
 
 import dstack._internal.core.models.resources as resources
 from dstack._internal.cli.services.args import disk_spec, gpu_spec, port_mapping
@@ -39,6 +40,7 @@ from dstack._internal.core.models.configurations import (
     TaskConfiguration,
 )
 from dstack._internal.core.models.repos.base import Repo
+from dstack._internal.core.models.resources import CPUSpec
 from dstack._internal.core.models.runs import JobSubmission, JobTerminationReason, RunStatus
 from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.core.services.diff import diff_models
@@ -72,6 +74,7 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
     ):
         self.apply_args(conf, configurator_args, unknown_args)
         self.validate_gpu_vendor_and_image(conf)
+        self.validate_cpu_arch_and_image(conf)
         if repo is None:
             repo = self.api.repos.load(Path.cwd())
         config_manager = ConfigManager()
@@ -342,7 +345,7 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
 
     def validate_gpu_vendor_and_image(self, conf: BaseRunConfiguration) -> None:
         """
-        Infers `resources.gpu.vendor` if not set, requires `image` if the vendor is AMD.
+        Infers and sets `resources.gpu.vendor` if not set, requires `image` if the vendor is AMD.
         """
         gpu_spec = conf.resources.gpu
         if gpu_spec is None:
@@ -399,6 +402,29 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
             raise ConfigurationError(
                 "`image` is required if `resources.gpu.vendor` is `tenstorrent`"
             )
+
+    def validate_cpu_arch_and_image(self, conf: BaseRunConfiguration) -> None:
+        """
+        Infers `resources.cpu.arch` if not set, requires `image` if the architecture is ARM.
+        """
+        # TODO: Remove in 0.20. Use conf.resources.cpu directly
+        cpu_spec = parse_obj_as(CPUSpec, conf.resources.cpu)
+        arch = cpu_spec.arch
+        if arch is None:
+            gpu_spec = conf.resources.gpu
+            if (
+                gpu_spec is not None
+                and gpu_spec.vendor == gpuhunt.AcceleratorVendor.NVIDIA
+                and gpu_spec.name
+                and any(map(gpuhunt.is_nvidia_superchip, gpu_spec.name))
+            ):
+                arch = gpuhunt.CPUArchitecture.ARM
+            else:
+                arch = gpuhunt.CPUArchitecture.X86
+        # NOTE: We don't set the inferred resources.cpu.arch for compatibility with older servers.
+        # Servers with ARM support set the arch using the same logic.
+        if arch == gpuhunt.CPUArchitecture.ARM and conf.image is None:
+            raise ConfigurationError("`image` is required if `resources.cpu.arch` is `arm`")
 
 
 class RunWithPortsConfigurator(BaseRunConfigurator):

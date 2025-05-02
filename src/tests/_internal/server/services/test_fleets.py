@@ -23,6 +23,7 @@ from dstack._internal.server.testing.common import (
     create_project,
     create_user,
     get_fleet_spec,
+    get_ssh_key,
 )
 
 
@@ -36,7 +37,12 @@ class TestGetPlanSSHFleetHostsValidation:
     def get_ssh_fleet_spec(
         self, name: Optional[str], hosts: list[Union[SSHHostParams, str]]
     ) -> FleetSpec:
-        ssh_config = SSHParams(hosts=hosts, network=None)
+        ssh_config = SSHParams(
+            hosts=hosts,
+            network=None,
+            user="ubuntu",
+            ssh_key=get_ssh_key(),
+        )
         fleet_conf = FleetConfiguration(name=name, ssh_config=ssh_config)
         return get_fleet_spec(conf=fleet_conf)
 

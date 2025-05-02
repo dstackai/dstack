@@ -6,7 +6,7 @@ import threading
 from abc import ABC, abstractmethod
 from functools import lru_cache
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Literal, Optional
 
 import git
 import requests
@@ -43,6 +43,8 @@ logger = get_logger(__name__)
 
 DSTACK_SHIM_BINARY_NAME = "dstack-shim"
 DSTACK_RUNNER_BINARY_NAME = "dstack-runner"
+
+GoArchType = Literal["amd64", "arm64"]
 
 
 class Compute(ABC):
@@ -483,13 +485,14 @@ def get_shim_env(
     base_path: Optional[PathLike] = None,
     bin_path: Optional[PathLike] = None,
     backend_shim_env: Optional[Dict[str, str]] = None,
+    arch: Optional[str] = None,
 ) -> Dict[str, str]:
     log_level = "6"  # Trace
     envs = {
         "DSTACK_SHIM_HOME": get_dstack_working_dir(base_path),
         "DSTACK_SHIM_HTTP_PORT": str(DSTACK_SHIM_HTTP_PORT),
         "DSTACK_SHIM_LOG_LEVEL": log_level,
-        "DSTACK_RUNNER_DOWNLOAD_URL": get_dstack_runner_download_url(),
+        "DSTACK_RUNNER_DOWNLOAD_URL": get_dstack_runner_download_url(arch),
         "DSTACK_RUNNER_BINARY_PATH": get_dstack_runner_binary_path(bin_path),
         "DSTACK_RUNNER_HTTP_PORT": str(DSTACK_RUNNER_HTTP_PORT),
         "DSTACK_RUNNER_SSH_PORT": str(DSTACK_RUNNER_SSH_PORT),
@@ -509,16 +512,19 @@ def get_shim_commands(
     base_path: Optional[PathLike] = None,
     bin_path: Optional[PathLike] = None,
     backend_shim_env: Optional[Dict[str, str]] = None,
+    arch: Optional[str] = None,
 ) -> List[str]:
     commands = get_shim_pre_start_commands(
         base_path=base_path,
         bin_path=bin_path,
+        arch=arch,
     )
     shim_env = get_shim_env(
         authorized_keys=authorized_keys,
         base_path=base_path,
         bin_path=bin_path,
         backend_shim_env=backend_shim_env,
+        arch=arch,
     )
     for k, v in shim_env.items():
         commands += [f'export "{k}={v}"']
@@ -539,35 +545,63 @@ def get_dstack_runner_version() -> str:
     return version or "latest"
 
 
-def get_dstack_runner_download_url() -> str:
-    if url := os.environ.get("DSTACK_RUNNER_DOWNLOAD_URL"):
-        return url
-    build = get_dstack_runner_version()
-    if settings.DSTACK_VERSION is not None:
-        bucket = "dstack-runner-downloads"
-    else:
-        bucket = "dstack-runner-downloads-stgn"
-    return (
-        f"https://{bucket}.s3.eu-west-1.amazonaws.com/{build}/binaries/dstack-runner-linux-amd64"
-    )
+def normalize_arch(arch: Optional[str] = None) -> GoArchType:
+    """
+    Converts the given free-form architecture string to the Go GOARCH format.
+    Only 64-bit x86 and ARM are supported. If the word size is not specified (e.g., `x86`, `arm`),
+    64-bit is implied.
+    If the arch is not specified, falls back to `amd64`.
+    """
+    if not arch:
+        return "amd64"
+    arch_lower = arch.lower()
+    if "32" in arch_lower or arch_lower in ["i386", "i686"]:
+        raise ValueError(f"32-bit architectures are not supported: {arch}")
+    if arch_lower.startswith("x86") or arch_lower.startswith("amd"):
+        return "amd64"
+    if arch_lower.startswith("arm") or arch_lower.startswith("aarch"):
+        return "arm64"
+    raise ValueError(f"Unsupported architecture: {arch}")
 
 
-def get_dstack_shim_download_url() -> str:
-    if url := os.environ.get("DSTACK_SHIM_DOWNLOAD_URL"):
-        return url
-    build = get_dstack_runner_version()
-    if settings.DSTACK_VERSION is not None:
-        bucket = "dstack-runner-downloads"
-    else:
-        bucket = "dstack-runner-downloads-stgn"
-    return f"https://{bucket}.s3.eu-west-1.amazonaws.com/{build}/binaries/dstack-shim-linux-amd64"
+def get_dstack_runner_download_url(arch: Optional[str] = None) -> str:
+    url_template = os.environ.get("DSTACK_RUNNER_DOWNLOAD_URL")
+    if not url_template:
+        if settings.DSTACK_VERSION is not None:
+            bucket = "dstack-runner-downloads"
+        else:
+            bucket = "dstack-runner-downloads-stgn"
+        url_template = (
+            f"https://{bucket}.s3.eu-west-1.amazonaws.com"
+            "/{version}/binaries/dstack-runner-linux-{arch}"
+        )
+    version = get_dstack_runner_version()
+    arch = normalize_arch(arch)
+    return url_template.format(version=version, arch=arch)
+
+
+def get_dstack_shim_download_url(arch: Optional[str] = None) -> str:
+    url_template = os.environ.get("DSTACK_SHIM_DOWNLOAD_URL")
+    if not url_template:
+        if settings.DSTACK_VERSION is not None:
+            bucket = "dstack-runner-downloads"
+        else:
+            bucket = "dstack-runner-downloads-stgn"
+        url_template = (
+            f"https://{bucket}.s3.eu-west-1.amazonaws.com"
+            "/{version}/binaries/dstack-shim-linux-{arch}"
+        )
+    version = get_dstack_runner_version()
+    arch = normalize_arch(arch)
+    return url_template.format(version=version, arch=arch)
 
 
 def get_shim_pre_start_commands(
     base_path: Optional[PathLike] = None,
     bin_path: Optional[PathLike] = None,
+    arch: Optional[str] = None,
 ) -> List[str]:
-    url = get_dstack_shim_download_url()
+    url = get_dstack_shim_download_url(arch)
     dstack_shim_binary_path = get_dstack_shim_binary_path(bin_path)
     dstack_working_dir = get_dstack_working_dir(base_path)
     return [

@@ -117,8 +117,11 @@ For more details on the options below, refer to the [server deployment](../guide
      * `DSTACK_SERVER_MAX_OFFERS_TRIED` - Sets how many instance offers to try when starting a job.
        Setting a high value can degrade server performance.
      * `DSTACK_RUNNER_VERSION` – Sets exact runner version for debug. Defaults to `latest`. Ignored if `DSTACK_RUNNER_DOWNLOAD_URL` is set.
-     * `DSTACK_RUNNER_DOWNLOAD_URL` – Overrides `dstack-runner` binary download URL.
-     * `DSTACK_SHIM_DOWNLOAD_URL` – Overrides `dstack-shim` binary download URL.
+     * `DSTACK_RUNNER_DOWNLOAD_URL` – Overrides `dstack-runner` binary download URL. The URL can contain `{version}` and/or `{arch}` placeholders,
+      where `{version}` is `dstack` version in the `X.Y.Z` format or `latest`, and `{arch}` is either `amd64` or `arm64`, for example,
+      `https://dstack.example.com/{arch}/{version}/dstack-runner`.
+     * `DSTACK_SHIM_DOWNLOAD_URL` – Overrides `dstack-shim` binary download URL. The URL can contain `{version}` and/or `{arch}` placeholders,
+      see `DSTACK_RUNNER_DOWNLOAD_URL` for the details.
      * `DSTACK_DEFAULT_CREDS_DISABLED` – Disables default credentials detection if set. Defaults to `None`.
      * `DSTACK_LOCAL_BACKEND_ENABLED` – Enables local backend for debug if set. Defaults to `None`.
 

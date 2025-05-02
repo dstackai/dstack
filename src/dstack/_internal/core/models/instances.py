@@ -49,11 +49,13 @@ class Resources(CoreModel):
     spot: bool
     disk: Disk = Disk(size_mib=102400)  # the default value (100GB) for backward compatibility
     description: str = ""
+    cpu_arch: Optional[gpuhunt.CPUArchitecture] = None
 
     def pretty_format(self, include_spot: bool = False) -> str:
         resources = {}
         if self.cpus > 0:
             resources["cpus"] = self.cpus
+            resources["cpu_arch"] = self.cpu_arch
         if self.memory_mib > 0:
             resources["memory"] = f"{self.memory_mib / 1024:.0f}GB"
         if self.disk.size_mib > 0:

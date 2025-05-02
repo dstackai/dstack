@@ -643,7 +643,7 @@ class TestAddSSHInstance:
 
     @pytest.fixture
     def deploy_instance_mock(self, monkeypatch: pytest.MonkeyPatch, host_info: dict):
-        mock = Mock(return_value=(HealthStatus(healthy=True, reason="OK"), host_info))
+        mock = Mock(return_value=(HealthStatus(healthy=True, reason="OK"), host_info, "amd64"))
         monkeypatch.setattr(
             "dstack._internal.server.background.tasks.process_instances._deploy_instance", mock
         )

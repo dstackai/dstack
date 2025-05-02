@@ -1,4 +1,5 @@
 import asyncio
+import enum
 import itertools
 import re
 import time
@@ -83,6 +84,8 @@ def pretty_date(time: datetime) -> str:
 
 
 def pretty_resources(
+    *,
+    cpu_arch: Optional[Any] = None,
     cpus: Optional[Any] = None,
     memory: Optional[Any] = None,
     gpu_count: Optional[Any] = None,
@@ -110,7 +113,16 @@ def pretty_resources(
     """
     parts = []
     if cpus is not None:
-        parts.append(f"cpu={cpus}")
+        cpu_arch_lower: Optional[str] = None
+        if isinstance(cpu_arch, enum.Enum):
+            cpu_arch_lower = str(cpu_arch.value).lower()
+        elif isinstance(cpu_arch, str):
+            cpu_arch_lower = cpu_arch.lower()
+        if cpu_arch_lower == "arm":
+            cpu_arch_prefix = "arm:"
+        else:
+            cpu_arch_prefix = ""
+        parts.append(f"cpu={cpu_arch_prefix}{cpus}")
     if memory is not None:
         parts.append(f"mem={memory}")
     if disk_size:
