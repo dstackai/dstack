@@ -7,7 +7,7 @@ for AI workloads both in the cloud and on-prem, speeding up the development, tra
 
 #### Accelerators
 
-`dstack` supports `NVIDIA`, `AMD`, `Google TPU`, and `Intel Gaudi` accelerators out of the box.
+`dstack` supports `NVIDIA`, `AMD`, `TPU`, `Intel Gaudi`, and `Tenstorrent` accelerators out of the box.
 
 ## How does it work?
 
