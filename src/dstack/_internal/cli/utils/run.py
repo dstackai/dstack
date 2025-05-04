@@ -1,4 +1,4 @@
-import os
+import shutil
 from typing import Any, Dict, List, Optional, Union
 
 from rich.markup import escape
@@ -95,7 +95,7 @@ def print_run_plan(
             props.add_row(th("Inactivity duration"), inactivity_duration)
     props.add_row(th("Reservation"), run_spec.configuration.reservation or "-")
 
-    offers = Table(box=None, expand=os.get_terminal_size()[0] <= 110)
+    offers = Table(box=None, expand=shutil.get_terminal_size(fallback=(120, 40)).columns <= 110)
     offers.add_column("#")
     offers.add_column("BACKEND", style="grey58", ratio=2)
     offers.add_column("RESOURCES", ratio=4)
@@ -149,7 +149,7 @@ def print_run_plan(
 def get_runs_table(
     runs: List[Run], verbose: bool = False, format_date: DateFormatter = pretty_date
 ) -> Table:
-    table = Table(box=None, expand=os.get_terminal_size()[0] <= 110)
+    table = Table(box=None, expand=shutil.get_terminal_size(fallback=(120, 40)).columns <= 110)
     table.add_column("NAME", style="bold", no_wrap=True, ratio=2)
     table.add_column("BACKEND", style="grey58", ratio=2)
     table.add_column("RESOURCES", ratio=3 if not verbose else 2)
