@@ -316,6 +316,8 @@ commands:
 port: 8000
 
 resources:
+  # 16 or more x86_64 cores
+  cpu: 16..
   # 2 GPUs of 80GB
   gpu: 80GB:2
 

@@ -175,6 +175,8 @@ name: vscode
 ide: vscode
 
 resources:
+  # 16 or more x86_64 cores
+  cpu: 16..
   # 200GB or more RAM
   memory: 200GB..
   # 4 GPUs from 40GB to 80GB
