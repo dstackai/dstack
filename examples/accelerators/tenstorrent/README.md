@@ -1,3 +1,9 @@
+---
+title: "Tenstorrent"
+description: "You can now use SSH fleets to run dev environments, tasks, and services on Tenstorrent."  
+image: https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-tenstorrent-min.png?raw=true
+---
+
 # Tenstorrent
 
 `dstack` supports running dev environments, tasks, and services on Tenstorrent 
