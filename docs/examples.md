@@ -101,6 +101,17 @@ hide:
         </p>
     </a>
 
+    <a href="/examples/accelerators/tpu"
+       class="feature-cell sky">
+        <h3>
+            TPU
+        </h3>
+
+        <p>
+            Deploy and fine-tune LLMs on TPU
+        </p>
+    </a>
+
     <a href="/examples/accelerators/intel"
        class="feature-cell sky">
         <h3>
@@ -112,15 +123,14 @@ hide:
         </p>
     </a>
 
-
-    <a href="/examples/accelerators/tpu"
+    <a href="/examples/accelerators/tenstorrent"
        class="feature-cell sky">
         <h3>
-            TPU
+            Tenstorrent
         </h3>
 
         <p>
-            Deploy and fine-tune LLMs on TPU
+            Deploy and fine-tune LLMs on Tenstorrent
         </p>
     </a>
 </div>

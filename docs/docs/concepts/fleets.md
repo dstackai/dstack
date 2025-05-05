@@ -260,6 +260,10 @@ Define a fleet configuration as a YAML file in your project directory. The file 
         2.&nbsp;Hosts with Intel Gaudi accelerators should be pre-installed with [Gaudi software and drivers](https://docs.habana.ai/en/latest/Installation_Guide/Driver_Installation.html#driver-installation).
         This should include the drivers, `hl-smi`, and Habana Container Runtime.
 
+    === "Tenstorrent"
+        2.&nbsp;Hosts with Tenstorrent accelerators should be pre-installed with [Tenstorrent software](https://docs.tenstorrent.com/getting-started/README.html#software-installation).
+        This should include the drivers, `tt-smi`, and HugePages.
+
     3.&nbsp;The user specified should have passwordless `sudo` access.
 
 To create or update the fleet, pass the fleet configuration to [`dstack apply`](../reference/cli/dstack/apply.md):
