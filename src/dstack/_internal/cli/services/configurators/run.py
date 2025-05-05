@@ -9,7 +9,7 @@ import gpuhunt
 from pydantic import parse_obj_as
 
 import dstack._internal.core.models.resources as resources
-from dstack._internal.cli.services.args import disk_spec, gpu_spec, port_mapping
+from dstack._internal.cli.services.args import cpu_spec, disk_spec, gpu_spec, port_mapping
 from dstack._internal.cli.services.configurators.base import (
     ApplyEnvVarsConfiguratorMixin,
     BaseApplyConfigurator,
@@ -293,6 +293,14 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
         )
         cls.register_env_args(configuration_group)
         configuration_group.add_argument(
+            "--cpu",
+            type=cpu_spec,
+            help="Request CPU for the run. "
+            "The format is [code]ARCH[/]:[code]COUNT[/] (all parts are optional)",
+            dest="cpu_spec",
+            metavar="SPEC",
+        )
+        configuration_group.add_argument(
             "--gpu",
             type=gpu_spec,
             help="Request GPU for the run. "
@@ -313,6 +321,8 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
         apply_profile_args(args, conf)
         if args.run_name:
             conf.name = args.run_name
+        if args.cpu_spec:
+            conf.resources.cpu = resources.CPUSpec.parse_obj(args.cpu_spec)
         if args.gpu_spec:
             conf.resources.gpu = resources.GPUSpec.parse_obj(args.gpu_spec)
         if args.disk_spec:
