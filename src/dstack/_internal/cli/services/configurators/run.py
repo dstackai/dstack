@@ -414,7 +414,7 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
             gpu_spec = conf.resources.gpu
             if (
                 gpu_spec is not None
-                and gpu_spec.vendor == gpuhunt.AcceleratorVendor.NVIDIA
+                and gpu_spec.vendor in [None, gpuhunt.AcceleratorVendor.NVIDIA]
                 and gpu_spec.name
                 and any(map(gpuhunt.is_nvidia_superchip, gpu_spec.name))
             ):

@@ -11,7 +11,7 @@ def set_resources_defaults(resources: ResourcesSpec) -> None:
         gpu = resources.gpu
         if (
             gpu is not None
-            and gpu.vendor == gpuhunt.AcceleratorVendor.NVIDIA
+            and gpu.vendor in [None, gpuhunt.AcceleratorVendor.NVIDIA]
             and gpu.name
             and any(map(gpuhunt.is_nvidia_superchip, gpu.name))
         ):
