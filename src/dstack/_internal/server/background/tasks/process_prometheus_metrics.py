@@ -99,11 +99,14 @@ async def _collect_jobs_metrics(job_models: list[JobModel], collected_at: dateti
 
 
 async def _collect_job_metrics(job_model: JobModel) -> Optional[str]:
-    ssh_private_keys = get_instance_ssh_private_keys(get_or_error(job_model.instance))
     jpd = get_job_provisioning_data(job_model)
-    jrd = get_job_runtime_data(job_model)
     if jpd is None:
         return None
+    if not jpd.dockerized:
+        # Container-based backend, no shim
+        return None
+    ssh_private_keys = get_instance_ssh_private_keys(get_or_error(job_model.instance))
+    jrd = get_job_runtime_data(job_model)
     try:
         res = await run_async(
             _pull_job_metrics,
