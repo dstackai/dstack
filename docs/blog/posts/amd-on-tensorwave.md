@@ -3,7 +3,7 @@ title: Using SSH fleets with TensorWave's private AMD cloud
 date: 2025-03-11
 description: "This tutorial walks you through how dstack can be used with TensorWave's private AMD cloud using SSH fleets."  
 slug: amd-on-tensorwave
-image: https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-tensorwave-v2.png?raw=true
+image: https://dstack.ai/static-assets/static-assets/images/dstack-tensorwave-v2.png
 categories:
   - AMD
   - SSH fleets
@@ -18,7 +18,7 @@ In this tutorial, we’ll walk you through how `dstack` can be used with
 [TensorWave :material-arrow-top-right-thin:{ .external }](https://tensorwave.com/){:target="_blank"} using 
 [SSH fleets](../../docs/concepts/fleets.md#ssh).
 
-<img src="https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-tensorwave-v2.png?raw=true" width="630"/>
+<img src="https://dstack.ai/static-assets/static-assets/images/dstack-tensorwave-v2.png" width="630"/>
 
 <!-- more -->
 
@@ -28,7 +28,7 @@ training and inference.
 Before following this tutorial, ensure you have access to a cluster. You’ll see the cluster and its nodes in your
 TensorWave dashboard.
 
-<img src="https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-tensorwave-ui.png?raw=true" width="750"/>
+<img src="https://dstack.ai/static-assets/static-assets/images/dstack-tensorwave-ui.png" width="750"/>
 
 ## Creating a fleet
 

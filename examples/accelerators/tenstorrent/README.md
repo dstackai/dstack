@@ -1,7 +1,7 @@
 ---
 title: "Tenstorrent"
 description: "You can now use SSH fleets to run dev environments, tasks, and services on Tenstorrent."  
-image: https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-tenstorrent-min.png?raw=true
+image: https://dstack.ai/static-assets/static-assets/images/dstack-tenstorrent-min.png
 ---
 
 # Tenstorrent
@@ -122,7 +122,7 @@ $ curl http://127.0.0.1:3000/proxy/models/main/chat/completions \
 
 Additionally, the model is available via `dstack`'s control plane UI:
 
-![](https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-tenstorrent-model-ui.png?raw=true){ width=800 }
+![](https://dstack.ai/static-assets/static-assets/images/dstack-tenstorrent-model-ui.png){ width=800 }
 
 When a [gateway](https://dstack.ai/docs/concepts/gateways.md) is configured, the service endpoint 
 is available at `https://<run name>.<gateway domain>/`.
@@ -190,7 +190,7 @@ resources:
 
 If you run it via `dstack apply`, it will output the URL to access it via your desktop IDE.
 
-![](https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-tenstorrent-cursor.png?raw=true){ width=800 }
+![](https://dstack.ai/static-assets/static-assets/images/dstack-tenstorrent-cursor.png){ width=800 }
 
 > Dev nevironments support many options, including inactivity and max duration, IDE configuration, etc. To learn more, refer to [Dev environments](https://dstack.ai/docs/concepts/tasks).
 

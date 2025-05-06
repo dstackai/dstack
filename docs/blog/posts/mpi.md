@@ -3,7 +3,7 @@ title: "Supporting MPI and NCCL/RCCL tests"
 date: 2025-04-02
 description: "TBA"
 slug: mpi
-image: https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-mpi-v2.png?raw=true
+image: https://dstack.ai/static-assets/static-assets/images/dstack-mpi-v2.png
 categories:
   - SSH fleets
   - Cloud fleets
@@ -21,7 +21,7 @@ The strength of `dstack` lies in its flexibility. Users can leverage distributed
 system environment variables—such as `DSTACK_NODE_RANK`, `DSTACK_MASTER_NODE_IP`,
 `DSTACK_GPUS_PER_NODE` and [others](../../docs/concepts/tasks.md#system-environment-variables)—to containers.
 
-<img src="https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-mpi-v2.png?raw=true" width="630"/>
+<img src="https://dstack.ai/static-assets/static-assets/images/dstack-mpi-v2.png" width="630"/>
 
 One use case `dstack` hasn’t supported until now is MPI, as it requires a scheduled environment or
 direct SSH connections between containers. Since `mpirun` is essential for running NCCL/RCCL tests—crucial for large-scale

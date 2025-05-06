@@ -61,7 +61,7 @@ The minimum hardware requirements for running the server are 1 CPU and 1GB of RA
 
     First, ensure you've set up a private VPC with public and private subnets.
 
-    ![](https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-aws-private-vpc-example-v2.png?raw=true)
+    ![](https://dstack.ai/static-assets/static-assets/images/dstack-aws-private-vpc-example-v2.png)
 
     Create a stack using the template, and specify the VPC and private subnets.
     Once, the stack is created, go to `Outputs` for the server URL and admin token.

@@ -126,7 +126,7 @@ and [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/vllm-
     If you specify `model` when running a service, `dstack` will automatically register the model on
     an OpenAI-compatible endpoint and allow you to use it for chat via the control plane UI.
     
-    <img src="https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-control-plane-model-llama31.png?raw=true" width="750px" />
+    <img src="https://dstack.ai/static-assets/static-assets/images/dstack-control-plane-model-llama31.png" width="750px" />
 
 ### Memory requirements
 

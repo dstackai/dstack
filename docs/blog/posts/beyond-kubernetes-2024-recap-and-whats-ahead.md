@@ -3,7 +3,7 @@ title: "Beyond Kubernetes: 2024 recap and what's next for AI infra"
 date: 2024-12-10
 description: "Reflecting on key milestones from 2024, and looking ahead to the next steps in simplifying AI infrastructure orchestration."  
 slug: beyond-kubernetes-2024-recap-and-whats-ahead
-image: https://github.com/dstackai/static-assets/blob/main/static-assets/images/beyond-kubernetes-2024-recap-and-whats-ahead.png?raw=true
+image: https://dstack.ai/static-assets/static-assets/images/beyond-kubernetes-2024-recap-and-whats-ahead.png
 categories:
   - AMD
   - NVIDIA
