@@ -652,12 +652,14 @@ async def _create_instance(session: AsyncSession, instance: InstanceModel) -> No
                 "instance_status": InstanceStatus.PROVISIONING.value,
             },
         )
-        if _is_fleet_master_instance(instance):
+        if instance.fleet_id and _is_fleet_master_instance(instance):
             # Clean up placement groups that did not end up being used
             await schedule_fleet_placement_groups_deletion(
                 session=session,
                 fleet_id=instance.fleet_id,
-                except_placement_group_ids=[placement_group_model.id],
+                except_placement_group_ids=(
+                    [placement_group_model.id] if placement_group_model is not None else []
+                ),
             )
         return
 
@@ -675,9 +677,10 @@ async def _create_instance(session: AsyncSession, instance: InstanceModel) -> No
                 "instance_status": InstanceStatus.TERMINATED.value,
             },
         )
-        if _is_fleet_master_instance(instance):
+        if instance.fleet and _is_fleet_master_instance(instance):
             # Do not attempt to deploy other instances, as they won't determine the correct cluster
             # backend, region, and placement group without a successfully deployed master instance
+            # FIXME(critical): this should only apply to placement: cluster
             for sibling_instance in instance.fleet.instances:
                 if sibling_instance.id == instance.id:
                     continue
@@ -689,7 +692,7 @@ async def _create_instance(session: AsyncSession, instance: InstanceModel) -> No
                         " Should have been %s, as master instance %s has not been provisioned",
                         sibling_instance.name,
                         sibling_instance.status.value,
-                        InstanceStatus.PENDING,
+                        InstanceStatus.PENDING.value,
                         instance.name,
                     )
                     sibling_instance.status = InstanceStatus.TERMINATING
@@ -985,7 +988,7 @@ def _need_to_wait_fleet_provisioning(instance: InstanceModel) -> bool:
 
 
 def _is_fleet_master_instance(instance: InstanceModel) -> bool:
-    return instance.fleet and instance.id == instance.fleet.instances[0].id
+    return instance.fleet is not None and instance.id == instance.fleet.instances[0].id
 
 
 def _get_instance_offer_for_instance(

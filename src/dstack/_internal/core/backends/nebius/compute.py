@@ -317,7 +317,10 @@ class NebiusCompute(
         backend_data = NebiusPlacementGroupBackendData.load(
             placement_group.provisioning_data.backend_data
         )
-        return backend_data.cluster.fabric in _get_suitable_infiniband_fabrics(instance_offer)
+        return (
+            backend_data.cluster is None
+            or backend_data.cluster.fabric in _get_suitable_infiniband_fabrics(instance_offer)
+        )
 
 
 class NebiusInstanceBackendData(CoreModel):

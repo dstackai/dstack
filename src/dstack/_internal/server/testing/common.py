@@ -2,7 +2,7 @@ import json
 import uuid
 from contextlib import contextmanager
 from datetime import datetime, timezone
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Literal, Optional, Union
 from uuid import UUID
 
 import gpuhunt
@@ -25,7 +25,12 @@ from dstack._internal.core.models.configurations import (
     DevEnvironmentConfiguration,
 )
 from dstack._internal.core.models.envs import Env
-from dstack._internal.core.models.fleets import FleetConfiguration, FleetSpec, FleetStatus
+from dstack._internal.core.models.fleets import (
+    FleetConfiguration,
+    FleetSpec,
+    FleetStatus,
+    InstanceGroupPlacement,
+)
 from dstack._internal.core.models.gateways import GatewayComputeConfiguration, GatewayStatus
 from dstack._internal.core.models.instances import (
     Disk,
@@ -497,10 +502,12 @@ def get_fleet_spec(conf: Optional[FleetConfiguration] = None) -> FleetSpec:
 def get_fleet_configuration(
     name: str = "test-fleet",
     nodes: Range[int] = Range(min=1, max=1),
+    placement: Optional[InstanceGroupPlacement] = None,
 ) -> FleetConfiguration:
     return FleetConfiguration(
         name=name,
         nodes=nodes,
+        placement=placement,
     )
 
 
@@ -519,13 +526,13 @@ async def create_instance(
     instance_id: Optional[UUID] = None,
     job: Optional[JobModel] = None,
     instance_num: int = 0,
-    backend: BackendType = BackendType.DATACRUNCH,
+    backend: Optional[BackendType] = BackendType.DATACRUNCH,
     termination_policy: Optional[TerminationPolicy] = None,
     termination_idle_time: int = DEFAULT_FLEET_TERMINATION_IDLE_TIME,
-    region: str = "eu-west",
+    region: Optional[str] = "eu-west",
     remote_connection_info: Optional[RemoteConnectionInfo] = None,
-    offer: Optional[InstanceOfferWithAvailability] = None,
-    job_provisioning_data: Optional[JobProvisioningData] = None,
+    offer: Optional[Union[InstanceOfferWithAvailability, Literal["auto"]]] = "auto",
+    job_provisioning_data: Optional[Union[JobProvisioningData, Literal["auto"]]] = "auto",
     total_blocks: Optional[int] = 1,
     busy_blocks: int = 0,
     name: str = "test_instance",
@@ -534,7 +541,7 @@ async def create_instance(
 ) -> InstanceModel:
     if instance_id is None:
         instance_id = uuid.uuid4()
-    if job_provisioning_data is None:
+    if job_provisioning_data == "auto":
         job_provisioning_data = get_job_provisioning_data(
             dockerized=True,
             backend=backend,
@@ -543,7 +550,7 @@ async def create_instance(
             hostname="running_instance.ip",
             internal_ip=None,
         )
-    if offer is None:
+    if offer == "auto":
         offer = get_instance_offer_with_availability(backend=backend, region=region, spot=spot)
     if profile is None:
         profile = Profile(name="test_name")
@@ -571,8 +578,8 @@ async def create_instance(
         created_at=created_at,
         started_at=created_at,
         finished_at=finished_at,
-        job_provisioning_data=job_provisioning_data.json(),
-        offer=offer.json(),
+        job_provisioning_data=job_provisioning_data.json() if job_provisioning_data else None,
+        offer=offer.json() if offer else None,
         price=price,
         region=region,
         backend=backend,

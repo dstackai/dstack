@@ -41,7 +41,7 @@ async def schedule_fleet_placement_groups_deletion(
                 PlacementGroupModel.id.not_in(except_placement_group_ids),
             )
         )
-        .values(fleet_deleted=True)  # TODO: rename `fleet_deleted`
+        .values(fleet_deleted=True)  # TODO: rename `fleet_deleted` -> `to_be_deleted`
     )
 
 

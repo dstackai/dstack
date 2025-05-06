@@ -1,4 +1,5 @@
 import datetime as dt
+from collections import defaultdict
 from contextlib import contextmanager
 from typing import Optional
 from unittest.mock import Mock, patch
@@ -6,18 +7,27 @@ from unittest.mock import Mock, patch
 import gpuhunt
 import pytest
 from freezegun import freeze_time
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dstack._internal.core.errors import BackendError, NotYetTerminated, ProvisioningError
+from dstack._internal.core.errors import (
+    BackendError,
+    NoCapacityError,
+    NotYetTerminated,
+    ProvisioningError,
+)
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.fleets import InstanceGroupPlacement
 from dstack._internal.core.models.instances import (
     Gpu,
     InstanceAvailability,
+    InstanceOffer,
     InstanceOfferWithAvailability,
     InstanceStatus,
     InstanceType,
     Resources,
 )
+from dstack._internal.core.models.placement import PlacementGroup, PlacementGroupProvisioningData
 from dstack._internal.core.models.profiles import TerminationPolicy
 from dstack._internal.core.models.runs import (
     JobProvisioningData,
@@ -27,16 +37,21 @@ from dstack._internal.server.background.tasks.process_instances import (
     HealthStatus,
     process_instances,
 )
+from dstack._internal.server.models import PlacementGroupModel
 from dstack._internal.server.testing.common import (
     ComputeMockSpec,
+    create_fleet,
     create_instance,
     create_job,
     create_project,
     create_repo,
     create_run,
     create_user,
+    get_fleet_configuration,
+    get_fleet_spec,
     get_instance_offer_with_availability,
     get_job_provisioning_data,
+    get_placement_group_provisioning_data,
     get_remote_connection_info,
 )
 from dstack._internal.utils.common import get_current_datetime
@@ -622,6 +637,216 @@ class TestCreateInstance:
         await session.refresh(instance)
         assert instance.status == InstanceStatus.TERMINATED
         assert instance.termination_reason == "No offers found"
+
+    async def test_terminates_fleet_instances_if_master_instance_not_created(
+        self, session: AsyncSession
+    ):
+        project = await create_project(session=session)
+        fleet = await create_fleet(
+            session,
+            project,
+            spec=get_fleet_spec(
+                conf=get_fleet_configuration(placement=InstanceGroupPlacement.CLUSTER, nodes=4)
+            ),
+        )
+        instances = [
+            await create_instance(
+                session=session,
+                project=project,
+                fleet=fleet,
+                status=InstanceStatus.PENDING,
+                backend=None,
+                region=None,
+                offer=None,
+                job_provisioning_data=None,
+            )
+            for _ in range(4)
+        ]
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            m.return_value = []
+            for _ in range(4):
+                await process_instances()
+
+        termination_reasons = defaultdict(int)
+        for instance in instances:
+            await session.refresh(instance)
+            assert instance.status == InstanceStatus.TERMINATED
+            termination_reasons[instance.termination_reason] += 1
+        assert termination_reasons == {
+            "No offers found": 1,
+            "Master instance failed to start": 3,
+        }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+@pytest.mark.usefixtures("test_db")
+class TestPlacementGroups:
+    @pytest.mark.parametrize(
+        ("placement", "should_create"),
+        [
+            pytest.param(InstanceGroupPlacement.CLUSTER, True, id="placement-cluster"),
+            pytest.param(None, False, id="no-placement"),
+        ],
+    )
+    async def test_create_placement_group_if_placement_cluster(
+        self,
+        session: AsyncSession,
+        placement: Optional[InstanceGroupPlacement],
+        should_create: bool,
+    ) -> None:
+        project = await create_project(session=session)
+        fleet = await create_fleet(
+            session,
+            project,
+            spec=get_fleet_spec(conf=get_fleet_configuration(placement=placement, nodes=1)),
+        )
+        instance = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.PENDING,
+            backend=None,
+            region=None,
+            offer=None,
+            job_provisioning_data=None,
+        )
+        backend_mock = Mock()
+        backend_mock.TYPE = BackendType.AWS
+        backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
+        backend_mock.compute.return_value.get_offers_cached.return_value = [
+            get_instance_offer_with_availability()
+        ]
+        backend_mock.compute.return_value.create_instance.return_value = (
+            get_job_provisioning_data()
+        )
+        backend_mock.compute.return_value.create_placement_group.return_value = (
+            get_placement_group_provisioning_data()
+        )
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            m.return_value = [backend_mock]
+            await process_instances()
+
+        await session.refresh(instance)
+        assert instance.status == InstanceStatus.PROVISIONING
+        placement_groups = (await session.execute(select(PlacementGroupModel))).scalars().all()
+        if should_create:
+            assert backend_mock.compute.return_value.create_placement_group.call_count == 1
+            assert len(placement_groups) == 1
+        else:
+            assert backend_mock.compute.return_value.create_placement_group.call_count == 0
+            assert len(placement_groups) == 0
+
+    @pytest.mark.parametrize("can_reuse", [True, False])
+    async def test_reuses_placement_group_between_offers_if_the_group_is_suitable(
+        self, session: AsyncSession, can_reuse: bool
+    ) -> None:
+        project = await create_project(session=session)
+        fleet = await create_fleet(
+            session,
+            project,
+            spec=get_fleet_spec(
+                conf=get_fleet_configuration(placement=InstanceGroupPlacement.CLUSTER, nodes=1)
+            ),
+        )
+        instance = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.PENDING,
+            backend=None,
+            region=None,
+            offer=None,
+            job_provisioning_data=None,
+        )
+        backend_mock = Mock()
+        backend_mock.TYPE = BackendType.AWS
+        backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
+        backend_mock.compute.return_value.get_offers_cached.return_value = [
+            get_instance_offer_with_availability(instance_type="bad-offer-1"),
+            get_instance_offer_with_availability(instance_type="bad-offer-2"),
+            get_instance_offer_with_availability(instance_type="good-offer"),
+        ]
+
+        def create_instance_method(
+            instance_offer: InstanceOfferWithAvailability, *args, **kwargs
+        ) -> JobProvisioningData:
+            if instance_offer.instance.name == "good-offer":
+                return get_job_provisioning_data()
+            raise NoCapacityError()
+
+        backend_mock.compute.return_value.create_instance = create_instance_method
+        backend_mock.compute.return_value.create_placement_group.return_value = (
+            get_placement_group_provisioning_data()
+        )
+        backend_mock.compute.return_value.is_suitable_placement_group.return_value = can_reuse
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            m.return_value = [backend_mock]
+            await process_instances()
+
+        await session.refresh(instance)
+        assert instance.status == InstanceStatus.PROVISIONING
+        placement_groups = (await session.execute(select(PlacementGroupModel))).scalars().all()
+        if can_reuse:
+            assert backend_mock.compute.return_value.create_placement_group.call_count == 1
+            assert len(placement_groups) == 1
+        else:
+            assert backend_mock.compute.return_value.create_placement_group.call_count == 3
+            assert len(placement_groups) == 3
+            to_be_deleted_count = sum(pg.fleet_deleted for pg in placement_groups)
+            assert to_be_deleted_count == 2
+
+    @pytest.mark.parametrize("err", [NoCapacityError(), RuntimeError()])
+    async def test_handles_create_placement_group_errors(
+        self, session: AsyncSession, err: Exception
+    ) -> None:
+        project = await create_project(session=session)
+        fleet = await create_fleet(
+            session,
+            project,
+            spec=get_fleet_spec(
+                conf=get_fleet_configuration(placement=InstanceGroupPlacement.CLUSTER, nodes=1)
+            ),
+        )
+        instance = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.PENDING,
+            backend=None,
+            region=None,
+            offer=None,
+            job_provisioning_data=None,
+        )
+        backend_mock = Mock()
+        backend_mock.TYPE = BackendType.AWS
+        backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
+        backend_mock.compute.return_value.get_offers_cached.return_value = [
+            get_instance_offer_with_availability(instance_type="bad-offer"),
+            get_instance_offer_with_availability(instance_type="good-offer"),
+        ]
+        backend_mock.compute.return_value.create_instance.return_value = (
+            get_job_provisioning_data()
+        )
+
+        def create_placement_group_method(
+            placement_group: PlacementGroup, master_instance_offer: InstanceOffer
+        ) -> PlacementGroupProvisioningData:
+            if master_instance_offer.instance.name == "good-offer":
+                return get_job_provisioning_data()
+            raise err
+
+        backend_mock.compute.return_value.create_placement_group = create_placement_group_method
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            m.return_value = [backend_mock]
+            await process_instances()
+
+        await session.refresh(instance)
+        assert instance.status == InstanceStatus.PROVISIONING
+        assert "good-offer" in instance.offer
+        assert "bad-offer" not in instance.offer
+        placement_groups = (await session.execute(select(PlacementGroupModel))).scalars().all()
+        assert len(placement_groups) == 1
 
 
 @pytest.mark.asyncio
