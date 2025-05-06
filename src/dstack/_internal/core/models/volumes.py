@@ -159,7 +159,7 @@ class VolumeMountPoint(CoreModel):
             description=(
                 "The network volume name or the list of network volume names to mount."
                 " If a list is specified, one of the volumes in the list will be mounted."
-                " Specify volumes from different backends/regions to increase availability."
+                " Specify volumes from different backends/regions to increase availability"
             )
         ),
     ]

@@ -25,6 +25,7 @@ from dstack._internal.core.models.gateways import (
 )
 from dstack._internal.core.models.instances import (
     InstanceConfiguration,
+    InstanceOffer,
     InstanceOfferWithAvailability,
     SSHKey,
 )
@@ -144,6 +145,7 @@ class ComputeWithCreateInstanceSupport(ABC):
         self,
         instance_offer: InstanceOfferWithAvailability,
         instance_config: InstanceConfiguration,
+        placement_group: Optional[PlacementGroup],
     ) -> JobProvisioningData:
         """
         Launches a new instance. It should return `JobProvisioningData` ASAP.
@@ -225,9 +227,15 @@ class ComputeWithPlacementGroupSupport(ABC):
     def create_placement_group(
         self,
         placement_group: PlacementGroup,
+        master_instance_offer: InstanceOffer,
     ) -> PlacementGroupProvisioningData:
         """
         Creates a placement group.
+
+        Args:
+            placement_group: details about the placement group to be created
+            master_instance_offer: the first instance dstack will attempt to add
+                                   to the placement group
         """
         pass
 
@@ -242,10 +250,27 @@ class ComputeWithPlacementGroupSupport(ABC):
         """
         pass
 
+    @abstractmethod
+    def is_suitable_placement_group(
+        self,
+        placement_group: PlacementGroup,
+        instance_offer: InstanceOffer,
+    ) -> bool:
+        """
+        Checks if the instance offer can be provisioned in the placement group.
+
+        Should return immediately, without performing API calls.
+
+        Can be called with an offer originating from a different backend, because some backends
+        (BackendType.DSTACK) produce offers on behalf of other backends. Should return `False`
+        in that case.
+        """
+        pass
+
 
 class ComputeWithGatewaySupport(ABC):
     """
-    Must be subclassed and imlemented to support gateways.
+    Must be subclassed and implemented to support gateways.
     """
 
     @abstractmethod
@@ -414,6 +439,21 @@ def generate_unique_volume_name(
     return generate_unique_backend_name(
         resource_name=volume.name,
         project_name=volume.project_name,
+        max_length=max_length,
+    )
+
+
+def generate_unique_placement_group_name(
+    project_name: str,
+    fleet_name: str,
+    max_length: int = _DEFAULT_MAX_RESOURCE_NAME_LEN,
+) -> str:
+    """
+    Generates a unique placement group name valid across all backends.
+    """
+    return generate_unique_backend_name(
+        resource_name=fleet_name,
+        project_name=project_name,
         max_length=max_length,
     )
 

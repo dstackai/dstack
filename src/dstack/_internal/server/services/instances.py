@@ -408,7 +408,6 @@ async def create_instance_model(
     requirements: Requirements,
     instance_name: str,
     instance_num: int,
-    placement_group_name: Optional[str],
     reservation: Optional[str],
     blocks: Union[Literal["auto"], int],
     tags: Optional[Dict[str, str]],
@@ -427,7 +426,6 @@ async def create_instance_model(
         user=user.name,
         ssh_keys=[project_ssh_key],
         instance_id=str(instance_id),
-        placement_group_name=placement_group_name,
         reservation=reservation,
         tags=tags,
     )
