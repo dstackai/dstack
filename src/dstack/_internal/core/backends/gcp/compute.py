@@ -76,6 +76,10 @@ class GCPVolumeDiskBackendData(CoreModel):
     disk_type: str
 
 
+class GCPPlacementGroupBackendData(CoreModel):
+    collocation: str
+
+
 class GCPCompute(
     ComputeWithCreateInstanceSupport,
     ComputeWithMultinodeSupport,
@@ -409,20 +413,34 @@ class GCPCompute(
         placement_group: PlacementGroup,
         master_instance_offer: InstanceOffer,
     ) -> PlacementGroupProvisioningData:
+        group_placement_policy = compute_v1.ResourcePolicyGroupPlacementPolicy(
+            availability_domain_count=1,
+            collocation="COLLOCATED",
+        )
+        if _instance_supports_as_compact_placement(master_instance_offer):
+            group_placement_policy = compute_v1.ResourcePolicyGroupPlacementPolicy(
+                # GCP documents only collocation="COLLOCATED"
+                # but collocation="AS_COMPACT" actually places VMs on the same host
+                # and improves networking performance. Discovered with Gemini.
+                # Tested to work with A3 instances.
+                collocation="AS_COMPACT",
+            )
         policy = compute_v1.ResourcePolicy(
             name=placement_group.name,
             region=placement_group.configuration.region,
-            group_placement_policy=compute_v1.ResourcePolicyGroupPlacementPolicy(
-                availability_domain_count=1,
-                collocation="COLLOCATED",
-            ),
+            group_placement_policy=group_placement_policy,
         )
         self.resource_policies_client.insert(
             project=self.config.project_id,
             region=placement_group.configuration.region,
             resource_policy_resource=policy,
         )
-        return PlacementGroupProvisioningData(backend=BackendType.GCP)
+        return PlacementGroupProvisioningData(
+            backend=BackendType.GCP,
+            backend_data=GCPPlacementGroupBackendData(
+                collocation=group_placement_policy.collocation
+            ).json(),
+        )
 
     def delete_placement_group(
         self,
@@ -447,10 +465,20 @@ class GCPCompute(
         placement_group: PlacementGroup,
         instance_offer: InstanceOffer,
     ) -> bool:
-        return (
+        if not (
             placement_group.configuration.backend == BackendType.GCP
             and placement_group.configuration.region == instance_offer.region
+        ):
+            return False
+        provisioning_data = get_or_error(placement_group.provisioning_data)
+        if provisioning_data.backend_data is None:
+            return True
+        backend_data_parsed = GCPPlacementGroupBackendData.parse_raw(
+            provisioning_data.backend_data
         )
+        if backend_data_parsed.collocation == "AS_COMPACT":
+            return _instance_supports_as_compact_placement(instance_offer)
+        return True
 
     def create_gateway(
         self,
@@ -914,6 +942,14 @@ def _get_user_data(authorized_keys: List[str], instance_type_name: str) -> str:
         bin_path=bin_path,
         backend_shim_env=backend_shim_env,
     )
+
+
+def _instance_supports_as_compact_placement(instance_offer: InstanceOffer) -> bool:
+    return instance_offer.instance.name in [
+        "a3-edgegpu-8g",
+        "a3-highgpu-8g",
+        "a3-megagpu-8g",
+    ]
 
 
 def _get_backend_specific_commands(instance_type_name: str) -> List[str]:
