@@ -139,6 +139,7 @@ azure = [
     "azure-mgmt-network>=23.0.0,<28.0.0",
     "azure-mgmt-resource>=22.0.0",
     "azure-mgmt-authorization>=3.0.0",
+    "azure-mgmt-msi>=7.0.0",
     "dstack[server]",
 ]
 gcp = [
