@@ -303,7 +303,8 @@ async def get_plan(
             run_name=effective_run_spec.run_name,
         )
         if current_resource is not None:
-            # Resources in effective_run_spec are updated in _validate_run_spec_and_set_defaults
+            # For backward compatibility (current_resource may has been submitted before
+            # some fields, e.g., CPUSpec.arch, were added)
             set_resources_defaults(current_resource.run_spec.configuration.resources)
             if not current_resource.status.is_finished() and _can_update_run_spec(
                 current_resource.run_spec, effective_run_spec
@@ -408,7 +409,9 @@ async def apply_plan(
             project=project,
             run_spec=run_spec,
         )
-    # Resources in run_spec are updated in _validate_run_spec_and_set_defaults
+
+    # For backward compatibility (current_resource may has been submitted before
+    # some fields, e.g., CPUSpec.arch, were added)
     set_resources_defaults(current_resource.run_spec.configuration.resources)
     try:
         _check_can_update_run_spec(current_resource.run_spec, run_spec)
