@@ -19,6 +19,7 @@ from dstack._internal.core.backends import (
 from dstack._internal.core.backends.base.compute import (
     ComputeWithCreateInstanceSupport,
     ComputeWithPlacementGroupSupport,
+    GoArchType,
     generate_unique_placement_group_name,
     get_dstack_runner_binary_path,
     get_dstack_shim_binary_path,
@@ -27,6 +28,7 @@ from dstack._internal.core.backends.base.compute import (
     get_shim_pre_start_commands,
 )
 from dstack._internal.core.backends.remote.provisioning import (
+    detect_cpu_arch,
     get_host_info,
     get_paramiko_connection,
     get_shim_healthcheck,
@@ -270,7 +272,7 @@ async def _add_remote(instance: InstanceModel) -> None:
             )
             deploy_timeout = 20 * 60  # 20 minutes
             result = await asyncio.wait_for(future, timeout=deploy_timeout)
-            health, host_info = result
+            health, host_info, cpu_arch = result
         except (asyncio.TimeoutError, TimeoutError) as e:
             raise ProvisioningError(f"Deploy timeout: {e}") from e
         except Exception as e:
@@ -291,7 +293,7 @@ async def _add_remote(instance: InstanceModel) -> None:
         instance.last_retry_at = get_current_datetime()
         return
 
-    instance_type = host_info_to_instance_type(host_info)
+    instance_type = host_info_to_instance_type(host_info, cpu_arch)
     instance_network = None
     internal_ip = None
     try:
@@ -394,7 +396,7 @@ def _deploy_instance(
     pkeys: List[PKey],
     ssh_proxy_pkeys: Optional[list[PKey]],
     authorized_keys: List[str],
-) -> Tuple[HealthStatus, Dict[str, Any]]:
+) -> Tuple[HealthStatus, Dict[str, Any], GoArchType]:
     with get_paramiko_connection(
         remote_details.ssh_user,
         remote_details.host,
@@ -405,13 +407,16 @@ def _deploy_instance(
     ) as client:
         logger.info(f"Connected to {remote_details.ssh_user} {remote_details.host}")
 
+        arch = detect_cpu_arch(client)
+        logger.info("%s: CPU arch is %s", remote_details.host, arch)
+
         # Execute pre start commands
-        shim_pre_start_commands = get_shim_pre_start_commands()
+        shim_pre_start_commands = get_shim_pre_start_commands(arch=arch)
         run_pre_start_commands(client, shim_pre_start_commands, authorized_keys)
         logger.debug("The script for installing dstack has been executed")
 
         # Upload envs
-        shim_envs = get_shim_env(authorized_keys)
+        shim_envs = get_shim_env(authorized_keys, arch=arch)
         try:
             fleet_configuration_envs = remote_details.env.as_dict()
         except ValueError as e:
@@ -446,7 +451,7 @@ def _deploy_instance(
             raise ProvisioningError("Cannot read HealthcheckResponse") from e
         health = runner_client.health_response_to_health_status(health_response)
 
-        return health, host_info
+        return health, host_info, arch
 
 
 async def _create_instance(session: AsyncSession, instance: InstanceModel) -> None:

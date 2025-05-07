@@ -194,13 +194,17 @@ class TestValidateGPUVendorAndImage:
 
     def test_amd_vendor_declared_no_image(self):
         conf = self.prepare_conf(gpu_spec="AMD")
-        with pytest.raises(ConfigurationError, match=r"`image` is required"):
+        with pytest.raises(
+            ConfigurationError, match=r"`image` is required if `resources.gpu.vendor` is `amd`"
+        ):
             self.validate(conf)
 
     @pytest.mark.parametrize("gpu_spec", ["MI300X", "MI300x", "mi300x"])
     def test_amd_vendor_inferred_no_image(self, gpu_spec):
         conf = self.prepare_conf(gpu_spec=gpu_spec)
-        with pytest.raises(ConfigurationError, match=r"`image` is required"):
+        with pytest.raises(
+            ConfigurationError, match=r"`image` is required if `resources.gpu.vendor` is `amd`"
+        ):
             self.validate(conf)
 
     @pytest.mark.parametrize(
@@ -213,5 +217,56 @@ class TestValidateGPUVendorAndImage:
     )
     def test_two_vendors_including_amd_inferred_no_image(self, gpu_spec):
         conf = self.prepare_conf(gpu_spec=gpu_spec)
-        with pytest.raises(ConfigurationError, match=r"`image` is required"):
+        with pytest.raises(
+            ConfigurationError, match=r"`image` is required if `resources.gpu.vendor` is `amd`"
+        ):
             self.validate(conf)
+
+
+class TestValidateCPUArchAndImage:
+    def prepare_conf(
+        self,
+        *,
+        cpu_spec: str,
+        gpu_spec: Optional[str] = None,
+        image: Optional[str] = None,
+    ) -> BaseRunConfiguration:
+        conf_dict = {
+            "type": "none",
+            "resources": {
+                "cpu": cpu_spec,
+            },
+        }
+        if image is not None:
+            conf_dict["image"] = image
+        if gpu_spec is not None:
+            conf_dict["resources"]["gpu"] = gpu_spec
+        return BaseRunConfiguration.parse_obj(conf_dict)
+
+    def validate(self, conf: BaseRunConfiguration) -> None:
+        # validate_gpu_vendor_and_image sets GPU vendor if not set
+        BaseRunConfigurator(api_client=Mock()).validate_gpu_vendor_and_image(conf)
+        BaseRunConfigurator(api_client=Mock()).validate_cpu_arch_and_image(conf)
+
+    @pytest.mark.parametrize("gpu_spec", [None, "GH200", "H100"])
+    def test_explicit_arm_with_image(self, gpu_spec: Optional[str]):
+        conf = self.prepare_conf(cpu_spec="arm:1..", gpu_spec=gpu_spec, image="ubuntu")
+        self.validate(conf)
+
+    def test_inferred_arm_with_image(self):
+        conf = self.prepare_conf(cpu_spec="1..", gpu_spec="GH200", image="ubuntu")
+        self.validate(conf)
+
+    @pytest.mark.parametrize("cpu_spec", ["1..", "arm:1.."])
+    def test_arm_no_image(self, cpu_spec: str):
+        conf = self.prepare_conf(cpu_spec=cpu_spec, gpu_spec="GH200")
+        with pytest.raises(
+            ConfigurationError, match=r"`image` is required if `resources.cpu.arch` is `arm`"
+        ):
+            self.validate(conf)
+
+    @pytest.mark.parametrize("cpu_spec", ["1..", "x86:1.."])
+    @pytest.mark.parametrize("image", [None, "ubuntu"])
+    def test_x86(self, cpu_spec: str, image: Optional[str]):
+        conf = self.prepare_conf(cpu_spec=cpu_spec, gpu_spec="H100", image=image)
+        self.validate(conf)

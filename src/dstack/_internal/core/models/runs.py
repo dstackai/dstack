@@ -439,9 +439,14 @@ class Run(CoreModel):
 
     @root_validator
     def _error(cls, values) -> Dict:
+        try:
+            termination_reason = values["termination_reason"]
+            jobs = values["jobs"]
+        except KeyError:
+            return values
         values["error"] = _get_run_error(
-            run_termination_reason=values["termination_reason"],
-            run_jobs=values["jobs"],
+            run_termination_reason=termination_reason,
+            run_jobs=jobs,
         )
         return values
 

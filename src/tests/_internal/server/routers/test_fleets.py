@@ -504,6 +504,7 @@ class TestApplyFleetPlan:
                     "instance_type": {
                         "name": "ssh",
                         "resources": {
+                            "cpu_arch": None,
                             "cpus": 2,
                             "memory_mib": 8,
                             "gpus": [],

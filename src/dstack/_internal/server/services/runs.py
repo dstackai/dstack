@@ -81,6 +81,7 @@ from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.offers import get_offers_by_requirements
 from dstack._internal.server.services.plugins import apply_plugin_policies
 from dstack._internal.server.services.projects import list_project_models, list_user_project_models
+from dstack._internal.server.services.resources import set_resources_defaults
 from dstack._internal.server.services.users import get_user_model_by_name
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.random_names import generate_name
@@ -301,12 +302,14 @@ async def get_plan(
             project=project,
             run_name=effective_run_spec.run_name,
         )
-        if (
-            current_resource is not None
-            and not current_resource.status.is_finished()
-            and _can_update_run_spec(current_resource.run_spec, effective_run_spec)
-        ):
-            action = ApplyAction.UPDATE
+        if current_resource is not None:
+            # For backward compatibility (current_resource may has been submitted before
+            # some fields, e.g., CPUSpec.arch, were added)
+            set_resources_defaults(current_resource.run_spec.configuration.resources)
+            if not current_resource.status.is_finished() and _can_update_run_spec(
+                current_resource.run_spec, effective_run_spec
+            ):
+                action = ApplyAction.UPDATE
 
     jobs = await get_jobs_from_run_spec(effective_run_spec, replica_num=0)
 
@@ -406,6 +409,10 @@ async def apply_plan(
             project=project,
             run_spec=run_spec,
         )
+
+    # For backward compatibility (current_resource may has been submitted before
+    # some fields, e.g., CPUSpec.arch, were added)
+    set_resources_defaults(current_resource.run_spec.configuration.resources)
     try:
         _check_can_update_run_spec(current_resource.run_spec, run_spec)
     except ServerClientError:
@@ -414,6 +421,8 @@ async def apply_plan(
             raise ServerClientError("Cannot override active run. Stop the run first.")
         raise
     if not force:
+        if plan.current_resource is not None:
+            set_resources_defaults(plan.current_resource.run_spec.configuration.resources)
         if (
             plan.current_resource is None
             or plan.current_resource.id != current_resource.id
@@ -866,6 +875,7 @@ def _validate_run_spec_and_set_defaults(run_spec: RunSpec):
         raise ServerClientError(
             f"Maximum utilization_policy.time_window is {settings.SERVER_METRICS_TTL_SECONDS}s"
         )
+    set_resources_defaults(run_spec.configuration.resources)
 
 
 _UPDATABLE_SPEC_FIELDS = ["repo_code_hash", "configuration"]
