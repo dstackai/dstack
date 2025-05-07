@@ -87,6 +87,14 @@ class NebiusBackendConfig(CoreModel):
         Optional[list[str]],
         Field(description="The list of allowed Nebius regions. Omit to allow all regions"),
     ] = None
+    fabrics: Annotated[
+        Optional[list[str]],
+        Field(
+            description=(
+                "The list of allowed fabrics for InfiniBand clusters. Omit to allow all fabrics"
+            )
+        ),
+    ] = None
 
 
 class NebiusBackendConfigWithCreds(NebiusBackendConfig):
