@@ -105,7 +105,6 @@ class InstanceConfiguration(CoreModel):
     user: str  # dstack user name
     ssh_keys: List[SSHKey]
     instance_id: Optional[str] = None
-    placement_group_name: Optional[str] = None
     reservation: Optional[str] = None
     volumes: Optional[List[Volume]] = None
     tags: Optional[Dict[str, str]] = None

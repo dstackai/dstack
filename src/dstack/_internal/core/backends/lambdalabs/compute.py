@@ -20,6 +20,7 @@ from dstack._internal.core.models.instances import (
     InstanceOffer,
     InstanceOfferWithAvailability,
 )
+from dstack._internal.core.models.placement import PlacementGroup
 from dstack._internal.core.models.runs import JobProvisioningData, Requirements
 
 MAX_INSTANCE_NAME_LEN = 60
@@ -46,7 +47,10 @@ class LambdaCompute(
         return offers_with_availability
 
     def create_instance(
-        self, instance_offer: InstanceOfferWithAvailability, instance_config: InstanceConfiguration
+        self,
+        instance_offer: InstanceOfferWithAvailability,
+        instance_config: InstanceConfiguration,
+        placement_group: Optional[PlacementGroup],
     ) -> JobProvisioningData:
         instance_name = generate_unique_instance_name(
             instance_config, max_length=MAX_INSTANCE_NAME_LEN

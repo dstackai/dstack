@@ -15,6 +15,7 @@ from dstack._internal.core.models.instances import (
     InstanceType,
     Resources,
 )
+from dstack._internal.core.models.placement import PlacementGroup
 from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
 from dstack._internal.core.models.volumes import Volume, VolumeProvisioningData
 from dstack._internal.utils.logging import get_logger
@@ -53,6 +54,7 @@ class LocalCompute(
         self,
         instance_offer: InstanceOfferWithAvailability,
         instance_config: InstanceConfiguration,
+        placement_group: Optional[PlacementGroup],
     ) -> JobProvisioningData:
         return JobProvisioningData(
             backend=instance_offer.backend,

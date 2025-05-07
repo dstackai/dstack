@@ -15,14 +15,19 @@ from nebius.api.nebius.common.v1 import Operation, ResourceMetadata
 from nebius.api.nebius.compute.v1 import (
     AttachedDiskSpec,
     CreateDiskRequest,
+    CreateGpuClusterRequest,
     CreateInstanceRequest,
     DeleteDiskRequest,
+    DeleteGpuClusterRequest,
     DeleteInstanceRequest,
     DiskServiceClient,
     DiskSpec,
     ExistingDisk,
     GetInstanceRequest,
+    GpuClusterServiceClient,
+    GpuClusterSpec,
     Instance,
+    InstanceGpuClusterSpec,
     InstanceServiceClient,
     InstanceSpec,
     IPAddress,
@@ -275,6 +280,7 @@ def create_instance(
     user_data: str,
     platform: str,
     preset: str,
+    cluster_id: Optional[str],
     disk_id: str,
     subnet_id: str,
 ) -> SDKOperation[Operation]:
@@ -287,6 +293,7 @@ def create_instance(
         spec=InstanceSpec(
             cloud_init_user_data=user_data,
             resources=ResourcesSpec(platform=platform, preset=preset),
+            gpu_cluster=InstanceGpuClusterSpec(id=cluster_id) if cluster_id is not None else None,
             boot_disk=AttachedDiskSpec(
                 attach_mode=AttachedDiskSpec.AttachMode.READ_WRITE,
                 existing_disk=ExistingDisk(id=disk_id),
@@ -317,5 +324,27 @@ def delete_instance(sdk: SDK, instance_id: str) -> SDKOperation[Operation]:
     return LOOP.await_(
         InstanceServiceClient(sdk).delete(
             DeleteInstanceRequest(id=instance_id), timeout=REQUEST_TIMEOUT, metadata=REQUEST_MD
+        )
+    )
+
+
+def create_cluster(sdk: SDK, name: str, project_id: str, fabric: str) -> SDKOperation[Operation]:
+    with wrap_capacity_errors():
+        return LOOP.await_(
+            GpuClusterServiceClient(sdk).create(
+                CreateGpuClusterRequest(
+                    metadata=ResourceMetadata(name=name, parent_id=project_id),
+                    spec=GpuClusterSpec(infiniband_fabric=fabric),
+                ),
+                timeout=REQUEST_TIMEOUT,
+                metadata=REQUEST_MD,
+            )
+        )
+
+
+def delete_cluster(sdk: SDK, cluster_id: str) -> None:
+    return LOOP.await_(
+        GpuClusterServiceClient(sdk).delete(
+            DeleteGpuClusterRequest(id=cluster_id), timeout=REQUEST_TIMEOUT, metadata=REQUEST_MD
         )
     )
