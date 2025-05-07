@@ -338,6 +338,8 @@ There are two ways to configure Azure: using a client secret or using the defaul
                     "Microsoft.Compute/disks/write",
                     "Microsoft.Compute/disks/read",
                     "Microsoft.Compute/disks/delete",
+                    "Microsoft.ManagedIdentity/userAssignedIdentities/assign/action",
+                    "Microsoft.ManagedIdentity/userAssignedIdentities/read",
                     "Microsoft.Network/networkSecurityGroups/*",
                     "Microsoft.Network/locations/*",
                     "Microsoft.Network/virtualNetworks/*",
