@@ -9,6 +9,7 @@ from dstack._internal.core.backends.base.configurator import (
 )
 from dstack._internal.core.backends.nebius import resources
 from dstack._internal.core.backends.nebius.backend import NebiusBackend
+from dstack._internal.core.backends.nebius.fabrics import get_all_infiniband_fabrics
 from dstack._internal.core.backends.nebius.models import (
     AnyNebiusBackendConfig,
     NebiusBackendConfig,
@@ -37,6 +38,16 @@ class NebiusConfigurator(Configurator):
             raise_invalid_credentials_error(
                 fields=[["creds"]],
                 details=str(e),
+            )
+        valid_fabrics = get_all_infiniband_fabrics()
+        if invalid_fabrics := set(config.fabrics or []) - valid_fabrics:
+            raise_invalid_credentials_error(
+                fields=[["fabrics"]],
+                details=(
+                    "These InfiniBand fabrics do not exist or are not known to dstack:"
+                    f" {sorted(invalid_fabrics)}. Omit `fabrics` to allow all fabrics or select"
+                    f" some of the valid options: {sorted(valid_fabrics)}"
+                ),
             )
 
     def create_backend(

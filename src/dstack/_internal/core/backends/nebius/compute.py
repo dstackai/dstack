@@ -2,7 +2,6 @@ import json
 import random
 import shlex
 import time
-from dataclasses import dataclass
 from functools import cached_property
 from typing import List, Optional
 
@@ -21,6 +20,7 @@ from dstack._internal.core.backends.base.compute import (
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.nebius import resources
+from dstack._internal.core.backends.nebius.fabrics import get_suitable_infiniband_fabrics
 from dstack._internal.core.backends.nebius.models import NebiusConfig, NebiusServiceAccountCreds
 from dstack._internal.core.errors import (
     BackendError,
@@ -78,24 +78,6 @@ SUPPORTED_PLATFORMS = [
     "gpu-l40s-d",
     "cpu-d3",
     "cpu-e2",
-]
-
-
-@dataclass(frozen=True)
-class InfinibandFabric:
-    name: str
-    platform: str
-    region: str
-
-
-# https://docs.nebius.com/compute/clusters/gpu#fabrics
-INFINIBAND_FABRICS = [
-    InfinibandFabric("fabric-2", "gpu-h100-sxm", "eu-north1"),
-    InfinibandFabric("fabric-3", "gpu-h100-sxm", "eu-north1"),
-    InfinibandFabric("fabric-4", "gpu-h100-sxm", "eu-north1"),
-    InfinibandFabric("fabric-5", "gpu-h200-sxm", "eu-west1"),
-    InfinibandFabric("fabric-6", "gpu-h100-sxm", "eu-north1"),
-    InfinibandFabric("fabric-7", "gpu-h200-sxm", "eu-north1"),
 ]
 
 
@@ -280,7 +262,9 @@ class NebiusCompute(
         backend_data = NebiusPlacementGroupBackendData(cluster=None)
         # Only create a Nebius cluster if the instance supports it.
         # For other instances, return dummy PlacementGroupProvisioningData.
-        if fabrics := _get_suitable_infiniband_fabrics(master_instance_offer):
+        if fabrics := get_suitable_infiniband_fabrics(
+            master_instance_offer, allowed_fabrics=self.config.fabrics
+        ):
             fabric = random.choice(fabrics)
             op = resources.create_cluster(
                 self._sdk,
@@ -319,7 +303,11 @@ class NebiusCompute(
         )
         return (
             backend_data.cluster is None
-            or backend_data.cluster.fabric in _get_suitable_infiniband_fabrics(instance_offer)
+            or backend_data.cluster.fabric
+            in get_suitable_infiniband_fabrics(
+                instance_offer,
+                allowed_fabrics=None,  # enforced at cluster creation time, no need to enforce here
+            )
         )
 
 
@@ -380,15 +368,3 @@ def _wait_for_instance(sdk: SDK, op: SDKOperation[Operation]) -> None:
 def _supported_instances(offer: InstanceOffer) -> bool:
     platform, _ = offer.instance.name.split()
     return platform in SUPPORTED_PLATFORMS and not offer.instance.resources.spot
-
-
-def _get_suitable_infiniband_fabrics(offer: InstanceOffer) -> list[str]:
-    if len(offer.instance.resources.gpus) < 8:
-        # From the create VM page in the Nebius Console:
-        # > Only virtual machines with at least 8 NVIDIA® Hopper® H100 or H200 GPUs
-        # > can be added to the cluster
-        return []
-    platform, _ = offer.instance.name.split()
-    return [
-        f.name for f in INFINIBAND_FABRICS if f.platform == platform and f.region == offer.region
-    ]
