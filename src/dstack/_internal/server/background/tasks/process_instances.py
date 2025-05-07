@@ -83,7 +83,6 @@ from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services.fleets import (
     fleet_model_to_fleet,
     get_create_instance_offers,
-    get_fleet_spec,
 )
 from dstack._internal.server.services.instances import (
     get_instance_configuration,
@@ -574,10 +573,7 @@ async def _create_instance(session: AsyncSession, instance: InstanceModel) -> No
             _is_fleet_master_instance(instance)
             and instance_offer.backend in BACKENDS_WITH_PLACEMENT_GROUPS_SUPPORT
             and instance.fleet
-            and (
-                get_fleet_spec(instance.fleet).configuration.placement
-                == InstanceGroupPlacement.CLUSTER
-            )
+            and _is_cloud_cluster(instance.fleet)
         ):
             assert isinstance(compute, ComputeWithPlacementGroupSupport)
             placement_group_model = _find_suitable_placement_group(
@@ -666,37 +662,32 @@ async def _create_instance(session: AsyncSession, instance: InstanceModel) -> No
     instance.last_retry_at = get_current_datetime()
 
     if not should_retry:
-        instance.status = InstanceStatus.TERMINATED
-        instance.termination_reason = "All offers failed" if offers else "No offers found"
-        logger.info(
-            "Terminated instance %s: %s",
-            instance.name,
-            instance.termination_reason,
-            extra={
-                "instance_name": instance.name,
-                "instance_status": InstanceStatus.TERMINATED.value,
-            },
-        )
-        if instance.fleet and _is_fleet_master_instance(instance):
+        _mark_terminated(instance, "All offers failed" if offers else "No offers found")
+        if (
+            instance.fleet
+            and _is_fleet_master_instance(instance)
+            and _is_cloud_cluster(instance.fleet)
+        ):
             # Do not attempt to deploy other instances, as they won't determine the correct cluster
             # backend, region, and placement group without a successfully deployed master instance
-            # FIXME(critical): this should only apply to placement: cluster
             for sibling_instance in instance.fleet.instances:
                 if sibling_instance.id == instance.id:
                     continue
-                if sibling_instance.status == InstanceStatus.PENDING:
-                    sibling_instance.status = InstanceStatus.TERMINATED
-                else:
-                    logger.error(
-                        "Instance %s has unexpected status %s."
-                        " Should have been %s, as master instance %s has not been provisioned",
-                        sibling_instance.name,
-                        sibling_instance.status.value,
-                        InstanceStatus.PENDING.value,
-                        instance.name,
-                    )
-                    sibling_instance.status = InstanceStatus.TERMINATING
-                sibling_instance.termination_reason = "Master instance failed to start"
+                _mark_terminated(sibling_instance, "Master instance failed to start")
+
+
+def _mark_terminated(instance: InstanceModel, termination_reason: str) -> None:
+    instance.status = InstanceStatus.TERMINATED
+    instance.termination_reason = termination_reason
+    logger.info(
+        "Terminated instance %s: %s",
+        instance.name,
+        instance.termination_reason,
+        extra={
+            "instance_name": instance.name,
+            "instance_status": InstanceStatus.TERMINATED.value,
+        },
+    )
 
 
 async def _check_instance(instance: InstanceModel) -> None:
@@ -980,15 +971,19 @@ def _need_to_wait_fleet_provisioning(instance: InstanceModel) -> bool:
         or instance.fleet.instances[0].status == InstanceStatus.TERMINATED
     ):
         return False
-    fleet = fleet_model_to_fleet(instance.fleet)
-    return (
-        fleet.spec.configuration.placement == InstanceGroupPlacement.CLUSTER
-        and fleet.spec.configuration.ssh_config is None
-    )
+    return _is_cloud_cluster(instance.fleet)
 
 
 def _is_fleet_master_instance(instance: InstanceModel) -> bool:
     return instance.fleet is not None and instance.id == instance.fleet.instances[0].id
+
+
+def _is_cloud_cluster(fleet_model: FleetModel) -> bool:
+    fleet = fleet_model_to_fleet(fleet_model)
+    return (
+        fleet.spec.configuration.placement == InstanceGroupPlacement.CLUSTER
+        and fleet.spec.configuration.ssh_config is None
+    )
 
 
 def _get_instance_offer_for_instance(

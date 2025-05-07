@@ -638,16 +638,32 @@ class TestCreateInstance:
         assert instance.status == InstanceStatus.TERMINATED
         assert instance.termination_reason == "No offers found"
 
-    async def test_terminates_fleet_instances_if_master_instance_not_created(
-        self, session: AsyncSession
+    @pytest.mark.parametrize(
+        ("placement", "expected_termination_reasons"),
+        [
+            pytest.param(
+                InstanceGroupPlacement.CLUSTER,
+                {"No offers found": 1, "Master instance failed to start": 3},
+                id="cluster",
+            ),
+            pytest.param(
+                None,
+                {"No offers found": 4},
+                id="non-cluster",
+            ),
+        ],
+    )
+    async def test_terminates_cluster_instances_if_master_not_created(
+        self,
+        session: AsyncSession,
+        placement: Optional[InstanceGroupPlacement],
+        expected_termination_reasons: dict[str, int],
     ):
         project = await create_project(session=session)
         fleet = await create_fleet(
             session,
             project,
-            spec=get_fleet_spec(
-                conf=get_fleet_configuration(placement=InstanceGroupPlacement.CLUSTER, nodes=4)
-            ),
+            spec=get_fleet_spec(conf=get_fleet_configuration(placement=placement, nodes=4)),
         )
         instances = [
             await create_instance(
@@ -672,10 +688,7 @@ class TestCreateInstance:
             await session.refresh(instance)
             assert instance.status == InstanceStatus.TERMINATED
             termination_reasons[instance.termination_reason] += 1
-        assert termination_reasons == {
-            "No offers found": 1,
-            "Master instance failed to start": 3,
-        }
+        assert termination_reasons == expected_termination_reasons
 
 
 @pytest.mark.asyncio

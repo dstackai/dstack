@@ -178,7 +178,7 @@ class ComputeWithCreateInstanceSupport(ABC):
         )
         instance_offer = instance_offer.copy()
         self._restrict_instance_offer_az_to_volumes_az(instance_offer, volumes)
-        return self.create_instance(instance_offer, instance_config)
+        return self.create_instance(instance_offer, instance_config, placement_group=None)
 
     def _restrict_instance_offer_az_to_volumes_az(
         self,
