@@ -19,7 +19,7 @@ def authenticate(creds: AnyGCPCreds, project_id: Optional[str] = None) -> Tuple[
     credentials, credentials_project_id = get_credentials(creds)
     if project_id is None:
         # If project_id is not specified explicitly, try using credentials' project_id.
-        # Explicit project_id takes precedence bacause credentials' project_id may be irrelevant.
+        # Explicit project_id takes precedence because credentials' project_id may be irrelevant.
         # For example, with Workload Identity Federation for GKE, it's cluster project_id.
         project_id = credentials_project_id
     if project_id is None:

@@ -159,6 +159,7 @@ class AWSCompute(
         self,
         instance_offer: InstanceOfferWithAvailability,
         instance_config: InstanceConfiguration,
+        placement_group: Optional[PlacementGroup],
     ) -> JobProvisioningData:
         project_name = instance_config.project_name
         ec2_resource = self.session.resource("ec2", region_name=instance_offer.region)
@@ -248,7 +249,7 @@ class AWSCompute(
                         spot=instance_offer.instance.resources.spot,
                         subnet_id=subnet_id,
                         allocate_public_ip=allocate_public_ip,
-                        placement_group_name=instance_config.placement_group_name,
+                        placement_group_name=placement_group.name if placement_group else None,
                         enable_efa=enable_efa,
                         max_efa_interfaces=max_efa_interfaces,
                         reservation_id=instance_config.reservation,
@@ -291,6 +292,7 @@ class AWSCompute(
     def create_placement_group(
         self,
         placement_group: PlacementGroup,
+        master_instance_offer: InstanceOffer,
     ) -> PlacementGroupProvisioningData:
         ec2_client = self.session.client("ec2", region_name=placement_group.configuration.region)
         logger.debug("Creating placement group %s...", placement_group.name)
@@ -322,6 +324,16 @@ class AWSCompute(
             else:
                 raise e
         logger.debug("Deleted placement group %s", placement_group.name)
+
+    def is_suitable_placement_group(
+        self,
+        placement_group: PlacementGroup,
+        instance_offer: InstanceOffer,
+    ) -> bool:
+        return (
+            placement_group.configuration.backend == BackendType.AWS
+            and placement_group.configuration.region == instance_offer.region
+        )
 
     def create_gateway(
         self,

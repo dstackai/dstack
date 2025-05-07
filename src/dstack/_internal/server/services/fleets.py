@@ -1,5 +1,3 @@
-import random
-import string
 import uuid
 from datetime import datetime, timezone
 from typing import List, Literal, Optional, Tuple, Union, cast
@@ -33,6 +31,7 @@ from dstack._internal.core.models.instances import (
     SSHConnectionParams,
     SSHKey,
 )
+from dstack._internal.core.models.placement import PlacementGroup
 from dstack._internal.core.models.profiles import (
     Profile,
     SpotPolicy,
@@ -284,6 +283,7 @@ async def get_create_instance_offers(
     project: ProjectModel,
     profile: Profile,
     requirements: Requirements,
+    placement_group: Optional[PlacementGroup] = None,
     fleet_spec: Optional[FleetSpec] = None,
     fleet_model: Optional[FleetModel] = None,
     blocks: Union[int, Literal["auto"]] = 1,
@@ -309,6 +309,7 @@ async def get_create_instance_offers(
         exclude_not_available=exclude_not_available,
         multinode=multinode,
         master_job_provisioning_data=master_job_provisioning_data,
+        placement_group=placement_group,
         blocks=blocks,
     )
     offers = [
@@ -395,17 +396,12 @@ async def create_fleet(
                 )
                 fleet_model.instances.append(instances_model)
         else:
-            placement_group_name = _get_placement_group_name(
-                project=project,
-                fleet_spec=spec,
-            )
             for i in range(_get_fleet_nodes_to_provision(spec)):
                 instance_model = await create_fleet_instance_model(
                     session=session,
                     project=project,
                     user=user,
                     spec=spec,
-                    placement_group_name=placement_group_name,
                     reservation=spec.configuration.reservation,
                     instance_num=i,
                 )
@@ -419,7 +415,6 @@ async def create_fleet_instance_model(
     project: ProjectModel,
     user: UserModel,
     spec: FleetSpec,
-    placement_group_name: Optional[str],
     reservation: Optional[str],
     instance_num: int,
 ) -> InstanceModel:
@@ -433,7 +428,6 @@ async def create_fleet_instance_model(
         requirements=requirements,
         instance_name=f"{spec.configuration.name}-{instance_num}",
         instance_num=instance_num,
-        placement_group_name=placement_group_name,
         reservation=reservation,
         blocks=spec.configuration.blocks,
         tags=spec.configuration.tags,
@@ -739,18 +733,3 @@ def _get_fleet_requirements(fleet_spec: FleetSpec) -> Requirements:
         reservation=fleet_spec.configuration.reservation,
     )
     return requirements
-
-
-def _get_placement_group_name(
-    project: ProjectModel,
-    fleet_spec: FleetSpec,
-) -> Optional[str]:
-    if fleet_spec.configuration.placement != InstanceGroupPlacement.CLUSTER:
-        return None
-    # A random suffix to avoid clashing with to-be-deleted placement groups left by old fleets
-    suffix = _generate_random_placement_group_suffix()
-    return f"{project.name}-{fleet_spec.configuration.name}-{suffix}-pg"
-
-
-def _generate_random_placement_group_suffix(length: int = 8) -> str:
-    return "".join(random.choice(string.ascii_lowercase + string.digits) for _ in range(length))

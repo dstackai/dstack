@@ -1,0 +1,10 @@
+type: task
+name: tt-smi
+
+image: dstackai/tt-smi:latest
+
+commands:
+  - tt-smi -s
+
+resources:
+  gpu: n150:1

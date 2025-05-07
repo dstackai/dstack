@@ -256,8 +256,9 @@ nav:
         - Llama: examples/llms/llama/index.md
     - Accelerators:
         - AMD: examples/accelerators/amd/index.md
-        - Intel Gaudi: examples/accelerators/intel/index.md
         - TPU: examples/accelerators/tpu/index.md
+        - Intel Gaudi: examples/accelerators/intel/index.md
+        - Tenstorrent: examples/accelerators/tenstorrent/index.md
     - Misc:
         - Docker Compose: examples/misc/docker-compose/index.md
         - NCCL Tests: examples/misc/nccl-tests/index.md

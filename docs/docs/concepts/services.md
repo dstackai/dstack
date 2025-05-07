@@ -526,11 +526,29 @@ via the [`spot_policy`](../reference/dstack.yml/service.md#spot_policy) property
 
 ### Retry policy
 
-By default, if `dstack` can't find capacity, the task exits with an error, or the instance is interrupted, 
-the run will fail.
+By default, if `dstack` can't find capacity, or the service exits with an error, or the instance is interrupted, the run will fail.
 
 If you'd like `dstack` to automatically retry, configure the 
 [retry](../reference/dstack.yml/service.md#retry) property accordingly:
+
+<div editor-title="service.dstack.yml">
+
+```yaml
+type: service
+image: my-app:latest
+port: 80
+
+retry:
+  # Retry on specific events
+  on_events: [no-capacity, error, interruption]
+  # Retry for up to 1 hour
+  duration: 1h
+```
+
+</div>
+
+If one replica of a multi-replica service fails with retry enabled,
+`dstack` will resubmit only the failed replica while keeping active replicas running.
 
 --8<-- "docs/concepts/snippets/manage-fleets.ext"
 

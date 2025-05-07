@@ -11,14 +11,14 @@ control which users have access to it.
 In addition to [`~/.dstack/server/config.yml`](../reference/server/config.yml.md), 
 a global admin or a project admin can configure backends on the project settings page.
 
-<img src="https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-projects-project-backends.png?raw=true" width="750px" />
+<img src="https://dstack.ai/static-assets/static-assets/images/dstack-projects-project-backends.png" width="750px" />
 
 ## Global admins
 
 A user can be assigned or unassigned a global admin role on the user account settings page. This can only be done by 
 another global admin.
 
-<img src="https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-projects-global-admin.png?raw=true" width="750px" />
+<img src="https://dstack.ai/static-assets/static-assets/images/dstack-projects-global-admin.png" width="750px" />
 
 The global admin role allows a user to manage all projects and users.
 
@@ -26,7 +26,7 @@ The global admin role allows a user to manage all projects and users.
 
 A user can be added to a project and assigned or unassigned as a project role on the project settings page.
 
-<img src="https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-projects-project-admin.png?raw=true" width="750px" />
+<img src="https://dstack.ai/static-assets/static-assets/images/dstack-projects-project-admin.png" width="750px" />
 
 ### Project roles
 
@@ -42,7 +42,7 @@ A user can be added to a project and assigned or unassigned as a project role on
 
 Once created, a user is issued a token. This token can be found on the user account settings page. 
 
-<img src="https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-projects-user-token.png?raw=true" width="750px" />
+<img src="https://dstack.ai/static-assets/static-assets/images/dstack-projects-user-token.png" width="750px" />
 
 The token must be used for authentication when logging into the control plane UI
 and when using the CLI or API.
@@ -53,7 +53,7 @@ To use the CLI with a specific project, run the `dstack config` command with the
 
 You can find the command on the project’s settings page:
 
-<img src="https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-projects-project-cli.png?raw=true" width="750px" />
+<img src="https://dstack.ai/static-assets/static-assets/images/dstack-projects-project-cli.png" width="750px" />
 
 ??? info "API"
     In addition to the UI, managing projects, users, and user permissions can also be done via the [REST API](../reference/api/rest/index.md).

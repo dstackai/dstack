@@ -659,6 +659,7 @@ class PlacementGroupModel(BaseModel):
 
     fleet_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("fleets.id"))
     fleet: Mapped["FleetModel"] = relationship(foreign_keys=[fleet_id])
+    # TODO: rename `fleet_deleted` -> `to_be_deleted`
     fleet_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
 
     created_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)

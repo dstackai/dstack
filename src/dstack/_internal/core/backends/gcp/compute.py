@@ -166,6 +166,7 @@ class GCPCompute(
         self,
         instance_offer: InstanceOfferWithAvailability,
         instance_config: InstanceConfiguration,
+        placement_group: Optional[PlacementGroup],
     ) -> JobProvisioningData:
         instance_name = generate_unique_instance_name(
             instance_config, max_length=gcp_resources.MAX_RESOURCE_NAME_LEN
@@ -199,11 +200,11 @@ class GCPCompute(
             instance_type_name=instance_offer.instance.name,
         )
         placement_policy = None
-        if instance_config.placement_group_name is not None:
+        if placement_group is not None:
             placement_policy = gcp_resources.get_placement_policy_resource_name(
                 project_id=self.config.project_id,
                 region=instance_offer.region,
-                placement_policy=instance_config.placement_group_name,
+                placement_policy=placement_group.name,
             )
         labels = {
             "owner": "dstack",
@@ -406,6 +407,7 @@ class GCPCompute(
     def create_placement_group(
         self,
         placement_group: PlacementGroup,
+        master_instance_offer: InstanceOffer,
     ) -> PlacementGroupProvisioningData:
         policy = compute_v1.ResourcePolicy(
             name=placement_group.name,
@@ -439,6 +441,16 @@ class GCPCompute(
             if "is already being used by" in e.message:
                 raise PlacementGroupInUseError()
             raise
+
+    def is_suitable_placement_group(
+        self,
+        placement_group: PlacementGroup,
+        instance_offer: InstanceOffer,
+    ) -> bool:
+        return (
+            placement_group.configuration.backend == BackendType.GCP
+            and placement_group.configuration.region == instance_offer.region
+        )
 
     def create_gateway(
         self,

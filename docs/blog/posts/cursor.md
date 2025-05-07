@@ -3,7 +3,7 @@ title: "Accessing dev environments with Cursor"
 date: 2025-03-31
 description: "TBA"
 slug: cursor
-image: https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-cursor-v2.png?raw=true
+image: https://dstack.ai/static-assets/static-assets/images/dstack-cursor-v2.png
 categories:
   - Dev environments
 ---
@@ -17,7 +17,7 @@ Previously, support was limited to VS Code. However, as developers rely on a var
 we’ve expanded compatibility. With this update, dev environments now offer effortless access for users of 
 [Cursor :material-arrow-top-right-thin:{ .external }](https://www.cursor.com/){:target="_blank"}.
 
-<img src="https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-cursor-v2.png?raw=true" width="630"/>
+<img src="https://dstack.ai/static-assets/static-assets/images/dstack-cursor-v2.png" width="630"/>
 
 <!-- more -->
 
@@ -73,7 +73,7 @@ To open in Cursor, use this link:
 Clicking the provided URL will prompt your desktop Cursor IDE to automatically connect to the remote machine via the SSH
 tunnel created by the `dstack apply` command, allowing you to securely work with your dev environment.
 
-<img src="https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-cursor-ide.png?raw=true" width="800"/>
+<img src="https://dstack.ai/static-assets/static-assets/images/dstack-cursor-ide.png" width="800"/>
 
 Using Cursor over VS Code offers multiple benefits, particularly when it comes to integrated AI coding assistance and
 enhanced developer experience.

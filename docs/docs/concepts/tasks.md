@@ -395,7 +395,7 @@ via the [`spot_policy`](../reference/dstack.yml/task.md#spot_policy) property. I
 
 ### Retry policy
 
-By default, if `dstack` can't find capacity, the task exits with an error, or the instance is interrupted, 
+By default, if `dstack` can't find capacity, or the task exits with an error, or the instance is interrupted, 
 the run will fail.
 
 If you'd like `dstack` to automatically retry, configure the 
@@ -423,6 +423,9 @@ retry:
 ```
 
 </div>
+
+If one job of a multi-node task fails with retry enabled,
+`dstack` will stop all the jobs and resubmit the run.
 
 --8<-- "docs/concepts/snippets/manage-fleets.ext"
 

@@ -62,6 +62,7 @@ from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
     InstanceType,
 )
+from dstack._internal.core.models.placement import PlacementGroup
 from dstack._internal.core.models.resources import Memory, Range
 from dstack._internal.core.models.runs import JobProvisioningData, Requirements
 from dstack._internal.utils.logging import get_logger
@@ -109,6 +110,7 @@ class AzureCompute(
         self,
         instance_offer: InstanceOfferWithAvailability,
         instance_config: InstanceConfiguration,
+        placement_group: Optional[PlacementGroup],
     ) -> JobProvisioningData:
         instance_name = generate_unique_instance_name(
             instance_config, max_length=azure_resources.MAX_RESOURCE_NAME_LEN

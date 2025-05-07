@@ -20,6 +20,7 @@ from dstack._internal.core.models.instances import (
     InstanceOffer,
     InstanceOfferWithAvailability,
 )
+from dstack._internal.core.models.placement import PlacementGroup
 from dstack._internal.core.models.runs import JobProvisioningData, Requirements
 
 MAX_INSTANCE_NAME_LEN = 60
@@ -46,7 +47,10 @@ class LambdaCompute(
         return offers_with_availability
 
     def create_instance(
-        self, instance_offer: InstanceOfferWithAvailability, instance_config: InstanceConfiguration
+        self,
+        instance_offer: InstanceOfferWithAvailability,
+        instance_config: InstanceConfiguration,
+        placement_group: Optional[PlacementGroup],
     ) -> JobProvisioningData:
         instance_name = generate_unique_instance_name(
             instance_config, max_length=MAX_INSTANCE_NAME_LEN
@@ -182,13 +186,18 @@ def _setup_instance(
     ssh_private_key: str,
 ):
     setup_commands = (
-        "mkdir /home/ubuntu/.dstack && "
-        "sudo apt-get update && "
-        "sudo apt-get install -y --no-install-recommends nvidia-container-toolkit && "
-        "sudo nvidia-ctk runtime configure --runtime=docker && "
-        "sudo pkill -SIGHUP dockerd"
+        "mkdir /home/ubuntu/.dstack",
+        "sudo apt-get update",
+        "sudo apt-get install -y --no-install-recommends nvidia-container-toolkit",
+        "sudo install -d -m 0755 /etc/docker",
+        # Workaround for https://github.com/NVIDIA/nvidia-container-toolkit/issues/48
+        """echo '{"exec-opts":["native.cgroupdriver=cgroupfs"]}' | sudo tee /etc/docker/daemon.json""",
+        "sudo nvidia-ctk runtime configure --runtime=docker",
+        "sudo systemctl restart docker.service",  # `systemctl reload` (`kill -HUP`) won't work
     )
-    _run_ssh_command(hostname=hostname, ssh_private_key=ssh_private_key, command=setup_commands)
+    _run_ssh_command(
+        hostname=hostname, ssh_private_key=ssh_private_key, command=" && ".join(setup_commands)
+    )
 
 
 def _launch_runner(

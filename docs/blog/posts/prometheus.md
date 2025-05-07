@@ -3,7 +3,7 @@ title: "Exporting fleet and run metrics to Prometheus"
 date: 2025-04-01
 description: "TBA"
 slug: prometheus
-image: https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-prometheus-v3.png?raw=true
+image: https://dstack.ai/static-assets/static-assets/images/dstack-prometheus-v3.png
 categories:
   - Monitoring
   - NVIDIA
@@ -21,7 +21,7 @@ While `dstack` provides key metrics through its UI and [`dstack metrics`](dstack
 using their own monitoring tools. To support this, we’ve introduced a new endpoint that allows real-time exporting all collected
 metrics—covering fleets and runs—directly to Prometheus.
 
-<img src="https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-prometheus-v3.png?raw=true" width="630"/>
+<img src="https://dstack.ai/static-assets/static-assets/images/dstack-prometheus-v3.png" width="630"/>
 
 <!-- more -->
 
@@ -36,7 +36,7 @@ Once Prometheus is set up, it will automatically pull metrics from the `dstack` 
 With metrics now in Prometheus, you can use Grafana to create dashboards, whether to monitor all projects at once or
 drill down into specific projects or users.
 
-<img src="https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-prometheus-grafana-dark.png?raw=true" width="800"/>
+<img src="https://dstack.ai/static-assets/static-assets/images/dstack-prometheus-grafana-dark.png" width="800"/>
 
 Overall, `dstack` collects three groups of metrics:
 
