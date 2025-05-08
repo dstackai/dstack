@@ -1,15 +1,14 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { useSearchParams } from 'react-router-dom';
 
-import { Button, FormField, Header, Loader, SelectCSD, SpaceBetween, Table, Toggle } from 'components';
+import { Button, Header, Loader, PropertyFilter, SpaceBetween, Table } from 'components';
 
+import { DEFAULT_TABLE_PAGE_SIZE } from 'consts';
 import { useBreadcrumbs, useCollection, useInfiniteScroll } from 'hooks';
 import { ROUTES } from 'routes';
+import { useLazyGetRunsQuery } from 'services/run';
 
 import { useRunListPreferences } from './Preferences/useRunListPreferences';
-import { DEFAULT_TABLE_PAGE_SIZE } from '../../../consts';
-import { useLazyGetRunsQuery } from '../../../services/run';
 import {
     useAbortRuns,
     useColumnsDefinitions,
@@ -25,7 +24,6 @@ import styles from './styles.module.scss';
 
 export const RunList: React.FC = () => {
     const { t } = useTranslation();
-    const [searchParams, setSearchParams] = useSearchParams();
     const [preferences] = useRunListPreferences();
 
     useBreadcrumbs([
@@ -35,18 +33,22 @@ export const RunList: React.FC = () => {
         },
     ]);
 
-    const { projectOptions, selectedProject, setSelectedProject, onlyActive, setOnlyActive, clearSelected } = useFilters({
-        projectSearchKey: 'project',
+    const {
+        clearFilter,
+        propertyFilterQuery,
+        onChangePropertyFilter,
+        filteringOptions,
+        filteringProperties,
+        filteringRequestParams,
+    } = useFilters({
         localStorePrefix: 'administration-run-list-page',
     });
 
     const { data, isLoading, refreshList, isLoadingMore } = useInfiniteScroll<IRun, TRunsRequestParams>({
         useLazyQuery: useLazyGetRunsQuery,
-        args: { project_name: selectedProject?.value, only_active: onlyActive, limit: DEFAULT_TABLE_PAGE_SIZE },
+        args: { ...filteringRequestParams, limit: DEFAULT_TABLE_PAGE_SIZE },
         getPaginationParams: (lastRun) => ({ prev_submitted_at: lastRun.submitted_at }),
     });
-
-    const isDisabledClearFilter = !selectedProject && !onlyActive;
 
     const { stopRuns, isStopping } = useStopRuns();
     const { abortRuns, isAborting } = useAbortRuns();
@@ -54,14 +56,7 @@ export const RunList: React.FC = () => {
 
     const { columns } = useColumnsDefinitions();
 
-    const clearFilter = () => {
-        clearSelected();
-        setOnlyActive(false);
-        setSearchParams({});
-    };
-
     const { renderEmptyMessage, renderNoMatchMessage } = useEmptyMessages({
-        isDisabledClearFilter,
         clearFilter,
     });
 
@@ -143,32 +138,21 @@ export const RunList: React.FC = () => {
             }
             filter={
                 <div className={styles.selectFilters}>
-                    <div className={styles.select}>
-                        <FormField label={t('projects.run.project')}>
-                            <SelectCSD
-                                disabled={!projectOptions?.length}
-                                options={projectOptions}
-                                selectedOption={selectedProject}
-                                onChange={(event) => {
-                                    setSelectedProject(event.detail.selectedOption);
-                                }}
-                                placeholder={t('projects.run.project_placeholder')}
-                                expandToViewport={true}
-                                filteringType="auto"
-                            />
-                        </FormField>
-                    </div>
-
-                    <div className={styles.activeOnly}>
-                        <Toggle onChange={({ detail }) => setOnlyActive(detail.checked)} checked={onlyActive}>
-                            {t('projects.run.active_only')}
-                        </Toggle>
-                    </div>
-
-                    <div className={styles.clear}>
-                        <Button formAction="none" onClick={clearFilter} disabled={isDisabledClearFilter}>
-                            {t('common.clearFilter')}
-                        </Button>
+                    <div className={styles.propertyFilter}>
+                        <PropertyFilter
+                            query={propertyFilterQuery}
+                            onChange={onChangePropertyFilter}
+                            expandToViewport
+                            hideOperations
+                            i18nStrings={{
+                                clearFiltersText: 'Clear filter',
+                                filteringAriaLabel: 'Find runs',
+                                filteringPlaceholder: 'Find runs',
+                                operationAndText: 'and',
+                            }}
+                            filteringOptions={filteringOptions}
+                            filteringProperties={filteringProperties}
+                        />
                     </div>
                 </div>
             }
