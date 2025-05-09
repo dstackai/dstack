@@ -6,7 +6,7 @@ This example shows how to run distributed [RCCL tests :material-arrow-top-right-
 
 Here's an example of a task that runs AllReduce test on 2 nodes, each with 8 `Mi300x` GPUs (16 processes in total).
 
-<div editor-title="examples/misc/rccl-tests/.dstack.yml">
+<div editor-title="examples/distributed-training/rccl-tests/.dstack.yml">
 
 ```yaml
 type: task
@@ -109,7 +109,7 @@ To run a configuration, use the [`dstack apply`](https://dstack.ai/docs/referenc
 <div class="termy">
 
 ```shell
-$ dstack apply -f examples/misc/rccl-tests/.dstack.yml
+$ dstack apply -f examples/distributed-training/rccl-tests/.dstack.yml
 
  #  BACKEND       RESOURCES                      INSTANCE TYPE   PRICE
  1  ssh (remote)  cpu=256 mem=2268GB disk=752GB  instance        $0      idle
@@ -125,7 +125,7 @@ Submit the run rccl-tests? [y/n]: y
 ## Source code
 
 The source-code of this example can be found in 
-[`examples/misc/rccl-tests` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/misc/rccl-tests).
+[`examples/distributed-training/rccl-tests` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/distributed-training/rccl-tests).
 
 ## What's next?
 

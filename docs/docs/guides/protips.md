@@ -30,9 +30,8 @@ To change the default idle duration, set
 [`idle_duration`](../reference/dstack.yml/fleet.md#idle_duration) in the run configuration (e.g., `0s`, `1m`, or `off` for
 unlimited).
 
-!!! info "Fleets"
-    For greater control over fleet provisioning, configuration, and lifecycle management, it is recommended to use
-    [fleets](../concepts/fleets.md) directly.
+> For greater control over fleet provisioning, configuration, and lifecycle management, it is recommended to use
+> [fleets](../concepts/fleets.md) directly.
 
 ## Volumes
 

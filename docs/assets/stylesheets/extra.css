@@ -546,7 +546,7 @@ h4.doc-heading {
         background-color: transparent;
         border-radius: 3px;
         border: 0.5px solid rgba(0, 0, 0, 0.87);
-        height: 1.95rem;
+        /* height: 1.95rem; */
     }
 
     [data-md-color-primary=white] .md-search__form:hover {
@@ -813,13 +813,13 @@ body {
         z-index: 101;
     }
 
-    .md-search__form::before {
+    /* .md-search__form::before {
         content: "⌘";
         color: white;
         font-weight: 600;
         position: absolute;
         padding: 7px;
-        margin: 4.5px;
+        margin: 3.5px;
         font-size: .65rem;
         background-color: rgba(0,0,0,.87);
         border-radius: 5px;
@@ -835,7 +835,7 @@ body {
         font-weight: 600;
         position: absolute;
         padding: 7px;
-        margin: 4.5px;
+        margin: 3.5px;
         font-size: .65rem;
         background-color: rgba(0,0,0,.87);
         border-radius: 5px;
@@ -844,7 +844,7 @@ body {
         /*z-index: 1;*/
         width: 30px;
         text-align: center;
-    }
+    } */
 
     .md-nav--lifted > .md-nav__list > .md-nav__item > [for] {
         display: none;

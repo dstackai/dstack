@@ -22,7 +22,7 @@ to set up GPUDirect-TCPX – the GCP technology for GPU RDMA over TCP. This invo
 
 !!! info "A3 Mega"
     A3 Mega instances use GPUDirect-TCPXO, which is an extension of GPUDirect-TCPX.
-    See the [A3 Mega guide](https://dstack.ai/examples/misc/a3mega-clusters/) for more details.
+    See the [A3 Mega guide](https://dstack.ai/examples/distributed-training/a3mega-clusters/) for more details.
 
 ## Configure GCP backend
 
@@ -226,4 +226,4 @@ resources:
 ## Source code
 
 The source code for this example can be found in 
-[`examples/misc/a3high-clusters` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/misc/a3high-clusters).
+[`examples/distributed-training/a3high-clusters` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/distributed-training/a3high-clusters).
