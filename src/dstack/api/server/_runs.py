@@ -115,6 +115,8 @@ def _get_apply_plan_excludes(plan: ApplyRunPlanInput) -> Optional[Dict]:
             job_submissions_excludes["job_runtime_data"] = {
                 "offer": {"instance": {"resources": {"cpu_arch"}}}
             }
+        if all(js.exit_status is None for js in job_submissions):
+            job_submissions_excludes["exit_status"] = True
         latest_job_submission = current_resource.latest_job_submission
         if latest_job_submission is not None:
             latest_job_submission_excludes = {}
@@ -127,6 +129,8 @@ def _get_apply_plan_excludes(plan: ApplyRunPlanInput) -> Optional[Dict]:
                 latest_job_submission_excludes["job_runtime_data"] = {
                     "offer": {"instance": {"resources": {"cpu_arch"}}}
                 }
+            if latest_job_submission.exit_status is None:
+                latest_job_submission_excludes["exit_status"] = True
     return {"plan": apply_plan_excludes}
 
 

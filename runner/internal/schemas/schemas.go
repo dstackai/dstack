@@ -11,6 +11,7 @@ type JobStateEvent struct {
 	Timestamp          int64                   `json:"timestamp"`
 	TerminationReason  types.TerminationReason `json:"termination_reason"`
 	TerminationMessage string                  `json:"termination_message"`
+	ExitStatus         *int                    `json:"exit_status"`
 }
 
 type LogEvent struct {

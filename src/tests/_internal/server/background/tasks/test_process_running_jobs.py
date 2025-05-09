@@ -244,7 +244,7 @@ class TestProcessRunningJobs:
         ):
             runner_client_mock = RunnerClientMock.return_value
             runner_client_mock.pull.return_value = PullResponse(
-                job_states=[JobStateEvent(timestamp=1, state=JobStatus.DONE)],
+                job_states=[JobStateEvent(timestamp=1, state=JobStatus.DONE, exit_status=0)],
                 job_logs=[],
                 runner_logs=[],
                 last_updated=2,
@@ -255,6 +255,7 @@ class TestProcessRunningJobs:
         assert job is not None
         assert job.status == JobStatus.TERMINATING
         assert job.termination_reason == JobTerminationReason.DONE_BY_RUNNER
+        assert job.exit_status == 0
         assert job.runner_timestamp == 2
 
     @pytest.mark.asyncio

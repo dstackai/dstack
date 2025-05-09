@@ -560,7 +560,9 @@ def print_finished_message(run: Run):
         console.print("[code]Done[/]")
         return
 
-    termination_reason, termination_reason_message = _get_run_termination_reason(run)
+    termination_reason, termination_reason_message, exit_status = (
+        _get_run_termination_reason_and_exit_status(run)
+    )
     message = "Run failed due to unknown reason. Check CLI, server, and run logs."
     if run.status == RunStatus.TERMINATED:
         message = "Run terminated due to unknown reason. Check CLI, server, and run logs."
@@ -572,13 +574,15 @@ def print_finished_message(run: Run):
             "Check CLI and server logs for more details."
         )
     elif termination_reason is not None:
+        exit_status_details = f"Exit status: {exit_status}.\n" if exit_status else ""
         error_details = (
             f"Error: {termination_reason_message}\n" if termination_reason_message else ""
         )
         message = (
             f"Run failed with error code {termination_reason.name}.\n"
+            f"{exit_status_details}"
             f"{error_details}"
-            "Check CLI, server, and run logs for more details."
+            f"Check [bold]dstack logs -d {run.name}[/bold] for more details."
         )
     console.print(f"[error]{message}[/]")
 
@@ -589,14 +593,20 @@ def get_run_exit_code(run: Run) -> int:
     return 1
 
 
-def _get_run_termination_reason(run: Run) -> Tuple[Optional[JobTerminationReason], Optional[str]]:
+def _get_run_termination_reason_and_exit_status(
+    run: Run,
+) -> Tuple[Optional[JobTerminationReason], Optional[str], Optional[int]]:
     if len(run._run.jobs) == 0:
-        return None, None
+        return None, None, None
     job = run._run.jobs[0]
     if len(job.job_submissions) == 0:
-        return None, None
+        return None, None, None
     job_submission = job.job_submissions[0]
-    return job_submission.termination_reason, job_submission.termination_reason_message
+    return (
+        job_submission.termination_reason,
+        job_submission.termination_reason_message,
+        job_submission.exit_status,
+    )
 
 
 def _run_resubmitted(run: Run, current_job_submission: Optional[JobSubmission]) -> bool:
