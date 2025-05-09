@@ -61,18 +61,21 @@ resources:
 
 </div>
 
-The script orchestrates distributed execution across multiple nodes using MPI. The master node (identified by
-`DSTACK_NODE_RANK=0`) generates `hostfile` listing all node IPs and continuously checks until all worker nodes are
-accessible via MPI. Once confirmed, it executes the `/root/nccl-tests/build/all_reduce_perf` benchmark script across all available GPUs.
+!!! info "MPI"
+    NCCL tests rely on MPI to run on multiple processes. The master node (`DSTACK_NODE_RANK=0`) generates `hostfile` (using `DSTACK_NODES_IPS`) 
+    and waits until worker nodes are accessible via MPI. 
+    Then, it executes `/nccl-tests/build/all_reduce_perf` across all GPUs.
 
-Worker nodes use a FIFO pipe to block execution until they receive a termination signal from the master
-node. This ensures worker nodes remain active during the test and only exit once the master node completes the
-benchmark.
+    Worker nodes use a `FIFO` pipe to wait for until the MPI run is finished.
 
-> The `dstackai/efa` image used in the example comes with MPI and NCCL tests pre-installed. While it is optimized for
-> [AWS EFA :material-arrow-top-right-thin:{ .external }](https://aws.amazon.com/hpc/efa/){:target="_blank"}, it can also
-> be used with regular TCP/IP network adapters and InfiniBand. 
-> See the [source code :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/docker/efa) for the image.
+    There is an open [issue :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/2467){:target="_blank"} to simplify the use of MPI with distributed tasks.
+
+!!! info "Docker image"
+    The `dstackai/efa` image used in the example comes with MPI and NCCL tests pre-installed. While it is optimized for
+    [AWS EFA :material-arrow-top-right-thin:{ .external }](https://aws.amazon.com/hpc/efa/){:target="_blank"}, it can also
+    be used with regular TCP/IP network adapters and InfiniBand. 
+    
+    See the [source code :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/docker/efa) for the image.
 
 ### Apply a configuration
 
