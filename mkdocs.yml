@@ -107,6 +107,7 @@ plugins:
         'blog/distributed-training-with-aws-efa.md': 'blog/posts/efa.md'
         'blog/dstack-stats.md': 'blog/posts/dstack-metrics.md'
         'docs/concepts/metrics.md': 'docs/guides/monitoring.md'
+        'blog/nvidia-and-amd-on-vultr.md.md': 'blog/posts/nvidia-and-amd-on-vultr.md'
   - typeset
   - gen-files:
       scripts:  # always relative to mkdocs.yml

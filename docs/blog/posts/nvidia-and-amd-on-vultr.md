@@ -2,7 +2,7 @@
 title: Supporting NVIDIA and AMD accelerators on Vultr
 date: 2025-02-17
 description: "Introducing integration with Vultr: The new integration allows Vultr customers to train and deploy models on both AMD and NVIDIA GPUs."  
-slug: nvidia-and-amd-on-vultr.md
+slug: nvidia-and-amd-on-vultr
 image: https://dstack.ai/static-assets/static-assets/images/dstack-vultr.png
 categories:
   - Cloud fleets
