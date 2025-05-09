@@ -3,6 +3,7 @@ package metrics
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -10,12 +11,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dstackai/dstack/runner/internal/common"
 	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/dstackai/dstack/runner/internal/schemas"
 )
 
 type MetricsCollector struct {
 	cgroupVersion int
+	gpuVendor     common.GpuVendor
 }
 
 func NewMetricsCollector() (*MetricsCollector, error) {
@@ -23,8 +26,10 @@ func NewMetricsCollector() (*MetricsCollector, error) {
 	if err != nil {
 		return nil, err
 	}
+	gpuVendor := common.GetGpuVendor()
 	return &MetricsCollector{
 		cgroupVersion: cgroupVersion,
+		gpuVendor:     gpuVendor,
 	}, nil
 }
 
@@ -144,19 +149,24 @@ func (s *MetricsCollector) GetMemoryCacheBytes() (uint64, error) {
 }
 
 func (s *MetricsCollector) GetGPUMetrics() ([]schemas.GPUMetrics, error) {
-	metrics, err := s.GetNVIDIAGPUMetrics()
-	if err == nil {
-		return metrics, nil
+	var metrics []schemas.GPUMetrics
+	var err error
+	switch s.gpuVendor {
+	case common.GpuVendorNvidia:
+		metrics, err = s.GetNVIDIAGPUMetrics()
+	case common.GpuVendorAmd:
+		metrics, err = s.GetAMDGPUMetrics()
+	case common.GpuVendorIntel:
+		metrics, err = s.GetIntelAcceleratorMetrics()
+	case common.GpuVendorTenstorrent:
+		err = errors.New("tenstorrent metrics not suppored")
+	case common.GpuVendorNone:
+		// pass
 	}
-	metrics, err = s.GetAMDGPUMetrics()
-	if err == nil {
-		return metrics, nil
+	if metrics == nil {
+		metrics = []schemas.GPUMetrics{}
 	}
-	metrics, err = s.GetIntelAcceleratorMetrics()
-	if err == nil {
-		return metrics, nil
-	}
-	return []schemas.GPUMetrics{}, err
+	return metrics, err
 }
 
 func (s *MetricsCollector) GetNVIDIAGPUMetrics() ([]schemas.GPUMetrics, error) {
@@ -170,32 +180,65 @@ func (s *MetricsCollector) GetNVIDIAGPUMetrics() ([]schemas.GPUMetrics, error) {
 }
 
 func (s *MetricsCollector) GetAMDGPUMetrics() ([]schemas.GPUMetrics, error) {
-	metrics := []schemas.GPUMetrics{}
-
 	cmd := exec.Command("amd-smi", "monitor", "-vu", "--csv")
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	if err := cmd.Run(); err != nil {
 		return nil, fmt.Errorf("failed to execute amd-smi: %w", err)
 	}
+	return s.getAMDGPUMetrics(out.String())
+}
 
-	lines := strings.Split(strings.TrimSpace(out.String()), "\n")
+func (s *MetricsCollector) getAMDGPUMetrics(csv string) ([]schemas.GPUMetrics, error) {
+	lines := strings.Split(strings.TrimSpace(csv), "\n")
+	if len(lines) < 2 {
+		return nil, errors.New("too few lines in amd-smi output")
+	}
+
+	gpuUtilIndex := -1
+	memUsedIndex := -1
+	for index, header := range strings.Split(lines[0], ",") {
+		switch header {
+		case "gfx":
+			gpuUtilIndex = index
+		case "vram_used":
+			memUsedIndex = index
+		}
+	}
+	if gpuUtilIndex == -1 {
+		return nil, errors.New("GPU utilization column not found")
+	}
+	if memUsedIndex == -1 {
+		return nil, errors.New("used VRAM column not found")
+	}
+
+	metrics := []schemas.GPUMetrics{}
 	for _, line := range lines[1:] {
 		fields := strings.Split(line, ",")
-		if len(fields) != 5 {
-			return nil, fmt.Errorf("unexpected number of columns in amd-smi output")
+		if len(fields) <= gpuUtilIndex || len(fields) <= memUsedIndex {
+			return nil, errors.New("too few columns in amd-smi output")
 		}
-		memUsed, err := strconv.ParseUint(strings.TrimSpace(fields[3]), 10, 64)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse VRAM used: %w", err)
+
+		gpuUtilRaw := strings.TrimSpace(fields[gpuUtilIndex])
+		if strings.ToUpper(gpuUtilRaw) == "N/A" {
+			return nil, errors.New("GPU utilization is N/A")
 		}
-		utilization, err := strconv.ParseUint(strings.TrimSpace(fields[1]), 10, 64)
+		gpuUtil, err := strconv.ParseUint(gpuUtilRaw, 10, 64)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse GPU utilization: %w", err)
 		}
+
+		memUsedRaw := strings.TrimSpace(fields[memUsedIndex])
+		if strings.ToUpper(memUsedRaw) == "N/A" {
+			return nil, errors.New("used VRAM is N/A")
+		}
+		memUsed, err := strconv.ParseUint(memUsedRaw, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse used VRAM: %w", err)
+		}
 		metrics = append(metrics, schemas.GPUMetrics{
 			GPUMemoryUsage: memUsed * 1024 * 1024,
-			GPUUtil:        utilization,
+			GPUUtil:        gpuUtil,
 		})
 	}
 
