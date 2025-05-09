@@ -183,6 +183,16 @@ hide:
             Run multi-node NCCL tests with MPI
         </p>
     </a>
+    <a href="/examples/misc/rccl-tests"
+       class="feature-cell sky">
+        <h3>
+            RCCL tests
+        </h3>
+
+        <p>
+            Run multi-node RCCL tests with MPI
+        </p>
+    </a>
     <a href="/examples/misc/a3mega-clusters"
        class="feature-cell sky">
         <h3>

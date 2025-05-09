@@ -262,7 +262,8 @@ nav:
         - Tenstorrent: examples/accelerators/tenstorrent/index.md
     - Misc:
         - Docker Compose: examples/misc/docker-compose/index.md
-        - NCCL Tests: examples/misc/nccl-tests/index.md
+        - NCCL tests: examples/misc/nccl-tests/index.md
+        - RCCL tests: examples/misc/rccl-tests/index.md
         - A3 Mega: examples/misc/a3mega-clusters/index.md
         - A3 High: examples/misc/a3high-clusters/index.md
 #  - Community: community.md
