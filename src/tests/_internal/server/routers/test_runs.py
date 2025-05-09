@@ -375,6 +375,7 @@ def get_dev_env_run_dict(
                         "status": "submitted",
                         "termination_reason": None,
                         "termination_reason_message": None,
+                        "exit_status": None,
                         "job_provisioning_data": None,
                         "job_runtime_data": None,
                     }
@@ -391,6 +392,7 @@ def get_dev_env_run_dict(
             "status": "submitted",
             "termination_reason": None,
             "termination_reason_message": None,
+            "exit_status": None,
             "job_provisioning_data": None,
             "job_runtime_data": None,
         },
@@ -503,6 +505,7 @@ class TestListRuns:
                                 "status": "submitted",
                                 "termination_reason": None,
                                 "termination_reason_message": None,
+                                "exit_status": None,
                                 "job_provisioning_data": None,
                                 "job_runtime_data": None,
                             }
@@ -519,6 +522,7 @@ class TestListRuns:
                     "status": "submitted",
                     "termination_reason_message": None,
                     "termination_reason": None,
+                    "exit_status": None,
                     "job_provisioning_data": None,
                     "job_runtime_data": None,
                 },

@@ -382,6 +382,7 @@ class JobModel(BaseModel):
         Enum(JobTerminationReason)
     )
     termination_reason_message: Mapped[Optional[str]] = mapped_column(Text)
+    exit_status: Mapped[Optional[int]] = mapped_column(Integer)
     job_spec_data: Mapped[str] = mapped_column(Text)
     job_provisioning_data: Mapped[Optional[str]] = mapped_column(Text)
     runner_timestamp: Mapped[Optional[int]] = mapped_column(BigInteger)

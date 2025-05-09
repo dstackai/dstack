@@ -54,10 +54,15 @@ func TestExecutor_HomeDir(t *testing.T) {
 
 func TestExecutor_NonZeroExit(t *testing.T) {
 	ex := makeTestExecutor(t)
-	ex.jobSpec.Commands = append(ex.jobSpec.Commands, "ehco 1") // note: intentional misspelling
+	ex.jobSpec.Commands = append(ex.jobSpec.Commands, "exit 100")
+	makeCodeTar(t, ex.codePath)
 
-	err := ex.execJob(context.TODO(), io.Discard)
+	err := ex.Run(context.TODO())
 	assert.Error(t, err)
+	assert.NotEmpty(t, ex.jobStateHistory)
+	exitStatus := ex.jobStateHistory[len(ex.jobStateHistory)-1].ExitStatus
+	assert.NotNil(t, exitStatus, ex.jobStateHistory)
+	assert.Equal(t, 100, *exitStatus)
 }
 
 func TestExecutor_SSHCredentials(t *testing.T) {

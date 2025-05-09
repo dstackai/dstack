@@ -283,6 +283,7 @@ class JobSubmission(CoreModel):
     status: JobStatus
     termination_reason: Optional[JobTerminationReason]
     termination_reason_message: Optional[str]
+    exit_status: Optional[int]
     job_provisioning_data: Optional[JobProvisioningData]
     job_runtime_data: Optional[JobRuntimeData]
 
@@ -508,7 +509,9 @@ def _get_run_error(
         return ""
     if len(run_jobs) > 1:
         return run_termination_reason.name
-    run_job_termination_reason = _get_run_job_termination_reason(run_jobs)
+    run_job_termination_reason, exit_status = _get_run_job_termination_reason_and_exit_status(
+        run_jobs
+    )
     # For failed runs, also show termination reason to provide more context.
     # For other run statuses, the job termination reason will duplicate run status.
     if run_job_termination_reason is not None and run_termination_reason in [
@@ -516,13 +519,20 @@ def _get_run_error(
         RunTerminationReason.SERVER_ERROR,
         RunTerminationReason.RETRY_LIMIT_EXCEEDED,
     ]:
+        if exit_status:
+            return (
+                f"{run_termination_reason.name}\n({run_job_termination_reason.name} {exit_status})"
+            )
         return f"{run_termination_reason.name}\n({run_job_termination_reason.name})"
     return run_termination_reason.name
 
 
-def _get_run_job_termination_reason(run_jobs: List[Job]) -> Optional[JobTerminationReason]:
+def _get_run_job_termination_reason_and_exit_status(
+    run_jobs: List[Job],
+) -> tuple[Optional[JobTerminationReason], Optional[int]]:
     for job in run_jobs:
         if len(job.job_submissions) > 0:
-            if job.job_submissions[-1].termination_reason is not None:
-                return job.job_submissions[-1].termination_reason
-    return None
+            job_submission = job.job_submissions[-1]
+            if job_submission.termination_reason is not None:
+                return job_submission.termination_reason, job_submission.exit_status
+    return None, None
