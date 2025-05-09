@@ -6,7 +6,7 @@ This example shows how to run distributed [NCCL tests :material-arrow-top-right-
 
 Here's an example of a task that runs AllReduce test on 2 nodes, each with 4 GPUs (8 processes in total).
 
-<div editor-title="examples/misc/nccl-tests/.dstack.yml">
+<div editor-title="examples/distributed-training/nccl-tests/.dstack.yml">
 
 ```yaml
 type: task
@@ -84,7 +84,7 @@ To run a configuration, use the [`dstack apply`](https://dstack.ai/docs/referenc
 <div class="termy">
 
 ```shell
-$ dstack apply -f examples/misc/nccl-tests/.dstack.yml
+$ dstack apply -f examples/distributed-training/nccl-tests/.dstack.yml
 
  #  BACKEND  REGION     INSTANCE       RESOURCES                                   SPOT  PRICE
  1  aws      us-east-1  g4dn.12xlarge  48xCPU, 192GB, 4xT4 (16GB), 100.0GB (disk)  no    $3.912
@@ -99,7 +99,7 @@ Submit the run nccl-tests? [y/n]: y
 ## Source code
 
 The source-code of this example can be found in 
-[`examples/misc/nccl-tests` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/misc/nccl-tests).
+[`examples/distributed-training/nccl-tests` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/distributed-training/nccl-tests).
 
 ## What's next?
 

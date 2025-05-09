@@ -12,7 +12,79 @@ hide:
 }
 </style>
 
+## Fine-tuning
+
+<div class="tx-landing__highlights_grid">
+    <a href="/examples/fine-tuning/axolotl"
+       class="feature-cell">
+        <h3>
+            Axolotl
+        </h3>
+
+        <p>
+            Fine-tune Llama 4 on a custom dataset using Axolotl.
+        </p>
+    </a>
+
+    <a href="/examples/fine-tuning/trl"
+       class="feature-cell">
+        <h3>
+            TRL
+        </h3>
+
+        <p>
+            Fine-tune Llama 3.1 8B on a custom dataset using TRL.
+        </p>
+    </a>
+</div>
+
+## Distributed training
+
+<div class="tx-landing__highlights_grid">
+    <a href="/examples/distributed-training/nccl-tests"
+       class="feature-cell sky">
+        <h3>
+            NCCL tests
+        </h3>
+
+        <p>
+            Run multi-node NCCL tests with MPI
+        </p>
+    </a>
+    <a href="/examples/distributed-training/rccl-tests"
+       class="feature-cell sky">
+        <h3>
+            RCCL tests
+        </h3>
+
+        <p>
+            Run multi-node RCCL tests with MPI
+        </p>
+    </a>
+    <a href="/examples/distributed-training/a3mega-clusters"
+       class="feature-cell sky">
+        <h3>
+            A3 Mega
+        </h3>
+
+        <p>
+            Set up GCP A3 Mega clusters with optimized networking
+        </p>
+    </a>
+    <a href="/examples/distributed-training/a3high-clusters"
+       class="feature-cell sky">
+        <h3>
+            A3 High
+        </h3>
+
+        <p>
+            Set up GCP A3 High clusters with optimized networking
+        </p>
+    </a>
+</div>
+
 ## Deployment
+
 <div class="tx-landing__highlights_grid">
     <a href="/examples/deployment/sglang" 
        class="feature-cell">
@@ -57,32 +129,6 @@ hide:
        </h3>
        <p>
             Deploy DeepSeek R1 and its distilled version with TensorRT-LLM
-        </p>
-    </a>
-</div>
-
-## Fine-tuning
-
-<div class="tx-landing__highlights_grid">
-    <a href="/examples/fine-tuning/axolotl"
-       class="feature-cell">
-        <h3>
-            Axolotl
-        </h3>
-
-        <p>
-            Fine-tune Llama 4 on a custom dataset using Axolotl.
-        </p>
-    </a>
-
-    <a href="/examples/fine-tuning/trl"
-       class="feature-cell">
-        <h3>
-            TRL
-        </h3>
-
-        <p>
-            Fine-tune Llama 3.1 8B on a custom dataset using TRL.
         </p>
     </a>
 </div>
@@ -171,46 +217,6 @@ hide:
 
         <p>
             Use Docker and Docker Compose inside runs
-        </p>
-    </a>
-    <a href="/examples/misc/nccl-tests"
-       class="feature-cell sky">
-        <h3>
-            NCCL tests
-        </h3>
-
-        <p>
-            Run multi-node NCCL tests with MPI
-        </p>
-    </a>
-    <a href="/examples/misc/rccl-tests"
-       class="feature-cell sky">
-        <h3>
-            RCCL tests
-        </h3>
-
-        <p>
-            Run multi-node RCCL tests with MPI
-        </p>
-    </a>
-    <a href="/examples/misc/a3mega-clusters"
-       class="feature-cell sky">
-        <h3>
-            A3 Mega
-        </h3>
-
-        <p>
-            Set up GCP A3 Mega clusters with optimized networking
-        </p>
-    </a>
-    <a href="/examples/misc/a3high-clusters"
-       class="feature-cell sky">
-        <h3>
-            A3 High
-        </h3>
-
-        <p>
-            Set up GCP A3 High clusters with optimized networking
         </p>
     </a>
 </div>
