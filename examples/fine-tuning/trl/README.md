@@ -67,13 +67,13 @@ commands:
     --hub_model_id peterschmidt85/FineLlama-3.1-8B
 
 resources:
-gpu:
-  # 24GB or more VRAM
-  memory: 24GB..
-  # One or more GPU
-  count: 1..
-# Shared memory (for multi-gpu)
-shm_size: 24GB
+  gpu:
+    # 24GB or more VRAM
+    memory: 24GB..
+    # One or more GPU
+    count: 1..
+  # Shared memory (for multi-gpu)
+  shm_size: 24GB
 ```
 
 </div>
