@@ -546,7 +546,7 @@ h4.doc-heading {
         background-color: transparent;
         border-radius: 3px;
         border: 0.5px solid rgba(0, 0, 0, 0.87);
-        /* height: 1.95rem; */
+        height: 1.84rem;
     }
 
     [data-md-color-primary=white] .md-search__form:hover {
@@ -841,7 +841,6 @@ body {
         border-radius: 5px;
         right: 1px;
         top: 0;
-        /*z-index: 1;*/
         width: 30px;
         text-align: center;
     } */
@@ -1440,6 +1439,10 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
 }
 
 @media screen and (min-width: 76.25em) {
+    .md-search {
+        margin-top: 2px;
+    }
+
     .md-search .md-search__inner {
         /*padding-top: 0.58rem;*/
         margin-right: 8px;

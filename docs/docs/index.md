@@ -11,7 +11,7 @@ for AI workloads both in the cloud and on-prem, speeding up the development, tra
 
 ## How does it work?
 
-<img src="https://raw.githubusercontent.com/dstackai/static-assets/4aa9124edcaee397d9dd25d4b5aa8d8e82441852/static-assets/images/dstack-diagram.svg" />
+<img src="https://dstack.ai/static-assets/static-assets/images/dstack-architecture-diagram-v8.svg" />
 
 #### 1. Set up the server
 
@@ -36,19 +36,6 @@ Apply the configuration either via the `dstack apply` CLI command (or through a 
 
 `dstack` automatically manages infrastructure provisioning and job scheduling, while also handling auto-scaling,
 port-forwarding, ingress, and more.
-
-## Why dstack?
-
-`dstack`'s founder and CEO explains the challenges `dstack` addresses for AI and Ops teams.
-
-<iframe width="700" height="394" src="https://www.youtube.com/embed/yzVMp5Q0aPg?si=22QzF2OvtAybBWDg&rel=0" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
-
-`dstack` streamlines infrastructure management and container usage, enabling AI teams to work with any frameworks across
-cloud platforms or on-premise servers.
-
-
-[//]: # (??? info "Cloud platforms")
-[//]: # (    TBA)
 
 !!! info "Where do I start?"
     1. Proceed to [installation](installation/index.md)

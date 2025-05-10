@@ -774,7 +774,7 @@ projects:
 
 Also, the `vastai` backend supports on-demand instances only. Spot instance support coming soon.
 
-### TensorDock
+<!-- ### TensorDock
 
 Log into your [TensorDock :material-arrow-top-right-thin:{ .external }](https://dashboard.tensordock.com/) account, click Developers in the sidebar, and use the `Create an Authorization` section to create a new authorization key.
 
@@ -795,7 +795,7 @@ projects:
 
 </div>
 
-The `tensordock` backend supports on-demand instances only. Spot instance support coming soon.
+The `tensordock` backend supports on-demand instances only. Spot instance support coming soon. -->
 
 ### CUDO
 
