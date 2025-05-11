@@ -128,7 +128,7 @@ server = [
     "backports.entry-points-selectable",
 ]
 aws = [
-    "boto3",
+    "boto3>=1.38.13",
     "botocore",
     "dstack[server]",
 ]
@@ -161,7 +161,7 @@ kubernetes = [
     "dstack[server]",
 ]
 lambda = [
-    "boto3",
+    "boto3>=1.38.13",
     "botocore",
     "dstack[server]",
 ]
