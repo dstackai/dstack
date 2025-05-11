@@ -19,24 +19,30 @@ orchestration for ML teams across top clouds and on-prem clusters.
 
 #### Accelerators
 
-`dstack` supports `NVIDIA`, `AMD`, `Google TPU`, and `Intel Gaudi` accelerators out of the box.
+`dstack` supports `NVIDIA`, `AMD`, `Google TPU`, `Intel Gaudi`, and `Tenstorrent` accelerators out of the box.
 
-## Major news ✨
+## Latest news ✨
 
-- [2025/02] [dstack 0.18.41: GPU blocks, Proxy jump, inactivity duration, and more](https://github.com/dstackai/dstack/releases/tag/0.18.41)
-- [2025/01] [dstack 0.18.38: Intel Gaudi](https://github.com/dstackai/dstack/releases/tag/0.18.38)
-- [2025/01] [dstack 0.18.35: Vultr](https://github.com/dstackai/dstack/releases/tag/0.18.35)
-- [2024/12] [dstack 0.18.30: AWS Capacity Reservations and Capacity Blocks](https://github.com/dstackai/dstack/releases/tag/0.18.30)
-- [2024/10] [dstack 0.18.21: Instance volumes](https://github.com/dstackai/dstack/releases/tag/0.18.21)
-- [2024/10] [dstack 0.18.18: Hardware metrics monitoring](https://github.com/dstackai/dstack/releases/tag/0.18.18)
+- [2025/05] [dstack 0.19.8: Nebius clusters, GH200 on Lambda](https://github.com/dstackai/dstack/releases/tag/0.19.8)
+- [2025/04] [dstack 0.19.6: Tenstorrent, Plugins](https://github.com/dstackai/dstack/releases/tag/0.19.6)
+- [2025/04] [dstack 0.19.5: GCP A3 High clusters](https://github.com/dstackai/dstack/releases/tag/0.19.5)
+- [2025/04] [dstack 0.19.3: GCP A3 Mega clusters](https://github.com/dstackai/dstack/releases/tag/0.19.3)
+- [2025/03] [dstack 0.19.0: Prometheus](https://github.com/dstackai/dstack/releases/tag/0.19.0)
 
-## Installation
+## How does it work?
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://dstack.ai/static-assets/static-assets/images/dstack-architecture-diagram-v8-dark.svg"/>
+  <img src="https://dstack.ai/static-assets/static-assets/images/dstack-architecture-diagram-v8.svg" width="750" />
+</picture>
+
+### Installation
 
 > Before using `dstack` through CLI or API, set up a `dstack` server. If you already have a running `dstack` server, you only need to [set up the CLI](#set-up-the-cli).
 
-### Set up the server
+#### Set up the server
 
-#### (Optional) Configure backends
+##### (Optional) Configure backends
 
 To use `dstack` with cloud providers, configure backends
 via the `~/.dstack/server/config.yml` file.
@@ -46,21 +52,21 @@ For more details on how to configure backends, check [Backends](https://dstack.a
 > For using `dstack` with on-prem servers, create [SSH fleets](https://dstack.ai/docs/concepts/fleets#ssh) 
 > once the server is up.
 
-#### Start the server
+##### Start the server
 
 You can install the server on Linux, macOS, and Windows (via WSL 2). It requires Git and
 OpenSSH.
-
-##### pip
-
-```shell
-$ pip install "dstack[all]" -U
-```
 
 ##### uv
 
 ```shell
 $ uv tool install "dstack[all]" -U
+```
+
+##### pip
+
+```shell
+$ pip install "dstack[all]" -U
 ```
 
 Once it's installed, go ahead and start the server.
@@ -73,25 +79,28 @@ The admin token is "bbae0f28-d3dd-4820-bf61-8f4bb40815da"
 The server is running at http://127.0.0.1:3000/
 ```
 
-For more details on server configuration options, see the
+> For more details on server configuration options, see the
 [Server deployment](https://dstack.ai/docs/guides/server-deployment) guide.
 
-### Set up the CLI
+
+<details><summary>Set up the CLI</summary>
+
+#### Set up the CLI
 
 Once the server is up, you can access it via the `dstack` CLI. 
 
 The CLI can be installed on Linux, macOS, and Windows. It requires Git and OpenSSH.
 
-##### pip
-
-```shell
-$ pip install dstack -U
-```
-
 ##### uv
 
 ```shell
 $ uv tool install dstack -U
+```
+
+##### pip
+
+```shell
+$ pip install dstack -U
 ```
 
 To point the CLI to the `dstack` server, configure it
@@ -106,9 +115,9 @@ $ dstack config \
 Configuration is updated at ~/.dstack/config.yml
 ```
 
-## How does it work?
+</details>
 
-### 1. Define configurations
+### Define configurations
 
 `dstack` supports the following configurations:
    
@@ -121,7 +130,7 @@ Configuration is updated at ~/.dstack/config.yml
 
 Configuration can be defined as YAML files within your repo.
 
-### 2. Apply configurations
+### Apply configurations
 
 Apply the configuration either via the `dstack apply` CLI command or through a programmatic API.
 
@@ -133,6 +142,7 @@ out-of-capacity errors, port-forwarding, and more &mdash; across clouds and on-p
 For additional information, see the following links:
 
 * [Docs](https://dstack.ai/docs)
+* [Examples](https://dstack.ai/examples)
 * [Discord](https://discord.gg/u8SmfwPpMd)
 
 ## Contributing

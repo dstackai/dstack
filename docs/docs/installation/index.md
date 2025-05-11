@@ -25,15 +25,15 @@ For more details on how to configure backends, check [Backends](../concepts/back
 
 The server can run on your laptop or any environment with access to the cloud and on-prem clusters you plan to use.
 
-=== "pip"
+=== "uv"
 
-    > The server can be set up via `pip` on Linux, macOS, and Windows (via WSL 2).
+    > The server can be set up via `uv` on Linux, macOS, and Windows (via WSL 2).
     > It requires Git and OpenSSH.
 
     <div class="termy">
     
     ```shell
-    $ pip install "dstack[all]" -U
+    $ uv tool install "dstack[all]" -U
     $ dstack server
 
     Applying ~/.dstack/server/config.yml...
@@ -44,15 +44,15 @@ The server can run on your laptop or any environment with access to the cloud an
     
     </div>
 
-=== "uv"
+=== "pip"
 
-    > The server can be set up via `uv` on Linux, macOS, and Windows (via WSL 2).
+    > The server can be set up via `pip` on Linux, macOS, and Windows (via WSL 2).
     > It requires Git and OpenSSH.
 
     <div class="termy">
     
     ```shell
-    $ uv tool install "dstack[all]" -U
+    $ pip install "dstack[all]" -U
     $ dstack server
 
     Applying ~/.dstack/server/config.yml...
@@ -92,22 +92,22 @@ Once the server is up, you can access it via the `dstack` CLI.
 
 > The CLI can be set up via `pip` or `uv` on Linux, macOS, and Windows. It requires Git and OpenSSH.
 
-=== "pip"
-
-    <div class="termy">
-    
-    ```shell
-    $ pip install dstack -U
-    ```
-
-    </div>
-
 === "uv"
 
     <div class="termy">
     
     ```shell
     $ uv tool install dstack -U
+    ```
+
+    </div>
+
+=== "pip"
+
+    <div class="termy">
+    
+    ```shell
+    $ pip install dstack -U
     ```
 
     </div>
