@@ -16,6 +16,7 @@ class JobStateEvent(CoreModel):
     state: JobStatus
     termination_reason: Optional[str] = None
     termination_message: Optional[str] = None
+    exit_status: Optional[int] = None
 
 
 class LogEvent(CoreModel):

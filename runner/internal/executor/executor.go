@@ -181,11 +181,16 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 
 		// todo fail reason?
 		log.Error(ctx, "Exec failed", "err", err)
-		ex.SetJobState(ctx, types.JobStateFailed)
+		var exitError *exec.ExitError
+		if errors.As(err, &exitError) {
+			ex.SetJobStateWithExitStatus(ctx, types.JobStateFailed, exitError.ExitCode())
+		} else {
+			ex.SetJobState(ctx, types.JobStateFailed)
+		}
 		return gerrors.Wrap(err)
 	}
 
-	ex.SetJobState(ctx, types.JobStateDone)
+	ex.SetJobStateWithExitStatus(ctx, types.JobStateDone, 0)
 	return nil
 }
 
@@ -218,6 +223,22 @@ func (ex *RunExecutor) SetJobStateWithTerminationReason(
 			Timestamp:          ex.timestamp.Next(),
 			TerminationReason:  termination_reason,
 			TerminationMessage: termination_message,
+		},
+	)
+	ex.mu.Unlock()
+	log.Info(ctx, "Job state changed", "new", state)
+}
+
+func (ex *RunExecutor) SetJobStateWithExitStatus(
+	ctx context.Context, state types.JobState, exitStatus int,
+) {
+	ex.mu.Lock()
+	ex.jobStateHistory = append(
+		ex.jobStateHistory,
+		schemas.JobStateEvent{
+			State:      state,
+			Timestamp:  ex.timestamp.Next(),
+			ExitStatus: &exitStatus,
 		},
 	)
 	ex.mu.Unlock()

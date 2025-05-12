@@ -651,6 +651,10 @@ def _process_running(
                 )
             if latest_state_event.termination_message:
                 job_model.termination_reason_message = latest_state_event.termination_message
+        if (exit_status := latest_state_event.exit_status) is not None:
+            job_model.exit_status = exit_status
+            if exit_status != 0:
+                logger.info("%s: non-zero exit status %s", fmt(job_model), exit_status)
     else:
         _terminate_if_inactivity_duration_exceeded(run_model, job_model, resp.no_connections_secs)
     if job_model.status != previous_status:

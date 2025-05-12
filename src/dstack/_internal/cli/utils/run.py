@@ -218,6 +218,11 @@ def _get_run_error(run: Run) -> str:
 
 
 def _get_job_error(job: Job) -> str:
-    if job.job_submissions[-1].termination_reason is None:
+    job_submission = job.job_submissions[-1]
+    termination_reason = job_submission.termination_reason
+    exit_status = job_submission.exit_status
+    if termination_reason is None:
         return ""
-    return job.job_submissions[-1].termination_reason.name
+    if exit_status:
+        return f"{termination_reason.name} {exit_status}"
+    return termination_reason.name
