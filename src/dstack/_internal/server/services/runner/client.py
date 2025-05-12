@@ -12,7 +12,7 @@ from dstack._internal.core.models.common import CoreModel, NetworkMode
 from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.repos.remote import RemoteRepoCreds
 from dstack._internal.core.models.resources import Memory
-from dstack._internal.core.models.runs import ClusterInfo, JobSpec, RunSpec
+from dstack._internal.core.models.runs import ClusterInfo, Job, Run
 from dstack._internal.core.models.volumes import InstanceMountPoint, Volume, VolumeMountPoint
 from dstack._internal.server.schemas.runner import (
     GPUDevice,
@@ -72,8 +72,8 @@ class RunnerClient:
 
     def submit_job(
         self,
-        run_spec: RunSpec,
-        job_spec: JobSpec,
+        run: Run,
+        job: Job,
         cluster_info: ClusterInfo,
         secrets: Dict[str, str],
         repo_credentials: Optional[RemoteRepoCreds],
@@ -81,20 +81,23 @@ class RunnerClient:
     ):
         # XXX: This is a quick-and-dirty hack to deliver InstanceModel-specific environment
         # variables to the runner without runner API modification.
+        job_spec = job.job_spec
         if instance_env is not None:
             if isinstance(instance_env, Env):
                 merged_env = instance_env.as_dict()
             else:
                 merged_env = instance_env.copy()
-            merged_env.update(job_spec.env)
-            job_spec = job_spec.copy(deep=True)
+            merged_env.update(job.job_spec.env)
+            job_spec = job.job_spec.copy(deep=True)
             job_spec.env = merged_env
         body = SubmitBody(
-            run_spec=run_spec,
+            run=run,
             job_spec=job_spec,
+            job_submission=job.job_submissions[-1],
             cluster_info=cluster_info,
             secrets=secrets,
             repo_credentials=repo_credentials,
+            run_spec=run.run_spec,
         )
         resp = requests.post(
             # use .json() to encode enums
