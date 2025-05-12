@@ -14,8 +14,18 @@ func NewGCPBackend() *GCPBackend {
 	return &GCPBackend{}
 }
 
-// GetRealDeviceName resolves device names according to https://cloud.google.com/compute/docs/disks/disk-symlinks
-func (e *GCPBackend) GetRealDeviceName(volumeID, deviceName string) (string, error) {
+func (e *GCPBackend) GetVolumeOptions(volumeID, deviceName string) (*BackendVolumeOptions, error) {
+	realDeviceName, err := e.getRealDeviceName(volumeID, deviceName)
+	if err != nil {
+		return nil, err
+	}
+	return &BackendVolumeOptions{
+		DeviceName: realDeviceName,
+	}, nil
+}
+
+// getRealDeviceName resolves device names according to https://cloud.google.com/compute/docs/disks/disk-symlinks
+func (e *GCPBackend) getRealDeviceName(volumeID, deviceName string) (string, error) {
 	// Try resolving first partition or external volumes
 	realDeviceName, err := os.Readlink(fmt.Sprintf("/dev/disk/by-id/google-%s-part1", deviceName))
 	if err != nil {

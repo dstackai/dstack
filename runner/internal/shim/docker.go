@@ -498,6 +498,8 @@ func getBackend(backendType string) (backends.Backend, error) {
 		return backends.NewAWSBackend(), nil
 	case "gcp":
 		return backends.NewGCPBackend(), nil
+	case "nebius":
+		return backends.NewNebiusBackend(), nil
 	}
 	return nil, fmt.Errorf("unknown backend: %q", backendType)
 }
@@ -544,11 +546,11 @@ func formatAndMountVolume(ctx context.Context, volume VolumeInfo) error {
 	if err != nil {
 		return tracerr.Wrap(err)
 	}
-	deviceName, err := backend.GetRealDeviceName(volume.VolumeId, volume.DeviceName)
+	volumeOptions, err := backend.GetVolumeOptions(volume.VolumeId, volume.DeviceName)
 	if err != nil {
 		return tracerr.Wrap(err)
 	}
-	fsCreated, err := initFileSystem(ctx, deviceName, !volume.InitFs)
+	fsCreated, err := initFileSystem(ctx, volumeOptions, !volume.InitFs)
 	if err != nil {
 		return tracerr.Wrap(err)
 	}
@@ -565,7 +567,7 @@ func formatAndMountVolume(ctx context.Context, volume VolumeInfo) error {
 	if fsCreated {
 		fsRootPerms = 0o777
 	}
-	err = mountDisk(ctx, deviceName, getVolumeMountPoint(volume.Name), fsRootPerms)
+	err = mountDisk(ctx, volumeOptions, getVolumeMountPoint(volume.Name), fsRootPerms)
 	if err != nil {
 		return tracerr.Wrap(err)
 	}
@@ -599,11 +601,20 @@ func prepareInstanceMountPoints(taskConfig TaskConfig) error {
 	return nil
 }
 
-// initFileSystem creates an ext4 file system on a disk only if the disk is not already has a file system.
+// initFileSystem creates an ext4 file system on a disk only if the disk does not already have a file system.
 // Returns true if the file system is created.
-func initFileSystem(ctx context.Context, deviceName string, errorIfNotExists bool) (bool, error) {
+func initFileSystem(
+	ctx context.Context,
+	volumeOptions *backends.BackendVolumeOptions,
+	errorIfNotExists bool,
+) (bool, error) {
+	// Skip if the filesystem is known to be virtiofs. It is not represented by a block device
+	if volumeOptions.FsType == "virtiofs" {
+		return false, nil
+	}
+
 	// Run the lsblk command to get filesystem type
-	cmd := exec.Command("lsblk", "-no", "FSTYPE", deviceName)
+	cmd := exec.Command("lsblk", "-no", "FSTYPE", volumeOptions.DeviceName)
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	if err := cmd.Run(); err != nil {
@@ -620,16 +631,21 @@ func initFileSystem(ctx context.Context, deviceName string, errorIfNotExists boo
 		return false, fmt.Errorf("disk has no file system")
 	}
 
-	log.Debug(ctx, "formatting disk with ext4 filesystem...", "device", deviceName)
-	cmd = exec.Command("mkfs.ext4", "-F", deviceName)
+	log.Debug(ctx, "formatting disk with ext4 filesystem...", "device", volumeOptions.DeviceName)
+	cmd = exec.Command("mkfs.ext4", "-F", volumeOptions.DeviceName)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return false, fmt.Errorf("failed to format disk: %w, output: %s", err, string(output))
 	}
-	log.Debug(ctx, "disk formatted succesfully!", "device", deviceName)
+	log.Debug(ctx, "disk formatted succesfully!", "device", volumeOptions.DeviceName)
 	return true, nil
 }
 
-func mountDisk(ctx context.Context, deviceName, mountPoint string, fsRootPerms os.FileMode) error {
+func mountDisk(
+	ctx context.Context,
+	volumeOptions *backends.BackendVolumeOptions,
+	mountPoint string,
+	fsRootPerms os.FileMode,
+) error {
 	// Create the mount point directory if it doesn't exist
 	if _, err := os.Stat(mountPoint); os.IsNotExist(err) {
 		log.Debug(ctx, "creating mount point...", "mountpoint", mountPoint)
@@ -639,8 +655,11 @@ func mountDisk(ctx context.Context, deviceName, mountPoint string, fsRootPerms o
 	}
 
 	// Mount the disk to the mount point
-	log.Debug(ctx, "mounting disk...", "device", deviceName, "mountpoint", mountPoint)
-	cmd := exec.Command("mount", deviceName, mountPoint)
+	log.Debug(ctx, "mounting disk...", "device", volumeOptions.DeviceName, "mountpoint", mountPoint)
+	cmd := exec.Command("mount", volumeOptions.DeviceName, mountPoint)
+	if volumeOptions.FsType != "" {
+		cmd.Args = append(cmd.Args, "--type", volumeOptions.FsType)
+	}
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to mount disk: %w, output: %s", err, string(output))
 	}
