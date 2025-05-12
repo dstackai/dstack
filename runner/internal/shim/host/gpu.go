@@ -7,31 +7,22 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 
 	execute "github.com/alexellis/go-execute/v2"
+	"github.com/dstackai/dstack/runner/internal/common"
 	"github.com/dstackai/dstack/runner/internal/log"
 )
 
-const amdSmiImage = "un1def/amd-smi:6.2.2-0"
-
-const ttSmiImage = "dstackai/tt-smi:latest"
-
-type GpuVendor string
-
 const (
-	GpuVendorNone        GpuVendor = "none"
-	GpuVendorNvidia      GpuVendor = "nvidia"
-	GpuVendorAmd         GpuVendor = "amd"
-	GpuVendorIntel       GpuVendor = "intel"
-	GpuVendorTenstorrent GpuVendor = "tenstorrent"
+	amdSmiImage = "dstackai/amd-smi:latest"
+	ttSmiImage  = "dstackai/tt-smi:latest"
 )
 
 type GpuInfo struct {
-	Vendor GpuVendor
+	Vendor common.GpuVendor
 	Name   string
 	Vram   int // MiB
 	// NVIDIA: uuid field from nvidia-smi, "globally unique immutable alphanumeric identifier of the GPU",
@@ -50,33 +41,17 @@ type GpuInfo struct {
 	Index string
 }
 
-func GetGpuVendor() GpuVendor {
-	if _, err := os.Stat("/dev/kfd"); !errors.Is(err, os.ErrNotExist) {
-		return GpuVendorAmd
-	}
-	if _, err := os.Stat("/dev/nvidiactl"); !errors.Is(err, os.ErrNotExist) {
-		return GpuVendorNvidia
-	}
-	if _, err := os.Stat("/dev/accel"); !errors.Is(err, os.ErrNotExist) {
-		return GpuVendorIntel
-	}
-	if _, err := os.Stat("/dev/tenstorrent"); !errors.Is(err, os.ErrNotExist) {
-		return GpuVendorTenstorrent
-	}
-	return GpuVendorNone
-}
-
 func GetGpuInfo(ctx context.Context) []GpuInfo {
-	switch gpuVendor := GetGpuVendor(); gpuVendor {
-	case GpuVendorNvidia:
+	switch gpuVendor := common.GetGpuVendor(); gpuVendor {
+	case common.GpuVendorNvidia:
 		return getNvidiaGpuInfo(ctx)
-	case GpuVendorAmd:
+	case common.GpuVendorAmd:
 		return getAmdGpuInfo(ctx)
-	case GpuVendorIntel:
+	case common.GpuVendorIntel:
 		return getIntelGpuInfo(ctx)
-	case GpuVendorTenstorrent:
+	case common.GpuVendorTenstorrent:
 		return getTenstorrentGpuInfo(ctx)
-	case GpuVendorNone:
+	case common.GpuVendorNone:
 		return []GpuInfo{}
 	}
 	return []GpuInfo{}
@@ -123,7 +98,7 @@ func getNvidiaGpuInfo(ctx context.Context) []GpuInfo {
 			vram = 0
 		}
 		gpus = append(gpus, GpuInfo{
-			Vendor: GpuVendorNvidia,
+			Vendor: common.GpuVendorNvidia,
 			Name:   strings.TrimSpace(record[0]),
 			Vram:   vram,
 			ID:     strings.TrimSpace(record[2]),
@@ -194,7 +169,7 @@ func getAmdGpuInfo(ctx context.Context) []GpuInfo {
 			continue
 		}
 		gpus = append(gpus, GpuInfo{
-			Vendor:         GpuVendorAmd,
+			Vendor:         common.GpuVendorAmd,
 			Name:           amdGpu.Asic.Name,
 			Vram:           amdGpu.Vram.Size.Value,
 			RenderNodePath: renderNodePath,
@@ -271,7 +246,7 @@ func getTenstorrentGpuInfo(ctx context.Context) []GpuInfo {
 		}
 
 		gpus = append(gpus, GpuInfo{
-			Vendor: GpuVendorTenstorrent,
+			Vendor: common.GpuVendorTenstorrent,
 			Name:   name,
 			Vram:   vram,
 			ID:     device.BoardInfo.BusID,
@@ -338,7 +313,7 @@ func getIntelGpuInfo(ctx context.Context) []GpuInfo {
 			vram = 0
 		}
 		gpus = append(gpus, GpuInfo{
-			Vendor: GpuVendorIntel,
+			Vendor: common.GpuVendorIntel,
 			Name:   strings.TrimSpace(record[0]),
 			Vram:   vram,
 			Index:  strings.TrimSpace(record[2]),
