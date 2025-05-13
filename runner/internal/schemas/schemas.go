@@ -20,8 +20,9 @@ type LogEvent struct {
 }
 
 type SubmitBody struct {
-	RunSpec         RunSpec           `json:"run_spec"`
+	Run             Run               `json:"run"`
 	JobSpec         JobSpec           `json:"job_spec"`
+	JobSubmission   JobSubmission     `json:"job_submission"`
 	ClusterInfo     ClusterInfo       `json:"cluster_info"`
 	Secrets         map[string]string `json:"secrets"`
 	RepoCredentials *RepoCredentials  `json:"repo_credentials"`
@@ -37,12 +38,21 @@ type PullResponse struct {
 	// todo Result
 }
 
+type Run struct {
+	Id      string  `json:"id"`
+	RunSpec RunSpec `json:"run_spec"`
+}
+
 type RunSpec struct {
 	RunName           string        `json:"run_name"`
 	RepoId            string        `json:"repo_id"`
 	RepoData          RepoData      `json:"repo_data"`
 	Configuration     Configuration `json:"configuration"`
 	ConfigurationPath string        `json:"configuration_path"`
+}
+
+type JobSubmission struct {
+	Id string `json:"id"`
 }
 
 type JobSpec struct {
