@@ -40,7 +40,7 @@ func (ex *RunExecutor) setupRepo(ctx context.Context) error {
 			err = gerrors.Wrap(err_)
 		}
 	}()
-	switch ex.run.RepoData.RepoType {
+	switch ex.run.RunSpec.RepoData.RepoType {
 	case "remote":
 		log.Trace(ctx, "Fetching git repository")
 		if err := ex.prepareGit(ctx); err != nil {
@@ -52,7 +52,7 @@ func (ex *RunExecutor) setupRepo(ctx context.Context) error {
 			return gerrors.Wrap(err)
 		}
 	default:
-		return gerrors.Newf("unknown RepoType: %s", ex.run.RepoData.RepoType)
+		return gerrors.Newf("unknown RepoType: %s", ex.run.RunSpec.RepoData.RepoType)
 	}
 	return err
 }
@@ -61,8 +61,8 @@ func (ex *RunExecutor) prepareGit(ctx context.Context) error {
 	repoManager := repo.NewManager(
 		ctx,
 		ex.repoCredentials.CloneURL,
-		ex.run.RepoData.RepoBranch,
-		ex.run.RepoData.RepoHash,
+		ex.run.RunSpec.RepoData.RepoBranch,
+		ex.run.RunSpec.RepoData.RepoHash,
 		ex.jobSpec.SingleBranch,
 	).WithLocalPath(ex.workingDir)
 	if ex.repoCredentials != nil {
@@ -92,7 +92,7 @@ func (ex *RunExecutor) prepareGit(ctx context.Context) error {
 	if err := repoManager.Checkout(); err != nil {
 		return gerrors.Wrap(err)
 	}
-	if err := repoManager.SetConfig(ex.run.RepoData.RepoConfigName, ex.run.RepoData.RepoConfigEmail); err != nil {
+	if err := repoManager.SetConfig(ex.run.RunSpec.RepoData.RepoConfigName, ex.run.RunSpec.RepoData.RepoConfigEmail); err != nil {
 		return gerrors.Wrap(err)
 	}
 

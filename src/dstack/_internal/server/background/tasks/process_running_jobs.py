@@ -543,7 +543,7 @@ def _process_pulling_with_shim(
     if shim_client.is_api_v2_supported():  # raises error if shim is down, causes retry
         task = shim_client.get_task(job_model.id)
 
-        # If task goes to terminated before the job is submitted to runner, then an error occured
+        # If task goes to terminated before the job is submitted to runner, then an error occurred
         if task.status == TaskStatus.TERMINATED:
             logger.warning(
                 "shim failed to execute job %s: %s (%s)",
@@ -572,7 +572,7 @@ def _process_pulling_with_shim(
     else:
         shim_status = shim_client.pull()  # raises error if shim is down, causes retry
 
-        # If shim goes to pending before the job is submitted to runner, then an error occured
+        # If shim goes to pending before the job is submitted to runner, then an error occurred
         if (
             shim_status.state == "pending"
             and shim_status.result is not None
@@ -822,8 +822,8 @@ def _submit_job_to_runner(
         return success_if_not_available
 
     runner_client.submit_job(
-        run_spec=run.run_spec,
-        job_spec=job.job_spec,
+        run=run,
+        job=job,
         cluster_info=cluster_info,
         secrets=secrets,
         repo_credentials=repo_credentials,

@@ -34,8 +34,9 @@ type RunExecutor struct {
 	sshPort    int
 	uid        uint32
 
-	run             schemas.RunSpec
+	run             schemas.Run
 	jobSpec         schemas.JobSpec
+	jobSubmission   schemas.JobSubmission
 	clusterInfo     schemas.ClusterInfo
 	secrets         map[string]string
 	repoCredentials *schemas.RepoCredentials
@@ -195,7 +196,8 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 }
 
 func (ex *RunExecutor) SetJob(body schemas.SubmitBody) {
-	ex.run = body.RunSpec
+	ex.run = body.Run
+	ex.jobSubmission = body.JobSubmission
 	ex.jobSpec = body.JobSpec
 	ex.clusterInfo = body.ClusterInfo
 	ex.secrets = body.Secrets
@@ -256,8 +258,10 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 	gpus_num := nodes_num * gpus_per_node_num
 
 	jobEnvs := map[string]string{
-		"DSTACK_RUN_NAME":       ex.run.RunName,
-		"DSTACK_REPO_ID":        ex.run.RepoId,
+		"DSTACK_RUN_ID":         ex.run.Id,
+		"DSTACK_JOB_ID":         ex.jobSubmission.Id,
+		"DSTACK_RUN_NAME":       ex.run.RunSpec.RunName,
+		"DSTACK_REPO_ID":        ex.run.RunSpec.RepoId,
 		"DSTACK_NODES_IPS":      strings.Join(ex.clusterInfo.JobIPs, "\n"),
 		"DSTACK_MASTER_NODE_IP": ex.clusterInfo.MasterJobIP,
 		"DSTACK_NODE_RANK":      strconv.Itoa(node_rank),

@@ -19,6 +19,8 @@ tasks, and services:
 
      If `name` is not set in the configuration, it is assigned a random name (e.g. `wet-mangust-1`).
 
+- `DSTACK_RUN_ID`{ #DSTACK_RUN_ID } – The UUID of the run.
+- `DSTACK_JOB_ID`{ #DSTACK_JOB_ID } – The UUID of the job submission.
 - `DSTACK_REPO_ID`{ #DSTACK_REPO_ID } – The ID of the repo.
 - `DSTACK_GPUS_NUM`{ #DSTACK_GPUS_NUM } – The total number of GPUs in the run.
 
