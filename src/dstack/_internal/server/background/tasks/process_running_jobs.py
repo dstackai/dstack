@@ -1,6 +1,6 @@
 import asyncio
 from collections.abc import Iterable
-from datetime import timedelta
+from datetime import timedelta, timezone
 from typing import Dict, List, Optional
 
 from sqlalchemy import select
@@ -69,6 +69,12 @@ from dstack._internal.utils.interpolator import VariablesInterpolator
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
+
+
+# Minimum time before terminating active job in case of connectivity issues.
+# Should be sufficient to survive most problems caused by
+# the server network flickering and providers' glitches.
+JOB_DISCONNECTED_RETRY_TIMEOUT = timedelta(minutes=2)
 
 
 async def process_running_jobs(batch_size: int = 1):
@@ -202,7 +208,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
                 user_ssh_key = run.run_spec.ssh_key_pub.strip()
                 public_keys = [project.ssh_public_key.strip(), user_ssh_key]
                 if job_provisioning_data.backend == BackendType.LOCAL:
-                    # No need to update ~/.ssh/authorized_keys when running shim localy
+                    # No need to update ~/.ssh/authorized_keys when running shim locally
                     user_ssh_key = ""
                 success = await common_utils.run_async(
                     _process_provisioning_with_shim,
@@ -299,19 +305,38 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
                 run_model,
                 job_model,
             )
-            if not success:
-                job_model.termination_reason = JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY
 
-        if not success:  # kill the job
-            logger.warning(
-                "%s: failed because runner is not available or return an error,  age=%s",
-                fmt(job_model),
-                job_submission.age,
-            )
-            job_model.status = JobStatus.TERMINATING
-            if not job_model.termination_reason:
-                job_model.termination_reason = JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY
-            # job will be terminated and instance will be emptied by process_terminating_jobs
+        if success:
+            job_model.disconnected_at = None
+        else:
+            if job_model.termination_reason:
+                logger.warning(
+                    "%s: failed because shim/runner returned an error, age=%s",
+                    fmt(job_model),
+                    job_submission.age,
+                )
+                job_model.status = JobStatus.TERMINATING
+                # job will be terminated and instance will be emptied by process_terminating_jobs
+            else:
+                # No job_model.termination_reason set means ssh connection failed
+                if job_model.disconnected_at is None:
+                    job_model.disconnected_at = common_utils.get_current_datetime()
+                if _should_terminate_job_due_to_disconnect(job_model):
+                    logger.warning(
+                        "%s: failed because instance is unreachable, age=%s",
+                        fmt(job_model),
+                        job_submission.age,
+                    )
+                    # TODO: Replace with JobTerminationReason.INSTANCE_UNREACHABLE in 0.20 or
+                    # when CLI <= 0.19.8 is no longer supported
+                    job_model.termination_reason = JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY
+                    job_model.status = JobStatus.TERMINATING
+                else:
+                    logger.warning(
+                        "%s: is unreachable, waiting for the instance to become reachable again, age=%s",
+                        fmt(job_model),
+                        job_submission.age,
+                    )
 
     if (
         initial_status != job_model.status
@@ -690,6 +715,15 @@ def _terminate_if_inactivity_duration_exceeded(
             f"The job was inactive for {no_connections_secs} seconds,"
             f" exceeding the inactivity_duration of {conf.inactivity_duration} seconds"
         )
+
+
+def _should_terminate_job_due_to_disconnect(job_model: JobModel) -> bool:
+    if job_model.disconnected_at is None:
+        return False
+    return (
+        common_utils.get_current_datetime()
+        > job_model.disconnected_at.replace(tzinfo=timezone.utc) + JOB_DISCONNECTED_RETRY_TIMEOUT
+    )
 
 
 async def _check_gpu_utilization(session: AsyncSession, job_model: JobModel, job: Job) -> None:
