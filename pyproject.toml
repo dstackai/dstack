@@ -75,6 +75,9 @@ pattern = '<picture>\s*|<source[^>]*>\s*|\s*</picture>|<video[^>]*>\s*|</video>\
 replacement = ''
 ignore-case = true
 
+[tool.uv.workspace]
+members = ["src/plugins/rest_plugin"]
+
 [dependency-groups]
 dev = [
     "build>=1.2.2.post1",
@@ -176,3 +179,6 @@ nebius = [
 all = [
     "dstack[gateway,server,aws,azure,gcp,datacrunch,kubernetes,lambda,nebius,oci]",
 ]
+
+[project.entry-points."dstack.plugins"]
+rest_plugin = "plugins.rest_plugin.src.rest_plugin:RESTPlugin"
