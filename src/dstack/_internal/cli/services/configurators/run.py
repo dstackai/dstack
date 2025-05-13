@@ -98,6 +98,8 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
         print_run_plan(run_plan, max_offers=configurator_args.max_offers)
 
         confirm_message = "Submit a new run?"
+        if conf.name:
+            confirm_message = f"Submit the run [code]{conf.name}[/]?"
         stop_run_name = None
         if run_plan.current_resource is not None:
             changed_fields = []
@@ -130,11 +132,6 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
                     f"Active run [code]{conf.name}[/] already exists and cannot be updated in-place."
                 )
                 confirm_message = "Stop and override the run?"
-            else:
-                console.print(f"Finished run [code]{conf.name}[/] already exists.")
-                confirm_message = "Override the run?"
-        elif conf.name:
-            confirm_message = f"Submit the run [code]{conf.name}[/]?"
 
         if not command_args.yes and not confirm_ask(confirm_message):
             console.print("\nExiting...")
