@@ -126,7 +126,7 @@ class ComputeCapability(Tuple[int, int]):
 
 DEFAULT_CPU_COUNT = Range[int](min=2)
 DEFAULT_MEMORY_SIZE = Range[Memory](min=Memory.parse("8GB"))
-DEFAULT_GPU_COUNT = Range[int](min=1, max=1)
+DEFAULT_GPU_COUNT = Range[int](min=1)
 
 
 class CPUSpec(CoreModel):
