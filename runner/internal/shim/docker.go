@@ -851,6 +851,9 @@ func (d *DockerRunner) startContainer(ctx context.Context, task *Task) error {
 	if err != nil {
 		return tracerr.Wrap(err)
 	}
+	// FIXME: container_.NetworkSettings.Ports values (bindings) are not immediately available
+	// on macOS, so ports can be empty with local backend.
+	// Workaround: restart shim after submitting the run.
 	task.ports = extractPorts(ctx, container_.NetworkSettings.Ports)
 	return nil
 }
