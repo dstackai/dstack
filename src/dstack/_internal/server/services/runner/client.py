@@ -87,8 +87,8 @@ class RunnerClient:
                 merged_env = instance_env.as_dict()
             else:
                 merged_env = instance_env.copy()
-            merged_env.update(job.job_spec.env)
-            job_spec = job.job_spec.copy(deep=True)
+            merged_env.update(job_spec.env)
+            job_spec = job_spec.copy(deep=True)
             job_spec.env = merged_env
         body = SubmitBody(
             run=run,
