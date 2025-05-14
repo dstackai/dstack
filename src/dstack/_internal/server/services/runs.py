@@ -870,10 +870,10 @@ def _validate_run_spec_and_set_defaults(run_spec: RunSpec):
     if (
         run_spec.merged_profile.utilization_policy is not None
         and run_spec.merged_profile.utilization_policy.time_window
-        > settings.SERVER_METRICS_TTL_SECONDS
+        > settings.SERVER_METRICS_RUNNING_TTL_SECONDS
     ):
         raise ServerClientError(
-            f"Maximum utilization_policy.time_window is {settings.SERVER_METRICS_TTL_SECONDS}s"
+            f"Maximum utilization_policy.time_window is {settings.SERVER_METRICS_RUNNING_TTL_SECONDS}s"
         )
     set_resources_defaults(run_spec.configuration.resources)
 

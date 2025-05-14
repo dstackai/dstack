@@ -114,7 +114,6 @@ class TestDeleteMetrics:
             session=session,
             run=run,
             status=JobStatus.RUNNING,
-            last_processed_at=datetime(2023, 1, 2, 3, 5, 0, tzinfo=timezone.utc),
         )
         await create_job_metrics_point(
             session=session,
@@ -131,7 +130,9 @@ class TestDeleteMetrics:
             job_model=job,
             timestamp=datetime(2023, 1, 2, 3, 5, 10, tzinfo=timezone.utc),
         )
-        with patch.object(settings, "SERVER_METRICS_TTL_SECONDS", 15):
+        with patch.multiple(
+            settings, SERVER_METRICS_RUNNING_TTL_SECONDS=15, SERVER_METRICS_FINISHED_TTL_SECONDS=0
+        ):
             await delete_metrics()
         res = await session.execute(select(JobMetricsPoint))
         points = res.scalars().all()
@@ -161,24 +162,25 @@ class TestDeleteMetrics:
             session=session,
             run=run,
             status=JobStatus.FAILED,
-            last_processed_at=datetime(2023, 1, 2, 3, 5, 0, tzinfo=timezone.utc),
         )
         await create_job_metrics_point(
             session=session,
             job_model=job,
-            timestamp=datetime(2023, 1, 2, 3, 4, 30, tzinfo=timezone.utc),
+            timestamp=datetime(2023, 1, 2, 3, 4, 10, tzinfo=timezone.utc),
         )
         await create_job_metrics_point(
             session=session,
             job_model=job,
-            timestamp=datetime(2023, 1, 2, 3, 4, 40, tzinfo=timezone.utc),
+            timestamp=datetime(2023, 1, 2, 3, 4, 20, tzinfo=timezone.utc),
         )
         last_metric = await create_job_metrics_point(
             session=session,
             job_model=job,
-            timestamp=datetime(2023, 1, 2, 3, 4, 50, tzinfo=timezone.utc),
+            timestamp=datetime(2023, 1, 2, 3, 5, 10, tzinfo=timezone.utc),
         )
-        with patch.object(settings, "SERVER_METRICS_WINDOW_SECONDS", 15):
+        with patch.multiple(
+            settings, SERVER_METRICS_RUNNING_TTL_SECONDS=0, SERVER_METRICS_FINISHED_TTL_SECONDS=15
+        ):
             await delete_metrics()
         res = await session.execute(select(JobMetricsPoint))
         points = res.scalars().all()

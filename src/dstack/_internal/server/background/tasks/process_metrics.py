@@ -1,15 +1,14 @@
 import asyncio
 import json
-from datetime import timedelta
 from typing import Dict, List, Optional
 
-from sqlalchemy import BigInteger, delete, func, select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import joinedload
 
 from dstack._internal.core.consts import DSTACK_RUNNER_HTTP_PORT
 from dstack._internal.core.models.runs import JobStatus
 from dstack._internal.server import settings
-from dstack._internal.server.db import get_db, get_session_ctx
+from dstack._internal.server.db import get_session_ctx
 from dstack._internal.server.models import InstanceModel, JobMetricsPoint, JobModel
 from dstack._internal.server.schemas.runner import MetricsResponse
 from dstack._internal.server.services.instances import get_instance_ssh_private_keys
@@ -43,22 +42,13 @@ async def collect_metrics():
 
 
 async def delete_metrics():
-    now = get_current_datetime()
-    running_timestamp_micro_cutoff = int(now.timestamp() * 1_000_000) - (
-        settings.SERVER_METRICS_TTL_SECONDS * 1_000_000
+    now_timestamp_micro = int(get_current_datetime().timestamp() * 1_000_000)
+    running_timestamp_micro_cutoff = (
+        now_timestamp_micro - settings.SERVER_METRICS_RUNNING_TTL_SECONDS * 1_000_000
     )
-    retention_window = timedelta(seconds=settings.SERVER_METRICS_WINDOW_SECONDS)
-    retention_window_micro = int(retention_window.total_seconds() * 1_000_000)
-    dialect_name = get_db().dialect_name
-    if dialect_name == "sqlite":
-        last_processed_at_epoch = func.unixepoch(JobModel.last_processed_at)
-    elif dialect_name == "postgresql":
-        last_processed_at_epoch = func.date_part("epoch", JobModel.last_processed_at)
-    else:
-        raise ValueError(f"unsupported dialect: {dialect_name}")
-    # Optimization - only check recently finished jobs,
-    # where last_processed_at > now() - retention_window * 2
-    finished_last_processed_cutoff = now - retention_window * 2
+    finished_timestamp_micro_cutoff = (
+        now_timestamp_micro - settings.SERVER_METRICS_FINISHED_TTL_SECONDS * 1_000_000
+    )
     async with get_session_ctx() as session:
         await asyncio.gather(
             session.execute(
@@ -73,19 +63,10 @@ async def delete_metrics():
                 delete(JobMetricsPoint).where(
                     JobMetricsPoint.job_id.in_(
                         select(JobModel.id).where(
-                            JobModel.status.in_(JobStatus.finished_statuses()),
-                            JobModel.last_processed_at > finished_last_processed_cutoff,
+                            JobModel.status.in_(JobStatus.finished_statuses())
                         )
                     ),
-                    JobMetricsPoint.timestamp_micro
-                    < (
-                        select(
-                            last_processed_at_epoch.cast(BigInteger) * 1_000_000
-                            - retention_window_micro
-                        )
-                        .where(JobModel.id == JobMetricsPoint.job_id)
-                        .scalar_subquery()
-                    ),
+                    JobMetricsPoint.timestamp_micro < finished_timestamp_micro_cutoff,
                 )
             ),
         )
