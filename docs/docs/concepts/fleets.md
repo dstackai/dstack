@@ -71,7 +71,16 @@ This ensures all instances are provisioned in the same backend and region with o
     If the `aws` backend config has `public_ips: false` set, `dstack` enables the maximum number of interfaces supported by the instance.
     Otherwise, if instances have public IPs, only one EFA interface is enabled per instance due to AWS limitations.
 
-> The `cluster` placement is supported only for `aws`, `azure`, `gcp`, `oci`, and `vultr`
+??? info "Nebius"
+    `dstack` automatically creates an [InfiniBand cluster](https://docs.nebius.com/compute/clusters/gpu)
+    if all instances in the fleet support it.
+    Otherwise, instances are only connected by the default VPC subnet.
+
+    An InfiniBand fabric for the cluster is selected automatically.
+    If you prefer to use some specific fabrics, configure them in the
+    [backend settings](../reference/server/config.yml.md#nebius).
+
+> The `cluster` placement is supported only for `aws`, `azure`, `gcp`, `nebius`, `oci`, and `vultr`
 > backends.
 
 #### Resources
