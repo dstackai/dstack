@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 from unittest.mock import MagicMock, Mock, patch
@@ -490,6 +490,17 @@ class TestProcessRunningJobs:
             assert SSHTunnelMock.call_count == 3
         await session.refresh(job)
         assert job is not None
+        assert job.disconnected_at is not None
+        assert job.status == JobStatus.PULLING
+        with (
+            patch("dstack._internal.server.services.runner.ssh.SSHTunnel") as SSHTunnelMock,
+            patch("dstack._internal.server.services.runner.ssh.time.sleep"),
+            freeze_time(job.disconnected_at + timedelta(minutes=5)),
+        ):
+            SSHTunnelMock.side_effect = SSHError
+            await process_running_jobs()
+            assert SSHTunnelMock.call_count == 3
+        await session.refresh(job)
         assert job.status == JobStatus.TERMINATING
         assert job.termination_reason == JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY
         assert job.remove_at is None
