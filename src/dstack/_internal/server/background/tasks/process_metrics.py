@@ -42,10 +42,33 @@ async def collect_metrics():
 
 
 async def delete_metrics():
-    cutoff = _get_delete_metrics_cutoff()
+    now_timestamp_micro = int(get_current_datetime().timestamp() * 1_000_000)
+    running_timestamp_micro_cutoff = (
+        now_timestamp_micro - settings.SERVER_METRICS_RUNNING_TTL_SECONDS * 1_000_000
+    )
+    finished_timestamp_micro_cutoff = (
+        now_timestamp_micro - settings.SERVER_METRICS_FINISHED_TTL_SECONDS * 1_000_000
+    )
     async with get_session_ctx() as session:
-        await session.execute(
-            delete(JobMetricsPoint).where(JobMetricsPoint.timestamp_micro < cutoff)
+        await asyncio.gather(
+            session.execute(
+                delete(JobMetricsPoint).where(
+                    JobMetricsPoint.job_id.in_(
+                        select(JobModel.id).where(JobModel.status.in_([JobStatus.RUNNING]))
+                    ),
+                    JobMetricsPoint.timestamp_micro < running_timestamp_micro_cutoff,
+                )
+            ),
+            session.execute(
+                delete(JobMetricsPoint).where(
+                    JobMetricsPoint.job_id.in_(
+                        select(JobModel.id).where(
+                            JobModel.status.in_(JobStatus.finished_statuses())
+                        )
+                    ),
+                    JobMetricsPoint.timestamp_micro < finished_timestamp_micro_cutoff,
+                )
+            ),
         )
         await session.commit()
 
@@ -134,9 +157,3 @@ def _pull_runner_metrics(
 ) -> Optional[MetricsResponse]:
     runner_client = client.RunnerClient(port=ports[DSTACK_RUNNER_HTTP_PORT])
     return runner_client.get_metrics()
-
-
-def _get_delete_metrics_cutoff() -> int:
-    now = int(get_current_datetime().timestamp() * 1_000_000)
-    cutoff = now - (settings.SERVER_METRICS_TTL_SECONDS * 1_000_000)
-    return cutoff
