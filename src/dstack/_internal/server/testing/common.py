@@ -302,6 +302,7 @@ async def create_job(
     job_num: int = 0,
     replica_num: int = 0,
     instance_assigned: bool = False,
+    disconnected_at: Optional[datetime] = None,
 ) -> JobModel:
     run_spec = RunSpec.parse_raw(run.run_spec)
     job_spec = (await get_job_specs_from_run_spec(run_spec, replica_num=replica_num))[0]
@@ -323,6 +324,7 @@ async def create_job(
         instance=instance,
         instance_assigned=instance_assigned,
         used_instance_id=instance.id if instance is not None else None,
+        disconnected_at=disconnected_at,
     )
     session.add(job)
     await session.commit()
