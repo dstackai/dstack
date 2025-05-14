@@ -14,15 +14,23 @@ from nebius.aio.token.renewable import OPTION_RENEW_REQUEST_TIMEOUT, OPTION_RENE
 from nebius.api.nebius.common.v1 import Operation, ResourceMetadata
 from nebius.api.nebius.compute.v1 import (
     AttachedDiskSpec,
+    AttachedFilesystemSpec,
     CreateDiskRequest,
+    CreateFilesystemRequest,
     CreateGpuClusterRequest,
     CreateInstanceRequest,
     DeleteDiskRequest,
+    DeleteFilesystemRequest,
     DeleteGpuClusterRequest,
     DeleteInstanceRequest,
     DiskServiceClient,
     DiskSpec,
     ExistingDisk,
+    ExistingFilesystem,
+    Filesystem,
+    FilesystemServiceClient,
+    FilesystemSpec,
+    GetFilesystemRequest,
     GetInstanceRequest,
     GpuClusterServiceClient,
     GpuClusterSpec,
@@ -35,6 +43,7 @@ from nebius.api.nebius.compute.v1 import (
     PublicIPAddress,
     ResourcesSpec,
     SourceImageFamily,
+    UpdateInstanceRequest,
 )
 from nebius.api.nebius.iam.v1 import (
     Container,
@@ -273,6 +282,137 @@ def delete_disk(sdk: SDK, disk_id: str) -> None:
     )
 
 
+def create_filesystem(
+    sdk: SDK, name: str, project_id: str, size_gib: int
+) -> SDKOperation[Operation]:
+    return LOOP.await_(
+        FilesystemServiceClient(sdk).create(
+            CreateFilesystemRequest(
+                metadata=ResourceMetadata(
+                    name=name,
+                    parent_id=project_id,
+                ),
+                spec=FilesystemSpec(
+                    size_gibibytes=size_gib,
+                    type=FilesystemSpec.FilesystemType.NETWORK_SSD,
+                ),
+            ),
+            timeout=REQUEST_TIMEOUT,
+            metadata=REQUEST_MD,
+        )
+    )
+
+
+def get_filesystem(sdk: SDK, filesystem_id: str) -> Filesystem:
+    return LOOP.await_(
+        FilesystemServiceClient(sdk).get(
+            GetFilesystemRequest(id=filesystem_id), timeout=REQUEST_TIMEOUT, metadata=REQUEST_MD
+        )
+    )
+
+
+def delete_filesystem(sdk: SDK, filesystem_id: str) -> None:
+    LOOP.await_(
+        FilesystemServiceClient(sdk).delete(
+            DeleteFilesystemRequest(id=filesystem_id), timeout=REQUEST_TIMEOUT, metadata=REQUEST_MD
+        )
+    )
+
+
+# def attach_filesystem_cold(
+#     sdk: SDK, instance_id: str, filesystem_id: str, virtiofs_mount_tag: str
+# ) -> SDKOperation[Operation]:
+#     instance = get_instance(sdk, instance_id)
+#     if instance.status.state == instance.status.InstanceState.UPDATING:
+#         raise VolumeNotYetAttached("Waiting for instance update operation to finish")
+#     is_attached = any(f.existing_filesystem.id == filesystem_id for f in instance.spec.filesystems)
+#     if not is_attached:
+#         if instance.status.state != instance.status.InstanceState.STOPPED:
+#             if instance.status.state != instance.status.InstanceState.STOPPING:
+#                 stop_instance(sdk, instance_id)
+#                 raise VolumeNotYetAttached(
+#                     "Requested the instance to stop before attaching the shared filesystem."
+#                     f" Instance state was: {instance.status.state.name}"
+#                 )
+#             else:
+#                 raise VolumeNotYetAttached(
+#                     "Waiting for instance to stop before attaching the shared filesystem"
+#                 )
+#         else:
+#             instance.spec.filesystems.append(
+#                 AttachedFilesystemSpec(
+#                     attach_mode=AttachedFilesystemSpec.AttachMode.READ_WRITE,
+#                     mount_tag=virtiofs_mount_tag,
+#                     existing_filesystem=ExistingFilesystem(id=filesystem_id),
+#                 )
+#             )
+#             LOOP.await_(
+#                 InstanceServiceClient(sdk).update(
+#                     UpdateInstanceRequest(metadata=instance.metadata, spec=instance.spec),
+#                     timeout=REQUEST_TIMEOUT,
+#                     metadata=REQUEST_MD,
+#                 )
+#             )
+#             raise VolumeNotYetAttached(
+#                 "Requested the shared filesystem to be attached to the instance"
+#             )
+#     else:
+#         if instance.status.state == instance.status.InstanceState.STOPPED:
+#             start_instance(sdk, instance_id)
+#             raise VolumeNotYetAttached(
+#                 "Requested the instance to start after attaching the shared filesystem."
+#                 f" Instance state was: {instance.status.state.name}"
+#             )
+#         elif instance.status.state != instance.status.InstanceState.RUNNING:
+#             raise VolumeNotYetAttached(
+#                 "Waiting for the instance to become running after attaching the shared filesystem."
+#                 f" Instance state: {instance.status.state.name}"
+#             )
+
+
+def attach_filesystem(
+    sdk: SDK, instance_id: str, filesystem_id: str, virtiofs_mount_tag: str
+) -> SDKOperation[Operation]:
+    instance = get_instance(sdk, instance_id)
+    instance.spec.filesystems = [  # in case the fs is already attached
+        fs for fs in instance.spec.filesystems if fs.existing_filesystem.id != filesystem_id
+    ]
+    instance.spec.filesystems.append(
+        AttachedFilesystemSpec(
+            attach_mode=AttachedFilesystemSpec.AttachMode.READ_WRITE,
+            mount_tag=virtiofs_mount_tag,
+            existing_filesystem=ExistingFilesystem(id=filesystem_id),
+        )
+    )
+    return LOOP.await_(
+        InstanceServiceClient(sdk).update(
+            UpdateInstanceRequest(
+                metadata=instance.metadata,
+                spec=instance.spec,
+            ),
+            timeout=REQUEST_TIMEOUT,
+            metadata=REQUEST_MD,
+        )
+    )
+
+
+def detach_filesystem(sdk: SDK, instance_id: str, filesystem_id: str) -> SDKOperation[Operation]:
+    instance = get_instance(sdk, instance_id)
+    instance.spec.filesystems = [
+        fs for fs in instance.spec.filesystems if fs.existing_filesystem.id != filesystem_id
+    ]
+    return LOOP.await_(
+        InstanceServiceClient(sdk).update(
+            UpdateInstanceRequest(
+                metadata=instance.metadata,
+                spec=instance.spec,
+            ),
+            timeout=REQUEST_TIMEOUT,
+            metadata=REQUEST_MD,
+        )
+    )
+
+
 def create_instance(
     sdk: SDK,
     name: str,
@@ -318,6 +458,22 @@ def get_instance(sdk: SDK, instance_id: str) -> Instance:
             GetInstanceRequest(id=instance_id), timeout=REQUEST_TIMEOUT, metadata=REQUEST_MD
         )
     )
+
+
+# def stop_instance(sdk: SDK, instance_id: str) -> SDKOperation[Operation]:
+#     return LOOP.await_(
+#         InstanceServiceClient(sdk).stop(
+#             StopInstanceRequest(id=instance_id), timeout=REQUEST_TIMEOUT, metadata=REQUEST_MD
+#         )
+#     )
+
+
+# def start_instance(sdk: SDK, instance_id: str) -> SDKOperation[Operation]:
+#     return LOOP.await_(
+#         InstanceServiceClient(sdk).stop(
+#             StartInstanceRequest(id=instance_id), timeout=REQUEST_TIMEOUT, metadata=REQUEST_MD
+#         )
+#     )
 
 
 def delete_instance(sdk: SDK, instance_id: str) -> SDKOperation[Operation]:

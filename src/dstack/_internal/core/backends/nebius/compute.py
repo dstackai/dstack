@@ -15,7 +15,9 @@ from dstack._internal.core.backends.base.compute import (
     ComputeWithCreateInstanceSupport,
     ComputeWithMultinodeSupport,
     ComputeWithPlacementGroupSupport,
+    ComputeWithVolumeSupport,
     generate_unique_instance_name,
+    generate_unique_volume_name,
     get_user_data,
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
@@ -42,6 +44,11 @@ from dstack._internal.core.models.placement import (
 )
 from dstack._internal.core.models.resources import Memory, Range
 from dstack._internal.core.models.runs import JobProvisioningData, Requirements
+from dstack._internal.core.models.volumes import (
+    Volume,
+    VolumeAttachmentData,
+    VolumeProvisioningData,
+)
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -85,6 +92,7 @@ class NebiusCompute(
     ComputeWithCreateInstanceSupport,
     ComputeWithMultinodeSupport,
     ComputeWithPlacementGroupSupport,
+    ComputeWithVolumeSupport,
     Compute,
 ):
     def __init__(self, config: NebiusConfig):
@@ -310,6 +318,63 @@ class NebiusCompute(
             )
         )
 
+    def register_volume(self, volume: Volume) -> VolumeProvisioningData:
+        # TODO: validate volume region?
+        assert volume.configuration.volume_id is not None
+        # TODO: error handling
+        filesystem = resources.get_filesystem(self._sdk, volume.configuration.volume_id)
+        size_gib = round(filesystem.status.size_bytes / 2**30)  # TODO: test
+        return VolumeProvisioningData(
+            backend=BackendType.NEBIUS,
+            volume_id=filesystem.metadata.id,
+            size_gb=size_gib,
+            price=_get_volume_price(size_gib),
+            attachable=True,
+            detachable=True,
+        )
+
+    def create_volume(self, volume: Volume) -> VolumeProvisioningData:
+        # TODO: error handling
+        # TODO: wait for operation?
+        op = resources.create_filesystem(
+            sdk=self._sdk,
+            name=generate_unique_volume_name(volume),
+            project_id=self._region_to_project_id[
+                volume.configuration.region
+            ],  # TODO: region not configured?
+            size_gib=volume.configuration.size_gb,
+        )
+        return VolumeProvisioningData(
+            backend=BackendType.NEBIUS,
+            volume_id=op.resource_id,
+            size_gb=volume.configuration.size_gb,
+            price=_get_volume_price(volume.configuration.size_gb),
+            attachable=True,
+            detachable=True,
+        )
+
+    def delete_volume(self, volume: Volume) -> None:
+        # TODO: ignore errors?
+        assert volume.provisioning_data is not None
+        return resources.delete_filesystem(self._sdk, volume.provisioning_data.volume_id)
+
+    def attach_volume(self, volume: Volume, instance_id: str) -> VolumeAttachmentData:
+        assert volume.provisioning_data is not None
+        virtiofs_mount_tag = volume.provisioning_data.volume_id
+        # TODO: error handling
+        resources.attach_filesystem(  # TODO: wait for operation?
+            sdk=self._sdk,
+            instance_id=instance_id,
+            filesystem_id=volume.provisioning_data.volume_id,
+            virtiofs_mount_tag=virtiofs_mount_tag,
+        )
+        return VolumeAttachmentData(device_name=virtiofs_mount_tag)
+
+    def detach_volume(self, volume: Volume, instance_id: str, force: bool = False) -> None:
+        assert volume.provisioning_data is not None
+        # TODO: error handling
+        resources.detach_filesystem(self._sdk, instance_id, volume.provisioning_data.volume_id)
+
 
 class NebiusInstanceBackendData(CoreModel):
     boot_disk_id: str
@@ -368,3 +433,8 @@ def _wait_for_instance(sdk: SDK, op: SDKOperation[Operation]) -> None:
 def _supported_instances(offer: InstanceOffer) -> bool:
     platform, _ = offer.instance.name.split()
     return platform in SUPPORTED_PLATFORMS and not offer.instance.resources.spot
+
+
+def _get_volume_price(size_gib: int) -> float:
+    # https://docs.nebius.com/compute/resources/pricing#prices-volumes-filesystems
+    return size_gib * 0.16

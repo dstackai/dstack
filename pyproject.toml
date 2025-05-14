@@ -170,7 +170,7 @@ oci = [
     "dstack[server]",
 ]
 nebius = [
-    "nebius>=0.2.19,<0.3; python_version >= '3.10'",
+    "nebius>=0.2.29,<0.3; python_version >= '3.10'",
     "dstack[server]",
 ]
 all = [

@@ -423,7 +423,7 @@ def _volume_to_shim_volume_info(volume: Volume, instance_id: str) -> ShimVolumeI
         backend=volume.configuration.backend.value,
         name=volume.name,
         volume_id=get_or_error(volume.volume_id),
-        init_fs=not volume.external,
+        init_fs=not volume.external,  # TODO: or has pre-installed fs?
         device_name=device_name,
     )
 

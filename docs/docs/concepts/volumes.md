@@ -11,7 +11,7 @@ Useful as a cache for cloud fleets or for persistent storage with SSH fleets.
 
 ## Network volumes
 
-Network volumes are currently supported for the `aws`, `gcp`, and `runpod` backends.
+Network volumes are currently supported for the `aws`, `gcp`, `nebius`, and `runpod` backends.
 
 ### Apply a configuration
 
@@ -219,7 +219,7 @@ If you've registered an existing volume, it will be de-registered with `dstack` 
     and specify them for the same mount point as [documented above](#attach-network-volume).
 
 ??? info "Can I attach network volumes to multiple runs or instances?"
-    You can mount a volume in multiple runs. This feature is currently supported only by the `runpod` backend.
+    You can mount a volume in multiple runs. This feature is currently supported only by the `nebius` and `runpod` backends.
 
 ## Instance volumes
 
