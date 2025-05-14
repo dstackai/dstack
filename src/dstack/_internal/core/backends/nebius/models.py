@@ -5,7 +5,7 @@ from pydantic import Field, root_validator
 from dstack._internal.core.backends.base.models import fill_data
 from dstack._internal.core.models.common import CoreModel
 
-DEFAULT_PROJECT_NAME_PREFIX = "default-project"
+DEFAULT_PROJECT_NAME_PREFIX = "default"
 
 
 class NebiusServiceAccountCreds(CoreModel):
