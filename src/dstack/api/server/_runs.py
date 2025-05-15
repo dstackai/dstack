@@ -186,6 +186,8 @@ def _get_run_spec_excludes(run_spec: RunSpec) -> Optional[Dict]:
         configuration_excludes["rate_limits"] = True
     if configuration.shell is None:
         configuration_excludes["shell"] = True
+    if configuration.priority is None:
+        configuration_excludes["priority"] = True
 
     if configuration_excludes:
         spec_excludes["configuration"] = configuration_excludes
