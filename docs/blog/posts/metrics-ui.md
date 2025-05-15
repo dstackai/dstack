@@ -5,7 +5,7 @@ description: "TBA"
 slug: metrics-ui
 image: https://dstack.ai/static-assets/static-assets/images/dstack-metrics-ui-v3-min.png
 categories:
-  - Monitoring
+  - Metrics
   - AMD
   - NVIDIA
 ---
@@ -55,6 +55,6 @@ For persistent storage and long-term access to metrics, we still recommend setti
 metrics from `dstack`.
 
 !!! info "What's next?"
-    1. See [Monitoring](../../docs/guides/monitoring.md)
+    1. See [Metrics](../../docs/guides/metrics.md)
     2. Check [dev environments](../../docs/concepts/dev-environments.md), [tasks](../../docs/concepts/tasks.md), [services](../../docs/concepts/services.md), and [fleets](../../docs/concepts/fleets.md)
     3. Join [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd){:target="_blank"}

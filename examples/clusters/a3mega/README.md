@@ -1,4 +1,4 @@
-# GCP A3 Mega clusters
+# GCP A3 Mega
 
 This example shows how to set up a GCP A3 Mega cluster with [GPUDirect-TCPXO](https://cloud.google.com/kubernetes-engine/docs/how-to/gpu-bandwidth-gpudirect-tcpx-autopilot)
 optimized NCCL communication and run [NCCL Tests](https://github.com/NVIDIA/nccl-tests) on it using `dstack`.

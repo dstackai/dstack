@@ -110,7 +110,7 @@ efficient manner.
 
 ### NVIDIA
 
-NVIDIA remains the top accelerator supported by `dstack`. Recently, we introduced a [NIM example](../../examples/deployment/nim/index.md) 
+NVIDIA remains the top accelerator supported by `dstack`. Recently, we introduced a [NIM example](../../examples/inference/nim/index.md) 
 for model deployment, and we continue to enhance support for the rest of NVIDIA's ecosystem.
 
 ### AMD

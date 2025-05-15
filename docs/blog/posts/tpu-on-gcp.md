@@ -50,7 +50,7 @@ and [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/vllm-
 
 === "Optimum TPU"
 
-    <div editor-title="examples/deployment/optimum-tpu/service.dstack.yml"> 
+    <div editor-title="examples/inference/optimum-tpu/service.dstack.yml"> 
     
     ```yaml
     type: service
@@ -83,7 +83,7 @@ and [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/vllm-
     the official Docker image can be used instead of `dstackai/optimum-tpu:llama31`.
 
 === "vLLM"
-    <div editor-title="examples/deployment/vllm/service-tpu.dstack.yml"> 
+    <div editor-title="examples/inference/vllm/service-tpu.dstack.yml"> 
     
     ```yaml
     type: service

@@ -24,7 +24,7 @@ This example shows how to deploy Llama 4 Scout with `dstack` using [HuggingFace 
 
 Here's an example of a service that deploys [`Llama-4-Scout-17B-16E-Instruct` :material-arrow-top-right-thin:{ .external }](https://huggingface.co/meta-llama/Llama-4-Scout-17B-16E-Instruct){:target="_blank"} using TGI.
 
-<div editor-title="examples/deployment/tgi/.dstack.yml">
+<div editor-title="examples/inference/tgi/.dstack.yml">
 
 ```yaml
 type: service
@@ -70,7 +70,7 @@ To run a configuration, use the [`dstack apply`](https://dstack.ai/docs/referenc
 
 ```shell
 $ HF_TOKEN=...
-$ dstack apply -f examples/deployment/tgi/.dstack.yml
+$ dstack apply -f examples/inference/tgi/.dstack.yml
 
  #  BACKEND  REGION     RESOURCES                      SPOT PRICE   
  1  vastai   is-iceland 48xCPU, 128GB, 2xH200 (140GB)  no   $7.87   
@@ -117,11 +117,11 @@ is available at `https://gateway.<gateway domain>/`.
 ## Source code
 
 The source-code of this example can be found in 
-[`examples/deployment/tgi` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/deployment/tgi).
+[`examples/inference/tgi` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/inference/tgi).
 
 ## What's next?
 
 1. Check [services](https://dstack.ai/docs/services)
-2. Browse the [Llama](https://dstack.ai/examples/llms/llama/), [vLLM](https://dstack.ai/examples/deployment/vllm/), [SgLang](https://dstack.ai/examples/deployment/sglang/) and [NIM](https://dstack.ai/examples/deployment/nim/) examples
+2. Browse the [Llama](https://dstack.ai/examples/llms/llama/), [vLLM](https://dstack.ai/examples/inference/vllm/), [SgLang](https://dstack.ai/examples/inference/sglang/) and [NIM](https://dstack.ai/examples/inference/nim/) examples
 3. See also [AMD](https://dstack.ai/examples/accelerators/amd/) and
    [TPU](https://dstack.ai/examples/accelerators/tpu/)

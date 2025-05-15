@@ -7,7 +7,7 @@ image: https://dstack.ai/static-assets/static-assets/images/dstack-stats-v2.png
 categories:
   - AMD
   - NVIDIA
-  - Monitoring
+  - Metrics
 ---
 
 # Monitoring essential GPU metrics via CLI

@@ -38,10 +38,10 @@ hide:
     </a>
 </div>
 
-## Distributed training
+## Clusters
 
 <div class="tx-landing__highlights_grid">
-    <a href="/examples/distributed-training/nccl-tests"
+    <a href="/examples/clusters/nccl-tests"
        class="feature-cell sky">
         <h3>
             NCCL tests
@@ -51,7 +51,7 @@ hide:
             Run multi-node NCCL tests with MPI
         </p>
     </a>
-    <a href="/examples/distributed-training/rccl-tests"
+    <a href="/examples/clusters/rccl-tests"
        class="feature-cell sky">
         <h3>
             RCCL tests
@@ -61,7 +61,7 @@ hide:
             Run multi-node RCCL tests with MPI
         </p>
     </a>
-    <a href="/examples/distributed-training/a3mega-clusters"
+    <a href="/examples/clusters/a3mega"
        class="feature-cell sky">
         <h3>
             A3 Mega
@@ -71,7 +71,7 @@ hide:
             Set up GCP A3 Mega clusters with optimized networking
         </p>
     </a>
-    <a href="/examples/distributed-training/a3high-clusters"
+    <a href="/examples/clusters/a3high"
        class="feature-cell sky">
         <h3>
             A3 High
@@ -83,10 +83,10 @@ hide:
     </a>
 </div>
 
-## Deployment
+## Inference
 
 <div class="tx-landing__highlights_grid">
-    <a href="/examples/deployment/sglang" 
+    <a href="/examples/inference/sglang" 
        class="feature-cell">
        <h3>
            SGLang
@@ -95,7 +95,7 @@ hide:
            Deploy DeepSeek distilled models with SGLang
       </p>
     </a>
-    <a href="/examples/deployment/vllm" 
+    <a href="/examples/inference/vllm" 
        class="feature-cell">
        <h3>
            vLLM
@@ -104,7 +104,7 @@ hide:
             Deploy Llama 3.1 with vLLM
         </p>
     </a>
-    <a href="/examples/deployment/tgi" 
+    <a href="/examples/inference/tgi" 
        class="feature-cell">
        <h3>
            TGI
@@ -113,7 +113,7 @@ hide:
             Deploy Llama 4 with TGI
         </p>
     </a>
-    <a href="/examples/deployment/nim" 
+    <a href="/examples/inference/nim" 
        class="feature-cell">
        <h3>
            NIM
@@ -122,7 +122,7 @@ hide:
             Deploy a DeepSeek distilled model with NIM
         </p>
     </a>
-    <a href="/examples/deployment/trtllm"
+    <a href="/examples/inference/trtllm"
        class="feature-cell">
        <h3>
            TensorRT-LLM

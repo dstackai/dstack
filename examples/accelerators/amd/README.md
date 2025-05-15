@@ -11,7 +11,7 @@ Llama 3.1 70B in FP16 using [TGI :material-arrow-top-right-thin:{ .external }](h
 
 === "TGI"
     
-    <div editor-title="examples/deployment/tgi/amd/.dstack.yml"> 
+    <div editor-title="examples/inference/tgi/amd/.dstack.yml"> 
     
     ```yaml
     type: service
@@ -44,7 +44,7 @@ Llama 3.1 70B in FP16 using [TGI :material-arrow-top-right-thin:{ .external }](h
 
 === "vLLM"
 
-    <div editor-title="examples/deployment/vllm/amd/.dstack.yml"> 
+    <div editor-title="examples/inference/vllm/amd/.dstack.yml"> 
     
     ```yaml
     type: service
@@ -98,7 +98,7 @@ Llama 3.1 70B in FP16 using [TGI :material-arrow-top-right-thin:{ .external }](h
     
     > To speed up the `vLLM-ROCm` installation, we use a pre-built binary from S3. 
     > You can find the task to build and upload the binary in 
-    > [`examples/deployment/vllm/amd/` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/deployment/vllm/amd/){:target="_blank"}.
+    > [`examples/inference/vllm/amd/` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/inference/vllm/amd/){:target="_blank"}.
 
 !!! info "Docker image"
     If you want to use AMD, specifying `image` is currently required. This must be an image that includes
@@ -228,7 +228,7 @@ $ WANDB_API_KEY=...
 $ WANDB_PROJECT=...
 $ WANDB_NAME=axolotl-amd-llama31-train
 $ HUB_MODEL_ID=...
-$ dstack apply -f examples/deployment/vllm/amd/.dstack.yml
+$ dstack apply -f examples/inference/vllm/amd/.dstack.yml
 ```
 
 </div>
@@ -236,8 +236,8 @@ $ dstack apply -f examples/deployment/vllm/amd/.dstack.yml
 ## Source code
 
 The source-code of this example can be found in 
-[`examples/deployment/tgi/amd` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/deployment/tgi/amd){:target="_blank"},
-[`examples/deployment/vllm/amd` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/deployment/vllm/amd){:target="_blank"},
+[`examples/inference/tgi/amd` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/inference/tgi/amd){:target="_blank"},
+[`examples/inference/vllm/amd` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/inference/vllm/amd){:target="_blank"},
 [`examples/fine-tuning/axolotl/amd` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/axolotl/amd){:target="_blank"} and
 [`examples/fine-tuning/trl/amd` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/trl/amd){:target="_blank"}
 

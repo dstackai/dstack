@@ -1,7 +1,7 @@
 type: service
 name: serve-r1
 
-# Specify the image built with `examples/deployment/trtllm/build-image.dstack.yml`
+# Specify the image built with `examples/inference/trtllm/build-image.dstack.yml`
 image: dstackai/tensorrt_llm:9b931c0f6305aefa3660e6fb84a76a42c0eef167 
 env:
   - MAX_BATCH_SIZE=256

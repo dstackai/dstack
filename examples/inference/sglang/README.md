@@ -20,7 +20,7 @@ Here's an example of a service that deploys DeepSeek-R1-Distill-Llama 8B and 70B
 
 === "AMD"
     
-    <div editor-title="examples/deployment/sglang/amd/.dstack.yml">
+    <div editor-title="examples/inference/sglang/amd/.dstack.yml">
 
     ```yaml
     type: service
@@ -47,7 +47,7 @@ Here's an example of a service that deploys DeepSeek-R1-Distill-Llama 8B and 70B
 
 === "NVIDIA"
     
-    <div editor-title="examples/deployment/sglang/nvidia/.dstack.yml">
+    <div editor-title="examples/inference/sglang/nvidia/.dstack.yml">
 
     ```yaml
     type: service

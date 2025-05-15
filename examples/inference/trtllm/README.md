@@ -34,7 +34,7 @@ To use `trtllm-serve`, we first need to build the TensorRT-LLM Docker image from
 
 Here’s the task config that builds the image and pushes it using the provided Docker credentials.
 
-<div editor-title="examples/deployment/trtllm/build-image.dstack.yml">
+<div editor-title="examples/inference/trtllm/build-image.dstack.yml">
 
 ```yaml
 type: task
@@ -70,7 +70,7 @@ To run it, pass the task configuration to `dstack apply`.
 <div class="termy">
 
 ```shell
-$ dstack apply -f examples/deployment/trtllm/build-image.dstack.yml
+$ dstack apply -f examples/inference/trtllm/build-image.dstack.yml
 
  #  BACKEND  REGION             RESOURCES               SPOT  PRICE       
  1  cudo     ca-montreal-2      8xCPU, 25GB, (500.0GB)  yes   $0.1073   
@@ -86,13 +86,13 @@ Provisioning...
 
 Below is the service configuration that deploys DeepSeek R1 using the built TensorRT-LLM image.
 
-<div editor-title="examples/deployment/trtllm/serve-r1.dstack.yml">
+<div editor-title="examples/inference/trtllm/serve-r1.dstack.yml">
 
     ```yaml
     type: service
     name: serve-r1
 
-    # Specify the image built with `examples/deployment/trtllm/build-image.dstack.yml`
+    # Specify the image built with `examples/inference/trtllm/build-image.dstack.yml`
     image: dstackai/tensorrt_llm:9b931c0f6305aefa3660e6fb84a76a42c0eef167 
     env:
       - MAX_BATCH_SIZE=256
@@ -130,7 +130,7 @@ To run it, pass the configuration to `dstack apply`.
 <div class="termy">
 
 ```shell
-$ dstack apply -f examples/deployment/trtllm/serve-r1.dstack.yml
+$ dstack apply -f examples/inference/trtllm/serve-r1.dstack.yml
 
  #  BACKEND  REGION             RESOURCES                        SPOT  PRICE       
  1  vastai   is-iceland         192xCPU, 2063GB, 8xH200 (141GB)  yes   $25.62   
@@ -152,7 +152,7 @@ To deploy DeepSeek R1 Distill Llama 8B, follow the steps below.
 Here’s the task config that converts a Hugging Face model to a TensorRT-LLM checkpoint format 
 and uploads it to S3 using the provided AWS credentials.
 
-<div editor-title="examples/deployment/trtllm/convert-model.dstack.yml">
+<div editor-title="examples/inference/trtllm/convert-model.dstack.yml">
 
     ```yaml
     type: task
@@ -197,7 +197,7 @@ To run it, pass the configuration to `dstack apply`.
 <div class="termy">
 
 ```shell
-$ dstack apply -f examples/deployment/trtllm/convert-model.dstack.yml
+$ dstack apply -f examples/inference/trtllm/convert-model.dstack.yml
 
  #  BACKEND  REGION       RESOURCES                    SPOT  PRICE       
  1  vastai   us-iowa      12xCPU, 85GB, 1xA100 (40GB)  yes   $0.66904  
@@ -265,7 +265,7 @@ To run it, pass the configuration to `dstack apply`.
 <div class="termy">
 
 ```shell
-$ dstack apply -f examples/deployment/trtllm/build-model.dstack.yml
+$ dstack apply -f examples/inference/trtllm/build-model.dstack.yml
 
  #  BACKEND  REGION       RESOURCES                    SPOT  PRICE       
  1  vastai   us-iowa      12xCPU, 85GB, 1xA100 (40GB)  yes   $0.66904  
@@ -317,7 +317,7 @@ To run it, pass the configuration to `dstack apply`.
 <div class="termy">
 
 ```shell
-$ dstack apply -f examples/deployment/trtllm/serve-distill.dstack.yml
+$ dstack apply -f examples/inference/trtllm/serve-distill.dstack.yml
 
  #  BACKEND  REGION       RESOURCES                    SPOT  PRICE       
  1  vastai   us-iowa      12xCPU, 85GB, 1xA100 (40GB)  yes   $0.66904  
@@ -366,7 +366,7 @@ is available at `https://gateway.<gateway domain>/`.
 ## Source code
 
 The source-code of this example can be found in 
-[`examples/deployment/trtllm` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/deployment/trtllm){:target="_blank"}.
+[`examples/inference/trtllm` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/inference/trtllm){:target="_blank"}.
 
 ## What's next?
 

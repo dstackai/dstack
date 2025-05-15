@@ -790,6 +790,7 @@ body {
         display: flex;
     }
 
+    /* Comment to siwtch to sections in sidebar */
     .md-sidebar__inner > .md-nav--primary > .md-nav__list:not(.md-post__meta) > .md-nav__item > .md-nav > .md-nav__list > .md-nav__item:not(.md-nav__item--section) {
         display: none;
     }
@@ -861,7 +862,7 @@ body {
 }
 
 .md-sidebar--primary .md-nav__link, .md-sidebar--post .md-nav__link {
-    padding: 5px 15px 5px;
+    padding: 5px 15px 4px;
     margin-top: 0;
 }
 

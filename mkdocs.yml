@@ -50,6 +50,7 @@ theme:
     - navigation.tabs
     #    - navigation.instant
     #    - toc.integrate
+    # Comment to switch to sections in sidebar
     - navigation.sections
     #    - navigation.expand
     - navigation.top
@@ -95,9 +96,9 @@ plugins:
         'examples/llms/llama31/index.md': 'examples/llms/llama/index.md'
         'examples/llms/llama32/index.md': 'examples/llms/llama/index.md'
         'docs/examples/accelerators/amd/index.md': 'examples/accelerators/amd/index.md'
-        'docs/examples/deployment/nim/index.md': 'examples/deployment/nim/index.md'
-        'docs/examples/deployment/vllm/index.md': 'examples/deployment/vllm/index.md'
-        'docs/examples/deployment/tgi/index.md': 'examples/deployment/tgi/index.md'
+        'docs/examples/deployment/nim/index.md': 'examples/inference/nim/index.md'
+        'docs/examples/deployment/vllm/index.md': 'examples/inference/vllm/index.md'
+        'docs/examples/deployment/tgi/index.md': 'examples/inference/tgi/index.md'
         'providers.md': 'partners.md'
         'backends.md': 'partners.md'
         'blog/ambassador-program.md': 'blog/archive/ambassador-program.md'
@@ -106,11 +107,19 @@ plugins:
         'blog/data-centers-and-private-clouds.md': 'blog/posts/gpu-blocks-and-proxy-jump.md'
         'blog/distributed-training-with-aws-efa.md': 'blog/posts/efa.md'
         'blog/dstack-stats.md': 'blog/posts/dstack-metrics.md'
-        'docs/concepts/metrics.md': 'docs/guides/monitoring.md'
+        'docs/concepts/metrics.md': 'docs/guides/metrics.md'
+        'docs/guides/monitoring.md': 'docs/guides/metrics.md'
         'blog/nvidia-and-amd-on-vultr.md.md': 'blog/posts/nvidia-and-amd-on-vultr.md'
-        'examples/misc/nccl-tests/index.md': 'examples/distributed-training/nccl-tests/index.md'
-        'examples/misc/a3high-clusters/index.md': 'examples/distributed-training/a3high-clusters/index.md'
-        'examples/misc/a3mega-clusters/index.md': 'examples/distributed-training/a3mega-clusters/index.md'
+        'examples/misc/nccl-tests/index.md': 'examples/clusters/nccl-tests/index.md'
+        'examples/misc/a3high-clusters/index.md': 'examples/clusters/a3high/index.md'
+        'examples/misc/a3mega-clusters/index.md': 'examples/clusters/a3mega/index.md'
+        'examples/distributed-training/nccl-tests/index.md': 'examples/clusters/nccl-tests/index.md'
+        'examples/distributed-training/rccl-tests/index.md': 'examples/clusters/rccl-tests/index.md'
+        'examples/deployment/nim/index.md': 'examples/inference/nim/index.md'
+        'examples/deployment/vllm/index.md': 'examples/inference/vllm/index.md'
+        'examples/deployment/tgi/index.md': 'examples/inference/tgi/index.md'
+        'examples/deployment/sglang/index.md': 'examples/inference/sglang/index.md'
+        'examples/deployment/trtllm/index.md': 'examples/inference/trtllm/index.md'
   - typeset
   - gen-files:
       scripts:  # always relative to mkdocs.yml
@@ -212,8 +221,8 @@ nav:
           - Gateways: docs/concepts/gateways.md
       - Guides:
           - Protips: docs/guides/protips.md
+          - Metrics: docs/guides/metrics.md
           - Server deployment: docs/guides/server-deployment.md
-          - Monitoring: docs/guides/monitoring.md
           - Plugins: docs/guides/plugins.md
           - Troubleshooting: docs/guides/troubleshooting.md
       - Reference:
@@ -249,17 +258,17 @@ nav:
     - Fine-tuning:
         - TRL: examples/fine-tuning/trl/index.md
         - Axolotl: examples/fine-tuning/axolotl/index.md
-    - Distributed training:
-        - NCCL tests: examples/distributed-training/nccl-tests/index.md
-        - RCCL tests: examples/distributed-training/rccl-tests/index.md
-        - A3 Mega: examples/distributed-training/a3mega-clusters/index.md
-        - A3 High: examples/distributed-training/a3high-clusters/index.md
+    - Clusters:
+        - NCCL tests: examples/clusters/nccl-tests/index.md
+        - RCCL tests: examples/clusters/rccl-tests/index.md
+        - A3 Mega: examples/clusters/a3mega/index.md
+        - A3 High: examples/clusters/a3high/index.md
     - Deployment:
-        - SGLang: examples/deployment/sglang/index.md
-        - vLLM: examples/deployment/vllm/index.md
-        - TGI:  examples/deployment/tgi/index.md
-        - NIM: examples/deployment/nim/index.md
-        - TensorRT-LLM: examples/deployment/trtllm/index.md
+        - SGLang: examples/inference/sglang/index.md
+        - vLLM: examples/inference/vllm/index.md
+        - TGI:  examples/inference/tgi/index.md
+        - NIM: examples/inference/nim/index.md
+        - TensorRT-LLM: examples/inference/trtllm/index.md
     - LLMs:
         - Deepseek: examples/llms/deepseek/index.md
         - Llama: examples/llms/llama/index.md
