@@ -101,5 +101,5 @@ as well as use MPI for other tasks.
 
 !!! info "What's next?"
     1. Learn more about [dev environments](../../docs/concepts/dev-environments.md), [tasks](../../docs/concepts/tasks.md), [services](../../docs/concepts/services.md), and [fleets](../../docs/concepts/fleets.md)
-    2. Check the [NCCL tests](../../examples/distributed-training/nccl-tests/index.md) example
+    2. Check the [NCCL tests](../../examples/clusters/nccl-tests/index.md) example
     2. Join [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd){:target="_blank"}

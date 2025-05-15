@@ -22,13 +22,16 @@ logger = logging.getLogger("mkdocs.plugins.dstack.cli")
 DISABLE_ENV = "DSTACK_DOCS_DISABLE_CLI_REFERENCE"
 
 
+logger.info("Generating CLI reference...")
+
+
 @cache  # TODO make caching work
 def call_dstack(command: str) -> str:
     return subprocess.check_output(shlex.split(command)).decode()
 
 
 def sub_help(match: re.Match) -> str:
-    logger.info("Generating help for `%s`", match.group(1))
+    logger.debug("Generating CLI reference for `%s`", match.group(1))
     try:
         output = call_dstack(match.group(1))
     except subprocess.CalledProcessError:

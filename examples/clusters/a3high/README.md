@@ -1,4 +1,4 @@
-# GCP A3 High clusters
+# GCP A3 High
 
 This example shows how to set up a GCP A3 High cluster with [GPUDirect-TCPX](https://cloud.google.com/compute/docs/gpus/gpudirect)
 optimized NCCL communication and run [NCCL Tests](https://github.com/NVIDIA/nccl-tests) on it using `dstack`.

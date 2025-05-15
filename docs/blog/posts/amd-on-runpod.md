@@ -42,7 +42,7 @@ you can now specify an AMD GPU under `resources`. Below are a few examples.
     Here's an example of a [service](../../docs/concepts/services.md) that deploys
     Llama 3.1 70B in FP16 using [TGI :material-arrow-top-right-thin:{ .external }](https://huggingface.co/docs/text-generation-inference/en/installation_amd){:target="_blank"}.
     
-    <div editor-title="examples/deployment/tgi/amd/service.dstack.yml"> 
+    <div editor-title="examples/inference/tgi/amd/service.dstack.yml"> 
     
     ```yaml
     type: service

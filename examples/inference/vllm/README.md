@@ -23,7 +23,7 @@ This example shows how to deploy Llama 3.1 8B with `dstack` using [vLLM :materia
 
 Here's an example of a service that deploys Llama 3.1 8B using vLLM.
 
-<div editor-title="examples/deployment/vllm/.dstack.yml">
+<div editor-title="examples/inference/vllm/.dstack.yml">
 
 ```yaml
 type: service
@@ -65,7 +65,7 @@ To run a configuration, use the [`dstack apply`](https://dstack.ai/docs/referenc
 <div class="termy">
 
 ```shell
-$ dstack apply -f examples/deployment/vllm/.dstack.yml
+$ dstack apply -f examples/inference/vllm/.dstack.yml
 
  #  BACKEND  REGION    RESOURCES                    SPOT  PRICE     
  1  runpod   CA-MTL-1  18xCPU, 100GB, A5000:24GB    yes   $0.12
@@ -113,12 +113,12 @@ is available at `https://gateway.<gateway domain>/`.
 ## Source code
 
 The source-code of this example can be found in 
-[`examples/deployment/vllm` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/deployment/vllm).
+[`examples/inference/vllm` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/inference/vllm).
 
 ## What's next?
 
 1. Check [services](https://dstack.ai/docs/services)
-2. Browse the [Llama 3.1](https://dstack.ai/examples/llms/llama31/), [TGI](https://dstack.ai/examples/deployment/tgi/)
-   and [NIM](https://dstack.ai/examples/deployment/nim/) examples
+2. Browse the [Llama 3.1](https://dstack.ai/examples/llms/llama31/), [TGI](https://dstack.ai/examples/inference/tgi/)
+   and [NIM](https://dstack.ai/examples/inference/nim/) examples
 3. See also [AMD](https://dstack.ai/examples/accelerators/amd/) and
    [TPU](https://dstack.ai/examples/accelerators/tpu/)

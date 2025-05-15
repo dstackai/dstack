@@ -24,7 +24,7 @@ This example shows how to deploy DeepSeek-R1-Distill-Llama-8B using [NVIDIA NIM 
 
 Here's an example of a service that deploys DeepSeek-R1-Distill-Llama-8B using NIM.
 
-<div editor-title="examples/deployment/nim/.dstack.yml">
+<div editor-title="examples/inference/nim/.dstack.yml">
 
 ```yaml
 type: service
@@ -65,7 +65,7 @@ To run a configuration, use the [`dstack apply`](https://dstack.ai/docs/referenc
 
 ```shell
 $ NGC_API_KEY=...
-$ dstack apply -f examples/deployment/nim/.dstack.yml
+$ dstack apply -f examples/inference/nim/.dstack.yml
 
  #  BACKEND  REGION    RESOURCES                  SPOT  PRICE       
  1  vultr    ewr       6xCPU, 60GB, 1xA100 (40GB) no    $1.199   
@@ -113,7 +113,7 @@ is available at `https://gateway.<gateway domain>/`.
 ## Source code
 
 The source-code of this example can be found in 
-[`examples/deployment/nim` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/deployment/nim){:target="_blank"}.
+[`examples/inference/nim` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/inference/nim){:target="_blank"}.
 
 ## What's next?
 

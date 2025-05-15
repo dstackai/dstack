@@ -558,6 +558,6 @@ If one replica of a multi-replica service fails with retry enabled,
     1. Read about [dev environments](dev-environments.md), [tasks](tasks.md), and [repos](repos.md)
     2. Learn how to manage [fleets](fleets.md)
     3. See how to set up [gateways](gateways.md)
-    4. Check the [TGI :material-arrow-top-right-thin:{ .external }](../../examples/deployment/tgi/index.md){:target="_blank"},
-       [vLLM :material-arrow-top-right-thin:{ .external }](../../examples/deployment/vllm/index.md){:target="_blank"}, and 
-       [NIM :material-arrow-top-right-thin:{ .external }](../../examples/deployment/nim/index.md){:target="_blank"} examples
+    4. Check the [TGI :material-arrow-top-right-thin:{ .external }](../../examples/inference/tgi/index.md){:target="_blank"},
+       [vLLM :material-arrow-top-right-thin:{ .external }](../../examples/inference/vllm/index.md){:target="_blank"}, and 
+       [NIM :material-arrow-top-right-thin:{ .external }](../../examples/inference/nim/index.md){:target="_blank"} examples

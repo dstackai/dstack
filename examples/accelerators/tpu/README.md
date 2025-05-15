@@ -24,7 +24,7 @@ and [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/vllm-
 
 === "Optimum TPU"
 
-    <div editor-title="examples/deployment/tgi/tpu/.dstack.yml"> 
+    <div editor-title="examples/inference/tgi/tpu/.dstack.yml"> 
     
     ```yaml
     type: service
@@ -56,7 +56,7 @@ and [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/vllm-
         the official Docker image can be used.
 
 === "vLLM"
-    <div editor-title="examples/deployment/vllm/tpu/.dstack.yml"> 
+    <div editor-title="examples/inference/vllm/tpu/.dstack.yml"> 
     
     ```yaml
     type: service
@@ -179,8 +179,8 @@ Note, `v5litepod` is optimized for fine-tuning transformer-based models. Each co
 ## Source code
 
 The source-code of this example can be found in 
-[`examples/deployment/tgi/tpu` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/deployment/tgi/tpu){:target="_blank"},
-[`examples/deployment/vllm/tpu` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/deployment/vllm/tpu){:target="_blank"},
+[`examples/inference/tgi/tpu` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/inference/tgi/tpu){:target="_blank"},
+[`examples/inference/vllm/tpu` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/inference/vllm/tpu){:target="_blank"},
 and [`examples/fine-tuning/optimum-tpu` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/trl){:target="_blank"}.
 
 ## What's next?

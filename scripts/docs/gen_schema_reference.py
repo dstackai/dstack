@@ -19,6 +19,8 @@ from dstack._internal.core.models.resources import Range
 FILE_PATTERN = "docs/reference/**.md"
 logger = logging.getLogger("mkdocs.plugins.dstack.schema")
 
+logger.info("Generating schema reference...")
+
 
 def get_type(annotation: Type) -> str:
     if get_origin(annotation) is Annotated:
@@ -135,7 +137,7 @@ def generate_schema_reference(
 
 
 def sub_schema_reference(match: re.Match) -> str:
-    logger.info("Generating schema reference for `%s`", match.group(2))
+    logger.debug("Generating schema reference for `%s`", match.group(2))
     options = yaml.safe_load("\n".join(row[4:] for row in match.group(3).split("\n")))
     logger.debug("Options: %s", options)
     return (
