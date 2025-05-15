@@ -147,7 +147,7 @@ class CudoCompute(
 
 
 def _get_image_id(cuda: bool) -> str:
-    image_name = "ubuntu-2204-nvidia-535-docker-v20240214" if cuda else "ubuntu-2204"
+    image_name = "ubuntu-2204-nvidia-535-docker-v20241017" if cuda else "ubuntu-2204"
     return image_name
 
 
