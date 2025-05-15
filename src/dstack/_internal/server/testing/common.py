@@ -262,6 +262,7 @@ async def create_run(
     run_spec: Optional[RunSpec] = None,
     run_id: Optional[UUID] = None,
     deleted: bool = False,
+    priority: int = 0,
 ) -> RunModel:
     if run_spec is None:
         run_spec = get_run_spec(
@@ -282,6 +283,7 @@ async def create_run(
         run_spec=run_spec.json(),
         last_processed_at=submitted_at,
         jobs=[],
+        priority=priority,
     )
     session.add(run)
     await session.commit()
