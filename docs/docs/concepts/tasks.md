@@ -137,8 +137,7 @@ resources:
 
 Nodes can communicate using their private IP addresses.
 Use `DSTACK_MASTER_NODE_IP`, `DSTACK_NODES_IPS`, `DSTACK_NODE_RANK`, and other
-[System environment variables](#system-environment-variables)
-to discover IP addresses and other details.
+[System environment variables](#system-environment-variables) for inter-node communication.
 
 ??? info "Network interface"
     Distributed frameworks usually detect the correct network interface automatically,

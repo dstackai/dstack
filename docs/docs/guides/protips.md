@@ -36,9 +36,9 @@ unlimited).
 ## Volumes
 
 To persist data across runs, it is recommended to use volumes.
-`dstack` supports two types of volumes: [network](../concepts/volumes.md#network-volumes) 
+`dstack` supports two types of volumes: [network](../concepts/volumes.md#network) 
 (for persisting data even if the instance is interrupted)
-and [instance](../concepts/volumes.md#instance-volumes) (useful for persisting cached data across runs while the instance remains active).
+and [instance](../concepts/volumes.md#instance) (useful for persisting cached data across runs while the instance remains active).
 
 > If you use [SSH fleets](../concepts/fleets.md#ssh), you can mount network storage (e.g., NFS or SMB) to the hosts and access it in runs via instance volumes.
 

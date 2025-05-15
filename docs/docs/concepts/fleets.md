@@ -66,14 +66,22 @@ To ensure instances are interconnected (e.g., for
 This ensures all instances are provisioned in the same backend and region with optimal inter-node connectivity
 
 ??? info "AWS"
-    `dstack` automatically enables the Elastic Fabric Adapter for all
-    [EFA-capable instance types :material-arrow-top-right-thin:{ .external }](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/efa.html#efa-instance-types){:target="_blank"}.
-    If the `aws` backend config has `public_ips: false` set, `dstack` enables the maximum number of interfaces supported by the instance.
-    Otherwise, if instances have public IPs, only one EFA interface is enabled per instance due to AWS limitations.
+    When you create a cloud fleet with `aws`, [Elastic Fabric Adapter networking :material-arrow-top-right-thin:{ .external }](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/efa.html){:target="_blank"} is automatically configured if it’s supported for the corresponding instance type.
+    Note, EFA requires the `public_ips` to set to `false` in the `aws` backend configuration.
+    Otherwise, instances are only connected by the default VPC subnet.
+
+    Refer to the [EFA](../../blog/posts/efa.md) example for more details.
+
+??? info "GCP"
+    When you create a cloud fleet with `gcp`, for the A3 Mega and A3 High instance types, [GPUDirect-TCPXO and GPUDirect-TCPX :material-arrow-top-right-thin:{ .external }](https://cloud.google.com/kubernetes-engine/docs/how-to/gpu-bandwidth-gpudirect-tcpx-autopilot){:target="_blank"} networking is automatically configured.
+
+    !!! info "Backend configuration"    
+        Note, GPUDirect-TCPXO and GPUDirect-TCPX require `extra_vpcs` to be configured  in the `gcp` backend configuration.
+        Refer to the [A3 Mega](../../examples/clusters/a3mega/index.md) and 
+        [A3 Mega](../../examples/clusters/a3high/index.md) examples for more details.
 
 ??? info "Nebius"
-    `dstack` automatically creates an [InfiniBand cluster](https://docs.nebius.com/compute/clusters/gpu)
-    if all instances in the fleet support it.
+    When you create a cloud fleet with `nebius`, [InfiniBand networking :material-arrow-top-right-thin:{ .external }](https://docs.nebius.com/compute/clusters/gpu){:target="_blank"} is automatically configured if it’s supported for the corresponding instance type.
     Otherwise, instances are only connected by the default VPC subnet.
 
     An InfiniBand fabric for the cluster is selected automatically.

@@ -87,7 +87,7 @@ Examples: `gpu: amd` (one AMD GPU), `gpu: A10:4..8` (4 to 8 A10 GPUs),
 
 #### Cause 6: Network volumes
 
-If your run configuration uses [network volumes](../concepts/volumes.md#network-volumes),
+If your run configuration uses [network volumes](../concepts/volumes.md#network),
 `dstack` will only select instances from the same backend and region as the volumes.
 For AWS, the availability zone of the volume and the instance should also match.
 
@@ -97,7 +97,7 @@ Some `dstack` features are not supported by all backends. If your configuration 
 one of these features, `dstack` will only select offers from the backends that support it.
 
 - [Cloud fleet](../concepts/fleets.md#cloud) configurations,
-  [Instance volumes](../concepts/volumes.md#instance-volumes),
+  [Instance volumes](../concepts/volumes.md#instance),
   and [Privileged containers](../reference/dstack.yml/dev-environment.md#privileged)
   are supported by all backends except `runpod`, `vastai`, and `kubernetes`.
 - [Clusters](../concepts/fleets.md#cloud-placement)
