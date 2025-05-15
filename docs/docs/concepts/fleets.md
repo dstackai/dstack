@@ -275,6 +275,10 @@ Define a fleet configuration as a YAML file in your project directory. The file 
 
     3.&nbsp;The user specified should have passwordless `sudo` access.
 
+    4.&nbsp;The SSH server should be running and configured with `AllowTcpForwarding yes` in `/etc/ssh/sshd_config`.
+
+    5.&nbsp;The firewall should allow SSH and forbid any other connections from external networks.
+
 To create or update the fleet, pass the fleet configuration to [`dstack apply`](../reference/cli/dstack/apply.md):
 
 <div class="termy">
@@ -331,10 +335,10 @@ divided into, allowing multiple jobs to use these blocks concurrently.
       hosts:
         - hostname: 3.255.177.51
           blocks: 4
-        - hostaname: 3.255.177.52
+        - hostname: 3.255.177.52
           # As many as possible, according to numbers of GPUs and CPUs
           blocks: auto
-        - hostaname: 3.255.177.53
+        - hostname: 3.255.177.53
           # Do not sclice. This is the default value, may be omitted
           blocks: 1
     ```
