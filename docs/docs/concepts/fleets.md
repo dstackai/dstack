@@ -78,7 +78,7 @@ This ensures all instances are provisioned in the same backend and region with o
     !!! info "Backend configuration"    
         Note, GPUDirect-TCPXO and GPUDirect-TCPX require `extra_vpcs` to be configured  in the `gcp` backend configuration.
         Refer to the [A3 Mega](../../examples/clusters/a3mega/index.md) and 
-        [A3 Mega](../../examples/clusters/a3high/index.md) examples for more details.
+        [A3 High](../../examples/clusters/a3high/index.md) examples for more details.
 
 ??? info "Nebius"
     When you create a cloud fleet with `nebius`, [InfiniBand networking :material-arrow-top-right-thin:{ .external }](https://docs.nebius.com/compute/clusters/gpu){:target="_blank"} is automatically configured if it’s supported for the corresponding instance type.
