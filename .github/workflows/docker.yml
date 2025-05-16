@@ -104,7 +104,7 @@ jobs:
       VERSION: ${{ github.run_number }}
     strategy:
       matrix:
-        variant: ["", "-nvme", "-cuda", "-grid"]
+        variant: ["", "-cuda", "-grid"]
     steps:
       - uses: actions/checkout@v4
       - uses: Azure/login@v2
