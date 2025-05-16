@@ -33,7 +33,7 @@ commands:
         if ${MPIRUN} -n ${DSTACK_NODES_NUM} -N 1 true >/dev/null 2>&1; then
           break
         fi
-        echo 'Waiting for worker nodes...'
+        echo 'Waiting for other nodes...'
         sleep 5
       done
       # Run NCCL Tests
@@ -45,7 +45,7 @@ commands:
         -x NCCL_IB_GID_INDEX=3 \
         -x NCCL_IB_DISABLE=0 \
         ./build/all_reduce_perf -b 8M -e 8G -f 2 -g 1 -w 5 --iters 20 -c 0;
-      # Notify worker nodes the MPI run is finished
+      # Notify other nodes the MPI run is finished
       ${MPIRUN} -n ${DSTACK_NODES_NUM} -N 1 sh -c "echo done > ${FIFO}"
     else
       mkfifo ${FIFO}

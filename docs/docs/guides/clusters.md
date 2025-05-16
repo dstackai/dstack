@@ -18,22 +18,22 @@ Cloud fleets allow to provision interconnected clusters across supported backend
 For cloud fleets, fast interconnect is currently supported only on the `aws`, `gcp`, and `nebius` backends.
 
 === "AWS"
-    When you create a cloud fleet with `aws`, [Elastic Fabric Adapter :material-arrow-top-right-thin:{ .external }](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/efa.html){:target="_blank"} networking is automatically configured if it’s supported for the corresponding instance type.
+    When you create a cloud fleet with AWS, [Elastic Fabric Adapter :material-arrow-top-right-thin:{ .external }](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/efa.html){:target="_blank"} networking is automatically configured if it’s supported for the corresponding instance type.
     
     !!! info "Backend configuration"    
-        Note, EFA requires the `public_ips` to set to `false` in the `aws` backend configuration.
+        Note, EFA requires the `public_ips` to be set to `false` in the `aws` backend configuration.
         Refer to the [EFA](../../blog/posts/efa.md) example for more details.
 
 === "GCP"
-    When you create a cloud fleet with `gcp`, for the A3 Mega and A3 High instance types, [GPUDirect-TCPXO and GPUDirect-TCPX :material-arrow-top-right-thin:{ .external }](https://cloud.google.com/kubernetes-engine/docs/how-to/gpu-bandwidth-gpudirect-tcpx-autopilot){:target="_blank"} networking is automatically configured.
+    When you create a cloud fleet with GCP, for the A3 Mega and A3 High instance types, [GPUDirect-TCPXO and GPUDirect-TCPX :material-arrow-top-right-thin:{ .external }](https://cloud.google.com/kubernetes-engine/docs/how-to/gpu-bandwidth-gpudirect-tcpx-autopilot){:target="_blank"} networking is automatically configured.
 
     !!! info "Backend configuration"    
         Note, GPUDirect-TCPXO and GPUDirect-TCPX require `extra_vpcs` to be configured  in the `gcp` backend configuration.
         Refer to the [A3 Mega](../../examples/clusters/a3mega/index.md) and 
-        [A3 Mega](../../examples/clusters/a3high/index.md) examples for more details.
+        [A3 High](../../examples/clusters/a3high/index.md) examples for more details.
 
 === "Nebius"
-    When you create a cloud fleet with `nebius`, [InfiniBand :material-arrow-top-right-thin:{ .external }](https://docs.nebius.com/compute/clusters/gpu){:target="_blank"} networking is automatically configured if it’s supported for the corresponding instance type.
+    When you create a cloud fleet with Nebius, [InfiniBand :material-arrow-top-right-thin:{ .external }](https://docs.nebius.com/compute/clusters/gpu){:target="_blank"} networking is automatically configured if it’s supported for the corresponding instance type.
 
 > To request fast interconnect support for a other backends,
 file an [issue :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues){:target="_ blank"}. 
@@ -47,7 +47,7 @@ To test the interconnect of a created fleet, ensure you run [NCCL](../../example
 
 A distributed task is a task with `nodes` set to a value greater than `2`. In this case, `dstack` first ensures a 
 suitable fleet is available, then starts the master node and runs the task container on it. Once the master is up,
-`dstack` starts worker nodes and runs the task container on each worker node.
+`dstack` starts the rest of the nodes and runs the task container on each of them.
 
 Within the task's `commands`, it's possible to use `DSTACK_MASTER_NODE_IP`, `DSTACK_NODES_IPS`, `DSTACK_NODE_RANK`, and other
 [system environment variables](../concepts/tasks.md#system-environment-variables) for inter-node communication.
