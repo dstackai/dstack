@@ -254,30 +254,30 @@ Define a fleet configuration as a YAML file in your project directory. The file 
 </div>
 
 ??? info "Requirements" 
-    1.&nbsp;Hosts should be pre-installed with Docker.
+    1.&nbsp;Hosts must be pre-installed with Docker.
 
     === "NVIDIA"
-        2.&nbsp;Hosts with NVIDIA GPUs should also be pre-installed with CUDA 12.1 and
+        2.&nbsp;Hosts with NVIDIA GPUs must also be pre-installed with CUDA 12.1 and
         [NVIDIA Container Toolkit :material-arrow-top-right-thin:{ .external }](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html).
 
     === "AMD"
-        2.&nbsp;Hosts with AMD GPUs should also be pre-installed with AMDGPU-DKMS kernel driver (e.g. via
+        2.&nbsp;Hosts with AMD GPUs must also be pre-installed with AMDGPU-DKMS kernel driver (e.g. via
         [native package manager :material-arrow-top-right-thin:{ .external }](https://rocm.docs.amd.com/projects/install-on-linux/en/latest/install/native-install/index.html)
         or [AMDGPU installer :material-arrow-top-right-thin:{ .external }](https://rocm.docs.amd.com/projects/install-on-linux/en/latest/install/amdgpu-install.html).)
 
     === "Intel Gaudi"
-        2.&nbsp;Hosts with Intel Gaudi accelerators should be pre-installed with [Gaudi software and drivers](https://docs.habana.ai/en/latest/Installation_Guide/Driver_Installation.html#driver-installation).
-        This should include the drivers, `hl-smi`, and Habana Container Runtime.
+        2.&nbsp;Hosts with Intel Gaudi accelerators must be pre-installed with [Gaudi software and drivers](https://docs.habana.ai/en/latest/Installation_Guide/Driver_Installation.html#driver-installation).
+        This must include the drivers, `hl-smi`, and Habana Container Runtime.
 
     === "Tenstorrent"
-        2.&nbsp;Hosts with Tenstorrent accelerators should be pre-installed with [Tenstorrent software](https://docs.tenstorrent.com/getting-started/README.html#software-installation).
-        This should include the drivers, `tt-smi`, and HugePages.
+        2.&nbsp;Hosts with Tenstorrent accelerators must be pre-installed with [Tenstorrent software](https://docs.tenstorrent.com/getting-started/README.html#software-installation).
+        This must include the drivers, `tt-smi`, and HugePages.
 
-    3.&nbsp;The user specified should have passwordless `sudo` access.
+    3.&nbsp;The user specified must have passwordless `sudo` access.
 
-    4.&nbsp;The SSH server should be running and configured with `AllowTcpForwarding yes` in `/etc/ssh/sshd_config`.
+    4.&nbsp;The SSH server must be running and configured with `AllowTcpForwarding yes` in `/etc/ssh/sshd_config`.
 
-    5.&nbsp;The firewall should allow SSH and forbid any other connections from external networks.
+    5.&nbsp;The firewall must allow SSH and should forbid any other connections from external networks. For `placement: cluster` fleets, it should also allow any communication between fleet nodes.
 
 To create or update the fleet, pass the fleet configuration to [`dstack apply`](../reference/cli/dstack/apply.md):
 
