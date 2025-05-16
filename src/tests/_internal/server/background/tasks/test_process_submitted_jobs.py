@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.configurations import TaskConfiguration
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceOfferWithAvailability,
@@ -535,6 +536,99 @@ class TestProcessSubmittedJobs:
         )
         assert instance.total_blocks == 4
         assert instance.busy_blocks == 2
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_assigns_multi_node_job_to_shared_instance(self, test_db, session: AsyncSession):
+        project = await create_project(session)
+        user = await create_user(session)
+        repo = await create_repo(
+            session=session,
+            project_id=project.id,
+        )
+        offer = get_instance_offer_with_availability(gpu_count=8, cpu_count=64, memory_gib=128)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.IDLE,
+            backend=BackendType.AWS,
+            offer=offer,
+            total_blocks=4,
+            busy_blocks=0,
+        )
+        configuration = TaskConfiguration(image="debian", nodes=2)
+        run_spec = get_run_spec(run_name="run", repo_id=repo.name, configuration=configuration)
+        run = await create_run(
+            session=session,
+            run_name="run",
+            project=project,
+            repo=repo,
+            user=user,
+            run_spec=run_spec,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            instance_assigned=False,
+        )
+        await process_submitted_jobs()
+        await session.refresh(job)
+        await session.refresh(instance)
+        res = await session.execute(select(JobModel).options(joinedload(JobModel.instance)))
+        job = res.unique().scalar_one()
+        assert job.status == JobStatus.SUBMITTED
+        assert job.instance_assigned
+        assert job.instance is not None
+        assert job.instance.id == instance.id
+        assert instance.total_blocks == 4
+        assert instance.busy_blocks == 4
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_cannot_assign_multi_node_job_to_partially_busy_shared_instance(
+        self, test_db, session: AsyncSession
+    ):
+        project = await create_project(session)
+        user = await create_user(session)
+        repo = await create_repo(
+            session=session,
+            project_id=project.id,
+        )
+        offer = get_instance_offer_with_availability(gpu_count=8, cpu_count=64, memory_gib=128)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.IDLE,
+            backend=BackendType.AWS,
+            offer=offer,
+            total_blocks=4,
+            busy_blocks=1,
+        )
+        configuration = TaskConfiguration(image="debian", nodes=2)
+        run_spec = get_run_spec(run_name="run", repo_id=repo.name, configuration=configuration)
+        run = await create_run(
+            session=session,
+            run_name="run",
+            project=project,
+            repo=repo,
+            user=user,
+            run_spec=run_spec,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            instance_assigned=False,
+        )
+        await process_submitted_jobs()
+        await session.refresh(job)
+        await session.refresh(instance)
+        res = await session.execute(select(JobModel).options(joinedload(JobModel.instance)))
+        job = res.unique().scalar_one()
+        assert job.status == JobStatus.SUBMITTED
+        assert job.instance_assigned
+        assert job.instance is None
+        assert instance.total_blocks == 4
+        assert instance.busy_blocks == 1
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)

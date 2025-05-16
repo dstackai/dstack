@@ -360,16 +360,16 @@ async def _assign_job_to_pool_instance(
         (instance, common_utils.get_or_error(get_instance_offer(instance)))
         for instance in nonshared_instances
     ]
-    if not multinode:
-        shared_instances_with_offers = get_shared_pool_instances_with_offers(
-            pool_instances=pool_instances,
-            profile=profile,
-            requirements=job.job_spec.requirements,
-            idle_only=True,
-            fleet_model=fleet_model,
-            volumes=volumes,
-        )
-        instances_with_offers.extend(shared_instances_with_offers)
+    shared_instances_with_offers = get_shared_pool_instances_with_offers(
+        pool_instances=pool_instances,
+        profile=profile,
+        requirements=job.job_spec.requirements,
+        idle_only=True,
+        fleet_model=fleet_model,
+        multinode=multinode,
+        volumes=volumes,
+    )
+    instances_with_offers.extend(shared_instances_with_offers)
 
     if len(instances_with_offers) == 0:
         return None
@@ -572,7 +572,7 @@ def _create_instance_model_for_job(
 
 
 def _prepare_job_runtime_data(offer: InstanceOfferWithAvailability) -> JobRuntimeData:
-    if offer.total_blocks == 1:
+    if offer.blocks == offer.total_blocks:
         if env_utils.get_bool("DSTACK_FORCE_BRIDGE_NETWORK"):
             network_mode = NetworkMode.BRIDGE
         else:

@@ -235,6 +235,7 @@ def get_shared_pool_instances_with_offers(
     *,
     idle_only: bool = False,
     fleet_model: Optional[FleetModel] = None,
+    multinode: bool = False,
     volumes: Optional[List[List[Volume]]] = None,
 ) -> list[tuple[InstanceModel, InstanceOfferWithAvailability]]:
     instances_with_offers: list[tuple[InstanceModel, InstanceOfferWithAvailability]] = []
@@ -243,19 +244,22 @@ def get_shared_pool_instances_with_offers(
         pool_instances=pool_instances,
         profile=profile,
         fleet_model=fleet_model,
-        multinode=False,
+        multinode=multinode,
         volumes=volumes,
         shared=True,
     )
     for instance in filtered_instances:
         if idle_only and instance.status not in [InstanceStatus.IDLE, InstanceStatus.BUSY]:
             continue
+        if multinode and instance.busy_blocks > 0:
+            continue
         offer = get_instance_offer(instance)
         if offer is None:
             continue
         total_blocks = common_utils.get_or_error(instance.total_blocks)
         idle_blocks = total_blocks - instance.busy_blocks
-        for blocks in range(1, total_blocks + 1):
+        min_blocks = total_blocks if multinode else 1
+        for blocks in range(min_blocks, total_blocks + 1):
             shared_offer = generate_shared_offer(offer, blocks, total_blocks)
             catalog_item = offer_to_catalog_item(shared_offer)
             if gpuhunt.matches(catalog_item, query_filter):
