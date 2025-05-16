@@ -391,9 +391,15 @@ class VMImageVariant(enum.Enum):
 
 
 _SUPPORTED_VM_SERIES_PATTERNS = [
-    r"D(\d+)s_v3",  # Dsv3-series
-    r"E(\d+)i?s_v4",  # Esv4-series
+    # We currently do not support series without a temporary storage, e.g. Dsv6.
+    # They are cheaper but require a separate VM image built without a temporary storage.
+    # TODO: Built a separate VM image to support such series.
+    r"A(\d+)_v2",  # Av2-series (entry level)
+    r"D(\d+)ds_v6",  # Ddsv6-series (general purpose)
+    r"E(\d+)i?ds_v6",  # Edsv6-series (memory optimized)
+    r"E(\d+)i?s_v4",  # Esv4-series (memory optimized, cheaper than Edsv6)
     r"E(\d+)-(\d+)s_v4",  # Esv4-series (constrained vCPU)
+    r"F(\d+)s_v2",  # Fsv2-series (compute optimized)
     r"NC(\d+)s_v3",  # NCv3-series [V100 16GB]
     r"NC(\d+)as_T4_v3",  # NCasT4_v3-series [T4]
     r"ND(\d+)rs_v2",  # NDv2-series [8xV100 32GB]
