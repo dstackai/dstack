@@ -81,7 +81,7 @@ This ensures all instances are provisioned in the same backend and region with o
         [A3 High](../../examples/clusters/a3high/index.md) examples for more details.
 
 ??? info "Nebius"
-    When you create a cloud fleet with `nebius`, [InfiniBand networking :material-arrow-top-right-thin:{ .external }](https://docs.nebius.com/compute/clusters/gpu){:target="_blank"} is automatically configured if it’s supported for the corresponding instance type.
+    When you create a Nebius cloud fleet with `placement: cluster`, [InfiniBand networking :material-arrow-top-right-thin:{ .external }](https://docs.nebius.com/compute/clusters/gpu){:target="_blank"} is automatically configured if it’s supported for the corresponding instance type.
     Otherwise, instances are only connected by the default VPC subnet.
 
     An InfiniBand fabric for the cluster is selected automatically.
