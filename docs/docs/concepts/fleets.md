@@ -67,7 +67,7 @@ This ensures all instances are provisioned in the same backend and region with o
 
 ??? info "AWS"
     When you create a cloud fleet with `aws`, [Elastic Fabric Adapter networking :material-arrow-top-right-thin:{ .external }](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/efa.html){:target="_blank"} is automatically configured if it’s supported for the corresponding instance type.
-    Note, EFA requires the `public_ips` to set to `false` in the `aws` backend configuration.
+    Note, EFA requires the `public_ips` to be set to `false` in the `aws` backend configuration.
     Otherwise, instances are only connected by the default VPC subnet.
 
     Refer to the [EFA](../../blog/posts/efa.md) example for more details.
