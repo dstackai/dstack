@@ -44,7 +44,7 @@ commands:
         if ${MPIRUN} -n ${DSTACK_NODES_NUM} -N 1 true >/dev/null 2>&1; then
           break
         fi
-        echo 'Waiting for worker nodes...'
+        echo 'Waiting for other nodes...'
         sleep 5
       done
       # Run NCCL Tests
@@ -56,7 +56,7 @@ commands:
         -x NCCL_IB_GID_INDEX=3 \
         -x NCCL_IB_DISABLE=0 \
         ./build/all_reduce_perf -b 8M -e 8G -f 2 -g 1 -w 5 --iters 20 -c 0;
-      # Notify worker nodes the MPI run is finished
+      # Notify other nodes the MPI run is finished
       ${MPIRUN} -n ${DSTACK_NODES_NUM} -N 1 sh -c "echo done > ${FIFO}"
     else
       mkfifo ${FIFO}
@@ -72,10 +72,10 @@ resources:
 
 !!! info "MPI"
     RCCL tests rely on MPI to run on multiple processes. The master node (`DSTACK_NODE_RANK=0`) generates `hostfile` (using `DSTACK_NODES_IPS`) 
-    and waits until worker nodes are accessible via MPI. 
+    and waits until other nodes are accessible via MPI. 
     Then, it executes `/rccl-tests/build/all_reduce_perf` across all GPUs.
 
-    Worker nodes use a `FIFO` pipe to wait for until the MPI run is finished.
+    Other nodes use a `FIFO` pipe to wait for until the MPI run is finished.
 
     There is an open [issue :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/2467){:target="_blank"} to simplify the use of MPI with distributed tasks.
 

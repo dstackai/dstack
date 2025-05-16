@@ -63,25 +63,34 @@ Once the status of instances changes to `idle`, they can be used by dev environm
 
 To ensure instances are interconnected (e.g., for
 [distributed tasks](tasks.md#distributed-tasks)), set `placement` to `cluster`. 
-This ensures all instances are provisioned in the same backend and region with optimal inter-node connectivity
+This ensures all instances are provisioned with optimal inter-node connectivity.
 
 ??? info "AWS"
-    `dstack` automatically enables the Elastic Fabric Adapter for all
-    [EFA-capable instance types :material-arrow-top-right-thin:{ .external }](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/efa.html#efa-instance-types){:target="_blank"}.
-    If the `aws` backend config has `public_ips: false` set, `dstack` enables the maximum number of interfaces supported by the instance.
-    Otherwise, if instances have public IPs, only one EFA interface is enabled per instance due to AWS limitations.
-
-??? info "Nebius"
-    `dstack` automatically creates an [InfiniBand cluster](https://docs.nebius.com/compute/clusters/gpu)
-    if all instances in the fleet support it.
+    When you create a cloud fleet with AWS, [Elastic Fabric Adapter networking :material-arrow-top-right-thin:{ .external }](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/efa.html){:target="_blank"} is automatically configured if it’s supported for the corresponding instance type.
+    Note, EFA requires the `public_ips` to be set to `false` in the `aws` backend configuration.
     Otherwise, instances are only connected by the default VPC subnet.
 
-    An InfiniBand fabric for the cluster is selected automatically.
-    If you prefer to use some specific fabrics, configure them in the
+    Refer to the [EFA](../../blog/posts/efa.md) example for more details.
+
+??? info "GCP"
+    When you create a cloud fleet with GCP, for the A3 Mega and A3 High instance types, [GPUDirect-TCPXO and GPUDirect-TCPX :material-arrow-top-right-thin:{ .external }](https://cloud.google.com/kubernetes-engine/docs/how-to/gpu-bandwidth-gpudirect-tcpx-autopilot){:target="_blank"} networking is automatically configured.
+
+    !!! info "Backend configuration"    
+        Note, GPUDirect-TCPXO and GPUDirect-TCPX require `extra_vpcs` to be configured  in the `gcp` backend configuration.
+        Refer to the [A3 Mega](../../examples/clusters/a3mega/index.md) and 
+        [A3 High](../../examples/clusters/a3high/index.md) examples for more details.
+
+??? info "Nebius"
+    When you create a cloud fleet with Nebius, [InfiniBand networking :material-arrow-top-right-thin:{ .external }](https://docs.nebius.com/compute/clusters/gpu){:target="_blank"} is automatically configured if it’s supported for the corresponding instance type.
+    Otherwise, instances are only connected by the default VPC subnet.
+
+    An InfiniBand fabric for the cluster is selected automatically. If you prefer to use some specific fabrics, configure them in the
     [backend settings](../reference/server/config.yml.md#nebius).
 
-> The `cluster` placement is supported only for `aws`, `azure`, `gcp`, `nebius`, `oci`, and `vultr`
-> backends.
+The `cluster` placement is supported for `aws`, `azure`, `gcp`, `nebius`, `oci`, and `vultr`
+backends.
+
+> For more details on optimal inter-node connectivity, read the [Clusters](../guides/clusters.md) guide.
 
 #### Resources
 
@@ -304,13 +313,14 @@ Once the status of instances changes to `idle`, they can be used by dev environm
 If the hosts are interconnected (i.e. share the same network), set `placement` to `cluster`. 
 This is required if you'd like to use the fleet for [distributed tasks](tasks.md#distributed-tasks).
 
-##### Network
-    
-By default, `dstack` automatically detects the network shared by the hosts. 
-However, it's possible to configure it explicitly via 
-the [`network`](../reference/dstack.yml/fleet.md#network) property.
+??? info "Network"  
+    By default, `dstack` automatically detects the network shared by the hosts. 
+    However, it's possible to configure it explicitly via 
+    the [`network`](../reference/dstack.yml/fleet.md#network) property.
 
-[//]: # (TODO: Provide an example and more detail)
+    [//]: # (TODO: Provide an example and more detail)
+
+> For more details on optimal inter-node connectivity, read the [Clusters](../guides/clusters.md) guide.
 
 #### Blocks { #ssh-blocks }
 
@@ -463,5 +473,6 @@ Alternatively, you can delete a fleet by passing the fleet name  to `dstack flee
 To terminate and delete specific instances from a fleet, pass `-i INSTANCE_NUM`.
 
 !!! info "What's next?"
-    1. Read about [dev environments](dev-environments.md), [tasks](tasks.md), and
+    1. Check [dev environments](dev-environments.md), [tasks](tasks.md), and
     [services](services.md)
+    2. Read the [Clusters](../guides/clusters.md) guide

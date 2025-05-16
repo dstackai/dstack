@@ -222,6 +222,7 @@ nav:
       - Guides:
           - Protips: docs/guides/protips.md
           - Metrics: docs/guides/metrics.md
+          - Clusters: docs/guides/clusters.md
           - Server deployment: docs/guides/server-deployment.md
           - Plugins: docs/guides/plugins.md
           - Troubleshooting: docs/guides/troubleshooting.md

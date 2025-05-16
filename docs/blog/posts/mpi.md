@@ -86,10 +86,10 @@ resources:
 
 </div>
 
-The first worker node (`DSTACK_NODE_RANK=0`) generates a `hostfile` listing all node IPs and waits until all nodes are
+The master node (`DSTACK_NODE_RANK=0`) generates a `hostfile` listing all node IPs and waits until all nodes are
 reachable via MPI. Once confirmed, it launches the `/root/nccl-tests/build/all_reduce_perf` benchmark across all available GPUs in the cluster.
 
-The other worker nodes remain blocked until they receive a termination signal from the master node via a FIFO pipe.
+Non-master nodes remain blocked until they receive a termination signal from the master node via a FIFO pipe.
 
 With this, now you can use such a task to run both NCCL or RCCL tests on both cloud and SSH fleets, 
 as well as use MPI for other tasks.
@@ -102,4 +102,4 @@ as well as use MPI for other tasks.
 !!! info "What's next?"
     1. Learn more about [dev environments](../../docs/concepts/dev-environments.md), [tasks](../../docs/concepts/tasks.md), [services](../../docs/concepts/services.md), and [fleets](../../docs/concepts/fleets.md)
     2. Check the [NCCL tests](../../examples/clusters/nccl-tests/index.md) example
-    2. Join [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd){:target="_blank"}
+    3. Join [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd){:target="_blank"}

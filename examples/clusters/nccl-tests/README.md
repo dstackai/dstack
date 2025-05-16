@@ -63,10 +63,10 @@ resources:
 
 !!! info "MPI"
     NCCL tests rely on MPI to run on multiple processes. The master node (`DSTACK_NODE_RANK=0`) generates `hostfile` (using `DSTACK_NODES_IPS`) 
-    and waits until worker nodes are accessible via MPI. 
+    and waits until other nodes are accessible via MPI. 
     Then, it executes `/nccl-tests/build/all_reduce_perf` across all GPUs.
 
-    Worker nodes use a `FIFO` pipe to wait for until the MPI run is finished.
+    Non-master nodes use a `FIFO` pipe to wait for until the MPI run is finished.
 
     There is an open [issue :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/2467){:target="_blank"} to simplify the use of MPI with distributed tasks.
 
