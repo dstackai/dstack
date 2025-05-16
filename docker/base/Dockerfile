@@ -1,4 +1,4 @@
-FROM nvidia/cuda:12.1.0-base-ubuntu20.04
+FROM nvidia/cuda:12.1.1-base-ubuntu20.04
 
 ARG PYTHON
 ARG _UV_HOME="/opt/uv"
