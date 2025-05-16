@@ -23,6 +23,9 @@ ValidPort = conint(gt=0, le=65536)
 MAX_INT64 = 2**63 - 1
 SERVICE_HTTPS_DEFAULT = True
 STRIP_PREFIX_DEFAULT = True
+RUN_PRIOTIRY_MIN = 0
+RUN_PRIOTIRY_MAX = 100
+RUN_PRIORITY_DEFAULT = 0
 
 
 class RunConfigurationType(str, Enum):
@@ -221,14 +224,26 @@ class BaseRunConfiguration(CoreModel):
             )
         ),
     ] = None
-    # deprecated since 0.18.31; task, service -- no effect; dev-environment -- executed right before `init`
-    setup: CommandsList = []
     resources: Annotated[
         ResourcesSpec, Field(description="The resources requirements to run the configuration")
     ] = ResourcesSpec()
+    priority: Annotated[
+        Optional[int],
+        Field(
+            ge=RUN_PRIOTIRY_MIN,
+            le=RUN_PRIOTIRY_MAX,
+            description=(
+                f"The priority of the run, an integer between `{RUN_PRIOTIRY_MIN}` and `{RUN_PRIOTIRY_MAX}`."
+                " `dstack` tries to provision runs with higher priority first."
+                f" Defaults to `{RUN_PRIORITY_DEFAULT}`"
+            ),
+        ),
+    ] = None
     volumes: Annotated[
         List[Union[MountPoint, str]], Field(description="The volumes mount points")
     ] = []
+    # deprecated since 0.18.31; task, service -- no effect; dev-environment -- executed right before `init`
+    setup: CommandsList = []
 
     @validator("python", pre=True, always=True)
     def convert_python(cls, v, values) -> Optional[PythonVersion]:

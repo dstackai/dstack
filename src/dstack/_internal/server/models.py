@@ -348,6 +348,7 @@ class RunModel(BaseModel):
     resubmission_attempt: Mapped[int] = mapped_column(Integer, default=0)
     run_spec: Mapped[str] = mapped_column(Text)
     service_spec: Mapped[Optional[str]] = mapped_column(Text)
+    priority: Mapped[int] = mapped_column(Integer, default=0)
 
     jobs: Mapped[List["JobModel"]] = relationship(
         back_populates="run", lazy="selectin", order_by="[JobModel.replica_num, JobModel.job_num]"

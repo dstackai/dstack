@@ -124,6 +124,7 @@ def get_dev_env_run_plan_dict(
             "reservation": None,
             "fleets": None,
             "tags": None,
+            "priority": 0,
         },
         "configuration_path": "dstack.yaml",
         "profile": {
@@ -284,6 +285,7 @@ def get_dev_env_run_dict(
                 "reservation": None,
                 "fleets": None,
                 "tags": None,
+                "priority": 0,
             },
             "configuration_path": "dstack.yaml",
             "profile": {

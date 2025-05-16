@@ -426,6 +426,34 @@ retry:
 If one job of a multi-node task fails with retry enabled,
 `dstack` will stop all the jobs and resubmit the run.
 
+### Priority
+
+Be default, submitted runs are scheduled in the order they were submitted.
+When compute resources are limited, you may want to prioritize some runs over others.
+This can be done by specifying the [`priority`](../reference/dstack.yml/task.md) property in the run configuration:
+
+<div editor-title=".dstack.yml">
+
+```yaml
+type: task
+name: train
+
+python: "3.10"
+
+# Commands of the task
+commands:
+  - pip install -r fine-tuning/qlora/requirements.txt
+  - python fine-tuning/qlora/train.py
+
+priority: 50
+```
+
+</div>
+
+`dstack` tries to provision runs with higher priority first.
+Note that if a high priority run cannot be scheduled,
+it does not block other runs with lower priority from scheduling.
+
 --8<-- "docs/concepts/snippets/manage-fleets.ext"
 
 --8<-- "docs/concepts/snippets/manage-runs.ext"
