@@ -391,9 +391,12 @@ class VMImageVariant(enum.Enum):
 
 
 _SUPPORTED_VM_SERIES_PATTERNS = [
-    r"D(\d+)s_v3",  # Dsv3-series
-    r"E(\d+)i?s_v4",  # Esv4-series
+    # TODO: Support newer CPU series (Dsv6, Esv6).
+    # They are NVMe-only and require marking the VM image as NVMe.
+    r"D(\d+)s_v3",  # Dsv3-series (general purpose)
+    r"E(\d+)i?s_v4",  # Esv4-series (memory optimized)
     r"E(\d+)-(\d+)s_v4",  # Esv4-series (constrained vCPU)
+    r"F(\d+)s_v2",  # Fsv2-series (compute optimized)
     r"NC(\d+)s_v3",  # NCv3-series [V100 16GB]
     r"NC(\d+)as_T4_v3",  # NCasT4_v3-series [T4]
     r"ND(\d+)rs_v2",  # NDv2-series [8xV100 32GB]
