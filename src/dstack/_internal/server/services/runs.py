@@ -721,15 +721,15 @@ async def _get_pool_offers(
     pool_instances = [i for i in pool_instances if i.id not in detaching_instances_ids]
     multinode = job.job_spec.jobs_per_replica > 1
 
-    if not multinode:
-        shared_instances_with_offers = get_shared_pool_instances_with_offers(
-            pool_instances=pool_instances,
-            profile=run_spec.merged_profile,
-            requirements=job.job_spec.requirements,
-            volumes=volumes,
-        )
-        for _, offer in shared_instances_with_offers:
-            pool_offers.append(offer)
+    shared_instances_with_offers = get_shared_pool_instances_with_offers(
+        pool_instances=pool_instances,
+        profile=run_spec.merged_profile,
+        requirements=job.job_spec.requirements,
+        volumes=volumes,
+        multinode=multinode,
+    )
+    for _, offer in shared_instances_with_offers:
+        pool_offers.append(offer)
 
     nonshared_instances = filter_pool_instances(
         pool_instances=pool_instances,
