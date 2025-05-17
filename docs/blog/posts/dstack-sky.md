@@ -40,8 +40,8 @@ set up with `dstack Sky`.
 <div class="termy">
 
 ```shell
-$ dstack config --url https://sky.dstack.ai \
-    --project my-awesome-project \
+$ dstack project add --name my-awesome-project \
+    --url https://sky.dstack.ai \
     --token ca1ee60b-7b3f-8943-9a25-6974c50efa75
 ```
 
