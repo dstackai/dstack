@@ -107,9 +107,9 @@ To point the CLI to the `dstack` server, configure it
 with the server address, user token, and project name:
 
 ```shell
-$ dstack config \
+$ dstack project add \
+    --name main \
     --url http://127.0.0.1:3000 \
-    --project main \
     --token bbae0f28-d3dd-4820-bf61-8f4bb40815da
     
 Configuration is updated at ~/.dstack/config.yml

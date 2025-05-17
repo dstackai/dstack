@@ -14,7 +14,7 @@ logger = get_logger(__name__)
 
 class ConfigCommand(BaseCommand):
     NAME = "config"
-    DESCRIPTION = "Configure CLI"
+    DESCRIPTION = "Configure CLI (deprecated; use `dstack project`)"
 
     def _register(self):
         super()._register()

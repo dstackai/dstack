@@ -92,7 +92,7 @@ export const CONFIGURE_CLI_TUTORIAL: TutorialPanelProps.Tutorial = {
             title: 'Configure the CLI',
             steps: [
                 {
-                    title: 'Run the dstack config command',
+                    title: 'Run the dstack project add command',
                     content: 'Run this command on your local machine to configure the dstack CLI.',
                     hotspotId: HotspotIds.CONFIGURE_CLI_COMMAND,
                 },

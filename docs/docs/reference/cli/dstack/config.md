@@ -13,7 +13,7 @@ To use CLI and API on different machines or projects, use the `dstack config` co
 <div class="termy">
 
 ```shell
-$ dstack config --help
+$ dstack project --help
 #GENERATE#
 ```
 
