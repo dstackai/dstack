@@ -29,6 +29,10 @@
     margin-left: 32px;
 }
 
+[dir=ltr] .md-typeset :is(.md-typeset__scrollwrap,p,h4,h3,.tabbed-set,ul):not(.admonition-title) :is(.admonition,details, .termy) {
+    margin-left: 0;
+}
+
 @media screen and (max-width: 76.1875em) {
     .md-header {
         background-color: rgb(255, 255, 255);
