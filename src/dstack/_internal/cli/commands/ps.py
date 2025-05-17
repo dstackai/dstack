@@ -36,10 +36,17 @@ class PsCommand(APIBaseCommand):
             help="Watch statuses of runs in realtime",
             action="store_true",
         )
+        self._parser.add_argument(
+            "-n",
+            "--last",
+            help="Show only the last N runs",
+            type=int,
+            default=None,
+        )
 
     def _command(self, args: argparse.Namespace):
         super()._command(args)
-        runs = self.api.runs.list(all=args.all)
+        runs = self.api.runs.list(all=args.all, limit=args.last)
         if not args.watch:
             console.print(run_utils.get_runs_table(runs, verbose=args.verbose))
             return
@@ -49,6 +56,6 @@ class PsCommand(APIBaseCommand):
                 while True:
                     live.update(run_utils.get_runs_table(runs, verbose=args.verbose))
                     time.sleep(LIVE_TABLE_PROVISION_INTERVAL_SECS)
-                    runs = self.api.runs.list(all=args.all)
+                    runs = self.api.runs.list(all=args.all, limit=args.last)
         except KeyboardInterrupt:
             pass
