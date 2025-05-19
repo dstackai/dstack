@@ -166,7 +166,11 @@ lambda = [
     "dstack[server]",
 ]
 oci = [
-    "oci",
+    "oci>=2.150.0",
+    "cryptography>=44.0.3",
+    # pyopenssl is indirect to avoid uv falling back to the old version
+    # due to an upper limit from oci
+    "pyopenssl>=23.2.0",
     "dstack[server]",
 ]
 nebius = [
