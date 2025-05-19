@@ -728,3 +728,63 @@ class TestProcessSubmittedJobs:
         assert job.instance is not None
         assert job.instance.instance_num == 1
         assert job.instance.fleet_id == fleet.id
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_picks_high_priority_jobs_first(self, test_db, session: AsyncSession):
+        project = await create_project(session)
+        user = await create_user(session)
+        repo = await create_repo(
+            session=session,
+            project_id=project.id,
+        )
+        instance = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.IDLE,
+        )
+        run1 = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            priority=10,
+        )
+        job1 = await create_job(
+            session=session,
+            run=run1,
+            instance_assigned=True,
+            instance=instance,
+        )
+        run2 = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            priority=0,
+        )
+        job2 = await create_job(
+            session=session, run=run2, instance_assigned=True, instance=instance
+        )
+        run3 = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            priority=100,
+        )
+        job3 = await create_job(
+            session=session,
+            run=run3,
+            instance_assigned=True,
+            instance=instance,
+        )
+        await process_submitted_jobs()
+        await session.refresh(job3)
+        assert job3.status == JobStatus.PROVISIONING
+        await process_submitted_jobs()
+        await session.refresh(job1)
+        assert job1.status == JobStatus.PROVISIONING
+        await process_submitted_jobs()
+        await session.refresh(job2)
+        assert job2.status == JobStatus.PROVISIONING

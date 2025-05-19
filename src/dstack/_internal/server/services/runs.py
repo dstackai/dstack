@@ -16,7 +16,7 @@ from dstack._internal.core.errors import (
     ServerClientError,
 )
 from dstack._internal.core.models.common import ApplyAction
-from dstack._internal.core.models.configurations import AnyRunConfiguration
+from dstack._internal.core.models.configurations import RUN_PRIORITY_DEFAULT, AnyRunConfiguration
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceOfferWithAvailability,
@@ -434,7 +434,12 @@ async def apply_plan(
     # FIXME: potentially long write transaction
     # Avoid getting run_model after update
     await session.execute(
-        update(RunModel).where(RunModel.id == current_resource.id).values(run_spec=run_spec.json())
+        update(RunModel)
+        .where(RunModel.id == current_resource.id)
+        .values(
+            run_spec=run_spec.json(),
+            priority=run_spec.configuration.priority,
+        )
     )
     run = await get_run_by_name(
         session=session,
@@ -495,6 +500,7 @@ async def submit_run(
             status=RunStatus.SUBMITTED,
             run_spec=run_spec.json(),
             last_processed_at=submitted_at,
+            priority=run_spec.configuration.priority,
         )
         session.add(run_model)
 
@@ -852,6 +858,13 @@ def _get_job_submission_cost(job_submission: JobSubmission) -> float:
 
 
 def _validate_run_spec_and_set_defaults(run_spec: RunSpec):
+    # This function may set defaults for null run_spec values,
+    # although most defaults are resolved when building job_spec
+    # so that we can keep both the original user-supplied value (null in run_spec)
+    # and the default in job_spec.
+    # If a property is stored in job_spec - resolve the default there.
+    # Server defaults are preferable over client defaults so that
+    # the defaults depend on the server version, not the client version.
     if run_spec.run_name is not None:
         validate_dstack_resource_name(run_spec.run_name)
     for mount_point in run_spec.configuration.volumes:
@@ -875,11 +888,14 @@ def _validate_run_spec_and_set_defaults(run_spec: RunSpec):
         raise ServerClientError(
             f"Maximum utilization_policy.time_window is {settings.SERVER_METRICS_RUNNING_TTL_SECONDS}s"
         )
+    if run_spec.configuration.priority is None:
+        run_spec.configuration.priority = RUN_PRIORITY_DEFAULT
     set_resources_defaults(run_spec.configuration.resources)
 
 
 _UPDATABLE_SPEC_FIELDS = ["repo_code_hash", "configuration"]
-_CONF_TYPE_TO_UPDATABLE_FIELDS = {
+_CONF_UPDATABLE_FIELDS = ["priority"]
+_TYPE_SPECIFIC_CONF_UPDATABLE_FIELDS = {
     "dev-environment": ["inactivity_duration"],
     # Most service fields can be updated via replica redeployment.
     # TODO: Allow updating other fields when rolling deployment is supported.
@@ -915,12 +931,9 @@ def _check_can_update_configuration(
         raise ServerClientError(
             f"Configuration type changed from {current.type} to {new.type}, cannot update"
         )
-    updatable_fields = _CONF_TYPE_TO_UPDATABLE_FIELDS.get(new.type)
-    if updatable_fields is None:
-        raise ServerClientError(
-            f"Can only update {', '.join(_CONF_TYPE_TO_UPDATABLE_FIELDS)} configurations."
-            f" Not {new.type}"
-        )
+    updatable_fields = _CONF_UPDATABLE_FIELDS + _TYPE_SPECIFIC_CONF_UPDATABLE_FIELDS.get(
+        new.type, []
+    )
     diff = diff_models(current, new)
     changed_fields = list(diff.keys())
     for key in changed_fields:

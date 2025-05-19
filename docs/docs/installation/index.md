@@ -139,71 +139,71 @@ Configuration is updated at ~/.dstack/config.yml
 
 This configuration is stored in `~/.dstack/config.yml`.
 
-### (Optional) Enable shell autocompletion
+??? info "Shell autocompletion"
 
-`dstack` supports shell autocompletion for `bash` and `zsh`.
+    `dstack` supports shell autocompletion for `bash` and `zsh`.
 
-=== "bash"
+    === "bash"
 
-    First, validate if completion scripts load correctly in your current shell session:
-    
-    <div class="termy">
-    
-    ```shell
-    $ eval "$(dstack completion bash)"
-    ```
-
-    </div>
-    
-    If completions work as expected and you would like them to persist across shell sessions, add the completion script to your shell profile using these commands:
-    
-    <div class="termy">
-    
-    ```shell
-    $ mkdir -p ~/.dstack
-    $ dstack completion bash > ~/.dstack/completion.sh
-    $ echo 'source ~/.dstack/completion.sh' >> ~/.bashrc
-    ```
-    
-    </div>
-
-=== "zsh"
-    
-    First, validate if completion scripts load correctly in your current shell session:
-    
-    <div class="termy">
-    
-    ```shell
-    $ eval "$(dstack completion zsh)"
-    ```
-
-    </div>
-    
-    If completions work as expected and you would like them to persist across shell sessions, you can install them via Oh My Zsh using these commands:
-    
-    <div class="termy">
-    
-    ```shell
-    $ mkdir -p ~/.oh-my-zsh/completions
-    $ dstack completion zsh > ~/.oh-my-zsh/completions/_dstack
-    ```
+        First, validate if completion scripts load correctly in your current shell session:
         
-    </div>
+        <div class="termy">
+        
+        ```shell
+        $ eval "$(dstack completion bash)"
+        ```
 
-    And if you don't use Oh My Zsh:
+        </div>
+        
+        If completions work as expected and you would like them to persist across shell sessions, add the completion script to your shell profile using these commands:
+        
+        <div class="termy">
+        
+        ```shell
+        $ mkdir -p ~/.dstack
+        $ dstack completion bash > ~/.dstack/completion.sh
+        $ echo 'source ~/.dstack/completion.sh' >> ~/.bashrc
+        ```
+        
+        </div>
 
-    <div class="termy">
-    
-    ```shell
-    $ mkdir -p ~/.dstack
-    $ dstack completion zsh > ~/.dstack/completion.sh
-    $ echo 'source ~/.dstack/completion.sh' >> ~/.zshrc
-    ```
-    
-    </div>
+    === "zsh"
+        
+        First, validate if completion scripts load correctly in your current shell session:
+        
+        <div class="termy">
+        
+        ```shell
+        $ eval "$(dstack completion zsh)"
+        ```
 
-    > If you get an error similar to `2: command not found: compdef`, then add the following line to the beginning of your `~/.zshrc` file:
-    > `autoload -Uz compinit && compinit`.
+        </div>
+        
+        If completions work as expected and you would like them to persist across shell sessions, you can install them via Oh My Zsh using these commands:
+        
+        <div class="termy">
+        
+        ```shell
+        $ mkdir -p ~/.oh-my-zsh/completions
+        $ dstack completion zsh > ~/.oh-my-zsh/completions/_dstack
+        ```
+            
+        </div>
+
+        And if you don't use Oh My Zsh:
+
+        <div class="termy">
+        
+        ```shell
+        $ mkdir -p ~/.dstack
+        $ dstack completion zsh > ~/.dstack/completion.sh
+        $ echo 'source ~/.dstack/completion.sh' >> ~/.zshrc
+        ```
+        
+        </div>
+
+        > If you get an error similar to `2: command not found: compdef`, then add the following line to the beginning of your `~/.zshrc` file:
+        > `autoload -Uz compinit && compinit`.
     
 
 !!! info "What's next?"

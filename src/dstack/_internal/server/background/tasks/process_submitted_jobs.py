@@ -93,11 +93,20 @@ async def _process_next_submitted_job():
         async with lock:
             res = await session.execute(
                 select(JobModel)
+                .join(JobModel.run)
                 .where(
                     JobModel.status == JobStatus.SUBMITTED,
                     JobModel.id.not_in(lockset),
                 )
-                .order_by(JobModel.last_processed_at.asc())
+                # Jobs are process in FIFO sorted by priority globally,
+                # thus runs from different project can "overtake" each other by using higher priorities.
+                # That's not a big problem as long as projects do not compete for the same compute resources.
+                # Jobs with lower priorities from other projects will be processed without major lag
+                # as long as new higher priority runs are not constantly submitted.
+                # TODO: Consider processing jobs from different projects fairly/round-robin
+                # Fully fair processing can be tricky to implement via the current DB queue as
+                # there can be many projects and we are limited by the max DB connections.
+                .order_by(RunModel.priority.desc(), JobModel.last_processed_at.asc())
                 .limit(1)
                 .with_for_update(skip_locked=True)
             )
