@@ -61,7 +61,7 @@ jobs:
         uses: docker/setup-qemu-action@v3
       - name: Build and upload to DockerHub
         run: |
-          docker buildx build --platform linux/amd64 --build-arg FLAVOR=${{ matrix.flavor }} --build-arg PYTHON=${{ matrix.python }} --load --provenance=false --tag dstackai/base:py${{ matrix.python }}-${{ inputs.image_version }}-cuda-12.1${{ matrix.flavor == 'devel' && '-devel' || '' }} -f base/Dockerfile .
+          docker buildx build --platform linux/amd64 --build-arg FLAVOR=${{ matrix.flavor }} --build-arg PYTHON=${{ matrix.python }} --push --provenance=false --tag dstackai/base:py${{ matrix.python }}-${{ inputs.image_version }}-cuda-12.1${{ matrix.flavor == 'devel' && '-devel' || '' }} -f base/Dockerfile .
 
   build-aws-images:
     needs: build-docker
