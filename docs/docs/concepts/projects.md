@@ -49,11 +49,11 @@ and when using the CLI or API.
 
 ### Setting up the CLI
 
-To use the CLI with a specific project, run the `dstack config` command with the server address, user token, and project name.
+You can configure multiple projects on the client and set the default project using the [`dstack project`](../reference/cli/dstack/project.md) CLI command. 
 
 You can find the command on the project’s settings page:
 
-<img src="https://dstack.ai/static-assets/static-assets/images/dstack-projects-project-cli.png" width="750px" />
+<img src="https://dstack.ai/static-assets/static-assets/images/dstack-projects-project-cli-v2.png" width="750px" />
 
 ??? info "API"
     In addition to the UI, managing projects, users, and user permissions can also be done via the [REST API](../reference/api/rest/index.md).
