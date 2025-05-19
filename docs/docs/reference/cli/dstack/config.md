@@ -1,5 +1,8 @@
 # dstack config
 
+!!! info "Deprecated"
+    The `dstack config` is deprecated. Use [`dstack project`](project.md) instead.
+
 Both the CLI and API need to be configured with the server address, user token, and project name
 via `~/.dstack/config.yml`.
 
@@ -13,7 +16,7 @@ To use CLI and API on different machines or projects, use the `dstack config` co
 <div class="termy">
 
 ```shell
-$ dstack project --help
+$ dstack config --help
 #GENERATE#
 ```
 

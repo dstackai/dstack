@@ -15,14 +15,14 @@ logger = get_logger(__name__)
 
 class ProjectCommand(BaseCommand):
     NAME = "project"
-    DESCRIPTION = "Manage projects"
+    DESCRIPTION = "Manage projects configs"
 
     def _register(self):
         super()._register()
         subparsers = self._parser.add_subparsers(dest="subcommand", help="Command to execute")
 
         # Add subcommand
-        add_parser = subparsers.add_parser("add", help="Add or update a project")
+        add_parser = subparsers.add_parser("add", help="Add or update a project config")
         add_parser.add_argument(
             "--name", type=str, help="The name of the project to configure", required=True
         )
@@ -43,7 +43,7 @@ class ProjectCommand(BaseCommand):
         add_parser.set_defaults(subfunc=self._add)
 
         # Delete subcommand
-        delete_parser = subparsers.add_parser("delete", help="Delete a project")
+        delete_parser = subparsers.add_parser("delete", help="Delete a project config")
         delete_parser.add_argument(
             "--name", type=str, help="The name of the project to delete", required=True
         )
