@@ -46,6 +46,7 @@ jobs:
     strategy:
       matrix:
         python: ["3.9", "3.10", "3.11", "3.12", "3.13"]
+        flavor: ["base", "devel"]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -60,8 +61,7 @@ jobs:
         uses: docker/setup-qemu-action@v3
       - name: Build and upload to DockerHub
         run: |
-          docker buildx build --platform linux/amd64 --build-arg FLAVOR=base --build-arg PYTHON=${{ matrix.python }} --push --provenance=false --tag dstackai/base:py${{ matrix.python }}-${{ inputs.image_version }}-cuda-12.1 -f base/Dockerfile .
-          docker buildx build --platform linux/amd64 --build-arg FLAVOR=devel --build-arg PYTHON=${{ matrix.python }} --push --provenance=false --tag dstackai/base:py${{ matrix.python }}-${{ inputs.image_version }}-cuda-12.1-devel -f base/Dockerfile .
+          docker buildx build --platform linux/amd64 --build-arg FLAVOR=${{ matrix.flavor }} --build-arg PYTHON=${{ matrix.python }} --load --provenance=false --tag dstackai/base:py${{ matrix.python }}-${{ inputs.image_version }}-cuda-12.1${{ matrix.flavor == 'devel' && '-devel' || '' }} -f base/Dockerfile .
 
   build-aws-images:
     needs: build-docker
