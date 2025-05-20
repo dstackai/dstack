@@ -10,6 +10,7 @@ from dstack._internal import settings
 from dstack._internal.core.errors import DockerRegistryError, ServerClientError
 from dstack._internal.core.models.common import RegistryAuth
 from dstack._internal.core.models.configurations import (
+    DEFAULT_REPO_DIR,
     PortMapping,
     PythonVersion,
     RunConfigurationType,
@@ -149,7 +150,8 @@ class JobConfigurator(ABC):
             commands = self.run_spec.configuration.commands
         elif shell_commands := self._shell_commands():
             entrypoint = [self._shell(), "-i", "-c"]
-            commands = [_join_shell_commands(shell_commands)]
+            dstack_image_commands = self._dstack_image_commands()
+            commands = [_join_shell_commands(dstack_image_commands + shell_commands)]
         else:  # custom docker image without commands
             image_config = await self._get_image_config()
             entrypoint = image_config.entrypoint or []
@@ -163,6 +165,18 @@ class JobConfigurator(ABC):
             )
 
         return result
+
+    def _dstack_image_commands(self) -> List[str]:
+        if (
+            self.run_spec.configuration.image is not None
+            or self.run_spec.configuration.entrypoint is not None
+        ):
+            return []
+        return [
+            f"uv venv --prompt workflow --seed {DEFAULT_REPO_DIR}/.venv > /dev/null 2>&1",
+            f"echo 'source {DEFAULT_REPO_DIR}/.venv/bin/activate' >> ~/.bashrc",
+            f"source {DEFAULT_REPO_DIR}/.venv/bin/activate",
+        ]
 
     def _app_specs(self) -> List[AppSpec]:
         specs = []

@@ -1,5 +1,7 @@
 from typing import List
 
+from dstack._internal.core.models.configurations import DEFAULT_REPO_DIR
+
 
 class CursorDesktop:
     def __init__(
@@ -37,6 +39,6 @@ class CursorDesktop:
         return [
             "echo To open in Cursor, use link below:",
             "echo ''",
-            f"echo '  cursor://vscode-remote/ssh-remote+{self.run_name}/workflow'",  # TODO use $REPO_DIR
+            f"echo '  cursor://vscode-remote/ssh-remote+{self.run_name}{DEFAULT_REPO_DIR}'",  # TODO use $REPO_DIR
             "echo ''",
         ]
