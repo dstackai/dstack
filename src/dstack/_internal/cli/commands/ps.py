@@ -39,7 +39,7 @@ class PsCommand(APIBaseCommand):
         self._parser.add_argument(
             "-n",
             "--last",
-            help="Show only the last N runs",
+            help="Show only the last N runs. Implies --all",
             type=int,
             default=None,
         )
