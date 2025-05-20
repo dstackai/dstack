@@ -166,7 +166,10 @@ def get_dev_env_run_plan_dict(
                         "/bin/bash",
                         "-i",
                         "-c",
-                        "(echo pip install ipykernel... && "
+                        "uv venv --prompt workflow --seed /workflow/.venv > /dev/null 2>&1"
+                        " && echo 'source /workflow/.venv/bin/activate' >> ~/.bashrc"
+                        " && source /workflow/.venv/bin/activate"
+                        " && (echo pip install ipykernel... && "
                         "pip install -q --no-cache-dir "
                         'ipykernel 2> /dev/null) || echo "no '
                         'pip, ipykernel was not installed" '
@@ -322,7 +325,10 @@ def get_dev_env_run_dict(
                         "/bin/bash",
                         "-i",
                         "-c",
-                        "(echo pip install ipykernel... && "
+                        "uv venv --prompt workflow --seed /workflow/.venv > /dev/null 2>&1"
+                        " && echo 'source /workflow/.venv/bin/activate' >> ~/.bashrc"
+                        " && source /workflow/.venv/bin/activate"
+                        " && (echo pip install ipykernel... && "
                         "pip install -q --no-cache-dir "
                         'ipykernel 2> /dev/null) || echo "no '
                         'pip, ipykernel was not installed" '
