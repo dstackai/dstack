@@ -113,4 +113,9 @@ class ExamplePolicy(ApplyPolicy):
 
 </div>
 
+## Built-in Plugins
+
+### REST Plugin
+If you'd like to apply custom policies within your organization, you can set up your own plugin API server and integrate it with `dstack` via the `rest-plugin`. To get started, check out the [plugijn server example](/examples/plugins/example_plugin_server/README.md).
+
 For more information on the plugin development, see the [plugin example](https://github.com/dstackai/dstack/tree/master/examples/plugins/example_plugin).
