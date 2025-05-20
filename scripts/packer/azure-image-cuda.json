@@ -6,7 +6,7 @@
     "azure_tenant_id": "{{env `AZURE_TENANT_ID`}}",
     "azure_subscription_id": "{{env `AZURE_SUBSCRIPTION_ID`}}",
     "azure_location": "westeurope",
-    "azure_vm_size": "Standard_DS1_v2",
+    "azure_vm_size": "Standard_D2s_v6",
     "build_prefix": "",
     "docker_version": "",
     "cuda_drivers_version": "",

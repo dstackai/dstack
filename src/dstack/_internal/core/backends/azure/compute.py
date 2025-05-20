@@ -391,11 +391,8 @@ class VMImageVariant(enum.Enum):
 
 
 _SUPPORTED_VM_SERIES_PATTERNS = [
-    # TODO: Support newer CPU series (Dsv6, Esv6).
-    # They are NVMe-only and require marking the VM image as NVMe.
-    r"D(\d+)s_v3",  # Dsv3-series (general purpose)
-    r"E(\d+)i?s_v4",  # Esv4-series (memory optimized)
-    r"E(\d+)-(\d+)s_v4",  # Esv4-series (constrained vCPU)
+    r"D(\d+)s_v6",  # Dsv6-series (general purpose)
+    r"E(\d+)i?s_v6",  # Esv6-series (memory optimized)
     r"F(\d+)s_v2",  # Fsv2-series (compute optimized)
     r"NC(\d+)s_v3",  # NCv3-series [V100 16GB]
     r"NC(\d+)as_T4_v3",  # NCasT4_v3-series [T4]
@@ -404,6 +401,11 @@ _SUPPORTED_VM_SERIES_PATTERNS = [
     r"NC(\d+)ads_A100_v4",  # NC A100 v4-series [A100 80GB]
     r"ND(\d+)asr_v4",  # ND A100 v4-series [8xA100 40GB]
     r"ND(\d+)amsr_A100_v4",  # NDm A100 v4-series [8xA100 80GB]
+    # Deprecated series
+    # TODO: Remove after several releases
+    r"D(\d+)s_v3",  # Dsv3-series (general purpose)
+    r"E(\d+)i?s_v4",  # Esv4-series (memory optimized)
+    r"E(\d+)-(\d+)s_v4",  # Esv4-series (constrained vCPU)
 ]
 _SUPPORTED_VM_SERIES_PATTERN = (
     "^Standard_(" + "|".join(f"({s})" for s in _SUPPORTED_VM_SERIES_PATTERNS) + ")$"
