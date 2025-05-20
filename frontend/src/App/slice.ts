@@ -21,7 +21,7 @@ const getInitialState = (): IAppState => {
     try {
         const modeStorageData = localStorage.getItem(MODE_STORAGE_KEY);
 
-        if (modeStorageData && JSON.parse(modeStorageData)) {
+        if (modeStorageData) {
             activeMode = modeStorageData as Mode;
         }
     } catch (e) {
