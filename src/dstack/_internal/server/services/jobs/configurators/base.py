@@ -60,7 +60,7 @@ class JobConfigurator(ABC):
     TYPE: RunConfigurationType
 
     _image_config: Optional[ImageConfig] = None
-    # JobSSHKey should be shared for all jobs in a replica for inter-node communitation.
+    # JobSSHKey should be shared for all jobs in a replica for inter-node communication.
     _job_ssh_key: Optional[JobSSHKey] = None
 
     def __init__(self, run_spec: RunSpec):

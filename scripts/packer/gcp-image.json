@@ -2,6 +2,7 @@
   "variables": {
     "build_prefix": "",
     "docker_version": "",
+    "image_repo": "",
     "image_version": ""
   },
   "builders": [
@@ -48,7 +49,10 @@
     },
     {
       "type": "shell",
-      "environment_vars": ["IMAGE_VERSION={{user `image_version`}}"],
+      "environment_vars": [
+        "IMAGE_REPO={{user `image_repo`}}",
+        "IMAGE_VERSION={{user `image_version`}}"
+      ],
       "script": "provisioners/pull-docker-images.sh"
     }
   ]
