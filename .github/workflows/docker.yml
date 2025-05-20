@@ -8,11 +8,15 @@ on:
         description: "Docker image version"
         required: true
       staging:
-        description: "Staging build"
+        description: "Build staging images"
+        type: boolean
+        default: false
+      prepull_staging:
+        description: "Pre-pull staging Docker images"
         type: boolean
         default: false
       build_docker:
-        description: "Build docker images"
+        description: "Build Docker images"
         type: boolean
         default: true
       build_aws:
@@ -34,7 +38,9 @@ on:
 
 env:
   PACKER_VERSION: "1.9.2"
-  BUILD_PREFIX: ${{ inputs.staging && format('stgn-{0}-', github.run_number) || '' }} # staging ? prefix : ''
+  BUILD_DOCKER_REPO: ${{ inputs.staging && 'base-stgn' || 'base' }}
+  PREPULL_DOCKER_REPO: ${{ inputs.prepull_staging && 'base-stgn' || 'base' }}
+  VM_IMAGE_BUILD_PREFIX: ${{ inputs.staging && format('stgn-{0}-', github.run_number) || '' }} # staging ? prefix : ''
 
 jobs:
   build-docker:
@@ -61,7 +67,7 @@ jobs:
         uses: docker/setup-qemu-action@v3
       - name: Build and upload to DockerHub
         run: |
-          docker buildx build --platform linux/amd64 --build-arg FLAVOR=${{ matrix.flavor }} --build-arg PYTHON=${{ matrix.python }} --push --provenance=false --tag dstackai/base:py${{ matrix.python }}-${{ inputs.image_version }}-cuda-12.1${{ matrix.flavor == 'devel' && '-devel' || '' }} -f base/Dockerfile .
+          docker buildx build --platform linux/amd64 --build-arg FLAVOR=${{ matrix.flavor }} --build-arg PYTHON=${{ matrix.python }} --push --provenance=false --tag dstackai/${{ env.BUILD_DOCKER_REPO }}:py${{ matrix.python }}-${{ inputs.image_version }}-cuda-12.1${{ matrix.flavor == 'devel' && '-devel' || '' }} -f base/Dockerfile .
 
   build-aws-images:
     needs: build-docker
@@ -85,7 +91,7 @@ jobs:
           chmod +x packer
       - name: Run packer
         run: |
-          ./packer build -var-file=versions.json $PROD_VARS -var image_version=${{ inputs.image_version }} -var build_prefix=$BUILD_PREFIX aws-image${{ matrix.variant }}.json
+          ./packer build -var-file=versions.json $PROD_VARS -var image_repo=${{ env.PREPULL_DOCKER_REPO }} -var image_version=${{ inputs.image_version }} -var build_prefix=$VM_IMAGE_BUILD_PREFIX aws-image${{ matrix.variant }}.json
         env:
           PROD_VARS: ${{ !inputs.staging && '-var-file=aws-vars-prod.json' || '' }} # production ? var-file : ''
 
@@ -118,12 +124,12 @@ jobs:
           chmod +x packer
       - name: Run packer
         run: |
-          ./packer build -var-file=versions.json -var image_version=${{ inputs.image_version }} -var build_prefix=$BUILD_PREFIX azure-image${{ matrix.variant }}.json
+          ./packer build -var-file=versions.json -var image_repo=${{ env.PREPULL_DOCKER_REPO }} -var image_version=${{ inputs.image_version }} -var build_prefix=$VM_IMAGE_BUILD_PREFIX azure-image${{ matrix.variant }}.json
       - name: Publish azure image
         if: ${{ !inputs.staging }}
         run: |
-          IMAGE_DEFINITION=${BUILD_PREFIX}dstack${{ matrix.variant }}-${{ inputs.image_version }}
-          IMAGE_NAME=${BUILD_PREFIX}dstack${{ matrix.variant }}-${{ inputs.image_version }}
+          IMAGE_DEFINITION=${VM_IMAGE_BUILD_PREFIX}dstack${{ matrix.variant }}-${{ inputs.image_version }}
+          IMAGE_NAME=${VM_IMAGE_BUILD_PREFIX}dstack${{ matrix.variant }}-${{ inputs.image_version }}
           ../publish_azure_image.sh $IMAGE_DEFINITION $IMAGE_NAME
 
   build-gcp-images:
@@ -156,11 +162,11 @@ jobs:
           chmod +x packer
       - name: Run packer
         run: |
-          ./packer build -var-file=versions.json -var image_version=${{ inputs.image_version }} -var build_prefix=$BUILD_PREFIX gcp-image${{ matrix.variant }}.json
+          ./packer build -var-file=versions.json -var image_repo=${{ env.PREPULL_DOCKER_REPO }} -var image_version=${{ inputs.image_version }} -var build_prefix=$VM_IMAGE_BUILD_PREFIX gcp-image${{ matrix.variant }}.json
       - name: Publish images
         run: |
           IMAGE_VERSION=${IMAGE_VERSION//./-}
-          gcloud compute images add-iam-policy-binding ${BUILD_PREFIX}dstack${{ matrix.variant }}-$IMAGE_VERSION --member='allAuthenticatedUsers' --role='roles/compute.imageUser'
+          gcloud compute images add-iam-policy-binding ${VM_IMAGE_BUILD_PREFIX}dstack${{ matrix.variant }}-$IMAGE_VERSION --member='allAuthenticatedUsers' --role='roles/compute.imageUser'
         env:
           IMAGE_VERSION: ${{ inputs.image_version }}
 
@@ -205,8 +211,9 @@ jobs:
         run: |
           ./packer build \
             -var-file=versions.json \
+            -var image_repo=${{ env.PREPULL_DOCKER_REPO }} \
             -var image_version=${{ inputs.image_version }} \
-            -var build_prefix=$BUILD_PREFIX \
+            -var build_prefix=$VM_IMAGE_BUILD_PREFIX \
             -var oci_compartment_ocid=$OCI_COMPARTMENT \
             -var oci_subnet_ocid=$OCI_SUBNET \
             -var oci_availability_domain=$OCI_AVAILABILITY_DOMAIN \
@@ -221,14 +228,14 @@ jobs:
         if: ${{ !inputs.staging }}
         run: |
           uv run scripts/oci_image_tools.py copy \
-            --image ${BUILD_PREFIX}dstack${{ matrix.variant }}-${{ inputs.image_version }} \
+            --image ${VM_IMAGE_BUILD_PREFIX}dstack${{ matrix.variant }}-${{ inputs.image_version }} \
             --from $OCI_REGION \
             --compartment $OCI_COMPARTMENT
       - name: Publish image in OCI Marketplace
         if: ${{ !inputs.staging }}
         run: |
           uv run scripts/oci_image_tools.py publish \
-            --image ${BUILD_PREFIX}dstack${{ matrix.variant }}-${{ inputs.image_version }} \
+            --image ${VM_IMAGE_BUILD_PREFIX}dstack${{ matrix.variant }}-${{ inputs.image_version }} \
             --compartment $OCI_COMPARTMENT \
             --version ${{ inputs.image_version }} \
             --description "Image for running workloads with dstack - https://dstack.ai/" \
