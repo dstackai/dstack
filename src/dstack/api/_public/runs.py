@@ -715,8 +715,8 @@ class RunCollection:
             runs = self._api_client.runs.list(
                 project_name=self._project,
                 repo_id=None,
-                limit=limit or 100,
-            )[:1]
+                limit=1,
+            )
         return [self._model_to_run(run) for run in runs]
 
     def get(self, run_name: str) -> Optional[Run]:
