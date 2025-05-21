@@ -34,6 +34,7 @@ dependencies = [
     "psutil",
     "gpuhunt==0.1.5",
     "argcomplete>=3.5.0",
+    "humanize>=4.12.3",
 ]
 
 [project.urls]

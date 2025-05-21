@@ -12,7 +12,7 @@ tasks, and services:
      ```yaml
      type: task
      name: vscode
-     
+
      commands:
        - echo $DSTACK_RUN_NAME
      ```
@@ -25,11 +25,11 @@ tasks, and services:
 - `DSTACK_GPUS_NUM`{ #DSTACK_GPUS_NUM } – The total number of GPUs in the run.
 
      Example:
-     
+
      ```yaml
      type: service
      name: llama31
-     
+
      env:
        - HF_TOKEN
      commands:
@@ -39,7 +39,7 @@ tasks, and services:
          --tensor-parallel-size $DSTACK_GPUS_NUM
      port: 8000
      model: meta-llama/Meta-Llama-3.1-8B-Instruct
-     
+
      resources:
        gpu: 24GB
      ```
@@ -51,7 +51,7 @@ tasks, and services:
 
      Below is an example of using `DSTACK_NODES_NUM`, `DSTACK_GPUS_PER_NODE`, `DSTACK_NODE_RANK`, and `DSTACK_MASTER_NODE_IP`
      for distributed training:
-     
+
      ```yaml
       type: task
       name: train-distrib
@@ -83,18 +83,18 @@ tasks, and services:
 The following environment variables are supported by the `dstack` server and can be specified whether the server is run
 via `dstack server` or deployed using Docker.
 
-For more details on the options below, refer to the [server deployment](../guides/server-deployment.md) guide. 
+For more details on the options below, refer to the [server deployment](../guides/server-deployment.md) guide.
 
 - `DSTACK_SERVER_LOG_LEVEL`{ #DSTACK_SERVER_LOG_LEVEL } – Has the same effect as `--log-level`. Defaults to `INFO`.
 
      Example:
-     
+
      <div class="termy">
-     
+
      ```shell
      $ DSTACK_SERVER_LOG_LEVEL=debug dstack server
      ```
-     
+
      </div>
 
 - `DSTACK_SERVER_LOG_FORMAT`{ #DSTACK_SERVER_LOG_FORMAT } – Sets format of log output. Can be `rich`, `standard`, `json`. Defaults to `rich`.
@@ -110,9 +110,10 @@ For more details on the options below, refer to the [server deployment](../guide
 - `DSTACK_ENABLE_PROMETHEUS_METRICS`{ #DSTACK_ENABLE_PROMETHEUS_METRICS } — Enables Prometheus metrics collection and export.
 - `DSTACK_DEFAULT_SERVICE_CLIENT_MAX_BODY_SIZE`{ #DSTACK_DEFAULT_SERVICE_CLIENT_MAX_BODY_SIZE } – Request body size limit for services running with a gateway, in bytes. Defaults to 64 MiB.
 - `DSTACK_FORBID_SERVICES_WITHOUT_GATEWAY`{ #DSTACK_FORBID_SERVICES_WITHOUT_GATEWAY } – Forbids registering new services without a gateway if set to any value.
+- `DSTACK_SERVER_CODE_UPLOAD_LIMIT`{ #DSTACK_SERVER_CODE_UPLOAD_LIMIT } - The repo size limit when uploading diffs or local repos, in bytes. Set to 0 to disable size limits. Defaults to 2MiB.
 
 ??? info "Internal environment variables"
-     The following environment variables are intended for development purposes: 
+     The following environment variables are intended for development purposes:
 
      * `DSTACK_SERVER_ROOT_LOG_LEVEL` – Sets root logger log level. Defaults to `ERROR`.
      * `DSTACK_SERVER_UVICORN_LOG_LEVEL` – Sets uvicorn logger log level. Defaults to `ERROR`.
