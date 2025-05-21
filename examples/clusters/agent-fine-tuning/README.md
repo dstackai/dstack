@@ -12,7 +12,7 @@ name: lambda-h100-fleet
 
 ssh_config:
   user: ubuntu
-  identity_file: ~/.ssh/peterschmidt85
+  identity_file: ~/.ssh/id_rsa
   hosts:
     - lambda-cluster-node-001
     - lambda-cluster-node-002
