@@ -76,5 +76,5 @@ Refer to [instance volumes](../concepts/volumes.md#instance) for an example.
 
 !!! info "What's next?"
     1. Read about [distributed tasks](../concepts/tasks.md#distributed-tasks), [fleets](../concepts/fleets.md), and [volumes](../concepts/volumes.md)
-    2. Browse the [Clusters](../../examples.md#clusters) examples
+    2. Browse the [Clusters](../../examples.md#clusters) and [Distributed training](../../examples.md#distributed-training) examples
     

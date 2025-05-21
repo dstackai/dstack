@@ -83,6 +83,22 @@ hide:
     </a>
 </div>
 
+## Distributed training
+
+<div class="tx-landing__highlights_grid">
+    <a href="/examples/distributed-training/ray-ragen"
+       class="feature-cell sky">
+        <h3>
+            Ray+RAGEN
+        </h3>
+
+        <p>
+            Fine-tune an agent on multiple nodes
+            with RAGEN, verl, and Ray.
+        </p>
+    </a>
+</div>
+
 ## Inference
 
 <div class="tx-landing__highlights_grid">
@@ -128,7 +144,7 @@ hide:
            TensorRT-LLM
        </h3>
        <p>
-            Deploy DeepSeek R1 and its distilled version with TensorRT-LLM
+            Deploy DeepSeek models with TensorRT-LLM
         </p>
     </a>
 </div>

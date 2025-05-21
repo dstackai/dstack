@@ -33,7 +33,7 @@ name: ray-cluster
 nodes: 4
 commands:
   - pip install -U "ray[default]"
-  - >
+  - |
     if [ $DSTACK_NODE_RANK = 0 ]; then 
       ray start --head --port=6379;
     else
