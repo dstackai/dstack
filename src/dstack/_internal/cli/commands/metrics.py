@@ -113,7 +113,7 @@ def _get_metrics_table(run: Run, metrics: List[JobMetrics]) -> Table:
                     gpu_metrics += f"gpu={i} mem={_format_memory(gpu_memory_usage, 2)}"
                     if resources is not None:
                         gpu_metrics += (
-                            f"/{_format_memory(resources.gpus[i].memory_mib * 1024 * 1024, 0)}"
+                            f"/{_format_memory(resources.gpus[i].memory_mib * 1024 * 1024, 2)}"
                         )
                     gpu_metrics += f" util={gpu_util_percent}%"
 
