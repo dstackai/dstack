@@ -3,7 +3,7 @@ import logging
 from fastapi import FastAPI
 
 from app.utils import configure_logging
-from dstack.plugins.builtin.models import (
+from dstack.plugins.builtin.rest_plugin import (
     FleetSpecRequest,
     FleetSpecResponse,
     GatewaySpecRequest,

@@ -8,9 +8,8 @@ from dstack._internal.core.errors import ServerClientError
 from dstack._internal.core.models.fleets import FleetSpec
 from dstack._internal.core.models.gateways import GatewaySpec
 from dstack._internal.core.models.volumes import VolumeSpec
-from dstack.plugins import ApplyPolicy, Plugin, RunSpec, get_plugin_logger
-from dstack.plugins._models import ApplySpec
-from dstack.plugins.builtin.models import (
+from dstack.plugins import ApplyPolicy, ApplySpec, Plugin, RunSpec, get_plugin_logger
+from dstack.plugins.builtin.rest_plugin import (
     FleetSpecRequest,
     FleetSpecResponse,
     GatewaySpecRequest,

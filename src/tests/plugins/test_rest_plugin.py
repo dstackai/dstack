@@ -3,7 +3,6 @@ import os
 from unittest import mock
 from unittest.mock import Mock
 
-import pydantic
 import pytest
 import pytest_asyncio
 import requests
@@ -164,5 +163,5 @@ class TestRESTPlugin:
         mock_response.text = json.dumps({"invalid-key": "abc"})
         mock_response.raise_for_status = Mock()
         with mock.patch("requests.post", return_value=mock_response):
-            with pytest.raises(pydantic.ValidationError):
+            with pytest.raises(ServerClientError):
                 policy.on_apply(user.name, project=project.name, spec=spec)
