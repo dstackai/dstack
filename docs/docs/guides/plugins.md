@@ -116,6 +116,11 @@ class ExamplePolicy(ApplyPolicy):
 ## Built-in Plugins
 
 ### REST Plugin
-If you'd like to apply custom policies within your organization, you can set up your own plugin API server and integrate it with `dstack` via the `rest-plugin`. To get started, check out the [plugijn server example](/examples/plugins/example_plugin_server/README.md).
+`rest_plugin` is a builtin `dstack` plugin that allows writing your custom plugins as API servers, so you don't need to install plugins as Python packages.
 
-For more information on the plugin development, see the [plugin example](https://github.com/dstackai/dstack/tree/master/examples/plugins/example_plugin).
+Plugins implemented as API servers have advantages over plugins implemented as Python packages in some cases:
+* No dependency conflicts with `dstack`.
+* You can use any programming language.
+* If you run the `dstack` server via Docker, you don't need to extend the `dstack` server image with plugins or map them via volumes.
+
+To get started, check out the [plugin server example](/examples/plugins/example_plugin_server/README.md).

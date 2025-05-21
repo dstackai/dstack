@@ -1,6 +1,6 @@
 ## Overview
 
-If you wish to hook up your own plugin server through `dstack` builtin ` rest-plugin`, here's a basic example on how to do so.
+If you wish to hook up your own plugin server through `dstack` builtin `rest_plugin`, here's a basic example on how to do so.
 
 ## Steps
 
@@ -17,7 +17,7 @@ If you wish to hook up your own plugin server through `dstack` builtin ` rest-pl
     fastapi dev app/main.py 
     ```
 
-1. Enable `rest-plugin` in `dstack` `server/config.yaml`:
+1. Enable `rest_plugin` in `server/config.yaml`:
 
     ```yaml
    plugins:
