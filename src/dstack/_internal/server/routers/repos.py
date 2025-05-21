@@ -1,6 +1,7 @@
 from typing import List, Tuple
 
 from fastapi import APIRouter, Depends, Request, UploadFile
+from humanize import naturalsize
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.errors import ResourceNotExistsError, ServerClientError
@@ -14,9 +15,10 @@ from dstack._internal.server.schemas.repos import (
 )
 from dstack._internal.server.security.permissions import ProjectMember
 from dstack._internal.server.services import repos
+from dstack._internal.server.settings import SERVER_CODE_UPLOAD_LIMIT
 from dstack._internal.server.utils.routers import (
     get_base_api_additional_responses,
-    request_size_exceeded,
+    get_request_size,
 )
 
 router = APIRouter(
@@ -94,10 +96,12 @@ async def upload_code(
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
 ):
-    if request_size_exceeded(request, limit=2 * 2**20):
+    request_size = get_request_size(request)
+    if SERVER_CODE_UPLOAD_LIMIT > 0 and request_size > SERVER_CODE_UPLOAD_LIMIT:
         raise ServerClientError(
-            "Repo diff size exceeds the limit of 2MB. "
-            "Use .gitignore to exclude large files from the repo."
+            f"Repo diff size is {naturalsize(request_size)}, which exceeds the limit of "
+            f"{naturalsize(SERVER_CODE_UPLOAD_LIMIT)}. Use .gitignore to exclude large files from the repo. This "
+            f"limit can be modified by setting the DSTACK_SERVER_CODE_UPLOAD_LIMIT_BYTES environment variable"
         )
     _, project = user_project
     await repos.upload_code(

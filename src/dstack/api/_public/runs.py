@@ -691,29 +691,32 @@ class RunCollection:
         logger.warning("The exec_plan() method is deprecated in favor of apply_plan().")
         return self.apply_plan(run_plan=run_plan, repo=repo, reserve_ports=reserve_ports)
 
-    def list(self, all: bool = False) -> List[Run]:
+    def list(self, all: bool = False, limit: Optional[int] = None) -> List[Run]:
         """
         List runs.
 
         Args:
             all: Show all runs (active and finished) if `True`.
+            limit: Limit the number of runs to return. Must be less than 100.
 
         Returns:
             List of runs.
         """
         # Return only one page of latest runs (<=100). Returning all the pages may be costly.
         # TODO: Consider introducing `since` filter with a reasonable default.
-        only_active = not all
+        only_active = not all and limit is None
         runs = self._api_client.runs.list(
             project_name=self._project,
             repo_id=None,
             only_active=only_active,
+            limit=limit or 100,
         )
         if only_active and len(runs) == 0:
             runs = self._api_client.runs.list(
                 project_name=self._project,
                 repo_id=None,
-            )[:1]
+                limit=1,
+            )
         return [self._model_to_run(run) for run in runs]
 
     def get(self, run_name: str) -> Optional[Run]:

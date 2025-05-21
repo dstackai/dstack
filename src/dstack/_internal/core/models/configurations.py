@@ -81,7 +81,8 @@ class ScalingSpec(CoreModel):
         Field(
             description="The target value of the metric. "
             "The number of replicas is calculated based on this number and automatically adjusts "
-            "(scales up or down) as this metric changes"
+            "(scales up or down) as this metric changes",
+            gt=0,
         ),
     ]
     scale_up_delay: Annotated[
