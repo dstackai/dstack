@@ -19,7 +19,7 @@ ssh_config:
   proxy_jump:
     hostname: 192.222.48.90
     user: ubuntu
-    identity_file: ~/.ssh/peterschmidt85
+    identity_file: ~/.ssh/id_rsa
 
 placement: cluster
 ```
