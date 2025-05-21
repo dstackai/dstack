@@ -96,7 +96,7 @@ def apply_plugin_policies(user: str, project: str, spec: ApplySpec) -> ApplySpec
     for policy in policies:
         try:
             spec = policy.on_apply(user=user, project=project, spec=spec)
-        except Exception as e:
+        except ValueError as e:
             msg = None
             if len(e.args) > 0:
                 msg = e.args[0]

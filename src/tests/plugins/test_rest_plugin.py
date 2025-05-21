@@ -10,7 +10,7 @@ import requests
 from pydantic import parse_obj_as
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dstack._internal.core.errors import ServerError
+from dstack._internal.core.errors import ServerClientError, ServerError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import ServiceConfiguration
 from dstack._internal.core.models.fleets import FleetConfiguration, FleetSpec
@@ -106,23 +106,23 @@ class TestRESTPlugin:
     @pytest.mark.parametrize(
         "spec", ["run_spec", "fleet_spec", "volume_spec", "gateway_spec"], indirect=True
     )
-    async def test_on_run_apply_plugin_service_returns_mutated_spec(
+    async def test_on_apply_plugin_service_returns_mutated_spec(
         self, test_db, user, project, spec
     ):
         policy = CustomApplyPolicy()
         mock_response = Mock()
-        spec_dict = spec.dict()
+        response_dict = {"spec": spec.dict(), "error": None}
 
         if isinstance(spec, (RunSpec, FleetSpec)):
-            spec_dict["profile"]["tags"] = {"env": "test", "team": "qa"}
+            response_dict["spec"]["profile"]["tags"] = {"env": "test", "team": "qa"}
         else:
-            spec_dict["configuration_path"] = "/path/to/something"
+            response_dict["spec"]["configuration_path"] = "/path/to/something"
 
-        mock_response.text = json.dumps(spec_dict)
+        mock_response.text = json.dumps(response_dict)
         mock_response.raise_for_status = Mock()
         with mock.patch("requests.post", return_value=mock_response):
             result = policy.on_apply(user=user.name, project=project.name, spec=spec)
-            assert result == type(spec)(**spec_dict)
+            assert result == type(spec)(**response_dict["spec"])
 
     @pytest.mark.asyncio
     @mock.patch.dict(os.environ, {PLUGIN_SERVICE_URI_ENV_VAR_NAME: "http://mock"})
@@ -130,10 +130,10 @@ class TestRESTPlugin:
     @pytest.mark.parametrize(
         "spec", ["run_spec", "fleet_spec", "volume_spec", "gateway_spec"], indirect=True
     )
-    async def test_on_run_apply_plugin_service_call_fails(self, test_db, user, project, spec):
+    async def test_on_apply_plugin_service_call_fails(self, test_db, user, project, spec):
         policy = CustomApplyPolicy()
         with mock.patch("requests.post", side_effect=requests.RequestException("fail")):
-            with pytest.raises(requests.RequestException):
+            with pytest.raises(ServerClientError):
                 policy.on_apply(user=user.name, project=project.name, spec=spec)
 
     @pytest.mark.asyncio
@@ -142,14 +142,12 @@ class TestRESTPlugin:
     @pytest.mark.parametrize(
         "spec", ["run_spec", "fleet_spec", "volume_spec", "gateway_spec"], indirect=True
     )
-    async def test_on_run_apply_plugin_service_connection_fails(
-        self, test_db, user, project, spec
-    ):
+    async def test_on_apply_plugin_service_connection_fails(self, test_db, user, project, spec):
         policy = CustomApplyPolicy()
         with mock.patch(
             "requests.post", side_effect=requests.ConnectionError("Failed to connect")
         ):
-            with pytest.raises(requests.ConnectionError):
+            with pytest.raises(ServerClientError):
                 policy.on_apply(user=user.name, project=project.name, spec=spec)
 
     @pytest.mark.asyncio
@@ -158,7 +156,7 @@ class TestRESTPlugin:
     @pytest.mark.parametrize(
         "spec", ["run_spec", "fleet_spec", "volume_spec", "gateway_spec"], indirect=True
     )
-    async def test_on_run_apply_plugin_service_returns_invalid_spec(
+    async def test_on_apply_plugin_service_returns_invalid_spec(
         self, test_db, user, project, spec
     ):
         policy = CustomApplyPolicy()

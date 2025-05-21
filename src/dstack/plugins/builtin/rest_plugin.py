@@ -1,9 +1,8 @@
 import json
 import os
-from typing import Generic, TypeVar
 
 import requests
-from pydantic import BaseModel, ValidationError
+from pydantic import ValidationError
 
 from dstack._internal.core.errors import ServerClientError
 from dstack._internal.core.models.fleets import FleetSpec
@@ -11,25 +10,23 @@ from dstack._internal.core.models.gateways import GatewaySpec
 from dstack._internal.core.models.volumes import VolumeSpec
 from dstack.plugins import ApplyPolicy, Plugin, RunSpec, get_plugin_logger
 from dstack.plugins._models import ApplySpec
+from dstack.plugins.builtin.models import (
+    FleetSpecRequest,
+    FleetSpecResponse,
+    GatewaySpecRequest,
+    GatewaySpecResponse,
+    RunSpecRequest,
+    RunSpecResponse,
+    SpecApplyRequest,
+    SpecApplyResponse,
+    VolumeSpecRequest,
+    VolumeSpecResponse,
+)
 
 logger = get_plugin_logger(__name__)
 
 PLUGIN_SERVICE_URI_ENV_VAR_NAME = "DSTACK_PLUGIN_SERVICE_URI"
 PLUGIN_REQUEST_TIMEOUT = 8  # in seconds
-
-SpecType = TypeVar("SpecType", RunSpec, FleetSpec, VolumeSpec, GatewaySpec)
-
-
-class SpecRequest(BaseModel, Generic[SpecType]):
-    user: str
-    project: str
-    spec: SpecType
-
-
-RunSpecRequest = SpecRequest[RunSpec]
-FleetSpecRequest = SpecRequest[FleetSpec]
-VolumeSpecRequest = SpecRequest[VolumeSpec]
-GatewaySpecRequest = SpecRequest[GatewaySpec]
 
 
 class CustomApplyPolicy(ApplyPolicy):
@@ -42,7 +39,12 @@ class CustomApplyPolicy(ApplyPolicy):
             )
             raise ServerClientError(f"{PLUGIN_SERVICE_URI_ENV_VAR_NAME} is not set")
 
-    def _call_plugin_service(self, spec_request: SpecRequest, endpoint: str) -> ApplySpec:
+    def _check_request_rejected(self, response: SpecApplyResponse):
+        if response.error is not None:
+            logger.error(f"Plugin service rejected apply request: {response.error}")
+            raise ServerClientError(f"Apply request rejected: {response.error}")
+
+    def _call_plugin_service(self, spec_request: SpecApplyRequest, endpoint: str) -> ApplySpec:
         response = None
         try:
             response = requests.post(
@@ -58,38 +60,58 @@ class CustomApplyPolicy(ApplyPolicy):
             logger.error(
                 f"Could not connect to plugin service at {self._plugin_service_uri}: %s", e
             )
-            raise e
+            raise ServerClientError(
+                f"Could not connect to plugin service at {self._plugin_service_uri}"
+            )
         except requests.RequestException as e:
             logger.error("Request to the plugin service failed: %s", e)
-            if response:
-                logger.error(f"Error response from plugin service:\n{response.text}")
-            raise e
-        except ValidationError as e:
-            # Received 200 code but response body is invalid
-            logger.exception(
-                f"Plugin service returned invalid response:\n{response.text if response else None}"
-            )
-            raise e
+            raise ServerClientError("Request to the plugin service failed")
+
+    def _on_apply(self, request_cls, response_cls, endpoint, user, project, spec):
+        try:
+            spec_request = request_cls(user=user, project=project, spec=spec)
+            spec_json = self._call_plugin_service(spec_request, endpoint)
+            response = response_cls(**spec_json)
+            self._check_request_rejected(response)
+            return response.spec
+        except ValidationError:
+            logger.error(f"Plugin service returned invalid response:\n{spec_json}")
+            raise ServerClientError("Plugin service returned an invalid response")
 
     def on_run_apply(self, user: str, project: str, spec: RunSpec) -> RunSpec:
-        spec_request = RunSpecRequest(user=user, project=project, spec=spec)
-        spec_json = self._call_plugin_service(spec_request, "/apply_policies/on_run_apply")
-        return RunSpec(**spec_json)
+        return self._on_apply(
+            RunSpecRequest, RunSpecResponse, "/apply_policies/on_run_apply", user, project, spec
+        )
 
     def on_fleet_apply(self, user: str, project: str, spec: FleetSpec) -> FleetSpec:
-        spec_request = FleetSpecRequest(user=user, project=project, spec=spec)
-        spec_json = self._call_plugin_service(spec_request, "/apply_policies/on_fleet_apply")
-        return FleetSpec(**spec_json)
+        return self._on_apply(
+            FleetSpecRequest,
+            FleetSpecResponse,
+            "/apply_policies/on_fleet_apply",
+            user,
+            project,
+            spec,
+        )
 
     def on_volume_apply(self, user: str, project: str, spec: VolumeSpec) -> VolumeSpec:
-        spec_request = VolumeSpecRequest(user=user, project=project, spec=spec)
-        spec_json = self._call_plugin_service(spec_request, "/apply_policies/on_volume_apply")
-        return VolumeSpec(**spec_json)
+        return self._on_apply(
+            VolumeSpecRequest,
+            VolumeSpecResponse,
+            "/apply_policies/on_volume_apply",
+            user,
+            project,
+            spec,
+        )
 
     def on_gateway_apply(self, user: str, project: str, spec: GatewaySpec) -> GatewaySpec:
-        spec_request = GatewaySpecRequest(user=user, project=project, spec=spec)
-        spec_json = self._call_plugin_service(spec_request, "/apply_policies/on_gateway_apply")
-        return GatewaySpec(**spec_json)
+        return self._on_apply(
+            GatewaySpecRequest,
+            GatewaySpecResponse,
+            "/apply_policies/on_gateway_apply",
+            user,
+            project,
+            spec,
+        )
 
 
 class RESTPlugin(Plugin):
