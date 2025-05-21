@@ -100,7 +100,7 @@ def _get_metrics_table(run: Run, metrics: List[JobMetrics]) -> Table:
         if memory_usage is not None:
             memory_usage = _format_memory(memory_usage, 2)
             if resources is not None:
-                memory_usage += f"/{_format_memory(resources.memory_mib * 1024 * 1024, 0)}"
+                memory_usage += f"/{_format_memory(resources.memory_mib * 1024 * 1024, 2)}"
         gpu_metrics = ""
         gpus_detected_num = _get_metric_value(job_metrics, "gpus_detected_num")
         if gpus_detected_num is not None:
