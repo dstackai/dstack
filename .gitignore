@@ -24,3 +24,4 @@ build/
 .vscode
 .aider*
 uv.lock
+.local/
