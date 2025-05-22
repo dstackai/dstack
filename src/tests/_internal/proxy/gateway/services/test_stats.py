@@ -17,11 +17,11 @@ from dstack._internal.proxy.gateway.services.stats import StatsCollector
         pytest.param(
             dedent(
                 """
-                2024-12-06T12:08:00+00:00 srv-0.gtw.test 200 0.100
-                2024-12-06T12:08:00+00:00 srv-1.gtw.test 200 1.100
-                2024-12-06T12:09:15+00:00 srv-0.gtw.test 200 0.200
-                2024-12-06T12:09:15+00:00 srv-1.gtw.test 200 1.200
-                2024-12-06T12:09:45+00:00 srv-0.gtw.test 200 0.300
+                2024-12-06T12:08:00+00:00 srv-0.gtw.test 200 0.100 1
+                2024-12-06T12:08:00+00:00 srv-1.gtw.test 200 1.100 1
+                2024-12-06T12:09:15+00:00 srv-0.gtw.test 200 0.200 1
+                2024-12-06T12:09:15+00:00 srv-1.gtw.test 200 1.200 1
+                2024-12-06T12:09:45+00:00 srv-0.gtw.test 200 0.300 1
                 """
             ),
             {
@@ -41,11 +41,11 @@ from dstack._internal.proxy.gateway.services.stats import StatsCollector
         pytest.param(
             dedent(
                 """
-                2024-12-06T12:08:00+00:00 srv.gtw.test 200 0.100
-                2024-12-06T12:08:00+00:00 srv.gtw.test 200 0.200
-                2024-12-06T12:08:00+00:00 srv.gtw.test 200 0.300
-                2024-12-06T12:08:01+00:00 srv.gtw.test 200 0.400
-                2024-12-06T12:08:01+00:00 srv.gtw.test 200 0.500
+                2024-12-06T12:08:00+00:00 srv.gtw.test 200 0.100 1
+                2024-12-06T12:08:00+00:00 srv.gtw.test 200 0.200 1
+                2024-12-06T12:08:00+00:00 srv.gtw.test 200 0.300 1
+                2024-12-06T12:08:01+00:00 srv.gtw.test 200 0.400 1
+                2024-12-06T12:08:01+00:00 srv.gtw.test 200 0.500 1
                 """
             ),
             {
@@ -60,10 +60,10 @@ from dstack._internal.proxy.gateway.services.stats import StatsCollector
         pytest.param(
             dedent(
                 """
-                2024-12-06T12:04:50+00:00 srv.gtw.test 200 0.400
-                2024-12-06T12:08:00+00:00 srv.gtw.test 200 0.300
-                2024-12-06T12:09:15+00:00 srv.gtw.test 200 0.200
-                2024-12-06T12:09:45+00:00 srv.gtw.test 200 0.100
+                2024-12-06T12:04:50+00:00 srv.gtw.test 200 0.400 1
+                2024-12-06T12:08:00+00:00 srv.gtw.test 200 0.300 1
+                2024-12-06T12:09:15+00:00 srv.gtw.test 200 0.200 1
+                2024-12-06T12:09:45+00:00 srv.gtw.test 200 0.100 1
                 """
             ),
             {
@@ -74,6 +74,23 @@ from dstack._internal.proxy.gateway.services.stats import StatsCollector
                 },
             },
             id="ignores-out-of-window",
+        ),
+        pytest.param(
+            dedent(
+                """
+                2024-12-06T12:08:01+00:00 srv.gtw.test 200 0.100 1
+                2024-12-06T12:08:02+00:00 srv.gtw.test 200 0.200 0
+                2024-12-06T12:08:03+00:00 srv.gtw.test 200 0.300 1
+                """
+            ),
+            {
+                "srv.gtw.test": {
+                    30: Stat(requests=0, request_time=0.0),
+                    60: Stat(requests=0, request_time=0.0),
+                    300: Stat(requests=2, request_time=0.2),
+                },
+            },
+            id="ignores-replica-not-hit",
         ),
         pytest.param(
             dedent(
@@ -93,7 +110,7 @@ from dstack._internal.proxy.gateway.services.stats import StatsCollector
                     300: Stat(requests=4, request_time=0.25),
                 },
             },
-            id="ignores-irrelevant-statuses",
+            id="ignores-irrelevant-statuses-in-legacy-pre-0.19.11-log",
         ),
         pytest.param(
             "",
