@@ -19,6 +19,7 @@ from dstack._internal.core.consts import (
     DSTACK_RUNNER_SSH_PORT,
     DSTACK_SHIM_HTTP_PORT,
 )
+from dstack._internal.core.models.configurations import DEFAULT_REPO_DIR
 from dstack._internal.core.models.gateways import (
     GatewayComputeConfiguration,
     GatewayProvisioningData,
@@ -754,7 +755,7 @@ def get_docker_commands(
             f" --ssh-port {DSTACK_RUNNER_SSH_PORT}"
             " --temp-dir /tmp/runner"
             " --home-dir /root"
-            " --working-dir /workflow"
+            f" --working-dir {DEFAULT_REPO_DIR}"
         ),
     ]
 

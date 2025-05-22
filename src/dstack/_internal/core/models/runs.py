@@ -8,6 +8,7 @@ from typing_extensions import Annotated
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import ApplyAction, CoreModel, NetworkMode, RegistryAuth
 from dstack._internal.core.models.configurations import (
+    DEFAULT_REPO_DIR,
     AnyRunConfiguration,
     RunConfiguration,
 )
@@ -338,7 +339,7 @@ class RunSpec(CoreModel):
         Field(
             description=(
                 "The path to the working directory inside the container."
-                " It's specified relative to the repository directory (`/workflow`) and should be inside it."
+                f" It's specified relative to the repository directory (`{DEFAULT_REPO_DIR}`) and should be inside it."
                 ' Defaults to `"."`.'
             )
         ),

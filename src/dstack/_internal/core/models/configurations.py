@@ -26,6 +26,7 @@ STRIP_PREFIX_DEFAULT = True
 RUN_PRIOTIRY_MIN = 0
 RUN_PRIOTIRY_MAX = 100
 RUN_PRIORITY_DEFAULT = 0
+DEFAULT_REPO_DIR = "/workflow"
 
 
 class RunConfigurationType(str, Enum):
@@ -181,7 +182,7 @@ class BaseRunConfiguration(CoreModel):
         Field(
             description=(
                 "The path to the working directory inside the container."
-                " It's specified relative to the repository directory (`/workflow`) and should be inside it."
+                f" It's specified relative to the repository directory (`{DEFAULT_REPO_DIR}`) and should be inside it."
                 ' Defaults to `"."` '
             )
         ),
