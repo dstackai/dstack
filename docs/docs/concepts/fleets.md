@@ -328,10 +328,7 @@ This is required if you'd like to use the fleet for [distributed tasks](tasks.md
 
 #### Blocks { #ssh-blocks }
 
-By default, a single job occupies the entire instance, so if the instance has 8 GPUs, the job will use all of them.
-
-To make it more efficient, you can set the blocks property to specify how many blocks you’d like the instance to be
-divided into, allowing multiple jobs to use these blocks concurrently.
+By default, a job uses the entire instance—e.g., all 8 GPUs. To allow multiple jobs on the same instance, set the `blocks` property to divide the instance. Each job can then use one or more blocks, up to the full instance.
 
 <div editor-title=".dstack.yml">
 
@@ -355,14 +352,15 @@ divided into, allowing multiple jobs to use these blocks concurrently.
 
 </div>
 
-For instance, with 8 GPUs, 128 CPUs, and 2TB of memory, setting blocks to 8 would assign 1 GPU, 16 CPUs, and 256 GB of
-memory to each block. These blocks can be used concurrently, and a single job can occupy multiple blocks if needed.
+All resources (GPU, CPU, memory) are split evenly across blocks, while disk is shared.
 
-> GPUs and CPUs must be divisible by the number of blocks. All resources (GPU, CPU, memory) are split proportionally,
-> except disk storage, which is shared.
+For example, with 8 GPUs, 128 CPUs, and 2TB RAM, setting `blocks` to `8` gives each block 1 GPU, 16 CPUs, and 256 GB RAM.
 
-You can also set `blocks` to `auto`, which automatically sets the number of blocks to match the number of GPUs.
+Set `blocks` to `auto` to match the number od blocks to the number of GPUs.
 
+!!! info "Distributed tasks"
+    Distributed tasks require exclusive access to all host resources and therefore must use all blocks on each node.
+    
 #### Environment variables
 
 If needed, you can specify environment variables that will be used by `dstack-shim` and passed to containers.
