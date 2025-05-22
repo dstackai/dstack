@@ -356,7 +356,7 @@ All resources (GPU, CPU, memory) are split evenly across blocks, while disk is s
 
 For example, with 8 GPUs, 128 CPUs, and 2TB RAM, setting `blocks` to `8` gives each block 1 GPU, 16 CPUs, and 256 GB RAM.
 
-Set `blocks` to `auto` to match the number od blocks to the number of GPUs.
+Set `blocks` to `auto` to match the number of blocks to the number of GPUs.
 
 !!! info "Distributed tasks"
     Distributed tasks require exclusive access to all host resources and therefore must use all blocks on each node.
