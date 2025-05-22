@@ -6,6 +6,33 @@ Before the CLI can be used, it must be configured with a [project](../../../conc
 
 The `dstack project set-default` command can be used to switch between multiple projects.
 
+??? info "Environment variable"
+    Alternatively to `dstack project set-default`, you can set the `DSTACK_PROJECT` environment variable. It overrides the default project set in `~/.dstack/config.yml`.
+
+    <div class="termy">
+    
+    ```shell
+    $ DSTACK_PROJECT=main
+    $ dstack apply -f examples/.dstack.yml
+    ```
+    
+    </div>
+
+    Also, you can install [`direnv` :material-arrow-top-right-thin:{ .external }](https://direnv.net/){:target="_blank"}  
+    to automatically apply environment variables from the `.envrc` file in your project directory.
+
+    <div editor-title=".envrc"> 
+
+    ```shell
+    export DSTACK_PROJECT=main
+    ```
+
+    </div>
+
+    Now, `dstack` will always use this project within this directory.
+
+    Remember to add `.envrc` to `.gitignore` to avoid committing it to the repo. 
+
 ## dstack project add
 
 This command adds a new project configuration.

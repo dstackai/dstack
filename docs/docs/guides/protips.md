@@ -197,6 +197,26 @@ replace it with a corresponding command to start Docker daemon.
 
 See more Docker examples [here](https://github.com/dstackai/dstack/tree/master/examples/misc/docker-compose).
 
+## Projects
+
+If you're using multiple `dstack` projects (e.g., from different `dstack` servers),  
+you can switch between them using the [`dstack project`](../reference/cli/dstack/project.md) command.
+
+Alternatively, you can install [`direnv` :material-arrow-top-right-thin:{ .external }](https://direnv.net/){:target="_blank"}  
+to automatically apply environment variables from the `.envrc` file in your project directory.
+
+<div editor-title=".envrc"> 
+
+```shell
+export DSTACK_PROJECT=main
+```
+
+</div>
+
+Now, `dstack` will always use this project within this directory.
+
+Remember to add `.envrc` to `.gitignore` to avoid committing it to the repo. 
+
 ## Environment variables
 
 If a configuration requires an environment variable that you don't want to hardcode in the YAML, you can define it
@@ -250,9 +270,9 @@ $ dstack apply -e HF_TOKEN=... -f .dstack.yml
     </div>
     
     If you install [`direnv` :material-arrow-top-right-thin:{ .external }](https://direnv.net/){:target="_blank"},
-    it will automatically pass the environment variables from the `.env` file to the `dstack apply` command.
+    it will automatically apply the environment variables from the `.envrc` file to the `dstack apply` command.
 
-    Remember to add `.env` to `.gitignore` to avoid pushing it to the repo.    
+    Remember to add `.envrc` to `.gitignore` to avoid committing it to the repo.    
 
 [//]: # (## Profiles)
 [//]: # ()
