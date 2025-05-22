@@ -97,6 +97,28 @@ hide:
             with RAGEN, verl, and Ray.
         </p>
     </a>
+    <a href="/examples/distributed-training/trl"
+       class="feature-cell sky">
+        <h3>
+            TRL
+        </h3>
+
+        <p>
+            Fine-tune LLM on multiple nodes
+            with TRL, Accelerate, and Deepspeed.
+        </p>
+    </a>
+    <a href="/examples/distributed-training/axolotl"
+       class="feature-cell sky">
+        <h3>
+            Axolotl
+        </h3>
+
+        <p>
+            Fine-tune LLM on multiple nodes
+            with Axolotl.
+        </p>
+    </a>
 </div>
 
 ## Inference

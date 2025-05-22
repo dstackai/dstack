@@ -266,6 +266,8 @@ nav:
         - A3 High: examples/clusters/a3high/index.md
     - Distributed training:
         - Ray+RAGEN: examples/distributed-training/ray-ragen/index.md
+        - TRL: examples/distributed-training/trl/index.md
+        - Axolotl: examples/distributed-training/axolotl/index.md
     - Deployment:
         - SGLang: examples/inference/sglang/index.md
         - vLLM: examples/inference/vllm/index.md
