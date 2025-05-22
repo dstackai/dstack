@@ -1,5 +1,6 @@
 import json
 import os
+from typing import Type
 
 import requests
 from pydantic import ValidationError
@@ -25,7 +26,7 @@ from dstack.plugins.builtin.rest_plugin import (
 logger = get_plugin_logger(__name__)
 
 PLUGIN_SERVICE_URI_ENV_VAR_NAME = "DSTACK_PLUGIN_SERVICE_URI"
-PLUGIN_REQUEST_TIMEOUT = 8  # in seconds
+PLUGIN_REQUEST_TIMEOUT_SEC = 8
 
 
 class CustomApplyPolicy(ApplyPolicy):
@@ -50,7 +51,7 @@ class CustomApplyPolicy(ApplyPolicy):
                 f"{self._plugin_service_uri}{endpoint}",
                 json=spec_request.dict(),
                 headers={"accept": "application/json", "Content-Type": "application/json"},
-                timeout=PLUGIN_REQUEST_TIMEOUT,
+                timeout=PLUGIN_REQUEST_TIMEOUT_SEC,
             )
             response.raise_for_status()
             spec_json = json.loads(response.text)
@@ -66,7 +67,15 @@ class CustomApplyPolicy(ApplyPolicy):
             logger.error("Request to the plugin service failed: %s", e)
             raise ServerClientError("Request to the plugin service failed")
 
-    def _on_apply(self, request_cls, response_cls, endpoint, user, project, spec):
+    def _on_apply(
+        self,
+        request_cls: Type[SpecApplyRequest],
+        response_cls: Type[SpecApplyResponse],
+        endpoint: str,
+        user: str,
+        project: str,
+        spec: ApplySpec,
+    ) -> ApplySpec:
         try:
             spec_request = request_cls(user=user, project=project, spec=spec)
             spec_json = self._call_plugin_service(spec_request, endpoint)

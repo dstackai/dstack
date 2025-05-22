@@ -1,5 +1,6 @@
 import json
 import os
+from contextlib import nullcontext as does_not_raise
 from unittest import mock
 from unittest.mock import Mock
 
@@ -165,3 +166,42 @@ class TestRESTPlugin:
         with mock.patch("requests.post", return_value=mock_response):
             with pytest.raises(ServerClientError):
                 policy.on_apply(user.name, project=project.name, spec=spec)
+
+    @pytest.mark.asyncio
+    @mock.patch.dict(os.environ, {PLUGIN_SERVICE_URI_ENV_VAR_NAME: "http://mock"})
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.parametrize(
+        "spec", ["run_spec", "fleet_spec", "volume_spec", "gateway_spec"], indirect=True
+    )
+    @pytest.mark.parametrize(
+        ("error", "expectation"),
+        [
+            pytest.param(None, does_not_raise(), id="error_none"),
+            pytest.param(
+                "",
+                pytest.raises(
+                    ServerClientError, match="Plugin service returned an invalid response"
+                ),
+                id="error_empty_str",
+            ),
+            pytest.param(
+                "validation failed",
+                pytest.raises(
+                    ServerClientError, match="Apply request rejected: validation failed"
+                ),
+                id="error_non_empty_str",
+            ),
+        ],
+    )
+    async def test_on_apply_plugin_service_error_handling(
+        self, test_db, user, project, spec, error, expectation
+    ):
+        policy = CustomApplyPolicy()
+        mock_response = Mock()
+        response_dict = {"spec": spec.dict(), "error": error}
+        mock_response.text = json.dumps(response_dict)
+        mock_response.raise_for_status = Mock()
+        with mock.patch("requests.post", return_value=mock_response):
+            with expectation:
+                result = policy.on_apply(user=user.name, project=project.name, spec=spec)
+                assert result == type(spec)(**response_dict["spec"])
