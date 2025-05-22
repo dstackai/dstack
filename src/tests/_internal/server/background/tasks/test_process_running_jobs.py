@@ -330,7 +330,7 @@ class TestProcessRunningJobs:
             name="test-run-0-0",
             registry_username="",
             registry_password="",
-            image_name="dstackai/base:py3.13-0.7-cuda-12.1",
+            image_name="dstackai/base:py3.13-0.8-cuda-12.1",
             container_user="root",
             privileged=privileged,
             gpu=None,
