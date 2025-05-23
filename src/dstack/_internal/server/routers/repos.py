@@ -101,7 +101,7 @@ async def upload_code(
         raise ServerClientError(
             f"Repo diff size is {naturalsize(request_size)}, which exceeds the limit of "
             f"{naturalsize(SERVER_CODE_UPLOAD_LIMIT)}. Use .gitignore to exclude large files from the repo. This "
-            f"limit can be modified by setting the DSTACK_SERVER_CODE_UPLOAD_LIMIT_BYTES environment variable"
+            f"limit can be modified by setting the DSTACK_SERVER_CODE_UPLOAD_LIMIT environment variable"
         )
     _, project = user_project
     await repos.upload_code(
