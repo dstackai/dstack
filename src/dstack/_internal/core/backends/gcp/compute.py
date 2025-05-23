@@ -815,6 +815,11 @@ def _supported_instances_and_zones(
         if _is_tpu(offer.instance.name) and not _is_single_host_tpu(offer.instance.name):
             return False
         for family in [
+            "m4-",
+            "c4-",
+            "n4-",
+            "h3-",
+            "n2-",
             "e2-medium",
             "e2-standard-",
             "e2-highmem-",
