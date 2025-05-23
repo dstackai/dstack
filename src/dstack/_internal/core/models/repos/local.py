@@ -2,12 +2,16 @@ import tarfile
 from pathlib import Path
 from typing import BinaryIO, Optional
 
+import humanize
 from typing_extensions import Literal
 
 from dstack._internal.core.models.repos.base import BaseRepoInfo, Repo
 from dstack._internal.utils.hash import get_sha256, slugify
 from dstack._internal.utils.ignore import GitIgnore
+from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.path import PathLike
+
+logger = get_logger(__name__)
 
 
 class LocalRepoInfo(BaseRepoInfo):
@@ -75,6 +79,8 @@ class LocalRepo(Repo):
                 arcname="",
                 filter=TarIgnore(self.run_repo_data.repo_dir, globs=[".git"]),
             )
+
+        logger.debug(f"Code file size: {humanize.naturalsize(fp.tell())} bytes")
         return get_sha256(fp)
 
     def get_repo_info(self) -> LocalRepoInfo:
