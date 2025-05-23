@@ -11,7 +11,7 @@ Runs are created from run configurations. There are three types of run configura
 
 1. `dev-environment` — runs a VS Code server.
 2. `task` — runs the user's bash script until completion.
-3. `service` — runs the user's bash script and exposes a port through the [gateway](GATEWAY.md) or the server built-in proxy.
+3. `service` — runs the user's bash script and exposes a port through [dstack-proxy](PROXY.md).
 
 A run can spawn one or multiple jobs, depending on the configuration. A task that specifies multiple `nodes` spawns a job for every node (a multi-node task). A service that specifies multiple `replicas` spawns a job for every replica. A job submission is always assigned to one particular instance. If a job fails and the configuration allows retrying, the server creates a new job submission for the job.
 
