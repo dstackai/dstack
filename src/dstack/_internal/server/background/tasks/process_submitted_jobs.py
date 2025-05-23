@@ -659,7 +659,7 @@ async def _attach_volumes(
                         backend=backend,
                         volume_model=volume_model,
                         instance=instance,
-                        instance_id=job_provisioning_data.instance_id,
+                        jpd=job_provisioning_data,
                     )
                     job_runtime_data.volume_names.append(volume.name)
                     break  # attach next mount point
@@ -685,7 +685,7 @@ async def _attach_volume(
     backend: Backend,
     volume_model: VolumeModel,
     instance: InstanceModel,
-    instance_id: str,
+    jpd: JobProvisioningData,
 ):
     compute = backend.compute()
     assert isinstance(compute, ComputeWithVolumeSupport)
@@ -697,7 +697,7 @@ async def _attach_volume(
     attachment_data = await common_utils.run_async(
         compute.attach_volume,
         volume=volume,
-        instance_id=instance_id,
+        provisioning_data=jpd,
     )
     volume_attachment_model = VolumeAttachmentModel(
         volume=volume_model,

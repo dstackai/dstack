@@ -649,13 +649,24 @@ class GCPCompute(
             pass
         logger.debug("Deleted persistent disk for volume %s", volume.name)
 
-    def attach_volume(self, volume: Volume, instance_id: str) -> VolumeAttachmentData:
+    def attach_volume(
+        self, volume: Volume, provisioning_data: JobProvisioningData
+    ) -> VolumeAttachmentData:
+        instance_id = provisioning_data.instance_id
         logger.debug(
             "Attaching persistent disk for volume %s to instance %s",
             volume.volume_id,
             instance_id,
         )
+        if not gcp_resources.instance_type_supports_persistent_disk(
+            provisioning_data.instance_type.name
+        ):
+            raise ComputeError(
+                f"Instance type {provisioning_data.instance_type.name} does not support Persistent disk volumes"
+            )
+
         zone = get_or_error(volume.provisioning_data).availability_zone
+        is_tpu = _is_tpu_provisioning_data(provisioning_data)
         try:
             disk = self.disk_client.get(
                 project=self.config.project_id,
@@ -663,18 +674,16 @@ class GCPCompute(
                 disk=volume.volume_id,
             )
             disk_url = disk.self_link
+        except google.api_core.exceptions.NotFound:
+            raise ComputeError("Persistent disk found")
 
-            # This method has no information if the instance is a TPU or a VM,
-            # so we first try to see if there is a TPU with such name
-            try:
+        try:
+            if is_tpu:
                 get_node_request = tpu_v2.GetNodeRequest(
                     name=f"projects/{self.config.project_id}/locations/{zone}/nodes/{instance_id}",
                 )
                 tpu_node = self.tpu_client.get_node(get_node_request)
-            except google.api_core.exceptions.NotFound:
-                tpu_node = None
 
-            if tpu_node is not None:
                 # Python API to attach a disk to a TPU is not documented,
                 # so we follow the code from the gcloud CLI:
                 # https://github.com/twistedpair/google-cloud-sdk/blob/26ab5a281d56b384cc25750f3279a27afe5b499f/google-cloud-sdk/lib/googlecloudsdk/command_lib/compute/tpus/tpu_vm/util.py#L113
@@ -711,7 +720,6 @@ class GCPCompute(
                 attached_disk.auto_delete = False
                 attached_disk.device_name = f"pd-{volume.volume_id}"
                 device_name = attached_disk.device_name
-
                 operation = self.instances_client.attach_disk(
                     project=self.config.project_id,
                     zone=zone,
@@ -720,13 +728,16 @@ class GCPCompute(
                 )
                 gcp_resources.wait_for_extended_operation(operation, "persistent disk attachment")
         except google.api_core.exceptions.NotFound:
-            raise ComputeError("Persistent disk or instance not found")
+            raise ComputeError("Disk or instance not found")
         logger.debug(
             "Attached persistent disk for volume %s to instance %s", volume.volume_id, instance_id
         )
         return VolumeAttachmentData(device_name=device_name)
 
-    def detach_volume(self, volume: Volume, instance_id: str, force: bool = False):
+    def detach_volume(
+        self, volume: Volume, provisioning_data: JobProvisioningData, force: bool = False
+    ):
+        instance_id = provisioning_data.instance_id
         logger.debug(
             "Detaching persistent disk for volume %s from instance %s",
             volume.volume_id,
@@ -734,17 +745,16 @@ class GCPCompute(
         )
         zone = get_or_error(volume.provisioning_data).availability_zone
         attachment_data = get_or_error(volume.get_attachment_data_for_instance(instance_id))
-        # This method has no information if the instance is a TPU or a VM,
-        # so we first try to see if there is a TPU with such name
-        try:
-            get_node_request = tpu_v2.GetNodeRequest(
-                name=f"projects/{self.config.project_id}/locations/{zone}/nodes/{instance_id}",
-            )
-            tpu_node = self.tpu_client.get_node(get_node_request)
-        except google.api_core.exceptions.NotFound:
-            tpu_node = None
+        is_tpu = _is_tpu_provisioning_data(provisioning_data)
+        if is_tpu:
+            try:
+                get_node_request = tpu_v2.GetNodeRequest(
+                    name=f"projects/{self.config.project_id}/locations/{zone}/nodes/{instance_id}",
+                )
+                tpu_node = self.tpu_client.get_node(get_node_request)
+            except google.api_core.exceptions.NotFound:
+                raise ComputeError("Instance not found")
 
-        if tpu_node is not None:
             source_disk = (
                 f"projects/{self.config.project_id}/zones/{zone}/disks/{volume.volume_id}"
             )
@@ -1006,3 +1016,11 @@ def _get_tpu_data_disk_for_volume(project_id: str, volume: Volume) -> tpu_v2.Att
         mode=tpu_v2.AttachedDisk.DiskMode.READ_WRITE,
     )
     return attached_disk
+
+
+def _is_tpu_provisioning_data(provisioning_data: JobProvisioningData) -> bool:
+    is_tpu = False
+    if provisioning_data.backend_data:
+        backend_data_dict = json.loads(provisioning_data.backend_data)
+        is_tpu = backend_data_dict.get("is_tpu", False)
+    return is_tpu

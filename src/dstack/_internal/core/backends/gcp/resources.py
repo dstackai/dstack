@@ -424,7 +424,7 @@ def wait_for_extended_operation(
 
     if operation.error_code:
         # Write only debug logs here.
-        # The unexpected errors will be propagated and logged appropriatly by the caller.
+        # The unexpected errors will be propagated and logged appropriately by the caller.
         logger.debug(
             "Error during %s: [Code: %s]: %s",
             verbose_name,
@@ -475,5 +475,6 @@ def instance_type_supports_persistent_disk(instance_type_name: str) -> bool:
             "c4-",
             "n4-",
             "h3-",
+            "v6e",
         ]
     )

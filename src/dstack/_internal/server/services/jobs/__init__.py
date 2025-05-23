@@ -470,20 +470,20 @@ async def _detach_volume_from_job_instance(
             await run_async(
                 compute.detach_volume,
                 volume=volume,
-                instance_id=jpd.instance_id,
+                provisioning_data=jpd,
                 force=False,
             )
             # For some backends, the volume may be detached immediately
             detached = await run_async(
                 compute.is_volume_detached,
                 volume=volume,
-                instance_id=jpd.instance_id,
+                provisioning_data=jpd,
             )
         else:
             detached = await run_async(
                 compute.is_volume_detached,
                 volume=volume,
-                instance_id=jpd.instance_id,
+                provisioning_data=jpd,
             )
             if not detached and _should_force_detach_volume(job_model, job_spec.stop_duration):
                 logger.info(
@@ -494,7 +494,7 @@ async def _detach_volume_from_job_instance(
                 await run_async(
                     compute.detach_volume,
                     volume=volume,
-                    instance_id=jpd.instance_id,
+                    provisioning_data=jpd,
                     force=True,
                 )
                 # Let the next iteration check if force detach worked
