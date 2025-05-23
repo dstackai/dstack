@@ -336,7 +336,9 @@ class ComputeWithVolumeSupport(ABC):
         """
         raise NotImplementedError()
 
-    def attach_volume(self, volume: Volume, instance_id: str) -> VolumeAttachmentData:
+    def attach_volume(
+        self, volume: Volume, provisioning_data: JobProvisioningData
+    ) -> VolumeAttachmentData:
         """
         Attaches a volume to the instance.
         If the volume is not found, it should raise `ComputeError()`.
@@ -345,7 +347,9 @@ class ComputeWithVolumeSupport(ABC):
         """
         raise NotImplementedError()
 
-    def detach_volume(self, volume: Volume, instance_id: str, force: bool = False):
+    def detach_volume(
+        self, volume: Volume, provisioning_data: JobProvisioningData, force: bool = False
+    ):
         """
         Detaches a volume from the instance.
         Implement only if compute may return `VolumeProvisioningData.detachable`.
@@ -353,7 +357,7 @@ class ComputeWithVolumeSupport(ABC):
         """
         raise NotImplementedError()
 
-    def is_volume_detached(self, volume: Volume, instance_id: str) -> bool:
+    def is_volume_detached(self, volume: Volume, provisioning_data: JobProvisioningData) -> bool:
         """
         Checks if a volume was detached from the instance.
         If `detach_volume()` may fail to detach volume,

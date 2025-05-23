@@ -611,9 +611,12 @@ class AWSCompute(
                 raise e
         logger.debug("Deleted EBS volume %s", volume.configuration.name)
 
-    def attach_volume(self, volume: Volume, instance_id: str) -> VolumeAttachmentData:
+    def attach_volume(
+        self, volume: Volume, provisioning_data: JobProvisioningData
+    ) -> VolumeAttachmentData:
         ec2_client = self.session.client("ec2", region_name=volume.configuration.region)
 
+        instance_id = provisioning_data.instance_id
         device_names = aws_resources.list_available_device_names(
             ec2_client=ec2_client, instance_id=instance_id
         )
@@ -646,9 +649,12 @@ class AWSCompute(
         logger.debug("Attached EBS volume %s to instance %s", volume.volume_id, instance_id)
         return VolumeAttachmentData(device_name=device_name)
 
-    def detach_volume(self, volume: Volume, instance_id: str, force: bool = False):
+    def detach_volume(
+        self, volume: Volume, provisioning_data: JobProvisioningData, force: bool = False
+    ):
         ec2_client = self.session.client("ec2", region_name=volume.configuration.region)
 
+        instance_id = provisioning_data.instance_id
         logger.debug("Detaching EBS volume %s from instance %s", volume.volume_id, instance_id)
         attachment_data = get_or_error(volume.get_attachment_data_for_instance(instance_id))
         try:
@@ -667,9 +673,10 @@ class AWSCompute(
             raise e
         logger.debug("Detached EBS volume %s from instance %s", volume.volume_id, instance_id)
 
-    def is_volume_detached(self, volume: Volume, instance_id: str) -> bool:
+    def is_volume_detached(self, volume: Volume, provisioning_data: JobProvisioningData) -> bool:
         ec2_client = self.session.client("ec2", region_name=volume.configuration.region)
 
+        instance_id = provisioning_data.instance_id
         logger.debug("Getting EBS volume %s status", volume.volume_id)
         response = ec2_client.describe_volumes(VolumeIds=[volume.volume_id])
         volumes_infos = response.get("Volumes")

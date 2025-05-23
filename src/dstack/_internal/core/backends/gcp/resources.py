@@ -140,7 +140,10 @@ def create_instance_struct(
     initialize_params = compute_v1.AttachedDiskInitializeParams()
     initialize_params.source_image = image_id
     initialize_params.disk_size_gb = disk_size
-    initialize_params.disk_type = f"zones/{zone}/diskTypes/pd-balanced"
+    if instance_type_supports_persistent_disk(machine_type):
+        initialize_params.disk_type = f"zones/{zone}/diskTypes/pd-balanced"
+    else:
+        initialize_params.disk_type = f"zones/{zone}/diskTypes/hyperdisk-balanced"
     disk.initialize_params = initialize_params
     instance.disks = [disk]
 
@@ -421,7 +424,7 @@ def wait_for_extended_operation(
 
     if operation.error_code:
         # Write only debug logs here.
-        # The unexpected errors will be propagated and logged appropriatly by the caller.
+        # The unexpected errors will be propagated and logged appropriately by the caller.
         logger.debug(
             "Error during %s: [Code: %s]: %s",
             verbose_name,
@@ -462,3 +465,16 @@ def get_placement_policy_resource_name(
     placement_policy: str,
 ) -> str:
     return f"projects/{project_id}/regions/{region}/resourcePolicies/{placement_policy}"
+
+
+def instance_type_supports_persistent_disk(instance_type_name: str) -> bool:
+    return not any(
+        instance_type_name.startswith(series)
+        for series in [
+            "m4-",
+            "c4-",
+            "n4-",
+            "h3-",
+            "v6e",
+        ]
+    )
