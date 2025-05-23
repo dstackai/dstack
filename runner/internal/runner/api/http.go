@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"io"
+	"math"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -64,7 +65,11 @@ func (s *Server) uploadCodePostHandler(w http.ResponseWriter, r *http.Request) (
 		return nil, &api.Error{Status: http.StatusConflict}
 	}
 
-	r.Body = http.MaxBytesReader(w, r.Body, 10*1024*1024)
+	if s.codeUploadLimit > 0 {
+		r.Body = http.MaxBytesReader(w, r.Body, s.codeUploadLimit)
+	} else {
+		r.Body = http.MaxBytesReader(w, r.Body, math.MaxInt64)
+	}
 	codePath := filepath.Join(s.tempDir, "code") // todo random name?
 	file, err := os.Create(codePath)
 	if err != nil {

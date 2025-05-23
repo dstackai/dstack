@@ -31,9 +31,11 @@ type Server struct {
 	cancelRun context.CancelFunc
 
 	version string
+
+	codeUploadLimit int64
 }
 
-func NewServer(tempDir string, homeDir string, workingDir string, address string, sshPort int, version string) (*Server, error) {
+func NewServer(tempDir string, homeDir string, workingDir string, address string, sshPort int, version string, codeUploadLimit int64) (*Server, error) {
 	r := api.NewRouter()
 	ex, err := executor.NewRunExecutor(tempDir, homeDir, workingDir, sshPort)
 	if err != nil {
@@ -57,6 +59,8 @@ func NewServer(tempDir string, homeDir string, workingDir string, address string
 		executor: ex,
 
 		version: version,
+
+		codeUploadLimit: codeUploadLimit,
 	}
 	r.AddHandler("GET", "/api/healthcheck", s.healthcheckGetHandler)
 	r.AddHandler("GET", "/api/metrics", s.metricsGetHandler)
