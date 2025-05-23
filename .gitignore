@@ -21,3 +21,6 @@ build/
 .fleet
 .env
 .aider*
+uv.lock
+.local/
+.claude/settings.local.json
