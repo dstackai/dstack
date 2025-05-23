@@ -15,6 +15,7 @@ func App() {
 	var httpPort int
 	var sshPort int
 	var logLevel int
+	var codeUploadLimit int64
 
 	app := &cli.App{
 		Name:    "dstack-runner",
@@ -27,6 +28,13 @@ func App() {
 				DefaultText: "4 (Info)",
 				Usage:       "log verbosity level: 2 (Error), 3 (Warning), 4 (Info), 5 (Debug), 6 (Trace)",
 				Destination: &logLevel,
+			},
+			&cli.Int64Flag{
+				Name:        "code-upload-limit",
+				Usage:       "Set the code upload limit",
+				Value:       10 * 1024 * 1024,
+				Destination: &codeUploadLimit,
+				EnvVars:     []string{"DSTACK_RUNNER_CODE_UPLOAD_LIMIT"},
 			},
 		},
 		Commands: []*cli.Command{
@@ -66,7 +74,7 @@ func App() {
 					},
 				},
 				Action: func(c *cli.Context) error {
-					err := start(paths.tempDir, paths.homeDir, paths.workingDir, httpPort, sshPort, logLevel, Version)
+					err := start(paths.tempDir, paths.homeDir, paths.workingDir, httpPort, sshPort, logLevel, Version, codeUploadLimit)
 					if err != nil {
 						return cli.Exit(err, 1)
 					}

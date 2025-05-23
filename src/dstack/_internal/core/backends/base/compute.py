@@ -38,6 +38,7 @@ from dstack._internal.core.models.volumes import (
     VolumeProvisioningData,
 )
 from dstack._internal.core.services import is_valid_dstack_resource_name
+from dstack._internal.server.settings import SERVER_CODE_UPLOAD_LIMIT
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.path import PathLike
 
@@ -538,6 +539,7 @@ def get_shim_env(
         "DSTACK_RUNNER_HTTP_PORT": str(DSTACK_RUNNER_HTTP_PORT),
         "DSTACK_RUNNER_SSH_PORT": str(DSTACK_RUNNER_SSH_PORT),
         "DSTACK_RUNNER_LOG_LEVEL": log_level,
+        "DSTACK_RUNNER_CODE_UPLOAD_LIMIT": str(SERVER_CODE_UPLOAD_LIMIT),
         "DSTACK_PUBLIC_SSH_KEY": "\n".join(authorized_keys),
     }
     if backend_shim_env is not None:
