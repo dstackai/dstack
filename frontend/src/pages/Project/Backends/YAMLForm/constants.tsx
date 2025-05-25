@@ -22,7 +22,7 @@ export const CONFIG_YAML_HELP_SKY = {
             </p>
             <p>
                 You can see all supported backend types at the{' '}
-                <a href={'https://dstack.ai/docs/reference/server/config.yml/#examples'} target={'_blank'}>
+                <a href={'https://dstack.ai/docs/concepts/backends'} target={'_blank'}>
                     documentation
                 </a>
                 .
@@ -30,7 +30,7 @@ export const CONFIG_YAML_HELP_SKY = {
             <h4>Your own cloud account</h4>
             <p>
                 If you want to use your own cloud account, configure <code>creds</code> and other settings according to the{' '}
-                <a href={'https://dstack.ai/docs/reference/server/config.yml/#examples'} target={'_blank'}>
+                <a href={'https://dstack.ai/docs/concepts/backends'} target={'_blank'}>
                     documentation
                 </a>
                 . Example:
@@ -68,7 +68,7 @@ export const CONFIG_YAML_HELP_ENTERPRISE = {
             </p>
             <p>
                 Each backend type may support different properties. See the{' '}
-                <a href={'https://dstack.ai/docs/reference/server/config.yml/#examples'}>reference page</a> for more examples.
+                <a href={'https://dstack.ai/docs/concepts/backends'} target='_blank'>documentaiton</a> for more examples.
             </p>
         </>
     ),
