@@ -15,7 +15,7 @@ to configure [backends](../../concepts/backends.md) and other [sever-level setti
     overrides:
         show_root_heading: false
         backends:
-            type: 'Union[AWSBackendConfigWithCreds, AzureBackendConfigWithCreds, GCPBackendConfigWithCreds, LambdaBackendConfigWithCreds, NebiusBackendConfigWithCreds, RunpodBackendConfigWithCreds, TensorDockBackendConfigWithCreds, VastAIBackendConfigWithCreds, KubernetesConfig]'
+            type: 'Union[AWSBackendConfigWithCreds, AzureBackendConfigWithCreds, GCPBackendConfigWithCreds, LambdaBackendConfigWithCreds, NebiusBackendConfigWithCreds, RunpodBackendConfigWithCreds, VastAIBackendConfigWithCreds, KubernetesConfig]'
 
 #### `projects[n].backends` { #backends data-toc-label="backends" }
 
@@ -194,7 +194,7 @@ to configure [backends](../../concepts/backends.md) and other [sever-level setti
         type:
             required: true
 
-##### `projects[n].backends[type=tensordock]` { #tensordock data-toc-label="tensordock" }
+<!-- ##### `projects[n].backends[type=tensordock]` { #tensordock data-toc-label="tensordock" }
 
 #SCHEMA# dstack._internal.core.backends.tensordock.models.TensorDockBackendConfigWithCreds
     overrides:
@@ -209,7 +209,7 @@ to configure [backends](../../concepts/backends.md) and other [sever-level setti
     overrides:
         show_root_heading: false
         type:
-            required: true
+            required: true -->
 
 ##### `projects[n].backends[type=oci]` { #oci data-toc-label="oci" }
 
