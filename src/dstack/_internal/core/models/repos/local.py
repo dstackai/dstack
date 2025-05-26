@@ -5,9 +5,13 @@ from typing import BinaryIO, Optional
 from typing_extensions import Literal
 
 from dstack._internal.core.models.repos.base import BaseRepoInfo, Repo
+from dstack._internal.utils.common import sizeof_fmt
 from dstack._internal.utils.hash import get_sha256, slugify
 from dstack._internal.utils.ignore import GitIgnore
+from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.path import PathLike
+
+logger = get_logger(__name__)
 
 
 class LocalRepoInfo(BaseRepoInfo):
@@ -75,6 +79,7 @@ class LocalRepo(Repo):
                 arcname="",
                 filter=TarIgnore(self.run_repo_data.repo_dir, globs=[".git"]),
             )
+        logger.debug(f"Code file size: {sizeof_fmt(fp.tell())} bytes")
         return get_sha256(fp)
 
     def get_repo_info(self) -> LocalRepoInfo:
