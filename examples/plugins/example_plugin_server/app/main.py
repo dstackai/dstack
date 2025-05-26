@@ -1,8 +1,8 @@
 import logging
 
+import uvicorn
 from fastapi import FastAPI
 
-from app.utils import configure_logging
 from dstack.plugins.builtin.rest_plugin import (
     FleetSpecRequest,
     FleetSpecResponse,
@@ -13,6 +13,7 @@ from dstack.plugins.builtin.rest_plugin import (
     VolumeSpecRequest,
     VolumeSpecResponse,
 )
+from examples.plugins.example_plugin_server.app.utils import configure_logging
 
 configure_logging()
 logger = logging.getLogger(__name__)
@@ -54,3 +55,7 @@ async def on_gateway_apply(request: GatewaySpecRequest) -> GatewaySpecResponse:
     )
     response = GatewaySpecResponse(request.spec, error=None)
     return response
+
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="127.0.0.1", port=8000)

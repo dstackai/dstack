@@ -127,6 +127,7 @@ plugins:
         - scripts/docs/gen_cli_reference.py
         - scripts/docs/gen_openapi_reference.py
         - scripts/docs/gen_schema_reference.py
+        - scripts/docs/gen_rest_plugin_spec_reference.py
   - mkdocstrings:
       handlers:
         python:
@@ -253,6 +254,7 @@ nav:
         - API:
             - Python API: docs/reference/api/python/index.md
             - REST API: docs/reference/api/rest/index.md
+            - REST Plugin API: docs/reference/rest_plugin/api/rest/index.md
         - Environment variables: docs/reference/environment-variables.md
   - Examples:
     - examples.md

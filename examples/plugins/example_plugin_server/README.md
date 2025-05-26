@@ -14,7 +14,7 @@ If you wish to hook up your own plugin server through `dstack` builtin `rest_plu
 1. Start the plugin server locally:
 
     ```bash
-    fastapi dev app/main.py 
+    PYTHONPATH=. python examples/plugins/example_plugin_server/app/main.py
     ```
 
 1. Enable `rest_plugin` in `server/config.yaml`:
