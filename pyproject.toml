@@ -56,10 +56,14 @@ dstack = "dstack._internal.cli.main:main"
 path = "src/dstack/version.py"
 
 [tool.hatch.build.targets.sdist]
-artifacts = ["src/dstack/_internal/server/statics/**"]
+artifacts = [
+    "src/dstack/_internal/server/statics/**",
+]
 
 [tool.hatch.build.targets.wheel]
-artifacts = ["src/dstack/_internal/server/statics/**"]
+artifacts = [
+    "src/dstack/_internal/server/statics/**",
+]
 
 [tool.hatch.metadata.hooks.fancy-pypi-readme]
 content-type = "text/markdown"
@@ -79,13 +83,13 @@ dev = [
     "pre-commit>=4.2.0",
     "pytest-asyncio>=0.23.8",
     "pytest-httpbin>=2.1.0",
-    "httpbin>=0.10.2",        # indirect to make compatible with Werkzeug 3
+    "httpbin>=0.10.2", # indirect to make compatible with Werkzeug 3
     "pytest~=7.2",
     "pytest-socket>=0.7.0",
     "requests-mock>=1.12.1",
     "openai>=1.68.2",
     "freezegun>=1.5.1",
-    "ruff==0.11.6",           # should match .pre-commit-config.yaml
+    "ruff==0.11.6",  # should match .pre-commit-config.yaml
     "testcontainers>=4.9.2",
     "pytest-xdist>=3.6.1",
 ]
@@ -124,7 +128,11 @@ server = [
     "grpcio>=1.50",
     "backports.entry-points-selectable",
 ]
-aws = ["boto3>=1.38.13", "botocore", "dstack[server]"]
+aws = [
+    "boto3>=1.38.13",
+    "botocore",
+    "dstack[server]",
+]
 azure = [
     "azure-identity>=1.12.0",
     "azure-mgmt-subscription>=3.1.1",
@@ -145,9 +153,19 @@ gcp = [
     "google-cloud-tpu>=1.18.3",
     "dstack[server]",
 ]
-datacrunch = ["datacrunch", "dstack[server]"]
-kubernetes = ["kubernetes", "dstack[server]"]
-lambda = ["boto3>=1.38.13", "botocore", "dstack[server]"]
+datacrunch = [
+    "datacrunch",
+    "dstack[server]",
+]
+kubernetes = [
+    "kubernetes",
+    "dstack[server]",
+]
+lambda = [
+    "boto3>=1.38.13",
+    "botocore",
+    "dstack[server]",
+]
 oci = [
     "oci>=2.150.0",
     "cryptography>=44.0.3",
@@ -156,7 +174,10 @@ oci = [
     "pyopenssl>=23.2.0",
     "dstack[server]",
 ]
-nebius = ["nebius>=0.2.19,<0.3; python_version >= '3.10'", "dstack[server]"]
+nebius = [
+    "nebius>=0.2.19,<0.3; python_version >= '3.10'",
+    "dstack[server]",
+]
 all = [
     "dstack[gateway,server,aws,azure,gcp,datacrunch,kubernetes,lambda,nebius,oci]",
 ]
