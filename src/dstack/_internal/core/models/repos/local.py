@@ -79,7 +79,7 @@ class LocalRepo(Repo):
                 arcname="",
                 filter=TarIgnore(self.run_repo_data.repo_dir, globs=[".git"]),
             )
-        logger.debug(f"Code file size: {sizeof_fmt(fp.tell())} bytes")
+        logger.debug(f"Code file size: {sizeof_fmt(fp.tell())}")
         return get_sha256(fp)
 
     def get_repo_info(self) -> LocalRepoInfo:
