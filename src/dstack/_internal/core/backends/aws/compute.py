@@ -826,18 +826,23 @@ def _get_regions_to_zones(session: boto3.Session, regions: List[str]) -> Dict[st
 
 def _supported_instances(offer: InstanceOffer) -> bool:
     for family in [
+        "m7i.",
+        "c7i.",
+        "r7i.",
+        "t3.",
         "t2.small",
         "c5.",
         "m5.",
-        "g4dn.",
-        "g5.",
+        "p5.",
+        "p5e.",
+        "p4d.",
+        "p4de.",
+        "p3.",
         "g6.",
         "g6e.",
         "gr6.",
-        "p3.",
-        "p4d.",
-        "p4de.",
-        "p5.",
+        "g5.",
+        "g4dn.",
     ]:
         if offer.instance.name.startswith(family):
             return True
