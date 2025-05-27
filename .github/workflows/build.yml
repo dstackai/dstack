@@ -287,7 +287,8 @@ jobs:
           python-version: 3.11
       - name: Install dstack
         run: |
-          uv sync --extra server
+          uv pip install examples/plugins/example_plugin_server
+          uv pip install -e '.[server]'
       # Move these deps into an extra and install that way
       - name: Build
         run: |
