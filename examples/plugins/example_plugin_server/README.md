@@ -4,17 +4,16 @@ If you wish to hook up your own plugin server through `dstack` builtin `rest_plu
 
 ## Steps
 
-
-1. Install required dependencies for the plugin server:
+1. Install the plugin server:
 
     ```bash
-    uv sync 
+    uv pip install examples/plugins/example_plugin_server
     ```
 
-2. Start the plugin server locally:
+2. Start the plugin server:
 
     ```bash
-    PYTHONPATH=. python examples/plugins/example_plugin_server/app/main.py
+    python -m example_plugin_server.main
     ```
 
 3. Enable `rest_plugin` in `server/config.yaml`:

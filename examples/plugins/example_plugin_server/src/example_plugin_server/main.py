@@ -14,7 +14,7 @@ from dstack.plugins.builtin.rest_plugin import (
     VolumeSpecRequest,
     VolumeSpecResponse,
 )
-from examples.plugins.example_plugin_server.app.utils import configure_logging
+from example_plugin_server.utils import configure_logging
 
 configure_logging()
 logger = logging.getLogger(__name__)

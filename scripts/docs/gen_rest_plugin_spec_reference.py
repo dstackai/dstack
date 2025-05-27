@@ -3,11 +3,23 @@ Generates OpenAPI schema from an example REST plugin.
 """
 
 import json
+import logging
 
 import mkdocs_gen_files
 
 from dstack._internal.settings import DSTACK_VERSION
-from examples.plugins.example_plugin_server.app.main import app
+
+logger = logging.getLogger("mkdocs.plugins.dstack.rest_plugin_schema")
+
+try:
+    from example_plugin_server.main import app
+except ImportError:
+    logger.warning(
+        "No module named 'example_plugin_server'."
+        " The REST Plugin API won't be generated."
+        " Run 'uv pip install examples/plugins/example_plugin_server' to install 'example_plugin_server'."
+    )
+    exit(0)
 
 app.title = "REST Plugin OpenAPI Spec"
 app.servers = [

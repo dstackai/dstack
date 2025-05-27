@@ -16,10 +16,11 @@ jobs:
           python-version: 3.11
       - name: Install dstack
         run: |
+          uv pip install examples/plugins/example_plugin_server
           if [ -n "${{ inputs.release_tag }}" ]; then
             uv pip install "dstack[server]==${{ inputs.release_tag }}"
           else
-            uv sync --extra server
+            uv pip install -e '.[server]'
           fi
       - name: Build
         run: |
