@@ -140,7 +140,7 @@ async def create_gateway(
     project: ProjectModel,
     configuration: GatewayConfiguration,
 ) -> Gateway:
-    spec = apply_plugin_policies(
+    spec = await apply_plugin_policies(
         user=user.name,
         project=project.name,
         # Create pseudo spec until the gateway API is updated to accept spec

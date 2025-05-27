@@ -283,7 +283,7 @@ async def get_plan(
 ) -> RunPlan:
     # Spec must be copied by parsing to calculate merged_profile
     effective_run_spec = RunSpec.parse_obj(run_spec.dict())
-    effective_run_spec = apply_plugin_policies(
+    effective_run_spec = await apply_plugin_policies(
         user=user.name,
         project=project.name,
         spec=effective_run_spec,
@@ -382,7 +382,7 @@ async def apply_plan(
     force: bool,
 ) -> Run:
     run_spec = plan.run_spec
-    run_spec = apply_plugin_policies(
+    run_spec = await apply_plugin_policies(
         user=user.name,
         project=project.name,
         spec=run_spec,

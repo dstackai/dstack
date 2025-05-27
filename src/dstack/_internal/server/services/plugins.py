@@ -5,6 +5,7 @@ from typing import Dict
 from backports.entry_points_selectable import entry_points  # backport for Python 3.9
 
 from dstack._internal.core.errors import ServerClientError
+from dstack._internal.utils.common import run_async
 from dstack._internal.utils.logging import get_logger
 from dstack.plugins import ApplyPolicy, ApplySpec, Plugin
 
@@ -91,11 +92,11 @@ def load_plugins(enabled_plugins: list[str]):
         logger.warning("Enabled plugins not found: %s", plugins_to_load)
 
 
-def apply_plugin_policies(user: str, project: str, spec: ApplySpec) -> ApplySpec:
+async def apply_plugin_policies(user: str, project: str, spec: ApplySpec) -> ApplySpec:
     policies = _get_apply_policies()
     for policy in policies:
         try:
-            spec = policy.on_apply(user=user, project=project, spec=spec)
+            spec = await run_async(policy.on_apply, user=user, project=project, spec=spec)
         except ValueError as e:
             msg = None
             if len(e.args) > 0:
