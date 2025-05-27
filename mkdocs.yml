@@ -254,8 +254,9 @@ nav:
         - API:
             - Python API: docs/reference/api/python/index.md
             - REST API: docs/reference/api/rest/index.md
-            - REST Plugin API: docs/reference/rest_plugin/api/rest/index.md
         - Environment variables: docs/reference/environment-variables.md
+        - Plugins:
+            - REST Plugin API: docs/reference/plugins/rest_plugin/index.md
   - Examples:
     - examples.md
     - Fine-tuning:
