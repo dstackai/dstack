@@ -1,8 +1,9 @@
 import logging
+import os
 
+import uvicorn
 from fastapi import FastAPI
 
-from app.utils import configure_logging
 from dstack.plugins.builtin.rest_plugin import (
     FleetSpecRequest,
     FleetSpecResponse,
@@ -13,6 +14,7 @@ from dstack.plugins.builtin.rest_plugin import (
     VolumeSpecRequest,
     VolumeSpecResponse,
 )
+from example_plugin_server.utils import configure_logging
 
 configure_logging()
 logger = logging.getLogger(__name__)
@@ -34,7 +36,7 @@ async def on_fleet_apply(request: FleetSpecRequest) -> FleetSpecResponse:
     logger.info(
         f"Received fleet spec request from user {request.user} and project {request.project}"
     )
-    response = FleetSpecResponse(request.spec, error=None)
+    response = FleetSpecResponse(spec=request.spec, error=None)
     return response
 
 
@@ -43,7 +45,7 @@ async def on_volume_apply(request: VolumeSpecRequest) -> VolumeSpecResponse:
     logger.info(
         f"Received volume spec request from user {request.user} and project {request.project}"
     )
-    response = VolumeSpecResponse(request.spec, error=None)
+    response = VolumeSpecResponse(spec=request.spec, error=None)
     return response
 
 
@@ -52,5 +54,13 @@ async def on_gateway_apply(request: GatewaySpecRequest) -> GatewaySpecResponse:
     logger.info(
         f"Received gateway spec request from user {request.user} and project {request.project}"
     )
-    response = GatewaySpecResponse(request.spec, error=None)
+    response = GatewaySpecResponse(spec=request.spec, error=None)
     return response
+
+
+if __name__ == "__main__":
+    uvicorn.run(
+        app,
+        host="127.0.0.1",
+        port=int(os.getenv("DSTACK_REST_PLUGIN_SERVER_PORT", 8000)),
+    )

@@ -116,11 +116,13 @@ class ExamplePolicy(ApplyPolicy):
 ## Built-in Plugins
 
 ### REST Plugin
+
 `rest_plugin` is a builtin `dstack` plugin that allows writing your custom plugins as API servers, so you don't need to install plugins as Python packages.
 
 Plugins implemented as API servers have advantages over plugins implemented as Python packages in some cases:
+
 * No dependency conflicts with `dstack`.
 * You can use any programming language.
 * If you run the `dstack` server via Docker, you don't need to extend the `dstack` server image with plugins or map them via volumes.
 
-To get started, check out the [plugin server example](/examples/plugins/example_plugin_server/README.md).
+To get started, check out the [plugin server example](https://github.com/dstackai/dstack/tree/master/examples/plugins/example_plugin_server). The `rest_plugin` server API is documented [here](../reference/plugins/rest_plugin/index.md).
