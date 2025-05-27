@@ -205,7 +205,7 @@ async def create_volume(
     user: UserModel,
     configuration: VolumeConfiguration,
 ) -> Volume:
-    spec = apply_plugin_policies(
+    spec = await apply_plugin_policies(
         user=user.name,
         project=project.name,
         # Create pseudo spec until the volume API is updated to accept spec

@@ -237,7 +237,7 @@ async def get_plan(
 ) -> FleetPlan:
     # Spec must be copied by parsing to calculate merged_profile
     effective_spec = FleetSpec.parse_obj(spec.dict())
-    effective_spec = apply_plugin_policies(
+    effective_spec = await apply_plugin_policies(
         user=user.name,
         project=project.name,
         spec=effective_spec,
@@ -342,7 +342,7 @@ async def create_fleet(
     spec: FleetSpec,
 ) -> Fleet:
     # Spec must be copied by parsing to calculate merged_profile
-    spec = apply_plugin_policies(
+    spec = await apply_plugin_policies(
         user=user.name,
         project=project.name,
         spec=spec,
