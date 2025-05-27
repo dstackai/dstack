@@ -11,20 +11,20 @@ If you wish to hook up your own plugin server through `dstack` builtin `rest_plu
     uv sync 
     ```
 
-1. Start the plugin server locally:
+2. Start the plugin server locally:
 
     ```bash
     PYTHONPATH=. python examples/plugins/example_plugin_server/app/main.py
     ```
 
-1. Enable `rest_plugin` in `server/config.yaml`:
+3. Enable `rest_plugin` in `server/config.yaml`:
 
     ```yaml
    plugins:
     - rest_plugin
     ```
 
-1. Point the `dstack` server to your plugin server:
+4. Point the `dstack` server to your plugin server:
     ```bash
     export DSTACK_PLUGIN_SERVICE_URI=http://127.0.0.1:8000
     ```
