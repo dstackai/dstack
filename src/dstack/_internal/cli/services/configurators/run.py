@@ -105,7 +105,7 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
             changed_fields = []
             if run_plan.action == ApplyAction.UPDATE:
                 diff = diff_models(
-                    run_plan.run_spec.configuration,
+                    run_plan.get_effective_run_spec().configuration,
                     run_plan.current_resource.run_spec.configuration,
                 )
                 changed_fields = list(diff.keys())
