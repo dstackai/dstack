@@ -36,6 +36,7 @@ export function isResponseServerError(formErrors: unknown): formErrors is Respon
     );
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function getServerError(error: any): string {
     let errorText = error?.error;
 
