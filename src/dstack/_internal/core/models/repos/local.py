@@ -2,12 +2,12 @@ import tarfile
 from pathlib import Path
 from typing import BinaryIO, Optional
 
+from ignore import WalkBuilder
 from typing_extensions import Literal
 
 from dstack._internal.core.models.repos.base import BaseRepoInfo, Repo
 from dstack._internal.utils.common import sizeof_fmt
 from dstack._internal.utils.hash import get_sha256, slugify
-from dstack._internal.utils.ignore import GitIgnore
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.path import PathLike
 
@@ -74,11 +74,14 @@ class LocalRepo(Repo):
 
     def write_code_file(self, fp: BinaryIO) -> str:
         with tarfile.TarFile(mode="w", fileobj=fp) as t:
-            t.add(
-                self.run_repo_data.repo_dir,
-                arcname="",
-                filter=TarIgnore(self.run_repo_data.repo_dir, globs=[".git"]),
-            )
+            for entry in (
+                WalkBuilder(self.run_repo_data.repo_dir)
+                .add_custom_ignore_filename(".dstackignore")
+                .build()
+            ):
+                path = entry.path()
+                if path.is_file():
+                    t.add(path, arcname="")
         logger.debug(f"Code file size: {sizeof_fmt(fp.tell())}")
         return get_sha256(fp)
 
@@ -86,10 +89,3 @@ class LocalRepo(Repo):
         return LocalRepoInfo(
             repo_dir=self.run_repo_data.repo_dir,
         )
-
-
-class TarIgnore(GitIgnore):
-    def __call__(self, tarinfo: tarfile.TarInfo) -> Optional[tarfile.TarInfo]:
-        if self.ignore(tarinfo.path):
-            return None
-        return tarinfo

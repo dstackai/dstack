@@ -34,7 +34,7 @@ dependencies = [
     "psutil",
     "gpuhunt==0.1.6",
     "argcomplete>=3.5.0",
-    "gitignore-parser>=0.1.12",
+    "ignore-python>=0.2.0",
 ]
 
 [project.urls]
