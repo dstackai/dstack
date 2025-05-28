@@ -162,25 +162,38 @@ The gateway app needs to interact with Nginx and certbot, so running it locally 
    dstack apply -f my-gateway.dstack.yml
    ```
 
-1. Save the gateway key to a file. You can find the key in sqlite, e.g.:
+1. Save the gateway key to a file:
 
    ```shell
-   sqlite3 ~/.dstack/server/data/sqlite.db "SELECT ip_address, ssh_private_key FROM gateway_computes"
+   sqlite3 ~/.dstack/server/data/sqlite.db "SELECT ssh_private_key FROM gateway_computes WHERE deleted = 0 AND ip_address = '<gateway-ip-addr>'" > /tmp/gateway.key
+   chmod 600 /tmp/gateway.key
+   ```
+
+1. Deliver your code to the gateway. For example, clone it from a remote repo:
+
+   ```shell
+   ssh -i /tmp/gateway.key ubuntu@gateway.example "git clone https://github.com/dstackai/dstack.git ~/dstack-repo"
+   ```
+
+   Or push it from your machine:
+
+   ```shell
+   ssh -i /tmp/gateway.key ubuntu@gateway.example "git init ~/dstack-repo"
+   git remote add gateway ubuntu@gateway.example:~/dstack-repo
+   GIT_SSH_COMMAND='ssh -i /tmp/gateway.key' git push gateway branch_name
    ```
 
 1. Connect to the gateway:
 
    ```shell
-   chmod 600 /path/to/the/gateway/key
-   ssh -i /path/to/the/gateway/key ubuntu@gateway.example
+   ssh -i /tmp/gateway.key ubuntu@gateway.example
    ```
 
 1. Prepare an environment with your development branch on the gateway:
 
    ```shell
-   git clone https://github.com/dstackai/dstack.git dstack-repo
-   cd dstack-repo
-   git checkout my-development-branch
+   cd ~/dstack-repo
+   git checkout branch_name
    curl -LsSf https://astral.sh/uv/install.sh | sh
    source ~/.local/bin/env
    uv sync --extra gateway
