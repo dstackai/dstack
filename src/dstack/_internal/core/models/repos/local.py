@@ -2,12 +2,17 @@ import tarfile
 from pathlib import Path
 from typing import BinaryIO, Optional
 
+import ignore
+import ignore.overrides
 from typing_extensions import Literal
 
 from dstack._internal.core.models.repos.base import BaseRepoInfo, Repo
+from dstack._internal.utils.common import sizeof_fmt
 from dstack._internal.utils.hash import get_sha256, slugify
-from dstack._internal.utils.ignore import GitIgnore
+from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.path import PathLike
+
+logger = get_logger(__name__)
 
 
 class LocalRepoInfo(BaseRepoInfo):
@@ -69,22 +74,23 @@ class LocalRepo(Repo):
         self.run_repo_data = repo_data
 
     def write_code_file(self, fp: BinaryIO) -> str:
+        repo_path = Path(self.run_repo_data.repo_dir)
         with tarfile.TarFile(mode="w", fileobj=fp) as t:
-            t.add(
-                self.run_repo_data.repo_dir,
-                arcname="",
-                filter=TarIgnore(self.run_repo_data.repo_dir, globs=[".git"]),
-            )
+            for entry in (
+                ignore.WalkBuilder(repo_path)
+                .overrides(ignore.overrides.OverrideBuilder(repo_path).add("!/.git/").build())
+                .hidden(False)  # do not ignore files that start with a dot
+                .require_git(False)  # respect git ignore rules even if not a git repo
+                .add_custom_ignore_filename(".dstackignore")
+                .build()
+            ):
+                path = entry.path().relative_to(repo_path.absolute())
+                if path != Path("."):
+                    t.add(path, recursive=False)
+        logger.debug("Code file size: %s", sizeof_fmt(fp.tell()))
         return get_sha256(fp)
 
     def get_repo_info(self) -> LocalRepoInfo:
         return LocalRepoInfo(
             repo_dir=self.run_repo_data.repo_dir,
         )
-
-
-class TarIgnore(GitIgnore):
-    def __call__(self, tarinfo: tarfile.TarInfo) -> Optional[tarfile.TarInfo]:
-        if self.ignore(tarinfo.path):
-            return None
-        return tarinfo
