@@ -16,10 +16,10 @@ env:
   - HUB_MODEL_ID
 # Commands of the task
 commands:
-  - uv pip install transformers bitsandbytes peft wandb
+  - pip install transformers bitsandbytes peft wandb
   - git clone https://github.com/huggingface/trl
   - cd trl
-  - uv pip install .
+  - pip install .
   - |
     accelerate launch \
       --config_file=examples/accelerate_configs/fsdp1.yaml \

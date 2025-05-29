@@ -47,10 +47,10 @@ Once the fleet is created, define a distributed task configuration. Here's an ex
     
     # Commands of the task
     commands:
-      - uv pip install transformers bitsandbytes peft wandb
+      - pip install transformers bitsandbytes peft wandb
       - git clone https://github.com/huggingface/trl
       - cd trl
-      - uv pip install .
+      - pip install .
       - |
         accelerate launch \
           --config_file=examples/accelerate_configs/fsdp1.yaml \
@@ -108,10 +108,10 @@ Once the fleet is created, define a distributed task configuration. Here's an ex
     
     # Commands of the task
     commands:
-      - uv pip install transformers bitsandbytes peft wandb deepspeed
+      - pip install transformers bitsandbytes peft wandb deepspeed
       - git clone https://github.com/huggingface/trl
       - cd trl
-      - uv pip install .
+      - pip install .
       - |
         accelerate launch \
           --config_file=examples/accelerate_configs/deepspeed_zero3.yaml \

@@ -1,7 +1,7 @@
 # Axolotl
 
-This example shows how use [Axolotl :material-arrow-top-right-thin:{ .external }](https://github.com/OpenAccess-AI-Collective/axolotl){:target="_blank"} 
-with `dstack` to fine-tune 4-bit Quantized [Llama-4-Scout-17B-16E :material-arrow-top-right-thin:{ .external }](https://huggingface.co/axolotl-quants/Llama-4-Scout-17B-16E-Linearized-bnb-nf4-bf16){:target="_blank"} in `single-node` setup and fine-tune [Llama-3-70b-fp16 :material-arrow-top-right-thin:{ .external}](https://huggingface.co/casperhansen/llama-3-70b-fp16) in `multi-node` setup using FSDP and QLoRA.
+This example shows how to use [Axolotl :material-arrow-top-right-thin:{ .external }](https://github.com/OpenAccess-AI-Collective/axolotl){:target="_blank"} 
+with `dstack` to fine-tune 4-bit Quantized [Llama-4-Scout-17B-16E :material-arrow-top-right-thin:{ .external }] using FSDP and QLoRA.
 
 ??? info "Prerequisites"
     Once `dstack` is [installed](https://dstack.ai/docs/installation), go ahead clone the repo, and run `dstack init`.
@@ -66,72 +66,6 @@ The task uses Axolotl's Docker image, where Axolotl is already pre-installed.
 !!! info "AMD"
     The example above uses NVIDIA accelerators. To use it with AMD, check out [AMD](https://dstack.ai/examples/accelerators/amd#axolotl).
 
-## Multi-node training
-
-In case the model doesn't feet into a single GPU, consider running a `dstack` task on multiple nodes. Here's an example of distributed `QLORA` task using `FSDP`. Before submitting distributed training runs, make sure to create a fleet with a `placement` set to `cluster`.
-
-> For more detials on how to use clusters with `dstack`, check the [Clusters](https://dstack.ai/docs/guides/clusters) guide.
-
-<div editor-title="examples/distributed-training/axolotl/.dstack.yml">
-
-```yaml
-type: task
-# The name is optional, if not specified, generated randomly
-name: axolotl-multi-node-qlora-llama3-70b
-
-# Size of the cluster
-nodes: 2
-
-# The axolotlai/axolotl:main-latest image does not include InfiniBand or RDMA libraries, so we need to use the NGC container.
-image: nvcr.io/nvidia/pytorch:25.01-py3
-# Required environment variables
-env:
-  - HF_TOKEN
-  - ACCELERATE_LOG_LEVEL=info
-  - WANDB_API_KEY
-  - NCCL_DEBUG=INFO
-  - CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
-  - WANDB_NAME=axolotl-dist-llama-qlora-train
-  - WANDB_PROJECT
-  - HUB_MODEL_ID
-# Commands of the task
-commands:
-  # Replacing the default Torch and FlashAttention in the NCG container with Axolotl-compatible versions.
-  # The preinstalled versions are incompatible with Axolotl.
-  - uv pip uninstall -y torch flash-attn
-  - uv pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/test/cu124
-  - uv pip install --no-build-isolation axolotl[flash-attn,deepspeed]
-  - wget https://raw.githubusercontent.com/huggingface/trl/main/examples/accelerate_configs/fsdp1.yaml
-  - wget https://raw.githubusercontent.com/axolotl-ai-cloud/axolotl/main/examples/llama-3/qlora-fsdp-70b.yaml
-  # Axolotl includes hf-xet version 1.1.0, which fails during downloads. Replacing it with the latest version (1.1.2).
-  - uv pip uninstall -y hf-xet
-  - uv pip install hf-xet --no-cache-dir
-  - |
-    accelerate launch \
-      --config_file=fsdp1.yaml \
-      -m axolotl.cli.train qlora-fsdp-70b.yaml \
-      --hub-model-id $HUB_MODEL_ID \
-      --output-dir /checkpoints/qlora-llama3-70b \
-      --wandb-project $WANDB_PROJECT \
-      --wandb-name $WANDB_NAME \
-      --main_process_ip=$DSTACK_MASTER_NODE_IP \
-      --main_process_port=8008 \
-      --machine_rank=$DSTACK_NODE_RANK \
-      --num_processes=$DSTACK_GPUS_NUM \
-      --num_machines=$DSTACK_NODES_NUM
-  
-resources:
-  gpu: 80GB:8
-  shm_size: 128GB
-
-volumes:
-  - /checkpoints:/checkpoints
-```
-</div>
-
-!!! Note
-    We are using the NGC container because it includes the necessary libraries and packages for RDMA and InfiniBand support.
-
 ## Running a configuration
 
 Once the configuration is ready, run `dstack apply -f <configuration file>`, and `dstack` will automatically provision the
@@ -167,7 +101,7 @@ The source-code of this example can be found in
 
 ## What's next?
 
-1. Check [dev environments](https://dstack.ai/docs/dev-environments), [tasks](https://dstack.ai/docs/tasks), 
+1. Browse [Axolotl Distributed Training](https://dstack.ai/docs/examples/distributed-training/axolotl) and [Axolotl :material-arrow-top-right-thin:{ .external }](https://github.com/OpenAccess-AI-Collective/axolotl){:target="_blank"}.
+2. Check [dev environments](https://dstack.ai/docs/dev-environments), [tasks](https://dstack.ai/docs/tasks), 
    [services](https://dstack.ai/docs/services), [clusters](https://dstack.ai/docs/guides/clusters) and [fleets](https://dstack.ai/docs/concepts/fleets).
-2. See [AMD](https://dstack.ai/examples/accelerators/amd#axolotl). 
-3. Browse [Axolotl :material-arrow-top-right-thin:{ .external }](https://github.com/OpenAccess-AI-Collective/axolotl){:target="_blank"}.
+3. See [AMD](https://dstack.ai/examples/accelerators/amd#axolotl).

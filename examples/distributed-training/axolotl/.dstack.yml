@@ -21,14 +21,14 @@ env:
 commands:
   # Replacing the default Torch and FlashAttention in the NCG container with Axolotl-compatible versions.
   # The preinstalled versions are incompatible with Axolotl.
-  - uv pip uninstall -y torch flash-attn
-  - uv pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/test/cu124
-  - uv pip install --no-build-isolation axolotl[flash-attn,deepspeed]
+  - pip uninstall -y torch flash-attn
+  - pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/test/cu124
+  - pip install --no-build-isolation axolotl[flash-attn,deepspeed]
   - wget https://raw.githubusercontent.com/huggingface/trl/main/examples/accelerate_configs/fsdp1.yaml
   - wget https://raw.githubusercontent.com/axolotl-ai-cloud/axolotl/main/examples/llama-3/qlora-fsdp-70b.yaml
   # Axolotl includes hf-xet version 1.1.0, which fails during downloads. Replacing it with the latest version (1.1.2).
-  - uv pip uninstall -y hf-xet
-  - uv pip install hf-xet --no-cache-dir
+  - pip uninstall -y hf-xet
+  - pip install hf-xet --no-cache-dir
   - |
     accelerate launch \
       --config_file=fsdp1.yaml \
