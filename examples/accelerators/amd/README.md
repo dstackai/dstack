@@ -114,7 +114,7 @@ To request multiple GPUs, specify the quantity after the GPU name, separated by 
     and the [`mlabonne/guanaco-llama2-1k` :material-arrow-top-right-thin:{ .external }](https://huggingface.co/datasets/mlabonne/guanaco-llama2-1k){:target="_blank"}
     dataset.
     
-    <div editor-title="examples/fine-tuning/trl/amd/.dstack.yml">
+    <div editor-title="examples/single-node-training/trl/amd/.dstack.yml">
     
     ```yaml
     type: task
@@ -140,7 +140,7 @@ To request multiple GPUs, specify the quantity after the GPU name, separated by 
       - pip install peft
       - pip install transformers datasets huggingface-hub scipy
       - cd ..
-      - python examples/fine-tuning/trl/amd/train.py
+      - python examples/single-node-training/trl/amd/train.py
     
     # Uncomment to leverage spot instances
     #spot_policy: auto
@@ -157,7 +157,7 @@ To request multiple GPUs, specify the quantity after the GPU name, separated by 
     and the [tatsu-lab/alpaca :material-arrow-top-right-thin:{ .external }](https://huggingface.co/datasets/tatsu-lab/alpaca){:target="_blank"}
     dataset.
     
-    <div editor-title="examples/fine-tuning/axolotl/amd/.dstack.yml">
+    <div editor-title="examples/single-node-training/axolotl/amd/.dstack.yml">
     
     ```yaml
     type: task
@@ -213,7 +213,7 @@ To request multiple GPUs, specify the quantity after the GPU name, separated by 
 
     > To speed up installation of `flash-attention` and `xformers `, we use pre-built binaries uploaded to S3. 
     > You can find the tasks that build and upload the binaries
-    > in [`examples/fine-tuning/axolotl/amd/` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/axolotl/amd/){:target="_blank"}.
+    > in [`examples/single-node-training/axolotl/amd/` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/single-node-training/axolotl/amd/){:target="_blank"}.
 
 ## Running a configuration
 
@@ -238,8 +238,8 @@ $ dstack apply -f examples/inference/vllm/amd/.dstack.yml
 The source-code of this example can be found in 
 [`examples/inference/tgi/amd` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/inference/tgi/amd){:target="_blank"},
 [`examples/inference/vllm/amd` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/inference/vllm/amd){:target="_blank"},
-[`examples/fine-tuning/axolotl/amd` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/axolotl/amd){:target="_blank"} and
-[`examples/fine-tuning/trl/amd` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/trl/amd){:target="_blank"}
+[`examples/single-node-training/axolotl/amd` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/single-node-training/axolotl/amd){:target="_blank"} and
+[`examples/single-node-training/trl/amd` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/single-node-training/trl/amd){:target="_blank"}
 
 ## What's next?
 

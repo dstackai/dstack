@@ -1,0 +1,49 @@
+type: task
+name: axolotl-multi-node-qlora-llama3-70b
+
+# Size of the cluster
+nodes: 2
+
+# The axolotlai/axolotl:main-latest image does not include InfiniBand or RDMA libraries, so we need to use the NGC container.
+image: nvcr.io/nvidia/pytorch:25.01-py3
+# Required environment variables
+env:
+  - HF_TOKEN
+  - WANDB_API_KEY
+  - WANDB_PROJECT
+  - HUB_MODEL_ID
+  - NCCL_DEBUG=INFO
+  - CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
+  - ACCELERATE_LOG_LEVEL=info
+# Commands of the task
+commands:
+  # Replacing the default Torch and FlashAttention in the NCG container with Axolotl-compatible versions.
+  # The preinstalled versions are incompatible with Axolotl.
+  - pip uninstall -y torch flash-attn
+  - pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/test/cu124
+  - pip install --no-build-isolation axolotl[flash-attn,deepspeed]
+  - wget https://raw.githubusercontent.com/huggingface/trl/main/examples/accelerate_configs/fsdp1.yaml
+  - wget https://raw.githubusercontent.com/axolotl-ai-cloud/axolotl/main/examples/llama-3/qlora-fsdp-70b.yaml
+  # Axolotl includes hf-xet version 1.1.0, which fails during downloads. Replacing it with the latest version (1.1.2).
+  - pip uninstall -y hf-xet
+  - pip install hf-xet --no-cache-dir
+  - |
+    accelerate launch \
+      --config_file=fsdp1.yaml \
+      -m axolotl.cli.train qlora-fsdp-70b.yaml \
+      --hub-model-id $HUB_MODEL_ID \
+      --output-dir /checkpoints/qlora-llama3-70b \
+      --wandb-project $DSTACK_RUN_NAME \
+      --wandb-name $WANDB_NAME \
+      --main_process_ip=$DSTACK_MASTER_NODE_IP \
+      --main_process_port=8008 \
+      --machine_rank=$DSTACK_NODE_RANK \
+      --num_processes=$DSTACK_GPUS_NUM \
+      --num_machines=$DSTACK_NODES_NUM
+  
+resources:
+  gpu: 80GB:8
+  shm_size: 128GB
+
+volumes:
+  - /checkpoints:/checkpoints

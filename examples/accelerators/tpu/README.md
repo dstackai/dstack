@@ -127,7 +127,7 @@ Below is an example of fine-tuning Llama 3.1 8B using [Optimum TPU :material-arr
 and the [`Abirate/english_quotes` :material-arrow-top-right-thin:{ .external }](https://huggingface.co/datasets/Abirate/english_quotes){:target="_blank"}
 dataset.
 
-<div editor-title="examples/fine-tuning/optimum-tpu/llama31/.dstack.yml"> 
+<div editor-title="examples/single-node-training/optimum-tpu/llama31/.dstack.yml"> 
 
 ```yaml
 type: task
@@ -139,8 +139,8 @@ env:
 commands:
   - git clone -b add_llama_31_support https://github.com/dstackai/optimum-tpu.git
   - mkdir -p optimum-tpu/examples/custom/
-  - cp examples/fine-tuning/optimum-tpu/llama31/train.py optimum-tpu/examples/custom/train.py
-  - cp examples/fine-tuning/optimum-tpu/llama31/config.yaml optimum-tpu/examples/custom/config.yaml
+  - cp examples/single-node-training/optimum-tpu/llama31/train.py optimum-tpu/examples/custom/train.py
+  - cp examples/single-node-training/optimum-tpu/llama31/config.yaml optimum-tpu/examples/custom/config.yaml
   - cd optimum-tpu
   - pip install -e . -f https://storage.googleapis.com/libtpu-releases/index.html
   - pip install datasets evaluate
@@ -155,7 +155,7 @@ resources:
 </div>
 
 [//]: # (### Fine-Tuning with TRL)
-[//]: # (Use the example `examples/fine-tuning/optimum-tpu/gemma/train.dstack.yml` to Finetune `Gemma-2B` model using `trl` with `dstack` and `optimum-tpu`. )
+[//]: # (Use the example `examples/single-node-training/optimum-tpu/gemma/train.dstack.yml` to Finetune `Gemma-2B` model using `trl` with `dstack` and `optimum-tpu`. )
 
 ### Memory requirements
 
@@ -181,7 +181,7 @@ Note, `v5litepod` is optimized for fine-tuning transformer-based models. Each co
 The source-code of this example can be found in 
 [`examples/inference/tgi/tpu` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/inference/tgi/tpu){:target="_blank"},
 [`examples/inference/vllm/tpu` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/inference/vllm/tpu){:target="_blank"},
-and [`examples/fine-tuning/optimum-tpu` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/trl){:target="_blank"}.
+and [`examples/single-node-training/optimum-tpu` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/single-node-training/trl){:target="_blank"}.
 
 ## What's next?
 
