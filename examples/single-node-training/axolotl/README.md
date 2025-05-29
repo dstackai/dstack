@@ -48,10 +48,10 @@ commands:
       --hub-model-id $HUB_MODEL_ID
 
 resources:
-  # Two GPU (required by FSDP)
-  gpu: H100:2
+  # Four GPU (required by FSDP)
+  gpu: H100:4
   # Shared memory size for inter-process communication
-  shm_size: 24GB
+  shm_size: 64GB
   disk: 500GB..
 ```
 
