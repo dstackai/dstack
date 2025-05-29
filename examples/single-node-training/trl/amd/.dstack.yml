@@ -22,7 +22,7 @@ commands:
   - pip install peft
   - pip install transformers datasets huggingface-hub scipy
   - cd ..
-  - python examples/fine-tuning/trl/amd/train.py
+  - python examples/single-node-training/trl/amd/train.py
 
 # Uncomment to leverage spot instances
 #spot_policy: auto

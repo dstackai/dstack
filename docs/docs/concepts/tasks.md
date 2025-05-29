@@ -10,7 +10,7 @@ The filename must end with `.dstack.yml` (e.g. `.dstack.yml` or `dev.dstack.yml`
 
 [//]: # (TODO: Make tabs - single machine & distributed tasks & web app)
 
-<div editor-title="examples/fine-tuning/axolotl/train.dstack.yml"> 
+<div editor-title="examples/single-node-training/axolotl/train.dstack.yml"> 
 
 ```yaml
 type: task
@@ -26,7 +26,7 @@ env:
   - WANDB_API_KEY
 # Commands of the task
 commands:
-  - accelerate launch -m axolotl.cli.train examples/fine-tuning/axolotl/config.yaml
+  - accelerate launch -m axolotl.cli.train examples/single-node-training/axolotl/config.yaml
 
 resources:
   gpu:
@@ -461,4 +461,4 @@ it does not block other runs with lower priority from scheduling.
 !!! info "What's next?"
     1. Read about [dev environments](dev-environments.md), [services](services.md), and [repos](repos.md)
     2. Learn how to manage [fleets](fleets.md)
-    3. Check the [Axolotl](/examples/fine-tuning/axolotl) example
+    3. Check the [Axolotl](/examples/single-node-training/axolotl) example

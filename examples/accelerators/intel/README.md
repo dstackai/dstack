@@ -102,7 +102,7 @@ using [Optimum for Intel Gaudi :material-arrow-top-right-thin:{ .external }](htt
 and [DeepSpeed :material-arrow-top-right-thin:{ .external }](https://docs.habana.ai/en/latest/PyTorch/DeepSpeed/DeepSpeed_User_Guide/DeepSpeed_User_Guide.html#deepspeed-user-guide){:target="_blank"} with 
 the [`lvwerra/stack-exchange-paired` :material-arrow-top-right-thin:{ .external }](https://huggingface.co/datasets/lvwerra/stack-exchange-paired){:target="_blank"} dataset. 
     
-<div editor-title="examples/fine-tuning/trl/intel/.dstack.yml">
+<div editor-title="examples/single-node-training/trl/intel/.dstack.yml">
     
 ```yaml
 type: task

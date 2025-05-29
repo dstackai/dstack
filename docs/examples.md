@@ -12,10 +12,10 @@ hide:
 }
 </style>
 
-## Fine-tuning
+## Single-node training
 
 <div class="tx-landing__highlights_grid">
-    <a href="/examples/fine-tuning/axolotl"
+    <a href="/examples/single-node-training/axolotl"
        class="feature-cell">
         <h3>
             Axolotl
@@ -26,7 +26,7 @@ hide:
         </p>
     </a>
 
-    <a href="/examples/fine-tuning/trl"
+    <a href="/examples/single-node-training/trl"
        class="feature-cell">
         <h3>
             TRL
@@ -37,6 +37,45 @@ hide:
         </p>
     </a>
 </div>
+
+## Distributed training
+
+<div class="tx-landing__highlights_grid">
+    <a href="/examples/distributed-training/ray-ragen"
+       class="feature-cell sky">
+        <h3>
+            Ray+RAGEN
+        </h3>
+
+        <p>
+            Fine-tune an agent on multiple nodes
+            with RAGEN, verl, and Ray.
+        </p>
+    </a>
+    <a href="/examples/distributed-training/trl"
+       class="feature-cell sky">
+        <h3>
+            TRL
+        </h3>
+
+        <p>
+            Fine-tune LLM on multiple nodes
+            with TRL, Accelerate, and Deepspeed.
+        </p>
+    </a>
+    <a href="/examples/distributed-training/axolotl"
+       class="feature-cell sky">
+        <h3>
+            Axolotl
+        </h3>
+
+        <p>
+            Fine-tune LLM on multiple nodes
+            with Axolotl.
+        </p>
+    </a>
+</div>
+
 
 ## Clusters
 
@@ -79,44 +118,6 @@ hide:
 
         <p>
             Set up GCP A3 High clusters with optimized networking
-        </p>
-    </a>
-</div>
-
-## Distributed training
-
-<div class="tx-landing__highlights_grid">
-    <a href="/examples/distributed-training/ray-ragen"
-       class="feature-cell sky">
-        <h3>
-            Ray+RAGEN
-        </h3>
-
-        <p>
-            Fine-tune an agent on multiple nodes
-            with RAGEN, verl, and Ray.
-        </p>
-    </a>
-    <a href="/examples/distributed-training/trl"
-       class="feature-cell sky">
-        <h3>
-            TRL
-        </h3>
-
-        <p>
-            Fine-tune LLM on multiple nodes
-            with TRL, Accelerate, and Deepspeed.
-        </p>
-    </a>
-    <a href="/examples/distributed-training/axolotl"
-       class="feature-cell sky">
-        <h3>
-            Axolotl
-        </h3>
-
-        <p>
-            Fine-tune LLM on multiple nodes
-            with Axolotl.
         </p>
     </a>
 </div>
@@ -215,31 +216,6 @@ hide:
 
         <p>
             Deploy and fine-tune LLMs on Tenstorrent
-        </p>
-    </a>
-</div>
-
-## LLMs
-
-<div class="tx-landing__highlights_grid">
-    <a href="/examples/llms/deepseek"
-       class="feature-cell sky">
-        <h3>
-            Deepseek
-        </h3>
-
-        <p>
-            Deploy and train Deepseek models
-        </p>
-    </a>
-    <a href="/examples/llms/llama"
-       class="feature-cell sky">
-        <h3>
-            Llama
-        </h3>
-
-        <p>
-            Deploy Llama 4 models
         </p>
     </a>
 </div>

@@ -120,6 +120,8 @@ plugins:
         'examples/deployment/tgi/index.md': 'examples/inference/tgi/index.md'
         'examples/deployment/sglang/index.md': 'examples/inference/sglang/index.md'
         'examples/deployment/trtllm/index.md': 'examples/inference/trtllm/index.md'
+        'examples/fine-tuning/trl/index.md': 'examples/single-node-training/trl/index.md'
+        'examples/fine-tuning/axolotl/index.md': 'examples/single-node-training/axolotl/index.md'
   - typeset
   - gen-files:
       scripts:  # always relative to mkdocs.yml
@@ -256,27 +258,24 @@ nav:
         - Environment variables: docs/reference/environment-variables.md
   - Examples:
     - examples.md
-    - Fine-tuning:
-        - TRL: examples/fine-tuning/trl/index.md
-        - Axolotl: examples/fine-tuning/axolotl/index.md
+    - Single-node training:
+        - TRL: examples/single-node-training/trl/index.md
+        - Axolotl: examples/single-node-training/axolotl/index.md
+    - Distributed training:
+        - Ray+RAGEN: examples/distributed-training/ray-ragen/index.md
+        - TRL: examples/distributed-training/trl/index.md
+        - Axolotl: examples/distributed-training/axolotl/index.md
     - Clusters:
         - NCCL tests: examples/clusters/nccl-tests/index.md
         - RCCL tests: examples/clusters/rccl-tests/index.md
         - A3 Mega: examples/clusters/a3mega/index.md
         - A3 High: examples/clusters/a3high/index.md
-    - Distributed training:
-        - Ray+RAGEN: examples/distributed-training/ray-ragen/index.md
-        - TRL: examples/distributed-training/trl/index.md
-        - Axolotl: examples/distributed-training/axolotl/index.md
-    - Deployment:
+    - Inference:
         - SGLang: examples/inference/sglang/index.md
         - vLLM: examples/inference/vllm/index.md
         - TGI:  examples/inference/tgi/index.md
         - NIM: examples/inference/nim/index.md
         - TensorRT-LLM: examples/inference/trtllm/index.md
-    - LLMs:
-        - Deepseek: examples/llms/deepseek/index.md
-        - Llama: examples/llms/llama/index.md
     - Accelerators:
         - AMD: examples/accelerators/amd/index.md
         - TPU: examples/accelerators/tpu/index.md

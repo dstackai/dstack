@@ -24,9 +24,9 @@ Axolotl reads the model, QLoRA, and dataset arguments, as well as trainer config
 ## Single-node training
 
 The easiest way to run a training script with `dstack` is by creating a task configuration file.
-This file can be found at [`examples/fine-tuning/axolotl/.dstack.yml` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/axolotl/.dstack.yaml){:target="_blank"}.
+This file can be found at [`examples/single-node-training/axolotl/.dstack.yml` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/single-node-training/axolotl/.dstack.yaml){:target="_blank"}.
 
-<div editor-title="examples/fine-tuning/axolotl/.dstack.yml">
+<div editor-title="examples/single-node-training/axolotl/.dstack.yml">
 
 ```yaml
 type: task
@@ -145,7 +145,7 @@ $ WANDB_API_KEY=...
 $ WANDB_PROJECT=...
 $ WANDB_NAME=axolotl-nvidia-llama-scout-train
 $ HUB_MODEL_ID=...
-$ dstack apply -f examples/fine-tuning/axolotl/.dstack.yml
+$ dstack apply -f examples/single-node-training/axolotl/.dstack.yml
 
  #  BACKEND              RESOURCES                     INSTANCE TYPE  PRICE     
  1  vastai (cz-czechia)  cpu=64 mem=128GB H100:80GB:2  18794506       $3.8907   
@@ -163,7 +163,7 @@ Provisioning...
 ## Source code
 
 The source-code of this example can be found in
-[`examples/fine-tuning/axolotl` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/axolotl){:target="_blank"} and [`examples/distributed-training/axolotl` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/distributed-training/axolotl){:target="_blank"}.
+[`examples/single-node-training/axolotl` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/single-node-training/axolotl){:target="_blank"} and [`examples/distributed-training/axolotl` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/distributed-training/axolotl){:target="_blank"}.
 
 ## What's next?
 

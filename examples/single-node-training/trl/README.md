@@ -21,7 +21,7 @@ Below is an example for `QLORA fine-tuning` Llama 3.1 8B using
 the [`OpenAssistant/oasst_top1_2023-08-25` :material-arrow-top-right-thin:{ .external }](https://huggingface.co/datasets/OpenAssistant/oasst_top1_2023-08-25){:target="_blank"}
 dataset:
 
-<div editor-title="examples/fine-tuning/trl/train.dstack.yml"> 
+<div editor-title="examples/single-node-training/trl/train.dstack.yml"> 
 
 ```yaml
 type: task
@@ -175,12 +175,12 @@ allow you to run commands interactively.
 ## Source code
 
 The source-code of this example can be found in 
-[`examples/llms/llama31` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/llms/llama31){:target="_blank"}, [`examples/fine-tuning/trl` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/trl){:target="_blank"} and [`examples/distributed-training/trl` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/distributed-training/trl){:target="_blank"}.
+[`examples/llms/llama31` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/llms/llama31){:target="_blank"}, [`examples/single-node-training/trl` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/single-node-training/trl){:target="_blank"} and [`examples/distributed-training/trl` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/distributed-training/trl){:target="_blank"}.
 
 ## What's next?
 
-1. Browse the [Axolotl](https://dstack.ai/docs/examples/fine-tuning/axolotl) 
-   and [Alignment Handbook](https://dstack.ai/docs/examples/fine-tuning/alignment-handbook) examples
+1. Browse the [Axolotl](https://dstack.ai/docs/examples/single-node-training/axolotl) 
+   and [Alignment Handbook](https://dstack.ai/docs/examples/single-node-training/alignment-handbook) examples
 2. See [AMD](https://dstack.ai/examples/accelerators/amd#axolotl). 
 3. Check [dev environments](https://dstack.ai/docs/dev-environments), [tasks](https://dstack.ai/docs/tasks), 
    [services](https://dstack.ai/docs/services),[clusters](https://dstack.ai/docs/guides/clusters) and [fleets](https://dstack.ai/docs/fleets).
