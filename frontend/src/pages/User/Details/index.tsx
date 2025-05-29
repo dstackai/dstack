@@ -5,12 +5,12 @@ import { Outlet, useNavigate, useParams } from 'react-router-dom';
 import { ConfirmationDialog, ContentLayout, SpaceBetween, Tabs } from 'components';
 import { DetailsHeader } from 'components';
 
-import { useNotifications, usePermissionGuard } from 'hooks';
+import { useNotifications /* usePermissionGuard*/ } from 'hooks';
 import { getServerError, riseRouterException } from 'libs';
 import { ROUTES } from 'routes';
 import { useDeleteUsersMutation, useGetUserQuery } from 'services/user';
 
-import { GlobalUserRole } from '../../../types';
+// import { GlobalUserRole } from '../../../types';
 import { UserDetailsTabTypeEnum } from './types';
 
 export { Settings as UserSettings } from './Settings';
@@ -24,9 +24,9 @@ export const UserDetails: React.FC = () => {
     const paramUserName = params.userName ?? '';
     const navigate = useNavigate();
     const { error: userError } = useGetUserQuery({ name: paramUserName });
-    const [deleteUsers, { isLoading: isDeleting }] = useDeleteUsersMutation();
+    const [deleteUsers /*, { isLoading: isDeleting }*/] = useDeleteUsersMutation();
     const [pushNotification] = useNotifications();
-    const [isAvailableDeleteUser] = usePermissionGuard({ allowedGlobalRoles: [GlobalUserRole.ADMIN] });
+    // const [isAvailableDeleteUser] = usePermissionGuard({ allowedGlobalRoles: [GlobalUserRole.ADMIN] });
 
     useEffect(() => {
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment

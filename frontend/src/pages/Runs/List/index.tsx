@@ -25,7 +25,7 @@ import styles from './styles.module.scss';
 
 export const RunList: React.FC = () => {
     const { t } = useTranslation();
-    const [searchParams, setSearchParams] = useSearchParams();
+    const [, setSearchParams] = useSearchParams();
     const [preferences] = useRunListPreferences();
 
     useBreadcrumbs([
@@ -50,7 +50,10 @@ export const RunList: React.FC = () => {
 
     const { stopRuns, isStopping } = useStopRuns();
     const { abortRuns, isAborting } = useAbortRuns();
-    const { deleteRuns, isDeleting } = useDeleteRuns();
+    const {
+        // deleteRuns,
+        isDeleting,
+    } = useDeleteRuns();
 
     const { columns } = useColumnsDefinitions();
 
@@ -75,7 +78,11 @@ export const RunList: React.FC = () => {
 
     const { selectedItems } = collectionProps;
 
-    const { isDisabledAbortButton, isDisabledStopButton, isDisabledDeleteButton } = useDisabledStatesForButtons({
+    const {
+        isDisabledAbortButton,
+        isDisabledStopButton,
+        // isDisabledDeleteButton
+    } = useDisabledStatesForButtons({
         selectedRuns: selectedItems,
         isStopping,
         isAborting,
@@ -94,11 +101,11 @@ export const RunList: React.FC = () => {
         stopRuns([...selectedItems]).then(() => actions.setSelectedItems([]));
     };
 
-    const deleteClickHandle = () => {
-        if (!selectedItems?.length) return;
-
-        deleteRuns([...selectedItems]).catch(console.log);
-    };
+    // const deleteClickHandle = () => {
+    //     if (!selectedItems?.length) return;
+    //
+    //     deleteRuns([...selectedItems]).catch(console.log);
+    // };
 
     return (
         <Table

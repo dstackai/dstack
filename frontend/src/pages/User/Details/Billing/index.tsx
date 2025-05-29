@@ -12,7 +12,7 @@ import { ROUTES } from 'routes';
 import {
     useGetUserBillingInfoQuery,
     useUserBillingCheckoutSessionMutation,
-    useUserBillingPortalSessionMutation,
+    // useUserBillingPortalSessionMutation,
 } from 'services/user';
 import { GlobalUserRole } from 'types';
 
@@ -37,7 +37,7 @@ export const Billing: React.FC = () => {
 
     const { data, isLoading } = useGetUserBillingInfoQuery({ username: paramUserName });
     const [billingCheckout, { isLoading: isLoadingBillingCheckout }] = useUserBillingCheckoutSessionMutation();
-    const [billingPortalSession, { isLoading: isLoadingBillingPortalSession }] = useUserBillingPortalSessionMutation();
+    // const [billingPortalSession, { isLoading: isLoadingBillingPortalSession }] = useUserBillingPortalSessionMutation();
 
     useBreadcrumbs([
         {
@@ -81,20 +81,21 @@ export const Billing: React.FC = () => {
         setShowPaymentModal(true);
     };
 
-    const editPaymentMethod = () => {
-        billingPortalSession({
-            username: paramUserName,
-        })
-            .unwrap()
-            .then((data) => goToUrl(data.url))
-            .catch((error) => {
-                pushNotification({
-                    type: 'error',
-                    content: t('common.server_error', { error: getServerError(error) }),
-                });
-            })
-            .finally(closeModal);
-    };
+    // const editPaymentMethod = () => {
+    //     billingPortalSession({
+    //         username: paramUserName,
+    //     })
+    //         .unwrap()
+    //         .then((data) => goToUrl(data.url))
+    //         .catch((error) => {
+    //             pushNotification({
+    //                 type: 'error',
+    //                 content: t('common.server_error', { error: getServerError(error) }),
+    //             });
+    //         })
+    //         .finally(closeModal);
+    // };
+
     const closeModal = () => {
         setShowPaymentModal(false);
     };

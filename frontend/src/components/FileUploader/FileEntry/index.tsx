@@ -22,6 +22,7 @@ export const FileEntry: React.FC<IProps> = ({ file, showImage = false, truncateL
     };
     reader.readAsDataURL(file);
 
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     const ext = file.name.split('.').pop()!;
     const displayFileName =
         file.name.length - ext.length - 1 > truncateLength ? `${file.name.slice(0, truncateLength)}... .${ext}` : file.name;

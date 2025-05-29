@@ -15,9 +15,4 @@ function baseQueryHeaders(headers: Headers, { getState }: Pick<BaseQueryApi, 'ge
     return headers;
 }
 
-export function unauthorizedQueryHeaders(headers: Headers, { getState }: Pick<BaseQueryApi, 'getState'>): Headers {
-    headers.set('X-API-VERSION', 'latest');
-    return headers;
-}
-
 export default baseQueryHeaders;

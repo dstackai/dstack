@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { DISCORD_URL, QUICK_START_URL, TALLY_FORM_ID } from 'consts';
+import {
+    DISCORD_URL,
+    QUICK_START_URL,
+    // TALLY_FORM_ID
+} from 'consts';
 import { useAppDispatch, useAppSelector } from 'hooks';
 import { goToUrl } from 'libs';
 import { useGetRunsQuery } from 'services/run';
@@ -60,6 +64,7 @@ export const useTutorials = () => {
         dispatch(updateTutorialPanelState({ billingCompleted: true }));
     }, []);
 
+    // eslint-disable-next-line @typescript-eslint/no-empty-function
     const startConfigCliTutorial = useCallback(() => {}, [billingUrl]);
 
     const finishConfigCliTutorial = useCallback(() => {
