@@ -32,6 +32,7 @@ from dstack._internal.utils.common import get_or_error
 from dstack._internal.utils.logging import get_logger
 
 REQUEST_TIMEOUT = 9
+UPLOAD_CODE_REQUEST_TIMEOUT = 60
 
 logger = get_logger(__name__)
 
@@ -109,7 +110,9 @@ class RunnerClient:
         resp.raise_for_status()
 
     def upload_code(self, file: Union[BinaryIO, bytes]):
-        resp = requests.post(self._url("/api/upload_code"), data=file, timeout=REQUEST_TIMEOUT)
+        resp = requests.post(
+            self._url("/api/upload_code"), data=file, timeout=UPLOAD_CODE_REQUEST_TIMEOUT
+        )
         resp.raise_for_status()
 
     def run_job(self):
