@@ -1,7 +1,6 @@
 # Axolotl
 
-This example shows how to use [Axolotl :material-arrow-top-right-thin:{ .external }](https://github.com/OpenAccess-AI-Collective/axolotl){:target="_blank"} 
-with `dstack` to fine-tune 4-bit Quantized [Llama-4-Scout-17B-16E :material-arrow-top-right-thin:{ .external }] using FSDP and QLoRA.
+This example shows how to use [Axolotl :material-arrow-top-right-thin:{ .external }](https://github.com/OpenAccess-AI-Collective/axolotl){:target="_blank"} with `dstack` to fine-tune 4-bit Quantized `Llama-4-Scout-17B-16E` using SFT with FSDP and QLoRA.
 
 ??? info "Prerequisites"
     Once `dstack` is [installed](https://dstack.ai/docs/installation), go ahead clone the repo, and run `dstack init`.
@@ -16,15 +15,11 @@ with `dstack` to fine-tune 4-bit Quantized [Llama-4-Scout-17B-16E :material-arro
  
     </div>
 
-## Training configuration recipe
+## Define a configuration
 
 Axolotl reads the model, QLoRA, and dataset arguments, as well as trainer configuration from a [`scout-qlora-fsdp1.yaml` :material-arrow-top-right-thin:{ .external }](https://github.com/axolotl-ai-cloud/axolotl/blob/main/examples/llama-4/scout-qlora-fsdp1.yaml){:target="_blank"} file. The configuration uses 4-bit axolotl quantized version of `meta-llama/Llama-4-Scout-17B-16E`, requiring only ~43GB VRAM/GPU with 4K context length.
 
-
-## Single-node training
-
-The easiest way to run a training script with `dstack` is by creating a task configuration file.
-This file can be found at [`examples/single-node-training/axolotl/.dstack.yml` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/single-node-training/axolotl/.dstack.yaml){:target="_blank"}.
+Below is a task configuration that does fine-tuning.
 
 <div editor-title="examples/single-node-training/axolotl/.dstack.yml">
 
@@ -41,15 +36,16 @@ env:
   - HF_TOKEN
   - WANDB_API_KEY
   - WANDB_PROJECT
-  - WANDB_NAME=axolotl-nvidia-llama-scout-train
   - HUB_MODEL_ID
+  - DSTACK_RUN_NAME
 # Commands of the task
 commands:
   - wget https://raw.githubusercontent.com/axolotl-ai-cloud/axolotl/main/examples/llama-4/scout-qlora-fsdp1.yaml
-  - axolotl train scout-qlora-fsdp1.yaml 
-            --wandb-project $WANDB_PROJECT 
-            --wandb-name $WANDB_NAME 
-            --hub-model-id $HUB_MODEL_ID
+  - |
+    axolotl train scout-qlora-fsdp1.yaml \
+      --wandb-project $WANDB_PROJECT \
+      --wandb-name $DSTACK_RUN_NAME \
+      --hub-model-id $HUB_MODEL_ID
 
 resources:
   # Two GPU (required by FSDP)
@@ -66,7 +62,7 @@ The task uses Axolotl's Docker image, where Axolotl is already pre-installed.
 !!! info "AMD"
     The example above uses NVIDIA accelerators. To use it with AMD, check out [AMD](https://dstack.ai/examples/accelerators/amd#axolotl).
 
-## Running a configuration
+## Run the configuration
 
 Once the configuration is ready, run `dstack apply -f <configuration file>`, and `dstack` will automatically provision the
 cloud resources and run the configuration.
@@ -77,7 +73,6 @@ cloud resources and run the configuration.
 $ HF_TOKEN=...
 $ WANDB_API_KEY=...
 $ WANDB_PROJECT=...
-$ WANDB_NAME=axolotl-nvidia-llama-scout-train
 $ HUB_MODEL_ID=...
 $ dstack apply -f examples/single-node-training/axolotl/.dstack.yml
 
@@ -101,7 +96,7 @@ The source-code of this example can be found in
 
 ## What's next?
 
-1. Browse [Axolotl Distributed Training](https://dstack.ai/docs/examples/distributed-training/axolotl) and [Axolotl :material-arrow-top-right-thin:{ .external }](https://github.com/OpenAccess-AI-Collective/axolotl){:target="_blank"}.
+1. Browse the [Axolotl distributed training](https://dstack.ai/docs/examples/distributed-training/axolotl) example
 2. Check [dev environments](https://dstack.ai/docs/dev-environments), [tasks](https://dstack.ai/docs/tasks), 
-   [services](https://dstack.ai/docs/services), [clusters](https://dstack.ai/docs/guides/clusters) and [fleets](https://dstack.ai/docs/concepts/fleets).
-3. See [AMD](https://dstack.ai/examples/accelerators/amd#axolotl).
+   [services](https://dstack.ai/docs/services), [fleets](https://dstack.ai/docs/concepts/fleets)
+3. See the [AMD](https://dstack.ai/examples/accelerators/amd#axolotl) example

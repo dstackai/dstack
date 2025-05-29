@@ -1,6 +1,6 @@
 # TRL
 
-This example walks you through how to run distributed fine-tune using [TRL](https://github.com/huggingface/trl), [Accelerate](https://github.com/huggingface/accelerate) and [Deepspeed](https://github.com/deepspeedai/DeepSpeed) with `dstack`.
+This example walks you through how to run distributed fine-tune using [TRL :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/trl){:target="_blank"}, [Accelerate :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/accelerate){:target="_blank"} and [Deepspeed :material-arrow-top-right-thin:{ .external }](https://github.com/deepspeedai/DeepSpeed){:target="_blank"}.
 
 ??? info "Prerequisites"
     Once `dstack` is [installed](https://dstack.ai/docs/installation), go ahead clone the repo, and run `dstack init`.
@@ -20,24 +20,21 @@ Before submitting distributed training runs, make sure to create a fleet with a 
 
 > For more detials on how to use clusters with `dstack`, check the [Clusters](https://dstack.ai/docs/guides/clusters) guide.
 
-## Run Distributed Training
-Once the fleet is created, define a distributed task configuration. Here's an example of distributed Supervised Fine-Tuning (SFT) task using `FSDP` and `Deepseed ZeRO-3`.
+## Define a configurtation
 
+Once the fleet is created, define a distributed task configuration. Here's an example of such a task.
 
 === "FSDP"
 
     <div editor-title="examples/distributed-training/trl/fsdp.dstack.yml">
     ```yaml
     type: task
-    # The name is optional, if not specified, generated randomly
     name: trl-train-fsdp-distrib
 
-    # Size of the cluster
     nodes: 2
 
     image: nvcr.io/nvidia/pytorch:25.01-py3
 
-    # Required environment variables
     env:
       - HF_TOKEN
       - ACCELERATE_LOG_LEVEL=info
@@ -45,7 +42,6 @@ Once the fleet is created, define a distributed task configuration. Here's an ex
       - MODEL_ID=meta-llama/Llama-3.1-8B
       - HUB_MODEL_ID
     
-    # Commands of the task
     commands:
       - pip install transformers bitsandbytes peft wandb
       - git clone https://github.com/huggingface/trl
@@ -90,23 +86,19 @@ Once the fleet is created, define a distributed task configuration. Here's an ex
     <div editor-title="examples/distributed-training/trl/deepspeed.dstack.yml">
     ```yaml
     type: task
-    # The name is optional, if not specified, generated randomly
     name: trl-train-deepspeed-distrib
 
-    # Size of the cluster
     nodes: 2
 
     image: nvcr.io/nvidia/pytorch:25.01-py3
 
-    # Required environment variables
     env:
       - HF_TOKEN
-      - ACCELERATE_LOG_LEVEL=info
       - WANDB_API_KEY
-      - MODEL_ID=meta-llama/Llama-3.1-8B
       - HUB_MODEL_ID
+      - MODEL_ID=meta-llama/Llama-3.1-8B
+      - ACCELERATE_LOG_LEVEL=info
     
-    # Commands of the task
     commands:
       - pip install transformers bitsandbytes peft wandb deepspeed
       - git clone https://github.com/huggingface/trl
@@ -146,11 +138,11 @@ Once the fleet is created, define a distributed task configuration. Here's an ex
     ```
     </div>
 
+!!! info "Docker image"
+    We are using `nvcr.io/nvidia/pytorch:25.01-py3` from NGC because it includes the necessary libraries and packages for RDMA and InfiniBand support.
 
-!!! Note
-    We are using the NGC container because it includes the necessary libraries and packages for RDMA and InfiniBand support.
+### Apply the configuration
 
-### Applying the configuration
 To run a configuration, use the [`dstack apply`](https://dstack.ai/docs/reference/cli/dstack/apply.md) command.
 
 <div class="termy">
@@ -175,8 +167,10 @@ Provisioning...
 ## Source code
 
 The source-code of this example can be found in 
-[`examples/distributed-training/trl` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/distributed-training/trl).
+[`examples/distributed-training/trl` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/distributed-training/trl){:target="_blank"}.
 
 !!! info "What's next?"
-    1. Check [dev environments](https://dstack.ai/docs/dev-environments), [tasks](https://dstack.ai/docs/tasks), 
-       [services](https://dstack.ai/docs/services),[clusters](https://dstack.ai/docs/guides/clusters) and [protips](https://dstack.ai/docs/protips).
+    1. Read the [clusters](https://dstack.ai/docs/guides/clusters) guide
+    2. Check [dev environments](https://dstack.ai/docs/concepts/dev-environments), [tasks](https://dstack.ai/docs/concepts/tasks), 
+       [services](https://dstack.ai/docs/concepts/services), and [fleets](https://dstack.ai/docs/concepts/fleets)
+    

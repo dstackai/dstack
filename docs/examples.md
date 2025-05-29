@@ -15,17 +15,6 @@ hide:
 ## Single-node training
 
 <div class="tx-landing__highlights_grid">
-    <a href="/examples/single-node-training/axolotl"
-       class="feature-cell">
-        <h3>
-            Axolotl
-        </h3>
-
-        <p>
-            Fine-tune Llama 4 on a custom dataset using Axolotl.
-        </p>
-    </a>
-
     <a href="/examples/single-node-training/trl"
        class="feature-cell">
         <h3>
@@ -36,22 +25,22 @@ hide:
             Fine-tune Llama 3.1 8B on a custom dataset using TRL.
         </p>
     </a>
+
+    <a href="/examples/single-node-training/axolotl"
+       class="feature-cell">
+        <h3>
+            Axolotl
+        </h3>
+
+        <p>
+            Fine-tune Llama 4 on a custom dataset using Axolotl.
+        </p>
+    </a>
 </div>
 
 ## Distributed training
 
 <div class="tx-landing__highlights_grid">
-    <a href="/examples/distributed-training/ray-ragen"
-       class="feature-cell sky">
-        <h3>
-            Ray+RAGEN
-        </h3>
-
-        <p>
-            Fine-tune an agent on multiple nodes
-            with RAGEN, verl, and Ray.
-        </p>
-    </a>
     <a href="/examples/distributed-training/trl"
        class="feature-cell sky">
         <h3>
@@ -72,6 +61,17 @@ hide:
         <p>
             Fine-tune LLM on multiple nodes
             with Axolotl.
+        </p>
+    </a>
+    <a href="/examples/distributed-training/ray-ragen"
+       class="feature-cell sky">
+        <h3>
+            Ray+RAGEN
+        </h3>
+
+        <p>
+            Fine-tune an agent on multiple nodes
+            with RAGEN, verl, and Ray.
         </p>
     </a>
 </div>

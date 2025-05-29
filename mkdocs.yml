@@ -262,9 +262,9 @@ nav:
         - TRL: examples/single-node-training/trl/index.md
         - Axolotl: examples/single-node-training/axolotl/index.md
     - Distributed training:
-        - Ray+RAGEN: examples/distributed-training/ray-ragen/index.md
         - TRL: examples/distributed-training/trl/index.md
         - Axolotl: examples/distributed-training/axolotl/index.md
+        - Ray+RAGEN: examples/distributed-training/ray-ragen/index.md
     - Clusters:
         - NCCL tests: examples/clusters/nccl-tests/index.md
         - RCCL tests: examples/clusters/rccl-tests/index.md

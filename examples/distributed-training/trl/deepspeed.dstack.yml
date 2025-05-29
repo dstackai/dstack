@@ -1,5 +1,4 @@
 type: task
-# The name is optional, if not specified, generated randomly
 name: trl-train-deepspeed-distrib
 
 # Size of the cluster
@@ -10,10 +9,10 @@ image: nvcr.io/nvidia/pytorch:25.01-py3
 # Required environment variables
 env:
   - HF_TOKEN
-  - ACCELERATE_LOG_LEVEL=info
   - WANDB_API_KEY
-  - MODEL_ID=meta-llama/Llama-3.1-8B
   - HUB_MODEL_ID
+  - MODEL_ID=meta-llama/Llama-3.1-8B
+  - ACCELERATE_LOG_LEVEL=info
 # Commands of the task
 commands:
   - pip install transformers bitsandbytes peft wandb deepspeed

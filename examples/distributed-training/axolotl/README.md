@@ -1,6 +1,6 @@
 # Axolotl
 
-This example walks you through how to run distributed fine-tune using [Axolotl](https://github.com/axolotl-ai-cloud/axolotl) with `dstack`.
+This example walks you through how to run distributed fine-tune using [Axolotl :material-arrow-top-right-thin:{ .external }](https://github.com/axolotl-ai-cloud/axolotl){:target="_blank"} with `dstack`.
 
 ??? info "Prerequisites"
     Once `dstack` is [installed](https://dstack.ai/docs/installation), go ahead clone the repo, and run `dstack init`.
@@ -14,38 +14,35 @@ This example walks you through how to run distributed fine-tune using [Axolotl](
     ```
     </div>
 
-## Create fleet
+## Create a fleet
 
 Before submitting distributed training runs, make sure to create a fleet with a `placement` set to `cluster`.
 
 > For more detials on how to use clusters with `dstack`, check the [Clusters](https://dstack.ai/docs/guides/clusters) guide.
 
-## Run Distributed Training
+## Define a configuration
+
 Once the fleet is created, define a distributed task configuration. Here's an example of distributed `QLORA` task using `FSDP`.
 
 <div editor-title="examples/distributed-training/axolotl/.dstack.yml">
 
 ```yaml
 type: task
-# The name is optional, if not specified, generated randomly
 name: axolotl-multi-node-qlora-llama3-70b
 
-# Size of the cluster
 nodes: 2
 
-# The axolotlai/axolotl:main-latest image does not include InfiniBand or RDMA libraries, so we need to use the NGC container.
 image: nvcr.io/nvidia/pytorch:25.01-py3
-# Required environment variables
+
 env:
   - HF_TOKEN
-  - ACCELERATE_LOG_LEVEL=info
   - WANDB_API_KEY
-  - NCCL_DEBUG=INFO
-  - CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
-  - WANDB_NAME=axolotl-dist-llama-qlora-train
   - WANDB_PROJECT
   - HUB_MODEL_ID
-# Commands of the task
+  - CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
+  - NCCL_DEBUG=INFO
+  - ACCELERATE_LOG_LEVEL=info
+
 commands:
   # Replacing the default Torch and FlashAttention in the NCG container with Axolotl-compatible versions.
   # The preinstalled versions are incompatible with Axolotl.
@@ -64,7 +61,7 @@ commands:
       --hub-model-id $HUB_MODEL_ID \
       --output-dir /checkpoints/qlora-llama3-70b \
       --wandb-project $WANDB_PROJECT \
-      --wandb-name $WANDB_NAME \
+      --wandb-name $DSTACK_RUN_NAME \
       --main_process_ip=$DSTACK_MASTER_NODE_IP \
       --main_process_port=8008 \
       --machine_rank=$DSTACK_NODE_RANK \
@@ -80,10 +77,11 @@ volumes:
 ```
 </div>
 
-!!! Note
-    We are using the NGC container because it includes the necessary libraries and packages for RDMA and InfiniBand support.
+!!! info "Docker image"
+    We are using `nvcr.io/nvidia/pytorch:25.01-py3` from NGC because it includes the necessary libraries and packages for RDMA and InfiniBand support.
 
-### Applying the configuration
+### Apply the configuration
+
 To run a configuration, use the [`dstack apply`](https://dstack.ai/docs/reference/cli/dstack/apply.md) command.
 
 <div class="termy">
@@ -112,5 +110,6 @@ The source-code of this example can be found in
 [`examples/distributed-training/axolotl` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/distributed-training/axolotl).
 
 !!! info "What's next?"
-    1. Check [dev environments](https://dstack.ai/docs/dev-environments), [tasks](https://dstack.ai/docs/tasks), 
-       [services](https://dstack.ai/docs/services), [clusters](https://dstack.ai/docs/guides/clusters) and [protips](https://dstack.ai/docs/protips).
+    1. Read the [clusters](https://dstack.ai/docs/guides/clusters) guide
+    2. Check [dev environments](https://dstack.ai/docs/dev-environments), [tasks](https://dstack.ai/docs/concepts/tasks), 
+       [services](https://dstack.ai/docs/concepts/services), and [fleets](https://dstack.ai/docs/concepts/fleets)
