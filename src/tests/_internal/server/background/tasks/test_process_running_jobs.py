@@ -12,7 +12,7 @@ from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import NetworkMode
 from dstack._internal.core.models.configurations import DevEnvironmentConfiguration
 from dstack._internal.core.models.instances import InstanceStatus
-from dstack._internal.core.models.profiles import UtilizationPolicy
+from dstack._internal.core.models.profiles import StartupOrder, UtilizationPolicy
 from dstack._internal.core.models.runs import (
     JobRuntimeData,
     JobStatus,
@@ -805,3 +805,76 @@ class TestProcessRunningJobs:
         else:
             assert job.termination_reason is None
             assert job.termination_reason_message is None
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_master_job_waits_for_workers(self, test_db, session: AsyncSession):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(
+            session=session,
+            project_id=project.id,
+        )
+        run_spec = get_run_spec(
+            run_name="test-run",
+            repo_id=repo.name,
+        )
+        run_spec.configuration.startup_order = StartupOrder.WORKERS_FIRST
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_spec=run_spec,
+        )
+        instance1 = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.BUSY,
+        )
+        instance2 = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.BUSY,
+        )
+        job_provisioning_data = get_job_provisioning_data(dockerized=False)
+        master_job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.PROVISIONING,
+            job_provisioning_data=job_provisioning_data,
+            instance_assigned=True,
+            instance=instance1,
+            job_num=0,
+            last_processed_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
+        worker_job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.PROVISIONING,
+            job_provisioning_data=job_provisioning_data,
+            instance_assigned=True,
+            instance=instance2,
+            job_num=1,
+            last_processed_at=datetime(2023, 1, 2, 3, 5, tzinfo=timezone.utc),
+        )
+        await process_running_jobs()
+        await session.refresh(master_job)
+        assert master_job.status == JobStatus.PROVISIONING
+        worker_job.status = JobStatus.RUNNING
+        # To guarantee master_job is processed next
+        master_job.last_processed_at = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
+        await session.commit()
+        with (
+            patch("dstack._internal.server.services.runner.ssh.SSHTunnel"),
+            patch(
+                "dstack._internal.server.services.runner.client.RunnerClient"
+            ) as RunnerClientMock,
+        ):
+            runner_client_mock = RunnerClientMock.return_value
+            runner_client_mock.healthcheck.return_value = HealthcheckResponse(
+                service="dstack-runner", version="0.0.1.dev2"
+            )
+            await process_running_jobs()
+        await session.refresh(master_job)
+        assert master_job.status == JobStatus.RUNNING
