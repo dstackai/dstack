@@ -6,6 +6,7 @@ from typing_extensions import Annotated, Literal
 
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import CoreModel, Duration
+from dstack._internal.utils.common import list_enum_values_for_annotation
 from dstack._internal.utils.tags import tags_validator
 
 DEFAULT_RETRY_DURATION = 3600
@@ -201,7 +202,10 @@ class ProfileParams(CoreModel):
     spot_policy: Annotated[
         Optional[SpotPolicy],
         Field(
-            description="The policy for provisioning spot or on-demand instances: `spot`, `on-demand`, or `auto`. Defaults to `on-demand`"
+            description=(
+                "The policy for provisioning spot or on-demand instances: `spot`, `on-demand`, or `auto`."
+                " Defaults to `on-demand`"
+            )
         ),
     ] = None
     retry: Annotated[
@@ -254,12 +258,22 @@ class ProfileParams(CoreModel):
     ] = None
     startup_order: Annotated[
         Optional[StartupOrder],
-        Field(description="The order in which master and workers jobs are started"),
+        Field(
+            description=(
+                f"The order in which master and workers jobs are started:"
+                f" {list_enum_values_for_annotation(StartupOrder)}."
+                f" Defaults to `{StartupOrder.ANY.value}`"
+            )
+        ),
     ] = None
     stop_criteria: Annotated[
         Optional[StopCriteria],
         Field(
-            description="The criteria determining when a multi-node run should be considered finished"
+            description=(
+                "The criteria determining when a multi-node run should be considered finished:"
+                f" {list_enum_values_for_annotation(StopCriteria)}."
+                f" Defaults to `{StopCriteria.ALL_DONE.value}`"
+            )
         ),
     ] = None
     fleets: Annotated[
