@@ -126,6 +126,10 @@ def _get_fleet_spec_excludes(fleet_spec: FleetSpec) -> Optional[Dict]:
         configuration_excludes["tags"] = True
     if profile.tags is None:
         profile_excludes.add("tags")
+    if profile.startup_order is None:
+        profile_excludes.add("startup_order")
+    if profile.stop_criteria is None:
+        profile_excludes.add("stop_criteria")
     if configuration_excludes:
         spec_excludes["configuration"] = configuration_excludes
     if profile_excludes:

@@ -314,3 +314,7 @@ def make_proxy_url(server_url: str, proxy_url: str) -> str:
         path=concat_url_path(server.path, proxy.path),
     )
     return proxy.geturl()
+
+
+def list_enum_values_for_annotation(enum_class: type[enum.Enum]) -> str:
+    return ", ".join(f"`{e.value}`" for e in enum_class)
