@@ -32,6 +32,12 @@ class TerminationPolicy(str, Enum):
     DESTROY_AFTER_IDLE = "destroy-after-idle"
 
 
+class StartupOrder(str, Enum):
+    ANY = "any"
+    MASTER_FIRST = "master-first"
+    WORKERS_FIRST = "workers-first"
+
+
 @overload
 def parse_duration(v: None) -> None: ...
 
@@ -240,6 +246,10 @@ class ProfileParams(CoreModel):
     utilization_policy: Annotated[
         Optional[UtilizationPolicy],
         Field(description="Run termination policy based on utilization"),
+    ] = None
+    startup_order: Annotated[
+        Optional[StartupOrder],
+        Field(description="The order in which master and workers jobs are started"),
     ] = None
     fleets: Annotated[
         Optional[list[str]], Field(description="The fleets considered for reuse")
