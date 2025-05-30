@@ -78,7 +78,6 @@ ignore-case = true
 
 [dependency-groups]
 dev = [
-    "build>=1.2.2.post1",
     "httpx>=0.28.1",
     "pre-commit>=4.2.0",
     "pytest-asyncio>=0.23.8",
