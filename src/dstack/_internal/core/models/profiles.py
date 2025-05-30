@@ -38,6 +38,11 @@ class StartupOrder(str, Enum):
     WORKERS_FIRST = "workers-first"
 
 
+class StopCriteria(str, Enum):
+    ALL_DONE = "all-done"
+    MASTER_DONE = "master-done"
+
+
 @overload
 def parse_duration(v: None) -> None: ...
 
@@ -250,6 +255,12 @@ class ProfileParams(CoreModel):
     startup_order: Annotated[
         Optional[StartupOrder],
         Field(description="The order in which master and workers jobs are started"),
+    ] = None
+    stop_criteria: Annotated[
+        Optional[StopCriteria],
+        Field(
+            description="The criteria determining when a multi-node run should be considered finished"
+        ),
     ] = None
     fleets: Annotated[
         Optional[list[str]], Field(description="The fleets considered for reuse")
