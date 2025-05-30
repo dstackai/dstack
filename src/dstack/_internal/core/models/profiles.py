@@ -114,7 +114,7 @@ class ProfileRetry(CoreModel):
         Field(
             description=(
                 "The list of events that should be handled with retry."
-                " Supported events are `no-capacity`, `interruption`, and `error`."
+                f" Supported events are {list_enum_values_for_annotation(RetryEvent)}."
                 " Omit to retry on all events"
             )
         ),
@@ -203,8 +203,9 @@ class ProfileParams(CoreModel):
         Optional[SpotPolicy],
         Field(
             description=(
-                "The policy for provisioning spot or on-demand instances: `spot`, `on-demand`, or `auto`."
-                " Defaults to `on-demand`"
+                "The policy for provisioning spot or on-demand instances:"
+                f" {list_enum_values_for_annotation(SpotPolicy)}."
+                f" Defaults to `{SpotPolicy.ONDEMAND.value}`"
             )
         ),
     ] = None
@@ -240,7 +241,11 @@ class ProfileParams(CoreModel):
     creation_policy: Annotated[
         Optional[CreationPolicy],
         Field(
-            description="The policy for using instances from fleets. Defaults to `reuse-or-create`"
+            description=(
+                "The policy for using instances from fleets:"
+                f" {list_enum_values_for_annotation(CreationPolicy)}."
+                f" Defaults to `{CreationPolicy.REUSE_OR_CREATE.value}`"
+            )
         ),
     ] = None
     idle_duration: Annotated[
