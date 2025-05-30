@@ -188,6 +188,14 @@ def _get_run_spec_excludes(run_spec: RunSpec) -> Optional[Dict]:
         configuration_excludes["shell"] = True
     if configuration.priority is None:
         configuration_excludes["priority"] = True
+    if configuration.startup_order is None:
+        configuration_excludes["startup_order"] = True
+    if profile is not None and profile.startup_order is None:
+        profile_excludes.add("startup_order")
+    if configuration.stop_criteria is None:
+        configuration_excludes["stop_criteria"] = True
+    if profile is not None and profile.stop_criteria is None:
+        profile_excludes.add("stop_criteria")
 
     if configuration_excludes:
         spec_excludes["configuration"] = configuration_excludes
