@@ -5,7 +5,7 @@ import { format } from 'date-fns';
 import { NavigateLink, StatusIndicator } from 'components';
 
 import { DATE_TIME_FORMAT } from 'consts';
-import { getRepoNameFromRun, getStatusIconType } from 'libs/run';
+import { getRepoNameFromRun, getStatusIconType, getJobSubmissionStatus, getStatusIconColor } from 'libs/run';
 import { ROUTES } from 'routes';
 
 import {
@@ -65,8 +65,8 @@ export const useColumnsDefinitions = () => {
             id: 'status',
             header: t('projects.run.status'),
             cell: (item: IRun) => (
-                <StatusIndicator type={getStatusIconType(item.status)}>
-                    {t(`projects.run.statuses.${item.status}`)}
+                <StatusIndicator type={getStatusIconType(item.latest_job_submission?.status || item.status)} colorOverride={getStatusIconColor(item.latest_job_submission?.status || item.status, item.latest_job_submission?.termination_reason)}>
+                    {getJobSubmissionStatus(item)}
                 </StatusIndicator>
             ),
         },

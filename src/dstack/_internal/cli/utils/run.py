@@ -183,7 +183,7 @@ def get_runs_table(
                 status += f" (inactive for {inactive_for})"
             job_row: Dict[Union[str, int], Any] = {
                 "NAME": f"  replica={job.job_spec.replica_num} job={job.job_spec.job_num}",
-                "STATUS": status,
+                "STATUS": latest_job_submission.pretty_repr,
                 "SUBMITTED": format_date(latest_job_submission.submitted_at),
                 "ERROR": _get_job_error(job),
             }

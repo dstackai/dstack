@@ -301,6 +301,26 @@ class JobSubmission(CoreModel):
             end_time = self.finished_at
         return end_time - self.submitted_at
 
+    @property
+    def pretty_repr(self) -> str:
+        status = self.status.value
+        termination_reason = self.termination_reason
+        if status == JobStatus.DONE:
+            return "exited (0)"
+        elif status == JobStatus.FAILED:
+            if termination_reason == JobTerminationReason.CONTAINER_EXITED_WITH_ERROR:
+                return f"exited ({self.exit_status})"
+            elif termination_reason == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY:
+                return "no offers"
+            elif termination_reason == JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY:
+                return "interrupted"
+        elif status == JobStatus.TERMINATED:
+            if termination_reason == JobTerminationReason.TERMINATED_BY_USER:
+                return "stopped"
+            elif termination_reason == JobTerminationReason.ABORTED_BY_USER:
+                return "aborted"
+        return status
+
 
 class Job(CoreModel):
     job_spec: JobSpec
