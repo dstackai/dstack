@@ -5,6 +5,7 @@ from dstack._internal.core.backends.base.configurator import (
     Configurator,
     raise_invalid_credentials_error,
 )
+from dstack._internal.core.backends.cloudrift.api_client import RiftClient
 from dstack._internal.core.backends.cloudrift.backend import CloudRiftBackend
 from dstack._internal.core.backends.cloudrift.models import (
     AnyCloudRiftBackendConfig,
@@ -21,6 +22,8 @@ from dstack._internal.core.models.backends.base import (
 
 # TODO: Add all supported regions and default regions
 REGIONS = []
+
+CLOUDRIFT_API_URL = "https://api.cloudrift.ai"
 
 
 class CloudRiftConfigurator(Configurator):
@@ -64,7 +67,8 @@ class CloudRiftConfigurator(Configurator):
         )
 
     def _validate_creds(self, creds: AnyCloudRiftCreds):
-        # TODO: Implement API key or other creds validation
-        # if valid:
-        #     return
-        raise_invalid_credentials_error(fields=[["creds", "api_key"]])
+        if not isinstance(creds, CloudRiftCreds):
+            raise_invalid_credentials_error(fields=[["creds"]])
+        client = RiftClient(creds.api_key)
+        if not client.validate_api_key():
+            raise_invalid_credentials_error(fields=[["creds", "api_key"]])
