@@ -61,13 +61,15 @@ export const ModelDetails: React.FC = () => {
     const [viewCodeVisible, setViewCodeVisible] = useState<boolean>(false);
     const [codeTab, setCodeTab] = useState<CodeTab>(CodeTab.Python);
     const [loading, setLoading] = useState<boolean>(false);
+    const [isGenerating, setIsGenerating] = useState<boolean>(false);
     const params = useParams();
     const paramProjectName = params.projectName ?? '';
     const paramRunName = params.runName ?? '';
     const openai = useRef<OpenAI>();
     const textAreaRef = useRef<HTMLDivElement>(null);
-    const chatList = useRef<HTMLElement>();
+    const chatList = useRef<HTMLDivElement>(null);
     const [pushNotification] = useNotifications();
+    const abortControllerRef = useRef<AbortController | null>(null);
 
     const messageForShowing = useMemo<Message[]>(() => messages.filter((m) => m.role !== 'system'), [messages]);
 
@@ -99,7 +101,7 @@ export const ModelDetails: React.FC = () => {
 
     const { data: runData, isLoading: isLoadingRun } = useGetRunQuery({
         project_name: paramProjectName,
-        run_name: paramRunName,
+        id: paramRunName,
     });
 
     useEffect(() => {
@@ -112,7 +114,6 @@ export const ModelDetails: React.FC = () => {
         if (!runData) {
             return;
         }
-
         return getExtendedModelFromRun(runData);
     }, [runData]);
 
@@ -120,7 +121,6 @@ export const ModelDetails: React.FC = () => {
         if (!modelData) {
             return;
         }
-
         openai.current = new OpenAI({
             baseURL: getModelGateway(modelData.base_url),
             apiKey: token,
@@ -133,18 +133,51 @@ export const ModelDetails: React.FC = () => {
     }, [messageForShowing]);
 
     const { handleSubmit, control, setValue, watch } = useForm<FormValues>();
-
     const messageText = watch('message');
+
+    // Map Message[] to OpenAI's expected message format
+    const mapMessagesForOpenAI = (messages: Message[]) =>
+        messages.map((msg) => {
+            if (msg.role === 'tool') {
+                if (!msg.tool_call_id) {
+                    throw new Error('tool_call_id is required for tool messages');
+                }
+                return {
+                    role: msg.role,
+                    content: msg.content,
+                    tool_call_id: msg.tool_call_id, // Now always present
+                };
+            }
+            return {
+                role: msg.role,
+                content: msg.content,
+            };
+        });
 
     const sendRequest = async (messages: Message[]) => {
         if (!openai.current) return Promise.reject('Model not found');
 
-        return openai.current.chat.completions.create({
-            model: modelData?.name ?? '',
-            messages,
-            stream: true,
-            max_tokens: 512,
-        });
+        abortControllerRef.current = new AbortController();
+
+        return openai.current.chat.completions.create(
+            {
+                model: modelData?.name ?? '',
+                messages: mapMessagesForOpenAI(messages),
+                stream: true,
+                max_tokens: 512,
+            },
+            {
+                signal: abortControllerRef.current.signal,
+            },
+        );
+    };
+
+    const handleCancel = () => {
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+            setIsGenerating(false);
+            setLoading(false);
+        }
     };
 
     const onSubmit = async (data: FormValues) => {
@@ -165,6 +198,7 @@ export const ModelDetails: React.FC = () => {
 
         setMessages(newMessages);
         setLoading(true);
+        setIsGenerating(true);
 
         try {
             const stream = await sendRequest(newMessages);
@@ -183,80 +217,64 @@ export const ModelDetails: React.FC = () => {
             for await (const chunk of stream) {
                 setMessages((oldMessages) => {
                     const newMessages = [...oldMessages];
-
                     const lastMessage = newMessages.pop();
-
                     if (!lastMessage) {
                         return oldMessages;
                     }
-
                     return [
                         ...newMessages,
                         {
-                            role: chunk.choices[0]?.delta?.role ?? lastMessage?.role,
+                            role: (chunk.choices[0]?.delta?.role as Role) ?? lastMessage?.role,
                             content: (lastMessage?.content ?? '') + (chunk.choices[0]?.delta?.content ?? ''),
                         },
                     ];
                 });
             }
-        } catch (e) {
-            pushNotification({
-                type: 'error',
-                content: t('common.server_error', { error: e }),
-            });
-
-            clearChat();
+        } catch (e: any) {
+            if (e.name === 'AbortError') {
+                pushNotification({
+                    type: 'info',
+                    content: t('common.cancelled_by_user'),
+                });
+            } else {
+                pushNotification({
+                    type: 'error',
+                    content: t('common.server_error', { error: e }),
+                });
+                clearChat();
+            }
+        } finally {
+            setLoading(false);
+            setIsGenerating(false);
         }
-
-        setLoading(false);
-
-        setTimeout(() => {
-            textAreaRef.current?.querySelector('textarea')?.focus();
-        }, 10);
     };
 
     const clearChat = () => {
         setValue('message', '');
         setValue('instructions', '');
-
         setMessages([]);
         setTimeout(onChangeMessage, 10);
     };
 
     const renderMessageBody = (content: Message['content']) => {
-        const LANGUAGE_PATTERN = /^(```[A-Za-z]*)/m;
-        const PATTERN = /^([A-Za-z \t]*)```([A-Za-z]*)?\n([\s\S]*?)```([A-Za-z \t]*)*$/gm;
-        const languages: string[] = [];
+        // Ensure content is a string; fallback to '...' if undefined
+        const safeContent = content || '...';
 
-        const matches = content.match(LANGUAGE_PATTERN);
+        // Match code blocks like ```language\ncode\n```
+        const PATTERN = /```(\w+)?\n([\s\S]*?)\n```/g;
 
-        if (matches) {
-            [...matches].forEach((l) => l && languages.push(l.replace(/^```/, '')));
-        }
-
-        const replacedStrings = reactStringReplace(content, PATTERN, (match) => {
-            if (!match) {
-                return '';
-            }
-
-            return <Code>{match}</Code>;
+        // Replace code blocks with <Code> components
+        const replacedStrings = reactStringReplace(safeContent, PATTERN, (match, language, code) => {
+            // language might be undefined; default to 'text'
+            return <Code language={typeof language === 'string' ? language : 'text'}>{code}</Code>;
         });
 
-        return (
-            <Box variant="p">
-                {replacedStrings.filter((line, index) => {
-                    if (
-                        languages.includes(line) &&
-                        typeof replacedStrings[index + 1] !== 'string' &&
-                        typeof replacedStrings[index + 1] !== undefined
-                    ) {
-                        return false;
-                    }
-
-                    return true;
-                })}
-            </Box>
-        );
+        // If replacedStrings is a single string, Box can accept it.
+        // If it's an array (mixed strings and JSX), use a fragment or div instead of Box.
+        if (typeof replacedStrings === 'string') {
+            return <Box variant="p">{replacedStrings}</Box>;
+        }
+        return <div className={css.messageBody}>{replacedStrings}</div>;
     };
 
     const onChangeMessage = () => {
@@ -270,20 +288,19 @@ export const ModelDetails: React.FC = () => {
         textAreaElement.style.height = textAreaElement.scrollHeight + 'px';
     };
 
-    const onKeyDown = (event) => {
-        const isCtrlOrShiftKey = event?.detail?.ctrlKey || event?.detail?.shiftKey;
-
-        if (event?.detail?.keyCode === 13 && !isCtrlOrShiftKey) {
+    // AWS UI CustomEvent handler for FormTextarea
+    const onKeyDownAwsui = (event: CustomEvent<{ keyCode: number; key: string; ctrlKey: boolean; shiftKey: boolean }>) => {
+        const { key, ctrlKey, shiftKey } = event.detail;
+        if (key === 'Enter' && !ctrlKey && !shiftKey) {
             handleSubmit(onSubmit)();
-        } else if (event?.detail?.keyCode === 13 && isCtrlOrShiftKey) {
-            event.preventDefault();
+        } else if (key === 'Enter' && (ctrlKey || shiftKey)) {
+            event.preventDefault?.();
             setValue('message', messageText + '\n');
             setTimeout(onChangeMessage, 0);
         }
     };
 
     const pythonCode = getPythonModelCode({ model: modelData, token });
-
     const curlCode = getCurlModelCode({ model: modelData, token });
 
     const onCopyCode = () => {
@@ -294,8 +311,6 @@ export const ModelDetails: React.FC = () => {
                 return copyToClipboard(curlCode);
         }
     };
-
-    console.log({ modelData });
 
     return (
         <ContentLayout
@@ -330,12 +345,10 @@ export const ModelDetails: React.FC = () => {
                                         <Box variant="awsui-key-label">{t('models.details.run_name')}</Box>
                                         <div>{modelData.run_name}</div>
                                     </div>
-
                                     <div>
                                         <Box variant="awsui-key-label">{t('models.model_name')}</Box>
                                         <div>{modelData.name}</div>
                                     </div>
-
                                     <div>
                                         <Box variant="awsui-key-label">{t('models.type')}</Box>
                                         <div>{modelData.type}</div>
@@ -347,6 +360,11 @@ export const ModelDetails: React.FC = () => {
                         <form className={css.modelForm} onSubmit={handleSubmit(onSubmit)}>
                             <div className={css.buttons}>
                                 <Button iconName="remove" disabled={loading || !messages.length} onClick={clearChat} />
+                                {isGenerating && (
+                                    <Button iconName="close" variant="normal" onClick={handleCancel} disabled={!isGenerating}>
+                                        {t('common.cancel')}
+                                    </Button>
+                                )}
                             </div>
 
                             <aside className={css.side}>
@@ -368,23 +386,37 @@ export const ModelDetails: React.FC = () => {
                                     />
                                 )}
 
-                                {messageForShowing.map((message, index) => (
-                                    <div key={index} className={css.message}>
-                                        <ChatBubble
-                                            ariaLabel=""
-                                            type={message.role === 'user' ? 'outgoing' : 'incoming'}
-                                            avatar={
-                                                <Avatar
-                                                    ariaLabel={MESSAGE_ROLE_MAP[message.role as keyof typeof MESSAGE_ROLE_MAP]}
-                                                    color={message.role === 'user' ? 'default' : 'gen-ai'}
-                                                    iconName={message.role === 'user' ? 'user-profile' : 'gen-ai'}
-                                                />
-                                            }
-                                        >
-                                            {renderMessageBody(message.content || '...')}
-                                        </ChatBubble>
-                                    </div>
-                                ))}
+                                {messageForShowing.map((message, index) => {
+                                    const isAssistantGenerating =
+                                        isGenerating && index === messageForShowing.length - 1 && message.role === 'assistant';
+
+                                    return (
+                                        <div key={index} className={css.message}>
+                                            <ChatBubble
+                                                ariaLabel=""
+                                                type={message.role === 'user' ? 'outgoing' : 'incoming'}
+                                                avatar={
+                                                    <Avatar
+                                                        ariaLabel={
+                                                            MESSAGE_ROLE_MAP[message.role as keyof typeof MESSAGE_ROLE_MAP]
+                                                        }
+                                                        color={message.role === 'user' ? 'default' : 'gen-ai'}
+                                                        iconName={message.role === 'user' ? 'user-profile' : 'gen-ai'}
+                                                    />
+                                                }
+                                            >
+                                                {isAssistantGenerating ? (
+                                                    <div className={css.generatingIndicator}>
+                                                        <Loader />
+                                                        <span>{t('models.generating')}</span>
+                                                    </div>
+                                                ) : (
+                                                    renderMessageBody(message.content || '...')
+                                                )}
+                                            </ChatBubble>
+                                        </div>
+                                    );
+                                })}
                             </div>
 
                             <div ref={textAreaRef} className={css.messageForm}>
@@ -394,14 +426,20 @@ export const ModelDetails: React.FC = () => {
                                     control={control}
                                     disabled={loading}
                                     name="message"
-                                    onKeyDown={onKeyDown}
+                                    onKeyDown={onKeyDownAwsui} // <-- Use the AWS UI compatible handler
                                     onChange={onChangeMessage}
                                 />
 
                                 <div className={css.buttons}>
-                                    <Button variant="primary" disabled={loading}>
-                                        {t('common.send')}
-                                    </Button>
+                                    {isGenerating ? (
+                                        <Button variant="normal" onClick={handleCancel}>
+                                            {t('common.cancel')}
+                                        </Button>
+                                    ) : (
+                                        <Button variant="primary" disabled={loading}>
+                                            {t('common.send')}
+                                        </Button>
+                                    )}
                                 </div>
                             </div>
                         </form>
