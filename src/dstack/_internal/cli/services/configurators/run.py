@@ -41,7 +41,12 @@ from dstack._internal.core.models.configurations import (
 )
 from dstack._internal.core.models.repos.base import Repo
 from dstack._internal.core.models.resources import CPUSpec
-from dstack._internal.core.models.runs import JobSubmission, JobTerminationReason, RunStatus
+from dstack._internal.core.models.runs import (
+    JobStatus,
+    JobSubmission,
+    JobTerminationReason,
+    RunStatus,
+)
 from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.core.services.diff import diff_models
 from dstack._internal.utils.common import local_time
@@ -166,12 +171,7 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
             # We can attach to run multiple times if it goes from running to pending (retried).
             while True:
                 with MultiItemStatus(f"Launching [code]{run.name}[/]...", console=console) as live:
-                    while run.status in (
-                        RunStatus.SUBMITTED,
-                        RunStatus.PENDING,
-                        RunStatus.PROVISIONING,
-                        RunStatus.TERMINATING,
-                    ):
+                    while not _is_ready_to_attach(run):
                         table = get_runs_table([run])
                         live.update(table)
                         time.sleep(5)
@@ -588,6 +588,20 @@ def get_run_exit_code(run: Run) -> int:
     if run.status == RunStatus.DONE:
         return 0
     return 1
+
+
+def _is_ready_to_attach(run: Run) -> bool:
+    return not (
+        run.status
+        in [
+            RunStatus.SUBMITTED,
+            RunStatus.PENDING,
+            RunStatus.PROVISIONING,
+            RunStatus.TERMINATING,
+        ]
+        or run._run.jobs[0].job_submissions[-1].status
+        in [JobStatus.SUBMITTED, JobStatus.PROVISIONING, JobStatus.PULLING]
+    )
 
 
 def _get_run_termination_reason_and_exit_status(
