@@ -45,3 +45,18 @@ export const getJobStatus = (job: IJob) => {
 export const getJobTerminationReason = (job: IJob) => {
     return job.job_submissions?.[job.job_submissions.length - 1].termination_reason ?? '-';
 };
+
+const capitalize = (str: string): string => str.charAt(0).toUpperCase() + str.slice(1);
+
+export const getJobStatusMessage = (job: IJob): string | null => {
+    const latest_submission = job.job_submissions?.[job.job_submissions.length - 1];
+    if (latest_submission?.status_message) {
+        return capitalize(latest_submission.status_message);
+    } else {
+        return capitalize(latest_submission.status);
+    }
+};
+
+export const getJobError = (job: IJob): string | null => {
+    return job.job_submissions?.[job.job_submissions.length - 1]?.error ?? null;
+};

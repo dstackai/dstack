@@ -163,14 +163,14 @@ def get_runs_table(
         table.add_column("ERROR", no_wrap=True, ratio=2)
 
     for run in runs:
-        run_error = _get_run_error(run)
         run = run._run  # TODO(egor-s): make public attribute
 
         run_row: Dict[Union[str, int], Any] = {
             "NAME": run.run_spec.run_name,
             "SUBMITTED": format_date(run.submitted_at),
-            "ERROR": run_error,
         }
+        if run.error:
+            run_row["ERROR"] = run.error
         if len(run.jobs) != 1:
             run_row["STATUS"] = run.status
             add_row_from_dict(table, run_row)
@@ -183,9 +183,9 @@ def get_runs_table(
                 status += f" (inactive for {inactive_for})"
             job_row: Dict[Union[str, int], Any] = {
                 "NAME": f"  replica={job.job_spec.replica_num} job={job.job_spec.job_num}",
-                "STATUS": latest_job_submission.pretty_repr,
+                "STATUS": latest_job_submission.status_message,
                 "SUBMITTED": format_date(latest_job_submission.submitted_at),
-                "ERROR": _get_job_error(job),
+                "ERROR": latest_job_submission.error,
             }
             jpd = latest_job_submission.job_provisioning_data
             if jpd is not None:

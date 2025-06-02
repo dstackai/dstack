@@ -148,9 +148,6 @@ class JobTerminationReason(str, Enum):
         }
         return mapping[self]
 
-    def pretty_repr(self) -> str:
-        return " ".join(self.value.split("_")).capitalize()
-
 
 class Requirements(CoreModel):
     # TODO: Make requirements' fields required
@@ -289,6 +286,9 @@ class JobSubmission(CoreModel):
     exit_status: Optional[int]
     job_provisioning_data: Optional[JobProvisioningData]
     job_runtime_data: Optional[JobRuntimeData]
+    # TODO: make status_message and error a computed field after migrating to pydanticV2
+    status_message: Optional[str]
+    error: Optional[str] = None
 
     @property
     def age(self) -> timedelta:
@@ -301,25 +301,80 @@ class JobSubmission(CoreModel):
             end_time = self.finished_at
         return end_time - self.submitted_at
 
-    @property
-    def pretty_repr(self) -> str:
-        status = self.status.value
-        termination_reason = self.termination_reason
+    @root_validator
+    def _status_message(cls, values) -> Dict:
+        try:
+            status = values["status"]
+            termination_reason = values["termination_reason"]
+            exit_code = values["exit_status"]
+        except KeyError:
+            return values
+        values["status_message"] = JobSubmission._get_status_message(
+            status=status,
+            termination_reason=termination_reason,
+            exit_status=exit_code,
+        )
+        return values
+
+    @staticmethod
+    def _get_status_message(
+        status: JobStatus,
+        termination_reason: Optional[JobTerminationReason],
+        exit_status: Optional[int],
+    ) -> str:
         if status == JobStatus.DONE:
             return "exited (0)"
         elif status == JobStatus.FAILED:
             if termination_reason == JobTerminationReason.CONTAINER_EXITED_WITH_ERROR:
-                return f"exited ({self.exit_status})"
+                return f"exited ({exit_status})"
             elif termination_reason == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY:
                 return "no offers"
             elif termination_reason == JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY:
                 return "interrupted"
+            else:
+                return "error"
         elif status == JobStatus.TERMINATED:
             if termination_reason == JobTerminationReason.TERMINATED_BY_USER:
                 return "stopped"
             elif termination_reason == JobTerminationReason.ABORTED_BY_USER:
                 return "aborted"
-        return status
+        return status.value
+
+    @root_validator
+    def _error(cls, values) -> Dict:
+        try:
+            termination_reason = values["termination_reason"]
+        except KeyError:
+            return values
+        values["error"] = JobSubmission._get_error(termination_reason=termination_reason)
+        return values
+
+    @staticmethod
+    def _get_error(termination_reason: Optional[JobTerminationReason]) -> Optional[str]:
+        if termination_reason == JobTerminationReason.INSTANCE_UNREACHABLE:
+            return "instance unreachable"
+        elif termination_reason == JobTerminationReason.WAITING_INSTANCE_LIMIT_EXCEEDED:
+            return "waiting instance limit exceeded"
+        elif termination_reason == JobTerminationReason.VOLUME_ERROR:
+            return "waiting runner limit exceeded"
+        elif termination_reason == JobTerminationReason.GATEWAY_ERROR:
+            return "gateway error"
+        elif termination_reason == JobTerminationReason.SCALED_DOWN:
+            return "scaled down"
+        elif termination_reason == JobTerminationReason.INACTIVITY_DURATION_EXCEEDED:
+            return "inactivity duration exceeded"
+        elif termination_reason == JobTerminationReason.TERMINATED_DUE_TO_UTILIZATION_POLICY:
+            return "utilization policy"
+        elif termination_reason == JobTerminationReason.PORTS_BINDING_FAILED:
+            return "ports binding failed"
+        elif termination_reason == JobTerminationReason.CREATING_CONTAINER_ERROR:
+            return "runner error"
+        elif termination_reason == JobTerminationReason.EXECUTOR_ERROR:
+            return "executor error"
+        elif termination_reason == JobTerminationReason.MAX_DURATION_EXCEEDED:
+            return "max duration exceeded"
+        else:
+            return None
 
 
 class Job(CoreModel):
@@ -465,14 +520,19 @@ class Run(CoreModel):
     def _error(cls, values) -> Dict:
         try:
             termination_reason = values["termination_reason"]
-            jobs = values["jobs"]
         except KeyError:
             return values
-        values["error"] = _get_run_error(
-            run_termination_reason=termination_reason,
-            run_jobs=jobs,
-        )
+        values["error"] = Run._get_error(termination_reason=termination_reason)
         return values
+
+    @staticmethod
+    def _get_error(termination_reason: Optional[RunTerminationReason]) -> Optional[str]:
+        if termination_reason == RunTerminationReason.RETRY_LIMIT_EXCEEDED:
+            return "retry limit exceeded"
+        elif termination_reason == RunTerminationReason.SERVER_ERROR:
+            return "server error"
+        else:
+            return None
 
 
 class JobPlan(CoreModel):
@@ -522,40 +582,3 @@ def get_policy_map(spot_policy: Optional[SpotPolicy], default: SpotPolicy) -> Op
         SpotPolicy.ONDEMAND: False,
     }
     return policy_map[spot_policy]
-
-
-def _get_run_error(
-    run_termination_reason: Optional[RunTerminationReason],
-    run_jobs: List[Job],
-) -> str:
-    if run_termination_reason is None:
-        return ""
-    if len(run_jobs) > 1:
-        return run_termination_reason.name
-    run_job_termination_reason, exit_status = _get_run_job_termination_reason_and_exit_status(
-        run_jobs
-    )
-    # For failed runs, also show termination reason to provide more context.
-    # For other run statuses, the job termination reason will duplicate run status.
-    if run_job_termination_reason is not None and run_termination_reason in [
-        RunTerminationReason.JOB_FAILED,
-        RunTerminationReason.SERVER_ERROR,
-        RunTerminationReason.RETRY_LIMIT_EXCEEDED,
-    ]:
-        if exit_status:
-            return (
-                f"{run_termination_reason.name}\n({run_job_termination_reason.name} {exit_status})"
-            )
-        return f"{run_termination_reason.name}\n({run_job_termination_reason.name})"
-    return run_termination_reason.name
-
-
-def _get_run_job_termination_reason_and_exit_status(
-    run_jobs: List[Job],
-) -> tuple[Optional[JobTerminationReason], Optional[int]]:
-    for job in run_jobs:
-        if len(job.job_submissions) > 0:
-            job_submission = job.job_submissions[-1]
-            if job_submission.termination_reason is not None:
-                return job_submission.termination_reason, job_submission.exit_status
-    return None, None

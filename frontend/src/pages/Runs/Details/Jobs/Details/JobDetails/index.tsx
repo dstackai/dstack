@@ -9,6 +9,7 @@ import { useGetRunQuery } from 'services/run';
 
 import { Logs } from '../../../Logs';
 import {
+    getJobError,
     getJobListItemBackend,
     getJobListItemInstance,
     getJobListItemPrice,
@@ -16,6 +17,7 @@ import {
     getJobListItemResources,
     getJobListItemSpot,
     getJobStatus,
+    getJobStatusMessage,
     getJobSubmittedAt,
     getJobTerminationReason,
 } from '../../List/helpers';
@@ -67,15 +69,15 @@ export const JobDetails = () => {
                     <div>
                         <Box variant="awsui-key-label">{t('projects.run.status')}</Box>
                         <div>
-                            <StatusIndicator type={getStatusIconType(getJobStatus(jobData))}>
-                                {t(`projects.run.statuses.${getJobStatus(jobData)}`)}
+                            <StatusIndicator type={getStatusIconType(getJobStatus(jobData), getJobTerminationReason(jobData))}>
+                                {getJobStatusMessage(jobData)}
                             </StatusIndicator>
                         </div>
                     </div>
 
                     <div>
-                        <Box variant="awsui-key-label">{t('projects.run.termination_reason')}</Box>
-                        <div>{getJobTerminationReason(jobData)}</div>
+                        <Box variant="awsui-key-label">{t('projects.run.error')}</Box>
+                        <div>{getJobError(jobData)}</div>
                     </div>
 
                     <div>
