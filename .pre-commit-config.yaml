@@ -19,7 +19,7 @@ repos:
       - id: end-of-file-fixer
 
   - repo: https://github.com/pre-commit/mirrors-eslint
-    rev: 'v9.28.0'
+    rev: 'v8.31.0'
     hooks:
       - id: eslint
         name: ESLint

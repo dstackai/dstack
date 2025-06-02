@@ -88,7 +88,8 @@ export const RunDetails = () => {
                             <StatusIndicator
                                 type={getStatusIconType(status, terminationReason)}
                                 colorOverride={
-                                getStatusIconColor(status, terminationReason)
+                                getStatusIconColor(status,
+                                    terminationReason)
                             }
                             >
                                 {getRunStatusMessage(runData)}
