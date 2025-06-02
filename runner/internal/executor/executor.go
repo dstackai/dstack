@@ -257,6 +257,8 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 	gpus_per_node_num := ex.clusterInfo.GPUSPerJob
 	gpus_num := nodes_num * gpus_per_node_num
 
+	mpiHostfilePath := filepath.Join(ex.homeDir, ".dstack/mpi/hostfile")
+
 	jobEnvs := map[string]string{
 		"DSTACK_RUN_ID":         ex.run.Id,
 		"DSTACK_JOB_ID":         ex.jobSubmission.Id,
@@ -268,6 +270,7 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 		"DSTACK_NODES_NUM":      strconv.Itoa(nodes_num),
 		"DSTACK_GPUS_PER_NODE":  strconv.Itoa(gpus_per_node_num),
 		"DSTACK_GPUS_NUM":       strconv.Itoa(gpus_num),
+		"DSTACK_MPI_HOSTFILE":   mpiHostfilePath,
 	}
 
 	// Call buildLDLibraryPathEnv and update jobEnvs if no error occurs
@@ -388,6 +391,11 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 		if err != nil {
 			log.Warning(ctx, "failed to configure SSH", "err", err)
 		}
+	}
+
+	err = writeMpiHostfile(ctx, ex.clusterInfo.JobIPs, gpus_per_node_num, mpiHostfilePath)
+	if err != nil {
+		return err
 	}
 
 	cmd.Env = envMap.Render()
@@ -694,6 +702,34 @@ func prepareSSHDir(uid int, gid int, homeDir string) (string, error) {
 		return "", err
 	}
 	return sshDir, nil
+}
+
+func writeMpiHostfile(ctx context.Context, ips []string, gpus_per_node int, path string) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	nonEmptyIps := []string{}
+	for _, ip := range ips {
+		if ip != "" {
+			nonEmptyIps = append(nonEmptyIps, ip)
+		}
+	}
+	if len(nonEmptyIps) == len(ips) {
+		for _, ip := range nonEmptyIps {
+			line := fmt.Sprintf("%s slots=%d\n", ip, gpus_per_node)
+			if _, err = file.WriteString(line); err != nil {
+				return err
+			}
+		}
+	} else {
+		log.Info(ctx, "creating empty MPI hostfile: no internal IPs assigned")
+	}
+	return nil
 }
 
 func writeDstackProfile(env map[string]string, path string) error {
