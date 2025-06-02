@@ -1,6 +1,7 @@
 import { format } from 'date-fns';
 
 import { DATE_TIME_FORMAT } from 'consts';
+import { capitalize } from 'libs';
 
 export const getJobListItemResources = (job: IJob) => {
     return job.job_submissions?.[job.job_submissions.length - 1]?.job_provisioning_data?.instance_type?.resources?.description;
@@ -45,8 +46,6 @@ export const getJobStatus = (job: IJob) => {
 export const getJobTerminationReason = (job: IJob) => {
     return job.job_submissions?.[job.job_submissions.length - 1].termination_reason ?? '-';
 };
-
-const capitalize = (str: string): string => str.charAt(0).toUpperCase() + str.slice(1);
 
 export const getJobStatusMessage = (job: IJob): string | null => {
     const latest_submission = job.job_submissions?.[job.job_submissions.length - 1];

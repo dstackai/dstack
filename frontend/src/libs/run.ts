@@ -1,10 +1,15 @@
 import { get as _get } from 'lodash';
 import { StatusIndicatorProps } from '@cloudscape-design/components';
 
+import { capitalize } from 'libs';
+
 import { IModelExtended } from '../pages/Models/List/types';
 
-export const getStatusIconType = (status: IRun['status'] | TJobStatus, termination_reason: string | null | undefined): StatusIndicatorProps['type'] => {
-    if (termination_reason === 'interrupted_by_no_capacity') {
+export const getStatusIconType = (
+    status: IRun['status'] | TJobStatus,
+    terminationReason: string | null | undefined,
+): StatusIndicatorProps['type'] => {
+    if (terminationReason === 'interrupted_by_no_capacity') {
         return 'stopped';
     }
     switch (status) {
@@ -28,25 +33,23 @@ export const getStatusIconType = (status: IRun['status'] | TJobStatus, terminati
     }
 };
 
-export const getStatusIconColor = (status: IRun['status'] | TJobStatus, termination_reason: string | null | undefined): StatusIndicatorProps.Color | undefined => {
-    if (termination_reason === 'failed_to_start_due_to_no_capacity' ||
-        termination_reason === 'interrupted_by_no_capacity'
-    ) {
+export const getStatusIconColor = (
+    status: IRun['status'] | TJobStatus,
+    terminationReason: string | null | undefined,
+): StatusIndicatorProps.Color | undefined => {
+    if (terminationReason === 'failed_to_start_due_to_no_capacity' || terminationReason === 'interrupted_by_no_capacity') {
         return 'yellow';
     }
 
     switch (status) {
         case 'pulling':
-            return 'green'
+            return 'green';
         case 'aborted':
-            return 'yellow'
+            return 'yellow';
         default:
             return undefined;
     }
 };
-
-
-const capitalize = (str: string): string => str.charAt(0).toUpperCase() + str.slice(1);
 
 export const getRunStatusMessage = (run: IRun): string => {
     if (run.latest_job_submission?.status_message) {
@@ -56,7 +59,7 @@ export const getRunStatusMessage = (run: IRun): string => {
     }
 };
 
-export const getRunError = (run: IRun): string | null  => {
+export const getRunError = (run: IRun): string | null => {
     const error = run.error ?? run.latest_job_submission?.error ?? null;
     return error ? capitalize(error) : null;
 };
