@@ -314,11 +314,8 @@ async def _process_active_run(session: AsyncSession, run_model: RunModel):
         else:
             raise ValueError(f"Unexpected termination reason {run_termination_reasons}")
     elif _should_stop_on_master_done(run):
-        logger.info(
-            "%s: run is done because master job is done",
-            fmt(run_model),
-        )
         new_status = RunStatus.TERMINATING
+        # ALL_JOBS_DONE is used for all DONE reasons including master-done
         termination_reason = RunTerminationReason.ALL_JOBS_DONE
     elif RunStatus.RUNNING in run_statuses:
         new_status = RunStatus.RUNNING
