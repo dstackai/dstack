@@ -90,6 +90,7 @@ export const RunDetails = () => {
                                 colorOverride={
                                 getStatusIconColor(status,
                                     terminationReason)
+
                             }
                             >
                                 {getRunStatusMessage(runData)}
