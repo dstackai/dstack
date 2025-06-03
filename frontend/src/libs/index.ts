@@ -112,3 +112,5 @@ export const isValidUrl = (urlString: string) => {
 export const includeSubString = (value: string, query: string) => {
     return value.toLowerCase().includes(query.trim().toLowerCase());
 };
+
+export const capitalize = (str: string): string => str.charAt(0).toUpperCase() + str.slice(1);

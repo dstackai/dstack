@@ -7,6 +7,7 @@ import { getStatusIconType } from 'libs/run';
 import { ROUTES } from 'routes';
 
 import {
+    getJobError,
     getJobListItemBackend,
     getJobListItemInstance,
     getJobListItemPrice,
@@ -14,7 +15,9 @@ import {
     getJobListItemResources,
     getJobListItemSpot,
     getJobStatus,
+    getJobStatusMessage,
     getJobSubmittedAt,
+    getJobTerminationReason,
 } from './helpers';
 
 export const useColumnsDefinitions = ({ projectName, runId }: { projectName: string; runId: string }) => {
@@ -43,12 +46,17 @@ export const useColumnsDefinitions = ({ projectName, runId }: { projectName: str
             cell: (item: IJob) => {
                 const status = getJobStatus(item);
 
-                if (!status) return '';
-
                 return (
-                    <StatusIndicator type={getStatusIconType(status)}>{t(`projects.run.statuses.${status}`)}</StatusIndicator>
+                    <StatusIndicator type={getStatusIconType(status, getJobTerminationReason(item))}>
+                        {getJobStatusMessage(item)}
+                    </StatusIndicator>
                 );
             },
+        },
+        {
+            id: 'error',
+            header: t('projects.run.error'),
+            cell: (item: IJob) => getJobError(item),
         },
         {
             id: 'resources',

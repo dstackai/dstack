@@ -1,9 +1,17 @@
 import { get as _get } from 'lodash';
 import { StatusIndicatorProps } from '@cloudscape-design/components';
 
+import { capitalize } from 'libs';
+
 import { IModelExtended } from '../pages/Models/List/types';
 
-export const getStatusIconType = (status: IRun['status']): StatusIndicatorProps['type'] => {
+export const getStatusIconType = (
+    status: IRun['status'] | TJobStatus,
+    terminationReason: string | null | undefined,
+): StatusIndicatorProps['type'] => {
+    if (terminationReason === 'interrupted_by_no_capacity') {
+        return 'stopped';
+    }
     switch (status) {
         case 'failed':
             return 'error';
@@ -23,6 +31,37 @@ export const getStatusIconType = (status: IRun['status']): StatusIndicatorProps[
         default:
             console.error(new Error('Undefined run status'));
     }
+};
+
+export const getStatusIconColor = (
+    status: IRun['status'] | TJobStatus,
+    terminationReason: string | null | undefined,
+): StatusIndicatorProps.Color | undefined => {
+    if (terminationReason === 'failed_to_start_due_to_no_capacity' || terminationReason === 'interrupted_by_no_capacity') {
+        return 'yellow';
+    }
+
+    switch (status) {
+        case 'pulling':
+            return 'green';
+        case 'aborted':
+            return 'yellow';
+        default:
+            return undefined;
+    }
+};
+
+export const getRunStatusMessage = (run: IRun): string => {
+    if (run.latest_job_submission?.status_message) {
+        return capitalize(run.latest_job_submission.status_message);
+    } else {
+        return capitalize(run.status);
+    }
+};
+
+export const getRunError = (run: IRun): string | null => {
+    const error = run.error ?? run.latest_job_submission?.error ?? null;
+    return error ? capitalize(error) : null;
 };
 
 export const getExtendedModelFromRun = (run: IRun): IModelExtended | null => {
