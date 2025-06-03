@@ -3,7 +3,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Optional, Set
 
 import gpuhunt
 from pydantic import parse_obj_as
@@ -41,7 +41,7 @@ from dstack._internal.core.models.configurations import (
 )
 from dstack._internal.core.models.repos.base import Repo
 from dstack._internal.core.models.resources import CPUSpec
-from dstack._internal.core.models.runs import JobSubmission, JobTerminationReason, RunStatus
+from dstack._internal.core.models.runs import JobSubmission, RunStatus
 from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.core.services.diff import diff_models
 from dstack._internal.utils.common import local_time
@@ -553,57 +553,44 @@ def _print_service_urls(run: Run) -> None:
 
 
 def print_finished_message(run: Run):
-    if run.status == RunStatus.DONE:
-        console.print("[code]Done[/]")
-        return
-
-    termination_reason, termination_reason_message, exit_status = (
-        _get_run_termination_reason_and_exit_status(run)
+    status_message = (
+        run._run.latest_job_submission.status_message
+        if run._run.latest_job_submission
+        else run._run.status_message
     )
-    message = "Run failed due to unknown reason. Check CLI, server, and run logs."
-    if run.status == RunStatus.TERMINATED:
-        message = "Run terminated due to unknown reason. Check CLI, server, and run logs."
+    error = (
+        run._run.latest_job_submission.error if run._run.latest_job_submission else run._run.error
+    )
+    termination_reason = (
+        run._run.latest_job_submission.termination_reason
+        if run._run.latest_job_submission
+        else None
+    )
+    termination_reason_message = (
+        run._run.latest_job_submission.termination_reason_message
+        if run._run.latest_job_submission
+        else None
+    )
+    if run.status == RunStatus.DONE:
+        console.print(f"[code]{status_message.capitalize()}[/code]")
+        return
+    else:
+        str = f"[error]{status_message.capitalize()}[/error]"
+        if error:
+            str += f" ([error]{error.capitalize()}[/error])"
+        console.print(str)
 
-    if termination_reason == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY:
-        message = (
-            "All provisioning attempts failed. "
-            "This is likely due to cloud providers not having enough capacity. "
-            "Check CLI and server logs for more details."
-        )
-    elif termination_reason is not None:
-        exit_status_details = f"Exit status: {exit_status}.\n" if exit_status else ""
-        error_details = (
-            f"Error: {termination_reason_message}\n" if termination_reason_message else ""
-        )
-        message = (
-            f"Run failed with error code {termination_reason.name}.\n"
-            f"{exit_status_details}"
-            f"{error_details}"
-            f"Check [bold]dstack logs -d {run.name}[/bold] for more details."
-        )
-    console.print(f"[error]{message}[/]")
+        if termination_reason_message:
+            console.print(f"[error]{termination_reason_message}[/error]")
+
+        if termination_reason:
+            console.print(f"Check [code]dstack logs -d {run.name}[/code] for more details.")
 
 
 def get_run_exit_code(run: Run) -> int:
     if run.status == RunStatus.DONE:
         return 0
     return 1
-
-
-def _get_run_termination_reason_and_exit_status(
-    run: Run,
-) -> Tuple[Optional[JobTerminationReason], Optional[str], Optional[int]]:
-    if len(run._run.jobs) == 0:
-        return None, None, None
-    job = run._run.jobs[0]
-    if len(job.job_submissions) == 0:
-        return None, None, None
-    job_submission = job.job_submissions[0]
-    return (
-        job_submission.termination_reason,
-        job_submission.termination_reason_message,
-        job_submission.exit_status,
-    )
 
 
 def _run_resubmitted(run: Run, current_job_submission: Optional[JobSubmission]) -> bool:
