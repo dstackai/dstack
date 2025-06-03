@@ -83,7 +83,7 @@ def _get_apply_plan_excludes(plan_input: ApplyFleetPlanInput) -> Dict:
     apply_plan_excludes = {}
     spec_excludes = _get_fleet_spec_excludes(plan_input.spec)
     if spec_excludes:
-        apply_plan_excludes["spec"] = apply_plan_excludes
+        apply_plan_excludes["spec"] = spec_excludes
     current_resource = plan_input.current_resource
     if current_resource is not None:
         current_resource_excludes = {}
