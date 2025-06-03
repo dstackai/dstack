@@ -246,9 +246,9 @@ export const ModelDetails: React.FC = () => {
             <Box variant="p">
                 {replacedStrings.filter((line, index) => {
                     if (
-                        languages.includes(line) &&
+                        languages.includes(line as string) &&
                         typeof replacedStrings[index + 1] !== 'string' &&
-                        typeof replacedStrings[index + 1] !== undefined
+                        typeof replacedStrings[index + 1] !== 'undefined'
                     ) {
                         return false;
                     }
@@ -270,6 +270,8 @@ export const ModelDetails: React.FC = () => {
         textAreaElement.style.height = textAreaElement.scrollHeight + 'px';
     };
 
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-expect-error
     const onKeyDown = (event) => {
         const isCtrlOrShiftKey = event?.detail?.ctrlKey || event?.detail?.shiftKey;
 

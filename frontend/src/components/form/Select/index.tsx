@@ -29,7 +29,7 @@ export const FormSelect = <T extends FieldValues>({
 
                 const onChangeSelect: SelectProps['onChange'] = (event) => {
                     onChange(event.detail.selectedOption.value);
-                    onChangeProp && onChangeProp(event);
+                    onChangeProp?.(event);
                 };
 
                 return (

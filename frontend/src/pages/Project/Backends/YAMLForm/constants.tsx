@@ -68,7 +68,10 @@ export const CONFIG_YAML_HELP_ENTERPRISE = {
             </p>
             <p>
                 Each backend type may support different properties. See the{' '}
-                <a href={'https://dstack.ai/docs/concepts/backends'} target='_blank'>documentaiton</a> for more examples.
+                <a href={'https://dstack.ai/docs/concepts/backends'} target="_blank">
+                    documentaiton
+                </a>{' '}
+                for more examples.
             </p>
         </>
     ),
