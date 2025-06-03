@@ -83,7 +83,7 @@ def _get_apply_plan_excludes(plan_input: ApplyFleetPlanInput) -> Dict:
     apply_plan_excludes = {}
     spec_excludes = _get_fleet_spec_excludes(plan_input.spec)
     if spec_excludes:
-        apply_plan_excludes["spec"] = apply_plan_excludes
+        apply_plan_excludes["spec"] = spec_excludes
     current_resource = plan_input.current_resource
     if current_resource is not None:
         current_resource_excludes = {}
@@ -126,6 +126,10 @@ def _get_fleet_spec_excludes(fleet_spec: FleetSpec) -> Optional[Dict]:
         configuration_excludes["tags"] = True
     if profile.tags is None:
         profile_excludes.add("tags")
+    if profile.startup_order is None:
+        profile_excludes.add("startup_order")
+    if profile.stop_criteria is None:
+        profile_excludes.add("stop_criteria")
     if configuration_excludes:
         spec_excludes["configuration"] = configuration_excludes
     if profile_excludes:

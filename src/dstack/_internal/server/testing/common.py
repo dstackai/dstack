@@ -308,12 +308,13 @@ async def create_job(
 ) -> JobModel:
     run_spec = RunSpec.parse_raw(run.run_spec)
     job_spec = (await get_job_specs_from_run_spec(run_spec, replica_num=replica_num))[0]
+    job_spec.job_num = job_num
     job = JobModel(
         project_id=run.project_id,
         run_id=run.id,
         run_name=run.run_name,
         job_num=job_num,
-        job_name=run.run_name + f"-0-{replica_num}",
+        job_name=run.run_name + f"-{job_num}-{replica_num}",
         replica_num=replica_num,
         submission_num=submission_num,
         submitted_at=submitted_at,

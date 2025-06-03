@@ -18,6 +18,7 @@ from dstack._internal.core.models.instances import (
     SSHConnectionParams,
 )
 from dstack._internal.core.models.metrics import Metric
+from dstack._internal.core.models.profiles import StartupOrder
 from dstack._internal.core.models.repos import RemoteRepoCreds
 from dstack._internal.core.models.runs import (
     ClusterInfo,
@@ -184,18 +185,10 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
         if job_provisioning_data.hostname is None:
             await _wait_for_instance_provisioning_data(job_model=job_model)
         else:
-            # Wait until all other jobs in the replica have IPs assigned.
-            # This is needed to ensure cluster_info has all IPs set.
-            for other_job in run.jobs:
-                if (
-                    other_job.job_spec.replica_num == job.job_spec.replica_num
-                    and other_job.job_submissions[-1].status == JobStatus.PROVISIONING
-                    and other_job.job_submissions[-1].job_provisioning_data is not None
-                    and other_job.job_submissions[-1].job_provisioning_data.hostname is None
-                ):
-                    job_model.last_processed_at = common_utils.get_current_datetime()
-                    await session.commit()
-                    return
+            if _should_wait_for_other_nodes(run, job, job_model):
+                job_model.last_processed_at = common_utils.get_current_datetime()
+                await session.commit()
+                return
 
             # fails are acceptable until timeout is exceeded
             if job_provisioning_data.dockerized:
@@ -404,6 +397,48 @@ async def _wait_for_instance_provisioning_data(job_model: JobModel):
         return
 
     job_model.job_provisioning_data = job_model.instance.job_provisioning_data
+
+
+def _should_wait_for_other_nodes(run: Run, job: Job, job_model: JobModel) -> bool:
+    for other_job in run.jobs:
+        if (
+            other_job.job_spec.replica_num == job.job_spec.replica_num
+            and other_job.job_submissions[-1].status == JobStatus.PROVISIONING
+            and other_job.job_submissions[-1].job_provisioning_data is not None
+            and other_job.job_submissions[-1].job_provisioning_data.hostname is None
+        ):
+            logger.debug(
+                "%s: waiting for other job to have IP assigned",
+                fmt(job_model),
+            )
+            return True
+    master_job = find_job(run.jobs, job.job_spec.replica_num, 0)
+    if (
+        job.job_spec.job_num != 0
+        and run.run_spec.merged_profile.startup_order == StartupOrder.MASTER_FIRST
+        and master_job.job_submissions[-1].status != JobStatus.RUNNING
+    ):
+        logger.debug(
+            "%s: waiting for master job to become running",
+            fmt(job_model),
+        )
+        return True
+    if (
+        job.job_spec.job_num == 0
+        and run.run_spec.merged_profile.startup_order == StartupOrder.WORKERS_FIRST
+    ):
+        for other_job in run.jobs:
+            if (
+                other_job.job_spec.replica_num == job.job_spec.replica_num
+                and other_job.job_spec.job_num != job.job_spec.job_num
+                and other_job.job_submissions[-1].status != JobStatus.RUNNING
+            ):
+                logger.debug(
+                    "%s: waiting for worker job to become running",
+                    fmt(job_model),
+                )
+                return True
+    return False
 
 
 @runner_ssh_tunnel(ports=[DSTACK_SHIM_HTTP_PORT], retries=1)

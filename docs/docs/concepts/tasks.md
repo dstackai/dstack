@@ -378,6 +378,7 @@ If you don't assign a value to an environment variable (see `HF_TOKEN` above),
     | `DSTACK_NODE_RANK`      | The rank of the node                                             |
     | `DSTACK_MASTER_NODE_IP` | The internal IP address of the master node                          |
     | `DSTACK_NODES_IPS`      | The list of internal IP addresses of all nodes delimited by "\n" |
+    | `DSTACK_MPI_HOSTFILE`   | The path to a pre-populated MPI hostfile                         |
 
 ### Spot policy
 

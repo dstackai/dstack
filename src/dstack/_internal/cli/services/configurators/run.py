@@ -41,7 +41,7 @@ from dstack._internal.core.models.configurations import (
 )
 from dstack._internal.core.models.repos.base import Repo
 from dstack._internal.core.models.resources import CPUSpec
-from dstack._internal.core.models.runs import JobSubmission, RunStatus
+from dstack._internal.core.models.runs import JobStatus, JobSubmission, RunStatus
 from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.core.services.diff import diff_models
 from dstack._internal.utils.common import local_time
@@ -591,6 +591,20 @@ def get_run_exit_code(run: Run) -> int:
     if run.status == RunStatus.DONE:
         return 0
     return 1
+
+
+def _is_ready_to_attach(run: Run) -> bool:
+    return not (
+        run.status
+        in [
+            RunStatus.SUBMITTED,
+            RunStatus.PENDING,
+            RunStatus.PROVISIONING,
+            RunStatus.TERMINATING,
+        ]
+        or run._run.jobs[0].job_submissions[-1].status
+        in [JobStatus.SUBMITTED, JobStatus.PROVISIONING, JobStatus.PULLING]
+    )
 
 
 def _run_resubmitted(run: Run, current_job_submission: Optional[JobSubmission]) -> bool:
