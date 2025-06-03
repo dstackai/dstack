@@ -12,7 +12,6 @@ from dstack._internal.core.models.profiles import (
     TerminationPolicy,
 )
 from dstack._internal.core.models.runs import (
-    Job,
     RunPlan,
 )
 from dstack._internal.core.services.profiles import get_termination
@@ -211,18 +210,3 @@ def get_runs_table(
             add_row_from_dict(table, job_row, style="secondary" if len(run.jobs) != 1 else None)
 
     return table
-
-
-def _get_run_error(run: Run) -> str:
-    return run._run.error or ""
-
-
-def _get_job_error(job: Job) -> str:
-    job_submission = job.job_submissions[-1]
-    termination_reason = job_submission.termination_reason
-    exit_status = job_submission.exit_status
-    if termination_reason is None:
-        return ""
-    if exit_status:
-        return f"{termination_reason.name} {exit_status}"
-    return termination_reason.name
