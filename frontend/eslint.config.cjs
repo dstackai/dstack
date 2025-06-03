@@ -1,28 +1,24 @@
-import { defineConfig, globalIgnores } from 'eslint/config';
-import i18N from 'eslint-plugin-i18n';
-import simpleImportSort from 'eslint-plugin-simple-import-sort';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { FlatCompat } from '@eslint/eslintrc';
-import js from '@eslint/js';
-import typescriptEslint from '@typescript-eslint/eslint-plugin';
-import tsParser from '@typescript-eslint/parser';
+const { defineConfig, globalIgnores } = require('eslint/config');
+const i18N = require('eslint-plugin-i18n');
+const simpleImportSort = require('eslint-plugin-simple-import-sort');
+const { FlatCompat } = require('@eslint/eslintrc');
+const js = require('@eslint/js');
+const typescriptEslint = require('@typescript-eslint/eslint-plugin');
+const tsParser = require('@typescript-eslint/parser');
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 const compat = new FlatCompat({
     baseDirectory: __dirname,
     recommendedConfig: js.configs.recommended,
     allConfig: js.configs.all,
 });
 
-export const BASE_CONFIG = {
+const BASE_CONFIG = {
     extends: compat.extends(
         'eslint:recommended',
         'plugin:@typescript-eslint/eslint-recommended',
         'plugin:@typescript-eslint/recommended',
         'prettier',
-        'plugin:prettier/recommended',
+        'plugin:prettier/recommended'
     ),
 
     plugins: {
@@ -56,7 +52,7 @@ export const BASE_CONFIG = {
     },
 };
 
-export default defineConfig([
+module.exports = defineConfig([
     globalIgnores([
         'node_modules',
         'build',

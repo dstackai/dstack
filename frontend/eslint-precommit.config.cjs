@@ -1,8 +1,7 @@
-import { defineConfig, globalIgnores } from 'eslint/config';
+const { defineConfig, globalIgnores } = require('eslint/config');
+const { BASE_CONFIG } = require('./eslint.config.cjs');
 
-import { BASE_CONFIG } from './eslint.config.mjs';
-
-export default defineConfig([
+module.exports = defineConfig([
     globalIgnores([
         'frontend/node_modules',
         'frontend/build',
@@ -16,8 +15,6 @@ export default defineConfig([
         'frontend/public',
         'frontend/staticServer.js',
         'frontend/webpack.config.js',
-        'docs/**/*',
     ]),
-
     { ...BASE_CONFIG },
 ]);
