@@ -22,8 +22,7 @@ repos:
     rev: 'v9.28.0'
     hooks:
       - id: eslint
-        args: ['--fix', '--config', 'frontend/eslint-precommit.config.cjs', '--no-warn-ignored', 'frontend/']
-        language: node
+        args: ['--fix', '--config', 'frontend/eslint-precommit.config.cjs', 'frontend/']
         files: ^frontend/.*\.(js|jsx|ts|tsx)$
         additional_dependencies:
           - eslint@9.28.0

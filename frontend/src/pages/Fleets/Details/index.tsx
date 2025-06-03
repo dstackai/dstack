@@ -34,7 +34,9 @@ export const FleetDetails: React.FC = () => {
     const { deleteFleets, isDeleting } = useDeleteFleet();
 
     const { data, isLoading } = useGetFleetDetailsQuery(
+
         {
+
             projectName: paramProjectName,
             fleetId: paramFleetId,
         },
