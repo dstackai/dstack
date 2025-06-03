@@ -23,9 +23,10 @@ repos:
     hooks:
       - id: eslint
         name: ESLint
-        entry: eslint --fix --config frontend/.eslintrc --ignore-path frontend/.eslintignore frontend/
+        entry: eslint --fix --config frontend/.eslintrc --ignore-path frontend/.eslintignore
         language: node
         pass_filenames: false
+        cwd: "frontend/"
         additional_dependencies:
           - eslint@8.31.0
           - eslint-config-prettier@8.10.0
