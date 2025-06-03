@@ -22,7 +22,7 @@ repos:
     rev: 'v9.28.0'
     hooks:
       - id: eslint
-        args: ['--fix', '--config', 'frontend/eslint-precommit.config.mjs', '--no-warn-ignored', 'frontend/']
+        args: ['--fix', '--config', './frontend/eslint-precommit.config.mjs', '--no-warn-ignored', './frontend/']
         additional_dependencies:
           - eslint@9.28.0
           - eslint-config-prettier@10.1.5
