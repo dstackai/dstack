@@ -154,8 +154,7 @@ def get_runs_table(
     table.add_column("BACKEND", style="grey58", ratio=2)
     table.add_column("RESOURCES", ratio=3 if not verbose else 2)
     if verbose:
-        table.add_column("INSTANCE", no_wrap=True, ratio=1)
-        table.add_column("RESERVATION", no_wrap=True, ratio=1)
+        table.add_column("INSTANCE TYPE", no_wrap=True, ratio=1)
     table.add_column("PRICE", style="grey58", ratio=1)
     table.add_column("STATUS", no_wrap=True, ratio=1)
     table.add_column("SUBMITTED", style="grey58", no_wrap=True, ratio=1)
@@ -190,18 +189,19 @@ def get_runs_table(
             jpd = latest_job_submission.job_provisioning_data
             if jpd is not None:
                 resources = jpd.instance_type.resources
-                instance = jpd.instance_type.name
+                instance_type = jpd.instance_type.name
                 jrd = latest_job_submission.job_runtime_data
                 if jrd is not None and jrd.offer is not None:
                     resources = jrd.offer.instance.resources
                     if jrd.offer.total_blocks > 1:
-                        instance += f" ({jrd.offer.blocks}/{jrd.offer.total_blocks})"
+                        instance_type += f" ({jrd.offer.blocks}/{jrd.offer.total_blocks})"
+                if jpd.reservation:
+                    instance_type += f" ({jpd.reservation})"
                 job_row.update(
                     {
                         "BACKEND": f"{jpd.backend.value.replace('remote', 'ssh')} ({jpd.region})",
                         "RESOURCES": resources.pretty_format(include_spot=True),
-                        "INSTANCE": instance,
-                        "RESERVATION": jpd.reservation,
+                        "INSTANCE TYPE": instance_type,
                         "PRICE": f"${jpd.price:.4f}".rstrip("0").rstrip("."),
                     }
                 )
