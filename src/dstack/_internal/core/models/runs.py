@@ -351,30 +351,20 @@ class JobSubmission(CoreModel):
 
     @staticmethod
     def _get_error(termination_reason: Optional[JobTerminationReason]) -> Optional[str]:
-        if termination_reason == JobTerminationReason.INSTANCE_UNREACHABLE:
-            return "instance unreachable"
-        elif termination_reason == JobTerminationReason.WAITING_INSTANCE_LIMIT_EXCEEDED:
-            return "waiting instance limit exceeded"
-        elif termination_reason == JobTerminationReason.VOLUME_ERROR:
-            return "waiting runner limit exceeded"
-        elif termination_reason == JobTerminationReason.GATEWAY_ERROR:
-            return "gateway error"
-        elif termination_reason == JobTerminationReason.SCALED_DOWN:
-            return "scaled down"
-        elif termination_reason == JobTerminationReason.INACTIVITY_DURATION_EXCEEDED:
-            return "inactivity duration exceeded"
-        elif termination_reason == JobTerminationReason.TERMINATED_DUE_TO_UTILIZATION_POLICY:
-            return "utilization policy"
-        elif termination_reason == JobTerminationReason.PORTS_BINDING_FAILED:
-            return "ports binding failed"
-        elif termination_reason == JobTerminationReason.CREATING_CONTAINER_ERROR:
-            return "runner error"
-        elif termination_reason == JobTerminationReason.EXECUTOR_ERROR:
-            return "executor error"
-        elif termination_reason == JobTerminationReason.MAX_DURATION_EXCEEDED:
-            return "max duration exceeded"
-        else:
-            return None
+        error_mapping = {
+            JobTerminationReason.INSTANCE_UNREACHABLE: "instance unreachable",
+            JobTerminationReason.WAITING_INSTANCE_LIMIT_EXCEEDED: "waiting instance limit exceeded",
+            JobTerminationReason.VOLUME_ERROR: "waiting runner limit exceeded",
+            JobTerminationReason.GATEWAY_ERROR: "gateway error",
+            JobTerminationReason.SCALED_DOWN: "scaled down",
+            JobTerminationReason.INACTIVITY_DURATION_EXCEEDED: "inactivity duration exceeded",
+            JobTerminationReason.TERMINATED_DUE_TO_UTILIZATION_POLICY: "utilization policy",
+            JobTerminationReason.PORTS_BINDING_FAILED: "ports binding failed",
+            JobTerminationReason.CREATING_CONTAINER_ERROR: "runner error",
+            JobTerminationReason.EXECUTOR_ERROR: "executor error",
+            JobTerminationReason.MAX_DURATION_EXCEEDED: "max duration exceeded",
+        }
+        return error_mapping.get(termination_reason)
 
 
 class Job(CoreModel):
