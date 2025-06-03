@@ -12,7 +12,6 @@ from dstack._internal.core.models.profiles import (
     TerminationPolicy,
 )
 from dstack._internal.core.models.runs import (
-    Job,
     RunPlan,
 )
 from dstack._internal.core.services.profiles import get_termination
@@ -154,8 +153,7 @@ def get_runs_table(
     table.add_column("BACKEND", style="grey58", ratio=2)
     table.add_column("RESOURCES", ratio=3 if not verbose else 2)
     if verbose:
-        table.add_column("INSTANCE", no_wrap=True, ratio=1)
-        table.add_column("RESERVATION", no_wrap=True, ratio=1)
+        table.add_column("INSTANCE TYPE", no_wrap=True, ratio=1)
     table.add_column("PRICE", style="grey58", ratio=1)
     table.add_column("STATUS", no_wrap=True, ratio=1)
     table.add_column("SUBMITTED", style="grey58", no_wrap=True, ratio=1)
@@ -163,14 +161,14 @@ def get_runs_table(
         table.add_column("ERROR", no_wrap=True, ratio=2)
 
     for run in runs:
-        run_error = _get_run_error(run)
         run = run._run  # TODO(egor-s): make public attribute
 
         run_row: Dict[Union[str, int], Any] = {
             "NAME": run.run_spec.run_name,
             "SUBMITTED": format_date(run.submitted_at),
-            "ERROR": run_error,
         }
+        if run.error:
+            run_row["ERROR"] = run.error
         if len(run.jobs) != 1:
             run_row["STATUS"] = run.status
             add_row_from_dict(table, run_row)
@@ -183,25 +181,26 @@ def get_runs_table(
                 status += f" (inactive for {inactive_for})"
             job_row: Dict[Union[str, int], Any] = {
                 "NAME": f"  replica={job.job_spec.replica_num} job={job.job_spec.job_num}",
-                "STATUS": status,
+                "STATUS": latest_job_submission.status_message,
                 "SUBMITTED": format_date(latest_job_submission.submitted_at),
-                "ERROR": _get_job_error(job),
+                "ERROR": latest_job_submission.error,
             }
             jpd = latest_job_submission.job_provisioning_data
             if jpd is not None:
                 resources = jpd.instance_type.resources
-                instance = jpd.instance_type.name
+                instance_type = jpd.instance_type.name
                 jrd = latest_job_submission.job_runtime_data
                 if jrd is not None and jrd.offer is not None:
                     resources = jrd.offer.instance.resources
                     if jrd.offer.total_blocks > 1:
-                        instance += f" ({jrd.offer.blocks}/{jrd.offer.total_blocks})"
+                        instance_type += f" ({jrd.offer.blocks}/{jrd.offer.total_blocks})"
+                if jpd.reservation:
+                    instance_type += f" ({jpd.reservation})"
                 job_row.update(
                     {
                         "BACKEND": f"{jpd.backend.value.replace('remote', 'ssh')} ({jpd.region})",
                         "RESOURCES": resources.pretty_format(include_spot=True),
-                        "INSTANCE": instance,
-                        "RESERVATION": jpd.reservation,
+                        "INSTANCE TYPE": instance_type,
                         "PRICE": f"${jpd.price:.4f}".rstrip("0").rstrip("."),
                     }
                 )
@@ -211,18 +210,3 @@ def get_runs_table(
             add_row_from_dict(table, job_row, style="secondary" if len(run.jobs) != 1 else None)
 
     return table
-
-
-def _get_run_error(run: Run) -> str:
-    return run._run.error or ""
-
-
-def _get_job_error(job: Job) -> str:
-    job_submission = job.job_submissions[-1]
-    termination_reason = job_submission.termination_reason
-    exit_status = job_submission.exit_status
-    if termination_reason is None:
-        return ""
-    if exit_status:
-        return f"{termination_reason.name} {exit_status}"
-    return termination_reason.name
