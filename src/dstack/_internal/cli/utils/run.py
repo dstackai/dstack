@@ -170,7 +170,11 @@ def get_runs_table(
         if run.error:
             run_row["ERROR"] = run.error
         if len(run.jobs) != 1:
-            run_row["STATUS"] = run.status
+            run_row["STATUS"] = (
+                run.latest_job_submission.status_message
+                if run.latest_job_submission
+                else run.status
+            )
             add_row_from_dict(table, run_row)
 
         for job in run.jobs:

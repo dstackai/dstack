@@ -15,9 +15,10 @@ export const getStatusIconType = (
     switch (status) {
         case 'failed':
             return 'error';
+        case 'done':
+            return 'success';
         case 'aborted':
         case 'terminated':
-        case 'done':
             return 'stopped';
         case 'running':
             return 'success';
@@ -46,6 +47,8 @@ export const getStatusIconColor = (
             return 'green';
         case 'aborted':
             return 'yellow';
+        case 'done':
+            return 'blue';
         default:
             return undefined;
     }
