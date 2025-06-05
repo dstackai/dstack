@@ -998,7 +998,11 @@ class TestSetProjectMembers:
 
 class TestListUserProjectsService:
     """Test the service-level functions for backward compatibility"""
+<<<<<<< HEAD
 
+=======
+    
+>>>>>>> 325b0c98 (test: Add service-level tests for backward compatibility)
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_list_user_projects_only_returns_member_projects(
@@ -1011,7 +1015,11 @@ class TestListUserProjectsService:
             created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
             global_role=GlobalRole.USER,
         )
+<<<<<<< HEAD
 
+=======
+        
+>>>>>>> 325b0c98 (test: Add service-level tests for backward compatibility)
         # Create a different user who is not a member
         non_member = await create_user(
             session=session,
@@ -1019,7 +1027,11 @@ class TestListUserProjectsService:
             created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
             global_role=GlobalRole.USER,
         )
+<<<<<<< HEAD
 
+=======
+        
+>>>>>>> 325b0c98 (test: Add service-level tests for backward compatibility)
         # Create a public project
         public_project = await create_project(
             session=session,
@@ -1028,11 +1040,16 @@ class TestListUserProjectsService:
             created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
             is_public=True,
         )
+<<<<<<< HEAD
 
+=======
+        
+>>>>>>> 325b0c98 (test: Add service-level tests for backward compatibility)
         # Add owner as admin
         await add_project_member(
             session=session, project=public_project, user=owner, project_role=ProjectRole.ADMIN
         )
+<<<<<<< HEAD
 
         # Test: list_user_projects should NOT return public projects for non-members
         from dstack._internal.server.services.projects import list_user_projects
@@ -1040,6 +1057,14 @@ class TestListUserProjectsService:
         projects = await list_user_projects(session=session, user=non_member)
         assert len(projects) == 0  # Non-member should see NO projects
 
+=======
+        
+        # Test: list_user_projects should NOT return public projects for non-members
+        from dstack._internal.server.services.projects import list_user_projects
+        projects = await list_user_projects(session=session, user=non_member)
+        assert len(projects) == 0  # Non-member should see NO projects
+        
+>>>>>>> 325b0c98 (test: Add service-level tests for backward compatibility)
         # Test: list_user_projects should return projects where user IS a member
         projects = await list_user_projects(session=session, user=owner)
         assert len(projects) == 1
@@ -1057,7 +1082,11 @@ class TestListUserProjectsService:
             created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
             global_role=GlobalRole.USER,
         )
+<<<<<<< HEAD
 
+=======
+        
+>>>>>>> 325b0c98 (test: Add service-level tests for backward compatibility)
         # Create a different user who is not a member
         non_member = await create_user(
             session=session,
@@ -1065,7 +1094,11 @@ class TestListUserProjectsService:
             created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
             global_role=GlobalRole.USER,
         )
+<<<<<<< HEAD
 
+=======
+        
+>>>>>>> 325b0c98 (test: Add service-level tests for backward compatibility)
         # Create a public project
         public_project = await create_project(
             session=session,
@@ -1074,7 +1107,11 @@ class TestListUserProjectsService:
             created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
             is_public=True,
         )
+<<<<<<< HEAD
 
+=======
+        
+>>>>>>> 325b0c98 (test: Add service-level tests for backward compatibility)
         # Create a private project
         private_project = await create_project(
             session=session,
@@ -1083,7 +1120,11 @@ class TestListUserProjectsService:
             created_at=datetime(2023, 1, 2, 3, 5, tzinfo=timezone.utc),
             is_public=False,
         )
+<<<<<<< HEAD
 
+=======
+        
+>>>>>>> 325b0c98 (test: Add service-level tests for backward compatibility)
         # Add owner as admin to both projects
         await add_project_member(
             session=session, project=public_project, user=owner, project_role=ProjectRole.ADMIN
@@ -1091,6 +1132,7 @@ class TestListUserProjectsService:
         await add_project_member(
             session=session, project=private_project, user=owner, project_role=ProjectRole.ADMIN
         )
+<<<<<<< HEAD
 
         # Test: list_user_accessible_projects should return public projects for non-members
         from dstack._internal.server.services.projects import list_user_accessible_projects
@@ -1099,6 +1141,15 @@ class TestListUserProjectsService:
         assert len(projects) == 1  # Should see only the public project
         assert projects[0].project_name == "public_project"
 
+=======
+        
+        # Test: list_user_accessible_projects should return public projects for non-members
+        from dstack._internal.server.services.projects import list_user_accessible_projects
+        projects = await list_user_accessible_projects(session=session, user=non_member)
+        assert len(projects) == 1  # Should see only the public project
+        assert projects[0].project_name == "public_project"
+        
+>>>>>>> 325b0c98 (test: Add service-level tests for backward compatibility)
         # Test: list_user_accessible_projects should return ALL projects for members
         projects = await list_user_accessible_projects(session=session, user=owner)
         assert len(projects) == 2  # Should see both projects
