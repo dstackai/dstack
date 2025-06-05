@@ -866,3 +866,112 @@ class TestSetProjectMembers:
             json=body,
         )
         assert response.status_code == 403
+
+
+class TestListUserProjectsService:
+    """Test the service-level functions for backward compatibility"""
+    
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_list_user_projects_only_returns_member_projects(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        # Create project owner
+        owner = await create_user(
+            session=session,
+            name="owner",
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+            global_role=GlobalRole.USER,
+        )
+        
+        # Create a different user who is not a member
+        non_member = await create_user(
+            session=session,
+            name="non_member",
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+            global_role=GlobalRole.USER,
+        )
+        
+        # Create a public project
+        public_project = await create_project(
+            session=session,
+            owner=owner,
+            name="public_project",
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+            is_public=True,
+        )
+        
+        # Add owner as admin
+        await add_project_member(
+            session=session, project=public_project, user=owner, project_role=ProjectRole.ADMIN
+        )
+        
+        # Test: list_user_projects should NOT return public projects for non-members
+        from dstack._internal.server.services.projects import list_user_projects
+        projects = await list_user_projects(session=session, user=non_member)
+        assert len(projects) == 0  # Non-member should see NO projects
+        
+        # Test: list_user_projects should return projects where user IS a member
+        projects = await list_user_projects(session=session, user=owner)
+        assert len(projects) == 1
+        assert projects[0].project_name == "public_project"
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_list_user_accessible_projects_returns_member_and_public_projects(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        # Create project owner
+        owner = await create_user(
+            session=session,
+            name="owner",
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+            global_role=GlobalRole.USER,
+        )
+        
+        # Create a different user who is not a member
+        non_member = await create_user(
+            session=session,
+            name="non_member",
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+            global_role=GlobalRole.USER,
+        )
+        
+        # Create a public project
+        public_project = await create_project(
+            session=session,
+            owner=owner,
+            name="public_project",
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+            is_public=True,
+        )
+        
+        # Create a private project
+        private_project = await create_project(
+            session=session,
+            owner=owner,
+            name="private_project",
+            created_at=datetime(2023, 1, 2, 3, 5, tzinfo=timezone.utc),
+            is_public=False,
+        )
+        
+        # Add owner as admin to both projects
+        await add_project_member(
+            session=session, project=public_project, user=owner, project_role=ProjectRole.ADMIN
+        )
+        await add_project_member(
+            session=session, project=private_project, user=owner, project_role=ProjectRole.ADMIN
+        )
+        
+        # Test: list_user_accessible_projects should return public projects for non-members
+        from dstack._internal.server.services.projects import list_user_accessible_projects
+        projects = await list_user_accessible_projects(session=session, user=non_member)
+        assert len(projects) == 1  # Should see only the public project
+        assert projects[0].project_name == "public_project"
+        
+        # Test: list_user_accessible_projects should return ALL projects for members
+        projects = await list_user_accessible_projects(session=session, user=owner)
+        assert len(projects) == 2  # Should see both projects
+        project_names = [p.project_name for p in projects]
+        assert "public_project" in project_names
+        assert "private_project" in project_names
