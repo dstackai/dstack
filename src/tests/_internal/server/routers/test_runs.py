@@ -247,6 +247,7 @@ def get_dev_env_run_dict(
         "submitted_at": submitted_at,
         "last_processed_at": last_processed_at,
         "status": "submitted",
+        "status_message": "submitted",
         "run_spec": {
             "configuration": {
                 "entrypoint": None,
@@ -510,6 +511,7 @@ class TestListRuns:
                 "submitted_at": run1_submitted_at.isoformat(),
                 "last_processed_at": run1_submitted_at.isoformat(),
                 "status": "submitted",
+                "status_message": "submitted",
                 "run_spec": run1_spec.dict(),
                 "jobs": [
                     {
@@ -563,6 +565,7 @@ class TestListRuns:
                 "submitted_at": run2_submitted_at.isoformat(),
                 "last_processed_at": run2_submitted_at.isoformat(),
                 "status": "submitted",
+                "status_message": "submitted",
                 "run_spec": run2_spec.dict(),
                 "jobs": [],
                 "latest_job_submission": None,
