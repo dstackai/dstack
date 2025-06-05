@@ -81,7 +81,9 @@ class TestListProjects:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_returns_public_projects_to_non_members(self, test_db, session: AsyncSession, client: AsyncClient):
+    async def test_returns_public_projects_to_non_members(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         # Create project owner
         owner = await create_user(
             session=session,
@@ -136,7 +138,9 @@ class TestListProjects:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_member_sees_both_public_and_private_projects(self, test_db, session: AsyncSession, client: AsyncClient):
+    async def test_member_sees_both_public_and_private_projects(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         # Create project owner
         owner = await create_user(
             session=session,
