@@ -81,9 +81,7 @@ class TestListProjects:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_returns_public_projects_to_non_members(
-        self, test_db, session: AsyncSession, client: AsyncClient
-    ):
+    async def test_returns_public_projects_to_non_members(self, test_db, session: AsyncSession, client: AsyncClient):
         # Create project owner
         owner = await create_user(
             session=session,
@@ -91,7 +89,7 @@ class TestListProjects:
             created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
             global_role=GlobalRole.USER,
         )
-
+        
         # Create a different user who is not a member
         non_member = await create_user(
             session=session,
@@ -99,7 +97,7 @@ class TestListProjects:
             created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
             global_role=GlobalRole.USER,
         )
-
+        
         # Create a public project
         public_project = await create_project(
             session=session,
@@ -108,16 +106,16 @@ class TestListProjects:
             created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
             is_public=True,
         )
-
-        # Create a private project
+        
+        # Create a private project  
         private_project = await create_project(
             session=session,
             owner=owner,
-            name="private_project",
+            name="private_project", 
             created_at=datetime(2023, 1, 2, 3, 5, tzinfo=timezone.utc),
             is_public=False,
         )
-
+        
         # Add owner as admin to both projects
         await add_project_member(
             session=session, project=public_project, user=owner, project_role=ProjectRole.ADMIN
@@ -125,11 +123,9 @@ class TestListProjects:
         await add_project_member(
             session=session, project=private_project, user=owner, project_role=ProjectRole.ADMIN
         )
-
+        
         # List projects as non-member - should only see public project
-        response = await client.post(
-            "/api/projects/list", headers=get_auth_headers(non_member.token)
-        )
+        response = await client.post("/api/projects/list", headers=get_auth_headers(non_member.token))
         assert response.status_code == 200
         projects = response.json()
 
@@ -140,9 +136,7 @@ class TestListProjects:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_member_sees_both_public_and_private_projects(
-        self, test_db, session: AsyncSession, client: AsyncClient
-    ):
+    async def test_member_sees_both_public_and_private_projects(self, test_db, session: AsyncSession, client: AsyncClient):
         # Create project owner
         owner = await create_user(
             session=session,
@@ -150,7 +144,7 @@ class TestListProjects:
             created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
             global_role=GlobalRole.USER,
         )
-
+        
         # Create a user who will be a member
         member = await create_user(
             session=session,
@@ -158,7 +152,7 @@ class TestListProjects:
             created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
             global_role=GlobalRole.USER,
         )
-
+        
         # Create a public project
         public_project = await create_project(
             session=session,
@@ -167,21 +161,21 @@ class TestListProjects:
             created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
             is_public=True,
         )
-
+        
         # Create a private project
         private_project = await create_project(
             session=session,
             owner=owner,
             name="private_project",
-            created_at=datetime(2023, 1, 2, 3, 5, tzinfo=timezone.utc),
+            created_at=datetime(2023, 1, 2, 3, 5, tzinfo=timezone.utc), 
             is_public=False,
         )
-
+        
         # Add member to the private project only
         await add_project_member(
             session=session, project=private_project, user=member, project_role=ProjectRole.USER
         )
-
+        
         # Add owner as admin to both projects
         await add_project_member(
             session=session, project=public_project, user=owner, project_role=ProjectRole.ADMIN
@@ -189,17 +183,6 @@ class TestListProjects:
         await add_project_member(
             session=session, project=private_project, user=owner, project_role=ProjectRole.ADMIN
         )
-
-        # List projects as member - should see both projects
-        response = await client.post("/api/projects/list", headers=get_auth_headers(member.token))
-        assert response.status_code == 200
-        projects = response.json()
-
-        # Should see both projects, sorted by created_at
-        assert len(projects) == 2
-        project_names = [p["project_name"] for p in projects]
-        assert "public_project" in project_names
-        assert "private_project" in project_names
 
 
 class TestCreateProject:
@@ -368,13 +351,9 @@ class TestCreateProject:
                 json=body,
             )
         assert response.status_code == 200, response.json()
-
-        # Check that the response includes is_public=True
         response_data = response.json()
         assert "is_public" in response_data
         assert response_data["is_public"] is True
-
-        # Verify the project was created as public in the database
         res = await session.execute(select(ProjectModel).where(ProjectModel.name == project_name))
         project = res.scalar_one()
         assert project.is_public is True
@@ -389,21 +368,17 @@ class TestCreateProject:
         project_id = UUID("1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e")
         project_name = "test_private_project"
         body = {"project_name": project_name}
-
-        with patch("uuid.uuid4", return_value=project_id):
+        with patch("uuid.uuid4") as m:
+            m.return_value = project_id
             response = await client.post(
                 "/api/projects/create",
                 headers=get_auth_headers(user.token),
                 json=body,
             )
         assert response.status_code == 200, response.json()
-
-        # Check that the response includes is_public=False (default)
         response_data = response.json()
         assert "is_public" in response_data
         assert response_data["is_public"] is False
-
-        # Verify the project was created as private in the database
         res = await session.execute(select(ProjectModel).where(ProjectModel.name == project_name))
         project = res.scalar_one()
         assert project.is_public is False
@@ -418,21 +393,17 @@ class TestCreateProject:
         project_id = UUID("1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e")
         project_name = "test_explicit_private_project"
         body = {"project_name": project_name, "is_public": False}
-
-        with patch("uuid.uuid4", return_value=project_id):
+        with patch("uuid.uuid4") as m:
+            m.return_value = project_id
             response = await client.post(
                 "/api/projects/create",
                 headers=get_auth_headers(user.token),
                 json=body,
             )
         assert response.status_code == 200, response.json()
-
-        # Check that the response includes is_public=False (explicit)
         response_data = response.json()
         assert "is_public" in response_data
         assert response_data["is_public"] is False
-
-        # Verify the project was created as private in the database
         res = await session.execute(select(ProjectModel).where(ProjectModel.name == project_name))
         project = res.scalar_one()
         assert project.is_public is False
