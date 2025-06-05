@@ -81,7 +81,9 @@ class TestListProjects:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_returns_public_projects_to_non_members(self, test_db, session: AsyncSession, client: AsyncClient):
+    async def test_returns_public_projects_to_non_members(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         # Create project owner
         owner = await create_user(
             session=session,
@@ -136,7 +138,9 @@ class TestListProjects:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_member_sees_both_public_and_private_projects(self, test_db, session: AsyncSession, client: AsyncClient):
+    async def test_member_sees_both_public_and_private_projects(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         # Create project owner
         owner = await create_user(
             session=session,
@@ -347,7 +351,9 @@ class TestCreateProject:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     @freeze_time(datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-    async def test_creates_public_project(self, test_db, session: AsyncSession, client: AsyncClient):
+    async def test_creates_public_project(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session=session)
         project_id = UUID("1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e")
         project_name = "test_public_project"
@@ -376,58 +382,58 @@ class TestCreateProject:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     @freeze_time(datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-    async def test_creates_private_project_by_default(self, test_db, session: AsyncSession, client: AsyncClient):
+    async def test_creates_private_project_by_default(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session=session)
         project_id = UUID("1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e")
         project_name = "test_private_project"
-        body = {"project_name": project_name}  # No is_public specified
-        with patch("uuid.uuid4") as m:
-            m.return_value = project_id
+        body = {"project_name": project_name}
+
+        with patch("uuid.uuid4", return_value=project_id):
             response = await client.post(
                 "/api/projects/create",
                 headers=get_auth_headers(user.token),
                 json=body,
             )
         assert response.status_code == 200, response.json()
-        
+
         # Check that the response includes is_public=False (default)
         response_data = response.json()
         assert "is_public" in response_data
         assert response_data["is_public"] is False
-        
+
         # Verify the project was created as private in the database
-        res = await session.execute(
-            select(ProjectModel).where(ProjectModel.name == project_name)
-        )
+        res = await session.execute(select(ProjectModel).where(ProjectModel.name == project_name))
         project = res.scalar_one()
         assert project.is_public is False
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     @freeze_time(datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-    async def test_creates_private_project_explicitly(self, test_db, session: AsyncSession, client: AsyncClient):
+    async def test_creates_private_project_explicitly(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session=session)
         project_id = UUID("1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e")
         project_name = "test_explicit_private_project"
-        body = {"project_name": project_name, "is_public": False}  # Explicitly set to false
-        with patch("uuid.uuid4") as m:
-            m.return_value = project_id
+        body = {"project_name": project_name, "is_public": False}
+
+        with patch("uuid.uuid4", return_value=project_id):
             response = await client.post(
                 "/api/projects/create",
                 headers=get_auth_headers(user.token),
                 json=body,
             )
         assert response.status_code == 200, response.json()
-        
+
         # Check that the response includes is_public=False (explicit)
         response_data = response.json()
         assert "is_public" in response_data
         assert response_data["is_public"] is False
-        
+
         # Verify the project was created as private in the database
-        res = await session.execute(
-            select(ProjectModel).where(ProjectModel.name == project_name)
-        )
+        res = await session.execute(select(ProjectModel).where(ProjectModel.name == project_name))
         project = res.scalar_one()
         assert project.is_public is False
 
