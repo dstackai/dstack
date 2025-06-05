@@ -262,11 +262,22 @@ async def list_user_project_models(
     session: AsyncSession,
     user: UserModel,
     include_members: bool = False,
-) -> List[ProjectModel]:    
+) -> List[ProjectModel]:
+    """
+    Get projects for a user where they are a member.
+
+    Args:
+        session: Database session
+        user: User model
+        include_members: Whether to join and load project members
+
+    Returns:
+        List of ProjectModel instances where user is a member
+    """
     options = []
     if include_members:
         options.append(joinedload(ProjectModel.members))
-    
+
     res = await session.execute(
         select(ProjectModel)
         .where(
@@ -276,7 +287,7 @@ async def list_user_project_models(
         )
         .options(*options)
     )
-    
+
     return list(res.scalars().unique().all())
 
 
@@ -288,13 +299,12 @@ async def _list_public_non_member_project_models(
     Get public projects where user is NOT a member.
     """
     res = await session.execute(
-        select(ProjectModel)
-        .where(
+        select(ProjectModel).where(
             ProjectModel.deleted == False,
             ProjectModel.is_public == True,
             ProjectModel.id.notin_(
                 select(MemberModel.project_id).where(MemberModel.user_id == user.id)
-            )
+            ),
         )
     )
     return list(res.scalars().all())
