@@ -49,6 +49,7 @@ async def create_project(
         session=session,
         user=user,
         project_name=body.project_name,
+        is_public=body.is_public,
     )
 
 
