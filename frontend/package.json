@@ -105,21 +105,27 @@
     "classnames": "^2.5.1",
     "css-minimizer-webpack-plugin": "^4.2.2",
     "date-fns": "^2.29.3",
-    "i18next": "^24.0.2",
+    "i18next": "^24.2.3",
     "lodash": "^4.17.21",
-    "openai": "^4.33.1",
+    "openai": "^4.104.0",
     "prismjs": "^1.29.0",
     "rc-tooltip": "^5.2.2",
     "react": "^18.3.1",
     "react-avatar": "^5.0.3",
     "react-dom": "^18.3.1",
     "react-helmet": "^6.1.0",
-    "react-hook-form": "^7.53.0",
-    "react-i18next": "^12.1.4",
+    "react-hook-form": "^7.56.4",
+    "react-i18next": "^12.3.1",
     "react-redux": "^8.0.5",
-    "react-router-dom": "^6.27.0",
+    "react-router-dom": "^6.30.1",
     "react-string-replace": "^1.1.1",
     "redux": "^5.0.1",
     "yup": "^0.32.11"
+  },
+  "common": {
+    "cancel": "Cancel"
+  },
+  "models": {
+    "generating": "Generating..."
   }
 }

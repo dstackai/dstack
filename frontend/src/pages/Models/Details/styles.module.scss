@@ -89,3 +89,15 @@
         top: 80px;
     }
 }
+
+.generatingIndicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #888;
+    font-size: 14px;
+
+    .awsui-loader {
+        margin-right: 6px;
+    }
+}
