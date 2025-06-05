@@ -53,6 +53,31 @@ async def list_user_projects(
     session: AsyncSession,
     user: UserModel,
 ) -> List[Project]:
+    """
+    Returns projects where the user is a member.
+    For backward compatibility - use list_user_accessible_projects for public project discovery.
+    """
+    if user.global_role == GlobalRole.ADMIN:
+        projects = await list_project_models(session=session)
+    else:
+        projects = await list_user_project_models(session=session, user=user)
+    
+    projects = sorted(projects, key=lambda p: p.created_at)
+    return [
+        project_model_to_project(p, include_backends=False, include_members=False)
+        for p in projects
+    ]
+
+
+async def list_user_accessible_projects(
+    session: AsyncSession,
+    user: UserModel,
+) -> List[Project]:
+    """
+    Returns all projects accessible to the user:
+    - Projects where user is a member (public or private)
+    - Public projects where user is NOT a member
+    """
     if user.global_role == GlobalRole.ADMIN:
         projects = await list_project_models(session=session)
     else:
@@ -71,8 +96,8 @@ async def _list_user_accessible_project_models(
 ) -> List[ProjectModel]:
     """
     Get projects that a user can access:
-    1. Projects where user is a member (public or private)
-    2. Public projects where user is NOT a member
+    1. Projects where user is a member (regardless of public/private)
+    2. Public projects where user is not a member
     """
     res = await session.execute(
         select(ProjectModel)
