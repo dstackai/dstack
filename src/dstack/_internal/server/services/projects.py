@@ -81,11 +81,8 @@ async def list_user_accessible_projects(
     if user.global_role == GlobalRole.ADMIN:
         projects = await list_project_models(session=session)
     else:
-        # Get member projects
         member_projects = await list_user_project_models(session=session, user=user)
-        # Get public non-member projects
         public_projects = await _list_public_non_member_project_models(session=session, user=user)
-        # Combine both lists
         projects = member_projects + public_projects
     
     projects = sorted(projects, key=lambda p: p.created_at)
