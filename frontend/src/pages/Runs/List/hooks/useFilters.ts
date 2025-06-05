@@ -9,10 +9,11 @@ type Args = {
     localStorePrefix: string;
 };
 
-type RequestParamsKeys = keyof Pick<TRunsRequestParams, 'only_active' | 'project_name'>;
+type RequestParamsKeys = keyof Pick<TRunsRequestParams, 'only_active' | 'project_name' | 'username'>;
 
 const FilterKeys: Record<string, RequestParamsKeys> = {
     PROJECT_NAME: 'project_name',
+    USER_NAME: 'username',
     ACTIVE: 'only_active',
 };
 
@@ -86,6 +87,11 @@ export const useFilters = ({ localStorePrefix }: Args) => {
             operators: ['='],
             propertyLabel: 'Project',
             groupValuesLabel: 'Project values',
+        },
+        {
+            key: FilterKeys.USER_NAME,
+            operators: ['='],
+            propertyLabel: 'Username',
         },
         {
             key: FilterKeys.ACTIVE,

@@ -1,7 +1,7 @@
 declare type TRunsRequestParams = {
     project_name?: IProject['project_name'];
     repo_id?: string;
-    user_name?: string;
+    username?: string;
     only_active?: boolean;
     prev_submitted_at?: string;
     prev_run_id?: string;
