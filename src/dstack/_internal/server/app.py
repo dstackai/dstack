@@ -11,6 +11,7 @@ from fastapi import FastAPI, Request, Response, status
 from fastapi.datastructures import URL
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from dstack._internal.cli.utils.common import console
 from dstack._internal.core.errors import ForbiddenError, ServerClientError
@@ -77,6 +78,7 @@ def create_app() -> FastAPI:
 
     app = FastAPI(docs_url="/api/docs", lifespan=lifespan)
     app.state.proxy_dependency_injector = ServerProxyDependencyInjector()
+    Instrumentator().instrument(app, metric_namespace="dstack", metric_subsystem="server")
     return app
 
 
