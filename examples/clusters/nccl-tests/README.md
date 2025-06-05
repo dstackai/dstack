@@ -20,13 +20,14 @@ image: dstackai/efa
 env:
   - NCCL_DEBUG=INFO
 commands:
+  - cd /root/nccl-tests/build
   - |
-    if [ ${DSTACK_NODE_RANK} -eq 0 ]; then
-      cd /root/nccl-tests/build
-      MPIRUN="mpirun --allow-run-as-root --hostfile $DSTACK_MPI_HOSTFILE"
-      # Run NCCL Tests
-      ${MPIRUN} \
-        -n ${DSTACK_GPUS_NUM} -N ${DSTACK_GPUS_PER_NODE} \
+    if [ $DSTACK_NODE_RANK -eq 0 ]; then
+      mpirun \
+        --allow-run-as-root \
+        --hostfile $DSTACK_MPI_HOSTFILE \
+        -n $DSTACK_GPUS_NUM \
+        -N $DSTACK_GPUS_PER_NODE \
         --mca btl_tcp_if_exclude lo,docker0 \
         --bind-to none \
         ./all_reduce_perf -b 8 -e 8G -f 2 -g 1
@@ -37,10 +38,11 @@ commands:
 resources:
   gpu: nvidia:4:16GB
   shm_size: 16GB
-
 ```
 
 </div>
+
+<!-- TODO: Need to stop using our EFA image - either make our default image cluster-friendly, or recommend using NGC or other images -->
 
 !!! info "Docker image"
     The `dstackai/efa` image used in the example comes with MPI and NCCL tests pre-installed. While it is optimized for

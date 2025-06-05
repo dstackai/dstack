@@ -139,6 +139,15 @@ Nodes can communicate using their private IP addresses.
 Use `DSTACK_MASTER_NODE_IP`, `DSTACK_NODES_IPS`, `DSTACK_NODE_RANK`, and other
 [System environment variables](#system-environment-variables) for inter-node communication.
 
+`dstack` is easy to use with `accelerate`, `torchrun`, Ray, Spark, and any other distributed frameworks.
+
+
+!!! info "MPI"
+    If want to use MPI, you can set `startup_order` to `workers-first` and `stop_criteria` to `master-done`, and use `DSTACK_MPI_HOSTFILE`.
+    See the [NCCL](../../examples/clusters/nccl-tests/index.md) or [RCCL](../../examples/clusters/rccl-tests/index.md) examples.
+
+> For detailed examples, see [distributed training](../../examples.md#distributed-training) examples.
+
 ??? info "Network interface"
     Distributed frameworks usually detect the correct network interface automatically,
     but sometimes you need to specify it explicitly.
@@ -170,7 +179,7 @@ Use `DSTACK_MASTER_NODE_IP`, `DSTACK_NODES_IPS`, `DSTACK_NODE_RANK`, and other
     recommended to create them via a fleet configuration
     to ensure the highest level of inter-node connectivity.
 
-`dstack` is easy to use with `accelerate`, `torchrun`, Ray, Spark, and any other distributed frameworks.
+> See the [Clusters](../guides/clusters.md) guide for more details on how to use `dstack` on clusters.
 
 ### Resources
 
