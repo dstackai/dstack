@@ -496,6 +496,7 @@ class Run(CoreModel):
     submitted_at: datetime
     last_processed_at: datetime
     status: RunStatus
+    status_message: Optional[str] = None
     termination_reason: Optional[RunTerminationReason]
     run_spec: RunSpec
     jobs: List[Job]
@@ -523,6 +524,49 @@ class Run(CoreModel):
             return "server error"
         else:
             return None
+
+    @root_validator
+    def _status_message(cls, values) -> Dict:
+        try:
+            status = values["status"]
+            run_spec: RunSpec = values["run_spec"]
+            retry_on_events = (
+                run_spec.configuration.retry.on_events
+                if run_spec and run_spec.configuration.retry
+                else []
+            )
+            jobs = values["jobs"]
+            termination_reason = Run.get_last_termination_reason(jobs[0]) if jobs else None
+        except KeyError:
+            return values
+        values["status_message"] = Run._get_status_message(
+            status=status,
+            retry_on_events=retry_on_events,
+            termination_reason=termination_reason,
+        )
+        return values
+
+    @staticmethod
+    def get_last_termination_reason(job: "Job") -> Optional[JobTerminationReason]:
+        for submission in reversed(job.job_submissions):
+            if submission.termination_reason is not None:
+                return submission.termination_reason
+        return None
+
+    @staticmethod
+    def _get_status_message(
+        status: RunStatus,
+        retry_on_events: List[RetryEvent],
+        termination_reason: Optional[JobTerminationReason],
+    ) -> str:
+        # Currently, `retrying` is shown only for `no-capacity` events
+        if (
+            status in [RunStatus.SUBMITTED, RunStatus.PENDING]
+            and termination_reason == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
+            and RetryEvent.NO_CAPACITY in retry_on_events
+        ):
+            return "retrying"
+        return status.value
 
 
 class JobPlan(CoreModel):

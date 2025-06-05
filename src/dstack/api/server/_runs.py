@@ -100,6 +100,7 @@ def _get_apply_plan_excludes(plan: ApplyRunPlanInput) -> Optional[Dict]:
     current_resource = plan.current_resource
     if current_resource is not None:
         current_resource_excludes = {}
+        current_resource_excludes["status_message"] = True
         apply_plan_excludes["current_resource"] = current_resource_excludes
         current_resource_excludes["run_spec"] = _get_run_spec_excludes(current_resource.run_spec)
         job_submissions_excludes = {}
