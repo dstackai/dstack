@@ -3,6 +3,7 @@ from typing import Dict, List, Optional
 from dstack._internal.core.backends.base.backend import Compute
 from dstack._internal.core.backends.base.compute import (
     ComputeWithCreateInstanceSupport,
+    get_shim_commands,
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.cloudrift.api_client import RiftClient
@@ -73,16 +74,17 @@ class CloudRiftCompute(
         instance_offer: InstanceOfferWithAvailability,
         instance_config: InstanceConfiguration,
     ) -> JobProvisioningData:
-        # TODO: add commands to cloud-init
-        # commands = get_shim_commands(authorized_keys=instance_config.get_public_keys())
-        # logger.debug(
-        #     f"Creating instance for offer {instance_offer.instance.name} in region {instance_offer.region} with commands: {commands}"
-        # )
+        commands = get_shim_commands(authorized_keys=instance_config.get_public_keys())
+        startup_script = " ".join([" && ".join(commands)])
+        logger.debug(
+            f"Creating instance for offer {instance_offer.instance.name} in region {instance_offer.region} with commands: {startup_script}"
+        )
 
         instance_ids = self.client.deploy_instance(
             instance_type=instance_offer.instance.name,
             region=instance_offer.region,
             ssh_keys=instance_config.get_public_keys(),
+            cmd=startup_script,
         )
 
         if len(instance_ids) == 0:

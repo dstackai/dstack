@@ -98,7 +98,9 @@ class RiftClient:
 
         return None
 
-    def deploy_instance(self, instance_type: str, region: str, ssh_keys: List[str]) -> List[str]:
+    def deploy_instance(
+        self, instance_type: str, region: str, ssh_keys: List[str], cmd: str
+    ) -> List[str]:
         image_url = self.get_vm_image_url()
         if not image_url:
             raise BackendError("No suitable VM image found.")
@@ -107,6 +109,7 @@ class RiftClient:
             "config": {
                 "VirtualMachine": {
                     # "cloudinit_url": "",
+                    "cloudinit_commands": cmd,
                     "image_url": image_url,
                     "ssh_key": {"PublicKeys": ssh_keys},
                 }

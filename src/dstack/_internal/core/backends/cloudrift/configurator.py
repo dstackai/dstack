@@ -23,8 +23,6 @@ from dstack._internal.core.models.backends.base import (
 # TODO: Add all supported regions and default regions
 REGIONS = []
 
-CLOUDRIFT_API_URL = "https://api.cloudrift.ai"
-
 
 class CloudRiftConfigurator(Configurator):
     TYPE = BackendType.CLOUDRIFT
