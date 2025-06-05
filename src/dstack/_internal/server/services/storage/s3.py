@@ -1,6 +1,6 @@
 from typing import Optional
 
-from dstack._internal.server import settings
+from dstack._internal.server.services.storage.base import BaseStorage
 
 BOTO_AVAILABLE = True
 try:
@@ -10,7 +10,7 @@ except ImportError:
     BOTO_AVAILABLE = False
 
 
-class S3Storage:
+class S3Storage(BaseStorage):
     def __init__(
         self,
         bucket: str,
@@ -29,7 +29,7 @@ class S3Storage:
     ):
         self._client.put_object(
             Bucket=self.bucket,
-            Key=_get_code_key(project_id, repo_id, code_hash),
+            Key=self._get_code_key(project_id, repo_id, code_hash),
             Body=blob,
         )
 
@@ -42,33 +42,10 @@ class S3Storage:
         try:
             response = self._client.get_object(
                 Bucket=self.bucket,
-                Key=_get_code_key(project_id, repo_id, code_hash),
+                Key=self._get_code_key(project_id, repo_id, code_hash),
             )
         except botocore.exceptions.ClientError as e:
             if e.response["Error"]["Code"] == "NoSuchKey":
                 return None
             raise e
         return response["Body"].read()
-
-
-def _get_code_key(project_id: str, repo_id: str, code_hash: str) -> str:
-    return f"data/projects/{project_id}/codes/{repo_id}/{code_hash}"
-
-
-_default_storage = None
-
-
-def init_default_storage():
-    global _default_storage
-    if settings.SERVER_BUCKET is None:
-        raise ValueError("settings.SERVER_BUCKET not set")
-    if not BOTO_AVAILABLE:
-        raise ValueError("AWS dependencies are not installed")
-    _default_storage = S3Storage(
-        bucket=settings.SERVER_BUCKET,
-        region=settings.SERVER_BUCKET_REGION,
-    )
-
-
-def get_default_storage() -> Optional[S3Storage]:
-    return _default_storage
