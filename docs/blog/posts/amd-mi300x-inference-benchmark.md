@@ -3,7 +3,7 @@ title: "Benchmarking Llama 3.1 405B on 8x AMD MI300X GPUs"
 date: 2024-10-09
 description: "Exploring how the inference performance of Llama 3.1 405B varies on 8x AMD MI300X GPUs across vLLM and TGI backends in different use cases."  
 slug: amd-mi300x-inference-benchmark
-image: https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-hotaisle-amd-mi300x-prompt-v5.png?raw=true
+image: https://dstack.ai/static-assets/static-assets/images/dstack-hotaisle-amd-mi300x-prompt-v5.png
 categories:
   - AMD
   - Benchmarks
@@ -16,7 +16,7 @@ so we saw this as a great chance to test our integration by benchmarking AMD GPU
 [Hot Aisle :material-arrow-top-right-thin:{ .external }](https://hotaisle.xyz/){:target="_blank"}, who build top-tier 
 bare metal compute for AMD GPUs, kindly provided the hardware for the benchmark.
 
-<img src="https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-hotaisle-amd-mi300x-prompt-v5.png?raw=true" width="750" />
+<img src="https://dstack.ai/static-assets/static-assets/images/dstack-hotaisle-amd-mi300x-prompt-v5.png" width="750" />
 
 <!-- more -->
 
@@ -169,9 +169,9 @@ We repeated the test using a higher number of requests, ranging from 300 to 900.
 
 <img src="https://raw.githubusercontent.com/dstackai/benchmarks/refs/heads/main/amd/inference/charts_rps/mean_ttft_tgi_vllm.png" width="725" style="padding: 0 40px 0 50px"/>
 
-### vRAM consumption
+### VRAM consumption
 
-When considering vRAM consumption right after loading model weights, TGI allocates approximately 28% less vRAM compared
+When considering VRAM consumption right after loading model weights, TGI allocates approximately 28% less VRAM compared
 to vLLM.
 
 <img src="https://raw.githubusercontent.com/dstackai/benchmarks/refs/heads/main/amd/inference/gpu_vram_tgi_vllm.png" width="750" />
@@ -189,7 +189,7 @@ This difference may be related to how vLLM [pre-allocates GPU cache :material-ar
       impossible to accurately track throughput and TTFT.
     * With vLLM, we used the default backend configuration. With better tuning, we might have achieved improved performance.
 
-In general, the 8x AMD MI300X is a good fit for larger models and allows us to make the most of its vRAM, especially for
+In general, the 8x AMD MI300X is a good fit for larger models and allows us to make the most of its VRAM, especially for
 larger batches.
 
 If you’d like to support us in doing more benchmarks, please let us know.

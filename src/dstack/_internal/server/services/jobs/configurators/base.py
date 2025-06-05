@@ -1,14 +1,16 @@
 import shlex
 import sys
 from abc import ABC, abstractmethod
+from pathlib import PurePosixPath
 from typing import Dict, List, Optional, Union
 
 from cachetools import TTLCache, cached
 
-import dstack.version as version
+from dstack._internal import settings
 from dstack._internal.core.errors import DockerRegistryError, ServerClientError
 from dstack._internal.core.models.common import RegistryAuth
 from dstack._internal.core.models.configurations import (
+    DEFAULT_REPO_DIR,
     PortMapping,
     PythonVersion,
     RunConfigurationType,
@@ -52,14 +54,14 @@ def get_default_image(python_version: str, nvcc: bool = False) -> str:
     suffix = ""
     if nvcc:
         suffix = "-devel"
-    return f"dstackai/base:py{python_version}-{version.base_image}-cuda-12.1{suffix}"
+    return f"{settings.DSTACK_BASE_IMAGE}:py{python_version}-{settings.DSTACK_BASE_IMAGE_VERSION}-cuda-12.1{suffix}"
 
 
 class JobConfigurator(ABC):
     TYPE: RunConfigurationType
 
     _image_config: Optional[ImageConfig] = None
-    # JobSSHKey should be shared for all jobs in a replica for inter-node communitation.
+    # JobSSHKey should be shared for all jobs in a replica for inter-node communication.
     _job_ssh_key: Optional[JobSSHKey] = None
 
     def __init__(self, run_spec: RunSpec):
@@ -131,16 +133,25 @@ class JobConfigurator(ABC):
         )
         return job_spec
 
+    def _shell(self) -> str:
+        shell = self.run_spec.configuration.shell
+        if shell is not None:
+            path = PurePosixPath(shell)
+            if path.is_absolute():
+                return shell
+            return str("/bin" / path)
+        if self.run_spec.configuration.image is None:  # dstackai/base
+            return "/bin/bash"
+        return "/bin/sh"
+
     async def _commands(self) -> List[str]:
         if self.run_spec.configuration.entrypoint is not None:  # docker-like format
             entrypoint = shlex.split(self.run_spec.configuration.entrypoint)
             commands = self.run_spec.configuration.commands
-        elif self.run_spec.configuration.image is None:  # dstackai/base
-            entrypoint = ["/bin/bash", "-i", "-c"]
-            commands = [_join_shell_commands(self._shell_commands())]
-        elif self._shell_commands():  # custom docker image with shell commands
-            entrypoint = ["/bin/sh", "-i", "-c"]
-            commands = [_join_shell_commands(self._shell_commands())]
+        elif shell_commands := self._shell_commands():
+            entrypoint = [self._shell(), "-i", "-c"]
+            dstack_image_commands = self._dstack_image_commands()
+            commands = [_join_shell_commands(dstack_image_commands + shell_commands)]
         else:  # custom docker image without commands
             image_config = await self._get_image_config()
             entrypoint = image_config.entrypoint or []
@@ -154,6 +165,18 @@ class JobConfigurator(ABC):
             )
 
         return result
+
+    def _dstack_image_commands(self) -> List[str]:
+        if (
+            self.run_spec.configuration.image is not None
+            or self.run_spec.configuration.entrypoint is not None
+        ):
+            return []
+        return [
+            f"uv venv --prompt workflow --seed {DEFAULT_REPO_DIR}/.venv > /dev/null 2>&1",
+            f"echo 'source {DEFAULT_REPO_DIR}/.venv/bin/activate' >> ~/.bashrc",
+            f"source {DEFAULT_REPO_DIR}/.venv/bin/activate",
+        ]
 
     def _app_specs(self) -> List[AppSpec]:
         specs = []

@@ -1,0 +1,17 @@
+type: task
+
+python: "3.11"
+
+env:
+  - HF_TOKEN
+  - HF_HUB_ENABLE_HF_TRANSFER=1
+
+commands:
+  - pip install -r examples/single-node-training/qlora/requirements.txt
+  - tensorboard --logdir results/runs &
+  - python examples/single-node-training/qlora/train.py --merge_and_push ${{ run.args }}
+ports:
+  - 6006
+
+resources:
+  gpu: 16GB..24GB

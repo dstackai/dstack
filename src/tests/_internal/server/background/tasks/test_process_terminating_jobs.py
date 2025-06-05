@@ -190,7 +190,7 @@ class TestProcessTerminatingJobs:
             m.assert_awaited_once()
             backend_mock.compute.return_value.detach_volume.assert_called_once_with(
                 volume=volume_model_to_volume(volume),
-                instance_id=job_provisioning_data.instance_id,
+                provisioning_data=job_provisioning_data,
                 force=True,
             )
             backend_mock.compute.return_value.is_volume_detached.assert_called_once()

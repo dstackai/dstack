@@ -93,11 +93,20 @@ async def _process_next_submitted_job():
         async with lock:
             res = await session.execute(
                 select(JobModel)
+                .join(JobModel.run)
                 .where(
                     JobModel.status == JobStatus.SUBMITTED,
                     JobModel.id.not_in(lockset),
                 )
-                .order_by(JobModel.last_processed_at.asc())
+                # Jobs are process in FIFO sorted by priority globally,
+                # thus runs from different project can "overtake" each other by using higher priorities.
+                # That's not a big problem as long as projects do not compete for the same compute resources.
+                # Jobs with lower priorities from other projects will be processed without major lag
+                # as long as new higher priority runs are not constantly submitted.
+                # TODO: Consider processing jobs from different projects fairly/round-robin
+                # Fully fair processing can be tricky to implement via the current DB queue as
+                # there can be many projects and we are limited by the max DB connections.
+                .order_by(RunModel.priority.desc(), JobModel.last_processed_at.asc())
                 .limit(1)
                 .with_for_update(skip_locked=True)
             )
@@ -197,7 +206,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         pool_instances = list(res.unique().scalars().all())
         instances_ids = sorted([i.id for i in pool_instances])
         if get_db().dialect_name == "sqlite":
-            # Start new transaction to see commited changes after lock
+            # Start new transaction to see committed changes after lock
             await session.commit()
         async with get_locker().lock_ctx(InstanceModel.__tablename__, instances_ids):
             # If another job freed the instance but is still trying to detach volumes,
@@ -360,16 +369,16 @@ async def _assign_job_to_pool_instance(
         (instance, common_utils.get_or_error(get_instance_offer(instance)))
         for instance in nonshared_instances
     ]
-    if not multinode:
-        shared_instances_with_offers = get_shared_pool_instances_with_offers(
-            pool_instances=pool_instances,
-            profile=profile,
-            requirements=job.job_spec.requirements,
-            idle_only=True,
-            fleet_model=fleet_model,
-            volumes=volumes,
-        )
-        instances_with_offers.extend(shared_instances_with_offers)
+    shared_instances_with_offers = get_shared_pool_instances_with_offers(
+        pool_instances=pool_instances,
+        profile=profile,
+        requirements=job.job_spec.requirements,
+        idle_only=True,
+        fleet_model=fleet_model,
+        multinode=multinode,
+        volumes=volumes,
+    )
+    instances_with_offers.extend(shared_instances_with_offers)
 
     if len(instances_with_offers) == 0:
         return None
@@ -572,7 +581,7 @@ def _create_instance_model_for_job(
 
 
 def _prepare_job_runtime_data(offer: InstanceOfferWithAvailability) -> JobRuntimeData:
-    if offer.total_blocks == 1:
+    if offer.blocks == offer.total_blocks:
         if env_utils.get_bool("DSTACK_FORCE_BRIDGE_NETWORK"):
             network_mode = NetworkMode.BRIDGE
         else:
@@ -650,7 +659,7 @@ async def _attach_volumes(
                         backend=backend,
                         volume_model=volume_model,
                         instance=instance,
-                        instance_id=job_provisioning_data.instance_id,
+                        jpd=job_provisioning_data,
                     )
                     job_runtime_data.volume_names.append(volume.name)
                     break  # attach next mount point
@@ -676,7 +685,7 @@ async def _attach_volume(
     backend: Backend,
     volume_model: VolumeModel,
     instance: InstanceModel,
-    instance_id: str,
+    jpd: JobProvisioningData,
 ):
     compute = backend.compute()
     assert isinstance(compute, ComputeWithVolumeSupport)
@@ -688,7 +697,7 @@ async def _attach_volume(
     attachment_data = await common_utils.run_async(
         compute.attach_volume,
         volume=volume,
-        instance_id=instance_id,
+        provisioning_data=jpd,
     )
     volume_attachment_model = VolumeAttachmentModel(
         volume=volume_model,

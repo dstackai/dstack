@@ -348,6 +348,7 @@ class RunModel(BaseModel):
     resubmission_attempt: Mapped[int] = mapped_column(Integer, default=0)
     run_spec: Mapped[str] = mapped_column(Text)
     service_spec: Mapped[Optional[str]] = mapped_column(Text)
+    priority: Mapped[int] = mapped_column(Integer, default=0)
 
     jobs: Mapped[List["JobModel"]] = relationship(
         back_populates="run", lazy="selectin", order_by="[JobModel.replica_num, JobModel.job_num]"
@@ -382,6 +383,10 @@ class JobModel(BaseModel):
         Enum(JobTerminationReason)
     )
     termination_reason_message: Mapped[Optional[str]] = mapped_column(Text)
+    # `disconnected_at` stores the first time of connectivity issues with the instance.
+    # Resets every time connectivity is restored.
+    disconnected_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
+    exit_status: Mapped[Optional[int]] = mapped_column(Integer)
     job_spec_data: Mapped[str] = mapped_column(Text)
     job_provisioning_data: Mapped[Optional[str]] = mapped_column(Text)
     runner_timestamp: Mapped[Optional[int]] = mapped_column(BigInteger)
@@ -390,7 +395,7 @@ class JobModel(BaseModel):
     remove_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
     volumes_detached_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
     # `instance_assigned` means instance assignment was done.
-    # if `instance_assigned` is True and `instance` is None, no instance was assiged.
+    # if `instance_assigned` is True and `instance` is None, no instance was assigned.
     instance_assigned: Mapped[bool] = mapped_column(Boolean, default=False)
     instance_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         ForeignKey("instances.id", ondelete="CASCADE")
@@ -659,6 +664,7 @@ class PlacementGroupModel(BaseModel):
 
     fleet_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("fleets.id"))
     fleet: Mapped["FleetModel"] = relationship(foreign_keys=[fleet_id])
+    # TODO: rename `fleet_deleted` -> `to_be_deleted`
     fleet_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
 
     created_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)

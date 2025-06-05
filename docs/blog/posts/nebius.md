@@ -3,7 +3,7 @@ title: Supporting GPU provisioning and orchestration on Nebius
 date: 2025-04-11
 description: "TBA"  
 slug: nebius
-image: https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-nebius-v2.png?raw=true
+image: https://dstack.ai/static-assets/static-assets/images/dstack-nebius-v2.png
 categories:
   - Cloud fleets
   - NVIDIA
@@ -16,7 +16,7 @@ developer velocity and efficiency.
 `dstack` is an open-source orchestrator purpose-built for AI infrastructure—offering a lightweight, container-native
 alternative to Kubernetes and Slurm.
 
-<img src="https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-nebius-v2.png?raw=true" width="630"/>
+<img src="https://dstack.ai/static-assets/static-assets/images/dstack-nebius-v2.png" width="630"/>
 
 Today, we’re announcing native integration with [Nebius :material-arrow-top-right-thin:{ .external }](https://nebius.com/){:target="_blank"},
 offering a streamlined developer experience for teams using GPUs for AI workloads.
@@ -104,7 +104,7 @@ $ dstack apply -f .dstack.yml
 The new `nebius` backend supports CPU and GPU instances, [fleets](../../docs/concepts/fleets.md), 
 [distributed tasks](../../docs/concepts/tasks.md#distributed-tasks), and more. 
  
-> Support for [network volumes](../../docs/concepts/volumes.md#network-volumes) and accelerated cluster 
+> Support for [network volumes](../../docs/concepts/volumes.md#network) and accelerated cluster 
 interconnects is coming soon.
 
 !!! info "What's next?"

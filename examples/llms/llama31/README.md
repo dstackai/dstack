@@ -222,7 +222,7 @@ is available at `https://gateway.<gateway domain>/`.
 Below is the task configuration file of fine-tuning Llama 3.1 8B using TRL on the
 [`OpenAssistant/oasst_top1_2023-08-25` :material-arrow-top-right-thin:{ .external }](https://huggingface.co/datasets/OpenAssistant/oasst_top1_2023-08-25) dataset.
 
-<div editor-title="examples/fine-tuning/trl/train.dstack.yml"> 
+<div editor-title="examples/single-node-training/trl/train.dstack.yml"> 
 
 ```yaml
 type: task
@@ -268,7 +268,7 @@ commands:
 
 resources:
 gpu:
-  # 24GB or more vRAM
+  # 24GB or more VRAM
   memory: 24GB..
   # One or more GPU
   count: 1..
@@ -304,7 +304,7 @@ To do this, use the `examples/accelerate_configs/deepspeed_zero3.yaml` configura
 In case the model doesn't feet into a single GPU, consider running a `dstack` task on multiple nodes.
 Below is the corresponding task configuration file.
 
-<div editor-title="examples/fine-tuning/trl/train.dstack.yml"> 
+<div editor-title="examples/single-node-training/trl/train.dstack.yml"> 
 
 ```yaml
 type: task
@@ -360,7 +360,7 @@ commands:
 
 resources:
   gpu:
-    # 24GB or more vRAM
+    # 24GB or more VRAM
     memory: 24GB..
     # One or more GPU
     count: 1..
@@ -375,7 +375,7 @@ resources:
 ## Source code
 
 The source-code of this example can be found in 
-[`examples/llms/llama31` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/llms/llama31) and [`examples/fine-tuning/trl` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/trl).
+[`examples/llms/llama31` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/llms/llama31) and [`examples/single-node-training/trl` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/single-node-training/trl).
 
 ## What's next?
 

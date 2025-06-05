@@ -43,7 +43,8 @@ class VastAICompute(Compute):
                     "reliability2": {"gte": 0.9},
                     "inet_down": {"gt": 128},
                     "verified": {"eq": True},
-                    "cuda_max_good": {"gte": 11.8},
+                    "cuda_max_good": {"gte": 12.1},
+                    "compute_cap": {"gte": 600},
                 }
             )
         )

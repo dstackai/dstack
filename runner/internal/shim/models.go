@@ -70,6 +70,11 @@ type PortMapping struct {
 	Container int `json:"container"`
 }
 
+type GPUDevice struct {
+	PathOnHost      string `json:"path_on_host"`
+	PathInContainer string `json:"path_in_container"`
+}
+
 type TaskConfig struct {
 	ID               string               `json:"id"`
 	Name             string               `json:"name"`
@@ -86,8 +91,11 @@ type TaskConfig struct {
 	Volumes          []VolumeInfo         `json:"volumes"`
 	VolumeMounts     []VolumeMountPoint   `json:"volume_mounts"`
 	InstanceMounts   []InstanceMountPoint `json:"instance_mounts"`
-	HostSshUser      string               `json:"host_ssh_user"`
-	HostSshKeys      []string             `json:"host_ssh_keys"`
+	// GPUDevices allows the server to set gpu devices instead of relying on the runner default logic.
+	// E.g. passing nvidia devices directly instead of using nvidia-container-toolkit.
+	GPUDevices  []GPUDevice `json:"gpu_devices"`
+	HostSshUser string      `json:"host_ssh_user"`
+	HostSshKeys []string    `json:"host_ssh_keys"`
 	// TODO: submit keys to runner, not to shim
 	ContainerSshKeys []string `json:"container_ssh_keys"`
 }

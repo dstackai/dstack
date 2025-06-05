@@ -1,4 +1,5 @@
 import asyncio
+import enum
 import itertools
 import re
 import time
@@ -83,6 +84,8 @@ def pretty_date(time: datetime) -> str:
 
 
 def pretty_resources(
+    *,
+    cpu_arch: Optional[Any] = None,
     cpus: Optional[Any] = None,
     memory: Optional[Any] = None,
     gpu_count: Optional[Any] = None,
@@ -110,25 +113,35 @@ def pretty_resources(
     """
     parts = []
     if cpus is not None:
-        parts.append(f"{cpus}xCPU")
+        cpu_arch_lower: Optional[str] = None
+        if isinstance(cpu_arch, enum.Enum):
+            cpu_arch_lower = str(cpu_arch.value).lower()
+        elif isinstance(cpu_arch, str):
+            cpu_arch_lower = cpu_arch.lower()
+        if cpu_arch_lower == "arm":
+            cpu_arch_prefix = "arm:"
+        else:
+            cpu_arch_prefix = ""
+        parts.append(f"cpu={cpu_arch_prefix}{cpus}")
     if memory is not None:
-        parts.append(f"{memory}")
+        parts.append(f"mem={memory}")
+    if disk_size:
+        parts.append(f"disk={disk_size}")
     if gpu_count:
         gpu_parts = []
+        gpu_parts.append(f"{gpu_name or 'gpu'}")
         if gpu_memory is not None:
             gpu_parts.append(f"{gpu_memory}")
+        if gpu_count is not None:
+            gpu_parts.append(f"{gpu_count}")
         if total_gpu_memory is not None:
-            gpu_parts.append(f"total {total_gpu_memory}")
+            gpu_parts.append(f"{total_gpu_memory}")
         if compute_capability is not None:
             gpu_parts.append(f"{compute_capability}")
 
-        gpu = f"{gpu_count}x{gpu_name or 'GPU'}"
-        if gpu_parts:
-            gpu += f" ({', '.join(gpu_parts)})"
+        gpu = ":".join(gpu_parts)
         parts.append(gpu)
-    if disk_size:
-        parts.append(f"{disk_size} (disk)")
-    return ", ".join(parts)
+    return " ".join(parts)
 
 
 def since(timestamp: str) -> datetime:
@@ -301,3 +314,7 @@ def make_proxy_url(server_url: str, proxy_url: str) -> str:
         path=concat_url_path(server.path, proxy.path),
     )
     return proxy.geturl()
+
+
+def list_enum_values_for_annotation(enum_class: type[enum.Enum]) -> str:
+    return ", ".join(f"`{e.value}`" for e in enum_class)

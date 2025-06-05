@@ -14,6 +14,8 @@ from dstack._internal.cli.commands.gateway import GatewayCommand
 from dstack._internal.cli.commands.init import InitCommand
 from dstack._internal.cli.commands.logs import LogsCommand
 from dstack._internal.cli.commands.metrics import MetricsCommand
+from dstack._internal.cli.commands.offer import OfferCommand
+from dstack._internal.cli.commands.project import ProjectCommand
 from dstack._internal.cli.commands.ps import PsCommand
 from dstack._internal.cli.commands.server import ServerCommand
 from dstack._internal.cli.commands.stats import StatsCommand
@@ -65,8 +67,10 @@ def main():
     FleetCommand.register(subparsers)
     GatewayCommand.register(subparsers)
     InitCommand.register(subparsers)
+    OfferCommand.register(subparsers)
     LogsCommand.register(subparsers)
     MetricsCommand.register(subparsers)
+    ProjectCommand.register(subparsers)
     PsCommand.register(subparsers)
     ServerCommand.register(subparsers)
     StatsCommand.register(subparsers)

@@ -20,6 +20,7 @@ from dstack._internal.core.models.profiles import (
     parse_idle_duration,
 )
 from dstack._internal.core.models.resources import Range, ResourcesSpec
+from dstack._internal.utils.common import list_enum_values_for_annotation
 from dstack._internal.utils.json_schema import add_extra_schema_types
 from dstack._internal.utils.tags import tags_validator
 
@@ -207,7 +208,11 @@ class InstanceGroupParams(CoreModel):
     spot_policy: Annotated[
         Optional[SpotPolicy],
         Field(
-            description="The policy for provisioning spot or on-demand instances: `spot`, `on-demand`, or `auto`"
+            description=(
+                "The policy for provisioning spot or on-demand instances:"
+                f" {list_enum_values_for_annotation(SpotPolicy)}."
+                f" Defaults to `{SpotPolicy.ONDEMAND.value}`"
+            )
         ),
     ] = None
     retry: Annotated[
@@ -269,6 +274,8 @@ class FleetSpec(CoreModel):
     configuration_path: Optional[str] = None
     profile: Profile
     autocreated: bool = False
+    # merged_profile stores profile parameters merged from profile and configuration.
+    # Read profile parameters from merged_profile instead of profile directly.
     # TODO: make merged_profile a computed field after migrating to pydanticV2
     merged_profile: Annotated[Profile, Field(exclude=True)] = None
 
@@ -312,7 +319,26 @@ class FleetPlan(CoreModel):
     project_name: str
     user: str
     spec: FleetSpec
-    current_resource: Optional[Fleet]
+    effective_spec: Optional[FleetSpec] = None
+    current_resource: Optional[Fleet] = None
     offers: List[InstanceOfferWithAvailability]
     total_offers: int
-    max_offer_price: Optional[float]
+    max_offer_price: Optional[float] = None
+
+    def get_effective_spec(self) -> FleetSpec:
+        if self.effective_spec is not None:
+            return self.effective_spec
+        return self.spec
+
+
+class ApplyFleetPlanInput(CoreModel):
+    spec: FleetSpec
+    current_resource: Annotated[
+        Optional[Fleet],
+        Field(
+            description=(
+                "The expected current resource."
+                " If the resource has changed, the apply fails unless `force: true`."
+            )
+        ),
+    ] = None

@@ -3,7 +3,7 @@ title: "Get involved as a community ambassador"
 date: 2024-12-18
 description: "Join dstack as an ambassador to grow the community, share knowledge, and help others use dstack."  
 slug: ambassador-program
-image: https://github.com/dstackai/static-assets/blob/main/static-assets/images/ambassador-program.png?raw=true
+image: https://dstack.ai/static-assets/static-assets/images/ambassador-program.png
 categories:
   - Community
 ---
@@ -23,7 +23,7 @@ of the `dstack` community, and play a key role in advancing the open AI ecosyste
 [//]: # (Mention:)
 [//]: # (Who we are looking for)
 
-<img src="https://github.com/dstackai/static-assets/blob/main/static-assets/images/ambassador-program.png?raw=true" width="630"/>
+<img src="https://dstack.ai/static-assets/static-assets/images/ambassador-program.png" width="630"/>
 
 <!-- more -->
 

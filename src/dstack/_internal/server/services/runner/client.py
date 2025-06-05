@@ -12,9 +12,10 @@ from dstack._internal.core.models.common import CoreModel, NetworkMode
 from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.repos.remote import RemoteRepoCreds
 from dstack._internal.core.models.resources import Memory
-from dstack._internal.core.models.runs import ClusterInfo, JobSpec, RunSpec
+from dstack._internal.core.models.runs import ClusterInfo, Job, Run
 from dstack._internal.core.models.volumes import InstanceMountPoint, Volume, VolumeMountPoint
 from dstack._internal.server.schemas.runner import (
+    GPUDevice,
     HealthcheckResponse,
     LegacyPullResponse,
     LegacyStopBody,
@@ -31,6 +32,7 @@ from dstack._internal.utils.common import get_or_error
 from dstack._internal.utils.logging import get_logger
 
 REQUEST_TIMEOUT = 9
+UPLOAD_CODE_REQUEST_TIMEOUT = 60
 
 logger = get_logger(__name__)
 
@@ -71,8 +73,8 @@ class RunnerClient:
 
     def submit_job(
         self,
-        run_spec: RunSpec,
-        job_spec: JobSpec,
+        run: Run,
+        job: Job,
         cluster_info: ClusterInfo,
         secrets: Dict[str, str],
         repo_credentials: Optional[RemoteRepoCreds],
@@ -80,6 +82,7 @@ class RunnerClient:
     ):
         # XXX: This is a quick-and-dirty hack to deliver InstanceModel-specific environment
         # variables to the runner without runner API modification.
+        job_spec = job.job_spec
         if instance_env is not None:
             if isinstance(instance_env, Env):
                 merged_env = instance_env.as_dict()
@@ -89,11 +92,13 @@ class RunnerClient:
             job_spec = job_spec.copy(deep=True)
             job_spec.env = merged_env
         body = SubmitBody(
-            run_spec=run_spec,
+            run=run,
             job_spec=job_spec,
+            job_submission=job.job_submissions[-1],
             cluster_info=cluster_info,
             secrets=secrets,
             repo_credentials=repo_credentials,
+            run_spec=run.run_spec,
         )
         resp = requests.post(
             # use .json() to encode enums
@@ -105,7 +110,9 @@ class RunnerClient:
         resp.raise_for_status()
 
     def upload_code(self, file: Union[BinaryIO, bytes]):
-        resp = requests.post(self._url("/api/upload_code"), data=file, timeout=REQUEST_TIMEOUT)
+        resp = requests.post(
+            self._url("/api/upload_code"), data=file, timeout=UPLOAD_CODE_REQUEST_TIMEOUT
+        )
         resp.raise_for_status()
 
     def run_job(self):
@@ -233,6 +240,7 @@ class ShimClient:
         volumes: list[Volume],
         volume_mounts: list[VolumeMountPoint],
         instance_mounts: list[InstanceMountPoint],
+        gpu_devices: list[GPUDevice],
         host_ssh_user: str,
         host_ssh_keys: list[str],
         container_ssh_keys: list[str],
@@ -256,6 +264,7 @@ class ShimClient:
             volumes=[_volume_to_shim_volume_info(v, instance_id) for v in volumes],
             volume_mounts=volume_mounts,
             instance_mounts=instance_mounts,
+            gpu_devices=gpu_devices,
             host_ssh_user=host_ssh_user,
             host_ssh_keys=host_ssh_keys,
             container_ssh_keys=container_ssh_keys,

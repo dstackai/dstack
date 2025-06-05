@@ -29,6 +29,7 @@ from dstack._internal.server.services.permissions import (
     DefaultPermissions,
     set_default_permissions,
 )
+from dstack._internal.server.services.plugins import load_plugins
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -38,7 +39,7 @@ logger = get_logger(__name__)
 # If a collection has nested collections, it will be assigned the block style. Otherwise it will have the flow style.
 #
 # We want mapping to always be displayed in block-style but lists without nested objects in flow-style.
-# So we define a custom representeter
+# So we define a custom representer.
 
 
 def seq_representer(dumper, sequence):
@@ -75,7 +76,10 @@ class ServerConfig(CoreModel):
     ] = None
     default_permissions: Annotated[
         Optional[DefaultPermissions], Field(description="The default user permissions")
-    ]
+    ] = None
+    plugins: Annotated[
+        Optional[List[str]], Field(description="The server-side plugins to enable")
+    ] = None
 
 
 class ServerConfigManager:
@@ -112,6 +116,7 @@ class ServerConfigManager:
             await self._apply_project_config(
                 session=session, owner=owner, project_config=project_config
             )
+        load_plugins(enabled_plugins=self.config.plugins or [])
 
     async def _apply_project_config(
         self,

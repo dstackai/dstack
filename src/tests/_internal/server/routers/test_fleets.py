@@ -292,13 +292,13 @@ class TestGetFleet:
         assert response.status_code == 400
 
 
-class TestCreateFleet:
+class TestApplyFleetPlan:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_40x_if_not_authenticated(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
-        response = await client.post("/api/project/main/fleets/create")
+        response = await client.post("/api/project/main/fleets/apply")
         assert response.status_code == 403
 
     @pytest.mark.asyncio
@@ -314,9 +314,9 @@ class TestCreateFleet:
         with patch("uuid.uuid4") as m:
             m.return_value = UUID("1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e")
             response = await client.post(
-                f"/api/project/{project.name}/fleets/create",
+                f"/api/project/{project.name}/fleets/apply",
                 headers=get_auth_headers(user.token),
-                json={"spec": spec.dict()},
+                json={"plan": {"spec": spec.dict()}, "force": False},
             )
         assert response.status_code == 200
         assert response.json() == {
@@ -364,6 +364,8 @@ class TestCreateFleet:
                     "creation_policy": None,
                     "idle_duration": None,
                     "utilization_policy": None,
+                    "startup_order": None,
+                    "stop_criteria": None,
                     "name": "",
                     "default": False,
                     "reservation": None,
@@ -427,9 +429,9 @@ class TestCreateFleet:
         with patch("uuid.uuid4") as m:
             m.return_value = UUID("1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e")
             response = await client.post(
-                f"/api/project/{project.name}/fleets/create",
+                f"/api/project/{project.name}/fleets/apply",
                 headers=get_auth_headers(user.token),
-                json={"spec": spec.dict()},
+                json={"plan": {"spec": spec.dict()}, "force": False},
             )
         assert response.status_code == 200, response.json()
         assert response.json() == {
@@ -485,6 +487,8 @@ class TestCreateFleet:
                     "creation_policy": None,
                     "idle_duration": None,
                     "utilization_policy": None,
+                    "startup_order": None,
+                    "stop_criteria": None,
                     "name": "",
                     "default": False,
                     "reservation": None,
@@ -504,6 +508,7 @@ class TestCreateFleet:
                     "instance_type": {
                         "name": "ssh",
                         "resources": {
+                            "cpu_arch": None,
                             "cpus": 2,
                             "memory_mib": 8,
                             "gpus": [],
@@ -559,9 +564,9 @@ class TestCreateFleet:
             )
         )
         response = await client.post(
-            f"/api/project/{project.name}/fleets/create",
+            f"/api/project/{project.name}/fleets/apply",
             headers=get_auth_headers(user.token),
-            json={"spec": spec.dict()},
+            json={"plan": {"spec": spec.dict()}, "force": False},
         )
         assert response.status_code == 400
 
@@ -590,9 +595,9 @@ class TestCreateFleet:
             DefaultPermissions(allow_non_admins_manage_ssh_fleets=False)
         ):
             response = await client.post(
-                f"/api/project/{project.name}/fleets/create",
+                f"/api/project/{project.name}/fleets/apply",
                 headers=get_auth_headers(user.token),
-                json={"spec": spec.dict()},
+                json={"plan": {"spec": spec.dict()}, "force": False},
             )
         assert response.status_code in [401, 403]
 
@@ -851,6 +856,7 @@ class TestGetPlan:
             "project_name": project.name,
             "user": user.name,
             "spec": spec.dict(),
+            "effective_spec": spec.dict(),
             "current_resource": None,
             "offers": [json.loads(o.json()) for o in offers],
             "total_offers": len(offers),

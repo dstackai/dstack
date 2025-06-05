@@ -2,7 +2,7 @@ import asyncio
 import json
 from typing import Dict, List, Optional
 
-from sqlalchemy import delete, select
+from sqlalchemy import Delete, delete, select
 from sqlalchemy.orm import joinedload
 
 from dstack._internal.core.consts import DSTACK_RUNNER_HTTP_PORT
@@ -42,11 +42,36 @@ async def collect_metrics():
 
 
 async def delete_metrics():
-    cutoff = _get_delete_metrics_cutoff()
+    now_timestamp_micro = int(get_current_datetime().timestamp() * 1_000_000)
+    running_timestamp_micro_cutoff = (
+        now_timestamp_micro - settings.SERVER_METRICS_RUNNING_TTL_SECONDS * 1_000_000
+    )
+    finished_timestamp_micro_cutoff = (
+        now_timestamp_micro - settings.SERVER_METRICS_FINISHED_TTL_SECONDS * 1_000_000
+    )
+    await asyncio.gather(
+        _execute_delete_statement(
+            delete(JobMetricsPoint).where(
+                JobMetricsPoint.job_id.in_(
+                    select(JobModel.id).where(JobModel.status.in_([JobStatus.RUNNING]))
+                ),
+                JobMetricsPoint.timestamp_micro < running_timestamp_micro_cutoff,
+            )
+        ),
+        _execute_delete_statement(
+            delete(JobMetricsPoint).where(
+                JobMetricsPoint.job_id.in_(
+                    select(JobModel.id).where(JobModel.status.in_(JobStatus.finished_statuses()))
+                ),
+                JobMetricsPoint.timestamp_micro < finished_timestamp_micro_cutoff,
+            )
+        ),
+    )
+
+
+async def _execute_delete_statement(stmt: Delete) -> None:
     async with get_session_ctx() as session:
-        await session.execute(
-            delete(JobMetricsPoint).where(JobMetricsPoint.timestamp_micro < cutoff)
-        )
+        await session.execute(stmt)
         await session.commit()
 
 
@@ -134,9 +159,3 @@ def _pull_runner_metrics(
 ) -> Optional[MetricsResponse]:
     runner_client = client.RunnerClient(port=ports[DSTACK_RUNNER_HTTP_PORT])
     return runner_client.get_metrics()
-
-
-def _get_delete_metrics_cutoff() -> int:
-    now = int(get_current_datetime().timestamp() * 1_000_000)
-    cutoff = now - (settings.SERVER_METRICS_TTL_SECONDS * 1_000_000)
-    return cutoff

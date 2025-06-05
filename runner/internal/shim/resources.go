@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/dstackai/dstack/runner/internal/common"
 	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/dstackai/dstack/runner/internal/shim/host"
 )
@@ -38,13 +39,15 @@ func NewGpuLock(gpus []host.GpuInfo) (*GpuLock, error) {
 			}
 			var resourceID string
 			switch vendor {
-			case host.GpuVendorNvidia:
+			case common.GpuVendorNvidia:
 				resourceID = gpu.ID
-			case host.GpuVendorAmd:
+			case common.GpuVendorAmd:
 				resourceID = gpu.RenderNodePath
-			case host.GpuVendorIntel:
+			case common.GpuVendorTenstorrent:
 				resourceID = gpu.Index
-			case host.GpuVendorNone:
+			case common.GpuVendorIntel:
+				resourceID = gpu.Index
+			case common.GpuVendorNone:
 				return nil, fmt.Errorf("unexpected GPU vendor %s", vendor)
 			default:
 				return nil, fmt.Errorf("unexpected GPU vendor %s", vendor)

@@ -10,7 +10,7 @@ The filename must end with `.dstack.yml` (e.g. `.dstack.yml` or `dev.dstack.yml`
 
 [//]: # (TODO: Make tabs - single machine & distributed tasks & web app)
 
-<div editor-title="examples/fine-tuning/axolotl/train.dstack.yml"> 
+<div editor-title="examples/single-node-training/axolotl/train.dstack.yml"> 
 
 ```yaml
 type: task
@@ -26,11 +26,11 @@ env:
   - WANDB_API_KEY
 # Commands of the task
 commands:
-  - accelerate launch -m axolotl.cli.train examples/fine-tuning/axolotl/config.yaml
+  - accelerate launch -m axolotl.cli.train examples/single-node-training/axolotl/config.yaml
 
 resources:
   gpu:
-    # 24GB or more vRAM
+    # 24GB or more VRAM
     memory: 24GB..
     # Two or more GPU
     count: 2..
@@ -137,8 +137,7 @@ resources:
 
 Nodes can communicate using their private IP addresses.
 Use `DSTACK_MASTER_NODE_IP`, `DSTACK_NODES_IPS`, `DSTACK_NODE_RANK`, and other
-[System environment variables](#system-environment-variables)
-to discover IP addresses and other details.
+[System environment variables](#system-environment-variables) for inter-node communication.
 
 ??? info "Network interface"
     Distributed frameworks usually detect the correct network interface automatically,
@@ -192,6 +191,8 @@ commands:
   - python fine-tuning/qlora/train.py
   
 resources:
+  # 16 or more x86_64 cores
+  cpu: 16..
   # 200GB or more RAM
   memory: 200GB..
   # 4 GPUs from 40GB to 80GB
@@ -204,10 +205,16 @@ resources:
 
 </div>
 
+The `cpu` property also allows you to specify the CPU architecture, `x86` or `arm`. Examples:
+`x86:16` (16 x86-64 cores), `arm:8..` (at least 8 ARM64 cores).
+If the architecture is not specified, `dstack` tries to infer it from the `gpu` specification
+using `x86` as the fallback value.
+
 The `gpu` property allows specifying not only memory size but also GPU vendor, names
 and their quantity. Examples: `nvidia` (one NVIDIA GPU), `A100` (one A100), `A10G,A100` (either A10G or A100),
 `A100:80GB` (one A100 of 80GB), `A100:2` (two A100), `24GB..40GB:2` (two GPUs between 24GB and 40GB),
 `A100:40GB:2` (two A100 GPUs of 40GB).
+If the vendor is not specified, `dstack` tries to infer it from the GPU name using `nvidia` as the fallback value.
 
 ??? info "Google Cloud TPU"
     To use TPUs, specify its architecture via the `gpu` property.
@@ -233,6 +240,9 @@ and their quantity. Examples: `nvidia` (one NVIDIA GPU), `A100` (one A100), `A10
 ??? info "Shared memory"
     If you are using parallel communicating processes (e.g., dataloaders in PyTorch), you may need to configure 
     `shm_size`, e.g. set it to `16GB`.
+
+> If you’re unsure which offers (hardware configurations) are available from the configured backends, use the
+> [`dstack offer`](../reference/cli/dstack/offer.md#list-gpu-offers) command to list them.
 
 ### Python version
 
@@ -368,6 +378,7 @@ If you don't assign a value to an environment variable (see `HF_TOKEN` above),
     | `DSTACK_NODE_RANK`      | The rank of the node                                             |
     | `DSTACK_MASTER_NODE_IP` | The internal IP address of the master node                          |
     | `DSTACK_NODES_IPS`      | The list of internal IP addresses of all nodes delimited by "\n" |
+    | `DSTACK_MPI_HOSTFILE`   | The path to a pre-populated MPI hostfile                         |
 
 ### Spot policy
 
@@ -384,7 +395,7 @@ via the [`spot_policy`](../reference/dstack.yml/task.md#spot_policy) property. I
 
 ### Retry policy
 
-By default, if `dstack` can't find capacity, the task exits with an error, or the instance is interrupted, 
+By default, if `dstack` can't find capacity, or the task exits with an error, or the instance is interrupted, 
 the run will fail.
 
 If you'd like `dstack` to automatically retry, configure the 
@@ -413,6 +424,37 @@ retry:
 
 </div>
 
+If one job of a multi-node task fails with retry enabled,
+`dstack` will stop all the jobs and resubmit the run.
+
+### Priority
+
+Be default, submitted runs are scheduled in the order they were submitted.
+When compute resources are limited, you may want to prioritize some runs over others.
+This can be done by specifying the [`priority`](../reference/dstack.yml/task.md) property in the run configuration:
+
+<div editor-title=".dstack.yml">
+
+```yaml
+type: task
+name: train
+
+python: "3.10"
+
+# Commands of the task
+commands:
+  - pip install -r fine-tuning/qlora/requirements.txt
+  - python fine-tuning/qlora/train.py
+
+priority: 50
+```
+
+</div>
+
+`dstack` tries to provision runs with higher priority first.
+Note that if a high priority run cannot be scheduled,
+it does not block other runs with lower priority from scheduling.
+
 --8<-- "docs/concepts/snippets/manage-fleets.ext"
 
 --8<-- "docs/concepts/snippets/manage-runs.ext"
@@ -420,4 +462,4 @@ retry:
 !!! info "What's next?"
     1. Read about [dev environments](dev-environments.md), [services](services.md), and [repos](repos.md)
     2. Learn how to manage [fleets](fleets.md)
-    3. Check the [Axolotl](/examples/fine-tuning/axolotl) example
+    3. Check the [Axolotl](/examples/single-node-training/axolotl) example

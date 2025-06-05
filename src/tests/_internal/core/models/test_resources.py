@@ -1,8 +1,17 @@
+from typing import Optional
+
 import pytest
-from gpuhunt import AcceleratorVendor
+from gpuhunt import AcceleratorVendor, CPUArchitecture
 from pydantic import ValidationError, parse_obj_as
 
-from dstack._internal.core.models.resources import ComputeCapability, GPUSpec, Memory, Range
+from dstack._internal.core.models.resources import (
+    DEFAULT_CPU_COUNT,
+    ComputeCapability,
+    CPUSpec,
+    GPUSpec,
+    Memory,
+    Range,
+)
 
 
 class TestMemory:
@@ -98,6 +107,67 @@ class TestMemoryRange:
         assert parse_obj_as(Range[Memory], {"min": "512MB", "max": "1TB"}).dict() == dict(
             min=0.5, max=1024.0
         )
+
+
+class TestCPU:
+    def test_integer(self):
+        assert parse_obj_as(CPUSpec, 1).dict() == {"arch": None, "count": {"min": 1, "max": 1}}
+
+    @pytest.mark.parametrize(
+        ["value", "expected_arch", "expected_min", "expected_max"],
+        [
+            ["1..2", None, 1, 2],
+            ["X86", CPUArchitecture.X86, DEFAULT_CPU_COUNT.min, DEFAULT_CPU_COUNT.max],
+            ["x86:2", CPUArchitecture.X86, 2, 2],
+            ["2..:ARM", CPUArchitecture.ARM, 2, None],
+        ],
+    )
+    def test_valid_string(
+        self,
+        value: str,
+        expected_arch: Optional[CPUArchitecture],
+        expected_min: Optional[int],
+        expected_max: Optional[int],
+    ):
+        assert parse_obj_as(CPUSpec, value).dict() == {
+            "arch": expected_arch,
+            "count": {"min": expected_min, "max": expected_max},
+        }
+
+    @pytest.mark.parametrize(
+        ["value", "error"],
+        [
+            ["arm:", "CPU spec contains empty token"],
+            ["2:foo", "Invalid CPU architecture"],
+            ["arm:x86", "CPU spec arch conflict"],
+            ["2:arm:2", "CPU spec count conflict"],
+        ],
+    )
+    def test_invalid_string(self, value: str, error: str):
+        with pytest.raises(ValidationError, match=error):
+            parse_obj_as(CPUSpec, value)
+
+    def test_range_object(self):
+        assert parse_obj_as(CPUSpec, Range[int](min=1, max=2)).dict() == {
+            "arch": None,
+            "count": {"min": 1, "max": 2},
+        }
+
+    def test_range_dict(self):
+        assert parse_obj_as(CPUSpec, {"min": 1, "max": 2}).dict() == {
+            "arch": None,
+            "count": {"min": 1, "max": 2},
+        }
+
+    def test_valid_dict(self):
+        assert parse_obj_as(CPUSpec, {"arch": "ARM", "count": {"min": 1, "max": 2}}).dict() == {
+            "arch": CPUArchitecture.ARM,
+            "count": {"min": 1, "max": 2},
+        }
+
+    def test_invalid_dict(self):
+        with pytest.raises(ValidationError):
+            parse_obj_as(CPUSpec, {"arch": "x86", "min": 1, "max": 2})
 
 
 class TestGPU:

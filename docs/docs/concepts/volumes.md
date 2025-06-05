@@ -4,12 +4,12 @@ Volumes enable data persistence between runs of dev environments, tasks, and ser
 
 `dstack` supports two kinds of volumes: 
 
-* [Network volumes](#network-volumes) &mdash; provisioned via backends and mounted to specific container directories.
+* [Network volumes](#network) &mdash; provisioned via backends and mounted to specific container directories.
   Ideal for persistent storage.
-* [Instance volumes](#instance-volumes) &mdash; bind directories on the host instance to container directories.
+* [Instance volumes](#instance) &mdash; bind directories on the host instance to container directories.
 Useful as a cache for cloud fleets or for persistent storage with SSH fleets.
 
-## Network volumes
+## Network volumes { #network }
 
 Network volumes are currently supported for the `aws`, `gcp`, and `runpod` backends.
 
@@ -130,6 +130,7 @@ and its contents will persist across runs.
 
     `dstack` will attach one of the volumes based on the region and backend of the run.  
 
+<span id="distributed-tasks"></span>
 ??? info "Distributed tasks"
     When using single-attach volumes such as AWS EBS with distributed tasks,
     you can attach different volumes to different nodes using `dstack` variable interpolation:
@@ -221,7 +222,7 @@ If you've registered an existing volume, it will be de-registered with `dstack` 
 ??? info "Can I attach network volumes to multiple runs or instances?"
     You can mount a volume in multiple runs. This feature is currently supported only by the `runpod` backend.
 
-## Instance volumes
+## Instance volumes { #instance }
 
 Instance volumes allow mapping any directory on the instance where the run is executed to any path inside the container.
 This means that the data in instance volumes is persisted only if the run is executed on the same instance.

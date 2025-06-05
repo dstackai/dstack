@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/dstackai/dstack/runner/internal/common"
 	"github.com/dstackai/dstack/runner/internal/shim/host"
 	"github.com/stretchr/testify/assert"
 )
@@ -17,8 +18,8 @@ func TestNewGpuLock_NoGpus(t *testing.T) {
 
 func TestNewGpuLock_NvidiaGpus(t *testing.T) {
 	gpus := []host.GpuInfo{
-		{Vendor: host.GpuVendorNvidia, ID: "GPU-beef"},
-		{Vendor: host.GpuVendorNvidia, ID: "GPU-f00d"},
+		{Vendor: common.GpuVendorNvidia, ID: "GPU-beef"},
+		{Vendor: common.GpuVendorNvidia, ID: "GPU-f00d"},
 	}
 	gl, err := NewGpuLock(gpus)
 	assert.Nil(t, err)
@@ -31,8 +32,8 @@ func TestNewGpuLock_NvidiaGpus(t *testing.T) {
 
 func TestNewGpuLock_AmdGpus(t *testing.T) {
 	gpus := []host.GpuInfo{
-		{Vendor: host.GpuVendorAmd, RenderNodePath: "/dev/dri/renderD128"},
-		{Vendor: host.GpuVendorAmd, RenderNodePath: "/dev/dri/renderD129"},
+		{Vendor: common.GpuVendorAmd, RenderNodePath: "/dev/dri/renderD128"},
+		{Vendor: common.GpuVendorAmd, RenderNodePath: "/dev/dri/renderD129"},
 	}
 	gl, err := NewGpuLock(gpus)
 	assert.Nil(t, err)
@@ -45,8 +46,8 @@ func TestNewGpuLock_AmdGpus(t *testing.T) {
 
 func TestNewGpuLock_ErrorMultipleVendors(t *testing.T) {
 	gpus := []host.GpuInfo{
-		{Vendor: host.GpuVendorAmd},
-		{Vendor: host.GpuVendorNvidia},
+		{Vendor: common.GpuVendorAmd},
+		{Vendor: common.GpuVendorNvidia},
 	}
 	gl, err := NewGpuLock(gpus)
 	assert.Nil(t, gl)
@@ -67,9 +68,9 @@ func TestGpuLock_Acquire_ErrorBadCount(t *testing.T) {
 
 func TestGpuLock_Acquire_All_Available(t *testing.T) {
 	gpus := []host.GpuInfo{
-		{Vendor: host.GpuVendorNvidia, ID: "GPU-beef"},
-		{Vendor: host.GpuVendorNvidia, ID: "GPU-f00d"},
-		{Vendor: host.GpuVendorNvidia, ID: "GPU-c0de"},
+		{Vendor: common.GpuVendorNvidia, ID: "GPU-beef"},
+		{Vendor: common.GpuVendorNvidia, ID: "GPU-f00d"},
+		{Vendor: common.GpuVendorNvidia, ID: "GPU-c0de"},
 	}
 	gl, _ := NewGpuLock(gpus)
 	gl.lock["GPU-f00d"] = true
@@ -83,8 +84,8 @@ func TestGpuLock_Acquire_All_Available(t *testing.T) {
 
 func TestGpuLock_Acquire_All_NoneAvailable(t *testing.T) {
 	gpus := []host.GpuInfo{
-		{Vendor: host.GpuVendorNvidia, ID: "GPU-beef"},
-		{Vendor: host.GpuVendorNvidia, ID: "GPU-f00d"},
+		{Vendor: common.GpuVendorNvidia, ID: "GPU-beef"},
+		{Vendor: common.GpuVendorNvidia, ID: "GPU-f00d"},
 	}
 	gl, _ := NewGpuLock(gpus)
 	gl.lock["GPU-beef"] = true
@@ -103,10 +104,10 @@ func TestGpuLock_Acquire_All_NoGpus(t *testing.T) {
 
 func TestGpuLock_Acquire_Count_OK(t *testing.T) {
 	gpus := []host.GpuInfo{
-		{Vendor: host.GpuVendorNvidia, ID: "GPU-beef"},
-		{Vendor: host.GpuVendorNvidia, ID: "GPU-f00d"},
-		{Vendor: host.GpuVendorNvidia, ID: "GPU-c0de"},
-		{Vendor: host.GpuVendorNvidia, ID: "GPU-cafe"},
+		{Vendor: common.GpuVendorNvidia, ID: "GPU-beef"},
+		{Vendor: common.GpuVendorNvidia, ID: "GPU-f00d"},
+		{Vendor: common.GpuVendorNvidia, ID: "GPU-c0de"},
+		{Vendor: common.GpuVendorNvidia, ID: "GPU-cafe"},
 	}
 	gl, _ := NewGpuLock(gpus)
 	gl.lock["GPU-f00d"] = true
@@ -127,8 +128,8 @@ func TestGpuLock_Acquire_Count_OK(t *testing.T) {
 
 func TestGpuLock_Acquire_Count_ErrNoCapacity(t *testing.T) {
 	gpus := []host.GpuInfo{
-		{Vendor: host.GpuVendorNvidia, ID: "GPU-beef"},
-		{Vendor: host.GpuVendorNvidia, ID: "GPU-f00d"},
+		{Vendor: common.GpuVendorNvidia, ID: "GPU-beef"},
+		{Vendor: common.GpuVendorNvidia, ID: "GPU-f00d"},
 	}
 	gl, _ := NewGpuLock(gpus)
 	gl.lock["GPU-f00d"] = true
@@ -141,9 +142,9 @@ func TestGpuLock_Acquire_Count_ErrNoCapacity(t *testing.T) {
 
 func TestGpuLock_Lock(t *testing.T) {
 	gpus := []host.GpuInfo{
-		{Vendor: host.GpuVendorNvidia, ID: "GPU-beef"},
-		{Vendor: host.GpuVendorNvidia, ID: "GPU-f00d"},
-		{Vendor: host.GpuVendorNvidia, ID: "GPU-c0de"},
+		{Vendor: common.GpuVendorNvidia, ID: "GPU-beef"},
+		{Vendor: common.GpuVendorNvidia, ID: "GPU-f00d"},
+		{Vendor: common.GpuVendorNvidia, ID: "GPU-c0de"},
 	}
 	gl, _ := NewGpuLock(gpus)
 	gl.lock["GPU-beef"] = true
@@ -161,8 +162,8 @@ func TestGpuLock_Lock(t *testing.T) {
 
 func TestGpuLock_Lock_Nil(t *testing.T) {
 	gpus := []host.GpuInfo{
-		{Vendor: host.GpuVendorNvidia, ID: "GPU-beef"},
-		{Vendor: host.GpuVendorNvidia, ID: "GPU-f00d"},
+		{Vendor: common.GpuVendorNvidia, ID: "GPU-beef"},
+		{Vendor: common.GpuVendorNvidia, ID: "GPU-f00d"},
 	}
 	gl, _ := NewGpuLock(gpus)
 	gl.lock["GPU-beef"] = true
@@ -175,9 +176,9 @@ func TestGpuLock_Lock_Nil(t *testing.T) {
 
 func TestGpuLock_Release(t *testing.T) {
 	gpus := []host.GpuInfo{
-		{Vendor: host.GpuVendorNvidia, ID: "GPU-beef"},
-		{Vendor: host.GpuVendorNvidia, ID: "GPU-f00d"},
-		{Vendor: host.GpuVendorNvidia, ID: "GPU-c0de"},
+		{Vendor: common.GpuVendorNvidia, ID: "GPU-beef"},
+		{Vendor: common.GpuVendorNvidia, ID: "GPU-f00d"},
+		{Vendor: common.GpuVendorNvidia, ID: "GPU-c0de"},
 	}
 	gl, _ := NewGpuLock(gpus)
 	gl.lock["GPU-beef"] = true
@@ -195,8 +196,8 @@ func TestGpuLock_Release(t *testing.T) {
 
 func TestGpuLock_Release_Nil(t *testing.T) {
 	gpus := []host.GpuInfo{
-		{Vendor: host.GpuVendorNvidia, ID: "GPU-beef"},
-		{Vendor: host.GpuVendorNvidia, ID: "GPU-f00d"},
+		{Vendor: common.GpuVendorNvidia, ID: "GPU-beef"},
+		{Vendor: common.GpuVendorNvidia, ID: "GPU-f00d"},
 	}
 	gl, _ := NewGpuLock(gpus)
 	gl.lock["GPU-beef"] = true

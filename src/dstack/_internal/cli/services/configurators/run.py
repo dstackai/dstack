@@ -3,12 +3,13 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Optional, Set
 
 import gpuhunt
+from pydantic import parse_obj_as
 
 import dstack._internal.core.models.resources as resources
-from dstack._internal.cli.services.args import disk_spec, gpu_spec, port_mapping
+from dstack._internal.cli.services.args import cpu_spec, disk_spec, gpu_spec, port_mapping
 from dstack._internal.cli.services.configurators.base import (
     ApplyEnvVarsConfiguratorMixin,
     BaseApplyConfigurator,
@@ -39,7 +40,8 @@ from dstack._internal.core.models.configurations import (
     TaskConfiguration,
 )
 from dstack._internal.core.models.repos.base import Repo
-from dstack._internal.core.models.runs import JobSubmission, JobTerminationReason, RunStatus
+from dstack._internal.core.models.resources import CPUSpec
+from dstack._internal.core.models.runs import JobStatus, JobSubmission, RunStatus
 from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.core.services.diff import diff_models
 from dstack._internal.utils.common import local_time
@@ -52,7 +54,7 @@ from dstack.api.utils import load_profile
 _KNOWN_AMD_GPUS = {gpu.name.lower() for gpu in gpuhunt.KNOWN_AMD_GPUS}
 _KNOWN_NVIDIA_GPUS = {gpu.name.lower() for gpu in gpuhunt.KNOWN_NVIDIA_GPUS}
 _KNOWN_TPU_VERSIONS = {gpu.name.lower() for gpu in gpuhunt.KNOWN_TPUS}
-
+_KNOWN_TENSTORRENT_GPUS = {gpu.name.lower() for gpu in gpuhunt.KNOWN_TENSTORRENT_ACCELERATORS}
 _BIND_ADDRESS_ARG = "bind_address"
 
 logger = get_logger(__name__)
@@ -72,6 +74,7 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
     ):
         self.apply_args(conf, configurator_args, unknown_args)
         self.validate_gpu_vendor_and_image(conf)
+        self.validate_cpu_arch_and_image(conf)
         if repo is None:
             repo = self.api.repos.load(Path.cwd())
         config_manager = ConfigManager()
@@ -92,15 +95,17 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
                 profile=profile,
             )
 
-        print_run_plan(run_plan, offers_limit=configurator_args.max_offers)
+        print_run_plan(run_plan, max_offers=configurator_args.max_offers)
 
         confirm_message = "Submit a new run?"
+        if conf.name:
+            confirm_message = f"Submit the run [code]{conf.name}[/]?"
         stop_run_name = None
         if run_plan.current_resource is not None:
             changed_fields = []
             if run_plan.action == ApplyAction.UPDATE:
                 diff = diff_models(
-                    run_plan.run_spec.configuration,
+                    run_plan.get_effective_run_spec().configuration,
                     run_plan.current_resource.run_spec.configuration,
                 )
                 changed_fields = list(diff.keys())
@@ -127,11 +132,6 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
                     f"Active run [code]{conf.name}[/] already exists and cannot be updated in-place."
                 )
                 confirm_message = "Stop and override the run?"
-            else:
-                console.print(f"Finished run [code]{conf.name}[/] already exists.")
-                confirm_message = "Override the run?"
-        elif conf.name:
-            confirm_message = f"Submit the run [code]{conf.name}[/]?"
 
         if not command_args.yes and not confirm_ask(confirm_message):
             console.print("\nExiting...")
@@ -274,7 +274,7 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
         console.print(f"Run [code]{conf.name}[/] deleted")
 
     @classmethod
-    def register_args(cls, parser: argparse.ArgumentParser):
+    def register_args(cls, parser: argparse.ArgumentParser, default_max_offers: int = 3):
         configuration_group = parser.add_argument_group(f"{cls.TYPE.value} Options")
         configuration_group.add_argument(
             "-n",
@@ -286,9 +286,17 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
             "--max-offers",
             help="Number of offers to show in the run plan",
             type=int,
-            default=3,
+            default=default_max_offers,
         )
         cls.register_env_args(configuration_group)
+        configuration_group.add_argument(
+            "--cpu",
+            type=cpu_spec,
+            help="Request CPU for the run. "
+            "The format is [code]ARCH[/]:[code]COUNT[/] (all parts are optional)",
+            dest="cpu_spec",
+            metavar="SPEC",
+        )
         configuration_group.add_argument(
             "--gpu",
             type=gpu_spec,
@@ -310,6 +318,8 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
         apply_profile_args(args, conf)
         if args.run_name:
             conf.name = args.run_name
+        if args.cpu_spec:
+            conf.resources.cpu = resources.CPUSpec.parse_obj(args.cpu_spec)
         if args.gpu_spec:
             conf.resources.gpu = resources.GPUSpec.parse_obj(args.gpu_spec)
         if args.disk_spec:
@@ -342,7 +352,7 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
 
     def validate_gpu_vendor_and_image(self, conf: BaseRunConfiguration) -> None:
         """
-        Infers `resources.gpu.vendor` if not set, requires `image` if the vendor is AMD.
+        Infers and sets `resources.gpu.vendor` if not set, requires `image` if the vendor is AMD.
         """
         gpu_spec = conf.resources.gpu
         if gpu_spec is None:
@@ -350,6 +360,7 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
         if gpu_spec.count.max == 0:
             return
         has_amd_gpu: bool
+        has_tt_gpu: bool
         vendor = gpu_spec.vendor
         if vendor is None:
             names = gpu_spec.name
@@ -362,6 +373,8 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
                         vendors.add(gpuhunt.AcceleratorVendor.NVIDIA)
                     elif name in _KNOWN_AMD_GPUS:
                         vendors.add(gpuhunt.AcceleratorVendor.AMD)
+                    elif name in _KNOWN_TENSTORRENT_GPUS:
+                        vendors.add(gpuhunt.AcceleratorVendor.TENSTORRENT)
                     else:
                         maybe_tpu_version, _, maybe_tpu_cores = name.partition("-")
                         if maybe_tpu_version in _KNOWN_TPU_VERSIONS and maybe_tpu_cores.isdigit():
@@ -380,15 +393,45 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
                 # to execute a run on an instance with an AMD accelerator with a default
                 # CUDA image, not a big deal.
                 has_amd_gpu = gpuhunt.AcceleratorVendor.AMD in vendors
+                has_tt_gpu = gpuhunt.AcceleratorVendor.TENSTORRENT in vendors
             else:
                 # If neither gpu.vendor nor gpu.name is set, assume Nvidia.
                 vendor = gpuhunt.AcceleratorVendor.NVIDIA
                 has_amd_gpu = False
+                has_tt_gpu = False
             gpu_spec.vendor = vendor
         else:
             has_amd_gpu = vendor == gpuhunt.AcceleratorVendor.AMD
+            has_tt_gpu = vendor == gpuhunt.AcceleratorVendor.TENSTORRENT
         if has_amd_gpu and conf.image is None:
-            raise ConfigurationError("`image` is required if `resources.gpu.vendor` is AMD.")
+            raise ConfigurationError("`image` is required if `resources.gpu.vendor` is `amd`")
+        if has_tt_gpu and conf.image is None:
+            raise ConfigurationError(
+                "`image` is required if `resources.gpu.vendor` is `tenstorrent`"
+            )
+
+    def validate_cpu_arch_and_image(self, conf: BaseRunConfiguration) -> None:
+        """
+        Infers `resources.cpu.arch` if not set, requires `image` if the architecture is ARM.
+        """
+        # TODO: Remove in 0.20. Use conf.resources.cpu directly
+        cpu_spec = parse_obj_as(CPUSpec, conf.resources.cpu)
+        arch = cpu_spec.arch
+        if arch is None:
+            gpu_spec = conf.resources.gpu
+            if (
+                gpu_spec is not None
+                and gpu_spec.vendor in [None, gpuhunt.AcceleratorVendor.NVIDIA]
+                and gpu_spec.name
+                and any(map(gpuhunt.is_nvidia_superchip, gpu_spec.name))
+            ):
+                arch = gpuhunt.CPUArchitecture.ARM
+            else:
+                arch = gpuhunt.CPUArchitecture.X86
+        # NOTE: We don't set the inferred resources.cpu.arch for compatibility with older servers.
+        # Servers with ARM support set the arch using the same logic.
+        if arch == gpuhunt.CPUArchitecture.ARM and conf.image is None:
+            raise ConfigurationError("`image` is required if `resources.cpu.arch` is `arm`")
 
 
 class RunWithPortsConfigurator(BaseRunConfigurator):
@@ -510,31 +553,38 @@ def _print_service_urls(run: Run) -> None:
 
 
 def print_finished_message(run: Run):
+    status_message = (
+        run._run.latest_job_submission.status_message
+        if run._run.latest_job_submission
+        else run._run.status_message
+    )
+    error = (
+        run._run.latest_job_submission.error if run._run.latest_job_submission else run._run.error
+    )
+    termination_reason = (
+        run._run.latest_job_submission.termination_reason
+        if run._run.latest_job_submission
+        else None
+    )
+    termination_reason_message = (
+        run._run.latest_job_submission.termination_reason_message
+        if run._run.latest_job_submission
+        else None
+    )
     if run.status == RunStatus.DONE:
-        console.print("[code]Done[/]")
+        console.print(f"[code]{status_message.capitalize()}[/code]")
         return
+    else:
+        str = f"[error]{status_message.capitalize()}[/error]"
+        if error:
+            str += f" ([error]{error.capitalize()}[/error])"
+        console.print(str)
 
-    termination_reason, termination_reason_message = _get_run_termination_reason(run)
-    message = "Run failed due to unknown reason. Check CLI, server, and run logs."
-    if run.status == RunStatus.TERMINATED:
-        message = "Run terminated due to unknown reason. Check CLI, server, and run logs."
+        if termination_reason_message:
+            console.print(f"[error]{termination_reason_message}[/error]")
 
-    if termination_reason == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY:
-        message = (
-            "All provisioning attempts failed. "
-            "This is likely due to cloud providers not having enough capacity. "
-            "Check CLI and server logs for more details."
-        )
-    elif termination_reason is not None:
-        error_details = (
-            f"Error: {termination_reason_message}\n" if termination_reason_message else ""
-        )
-        message = (
-            f"Run failed with error code {termination_reason.name}.\n"
-            f"{error_details}"
-            "Check CLI, server, and run logs for more details."
-        )
-    console.print(f"[error]{message}[/]")
+        if termination_reason:
+            console.print(f"Check [code]dstack logs -d {run.name}[/code] for more details.")
 
 
 def get_run_exit_code(run: Run) -> int:
@@ -543,14 +593,18 @@ def get_run_exit_code(run: Run) -> int:
     return 1
 
 
-def _get_run_termination_reason(run: Run) -> Tuple[Optional[JobTerminationReason], Optional[str]]:
-    if len(run._run.jobs) == 0:
-        return None, None
-    job = run._run.jobs[0]
-    if len(job.job_submissions) == 0:
-        return None, None
-    job_submission = job.job_submissions[0]
-    return job_submission.termination_reason, job_submission.termination_reason_message
+def _is_ready_to_attach(run: Run) -> bool:
+    return not (
+        run.status
+        in [
+            RunStatus.SUBMITTED,
+            RunStatus.PENDING,
+            RunStatus.PROVISIONING,
+            RunStatus.TERMINATING,
+        ]
+        or run._run.jobs[0].job_submissions[-1].status
+        in [JobStatus.SUBMITTED, JobStatus.PROVISIONING, JobStatus.PULLING]
+    )
 
 
 def _run_resubmitted(run: Run, current_job_submission: Optional[JobSubmission]) -> bool:

@@ -30,16 +30,15 @@ To change the default idle duration, set
 [`idle_duration`](../reference/dstack.yml/fleet.md#idle_duration) in the run configuration (e.g., `0s`, `1m`, or `off` for
 unlimited).
 
-!!! info "Fleets"
-    For greater control over fleet provisioning, configuration, and lifecycle management, it is recommended to use
-    [fleets](../concepts/fleets.md) directly.
+> For greater control over fleet provisioning, configuration, and lifecycle management, it is recommended to use
+> [fleets](../concepts/fleets.md) directly.
 
 ## Volumes
 
 To persist data across runs, it is recommended to use volumes.
-`dstack` supports two types of volumes: [network](../concepts/volumes.md#network-volumes) 
+`dstack` supports two types of volumes: [network](../concepts/volumes.md#network) 
 (for persisting data even if the instance is interrupted)
-and [instance](../concepts/volumes.md#instance-volumes) (useful for persisting cached data across runs while the instance remains active).
+and [instance](../concepts/volumes.md#instance) (useful for persisting cached data across runs while the instance remains active).
 
 > If you use [SSH fleets](../concepts/fleets.md#ssh), you can mount network storage (e.g., NFS or SMB) to the hosts and access it in runs via instance volumes.
 
@@ -198,6 +197,26 @@ replace it with a corresponding command to start Docker daemon.
 
 See more Docker examples [here](https://github.com/dstackai/dstack/tree/master/examples/misc/docker-compose).
 
+## Projects
+
+If you're using multiple `dstack` projects (e.g., from different `dstack` servers),  
+you can switch between them using the [`dstack project`](../reference/cli/dstack/project.md) command.
+
+Alternatively, you can install [`direnv` :material-arrow-top-right-thin:{ .external }](https://direnv.net/){:target="_blank"}  
+to automatically apply environment variables from the `.envrc` file in your project directory.
+
+<div editor-title=".envrc"> 
+
+```shell
+export DSTACK_PROJECT=main
+```
+
+</div>
+
+Now, `dstack` will always use this project within this directory.
+
+Remember to add `.envrc` to `.gitignore` to avoid committing it to the repo. 
+
 ## Environment variables
 
 If a configuration requires an environment variable that you don't want to hardcode in the YAML, you can define it
@@ -251,9 +270,9 @@ $ dstack apply -e HF_TOKEN=... -f .dstack.yml
     </div>
     
     If you install [`direnv` :material-arrow-top-right-thin:{ .external }](https://direnv.net/){:target="_blank"},
-    it will automatically pass the environment variables from the `.env` file to the `dstack apply` command.
+    it will automatically apply the environment variables from the `.envrc` file to the `dstack apply` command.
 
-    Remember to add `.env` to `.gitignore` to avoid pushing it to the repo.    
+    Remember to add `.envrc` to `.gitignore` to avoid committing it to the repo.    
 
 [//]: # (## Profiles)
 [//]: # ()
@@ -274,12 +293,23 @@ To run in detached mode, use `-d` with `dstack apply`.
 
 > If you detached the CLI, you can always re-attach to a run via [`dstack attach`](../reference/cli/dstack/attach.md).
 
-## GPU
+## GPU specification
 
 `dstack` natively supports NVIDIA GPU, AMD GPU, and Google Cloud TPU accelerator chips.
 
-The `gpu` property within [`resources`](../reference/dstack.yml/dev-environment.md#resources) (or the `--gpu` option with `dstack apply`)
+The `gpu` property within [`resources`](../reference/dstack.yml/dev-environment.md#resources) (or the `--gpu` option with [`dstack apply`](../reference/cli/dstack/apply.md) or
+[`dstack offer`](../reference/cli/dstack/offer.md))
 allows specifying not only memory size but also GPU vendor, names, their memory, and quantity.
+
+The general format is: `<vendor>:<comma-sparated names>:<memory range>:<quantity range>`.
+
+Each component is optional. 
+
+Ranges can be:
+
+* **Closed** (e.g. `24GB..80GB` or `1..8`)
+* **Open** (e.g. `24GB..` or `1..`)
+* **Single values** (e.g. `1` or `24GB`).
 
 Examples:
 
@@ -308,7 +338,36 @@ The GPU vendor is indicated by one of the following case-insensitive values:
     Currently, you can't specify other than 8 TPU cores. This means only single host workloads are supported.
     Support for multiple hosts is coming soon.
 
-## Monitoring metrics
+## Offers
+
+If you're not sure which offers (hardware configurations) are available with the configured backends, use the
+[`dstack offer`](../reference/cli/dstack/offer.md#list-gpu-offers) command.
+
+<div class="termy">
+
+```shell
+$ dstack offer --gpu H100:1.. --max-offers 10
+Getting offers...
+---> 100%
+
+ #   BACKEND     REGION     INSTANCE TYPE          RESOURCES                                     SPOT  PRICE   
+ 1   datacrunch  FIN-01     1H100.80S.30V          30xCPU, 120GB, 1xH100 (80GB), 100.0GB (disk)  no    $2.19   
+ 2   datacrunch  FIN-02     1H100.80S.30V          30xCPU, 120GB, 1xH100 (80GB), 100.0GB (disk)  no    $2.19   
+ 3   datacrunch  FIN-02     1H100.80S.32V          32xCPU, 185GB, 1xH100 (80GB), 100.0GB (disk)  no    $2.19   
+ 4   datacrunch  ICE-01     1H100.80S.32V          32xCPU, 185GB, 1xH100 (80GB), 100.0GB (disk)  no    $2.19   
+ 5   runpod      US-KS-2    NVIDIA H100 PCIe       16xCPU, 251GB, 1xH100 (80GB), 100.0GB (disk)  no    $2.39   
+ 6   runpod      CA         NVIDIA H100 80GB HBM3  24xCPU, 251GB, 1xH100 (80GB), 100.0GB (disk)  no    $2.69   
+ 7   nebius      eu-north1  gpu-h100-sxm           16xCPU, 200GB, 1xH100 (80GB), 100.0GB (disk)  no    $2.95   
+ 8   runpod      AP-JP-1    NVIDIA H100 80GB HBM3  20xCPU, 251GB, 1xH100 (80GB), 100.0GB (disk)  no    $2.99   
+ 9   runpod      CA-MTL-1   NVIDIA H100 80GB HBM3  28xCPU, 251GB, 1xH100 (80GB), 100.0GB (disk)  no    $2.99   
+ 10  runpod      CA-MTL-2   NVIDIA H100 80GB HBM3  26xCPU, 125GB, 1xH100 (80GB), 100.0GB (disk)  no    $2.99   
+     ...                                                                                                                
+ Shown 10 of 99 offers, $127.816 max
+```
+
+</div>
+
+## Metrics
 
 While `dstack` allows the use of any third-party monitoring tools (e.g., Weights and Biases), you can also
 monitor container metrics such as CPU, memory, and GPU usage using the [built-in

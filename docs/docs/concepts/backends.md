@@ -338,6 +338,8 @@ There are two ways to configure Azure: using a client secret or using the defaul
                     "Microsoft.Compute/disks/write",
                     "Microsoft.Compute/disks/read",
                     "Microsoft.Compute/disks/delete",
+                    "Microsoft.ManagedIdentity/userAssignedIdentities/assign/action",
+                    "Microsoft.ManagedIdentity/userAssignedIdentities/read",
                     "Microsoft.Network/networkSecurityGroups/*",
                     "Microsoft.Network/locations/*",
                     "Microsoft.Network/virtualNetworks/*",
@@ -529,7 +531,11 @@ gcloud projects list --format="json(projectId)"
         ```
     
         </div>
-    
+
+        If you specify a non-default VPC, ensure it has a firewall rule
+        allowing all traffic within the VPC. This is needed for multi-node tasks to work.
+        The default VPC already permits traffic within the VPC.
+
     === "Shared VPC"
     
         <div editor-title="~/.dstack/server/config.yml">
@@ -643,6 +649,25 @@ projects:
 
     </div>
 
+??? info "Projects"
+    If you have multiple projects per region, specify which ones to use, at most one per region.
+
+    <div editor-title="~/.dstack/server/config.yml">
+
+    ```yaml
+    type: nebius
+    projects:
+    - project-e00jt6t095t1ahrg4re30
+    - project-e01iahuh3cklave4ao1nv
+    creds:
+      type: service_account
+      service_account_id: serviceaccount-e00dhnv9ftgb3cqmej
+      public_key_id: publickey-e00ngaex668htswqy4
+      private_key_file: ~/path/to/key.pem
+    ```
+
+    </div>
+
 !!! info "Python version"
     Nebius is only supported if `dstack server` is running on Python 3.10 or higher.
 
@@ -749,7 +774,7 @@ projects:
 
 Also, the `vastai` backend supports on-demand instances only. Spot instance support coming soon.
 
-### TensorDock
+<!-- ### TensorDock
 
 Log into your [TensorDock :material-arrow-top-right-thin:{ .external }](https://dashboard.tensordock.com/) account, click Developers in the sidebar, and use the `Create an Authorization` section to create a new authorization key.
 
@@ -770,7 +795,7 @@ projects:
 
 </div>
 
-The `tensordock` backend supports on-demand instances only. Spot instance support coming soon.
+The `tensordock` backend supports on-demand instances only. Spot instance support coming soon. -->
 
 ### CUDO
 

@@ -6,7 +6,12 @@ from typing import Dict, List, Optional, Type
 import requests
 
 from dstack import version
-from dstack._internal.core.errors import ClientError, ServerClientError
+from dstack._internal.core.errors import (
+    ClientError,
+    MethodNotAllowedError,
+    ServerClientError,
+    URLNotFoundError,
+)
 from dstack._internal.utils.logging import get_logger
 from dstack.api.server._backends import BackendsAPIClient
 from dstack.api.server._fleets import FleetsAPIClient
@@ -154,6 +159,10 @@ class APIClient:
                 raise ClientError(
                     f"Access to {resp.request.url} is denied. Please check your access token"
                 )
+            if resp.status_code == 404:
+                raise URLNotFoundError(f"Status code 404 when requesting {resp.request.url}")
+            if resp.status_code == 405:
+                raise MethodNotAllowedError(f"Status code 405 when requesting {resp.request.url}")
             if 400 <= resp.status_code < 600:
                 raise ClientError(
                     f"Unexpected error: status code {resp.status_code}"

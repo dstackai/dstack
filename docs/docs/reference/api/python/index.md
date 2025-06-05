@@ -136,8 +136,19 @@ finally:
       show_root_toc_entry: false
       heading_level: 4
       item_id_mapping:
+        cpu: dstack.api.CPU
         gpu: dstack.api.GPU
         memory: dstack.api.Memory
+        Range: dstack.api.Range
+
+### `dstack.api.CPU` { #dstack.api.CPU data-toc-label="CPU" }
+
+#SCHEMA# dstack.api.CPU
+    overrides:
+      show_root_heading: false
+      show_root_toc_entry: false
+      heading_level: 4
+      item_id_mapping:
         Range: dstack.api.Range
 
 ### `dstack.api.GPU` { #dstack.api.GPU data-toc-label="GPU" }

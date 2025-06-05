@@ -1,4 +1,5 @@
-from typing import Any, Dict, List, Union
+import shutil
+from typing import Any, Dict, List, Optional, Union
 
 from rich.markup import escape
 from rich.table import Table
@@ -11,7 +12,6 @@ from dstack._internal.core.models.profiles import (
     TerminationPolicy,
 )
 from dstack._internal.core.models.runs import (
-    Job,
     RunPlan,
 )
 from dstack._internal.core.services.profiles import get_termination
@@ -24,7 +24,10 @@ from dstack._internal.utils.common import (
 from dstack.api import Run
 
 
-def print_run_plan(run_plan: RunPlan, offers_limit: int = 3):
+def print_run_plan(
+    run_plan: RunPlan, max_offers: Optional[int] = None, include_run_properties: bool = True
+):
+    run_spec = run_plan.get_effective_run_spec()
     job_plan = run_plan.job_plans[0]
 
     props = Table(box=None, show_header=False)
@@ -33,35 +36,36 @@ def print_run_plan(run_plan: RunPlan, offers_limit: int = 3):
 
     req = job_plan.job_spec.requirements
     pretty_req = req.pretty_format(resources_only=True)
-    max_price = f"${req.max_price:g}" if req.max_price else "-"
+    max_price = f"${req.max_price:3f}".rstrip("0").rstrip(".") if req.max_price else "-"
     max_duration = (
         format_pretty_duration(job_plan.job_spec.max_duration)
         if job_plan.job_spec.max_duration
         else "-"
     )
-    inactivity_duration = None
-    if isinstance(run_plan.run_spec.configuration, DevEnvironmentConfiguration):
-        inactivity_duration = "-"
-        if isinstance(run_plan.run_spec.configuration.inactivity_duration, int):
-            inactivity_duration = format_pretty_duration(
-                run_plan.run_spec.configuration.inactivity_duration
-            )
-    if job_plan.job_spec.retry is None:
-        retry = "-"
-    else:
-        retry = escape(job_plan.job_spec.retry.pretty_format())
+    if include_run_properties:
+        inactivity_duration = None
+        if isinstance(run_spec.configuration, DevEnvironmentConfiguration):
+            inactivity_duration = "-"
+            if isinstance(run_spec.configuration.inactivity_duration, int):
+                inactivity_duration = format_pretty_duration(
+                    run_spec.configuration.inactivity_duration
+                )
+        if job_plan.job_spec.retry is None:
+            retry = "-"
+        else:
+            retry = escape(job_plan.job_spec.retry.pretty_format())
 
-    profile = run_plan.run_spec.merged_profile
-    creation_policy = profile.creation_policy
-    # FIXME: This assumes the default idle_duration is the same for client and server.
-    # If the server changes idle_duration, old clients will see incorrect value.
-    termination_policy, termination_idle_time = get_termination(
-        profile, DEFAULT_RUN_TERMINATION_IDLE_TIME
-    )
-    if termination_policy == TerminationPolicy.DONT_DESTROY:
-        idle_duration = "-"
-    else:
-        idle_duration = format_pretty_duration(termination_idle_time)
+        profile = run_spec.merged_profile
+        creation_policy = profile.creation_policy
+        # FIXME: This assumes the default idle_duration is the same for client and server.
+        # If the server changes idle_duration, old clients will see incorrect value.
+        termination_policy, termination_idle_time = get_termination(
+            profile, DEFAULT_RUN_TERMINATION_IDLE_TIME
+        )
+        if termination_policy == TerminationPolicy.DONT_DESTROY:
+            idle_duration = "-"
+        else:
+            idle_duration = format_pretty_duration(termination_idle_time)
 
     if req.spot is None:
         spot_policy = "auto"
@@ -75,30 +79,30 @@ def print_run_plan(run_plan: RunPlan, offers_limit: int = 3):
 
     props.add_row(th("Project"), run_plan.project_name)
     props.add_row(th("User"), run_plan.user)
-    props.add_row(th("Configuration"), run_plan.run_spec.configuration_path)
-    props.add_row(th("Type"), run_plan.run_spec.configuration.type)
+    if include_run_properties:
+        props.add_row(th("Configuration"), run_spec.configuration_path)
+        props.add_row(th("Type"), run_spec.configuration.type)
     props.add_row(th("Resources"), pretty_req)
-    props.add_row(th("Max price"), max_price)
-    props.add_row(th("Max duration"), max_duration)
-    if inactivity_duration is not None:  # None means n/a
-        props.add_row(th("Inactivity duration"), inactivity_duration)
     props.add_row(th("Spot policy"), spot_policy)
-    props.add_row(th("Retry policy"), retry)
-    props.add_row(th("Creation policy"), creation_policy)
-    props.add_row(th("Idle duration"), idle_duration)
-    props.add_row(th("Reservation"), run_plan.run_spec.configuration.reservation or "-")
+    props.add_row(th("Max price"), max_price)
+    if include_run_properties:
+        props.add_row(th("Retry policy"), retry)
+        props.add_row(th("Creation policy"), creation_policy)
+        props.add_row(th("Idle duration"), idle_duration)
+        props.add_row(th("Max duration"), max_duration)
+        if inactivity_duration is not None:  # None means n/a
+            props.add_row(th("Inactivity duration"), inactivity_duration)
+    props.add_row(th("Reservation"), run_spec.configuration.reservation or "-")
 
-    offers = Table(box=None)
+    offers = Table(box=None, expand=shutil.get_terminal_size(fallback=(120, 40)).columns <= 110)
     offers.add_column("#")
-    offers.add_column("BACKEND")
-    offers.add_column("REGION")
-    offers.add_column("INSTANCE")
-    offers.add_column("RESOURCES")
-    offers.add_column("SPOT")
-    offers.add_column("PRICE")
+    offers.add_column("BACKEND", style="grey58", ratio=2)
+    offers.add_column("RESOURCES", ratio=4)
+    offers.add_column("INSTANCE TYPE", style="grey58", no_wrap=True, ratio=2)
+    offers.add_column("PRICE", style="grey58", ratio=1)
     offers.add_column()
 
-    job_plan.offers = job_plan.offers[:offers_limit]
+    job_plan.offers = job_plan.offers[:max_offers] if max_offers else job_plan.offers
 
     for i, offer in enumerate(job_plan.offers, start=1):
         r = offer.instance.resources
@@ -116,14 +120,12 @@ def print_run_plan(run_plan: RunPlan, offers_limit: int = 3):
             instance += f" ({offer.blocks}/{offer.total_blocks})"
         offers.add_row(
             f"{i}",
-            offer.backend.replace("remote", "ssh"),
-            offer.region,
+            offer.backend.replace("remote", "ssh") + " (" + offer.region + ")",
+            r.pretty_format(include_spot=True),
             instance,
-            r.pretty_format(),
-            "yes" if r.spot else "no",
-            f"${offer.price:g}",
+            f"${offer.price:.4f}".rstrip("0").rstrip("."),
             availability,
-            style=None if i == 1 else "secondary",
+            style=None if i == 1 or not include_run_properties else "secondary",
         )
     if job_plan.total_offers > len(job_plan.offers):
         offers.add_row("", "...", style="secondary")
@@ -135,7 +137,8 @@ def print_run_plan(run_plan: RunPlan, offers_limit: int = 3):
         if job_plan.total_offers > len(job_plan.offers):
             console.print(
                 f"[secondary] Shown {len(job_plan.offers)} of {job_plan.total_offers} offers, "
-                f"${job_plan.max_price:g} max[/]"
+                f"${job_plan.max_price:3f}".rstrip("0").rstrip(".")
+                + "max[/]"
             )
         console.print()
     else:
@@ -145,29 +148,27 @@ def print_run_plan(run_plan: RunPlan, offers_limit: int = 3):
 def get_runs_table(
     runs: List[Run], verbose: bool = False, format_date: DateFormatter = pretty_date
 ) -> Table:
-    table = Table(box=None)
-    table.add_column("NAME", style="bold", no_wrap=True)
-    table.add_column("BACKEND", style="grey58")
+    table = Table(box=None, expand=shutil.get_terminal_size(fallback=(120, 40)).columns <= 110)
+    table.add_column("NAME", style="bold", no_wrap=True, ratio=2)
+    table.add_column("BACKEND", style="grey58", ratio=2)
+    table.add_column("RESOURCES", ratio=3 if not verbose else 2)
     if verbose:
-        table.add_column("INSTANCE", no_wrap=True)
-    table.add_column("RESOURCES")
+        table.add_column("INSTANCE TYPE", no_wrap=True, ratio=1)
+    table.add_column("PRICE", style="grey58", ratio=1)
+    table.add_column("STATUS", no_wrap=True, ratio=1)
+    table.add_column("SUBMITTED", style="grey58", no_wrap=True, ratio=1)
     if verbose:
-        table.add_column("RESERVATION", no_wrap=True)
-    table.add_column("PRICE", no_wrap=True)
-    table.add_column("STATUS", no_wrap=True)
-    table.add_column("SUBMITTED", style="grey58", no_wrap=True)
-    if verbose:
-        table.add_column("ERROR", no_wrap=True)
+        table.add_column("ERROR", no_wrap=True, ratio=2)
 
     for run in runs:
-        run_error = _get_run_error(run)
         run = run._run  # TODO(egor-s): make public attribute
 
         run_row: Dict[Union[str, int], Any] = {
             "NAME": run.run_spec.run_name,
             "SUBMITTED": format_date(run.submitted_at),
-            "ERROR": run_error,
         }
+        if run.error:
+            run_row["ERROR"] = run.error
         if len(run.jobs) != 1:
             run_row["STATUS"] = run.status
             add_row_from_dict(table, run_row)
@@ -180,26 +181,27 @@ def get_runs_table(
                 status += f" (inactive for {inactive_for})"
             job_row: Dict[Union[str, int], Any] = {
                 "NAME": f"  replica={job.job_spec.replica_num} job={job.job_spec.job_num}",
-                "STATUS": status,
+                "STATUS": latest_job_submission.status_message,
                 "SUBMITTED": format_date(latest_job_submission.submitted_at),
-                "ERROR": _get_job_error(job),
+                "ERROR": latest_job_submission.error,
             }
             jpd = latest_job_submission.job_provisioning_data
             if jpd is not None:
                 resources = jpd.instance_type.resources
-                instance = jpd.instance_type.name
+                instance_type = jpd.instance_type.name
                 jrd = latest_job_submission.job_runtime_data
                 if jrd is not None and jrd.offer is not None:
                     resources = jrd.offer.instance.resources
                     if jrd.offer.total_blocks > 1:
-                        instance += f" ({jrd.offer.blocks}/{jrd.offer.total_blocks})"
+                        instance_type += f" ({jrd.offer.blocks}/{jrd.offer.total_blocks})"
+                if jpd.reservation:
+                    instance_type += f" ({jpd.reservation})"
                 job_row.update(
                     {
                         "BACKEND": f"{jpd.backend.value.replace('remote', 'ssh')} ({jpd.region})",
-                        "INSTANCE": instance,
                         "RESOURCES": resources.pretty_format(include_spot=True),
-                        "RESERVATION": jpd.reservation,
-                        "PRICE": f"${jpd.price:.4}",
+                        "INSTANCE TYPE": instance_type,
+                        "PRICE": f"${jpd.price:.4f}".rstrip("0").rstrip("."),
                     }
                 )
             if len(run.jobs) == 1:
@@ -208,13 +210,3 @@ def get_runs_table(
             add_row_from_dict(table, job_row, style="secondary" if len(run.jobs) != 1 else None)
 
     return table
-
-
-def _get_run_error(run: Run) -> str:
-    return run._run.error or ""
-
-
-def _get_job_error(job: Job) -> str:
-    if job.job_submissions[-1].termination_reason is None:
-        return ""
-    return job.job_submissions[-1].termination_reason.name

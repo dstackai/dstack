@@ -1,6 +1,6 @@
 import asyncio
 from collections.abc import Iterable
-from datetime import timedelta
+from datetime import timedelta, timezone
 from typing import Dict, List, Optional
 
 from sqlalchemy import select
@@ -18,6 +18,7 @@ from dstack._internal.core.models.instances import (
     SSHConnectionParams,
 )
 from dstack._internal.core.models.metrics import Metric
+from dstack._internal.core.models.profiles import StartupOrder
 from dstack._internal.core.models.repos import RemoteRepoCreds
 from dstack._internal.core.models.runs import (
     ClusterInfo,
@@ -40,7 +41,7 @@ from dstack._internal.server.models import (
     RepoModel,
     RunModel,
 )
-from dstack._internal.server.schemas.runner import TaskStatus
+from dstack._internal.server.schemas.runner import GPUDevice, TaskStatus
 from dstack._internal.server.services import logs as logs_services
 from dstack._internal.server.services import services
 from dstack._internal.server.services.instances import get_instance_ssh_private_keys
@@ -69,6 +70,12 @@ from dstack._internal.utils.interpolator import VariablesInterpolator
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
+
+
+# Minimum time before terminating active job in case of connectivity issues.
+# Should be sufficient to survive most problems caused by
+# the server network flickering and providers' glitches.
+JOB_DISCONNECTED_RETRY_TIMEOUT = timedelta(minutes=2)
 
 
 async def process_running_jobs(batch_size: int = 1):
@@ -178,18 +185,10 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
         if job_provisioning_data.hostname is None:
             await _wait_for_instance_provisioning_data(job_model=job_model)
         else:
-            # Wait until all other jobs in the replica have IPs assigned.
-            # This is needed to ensure cluster_info has all IPs set.
-            for other_job in run.jobs:
-                if (
-                    other_job.job_spec.replica_num == job.job_spec.replica_num
-                    and other_job.job_submissions[-1].status == JobStatus.PROVISIONING
-                    and other_job.job_submissions[-1].job_provisioning_data is not None
-                    and other_job.job_submissions[-1].job_provisioning_data.hostname is None
-                ):
-                    job_model.last_processed_at = common_utils.get_current_datetime()
-                    await session.commit()
-                    return
+            if _should_wait_for_other_nodes(run, job, job_model):
+                job_model.last_processed_at = common_utils.get_current_datetime()
+                await session.commit()
+                return
 
             # fails are acceptable until timeout is exceeded
             if job_provisioning_data.dockerized:
@@ -202,7 +201,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
                 user_ssh_key = run.run_spec.ssh_key_pub.strip()
                 public_keys = [project.ssh_public_key.strip(), user_ssh_key]
                 if job_provisioning_data.backend == BackendType.LOCAL:
-                    # No need to update ~/.ssh/authorized_keys when running shim localy
+                    # No need to update ~/.ssh/authorized_keys when running shim locally
                     user_ssh_key = ""
                 success = await common_utils.run_async(
                     _process_provisioning_with_shim,
@@ -299,19 +298,38 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
                 run_model,
                 job_model,
             )
-            if not success:
-                job_model.termination_reason = JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY
 
-        if not success:  # kill the job
-            logger.warning(
-                "%s: failed because runner is not available or return an error,  age=%s",
-                fmt(job_model),
-                job_submission.age,
-            )
-            job_model.status = JobStatus.TERMINATING
-            if not job_model.termination_reason:
-                job_model.termination_reason = JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY
-            # job will be terminated and instance will be emptied by process_terminating_jobs
+        if success:
+            job_model.disconnected_at = None
+        else:
+            if job_model.termination_reason:
+                logger.warning(
+                    "%s: failed because shim/runner returned an error, age=%s",
+                    fmt(job_model),
+                    job_submission.age,
+                )
+                job_model.status = JobStatus.TERMINATING
+                # job will be terminated and instance will be emptied by process_terminating_jobs
+            else:
+                # No job_model.termination_reason set means ssh connection failed
+                if job_model.disconnected_at is None:
+                    job_model.disconnected_at = common_utils.get_current_datetime()
+                if _should_terminate_job_due_to_disconnect(job_model):
+                    logger.warning(
+                        "%s: failed because instance is unreachable, age=%s",
+                        fmt(job_model),
+                        job_submission.age,
+                    )
+                    # TODO: Replace with JobTerminationReason.INSTANCE_UNREACHABLE in 0.20 or
+                    # when CLI <= 0.19.8 is no longer supported
+                    job_model.termination_reason = JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY
+                    job_model.status = JobStatus.TERMINATING
+                else:
+                    logger.warning(
+                        "%s: is unreachable, waiting for the instance to become reachable again, age=%s",
+                        fmt(job_model),
+                        job_submission.age,
+                    )
 
     if (
         initial_status != job_model.status
@@ -381,6 +399,48 @@ async def _wait_for_instance_provisioning_data(job_model: JobModel):
     job_model.job_provisioning_data = job_model.instance.job_provisioning_data
 
 
+def _should_wait_for_other_nodes(run: Run, job: Job, job_model: JobModel) -> bool:
+    for other_job in run.jobs:
+        if (
+            other_job.job_spec.replica_num == job.job_spec.replica_num
+            and other_job.job_submissions[-1].status == JobStatus.PROVISIONING
+            and other_job.job_submissions[-1].job_provisioning_data is not None
+            and other_job.job_submissions[-1].job_provisioning_data.hostname is None
+        ):
+            logger.debug(
+                "%s: waiting for other job to have IP assigned",
+                fmt(job_model),
+            )
+            return True
+    master_job = find_job(run.jobs, job.job_spec.replica_num, 0)
+    if (
+        job.job_spec.job_num != 0
+        and run.run_spec.merged_profile.startup_order == StartupOrder.MASTER_FIRST
+        and master_job.job_submissions[-1].status != JobStatus.RUNNING
+    ):
+        logger.debug(
+            "%s: waiting for master job to become running",
+            fmt(job_model),
+        )
+        return True
+    if (
+        job.job_spec.job_num == 0
+        and run.run_spec.merged_profile.startup_order == StartupOrder.WORKERS_FIRST
+    ):
+        for other_job in run.jobs:
+            if (
+                other_job.job_spec.replica_num == job.job_spec.replica_num
+                and other_job.job_spec.job_num != job.job_spec.job_num
+                and other_job.job_submissions[-1].status != JobStatus.RUNNING
+            ):
+                logger.debug(
+                    "%s: waiting for worker job to become running",
+                    fmt(job_model),
+                )
+                return True
+    return False
+
+
 @runner_ssh_tunnel(ports=[DSTACK_SHIM_HTTP_PORT], retries=1)
 def _process_provisioning_with_shim(
     ports: Dict[int, int],
@@ -438,6 +498,10 @@ def _process_provisioning_with_shim(
         job_provisioning_data.backend, job_provisioning_data.instance_type.name
     )
 
+    gpu_devices = _get_instance_specific_gpu_devices(
+        job_provisioning_data.backend, job_provisioning_data.instance_type.name
+    )
+
     container_user = "root"
 
     job_runtime_data = get_job_runtime_data(job_model)
@@ -471,6 +535,7 @@ def _process_provisioning_with_shim(
             volumes=volumes,
             volume_mounts=volume_mounts,
             instance_mounts=instance_mounts,
+            gpu_devices=gpu_devices,
             host_ssh_user=ssh_user,
             host_ssh_keys=[ssh_key] if ssh_key else [],
             container_ssh_keys=public_keys,
@@ -538,7 +603,7 @@ def _process_pulling_with_shim(
     if shim_client.is_api_v2_supported():  # raises error if shim is down, causes retry
         task = shim_client.get_task(job_model.id)
 
-        # If task goes to terminated before the job is submitted to runner, then an error occured
+        # If task goes to terminated before the job is submitted to runner, then an error occurred
         if task.status == TaskStatus.TERMINATED:
             logger.warning(
                 "shim failed to execute job %s: %s (%s)",
@@ -567,7 +632,7 @@ def _process_pulling_with_shim(
     else:
         shim_status = shim_client.pull()  # raises error if shim is down, causes retry
 
-        # If shim goes to pending before the job is submitted to runner, then an error occured
+        # If shim goes to pending before the job is submitted to runner, then an error occurred
         if (
             shim_status.state == "pending"
             and shim_status.result is not None
@@ -646,6 +711,10 @@ def _process_running(
                 )
             if latest_state_event.termination_message:
                 job_model.termination_reason_message = latest_state_event.termination_message
+        if (exit_status := latest_state_event.exit_status) is not None:
+            job_model.exit_status = exit_status
+            if exit_status != 0:
+                logger.info("%s: non-zero exit status %s", fmt(job_model), exit_status)
     else:
         _terminate_if_inactivity_duration_exceeded(run_model, job_model, resp.no_connections_secs)
     if job_model.status != previous_status:
@@ -681,6 +750,15 @@ def _terminate_if_inactivity_duration_exceeded(
             f"The job was inactive for {no_connections_secs} seconds,"
             f" exceeding the inactivity_duration of {conf.inactivity_duration} seconds"
         )
+
+
+def _should_terminate_job_due_to_disconnect(job_model: JobModel) -> bool:
+    if job_model.disconnected_at is None:
+        return False
+    return (
+        common_utils.get_current_datetime()
+        > job_model.disconnected_at.replace(tzinfo=timezone.utc) + JOB_DISCONNECTED_RETRY_TIMEOUT
+    )
 
 
 async def _check_gpu_utilization(session: AsyncSession, job_model: JobModel, job: Job) -> None:
@@ -813,8 +891,8 @@ def _submit_job_to_runner(
         return success_if_not_available
 
     runner_client.submit_job(
-        run_spec=run.run_spec,
-        job_spec=job.job_spec,
+        run=run,
+        job=job,
         cluster_info=cluster_info,
         secrets=secrets,
         repo_credentials=repo_credentials,
@@ -834,14 +912,60 @@ def _submit_job_to_runner(
 def _get_instance_specific_mounts(
     backend_type: BackendType, instance_type_name: str
 ) -> List[InstanceMountPoint]:
-    if backend_type == BackendType.GCP and instance_type_name == "a3-megagpu-8g":
-        return [
-            InstanceMountPoint(
-                instance_path="/dev/aperture_devices", path="/dev/aperture_devices"
-            ),
-            InstanceMountPoint(instance_path="/var/lib/tcpxo/lib64", path="/var/lib/tcpxo/lib64"),
-            InstanceMountPoint(
-                instance_path="/var/lib/fastrak/lib64", path="/var/lib/fastrak/lib64"
-            ),
-        ]
+    if backend_type == BackendType.GCP:
+        if instance_type_name == "a3-megagpu-8g":
+            return [
+                InstanceMountPoint(
+                    instance_path="/dev/aperture_devices",
+                    path="/dev/aperture_devices",
+                ),
+                InstanceMountPoint(
+                    instance_path="/var/lib/tcpxo/lib64",
+                    path="/var/lib/tcpxo/lib64",
+                ),
+                InstanceMountPoint(
+                    instance_path="/var/lib/fastrak/lib64",
+                    path="/var/lib/fastrak/lib64",
+                ),
+            ]
+        if instance_type_name in ["a3-edgegpu-8g", "a3-highgpu-8g"]:
+            return [
+                InstanceMountPoint(
+                    instance_path="/var/lib/nvidia/lib64",
+                    path="/usr/local/nvidia/lib64",
+                ),
+                InstanceMountPoint(
+                    instance_path="/var/lib/nvidia/bin",
+                    path="/usr/local/nvidia/bin",
+                ),
+                InstanceMountPoint(
+                    instance_path="/var/lib/tcpx/lib64",
+                    path="/usr/local/tcpx/lib64",
+                ),
+                InstanceMountPoint(
+                    instance_path="/run/tcpx",
+                    path="/run/tcpx",
+                ),
+            ]
     return []
+
+
+def _get_instance_specific_gpu_devices(
+    backend_type: BackendType, instance_type_name: str
+) -> List[GPUDevice]:
+    gpu_devices = []
+    if backend_type == BackendType.GCP and instance_type_name in [
+        "a3-edgegpu-8g",
+        "a3-highgpu-8g",
+    ]:
+        for i in range(8):
+            gpu_devices.append(
+                GPUDevice(path_on_host=f"/dev/nvidia{i}", path_in_container=f"/dev/nvidia{i}")
+            )
+        gpu_devices.append(
+            GPUDevice(path_on_host="/dev/nvidia-uvm", path_in_container="/dev/nvidia-uvm")
+        )
+        gpu_devices.append(
+            GPUDevice(path_on_host="/dev/nvidiactl", path_in_container="/dev/nvidiactl")
+        )
+    return gpu_devices

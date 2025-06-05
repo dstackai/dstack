@@ -9,6 +9,7 @@ from dstack._internal.core.backends.base.configurator import (
 )
 from dstack._internal.core.backends.nebius import resources
 from dstack._internal.core.backends.nebius.backend import NebiusBackend
+from dstack._internal.core.backends.nebius.fabrics import get_all_infiniband_fabrics
 from dstack._internal.core.backends.nebius.models import (
     AnyNebiusBackendConfig,
     NebiusBackendConfig,
@@ -29,19 +30,23 @@ class NebiusConfigurator(Configurator):
         assert isinstance(config.creds, NebiusServiceAccountCreds)
         try:
             sdk = resources.make_sdk(config.creds)
-            available_regions = set(resources.get_region_to_project_id_map(sdk))
+            # check that it's possible to build the projects map with configured settings
+            resources.get_region_to_project_id_map(
+                sdk, configured_regions=config.regions, configured_project_ids=config.projects
+            )
         except (ValueError, RequestError) as e:
             raise_invalid_credentials_error(
                 fields=[["creds"]],
                 details=str(e),
             )
-        if invalid_regions := set(config.regions or []) - available_regions:
+        valid_fabrics = get_all_infiniband_fabrics()
+        if invalid_fabrics := set(config.fabrics or []) - valid_fabrics:
             raise_invalid_credentials_error(
-                fields=[["regions"]],
+                fields=[["fabrics"]],
                 details=(
-                    f"Configured regions {invalid_regions} do not exist in this Nebius tenancy."
-                    " Omit `regions` to use all regions or select some of the available regions:"
-                    f" {available_regions}"
+                    "These InfiniBand fabrics do not exist or are not known to dstack:"
+                    f" {sorted(invalid_fabrics)}. Omit `fabrics` to allow all fabrics or select"
+                    f" some of the valid options: {sorted(valid_fabrics)}"
                 ),
             )
 

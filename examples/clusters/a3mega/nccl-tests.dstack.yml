@@ -1,0 +1,50 @@
+type: task
+name: nccl-tests
+nodes: 2
+image: nvcr.io/nvidia/pytorch:24.04-py3
+entrypoint: "bash -c" # Need to use bash instead of default dash for nccl-env-profile.sh
+commands:
+  - |
+    # Setup TCPXO NCCL env variables
+    NCCL_LIB_DIR="/var/lib/tcpxo/lib64"
+    source ${NCCL_LIB_DIR}/nccl-env-profile-ll128.sh
+    export NCCL_FASTRAK_CTRL_DEV=enp0s12
+    export NCCL_FASTRAK_IFNAME=enp6s0,enp7s0,enp13s0,enp14s0,enp134s0,enp135s0,enp141s0,enp142s0
+    export NCCL_SOCKET_IFNAME=enp0s12
+    export NCCL_FASTRAK_LLCM_DEVICE_DIRECTORY="/dev/aperture_devices"
+    export LD_LIBRARY_PATH="${NCCL_LIB_DIR}:${LD_LIBRARY_PATH}"
+    # Build NCCL Tests
+    git clone https://github.com/NVIDIA/nccl-tests.git
+    cd nccl-tests
+    MPI=1 CC=mpicc CXX=mpicxx make -j
+    cd build
+    # We use FIFO for inter-node communication
+    FIFO=/tmp/dstack_job
+    if [ ${DSTACK_NODE_RANK} -eq 0 ]; then
+      sleep 10
+      echo "${DSTACK_NODES_IPS}" > hostfile
+      MPIRUN='mpirun --allow-run-as-root --hostfile hostfile'
+      # Wait for other nodes
+      while true; do
+        if ${MPIRUN} -n ${DSTACK_NODES_NUM} -N 1 true >/dev/null 2>&1; then
+          break
+        fi
+        echo 'Waiting for nodes...'
+        sleep 5
+      done
+      # Run NCCL Tests
+      ${MPIRUN} \
+        -n ${DSTACK_GPUS_NUM} -N ${DSTACK_GPUS_PER_NODE} \
+        --mca btl tcp,self --mca btl_tcp_if_exclude lo,docker0 \
+        $(env | awk -F= '{print "-x", $1}' | xargs) \
+        ./all_gather_perf -b 8M -e 8G -f 2 -g 1 -w 5 --iters 200 -c 0;
+      # Notify nodes the job is done
+      ${MPIRUN} -n ${DSTACK_NODES_NUM} -N 1 sh -c "echo done > ${FIFO}"
+    else
+      mkfifo ${FIFO}
+      # Wait for a message from the first node
+      cat ${FIFO}
+    fi
+spot_policy: auto
+resources:
+  shm_size: 16GB

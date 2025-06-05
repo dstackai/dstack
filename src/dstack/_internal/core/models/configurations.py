@@ -1,6 +1,7 @@
 import re
 from collections import Counter
 from enum import Enum
+from pathlib import PurePosixPath
 from typing import Any, Dict, List, Optional, Union
 
 from pydantic import Field, ValidationError, conint, constr, root_validator, validator
@@ -22,6 +23,10 @@ ValidPort = conint(gt=0, le=65536)
 MAX_INT64 = 2**63 - 1
 SERVICE_HTTPS_DEFAULT = True
 STRIP_PREFIX_DEFAULT = True
+RUN_PRIOTIRY_MIN = 0
+RUN_PRIOTIRY_MAX = 100
+RUN_PRIORITY_DEFAULT = 0
+DEFAULT_REPO_DIR = "/workflow"
 
 
 class RunConfigurationType(str, Enum):
@@ -76,7 +81,8 @@ class ScalingSpec(CoreModel):
         Field(
             description="The target value of the metric. "
             "The number of replicas is calculated based on this number and automatically adjusts "
-            "(scales up or down) as this metric changes"
+            "(scales up or down) as this metric changes",
+            gt=0,
         ),
     ]
     scale_up_delay: Annotated[
@@ -176,7 +182,7 @@ class BaseRunConfiguration(CoreModel):
         Field(
             description=(
                 "The path to the working directory inside the container."
-                " It's specified relative to the repository directory (`/workflow`) and should be inside it."
+                f" It's specified relative to the repository directory (`{DEFAULT_REPO_DIR}`) and should be inside it."
                 ' Defaults to `"."` '
             )
         ),
@@ -210,14 +216,36 @@ class BaseRunConfiguration(CoreModel):
         Env,
         Field(description="The mapping or the list of environment variables"),
     ] = Env()
-    # deprecated since 0.18.31; task, service -- no effect; dev-environment -- executed right before `init`
-    setup: CommandsList = []
+    shell: Annotated[
+        Optional[str],
+        Field(
+            description=(
+                "The shell used to run commands."
+                " Allowed values are `sh`, `bash`, or an absolute path, e.g., `/usr/bin/zsh`."
+                " Defaults to `/bin/sh` if the `image` is specified, `/bin/bash` otherwise"
+            )
+        ),
+    ] = None
     resources: Annotated[
         ResourcesSpec, Field(description="The resources requirements to run the configuration")
     ] = ResourcesSpec()
+    priority: Annotated[
+        Optional[int],
+        Field(
+            ge=RUN_PRIOTIRY_MIN,
+            le=RUN_PRIOTIRY_MAX,
+            description=(
+                f"The priority of the run, an integer between `{RUN_PRIOTIRY_MIN}` and `{RUN_PRIOTIRY_MAX}`."
+                " `dstack` tries to provision runs with higher priority first."
+                f" Defaults to `{RUN_PRIORITY_DEFAULT}`"
+            ),
+        ),
+    ] = None
     volumes: Annotated[
         List[Union[MountPoint, str]], Field(description="The volumes mount points")
     ] = []
+    # deprecated since 0.18.31; task, service -- no effect; dev-environment -- executed right before `init`
+    setup: CommandsList = []
 
     @validator("python", pre=True, always=True)
     def convert_python(cls, v, values) -> Optional[PythonVersion]:
@@ -244,6 +272,17 @@ class BaseRunConfiguration(CoreModel):
         UnixUser.parse(v)
         return v
 
+    @validator("shell")
+    def validate_shell(cls, v) -> Optional[str]:
+        if v is None:
+            return None
+        if v in ["sh", "bash"]:
+            return v
+        path = PurePosixPath(v)
+        if path.is_absolute():
+            return v
+        raise ValueError("The value must be `sh`, `bash`, or an absolute path")
+
 
 class BaseRunConfigurationWithPorts(BaseRunConfiguration):
     ports: Annotated[
@@ -261,7 +300,7 @@ class BaseRunConfigurationWithPorts(BaseRunConfiguration):
 
 
 class BaseRunConfigurationWithCommands(BaseRunConfiguration):
-    commands: Annotated[CommandsList, Field(description="The bash commands to run")] = []
+    commands: Annotated[CommandsList, Field(description="The shell commands to run")] = []
 
     @root_validator
     def check_image_or_commands_present(cls, values):
@@ -276,7 +315,7 @@ class DevEnvironmentConfigurationParams(CoreModel):
         Field(description="The IDE to run. Supported values include `vscode` and `cursor`"),
     ]
     version: Annotated[Optional[str], Field(description="The version of the IDE")] = None
-    init: Annotated[CommandsList, Field(description="The bash commands to run on startup")] = []
+    init: Annotated[CommandsList, Field(description="The shell commands to run on startup")] = []
     inactivity_duration: Annotated[
         Optional[Union[Literal["off"], int, bool, str]],
         Field(
@@ -401,7 +440,7 @@ class ServiceConfigurationParams(CoreModel):
             raise ValueError("The minimum number of replicas must be greater than or equal to 0")
         if v.max < v.min:
             raise ValueError(
-                "The maximum number of replicas must be greater than or equal to the minium number of replicas"
+                "The maximum number of replicas must be greater than or equal to the minimum number of replicas"
             )
         return v
 

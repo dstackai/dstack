@@ -1,0 +1,9 @@
+type: dev-environment
+name: cursor
+
+image: dstackai/tt-smi:latest
+
+ide: cursor
+
+resources:
+  gpu: n150:1

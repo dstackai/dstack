@@ -6,6 +6,7 @@ from typing_extensions import Annotated, Literal
 
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import CoreModel, Duration
+from dstack._internal.utils.common import list_enum_values_for_annotation
 from dstack._internal.utils.tags import tags_validator
 
 DEFAULT_RETRY_DURATION = 3600
@@ -30,6 +31,17 @@ class CreationPolicy(str, Enum):
 class TerminationPolicy(str, Enum):
     DONT_DESTROY = "dont-destroy"
     DESTROY_AFTER_IDLE = "destroy-after-idle"
+
+
+class StartupOrder(str, Enum):
+    ANY = "any"
+    MASTER_FIRST = "master-first"
+    WORKERS_FIRST = "workers-first"
+
+
+class StopCriteria(str, Enum):
+    ALL_DONE = "all-done"
+    MASTER_DONE = "master-done"
 
 
 @overload
@@ -102,7 +114,7 @@ class ProfileRetry(CoreModel):
         Field(
             description=(
                 "The list of events that should be handled with retry."
-                " Supported events are `no-capacity`, `interruption`, and `error`."
+                f" Supported events are {list_enum_values_for_annotation(RetryEvent)}."
                 " Omit to retry on all events"
             )
         ),
@@ -190,7 +202,11 @@ class ProfileParams(CoreModel):
     spot_policy: Annotated[
         Optional[SpotPolicy],
         Field(
-            description="The policy for provisioning spot or on-demand instances: `spot`, `on-demand`, or `auto`. Defaults to `on-demand`"
+            description=(
+                "The policy for provisioning spot or on-demand instances:"
+                f" {list_enum_values_for_annotation(SpotPolicy)}."
+                f" Defaults to `{SpotPolicy.ONDEMAND.value}`"
+            )
         ),
     ] = None
     retry: Annotated[
@@ -225,7 +241,11 @@ class ProfileParams(CoreModel):
     creation_policy: Annotated[
         Optional[CreationPolicy],
         Field(
-            description="The policy for using instances from fleets. Defaults to `reuse-or-create`"
+            description=(
+                "The policy for using instances from fleets:"
+                f" {list_enum_values_for_annotation(CreationPolicy)}."
+                f" Defaults to `{CreationPolicy.REUSE_OR_CREATE.value}`"
+            )
         ),
     ] = None
     idle_duration: Annotated[
@@ -240,6 +260,26 @@ class ProfileParams(CoreModel):
     utilization_policy: Annotated[
         Optional[UtilizationPolicy],
         Field(description="Run termination policy based on utilization"),
+    ] = None
+    startup_order: Annotated[
+        Optional[StartupOrder],
+        Field(
+            description=(
+                f"The order in which master and workers jobs are started:"
+                f" {list_enum_values_for_annotation(StartupOrder)}."
+                f" Defaults to `{StartupOrder.ANY.value}`"
+            )
+        ),
+    ] = None
+    stop_criteria: Annotated[
+        Optional[StopCriteria],
+        Field(
+            description=(
+                "The criteria determining when a multi-node run should be considered finished:"
+                f" {list_enum_values_for_annotation(StopCriteria)}."
+                f" Defaults to `{StopCriteria.ALL_DONE.value}`"
+            )
+        ),
     ] = None
     fleets: Annotated[
         Optional[list[str]], Field(description="The fleets considered for reuse")

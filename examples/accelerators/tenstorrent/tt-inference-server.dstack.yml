@@ -1,0 +1,24 @@
+type: service
+name: tt-inference-server
+
+env:
+  - HF_TOKEN
+  - HF_MODEL_REPO_ID=meta-llama/Llama-3.2-1B-Instruct
+image: ghcr.io/tenstorrent/tt-inference-server/vllm-tt-metal-src-release-ubuntu-20.04-amd64:0.0.4-v0.56.0-rc47-e2e0002ac7dc
+commands:
+  - | 
+    . ${PYTHON_ENV_DIR}/bin/activate
+    pip install "huggingface_hub[cli]"
+    export LLAMA_DIR="/data/models--$(echo "$HF_MODEL_REPO_ID" | sed 's/\//--/g')/"
+    huggingface-cli download $HF_MODEL_REPO_ID --local-dir $LLAMA_DIR
+    python /home/container_app_user/app/src/run_vllm_api_server.py
+port: 7000
+
+model: meta-llama/Llama-3.2-1B-Instruct
+
+# Cache downloaded model
+volumes:
+  - /mnt/data/tt-inference-server/data:/data
+
+resources:
+  gpu: n150:1

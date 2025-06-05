@@ -175,6 +175,8 @@ name: vscode
 ide: vscode
 
 resources:
+  # 16 or more x86_64 cores
+  cpu: 16..
   # 200GB or more RAM
   memory: 200GB..
   # 4 GPUs from 40GB to 80GB
@@ -187,10 +189,16 @@ resources:
 
 </div>
 
+The `cpu` property also allows you to specify the CPU architecture, `x86` or `arm`. Examples:
+`x86:16` (16 x86-64 cores), `arm:8..` (at least 8 ARM64 cores).
+If the architecture is not specified, `dstack` tries to infer it from the `gpu` specification
+using `x86` as the fallback value.
+
 The `gpu` property allows specifying not only memory size but also GPU vendor, names
 and their quantity. Examples: `nvidia` (one NVIDIA GPU), `A100` (one A100), `A10G,A100` (either A10G or A100),
 `A100:80GB` (one A100 of 80GB), `A100:2` (two A100), `24GB..40GB:2` (two GPUs between 24GB and 40GB),
 `A100:40GB:2` (two A100 GPUs of 40GB).
+If the vendor is not specified, `dstack` tries to infer it from the GPU name using `nvidia` as the fallback value.
 
 ??? info "Google Cloud TPU"
     To use TPUs, specify its architecture via the `gpu` property.
@@ -211,6 +219,9 @@ and their quantity. Examples: `nvidia` (one NVIDIA GPU), `A100` (one A100), `A10
 ??? info "Shared memory"
     If you are using parallel communicating processes (e.g., dataloaders in PyTorch), you may need to configure 
     `shm_size`, e.g. set it to `16GB`.
+
+> If you’re unsure which offers (hardware configurations) are available from the configured backends, use the
+> [`dstack offer`](../reference/cli/dstack/offer.md#list-gpu-offers) command to list them.
 
 ### Python version
 

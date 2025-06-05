@@ -6,9 +6,10 @@
     "azure_tenant_id": "{{env `AZURE_TENANT_ID`}}",
     "azure_subscription_id": "{{env `AZURE_SUBSCRIPTION_ID`}}",
     "azure_location": "westeurope",
-    "azure_vm_size": "Standard_DS1_v2",
+    "azure_vm_size": "Standard_D2s_v6",
     "build_prefix": "",
     "docker_version": "",
+    "image_repo": "",
     "image_version": ""
   },
   "builders": [{
@@ -64,7 +65,10 @@
     },
     {
       "type": "shell",
-      "environment_vars": ["IMAGE_VERSION={{user `image_version`}}"],
+      "environment_vars": [
+        "IMAGE_REPO={{user `image_repo`}}",
+        "IMAGE_VERSION={{user `image_version`}}"
+      ],
       "script": "provisioners/pull-docker-images.sh"
     },
     {

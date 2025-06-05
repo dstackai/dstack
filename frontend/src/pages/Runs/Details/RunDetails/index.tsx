@@ -7,7 +7,7 @@ import { format } from 'date-fns';
 import { Box, ColumnLayout, Container, Header, Loader, StatusIndicator } from 'components';
 
 import { DATE_TIME_FORMAT } from 'consts';
-import { getStatusIconType } from 'libs/run';
+import { getRunError, getRunStatusMessage, getStatusIconColor, getStatusIconType } from 'libs/run';
 import { useGetRunQuery } from 'services/run';
 
 import {
@@ -47,6 +47,9 @@ export const RunDetails = () => {
 
     if (!runData) return null;
 
+    const status = runData.latest_job_submission?.status ?? runData.status;
+    const terminationReason = runData.latest_job_submission?.termination_reason;
+
     return (
         <>
             <Container header={<Header variant="h2">{t('common.general')}</Header>}>
@@ -82,10 +85,18 @@ export const RunDetails = () => {
                     <div>
                         <Box variant="awsui-key-label">{t('projects.run.status')}</Box>
                         <div>
-                            <StatusIndicator type={getStatusIconType(runData.status)}>
-                                {t(`projects.run.statuses.${runData.status}`)}
+                            <StatusIndicator
+                                type={getStatusIconType(status, terminationReason)}
+                                colorOverride={getStatusIconColor(status, terminationReason)}
+                            >
+                                {getRunStatusMessage(runData)}
                             </StatusIndicator>
                         </div>
+                    </div>
+
+                    <div>
+                        <Box variant="awsui-key-label">{t('projects.run.error')}</Box>
+                        <div>{getRunError(runData)}</div>
                     </div>
 
                     {getRunListItemBackend(runData) && (

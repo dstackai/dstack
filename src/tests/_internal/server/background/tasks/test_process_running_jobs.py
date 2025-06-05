@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 from unittest.mock import MagicMock, Mock, patch
@@ -12,7 +12,7 @@ from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import NetworkMode
 from dstack._internal.core.models.configurations import DevEnvironmentConfiguration
 from dstack._internal.core.models.instances import InstanceStatus
-from dstack._internal.core.models.profiles import UtilizationPolicy
+from dstack._internal.core.models.profiles import StartupOrder, UtilizationPolicy
 from dstack._internal.core.models.runs import (
     JobRuntimeData,
     JobStatus,
@@ -244,7 +244,7 @@ class TestProcessRunningJobs:
         ):
             runner_client_mock = RunnerClientMock.return_value
             runner_client_mock.pull.return_value = PullResponse(
-                job_states=[JobStateEvent(timestamp=1, state=JobStatus.DONE)],
+                job_states=[JobStateEvent(timestamp=1, state=JobStatus.DONE, exit_status=0)],
                 job_logs=[],
                 runner_logs=[],
                 last_updated=2,
@@ -255,6 +255,7 @@ class TestProcessRunningJobs:
         assert job is not None
         assert job.status == JobStatus.TERMINATING
         assert job.termination_reason == JobTerminationReason.DONE_BY_RUNNER
+        assert job.exit_status == 0
         assert job.runner_timestamp == 2
 
     @pytest.mark.asyncio
@@ -329,7 +330,7 @@ class TestProcessRunningJobs:
             name="test-run-0-0",
             registry_username="",
             registry_password="",
-            image_name="dstackai/base:py3.13-0.7-cuda-12.1",
+            image_name="dstackai/base:py3.13-0.8-cuda-12.1",
             container_user="root",
             privileged=privileged,
             gpu=None,
@@ -340,6 +341,7 @@ class TestProcessRunningJobs:
             volumes=[volume_model_to_volume(volume)],
             volume_mounts=[VolumeMountPoint(name="my-vol", path="/volume")],
             instance_mounts=[InstanceMountPoint(instance_path="/root/.cache", path="/cache")],
+            gpu_devices=[],
             host_ssh_user="ubuntu",
             host_ssh_keys=["user_ssh_key"],
             container_ssh_keys=[project_ssh_pub_key, "user_ssh_key"],
@@ -488,6 +490,17 @@ class TestProcessRunningJobs:
             assert SSHTunnelMock.call_count == 3
         await session.refresh(job)
         assert job is not None
+        assert job.disconnected_at is not None
+        assert job.status == JobStatus.PULLING
+        with (
+            patch("dstack._internal.server.services.runner.ssh.SSHTunnel") as SSHTunnelMock,
+            patch("dstack._internal.server.services.runner.ssh.time.sleep"),
+            freeze_time(job.disconnected_at + timedelta(minutes=5)),
+        ):
+            SSHTunnelMock.side_effect = SSHError
+            await process_running_jobs()
+            assert SSHTunnelMock.call_count == 3
+        await session.refresh(job)
         assert job.status == JobStatus.TERMINATING
         assert job.termination_reason == JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY
         assert job.remove_at is None
@@ -792,3 +805,76 @@ class TestProcessRunningJobs:
         else:
             assert job.termination_reason is None
             assert job.termination_reason_message is None
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_master_job_waits_for_workers(self, test_db, session: AsyncSession):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(
+            session=session,
+            project_id=project.id,
+        )
+        run_spec = get_run_spec(
+            run_name="test-run",
+            repo_id=repo.name,
+        )
+        run_spec.configuration.startup_order = StartupOrder.WORKERS_FIRST
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_spec=run_spec,
+        )
+        instance1 = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.BUSY,
+        )
+        instance2 = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.BUSY,
+        )
+        job_provisioning_data = get_job_provisioning_data(dockerized=False)
+        master_job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.PROVISIONING,
+            job_provisioning_data=job_provisioning_data,
+            instance_assigned=True,
+            instance=instance1,
+            job_num=0,
+            last_processed_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
+        worker_job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.PROVISIONING,
+            job_provisioning_data=job_provisioning_data,
+            instance_assigned=True,
+            instance=instance2,
+            job_num=1,
+            last_processed_at=datetime(2023, 1, 2, 3, 5, tzinfo=timezone.utc),
+        )
+        await process_running_jobs()
+        await session.refresh(master_job)
+        assert master_job.status == JobStatus.PROVISIONING
+        worker_job.status = JobStatus.RUNNING
+        # To guarantee master_job is processed next
+        master_job.last_processed_at = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
+        await session.commit()
+        with (
+            patch("dstack._internal.server.services.runner.ssh.SSHTunnel"),
+            patch(
+                "dstack._internal.server.services.runner.client.RunnerClient"
+            ) as RunnerClientMock,
+        ):
+            runner_client_mock = RunnerClientMock.return_value
+            runner_client_mock.healthcheck.return_value = HealthcheckResponse(
+                service="dstack-runner", version="0.0.1.dev2"
+            )
+            await process_running_jobs()
+        await session.refresh(master_job)
+        assert master_job.status == JobStatus.RUNNING

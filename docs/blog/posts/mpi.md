@@ -3,7 +3,7 @@ title: "Supporting MPI and NCCL/RCCL tests"
 date: 2025-04-02
 description: "TBA"
 slug: mpi
-image: https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-mpi-v2.png?raw=true
+image: https://dstack.ai/static-assets/static-assets/images/dstack-mpi-v2.png
 categories:
   - SSH fleets
   - Cloud fleets
@@ -21,7 +21,7 @@ The strength of `dstack` lies in its flexibility. Users can leverage distributed
 system environment variables—such as `DSTACK_NODE_RANK`, `DSTACK_MASTER_NODE_IP`,
 `DSTACK_GPUS_PER_NODE` and [others](../../docs/concepts/tasks.md#system-environment-variables)—to containers.
 
-<img src="https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-mpi-v2.png?raw=true" width="630"/>
+<img src="https://dstack.ai/static-assets/static-assets/images/dstack-mpi-v2.png" width="630"/>
 
 One use case `dstack` hasn’t supported until now is MPI, as it requires a scheduled environment or
 direct SSH connections between containers. Since `mpirun` is essential for running NCCL/RCCL tests—crucial for large-scale
@@ -31,7 +31,7 @@ cluster usage—we’ve added support for it.
 
 Below is an example of a task that runs AllReduce test on 2 nodes, each with 4 GPUs (8 processes in total).
 
-<div editor-title="examples/misc/nccl-tests/.dstack.yml">
+<div editor-title="examples/distributed-training/nccl-tests/.dstack.yml">
 
 ```yaml
 type: task
@@ -86,10 +86,10 @@ resources:
 
 </div>
 
-The first worker node (`DSTACK_NODE_RANK=0`) generates a `hostfile` listing all node IPs and waits until all nodes are
+The master node (`DSTACK_NODE_RANK=0`) generates a `hostfile` listing all node IPs and waits until all nodes are
 reachable via MPI. Once confirmed, it launches the `/root/nccl-tests/build/all_reduce_perf` benchmark across all available GPUs in the cluster.
 
-The other worker nodes remain blocked until they receive a termination signal from the master node via a FIFO pipe.
+Non-master nodes remain blocked until they receive a termination signal from the master node via a FIFO pipe.
 
 With this, now you can use such a task to run both NCCL or RCCL tests on both cloud and SSH fleets, 
 as well as use MPI for other tasks.
@@ -101,5 +101,5 @@ as well as use MPI for other tasks.
 
 !!! info "What's next?"
     1. Learn more about [dev environments](../../docs/concepts/dev-environments.md), [tasks](../../docs/concepts/tasks.md), [services](../../docs/concepts/services.md), and [fleets](../../docs/concepts/fleets.md)
-    2. Check the [NCCL tests](../../examples/misc/nccl-tests/index.md) example
-    2. Join [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd){:target="_blank"}
+    2. Check the [NCCL tests](../../examples/clusters/nccl-tests/index.md) example
+    3. Join [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd){:target="_blank"}
