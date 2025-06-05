@@ -81,9 +81,12 @@ async def list_user_accessible_projects(
     if user.global_role == GlobalRole.ADMIN:
         projects = await list_project_models(session=session)
     else:
-        projects = await list_user_project_models(
-            session=session, user=user, include_public_non_member=True
-        )
+        # Get member projects
+        member_projects = await list_user_project_models(session=session, user=user)
+        # Get public non-member projects
+        public_projects = await _list_public_non_member_project_models(session=session, user=user)
+        # Combine both lists
+        projects = member_projects + public_projects
     
     projects = sorted(projects, key=lambda p: p.created_at)
     return [
@@ -262,59 +265,53 @@ async def list_user_project_models(
     session: AsyncSession,
     user: UserModel,
     include_members: bool = False,
-    include_public_non_member: bool = False,
 ) -> List[ProjectModel]:
     """
-    Get projects for a user.
-    
+    Get projects for a user where they are a member.
+
     Args:
         session: Database session
         user: User model
         include_members: Whether to join and load project members
-        include_public_non_member: Whether to include public projects where user is not a member
-    
+
     Returns:
-        List of ProjectModel instances
+        List of ProjectModel instances where user is a member
     """
     options = []
     if include_members:
         options.append(joinedload(ProjectModel.members))
     
-    if include_public_non_member:
-        # Get both member projects AND public non-member projects
-        res = await session.execute(
-            select(ProjectModel)
-            .where(
-                ProjectModel.deleted == False,
-                # Either user is a member, OR project is public and user is not a member
-                (
-                    # User is a member (regardless of public/private)
-                    ProjectModel.id.in_(
-                        select(MemberModel.project_id).where(MemberModel.user_id == user.id)
-                    )
-                ) | (
-                    # OR project is public and user is not a member
-                    (ProjectModel.is_public == True) & 
-                    ProjectModel.id.notin_(
-                        select(MemberModel.project_id).where(MemberModel.user_id == user.id)
-                    )
-                )
-            )
-            .options(*options)
+    res = await session.execute(
+        select(ProjectModel)
+        .where(
+            MemberModel.project_id == ProjectModel.id,
+            MemberModel.user_id == user.id,
+            ProjectModel.deleted == False,
         )
-    else:
-        # Original logic - only member projects
-        res = await session.execute(
-            select(ProjectModel)
-            .where(
-                MemberModel.project_id == ProjectModel.id,
-                MemberModel.user_id == user.id,
-                ProjectModel.deleted == False,
-            )
-            .options(*options)
-        )
+        .options(*options)
+    )
     
     return list(res.scalars().unique().all())
+
+
+async def _list_public_non_member_project_models(
+    session: AsyncSession,
+    user: UserModel,
+) -> List[ProjectModel]:
+    """
+    Get public projects where user is NOT a member.
+    """
+    res = await session.execute(
+        select(ProjectModel)
+        .where(
+            ProjectModel.deleted == False,
+            ProjectModel.is_public == True,
+            ProjectModel.id.notin_(
+                select(MemberModel.project_id).where(MemberModel.user_id == user.id)
+            )
+        )
+    )
+    return list(res.scalars().all())
 
 
 async def list_user_owned_project_models(
