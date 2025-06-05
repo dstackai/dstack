@@ -166,12 +166,7 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
             # We can attach to run multiple times if it goes from running to pending (retried).
             while True:
                 with MultiItemStatus(f"Launching [code]{run.name}[/]...", console=console) as live:
-                    while run.status in (
-                        RunStatus.SUBMITTED,
-                        RunStatus.PENDING,
-                        RunStatus.PROVISIONING,
-                        RunStatus.TERMINATING,
-                    ):
+                    while not _is_ready_to_attach(run):
                         table = get_runs_table([run])
                         live.update(table)
                         time.sleep(5)
