@@ -78,7 +78,7 @@ export const FormCodeEditor = <T extends FieldValues>({
                             ace={ace}
                             onChange={(event) => {
                                 onChange(event.detail.value);
-                                onChangeProp && onChangeProp(event);
+                                onChangeProp?.(event);
                             }}
                             themes={{ light: [], dark: [] }}
                             preferences={codeEditorPreferences}

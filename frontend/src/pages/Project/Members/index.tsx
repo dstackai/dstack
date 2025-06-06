@@ -141,7 +141,6 @@ export const ProjectMembers: React.FC<IProps> = ({ members, loading, onChange, r
     ];
 
     return (
-        // eslint-disable-next-line @typescript-eslint/no-empty-function
         <form onSubmit={handleSubmit(() => {})}>
             <Table
                 selectionType="multi"

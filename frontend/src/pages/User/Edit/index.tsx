@@ -69,6 +69,7 @@ export const UserEdit: React.FC = () => {
                 type: 'success',
                 content: t('users.edit.refresh_token_success_notification'),
             });
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
         } catch (e) {
             pushNotification({
                 type: 'error',
@@ -94,6 +95,7 @@ export const UserEdit: React.FC = () => {
             });
 
             navigate(ROUTES.USER.DETAILS.FORMAT(data.username ?? paramUserName));
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
         } catch (e) {
             pushNotification({
                 type: 'error',

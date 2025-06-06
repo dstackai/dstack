@@ -51,7 +51,7 @@ export const FormInput = <T extends FieldValues>({
                                     invalid: !!error,
                                     onChange: (event) => {
                                         onChange(event.detail.value);
-                                        onChangeProp && onChangeProp(event);
+                                        onChangeProp?.(event);
                                     },
                                 })}
                             </Hotspot>
@@ -62,7 +62,7 @@ export const FormInput = <T extends FieldValues>({
                                 invalid: !!error,
                                 onChange: (event) => {
                                     onChange(event.detail.value);
-                                    onChangeProp && onChangeProp(event);
+                                    onChangeProp?.(event);
                                 },
                             })
                         )}

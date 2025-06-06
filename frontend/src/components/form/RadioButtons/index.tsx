@@ -26,7 +26,7 @@ export const FormRadioButtons = <T extends FieldValues>({
             render={({ field: { onChange, ...fieldRest }, fieldState: { error } }) => {
                 const onChangeSelect: RadioGroupProps['onChange'] = (event) => {
                     onChange(event.detail.value);
-                    onChangeProp && onChangeProp(event);
+                    onChangeProp?.(event);
                 };
 
                 return (

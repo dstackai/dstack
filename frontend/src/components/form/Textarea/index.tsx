@@ -42,7 +42,7 @@ export const FormTextarea = <T extends FieldValues>({
                             invalid={!!error}
                             onChange={(event) => {
                                 onChange(event.detail.value);
-                                onChangeProp && onChangeProp(event);
+                                onChangeProp?.(event);
                             }}
                         />
                     </FormField>
