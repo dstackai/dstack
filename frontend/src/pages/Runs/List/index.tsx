@@ -1,7 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Button, Header, Loader, PropertyFilter, SpaceBetween, Table } from 'components';
+import { Button, Header, ListEmptyMessage, Loader, PropertyFilter, SpaceBetween, Table } from 'components';
 
 import { DEFAULT_TABLE_PAGE_SIZE } from 'consts';
 import { useBreadcrumbs, useCollection, useInfiniteScroll } from 'hooks';
@@ -61,6 +61,8 @@ export const RunList: React.FC = () => {
 
     const { renderEmptyMessage, renderNoMatchMessage } = useEmptyMessages({
         clearFilter,
+        noData: !data.length,
+        isDisabledClearFilter: Object.keys(filteringRequestParams).length <= 1 && !filteringRequestParams.only_active,
     });
 
     const { items, actions, collectionProps } = useCollection(data ?? [], {

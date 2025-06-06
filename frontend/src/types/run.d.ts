@@ -128,15 +128,18 @@ declare interface IJob {
 
 declare interface IDevEnvironmentConfiguration {
     type: 'dev-environment';
+    priority?: number | null
 }
 
 declare interface ITaskConfiguration {
     type: 'task';
+    priority?: number | null
 }
 
 declare interface IServiceConfiguration {
     type: 'service';
     gateway: string | null;
+    priority?: number | null
 }
 declare interface IRunSpec {
     configuration: IDevEnvironmentConfiguration | ITaskConfiguration | IServiceConfiguration;

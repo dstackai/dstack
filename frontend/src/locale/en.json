@@ -46,7 +46,8 @@
     "discord": "Discord",
     "danger_zone": "Danger Zone",
     "control_plane": "Control plane",
-    "refresh": "Refresh"
+    "refresh": "Refresh",
+    "quickstart": "Quickstart"
   },
 
   "auth": {
@@ -318,6 +319,7 @@
       "search_placeholder": "Find runs",
       "empty_message_title": "No runs",
       "empty_message_text": "No runs to display.",
+      "quickstart_message_text": "No runs to display. Create a new one using the guide",
       "nomatch_message_title": "No matches",
       "nomatch_message_text": "We can't find a match. Try to change project or clear filter",
       "project": "Project",
@@ -334,6 +336,7 @@
       "workflow_name": "Workflow",
       "configuration": "Configuration",
       "instance": "Instance",
+      "priority": "Priority",
       "provider_name": "Provider",
       "status": "Status",
       "submitted_at": "Submitted",

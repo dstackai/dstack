@@ -20,7 +20,15 @@ import {
     getJobTerminationReason,
 } from './helpers';
 
-export const useColumnsDefinitions = ({ projectName, runId }: { projectName: string; runId: string }) => {
+export const useColumnsDefinitions = ({
+    projectName,
+    runId,
+    runPriority,
+}: {
+    projectName: string;
+    runId: string;
+    runPriority?: number | null;
+}) => {
     const { t } = useTranslation();
 
     const columns = [
@@ -52,6 +60,11 @@ export const useColumnsDefinitions = ({ projectName, runId }: { projectName: str
                     </StatusIndicator>
                 );
             },
+        },
+        {
+            id: 'priority',
+            header: t('projects.run.priority'),
+            cell: () => runPriority,
         },
         {
             id: 'error',
