@@ -277,7 +277,6 @@ async def list_user_project_models(
     options = []
     if include_members:
         options.append(joinedload(ProjectModel.members))
-
     res = await session.execute(
         select(ProjectModel)
         .where(
@@ -287,7 +286,6 @@ async def list_user_project_models(
         )
         .options(*options)
     )
-
     return list(res.scalars().unique().all())
 
 
