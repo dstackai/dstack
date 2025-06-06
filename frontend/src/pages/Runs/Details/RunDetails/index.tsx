@@ -89,6 +89,11 @@ export const RunDetails = () => {
                     </div>
 
                     <div>
+                        <Box variant="awsui-key-label">{t('projects.run.finished_at')}</Box>
+                        <div>{runData.terminated_at ? format(new Date(runData.terminated_at), DATE_TIME_FORMAT) : '-'}</div>
+                    </div>
+
+                    <div>
                         <Box variant="awsui-key-label">{t('projects.run.status')}</Box>
                         <div>
                             <StatusIndicator
@@ -105,51 +110,44 @@ export const RunDetails = () => {
                         <div>{getRunError(runData)}</div>
                     </div>
 
-                    {getRunListItemBackend(runData) && (
-                        <div>
-                            <Box variant="awsui-key-label">{t('projects.run.backend')}</Box>
-                            <div>{getRunListItemBackend(runData)}</div>
-                        </div>
-                    )}
-
-                    {getRunListItemRegion(runData) && (
-                        <div>
-                            <Box variant="awsui-key-label">{t('projects.run.region')}</Box>
-                            <div>{getRunListItemRegion(runData)}</div>
-                        </div>
-                    )}
-
-                    {getRunListItemInstanceId(runData) && (
-                        <div>
-                            <Box variant="awsui-key-label">{t('projects.run.instance_id')}</Box>
-                            <div>{getRunListItemInstanceId(runData)}</div>
-                        </div>
-                    )}
-
-                    {getRunListItemResources(runData) && (
-                        <div>
-                            <Box variant="awsui-key-label">{t('projects.run.resources')}</Box>
-                            <div>{getRunListItemResources(runData)}</div>
-                        </div>
-                    )}
-
-                    {getRunListItemSpot(runData) && (
-                        <div>
-                            <Box variant="awsui-key-label">{t('projects.run.spot')}</Box>
-                            <div>{getRunListItemSpot(runData)}</div>
-                        </div>
-                    )}
-
-                    {getRunListItemPrice(runData) && (
-                        <div>
-                            <Box variant="awsui-key-label">{t('projects.run.price')}</Box>
-                            <div>{getRunListItemPrice(runData)}</div>
-                        </div>
-                    )}
+                    <div>
+                        <Box variant="awsui-key-label">{t('projects.run.priority')}</Box>
+                        <div>{getRunPriority(runData)}</div>
+                    </div>
 
                     <div>
                         <Box variant="awsui-key-label">{t('projects.run.cost')}</Box>
                         <div>${runData.cost}</div>
+                    </div>
+
+                    <div>
+                        <Box variant="awsui-key-label">{t('projects.run.price')}</Box>
+                        <div>{getRunListItemPrice(runData)}</div>
+                    </div>
+
+                    <div>
+                        <Box variant="awsui-key-label">{t('projects.run.resources')}</Box>
+                        <div>{getRunListItemResources(runData)}</div>
+                    </div>
+
+                    <div>
+                        <Box variant="awsui-key-label">{t('projects.run.region')}</Box>
+                        <div>{getRunListItemRegion(runData)}</div>
+                    </div>
+
+                    <div>
+                        <Box variant="awsui-key-label">{t('projects.run.instance_id')}</Box>
+                        <div>{getRunListItemInstanceId(runData)}</div>
+                    </div>
+
+                    <div>
+                        <Box variant="awsui-key-label">{t('projects.run.spot')}</Box>
+                        <div>{getRunListItemSpot(runData)}</div>
+                    </div>
+
+                    <div>
+                        <Box variant="awsui-key-label">{t('projects.run.backend')}</Box>
+                        <div>{getRunListItemBackend(runData)}</div>
                     </div>
                 </ColumnLayout>
 
