@@ -334,6 +334,7 @@
       "workflow_name": "Workflow",
       "configuration": "Configuration",
       "instance": "Instance",
+      "priority": "Priority",
       "provider_name": "Provider",
       "status": "Status",
       "submitted_at": "Submitted",
