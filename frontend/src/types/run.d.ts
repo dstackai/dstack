@@ -173,6 +173,7 @@ declare interface IRun {
     latest_job_submission?: IJobSubmission;
     cost: number;
     service: IRunService | null;
+    status_message?: string | null;
 }
 
 declare interface IMetricsItem {

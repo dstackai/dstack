@@ -2,6 +2,7 @@ import { get as _get } from 'lodash';
 import { StatusIndicatorProps } from '@cloudscape-design/components';
 
 import { capitalize } from 'libs';
+import { finishedRunStatuses } from '../pages/Runs/constants';
 
 import { IModelExtended } from '../pages/Models/List/types';
 
@@ -9,7 +10,7 @@ export const getStatusIconType = (
     status: IRun['status'] | TJobStatus,
     terminationReason: string | null | undefined,
 ): StatusIndicatorProps['type'] => {
-    if (terminationReason === 'interrupted_by_no_capacity') {
+    if (finishedRunStatuses.includes(status) && terminationReason === 'interrupted_by_no_capacity') {
         return 'stopped';
     }
     switch (status) {
@@ -41,24 +42,26 @@ export const getStatusIconColor = (
     if (terminationReason === 'failed_to_start_due_to_no_capacity' || terminationReason === 'interrupted_by_no_capacity') {
         return 'yellow';
     }
-
     switch (status) {
+        case 'submitted':
+        case 'pending':
+                return 'blue';
         case 'pulling':
             return 'green';
         case 'aborted':
             return 'yellow';
         case 'done':
-            return 'blue';
+            return 'grey';
         default:
             return undefined;
     }
 };
 
 export const getRunStatusMessage = (run: IRun): string => {
-    if (run.latest_job_submission?.status_message) {
+    if (finishedRunStatuses.includes(run.status) && run.latest_job_submission?.status_message) {
         return capitalize(run.latest_job_submission.status_message);
     } else {
-        return capitalize(run.status);
+        return capitalize(run.status_message || run.status);
     }
 };
 

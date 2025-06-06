@@ -24,6 +24,7 @@ import { Logs } from '../Logs';
 import { getJobSubmissionId } from '../Logs/helpers';
 
 import styles from './styles.module.scss';
+import { finishedRunStatuses } from 'pages/Runs/constants';
 
 export const RunDetails = () => {
     const { t } = useTranslation();
@@ -47,8 +48,8 @@ export const RunDetails = () => {
 
     if (!runData) return null;
 
-    const status = runData.latest_job_submission?.status ?? runData.status;
-    const terminationReason = runData.latest_job_submission?.termination_reason;
+    const status = finishedRunStatuses.includes(runData.status) ? runData.latest_job_submission?.status ?? runData.status : runData.status;
+    const terminationReason = finishedRunStatuses.includes(runData.status) ? runData.latest_job_submission?.termination_reason : null;
 
     return (
         <>
