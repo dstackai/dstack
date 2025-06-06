@@ -13,7 +13,7 @@ logger = get_logger(__name__)
 
 
 CLOUDRIFT_SERVER_ADDRESS = "https://api.cloudrift.ai"
-CLOUDRIFT_API_VERSION = "2025-03-21"
+CLOUDRIFT_API_VERSION = "2025-05-29"
 
 
 class RiftClient:
