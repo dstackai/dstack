@@ -7,8 +7,10 @@ import { format } from 'date-fns';
 import { Box, ColumnLayout, Container, Header, Loader, StatusIndicator } from 'components';
 
 import { DATE_TIME_FORMAT } from 'consts';
-import { getRunError, getRunStatusMessage, getStatusIconColor, getStatusIconType } from 'libs/run';
+import { getRunError, getRunPriority, getRunStatusMessage, getStatusIconColor, getStatusIconType } from 'libs/run';
 import { useGetRunQuery } from 'services/run';
+
+import { finishedRunStatuses } from 'pages/Runs/constants';
 
 import {
     getRunListItemBackend,
@@ -24,7 +26,6 @@ import { Logs } from '../Logs';
 import { getJobSubmissionId } from '../Logs/helpers';
 
 import styles from './styles.module.scss';
-import { finishedRunStatuses } from 'pages/Runs/constants';
 
 export const RunDetails = () => {
     const { t } = useTranslation();
@@ -48,8 +49,12 @@ export const RunDetails = () => {
 
     if (!runData) return null;
 
-    const status = finishedRunStatuses.includes(runData.status) ? runData.latest_job_submission?.status ?? runData.status : runData.status;
-    const terminationReason = finishedRunStatuses.includes(runData.status) ? runData.latest_job_submission?.termination_reason : null;
+    const status = finishedRunStatuses.includes(runData.status)
+        ? runData.latest_job_submission?.status ?? runData.status
+        : runData.status;
+    const terminationReason = finishedRunStatuses.includes(runData.status)
+        ? runData.latest_job_submission?.termination_reason
+        : null;
 
     return (
         <>
@@ -169,7 +174,14 @@ export const RunDetails = () => {
                 />
             )}
 
-            {runData.jobs.length > 1 && <JobList projectName={paramProjectName} runId={paramRunId} jobs={runData.jobs} />}
+            {runData.jobs.length > 1 && (
+                <JobList
+                    projectName={paramProjectName}
+                    runId={paramRunId}
+                    jobs={runData.jobs}
+                    runPriority={getRunPriority(runData)}
+                />
+            )}
         </>
     );
 };
