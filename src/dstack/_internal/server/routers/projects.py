@@ -36,7 +36,7 @@ async def list_projects(
 
     `members` and `backends` are always empty - call `/api/projects/{project_name}/get` to retrieve them.
     """
-    return await projects.list_user_projects(session=session, user=user)
+    return await projects.list_user_accessible_projects(session=session, user=user)
 
 
 @router.post("/create")
@@ -49,6 +49,7 @@ async def create_project(
         session=session,
         user=user,
         project_name=body.project_name,
+        is_public=body.is_public,
     )
 
 

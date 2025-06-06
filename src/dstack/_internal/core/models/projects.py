@@ -25,3 +25,4 @@ class Project(CoreModel):
     created_at: Optional[datetime] = None
     backends: List[BackendInfo]
     members: List[Member]
+    is_public: bool = False
