@@ -70,6 +70,10 @@ export const getRunError = (run: IRun): string | null => {
     return error ? capitalize(error) : null;
 };
 
+export const getRunPriority = (run: IRun): number | null => {
+    return run.run_spec.configuration?.priority ?? null;
+};
+
 export const getExtendedModelFromRun = (run: IRun): IModelExtended | null => {
     if (!run?.service?.model) return null;
 
