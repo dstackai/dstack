@@ -3,6 +3,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import PlainTextResponse
+from prometheus_client import generate_latest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.server import settings
@@ -26,4 +27,6 @@ async def get_prometheus_metrics(
 ) -> str:
     if not settings.ENABLE_PROMETHEUS_METRICS:
         raise error_not_found()
-    return await prometheus.get_metrics(session=session)
+    custom_metrics = await prometheus.get_metrics(session=session)
+    prometheus_metrics = generate_latest()
+    return custom_metrics + prometheus_metrics.decode()
