@@ -24,7 +24,7 @@ router = APIRouter(
 @router.get("/metrics")
 async def get_prometheus_metrics(
     session: Annotated[AsyncSession, Depends(get_session)],
-):
+) -> str:
     if not settings.ENABLE_PROMETHEUS_METRICS:
         raise error_not_found()
     custom_metrics = await prometheus.get_metrics(session=session)
