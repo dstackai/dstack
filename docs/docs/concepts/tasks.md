@@ -81,11 +81,11 @@ type: task
 # The name is optional, if not specified, generated randomly
 name: streamlit-hello
 
-python: "3.10"
+python: 3.12
 
 # Commands of the task
 commands:
-  - pip3 install streamlit
+  - uv pip install streamlit
   - streamlit hello
 # Expose the port to access the web app
 ports: 
@@ -102,33 +102,33 @@ application.
 By default, a task runs on a single node.
 However, you can run it on a cluster of nodes by specifying `nodes`.
 
-<div editor-title="train.dstack.yml">
+<div editor-title="examples/distributed-training/torchrun/.dstack.yml">
 
 ```yaml
 type: task
-# The name is optional, if not specified, generated randomly
 name: train-distrib
 
 # The size of the cluster
 nodes: 2
 
-python: "3.12"
-
-# Commands to run on each node
+python: 3.12
+env:
+  - NCCL_DEBUG=INFO
 commands:
-  - git clone https://github.com/pytorch/examples.git
-  - cd examples/distributed/ddp-tutorial-series
-  - pip install -r requirements.txt
-  - torchrun
-    --nproc-per-node=$DSTACK_GPUS_PER_NODE
-    --node-rank=$DSTACK_NODE_RANK
-    --nnodes=$DSTACK_NODES_NUM
-    --master-addr=$DSTACK_MASTER_NODE_IP
-    --master-port=12345
-    multinode.py 50 10
+  - git clone https://github.com/pytorch/examples.git pytorch-examples
+  - cd pytorch-examples/distributed/ddp-tutorial-series
+  - uv pip install -r requirements.txt
+  - |
+    torchrun \
+      --nproc-per-node=$DSTACK_GPUS_PER_NODE \
+      --node-rank=$DSTACK_NODE_RANK \
+      --nnodes=$DSTACK_NODES_NUM \
+      --master-addr=$DSTACK_MASTER_NODE_IP \
+      --master-port=12345 \
+      multinode.py 50 10
 
 resources:
-  gpu: 24GB
+  gpu: 24GB:1..2
   # Uncomment if using multiple GPUs
   #shm_size: 24GB
 ```
@@ -196,7 +196,7 @@ name: train
 
 # Commands of the task
 commands:
-  - pip install -r fine-tuning/qlora/requirements.txt
+  - uv pip install -r fine-tuning/qlora/requirements.txt
   - python fine-tuning/qlora/train.py
   
 resources:
@@ -233,7 +233,7 @@ If the vendor is not specified, `dstack` tries to infer it from the GPU name usi
     # The name is optional, if not specified, generated randomly
     name: train    
     
-    python: "3.10"
+    python: 3.12
     
     # Commands of the task
     commands:
@@ -267,7 +267,7 @@ type: task
 name: train    
 
 # If `image` is not specified, dstack uses its base image
-python: "3.10"
+python: 3.12
 
 # Commands of the task
 commands:
@@ -288,7 +288,7 @@ commands:
     name: train    
 
     # If `image` is not specified, dstack uses its base image
-    python: "3.10"
+    python: 3.12
     # Ensure nvcc is installed (req. for Flash Attention) 
     nvcc: true
     
@@ -355,7 +355,7 @@ type: task
 # The name is optional, if not specified, generated randomly
 name: train
 
-python: "3.10"
+python: 3.12
 
 # Environment variables
 env:
@@ -389,19 +389,6 @@ If you don't assign a value to an environment variable (see `HF_TOKEN` above),
     | `DSTACK_NODES_IPS`      | The list of internal IP addresses of all nodes delimited by "\n" |
     | `DSTACK_MPI_HOSTFILE`   | The path to a pre-populated MPI hostfile                         |
 
-### Spot policy
-
-By default, `dstack` uses on-demand instances. However, you can change that
-via the [`spot_policy`](../reference/dstack.yml/task.md#spot_policy) property. It accepts `spot`, `on-demand`, and `auto`.
-
-!!! info "Reference"
-    Tasks support many more configuration options,
-    incl. [`backends`](../reference/dstack.yml/task.md#backends), 
-    [`regions`](../reference/dstack.yml/task.md#regions), 
-    [`max_price`](../reference/dstack.yml/task.md#max_price), and
-    [`max_duration`](../reference/dstack.yml/task.md#max_duration), 
-    among [others](../reference/dstack.yml/task.md).
-
 ### Retry policy
 
 By default, if `dstack` can't find capacity, or the task exits with an error, or the instance is interrupted, 
@@ -414,14 +401,12 @@ If you'd like `dstack` to automatically retry, configure the
 
 ```yaml
 type: task
-# The name is optional, if not specified, generated randomly
 name: train    
 
-python: "3.10"
+python: 3.12
 
-# Commands of the task
 commands:
-  - pip install -r fine-tuning/qlora/requirements.txt
+  - uv pip install -r fine-tuning/qlora/requirements.txt
   - python fine-tuning/qlora/train.py
 
 retry:
@@ -448,11 +433,10 @@ This can be done by specifying the [`priority`](../reference/dstack.yml/task.md)
 type: task
 name: train
 
-python: "3.10"
+python: 3.12
 
-# Commands of the task
 commands:
-  - pip install -r fine-tuning/qlora/requirements.txt
+  - uv pip install -r fine-tuning/qlora/requirements.txt
   - python fine-tuning/qlora/train.py
 
 priority: 50
@@ -464,7 +448,48 @@ priority: 50
 Note that if a high priority run cannot be scheduled,
 it does not block other runs with lower priority from scheduling.
 
+### Utilization policy
+
+Sometimes it’s useful to track whether a task is fully utilizing all GPUs. While you can check this with
+[`dstack metrics`](../reference/cli/dstack/metrics.md), `dstack` also lets you set a policy to auto-terminate the run if any GPU is underutilized.
+
+Below is an example of a task that auto-terminate if any GPU stays below 10% utilization for 1 hour.
+
+<div editor-title=".dstack.yml">
+
+```yaml
+type: task
+name: train
+
+python: 3.12
+commands:
+  - uv pip install -r fine-tuning/qlora/requirements.txt
+  - python fine-tuning/qlora/train.py
+
+resources:
+  gpu: H100:8
+
+utilization_policy:
+  min_gpu_utilization: 10
+  time_window: 1h
+```
+
+</div>
+
+### Spot policy
+
+By default, `dstack` uses on-demand instances. However, you can change that
+via the [`spot_policy`](../reference/dstack.yml/task.md#spot_policy) property. It accepts `spot`, `on-demand`, and `auto`.
+
 --8<-- "docs/concepts/snippets/manage-fleets.ext"
+
+!!! info "Reference"
+    Tasks support many more configuration options,
+    incl. [`backends`](../reference/dstack.yml/task.md#backends), 
+    [`regions`](../reference/dstack.yml/task.md#regions), 
+    [`max_price`](../reference/dstack.yml/task.md#max_price), and
+    [`max_duration`](../reference/dstack.yml/task.md#max_duration), 
+    among [others](../reference/dstack.yml/task.md).
 
 --8<-- "docs/concepts/snippets/manage-runs.ext"
 

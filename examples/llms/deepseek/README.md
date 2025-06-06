@@ -472,7 +472,7 @@ on NVIDIA GPU using HuggingFace's [TRL :material-arrow-top-right-thin:{ .externa
     type: task
     name: trl-train
 
-    python: "3.10"
+    python: 3.12
 
     env:
       - WANDB_API_KEY
@@ -514,7 +514,7 @@ on NVIDIA GPU using HuggingFace's [TRL :material-arrow-top-right-thin:{ .externa
     type: task
     name: trl-train-deepseek-v2
 
-    python: "3.10"
+    python: 3.12
     nvcc: true
     env:
       - WANDB_API_KEY

@@ -117,7 +117,7 @@ name: efa-task
 # The size of the cluster
 nodes: 2
 
-python: "3.12"
+python: 3.12
 
 # Commands to run on each node
 commands:
