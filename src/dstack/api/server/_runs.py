@@ -7,6 +7,7 @@ from pydantic import parse_obj_as
 from dstack._internal.core.models.configurations import ServiceConfiguration
 from dstack._internal.core.models.runs import (
     ApplyRunPlanInput,
+    JobSubmission,
     Run,
     RunPlan,
     RunSpec,
@@ -96,11 +97,56 @@ def _get_apply_plan_excludes(plan: ApplyRunPlanInput) -> Optional[Dict]:
     run_spec_excludes = _get_run_spec_excludes(plan.run_spec)
     if run_spec_excludes is not None:
         apply_plan_excludes["run_spec"] = run_spec_excludes
-    if plan.current_resource is not None:
-        apply_plan_excludes["current_resource"] = {
-            "run_spec": _get_run_spec_excludes(plan.current_resource.run_spec)
+    current_resource = plan.current_resource
+    if current_resource is not None:
+        current_resource_excludes = {}
+        current_resource_excludes["status_message"] = True
+        apply_plan_excludes["current_resource"] = current_resource_excludes
+        current_resource_excludes["run_spec"] = _get_run_spec_excludes(current_resource.run_spec)
+        job_submissions_excludes = {}
+        current_resource_excludes["jobs"] = {
+            "__all__": {"job_submissions": {"__all__": job_submissions_excludes}}
         }
+        job_submissions = [js for j in current_resource.jobs for js in j.job_submissions]
+        if all(map(_should_exclude_job_submission_jpd_cpu_arch, job_submissions)):
+            job_submissions_excludes["job_provisioning_data"] = {
+                "instance_type": {"resources": {"cpu_arch"}}
+            }
+        if all(map(_should_exclude_job_submission_jrd_cpu_arch, job_submissions)):
+            job_submissions_excludes["job_runtime_data"] = {
+                "offer": {"instance": {"resources": {"cpu_arch"}}}
+            }
+        if all(js.exit_status is None for js in job_submissions):
+            job_submissions_excludes["exit_status"] = True
+        latest_job_submission = current_resource.latest_job_submission
+        if latest_job_submission is not None:
+            latest_job_submission_excludes = {}
+            current_resource_excludes["latest_job_submission"] = latest_job_submission_excludes
+            if _should_exclude_job_submission_jpd_cpu_arch(latest_job_submission):
+                latest_job_submission_excludes["job_provisioning_data"] = {
+                    "instance_type": {"resources": {"cpu_arch"}}
+                }
+            if _should_exclude_job_submission_jrd_cpu_arch(latest_job_submission):
+                latest_job_submission_excludes["job_runtime_data"] = {
+                    "offer": {"instance": {"resources": {"cpu_arch"}}}
+                }
+            if latest_job_submission.exit_status is None:
+                latest_job_submission_excludes["exit_status"] = True
     return {"plan": apply_plan_excludes}
+
+
+def _should_exclude_job_submission_jpd_cpu_arch(job_submission: JobSubmission) -> bool:
+    try:
+        return job_submission.job_provisioning_data.instance_type.resources.cpu_arch is None
+    except AttributeError:
+        return True
+
+
+def _should_exclude_job_submission_jrd_cpu_arch(job_submission: JobSubmission) -> bool:
+    try:
+        return job_submission.job_runtime_data.offer.instance.resources.cpu_arch is None
+    except AttributeError:
+        return True
 
 
 def _get_get_plan_excludes(request: GetRunPlanRequest) -> Optional[Dict]:
@@ -141,6 +187,16 @@ def _get_run_spec_excludes(run_spec: RunSpec) -> Optional[Dict]:
         configuration_excludes["rate_limits"] = True
     if configuration.shell is None:
         configuration_excludes["shell"] = True
+    if configuration.priority is None:
+        configuration_excludes["priority"] = True
+    if configuration.startup_order is None:
+        configuration_excludes["startup_order"] = True
+    if profile is not None and profile.startup_order is None:
+        profile_excludes.add("startup_order")
+    if configuration.stop_criteria is None:
+        configuration_excludes["stop_criteria"] = True
+    if profile is not None and profile.stop_criteria is None:
+        profile_excludes.add("stop_criteria")
 
     if configuration_excludes:
         spec_excludes["configuration"] = configuration_excludes

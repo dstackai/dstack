@@ -204,7 +204,7 @@ is available at `https://<run name>.<gateway domain>/`.
 
 Here's and example of FSDP and QLoRA fine-tuning of 4-bit Quantized [Llama-4-Scout-17B-16E :material-arrow-top-right-thin:{ .external }](https://huggingface.co/axolotl-quants/Llama-4-Scout-17B-16E-Linearized-bnb-nf4-bf16) on 2xH100 NVIDIA GPUs using [Axolotl :material-arrow-top-right-thin:{ .external }](https://github.com/OpenAccess-AI-Collective/axolotl){:target="_blank"}
 
-<div editor-title="examples/fine-tuning/axolotl/.dstack.yml">
+<div editor-title="examples/single-node-training/axolotl/.dstack.yml">
 
 ```yaml
 type: task
@@ -272,7 +272,7 @@ $ WANDB_API_KEY=...
 $ WANDB_PROJECT=...
 $ WANDB_NAME=axolotl-nvidia-llama-scout-train
 $ HUB_MODEL_ID=...
-$ dstack apply -f examples/fine-tuning/axolotl/.dstack.yml
+$ dstack apply -f examples/single-node-training/axolotl/.dstack.yml
 ```
 
 </div>
@@ -280,7 +280,7 @@ $ dstack apply -f examples/fine-tuning/axolotl/.dstack.yml
 ## Source code
 
 The source-code for deployment examples can be found in 
-[`examples/llms/llama` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/llms/llama) and the source-code for the finetuning example can be found in [`examples/fine-tuning/axolotl` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/axolotl){:target="_blank"}.
+[`examples/llms/llama` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/llms/llama) and the source-code for the finetuning example can be found in [`examples/single-node-training/axolotl` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/single-node-training/axolotl){:target="_blank"}.
 
 ## What's next?
 

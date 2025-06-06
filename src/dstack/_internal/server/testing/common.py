@@ -2,7 +2,7 @@ import json
 import uuid
 from contextlib import contextmanager
 from datetime import datetime, timezone
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Literal, Optional, Union
 from uuid import UUID
 
 import gpuhunt
@@ -25,7 +25,12 @@ from dstack._internal.core.models.configurations import (
     DevEnvironmentConfiguration,
 )
 from dstack._internal.core.models.envs import Env
-from dstack._internal.core.models.fleets import FleetConfiguration, FleetSpec, FleetStatus
+from dstack._internal.core.models.fleets import (
+    FleetConfiguration,
+    FleetSpec,
+    FleetStatus,
+    InstanceGroupPlacement,
+)
 from dstack._internal.core.models.gateways import GatewayComputeConfiguration, GatewayStatus
 from dstack._internal.core.models.instances import (
     Disk,
@@ -51,7 +56,7 @@ from dstack._internal.core.models.profiles import (
 )
 from dstack._internal.core.models.repos.base import RepoType
 from dstack._internal.core.models.repos.local import LocalRunRepoData
-from dstack._internal.core.models.resources import Memory, Range, ResourcesSpec
+from dstack._internal.core.models.resources import CPUSpec, Memory, Range, ResourcesSpec
 from dstack._internal.core.models.runs import (
     JobProvisioningData,
     JobRuntimeData,
@@ -257,6 +262,7 @@ async def create_run(
     run_spec: Optional[RunSpec] = None,
     run_id: Optional[UUID] = None,
     deleted: bool = False,
+    priority: int = 0,
 ) -> RunModel:
     if run_spec is None:
         run_spec = get_run_spec(
@@ -277,6 +283,7 @@ async def create_run(
         run_spec=run_spec.json(),
         last_processed_at=submitted_at,
         jobs=[],
+        priority=priority,
     )
     session.add(run)
     await session.commit()
@@ -297,15 +304,17 @@ async def create_job(
     job_num: int = 0,
     replica_num: int = 0,
     instance_assigned: bool = False,
+    disconnected_at: Optional[datetime] = None,
 ) -> JobModel:
     run_spec = RunSpec.parse_raw(run.run_spec)
     job_spec = (await get_job_specs_from_run_spec(run_spec, replica_num=replica_num))[0]
+    job_spec.job_num = job_num
     job = JobModel(
         project_id=run.project_id,
         run_id=run.id,
         run_name=run.run_name,
         job_num=job_num,
-        job_name=run.run_name + f"-0-{replica_num}",
+        job_name=run.run_name + f"-{job_num}-{replica_num}",
         replica_num=replica_num,
         submission_num=submission_num,
         submitted_at=submitted_at,
@@ -318,6 +327,7 @@ async def create_job(
         instance=instance,
         instance_assigned=instance_assigned,
         used_instance_id=instance.id if instance is not None else None,
+        disconnected_at=disconnected_at,
     )
     session.add(job)
     await session.commit()
@@ -497,10 +507,12 @@ def get_fleet_spec(conf: Optional[FleetConfiguration] = None) -> FleetSpec:
 def get_fleet_configuration(
     name: str = "test-fleet",
     nodes: Range[int] = Range(min=1, max=1),
+    placement: Optional[InstanceGroupPlacement] = None,
 ) -> FleetConfiguration:
     return FleetConfiguration(
         name=name,
         nodes=nodes,
+        placement=placement,
     )
 
 
@@ -519,13 +531,13 @@ async def create_instance(
     instance_id: Optional[UUID] = None,
     job: Optional[JobModel] = None,
     instance_num: int = 0,
-    backend: BackendType = BackendType.DATACRUNCH,
+    backend: Optional[BackendType] = BackendType.DATACRUNCH,
     termination_policy: Optional[TerminationPolicy] = None,
     termination_idle_time: int = DEFAULT_FLEET_TERMINATION_IDLE_TIME,
-    region: str = "eu-west",
+    region: Optional[str] = "eu-west",
     remote_connection_info: Optional[RemoteConnectionInfo] = None,
-    offer: Optional[InstanceOfferWithAvailability] = None,
-    job_provisioning_data: Optional[JobProvisioningData] = None,
+    offer: Optional[Union[InstanceOfferWithAvailability, Literal["auto"]]] = "auto",
+    job_provisioning_data: Optional[Union[JobProvisioningData, Literal["auto"]]] = "auto",
     total_blocks: Optional[int] = 1,
     busy_blocks: int = 0,
     name: str = "test_instance",
@@ -534,7 +546,7 @@ async def create_instance(
 ) -> InstanceModel:
     if instance_id is None:
         instance_id = uuid.uuid4()
-    if job_provisioning_data is None:
+    if job_provisioning_data == "auto":
         job_provisioning_data = get_job_provisioning_data(
             dockerized=True,
             backend=backend,
@@ -543,13 +555,13 @@ async def create_instance(
             hostname="running_instance.ip",
             internal_ip=None,
         )
-    if offer is None:
+    if offer == "auto":
         offer = get_instance_offer_with_availability(backend=backend, region=region, spot=spot)
     if profile is None:
         profile = Profile(name="test_name")
 
     if requirements is None:
-        requirements = Requirements(resources=ResourcesSpec(cpu=1))
+        requirements = Requirements(resources=ResourcesSpec(cpu=CPUSpec.parse("1")))
 
     if instance_configuration is None:
         instance_configuration = get_instance_configuration()
@@ -571,8 +583,8 @@ async def create_instance(
         created_at=created_at,
         started_at=created_at,
         finished_at=finished_at,
-        job_provisioning_data=job_provisioning_data.json(),
-        offer=offer.json(),
+        job_provisioning_data=job_provisioning_data.json() if job_provisioning_data else None,
+        offer=offer.json() if offer else None,
         price=price,
         region=region,
         backend=backend,
@@ -659,20 +671,7 @@ def get_remote_connection_info(
     env: Optional[Union[Env, dict]] = None,
 ):
     if ssh_keys is None:
-        ssh_keys = [
-            SSHKey(
-                public="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIO6mJxVbNtm0zXgMLvByrhXJCmJRveSrJxLB5/OzcyCk",
-                private="""
-                    -----BEGIN OPENSSH PRIVATE KEY-----
-                    b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
-                    QyNTUxOQAAACDupicVWzbZtM14DC7wcq4VyQpiUb3kqycSwefzs3MgpAAAAJCiWa5Volmu
-                    VQAAAAtzc2gtZWQyNTUxOQAAACDupicVWzbZtM14DC7wcq4VyQpiUb3kqycSwefzs3MgpA
-                    AAAEAncHi4AhS6XdMp5Gzd+IMse/4ekyQ54UngByf0Sp0uH+6mJxVbNtm0zXgMLvByrhXJ
-                    CmJRveSrJxLB5/OzcyCkAAAACWRlZkBkZWZwYwECAwQ=
-                    -----END OPENSSH PRIVATE KEY-----
-                """,
-            )
-        ]
+        ssh_keys = [get_ssh_key()]
     if env is None:
         env = Env()
     elif isinstance(env, dict):
@@ -683,6 +682,21 @@ def get_remote_connection_info(
         ssh_user=ssh_user,
         ssh_keys=ssh_keys,
         env=env,
+    )
+
+
+def get_ssh_key() -> SSHKey:
+    return SSHKey(
+        public="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIO6mJxVbNtm0zXgMLvByrhXJCmJRveSrJxLB5/OzcyCk",
+        private="""
+                    -----BEGIN OPENSSH PRIVATE KEY-----
+                    b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
+                    QyNTUxOQAAACDupicVWzbZtM14DC7wcq4VyQpiUb3kqycSwefzs3MgpAAAAJCiWa5Volmu
+                    VQAAAAtzc2gtZWQyNTUxOQAAACDupicVWzbZtM14DC7wcq4VyQpiUb3kqycSwefzs3MgpA
+                    AAAEAncHi4AhS6XdMp5Gzd+IMse/4ekyQ54UngByf0Sp0uH+6mJxVbNtm0zXgMLvByrhXJ
+                    CmJRveSrJxLB5/OzcyCkAAAACWRlZkBkZWZwYwECAwQ=
+                    -----END OPENSSH PRIVATE KEY-----
+                """,
     )
 
 

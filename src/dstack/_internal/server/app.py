@@ -128,7 +128,7 @@ async def lifespan(app: FastAPI):
         yes=UPDATE_DEFAULT_PROJECT,
         no=DO_NOT_UPDATE_DEFAULT_PROJECT,
     )
-    if settings.SERVER_BUCKET is not None:
+    if settings.SERVER_S3_BUCKET is not None or settings.SERVER_GCS_BUCKET is not None:
         init_default_storage()
     scheduler = start_background_tasks()
     dstack_version = DSTACK_VERSION if DSTACK_VERSION else "(no version)"

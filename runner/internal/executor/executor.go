@@ -34,8 +34,9 @@ type RunExecutor struct {
 	sshPort    int
 	uid        uint32
 
-	run             schemas.RunSpec
+	run             schemas.Run
 	jobSpec         schemas.JobSpec
+	jobSubmission   schemas.JobSubmission
 	clusterInfo     schemas.ClusterInfo
 	secrets         map[string]string
 	repoCredentials *schemas.RepoCredentials
@@ -181,16 +182,22 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 
 		// todo fail reason?
 		log.Error(ctx, "Exec failed", "err", err)
-		ex.SetJobState(ctx, types.JobStateFailed)
+		var exitError *exec.ExitError
+		if errors.As(err, &exitError) {
+			ex.SetJobStateWithExitStatus(ctx, types.JobStateFailed, exitError.ExitCode())
+		} else {
+			ex.SetJobState(ctx, types.JobStateFailed)
+		}
 		return gerrors.Wrap(err)
 	}
 
-	ex.SetJobState(ctx, types.JobStateDone)
+	ex.SetJobStateWithExitStatus(ctx, types.JobStateDone, 0)
 	return nil
 }
 
 func (ex *RunExecutor) SetJob(body schemas.SubmitBody) {
-	ex.run = body.RunSpec
+	ex.run = body.Run
+	ex.jobSubmission = body.JobSubmission
 	ex.jobSpec = body.JobSpec
 	ex.clusterInfo = body.ClusterInfo
 	ex.secrets = body.Secrets
@@ -224,6 +231,22 @@ func (ex *RunExecutor) SetJobStateWithTerminationReason(
 	log.Info(ctx, "Job state changed", "new", state)
 }
 
+func (ex *RunExecutor) SetJobStateWithExitStatus(
+	ctx context.Context, state types.JobState, exitStatus int,
+) {
+	ex.mu.Lock()
+	ex.jobStateHistory = append(
+		ex.jobStateHistory,
+		schemas.JobStateEvent{
+			State:      state,
+			Timestamp:  ex.timestamp.Next(),
+			ExitStatus: &exitStatus,
+		},
+	)
+	ex.mu.Unlock()
+	log.Info(ctx, "Job state changed", "new", state)
+}
+
 func (ex *RunExecutor) SetRunnerState(state string) {
 	ex.state = state
 }
@@ -234,15 +257,20 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 	gpus_per_node_num := ex.clusterInfo.GPUSPerJob
 	gpus_num := nodes_num * gpus_per_node_num
 
+	mpiHostfilePath := filepath.Join(ex.homeDir, ".dstack/mpi/hostfile")
+
 	jobEnvs := map[string]string{
-		"DSTACK_RUN_NAME":       ex.run.RunName,
-		"DSTACK_REPO_ID":        ex.run.RepoId,
+		"DSTACK_RUN_ID":         ex.run.Id,
+		"DSTACK_JOB_ID":         ex.jobSubmission.Id,
+		"DSTACK_RUN_NAME":       ex.run.RunSpec.RunName,
+		"DSTACK_REPO_ID":        ex.run.RunSpec.RepoId,
 		"DSTACK_NODES_IPS":      strings.Join(ex.clusterInfo.JobIPs, "\n"),
 		"DSTACK_MASTER_NODE_IP": ex.clusterInfo.MasterJobIP,
 		"DSTACK_NODE_RANK":      strconv.Itoa(node_rank),
 		"DSTACK_NODES_NUM":      strconv.Itoa(nodes_num),
 		"DSTACK_GPUS_PER_NODE":  strconv.Itoa(gpus_per_node_num),
 		"DSTACK_GPUS_NUM":       strconv.Itoa(gpus_num),
+		"DSTACK_MPI_HOSTFILE":   mpiHostfilePath,
 	}
 
 	// Call buildLDLibraryPathEnv and update jobEnvs if no error occurs
@@ -363,6 +391,11 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 		if err != nil {
 			log.Warning(ctx, "failed to configure SSH", "err", err)
 		}
+	}
+
+	err = writeMpiHostfile(ctx, ex.clusterInfo.JobIPs, gpus_per_node_num, mpiHostfilePath)
+	if err != nil {
+		return err
 	}
 
 	cmd.Env = envMap.Render()
@@ -669,6 +702,34 @@ func prepareSSHDir(uid int, gid int, homeDir string) (string, error) {
 		return "", err
 	}
 	return sshDir, nil
+}
+
+func writeMpiHostfile(ctx context.Context, ips []string, gpus_per_node int, path string) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	nonEmptyIps := []string{}
+	for _, ip := range ips {
+		if ip != "" {
+			nonEmptyIps = append(nonEmptyIps, ip)
+		}
+	}
+	if len(nonEmptyIps) == len(ips) {
+		for _, ip := range nonEmptyIps {
+			line := fmt.Sprintf("%s slots=%d\n", ip, gpus_per_node)
+			if _, err = file.WriteString(line); err != nil {
+				return err
+			}
+		}
+	} else {
+		log.Info(ctx, "creating empty MPI hostfile: no internal IPs assigned")
+	}
+	return nil
 }
 
 func writeDstackProfile(env map[string]string, path string) error {

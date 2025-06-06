@@ -94,7 +94,15 @@ class TestCommands:
 
         job_specs = await configurator.get_job_specs(replica_num=0)
 
-        assert job_specs[0].commands == [expected_shell, "-i", "-c", "sleep inf"]
+        assert job_specs[0].commands == [
+            expected_shell,
+            "-i",
+            "-c",
+            "uv venv --prompt workflow --seed /workflow/.venv > /dev/null 2>&1"
+            " && echo 'source /workflow/.venv/bin/activate' >> ~/.bashrc"
+            " && source /workflow/.venv/bin/activate"
+            " && sleep inf",
+        ]
 
     async def test_no_commands(self, image_config_mock: ImageConfig):
         image_config_mock.entrypoint = ["/entrypoint.sh"]

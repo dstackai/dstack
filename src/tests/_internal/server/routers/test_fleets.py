@@ -364,6 +364,8 @@ class TestApplyFleetPlan:
                     "creation_policy": None,
                     "idle_duration": None,
                     "utilization_policy": None,
+                    "startup_order": None,
+                    "stop_criteria": None,
                     "name": "",
                     "default": False,
                     "reservation": None,
@@ -485,6 +487,8 @@ class TestApplyFleetPlan:
                     "creation_policy": None,
                     "idle_duration": None,
                     "utilization_policy": None,
+                    "startup_order": None,
+                    "stop_criteria": None,
                     "name": "",
                     "default": False,
                     "reservation": None,
@@ -504,6 +508,7 @@ class TestApplyFleetPlan:
                     "instance_type": {
                         "name": "ssh",
                         "resources": {
+                            "cpu_arch": None,
                             "cpus": 2,
                             "memory_mib": 8,
                             "gpus": [],

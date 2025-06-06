@@ -1,7 +1,7 @@
 declare type TRunsRequestParams = {
     project_name?: IProject['project_name'];
     repo_id?: string;
-    user_name?: string;
+    username?: string;
     only_active?: boolean;
     prev_submitted_at?: string;
     prev_run_id?: string;
@@ -116,6 +116,9 @@ declare interface IJobSubmission {
     submitted_at: number;
     termination_reason?: string | null;
     termination_reason_message?: string | null;
+    exit_status?: number | null;
+    status_message?: string | null;
+    error?: string | null;
 }
 
 declare interface IJob {
@@ -162,14 +165,15 @@ declare interface IRun {
     project_name: string;
     user: string;
     submitted_at: string;
-    terminated_at: string;
+    terminated_at: string | null;
     status: TJobStatus;
-    error?: string;
+    error?: string | null;
     jobs: IJob[];
     run_spec: IRunSpec;
     latest_job_submission?: IJobSubmission;
     cost: number;
     service: IRunService | null;
+    status_message?: string | null;
 }
 
 declare interface IMetricsItem {

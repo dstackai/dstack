@@ -1,5 +1,7 @@
 from typing import List
 
+from dstack._internal.core.models.configurations import DEFAULT_REPO_DIR
+
 
 class VSCodeDesktop:
     def __init__(
@@ -37,6 +39,6 @@ class VSCodeDesktop:
         return [
             "echo To open in VS Code Desktop, use link below:",
             "echo ''",
-            f"echo '  vscode://vscode-remote/ssh-remote+{self.run_name}/workflow'",  # TODO use $REPO_DIR
+            f"echo '  vscode://vscode-remote/ssh-remote+{self.run_name}{DEFAULT_REPO_DIR}'",  # TODO use $REPO_DIR
             "echo ''",
         ]

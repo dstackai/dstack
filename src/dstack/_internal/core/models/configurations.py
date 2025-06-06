@@ -23,6 +23,10 @@ ValidPort = conint(gt=0, le=65536)
 MAX_INT64 = 2**63 - 1
 SERVICE_HTTPS_DEFAULT = True
 STRIP_PREFIX_DEFAULT = True
+RUN_PRIOTIRY_MIN = 0
+RUN_PRIOTIRY_MAX = 100
+RUN_PRIORITY_DEFAULT = 0
+DEFAULT_REPO_DIR = "/workflow"
 
 
 class RunConfigurationType(str, Enum):
@@ -77,7 +81,8 @@ class ScalingSpec(CoreModel):
         Field(
             description="The target value of the metric. "
             "The number of replicas is calculated based on this number and automatically adjusts "
-            "(scales up or down) as this metric changes"
+            "(scales up or down) as this metric changes",
+            gt=0,
         ),
     ]
     scale_up_delay: Annotated[
@@ -177,7 +182,7 @@ class BaseRunConfiguration(CoreModel):
         Field(
             description=(
                 "The path to the working directory inside the container."
-                " It's specified relative to the repository directory (`/workflow`) and should be inside it."
+                f" It's specified relative to the repository directory (`{DEFAULT_REPO_DIR}`) and should be inside it."
                 ' Defaults to `"."` '
             )
         ),
@@ -221,14 +226,26 @@ class BaseRunConfiguration(CoreModel):
             )
         ),
     ] = None
-    # deprecated since 0.18.31; task, service -- no effect; dev-environment -- executed right before `init`
-    setup: CommandsList = []
     resources: Annotated[
         ResourcesSpec, Field(description="The resources requirements to run the configuration")
     ] = ResourcesSpec()
+    priority: Annotated[
+        Optional[int],
+        Field(
+            ge=RUN_PRIOTIRY_MIN,
+            le=RUN_PRIOTIRY_MAX,
+            description=(
+                f"The priority of the run, an integer between `{RUN_PRIOTIRY_MIN}` and `{RUN_PRIOTIRY_MAX}`."
+                " `dstack` tries to provision runs with higher priority first."
+                f" Defaults to `{RUN_PRIORITY_DEFAULT}`"
+            ),
+        ),
+    ] = None
     volumes: Annotated[
         List[Union[MountPoint, str]], Field(description="The volumes mount points")
     ] = []
+    # deprecated since 0.18.31; task, service -- no effect; dev-environment -- executed right before `init`
+    setup: CommandsList = []
 
     @validator("python", pre=True, always=True)
     def convert_python(cls, v, values) -> Optional[PythonVersion]:
@@ -423,7 +440,7 @@ class ServiceConfigurationParams(CoreModel):
             raise ValueError("The minimum number of replicas must be greater than or equal to 0")
         if v.max < v.min:
             raise ValueError(
-                "The maximum number of replicas must be greater than or equal to the minium number of replicas"
+                "The maximum number of replicas must be greater than or equal to the minimum number of replicas"
             )
         return v
 

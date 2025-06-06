@@ -6,7 +6,7 @@ import threading
 from abc import ABC, abstractmethod
 from functools import lru_cache
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Literal, Optional
 
 import git
 import requests
@@ -19,12 +19,14 @@ from dstack._internal.core.consts import (
     DSTACK_RUNNER_SSH_PORT,
     DSTACK_SHIM_HTTP_PORT,
 )
+from dstack._internal.core.models.configurations import DEFAULT_REPO_DIR
 from dstack._internal.core.models.gateways import (
     GatewayComputeConfiguration,
     GatewayProvisioningData,
 )
 from dstack._internal.core.models.instances import (
     InstanceConfiguration,
+    InstanceOffer,
     InstanceOfferWithAvailability,
     SSHKey,
 )
@@ -43,6 +45,8 @@ logger = get_logger(__name__)
 
 DSTACK_SHIM_BINARY_NAME = "dstack-shim"
 DSTACK_RUNNER_BINARY_NAME = "dstack-runner"
+
+GoArchType = Literal["amd64", "arm64"]
 
 
 class Compute(ABC):
@@ -144,6 +148,7 @@ class ComputeWithCreateInstanceSupport(ABC):
         self,
         instance_offer: InstanceOfferWithAvailability,
         instance_config: InstanceConfiguration,
+        placement_group: Optional[PlacementGroup],
     ) -> JobProvisioningData:
         """
         Launches a new instance. It should return `JobProvisioningData` ASAP.
@@ -176,7 +181,7 @@ class ComputeWithCreateInstanceSupport(ABC):
         )
         instance_offer = instance_offer.copy()
         self._restrict_instance_offer_az_to_volumes_az(instance_offer, volumes)
-        return self.create_instance(instance_offer, instance_config)
+        return self.create_instance(instance_offer, instance_config, placement_group=None)
 
     def _restrict_instance_offer_az_to_volumes_az(
         self,
@@ -225,9 +230,15 @@ class ComputeWithPlacementGroupSupport(ABC):
     def create_placement_group(
         self,
         placement_group: PlacementGroup,
+        master_instance_offer: InstanceOffer,
     ) -> PlacementGroupProvisioningData:
         """
         Creates a placement group.
+
+        Args:
+            placement_group: details about the placement group to be created
+            master_instance_offer: the first instance dstack will attempt to add
+                                   to the placement group
         """
         pass
 
@@ -242,10 +253,27 @@ class ComputeWithPlacementGroupSupport(ABC):
         """
         pass
 
+    @abstractmethod
+    def is_suitable_placement_group(
+        self,
+        placement_group: PlacementGroup,
+        instance_offer: InstanceOffer,
+    ) -> bool:
+        """
+        Checks if the instance offer can be provisioned in the placement group.
+
+        Should return immediately, without performing API calls.
+
+        Can be called with an offer originating from a different backend, because some backends
+        (BackendType.DSTACK) produce offers on behalf of other backends. Should return `False`
+        in that case.
+        """
+        pass
+
 
 class ComputeWithGatewaySupport(ABC):
     """
-    Must be subclassed and imlemented to support gateways.
+    Must be subclassed and implemented to support gateways.
     """
 
     @abstractmethod
@@ -308,7 +336,9 @@ class ComputeWithVolumeSupport(ABC):
         """
         raise NotImplementedError()
 
-    def attach_volume(self, volume: Volume, instance_id: str) -> VolumeAttachmentData:
+    def attach_volume(
+        self, volume: Volume, provisioning_data: JobProvisioningData
+    ) -> VolumeAttachmentData:
         """
         Attaches a volume to the instance.
         If the volume is not found, it should raise `ComputeError()`.
@@ -317,7 +347,9 @@ class ComputeWithVolumeSupport(ABC):
         """
         raise NotImplementedError()
 
-    def detach_volume(self, volume: Volume, instance_id: str, force: bool = False):
+    def detach_volume(
+        self, volume: Volume, provisioning_data: JobProvisioningData, force: bool = False
+    ):
         """
         Detaches a volume from the instance.
         Implement only if compute may return `VolumeProvisioningData.detachable`.
@@ -325,7 +357,7 @@ class ComputeWithVolumeSupport(ABC):
         """
         raise NotImplementedError()
 
-    def is_volume_detached(self, volume: Volume, instance_id: str) -> bool:
+    def is_volume_detached(self, volume: Volume, provisioning_data: JobProvisioningData) -> bool:
         """
         Checks if a volume was detached from the instance.
         If `detach_volume()` may fail to detach volume,
@@ -418,6 +450,21 @@ def generate_unique_volume_name(
     )
 
 
+def generate_unique_placement_group_name(
+    project_name: str,
+    fleet_name: str,
+    max_length: int = _DEFAULT_MAX_RESOURCE_NAME_LEN,
+) -> str:
+    """
+    Generates a unique placement group name valid across all backends.
+    """
+    return generate_unique_backend_name(
+        resource_name=fleet_name,
+        project_name=project_name,
+        max_length=max_length,
+    )
+
+
 def generate_unique_backend_name(
     resource_name: str,
     project_name: Optional[str],
@@ -483,13 +530,14 @@ def get_shim_env(
     base_path: Optional[PathLike] = None,
     bin_path: Optional[PathLike] = None,
     backend_shim_env: Optional[Dict[str, str]] = None,
+    arch: Optional[str] = None,
 ) -> Dict[str, str]:
     log_level = "6"  # Trace
     envs = {
         "DSTACK_SHIM_HOME": get_dstack_working_dir(base_path),
         "DSTACK_SHIM_HTTP_PORT": str(DSTACK_SHIM_HTTP_PORT),
         "DSTACK_SHIM_LOG_LEVEL": log_level,
-        "DSTACK_RUNNER_DOWNLOAD_URL": get_dstack_runner_download_url(),
+        "DSTACK_RUNNER_DOWNLOAD_URL": get_dstack_runner_download_url(arch),
         "DSTACK_RUNNER_BINARY_PATH": get_dstack_runner_binary_path(bin_path),
         "DSTACK_RUNNER_HTTP_PORT": str(DSTACK_RUNNER_HTTP_PORT),
         "DSTACK_RUNNER_SSH_PORT": str(DSTACK_RUNNER_SSH_PORT),
@@ -509,16 +557,19 @@ def get_shim_commands(
     base_path: Optional[PathLike] = None,
     bin_path: Optional[PathLike] = None,
     backend_shim_env: Optional[Dict[str, str]] = None,
+    arch: Optional[str] = None,
 ) -> List[str]:
     commands = get_shim_pre_start_commands(
         base_path=base_path,
         bin_path=bin_path,
+        arch=arch,
     )
     shim_env = get_shim_env(
         authorized_keys=authorized_keys,
         base_path=base_path,
         bin_path=bin_path,
         backend_shim_env=backend_shim_env,
+        arch=arch,
     )
     for k, v in shim_env.items():
         commands += [f'export "{k}={v}"']
@@ -539,35 +590,63 @@ def get_dstack_runner_version() -> str:
     return version or "latest"
 
 
-def get_dstack_runner_download_url() -> str:
-    if url := os.environ.get("DSTACK_RUNNER_DOWNLOAD_URL"):
-        return url
-    build = get_dstack_runner_version()
-    if settings.DSTACK_VERSION is not None:
-        bucket = "dstack-runner-downloads"
-    else:
-        bucket = "dstack-runner-downloads-stgn"
-    return (
-        f"https://{bucket}.s3.eu-west-1.amazonaws.com/{build}/binaries/dstack-runner-linux-amd64"
-    )
+def normalize_arch(arch: Optional[str] = None) -> GoArchType:
+    """
+    Converts the given free-form architecture string to the Go GOARCH format.
+    Only 64-bit x86 and ARM are supported. If the word size is not specified (e.g., `x86`, `arm`),
+    64-bit is implied.
+    If the arch is not specified, falls back to `amd64`.
+    """
+    if not arch:
+        return "amd64"
+    arch_lower = arch.lower()
+    if "32" in arch_lower or arch_lower in ["i386", "i686"]:
+        raise ValueError(f"32-bit architectures are not supported: {arch}")
+    if arch_lower.startswith("x86") or arch_lower.startswith("amd"):
+        return "amd64"
+    if arch_lower.startswith("arm") or arch_lower.startswith("aarch"):
+        return "arm64"
+    raise ValueError(f"Unsupported architecture: {arch}")
 
 
-def get_dstack_shim_download_url() -> str:
-    if url := os.environ.get("DSTACK_SHIM_DOWNLOAD_URL"):
-        return url
-    build = get_dstack_runner_version()
-    if settings.DSTACK_VERSION is not None:
-        bucket = "dstack-runner-downloads"
-    else:
-        bucket = "dstack-runner-downloads-stgn"
-    return f"https://{bucket}.s3.eu-west-1.amazonaws.com/{build}/binaries/dstack-shim-linux-amd64"
+def get_dstack_runner_download_url(arch: Optional[str] = None) -> str:
+    url_template = os.environ.get("DSTACK_RUNNER_DOWNLOAD_URL")
+    if not url_template:
+        if settings.DSTACK_VERSION is not None:
+            bucket = "dstack-runner-downloads"
+        else:
+            bucket = "dstack-runner-downloads-stgn"
+        url_template = (
+            f"https://{bucket}.s3.eu-west-1.amazonaws.com"
+            "/{version}/binaries/dstack-runner-linux-{arch}"
+        )
+    version = get_dstack_runner_version()
+    arch = normalize_arch(arch)
+    return url_template.format(version=version, arch=arch)
+
+
+def get_dstack_shim_download_url(arch: Optional[str] = None) -> str:
+    url_template = os.environ.get("DSTACK_SHIM_DOWNLOAD_URL")
+    if not url_template:
+        if settings.DSTACK_VERSION is not None:
+            bucket = "dstack-runner-downloads"
+        else:
+            bucket = "dstack-runner-downloads-stgn"
+        url_template = (
+            f"https://{bucket}.s3.eu-west-1.amazonaws.com"
+            "/{version}/binaries/dstack-shim-linux-{arch}"
+        )
+    version = get_dstack_runner_version()
+    arch = normalize_arch(arch)
+    return url_template.format(version=version, arch=arch)
 
 
 def get_shim_pre_start_commands(
     base_path: Optional[PathLike] = None,
     bin_path: Optional[PathLike] = None,
+    arch: Optional[str] = None,
 ) -> List[str]:
-    url = get_dstack_shim_download_url()
+    url = get_dstack_shim_download_url(arch)
     dstack_shim_binary_path = get_dstack_shim_binary_path(bin_path)
     dstack_working_dir = get_dstack_working_dir(base_path)
     return [
@@ -680,7 +759,7 @@ def get_docker_commands(
             f" --ssh-port {DSTACK_RUNNER_SSH_PORT}"
             " --temp-dir /tmp/runner"
             " --home-dir /root"
-            " --working-dir /workflow"
+            f" --working-dir {DEFAULT_REPO_DIR}"
         ),
     ]
 

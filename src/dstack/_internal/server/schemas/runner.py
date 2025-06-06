@@ -7,7 +7,14 @@ from typing_extensions import Annotated
 
 from dstack._internal.core.models.common import CoreModel, NetworkMode
 from dstack._internal.core.models.repos.remote import RemoteRepoCreds
-from dstack._internal.core.models.runs import ClusterInfo, JobSpec, JobStatus, RunSpec
+from dstack._internal.core.models.runs import (
+    ClusterInfo,
+    JobSpec,
+    JobStatus,
+    JobSubmission,
+    Run,
+    RunSpec,
+)
 from dstack._internal.core.models.volumes import InstanceMountPoint, VolumeMountPoint
 
 
@@ -16,6 +23,7 @@ class JobStateEvent(CoreModel):
     state: JobStatus
     termination_reason: Optional[str] = None
     termination_message: Optional[str] = None
+    exit_status: Optional[int] = None
 
 
 class LogEvent(CoreModel):
@@ -38,15 +46,18 @@ class PullResponse(CoreModel):
 
 
 class SubmitBody(CoreModel):
-    run_spec: Annotated[
-        RunSpec,
+    run: Annotated[
+        Run,
         Field(
             include={
-                "run_name",
-                "repo_id",
-                "repo_data",
-                "configuration",
-                "configuration_path",
+                "id": True,
+                "run_spec": {
+                    "run_name",
+                    "repo_id",
+                    "repo_data",
+                    "configuration",
+                    "configuration_path",
+                },
             }
         ),
     ]
@@ -69,9 +80,31 @@ class SubmitBody(CoreModel):
             }
         ),
     ]
+    job_submission: Annotated[
+        JobSubmission,
+        Field(
+            include={
+                "id",
+            }
+        ),
+    ]
     cluster_info: Annotated[Optional[ClusterInfo], Field(include=True)]
     secrets: Annotated[Optional[Dict[str, str]], Field(include=True)]
     repo_credentials: Annotated[Optional[RemoteRepoCreds], Field(include=True)]
+    # run_spec is deprecated in favor of run.run_spec
+    # TODO: Remove once we no longer support instances deployed with 0.19.8 or earlier.
+    run_spec: Annotated[
+        RunSpec,
+        Field(
+            include={
+                "run_name",
+                "repo_id",
+                "repo_data",
+                "configuration",
+                "configuration_path",
+            },
+        ),
+    ]
 
 
 class HealthcheckResponse(CoreModel):

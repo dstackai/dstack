@@ -84,6 +84,8 @@ class OfferCommand(APIBaseCommand):
         job_plan = run_plan.job_plans[0]
 
         if args.format == "json":
+            # FIXME: Should use effective_run_spec from run_plan,
+            # since the spec can be changed by the server and plugins
             output = {
                 "project": run_plan.project_name,
                 "user": run_plan.user,

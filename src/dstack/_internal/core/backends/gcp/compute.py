@@ -1,10 +1,12 @@
 import concurrent.futures
 import json
+import threading
 from collections import defaultdict
 from typing import Callable, Dict, List, Literal, Optional, Tuple
 
 import google.api_core.exceptions
 import google.cloud.compute_v1 as compute_v1
+from cachetools import TTLCache, cachedmethod
 from google.cloud import tpu_v2
 from gpuhunt import KNOWN_TPUS
 
@@ -98,6 +100,8 @@ class GCPCompute(
         self.resource_policies_client = compute_v1.ResourcePoliciesClient(
             credentials=self.credentials
         )
+        self._extra_subnets_cache_lock = threading.Lock()
+        self._extra_subnets_cache = TTLCache(maxsize=30, ttl=60)
 
     def get_offers(
         self, requirements: Optional[Requirements] = None
@@ -166,6 +170,7 @@ class GCPCompute(
         self,
         instance_offer: InstanceOfferWithAvailability,
         instance_config: InstanceConfiguration,
+        placement_group: Optional[PlacementGroup],
     ) -> JobProvisioningData:
         instance_name = generate_unique_instance_name(
             instance_config, max_length=gcp_resources.MAX_RESOURCE_NAME_LEN
@@ -192,18 +197,16 @@ class GCPCompute(
             config=self.config,
             region=instance_offer.region,
         )
-        extra_subnets = _get_extra_subnets(
-            subnetworks_client=self.subnetworks_client,
-            config=self.config,
+        extra_subnets = self._get_extra_subnets(
             region=instance_offer.region,
             instance_type_name=instance_offer.instance.name,
         )
         placement_policy = None
-        if instance_config.placement_group_name is not None:
+        if placement_group is not None:
             placement_policy = gcp_resources.get_placement_policy_resource_name(
                 project_id=self.config.project_id,
                 region=instance_offer.region,
-                placement_policy=instance_config.placement_group_name,
+                placement_policy=placement_group.name,
             )
         labels = {
             "owner": "dstack",
@@ -406,6 +409,7 @@ class GCPCompute(
     def create_placement_group(
         self,
         placement_group: PlacementGroup,
+        master_instance_offer: InstanceOffer,
     ) -> PlacementGroupProvisioningData:
         policy = compute_v1.ResourcePolicy(
             name=placement_group.name,
@@ -439,6 +443,16 @@ class GCPCompute(
             if "is already being used by" in e.message:
                 raise PlacementGroupInUseError()
             raise
+
+    def is_suitable_placement_group(
+        self,
+        placement_group: PlacementGroup,
+        instance_offer: InstanceOffer,
+    ) -> bool:
+        return (
+            placement_group.configuration.backend == BackendType.GCP
+            and placement_group.configuration.region == instance_offer.region
+        )
 
     def create_gateway(
         self,
@@ -635,13 +649,24 @@ class GCPCompute(
             pass
         logger.debug("Deleted persistent disk for volume %s", volume.name)
 
-    def attach_volume(self, volume: Volume, instance_id: str) -> VolumeAttachmentData:
+    def attach_volume(
+        self, volume: Volume, provisioning_data: JobProvisioningData
+    ) -> VolumeAttachmentData:
+        instance_id = provisioning_data.instance_id
         logger.debug(
             "Attaching persistent disk for volume %s to instance %s",
             volume.volume_id,
             instance_id,
         )
+        if not gcp_resources.instance_type_supports_persistent_disk(
+            provisioning_data.instance_type.name
+        ):
+            raise ComputeError(
+                f"Instance type {provisioning_data.instance_type.name} does not support Persistent disk volumes"
+            )
+
         zone = get_or_error(volume.provisioning_data).availability_zone
+        is_tpu = _is_tpu_provisioning_data(provisioning_data)
         try:
             disk = self.disk_client.get(
                 project=self.config.project_id,
@@ -649,18 +674,16 @@ class GCPCompute(
                 disk=volume.volume_id,
             )
             disk_url = disk.self_link
+        except google.api_core.exceptions.NotFound:
+            raise ComputeError("Persistent disk found")
 
-            # This method has no information if the instance is a TPU or a VM,
-            # so we first try to see if there is a TPU with such name
-            try:
+        try:
+            if is_tpu:
                 get_node_request = tpu_v2.GetNodeRequest(
                     name=f"projects/{self.config.project_id}/locations/{zone}/nodes/{instance_id}",
                 )
                 tpu_node = self.tpu_client.get_node(get_node_request)
-            except google.api_core.exceptions.NotFound:
-                tpu_node = None
 
-            if tpu_node is not None:
                 # Python API to attach a disk to a TPU is not documented,
                 # so we follow the code from the gcloud CLI:
                 # https://github.com/twistedpair/google-cloud-sdk/blob/26ab5a281d56b384cc25750f3279a27afe5b499f/google-cloud-sdk/lib/googlecloudsdk/command_lib/compute/tpus/tpu_vm/util.py#L113
@@ -697,7 +720,6 @@ class GCPCompute(
                 attached_disk.auto_delete = False
                 attached_disk.device_name = f"pd-{volume.volume_id}"
                 device_name = attached_disk.device_name
-
                 operation = self.instances_client.attach_disk(
                     project=self.config.project_id,
                     zone=zone,
@@ -706,13 +728,16 @@ class GCPCompute(
                 )
                 gcp_resources.wait_for_extended_operation(operation, "persistent disk attachment")
         except google.api_core.exceptions.NotFound:
-            raise ComputeError("Persistent disk or instance not found")
+            raise ComputeError("Disk or instance not found")
         logger.debug(
             "Attached persistent disk for volume %s to instance %s", volume.volume_id, instance_id
         )
         return VolumeAttachmentData(device_name=device_name)
 
-    def detach_volume(self, volume: Volume, instance_id: str, force: bool = False):
+    def detach_volume(
+        self, volume: Volume, provisioning_data: JobProvisioningData, force: bool = False
+    ):
+        instance_id = provisioning_data.instance_id
         logger.debug(
             "Detaching persistent disk for volume %s from instance %s",
             volume.volume_id,
@@ -720,17 +745,16 @@ class GCPCompute(
         )
         zone = get_or_error(volume.provisioning_data).availability_zone
         attachment_data = get_or_error(volume.get_attachment_data_for_instance(instance_id))
-        # This method has no information if the instance is a TPU or a VM,
-        # so we first try to see if there is a TPU with such name
-        try:
-            get_node_request = tpu_v2.GetNodeRequest(
-                name=f"projects/{self.config.project_id}/locations/{zone}/nodes/{instance_id}",
-            )
-            tpu_node = self.tpu_client.get_node(get_node_request)
-        except google.api_core.exceptions.NotFound:
-            tpu_node = None
+        is_tpu = _is_tpu_provisioning_data(provisioning_data)
+        if is_tpu:
+            try:
+                get_node_request = tpu_v2.GetNodeRequest(
+                    name=f"projects/{self.config.project_id}/locations/{zone}/nodes/{instance_id}",
+                )
+                tpu_node = self.tpu_client.get_node(get_node_request)
+            except google.api_core.exceptions.NotFound:
+                raise ComputeError("Instance not found")
 
-        if tpu_node is not None:
             source_disk = (
                 f"projects/{self.config.project_id}/zones/{zone}/disks/{volume.volume_id}"
             )
@@ -757,6 +781,38 @@ class GCPCompute(
             instance_id,
         )
 
+    @cachedmethod(
+        cache=lambda self: self._extra_subnets_cache,
+        lock=lambda self: self._extra_subnets_cache_lock,
+    )
+    def _get_extra_subnets(
+        self,
+        region: str,
+        instance_type_name: str,
+    ) -> List[Tuple[str, str]]:
+        if self.config.extra_vpcs is None:
+            return []
+        if instance_type_name == "a3-megagpu-8g":
+            subnets_num = 8
+        elif instance_type_name in ["a3-edgegpu-8g", "a3-highgpu-8g"]:
+            subnets_num = 4
+        else:
+            return []
+        extra_subnets = []
+        for vpc_name in self.config.extra_vpcs[:subnets_num]:
+            subnet = gcp_resources.get_vpc_subnet_or_error(
+                subnetworks_client=self.subnetworks_client,
+                vpc_project_id=self.config.vpc_project_id or self.config.project_id,
+                vpc_name=vpc_name,
+                region=region,
+            )
+            vpc_resource_name = gcp_resources.vpc_name_to_vpc_resource_name(
+                project_id=self.config.vpc_project_id or self.config.project_id,
+                vpc_name=vpc_name,
+            )
+            extra_subnets.append((vpc_resource_name, subnet))
+        return extra_subnets
+
 
 def _supported_instances_and_zones(
     regions: List[str],
@@ -769,6 +825,11 @@ def _supported_instances_and_zones(
         if _is_tpu(offer.instance.name) and not _is_single_host_tpu(offer.instance.name):
             return False
         for family in [
+            "m4-",
+            "c4-",
+            "n4-",
+            "h3-",
+            "n2-",
             "e2-medium",
             "e2-standard-",
             "e2-highmem-",
@@ -829,36 +890,6 @@ def _get_vpc_subnet(
         vpc_name=config.vpc_name,
         region=region,
     )
-
-
-def _get_extra_subnets(
-    subnetworks_client: compute_v1.SubnetworksClient,
-    config: GCPConfig,
-    region: str,
-    instance_type_name: str,
-) -> List[Tuple[str, str]]:
-    if config.extra_vpcs is None:
-        return []
-    if instance_type_name == "a3-megagpu-8g":
-        subnets_num = 8
-    elif instance_type_name in ["a3-edgegpu-8g", "a3-highgpu-8g"]:
-        subnets_num = 4
-    else:
-        return []
-    extra_subnets = []
-    for vpc_name in config.extra_vpcs[:subnets_num]:
-        subnet = gcp_resources.get_vpc_subnet_or_error(
-            subnetworks_client=subnetworks_client,
-            vpc_project_id=config.vpc_project_id or config.project_id,
-            vpc_name=vpc_name,
-            region=region,
-        )
-        vpc_resource_name = gcp_resources.vpc_name_to_vpc_resource_name(
-            project_id=config.vpc_project_id or config.project_id,
-            vpc_name=vpc_name,
-        )
-        extra_subnets.append((vpc_resource_name, subnet))
-    return extra_subnets
 
 
 def _get_image_id(instance_type_name: str, cuda: bool) -> str:
@@ -985,3 +1016,11 @@ def _get_tpu_data_disk_for_volume(project_id: str, volume: Volume) -> tpu_v2.Att
         mode=tpu_v2.AttachedDisk.DiskMode.READ_WRITE,
     )
     return attached_disk
+
+
+def _is_tpu_provisioning_data(provisioning_data: JobProvisioningData) -> bool:
+    is_tpu = False
+    if provisioning_data.backend_data:
+        backend_data_dict = json.loads(provisioning_data.backend_data)
+        is_tpu = backend_data_dict.get("is_tpu", False)
+    return is_tpu

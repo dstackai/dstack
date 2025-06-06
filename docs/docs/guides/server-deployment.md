@@ -61,7 +61,7 @@ The minimum hardware requirements for running the server are 1 CPU and 1GB of RA
 
     First, ensure you've set up a private VPC with public and private subnets.
 
-    ![](https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-aws-private-vpc-example-v2.png?raw=true)
+    ![](https://dstack.ai/static-assets/static-assets/images/dstack-aws-private-vpc-example-v2.png)
 
     Create a stack using the template, and specify the VPC and private subnets.
     Once, the stack is created, go to `Outputs` for the server URL and admin token.
@@ -162,7 +162,7 @@ For multi-replica server deployments, it's required to store logs externally.
 To store logs in AWS CloudWatch, set the `DSTACK_SERVER_CLOUDWATCH_LOG_GROUP` and
 the `DSTACK_SERVER_CLOUDWATCH_LOG_REGION` environment variables. 
 
-The log group must be created beforehand, `dstack` won't try to create it.
+The log group must be created beforehand. `dstack` won't try to create it.
 
 ??? info "Required permissions"
 
@@ -217,6 +217,56 @@ To store logs using GCP Logging, set the `DSTACK_SERVER_GCP_LOGGING_PROJECT` env
     ```
 
     </div>
+
+## File storage
+
+When using [repos](../concepts/repos.md), the `dstack` CLI uploads uncommitted local files and diffs to the server so that you can have access to them within runs. By default, the files are stored in the DB and each upload is limited to 2MB. You can configure an object storage to be used for uploads and increase the default limit by setting the `DSTACK_SERVER_CODE_UPLOAD_LIMIT` environment variable
+
+### S3
+
+To use S3 for storing uploaded files, set the `DSTACK_SERVER_S3_BUCKET` and `DSTACK_SERVER_BUCKET_REGION` environment variables.
+The bucket must be created beforehand. `dstack` won't try to create it.
+
+??? info "Required permissions"
+
+    ```json
+    {
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+            "Effect": "Allow",
+            "Action": [
+                "s3:GetObject",
+                "s3:PutObject",
+                "s3:DeleteObject",
+                "s3:ListBucket"
+            ],
+            "Resource": [
+                "arn:aws:s3:::<bucket-name>",
+                "arn:aws:s3:::<bucket-name>/*"
+            ]
+            }
+        ]
+    }
+    ```
+
+### GCS
+
+To use GCS for storing uploaded files, set the `DSTACK_SERVER_GCS_BUCKET` environment variable.
+The bucket must be created beforehand. `dstack` won't try to create it.
+
+??? info "Required permissions"
+    Ensure you've configured Application Default Credentials with the following permissions:
+
+    ```
+    storage.buckets.get
+    storage.buckets.list
+    storage.objects.get
+    storage.objects.list
+    storage.objects.create
+    storage.objects.delete
+    storage.objects.update
+    ```
 
 ## Encryption
 
@@ -320,7 +370,7 @@ default_permissions:
 `dstack` follows the `{major}.{minor}.{patch}` versioning scheme.
 Backward compatibility is maintained based on these principles:
 
-* The server backward compatibility is maintained across all minor and patch releases. The specific features can be removed but the removal is preceded with deprecation warnings for several minor releases. This means you can use older client versions with newer server versions.
+* The server backward compatibility is maintained on a best-effort basis across minor and patch releases. The specific features can be removed, but the removal is preceded with deprecation warnings for several minor releases. This means you can use older client versions with newer server versions.
 * The client backward compatibility is maintained across patch releases. A new minor release indicates that the release breaks client backward compatibility. This means you don't need to update the server when you update the client to a new patch release. Still, upgrading a client to a new minor version requires upgrading the server too.
 
 ## Server limits

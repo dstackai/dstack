@@ -16,7 +16,7 @@ from dstack._internal.core.errors import (
     ServerClientError,
 )
 from dstack._internal.core.models.common import ApplyAction
-from dstack._internal.core.models.configurations import AnyRunConfiguration
+from dstack._internal.core.models.configurations import RUN_PRIORITY_DEFAULT, AnyRunConfiguration
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceOfferWithAvailability,
@@ -79,7 +79,9 @@ from dstack._internal.server.services.jobs import (
 from dstack._internal.server.services.locking import get_locker, string_to_lock_id
 from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.offers import get_offers_by_requirements
+from dstack._internal.server.services.plugins import apply_plugin_policies
 from dstack._internal.server.services.projects import list_project_models, list_user_project_models
+from dstack._internal.server.services.resources import set_resources_defaults
 from dstack._internal.server.services.users import get_user_model_by_name
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.random_names import generate_name
@@ -279,7 +281,14 @@ async def get_plan(
     run_spec: RunSpec,
     max_offers: Optional[int],
 ) -> RunPlan:
+    # Spec must be copied by parsing to calculate merged_profile
     effective_run_spec = RunSpec.parse_obj(run_spec.dict())
+    effective_run_spec = await apply_plugin_policies(
+        user=user.name,
+        project=project.name,
+        spec=effective_run_spec,
+    )
+    effective_run_spec = RunSpec.parse_obj(effective_run_spec.dict())
     _validate_run_spec_and_set_defaults(effective_run_spec)
 
     profile = effective_run_spec.merged_profile
@@ -293,12 +302,14 @@ async def get_plan(
             project=project,
             run_name=effective_run_spec.run_name,
         )
-        if (
-            current_resource is not None
-            and not current_resource.status.is_finished()
-            and _can_update_run_spec(current_resource.run_spec, effective_run_spec)
-        ):
-            action = ApplyAction.UPDATE
+        if current_resource is not None:
+            # For backward compatibility (current_resource may has been submitted before
+            # some fields, e.g., CPUSpec.arch, were added)
+            set_resources_defaults(current_resource.run_spec.configuration.resources)
+            if not current_resource.status.is_finished() and _can_update_run_spec(
+                current_resource.run_spec, effective_run_spec
+            ):
+                action = ApplyAction.UPDATE
 
     jobs = await get_jobs_from_run_spec(effective_run_spec, replica_num=0)
 
@@ -370,34 +381,48 @@ async def apply_plan(
     plan: ApplyRunPlanInput,
     force: bool,
 ) -> Run:
-    _validate_run_spec_and_set_defaults(plan.run_spec)
-    if plan.run_spec.run_name is None:
+    run_spec = plan.run_spec
+    run_spec = await apply_plugin_policies(
+        user=user.name,
+        project=project.name,
+        spec=run_spec,
+    )
+    # Spec must be copied by parsing to calculate merged_profile
+    run_spec = RunSpec.parse_obj(run_spec.dict())
+    _validate_run_spec_and_set_defaults(run_spec)
+    if run_spec.run_name is None:
         return await submit_run(
             session=session,
             user=user,
             project=project,
-            run_spec=plan.run_spec,
+            run_spec=run_spec,
         )
     current_resource = await get_run_by_name(
         session=session,
         project=project,
-        run_name=plan.run_spec.run_name,
+        run_name=run_spec.run_name,
     )
     if current_resource is None or current_resource.status.is_finished():
         return await submit_run(
             session=session,
             user=user,
             project=project,
-            run_spec=plan.run_spec,
+            run_spec=run_spec,
         )
+
+    # For backward compatibility (current_resource may has been submitted before
+    # some fields, e.g., CPUSpec.arch, were added)
+    set_resources_defaults(current_resource.run_spec.configuration.resources)
     try:
-        _check_can_update_run_spec(current_resource.run_spec, plan.run_spec)
+        _check_can_update_run_spec(current_resource.run_spec, run_spec)
     except ServerClientError:
         # The except is only needed to raise an appropriate error if run is active
         if not current_resource.status.is_finished():
             raise ServerClientError("Cannot override active run. Stop the run first.")
         raise
     if not force:
+        if plan.current_resource is not None:
+            set_resources_defaults(plan.current_resource.run_spec.configuration.resources)
         if (
             plan.current_resource is None
             or plan.current_resource.id != current_resource.id
@@ -411,12 +436,15 @@ async def apply_plan(
     await session.execute(
         update(RunModel)
         .where(RunModel.id == current_resource.id)
-        .values(run_spec=plan.run_spec.json())
+        .values(
+            run_spec=run_spec.json(),
+            priority=run_spec.configuration.priority,
+        )
     )
     run = await get_run_by_name(
         session=session,
         project=project,
-        run_name=plan.run_spec.run_name,
+        run_name=run_spec.run_name,
     )
     return common_utils.get_or_error(run)
 
@@ -436,7 +464,7 @@ async def submit_run(
 
     lock_namespace = f"run_names_{project.name}"
     if get_db().dialect_name == "sqlite":
-        # Start new transaction to see commited changes after lock
+        # Start new transaction to see committed changes after lock
         await session.commit()
     elif get_db().dialect_name == "postgresql":
         await session.execute(
@@ -472,6 +500,7 @@ async def submit_run(
             status=RunStatus.SUBMITTED,
             run_spec=run_spec.json(),
             last_processed_at=submitted_at,
+            priority=run_spec.configuration.priority,
         )
         session.add(run_model)
 
@@ -698,15 +727,15 @@ async def _get_pool_offers(
     pool_instances = [i for i in pool_instances if i.id not in detaching_instances_ids]
     multinode = job.job_spec.jobs_per_replica > 1
 
-    if not multinode:
-        shared_instances_with_offers = get_shared_pool_instances_with_offers(
-            pool_instances=pool_instances,
-            profile=run_spec.merged_profile,
-            requirements=job.job_spec.requirements,
-            volumes=volumes,
-        )
-        for _, offer in shared_instances_with_offers:
-            pool_offers.append(offer)
+    shared_instances_with_offers = get_shared_pool_instances_with_offers(
+        pool_instances=pool_instances,
+        profile=run_spec.merged_profile,
+        requirements=job.job_spec.requirements,
+        volumes=volumes,
+        multinode=multinode,
+    )
+    for _, offer in shared_instances_with_offers:
+        pool_offers.append(offer)
 
     nonshared_instances = filter_pool_instances(
         pool_instances=pool_instances,
@@ -829,6 +858,13 @@ def _get_job_submission_cost(job_submission: JobSubmission) -> float:
 
 
 def _validate_run_spec_and_set_defaults(run_spec: RunSpec):
+    # This function may set defaults for null run_spec values,
+    # although most defaults are resolved when building job_spec
+    # so that we can keep both the original user-supplied value (null in run_spec)
+    # and the default in job_spec.
+    # If a property is stored in job_spec - resolve the default there.
+    # Server defaults are preferable over client defaults so that
+    # the defaults depend on the server version, not the client version.
     if run_spec.run_name is not None:
         validate_dstack_resource_name(run_spec.run_name)
     for mount_point in run_spec.configuration.volumes:
@@ -847,15 +883,19 @@ def _validate_run_spec_and_set_defaults(run_spec: RunSpec):
     if (
         run_spec.merged_profile.utilization_policy is not None
         and run_spec.merged_profile.utilization_policy.time_window
-        > settings.SERVER_METRICS_TTL_SECONDS
+        > settings.SERVER_METRICS_RUNNING_TTL_SECONDS
     ):
         raise ServerClientError(
-            f"Maximum utilization_policy.time_window is {settings.SERVER_METRICS_TTL_SECONDS}s"
+            f"Maximum utilization_policy.time_window is {settings.SERVER_METRICS_RUNNING_TTL_SECONDS}s"
         )
+    if run_spec.configuration.priority is None:
+        run_spec.configuration.priority = RUN_PRIORITY_DEFAULT
+    set_resources_defaults(run_spec.configuration.resources)
 
 
 _UPDATABLE_SPEC_FIELDS = ["repo_code_hash", "configuration"]
-_CONF_TYPE_TO_UPDATABLE_FIELDS = {
+_CONF_UPDATABLE_FIELDS = ["priority"]
+_TYPE_SPECIFIC_CONF_UPDATABLE_FIELDS = {
     "dev-environment": ["inactivity_duration"],
     # Most service fields can be updated via replica redeployment.
     # TODO: Allow updating other fields when rolling deployment is supported.
@@ -891,12 +931,9 @@ def _check_can_update_configuration(
         raise ServerClientError(
             f"Configuration type changed from {current.type} to {new.type}, cannot update"
         )
-    updatable_fields = _CONF_TYPE_TO_UPDATABLE_FIELDS.get(new.type)
-    if updatable_fields is None:
-        raise ServerClientError(
-            f"Can only update {', '.join(_CONF_TYPE_TO_UPDATABLE_FIELDS)} configurations."
-            f" Not {new.type}"
-        )
+    updatable_fields = _CONF_UPDATABLE_FIELDS + _TYPE_SPECIFIC_CONF_UPDATABLE_FIELDS.get(
+        new.type, []
+    )
     diff = diff_models(current, new)
     changed_fields = list(diff.keys())
     for key in changed_fields:

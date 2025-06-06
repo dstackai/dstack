@@ -7,7 +7,7 @@ import { format } from 'date-fns';
 import { Box, ColumnLayout, Container, Header, Loader, StatusIndicator } from 'components';
 
 import { DATE_TIME_FORMAT } from 'consts';
-import { getStatusIconType } from 'libs/run';
+import { getRunError, getRunStatusMessage, getStatusIconColor, getStatusIconType } from 'libs/run';
 import { useGetRunQuery } from 'services/run';
 
 import {
@@ -24,6 +24,7 @@ import { Logs } from '../Logs';
 import { getJobSubmissionId } from '../Logs/helpers';
 
 import styles from './styles.module.scss';
+import { finishedRunStatuses } from 'pages/Runs/constants';
 
 export const RunDetails = () => {
     const { t } = useTranslation();
@@ -46,6 +47,9 @@ export const RunDetails = () => {
         );
 
     if (!runData) return null;
+
+    const status = finishedRunStatuses.includes(runData.status) ? runData.latest_job_submission?.status ?? runData.status : runData.status;
+    const terminationReason = finishedRunStatuses.includes(runData.status) ? runData.latest_job_submission?.termination_reason : null;
 
     return (
         <>
@@ -82,10 +86,18 @@ export const RunDetails = () => {
                     <div>
                         <Box variant="awsui-key-label">{t('projects.run.status')}</Box>
                         <div>
-                            <StatusIndicator type={getStatusIconType(runData.status)}>
-                                {t(`projects.run.statuses.${runData.status}`)}
+                            <StatusIndicator
+                                type={getStatusIconType(status, terminationReason)}
+                                colorOverride={getStatusIconColor(status, terminationReason)}
+                            >
+                                {getRunStatusMessage(runData)}
                             </StatusIndicator>
                         </div>
+                    </div>
+
+                    <div>
+                        <Box variant="awsui-key-label">{t('projects.run.error')}</Box>
+                        <div>{getRunError(runData)}</div>
                     </div>
 
                     {getRunListItemBackend(runData) && (

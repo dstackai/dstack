@@ -11,6 +11,7 @@ from dstack._internal.utils.common import (
     make_proxy_url,
     parse_memory,
     pretty_date,
+    sizeof_fmt,
     split_chunks,
 )
 
@@ -211,3 +212,26 @@ def test_concat_url_path(a: str, b: str, result: str) -> None:
 )
 def test_make_proxy_url(server_url, proxy_url, expected_url):
     assert make_proxy_url(server_url, proxy_url) == expected_url
+
+
+class TestSizeofFmt:
+    @pytest.mark.parametrize(
+        ("num", "suffix", "expected"),
+        [
+            (0, "B", "0.0B"),
+            (1023, "B", "1023.0B"),
+            (1024, "B", "1.0KiB"),
+            (1536, "B", "1.5KiB"),
+            (1048576, "B", "1.0MiB"),
+            (1073741824, "B", "1.0GiB"),
+            (1099511627776, "B", "1.0TiB"),
+            (1125899906842624, "B", "1.0PiB"),
+            (1152921504606846976, "B", "1.0EiB"),
+            (1180591620717411303424, "B", "1.0ZiB"),
+            (1208925819614629174706176, "B", "1.0YiB"),
+            (2000, "", "2.0Ki"),
+            (3000000, "Hz", "2.9MiHz"),
+        ],
+    )
+    def test_sizeof_fmt(self, num: int, suffix: str, expected: str) -> None:
+        assert sizeof_fmt(num, suffix) == expected

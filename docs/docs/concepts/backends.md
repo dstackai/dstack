@@ -338,6 +338,8 @@ There are two ways to configure Azure: using a client secret or using the defaul
                     "Microsoft.Compute/disks/write",
                     "Microsoft.Compute/disks/read",
                     "Microsoft.Compute/disks/delete",
+                    "Microsoft.ManagedIdentity/userAssignedIdentities/assign/action",
+                    "Microsoft.ManagedIdentity/userAssignedIdentities/read",
                     "Microsoft.Network/networkSecurityGroups/*",
                     "Microsoft.Network/locations/*",
                     "Microsoft.Network/virtualNetworks/*",
@@ -772,7 +774,7 @@ projects:
 
 Also, the `vastai` backend supports on-demand instances only. Spot instance support coming soon.
 
-### TensorDock
+<!-- ### TensorDock
 
 Log into your [TensorDock :material-arrow-top-right-thin:{ .external }](https://dashboard.tensordock.com/) account, click Developers in the sidebar, and use the `Create an Authorization` section to create a new authorization key.
 
@@ -793,7 +795,7 @@ projects:
 
 </div>
 
-The `tensordock` backend supports on-demand instances only. Spot instance support coming soon.
+The `tensordock` backend supports on-demand instances only. Spot instance support coming soon. -->
 
 ### CUDO
 

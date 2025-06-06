@@ -18,6 +18,7 @@ from dstack._internal.core.models.instances import (
     InstanceConfiguration,
     InstanceOfferWithAvailability,
 )
+from dstack._internal.core.models.placement import PlacementGroup
 from dstack._internal.core.models.runs import JobProvisioningData, Requirements
 from dstack._internal.utils.logging import get_logger
 
@@ -58,6 +59,7 @@ class CudoCompute(
         self,
         instance_offer: InstanceOfferWithAvailability,
         instance_config: InstanceConfiguration,
+        placement_group: Optional[PlacementGroup],
     ) -> JobProvisioningData:
         vm_id = generate_unique_instance_name(instance_config, max_length=MAX_RESOURCE_NAME_LEN)
         public_keys = instance_config.get_public_keys()
@@ -145,7 +147,7 @@ class CudoCompute(
 
 
 def _get_image_id(cuda: bool) -> str:
-    image_name = "ubuntu-2204-nvidia-535-docker-v20240214" if cuda else "ubuntu-2204"
+    image_name = "ubuntu-2204-nvidia-535-docker-v20241017" if cuda else "ubuntu-2204"
     return image_name
 
 

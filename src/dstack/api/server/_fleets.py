@@ -3,6 +3,7 @@ from typing import Any, Dict, List, Optional, Union
 from pydantic import parse_obj_as
 
 from dstack._internal.core.models.fleets import ApplyFleetPlanInput, Fleet, FleetPlan, FleetSpec
+from dstack._internal.core.models.instances import Instance
 from dstack._internal.server.schemas.fleets import (
     ApplyFleetPlanRequest,
     CreateFleetRequest,
@@ -82,8 +83,23 @@ def _get_apply_plan_excludes(plan_input: ApplyFleetPlanInput) -> Dict:
     apply_plan_excludes = {}
     spec_excludes = _get_fleet_spec_excludes(plan_input.spec)
     if spec_excludes:
-        apply_plan_excludes["spec"] = apply_plan_excludes
+        apply_plan_excludes["spec"] = spec_excludes
+    current_resource = plan_input.current_resource
+    if current_resource is not None:
+        current_resource_excludes = {}
+        apply_plan_excludes["current_resource"] = current_resource_excludes
+        if all(map(_should_exclude_instance_cpu_arch, current_resource.instances)):
+            current_resource_excludes["instances"] = {
+                "__all__": {"instance_type": {"resources": {"cpu_arch"}}}
+            }
     return {"plan": apply_plan_excludes}
+
+
+def _should_exclude_instance_cpu_arch(instance: Instance) -> bool:
+    try:
+        return instance.instance_type.resources.cpu_arch is None
+    except AttributeError:
+        return True
 
 
 def _get_create_fleet_excludes(fleet_spec: FleetSpec) -> Dict:
@@ -110,6 +126,10 @@ def _get_fleet_spec_excludes(fleet_spec: FleetSpec) -> Optional[Dict]:
         configuration_excludes["tags"] = True
     if profile.tags is None:
         profile_excludes.add("tags")
+    if profile.startup_order is None:
+        profile_excludes.add("startup_order")
+    if profile.stop_criteria is None:
+        profile_excludes.add("stop_criteria")
     if configuration_excludes:
         spec_excludes["configuration"] = configuration_excludes
     if profile_excludes:

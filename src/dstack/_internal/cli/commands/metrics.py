@@ -39,8 +39,6 @@ class MetricsCommand(APIBaseCommand):
         run = self.api.runs.get(run_name=args.run_name)
         if run is None:
             raise CLIError(f"Run {args.run_name} not found")
-        if run.status.is_finished():
-            raise CLIError(f"Run {args.run_name} is finished")
         metrics = _get_run_jobs_metrics(api=self.api, run=run)
 
         if not args.watch:
@@ -55,8 +53,6 @@ class MetricsCommand(APIBaseCommand):
                     run = self.api.runs.get(run_name=args.run_name)
                     if run is None:
                         raise CLIError(f"Run {args.run_name} not found")
-                    if run.status.is_finished():
-                        raise CLIError(f"Run {args.run_name} is finished")
                     metrics = _get_run_jobs_metrics(api=self.api, run=run)
         except KeyboardInterrupt:
             pass
@@ -78,11 +74,12 @@ def _get_run_jobs_metrics(api: Client, run: Run) -> List[JobMetrics]:
 def _get_metrics_table(run: Run, metrics: List[JobMetrics]) -> Table:
     table = Table(box=None)
     table.add_column("NAME", style="bold", no_wrap=True)
+    table.add_column("STATUS")
     table.add_column("CPU")
     table.add_column("MEMORY")
     table.add_column("GPU")
 
-    run_row: Dict[Union[str, int], Any] = {"NAME": run.name}
+    run_row: Dict[Union[str, int], Any] = {"NAME": run.name, "STATUS": run.status.value}
     if len(run._run.jobs) != 1:
         add_row_from_dict(table, run_row)
 
@@ -101,9 +98,9 @@ def _get_metrics_table(run: Run, metrics: List[JobMetrics]) -> Table:
             cpu_usage = f"{cpu_usage:.0f}%"
         memory_usage = _get_metric_value(job_metrics, "memory_working_set_bytes")
         if memory_usage is not None:
-            memory_usage = f"{round(memory_usage / 1024 / 1024)}MB"
+            memory_usage = _format_memory(memory_usage, 2)
             if resources is not None:
-                memory_usage += f"/{resources.memory_mib}MB"
+                memory_usage += f"/{_format_memory(resources.memory_mib * 1024 * 1024, 2)}"
         gpu_metrics = ""
         gpus_detected_num = _get_metric_value(job_metrics, "gpus_detected_num")
         if gpus_detected_num is not None:
@@ -113,13 +110,16 @@ def _get_metrics_table(run: Run, metrics: List[JobMetrics]) -> Table:
                 if gpu_memory_usage is not None:
                     if i != 0:
                         gpu_metrics += "\n"
-                    gpu_metrics += f"#{i} {round(gpu_memory_usage / 1024 / 1024)}MB"
+                    gpu_metrics += f"gpu={i} mem={_format_memory(gpu_memory_usage, 2)}"
                     if resources is not None:
-                        gpu_metrics += f"/{resources.gpus[i].memory_mib}MB"
-                    gpu_metrics += f" {gpu_util_percent}% Util"
+                        gpu_metrics += (
+                            f"/{_format_memory(resources.gpus[i].memory_mib * 1024 * 1024, 2)}"
+                        )
+                    gpu_metrics += f" util={gpu_util_percent}%"
 
         job_row: Dict[Union[str, int], Any] = {
             "NAME": f"  replica={job.job_spec.replica_num} job={job.job_spec.job_num}",
+            "STATUS": job.job_submissions[-1].status.value,
             "CPU": cpu_usage or "-",
             "MEMORY": memory_usage or "-",
             "GPU": gpu_metrics or "-",
@@ -136,3 +136,18 @@ def _get_metric_value(job_metrics: JobMetrics, name: str) -> Optional[Any]:
         if metric.name == name:
             return metric.values[-1]
     return None
+
+
+def _format_memory(memory_bytes: int, decimal_places: int) -> str:
+    """See test_format_memory in tests/_internal/cli/commands/test_metrics.py for examples."""
+    memory_mb = memory_bytes / 1024 / 1024
+    if memory_mb >= 1024:
+        value = memory_mb / 1024
+        unit = "GB"
+    else:
+        value = memory_mb
+        unit = "MB"
+
+    if decimal_places == 0:
+        return f"{round(value)}{unit}"
+    return f"{value:.{decimal_places}f}".rstrip("0").rstrip(".") + unit

@@ -50,6 +50,7 @@ theme:
     - navigation.tabs
     #    - navigation.instant
     #    - toc.integrate
+    # Comment to switch to sections in sidebar
     - navigation.sections
     #    - navigation.expand
     - navigation.top
@@ -95,9 +96,9 @@ plugins:
         'examples/llms/llama31/index.md': 'examples/llms/llama/index.md'
         'examples/llms/llama32/index.md': 'examples/llms/llama/index.md'
         'docs/examples/accelerators/amd/index.md': 'examples/accelerators/amd/index.md'
-        'docs/examples/deployment/nim/index.md': 'examples/deployment/nim/index.md'
-        'docs/examples/deployment/vllm/index.md': 'examples/deployment/vllm/index.md'
-        'docs/examples/deployment/tgi/index.md': 'examples/deployment/tgi/index.md'
+        'docs/examples/deployment/nim/index.md': 'examples/inference/nim/index.md'
+        'docs/examples/deployment/vllm/index.md': 'examples/inference/vllm/index.md'
+        'docs/examples/deployment/tgi/index.md': 'examples/inference/tgi/index.md'
         'providers.md': 'partners.md'
         'backends.md': 'partners.md'
         'blog/ambassador-program.md': 'blog/archive/ambassador-program.md'
@@ -106,6 +107,21 @@ plugins:
         'blog/data-centers-and-private-clouds.md': 'blog/posts/gpu-blocks-and-proxy-jump.md'
         'blog/distributed-training-with-aws-efa.md': 'blog/posts/efa.md'
         'blog/dstack-stats.md': 'blog/posts/dstack-metrics.md'
+        'docs/concepts/metrics.md': 'docs/guides/metrics.md'
+        'docs/guides/monitoring.md': 'docs/guides/metrics.md'
+        'blog/nvidia-and-amd-on-vultr.md.md': 'blog/posts/nvidia-and-amd-on-vultr.md'
+        'examples/misc/nccl-tests/index.md': 'examples/clusters/nccl-tests/index.md'
+        'examples/misc/a3high-clusters/index.md': 'examples/clusters/a3high/index.md'
+        'examples/misc/a3mega-clusters/index.md': 'examples/clusters/a3mega/index.md'
+        'examples/distributed-training/nccl-tests/index.md': 'examples/clusters/nccl-tests/index.md'
+        'examples/distributed-training/rccl-tests/index.md': 'examples/clusters/rccl-tests/index.md'
+        'examples/deployment/nim/index.md': 'examples/inference/nim/index.md'
+        'examples/deployment/vllm/index.md': 'examples/inference/vllm/index.md'
+        'examples/deployment/tgi/index.md': 'examples/inference/tgi/index.md'
+        'examples/deployment/sglang/index.md': 'examples/inference/sglang/index.md'
+        'examples/deployment/trtllm/index.md': 'examples/inference/trtllm/index.md'
+        'examples/fine-tuning/trl/index.md': 'examples/single-node-training/trl/index.md'
+        'examples/fine-tuning/axolotl/index.md': 'examples/single-node-training/axolotl/index.md'
   - typeset
   - gen-files:
       scripts:  # always relative to mkdocs.yml
@@ -113,6 +129,7 @@ plugins:
         - scripts/docs/gen_cli_reference.py
         - scripts/docs/gen_openapi_reference.py
         - scripts/docs/gen_schema_reference.py
+        - scripts/docs/gen_rest_plugin_spec_reference.py
   - mkdocstrings:
       handlers:
         python:
@@ -196,19 +213,21 @@ nav:
           - Installation: docs/installation/index.md
           - Quickstart: docs/quickstart.md
       - Concepts:
+          - Backends: docs/concepts/backends.md
           - Dev environments: docs/concepts/dev-environments.md
           - Tasks: docs/concepts/tasks.md
           - Services: docs/concepts/services.md
           - Fleets: docs/concepts/fleets.md
           - Volumes: docs/concepts/volumes.md
           - Repos: docs/concepts/repos.md
-          - Metrics: docs/concepts/metrics.md
-          - Backends: docs/concepts/backends.md
           - Projects: docs/concepts/projects.md
           - Gateways: docs/concepts/gateways.md
       - Guides:
           - Protips: docs/guides/protips.md
+          - Metrics: docs/guides/metrics.md
+          - Clusters: docs/guides/clusters.md
           - Server deployment: docs/guides/server-deployment.md
+          - Plugins: docs/guides/plugins.md
           - Troubleshooting: docs/guides/troubleshooting.md
       - Reference:
         - .dstack.yml:
@@ -229,7 +248,7 @@ nav:
             - dstack attach: docs/reference/cli/dstack/attach.md
             - dstack logs: docs/reference/cli/dstack/logs.md
             - dstack metrics: docs/reference/cli/dstack/metrics.md
-            - dstack config: docs/reference/cli/dstack/config.md
+            - dstack project: docs/reference/cli/dstack/project.md
             - dstack fleet: docs/reference/cli/dstack/fleet.md
             - dstack offer: docs/reference/cli/dstack/offer.md
             - dstack volume: docs/reference/cli/dstack/volume.md
@@ -238,34 +257,40 @@ nav:
             - Python API: docs/reference/api/python/index.md
             - REST API: docs/reference/api/rest/index.md
         - Environment variables: docs/reference/environment-variables.md
+        - Plugins:
+            - REST Plugin API: docs/reference/plugins/rest_plugin/index.md
   - Examples:
     - examples.md
-    - Fine-tuning:
-        - TRL: examples/fine-tuning/trl/index.md
-        - Axolotl: examples/fine-tuning/axolotl/index.md
-    - Deployment:
-        - SGLang: examples/deployment/sglang/index.md
-        - vLLM: examples/deployment/vllm/index.md
-        - TGI:  examples/deployment/tgi/index.md
-        - NIM: examples/deployment/nim/index.md
-        - TensorRT-LLM: examples/deployment/trtllm/index.md
-    - LLMs:
-        - Deepseek: examples/llms/deepseek/index.md
-        - Llama: examples/llms/llama/index.md
+    - Single-node training:
+        - TRL: examples/single-node-training/trl/index.md
+        - Axolotl: examples/single-node-training/axolotl/index.md
+    - Distributed training:
+        - TRL: examples/distributed-training/trl/index.md
+        - Axolotl: examples/distributed-training/axolotl/index.md
+        - Ray+RAGEN: examples/distributed-training/ray-ragen/index.md
+    - Clusters:
+        - NCCL tests: examples/clusters/nccl-tests/index.md
+        - RCCL tests: examples/clusters/rccl-tests/index.md
+        - A3 Mega: examples/clusters/a3mega/index.md
+        - A3 High: examples/clusters/a3high/index.md
+    - Inference:
+        - SGLang: examples/inference/sglang/index.md
+        - vLLM: examples/inference/vllm/index.md
+        - TGI:  examples/inference/tgi/index.md
+        - NIM: examples/inference/nim/index.md
+        - TensorRT-LLM: examples/inference/trtllm/index.md
     - Accelerators:
         - AMD: examples/accelerators/amd/index.md
-        - Intel Gaudi: examples/accelerators/intel/index.md
         - TPU: examples/accelerators/tpu/index.md
+        - Intel Gaudi: examples/accelerators/intel/index.md
+        - Tenstorrent: examples/accelerators/tenstorrent/index.md
     - Misc:
         - Docker Compose: examples/misc/docker-compose/index.md
-        - NCCL Tests: examples/misc/nccl-tests/index.md
-        - A3 Mega: examples/misc/a3mega-clusters/index.md
-        - A3 High: examples/misc/a3high-clusters/index.md
 #  - Community: community.md
 #  - Partners: partners.md
   - Blog:
       - blog/index.md
-  - Discord: https://discord.gg/u8SmfwPpMd" target="_blank
+#  - Discord: https://discord.gg/u8SmfwPpMd" target="_blank
 #  - Changelog: https://github.com/dstackai/dstack/releases" target="_blank
 #  - GitHub: https://github.com/dstackai/dstack" target="_blank
 #  - Sign in: https://sky.dstack.ai" target="_blank

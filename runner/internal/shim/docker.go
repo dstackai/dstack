@@ -30,6 +30,7 @@ import (
 	"github.com/docker/go-connections/nat"
 	"github.com/docker/go-units"
 	"github.com/dstackai/dstack/runner/consts"
+	"github.com/dstackai/dstack/runner/internal/common"
 	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/dstackai/dstack/runner/internal/shim/backends"
 	"github.com/dstackai/dstack/runner/internal/shim/host"
@@ -54,7 +55,7 @@ type DockerRunner struct {
 	dockerParams DockerParameters
 	dockerInfo   dockersystem.Info
 	gpus         []host.GpuInfo
-	gpuVendor    host.GpuVendor
+	gpuVendor    common.GpuVendor
 	gpuLock      *GpuLock
 	tasks        TaskStorage
 }
@@ -69,12 +70,12 @@ func NewDockerRunner(ctx context.Context, dockerParams DockerParameters) (*Docke
 		return nil, tracerr.Wrap(err)
 	}
 
-	var gpuVendor host.GpuVendor
+	var gpuVendor common.GpuVendor
 	gpus := host.GetGpuInfo(ctx)
 	if len(gpus) > 0 {
 		gpuVendor = gpus[0].Vendor
 	} else {
-		gpuVendor = host.GpuVendorNone
+		gpuVendor = common.GpuVendorNone
 	}
 	gpuLock, err := NewGpuLock(gpus)
 	if err != nil {
@@ -134,7 +135,7 @@ func (d *DockerRunner) restoreStateFromContainers(ctx context.Context) error {
 			log.Error(ctx, "failed to inspect container", "id", containerID, "task", taskID)
 		} else {
 			switch d.gpuVendor {
-			case host.GpuVendorNvidia:
+			case common.GpuVendorNvidia:
 				deviceRequests := containerFull.HostConfig.Resources.DeviceRequests
 				if len(deviceRequests) == 1 {
 					gpuIDs = deviceRequests[0].DeviceIDs
@@ -145,20 +146,28 @@ func (d *DockerRunner) restoreStateFromContainers(ctx context.Context) error {
 						"id", containerID, "task", taskID,
 					)
 				}
-			case host.GpuVendorAmd:
+			case common.GpuVendorAmd:
 				for _, device := range containerFull.HostConfig.Resources.Devices {
 					if host.IsRenderNodePath(device.PathOnHost) {
 						gpuIDs = append(gpuIDs, device.PathOnHost)
 					}
 				}
-			case host.GpuVendorIntel:
+			case common.GpuVendorTenstorrent:
+				for _, device := range containerFull.HostConfig.Resources.Devices {
+					if strings.HasPrefix(device.PathOnHost, "/dev/tenstorrent/") {
+						// Extract the device ID from the path
+						deviceID := strings.TrimPrefix(device.PathOnHost, "/dev/tenstorrent/")
+						gpuIDs = append(gpuIDs, deviceID)
+					}
+				}
+			case common.GpuVendorIntel:
 				for _, envVar := range containerFull.Config.Env {
 					if indices, found := strings.CutPrefix(envVar, "HABANA_VISIBLE_DEVICES="); found {
 						gpuIDs = strings.Split(indices, ",")
 						break
 					}
 				}
-			case host.GpuVendorNone:
+			case common.GpuVendorNone:
 				gpuIDs = []string{}
 			}
 			ports = extractPorts(ctx, containerFull.NetworkSettings.Ports)
@@ -564,8 +573,9 @@ func formatAndMountVolume(ctx context.Context, volume VolumeInfo) error {
 }
 
 func getVolumeMountPoint(volumeName string) string {
-	// Put volumes in data-specific dir to avoid clashes with host dirs
-	return fmt.Sprintf("/dstack-volumes/%s", volumeName)
+	// Put volumes in dstack-specific dir to avoid clashes with host dirs.
+	// /mnt/disks is used since on some VM images other places may not be writable (e.g. GCP COS).
+	return fmt.Sprintf("/mnt/disks/dstack-volumes/%s", volumeName)
 }
 
 func prepareInstanceMountPoints(taskConfig TaskConfig) error {
@@ -842,6 +852,9 @@ func (d *DockerRunner) startContainer(ctx context.Context, task *Task) error {
 	if err != nil {
 		return tracerr.Wrap(err)
 	}
+	// FIXME: container_.NetworkSettings.Ports values (bindings) are not immediately available
+	// on macOS, so ports can be empty with local backend.
+	// Workaround: restart shim after submitting the run.
 	task.ports = extractPorts(ctx, container_.NetworkSettings.Ports)
 	return nil
 }
@@ -1005,11 +1018,12 @@ func configureGpuDevices(hostConfig *container.HostConfig, gpuDevices []GPUDevic
 	}
 }
 
-func configureGpus(config *container.Config, hostConfig *container.HostConfig, vendor host.GpuVendor, ids []string) {
+func configureGpus(config *container.Config, hostConfig *container.HostConfig, vendor common.GpuVendor, ids []string) {
 	// NVIDIA: ids are identifiers reported by nvidia-smi, GPU-<UUID> strings
 	// AMD: ids are DRI render node paths, e.g., /dev/dri/renderD128
+	// Tenstorrent: ids are device indices to be used with /dev/tenstorrent/<id>
 	switch vendor {
-	case host.GpuVendorNvidia:
+	case common.GpuVendorNvidia:
 		hostConfig.Resources.DeviceRequests = append(
 			hostConfig.Resources.DeviceRequests,
 			container.DeviceRequest{
@@ -1020,7 +1034,7 @@ func configureGpus(config *container.Config, hostConfig *container.HostConfig, v
 				DeviceIDs:    ids,
 			},
 		)
-	case host.GpuVendorAmd:
+	case common.GpuVendorAmd:
 		// All options are listed here: https://hub.docker.com/r/rocm/pytorch
 		// Only --device are mandatory, other seem to be performance-related.
 		// --device=/dev/kfd
@@ -1050,7 +1064,28 @@ func configureGpus(config *container.Config, hostConfig *container.HostConfig, v
 		// --security-opt=seccomp=unconfined
 		hostConfig.SecurityOpt = append(hostConfig.SecurityOpt, "seccomp=unconfined")
 		// TODO: in addition, for non-root user, --group-add=video, and possibly --group-add=render, are required.
-	case host.GpuVendorIntel:
+	case common.GpuVendorTenstorrent:
+		// For Tenstorrent, simply add each device
+		for _, id := range ids {
+			devicePath := fmt.Sprintf("/dev/tenstorrent/%s", id)
+			hostConfig.Resources.Devices = append(
+				hostConfig.Resources.Devices,
+				container.DeviceMapping{
+					PathOnHost:        devicePath,
+					PathInContainer:   devicePath,
+					CgroupPermissions: "rwm",
+				},
+			)
+		}
+		// Check and mount hugepages-1G if it exists
+		if _, err := os.Stat("/dev/hugepages-1G"); err == nil {
+			hostConfig.Mounts = append(hostConfig.Mounts, mount.Mount{
+				Type:   mount.TypeBind,
+				Source: "/dev/hugepages-1G",
+				Target: "/dev/hugepages-1G",
+			})
+		}
+	case common.GpuVendorIntel:
 		// All options are listed here:
 		// https://docs.habana.ai/en/latest/Installation_Guide/Additional_Installation/Docker_Installation.html
 		// --runtime=habana
@@ -1061,7 +1096,7 @@ func configureGpus(config *container.Config, hostConfig *container.HostConfig, v
 		hostConfig.CapAdd = append(hostConfig.CapAdd, "SYS_NICE")
 		// -e HABANA_VISIBLE_DEVICES=0,1,...
 		config.Env = append(config.Env, fmt.Sprintf("HABANA_VISIBLE_DEVICES=%s", strings.Join(ids, ",")))
-	case host.GpuVendorNone:
+	case common.GpuVendorNone:
 		// nothing to do
 	}
 }

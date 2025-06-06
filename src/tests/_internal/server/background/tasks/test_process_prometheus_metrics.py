@@ -34,7 +34,13 @@ from dstack._internal.server.testing.common import (
 @pytest.mark.usefixtures("test_db", "image_config_mock")
 class TestCollectPrometheusMetrics:
     @pytest_asyncio.fixture
-    async def job(self, session: AsyncSession) -> JobModel:
+    async def job(self, request: pytest.FixtureRequest, session: AsyncSession) -> JobModel:
+        dockerized: bool
+        marker = request.node.get_closest_marker("dockerized")
+        if marker is None:
+            dockerized = True
+        else:
+            dockerized = marker.args[0]
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
@@ -59,7 +65,7 @@ class TestCollectPrometheusMetrics:
             session=session,
             run=run,
             status=JobStatus.RUNNING,
-            job_provisioning_data=get_job_provisioning_data(),
+            job_provisioning_data=get_job_provisioning_data(dockerized=dockerized),
             instance_assigned=True,
             instance=instance,
         )
@@ -141,6 +147,21 @@ class TestCollectPrometheusMetrics:
         metrics = res.scalar_one()
         assert metrics.text == "# prom old response"
         assert metrics.collected_at == datetime(2023, 1, 2, 3, 5, 15)
+
+    @freeze_time(datetime(2023, 1, 2, 3, 5, 20, tzinfo=timezone.utc))
+    @pytest.mark.dockerized(False)
+    async def test_skips_non_dockerized_jobs(
+        self, session: AsyncSession, job: JobModel, ssh_tunnel_mock: Mock, shim_client_mock: Mock
+    ):
+        await collect_prometheus_metrics()
+
+        ssh_tunnel_mock.assert_not_called()
+        shim_client_mock.get_task_metrics.assert_not_called()
+        res = await session.execute(
+            select(JobPrometheusMetrics).where(JobPrometheusMetrics.job_id == job.id)
+        )
+        metrics = res.scalar_one_or_none()
+        assert metrics is None
 
 
 @pytest.mark.asyncio

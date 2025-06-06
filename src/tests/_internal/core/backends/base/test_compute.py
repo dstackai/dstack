@@ -1,10 +1,14 @@
 import re
+from typing import Optional
+
+import pytest
 
 from dstack._internal.core.backends.base.compute import (
     generate_unique_backend_name,
     generate_unique_gateway_instance_name,
     generate_unique_instance_name,
     generate_unique_volume_name,
+    normalize_arch,
 )
 from dstack._internal.server.testing.common import (
     get_gateway_compute_configuration,
@@ -54,3 +58,22 @@ class TestGenerateUniqueBackendName:
     def test_validates_project_name(self):
         name = generate_unique_backend_name("instance", "invalid_project!@", 60)
         assert re.match(r"^dstack-instance-[a-z0-9]{8}$", name)
+
+
+class TestNormalizeArch:
+    @pytest.mark.parametrize("arch", [None, "", "X86", "x86_64", "AMD64"])
+    def test_amd64(self, arch: Optional[str]):
+        assert normalize_arch(arch) == "amd64"
+
+    @pytest.mark.parametrize("arch", ["arm", "ARM64", "AArch64"])
+    def test_arm64(self, arch: str):
+        assert normalize_arch(arch) == "arm64"
+
+    @pytest.mark.parametrize("arch", ["IA32", "i686", "ARM32", "aarch32"])
+    def test_32bit_not_supported(self, arch: str):
+        with pytest.raises(ValueError, match="32-bit architectures are not supported"):
+            normalize_arch(arch)
+
+    def test_unknown_arch(self):
+        with pytest.raises(ValueError, match="Unsupported architecture: MIPS"):
+            normalize_arch("MIPS")

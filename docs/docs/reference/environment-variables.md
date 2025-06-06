@@ -12,22 +12,24 @@ tasks, and services:
      ```yaml
      type: task
      name: vscode
-     
+
      commands:
        - echo $DSTACK_RUN_NAME
      ```
 
      If `name` is not set in the configuration, it is assigned a random name (e.g. `wet-mangust-1`).
 
+- `DSTACK_RUN_ID`{ #DSTACK_RUN_ID } – The UUID of the run.
+- `DSTACK_JOB_ID`{ #DSTACK_JOB_ID } – The UUID of the job submission.
 - `DSTACK_REPO_ID`{ #DSTACK_REPO_ID } – The ID of the repo.
 - `DSTACK_GPUS_NUM`{ #DSTACK_GPUS_NUM } – The total number of GPUs in the run.
 
      Example:
-     
+
      ```yaml
      type: service
      name: llama31
-     
+
      env:
        - HF_TOKEN
      commands:
@@ -37,7 +39,7 @@ tasks, and services:
          --tensor-parallel-size $DSTACK_GPUS_NUM
      port: 8000
      model: meta-llama/Meta-Llama-3.1-8B-Instruct
-     
+
      resources:
        gpu: 24GB
      ```
@@ -49,50 +51,56 @@ tasks, and services:
 
      Below is an example of using `DSTACK_NODES_NUM`, `DSTACK_GPUS_PER_NODE`, `DSTACK_NODE_RANK`, and `DSTACK_MASTER_NODE_IP`
      for distributed training:
-     
+
      ```yaml
       type: task
       name: train-distrib
 
+      # The size of the cluster
       nodes: 2
-      python: "3.12"
 
+      python: 3.12
+      env:
+        - NCCL_DEBUG=INFO
       commands:
-        - git clone https://github.com/pytorch/examples.git
-        - cd examples/distributed/ddp-tutorial-series
-        - pip install -r requirements.txt
-        - torchrun
-          --nproc-per-node=$DSTACK_GPUS_PER_NODE
-          --node-rank=$DSTACK_NODE_RANK
-          --nnodes=$DSTACK_NODES_NUM
-          --master-addr=$DSTACK_MASTER_NODE_IP
-          --master-port=12345
-          multinode.py 50 10
+        - git clone https://github.com/pytorch/examples.git pytorch-examples
+        - cd pytorch-examples/distributed/ddp-tutorial-series
+        - uv pip install -r requirements.txt
+        - |
+          torchrun \
+            --nproc-per-node=$DSTACK_GPUS_PER_NODE \
+            --node-rank=$DSTACK_NODE_RANK \
+            --nnodes=$DSTACK_NODES_NUM \
+            --master-addr=$DSTACK_MASTER_NODE_IP \
+            --master-port=12345 \
+            multinode.py 50 10
 
       resources:
-        gpu: 24GB
-        shm_size: 24GB
+        gpu: 24GB:1..2
+        # Uncomment if using multiple GPUs
+        #shm_size: 24GB
      ```
 
 - `DSTACK_NODES_IPS`{ #DSTACK_NODES_IPS } – The list of internal IP addresses of all nodes delimited by `"\n"`.
+- `DSTACK_MPI_HOSTFILE`{ #DSTACK_MPI_HOSTFILE } – The path to a pre-populated MPI hostfile that can be used directly as `mpirun --hostfile $DSTACK_MPI_HOSTFILE`.
 
 ## Server
 
 The following environment variables are supported by the `dstack` server and can be specified whether the server is run
 via `dstack server` or deployed using Docker.
 
-For more details on the options below, refer to the [server deployment](../guides/server-deployment.md) guide. 
+For more details on the options below, refer to the [server deployment](../guides/server-deployment.md) guide.
 
 - `DSTACK_SERVER_LOG_LEVEL`{ #DSTACK_SERVER_LOG_LEVEL } – Has the same effect as `--log-level`. Defaults to `INFO`.
 
      Example:
-     
+
      <div class="termy">
-     
+
      ```shell
      $ DSTACK_SERVER_LOG_LEVEL=debug dstack server
      ```
-     
+
      </div>
 
 - `DSTACK_SERVER_LOG_FORMAT`{ #DSTACK_SERVER_LOG_FORMAT } – Sets format of log output. Can be `rich`, `standard`, `json`. Defaults to `rich`.
@@ -108,17 +116,24 @@ For more details on the options below, refer to the [server deployment](../guide
 - `DSTACK_ENABLE_PROMETHEUS_METRICS`{ #DSTACK_ENABLE_PROMETHEUS_METRICS } — Enables Prometheus metrics collection and export.
 - `DSTACK_DEFAULT_SERVICE_CLIENT_MAX_BODY_SIZE`{ #DSTACK_DEFAULT_SERVICE_CLIENT_MAX_BODY_SIZE } – Request body size limit for services running with a gateway, in bytes. Defaults to 64 MiB.
 - `DSTACK_FORBID_SERVICES_WITHOUT_GATEWAY`{ #DSTACK_FORBID_SERVICES_WITHOUT_GATEWAY } – Forbids registering new services without a gateway if set to any value.
+- `DSTACK_SERVER_CODE_UPLOAD_LIMIT`{ #DSTACK_SERVER_CODE_UPLOAD_LIMIT } - The repo size limit when uploading diffs or local repos, in bytes. Set to 0 to disable size limits. Defaults to 2MiB.
+- `DSTACK_SERVER_S3_BUCKET`{ #DSTACK_SERVER_S3_BUCKET } - The bucket that repo diffs will be uploaded to if set. If unset, diffs are uploaded to the database.
+- `DSTACK_SERVER_S3_BUCKET_REGION`{ #DSTACK_SERVER_S3_BUCKET_REGION } - The region of the S3 Bucket.
+- `DSTACK_SERVER_GCS_BUCKET`{ #DSTACK_SERVER_GCD_BUCKET } - The bucket that repo diffs will be uploaded to if set. If unset, diffs are uploaded to the database.
 
 ??? info "Internal environment variables"
-     The following environment variables are intended for development purposes: 
+     The following environment variables are intended for development purposes:
 
      * `DSTACK_SERVER_ROOT_LOG_LEVEL` – Sets root logger log level. Defaults to `ERROR`.
      * `DSTACK_SERVER_UVICORN_LOG_LEVEL` – Sets uvicorn logger log level. Defaults to `ERROR`.
      * `DSTACK_SERVER_MAX_OFFERS_TRIED` - Sets how many instance offers to try when starting a job.
        Setting a high value can degrade server performance.
      * `DSTACK_RUNNER_VERSION` – Sets exact runner version for debug. Defaults to `latest`. Ignored if `DSTACK_RUNNER_DOWNLOAD_URL` is set.
-     * `DSTACK_RUNNER_DOWNLOAD_URL` – Overrides `dstack-runner` binary download URL.
-     * `DSTACK_SHIM_DOWNLOAD_URL` – Overrides `dstack-shim` binary download URL.
+     * `DSTACK_RUNNER_DOWNLOAD_URL` – Overrides `dstack-runner` binary download URL. The URL can contain `{version}` and/or `{arch}` placeholders,
+      where `{version}` is `dstack` version in the `X.Y.Z` format or `latest`, and `{arch}` is either `amd64` or `arm64`, for example,
+      `https://dstack.example.com/{arch}/{version}/dstack-runner`.
+     * `DSTACK_SHIM_DOWNLOAD_URL` – Overrides `dstack-shim` binary download URL. The URL can contain `{version}` and/or `{arch}` placeholders,
+      see `DSTACK_RUNNER_DOWNLOAD_URL` for the details.
      * `DSTACK_DEFAULT_CREDS_DISABLED` – Disables default credentials detection if set. Defaults to `None`.
      * `DSTACK_LOCAL_BACKEND_ENABLED` – Enables local backend for debug if set. Defaults to `None`.
 

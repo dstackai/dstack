@@ -21,6 +21,7 @@ from dstack._internal.core.models.volumes import (
     VolumeConfiguration,
     VolumeInstance,
     VolumeProvisioningData,
+    VolumeSpec,
     VolumeStatus,
 )
 from dstack._internal.core.services import validate_dstack_resource_name
@@ -38,6 +39,7 @@ from dstack._internal.server.services.locking import (
     get_locker,
     string_to_lock_id,
 )
+from dstack._internal.server.services.plugins import apply_plugin_policies
 from dstack._internal.server.services.projects import list_project_models, list_user_project_models
 from dstack._internal.utils import common, random_names
 from dstack._internal.utils.logging import get_logger
@@ -203,11 +205,18 @@ async def create_volume(
     user: UserModel,
     configuration: VolumeConfiguration,
 ) -> Volume:
+    spec = await apply_plugin_policies(
+        user=user.name,
+        project=project.name,
+        # Create pseudo spec until the volume API is updated to accept spec
+        spec=VolumeSpec(configuration=configuration),
+    )
+    configuration = spec.configuration
     _validate_volume_configuration(configuration)
 
     lock_namespace = f"volume_names_{project.name}"
     if get_db().dialect_name == "sqlite":
-        # Start new transaction to see commited changes after lock
+        # Start new transaction to see committed changes after lock
         await session.commit()
     elif get_db().dialect_name == "postgresql":
         await session.execute(

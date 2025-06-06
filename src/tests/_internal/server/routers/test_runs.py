@@ -121,9 +121,12 @@ def get_dev_env_run_plan_dict(
             "spot_policy": "spot",
             "idle_duration": None,
             "utilization_policy": None,
+            "startup_order": None,
+            "stop_criteria": None,
             "reservation": None,
             "fleets": None,
             "tags": None,
+            "priority": 0,
         },
         "configuration_path": "dstack.yaml",
         "profile": {
@@ -141,6 +144,8 @@ def get_dev_env_run_plan_dict(
             "spot_policy": "spot",
             "idle_duration": None,
             "utilization_policy": None,
+            "startup_order": None,
+            "stop_criteria": None,
             "reservation": None,
             "fleets": None,
             "tags": None,
@@ -165,7 +170,10 @@ def get_dev_env_run_plan_dict(
                         "/bin/bash",
                         "-i",
                         "-c",
-                        "(echo pip install ipykernel... && "
+                        "uv venv --prompt workflow --seed /workflow/.venv > /dev/null 2>&1"
+                        " && echo 'source /workflow/.venv/bin/activate' >> ~/.bashrc"
+                        " && source /workflow/.venv/bin/activate"
+                        " && (echo pip install ipykernel... && "
                         "pip install -q --no-cache-dir "
                         'ipykernel 2> /dev/null) || echo "no '
                         'pip, ipykernel was not installed" '
@@ -180,7 +188,7 @@ def get_dev_env_run_plan_dict(
                     ],
                     "env": {},
                     "home_dir": "/root",
-                    "image_name": "dstackai/base:py3.13-0.7-cuda-12.1",
+                    "image_name": "dstackai/base:py3.13-0.8-cuda-12.1",
                     "user": None,
                     "privileged": privileged,
                     "job_name": f"{run_name}-0-0",
@@ -239,6 +247,7 @@ def get_dev_env_run_dict(
         "submitted_at": submitted_at,
         "last_processed_at": last_processed_at,
         "status": "submitted",
+        "status_message": "submitted",
         "run_spec": {
             "configuration": {
                 "entrypoint": None,
@@ -281,9 +290,12 @@ def get_dev_env_run_dict(
                 "spot_policy": "spot",
                 "idle_duration": None,
                 "utilization_policy": None,
+                "startup_order": None,
+                "stop_criteria": None,
                 "reservation": None,
                 "fleets": None,
                 "tags": None,
+                "priority": 0,
             },
             "configuration_path": "dstack.yaml",
             "profile": {
@@ -301,6 +313,8 @@ def get_dev_env_run_dict(
                 "spot_policy": "spot",
                 "idle_duration": None,
                 "utilization_policy": None,
+                "startup_order": None,
+                "stop_criteria": None,
                 "reservation": None,
                 "fleets": None,
                 "tags": None,
@@ -320,7 +334,10 @@ def get_dev_env_run_dict(
                         "/bin/bash",
                         "-i",
                         "-c",
-                        "(echo pip install ipykernel... && "
+                        "uv venv --prompt workflow --seed /workflow/.venv > /dev/null 2>&1"
+                        " && echo 'source /workflow/.venv/bin/activate' >> ~/.bashrc"
+                        " && source /workflow/.venv/bin/activate"
+                        " && (echo pip install ipykernel... && "
                         "pip install -q --no-cache-dir "
                         'ipykernel 2> /dev/null) || echo "no '
                         'pip, ipykernel was not installed" '
@@ -335,7 +352,7 @@ def get_dev_env_run_dict(
                     ],
                     "env": {},
                     "home_dir": "/root",
-                    "image_name": "dstackai/base:py3.13-0.7-cuda-12.1",
+                    "image_name": "dstackai/base:py3.13-0.8-cuda-12.1",
                     "user": None,
                     "privileged": privileged,
                     "job_name": f"{run_name}-0-0",
@@ -373,8 +390,11 @@ def get_dev_env_run_dict(
                         "finished_at": finished_at,
                         "inactivity_secs": None,
                         "status": "submitted",
+                        "status_message": "submitted",
                         "termination_reason": None,
                         "termination_reason_message": None,
+                        "error": None,
+                        "exit_status": None,
                         "job_provisioning_data": None,
                         "job_runtime_data": None,
                     }
@@ -389,15 +409,18 @@ def get_dev_env_run_dict(
             "inactivity_secs": None,
             "finished_at": finished_at,
             "status": "submitted",
+            "status_message": "submitted",
             "termination_reason": None,
             "termination_reason_message": None,
+            "error": None,
+            "exit_status": None,
             "job_provisioning_data": None,
             "job_runtime_data": None,
         },
         "cost": 0.0,
         "service": None,
         "termination_reason": None,
-        "error": "",
+        "error": None,
         "deleted": deleted,
     }
 
@@ -488,6 +511,7 @@ class TestListRuns:
                 "submitted_at": run1_submitted_at.isoformat(),
                 "last_processed_at": run1_submitted_at.isoformat(),
                 "status": "submitted",
+                "status_message": "submitted",
                 "run_spec": run1_spec.dict(),
                 "jobs": [
                     {
@@ -501,8 +525,11 @@ class TestListRuns:
                                 "finished_at": None,
                                 "inactivity_secs": None,
                                 "status": "submitted",
+                                "status_message": "submitted",
                                 "termination_reason": None,
                                 "termination_reason_message": None,
+                                "error": None,
+                                "exit_status": None,
                                 "job_provisioning_data": None,
                                 "job_runtime_data": None,
                             }
@@ -517,15 +544,18 @@ class TestListRuns:
                     "finished_at": None,
                     "inactivity_secs": None,
                     "status": "submitted",
+                    "status_message": "submitted",
                     "termination_reason_message": None,
                     "termination_reason": None,
+                    "error": None,
+                    "exit_status": None,
                     "job_provisioning_data": None,
                     "job_runtime_data": None,
                 },
                 "cost": 0,
                 "service": None,
                 "termination_reason": None,
-                "error": "",
+                "error": None,
                 "deleted": False,
             },
             {
@@ -535,13 +565,14 @@ class TestListRuns:
                 "submitted_at": run2_submitted_at.isoformat(),
                 "last_processed_at": run2_submitted_at.isoformat(),
                 "status": "submitted",
+                "status_message": "submitted",
                 "run_spec": run2_spec.dict(),
                 "jobs": [],
                 "latest_job_submission": None,
                 "cost": 0,
                 "service": None,
                 "termination_reason": None,
-                "error": "",
+                "error": None,
                 "deleted": False,
             },
         ]

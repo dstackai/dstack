@@ -87,12 +87,12 @@ hide:
         </h3>
     </span>    
 
-    <span class="feature-cell" target="_blank">
+    <!-- <span class="feature-cell" target="_blank">
         <img width="35" style="padding: 0" src="/assets/images/tensordock-logo.svg">
         <h3>
             TensorDock
         </h3>
-    </span>
+    </span> -->
 
     <span class="feature-cell" target="_blank">
         <img width="52" style="margin: 10px -4px;" src="/assets/images/datacrunch-logo.svg">
@@ -149,5 +149,5 @@ Are you interested in integrating and collaborating with us to become part of th
     Contribute
 </a>&nbsp;&nbsp;<a href="https://calendly.com/dstackai/discovery-call" target="_blank"
    class="md-button md-button-secondary external">
-    Talk to us
+    Talk to an expert
 </a>

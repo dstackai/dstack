@@ -129,7 +129,15 @@ The `service` configuration type allows running [services](../../concepts/servic
         required: true
       item_id_prefix: resources-
 
-#### `resouces.gpu` { #resources-gpu data-toc-label="gpu" }
+#### `resources.cpu` { #resources-cpu data-toc-label="cpu" }
+
+#SCHEMA# dstack._internal.core.models.resources.CPUSpec
+    overrides:
+      show_root_heading: false
+      type:
+        required: true
+
+#### `resources.gpu` { #resources-gpu data-toc-label="gpu" }
 
 #SCHEMA# dstack._internal.core.models.resources.GPUSpec
     overrides:
@@ -137,7 +145,7 @@ The `service` configuration type allows running [services](../../concepts/servic
       type:
         required: true
 
-#### `resouces.disk` { #resources-disk data-toc-label="disk" }
+#### `resources.disk` { #resources-disk data-toc-label="disk" }
 
 #SCHEMA# dstack._internal.core.models.resources.DiskSpec
     overrides:

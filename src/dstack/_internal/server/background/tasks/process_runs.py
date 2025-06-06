@@ -10,7 +10,7 @@ from sqlalchemy.orm import joinedload, selectinload
 import dstack._internal.server.services.gateways as gateways
 import dstack._internal.server.services.services.autoscalers as autoscalers
 from dstack._internal.core.errors import ServerError
-from dstack._internal.core.models.profiles import RetryEvent
+from dstack._internal.core.models.profiles import RetryEvent, StopCriteria
 from dstack._internal.core.models.runs import (
     Job,
     JobStatus,
@@ -313,6 +313,10 @@ async def _process_active_run(session: AsyncSession, run_model: RunModel):
             termination_reason = RunTerminationReason.RETRY_LIMIT_EXCEEDED
         else:
             raise ValueError(f"Unexpected termination reason {run_termination_reasons}")
+    elif _should_stop_on_master_done(run):
+        new_status = RunStatus.TERMINATING
+        # ALL_JOBS_DONE is used for all DONE reasons including master-done
+        termination_reason = RunTerminationReason.ALL_JOBS_DONE
     elif RunStatus.RUNNING in run_statuses:
         new_status = RunStatus.RUNNING
     elif RunStatus.PROVISIONING in run_statuses:
@@ -433,4 +437,13 @@ def _can_retry_single_job(run_spec: RunSpec) -> bool:
     # TODO: Currently, we terminate and retry the entire replica if one of the job fails.
     # We could make partial retry in some multi-node cases.
     # E.g. restarting a worker node, independent jobs.
+    return False
+
+
+def _should_stop_on_master_done(run: Run) -> bool:
+    if run.run_spec.merged_profile.stop_criteria != StopCriteria.MASTER_DONE:
+        return False
+    for job in run.jobs:
+        if job.job_spec.job_num == 0 and job.job_submissions[-1].status == JobStatus.DONE:
+            return True
     return False

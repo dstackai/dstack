@@ -54,6 +54,8 @@ uv run pytest src/tests --runpostgres
 
 If you'd like to integrate a new cloud provider to `dstack`, follow [contributing/BACKENDS.md](contributing/BACKENDS.md).
 
-## Get help
+## What's next
+
+You can find more subject-focused guides in the [contributing](contributing/) directory.
 
 If you have any questions, you can always get help in our [Discord](https://discord.gg/u8SmfwPpMd) community.

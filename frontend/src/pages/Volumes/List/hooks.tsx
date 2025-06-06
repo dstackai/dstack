@@ -184,9 +184,9 @@ const getVolumeFinised = (volume: IVolume): string => {
     if (!volume.deleted_at && volume.status != 'failed') {
         return '-';
     }
-    let finished = volume.last_processed_at
+    let finished = volume.last_processed_at;
     if (volume.deleted_at) {
-        finished = volume.deleted_at
+        finished = volume.deleted_at;
     }
     return format(new Date(finished), DATE_TIME_FORMAT);
 };

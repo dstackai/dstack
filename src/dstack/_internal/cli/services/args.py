@@ -19,8 +19,8 @@ def port_mapping(v: str) -> PortMapping:
     return PortMapping.parse(v)
 
 
-def cpu_spec(v: str) -> resources.Range[int]:
-    return parse_obj_as(resources.Range[int], v)
+def cpu_spec(v: str) -> dict:
+    return resources.CPUSpec.parse(v)
 
 
 def memory_spec(v: str) -> resources.Range[resources.Memory]:

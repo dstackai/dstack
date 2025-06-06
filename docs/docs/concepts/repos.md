@@ -28,6 +28,8 @@ If the directory is cloned Git repo, [`dstack apply`](../reference/cli/dstack/ap
 If the directory is not a cloned Git repo, it uploads the entire directory.
 
 Uploads are limited to 2MB. Use `.gitignore` to exclude unnecessary files from being uploaded.
+You can set the `DSTACK_SERVER_CODE_UPLOAD_LIMIT` environment variable to increase the default server limit.
+Increasing the limit is recommended only if you [configure an object storage](../guides/server-deployment.md).
 
 ### Initialize as a local directory
 

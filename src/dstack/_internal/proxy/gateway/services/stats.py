@@ -11,10 +11,10 @@ from pydantic import BaseModel
 
 from dstack._internal.proxy.gateway.repo.repo import GatewayProxyRepo
 from dstack._internal.proxy.gateway.schemas.stats import PerWindowStats, ServiceStats, Stat
+from dstack._internal.proxy.lib.errors import UnexpectedProxyError
 from dstack._internal.utils.common import run_async
 
 logger = logging.getLogger(__name__)
-IGNORE_STATUSES = {403, 404}
 WINDOWS = (30, 60, 300)
 TTL = WINDOWS[-1]
 EMPTY_STATS = {window: Stat(requests=0, request_time=0.0) for window in WINDOWS}
@@ -35,6 +35,7 @@ class LogEntry(BaseModel):
     host: str
     status: int
     request_time: float
+    is_replica_hit: bool
 
 
 class StatsCollector:
@@ -87,7 +88,8 @@ class StatsCollector:
         now = datetime.datetime.now(tz=datetime.timezone.utc)
 
         for entry in self._read_access_log(now - datetime.timedelta(seconds=TTL)):
-            if entry.status in IGNORE_STATUSES:
+            # only include requests that hit or should hit a service replica
+            if not entry.is_replica_hit:
                 continue
 
             frame_timestamp = int(entry.timestamp.timestamp())
@@ -119,7 +121,10 @@ class StatsCollector:
                 line = self._file.readline()
                 if not line:
                     break
-                timestamp_str, host, status, request_time = line.split()
+                cells = line.split()
+                if len(cells) == 4:  # compatibility with pre-0.19.11 logs
+                    cells.append("0" if cells[2] in ["403", "404"] else "1")
+                timestamp_str, host, status, request_time, dstack_replica_hit = cells
                 timestamp = datetime.datetime.fromisoformat(timestamp_str)
                 if timestamp < after:
                     continue
@@ -128,6 +133,7 @@ class StatsCollector:
                     host=host,
                     status=int(status),
                     request_time=float(request_time),
+                    is_replica_hit=_parse_nginx_bool(dstack_replica_hit),
                 )
             if os.fstat(self._file.fileno()).st_ino != st_ino:
                 # file was rotated
@@ -154,3 +160,11 @@ async def get_service_stats(
         )
         for service in services
     ]
+
+
+def _parse_nginx_bool(v: str) -> bool:
+    if v == "0":
+        return False
+    if v == "1":
+        return True
+    raise UnexpectedProxyError(f"Cannot parse boolean value: expected '0' or '1', got {v!r}")

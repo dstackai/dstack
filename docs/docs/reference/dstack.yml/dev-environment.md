@@ -35,6 +35,14 @@ The `dev-environment` configuration type allows running [dev environments](../..
         required: true
       item_id_prefix: resources-
 
+#### `resources.cpu` { #resources-cpu data-toc-label="cpu" }
+
+#SCHEMA# dstack._internal.core.models.resources.CPUSpec
+    overrides:
+      show_root_heading: false
+      type:
+        required: true
+
 #### `resources.gpu` { #resources-gpu data-toc-label="gpu" }
 
 #SCHEMA# dstack._internal.core.models.resources.GPUSpec

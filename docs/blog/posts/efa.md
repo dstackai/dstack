@@ -3,7 +3,7 @@ title: Efficient distributed training with AWS EFA
 date: 2025-02-20
 description: "The latest release of dstack allows you to use AWS EFA for your distributed training tasks."  
 slug: efa
-image: https://github.com/dstackai/static-assets/blob/main/static-assets/images/distributed-training-with-aws-efa-v2.png?raw=true
+image: https://dstack.ai/static-assets/static-assets/images/distributed-training-with-aws-efa-v2.png
 categories:
   - Cloud fleets
 ---
@@ -16,7 +16,7 @@ distributed training workloads across multiple GPUs and instances.
 
 With the latest release of `dstack`, you can now leverage AWS EFA to supercharge your distributed training tasks.
 
-<img src="https://github.com/dstackai/static-assets/blob/main/static-assets/images/distributed-training-with-aws-efa-v2.png?raw=true" width="630"/>
+<img src="https://dstack.ai/static-assets/static-assets/images/distributed-training-with-aws-efa-v2.png" width="630"/>
 
 <!-- more -->
 
@@ -117,7 +117,7 @@ name: efa-task
 # The size of the cluster
 nodes: 2
 
-python: "3.12"
+python: 3.12
 
 # Commands to run on each node
 commands:

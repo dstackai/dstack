@@ -49,15 +49,17 @@ class Resources(CoreModel):
     spot: bool
     disk: Disk = Disk(size_mib=102400)  # the default value (100GB) for backward compatibility
     description: str = ""
+    cpu_arch: Optional[gpuhunt.CPUArchitecture] = None
 
     def pretty_format(self, include_spot: bool = False) -> str:
         resources = {}
         if self.cpus > 0:
             resources["cpus"] = self.cpus
+            resources["cpu_arch"] = self.cpu_arch
         if self.memory_mib > 0:
             resources["memory"] = f"{self.memory_mib / 1024:.0f}GB"
         if self.disk.size_mib > 0:
-            resources["disk_size"] = f"{self.disk.size_mib / 1024:.1f}GB"
+            resources["disk_size"] = f"{self.disk.size_mib / 1024:.0f}GB"
         if self.gpus:
             gpu = self.gpus[0]
             resources["gpu_name"] = gpu.name
@@ -66,7 +68,7 @@ class Resources(CoreModel):
                 resources["gpu_memory"] = f"{gpu.memory_mib / 1024:.0f}GB"
         output = pretty_resources(**resources)
         if include_spot and self.spot:
-            output += ", SPOT"
+            output += " (spot)"
         return output
 
 
@@ -105,7 +107,6 @@ class InstanceConfiguration(CoreModel):
     user: str  # dstack user name
     ssh_keys: List[SSHKey]
     instance_id: Optional[str] = None
-    placement_group_name: Optional[str] = None
     reservation: Optional[str] = None
     volumes: Optional[List[Volume]] = None
     tags: Optional[Dict[str, str]] = None

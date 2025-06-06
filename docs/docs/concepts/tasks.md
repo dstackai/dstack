@@ -10,7 +10,7 @@ The filename must end with `.dstack.yml` (e.g. `.dstack.yml` or `dev.dstack.yml`
 
 [//]: # (TODO: Make tabs - single machine & distributed tasks & web app)
 
-<div editor-title="examples/fine-tuning/axolotl/train.dstack.yml"> 
+<div editor-title="examples/single-node-training/axolotl/train.dstack.yml"> 
 
 ```yaml
 type: task
@@ -26,7 +26,7 @@ env:
   - WANDB_API_KEY
 # Commands of the task
 commands:
-  - accelerate launch -m axolotl.cli.train examples/fine-tuning/axolotl/config.yaml
+  - accelerate launch -m axolotl.cli.train examples/single-node-training/axolotl/config.yaml
 
 resources:
   gpu:
@@ -81,11 +81,11 @@ type: task
 # The name is optional, if not specified, generated randomly
 name: streamlit-hello
 
-python: "3.10"
+python: 3.12
 
 # Commands of the task
 commands:
-  - pip3 install streamlit
+  - uv pip install streamlit
   - streamlit hello
 # Expose the port to access the web app
 ports: 
@@ -102,33 +102,33 @@ application.
 By default, a task runs on a single node.
 However, you can run it on a cluster of nodes by specifying `nodes`.
 
-<div editor-title="train.dstack.yml">
+<div editor-title="examples/distributed-training/torchrun/.dstack.yml">
 
 ```yaml
 type: task
-# The name is optional, if not specified, generated randomly
 name: train-distrib
 
 # The size of the cluster
 nodes: 2
 
-python: "3.12"
-
-# Commands to run on each node
+python: 3.12
+env:
+  - NCCL_DEBUG=INFO
 commands:
-  - git clone https://github.com/pytorch/examples.git
-  - cd examples/distributed/ddp-tutorial-series
-  - pip install -r requirements.txt
-  - torchrun
-    --nproc-per-node=$DSTACK_GPUS_PER_NODE
-    --node-rank=$DSTACK_NODE_RANK
-    --nnodes=$DSTACK_NODES_NUM
-    --master-addr=$DSTACK_MASTER_NODE_IP
-    --master-port=12345
-    multinode.py 50 10
+  - git clone https://github.com/pytorch/examples.git pytorch-examples
+  - cd pytorch-examples/distributed/ddp-tutorial-series
+  - uv pip install -r requirements.txt
+  - |
+    torchrun \
+      --nproc-per-node=$DSTACK_GPUS_PER_NODE \
+      --node-rank=$DSTACK_NODE_RANK \
+      --nnodes=$DSTACK_NODES_NUM \
+      --master-addr=$DSTACK_MASTER_NODE_IP \
+      --master-port=12345 \
+      multinode.py 50 10
 
 resources:
-  gpu: 24GB
+  gpu: 24GB:1..2
   # Uncomment if using multiple GPUs
   #shm_size: 24GB
 ```
@@ -137,8 +137,16 @@ resources:
 
 Nodes can communicate using their private IP addresses.
 Use `DSTACK_MASTER_NODE_IP`, `DSTACK_NODES_IPS`, `DSTACK_NODE_RANK`, and other
-[System environment variables](#system-environment-variables)
-to discover IP addresses and other details.
+[System environment variables](#system-environment-variables) for inter-node communication.
+
+`dstack` is easy to use with `accelerate`, `torchrun`, Ray, Spark, and any other distributed frameworks.
+
+
+!!! info "MPI"
+    If want to use MPI, you can set `startup_order` to `workers-first` and `stop_criteria` to `master-done`, and use `DSTACK_MPI_HOSTFILE`.
+    See the [NCCL](../../examples/clusters/nccl-tests/index.md) or [RCCL](../../examples/clusters/rccl-tests/index.md) examples.
+
+> For detailed examples, see [distributed training](../../examples.md#distributed-training) examples.
 
 ??? info "Network interface"
     Distributed frameworks usually detect the correct network interface automatically,
@@ -171,7 +179,7 @@ to discover IP addresses and other details.
     recommended to create them via a fleet configuration
     to ensure the highest level of inter-node connectivity.
 
-`dstack` is easy to use with `accelerate`, `torchrun`, Ray, Spark, and any other distributed frameworks.
+> See the [Clusters](../guides/clusters.md) guide for more details on how to use `dstack` on clusters.
 
 ### Resources
 
@@ -188,10 +196,12 @@ name: train
 
 # Commands of the task
 commands:
-  - pip install -r fine-tuning/qlora/requirements.txt
+  - uv pip install -r fine-tuning/qlora/requirements.txt
   - python fine-tuning/qlora/train.py
   
 resources:
+  # 16 or more x86_64 cores
+  cpu: 16..
   # 200GB or more RAM
   memory: 200GB..
   # 4 GPUs from 40GB to 80GB
@@ -204,10 +214,16 @@ resources:
 
 </div>
 
+The `cpu` property also allows you to specify the CPU architecture, `x86` or `arm`. Examples:
+`x86:16` (16 x86-64 cores), `arm:8..` (at least 8 ARM64 cores).
+If the architecture is not specified, `dstack` tries to infer it from the `gpu` specification
+using `x86` as the fallback value.
+
 The `gpu` property allows specifying not only memory size but also GPU vendor, names
 and their quantity. Examples: `nvidia` (one NVIDIA GPU), `A100` (one A100), `A10G,A100` (either A10G or A100),
 `A100:80GB` (one A100 of 80GB), `A100:2` (two A100), `24GB..40GB:2` (two GPUs between 24GB and 40GB),
 `A100:40GB:2` (two A100 GPUs of 40GB).
+If the vendor is not specified, `dstack` tries to infer it from the GPU name using `nvidia` as the fallback value.
 
 ??? info "Google Cloud TPU"
     To use TPUs, specify its architecture via the `gpu` property.
@@ -217,7 +233,7 @@ and their quantity. Examples: `nvidia` (one NVIDIA GPU), `A100` (one A100), `A10
     # The name is optional, if not specified, generated randomly
     name: train    
     
-    python: "3.10"
+    python: 3.12
     
     # Commands of the task
     commands:
@@ -251,7 +267,7 @@ type: task
 name: train    
 
 # If `image` is not specified, dstack uses its base image
-python: "3.10"
+python: 3.12
 
 # Commands of the task
 commands:
@@ -272,7 +288,7 @@ commands:
     name: train    
 
     # If `image` is not specified, dstack uses its base image
-    python: "3.10"
+    python: 3.12
     # Ensure nvcc is installed (req. for Flash Attention) 
     nvcc: true
     
@@ -339,7 +355,7 @@ type: task
 # The name is optional, if not specified, generated randomly
 name: train
 
-python: "3.10"
+python: 3.12
 
 # Environment variables
 env:
@@ -371,23 +387,11 @@ If you don't assign a value to an environment variable (see `HF_TOKEN` above),
     | `DSTACK_NODE_RANK`      | The rank of the node                                             |
     | `DSTACK_MASTER_NODE_IP` | The internal IP address of the master node                          |
     | `DSTACK_NODES_IPS`      | The list of internal IP addresses of all nodes delimited by "\n" |
-
-### Spot policy
-
-By default, `dstack` uses on-demand instances. However, you can change that
-via the [`spot_policy`](../reference/dstack.yml/task.md#spot_policy) property. It accepts `spot`, `on-demand`, and `auto`.
-
-!!! info "Reference"
-    Tasks support many more configuration options,
-    incl. [`backends`](../reference/dstack.yml/task.md#backends), 
-    [`regions`](../reference/dstack.yml/task.md#regions), 
-    [`max_price`](../reference/dstack.yml/task.md#max_price), and
-    [`max_duration`](../reference/dstack.yml/task.md#max_duration), 
-    among [others](../reference/dstack.yml/task.md).
+    | `DSTACK_MPI_HOSTFILE`   | The path to a pre-populated MPI hostfile                         |
 
 ### Retry policy
 
-By default, if `dstack` can't find capacity, the task exits with an error, or the instance is interrupted, 
+By default, if `dstack` can't find capacity, or the task exits with an error, or the instance is interrupted, 
 the run will fail.
 
 If you'd like `dstack` to automatically retry, configure the 
@@ -397,14 +401,12 @@ If you'd like `dstack` to automatically retry, configure the
 
 ```yaml
 type: task
-# The name is optional, if not specified, generated randomly
 name: train    
 
-python: "3.10"
+python: 3.12
 
-# Commands of the task
 commands:
-  - pip install -r fine-tuning/qlora/requirements.txt
+  - uv pip install -r fine-tuning/qlora/requirements.txt
   - python fine-tuning/qlora/train.py
 
 retry:
@@ -416,11 +418,82 @@ retry:
 
 </div>
 
+If one job of a multi-node task fails with retry enabled,
+`dstack` will stop all the jobs and resubmit the run.
+
+### Priority
+
+Be default, submitted runs are scheduled in the order they were submitted.
+When compute resources are limited, you may want to prioritize some runs over others.
+This can be done by specifying the [`priority`](../reference/dstack.yml/task.md) property in the run configuration:
+
+<div editor-title=".dstack.yml">
+
+```yaml
+type: task
+name: train
+
+python: 3.12
+
+commands:
+  - uv pip install -r fine-tuning/qlora/requirements.txt
+  - python fine-tuning/qlora/train.py
+
+priority: 50
+```
+
+</div>
+
+`dstack` tries to provision runs with higher priority first.
+Note that if a high priority run cannot be scheduled,
+it does not block other runs with lower priority from scheduling.
+
+### Utilization policy
+
+Sometimes it’s useful to track whether a task is fully utilizing all GPUs. While you can check this with
+[`dstack metrics`](../reference/cli/dstack/metrics.md), `dstack` also lets you set a policy to auto-terminate the run if any GPU is underutilized.
+
+Below is an example of a task that auto-terminate if any GPU stays below 10% utilization for 1 hour.
+
+<div editor-title=".dstack.yml">
+
+```yaml
+type: task
+name: train
+
+python: 3.12
+commands:
+  - uv pip install -r fine-tuning/qlora/requirements.txt
+  - python fine-tuning/qlora/train.py
+
+resources:
+  gpu: H100:8
+
+utilization_policy:
+  min_gpu_utilization: 10
+  time_window: 1h
+```
+
+</div>
+
+### Spot policy
+
+By default, `dstack` uses on-demand instances. However, you can change that
+via the [`spot_policy`](../reference/dstack.yml/task.md#spot_policy) property. It accepts `spot`, `on-demand`, and `auto`.
+
 --8<-- "docs/concepts/snippets/manage-fleets.ext"
+
+!!! info "Reference"
+    Tasks support many more configuration options,
+    incl. [`backends`](../reference/dstack.yml/task.md#backends), 
+    [`regions`](../reference/dstack.yml/task.md#regions), 
+    [`max_price`](../reference/dstack.yml/task.md#max_price), and
+    [`max_duration`](../reference/dstack.yml/task.md#max_duration), 
+    among [others](../reference/dstack.yml/task.md).
 
 --8<-- "docs/concepts/snippets/manage-runs.ext"
 
 !!! info "What's next?"
     1. Read about [dev environments](dev-environments.md), [services](services.md), and [repos](repos.md)
     2. Learn how to manage [fleets](fleets.md)
-    3. Check the [Axolotl](/examples/fine-tuning/axolotl) example
+    3. Check the [Axolotl](/examples/single-node-training/axolotl) example

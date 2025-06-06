@@ -66,7 +66,7 @@ async def _delete_placement_groups(
 
 
 async def _delete_placement_group(placement_group_model: PlacementGroupModel):
-    logger.info("Deleting placement group %s", placement_group_model.name)
+    logger.debug("Deleting placement group %s", placement_group_model.name)
     placement_group = placement_group_model_to_placement_group(placement_group_model)
     if placement_group.provisioning_data is None:
         logger.error(

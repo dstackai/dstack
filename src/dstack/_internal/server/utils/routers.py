@@ -93,13 +93,10 @@ def get_server_client_error_details(error: ServerClientError) -> List[Dict]:
     return details
 
 
-def request_size_exceeded(request: Request, limit: int) -> bool:
+def get_request_size(request: Request) -> int:
     if "content-length" not in request.headers:
-        return True
-    content_length = int(request.headers["content-length"])
-    if content_length > limit:
-        return True
-    return False
+        return 0
+    return int(request.headers["content-length"])
 
 
 def check_client_server_compatibility(

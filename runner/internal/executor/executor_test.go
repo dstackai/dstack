@@ -54,10 +54,15 @@ func TestExecutor_HomeDir(t *testing.T) {
 
 func TestExecutor_NonZeroExit(t *testing.T) {
 	ex := makeTestExecutor(t)
-	ex.jobSpec.Commands = append(ex.jobSpec.Commands, "ehco 1") // note: intentional misspelling
+	ex.jobSpec.Commands = append(ex.jobSpec.Commands, "exit 100")
+	makeCodeTar(t, ex.codePath)
 
-	err := ex.execJob(context.TODO(), io.Discard)
+	err := ex.Run(context.TODO())
 	assert.Error(t, err)
+	assert.NotEmpty(t, ex.jobStateHistory)
+	exitStatus := ex.jobStateHistory[len(ex.jobStateHistory)-1].ExitStatus
+	assert.NotNil(t, exitStatus, ex.jobStateHistory)
+	assert.Equal(t, 100, *exitStatus)
 }
 
 func TestExecutor_SSHCredentials(t *testing.T) {
@@ -127,7 +132,7 @@ func TestExecutor_RemoteRepo(t *testing.T) {
 
 	var b bytes.Buffer
 	ex := makeTestExecutor(t)
-	ex.run.RepoData = schemas.RepoData{
+	ex.run.RunSpec.RepoData = schemas.RepoData{
 		RepoType:        "remote",
 		RepoBranch:      "main",
 		RepoHash:        "2b83592e506ed6fe8e49f4eaa97c3866bc9402b1",
@@ -143,7 +148,7 @@ func TestExecutor_RemoteRepo(t *testing.T) {
 
 	err = ex.execJob(context.TODO(), io.Writer(&b))
 	assert.NoError(t, err)
-	expected := fmt.Sprintf("%s\r\n%s\r\n%s\r\n", ex.run.RepoData.RepoHash, ex.run.RepoData.RepoConfigName, ex.run.RepoData.RepoConfigEmail)
+	expected := fmt.Sprintf("%s\r\n%s\r\n%s\r\n", ex.run.RunSpec.RepoData.RepoHash, ex.run.RunSpec.RepoData.RepoConfigName, ex.run.RunSpec.RepoData.RepoConfigEmail)
 	assert.Equal(t, expected, b.String())
 }
 
@@ -156,14 +161,17 @@ func makeTestExecutor(t *testing.T) *RunExecutor {
 	require.NoError(t, err)
 
 	body := schemas.SubmitBody{
-		RunSpec: schemas.RunSpec{
-			RunName:  "red-turtle-1",
-			RepoId:   "test-000000",
-			RepoData: schemas.RepoData{RepoType: "local"},
-			Configuration: schemas.Configuration{
-				Type: "task",
+		Run: schemas.Run{
+			Id: "12346",
+			RunSpec: schemas.RunSpec{
+				RunName:  "red-turtle-1",
+				RepoId:   "test-000000",
+				RepoData: schemas.RepoData{RepoType: "local"},
+				Configuration: schemas.Configuration{
+					Type: "task",
+				},
+				ConfigurationPath: ".dstack.yml",
 			},
-			ConfigurationPath: ".dstack.yml",
 		},
 		JobSpec: schemas.JobSpec{
 			Commands:    []string{"/bin/bash", "-c"},

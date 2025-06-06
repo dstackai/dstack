@@ -20,6 +20,7 @@ from dstack._internal.cli.utils.rich import MultiItemStatus
 from dstack._internal.core.errors import (
     CLIError,
     ConfigurationError,
+    MethodNotAllowedError,
     ResourceNotExistsError,
     ServerClientError,
     URLNotFoundError,
@@ -321,7 +322,7 @@ def _print_plan_header(plan: FleetPlan):
             offer.instance.name,
             resources.pretty_format(),
             "yes" if resources.spot else "no",
-            f"${offer.price:g}",
+            f"${offer.price:3f}".rstrip("0").rstrip("."),
             availability,
             style=None if index == 1 else "secondary",
         )
@@ -367,7 +368,7 @@ def _apply_plan(api: Client, plan: FleetPlan) -> Fleet:
             project_name=api.project,
             plan=plan,
         )
-    except URLNotFoundError:
+    except (URLNotFoundError, MethodNotAllowedError):
         # TODO: Remove in 0.20
         return api.client.fleets.create(
             project_name=api.project,

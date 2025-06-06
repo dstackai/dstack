@@ -1,60 +1,136 @@
-import { useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
-import { SelectCSDProps } from 'components';
+import type { PropertyFilterProps } from 'components';
 
-import { useLocalStorageState } from 'hooks/useLocalStorageState';
 import { useProjectFilter } from 'hooks/useProjectFilter';
 
 type Args = {
     localStorePrefix: string;
-    projectSearchKey?: string;
-    selectedProject?: string;
 };
 
-export const useFilters = ({ localStorePrefix, projectSearchKey }: Args) => {
-    const [searchParams] = useSearchParams();
-    const { selectedProject, setSelectedProject, projectOptions } = useProjectFilter({ localStorePrefix });
-    const [onlyActive, setOnlyActive] = useLocalStorageState<boolean>(`${localStorePrefix}-is-active`, false);
+type RequestParamsKeys = keyof Pick<TRunsRequestParams, 'only_active' | 'project_name' | 'username'>;
 
-    const setSelectedOptionFromParams = (
-        searchKey: string,
-        options: SelectCSDProps.Options | null,
-        set: (option: SelectCSDProps.Option) => void,
-    ) => {
-        const searchValue = searchParams.get(searchKey);
+const FilterKeys: Record<string, RequestParamsKeys> = {
+    PROJECT_NAME: 'project_name',
+    USER_NAME: 'username',
+    ACTIVE: 'only_active',
+};
 
-        if (!searchValue || !options?.length) return;
+const EMPTY_QUERY: PropertyFilterProps.Query = {
+    tokens: [],
+    operation: 'and',
+};
+
+const tokensToRequestParams = (tokens: PropertyFilterProps.Query['tokens']) => {
+    return tokens.reduce((acc, token) => {
+        if (token.propertyKey) {
+            acc[token.propertyKey as RequestParamsKeys] = token.value;
+        }
+
+        return acc;
+    }, {} as Record<RequestParamsKeys, string>);
+};
+
+export const useFilters = ({ localStorePrefix }: Args) => {
+    const [searchParams, setSearchParams] = useSearchParams();
+    const { projectOptions } = useProjectFilter({ localStorePrefix });
+
+    const [propertyFilterQuery, setPropertyFilterQuery] = useState<PropertyFilterProps.Query>(() => {
+        const tokens = [];
 
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-ignore
-        const selectedOption = options.find((option) => option?.value === searchValue);
+        for (const [paramKey, paramValue] of searchParams.entries()) {
+            if (Object.values(FilterKeys).includes(paramKey)) {
+                tokens.push({ propertyKey: paramKey, operator: '=', value: paramValue });
+            }
+        }
 
-        if (selectedOption) set(selectedOption);
+        if (!tokens.length) {
+            return EMPTY_QUERY;
+        }
+
+        return {
+            ...EMPTY_QUERY,
+            tokens,
+        };
+    });
+
+    const clearFilter = () => {
+        setSearchParams({});
+        setPropertyFilterQuery(EMPTY_QUERY);
     };
 
-    useEffect(() => {
-        if (!projectSearchKey) return;
+    const filteringOptions = useMemo(() => {
+        const options: PropertyFilterProps.FilteringOption[] = [];
 
-        setSelectedOptionFromParams(projectSearchKey, projectOptions, setSelectedProject);
-    }, [searchParams, projectSearchKey, projectOptions]);
+        projectOptions.forEach(({ value }) => {
+            if (value)
+                options.push({
+                    propertyKey: FilterKeys.PROJECT_NAME,
+                    value,
+                });
+        });
 
-    const clearSelected = () => {
-        setSelectedProject(null);
-        setOnlyActive(false);
+        options.push({
+            propertyKey: FilterKeys.ACTIVE,
+            value: 'True',
+        });
+
+        return options;
+    }, [projectOptions]);
+
+    const filteringProperties = [
+        {
+            key: FilterKeys.PROJECT_NAME,
+            operators: ['='],
+            propertyLabel: 'Project',
+            groupValuesLabel: 'Project values',
+        },
+        {
+            key: FilterKeys.USER_NAME,
+            operators: ['='],
+            propertyLabel: 'Username',
+        },
+        {
+            key: FilterKeys.ACTIVE,
+            operators: ['='],
+            propertyLabel: 'Only active',
+            groupValuesLabel: 'Active values',
+        },
+    ];
+
+    const onChangePropertyFilter: PropertyFilterProps['onChange'] = ({ detail }) => {
+        const { tokens, operation } = detail;
+
+        const filteredTokens = tokens.filter((token, tokenIndex) => {
+            return !tokens.some((item, index) => token.propertyKey === item.propertyKey && index > tokenIndex);
+        });
+
+        setSearchParams(tokensToRequestParams(filteredTokens));
+
+        setPropertyFilterQuery({
+            operation,
+            tokens: filteredTokens,
+        });
     };
 
-    const setSelectedProjectHandle = (project: SelectCSDProps.Option | null) => {
-        setSelectedProject(project);
-        setOnlyActive(false);
-    };
+    const filteringRequestParams = useMemo(() => {
+        const params = tokensToRequestParams(propertyFilterQuery.tokens);
+
+        return {
+            ...params,
+            only_active: params.only_active === 'True',
+        };
+    }, [propertyFilterQuery]);
 
     return {
-        projectOptions,
-        selectedProject,
-        setSelectedProject: setSelectedProjectHandle,
-        onlyActive,
-        setOnlyActive,
-        clearSelected,
+        filteringRequestParams,
+        clearFilter,
+        propertyFilterQuery,
+        onChangePropertyFilter,
+        filteringOptions,
+        filteringProperties,
     } as const;
 };

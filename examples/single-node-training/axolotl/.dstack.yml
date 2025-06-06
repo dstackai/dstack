@@ -1,0 +1,28 @@
+type: task
+# The name is optional, if not specified, generated randomly
+name: axolotl-nvidia-llama-scout-train
+
+# Using the official Axolotl's Docker image
+image: axolotlai/axolotl:main-latest
+
+# Required environment variables
+env:
+  - HF_TOKEN
+  - WANDB_API_KEY
+  - WANDB_PROJECT
+  - HUB_MODEL_ID
+# Commands of the task
+commands:
+  - wget https://raw.githubusercontent.com/axolotl-ai-cloud/axolotl/main/examples/llama-4/scout-qlora-flexattn-fsdp2.yaml
+  - | 
+    axolotl train scout-qlora-flexattn-fsdp2.yaml \
+      --wandb-project $WANDB_PROJECT \
+      --wandb-name $DSTACK_RUN_NAME \
+      --hub-model-id $HUB_MODEL_ID
+
+resources:
+  # Four GPU (required by FSDP)
+  gpu: H100:4
+  # Shared memory size for inter-process communication
+  shm_size: 64GB
+  disk: 500GB..

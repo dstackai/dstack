@@ -99,66 +99,6 @@ init:
 
 </div>
 
-### Inactivity duration
-
-Set [`inactivity_duration`](../reference/dstack.yml/dev-environment.md#inactivity_duration)
-to automatically stop the dev environment after a configured period of inactivity.
-
-<div editor-title=".dstack.yml">
-
-```yaml
-type: dev-environment
-name: vscode
-ide: vscode
-
-# Stop if inactive for 2 hours
-inactivity_duration: 2h
-```
-
-</div>
-
-The dev environment becomes inactive when you close the remote VS Code window,
-close any `ssh <run name>` shells, and stop the `dstack apply` or `dstack attach` command.
-If you go offline without stopping anything manually, the dev environment will also become inactive
-within about 3 minutes.
-
-If `inactivity_duration` is configured for your dev environment, you can see how long
-it has been inactive in `dstack ps --verbose`.
-
-<div class="termy">
-
-```shell
-$ dstack ps --verbose
- NAME    BACKEND  RESOURCES       PRICE    STATUS                 SUBMITTED
- vscode  cudo     2xCPU, 8GB,     $0.0286  running                8 mins ago
-                  100.0GB (disk)           (inactive for 2m 34s)
-```
-
-</div>
-
-If you reattach to the dev environment using [`dstack attach`](../reference/cli/dstack/attach.md),
-the inactivity timer will be reset within a few seconds.
-
-??? info "In-place update"
-    As long as the configuration defines the `name` property, the value of `inactivity_duration`
-    can be changed for a running dev environment without a restart.
-    Just change the value in the configuration and run `dstack apply` again.
-
-    <div class="termy">
-
-    ```shell
-    $ dstack apply -f .dstack.yml
-
-    Detected configuration changes that can be updated in-place: ['inactivity_duration']
-    Update the run? [y/n]:
-    ```
-
-    </div>
-
-> `inactivity_duration` is not to be confused with [`idle_duration`](#idle-duration).
-> The latter determines how soon the underlying cloud instance will be terminated
-> _after_ the dev environment is stopped.
-
 ### Resources
 
 When you specify a resource value like `cpu` or `memory`,
@@ -175,6 +115,8 @@ name: vscode
 ide: vscode
 
 resources:
+  # 16 or more x86_64 cores
+  cpu: 16..
   # 200GB or more RAM
   memory: 200GB..
   # 4 GPUs from 40GB to 80GB
@@ -187,10 +129,16 @@ resources:
 
 </div>
 
+The `cpu` property also allows you to specify the CPU architecture, `x86` or `arm`. Examples:
+`x86:16` (16 x86-64 cores), `arm:8..` (at least 8 ARM64 cores).
+If the architecture is not specified, `dstack` tries to infer it from the `gpu` specification
+using `x86` as the fallback value.
+
 The `gpu` property allows specifying not only memory size but also GPU vendor, names
 and their quantity. Examples: `nvidia` (one NVIDIA GPU), `A100` (one A100), `A10G,A100` (either A10G or A100),
 `A100:80GB` (one A100 of 80GB), `A100:2` (two A100), `24GB..40GB:2` (two GPUs between 24GB and 40GB),
 `A100:40GB:2` (two A100 GPUs of 40GB).
+If the vendor is not specified, `dstack` tries to infer it from the GPU name using `nvidia` as the fallback value.
 
 ??? info "Google Cloud TPU"
     To use TPUs, specify its architecture via the `gpu` property.
@@ -299,19 +247,6 @@ If you don't assign a value to an environment variable (see `HF_TOKEN` above),
     | `DSTACK_REPO_ID`        | The ID of the repo                      |
     | `DSTACK_GPUS_NUM`       | The total number of GPUs in the run     |
 
-### Spot policy
-
-By default, `dstack` uses on-demand instances. However, you can change that
-via the [`spot_policy`](../reference/dstack.yml/dev-environment.md#spot_policy) property. It accepts `spot`, `on-demand`, and `auto`.
-
-!!! info "Reference"
-    Dev environments support many more configuration options,
-    incl. [`backends`](../reference/dstack.yml/dev-environment.md#backends), 
-    [`regions`](../reference/dstack.yml/dev-environment.md#regions), 
-    [`max_price`](../reference/dstack.yml/dev-environment.md#max_price), and
-    [`max_duration`](../reference/dstack.yml/dev-environment.md#max_duration), 
-    among [others](../reference/dstack.yml/dev-environment.md).
-
 ### Retry policy
 
 By default, if `dstack` can't find capacity or the instance is interrupted, the run will fail.
@@ -337,7 +272,107 @@ retry:
 
 </div>
 
+### Inactivity duration
+
+Set [`inactivity_duration`](../reference/dstack.yml/dev-environment.md#inactivity_duration)
+to automatically stop the dev environment after a configured period of inactivity.
+
+<div editor-title=".dstack.yml">
+
+```yaml
+type: dev-environment
+name: vscode
+ide: vscode
+
+# Stop if inactive for 2 hours
+inactivity_duration: 2h
+```
+
+</div>
+
+The dev environment becomes inactive when you close the remote VS Code window,
+close any `ssh <run name>` shells, and stop the `dstack apply` or `dstack attach` command.
+If you go offline without stopping anything manually, the dev environment will also become inactive
+within about 3 minutes.
+
+If `inactivity_duration` is configured for your dev environment, you can see how long
+it has been inactive in `dstack ps --verbose`.
+
+<div class="termy">
+
+```shell
+$ dstack ps --verbose
+ NAME    BACKEND  RESOURCES       PRICE    STATUS                 SUBMITTED
+ vscode  cudo     2xCPU, 8GB,     $0.0286  running                8 mins ago
+                  100.0GB (disk)           (inactive for 2m 34s)
+```
+
+</div>
+
+If you reattach to the dev environment using [`dstack attach`](../reference/cli/dstack/attach.md),
+the inactivity timer will be reset within a few seconds.
+
+??? info "In-place update"
+    As long as the configuration defines the `name` property, the value of `inactivity_duration`
+    can be changed for a running dev environment without a restart.
+    Just change the value in the configuration and run `dstack apply` again.
+
+    <div class="termy">
+
+    ```shell
+    $ dstack apply -f .dstack.yml
+
+    Detected configuration changes that can be updated in-place: ['inactivity_duration']
+    Update the run? [y/n]:
+    ```
+
+    </div>
+
+> `inactivity_duration` is not to be confused with [`idle_duration`](#idle-duration).
+> The latter determines how soon the underlying cloud instance will be terminated
+> _after_ the dev environment is stopped.
+
+### Utilization policy
+
+Sometimes it’s useful to track whether a dev environment is fully utilizing all GPUs. While you can check this with
+[`dstack metrics`](../reference/cli/dstack/metrics.md), `dstack` also lets you set a policy to auto-terminate the run if any GPU is underutilized.
+
+Below is an example of a dev environment that auto-terminate if any GPU stays below 10% utilization for 1 hour.
+
+<div editor-title=".dstack.yml">
+
+```yaml
+type: dev-environment
+name: my-dev
+
+python: 3.12
+ide: cursor
+
+resources:
+  gpu: H100:8
+
+utilization_policy:
+  min_gpu_utilization: 10
+  time_window: 1h
+```
+
+</div>
+
+### Spot policy
+
+By default, `dstack` uses on-demand instances. However, you can change that
+via the [`spot_policy`](../reference/dstack.yml/dev-environment.md#spot_policy) property. It accepts `spot`, `on-demand`, and `auto`.
+
 --8<-- "docs/concepts/snippets/manage-fleets.ext"
+
+!!! info "Reference"
+    Dev environments support many more configuration options,
+    incl. [`backends`](../reference/dstack.yml/dev-environment.md#backends), 
+    [`regions`](../reference/dstack.yml/dev-environment.md#regions), 
+    [`max_price`](../reference/dstack.yml/dev-environment.md#max_price), and
+    [`max_duration`](../reference/dstack.yml/dev-environment.md#max_duration), 
+    among [others](../reference/dstack.yml/dev-environment.md).
+
 
 --8<-- "docs/concepts/snippets/manage-runs.ext"
 

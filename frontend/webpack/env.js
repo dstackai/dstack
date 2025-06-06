@@ -1,8 +1,8 @@
-const {join} = require('path');
+const { join } = require('path');
 
-const apiURLs = '/api'
+const apiURLs = '/api';
 
-const publicURLs = '/'
+const publicURLs = '/';
 
 const environment = process.env.NODE_ENV || 'production';
 const isProd = environment === 'production';
@@ -17,10 +17,10 @@ const apiUrl = process.env.API_URL || apiURLs;
 const publicUrl = process.env.PUBLIC_URL || publicURLs;
 const uiVersion = process.env.UI_VERSION === 'sky' ? 'sky' : 'enterprise';
 
-
-const title = uiVersion === 'enterprise' ? "dstack" : "dstack Sky";
-const description = "Get GPUs at the best prices and availability from a wide range of providers. No cloud " +
-    "account of your own is required.\n";
+const title = uiVersion === 'enterprise' ? 'dstack' : 'dstack Sky';
+const description =
+    'Get GPUs at the best prices and availability from a wide range of providers. No cloud ' +
+    'account of your own is required.\n';
 
 module.exports = {
     environment,
@@ -37,4 +37,4 @@ module.exports = {
     title,
     description,
     uiVersion,
-}
+};

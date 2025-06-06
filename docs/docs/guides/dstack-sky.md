@@ -15,8 +15,8 @@ Then, install the CLI on your machine and use the copied command.
 
 ```shell
 $ pip install dstack
-$ dstack config --url https://sky.dstack.ai \
-    --project peterschmidt85 \
+$ dstack project add --name peterschmidt85 \
+    --url https://sky.dstack.ai \
     --token bbae0f28-d3dd-4820-bf61-8f4bb40815da
     
 Configuration is updated at ~/.dstack/config.yml

@@ -287,12 +287,13 @@ jobs:
           python-version: 3.11
       - name: Install dstack
         run: |
-          uv sync --extra server
+          uv pip install examples/plugins/example_plugin_server
+          uv pip install -e '.[server]'
       # Move these deps into an extra and install that way
       - name: Build
         run: |
           uv pip install pillow cairosvg
-          sudo apt-get install -y libcairo2-dev libfreetype6-dev libffi-dev libjpeg-dev libpng-dev libz-dev
+          sudo apt-get update && sudo apt-get install -y libcairo2-dev libfreetype6-dev libffi-dev libjpeg-dev libpng-dev libz-dev
           uv pip install mkdocs-material "mkdocs-material[imaging]" mkdocs-material-extensions mkdocs-redirects mkdocs-gen-files "mkdocstrings[python]" mkdocs-render-swagger-plugin --upgrade
           uv pip install git+https://${{ secrets.GH_TOKEN }}@github.com/squidfunk/mkdocs-material-insiders.git
           uv run mkdocs build -s

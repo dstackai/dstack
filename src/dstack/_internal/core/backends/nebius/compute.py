@@ -1,4 +1,5 @@
 import json
+import random
 import shlex
 import time
 from functools import cached_property
@@ -13,13 +14,19 @@ from dstack._internal.core.backends.base.backend import Compute
 from dstack._internal.core.backends.base.compute import (
     ComputeWithCreateInstanceSupport,
     ComputeWithMultinodeSupport,
+    ComputeWithPlacementGroupSupport,
     generate_unique_instance_name,
     get_user_data,
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.nebius import resources
+from dstack._internal.core.backends.nebius.fabrics import get_suitable_infiniband_fabrics
 from dstack._internal.core.backends.nebius.models import NebiusConfig, NebiusServiceAccountCreds
-from dstack._internal.core.errors import BackendError, NotYetTerminated, ProvisioningError
+from dstack._internal.core.errors import (
+    BackendError,
+    NotYetTerminated,
+    ProvisioningError,
+)
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.instances import (
@@ -27,6 +34,11 @@ from dstack._internal.core.models.instances import (
     InstanceConfiguration,
     InstanceOffer,
     InstanceOfferWithAvailability,
+)
+from dstack._internal.core.models.placement import (
+    PlacementGroup,
+    PlacementGroupProvisioningData,
+    PlacementStrategy,
 )
 from dstack._internal.core.models.resources import Memory, Range
 from dstack._internal.core.models.runs import JobProvisioningData, Requirements
@@ -72,6 +84,7 @@ SUPPORTED_PLATFORMS = [
 class NebiusCompute(
     ComputeWithCreateInstanceSupport,
     ComputeWithMultinodeSupport,
+    ComputeWithPlacementGroupSupport,
     Compute,
 ):
     def __init__(self, config: NebiusConfig):
@@ -121,6 +134,7 @@ class NebiusCompute(
         self,
         instance_offer: InstanceOfferWithAvailability,
         instance_config: InstanceConfiguration,
+        placement_group: Optional[PlacementGroup],
     ) -> JobProvisioningData:
         # NOTE: This method can block for a long time as it waits for the boot disk to be created
         # and the instance to enter the STARTING state. This has to be done in create_instance so
@@ -128,6 +142,14 @@ class NebiusCompute(
         # instance.
         instance_name = generate_unique_instance_name(instance_config)
         platform, preset = instance_offer.instance.name.split()
+        cluster_id = None
+        if placement_group:
+            assert placement_group.provisioning_data is not None
+            backend_data = NebiusPlacementGroupBackendData.load(
+                placement_group.provisioning_data.backend_data
+            )
+            if backend_data.cluster is not None:
+                cluster_id = backend_data.cluster.id
         create_disk_op = resources.create_disk(
             sdk=self._sdk,
             name=instance_name,
@@ -155,6 +177,7 @@ class NebiusCompute(
                 ),
                 platform=platform,
                 preset=preset,
+                cluster_id=cluster_id,
                 disk_id=create_disk_op.resource_id,
                 subnet_id=self._get_subnet_id(instance_offer.region),
             )
@@ -230,12 +253,83 @@ class NebiusCompute(
         with resources.ignore_errors([StatusCode.NOT_FOUND]):
             resources.delete_disk(self._sdk, backend_data_parsed.boot_disk_id)
 
+    def create_placement_group(
+        self,
+        placement_group: PlacementGroup,
+        master_instance_offer: InstanceOffer,
+    ) -> PlacementGroupProvisioningData:
+        assert placement_group.configuration.placement_strategy == PlacementStrategy.CLUSTER
+        backend_data = NebiusPlacementGroupBackendData(cluster=None)
+        # Only create a Nebius cluster if the instance supports it.
+        # For other instances, return dummy PlacementGroupProvisioningData.
+        if fabrics := get_suitable_infiniband_fabrics(
+            master_instance_offer, allowed_fabrics=self.config.fabrics
+        ):
+            fabric = random.choice(fabrics)
+            op = resources.create_cluster(
+                self._sdk,
+                name=placement_group.name,
+                project_id=self._region_to_project_id[placement_group.configuration.region],
+                fabric=fabric,
+            )
+            backend_data.cluster = NebiusClusterBackendData(id=op.resource_id, fabric=fabric)
+        return PlacementGroupProvisioningData(
+            backend=BackendType.NEBIUS,
+            backend_data=backend_data.json(),
+        )
+
+    def delete_placement_group(self, placement_group: PlacementGroup) -> None:
+        assert placement_group.provisioning_data is not None
+        backend_data = NebiusPlacementGroupBackendData.load(
+            placement_group.provisioning_data.backend_data
+        )
+        if backend_data.cluster is not None:
+            with resources.ignore_errors([StatusCode.NOT_FOUND]):
+                resources.delete_cluster(self._sdk, backend_data.cluster.id)
+
+    def is_suitable_placement_group(
+        self,
+        placement_group: PlacementGroup,
+        instance_offer: InstanceOffer,
+    ) -> bool:
+        if not (
+            placement_group.configuration.backend == BackendType.NEBIUS
+            and placement_group.configuration.region == instance_offer.region
+        ):
+            return False
+        assert placement_group.provisioning_data is not None
+        backend_data = NebiusPlacementGroupBackendData.load(
+            placement_group.provisioning_data.backend_data
+        )
+        return (
+            backend_data.cluster is None
+            or backend_data.cluster.fabric
+            in get_suitable_infiniband_fabrics(
+                instance_offer,
+                allowed_fabrics=None,  # enforced at cluster creation time, no need to enforce here
+            )
+        )
+
 
 class NebiusInstanceBackendData(CoreModel):
     boot_disk_id: str
 
     @classmethod
     def load(cls, raw: Optional[str]) -> "NebiusInstanceBackendData":
+        assert raw is not None
+        return cls.__response__.parse_raw(raw)
+
+
+class NebiusClusterBackendData(CoreModel):
+    id: str
+    fabric: str
+
+
+class NebiusPlacementGroupBackendData(CoreModel):
+    cluster: Optional[NebiusClusterBackendData]
+
+    @classmethod
+    def load(cls, raw: Optional[str]) -> "NebiusPlacementGroupBackendData":
         assert raw is not None
         return cls.__response__.parse_raw(raw)
 

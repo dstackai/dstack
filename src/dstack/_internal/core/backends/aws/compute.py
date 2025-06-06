@@ -159,6 +159,7 @@ class AWSCompute(
         self,
         instance_offer: InstanceOfferWithAvailability,
         instance_config: InstanceConfiguration,
+        placement_group: Optional[PlacementGroup],
     ) -> JobProvisioningData:
         project_name = instance_config.project_name
         ec2_resource = self.session.resource("ec2", region_name=instance_offer.region)
@@ -248,7 +249,7 @@ class AWSCompute(
                         spot=instance_offer.instance.resources.spot,
                         subnet_id=subnet_id,
                         allocate_public_ip=allocate_public_ip,
-                        placement_group_name=instance_config.placement_group_name,
+                        placement_group_name=placement_group.name if placement_group else None,
                         enable_efa=enable_efa,
                         max_efa_interfaces=max_efa_interfaces,
                         reservation_id=instance_config.reservation,
@@ -291,6 +292,7 @@ class AWSCompute(
     def create_placement_group(
         self,
         placement_group: PlacementGroup,
+        master_instance_offer: InstanceOffer,
     ) -> PlacementGroupProvisioningData:
         ec2_client = self.session.client("ec2", region_name=placement_group.configuration.region)
         logger.debug("Creating placement group %s...", placement_group.name)
@@ -322,6 +324,16 @@ class AWSCompute(
             else:
                 raise e
         logger.debug("Deleted placement group %s", placement_group.name)
+
+    def is_suitable_placement_group(
+        self,
+        placement_group: PlacementGroup,
+        instance_offer: InstanceOffer,
+    ) -> bool:
+        return (
+            placement_group.configuration.backend == BackendType.AWS
+            and placement_group.configuration.region == instance_offer.region
+        )
 
     def create_gateway(
         self,
@@ -599,9 +611,12 @@ class AWSCompute(
                 raise e
         logger.debug("Deleted EBS volume %s", volume.configuration.name)
 
-    def attach_volume(self, volume: Volume, instance_id: str) -> VolumeAttachmentData:
+    def attach_volume(
+        self, volume: Volume, provisioning_data: JobProvisioningData
+    ) -> VolumeAttachmentData:
         ec2_client = self.session.client("ec2", region_name=volume.configuration.region)
 
+        instance_id = provisioning_data.instance_id
         device_names = aws_resources.list_available_device_names(
             ec2_client=ec2_client, instance_id=instance_id
         )
@@ -634,9 +649,12 @@ class AWSCompute(
         logger.debug("Attached EBS volume %s to instance %s", volume.volume_id, instance_id)
         return VolumeAttachmentData(device_name=device_name)
 
-    def detach_volume(self, volume: Volume, instance_id: str, force: bool = False):
+    def detach_volume(
+        self, volume: Volume, provisioning_data: JobProvisioningData, force: bool = False
+    ):
         ec2_client = self.session.client("ec2", region_name=volume.configuration.region)
 
+        instance_id = provisioning_data.instance_id
         logger.debug("Detaching EBS volume %s from instance %s", volume.volume_id, instance_id)
         attachment_data = get_or_error(volume.get_attachment_data_for_instance(instance_id))
         try:
@@ -655,9 +673,10 @@ class AWSCompute(
             raise e
         logger.debug("Detached EBS volume %s from instance %s", volume.volume_id, instance_id)
 
-    def is_volume_detached(self, volume: Volume, instance_id: str) -> bool:
+    def is_volume_detached(self, volume: Volume, provisioning_data: JobProvisioningData) -> bool:
         ec2_client = self.session.client("ec2", region_name=volume.configuration.region)
 
+        instance_id = provisioning_data.instance_id
         logger.debug("Getting EBS volume %s status", volume.volume_id)
         response = ec2_client.describe_volumes(VolumeIds=[volume.volume_id])
         volumes_infos = response.get("Volumes")
@@ -807,18 +826,23 @@ def _get_regions_to_zones(session: boto3.Session, regions: List[str]) -> Dict[st
 
 def _supported_instances(offer: InstanceOffer) -> bool:
     for family in [
+        "m7i.",
+        "c7i.",
+        "r7i.",
+        "t3.",
         "t2.small",
         "c5.",
         "m5.",
-        "g4dn.",
-        "g5.",
+        "p5.",
+        "p5e.",
+        "p4d.",
+        "p4de.",
+        "p3.",
         "g6.",
         "g6e.",
         "gr6.",
-        "p3.",
-        "p4d.",
-        "p4de.",
-        "p5.",
+        "g5.",
+        "g4dn.",
     ]:
         if offer.instance.name.startswith(family):
             return True
