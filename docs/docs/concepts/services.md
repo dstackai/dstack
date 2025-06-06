@@ -14,13 +14,13 @@ type: service
 name: llama31
 
 # If `image` is not specified, dstack uses its default image
-python: "3.11"
+python: 3.12
 env:
   - HF_TOKEN
   - MODEL_ID=meta-llama/Meta-Llama-3.1-8B-Instruct
   - MAX_MODEL_LEN=4096
 commands:
-  - pip install vllm
+  - uv pip install vllm
   - vllm serve $MODEL_ID
     --max-model-len $MAX_MODEL_LEN
     --tensor-parallel-size $DSTACK_GPUS_NUM
@@ -128,13 +128,13 @@ type: service
 # The name is optional, if not specified, generated randomly
 name: llama31-service
 
-python: "3.10"
+python: 3.12
 
 # Required environment variables
 env:
   - HF_TOKEN
 commands:
-  - pip install vllm
+  - uv pip install vllm
   - vllm serve meta-llama/Meta-Llama-3.1-8B-Instruct --max-model-len 4096
 # Expose the port of the service
 port: 8000
@@ -184,7 +184,7 @@ name: http-server-service
 # Disable authorization
 auth: false
 
-python: "3.10"
+python: 3.12
 
 # Commands of the service
 commands:
@@ -220,7 +220,7 @@ env:
   - DASH_ROUTES_PATHNAME_PREFIX=/proxy/services/main/dash/
 
 commands:
-  - pip install dash
+  - uv pip install dash
   # Assuming the Dash app is in your repo at app.py
   - python app.py
 
@@ -303,11 +303,11 @@ type: service
 # The name is optional, if not specified, generated randomly
 name: llama31-service
 
-python: "3.10"
+python: 3.12
 
 # Commands of the service
 commands:
-  - pip install vllm
+  - uv pip install vllm
   - python -m vllm.entrypoints.openai.api_server
     --model mistralai/Mixtral-8X7B-Instruct-v0.1
     --host 0.0.0.0
@@ -384,7 +384,7 @@ type: service
 name: http-server-service    
 
 # If `image` is not specified, dstack uses its base image
-python: "3.10"
+python: 3.12
 
 # Commands of the service
 commands:
@@ -407,7 +407,7 @@ port: 8000
     name: http-server-service    
     
     # If `image` is not specified, dstack uses its base image
-    python: "3.10"
+    python: 3.12
     # Ensure nvcc is installed (req. for Flash Attention) 
     nvcc: true
 
@@ -480,7 +480,7 @@ type: service
 # The name is optional, if not specified, generated randomly
 name: llama-2-7b-service
 
-python: "3.10"
+python: 3.12
 
 # Environment variables
 env:
@@ -488,7 +488,7 @@ env:
   - MODEL=NousResearch/Llama-2-7b-chat-hf
 # Commands of the service
 commands:
-  - pip install vllm
+  - uv pip install vllm
   - python -m vllm.entrypoints.openai.api_server --model $MODEL --port 8000
 # The port of the service
 port: 8000
@@ -511,18 +511,6 @@ resources:
     | `DSTACK_RUN_NAME`       | The name of the run                     |
     | `DSTACK_REPO_ID`        | The ID of the repo                      |
     | `DSTACK_GPUS_NUM`       | The total number of GPUs in the run     |
-
-### Spot policy
-
-By default, `dstack` uses on-demand instances. However, you can change that
-via the [`spot_policy`](../reference/dstack.yml/service.md#spot_policy) property. It accepts `spot`, `on-demand`, and `auto`.
-
-!!! info "Reference"
-    Services support many more configuration options,
-    incl. [`backends`](../reference/dstack.yml/service.md#backends), 
-    [`regions`](../reference/dstack.yml/service.md#regions), 
-    [`max_price`](../reference/dstack.yml/service.md#max_price), and
-    among [others](../reference/dstack.yml/service.md).
 
 ### Retry policy
 
@@ -550,7 +538,51 @@ retry:
 If one replica of a multi-replica service fails with retry enabled,
 `dstack` will resubmit only the failed replica while keeping active replicas running.
 
+### Spot policy
+
+By default, `dstack` uses on-demand instances. However, you can change that
+via the [`spot_policy`](../reference/dstack.yml/service.md#spot_policy) property. It accepts `spot`, `on-demand`, and `auto`.
+
+### Utilization policy
+
+Sometimes it’s useful to track whether a service is fully utilizing all GPUs. While you can check this with
+[`dstack metrics`](../reference/cli/dstack/metrics.md), `dstack` also lets you set a policy to auto-terminate the run if any GPU is underutilized.
+
+Below is an example of a service that auto-terminate if any GPU stays below 10% utilization for 1 hour.
+
+<div editor-title=".dstack.yml">
+
+```yaml
+type: service
+name: llama-2-7b-service
+
+python: 3.12
+env:
+  - HF_TOKEN
+  - MODEL=NousResearch/Llama-2-7b-chat-hf
+commands:
+  - uv pip install vllm
+  - python -m vllm.entrypoints.openai.api_server --model $MODEL --port 8000
+port: 8000
+
+resources:
+  gpu: 24GB
+
+utilization_policy:
+  min_gpu_utilization: 10
+  time_window: 1h
+```
+
+</div>
+
 --8<-- "docs/concepts/snippets/manage-fleets.ext"
+
+!!! info "Reference"
+    Services support many more configuration options,
+    incl. [`backends`](../reference/dstack.yml/service.md#backends), 
+    [`regions`](../reference/dstack.yml/service.md#regions), 
+    [`max_price`](../reference/dstack.yml/service.md#max_price), and
+    among [others](../reference/dstack.yml/service.md).
 
 --8<-- "docs/concepts/snippets/manage-runs.ext"
 

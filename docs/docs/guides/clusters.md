@@ -1,6 +1,6 @@
 # Clusters
 
-A cluster is a fleet with its `placement` set to `cluster`. This configuration ensures that the instances within the fleet are interconnected, enabling fast inter-node communication—crucial for tasks such as efficient distributed training.
+A cluster is a [fleet](../concepts/fleets.md) with its `placement` set to `cluster`. This configuration ensures that the instances within the fleet are interconnected, enabling fast inter-node communication—crucial for tasks such as efficient distributed training.
 
 ## Fleets
 
@@ -8,13 +8,13 @@ Ensure a fleet is created before you run any distributed task. This can be eithe
 
 ### SSH fleets
 
-SSH fleets can be used to create a fleet out of existing baremetals or VMs, e.g. if they are already pre-provisioned, or set up on-premises.
+[SSH fleets](../concepts/fleets.md#ssh) can be used to create a fleet out of existing baremetals or VMs, e.g. if they are already pre-provisioned, or set up on-premises.
 
 > For SSH fleets, fast interconnect is supported provided that the hosts are pre-configured with the appropriate interconnect drivers.
 
 ### Cloud fleets
 
-Cloud fleets allow to provision interconnected clusters across supported backends.
+[Cloud fleets](../concepts/fleets.md#cloud) allow to provision interconnected clusters across supported backends.
 For cloud fleets, fast interconnect is currently supported only on the `aws`, `gcp`, and `nebius` backends.
 
 === "AWS"
@@ -62,20 +62,18 @@ To test the interconnect of a created fleet, ensure you run [NCCL](../../example
 
 ## Volumes
 
-### Network volumes
-
-Currently, no backend supports multi-attach network volumes for distributed tasks. However, single-attach volumes can be used by leveraging volume name [interpolation syntax](../concepts/volumes.md#distributed-tasks). This approach mounts a separate single-attach volume to each node.
-
 ### Instance volumes
 
-Instance volumes enable mounting any folder from the host into the container, allowing data persistence during distributed tasks.
+[Instance volumes](../concepts/volumes.md#instance) enable mounting any folder from the host into the container, allowing data persistence during distributed tasks.
 
 Instance volumes can be used to mount:
 
 * Regular folders (data persists only while the fleet exists)
 * Folders that are mounts of shared filesystems (e.g., manually mounted shared filesystems).
 
-Refer to [instance volumes](../concepts/volumes.md#instance) for an example.
+### Network volumes
+    
+Currently, no backend supports multi-attach [network volumes](../concepts/volumes.md#network) for distributed tasks. However, single-attach volumes can be used by leveraging volume name [interpolation syntax](../concepts/volumes.md#distributed-tasks). This approach mounts a separate single-attach volume to each node.
 
 !!! info "What's next?"
     1. Read about [distributed tasks](../concepts/tasks.md#distributed-tasks), [fleets](../concepts/fleets.md), and [volumes](../concepts/volumes.md)
