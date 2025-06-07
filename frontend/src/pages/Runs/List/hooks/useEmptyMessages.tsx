@@ -24,7 +24,7 @@ export const useEmptyMessages = ({
                     title={t('projects.run.empty_message_title')}
                     message={t('projects.run.quickstart_message_text')}
                 >
-                    <Button variant="primary" onClick={() => goToUrl(QUICK_START_URL, true)}>{t('common.quickstart')}</Button>
+                    <Button variant="primary" external onClick={() => goToUrl(QUICK_START_URL, true)}>{t('common.quickstart')}</Button>
                 </ListEmptyMessage>
             );
         }
