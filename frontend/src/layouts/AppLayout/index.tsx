@@ -155,12 +155,6 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                                 onClick: toggleTutorialPanel,
                             },
                             {
-                                href: 'theme-button',
-                                type: 'button',
-                                iconSvg: <ThemeIcon />,
-                                onClick: onChangeSystemModeToggle,
-                            },
-                            {
                                 type: 'button',
                                 text: t('common.docs'),
                                 external: true,
@@ -171,6 +165,12 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                                 text: t('common.discord'),
                                 external: true,
                                 onClick: () => goToUrl(DISCORD_URL, true),
+                            },
+                            {
+                                href: 'theme-button',
+                                type: 'button',
+                                iconSvg: <ThemeIcon />,
+                                onClick: onChangeSystemModeToggle,
                             },
                             {
                                 'data-class': 'user-menu',

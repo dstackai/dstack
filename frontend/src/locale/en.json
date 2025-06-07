@@ -319,7 +319,7 @@
       "search_placeholder": "Find runs",
       "empty_message_title": "No runs",
       "empty_message_text": "No runs to display.",
-      "quickstart_message_text": "No runs to display. Create a new one using the guide",
+      "quickstart_message_text": "Check out the quickstart guide to get started with dstack",
       "nomatch_message_title": "No matches",
       "nomatch_message_text": "We can't find a match. Try to change project or clear filter",
       "project": "Project",
