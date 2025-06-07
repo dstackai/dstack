@@ -4,7 +4,7 @@ import { useParams } from 'react-router-dom';
 import { get as _get } from 'lodash';
 import { format } from 'date-fns';
 
-import { Box, ColumnLayout, Container, Header, Loader, StatusIndicator } from 'components';
+import { Box, ColumnLayout, Container, Header, Loader, NavigateLink, StatusIndicator } from 'components';
 
 import { DATE_TIME_FORMAT } from 'consts';
 import { getRunError, getRunPriority, getRunStatusMessage, getStatusIconColor, getStatusIconType } from 'libs/run';
@@ -12,6 +12,7 @@ import { useGetRunQuery } from 'services/run';
 
 import { finishedRunStatuses } from 'pages/Runs/constants';
 
+import { ROUTES } from '../../../../routes';
 import {
     getRunListItemBackend,
     getRunListItemInstanceId,
@@ -62,7 +63,12 @@ export const RunDetails = () => {
                 <ColumnLayout columns={4} variant="text-grid">
                     <div>
                         <Box variant="awsui-key-label">{t('projects.run.project')}</Box>
-                        <div>{runData.project_name}</div>
+
+                        <div>
+                            <NavigateLink href={ROUTES.PROJECT.DETAILS.FORMAT(runData.project_name)}>
+                                {runData.project_name}
+                            </NavigateLink>
+                        </div>
                     </div>
 
                     <div>
@@ -75,7 +81,10 @@ export const RunDetails = () => {
 
                     <div>
                         <Box variant="awsui-key-label">{t('projects.run.hub_user_name')}</Box>
-                        <div>{runData.user}</div>
+
+                        <div>
+                            <NavigateLink href={ROUTES.USER.DETAILS.FORMAT(runData.user)}>{runData.user}</NavigateLink>
+                        </div>
                     </div>
 
                     <div>
