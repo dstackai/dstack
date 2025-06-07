@@ -17,6 +17,7 @@ import {
     TopNavigation,
 } from 'components';
 
+import { DISCORD_URL, DOCS_URL } from 'consts';
 import { useAppDispatch, useAppSelector } from 'hooks';
 import { goToUrl } from 'libs';
 import { ROUTES } from 'routes';
@@ -158,6 +159,18 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                                 type: 'button',
                                 iconSvg: <ThemeIcon />,
                                 onClick: onChangeSystemModeToggle,
+                            },
+                            {
+                                type: 'button',
+                                text: t('common.docs'),
+                                external: true,
+                                onClick: () => goToUrl(DOCS_URL, true),
+                            },
+                            {
+                                type: 'button',
+                                text: t('common.discord'),
+                                external: true,
+                                onClick: () => goToUrl(DISCORD_URL, true),
                             },
                             {
                                 'data-class': 'user-menu',

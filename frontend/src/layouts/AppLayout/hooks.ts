@@ -4,9 +4,7 @@ import { useLocation, useMatch } from 'react-router-dom';
 
 import { SideNavigationProps } from 'components';
 
-import { DISCORD_URL, DOCS_URL } from 'consts';
 import { useAppSelector, usePermissionGuard } from 'hooks';
-import { goToUrl } from 'libs';
 import { ROUTES } from 'routes';
 import { useGetServerInfoQuery } from 'services/server';
 import { GlobalUserRole } from 'types';
@@ -70,29 +68,6 @@ export const useSideNavigation = () => {
             type: 'section-group',
             title: t('navigation.account'),
             items: userSettingsLinks,
-        },
-
-        { type: 'divider' },
-
-        {
-            type: 'section-group',
-            title: t('navigation.resources'),
-            items: [
-                {
-                    type: 'link',
-                    text: t('common.docs'),
-                    external: true,
-                    href: DOCS_URL,
-                    // onClick: () => goToUrl(DOCS_URL, true),
-                },
-                {
-                    type: 'link',
-                    text: t('common.discord'),
-                    external: true,
-                    href: DISCORD_URL,
-                    onClick: () => goToUrl(DISCORD_URL, true),
-                },
-            ],
         },
 
         { type: 'divider' },
