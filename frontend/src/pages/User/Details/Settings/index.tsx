@@ -2,7 +2,7 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
 
-import { Box, Button, ColumnLayout, Container, Header, Loader, Popover, SpaceBetween, StatusIndicator } from 'components';
+import { Box, Button, ColumnLayout, Container, Header, Link, Loader, Popover, SpaceBetween, StatusIndicator } from 'components';
 import { PermissionGuard } from 'components/PermissionGuard';
 
 import { useAppSelector, useBreadcrumbs, usePermissionGuard } from 'hooks';
@@ -78,7 +78,7 @@ export const Settings: React.FC = () => {
 
                             <div>
                                 <Box variant="awsui-key-label">{t('users.email')}</Box>
-                                <div>{data.email ?? '-'}</div>
+                                <div>{data.email ? <Link href={`mailto:${data.email}`}>{data.email}</Link> : '-'}</div>
                             </div>
 
                             <PermissionGuard allowedGlobalRoles={[GlobalUserRole.ADMIN]}>
