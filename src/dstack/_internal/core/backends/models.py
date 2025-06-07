@@ -8,6 +8,10 @@ from dstack._internal.core.backends.azure.models import (
     AzureBackendConfig,
     AzureBackendConfigWithCreds,
 )
+from dstack._internal.core.backends.cloudrift.models import (
+    CloudRiftBackendConfig,
+    CloudRiftBackendConfigWithCreds,
+)
 from dstack._internal.core.backends.cudo.models import (
     CudoBackendConfig,
     CudoBackendConfigWithCreds,
@@ -65,6 +69,7 @@ from dstack._internal.core.models.common import CoreModel
 AnyBackendConfigWithoutCreds = Union[
     AWSBackendConfig,
     AzureBackendConfig,
+    CloudRiftBackendConfig,
     CudoBackendConfig,
     DataCrunchBackendConfig,
     GCPBackendConfig,
@@ -86,6 +91,7 @@ AnyBackendConfigWithoutCreds = Union[
 AnyBackendConfigWithCreds = Union[
     AWSBackendConfigWithCreds,
     AzureBackendConfigWithCreds,
+    CloudRiftBackendConfigWithCreds,
     CudoBackendConfigWithCreds,
     DataCrunchBackendConfigWithCreds,
     GCPBackendConfigWithCreds,
@@ -106,6 +112,7 @@ AnyBackendConfigWithCreds = Union[
 AnyBackendFileConfigWithCreds = Union[
     AWSBackendConfigWithCreds,
     AzureBackendConfigWithCreds,
+    CloudRiftBackendConfigWithCreds,
     CudoBackendConfigWithCreds,
     DataCrunchBackendConfigWithCreds,
     GCPBackendFileConfigWithCreds,
