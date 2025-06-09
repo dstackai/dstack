@@ -91,7 +91,7 @@ class TestListProjects:
             created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
             global_role=GlobalRole.USER,
         )
-        
+
         # Create a different user who is not a member
         non_member = await create_user(
             session=session,
@@ -99,7 +99,7 @@ class TestListProjects:
             created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
             global_role=GlobalRole.USER,
         )
-        
+
         # Create a public project
         public_project = await create_project(
             session=session,
@@ -108,16 +108,16 @@ class TestListProjects:
             created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
             is_public=True,
         )
-        
-        # Create a private project  
+
+        # Create a private project
         private_project = await create_project(
             session=session,
             owner=owner,
-            name="private_project", 
+            name="private_project",
             created_at=datetime(2023, 1, 2, 3, 5, tzinfo=timezone.utc),
             is_public=False,
         )
-        
+
         # Add owner as admin to both projects
         await add_project_member(
             session=session, project=public_project, user=owner, project_role=ProjectRole.ADMIN
@@ -125,9 +125,11 @@ class TestListProjects:
         await add_project_member(
             session=session, project=private_project, user=owner, project_role=ProjectRole.ADMIN
         )
-        
+
         # List projects as non-member - should only see public project
-        response = await client.post("/api/projects/list", headers=get_auth_headers(non_member.token))
+        response = await client.post(
+            "/api/projects/list", headers=get_auth_headers(non_member.token)
+        )
         assert response.status_code == 200
         projects = response.json()
 
@@ -148,7 +150,7 @@ class TestListProjects:
             created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
             global_role=GlobalRole.USER,
         )
-        
+
         # Create a user who will be a member
         member = await create_user(
             session=session,
@@ -156,7 +158,7 @@ class TestListProjects:
             created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
             global_role=GlobalRole.USER,
         )
-        
+
         # Create a public project
         public_project = await create_project(
             session=session,
@@ -165,21 +167,21 @@ class TestListProjects:
             created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
             is_public=True,
         )
-        
+
         # Create a private project
         private_project = await create_project(
             session=session,
             owner=owner,
             name="private_project",
-            created_at=datetime(2023, 1, 2, 3, 5, tzinfo=timezone.utc), 
+            created_at=datetime(2023, 1, 2, 3, 5, tzinfo=timezone.utc),
             is_public=False,
         )
-        
+
         # Add member to the private project only
         await add_project_member(
             session=session, project=private_project, user=member, project_role=ProjectRole.USER
         )
-        
+
         # Add owner as admin to both projects
         await add_project_member(
             session=session, project=public_project, user=owner, project_role=ProjectRole.ADMIN
@@ -1035,6 +1037,7 @@ class TestListUserProjectsService:
         )
         # Test: list_user_projects should NOT return public projects for non-members
         from dstack._internal.server.services.projects import list_user_projects
+
         projects = await list_user_projects(session=session, user=non_member)
         assert len(projects) == 0  # Non-member should see NO projects
         # Test: list_user_projects should return projects where user IS a member
@@ -1086,6 +1089,7 @@ class TestListUserProjectsService:
         )
         # Test: list_user_accessible_projects should return public projects for non-members
         from dstack._internal.server.services.projects import list_user_accessible_projects
+
         projects = await list_user_accessible_projects(session=session, user=non_member)
         assert len(projects) == 1  # Should see only the public project
         assert projects[0].project_name == "public_project"
