@@ -5,12 +5,12 @@ from typing import Dict, Optional, Type
 import requests
 from pydantic import ValidationError
 
+from dstack._internal.core.compatibility.fleets import get_fleet_spec_excludes
+from dstack._internal.core.compatibility.runs import get_run_spec_excludes
 from dstack._internal.core.errors import ServerClientError
 from dstack._internal.core.models.fleets import FleetSpec
 from dstack._internal.core.models.gateways import GatewaySpec
 from dstack._internal.core.models.volumes import VolumeSpec
-from dstack.api.server._fleets import _get_fleet_spec_excludes
-from dstack.api.server._runs import _get_run_spec_excludes
 from dstack.plugins import ApplyPolicy, ApplySpec, Plugin, RunSpec, get_plugin_logger
 from dstack.plugins.builtin.rest_plugin import (
     FleetSpecRequest,
@@ -102,7 +102,7 @@ class CustomApplyPolicy(ApplyPolicy):
             user,
             project,
             spec,
-            excludes=_get_run_spec_excludes(spec),
+            excludes=get_run_spec_excludes(spec),
         )
 
     def on_fleet_apply(self, user: str, project: str, spec: FleetSpec) -> FleetSpec:
@@ -113,7 +113,7 @@ class CustomApplyPolicy(ApplyPolicy):
             user,
             project,
             spec,
-            excludes=_get_fleet_spec_excludes(spec),
+            excludes=get_fleet_spec_excludes(spec),
         )
 
     def on_volume_apply(self, user: str, project: str, spec: VolumeSpec) -> VolumeSpec:
