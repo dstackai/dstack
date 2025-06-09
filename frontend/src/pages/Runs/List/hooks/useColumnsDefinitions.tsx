@@ -2,21 +2,13 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { format } from 'date-fns';
 
-import { NavigateLink, StatusIndicator } from 'components';
+import { NavigateLink } from 'components';
 
 import { DATE_TIME_FORMAT } from 'consts';
-import {
-    getRepoNameFromRun,
-    getRunError,
-    getRunPriority,
-    getRunStatusMessage,
-    getStatusIconColor,
-    getStatusIconType,
-} from 'libs/run';
+import { getRepoNameFromRun, getRunError, getRunPriority } from 'libs/run';
 import { ROUTES } from 'routes';
 
-import { finishedRunStatuses } from 'pages/Runs/constants';
-
+import { RunStatusIndicator } from '../../components/RunStatusIndicator';
 import {
     getRunListItemBackend,
     getRunListItemInstance,
@@ -73,23 +65,7 @@ export const useColumnsDefinitions = () => {
         {
             id: 'status',
             header: t('projects.run.status'),
-            cell: (item: IRun) => {
-                const status = finishedRunStatuses.includes(item.status)
-                    ? item.latest_job_submission?.status ?? item.status
-                    : item.status;
-                const terminationReason = finishedRunStatuses.includes(item.status)
-                    ? item.latest_job_submission?.termination_reason
-                    : null;
-
-                return (
-                    <StatusIndicator
-                        type={getStatusIconType(status, terminationReason)}
-                        colorOverride={getStatusIconColor(status, terminationReason)}
-                    >
-                        {getRunStatusMessage(item)}
-                    </StatusIndicator>
-                );
-            },
+            cell: (item: IRun) => <RunStatusIndicator run={item} />,
         },
         {
             id: 'error',
