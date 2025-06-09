@@ -1,10 +1,14 @@
 import json
 import os
-from typing import Type
+from typing import Dict, Optional, Type
 
 import requests
 from pydantic import ValidationError
 
+from dstack._internal.core.compatibility.fleets import get_fleet_spec_excludes
+from dstack._internal.core.compatibility.gateways import get_gateway_spec_excludes
+from dstack._internal.core.compatibility.runs import get_run_spec_excludes
+from dstack._internal.core.compatibility.volumes import get_volume_spec_excludes
 from dstack._internal.core.errors import ServerClientError
 from dstack._internal.core.models.fleets import FleetSpec
 from dstack._internal.core.models.gateways import GatewaySpec
@@ -44,12 +48,17 @@ class CustomApplyPolicy(ApplyPolicy):
             logger.error(f"Plugin service rejected apply request: {response.error}")
             raise ServerClientError(f"Apply request rejected: {response.error}")
 
-    def _call_plugin_service(self, spec_request: SpecApplyRequest, endpoint: str) -> ApplySpec:
+    def _call_plugin_service(
+        self,
+        spec_request: SpecApplyRequest,
+        endpoint: str,
+        excludes: Optional[Dict],
+    ) -> ApplySpec:
         response = None
         try:
             response = requests.post(
                 f"{self._plugin_service_uri}{endpoint}",
-                json=spec_request.dict(),
+                json=spec_request.dict(exclude={"spec": excludes}),
                 headers={"accept": "application/json", "Content-Type": "application/json"},
                 timeout=PLUGIN_REQUEST_TIMEOUT_SEC,
             )
@@ -75,10 +84,11 @@ class CustomApplyPolicy(ApplyPolicy):
         user: str,
         project: str,
         spec: ApplySpec,
+        excludes: Optional[Dict] = None,
     ) -> ApplySpec:
         try:
             spec_request = request_cls(user=user, project=project, spec=spec)
-            spec_json = self._call_plugin_service(spec_request, endpoint)
+            spec_json = self._call_plugin_service(spec_request, endpoint, excludes)
             response = response_cls(**spec_json)
             self._check_request_rejected(response)
             return response.spec
@@ -88,7 +98,13 @@ class CustomApplyPolicy(ApplyPolicy):
 
     def on_run_apply(self, user: str, project: str, spec: RunSpec) -> RunSpec:
         return self._on_apply(
-            RunSpecRequest, RunSpecResponse, "/apply_policies/on_run_apply", user, project, spec
+            RunSpecRequest,
+            RunSpecResponse,
+            "/apply_policies/on_run_apply",
+            user,
+            project,
+            spec,
+            excludes=get_run_spec_excludes(spec),
         )
 
     def on_fleet_apply(self, user: str, project: str, spec: FleetSpec) -> FleetSpec:
@@ -99,6 +115,7 @@ class CustomApplyPolicy(ApplyPolicy):
             user,
             project,
             spec,
+            excludes=get_fleet_spec_excludes(spec),
         )
 
     def on_volume_apply(self, user: str, project: str, spec: VolumeSpec) -> VolumeSpec:
@@ -109,6 +126,7 @@ class CustomApplyPolicy(ApplyPolicy):
             user,
             project,
             spec,
+            excludes=get_volume_spec_excludes(spec),
         )
 
     def on_gateway_apply(self, user: str, project: str, spec: GatewaySpec) -> GatewaySpec:
@@ -119,6 +137,7 @@ class CustomApplyPolicy(ApplyPolicy):
             user,
             project,
             spec,
+            excludes=get_gateway_spec_excludes(spec),
         )
 
 
