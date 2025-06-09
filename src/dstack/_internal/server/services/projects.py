@@ -61,7 +61,7 @@ async def list_user_projects(
         projects = await list_project_models(session=session)
     else:
         projects = await list_user_project_models(session=session, user=user)
-    
+
     projects = sorted(projects, key=lambda p: p.created_at)
     return [
         project_model_to_project(p, include_backends=False, include_members=False)
@@ -84,7 +84,7 @@ async def list_user_accessible_projects(
         member_projects = await list_user_project_models(session=session, user=user)
         public_projects = await _list_public_non_member_project_models(session=session, user=user)
         projects = member_projects + public_projects
-    
+
     projects = sorted(projects, key=lambda p: p.created_at)
     return [
         project_model_to_project(p, include_backends=False, include_members=False)
