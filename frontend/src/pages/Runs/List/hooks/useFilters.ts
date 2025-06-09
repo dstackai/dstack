@@ -91,7 +91,7 @@ export const useFilters = ({ localStorePrefix }: Args) => {
         {
             key: FilterKeys.USER_NAME,
             operators: ['='],
-            propertyLabel: 'Username',
+            propertyLabel: 'User',
         },
         {
             key: FilterKeys.ACTIVE,
