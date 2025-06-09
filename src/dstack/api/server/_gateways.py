@@ -1,7 +1,8 @@
-from typing import Dict, List
+from typing import List
 
 from pydantic import parse_obj_as
 
+from dstack._internal.core.compatibility.gateways import get_create_gateway_excludes
 from dstack._internal.core.models.gateways import Gateway, GatewayConfiguration
 from dstack._internal.server.schemas.gateways import (
     CreateGatewayRequest,
@@ -31,7 +32,7 @@ class GatewaysAPIClient(APIClientGroup):
         body = CreateGatewayRequest(configuration=configuration)
         resp = self._request(
             f"/api/project/{project_name}/gateways/create",
-            body=body.json(exclude=_get_gateway_configuration_excludes(configuration)),
+            body=body.json(exclude=get_create_gateway_excludes(configuration)),
         )
         return parse_obj_as(Gateway.__response__, resp.json())
 
@@ -51,15 +52,3 @@ class GatewaysAPIClient(APIClientGroup):
             f"/api/project/{project_name}/gateways/set_wildcard_domain", body=body.json()
         )
         return parse_obj_as(Gateway.__response__, resp.json())
-
-
-def _get_gateway_configuration_excludes(configuration: GatewayConfiguration) -> Dict:
-    """
-    Returns `configuration` exclude mapping to exclude certain fields from the request.
-    Use this method to exclude new fields when they are not set to keep
-    clients backward-compatibility with older servers.
-    """
-    configuration_excludes = {}
-    if configuration.tags is None:
-        configuration_excludes["tags"] = True
-    return {"configuration": configuration_excludes}

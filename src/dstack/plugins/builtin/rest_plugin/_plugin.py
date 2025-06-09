@@ -6,7 +6,9 @@ import requests
 from pydantic import ValidationError
 
 from dstack._internal.core.compatibility.fleets import get_fleet_spec_excludes
+from dstack._internal.core.compatibility.gateways import get_gateway_spec_excludes
 from dstack._internal.core.compatibility.runs import get_run_spec_excludes
+from dstack._internal.core.compatibility.volumes import get_volume_spec_excludes
 from dstack._internal.core.errors import ServerClientError
 from dstack._internal.core.models.fleets import FleetSpec
 from dstack._internal.core.models.gateways import GatewaySpec
@@ -124,6 +126,7 @@ class CustomApplyPolicy(ApplyPolicy):
             user,
             project,
             spec,
+            excludes=get_volume_spec_excludes(spec),
         )
 
     def on_gateway_apply(self, user: str, project: str, spec: GatewaySpec) -> GatewaySpec:
@@ -134,6 +137,7 @@ class CustomApplyPolicy(ApplyPolicy):
             user,
             project,
             spec,
+            excludes=get_gateway_spec_excludes(spec),
         )
 
 
