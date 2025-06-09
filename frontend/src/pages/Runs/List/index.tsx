@@ -1,7 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Button, Header, ListEmptyMessage, Loader, PropertyFilter, SpaceBetween, Table } from 'components';
+import { Button, Header, Loader, PropertyFilter, SpaceBetween, Table, Toggle } from 'components';
 
 import { DEFAULT_TABLE_PAGE_SIZE } from 'consts';
 import { useBreadcrumbs, useCollection, useInfiniteScroll } from 'hooks';
@@ -40,6 +40,8 @@ export const RunList: React.FC = () => {
         filteringOptions,
         filteringProperties,
         filteringRequestParams,
+        onlyActive,
+        onChangeOnlyActive,
     } = useFilters({
         localStorePrefix: 'administration-run-list-page',
     });
@@ -162,6 +164,12 @@ export const RunList: React.FC = () => {
                             filteringOptions={filteringOptions}
                             filteringProperties={filteringProperties}
                         />
+                    </div>
+
+                    <div className={styles.activeOnly}>
+                        <Toggle onChange={onChangeOnlyActive} checked={onlyActive}>
+                            {t('projects.run.active_only')}
+                        </Toggle>
                     </div>
                 </div>
             }
