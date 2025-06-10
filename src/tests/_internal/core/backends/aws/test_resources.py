@@ -116,7 +116,11 @@ class TestGetImageIdAndUsername:
                 },
             ]
         }
-        image_id, username = get_image_id_and_username(ec2_client_mock, cuda=False)
+        image_id, username = get_image_id_and_username(
+            ec2_client_mock,
+            cuda=False,
+            instance_type="some",
+        )
         assert image_id == "ami-00000000000000003"
         assert username == "ubuntu"
 
@@ -138,7 +142,11 @@ class TestGetImageIdAndUsername:
             ]
         }
         with pytest.raises(ComputeResourceNotFoundError):
-            get_image_id_and_username(ec2_client_mock, cuda=False)
+            get_image_id_and_username(
+                ec2_client_mock,
+                cuda=False,
+                instance_type="some",
+            )
         assert "image 'dstack-0.0' not found" in caplog.text
 
     @pytest.mark.parametrize(
@@ -152,7 +160,11 @@ class TestGetImageIdAndUsername:
         self, monkeypatch: pytest.MonkeyPatch, ec2_client_mock: Mock, cuda: bool, expected: str
     ):
         monkeypatch.setattr("dstack.version.base_image", "0.0")
-        _, username = get_image_id_and_username(ec2_client_mock, cuda)
+        _, username = get_image_id_and_username(
+            ec2_client_mock,
+            cuda=cuda,
+            instance_type="some",
+        )
         assert username == "ubuntu"
         ec2_client_mock.describe_images.assert_called_once_with(
             Filters=[{"Name": "name", "Values": [expected]}], Owners=["142421590066"]
@@ -184,7 +196,12 @@ class TestGetImageIdAndUsername:
                 user="dstack",
             ),
         )
-        _, username = get_image_id_and_username(ec2_client_mock, cuda, image_config)
+        _, username = get_image_id_and_username(
+            ec2_client_mock,
+            cuda=cuda,
+            instance_type="some",
+            image_config=image_config,
+        )
         assert username == expected_username
         ec2_client_mock.describe_images.assert_called_once_with(
             Filters=[{"Name": "name", "Values": [expected_name]}],
@@ -202,5 +219,10 @@ class TestGetImageIdAndUsername:
             ),
         )
         with pytest.raises(ComputeResourceNotFoundError):
-            get_image_id_and_username(ec2_client_mock, cuda=False, image_config=image_config)
+            get_image_id_and_username(
+                ec2_client_mock,
+                cuda=False,
+                instance_type="some",
+                image_config=image_config,
+            )
         assert "cpu image not configured" in caplog.text

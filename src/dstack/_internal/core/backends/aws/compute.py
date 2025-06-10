@@ -231,6 +231,7 @@ class AWSCompute(
                 image_id, username = aws_resources.get_image_id_and_username(
                     ec2_client=ec2_client,
                     cuda=len(instance_offer.instance.resources.gpus) > 0,
+                    instance_type=instance_offer.instance.name,
                     image_config=self.config.os_images,
                 )
                 response = ec2_resource.create_instances(

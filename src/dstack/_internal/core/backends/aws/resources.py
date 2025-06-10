@@ -12,11 +12,13 @@ from dstack._internal.utils.logging import get_logger
 logger = get_logger(__name__)
 
 DSTACK_ACCOUNT_ID = "142421590066"
+DLAMI_OWNER_ACCOUNT_ID = "898082745236"
 
 
 def get_image_id_and_username(
     ec2_client: botocore.client.BaseClient,
     cuda: bool,
+    instance_type: str,
     image_config: Optional[AWSOSImageConfig] = None,
 ) -> tuple[str, str]:
     if image_config is not None:
@@ -27,6 +29,11 @@ def get_image_id_and_username(
         image_name = image.name
         image_owner = image.owner
         username = image.user
+    elif _supported_by_dlami(instance_type):
+        # TODO: Update DLAMI image version from time to time
+        image_name = "Deep Learning Base OSS Nvidia Driver GPU AMI (Ubuntu 22.04) 20250516"
+        image_owner = DLAMI_OWNER_ACCOUNT_ID
+        username = "ubuntu"
     else:
         image_name = (
             f"dstack-{version.base_image}" if not cuda else f"dstack-cuda-{version.base_image}"
@@ -626,6 +633,25 @@ def _is_private_subnet_with_internet_egress(
                     return True
 
     return False
+
+
+def _supported_by_dlami(instance_type: str) -> bool:
+    # Currently only p3. instances are not supported by DLAMI among GPU instances.
+    return any(
+        instance_type.startswith(family)
+        for family in [
+            "g4dn.",
+            "g5.",
+            "g6.",
+            "gr6.",
+            "g6e.",
+            "p4d.",
+            "p4de.",
+            "p5.",
+            "p5e.",
+            "p6-b200.",
+        ]
+    )
 
 
 def get_reservation(
