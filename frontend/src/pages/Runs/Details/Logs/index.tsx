@@ -37,7 +37,7 @@ export const Logs: React.FC<IProps> = ({ className, projectName, runName, jobSub
         } else {
             terminalInstance.current.options.theme = {
                 foreground: '#b6bec9',
-                background: '#0f1b2a',
+                background: '#161d26',
             };
         }
     }, [appliedTheme]);

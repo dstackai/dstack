@@ -322,6 +322,7 @@
       "quickstart_message_text": "Check out the quickstart guide to get started with dstack",
       "nomatch_message_title": "No matches",
       "nomatch_message_text": "We can't find a match. Try to change project or clear filter",
+      "filter_property_placeholder": "Filter runs by properties",
       "project": "Project",
       "project_placeholder": "Filtering by project",
       "repo": "Repository",

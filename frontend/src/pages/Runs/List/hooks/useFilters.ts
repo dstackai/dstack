@@ -1,9 +1,12 @@
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { ToggleProps } from '@cloudscape-design/components';
 
 import type { PropertyFilterProps } from 'components';
 
 import { useProjectFilter } from 'hooks/useProjectFilter';
+
+import { useGetUserListQuery } from '../../../../services/user';
 
 type Args = {
     localStorePrefix: string;
@@ -14,7 +17,6 @@ type RequestParamsKeys = keyof Pick<TRunsRequestParams, 'only_active' | 'project
 const FilterKeys: Record<string, RequestParamsKeys> = {
     PROJECT_NAME: 'project_name',
     USER_NAME: 'username',
-    ACTIVE: 'only_active',
 };
 
 const EMPTY_QUERY: PropertyFilterProps.Query = {
@@ -22,19 +24,27 @@ const EMPTY_QUERY: PropertyFilterProps.Query = {
     operation: 'and',
 };
 
-const tokensToRequestParams = (tokens: PropertyFilterProps.Query['tokens']) => {
-    return tokens.reduce((acc, token) => {
+const tokensToRequestParams = (tokens: PropertyFilterProps.Query['tokens'], onlyActive?: boolean) => {
+    const params = tokens.reduce((acc, token) => {
         if (token.propertyKey) {
             acc[token.propertyKey as RequestParamsKeys] = token.value;
         }
 
         return acc;
     }, {} as Record<RequestParamsKeys, string>);
+
+    if (onlyActive) {
+        params['only_active'] = 'true';
+    }
+
+    return params;
 };
 
 export const useFilters = ({ localStorePrefix }: Args) => {
     const [searchParams, setSearchParams] = useSearchParams();
+    const [onlyActive, setOnlyActive] = useState(() => searchParams.get('only_active') === 'true');
     const { projectOptions } = useProjectFilter({ localStorePrefix });
+    const { data: usersData } = useGetUserListQuery();
 
     const [propertyFilterQuery, setPropertyFilterQuery] = useState<PropertyFilterProps.Query>(() => {
         const tokens = [];
@@ -59,6 +69,7 @@ export const useFilters = ({ localStorePrefix }: Args) => {
 
     const clearFilter = () => {
         setSearchParams({});
+        setOnlyActive(false);
         setPropertyFilterQuery(EMPTY_QUERY);
     };
 
@@ -73,13 +84,15 @@ export const useFilters = ({ localStorePrefix }: Args) => {
                 });
         });
 
-        options.push({
-            propertyKey: FilterKeys.ACTIVE,
-            value: 'True',
+        usersData?.forEach(({ username }) => {
+            options.push({
+                propertyKey: FilterKeys.USER_NAME,
+                value: username,
+            });
         });
 
         return options;
-    }, [projectOptions]);
+    }, [projectOptions, usersData]);
 
     const filteringProperties = [
         {
@@ -93,12 +106,6 @@ export const useFilters = ({ localStorePrefix }: Args) => {
             operators: ['='],
             propertyLabel: 'User',
         },
-        {
-            key: FilterKeys.ACTIVE,
-            operators: ['='],
-            propertyLabel: 'Only active',
-            groupValuesLabel: 'Active values',
-        },
     ];
 
     const onChangePropertyFilter: PropertyFilterProps['onChange'] = ({ detail }) => {
@@ -108,7 +115,7 @@ export const useFilters = ({ localStorePrefix }: Args) => {
             return !tokens.some((item, index) => token.propertyKey === item.propertyKey && index > tokenIndex);
         });
 
-        setSearchParams(tokensToRequestParams(filteredTokens));
+        setSearchParams(tokensToRequestParams(filteredTokens, onlyActive));
 
         setPropertyFilterQuery({
             operation,
@@ -116,12 +123,18 @@ export const useFilters = ({ localStorePrefix }: Args) => {
         });
     };
 
+    const onChangeOnlyActive: ToggleProps['onChange'] = ({ detail }) => {
+        setOnlyActive(detail.checked);
+
+        setSearchParams(tokensToRequestParams(propertyFilterQuery.tokens, detail.checked));
+    };
+
     const filteringRequestParams = useMemo(() => {
         const params = tokensToRequestParams(propertyFilterQuery.tokens);
 
         return {
             ...params,
-            only_active: params.only_active === 'True',
+            only_active: onlyActive,
         };
     }, [propertyFilterQuery]);
 
@@ -132,5 +145,7 @@ export const useFilters = ({ localStorePrefix }: Args) => {
         onChangePropertyFilter,
         filteringOptions,
         filteringProperties,
+        onlyActive,
+        onChangeOnlyActive,
     } as const;
 };
