@@ -1001,7 +1001,7 @@ class TestSetProjectMembers:
         project = await create_project(session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
         admin = await create_user(session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
         await add_project_member(session=session, project=project, user=admin, project_role=ProjectRole.ADMIN)
-        
+
         # Try to add non-existent user - should now error instead of silently skipping
         body = {"members": [{"username": "nonexistent", "project_role": "user"}]}
         response = await client.post(
@@ -1009,7 +1009,7 @@ class TestSetProjectMembers:
             headers=get_auth_headers(admin.token),
             json=body,
         )
-        
+
         # Operation should fail with 400 error for non-existent user
         assert response.status_code == 400
         response_json = response.json()
@@ -1022,10 +1022,10 @@ class TestSetProjectMembers:
         project = await create_project(session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
         manager = await create_user(session=session, global_role=GlobalRole.USER, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
         await add_project_member(session=session, project=project, user=manager, project_role=ProjectRole.MANAGER)
-        
+
         # Create user to add
-        new_user = await create_user(session=session, name="newuser", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-        
+        _new_user = await create_user(session=session, name="newuser", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
+
         # Try to add admin
         body = {"members": [{"username": "newuser", "project_role": "admin"}]}
         response = await client.post(
@@ -1033,7 +1033,7 @@ class TestSetProjectMembers:
             headers=get_auth_headers(manager.token),
             json=body,
         )
-        
+
         assert response.status_code == 403
 
 
@@ -1168,7 +1168,7 @@ class TestMemberManagement:
         await add_project_member(session=session, project=project, user=admin, project_role=ProjectRole.ADMIN)
 
         # Create user to add
-        new_user = await create_user(session=session, name="newuser", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
+        _new_user = await create_user(session=session, name="newuser", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
 
         # Add member
         body = {"members": [{"username": "newuser", "project_role": "user"}]}
@@ -1177,20 +1177,20 @@ class TestMemberManagement:
             headers=get_auth_headers(admin.token),
             json=body,
         )
-        
+
         assert response.status_code == 200
         response_data = response.json()
-        
+
         # Check that new user is in the members list
         member_usernames = [member["user"]["username"] for member in response_data["members"]]
         assert "newuser" in member_usernames
-        
+
         # Find the new member and check their role
         new_member = next(m for m in response_data["members"] if m["user"]["username"] == "newuser")
         assert new_member["project_role"] == "user"
-        
+
         # Verify in database
-        res = await session.execute(select(MemberModel).where(MemberModel.user_id == new_user.id))
+        res = await session.execute(select(MemberModel).where(MemberModel.user_id == _new_user.id))
         member = res.scalar_one()
         assert member.project_role == ProjectRole.USER
 
@@ -1203,9 +1203,9 @@ class TestMemberManagement:
         await add_project_member(session=session, project=project, user=admin, project_role=ProjectRole.ADMIN)
 
         # Create user to add
-        new_user = await create_user(
+        _new_user = await create_user(
             session=session,
-            name="emailuser", 
+            name="emailuser",
             email="test@example.com",
             created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
         )
@@ -1220,11 +1220,11 @@ class TestMemberManagement:
 
         assert response.status_code == 200
         response_data = response.json()
-        
+
         # Check that new user is in the members list
         member_usernames = [member["user"]["username"] for member in response_data["members"]]
         assert "emailuser" in member_usernames
-        
+
         # Find the new member and check their role
         new_member = next(m for m in response_data["members"] if m["user"]["username"] == "emailuser")
         assert new_member["project_role"] == "manager"
@@ -1236,11 +1236,11 @@ class TestMemberManagement:
         project = await create_project(session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
         admin = await create_user(session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
         await add_project_member(session=session, project=project, user=admin, project_role=ProjectRole.ADMIN)
-        
+
         # Create user and add as USER first
         existing_user = await create_user(session=session, name="existing", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
         await add_project_member(session=session, project=project, user=existing_user, project_role=ProjectRole.USER)
-        
+
         # Update to MANAGER
         body = {"members": [{"username": "existing", "project_role": "manager"}]}
         response = await client.post(
@@ -1248,10 +1248,10 @@ class TestMemberManagement:
             headers=get_auth_headers(admin.token),
             json=body,
         )
-        
+
         assert response.status_code == 200
         response_data = response.json()
-        
+
         # Find the updated member and check their role
         updated_member = next(m for m in response_data["members"] if m["user"]["username"] == "existing")
         assert updated_member["project_role"] == "manager"
@@ -1268,7 +1268,7 @@ class TestMemberManagement:
         project = await create_project(session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
         admin = await create_user(session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
         await add_project_member(session=session, project=project, user=admin, project_role=ProjectRole.ADMIN)
-        
+
         # Try to add non-existent user - should now error instead of silently skipping
         body = {"members": [{"username": "nonexistent", "project_role": "user"}]}
         response = await client.post(
@@ -1276,7 +1276,7 @@ class TestMemberManagement:
             headers=get_auth_headers(admin.token),
             json=body,
         )
-        
+
         # Operation should fail with 400 error for non-existent user
         assert response.status_code == 400
         response_json = response.json()
@@ -1289,10 +1289,10 @@ class TestMemberManagement:
         project = await create_project(session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
         manager = await create_user(session=session, global_role=GlobalRole.USER, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
         await add_project_member(session=session, project=project, user=manager, project_role=ProjectRole.MANAGER)
-        
+
         # Create user to add
-        new_user = await create_user(session=session, name="newuser", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-        
+        _new_user = await create_user(session=session, name="newuser", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
+
         # Try to add admin
         body = {"members": [{"username": "newuser", "project_role": "admin"}]}
         response = await client.post(
@@ -1300,7 +1300,7 @@ class TestMemberManagement:
             headers=get_auth_headers(manager.token),
             json=body,
         )
-        
+
         assert response.status_code == 403
 
     # Remove Member Tests
@@ -1311,7 +1311,7 @@ class TestMemberManagement:
         project = await create_project(session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
         admin = await create_user(session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
         await add_project_member(session=session, project=project, user=admin, project_role=ProjectRole.ADMIN)
-        
+
         # Create user to remove
         user_to_remove = await create_user(session=session, name="removeuser", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
         await add_project_member(session=session, project=project, user=user_to_remove, project_role=ProjectRole.USER)
@@ -1323,14 +1323,14 @@ class TestMemberManagement:
             headers=get_auth_headers(admin.token),
             json=body,
         )
-        
+
         assert response.status_code == 200
         response_data = response.json()
 
         # Check that user is NOT in the members list anymore
         member_usernames = [member["user"]["username"] for member in response_data["members"]]
         assert "removeuser" not in member_usernames
-        
+
         # Verify removed from database
         res = await session.execute(select(MemberModel).where(MemberModel.user_id == user_to_remove.id))
         member = res.scalar_one_or_none()
@@ -1343,16 +1343,16 @@ class TestMemberManagement:
         project = await create_project(session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
         admin = await create_user(session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
         await add_project_member(session=session, project=project, user=admin, project_role=ProjectRole.ADMIN)
-        
+
         # Create user to remove
         user_to_remove = await create_user(
             session=session,
-            name="emailremove", 
+            name="emailremove",
             email="remove@example.com",
             created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
         )
         await add_project_member(session=session, project=project, user=user_to_remove, project_role=ProjectRole.USER)
-        
+
         # Remove member by email
         body = {"usernames": ["remove@example.com"]}
         response = await client.post(
@@ -1360,7 +1360,7 @@ class TestMemberManagement:
             headers=get_auth_headers(admin.token),
             json=body,
         )
-        
+
         assert response.status_code == 200
 
     @pytest.mark.asyncio
@@ -1370,7 +1370,7 @@ class TestMemberManagement:
         project = await create_project(session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
         admin = await create_user(session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
         await add_project_member(session=session, project=project, user=admin, project_role=ProjectRole.ADMIN)
-        
+
         # Try to remove non-existent user - should now error instead of silently skipping
         body = {"usernames": ["nonexistent"]}
         response = await client.post(
@@ -1378,7 +1378,7 @@ class TestMemberManagement:
             headers=get_auth_headers(admin.token),
             json=body,
         )
-        
+
         # Operation should fail with 400 error for non-existent user
         assert response.status_code == 400
         response_json = response.json()
@@ -1393,8 +1393,8 @@ class TestMemberManagement:
         await add_project_member(session=session, project=project, user=admin, project_role=ProjectRole.ADMIN)
 
         # Create user who is NOT a member
-        non_member = await create_user(session=session, name="nonmember", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-        
+        _non_member = await create_user(session=session, name="nonmember", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
+
         # Try to remove non-member - should now error instead of silently skipping
         body = {"usernames": ["nonmember"]}
         response = await client.post(
@@ -1402,7 +1402,7 @@ class TestMemberManagement:
             headers=get_auth_headers(admin.token),
             json=body,
         )
-        
+
         # Operation should fail with 400 error for non-member
         assert response.status_code == 400
         response_json = response.json()
@@ -1415,7 +1415,7 @@ class TestMemberManagement:
         project = await create_project(session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
         admin = await create_user(session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
         await add_project_member(session=session, project=project, user=admin, project_role=ProjectRole.ADMIN)
-        
+
         # Try to remove the only admin
         body = {"usernames": [admin.name]}
         response = await client.post(
@@ -1423,7 +1423,7 @@ class TestMemberManagement:
             headers=get_auth_headers(admin.token),
             json=body,
         )
-        
+
         assert response.status_code == 400
         response_json = response.json()
         # Check for the new self-leave error message (since admin is removing themselves)
@@ -1437,7 +1437,7 @@ class TestMemberManagement:
         admin = await create_user(session=session, name="admin", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
         regular_user = await create_user(session=session, name="regular", global_role=GlobalRole.USER, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
         other_user = await create_user(session=session, name="other", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-        
+
         await add_project_member(session=session, project=project, user=admin, project_role=ProjectRole.ADMIN)
         await add_project_member(session=session, project=project, user=regular_user, project_role=ProjectRole.USER)
         await add_project_member(session=session, project=project, user=other_user, project_role=ProjectRole.USER)
@@ -1449,7 +1449,7 @@ class TestMemberManagement:
             headers=get_auth_headers(regular_user.token),
             json=body,
         )
-        
+
         assert response.status_code == 403
 
     # Batch Operations Tests
@@ -1460,12 +1460,12 @@ class TestMemberManagement:
         project = await create_project(session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
         admin = await create_user(session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
         await add_project_member(session=session, project=project, user=admin, project_role=ProjectRole.ADMIN)
-        
+
         # Create multiple users to add
-        user1 = await create_user(session=session, name="user1", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-        user2 = await create_user(session=session, name="user2", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-        user3 = await create_user(session=session, name="user3", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-        
+        _user1 = await create_user(session=session, name="user1", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
+        _user2 = await create_user(session=session, name="user2", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
+        _user3 = await create_user(session=session, name="user3", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
+
         # Add multiple members at once
         body = {
             "members": [
@@ -1479,20 +1479,20 @@ class TestMemberManagement:
             headers=get_auth_headers(admin.token),
             json=body,
         )
-        
+
         assert response.status_code == 200
         response_data = response.json()
-        
+
         # Check that all new users are in the members list
         member_usernames = [member["user"]["username"] for member in response_data["members"]]
         assert "user1" in member_usernames
         assert "user2" in member_usernames
         assert "user3" in member_usernames
-        
+
         # Check roles
         user1_member = next(m for m in response_data["members"] if m["user"]["username"] == "user1")
         assert user1_member["project_role"] == "user"
-        
+
         user2_member = next(m for m in response_data["members"] if m["user"]["username"] == "user2")
         assert user2_member["project_role"] == "manager"
 
@@ -1508,11 +1508,11 @@ class TestMemberManagement:
         user1 = await create_user(session=session, name="user1", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
         user2 = await create_user(session=session, name="user2", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
         user3 = await create_user(session=session, name="user3", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-        
+
         await add_project_member(session=session, project=project, user=user1, project_role=ProjectRole.USER)
         await add_project_member(session=session, project=project, user=user2, project_role=ProjectRole.USER)
         await add_project_member(session=session, project=project, user=user3, project_role=ProjectRole.USER)
-        
+
         # Remove multiple members at once
         body = {"usernames": ["user1", "user2", "user3"]}
         response = await client.post(
@@ -1520,20 +1520,20 @@ class TestMemberManagement:
             headers=get_auth_headers(admin.token),
             json=body,
         )
-        
+
         assert response.status_code == 200
         response_data = response.json()
-        
+
         # Check that all users are NOT in the members list anymore
         member_usernames = [member["user"]["username"] for member in response_data["members"]]
         assert "user1" not in member_usernames
         assert "user2" not in member_usernames
         assert "user3" not in member_usernames
-        
+
         # Verify removed from database
         res = await session.execute(select(MemberModel).where(MemberModel.user_id == user1.id))
         assert res.scalar_one_or_none() is None
-        
+
         res = await session.execute(select(MemberModel).where(MemberModel.user_id == user2.id))
         assert res.scalar_one_or_none() is None
 
@@ -1546,13 +1546,13 @@ class TestMemberManagement:
         # Make project public
         project.is_public = True
         await session.commit()
-        
+
         admin = await create_user(session=session, name="admin", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
         await add_project_member(session=session, project=project, user=admin, project_role=ProjectRole.ADMIN)
-        
+
         # Create user who wants to join
         regular_user = await create_user(session=session, name="joiner", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-        
+
         # User joins public project (should work)
         body = {"members": [{"username": "joiner", "project_role": "user"}]}
         response = await client.post(
@@ -1560,14 +1560,14 @@ class TestMemberManagement:
             headers=get_auth_headers(regular_user.token),
             json=body,
         )
-        
+
         assert response.status_code == 200
         response_data = response.json()
-        
+
         # Check that user is now in the members list
         member_usernames = [member["user"]["username"] for member in response_data["members"]]
         assert "joiner" in member_usernames
-        
+
         # Find the new member and check their role is USER
         new_member = next(m for m in response_data["members"] if m["user"]["username"] == "joiner")
         assert new_member["project_role"] == "user"
@@ -1578,13 +1578,13 @@ class TestMemberManagement:
         # Setup private project with admin
         project = await create_project(session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
         # Project is private by default (is_public=False)
-        
+
         admin = await create_user(session=session, name="admin", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
         await add_project_member(session=session, project=project, user=admin, project_role=ProjectRole.ADMIN)
-        
+
         # Create user who wants to join
         regular_user = await create_user(session=session, name="joiner", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-        
+
         # User tries to join private project (should fail)
         body = {"members": [{"username": "joiner", "project_role": "user"}]}
         response = await client.post(
@@ -1592,7 +1592,7 @@ class TestMemberManagement:
             headers=get_auth_headers(regular_user.token),
             json=body,
         )
-        
+
         assert response.status_code == 403
 
     @pytest.mark.asyncio
@@ -1602,13 +1602,13 @@ class TestMemberManagement:
         project = await create_project(session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
         project.is_public = True
         await session.commit()
-        
+
         admin = await create_user(session=session, name="admin", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
         await add_project_member(session=session, project=project, user=admin, project_role=ProjectRole.ADMIN)
-        
+
         # Create user who wants to join as admin
         regular_user = await create_user(session=session, name="joiner", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-        
+
         # User tries to join public project as admin (should fail)
         body = {"members": [{"username": "joiner", "project_role": "admin"}]}
         response = await client.post(
@@ -1616,7 +1616,7 @@ class TestMemberManagement:
             headers=get_auth_headers(regular_user.token),
             json=body,
         )
-        
+
         assert response.status_code == 403
 
     @pytest.mark.asyncio
@@ -1626,10 +1626,10 @@ class TestMemberManagement:
         project = await create_project(session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
         admin = await create_user(session=session, name="admin", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
         regular_user = await create_user(session=session, name="leaver", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-        
+
         await add_project_member(session=session, project=project, user=admin, project_role=ProjectRole.ADMIN)
         await add_project_member(session=session, project=project, user=regular_user, project_role=ProjectRole.USER)
-        
+
         # User leaves project (should work)
         body = {"usernames": ["leaver"]}
         response = await client.post(
@@ -1637,14 +1637,14 @@ class TestMemberManagement:
             headers=get_auth_headers(regular_user.token),
             json=body,
         )
-        
+
         assert response.status_code == 200
         response_data = response.json()
-        
+
         # Check that user is NOT in the members list anymore
         member_usernames = [member["user"]["username"] for member in response_data["members"]]
         assert "leaver" not in member_usernames
-        
+
         # Should only have admin left
         assert len(response_data["members"]) == 1
         assert response_data["members"][0]["user"]["username"] == "admin"
@@ -1656,15 +1656,15 @@ class TestMemberManagement:
         project = await create_project(session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
         admin = await create_user(session=session, name="admin", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
         regular_user = await create_user(
-            session=session, 
-            name="leaver", 
+            session=session,
+            name="leaver",
             email="leaver@example.com",
             created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
         )
-        
+
         await add_project_member(session=session, project=project, user=admin, project_role=ProjectRole.ADMIN)
         await add_project_member(session=session, project=project, user=regular_user, project_role=ProjectRole.USER)
-        
+
         # User leaves project by email (should work)
         body = {"usernames": ["leaver@example.com"]}
         response = await client.post(
@@ -1672,7 +1672,7 @@ class TestMemberManagement:
             headers=get_auth_headers(regular_user.token),
             json=body,
         )
-        
+
         assert response.status_code == 200
 
     @pytest.mark.asyncio
@@ -1682,7 +1682,7 @@ class TestMemberManagement:
         project = await create_project(session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
         admin = await create_user(session=session, name="admin", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
         await add_project_member(session=session, project=project, user=admin, project_role=ProjectRole.ADMIN)
-        
+
         # Admin tries to leave (should fail as they're the last admin)
         body = {"usernames": ["admin"]}
         response = await client.post(
@@ -1690,7 +1690,7 @@ class TestMemberManagement:
             headers=get_auth_headers(admin.token),
             json=body,
         )
-        
+
         assert response.status_code == 400
         response_json = response.json()
         assert "Cannot leave project: you are the last admin" in str(response_json)
@@ -1702,10 +1702,10 @@ class TestMemberManagement:
         project = await create_project(session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
         admin1 = await create_user(session=session, name="admin1", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
         admin2 = await create_user(session=session, name="admin2", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-        
+
         await add_project_member(session=session, project=project, user=admin1, project_role=ProjectRole.ADMIN)
         await add_project_member(session=session, project=project, user=admin2, project_role=ProjectRole.ADMIN)
-        
+
         # One admin leaves (should work as there's another admin)
         body = {"usernames": ["admin1"]}
         response = await client.post(
@@ -1713,10 +1713,10 @@ class TestMemberManagement:
             headers=get_auth_headers(admin1.token),
             json=body,
         )
-        
+
         assert response.status_code == 200
         response_data = response.json()
-        
+
         # Check that admin1 is NOT in the members list anymore
         member_usernames = [member["user"]["username"] for member in response_data["members"]]
         assert "admin1" not in member_usernames
@@ -1730,11 +1730,11 @@ class TestMemberManagement:
         admin = await create_user(session=session, name="admin", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
         user1 = await create_user(session=session, name="user1", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
         user2 = await create_user(session=session, name="user2", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-        
+
         await add_project_member(session=session, project=project, user=admin, project_role=ProjectRole.ADMIN)
         await add_project_member(session=session, project=project, user=user1, project_role=ProjectRole.USER)
         await add_project_member(session=session, project=project, user=user2, project_role=ProjectRole.USER)
-        
+
         # user1 tries to remove user2 (should fail)
         body = {"usernames": ["user2"]}
         response = await client.post(
@@ -1742,6 +1742,6 @@ class TestMemberManagement:
             headers=get_auth_headers(user1.token),
             json=body,
         )
-        
+
         assert response.status_code == 403
 >>>>>>> 7fc1b408 (fix: retrack PR2 based on PR1)
