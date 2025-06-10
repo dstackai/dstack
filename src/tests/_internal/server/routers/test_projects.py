@@ -75,6 +75,7 @@ class TestListProjects:
                 "created_at": "2023-01-02T03:04:00+00:00",
                 "backends": [],
                 "members": [],
+                "is_public": False,
             }
         ]
 
@@ -605,6 +606,7 @@ class TestGetProject:
                     },
                 }
             ],
+            "is_public": False,
         }
 
     @pytest.mark.asyncio
