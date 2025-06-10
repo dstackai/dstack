@@ -120,6 +120,7 @@ class ProjectManagerOrPublicJoin:
     1. Project managers to add any members
     2. Any authenticated user to join public projects themselves
     """
+
     async def __call__(
         self,
         project_name: str,
@@ -132,20 +133,20 @@ class ProjectManagerOrPublicJoin:
         project = await get_project_model_by_name(session=session, project_name=project_name)
         if project is None:
             raise error_not_found()
-        
+
         # Global admin can always manage projects
         if user.global_role == GlobalRole.ADMIN:
             return user, project
-            
+
         # Project managers can add members
         project_role = get_user_project_role(user=user, project=project)
         if project_role in [ProjectRole.ADMIN, ProjectRole.MANAGER]:
             return user, project
-            
+
         # For public projects, any authenticated user can join (will be validated in service layer)
         if project.is_public:
             return user, project
-            
+
         raise error_forbidden()
 
 
@@ -155,6 +156,7 @@ class ProjectManagerOrSelfLeave:
     1. Project managers to remove any members
     2. Any project member to leave (remove themselves)
     """
+
     async def __call__(
         self,
         project_name: str,
@@ -167,20 +169,20 @@ class ProjectManagerOrSelfLeave:
         project = await get_project_model_by_name(session=session, project_name=project_name)
         if project is None:
             raise error_not_found()
-        
+
         # Global admin can always manage projects
         if user.global_role == GlobalRole.ADMIN:
             return user, project
-            
+
         # Project managers can remove members
         project_role = get_user_project_role(user=user, project=project)
         if project_role in [ProjectRole.ADMIN, ProjectRole.MANAGER]:
             return user, project
-            
+
         # Any project member can leave (will be validated in service layer)
         if project_role is not None:
             return user, project
-            
+
         raise error_forbidden()
 
 
