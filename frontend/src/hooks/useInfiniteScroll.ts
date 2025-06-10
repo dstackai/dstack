@@ -29,9 +29,7 @@ export const useInfiniteScroll = <DataItem, Args extends InfinityListArgs>({
     const lastRequestParams = useRef<TRunsRequestParams | undefined>(undefined);
     const [disabledMore, setDisabledMore] = useState(false);
     const { limit, ...argsProp } = args;
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
-    const oldArgsProps = useRef<Partial<Args>>(argsProp);
+    const lastArgsProps = useRef<Partial<Args>>(null);
 
     const [getItems, { isLoading, isFetching }] = useLazyQuery({ ...args } as Args);
 
@@ -57,13 +55,11 @@ export const useInfiniteScroll = <DataItem, Args extends InfinityListArgs>({
     };
 
     useEffect(() => {
-        if (!isEqual(argsProp, oldArgsProps.current)) {
+        if (!isEqual(argsProp, lastArgsProps.current)) {
             getEmptyList();
-            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-            // @ts-ignore
-            oldArgsProps.current = argsProp;
+            lastArgsProps.current = argsProp as Args;
         }
-    }, [argsProp, oldArgsProps]);
+    }, [argsProp, lastArgsProps]);
 
     const getMore = async () => {
         if (isLoadingRef.current || disabledMore) {
