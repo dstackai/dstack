@@ -136,7 +136,7 @@ export const useFilters = ({ localStorePrefix }: Args) => {
             ...params,
             only_active: onlyActive,
         };
-    }, [propertyFilterQuery]);
+    }, [propertyFilterQuery, onlyActive]);
 
     return {
         filteringRequestParams,
