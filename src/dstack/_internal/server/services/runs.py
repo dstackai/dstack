@@ -1,10 +1,12 @@
 import itertools
 import math
+import time
 import uuid
 from datetime import datetime, timezone
 from typing import List, Optional
 
 import pydantic
+from prometheus_client import REGISTRY, Histogram
 from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
@@ -88,6 +90,13 @@ from dstack._internal.utils.random_names import generate_name
 
 logger = get_logger(__name__)
 
+RUN_SUBMISSION_TIME = Histogram(
+    "dstack_run_submission_duration_seconds",
+    "Time taken to submit a run",
+    labelnames=["project_name", "run_type", "action_type"],
+    buckets=[0.1, 0.5, 1.0, 2.5, 5.0, 10.0, 25.0, 50.0, 100.0, float("inf")],
+    registry=REGISTRY,  # Explicitly specify the registry
+)
 
 JOB_TERMINATION_REASONS_TO_RETRY = {
     JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY,
@@ -381,6 +390,8 @@ async def apply_plan(
     plan: ApplyRunPlanInput,
     force: bool,
 ) -> Run:
+    submission_start_time = time.time()
+
     run_spec = plan.run_spec
     run_spec = await apply_plugin_policies(
         user=user.name,
@@ -390,25 +401,50 @@ async def apply_plan(
     # Spec must be copied by parsing to calculate merged_profile
     run_spec = RunSpec.parse_obj(run_spec.dict())
     _validate_run_spec_and_set_defaults(run_spec)
+
+    # Prepare labels for metrics
+    project_name = project.name
+    run_type = run_spec.configuration.type
+
     if run_spec.run_name is None:
-        return await submit_run(
-            session=session,
-            user=user,
-            project=project,
-            run_spec=run_spec,
-        )
+        try:
+            run = await submit_run(
+                session=session,
+                user=user,
+                project=project,
+                run_spec=run_spec,
+            )
+            RUN_SUBMISSION_TIME.labels(
+                project_name=project_name, run_type=run_type, action_type="submit"
+            ).observe(time.time() - submission_start_time)
+            return run
+        except Exception:
+            RUN_SUBMISSION_TIME.labels(
+                project_name=project_name, run_type=run_type, action_type="submit"
+            ).observe(time.time() - submission_start_time)
+            raise
     current_resource = await get_run_by_name(
         session=session,
         project=project,
         run_name=run_spec.run_name,
     )
     if current_resource is None or current_resource.status.is_finished():
-        return await submit_run(
-            session=session,
-            user=user,
-            project=project,
-            run_spec=run_spec,
-        )
+        try:
+            run = await submit_run(
+                session=session,
+                user=user,
+                project=project,
+                run_spec=run_spec,
+            )
+            RUN_SUBMISSION_TIME.labels(
+                project_name=project_name, run_type=run_type, action_type="submit"
+            ).observe(time.time() - submission_start_time)
+            return run
+        except Exception:
+            RUN_SUBMISSION_TIME.labels(
+                project_name=project_name, run_type=run_type, action_type="submit"
+            ).observe(time.time() - submission_start_time)
+            raise
 
     # For backward compatibility (current_resource may has been submitted before
     # some fields, e.g., CPUSpec.arch, were added)
@@ -433,20 +469,29 @@ async def apply_plan(
             )
     # FIXME: potentially long write transaction
     # Avoid getting run_model after update
-    await session.execute(
-        update(RunModel)
-        .where(RunModel.id == current_resource.id)
-        .values(
-            run_spec=run_spec.json(),
-            priority=run_spec.configuration.priority,
+    try:
+        await session.execute(
+            update(RunModel)
+            .where(RunModel.id == current_resource.id)
+            .values(
+                run_spec=run_spec.json(),
+                priority=run_spec.configuration.priority,
+            )
         )
-    )
-    run = await get_run_by_name(
-        session=session,
-        project=project,
-        run_name=run_spec.run_name,
-    )
-    return common_utils.get_or_error(run)
+        run = await get_run_by_name(
+            session=session,
+            project=project,
+            run_name=run_spec.run_name,
+        )
+        RUN_SUBMISSION_TIME.labels(
+            project_name=project_name, run_type=run_type, action_type="update"
+        ).observe(time.time() - submission_start_time)
+        return common_utils.get_or_error(run)
+    except Exception:
+        RUN_SUBMISSION_TIME.labels(
+            project_name=project_name, run_type=run_type, action_type="update"
+        ).observe(time.time() - submission_start_time)
+        raise
 
 
 async def submit_run(
