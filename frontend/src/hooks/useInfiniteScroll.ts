@@ -68,7 +68,6 @@ export const useInfiniteScroll = <DataItem, Args extends InfinityListArgs>({
 
         try {
             isLoadingRef.current = true;
-            console.log('test2');
 
             const result = await getDataRequest({
                 ...argsProp,
