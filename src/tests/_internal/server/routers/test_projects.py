@@ -998,11 +998,19 @@ class TestSetProjectMembers:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_add_member_errors_on_nonexistent_user(self, test_db, session: AsyncSession, client: AsyncClient):
+    async def test_add_member_errors_on_nonexistent_user(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         # Setup project and admin
-        project = await create_project(session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-        admin = await create_user(session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-        await add_project_member(session=session, project=project, user=admin, project_role=ProjectRole.ADMIN)
+        project = await create_project(
+            session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
+        )
+        admin = await create_user(
+            session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
+        )
+        await add_project_member(
+            session=session, project=project, user=admin, project_role=ProjectRole.ADMIN
+        )
 
         # Try to add non-existent user - should now error instead of silently skipping
         body = {"members": [{"username": "nonexistent", "project_role": "user"}]}
@@ -1019,14 +1027,28 @@ class TestSetProjectMembers:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_add_member_manager_cannot_add_admin_without_global_admin(self, test_db, session: AsyncSession, client: AsyncClient):
+    async def test_add_member_manager_cannot_add_admin_without_global_admin(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         # Setup project with manager (not global admin)
-        project = await create_project(session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-        manager = await create_user(session=session, global_role=GlobalRole.USER, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-        await add_project_member(session=session, project=project, user=manager, project_role=ProjectRole.MANAGER)
+        project = await create_project(
+            session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
+        )
+        manager = await create_user(
+            session=session,
+            global_role=GlobalRole.USER,
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
+        await add_project_member(
+            session=session, project=project, user=manager, project_role=ProjectRole.MANAGER
+        )
 
         # Create user to add
-        _new_user = await create_user(session=session, name="newuser", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
+        _new_user = await create_user(
+            session=session,
+            name="newuser",
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
 
         # Try to add admin
         body = {"members": [{"username": "newuser", "project_role": "admin"}]}
@@ -1156,21 +1178,35 @@ class TestMemberManagement:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     @pytest.mark.parametrize("endpoint", ["add_members", "remove_members"])
-    async def test_returns_40x_if_not_authenticated(self, test_db, client: AsyncClient, endpoint: str):
+    async def test_returns_40x_if_not_authenticated(
+        self, test_db, client: AsyncClient, endpoint: str
+    ):
         response = await client.post(f"/api/projects/test-project/{endpoint}")
         assert response.status_code in [401, 403]
 
     # Add Member Tests
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_add_member_by_username(self, test_db, session: AsyncSession, client: AsyncClient):
+    async def test_add_member_by_username(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         # Setup project and admin
-        project = await create_project(session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-        admin = await create_user(session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-        await add_project_member(session=session, project=project, user=admin, project_role=ProjectRole.ADMIN)
+        project = await create_project(
+            session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
+        )
+        admin = await create_user(
+            session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
+        )
+        await add_project_member(
+            session=session, project=project, user=admin, project_role=ProjectRole.ADMIN
+        )
 
         # Create user to add
-        _new_user = await create_user(session=session, name="newuser", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
+        _new_user = await create_user(
+            session=session,
+            name="newuser",
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
 
         # Add member
         body = {"members": [{"username": "newuser", "project_role": "user"}]}
@@ -1188,7 +1224,9 @@ class TestMemberManagement:
         assert "newuser" in member_usernames
 
         # Find the new member and check their role
-        new_member = next(m for m in response_data["members"] if m["user"]["username"] == "newuser")
+        new_member = next(
+            m for m in response_data["members"] if m["user"]["username"] == "newuser"
+        )
         assert new_member["project_role"] == "user"
 
         # Verify in database
@@ -1200,16 +1238,22 @@ class TestMemberManagement:
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_add_member_by_email(self, test_db, session: AsyncSession, client: AsyncClient):
         # Setup project and admin
-        project = await create_project(session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-        admin = await create_user(session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-        await add_project_member(session=session, project=project, user=admin, project_role=ProjectRole.ADMIN)
+        project = await create_project(
+            session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
+        )
+        admin = await create_user(
+            session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
+        )
+        await add_project_member(
+            session=session, project=project, user=admin, project_role=ProjectRole.ADMIN
+        )
 
         # Create user to add
         _new_user = await create_user(
             session=session,
             name="emailuser",
             email="test@example.com",
-            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
         )
 
         # Add member by email
@@ -1228,20 +1272,36 @@ class TestMemberManagement:
         assert "emailuser" in member_usernames
 
         # Find the new member and check their role
-        new_member = next(m for m in response_data["members"] if m["user"]["username"] == "emailuser")
+        new_member = next(
+            m for m in response_data["members"] if m["user"]["username"] == "emailuser"
+        )
         assert new_member["project_role"] == "manager"
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_add_member_updates_existing_role(self, test_db, session: AsyncSession, client: AsyncClient):
+    async def test_add_member_updates_existing_role(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         # Setup project and admin
-        project = await create_project(session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-        admin = await create_user(session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-        await add_project_member(session=session, project=project, user=admin, project_role=ProjectRole.ADMIN)
+        project = await create_project(
+            session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
+        )
+        admin = await create_user(
+            session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
+        )
+        await add_project_member(
+            session=session, project=project, user=admin, project_role=ProjectRole.ADMIN
+        )
 
         # Create user and add as USER first
-        existing_user = await create_user(session=session, name="existing", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-        await add_project_member(session=session, project=project, user=existing_user, project_role=ProjectRole.USER)
+        existing_user = await create_user(
+            session=session,
+            name="existing",
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
+        await add_project_member(
+            session=session, project=project, user=existing_user, project_role=ProjectRole.USER
+        )
 
         # Update to MANAGER
         body = {"members": [{"username": "existing", "project_role": "manager"}]}
@@ -1255,21 +1315,33 @@ class TestMemberManagement:
         response_data = response.json()
 
         # Find the updated member and check their role
-        updated_member = next(m for m in response_data["members"] if m["user"]["username"] == "existing")
+        updated_member = next(
+            m for m in response_data["members"] if m["user"]["username"] == "existing"
+        )
         assert updated_member["project_role"] == "manager"
 
         # Verify in database
-        res = await session.execute(select(MemberModel).where(MemberModel.user_id == existing_user.id))
+        res = await session.execute(
+            select(MemberModel).where(MemberModel.user_id == existing_user.id)
+        )
         member = res.scalar_one()
         assert member.project_role == ProjectRole.MANAGER
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_add_member_errors_on_nonexistent_user(self, test_db, session: AsyncSession, client: AsyncClient):
+    async def test_add_member_errors_on_nonexistent_user(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         # Setup project and admin
-        project = await create_project(session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-        admin = await create_user(session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-        await add_project_member(session=session, project=project, user=admin, project_role=ProjectRole.ADMIN)
+        project = await create_project(
+            session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
+        )
+        admin = await create_user(
+            session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
+        )
+        await add_project_member(
+            session=session, project=project, user=admin, project_role=ProjectRole.ADMIN
+        )
 
         # Try to add non-existent user - should now error instead of silently skipping
         body = {"members": [{"username": "nonexistent", "project_role": "user"}]}
@@ -1286,14 +1358,28 @@ class TestMemberManagement:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_add_member_manager_cannot_add_admin_without_global_admin(self, test_db, session: AsyncSession, client: AsyncClient):
+    async def test_add_member_manager_cannot_add_admin_without_global_admin(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         # Setup project with manager (not global admin)
-        project = await create_project(session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-        manager = await create_user(session=session, global_role=GlobalRole.USER, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-        await add_project_member(session=session, project=project, user=manager, project_role=ProjectRole.MANAGER)
+        project = await create_project(
+            session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
+        )
+        manager = await create_user(
+            session=session,
+            global_role=GlobalRole.USER,
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
+        await add_project_member(
+            session=session, project=project, user=manager, project_role=ProjectRole.MANAGER
+        )
 
         # Create user to add
-        _new_user = await create_user(session=session, name="newuser", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
+        _new_user = await create_user(
+            session=session,
+            name="newuser",
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
 
         # Try to add admin
         body = {"members": [{"username": "newuser", "project_role": "admin"}]}
@@ -1308,15 +1394,29 @@ class TestMemberManagement:
     # Remove Member Tests
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_remove_member_by_username(self, test_db, session: AsyncSession, client: AsyncClient):
+    async def test_remove_member_by_username(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         # Setup project and admin
-        project = await create_project(session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-        admin = await create_user(session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-        await add_project_member(session=session, project=project, user=admin, project_role=ProjectRole.ADMIN)
+        project = await create_project(
+            session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
+        )
+        admin = await create_user(
+            session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
+        )
+        await add_project_member(
+            session=session, project=project, user=admin, project_role=ProjectRole.ADMIN
+        )
 
         # Create user to remove
-        user_to_remove = await create_user(session=session, name="removeuser", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-        await add_project_member(session=session, project=project, user=user_to_remove, project_role=ProjectRole.USER)
+        user_to_remove = await create_user(
+            session=session,
+            name="removeuser",
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
+        await add_project_member(
+            session=session, project=project, user=user_to_remove, project_role=ProjectRole.USER
+        )
 
         # Remove member
         body = {"usernames": ["removeuser"]}
@@ -1334,26 +1434,38 @@ class TestMemberManagement:
         assert "removeuser" not in member_usernames
 
         # Verify removed from database
-        res = await session.execute(select(MemberModel).where(MemberModel.user_id == user_to_remove.id))
+        res = await session.execute(
+            select(MemberModel).where(MemberModel.user_id == user_to_remove.id)
+        )
         member = res.scalar_one_or_none()
         assert member is None
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_remove_member_by_email(self, test_db, session: AsyncSession, client: AsyncClient):
+    async def test_remove_member_by_email(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         # Setup project and admin
-        project = await create_project(session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-        admin = await create_user(session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-        await add_project_member(session=session, project=project, user=admin, project_role=ProjectRole.ADMIN)
+        project = await create_project(
+            session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
+        )
+        admin = await create_user(
+            session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
+        )
+        await add_project_member(
+            session=session, project=project, user=admin, project_role=ProjectRole.ADMIN
+        )
 
         # Create user to remove
         user_to_remove = await create_user(
             session=session,
             name="emailremove",
             email="remove@example.com",
-            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
         )
-        await add_project_member(session=session, project=project, user=user_to_remove, project_role=ProjectRole.USER)
+        await add_project_member(
+            session=session, project=project, user=user_to_remove, project_role=ProjectRole.USER
+        )
 
         # Remove member by email
         body = {"usernames": ["remove@example.com"]}
@@ -1367,11 +1479,19 @@ class TestMemberManagement:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_remove_member_errors_on_nonexistent_user(self, test_db, session: AsyncSession, client: AsyncClient):
+    async def test_remove_member_errors_on_nonexistent_user(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         # Setup project and admin
-        project = await create_project(session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-        admin = await create_user(session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-        await add_project_member(session=session, project=project, user=admin, project_role=ProjectRole.ADMIN)
+        project = await create_project(
+            session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
+        )
+        admin = await create_user(
+            session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
+        )
+        await add_project_member(
+            session=session, project=project, user=admin, project_role=ProjectRole.ADMIN
+        )
 
         # Try to remove non-existent user - should now error instead of silently skipping
         body = {"usernames": ["nonexistent"]}
@@ -1388,14 +1508,26 @@ class TestMemberManagement:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_remove_member_errors_on_non_members(self, test_db, session: AsyncSession, client: AsyncClient):
+    async def test_remove_member_errors_on_non_members(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         # Setup project and admin
-        project = await create_project(session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-        admin = await create_user(session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-        await add_project_member(session=session, project=project, user=admin, project_role=ProjectRole.ADMIN)
+        project = await create_project(
+            session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
+        )
+        admin = await create_user(
+            session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
+        )
+        await add_project_member(
+            session=session, project=project, user=admin, project_role=ProjectRole.ADMIN
+        )
 
         # Create user who is NOT a member
-        _non_member = await create_user(session=session, name="nonmember", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
+        _non_member = await create_user(
+            session=session,
+            name="nonmember",
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
 
         # Try to remove non-member - should now error instead of silently skipping
         body = {"usernames": ["nonmember"]}
@@ -1412,11 +1544,19 @@ class TestMemberManagement:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_remove_member_prevents_removing_last_admin(self, test_db, session: AsyncSession, client: AsyncClient):
+    async def test_remove_member_prevents_removing_last_admin(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         # Setup project with only one admin
-        project = await create_project(session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-        admin = await create_user(session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-        await add_project_member(session=session, project=project, user=admin, project_role=ProjectRole.ADMIN)
+        project = await create_project(
+            session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
+        )
+        admin = await create_user(
+            session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
+        )
+        await add_project_member(
+            session=session, project=project, user=admin, project_role=ProjectRole.ADMIN
+        )
 
         # Try to remove the only admin
         body = {"usernames": [admin.name]}
@@ -1433,16 +1573,39 @@ class TestMemberManagement:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_remove_member_requires_manager_or_admin_permission(self, test_db, session: AsyncSession, client: AsyncClient):
+    async def test_remove_member_requires_manager_or_admin_permission(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         # Setup project with regular user
-        project = await create_project(session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-        admin = await create_user(session=session, name="admin", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-        regular_user = await create_user(session=session, name="regular", global_role=GlobalRole.USER, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-        other_user = await create_user(session=session, name="other", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
+        project = await create_project(
+            session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
+        )
+        admin = await create_user(
+            session=session,
+            name="admin",
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
+        regular_user = await create_user(
+            session=session,
+            name="regular",
+            global_role=GlobalRole.USER,
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
+        other_user = await create_user(
+            session=session,
+            name="other",
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
 
-        await add_project_member(session=session, project=project, user=admin, project_role=ProjectRole.ADMIN)
-        await add_project_member(session=session, project=project, user=regular_user, project_role=ProjectRole.USER)
-        await add_project_member(session=session, project=project, user=other_user, project_role=ProjectRole.USER)
+        await add_project_member(
+            session=session, project=project, user=admin, project_role=ProjectRole.ADMIN
+        )
+        await add_project_member(
+            session=session, project=project, user=regular_user, project_role=ProjectRole.USER
+        )
+        await add_project_member(
+            session=session, project=project, user=other_user, project_role=ProjectRole.USER
+        )
 
         # Try to remove as regular user
         body = {"usernames": ["other"]}
@@ -1457,23 +1620,43 @@ class TestMemberManagement:
     # Batch Operations Tests
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_add_multiple_members_batch(self, test_db, session: AsyncSession, client: AsyncClient):
+    async def test_add_multiple_members_batch(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         # Setup project and admin
-        project = await create_project(session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-        admin = await create_user(session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-        await add_project_member(session=session, project=project, user=admin, project_role=ProjectRole.ADMIN)
+        project = await create_project(
+            session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
+        )
+        admin = await create_user(
+            session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
+        )
+        await add_project_member(
+            session=session, project=project, user=admin, project_role=ProjectRole.ADMIN
+        )
 
         # Create multiple users to add
-        _user1 = await create_user(session=session, name="user1", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-        _user2 = await create_user(session=session, name="user2", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-        _user3 = await create_user(session=session, name="user3", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
+        _user1 = await create_user(
+            session=session,
+            name="user1",
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
+        _user2 = await create_user(
+            session=session,
+            name="user2",
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
+        _user3 = await create_user(
+            session=session,
+            name="user3",
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
 
         # Add multiple members at once
         body = {
             "members": [
                 {"username": "user1", "project_role": "user"},
                 {"username": "user2", "project_role": "manager"},
-                {"username": "user3", "project_role": "user"}
+                {"username": "user3", "project_role": "user"},
             ]
         }
         response = await client.post(
@@ -1492,28 +1675,58 @@ class TestMemberManagement:
         assert "user3" in member_usernames
 
         # Check roles
-        user1_member = next(m for m in response_data["members"] if m["user"]["username"] == "user1")
+        user1_member = next(
+            m for m in response_data["members"] if m["user"]["username"] == "user1"
+        )
         assert user1_member["project_role"] == "user"
 
-        user2_member = next(m for m in response_data["members"] if m["user"]["username"] == "user2")
+        user2_member = next(
+            m for m in response_data["members"] if m["user"]["username"] == "user2"
+        )
         assert user2_member["project_role"] == "manager"
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_remove_multiple_members_batch(self, test_db, session: AsyncSession, client: AsyncClient):
+    async def test_remove_multiple_members_batch(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         # Setup project and admin
-        project = await create_project(session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-        admin = await create_user(session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-        await add_project_member(session=session, project=project, user=admin, project_role=ProjectRole.ADMIN)
+        project = await create_project(
+            session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
+        )
+        admin = await create_user(
+            session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
+        )
+        await add_project_member(
+            session=session, project=project, user=admin, project_role=ProjectRole.ADMIN
+        )
 
         # Create multiple users to remove
-        user1 = await create_user(session=session, name="user1", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-        user2 = await create_user(session=session, name="user2", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-        user3 = await create_user(session=session, name="user3", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
+        user1 = await create_user(
+            session=session,
+            name="user1",
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
+        user2 = await create_user(
+            session=session,
+            name="user2",
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
+        user3 = await create_user(
+            session=session,
+            name="user3",
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
 
-        await add_project_member(session=session, project=project, user=user1, project_role=ProjectRole.USER)
-        await add_project_member(session=session, project=project, user=user2, project_role=ProjectRole.USER)
-        await add_project_member(session=session, project=project, user=user3, project_role=ProjectRole.USER)
+        await add_project_member(
+            session=session, project=project, user=user1, project_role=ProjectRole.USER
+        )
+        await add_project_member(
+            session=session, project=project, user=user2, project_role=ProjectRole.USER
+        )
+        await add_project_member(
+            session=session, project=project, user=user3, project_role=ProjectRole.USER
+        )
 
         # Remove multiple members at once
         body = {"usernames": ["user1", "user2", "user3"]}
@@ -1542,18 +1755,32 @@ class TestMemberManagement:
     # Join/Leave Functionality Tests
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_user_can_join_public_project(self, test_db, session: AsyncSession, client: AsyncClient):
+    async def test_user_can_join_public_project(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         # Setup public project with admin
-        project = await create_project(session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
+        project = await create_project(
+            session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
+        )
         # Make project public
         project.is_public = True
         await session.commit()
 
-        admin = await create_user(session=session, name="admin", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-        await add_project_member(session=session, project=project, user=admin, project_role=ProjectRole.ADMIN)
+        admin = await create_user(
+            session=session,
+            name="admin",
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
+        await add_project_member(
+            session=session, project=project, user=admin, project_role=ProjectRole.ADMIN
+        )
 
         # Create user who wants to join
-        regular_user = await create_user(session=session, name="joiner", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
+        regular_user = await create_user(
+            session=session,
+            name="joiner",
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
 
         # User joins public project (should work)
         body = {"members": [{"username": "joiner", "project_role": "user"}]}
@@ -1576,16 +1803,30 @@ class TestMemberManagement:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_user_cannot_join_private_project(self, test_db, session: AsyncSession, client: AsyncClient):
+    async def test_user_cannot_join_private_project(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         # Setup private project with admin
-        project = await create_project(session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
+        project = await create_project(
+            session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
+        )
         # Project is private by default (is_public=False)
 
-        admin = await create_user(session=session, name="admin", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-        await add_project_member(session=session, project=project, user=admin, project_role=ProjectRole.ADMIN)
+        admin = await create_user(
+            session=session,
+            name="admin",
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
+        await add_project_member(
+            session=session, project=project, user=admin, project_role=ProjectRole.ADMIN
+        )
 
         # Create user who wants to join
-        regular_user = await create_user(session=session, name="joiner", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
+        regular_user = await create_user(
+            session=session,
+            name="joiner",
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
 
         # User tries to join private project (should fail)
         body = {"members": [{"username": "joiner", "project_role": "user"}]}
@@ -1599,17 +1840,31 @@ class TestMemberManagement:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_user_cannot_join_public_project_as_admin(self, test_db, session: AsyncSession, client: AsyncClient):
+    async def test_user_cannot_join_public_project_as_admin(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         # Setup public project with admin
-        project = await create_project(session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
+        project = await create_project(
+            session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
+        )
         project.is_public = True
         await session.commit()
 
-        admin = await create_user(session=session, name="admin", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-        await add_project_member(session=session, project=project, user=admin, project_role=ProjectRole.ADMIN)
+        admin = await create_user(
+            session=session,
+            name="admin",
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
+        await add_project_member(
+            session=session, project=project, user=admin, project_role=ProjectRole.ADMIN
+        )
 
         # Create user who wants to join as admin
-        regular_user = await create_user(session=session, name="joiner", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
+        regular_user = await create_user(
+            session=session,
+            name="joiner",
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
 
         # User tries to join public project as admin (should fail)
         body = {"members": [{"username": "joiner", "project_role": "admin"}]}
@@ -1623,14 +1878,30 @@ class TestMemberManagement:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_user_can_leave_project(self, test_db, session: AsyncSession, client: AsyncClient):
+    async def test_user_can_leave_project(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         # Setup project with admin and regular member
-        project = await create_project(session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-        admin = await create_user(session=session, name="admin", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-        regular_user = await create_user(session=session, name="leaver", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
+        project = await create_project(
+            session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
+        )
+        admin = await create_user(
+            session=session,
+            name="admin",
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
+        regular_user = await create_user(
+            session=session,
+            name="leaver",
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
 
-        await add_project_member(session=session, project=project, user=admin, project_role=ProjectRole.ADMIN)
-        await add_project_member(session=session, project=project, user=regular_user, project_role=ProjectRole.USER)
+        await add_project_member(
+            session=session, project=project, user=admin, project_role=ProjectRole.ADMIN
+        )
+        await add_project_member(
+            session=session, project=project, user=regular_user, project_role=ProjectRole.USER
+        )
 
         # User leaves project (should work)
         body = {"usernames": ["leaver"]}
@@ -1653,19 +1924,31 @@ class TestMemberManagement:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_user_can_leave_project_by_email(self, test_db, session: AsyncSession, client: AsyncClient):
+    async def test_user_can_leave_project_by_email(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         # Setup project with admin and regular member
-        project = await create_project(session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-        admin = await create_user(session=session, name="admin", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
+        project = await create_project(
+            session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
+        )
+        admin = await create_user(
+            session=session,
+            name="admin",
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
         regular_user = await create_user(
             session=session,
             name="leaver",
             email="leaver@example.com",
-            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
         )
 
-        await add_project_member(session=session, project=project, user=admin, project_role=ProjectRole.ADMIN)
-        await add_project_member(session=session, project=project, user=regular_user, project_role=ProjectRole.USER)
+        await add_project_member(
+            session=session, project=project, user=admin, project_role=ProjectRole.ADMIN
+        )
+        await add_project_member(
+            session=session, project=project, user=regular_user, project_role=ProjectRole.USER
+        )
 
         # User leaves project by email (should work)
         body = {"usernames": ["leaver@example.com"]}
@@ -1679,11 +1962,21 @@ class TestMemberManagement:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_last_admin_cannot_leave_project(self, test_db, session: AsyncSession, client: AsyncClient):
+    async def test_last_admin_cannot_leave_project(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         # Setup project with only one admin
-        project = await create_project(session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-        admin = await create_user(session=session, name="admin", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-        await add_project_member(session=session, project=project, user=admin, project_role=ProjectRole.ADMIN)
+        project = await create_project(
+            session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
+        )
+        admin = await create_user(
+            session=session,
+            name="admin",
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
+        await add_project_member(
+            session=session, project=project, user=admin, project_role=ProjectRole.ADMIN
+        )
 
         # Admin tries to leave (should fail as they're the last admin)
         body = {"usernames": ["admin"]}
@@ -1699,14 +1992,30 @@ class TestMemberManagement:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_admin_can_leave_if_other_admins_exist(self, test_db, session: AsyncSession, client: AsyncClient):
+    async def test_admin_can_leave_if_other_admins_exist(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         # Setup project with two admins
-        project = await create_project(session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-        admin1 = await create_user(session=session, name="admin1", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-        admin2 = await create_user(session=session, name="admin2", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
+        project = await create_project(
+            session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
+        )
+        admin1 = await create_user(
+            session=session,
+            name="admin1",
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
+        admin2 = await create_user(
+            session=session,
+            name="admin2",
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
 
-        await add_project_member(session=session, project=project, user=admin1, project_role=ProjectRole.ADMIN)
-        await add_project_member(session=session, project=project, user=admin2, project_role=ProjectRole.ADMIN)
+        await add_project_member(
+            session=session, project=project, user=admin1, project_role=ProjectRole.ADMIN
+        )
+        await add_project_member(
+            session=session, project=project, user=admin2, project_role=ProjectRole.ADMIN
+        )
 
         # One admin leaves (should work as there's another admin)
         body = {"usernames": ["admin1"]}
@@ -1726,16 +2035,38 @@ class TestMemberManagement:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_user_cannot_leave_others_from_project(self, test_db, session: AsyncSession, client: AsyncClient):
+    async def test_user_cannot_leave_others_from_project(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         # Setup project with admin and two regular users
-        project = await create_project(session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-        admin = await create_user(session=session, name="admin", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-        user1 = await create_user(session=session, name="user1", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-        user2 = await create_user(session=session, name="user2", created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
+        project = await create_project(
+            session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
+        )
+        admin = await create_user(
+            session=session,
+            name="admin",
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
+        user1 = await create_user(
+            session=session,
+            name="user1",
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
+        user2 = await create_user(
+            session=session,
+            name="user2",
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
 
-        await add_project_member(session=session, project=project, user=admin, project_role=ProjectRole.ADMIN)
-        await add_project_member(session=session, project=project, user=user1, project_role=ProjectRole.USER)
-        await add_project_member(session=session, project=project, user=user2, project_role=ProjectRole.USER)
+        await add_project_member(
+            session=session, project=project, user=admin, project_role=ProjectRole.ADMIN
+        )
+        await add_project_member(
+            session=session, project=project, user=user1, project_role=ProjectRole.USER
+        )
+        await add_project_member(
+            session=session, project=project, user=user2, project_role=ProjectRole.USER
+        )
 
         # user1 tries to remove user2 (should fail)
         body = {"usernames": ["user2"]}
