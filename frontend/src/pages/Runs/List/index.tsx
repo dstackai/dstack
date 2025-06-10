@@ -156,9 +156,9 @@ export const RunList: React.FC = () => {
                             expandToViewport
                             hideOperations
                             i18nStrings={{
-                                clearFiltersText: 'Clear filter',
-                                filteringAriaLabel: 'Find runs',
-                                filteringPlaceholder: 'Find runs',
+                                clearFiltersText: t('common.clearFilter'),
+                                filteringAriaLabel: t('projects.run.filter_property_placeholder'),
+                                filteringPlaceholder: t('projects.run.filter_property_placeholder'),
                                 operationAndText: 'and',
                             }}
                             filteringOptions={filteringOptions}

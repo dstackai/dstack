@@ -6,6 +6,8 @@ import type { PropertyFilterProps } from 'components';
 
 import { useProjectFilter } from 'hooks/useProjectFilter';
 
+import { useGetUserListQuery } from '../../../../services/user';
+
 type Args = {
     localStorePrefix: string;
 };
@@ -42,6 +44,7 @@ export const useFilters = ({ localStorePrefix }: Args) => {
     const [searchParams, setSearchParams] = useSearchParams();
     const [onlyActive, setOnlyActive] = useState(() => searchParams.get('only_active') === 'true');
     const { projectOptions } = useProjectFilter({ localStorePrefix });
+    const { data: usersData } = useGetUserListQuery();
 
     const [propertyFilterQuery, setPropertyFilterQuery] = useState<PropertyFilterProps.Query>(() => {
         const tokens = [];
@@ -81,8 +84,15 @@ export const useFilters = ({ localStorePrefix }: Args) => {
                 });
         });
 
+        usersData?.forEach(({ username }) => {
+            options.push({
+                propertyKey: FilterKeys.USER_NAME,
+                value: username,
+            });
+        });
+
         return options;
-    }, [projectOptions]);
+    }, [projectOptions, usersData]);
 
     const filteringProperties = [
         {
