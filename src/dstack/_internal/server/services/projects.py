@@ -1,6 +1,6 @@
 import uuid
 from datetime import timezone
-from typing import Awaitable, Callable, List, Optional, Tuple
+from typing import Awaitable, Callable, List, Optional, Tuple, Union
 
 from sqlalchemy import delete, select, update
 from sqlalchemy import func as safunc
@@ -74,8 +74,8 @@ async def list_user_accessible_projects(
 ) -> List[Project]:
     """
     Returns all projects accessible to the user:
-    - For global admins: ALL projects in the system
-    - For regular users: Projects where user is a member + public projects where user is NOT a member
+    - Projects where user is a member (public or private)
+    - Public projects where user is NOT a member
     """
     if user.global_role == GlobalRole.ADMIN:
         projects = await list_project_models(session=session)
@@ -227,6 +227,99 @@ async def set_project_members(
             member_num=i,
             commit=False,
         )
+    await session.commit()
+
+
+async def add_project_members(
+    session: AsyncSession,
+    user: UserModel,
+    project: ProjectModel,
+    members: List[MemberSetting],
+):
+    """Add multiple members to a project."""
+    # reload with members
+    project = await get_project_model_by_name_or_error(
+        session=session,
+        project_name=project.name,
+    )
+    requesting_user_role = get_user_project_role(user=user, project=project)
+
+    # Check if this is a self-join to public project
+    is_self_join_to_public = (
+        len(members) == 1 and
+        project.is_public and
+        (members[0].username == user.name or members[0].username == user.email) and
+        requesting_user_role is None  # User is not already a member
+    )
+
+    # Check permissions: only managers/admins can add members, EXCEPT for self-join to public projects
+    if not is_self_join_to_public:
+        if requesting_user_role not in [ProjectRole.ADMIN, ProjectRole.MANAGER]:
+            raise ForbiddenError("Access denied: insufficient permissions to add members")
+
+        # For project managers, check if they're trying to add admins
+        if user.global_role != GlobalRole.ADMIN and requesting_user_role == ProjectRole.MANAGER:
+            for member in members:
+                if member.project_role == ProjectRole.ADMIN:
+                    raise ForbiddenError("Access denied: only global admins can add project admins")
+    else:
+        # For self-join to public project, only allow USER role
+        if members[0].project_role != ProjectRole.USER:
+            raise ForbiddenError("Access denied: can only join public projects as user role")
+
+    # Collect all usernames to query
+    usernames = [member.username for member in members]
+    
+    # Find all users (by username or email)
+    res = await session.execute(
+        select(UserModel).where(
+            (UserModel.name.in_(usernames)) | (UserModel.email.in_(usernames))
+        )
+    )
+    users_found = res.scalars().all()
+    
+    # Create lookup maps for both username and email
+    username_to_user = {user.name: user for user in users_found}
+    email_to_user = {user.email: user for user in users_found if user.email}
+    
+    # Build a set of current member IDs so we can quickly check if users are already members
+    member_ids = {m.user_id for m in project.members}
+    # Build a map from user_id to member for efficient existing member updates
+    member_by_user_id = {m.user_id: m for m in project.members}
+    
+    # Get current max member_num
+    max_member_num = 0
+    for member in project.members:
+        if member.member_num is not None and member.member_num > max_member_num:
+            max_member_num = member.member_num
+
+    # Process each member to add
+    for member_setting in members:
+        user_to_add = username_to_user.get(member_setting.username) or email_to_user.get(member_setting.username)
+        if user_to_add is None:
+            # Error on adding non-existing users instead of silently skipping
+            raise ServerClientError(f"User not found: {member_setting.username}")
+
+        # Check if user is already a member using our fast lookup set
+        if user_to_add.id in member_ids:
+            # Update existing member role if different using our efficient lookup
+            existing_member = member_by_user_id[user_to_add.id]
+            if existing_member.project_role != member_setting.project_role:
+                existing_member.project_role = member_setting.project_role
+        else:
+            # Add new member
+            max_member_num += 1
+            await add_project_member(
+                session=session,
+                project=project,
+                user=user_to_add,
+                project_role=member_setting.project_role,
+                member_num=max_member_num,
+                commit=False,
+            )
+            # Keep track of newly added members for subsequent iterations
+            member_ids.add(user_to_add.id)
+
     await session.commit()
 
 
@@ -502,3 +595,92 @@ def _is_project_admin(
             if m.project_role == ProjectRole.ADMIN:
                 return True
     return False
+
+
+async def remove_project_members(
+    session: AsyncSession,
+    user: UserModel,
+    project: ProjectModel,
+    usernames: List[str],
+):
+    """Remove multiple members from a project."""
+    # reload with members
+    project = await get_project_model_by_name_or_error(
+        session=session,
+        project_name=project.name,
+    )
+    requesting_user_role = get_user_project_role(user=user, project=project)
+
+    # Check if this is a self-leave (user removing themselves)
+    is_self_leave = (
+        len(usernames) == 1 and
+        (usernames[0] == user.name or usernames[0] == user.email) and
+        requesting_user_role is not None  # User is actually a member
+    )
+
+    # Check basic permissions: only managers/admins can remove members, EXCEPT for self-leave
+    if not is_self_leave:
+        if requesting_user_role not in [ProjectRole.ADMIN, ProjectRole.MANAGER]:
+            raise ForbiddenError("Access denied: insufficient permissions to remove members")
+
+    # Find all users to remove (by username or email)
+    res = await session.execute(
+        select(UserModel).where(
+            (UserModel.name.in_(usernames)) | (UserModel.email.in_(usernames))
+        )
+    )
+    users_found = res.scalars().all()
+    
+    # Create lookup maps
+    username_to_user = {user.name: user for user in users_found}
+    email_to_user = {user.email: user for user in users_found if user.email}
+    
+    # Build a set of member IDs for faster membership checks
+    member_user_ids = {m.user_id for m in project.members}
+    # Build a map from user_id to member for efficient member lookups
+    member_by_user_id = {m.user_id: m for m in project.members}
+
+    # Find members to remove and validate permissions
+    members_to_remove = []
+    admin_removals = 0
+    
+    for username in usernames:
+        user_to_remove = username_to_user.get(username) or email_to_user.get(username)
+        if user_to_remove is None:
+            # Error on removing non-existing users instead of silently skipping
+            raise ServerClientError(f"User not found: {username}")
+
+        # Check if user is actually a member before trying to remove them
+        if user_to_remove.id not in member_user_ids:
+            # Error on removing non-members instead of silently skipping
+            raise ServerClientError(f"User is not a member of this project: {username}")
+
+        # Get the member to remove using our efficient lookup
+        member_to_remove = member_by_user_id[user_to_remove.id]
+
+        # Check if trying to remove project admin
+        if member_to_remove.project_role == ProjectRole.ADMIN:
+            if is_self_leave:
+                # For self-leave, check if user is the last admin
+                total_admins = sum(1 for member in project.members if member.project_role == ProjectRole.ADMIN)
+                if total_admins <= 1:
+                    raise ServerClientError("Cannot leave project: you are the last admin")
+            else:
+                # For manager/admin removing other admins, only global admins can do this
+                if user.global_role != GlobalRole.ADMIN:
+                    raise ForbiddenError(f"Access denied: only global admins can remove project admins (user: {username})")
+            admin_removals += 1
+
+        members_to_remove.append(member_to_remove)
+
+    # Check we're not removing all admins (for non-self-leave operations)
+    if not is_self_leave:
+        total_admins = sum(1 for member in project.members if member.project_role == ProjectRole.ADMIN)
+        if admin_removals >= total_admins:
+            raise ServerClientError("Cannot remove all project admins")
+
+    # Remove all members
+    for member in members_to_remove:
+        await session.delete(member)
+    
+    await session.commit()
