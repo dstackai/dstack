@@ -75,8 +75,8 @@ async def list_user_accessible_projects(
 ) -> List[Project]:
     """
     Returns all projects accessible to the user:
-    - Projects where user is a member (public or private)
-    - Public projects where user is NOT a member
+    - For global admins: ALL projects in the system
+    - For regular users: Projects where user is a member + public projects where user is NOT a member
     """
     if user.global_role == GlobalRole.ADMIN:
         projects = await list_project_models(session=session)
