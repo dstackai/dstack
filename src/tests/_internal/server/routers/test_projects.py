@@ -621,7 +621,6 @@ class TestGetProject:
             headers=get_auth_headers(non_member.token),
         )
         assert response.status_code == 200, response.json()
-
         # Verify response includes is_public=True
         response_data = response.json()
         assert response_data["is_public"] is True
