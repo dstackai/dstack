@@ -12,6 +12,7 @@ from dstack._internal.server.schemas.projects import (
     DeleteProjectsRequest,
     RemoveProjectMemberRequest,
     SetProjectMembersRequest,
+    UpdateProjectVisibilityRequest,
 )
 from dstack._internal.server.security.permissions import (
     Authenticated,
@@ -132,6 +133,25 @@ async def remove_project_members(
         user=user,
         project=project,
         usernames=body.usernames,
+    )
+    await session.refresh(project)
+    return projects.project_model_to_project(project)
+
+
+@router.post(
+    "/{project_name}/update_visibility",
+)
+async def update_project_visibility(
+    body: UpdateProjectVisibilityRequest,
+    session: AsyncSession = Depends(get_session),
+    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectManager()),
+) -> Project:
+    user, project = user_project
+    await projects.update_project_visibility(
+        session=session,
+        user=user,
+        project=project,
+        is_public=body.is_public,
     )
     await session.refresh(project)
     return projects.project_model_to_project(project)

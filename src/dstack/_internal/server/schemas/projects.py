@@ -11,6 +11,10 @@ class CreateProjectRequest(CoreModel):
     is_public: bool = False
 
 
+class UpdateProjectVisibilityRequest(CoreModel):
+    is_public: bool
+
+
 class DeleteProjectsRequest(CoreModel):
     projects_names: List[str]
 
