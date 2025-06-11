@@ -49,7 +49,10 @@ class TestListProjects:
             created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
         )
         await add_project_member(
-            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
+            session=session,
+            project=project,
+            user=user,
+            project_role=ProjectRole.ADMIN
         )
         await create_backend(
             session=session,
@@ -2077,4 +2080,150 @@ class TestMemberManagement:
         )
 
         assert response.status_code == 403
+<<<<<<< HEAD
 >>>>>>> 7fc1b408 (fix: retrack PR2 based on PR1)
+=======
+
+
+class TestUpdateProjectVisibility:
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_40x_if_not_authenticated(self, test_db, client: AsyncClient):
+        response = await client.post("/api/projects/test/update_visibility")
+        assert response.status_code in [401, 403]
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_404_if_project_does_not_exist(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session=session)
+        response = await client.post(
+            "/api/projects/nonexistent/update_visibility",
+            headers=get_auth_headers(user.token),
+            json={"is_public": True},
+        )
+        assert response.status_code == 404
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_project_admin_can_update_visibility(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        # Setup project with admin
+        admin_user = await create_user(session=session, name="admin", global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=admin_user, is_public=False)
+        await add_project_member(
+            session=session, project=project, user=admin_user, project_role=ProjectRole.ADMIN
+        )
+
+        # Admin should be able to make project public
+        response = await client.post(
+            f"/api/projects/{project.name}/update_visibility",
+            headers=get_auth_headers(admin_user.token),
+            json={"is_public": True},
+        )
+        assert response.status_code == 200
+        assert response.json()["is_public"] == True
+
+        # Admin should be able to make project private again
+        response = await client.post(
+            f"/api/projects/{project.name}/update_visibility",
+            headers=get_auth_headers(admin_user.token),
+            json={"is_public": False},
+        )
+        assert response.status_code == 200
+        assert response.json()["is_public"] == False
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_project_manager_can_update_visibility(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        # Setup project with admin and manager
+        admin_user = await create_user(session=session, name="admin", global_role=GlobalRole.USER)
+        manager_user = await create_user(session=session, name="manager", global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=admin_user, is_public=False)
+        await add_project_member(
+            session=session, project=project, user=admin_user, project_role=ProjectRole.ADMIN
+        )
+        await add_project_member(
+            session=session, project=project, user=manager_user, project_role=ProjectRole.MANAGER
+        )
+
+        # Manager should be able to update visibility
+        response = await client.post(
+            f"/api/projects/{project.name}/update_visibility",
+            headers=get_auth_headers(manager_user.token),
+            json={"is_public": True},
+        )
+        assert response.status_code == 200
+        assert response.json()["is_public"] == True
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_regular_user_cannot_update_visibility(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        # Setup project with admin and regular user
+        admin_user = await create_user(session=session, name="admin", global_role=GlobalRole.USER)
+        regular_user = await create_user(session=session, name="user", global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=admin_user, is_public=False)
+        await add_project_member(
+            session=session, project=project, user=admin_user, project_role=ProjectRole.ADMIN
+        )
+        await add_project_member(
+            session=session, project=project, user=regular_user, project_role=ProjectRole.USER
+        )
+
+        # Regular user should not be able to update visibility
+        response = await client.post(
+            f"/api/projects/{project.name}/update_visibility",
+            headers=get_auth_headers(regular_user.token),
+            json={"is_public": True},
+        )
+        assert response.status_code == 403
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_non_member_cannot_update_visibility(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        # Setup project with admin and separate non-member user
+        admin_user = await create_user(session=session, name="admin", global_role=GlobalRole.USER)
+        non_member_user = await create_user(session=session, name="nonmember", global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=admin_user, is_public=False)
+        await add_project_member(
+            session=session, project=project, user=admin_user, project_role=ProjectRole.ADMIN
+        )
+
+        # Non-member should not be able to update visibility
+        response = await client.post(
+            f"/api/projects/{project.name}/update_visibility",
+            headers=get_auth_headers(non_member_user.token),
+            json={"is_public": True},
+        )
+        assert response.status_code == 403
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_global_admin_can_update_any_project_visibility(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        # Setup project with regular owner and global admin
+        project_owner = await create_user(session=session, name="owner", global_role=GlobalRole.USER)
+        global_admin = await create_user(session=session, name="admin", global_role=GlobalRole.ADMIN)
+        project = await create_project(session=session, owner=project_owner, is_public=False)
+        await add_project_member(
+            session=session, project=project, user=project_owner, project_role=ProjectRole.ADMIN
+        )
+
+        # Global admin should be able to update any project's visibility
+        response = await client.post(
+            f"/api/projects/{project.name}/update_visibility",
+            headers=get_auth_headers(global_admin.token),
+            json={"is_public": True},
+        )
+        assert response.status_code == 200
+        assert response.json()["is_public"] == True
+>>>>>>> a6246f4d (Add project visibility update API endpoint)

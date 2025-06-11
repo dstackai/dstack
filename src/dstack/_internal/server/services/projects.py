@@ -150,6 +150,18 @@ async def create_project(
     return project_model_to_project(project_model)
 
 
+async def update_project_visibility(
+    session: AsyncSession,
+    user: UserModel,
+    project: ProjectModel,
+    is_public: bool,
+):
+    """Update project visibility (public/private)."""
+    # Update the project visibility
+    project.is_public = is_public
+    await session.commit()
+
+
 async def delete_projects(
     session: AsyncSession,
     user: UserModel,
