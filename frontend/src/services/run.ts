@@ -108,6 +108,7 @@ export const runApi = createApi({
 
                 try {
                     await queryFulfilled;
+                    // eslint-disable-next-line @typescript-eslint/no-unused-vars
                 } catch (e) {
                     patchGetRunResult.undo();
                     patchGetAllRunResult.undo();

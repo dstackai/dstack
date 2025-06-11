@@ -8,10 +8,13 @@ import { format, formatDistanceToNowStrict } from 'date-fns';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function arrayToRecordByKeyName<T extends { [K in keyof T]: any }, K extends keyof T>(array: T[], selector: K) {
-    return array.reduce((acc, item) => {
-        acc[item[selector]] = item;
-        return acc;
-    }, {} as Record<T[K], T>);
+    return array.reduce(
+        (acc, item) => {
+            acc[item[selector]] = item;
+            return acc;
+        },
+        {} as Record<T[K], T>,
+    );
 }
 
 export function wait(delayInMS: number): Promise<void> {
@@ -46,6 +49,7 @@ export const getDateAgoSting = (time: number): string => {
         if (Date.now() - time < MINUTE * 60 * 24) return formatDistanceToNowStrict(new Date(time), { addSuffix: true });
 
         return format(new Date(time), 'dd/MM/yyyy');
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (err) {
         return '';
     }
@@ -84,7 +88,6 @@ export const centsToFormattedString = (cents: number, currency?: string): string
 };
 
 export const riseRouterException = (status = 404, json = 'Not Found'): never => {
-    // eslint-disable-next-line @typescript-eslint/no-throw-literal
     throw new Response(json, { status });
 };
 
@@ -100,6 +103,7 @@ export const base64ToArrayBuffer = (base64: string) => {
 export const isValidUrl = (urlString: string) => {
     try {
         return Boolean(new URL(urlString));
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (e) {
         return false;
     }

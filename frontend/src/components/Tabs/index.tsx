@@ -31,7 +31,7 @@ export const Tabs: React.FC<IProps> = ({ className, withNavigation, onChange, ac
     const onChangeTab: TabsProps['onChange'] = (event) => {
         if (withNavigation) {
             const { detail } = event;
-            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+
             navigate(detail.activeTabHref!);
         }
 

@@ -41,6 +41,7 @@ export const UserAdd: React.FC = () => {
             });
 
             navigate(ROUTES.USER.DETAILS.FORMAT(data.username));
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
         } catch (e) {
             pushNotification({
                 type: 'error',

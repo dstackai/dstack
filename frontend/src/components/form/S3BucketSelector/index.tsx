@@ -63,7 +63,7 @@ export const FormS3BucketSelector = <T extends FieldValues>({
                     lastValue.current = bucket;
 
                     onChange(bucket);
-                    onChangeProp && onChangeProp(event);
+                    onChangeProp?.(event);
                 };
 
                 return (

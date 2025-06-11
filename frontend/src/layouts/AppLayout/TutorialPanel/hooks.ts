@@ -64,7 +64,6 @@ export const useTutorials = () => {
         dispatch(updateTutorialPanelState({ billingCompleted: true }));
     }, []);
 
-    // eslint-disable-next-line @typescript-eslint/no-empty-function
     const startConfigCliTutorial = useCallback(() => {}, [billingUrl]);
 
     const finishConfigCliTutorial = useCallback(() => {

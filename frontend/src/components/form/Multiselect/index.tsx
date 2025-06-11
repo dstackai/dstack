@@ -30,7 +30,7 @@ export const FormMultiselect = <T extends FieldValues>({
                 const onChangeSelect: MultiselectProps['onChange'] = (event) => {
                     const value = event.detail.selectedOptions.map((item) => item.value);
                     onChange(value);
-                    onChangeProp && onChangeProp(event);
+                    onChangeProp?.(event);
                 };
 
                 return (
