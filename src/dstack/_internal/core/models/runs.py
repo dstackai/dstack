@@ -529,13 +529,10 @@ class Run(CoreModel):
     def _status_message(cls, values) -> Dict:
         try:
             status = values["status"]
-            run_spec: RunSpec = values["run_spec"]
+            jobs: List[Job] = values["jobs"]
             retry_on_events = (
-                run_spec.configuration.retry.on_events
-                if run_spec and run_spec.configuration.retry
-                else []
+                jobs[0].job_spec.retry.on_events if jobs and jobs[0].job_spec.retry else []
             )
-            jobs = values["jobs"]
             termination_reason = Run.get_last_termination_reason(jobs[0]) if jobs else None
         except KeyError:
             return values
