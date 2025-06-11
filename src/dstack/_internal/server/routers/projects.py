@@ -15,6 +15,7 @@ from dstack._internal.server.security.permissions import (
     Authenticated,
     ProjectManager,
     ProjectMember,
+    ProjectMemberOrPublicAccess,
 )
 from dstack._internal.server.services import projects
 from dstack._internal.server.utils.routers import get_base_api_additional_responses
@@ -69,7 +70,7 @@ async def delete_projects(
 @router.post("/{project_name}/get")
 async def get_project(
     session: AsyncSession = Depends(get_session),
-    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
+    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMemberOrPublicAccess()),
 ) -> Project:
     _, project = user_project
     return projects.project_model_to_project(project)

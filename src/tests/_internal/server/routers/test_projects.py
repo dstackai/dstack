@@ -605,6 +605,157 @@ class TestGetProject:
             "is_public": False,
         }
 
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_non_member_can_access_public_project(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        # Create project owner
+        owner = await create_user(
+            session=session,
+            name="owner",
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+            global_role=GlobalRole.USER,  # Make owner a regular user
+        )
+        
+        # Create public project
+        project = await create_project(
+            session=session,
+            owner=owner,
+            name="public_project",
+            is_public=True,
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
+        await add_project_member(
+            session=session, project=project, user=owner, project_role=ProjectRole.ADMIN
+        )
+
+        # Create non-member user as regular user (not global admin)
+        non_member = await create_user(
+            session=session,
+            name="non_member",
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+            global_role=GlobalRole.USER,  # Make non_member a regular user
+        )
+
+        # Non-member should be able to access public project details
+        response = await client.post(
+            f"/api/projects/{project.name}/get",
+            headers=get_auth_headers(non_member.token),
+        )
+        assert response.status_code == 200, response.json()
+        
+        # Verify response includes is_public=True
+        response_data = response.json()
+        assert response_data["is_public"] is True
+        assert response_data["project_name"] == "public_project"
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_non_member_cannot_access_private_project(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        # Create project owner
+        owner = await create_user(
+            session=session,
+            name="owner",
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+            global_role=GlobalRole.USER,  # Make owner a regular user
+        )
+        
+        # Create private project
+        project = await create_project(
+            session=session,
+            owner=owner,
+            name="private_project",
+            is_public=False,
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
+        await add_project_member(
+            session=session, project=project, user=owner, project_role=ProjectRole.ADMIN
+        )
+
+        # Create non-member user as regular user (not global admin)
+        non_member = await create_user(
+            session=session,
+            name="non_member",
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+            global_role=GlobalRole.USER,  # Make non_member a regular user
+        )
+
+        # Non-member should NOT be able to access private project details
+        response = await client.post(
+            f"/api/projects/{project.name}/get",
+            headers=get_auth_headers(non_member.token),
+        )
+        assert response.status_code == 403, response.json()
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_member_can_access_both_public_and_private_projects(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        # Create project owner
+        owner = await create_user(
+            session=session,
+            name="owner",
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+            global_role=GlobalRole.USER,  # Make owner a regular user
+        )
+        
+        # Create public project
+        public_project = await create_project(
+            session=session,
+            owner=owner,
+            name="public_project",
+            is_public=True,
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
+        await add_project_member(
+            session=session, project=public_project, user=owner, project_role=ProjectRole.ADMIN
+        )
+        
+        # Create private project
+        private_project = await create_project(
+            session=session,
+            owner=owner,
+            name="private_project", 
+            is_public=False,
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
+        await add_project_member(
+            session=session, project=private_project, user=owner, project_role=ProjectRole.ADMIN
+        )
+
+        # Create member user as regular user (not global admin) and add to both projects
+        member = await create_user(
+            session=session,
+            name="member",
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+            global_role=GlobalRole.USER,  # Make member a regular user
+        )
+        await add_project_member(
+            session=session, project=public_project, user=member, project_role=ProjectRole.USER
+        )
+        await add_project_member(
+            session=session, project=private_project, user=member, project_role=ProjectRole.USER
+        )
+
+        # Member should be able to access both public and private projects
+        response = await client.post(
+            f"/api/projects/{public_project.name}/get",
+            headers=get_auth_headers(member.token),
+        )
+        assert response.status_code == 200, response.json()
+        assert response.json()["is_public"] is True
+
+        response = await client.post(
+            f"/api/projects/{private_project.name}/get",
+            headers=get_auth_headers(member.token),
+        )
+        assert response.status_code == 200, response.json()
+        assert response.json()["is_public"] is False
+
 
 class TestSetProjectMembers:
     @pytest.mark.asyncio
