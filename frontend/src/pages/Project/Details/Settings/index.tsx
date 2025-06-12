@@ -61,18 +61,11 @@ export const ProjectSettings: React.FC = () => {
     const { data, isLoading, error } = useGetProjectQuery({ name: paramProjectName });
 
     useEffect(() => {
-        // Only throw router exception for actual 404 errors, not permission errors
-        // For public projects, non-members should still be able to view project details
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-ignore
-        if (error?.status === 404) {
+        if (error && 'status' in error && error.status === 404) {
             riseRouterException();
         }
-        // Don't throw exceptions for other errors (like 403) as they might be permission-related
-        // but the project might still be viewable if it's public
     }, [error]);
 
-    // Check if current user is a member of the project
     const currentUserRole = data ? getProjectRoleByUserName(data, currentUser?.username ?? '') : null;
     const isProjectMember = currentUserRole !== null;
 
@@ -116,7 +109,7 @@ export const ProjectSettings: React.FC = () => {
                     content: t('projects.edit.update_members_success'),
                 });
             })
-            .catch((error) => {
+            .catch((error: any) => {
                 pushNotification({
                     type: 'error',
                     content: t('common.server_error', { error: error?.data?.detail?.msg }),
@@ -155,8 +148,7 @@ export const ProjectSettings: React.FC = () => {
 
         deleteProject(data)
             .then(() => navigate(ROUTES.PROJECT.LIST))
-            .catch((error) => {
-                // Error is already handled in useDeleteProject hook
+            .catch((error: any) => {
                 console.error('Delete project failed:', error);
             });
     };
