@@ -617,7 +617,7 @@ class TestGetProject:
             created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
             global_role=GlobalRole.USER,  # Make owner a regular user
         )
-        
+
         # Create public project
         project = await create_project(
             session=session,
@@ -644,7 +644,7 @@ class TestGetProject:
             headers=get_auth_headers(non_member.token),
         )
         assert response.status_code == 200, response.json()
-        
+
         # Verify response includes is_public=True
         response_data = response.json()
         assert response_data["is_public"] is True
@@ -662,7 +662,7 @@ class TestGetProject:
             created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
             global_role=GlobalRole.USER,  # Make owner a regular user
         )
-        
+
         # Create private project
         project = await create_project(
             session=session,
@@ -702,7 +702,7 @@ class TestGetProject:
             created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
             global_role=GlobalRole.USER,  # Make owner a regular user
         )
-        
+
         # Create public project
         public_project = await create_project(
             session=session,
@@ -714,12 +714,12 @@ class TestGetProject:
         await add_project_member(
             session=session, project=public_project, user=owner, project_role=ProjectRole.ADMIN
         )
-        
+
         # Create private project
         private_project = await create_project(
             session=session,
             owner=owner,
-            name="private_project", 
+            name="private_project",
             is_public=False,
             created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
         )

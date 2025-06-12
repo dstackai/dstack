@@ -14,7 +14,6 @@ from dstack._internal.server.schemas.projects import (
 from dstack._internal.server.security.permissions import (
     Authenticated,
     ProjectManager,
-    ProjectMember,
     ProjectMemberOrPublicAccess,
 )
 from dstack._internal.server.services import projects
