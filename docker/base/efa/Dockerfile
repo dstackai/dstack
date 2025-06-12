@@ -1,4 +1,6 @@
-FROM nvidia/cuda:12.1.1-devel-ubuntu20.04
+# syntax = edrevo/dockerfile-plus
+
+INCLUDE+ base/Dockerfile
 
 ENV NCCL_HOME=/usr/local
 ENV CUDA_PATH=/usr/local/cuda
