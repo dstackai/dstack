@@ -204,12 +204,8 @@ class ProjectManagerOrSelfLeave:
         if user.global_role == GlobalRole.ADMIN:
             return user, project
 
-        # Project managers can remove members
+        # Any project member can access (managers can remove others, members can leave)
         project_role = get_user_project_role(user=user, project=project)
-        if project_role in [ProjectRole.ADMIN, ProjectRole.MANAGER]:
-            return user, project
-
-        # Any project member can leave (will be validated in service layer)
         if project_role is not None:
             return user, project
 

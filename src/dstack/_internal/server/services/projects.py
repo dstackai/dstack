@@ -296,16 +296,8 @@ async def add_project_members(
     username_to_user = {user.name: user for user in users_found}
     email_to_user = {user.email: user for user in users_found if user.email}
 
-    # Build a set of current member IDs so we can quickly check if users are already members
-    member_ids = {m.user_id for m in project.members}
     # Build a map from user_id to member for efficient existing member updates
     member_by_user_id = {m.user_id: m for m in project.members}
-
-    # Get current max member_num
-    max_member_num = 0
-    for member in project.members:
-        if member.member_num is not None and member.member_num > max_member_num:
-            max_member_num = member.member_num
 
     # Process each member to add
     for member_setting in members:
@@ -313,28 +305,26 @@ async def add_project_members(
             member_setting.username
         )
         if user_to_add is None:
-            # Error on adding non-existing users instead of silently skipping
             raise ServerClientError(f"User not found: {member_setting.username}")
 
-        # Check if user is already a member using our fast lookup set
-        if user_to_add.id in member_ids:
-            # Update existing member role if different using our efficient lookup
+        # Check if user is already a member
+        if user_to_add.id in member_by_user_id:
+            # Update existing member role if different
             existing_member = member_by_user_id[user_to_add.id]
             if existing_member.project_role != member_setting.project_role:
                 existing_member.project_role = member_setting.project_role
         else:
-            # Add new member
-            max_member_num += 1
+            # Add new member (let database handle member_num to avoid race conditions)
             await add_project_member(
                 session=session,
                 project=project,
                 user=user_to_add,
                 project_role=member_setting.project_role,
-                member_num=max_member_num,
+                member_num=None,  # Let database auto-assign to avoid race conditions
                 commit=False,
             )
-            # Keep track of newly added members for subsequent iterations
-            member_ids.add(user_to_add.id)
+            # Update our local tracking for subsequent iterations
+            member_by_user_id[user_to_add.id] = None  # Placeholder to track addition
 
     await session.commit()
 
@@ -654,8 +644,6 @@ async def remove_project_members(
     username_to_user = {user.name: user for user in users_found}
     email_to_user = {user.email: user for user in users_found if user.email}
 
-    # Build a set of member IDs for faster membership checks
-    member_user_ids = {m.user_id for m in project.members}
     # Build a map from user_id to member for efficient member lookups
     member_by_user_id = {m.user_id: m for m in project.members}
 
@@ -666,15 +654,13 @@ async def remove_project_members(
     for username in usernames:
         user_to_remove = username_to_user.get(username) or email_to_user.get(username)
         if user_to_remove is None:
-            # Error on removing non-existing users instead of silently skipping
             raise ServerClientError(f"User not found: {username}")
 
         # Check if user is actually a member before trying to remove them
-        if user_to_remove.id not in member_user_ids:
-            # Error on removing non-members instead of silently skipping
+        if user_to_remove.id not in member_by_user_id:
             raise ServerClientError(f"User is not a member of this project: {username}")
 
-        # Get the member to remove using our efficient lookup
+        # Get the member to remove
         member_to_remove = member_by_user_id[user_to_remove.id]
 
         # Check if trying to remove project admin
