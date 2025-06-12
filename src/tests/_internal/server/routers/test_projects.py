@@ -49,10 +49,7 @@ class TestListProjects:
             created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
         )
         await add_project_member(
-            session=session,
-            project=project,
-            user=user,
-            project_role=ProjectRole.ADMIN
+            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
         )
         await create_backend(
             session=session,
@@ -2142,7 +2139,9 @@ class TestUpdateProjectVisibility:
     ):
         # Setup project with admin and manager
         admin_user = await create_user(session=session, name="admin", global_role=GlobalRole.USER)
-        manager_user = await create_user(session=session, name="manager", global_role=GlobalRole.USER)
+        manager_user = await create_user(
+            session=session, name="manager", global_role=GlobalRole.USER
+        )
         project = await create_project(session=session, owner=admin_user, is_public=False)
         await add_project_member(
             session=session, project=project, user=admin_user, project_role=ProjectRole.ADMIN
@@ -2191,7 +2190,9 @@ class TestUpdateProjectVisibility:
     ):
         # Setup project with admin and separate non-member user
         admin_user = await create_user(session=session, name="admin", global_role=GlobalRole.USER)
-        non_member_user = await create_user(session=session, name="nonmember", global_role=GlobalRole.USER)
+        non_member_user = await create_user(
+            session=session, name="nonmember", global_role=GlobalRole.USER
+        )
         project = await create_project(session=session, owner=admin_user, is_public=False)
         await add_project_member(
             session=session, project=project, user=admin_user, project_role=ProjectRole.ADMIN
@@ -2211,8 +2212,12 @@ class TestUpdateProjectVisibility:
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
         # Setup project with regular owner and global admin
-        project_owner = await create_user(session=session, name="owner", global_role=GlobalRole.USER)
-        global_admin = await create_user(session=session, name="admin", global_role=GlobalRole.ADMIN)
+        project_owner = await create_user(
+            session=session, name="owner", global_role=GlobalRole.USER
+        )
+        global_admin = await create_user(
+            session=session, name="admin", global_role=GlobalRole.ADMIN
+        )
         project = await create_project(session=session, owner=project_owner, is_public=False)
         await add_project_member(
             session=session, project=project, user=project_owner, project_role=ProjectRole.ADMIN

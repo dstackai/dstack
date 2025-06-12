@@ -71,6 +71,7 @@ class ProjectManager:
     """
     Allows project admins and managers to manage projects.
     """
+
     async def __call__(
         self,
         project_name: str,
@@ -83,16 +84,16 @@ class ProjectManager:
         project = await get_project_model_by_name(session=session, project_name=project_name)
         if project is None:
             raise error_not_found()
-        
+
         # Global admin can always manage projects
         if user.global_role == GlobalRole.ADMIN:
             return user, project
-        
+
         # Project managers and admins can manage projects
         project_role = get_user_project_role(user=user, project=project)
         if project_role in [ProjectRole.ADMIN, ProjectRole.MANAGER]:
             return user, project
-        
+
         raise error_forbidden()
 
 

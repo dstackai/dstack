@@ -609,7 +609,7 @@ def _is_project_admin(
     # Check if user is the project owner
     if user.id == project.owner_id:
         return True
-    
+
     # Check if user has admin role in project members
     for m in project.members:
         if user.id == m.user_id:
