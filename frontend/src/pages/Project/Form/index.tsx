@@ -2,7 +2,7 @@ import React from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 
-import { Button, Container, FormInput, FormUI, Header, SpaceBetween } from 'components';
+import { Button, Container, FormCheckbox, FormInput, FormUI, Header, SpaceBetween } from 'components';
 
 import { useNotifications } from 'hooks';
 import { isResponseServerError, isResponseServerFormFieldError } from 'libs';
@@ -16,6 +16,7 @@ export const ProjectForm: React.FC<IProps> = ({ initialValues, onCancel, loading
 
     const formMethods = useForm<IProject>({
         defaultValues: {
+            is_public: false,
             ...initialValues,
         },
     });
@@ -80,6 +81,14 @@ export const ProjectForm: React.FC<IProps> = ({ initialValues, onCancel, loading
                                         message: t('projects.edit.validation.user_name_format'),
                                     },
                                 }}
+                            />
+
+                            <FormCheckbox
+                                label={t('projects.edit.is_public')}
+                                description={t('projects.edit.is_public_description')}
+                                control={control}
+                                name="is_public"
+                                disabled={loading}
                             />
                         </SpaceBetween>
                     </Container>
