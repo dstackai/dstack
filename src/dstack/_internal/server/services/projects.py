@@ -175,7 +175,9 @@ async def delete_projects(
         for project_name in projects_names:
             if project_name not in user_project_names:
                 raise ForbiddenError()
-        for project in user_projects:
+        # Only check admin permissions for projects being deleted
+        projects_to_delete = [p for p in user_projects if p.name in projects_names]
+        for project in projects_to_delete:
             if not _is_project_admin(user=user, project=project):
                 raise ForbiddenError()
         if all(name in projects_names for name in user_project_names):
@@ -604,6 +606,11 @@ def _is_project_admin(
     user: UserModel,
     project: ProjectModel,
 ) -> bool:
+    # Check if user is the project owner
+    if user.id == project.owner_id:
+        return True
+    
+    # Check if user has admin role in project members
     for m in project.members:
         if user.id == m.user_id:
             if m.project_role == ProjectRole.ADMIN:
