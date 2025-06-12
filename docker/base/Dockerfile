@@ -1,8 +1,11 @@
 ARG FLAVOR
 FROM nvidia/cuda:12.1.1-${FLAVOR}-ubuntu20.04
 
+# UV & Python
+
 ARG PYTHON
 ARG _UV_HOME="/opt/uv"
+
 ENV UV_PYTHON="${PYTHON}"
 ENV UV_INSTALL_DIR="${_UV_HOME}/bin"
 ENV UV_PYTHON_INSTALL_DIR="${_UV_HOME}/python"
@@ -26,3 +29,32 @@ RUN export DEBIAN_FRONTEND=noninteractive && \
 
 RUN curl -LsSf https://astral.sh/uv/install.sh | INSTALLER_NO_MODIFY_PATH=1 sh && \
     uv python install --preview --default
+
+# NCCL & NCCL tests
+
+ARG NCCL_VERSION=2.26.2-1
+ARG FLAVOR
+
+ENV FLAVOR=${FLAVOR}
+ENV NCCL_HOME=/usr/local
+ENV CUDA_PATH=/usr/local/cuda
+ENV OPEN_MPI_PATH=/usr/lib/x86_64-linux-gnu/openmpi
+ENV LD_LIBRARY_PATH="${OPEN_MPI_PATH}/lib:${NCCL_HOME}/lib:${LD_LIBRARY_PATH}"
+ENV PATH="${OPEN_MPI_PATH}/bin:${HOME}/nccl-tests/build:${PATH}"
+
+RUN if [ "${FLAVOR}" = "devel" ]; then \
+    apt-get install -y --no-install-recommends \
+        libopenmpi-dev \
+    && cd $HOME \
+    && git clone https://github.com/NVIDIA/nccl.git -b v${NCCL_VERSION} \
+    && cd nccl \
+    && make -j$(nproc) src.build BUILDDIR=${NCCL_HOME} \
+    && cd $HOME \
+    && git clone https://github.com/NVIDIA/nccl-tests \
+    && cd nccl-tests \
+    && make -j$(nproc) \
+        MPI=1 \
+        MPI_HOME=${OPEN_MPI_PATH} \
+        CUDA_HOME=${CUDA_PATH} \
+        NCCL_HOME=${NCCL_HOME}; \
+    fi

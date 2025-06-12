@@ -1,21 +1,16 @@
-# syntax = edrevo/dockerfile-plus
+FROM nvidia/cuda:12.1.1-devel-ubuntu20.04
 
-INCLUDE+ base/Dockerfile
-
-ENV PREFIX=/usr/local
+ENV NCCL_HOME=/usr/local
 ENV CUDA_PATH=/usr/local/cuda
 ENV LIBFABRIC_PATH=/opt/amazon/efa
 ENV OPEN_MPI_PATH=/opt/amazon/openmpi
-ENV PATH="${LIBFABRIC_PATH}/bin:${OPEN_MPI_PATH}/bin:${PATH}"
+ENV PATH="${LIBFABRIC_PATH}/bin:${OPEN_MPI_PATH}/bin:${HOME}/nccl-tests/build:${PATH}"
 ENV LD_LIBRARY_PATH="${OPEN_MPI_PATH}/lib:${LD_LIBRARY_PATH}"
 
-# prerequisites
+# Prerequisites
 
-RUN cuda_version=$(echo ${CUDA_VERSION} | awk -F . '{ print $1"-"$2 }') \
-    && apt-get update \
+RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        cuda-libraries-dev-${cuda_version} \
-        cuda-nvcc-${cuda_version} \
         libhwloc-dev \
         autoconf \
         automake \
@@ -38,7 +33,7 @@ ARG NCCL_VERSION=2.26.2-1
 RUN cd $HOME \
     && git clone https://github.com/NVIDIA/nccl.git -b v${NCCL_VERSION} \
     && cd nccl \
-    && make -j$(nproc) src.build BUILDDIR=${PREFIX}
+    && make -j$(nproc) src.build BUILDDIR=${NCCL_HOME}
 
 # AWS OFI NCCL
 
@@ -53,9 +48,9 @@ RUN cd $HOME \
         --with-libfabric=${LIBFABRIC_PATH} \
         --with-mpi=${OPEN_MPI_PATH} \
         --with-cuda=${CUDA_PATH} \
-        --with-nccl=${PREFIX} \
+        --with-nccl=${NCCL_HOME} \
         --disable-tests \
-        --prefix=${PREFIX} \
+        --prefix=${NCCL_HOME} \
     && make -j$(numproc) \
     && make install
 
@@ -68,12 +63,4 @@ RUN cd $HOME \
         MPI=1 \
         MPI_HOME=${OPEN_MPI_PATH} \
         CUDA_HOME=${CUDA_PATH} \
-        NCCL_HOME=${PREFIX}
-
-ARG BUILD_DATE
-ARG IMAGE_NAME
-ARG DSTACK_REVISION
-
-LABEL org.opencontainers.image.title="${IMAGE_NAME}"
-LABEL org.opencontainers.image.version="${EFA_VERSION}-${DSTACK_REVISION}"
-LABEL org.opencontainers.image.created="${BUILD_DATE}"
+        NCCL_HOME=${NCCL_HOME}
