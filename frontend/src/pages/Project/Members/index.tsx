@@ -144,7 +144,7 @@ export const ProjectMembers: React.FC<IProps> = ({ members, loading, onChange, r
                 actions.unshift(
                     <Button
                         key="leave"
-                        onClick={() => handleLeaveProject(project.project_name, userData.username!)}
+                        onClick={() => handleLeaveProject(project.project_name, userData.username!, () => navigate(ROUTES.PROJECT.LIST))}
                         disabled={isMemberActionLoading || !canLeave}
                         variant="normal"
                     >

@@ -135,6 +135,15 @@ export const projectApi = createApi({
 
             providesTags: () => ['ProjectRepos'],
         }),
+
+        updateProject: builder.mutation<IProject, { project_name: string; is_public: boolean }>({
+            query: ({ project_name, is_public }) => ({
+                url: API.PROJECTS.UPDATE(project_name),
+                method: 'POST',
+                body: { is_public },
+            }),
+            invalidatesTags: (result, error, params) => [{ type: 'Projects' as const, id: params?.project_name }],
+        }),
     }),
 });
 
@@ -149,4 +158,5 @@ export const {
     useDeleteProjectsMutation,
     useGetProjectLogsQuery,
     useGetProjectReposQuery,
+    useUpdateProjectMutation,
 } = projectApi;

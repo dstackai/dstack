@@ -35,7 +35,7 @@ export const useProjectMemberActions = () => {
         }
     };
 
-    const handleLeaveProject = async (projectName: string, username: string) => {
+    const handleLeaveProject = async (projectName: string, username: string, onLeaveSuccess?: () => void) => {
         if (!username || !projectName) return;
         
         try {
@@ -49,8 +49,8 @@ export const useProjectMemberActions = () => {
                 content: t('projects.leave_success'),
             });
             
-            // Redirect to project list after successfully leaving
-            navigate(ROUTES.PROJECT.LIST);
+            // Optionally call the success callback
+            onLeaveSuccess?.();
         } catch (error) {
             console.error('Failed to leave project:', error);
             pushNotification({

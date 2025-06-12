@@ -24,7 +24,7 @@ import { HotspotIds } from 'layouts/AppLayout/TutorialPanel/constants';
 import { useBreadcrumbs, useHelpPanel, useNotifications } from 'hooks';
 import { riseRouterException } from 'libs';
 import { ROUTES } from 'routes';
-import { useGetProjectQuery, useUpdateProjectMembersMutation, useUpdateProjectVisibilityMutation } from 'services/project';
+import { useGetProjectQuery, useUpdateProjectMembersMutation, useUpdateProjectMutation } from 'services/project';
 
 import { useCheckAvailableProjectPermission } from 'pages/Project/hooks/useCheckAvailableProjectPermission';
 import { useConfigProjectCliCommand } from 'pages/Project/hooks/useConfigProjectCliComand';
@@ -54,7 +54,7 @@ export const ProjectSettings: React.FC = () => {
 
     const [pushNotification] = useNotifications();
     const [updateProjectMembers] = useUpdateProjectMembersMutation();
-    const [updateProjectVisibility] = useUpdateProjectVisibilityMutation();
+    const [updateProject] = useUpdateProjectMutation();
     const { deleteProject, isDeleting } = useDeleteProject();
     const { data: currentUser } = useGetUserDataQuery({});
 
@@ -126,10 +126,10 @@ export const ProjectSettings: React.FC = () => {
 
     const debouncedMembersHandler = useCallback(debounce(changeMembersHandler, 1000), []);
 
-    const changeVisibilityHandler = (isPublic: boolean) => {
-        updateProjectVisibility({
+    const changeVisibilityHandler = (is_public: boolean) => {
+        updateProject({
             project_name: paramProjectName,
-            is_public: isPublic,
+            is_public,
         })
             .unwrap()
             .then(() => {
@@ -138,7 +138,7 @@ export const ProjectSettings: React.FC = () => {
                     content: t('projects.edit.update_visibility_success'),
                 });
             })
-            .catch((error) => {
+            .catch((error: any) => {
                 pushNotification({
                     type: 'error',
                     content: t('common.server_error', { error: error?.data?.detail?.msg }),
@@ -232,7 +232,7 @@ export const ProjectSettings: React.FC = () => {
                                     {t('projects.edit.project_visibility_description')}
                                 </Box>
                                 <Toggle
-                                    checked={data.isPublic}
+                                    checked={data.is_public}
                                     onChange={(detail) => changeVisibilityHandler(detail.detail.checked)}
                                     disabled={!isProjectManager(data)}
                                 >
