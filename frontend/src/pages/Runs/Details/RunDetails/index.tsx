@@ -4,15 +4,14 @@ import { useParams } from 'react-router-dom';
 import { get as _get } from 'lodash';
 import { format } from 'date-fns';
 
-import { Box, ColumnLayout, Container, Header, Loader, NavigateLink, StatusIndicator } from 'components';
+import { Box, ColumnLayout, Container, Header, Loader, NavigateLink } from 'components';
 
 import { DATE_TIME_FORMAT } from 'consts';
-import { getRunError, getRunPriority, getRunStatusMessage, getStatusIconColor, getStatusIconType } from 'libs/run';
+import { getRunError, getRunPriority } from 'libs/run';
+import { ROUTES } from 'routes';
 import { useGetRunQuery } from 'services/run';
 
-import { finishedRunStatuses } from 'pages/Runs/constants';
-
-import { ROUTES } from '../../../../routes';
+import { RunStatusIndicator } from '../../components/RunStatusIndicator';
 import {
     getRunListItemBackend,
     getRunListItemInstanceId,
@@ -49,13 +48,6 @@ export const RunDetails = () => {
         );
 
     if (!runData) return null;
-
-    const status = finishedRunStatuses.includes(runData.status)
-        ? runData.latest_job_submission?.status ?? runData.status
-        : runData.status;
-    const terminationReason = finishedRunStatuses.includes(runData.status)
-        ? runData.latest_job_submission?.termination_reason
-        : null;
 
     return (
         <>
@@ -105,12 +97,7 @@ export const RunDetails = () => {
                     <div>
                         <Box variant="awsui-key-label">{t('projects.run.status')}</Box>
                         <div>
-                            <StatusIndicator
-                                type={getStatusIconType(status, terminationReason)}
-                                colorOverride={getStatusIconColor(status, terminationReason)}
-                            >
-                                {getRunStatusMessage(runData)}
-                            </StatusIndicator>
+                            <RunStatusIndicator run={runData} />
                         </div>
                     </div>
 
