@@ -1,6 +1,6 @@
-ARG BASE_IMAGE=dstackai/base:py3.12-0.7-cuda-12.1
+# syntax = edrevo/dockerfile-plus
 
-FROM ${BASE_IMAGE}
+INCLUDE+ base/Dockerfile
 
 ENV PREFIX=/usr/local
 ENV CUDA_PATH=/usr/local/cuda
