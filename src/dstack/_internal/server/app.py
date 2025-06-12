@@ -11,6 +11,7 @@ from fastapi import FastAPI, Request, Response, status
 from fastapi.datastructures import URL
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from prometheus_client import Counter, Histogram
 
 from dstack._internal.cli.utils.common import console
 from dstack._internal.core.errors import ForbiddenError, ServerClientError
@@ -62,6 +63,18 @@ from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.ssh import check_required_ssh_version
 
 logger = get_logger(__name__)
+
+# Server HTTP metrics
+REQUESTS_TOTAL = Counter(
+    "dstack_server_requests_total",
+    "Total number of HTTP requests",
+    ["method", "endpoint", "http_status", "project_name"],
+)
+REQUEST_DURATION = Histogram(
+    "dstack_server_request_duration_seconds",
+    "HTTP request duration in seconds",
+    ["method", "endpoint", "http_status", "project_name"],
+)
 
 
 def create_app() -> FastAPI:
@@ -216,6 +229,8 @@ def register_routes(app: FastAPI, ui: bool = True):
         start_time = time.time()
         response: Response = await call_next(request)
         process_time = time.time() - start_time
+        # log process_time to be used in the log_http_metrics middleware
+        request.state.process_time = process_time
         logger.debug(
             "Processed request %s %s in %s. Status: %s",
             request.method,
@@ -223,6 +238,36 @@ def register_routes(app: FastAPI, ui: bool = True):
             f"{process_time:0.6f}s",
             response.status_code,
         )
+        return response
+
+    # this middleware must be defined after the log_request middleware
+    @app.middleware("http")
+    async def log_http_metrics(request: Request, call_next):
+        def _extract_project_name(request: Request):
+            project_name = None
+            prefix = "/api/project/"
+            if request.url.path.startswith(prefix):
+                rest = request.url.path[len(prefix) :]
+                project_name = rest.split("/", 1)[0] if rest else None
+
+            return project_name
+
+        project_name = _extract_project_name(request)
+        response: Response = await call_next(request)
+
+        REQUEST_DURATION.labels(
+            method=request.method,
+            endpoint=request.url.path,
+            http_status=response.status_code,
+            project_name=project_name,
+        ).observe(request.state.process_time)
+
+        REQUESTS_TOTAL.labels(
+            method=request.method,
+            endpoint=request.url.path,
+            http_status=response.status_code,
+            project_name=project_name,
+        ).inc()
         return response
 
     @app.middleware("http")

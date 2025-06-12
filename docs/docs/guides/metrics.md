@@ -176,3 +176,21 @@ telemetry, and more.
     | `dstack_run_type`     | *string*  | Run configuration type | `task`, `dev-environment`              |
     | `dstack_backend`      | *string*  | Backend                | `aws`, `runpod`                        |
     | `dstack_gpu`          | *string?* | GPU name               | `H100`                                 |
+
+### Server health metrics
+
+These are operational metrics to monitor the health of the dstack server. For now, these only include HTTP metrics, but more will be added later.
+
+=== "Metrics"
+    | Name                                     | Type      | Description                       | Examples     |
+    |------------------------------------------|-----------|-----------------------------------|--------------|
+    | `dstack_server_requests_total` | *counter* | Total number of HTTP requests | `100.0` |
+    | `dstack_server_request_duration_seconds` | *histogram*   | HTTP request duration in seconds  | `1.0`|
+
+=== "Labels"
+    | Name                   | Type      | Description   | Examples                               |
+    |------------------------|-----------|:--------------|----------------------------------------|
+    | `method`  | *string*  | HTTP method  | `POST`                                 |
+    | `endpoint`    | *string* | Endpoint path    | `/api/project/main/repos/get`                             |
+    | `http_status`      | *string* | HTTP status code      | `200` |
+    | `project_name` | *string?*  | Project name  | `main`                           |
