@@ -19,7 +19,6 @@ from dstack._internal.server.security.permissions import (
     ProjectManager,
     ProjectManagerOrPublicJoin,
     ProjectManagerOrSelfLeave,
-    ProjectMember,
     ProjectMemberOrPublicAccess,
 )
 from dstack._internal.server.services import projects
