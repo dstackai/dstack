@@ -4,6 +4,7 @@ export interface IProps {
     onChange: (users: IProjectMember[]) => void;
     readonly?: boolean;
     isAdmin?: boolean;
+    project?: IProject;
 }
 
 export type TProjectMemberWithIndex = IProjectMember & { index: number };

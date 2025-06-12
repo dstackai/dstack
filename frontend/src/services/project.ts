@@ -61,6 +61,40 @@ export const projectApi = createApi({
             invalidatesTags: (result, error, params) => [{ type: 'Projects' as const, id: params?.project_name }],
         }),
 
+        addProjectMember: builder.mutation<IProject, { project_name: string; username: string; project_role?: string }>({
+            query: ({ project_name, username, project_role = 'user' }) => ({
+                url: API.PROJECTS.ADD_MEMBERS(project_name),
+                method: 'POST',
+                body: {
+                    members: [{ username, project_role }],
+                },
+            }),
+
+            invalidatesTags: (result, error, params) => [{ type: 'Projects' as const, id: params?.project_name }],
+        }),
+
+        removeProjectMember: builder.mutation<IProject, { project_name: string; username: string }>({
+            query: ({ project_name, username }) => ({
+                url: API.PROJECTS.REMOVE_MEMBERS(project_name),
+                method: 'POST',
+                body: {
+                    usernames: [username],
+                },
+            }),
+
+            invalidatesTags: (result, error, params) => [{ type: 'Projects' as const, id: params?.project_name }],
+        }),
+
+        updateProjectVisibility: builder.mutation<IProject, { project_name: string; is_public: boolean }>({
+            query: ({ project_name, is_public }) => ({
+                url: API.PROJECTS.UPDATE_VISIBILITY(project_name),
+                method: 'POST',
+                body: { is_public },
+            }),
+
+            invalidatesTags: (result, error, params) => [{ type: 'Projects' as const, id: params?.project_name }],
+        }),
+
         deleteProjects: builder.mutation<void, IProject['project_name'][]>({
             query: (projectNames) => ({
                 url: API.PROJECTS.DELETE(),
@@ -109,6 +143,9 @@ export const {
     useGetProjectQuery,
     useCreateProjectMutation,
     useUpdateProjectMembersMutation,
+    useAddProjectMemberMutation,
+    useRemoveProjectMemberMutation,
+    useUpdateProjectVisibilityMutation,
     useDeleteProjectsMutation,
     useGetProjectLogsQuery,
     useGetProjectReposQuery,
