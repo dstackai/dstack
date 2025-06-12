@@ -20,6 +20,7 @@ from dstack._internal.core.models.runs import (
     RunStatus,
     RunTerminationReason,
 )
+from dstack._internal.server.background.metrics import run_metrics
 from dstack._internal.server.db import get_session_ctx
 from dstack._internal.server.models import JobModel, ProjectModel, RunModel
 from dstack._internal.server.services.jobs import (
@@ -369,6 +370,26 @@ async def _process_active_run(session: AsyncSession, run_model: RunModel):
             run_model.status.name,
             new_status.name,
         )
+        if run_model.status == RunStatus.SUBMITTED and new_status == RunStatus.PROVISIONING:
+            current_time = datetime.datetime.now(datetime.timezone.utc)
+            submit_to_provision_duration = (
+                current_time - run_model.submitted_at.replace(tzinfo=datetime.timezone.utc)
+            ).total_seconds()
+            logger.info(
+                "%s: run took %.2f seconds from submision to provisioning.",
+                fmt(run_model),
+                submit_to_provision_duration,
+            )
+            project_name = run_model.project.name
+            run_type = RunSpec.__response__.parse_raw(run_model.run_spec).configuration.type
+            run_metrics.log_submit_to_provision_duration(
+                submit_to_provision_duration, project_name, run_type
+            )
+
+        if new_status == RunStatus.PENDING:
+            run_spec = RunSpec.__response__.parse_raw(run_model.run_spec)
+            run_metrics.increment_pending_runs(run_model.project.name, run_spec.configuration.type)
+
         run_model.status = new_status
         run_model.termination_reason = termination_reason
         # While a run goes to pending without provisioning, resubmission_attempt increases.

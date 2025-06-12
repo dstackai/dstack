@@ -109,7 +109,6 @@ async def get_run_metrics(session: AsyncSession) -> Iterable[Metric]:
             metrics.add_sample(_RUN_COUNT_TOTAL, labels, sum(statuses.values()))
             metrics.add_sample(_RUN_COUNT_TERMINATED, labels, statuses[RunStatus.TERMINATED])
             metrics.add_sample(_RUN_COUNT_FAILED, labels, statuses[RunStatus.FAILED])
-            metrics.add_sample(_RUN_COUNT_PENDING, labels, statuses[RunStatus.PENDING])
             metrics.add_sample(_RUN_COUNT_DONE, labels, statuses[RunStatus.DONE])
     return metrics.values()
 
@@ -195,7 +194,6 @@ _RUN_COUNT_TOTAL = "dstack_run_count_total"
 _RUN_COUNT_TERMINATED = "dstack_run_count_terminated_total"
 _RUN_COUNT_FAILED = "dstack_run_count_failed_total"
 _RUN_COUNT_DONE = "dstack_run_count_done_total"
-_RUN_COUNT_PENDING = "dstack_run_count_pending_total"
 _JOB_DURATION = "dstack_job_duration_seconds_total"
 _JOB_PRICE = "dstack_job_price_dollars_per_hour"
 _JOB_GPU_COUNT = "dstack_job_gpu_count"
@@ -248,7 +246,6 @@ class _RunMetrics(_Metrics):
         (_RUN_COUNT_TERMINATED, _COUNTER, "Terminated runs count"),
         (_RUN_COUNT_FAILED, _COUNTER, "Failed runs count"),
         (_RUN_COUNT_DONE, _COUNTER, "Done runs count"),
-        (_RUN_COUNT_PENDING, _COUNTER, "Pending runs count"),
     ]
 
 
