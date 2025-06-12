@@ -78,7 +78,7 @@ jobs:
           else
             TAG_SUFFIX="-devel"
             FLAVOR="devel"
-            FILE="base/Dockerfile"
+            FILE="base/devel/Dockerfile"
           fi
           docker buildx build \
             --platform linux/amd64 \
