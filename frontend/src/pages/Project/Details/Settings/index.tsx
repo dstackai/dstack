@@ -61,12 +61,20 @@ export const ProjectSettings: React.FC = () => {
     const { data, isLoading, error } = useGetProjectQuery({ name: paramProjectName });
 
     useEffect(() => {
+        // Only throw router exception for actual 404 errors, not permission errors
+        // For public projects, non-members should still be able to view project details
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-ignore
         if (error?.status === 404) {
             riseRouterException();
         }
+        // Don't throw exceptions for other errors (like 403) as they might be permission-related
+        // but the project might still be viewable if it's public
     }, [error]);
+
+    // Check if current user is a member of the project
+    const currentUserRole = data ? getProjectRoleByUserName(data, currentUser?.username ?? '') : null;
+    const isProjectMember = currentUserRole !== null;
 
     const currentOwner = {
         label: data?.owner.username,
@@ -164,42 +172,44 @@ export const ProjectSettings: React.FC = () => {
         <>
             {data && backendsData && gatewaysData && (
                 <SpaceBetween size="l">
-                    <Container
-                        header={
-                            <Header variant="h2" info={<InfoLink onFollow={() => openHelpPanel(CLI_INFO)} />}>
-                                {t('projects.edit.cli')}
-                            </Header>
-                        }
-                    >
-                        <SpaceBetween size="s">
-                            <Box variant="p" color="text-body-secondary">
-                                Run the following commands to set up the CLI for this project
-                            </Box>
+                    {isProjectMember && (
+                        <Container
+                            header={
+                                <Header variant="h2" info={<InfoLink onFollow={() => openHelpPanel(CLI_INFO)} />}>
+                                    {t('projects.edit.cli')}
+                                </Header>
+                            }
+                        >
+                            <SpaceBetween size="s">
+                                <Box variant="p" color="text-body-secondary">
+                                    Run the following commands to set up the CLI for this project
+                                </Box>
 
-                            <div className={styles.codeWrapper}>
-                                <Hotspot hotspotId={HotspotIds.CONFIGURE_CLI_COMMAND}>
-                                    <Code className={styles.code}>{configCliCommand}</Code>
+                                <div className={styles.codeWrapper}>
+                                    <Hotspot hotspotId={HotspotIds.CONFIGURE_CLI_COMMAND}>
+                                        <Code className={styles.code}>{configCliCommand}</Code>
 
-                                    <div className={styles.copy}>
-                                        <Popover
-                                            dismissButton={false}
-                                            position="top"
-                                            size="small"
-                                            triggerType="custom"
-                                            content={<StatusIndicator type="success">{t('common.copied')}</StatusIndicator>}
-                                        >
-                                            <Button
-                                                formAction="none"
-                                                iconName="copy"
-                                                variant="normal"
-                                                onClick={copyCliCommand}
-                                            />
-                                        </Popover>
-                                    </div>
-                                </Hotspot>
-                            </div>
-                        </SpaceBetween>
-                    </Container>
+                                        <div className={styles.copy}>
+                                            <Popover
+                                                dismissButton={false}
+                                                position="top"
+                                                size="small"
+                                                triggerType="custom"
+                                                content={<StatusIndicator type="success">{t('common.copied')}</StatusIndicator>}
+                                            >
+                                                <Button
+                                                    formAction="none"
+                                                    iconName="copy"
+                                                    variant="normal"
+                                                    onClick={copyCliCommand}
+                                                />
+                                            </Popover>
+                                        </div>
+                                    </Hotspot>
+                                </div>
+                            </SpaceBetween>
+                        </Container>
+                    )}
 
                     <BackendsTable
                         backends={backendsData}
