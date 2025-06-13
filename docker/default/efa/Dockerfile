@@ -3,12 +3,12 @@
 INCLUDE+ base/Dockerfile
 
 ENV NCCL_HOME=/usr/local
-ENV CUDA_PATH=/usr/local/cuda
+ENV CUDA_HOME=/usr/local/cuda
 ENV LIBFABRIC_PATH=/opt/amazon/efa
-ENV OPEN_MPI_PATH=/opt/amazon/openmpi
-ENV NCCL_TESTS_PATH=/opt/nccl-tests
-ENV PATH="${LIBFABRIC_PATH}/bin:${OPEN_MPI_PATH}/bin:${NCCL_TESTS_PATH}:${PATH}"
-ENV LD_LIBRARY_PATH="${OPEN_MPI_PATH}/lib:${NCCL_HOME}/lib:${LD_LIBRARY_PATH}"
+ENV MPI_HOME=/opt/amazon/openmpi
+ENV NCCL_TESTS_HOME=/opt/nccl-tests
+ENV PATH="${LIBFABRIC_PATH}/bin:${MPI_HOME}/bin:${NCCL_TESTS_HOME}/build:${PATH}"
+ENV LD_LIBRARY_PATH="${MPI_HOME}/lib:${NCCL_HOME}/lib:${LD_LIBRARY_PATH}"
 
 # Prerequisites
 
@@ -49,10 +49,9 @@ RUN cd $HOME \
     && cd aws-ofi-nccl \
     && ./autogen.sh \
     && ./configure \
-        --with-cuda=${CUDA_PATH} \
+        --with-cuda=${CUDA_HOME} \
         --with-libfabric=${LIBFABRIC_PATH} \
-        --with-mpi=${OPEN_MPI_PATH} \
-        --with-cuda=${CUDA_PATH} \
+        --with-mpi=${MPI_HOME} \
         --with-nccl=${NCCL_HOME} \
         --disable-tests \
         --prefix=${NCCL_HOME} \
@@ -61,13 +60,29 @@ RUN cd $HOME \
 
 # NCCL Tests
 
-RUN git clone https://github.com/NVIDIA/nccl-tests ${NCCL_TESTS_PATH} \
-    && cd ${NCCL_TESTS_PATH} \
+RUN git clone https://github.com/NVIDIA/nccl-tests ${NCCL_TESTS_HOME} \
+    && cd ${NCCL_TESTS_HOME} \
     && make -j$(numproc) \
         MPI=1 \
-        MPI_HOME=${OPEN_MPI_PATH} \
-        CUDA_HOME=${CUDA_PATH} \
+        MPI_HOME=${MPI_HOME} \
+        CUDA_HOME=${CUDA_HOME} \
         NCCL_HOME=${NCCL_HOME} \
     && echo "${NCCL_HOME}/lib" >> /etc/ld.so.conf.d/nccl.conf \
     && ldconfig
     
+ARG FLAVOR
+ENV FLAVOR=${FLAVOR}    
+
+# If FLAVOR is base, uninstall development packages to reduce image size
+RUN if [ "$FLAVOR" = "base" ]; then \
+    cuda_version=$(echo ${CUDA_VERSION} | awk -F . '{ print $1"-"$2 }') \
+    && apt-get remove -y \
+        cuda-nvcc-${cuda_version} \
+        libhwloc-dev \
+        autoconf \
+        automake \
+        libtool \
+    && apt-get autoremove -y \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*; \
+fi
