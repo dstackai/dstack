@@ -5,10 +5,9 @@ INCLUDE+ base/Dockerfile.common
 ENV NCCL_HOME=/usr/local
 ENV CUDA_HOME=/usr/local/cuda
 ENV LIBFABRIC_PATH=/opt/amazon/efa
-ENV MPI_HOME=/opt/amazon/openmpi
+ENV OPEN_MPI_PATH=/opt/amazon/openmpi
 ENV NCCL_TESTS_HOME=/opt/nccl-tests
-ENV PATH="${LIBFABRIC_PATH}/bin:${MPI_HOME}/bin:${NCCL_TESTS_HOME}/build:${PATH}"
-ENV LD_LIBRARY_PATH="${MPI_HOME}/lib:${NCCL_HOME}/lib:${LD_LIBRARY_PATH}"
+ENV PATH="${LIBFABRIC_PATH}/bin:${OPEN_MPI_PATH}/bin:${PATH}"
 
 ARG EFA_VERSION=1.38.1
 ARG NCCL_VERSION=2.26.2-1
@@ -39,18 +38,20 @@ RUN cuda_version=$(echo ${CUDA_VERSION} | awk -F . '{ print $1"-"$2 }') \
     && ./configure \
         --with-cuda=${CUDA_HOME} \
         --with-libfabric=${LIBFABRIC_PATH} \
-        --with-mpi=${MPI_HOME} \
+        --with-mpi=${OPEN_MPI_PATH} \
         --with-nccl=${NCCL_HOME} \
         --disable-tests \
         --prefix=${NCCL_HOME} \
     && make -j$(numproc) \
     && make install \
-    && git clone https://github.com/NVIDIA/nccl-tests ${NCCL_TESTS_HOME} \
-    && cd ${NCCL_TESTS_HOME} \
+    && git clone https://github.com/NVIDIA/nccl-tests ${HOME}/nccl-tests \
+    && cd ${HOME}/nccl-tests \
     && make -j$(numproc) \
         MPI=1 \
-        MPI_HOME=${MPI_HOME} \
+        MPI_HOME=${OPEN_MPI_PATH} \
         CUDA_HOME=${CUDA_HOME} \
         NCCL_HOME=${NCCL_HOME} \
+    && ln -s ${HOME}/nccl-tests/build ${NCCL_TESTS_HOME} \
+    && echo "${OPEN_MPI_PATH}/lib" >> /etc/ld.so.conf.d/openmpi.conf \
     && echo "${NCCL_HOME}/lib" >> /etc/ld.so.conf.d/nccl.conf \
     && ldconfig

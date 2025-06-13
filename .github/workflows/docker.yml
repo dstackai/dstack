@@ -78,7 +78,7 @@ jobs:
           fi
           docker buildx build \
             --platform linux/amd64 \
-            --tag dstackai/${{ env.BUILD_DOCKER_REPO }}:${{ matrix.flavor }}-${{ inputs.image_version }} \
+            --tag dstackai/${{ env.BUILD_DOCKER_REPO }}:${{ inputs.image_version }}-${{ matrix.flavor }} \
             --build-arg FLAVOR=${{ matrix.flavor }} \
             --provenance=false \
             --push \

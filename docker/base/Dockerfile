@@ -68,5 +68,6 @@ RUN apt-get install -y --no-install-recommends openmpi-bin \
             cuda-nvcc-${cuda_version} \
             libhwloc-dev; \
     fi \
+    && rm -rf /var/lib/apt/lists/* \
     && echo "${NCCL_HOME}/lib" >> /etc/ld.so.conf.d/nccl.conf \
     && ldconfig
