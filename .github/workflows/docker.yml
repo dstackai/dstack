@@ -75,7 +75,7 @@ jobs:
             --build-arg PYTHON=${{ matrix.python }} \
             --provenance=false \
             --push \
-            -f default/${{ matrix.version }}/Dockerfile .
+            -f base/${{ matrix.version }}/Dockerfile .
 
   build-aws-images:
     needs: build-docker
