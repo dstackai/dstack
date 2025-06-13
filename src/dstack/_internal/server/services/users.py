@@ -44,9 +44,8 @@ async def list_users_for_user(
     session: AsyncSession,
     user: UserModel,
 ) -> List[User]:
-    if user.global_role == GlobalRole.ADMIN:
-        return await list_all_users(session=session)
-    return [user_model_to_user(user)]
+    # Allow all authenticated users to see the user list for project collaboration
+    return await list_all_users(session=session)
 
 
 async def list_all_users(
