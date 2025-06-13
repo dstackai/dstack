@@ -22,6 +22,7 @@ RUN cuda_version=$(echo ${CUDA_VERSION} | awk -F . '{ print $1"-"$2 }') \
         autoconf \
         automake \
         libtool \
+        openmpi-bin \
         libopenmpi-dev \
     && cd $HOME \
     && git clone https://github.com/NVIDIA/nccl.git -b v${NCCL_VERSION} \
