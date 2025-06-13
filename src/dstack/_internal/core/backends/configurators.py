@@ -21,6 +21,15 @@ except ImportError:
     pass
 
 try:
+    from dstack._internal.core.backends.cloudrift.configurator import (
+        CloudRiftConfigurator,
+    )
+
+    _CONFIGURATOR_CLASSES.append(CloudRiftConfigurator)
+except ImportError:
+    pass
+
+try:
     from dstack._internal.core.backends.cudo.configurator import (
         CudoConfigurator,
     )

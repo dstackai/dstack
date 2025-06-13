@@ -315,6 +315,23 @@ to configure [backends](../../concepts/backends.md) and other [sever-level setti
         type:
             required: true
 
+##### `projects[n].backends[type=cloudrift]` { #cloudrift data-toc-label="cloudrift" }
+
+#SCHEMA# dstack._internal.core.backends.cloudrift.models.CloudRiftBackendConfigWithCreds
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+        item_id_prefix: cloudrift-
+
+###### `projects[n].backends[type=cloudrift].creds` { #cloudrift-creds data-toc-label="creds" }
+
+#SCHEMA# dstack._internal.core.backends.cloudrift.models.CloudRiftAPIKeyCreds
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+
 ### `encryption` { #encryption data-toc-label="encryption" }
 
 #SCHEMA# dstack._internal.server.services.config.EncryptionConfig
