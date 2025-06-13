@@ -51,7 +51,6 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python: ["3.9", "3.10", "3.11", "3.12", "3.13"]
         version: ["nvidia", "efa"]
         flavor: ["base", "devel"]
     steps:
@@ -70,9 +69,8 @@ jobs:
         run: |
           docker buildx build \
             --platform linux/amd64 \
-            --tag dstackai/${{ env.BUILD_DOCKER_REPO }}:py${{ matrix.python }}-${{ inputs.image_version }}-${{ matrix.version }}-${{ matrix.flavor }} \
+            --tag dstackai/${{ env.BUILD_DOCKER_REPO }}:${{ matrix.version }}-${{ matrix.flavor }}-${{ inputs.image_version }} \
             --build-arg FLAVOR=${{ matrix.flavor }} \
-            --build-arg PYTHON=${{ matrix.python }} \
             --provenance=false \
             --push \
             -f base/${{ matrix.version }}/Dockerfile .
