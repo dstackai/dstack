@@ -68,6 +68,10 @@ class ProjectAdmin:
 
 
 class ProjectManager:
+    """
+    Allows project admins and managers to manage projects.
+    """
+
     async def __call__(
         self,
         project_name: str,
@@ -79,12 +83,17 @@ class ProjectManager:
             raise error_invalid_token()
         project = await get_project_model_by_name(session=session, project_name=project_name)
         if project is None:
-            raise error_forbidden()
+            raise error_not_found()
+
+        # Global admin can always manage projects
         if user.global_role == GlobalRole.ADMIN:
             return user, project
+
+        # Project managers and admins can manage projects
         project_role = get_user_project_role(user=user, project=project)
         if project_role in [ProjectRole.ADMIN, ProjectRole.MANAGER]:
             return user, project
+
         raise error_forbidden()
 
 
@@ -101,10 +110,9 @@ class ProjectMember:
 
 class ProjectMemberOrPublicAccess:
     """
-    Allows access to project for:
-    - Global admins
-    - Project members
-    - Any authenticated user if the project is public
+    Allows access to project details for:
+    1. Project members (existing behavior)
+    2. Any authenticated user if the project is public
     """
 
     async def __call__(
@@ -122,14 +130,86 @@ class ProjectMemberOrPublicAccess:
         if project is None:
             raise error_not_found()
 
+        # Global admins always have access
         if user.global_role == GlobalRole.ADMIN:
             return user, project
 
+        # Check if user is a project member
         project_role = get_user_project_role(user=user, project=project)
         if project_role is not None:
             return user, project
 
+        # If not a member, check if project is public
         if project.is_public:
+            return user, project
+
+        # Neither member nor public project
+        raise error_forbidden()
+
+
+class ProjectManagerOrPublicJoin:
+    """
+    Allows:
+    1. Project managers to add any members
+    2. Any authenticated user to join public projects themselves
+    """
+
+    async def __call__(
+        self,
+        project_name: str,
+        session: AsyncSession = Depends(get_session),
+        token: HTTPAuthorizationCredentials = Security(HTTPBearer()),
+    ) -> Tuple[UserModel, ProjectModel]:
+        user = await log_in_with_token(session=session, token=token.credentials)
+        if user is None:
+            raise error_invalid_token()
+        project = await get_project_model_by_name(session=session, project_name=project_name)
+        if project is None:
+            raise error_not_found()
+
+        # Global admin can always manage projects
+        if user.global_role == GlobalRole.ADMIN:
+            return user, project
+
+        # Project managers can add members
+        project_role = get_user_project_role(user=user, project=project)
+        if project_role in [ProjectRole.ADMIN, ProjectRole.MANAGER]:
+            return user, project
+
+        # For public projects, any authenticated user can join (will be validated in service layer)
+        if project.is_public:
+            return user, project
+
+        raise error_forbidden()
+
+
+class ProjectManagerOrSelfLeave:
+    """
+    Allows:
+    1. Project managers to remove any members
+    2. Any project member to leave (remove themselves)
+    """
+
+    async def __call__(
+        self,
+        project_name: str,
+        session: AsyncSession = Depends(get_session),
+        token: HTTPAuthorizationCredentials = Security(HTTPBearer()),
+    ) -> Tuple[UserModel, ProjectModel]:
+        user = await log_in_with_token(session=session, token=token.credentials)
+        if user is None:
+            raise error_invalid_token()
+        project = await get_project_model_by_name(session=session, project_name=project_name)
+        if project is None:
+            raise error_not_found()
+
+        # Global admin can always manage projects
+        if user.global_role == GlobalRole.ADMIN:
+            return user, project
+
+        # Any project member can access (managers can remove others, members can leave)
+        project_role = get_user_project_role(user=user, project=project)
+        if project_role is not None:
             return user, project
 
         raise error_forbidden()

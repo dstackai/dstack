@@ -17,18 +17,21 @@ import {
     SelectCSD,
     SpaceBetween,
     StatusIndicator,
+    Toggle,
 } from 'components';
 import { HotspotIds } from 'layouts/AppLayout/TutorialPanel/constants';
 
 import { useBreadcrumbs, useHelpPanel, useNotifications } from 'hooks';
 import { riseRouterException } from 'libs';
 import { ROUTES } from 'routes';
-import { useGetProjectQuery, useUpdateProjectMembersMutation } from 'services/project';
+import { useGetProjectQuery, useUpdateProjectMembersMutation, useUpdateProjectVisibilityMutation } from 'services/project';
 
 import { useCheckAvailableProjectPermission } from 'pages/Project/hooks/useCheckAvailableProjectPermission';
 import { useConfigProjectCliCommand } from 'pages/Project/hooks/useConfigProjectCliComand';
 import { useDeleteProject } from 'pages/Project/hooks/useDeleteProject';
 import { ProjectMembers } from 'pages/Project/Members';
+import { getProjectRoleByUserName } from 'pages/Project/utils';
+import { useGetUserDataQuery } from 'services/user';
 
 import { useBackendsTable } from '../../Backends/hooks';
 import { BackendsTable } from '../../Backends/Table';
@@ -51,17 +54,27 @@ export const ProjectSettings: React.FC = () => {
 
     const [pushNotification] = useNotifications();
     const [updateProjectMembers] = useUpdateProjectMembersMutation();
+    const [updateProjectVisibility] = useUpdateProjectVisibilityMutation();
     const { deleteProject, isDeleting } = useDeleteProject();
+    const { data: currentUser } = useGetUserDataQuery({});
 
     const { data, isLoading, error } = useGetProjectQuery({ name: paramProjectName });
 
     useEffect(() => {
+        // Only throw router exception for actual 404 errors, not permission errors
+        // For public projects, non-members should still be able to view project details
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-ignore
         if (error?.status === 404) {
             riseRouterException();
         }
+        // Don't throw exceptions for other errors (like 403) as they might be permission-related
+        // but the project might still be viewable if it's public
     }, [error]);
+
+    // Check if current user is a member of the project
+    const currentUserRole = data ? getProjectRoleByUserName(data, currentUser?.username ?? '') : null;
+    const isProjectMember = currentUserRole !== null;
 
     const currentOwner = {
         label: data?.owner.username,
@@ -113,6 +126,26 @@ export const ProjectSettings: React.FC = () => {
 
     const debouncedMembersHandler = useCallback(debounce(changeMembersHandler, 1000), []);
 
+    const changeVisibilityHandler = (is_public: boolean) => {
+        updateProjectVisibility({
+            project_name: paramProjectName,
+            is_public,
+        })
+            .unwrap()
+            .then(() => {
+                pushNotification({
+                    type: 'success',
+                    content: t('projects.edit.update_visibility_success'),
+                });
+            })
+            .catch((error) => {
+                pushNotification({
+                    type: 'error',
+                    content: t('common.server_error', { error: error?.data?.detail?.msg }),
+                });
+            });
+    };
+
     const isDisabledButtons = useMemo<boolean>(() => {
         return isDeleting || !data || !isAvailableDeletingPermission(data);
     }, [data, isDeleting, isAvailableDeletingPermission]);
@@ -120,7 +153,12 @@ export const ProjectSettings: React.FC = () => {
     const deleteProjectHandler = () => {
         if (!data) return;
 
-        deleteProject(data).then(() => navigate(ROUTES.PROJECT.LIST));
+        deleteProject(data)
+            .then(() => navigate(ROUTES.PROJECT.LIST))
+            .catch((error) => {
+                // Error is already handled in useDeleteProject hook
+                console.error('Delete project failed:', error);
+            });
     };
 
     if (isLoadingPage)
@@ -134,42 +172,44 @@ export const ProjectSettings: React.FC = () => {
         <>
             {data && backendsData && gatewaysData && (
                 <SpaceBetween size="l">
-                    <Container
-                        header={
-                            <Header variant="h2" info={<InfoLink onFollow={() => openHelpPanel(CLI_INFO)} />}>
-                                {t('projects.edit.cli')}
-                            </Header>
-                        }
-                    >
-                        <SpaceBetween size="s">
-                            <Box variant="p" color="text-body-secondary">
-                                Run the following commands to set up the CLI for this project
-                            </Box>
+                    {isProjectMember && (
+                        <Container
+                            header={
+                                <Header variant="h2" info={<InfoLink onFollow={() => openHelpPanel(CLI_INFO)} />}>
+                                    {t('projects.edit.cli')}
+                                </Header>
+                            }
+                        >
+                            <SpaceBetween size="s">
+                                <Box variant="p" color="text-body-secondary">
+                                    Run the following commands to set up the CLI for this project
+                                </Box>
 
-                            <div className={styles.codeWrapper}>
-                                <Hotspot hotspotId={HotspotIds.CONFIGURE_CLI_COMMAND}>
-                                    <Code className={styles.code}>{configCliCommand}</Code>
+                                <div className={styles.codeWrapper}>
+                                    <Hotspot hotspotId={HotspotIds.CONFIGURE_CLI_COMMAND}>
+                                        <Code className={styles.code}>{configCliCommand}</Code>
 
-                                    <div className={styles.copy}>
-                                        <Popover
-                                            dismissButton={false}
-                                            position="top"
-                                            size="small"
-                                            triggerType="custom"
-                                            content={<StatusIndicator type="success">{t('common.copied')}</StatusIndicator>}
-                                        >
-                                            <Button
-                                                formAction="none"
-                                                iconName="copy"
-                                                variant="normal"
-                                                onClick={copyCliCommand}
-                                            />
-                                        </Popover>
-                                    </div>
-                                </Hotspot>
-                            </div>
-                        </SpaceBetween>
-                    </Container>
+                                        <div className={styles.copy}>
+                                            <Popover
+                                                dismissButton={false}
+                                                position="top"
+                                                size="small"
+                                                triggerType="custom"
+                                                content={<StatusIndicator type="success">{t('common.copied')}</StatusIndicator>}
+                                            >
+                                                <Button
+                                                    formAction="none"
+                                                    iconName="copy"
+                                                    variant="normal"
+                                                    onClick={copyCliCommand}
+                                                />
+                                            </Popover>
+                                        </div>
+                                    </Hotspot>
+                                </div>
+                            </SpaceBetween>
+                        </Container>
+                    )}
 
                     <BackendsTable
                         backends={backendsData}
@@ -185,11 +225,29 @@ export const ProjectSettings: React.FC = () => {
 
                     <GatewaysTable gateways={gatewaysData} />
 
+                    {isAvailableProjectManaging && (
+                        <Container header={<Header variant="h2">{t('projects.edit.project_visibility')}</Header>}>
+                            <SpaceBetween size="s">
+                                <Box variant="p" color="text-body-secondary">
+                                    {t('projects.edit.project_visibility_description')}
+                                </Box>
+                                <Toggle
+                                    checked={data.is_public}
+                                    onChange={(detail) => changeVisibilityHandler(detail.detail.checked)}
+                                    disabled={!isProjectManager(data)}
+                                >
+                                    {t('projects.edit.make_project_public')}
+                                </Toggle>
+                            </SpaceBetween>
+                        </Container>
+                    )}
+
                     <ProjectMembers
                         onChange={debouncedMembersHandler}
                         members={data.members}
                         readonly={!isProjectManager(data)}
                         isAdmin={isProjectAdmin(data)}
+                        project={data}
                     />
 
                     <Container header={<Header variant="h2">{t('common.danger_zone')}</Header>}>

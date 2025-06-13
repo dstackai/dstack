@@ -9,7 +9,10 @@ import dstack._internal.server.services.gateways as gateways
 from dstack._internal.core.errors import ResourceNotExistsError
 from dstack._internal.server.db import get_session
 from dstack._internal.server.models import ProjectModel, UserModel
-from dstack._internal.server.security.permissions import ProjectAdmin, ProjectMember
+from dstack._internal.server.security.permissions import (
+    ProjectAdmin,
+    ProjectMemberOrPublicAccess,
+)
 from dstack._internal.server.utils.routers import get_base_api_additional_responses
 
 router = APIRouter(
@@ -22,7 +25,7 @@ router = APIRouter(
 @router.post("/list")
 async def list_gateways(
     session: AsyncSession = Depends(get_session),
-    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
+    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMemberOrPublicAccess()),
 ) -> List[models.Gateway]:
     _, project = user_project
     return await gateways.list_project_gateways(session=session, project=project)
@@ -32,7 +35,7 @@ async def list_gateways(
 async def get_gateway(
     body: schemas.GetGatewayRequest,
     session: AsyncSession = Depends(get_session),
-    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
+    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMemberOrPublicAccess()),
 ) -> models.Gateway:
     _, project = user_project
     gateway = await gateways.get_gateway_by_name(session=session, project=project, name=body.name)
