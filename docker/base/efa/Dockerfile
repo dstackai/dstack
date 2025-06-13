@@ -1,6 +1,6 @@
 # syntax = edrevo/dockerfile-plus
 
-INCLUDE+ base/Dockerfile
+INCLUDE+ base/Dockerfile.common
 
 ENV NCCL_HOME=/usr/local
 ENV CUDA_HOME=/usr/local/cuda
