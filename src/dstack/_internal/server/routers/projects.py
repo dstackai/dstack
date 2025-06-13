@@ -14,7 +14,7 @@ from dstack._internal.server.schemas.projects import (
 from dstack._internal.server.security.permissions import (
     Authenticated,
     ProjectManager,
-    ProjectMember,
+    ProjectMemberOrPublicAccess,
 )
 from dstack._internal.server.services import projects
 from dstack._internal.server.utils.routers import get_base_api_additional_responses
@@ -36,7 +36,7 @@ async def list_projects(
 
     `members` and `backends` are always empty - call `/api/projects/{project_name}/get` to retrieve them.
     """
-    return await projects.list_user_projects(session=session, user=user)
+    return await projects.list_user_accessible_projects(session=session, user=user)
 
 
 @router.post("/create")
@@ -49,6 +49,7 @@ async def create_project(
         session=session,
         user=user,
         project_name=body.project_name,
+        is_public=body.is_public,
     )
 
 
@@ -68,7 +69,7 @@ async def delete_projects(
 @router.post("/{project_name}/get")
 async def get_project(
     session: AsyncSession = Depends(get_session),
-    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
+    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMemberOrPublicAccess()),
 ) -> Project:
     _, project = user_project
     return projects.project_model_to_project(project)

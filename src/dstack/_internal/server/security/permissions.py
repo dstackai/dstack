@@ -99,6 +99,42 @@ class ProjectMember:
         return await get_project_member(session, project_name, token.credentials)
 
 
+class ProjectMemberOrPublicAccess:
+    """
+    Allows access to project for:
+    - Global admins
+    - Project members
+    - Any authenticated user if the project is public
+    """
+
+    async def __call__(
+        self,
+        *,
+        session: AsyncSession = Depends(get_session),
+        project_name: str,
+        token: HTTPAuthorizationCredentials = Security(HTTPBearer()),
+    ) -> Tuple[UserModel, ProjectModel]:
+        user = await log_in_with_token(session=session, token=token.credentials)
+        if user is None:
+            raise error_invalid_token()
+
+        project = await get_project_model_by_name(session=session, project_name=project_name)
+        if project is None:
+            raise error_not_found()
+
+        if user.global_role == GlobalRole.ADMIN:
+            return user, project
+
+        project_role = get_user_project_role(user=user, project=project)
+        if project_role is not None:
+            return user, project
+
+        if project.is_public:
+            return user, project
+
+        raise error_forbidden()
+
+
 class OptionalServiceAccount:
     def __init__(self, token: Optional[str]) -> None:
         self._token = token
