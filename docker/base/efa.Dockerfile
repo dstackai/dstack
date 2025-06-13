@@ -53,15 +53,4 @@ RUN cuda_version=$(echo ${CUDA_VERSION} | awk -F . '{ print $1"-"$2 }') \
         CUDA_HOME=${CUDA_HOME} \
         NCCL_HOME=${NCCL_HOME} \
     && echo "${NCCL_HOME}/lib" >> /etc/ld.so.conf.d/nccl.conf \
-    && ldconfig \
-    && if [ "$FLAVOR" = "base" ]; then \
-        apt-get remove -y \
-            cuda-nvcc-${cuda_version} \
-            libhwloc-dev \
-            autoconf \
-            automake \
-            libtool \
-        && apt-get autoremove -y \
-        && apt-get clean \
-        && rm -rf /var/lib/apt/lists/*; \
-    fi
+    && ldconfig

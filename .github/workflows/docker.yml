@@ -51,8 +51,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        version: ["nvidia", "efa"]
-        flavor: ["base", "devel"]
+        flavor: ["base", "devel", "devel-efa"]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -67,13 +66,23 @@ jobs:
         uses: docker/setup-qemu-action@v3
       - name: Build and upload to DockerHub
         run: |
+         if [ "${{ matrix.flavor }}" = "base" ]; then
+            FLAVOR="base"
+            FILE="base/Dockerfile"
+          elif [ "${{ matrix.flavor }}" = "devel" ]; then
+            FLAVOR="devel"
+            FILE="base/Dockerfile"
+          else
+            FLAVOR="devel-efa"
+            FILE="base/efa.Dockerfile"
+          fi
           docker buildx build \
             --platform linux/amd64 \
-            --tag dstackai/${{ env.BUILD_DOCKER_REPO }}:${{ matrix.version }}-${{ matrix.flavor }}-${{ inputs.image_version }} \
+            --tag dstackai/${{ env.BUILD_DOCKER_REPO }}:${{ matrix.version }}-${{ matrix.flavor }} \
             --build-arg FLAVOR=${{ matrix.flavor }} \
             --provenance=false \
             --push \
-            -f base/${{ matrix.version }}/Dockerfile .
+            -f $FILE .
 
   build-aws-images:
     needs: build-docker
