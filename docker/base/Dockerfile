@@ -60,7 +60,8 @@ COPY --from=builder ${NCCL_TESTS_HOME}/build ${NCCL_TESTS_HOME}
 ARG FLAVOR
 
 # Configure library paths
-RUN apt-get install -y --no-install-recommends openmpi-bin \
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends openmpi-bin \
     && if [ "$FLAVOR" = "devel" ]; then \
         cuda_version=$(echo ${CUDA_VERSION} | awk -F . '{ print $1"-"$2 }') \
         && apt-get install -y --no-install-recommends \

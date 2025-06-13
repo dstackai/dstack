@@ -14,7 +14,8 @@ ARG NCCL_VERSION=2.26.2-1
 ARG OFI_VERSION=1.14.0
 ARG FLAVOR
 
-RUN cuda_version=$(echo ${CUDA_VERSION} | awk -F . '{ print $1"-"$2 }') \
+RUN apt-get update \
+    && cuda_version=$(echo ${CUDA_VERSION} | awk -F . '{ print $1"-"$2 }') \
     && apt-get install -y --no-install-recommends \
         cuda-libraries-dev-${cuda_version} \
         cuda-nvcc-${cuda_version} \
