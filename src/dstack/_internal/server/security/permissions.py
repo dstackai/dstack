@@ -101,9 +101,10 @@ class ProjectMember:
 
 class ProjectMemberOrPublicAccess:
     """
-    Allows access to project details for:
-    1. Project members (existing behavior)
-    2. Any authenticated user if the project is public
+    Allows access to project for:
+    - Global admins
+    - Project members
+    - Any authenticated user if the project is public
     """
 
     async def __call__(
@@ -121,20 +122,16 @@ class ProjectMemberOrPublicAccess:
         if project is None:
             raise error_not_found()
 
-        # Global admins always have access
         if user.global_role == GlobalRole.ADMIN:
             return user, project
 
-        # Check if user is a project member
         project_role = get_user_project_role(user=user, project=project)
         if project_role is not None:
             return user, project
 
-        # If not a member, check if project is public
         if project.is_public:
             return user, project
 
-        # Neither member nor public project
         raise error_forbidden()
 
 

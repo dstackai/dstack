@@ -55,7 +55,6 @@ async def list_user_projects(
 ) -> List[Project]:
     """
     Returns projects where the user is a member.
-    For backward compatibility - use list_user_accessible_projects for public project discovery.
     """
     if user.global_role == GlobalRole.ADMIN:
         projects = await list_project_models(session=session)
@@ -82,7 +81,7 @@ async def list_user_accessible_projects(
         projects = await list_project_models(session=session)
     else:
         member_projects = await list_user_project_models(session=session, user=user)
-        public_projects = await _list_public_non_member_project_models(session=session, user=user)
+        public_projects = await list_public_non_member_project_models(session=session, user=user)
         projects = member_projects + public_projects
 
     projects = sorted(projects, key=lambda p: p.created_at)
@@ -264,15 +263,7 @@ async def list_user_project_models(
     include_members: bool = False,
 ) -> List[ProjectModel]:
     """
-    Get projects for a user where they are a member.
-
-    Args:
-        session: Database session
-        user: User model
-        include_members: Whether to join and load project members
-
-    Returns:
-        List of ProjectModel instances where user is a member
+    List project models for a user where they are a member.
     """
     options = []
     if include_members:
@@ -289,12 +280,12 @@ async def list_user_project_models(
     return list(res.scalars().unique().all())
 
 
-async def _list_public_non_member_project_models(
+async def list_public_non_member_project_models(
     session: AsyncSession,
     user: UserModel,
 ) -> List[ProjectModel]:
     """
-    Get public projects where user is NOT a member.
+    List public project models where user is NOT a member.
     """
     res = await session.execute(
         select(ProjectModel).where(
