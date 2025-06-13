@@ -6,13 +6,16 @@ ENV NCCL_HOME=/usr/local
 ENV CUDA_PATH=/usr/local/cuda
 ENV LIBFABRIC_PATH=/opt/amazon/efa
 ENV OPEN_MPI_PATH=/opt/amazon/openmpi
-ENV PATH="${LIBFABRIC_PATH}/bin:${OPEN_MPI_PATH}/bin:${HOME}/nccl-tests/build:${PATH}"
-ENV LD_LIBRARY_PATH="${OPEN_MPI_PATH}/lib:${LD_LIBRARY_PATH}"
+ENV NCCL_TESTS_PATH=/opt/nccl-tests
+ENV PATH="${LIBFABRIC_PATH}/bin:${OPEN_MPI_PATH}/bin:${NCCL_TESTS_PATH}:${PATH}"
+ENV LD_LIBRARY_PATH="${OPEN_MPI_PATH}/lib:${NCCL_HOME}/lib:${LD_LIBRARY_PATH}"
 
 # Prerequisites
 
-RUN apt-get update \
+RUN cuda_version=$(echo ${CUDA_VERSION} | awk -F . '{ print $1"-"$2 }') \
     && apt-get install -y --no-install-recommends \
+        cuda-libraries-dev-${cuda_version} \
+        cuda-nvcc-${cuda_version} \
         libhwloc-dev \
         autoconf \
         automake \
@@ -58,11 +61,13 @@ RUN cd $HOME \
 
 # NCCL Tests
 
-RUN cd $HOME \
-    && git clone https://github.com/NVIDIA/nccl-tests \
-    && cd nccl-tests \
+RUN git clone https://github.com/NVIDIA/nccl-tests ${NCCL_TESTS_PATH} \
+    && cd ${NCCL_TESTS_PATH} \
     && make -j$(numproc) \
         MPI=1 \
         MPI_HOME=${OPEN_MPI_PATH} \
         CUDA_HOME=${CUDA_PATH} \
-        NCCL_HOME=${NCCL_HOME}
+        NCCL_HOME=${NCCL_HOME} \
+    && echo "${NCCL_HOME}/lib" >> /etc/ld.so.conf.d/nccl.conf \
+    && ldconfig
+    

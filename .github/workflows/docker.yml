@@ -69,15 +69,12 @@ jobs:
         run: |
           if [ "${{ matrix.flavor }}" = "base" ]; then
             TAG_SUFFIX=""
-            FLAVOR="base"
             FILE="base/Dockerfile"
           elif [ "${{ matrix.flavor }}" = "efa" ]; then
             TAG_SUFFIX="-efa"
-            FLAVOR="devel"
             FILE="base/efa/Dockerfile"
           else
             TAG_SUFFIX="-devel"
-            FLAVOR="devel"
             FILE="base/devel/Dockerfile"
           fi
           docker buildx build \
