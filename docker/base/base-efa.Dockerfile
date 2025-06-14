@@ -92,7 +92,7 @@ RUN apt-get update \
     && curl -O https://s3-us-west-2.amazonaws.com/aws-efa-installer/aws-efa-installer-${EFA_VERSION}.tar.gz \
     && tar -xf aws-efa-installer-${EFA_VERSION}.tar.gz \
     && cd aws-efa-installer \
-    && ./efa_installer.sh -y --skip-kmod -g
+    && ./efa_installer.sh -y --skip-kmod -g \
     && rm -rf /tmp/aws-efa-installer /var/lib/apt/lists/* \
     && echo "${NCCL_HOME}/lib" >> /etc/ld.so.conf.d/nccl.conf \
     && echo "${OPEN_MPI_PATH}/lib" >> /etc/ld.so.conf.d/openmpi.conf \
