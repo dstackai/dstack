@@ -21,7 +21,7 @@ commands:
     else
       sleep infinity
     fi
-    
+
 resources:
   gpu: nvidia:1..8
   shm_size: 16GB
