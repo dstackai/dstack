@@ -7,8 +7,7 @@ ENV NCCL_HOME=/opt/nccl
 ENV CUDA_PATH=/usr/local/cuda
 ENV LIBFABRIC_PATH=/opt/amazon/efa
 ENV OPEN_MPI_PATH=/opt/amazon/openmpi
-ENV PATH="${LIBFABRIC_PATH}/bin:${OPEN_MPI_PATH}/bin:${PATH}"
-ENV LD_LIBRARY_PATH="${OPEN_MPI_PATH}/lib:${LD_LIBRARY_PATH}"
+ENV NCCL_TESTS_HOME=/opt/nccl-tests
 
 # Install build dependencies
 RUN export DEBIAN_FRONTEND=noninteractive \
