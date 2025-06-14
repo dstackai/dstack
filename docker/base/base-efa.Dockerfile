@@ -73,6 +73,8 @@ RUN git clone https://github.com/NVIDIA/nccl-tests ${NCCL_TESTS_HOME} \
 # Final stage
 INCLUDE+ base/Dockerfile.common
 
+ARG EFA_VERSION=1.38.1
+
 ENV NCCL_HOME=/opt/nccl
 ENV LIBFABRIC_PATH=/opt/amazon/efa
 ENV OPEN_MPI_PATH=/opt/amazon/openmpi
