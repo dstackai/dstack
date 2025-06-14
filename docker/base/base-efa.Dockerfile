@@ -76,6 +76,7 @@ INCLUDE+ base/Dockerfile.common
 ARG EFA_VERSION=1.38.1
 
 ENV NCCL_HOME=/opt/nccl
+ENV OFI_NCCL_HOME=/opt/amazon/ofi-nccl
 ENV LIBFABRIC_PATH=/opt/amazon/efa
 ENV OPEN_MPI_PATH=/opt/amazon/openmpi
 ENV NCCL_TESTS_HOME=/opt/nccl-tests
