@@ -52,7 +52,7 @@ jobs:
     strategy:
       matrix:
         # flavor: ["base", "devel", "devel-efa"]
-        flavor: ["devel-efa"]
+        flavor: ["base-efa"]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
