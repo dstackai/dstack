@@ -31,9 +31,4 @@ build {
   provisioner "shell" {
     script = "provisioners/install-nvidia-container-toolkit.sh"
   }
-
-  provisioner "shell" {
-    environment_vars = ["IMAGE_VERSION=${var.image_version}"]
-    script           = "provisioners/pull-docker-images.sh"
-  }
 }
