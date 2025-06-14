@@ -51,7 +51,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        flavor: ["base", "devel", "devel-efa"]
+        # flavor: ["base", "devel", "devel-efa"]
+        flavor: ["base-efa"]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -70,6 +71,8 @@ jobs:
             FILE="base/Dockerfile"
           elif [ "${{ matrix.flavor }}" = "devel" ]; then
             FILE="base/Dockerfile"
+          elif [ "${{ matrix.flavor }}" = "base-efa" ]; then
+            FILE="base/base-efa.Dockerfile"
           else
             FILE="base/efa.Dockerfile"
           fi
