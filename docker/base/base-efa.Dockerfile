@@ -10,17 +10,27 @@ ENV OPEN_MPI_PATH=/opt/amazon/openmpi
 ENV PATH="${LIBFABRIC_PATH}/bin:${OPEN_MPI_PATH}/bin:${PATH}"
 ENV LD_LIBRARY_PATH="${OPEN_MPI_PATH}/lib:${LD_LIBRARY_PATH}"
 
-# prerequisites
-
-RUN cuda_version=$(echo ${CUDA_VERSION} | awk -F . '{ print $1"-"$2 }') \
-    && apt-get update \
+# Install build dependencies
+RUN export DEBIAN_FRONTEND=noninteractive \
+    && apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/3bf863cc.pub \
+    && apt-get update --fix-missing \
+    && apt-get upgrade -y \
+    && ln -fs /usr/share/zoneinfo/America/New_York /etc/localtime \
+    && apt-get install -y tzdata \
+    && dpkg-reconfigure --frontend noninteractive tzdata \
+    && cuda_version=$(echo ${CUDA_VERSION} | awk -F . '{ print $1"-"$2 }') \
     && apt-get install -y --no-install-recommends \
         cuda-libraries-dev-${cuda_version} \
         cuda-nvcc-${cuda_version} \
         libhwloc-dev \
         autoconf \
         automake \
-        libtool
+        libtool \
+        libopenmpi-dev \
+        git \
+        curl \
+        python3 \
+        build-essential
 
 # EFA
 
