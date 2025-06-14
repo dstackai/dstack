@@ -55,7 +55,7 @@ ENV NCCL_TESTS_HOME=/opt/nccl-tests
 
 COPY --from=builder ${NCCL_HOME}/lib ${NCCL_HOME}/lib
 COPY --from=builder ${NCCL_HOME}/include ${NCCL_HOME}/include
-COPY --from=builder ${NCCL_TESTS_HOME}/build ${NCCL_TESTS_HOME}
+COPY --from=builder ${NCCL_TESTS_HOME}/build ${NCCL_TESTS_HOME}/build
 
 ARG FLAVOR
 
