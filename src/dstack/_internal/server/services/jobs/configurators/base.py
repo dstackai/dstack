@@ -50,11 +50,8 @@ def get_default_python_verison() -> str:
         )
 
 
-def get_default_image(python_version: str, nvcc: bool = False) -> str:
-    suffix = ""
-    if nvcc:
-        suffix = "-devel"
-    return f"{settings.DSTACK_BASE_IMAGE}:py{python_version}-{settings.DSTACK_BASE_IMAGE_VERSION}-cuda-12.1{suffix}"
+def get_default_image(nvcc: bool = False) -> str:
+    return f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}-{'devel' if nvcc else 'base'}"
 
 
 class JobConfigurator(ABC):
@@ -173,7 +170,7 @@ class JobConfigurator(ABC):
         ):
             return []
         return [
-            f"uv venv --prompt workflow --seed {DEFAULT_REPO_DIR}/.venv > /dev/null 2>&1",
+            f"uv venv --python {self._python()} --prompt workflow --seed {DEFAULT_REPO_DIR}/.venv > /dev/null 2>&1",
             f"echo 'source {DEFAULT_REPO_DIR}/.venv/bin/activate' >> ~/.bashrc",
             f"source {DEFAULT_REPO_DIR}/.venv/bin/activate",
         ]
@@ -199,7 +196,7 @@ class JobConfigurator(ABC):
     def _image_name(self) -> str:
         if self.run_spec.configuration.image is not None:
             return self.run_spec.configuration.image
-        return get_default_image(self._python(), nvcc=bool(self.run_spec.configuration.nvcc))
+        return get_default_image(nvcc=bool(self.run_spec.configuration.nvcc))
 
     async def _user(self) -> Optional[UnixUser]:
         user = self.run_spec.configuration.user

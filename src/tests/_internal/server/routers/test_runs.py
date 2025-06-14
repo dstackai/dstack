@@ -170,7 +170,7 @@ def get_dev_env_run_plan_dict(
                         "/bin/bash",
                         "-i",
                         "-c",
-                        "uv venv --prompt workflow --seed /workflow/.venv > /dev/null 2>&1"
+                        "uv venv --python 3.13 --prompt workflow --seed /workflow/.venv > /dev/null 2>&1"
                         " && echo 'source /workflow/.venv/bin/activate' >> ~/.bashrc"
                         " && source /workflow/.venv/bin/activate"
                         " && (echo pip install ipykernel... && "
@@ -188,7 +188,7 @@ def get_dev_env_run_plan_dict(
                     ],
                     "env": {},
                     "home_dir": "/root",
-                    "image_name": "dstackai/base:py3.13-0.9-cuda-12.1",
+                    "image_name": "dstackai/base:0.10-base",
                     "user": None,
                     "privileged": privileged,
                     "job_name": f"{run_name}-0-0",
@@ -334,7 +334,7 @@ def get_dev_env_run_dict(
                         "/bin/bash",
                         "-i",
                         "-c",
-                        "uv venv --prompt workflow --seed /workflow/.venv > /dev/null 2>&1"
+                        "uv venv --python 3.13 --prompt workflow --seed /workflow/.venv > /dev/null 2>&1"
                         " && echo 'source /workflow/.venv/bin/activate' >> ~/.bashrc"
                         " && source /workflow/.venv/bin/activate"
                         " && (echo pip install ipykernel... && "
@@ -352,7 +352,7 @@ def get_dev_env_run_dict(
                     ],
                     "env": {},
                     "home_dir": "/root",
-                    "image_name": "dstackai/base:py3.13-0.9-cuda-12.1",
+                    "image_name": "dstackai/base:0.10-base",
                     "user": None,
                     "privileged": privileged,
                     "job_name": f"{run_name}-0-0",
