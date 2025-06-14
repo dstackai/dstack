@@ -49,10 +49,9 @@ RUN cd /tmp \
         --with-cuda=${CUDA_HOME} \
         --with-libfabric=${LIBFABRIC_PATH} \
         --with-mpi=${OPEN_MPI_PATH} \
-        --with-nccl=${NCCL_HOME} \
         --disable-tests \
         --prefix=${NCCL_HOME} \
-    && make -j$(numproc) \
+    && make -j$(nproc) \
     && make install
 
 # Build NCCL
@@ -77,13 +76,17 @@ ENV NCCL_HOME=/opt/nccl
 ENV LIBFABRIC_PATH=/opt/amazon/efa
 ENV OPEN_MPI_PATH=/opt/amazon/openmpi
 ENV NCCL_TESTS_HOME=/opt/nccl-tests
+
 ENV PATH="${LIBFABRIC_PATH}/bin:${OPEN_MPI_PATH}/bin:${PATH}"
+# TODO: Unsure if this is required, updating ` /etc/ld.so.conf.d` should be enough
 ENV LD_LIBRARY_PATH="${OPEN_MPI_PATH}/lib:${LD_LIBRARY_PATH}"
 
 COPY --from=builder ${NCCL_HOME} ${NCCL_HOME}
 COPY --from=builder ${LIBFABRIC_PATH} ${LIBFABRIC_PATH}
 COPY --from=builder ${OPEN_MPI_PATH} ${OPEN_MPI_PATH}
 COPY --from=builder ${NCCL_TESTS_HOME}/build ${NCCL_TESTS_HOME}
+COPY --from=builder /etc/ld.so.conf.d/000_efa.conf /etc/ld.so.conf.d/000_efa.conf
+COPY --from=builder /etc/profile.d/zippy_efa.sh /etc/profile.d/zippy_efa.sh
 
 RUN echo "${NCCL_HOME}/lib" >> /etc/ld.so.conf.d/nccl.conf \
     && echo "${OPEN_MPI_PATH}/lib" >> /etc/ld.so.conf.d/openmpi.conf \
