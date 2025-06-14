@@ -51,7 +51,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        flavor: ["base", "devel", "devel-efa"]
+        # flavor: ["base", "devel", "devel-efa"]
+        flavor: ["devel-efa"]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -67,13 +68,12 @@ jobs:
       - name: Build and upload to DockerHub
         run: |
          if [ "${{ matrix.flavor }}" = "base" ]; then
-            FLAVOR="base"
             FILE="base/Dockerfile"
           elif [ "${{ matrix.flavor }}" = "devel" ]; then
-            FLAVOR="devel"
             FILE="base/Dockerfile"
+          elif [ "${{ matrix.flavor }}" = "base-efa" ]; then
+            FILE="base/base-efa.Dockerfile"
           else
-            FLAVOR="devel-efa"
             FILE="base/efa.Dockerfile"
           fi
           docker buildx build \
