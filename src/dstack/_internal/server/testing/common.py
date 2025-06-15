@@ -140,6 +140,7 @@ async def create_project(
     created_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
     ssh_private_key: str = "",
     ssh_public_key: str = "",
+    is_public: bool = False,
 ) -> ProjectModel:
     if owner is None:
         owner = await create_user(session=session, name="test_owner")
@@ -149,6 +150,7 @@ async def create_project(
         created_at=created_at,
         ssh_private_key=ssh_private_key,
         ssh_public_key=ssh_public_key,
+        is_public=is_public,
     )
     session.add(project)
     await session.commit()

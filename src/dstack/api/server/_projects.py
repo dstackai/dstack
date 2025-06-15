@@ -17,8 +17,8 @@ class ProjectsAPIClient(APIClientGroup):
         resp = self._request("/api/projects/list")
         return parse_obj_as(List[Project.__response__], resp.json())
 
-    def create(self, project_name: str) -> Project:
-        body = CreateProjectRequest(project_name=project_name)
+    def create(self, project_name: str, is_public: bool = False) -> Project:
+        body = CreateProjectRequest(project_name=project_name, is_public=is_public)
         resp = self._request("/api/projects/create", body=body.json())
         return parse_obj_as(Project.__response__, resp.json())
 

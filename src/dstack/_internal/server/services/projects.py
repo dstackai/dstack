@@ -53,10 +53,37 @@ async def list_user_projects(
     session: AsyncSession,
     user: UserModel,
 ) -> List[Project]:
+    """
+    Returns projects where the user is a member.
+    """
     if user.global_role == GlobalRole.ADMIN:
         projects = await list_project_models(session=session)
     else:
         projects = await list_user_project_models(session=session, user=user)
+
+    projects = sorted(projects, key=lambda p: p.created_at)
+    return [
+        project_model_to_project(p, include_backends=False, include_members=False)
+        for p in projects
+    ]
+
+
+async def list_user_accessible_projects(
+    session: AsyncSession,
+    user: UserModel,
+) -> List[Project]:
+    """
+    Returns all projects accessible to the user:
+    - For global admins: ALL projects in the system
+    - For regular users: Projects where user is a member + public projects where user is NOT a member
+    """
+    if user.global_role == GlobalRole.ADMIN:
+        projects = await list_project_models(session=session)
+    else:
+        member_projects = await list_user_project_models(session=session, user=user)
+        public_projects = await list_public_non_member_project_models(session=session, user=user)
+        projects = member_projects + public_projects
+
     projects = sorted(projects, key=lambda p: p.created_at)
     return [
         project_model_to_project(p, include_backends=False, include_members=False)
@@ -86,6 +113,7 @@ async def create_project(
     session: AsyncSession,
     user: UserModel,
     project_name: str,
+    is_public: bool = False,
 ) -> Project:
     user_permissions = users.get_user_permissions(user)
     if not user_permissions.can_create_projects:
@@ -100,6 +128,7 @@ async def create_project(
         session=session,
         owner=user,
         project_name=project_name,
+        is_public=is_public,
     )
     await add_project_member(
         session=session,
@@ -233,6 +262,9 @@ async def list_user_project_models(
     user: UserModel,
     include_members: bool = False,
 ) -> List[ProjectModel]:
+    """
+    List project models for a user where they are a member.
+    """
     options = []
     if include_members:
         options.append(joinedload(ProjectModel.members))
@@ -246,6 +278,25 @@ async def list_user_project_models(
         .options(*options)
     )
     return list(res.scalars().unique().all())
+
+
+async def list_public_non_member_project_models(
+    session: AsyncSession,
+    user: UserModel,
+) -> List[ProjectModel]:
+    """
+    List public project models where user is NOT a member.
+    """
+    res = await session.execute(
+        select(ProjectModel).where(
+            ProjectModel.deleted == False,
+            ProjectModel.is_public == True,
+            ProjectModel.id.notin_(
+                select(MemberModel.project_id).where(MemberModel.user_id == user.id)
+            ),
+        )
+    )
+    return list(res.scalars().all())
 
 
 async def list_user_owned_project_models(
@@ -323,7 +374,7 @@ async def get_project_model_by_id_or_error(
 
 
 async def create_project_model(
-    session: AsyncSession, owner: UserModel, project_name: str
+    session: AsyncSession, owner: UserModel, project_name: str, is_public: bool = False
 ) -> ProjectModel:
     private_bytes, public_bytes = await run_async(
         generate_rsa_key_pair_bytes, f"{project_name}@dstack"
@@ -334,6 +385,7 @@ async def create_project_model(
         name=project_name,
         ssh_private_key=private_bytes.decode(),
         ssh_public_key=public_bytes.decode(),
+        is_public=is_public,
     )
     session.add(project)
     await session.commit()
@@ -407,6 +459,7 @@ def project_model_to_project(
         created_at=project_model.created_at.replace(tzinfo=timezone.utc),
         backends=backends,
         members=members,
+        is_public=project_model.is_public,
     )
 
 
