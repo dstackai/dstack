@@ -12,6 +12,7 @@ from dstack._internal.cli.utils.common import (
     LIVE_TABLE_REFRESH_RATE_PER_SEC,
     add_row_from_dict,
     console,
+    format_job_display_name,
 )
 from dstack._internal.core.errors import CLIError
 from dstack._internal.core.models.instances import Resources
@@ -118,7 +119,7 @@ def _get_metrics_table(run: Run, metrics: List[JobMetrics]) -> Table:
                     gpu_metrics += f" util={gpu_util_percent}%"
 
         job_row: Dict[Union[str, int], Any] = {
-            "NAME": f"  replica={job.job_spec.replica_num} job={job.job_spec.job_num}",
+            "NAME": format_job_display_name(run._run.jobs, job),
             "STATUS": job.job_submissions[-1].status.value,
             "CPU": cpu_usage or "-",
             "MEMORY": memory_usage or "-",
