@@ -319,7 +319,7 @@ class TestProcessRunningJobs:
         job_provisioning_data = get_job_provisioning_data(dockerized=True)
 
         with patch(
-            "dstack._internal.server.services.jobs.configurators.base.get_default_python_verison"
+            "dstack._internal.server.services.jobs.configurators.base.get_default_python_version"
         ) as PyVersion:
             PyVersion.return_value = "3.13"
             job = await create_job(

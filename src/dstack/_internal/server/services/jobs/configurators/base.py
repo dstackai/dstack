@@ -12,7 +12,6 @@ from dstack._internal.core.models.common import RegistryAuth
 from dstack._internal.core.models.configurations import (
     DEFAULT_REPO_DIR,
     PortMapping,
-    PythonVersion,
     RunConfigurationType,
 )
 from dstack._internal.core.models.profiles import (
@@ -38,16 +37,8 @@ from dstack._internal.utils.common import run_async
 from dstack._internal.utils.interpolator import InterpolatorError, VariablesInterpolator
 
 
-def get_default_python_verison() -> str:
-    version_info = sys.version_info
-    python_version_str = f"{version_info.major}.{version_info.minor}"
-    try:
-        return PythonVersion(python_version_str).value
-    except ValueError:
-        raise ServerClientError(
-            "Failed to use the system Python version. "
-            f"Python {python_version_str} is not supported."
-        )
+def get_default_python_version() -> str:
+    return sys.version.split()[0]
 
 
 def get_default_image(nvcc: bool = False) -> str:
@@ -257,8 +248,8 @@ class JobConfigurator(ABC):
 
     def _python(self) -> str:
         if self.run_spec.configuration.python is not None:
-            return self.run_spec.configuration.python.value
-        return get_default_python_verison()
+            return self.run_spec.configuration.python
+        return get_default_python_version()
 
     def _volumes(self, job_num: int) -> List[MountPoint]:
         return interpolate_job_volumes(self.run_spec.configuration.volumes, job_num)
