@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import Any, Dict, Union
+from typing import Any, Dict, List, Union
 
 from rich.console import Console
 from rich.prompt import Confirm
@@ -9,6 +9,7 @@ from rich.theme import Theme
 
 from dstack._internal.cli.utils.rich import DstackRichHandler
 from dstack._internal.core.errors import CLIError, DstackError
+from dstack._internal.core.models.runs import Job
 
 _colors = {
     "secondary": "grey58",
@@ -60,3 +61,17 @@ def add_row_from_dict(table: Table, data: Dict[Union[str, int], Any], **kwargs):
         else:
             row.append("")
     table.add_row(*row, **kwargs)
+
+
+def format_job_display_name(jobs: List[Job], current_job: Job) -> str:
+    replica_nums = {job.job_spec.replica_num for job in jobs}
+    job_nums = {job.job_spec.job_num for job in jobs}
+    has_multiple_replicas = len(replica_nums) > 1
+    has_multiple_jobs = len(job_nums) > 1
+
+    name_parts = []
+    if has_multiple_replicas:
+        name_parts.append(f"replica={current_job.job_spec.replica_num}")
+    if has_multiple_jobs:
+        name_parts.append(f"job={current_job.job_spec.job_num}")
+    return "  " + " ".join(name_parts) if name_parts else "  "

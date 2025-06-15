@@ -4,7 +4,12 @@ from typing import Any, Dict, List, Optional, Union
 from rich.markup import escape
 from rich.table import Table
 
-from dstack._internal.cli.utils.common import NO_OFFERS_WARNING, add_row_from_dict, console
+from dstack._internal.cli.utils.common import (
+    NO_OFFERS_WARNING,
+    add_row_from_dict,
+    console,
+    format_job_display_name,
+)
 from dstack._internal.core.models.configurations import DevEnvironmentConfiguration
 from dstack._internal.core.models.instances import InstanceAvailability
 from dstack._internal.core.models.profiles import (
@@ -183,8 +188,9 @@ def get_runs_table(
             if verbose and latest_job_submission.inactivity_secs:
                 inactive_for = format_duration_multiunit(latest_job_submission.inactivity_secs)
                 status += f" (inactive for {inactive_for})"
+
             job_row: Dict[Union[str, int], Any] = {
-                "NAME": f"  replica={job.job_spec.replica_num} job={job.job_spec.job_num}",
+                "NAME": format_job_display_name(run.jobs, job),
                 "STATUS": latest_job_submission.status_message,
                 "SUBMITTED": format_date(latest_job_submission.submitted_at),
                 "ERROR": latest_job_submission.error,
