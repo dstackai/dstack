@@ -1,22 +1,26 @@
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 from freezegun import freeze_time
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from dstack._internal import settings
 from dstack._internal.core.errors import SSHError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import NetworkMode
 from dstack._internal.core.models.configurations import DevEnvironmentConfiguration
-from dstack._internal.core.models.instances import InstanceStatus
+from dstack._internal.core.models.instances import InstanceStatus, InstanceType
 from dstack._internal.core.models.profiles import StartupOrder, UtilizationPolicy
+from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import (
     JobRuntimeData,
+    JobSpec,
     JobStatus,
     JobTerminationReason,
+    Requirements,
     RunStatus,
 )
 from dstack._internal.core.models.volumes import (
@@ -24,8 +28,11 @@ from dstack._internal.core.models.volumes import (
     VolumeMountPoint,
     VolumeStatus,
 )
-from dstack._internal.server import settings
-from dstack._internal.server.background.tasks.process_running_jobs import process_running_jobs
+from dstack._internal.server import settings as server_settings
+from dstack._internal.server.background.tasks.process_running_jobs import (
+    _patch_base_image_for_aws_efa,
+    process_running_jobs,
+)
 from dstack._internal.server.schemas.runner import (
     HealthcheckResponse,
     JobStateEvent,
@@ -55,6 +62,9 @@ from dstack._internal.server.testing.common import (
 from dstack._internal.utils.common import get_current_datetime
 
 pytestmark = pytest.mark.usefixtures("image_config_mock")
+
+if TYPE_CHECKING:
+    from dstack._internal.core.models.runs import JobProvisioningData
 
 
 @pytest.fixture
@@ -221,7 +231,7 @@ class TestProcessRunningJobs:
             patch(
                 "dstack._internal.server.services.runner.client.RunnerClient"
             ) as RunnerClientMock,
-            patch.object(settings, "SERVER_DIR_PATH", tmp_path),
+            patch.object(server_settings, "SERVER_DIR_PATH", tmp_path),
         ):
             runner_client_mock = RunnerClientMock.return_value
             runner_client_mock.pull.return_value = PullResponse(
@@ -878,3 +888,132 @@ class TestProcessRunningJobs:
             await process_running_jobs()
         await session.refresh(master_job)
         assert master_job.status == JobStatus.RUNNING
+
+
+class TestPatchBaseImageForAwsEfa:
+    @staticmethod
+    def _create_job_spec(image_name: str) -> "JobSpec":
+        return JobSpec(
+            job_num=0,
+            job_name="test-job",
+            commands=["echo hello"],
+            env={},
+            image_name=image_name,
+            requirements=Requirements(resources=ResourcesSpec()),
+        )
+
+    @staticmethod
+    def _create_job_provisioning_data_with_instance_type(
+        backend: BackendType, instance_type: str
+    ) -> "JobProvisioningData":
+        job_provisioning_data = get_job_provisioning_data(backend=backend)
+        job_provisioning_data.instance_type = InstanceType(
+            name=instance_type,
+            resources=job_provisioning_data.instance_type.resources,
+        )
+        return job_provisioning_data
+
+    @staticmethod
+    def _call_patch_base_image_for_aws_efa(
+        image_name: str, backend: BackendType, instance_type: str
+    ) -> str:
+        job_spec = TestPatchBaseImageForAwsEfa._create_job_spec(image_name)
+        job_provisioning_data = (
+            TestPatchBaseImageForAwsEfa._create_job_provisioning_data_with_instance_type(
+                backend, instance_type
+            )
+        )
+        return _patch_base_image_for_aws_efa(job_spec, job_provisioning_data)
+
+    @pytest.mark.parametrize(
+        "suffix,instance_type",
+        [
+            ("-base", "p6.xlarge"),
+            ("-devel", "p5.48xlarge"),
+        ],
+    )
+    def test_patch_aws_efa_instance_with_suffix(self, suffix: str, instance_type: str):
+        image_name = f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}{suffix}"
+        result = self._call_patch_base_image_for_aws_efa(
+            image_name, BackendType.AWS, instance_type
+        )
+        expected = f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}-devel-efa"
+        assert result == expected
+
+    @pytest.mark.parametrize("suffix", ["-base", "-devel"])
+    @pytest.mark.parametrize(
+        "instance_type",
+        [
+            "p6.xlarge",
+            "p6.2xlarge",
+            "p5.xlarge",
+            "p5.48xlarge",
+            "p5e.xlarge",
+            "p4d.24xlarge",
+            "p4de.24xlarge",
+            "g6.xlarge",
+            "g6e.xlarge",
+        ],
+    )
+    def test_patch_all_efa_instance_types(self, instance_type: str, suffix: str):
+        image_name = f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}{suffix}"
+        result = self._call_patch_base_image_for_aws_efa(
+            image_name, BackendType.AWS, instance_type
+        )
+        expected = f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}-devel-efa"
+        assert result == expected
+
+    @pytest.mark.parametrize("suffix", ["-base", "-devel"])
+    @pytest.mark.parametrize(
+        "backend",
+        [BackendType.GCP, BackendType.AZURE, BackendType.LAMBDA, BackendType.LOCAL],
+    )
+    @pytest.mark.parametrize(
+        "instance_type",
+        [
+            "standard-4",
+            "p5.xlarge",
+            "p6.2xlarge",
+            "g6.xlarge",
+        ],  # Mix of generic and EFA-named types
+    )
+    def test_no_patch_non_aws_backends(
+        self, backend: BackendType, suffix: str, instance_type: str
+    ):
+        image_name = f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}{suffix}"
+        result = self._call_patch_base_image_for_aws_efa(image_name, backend, instance_type)
+        assert result == image_name
+
+    @pytest.mark.parametrize("suffix", ["-base", "-devel"])
+    @pytest.mark.parametrize(
+        "instance_type",
+        ["t3.micro", "m5.large", "c5.xlarge", "r5.2xlarge", "m6i.large"],
+    )
+    def test_no_patch_non_efa_aws_instances(self, instance_type: str, suffix: str):
+        image_name = f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}{suffix}"
+        result = self._call_patch_base_image_for_aws_efa(
+            image_name, BackendType.AWS, instance_type
+        )
+        assert result == image_name
+
+    @pytest.mark.parametrize(
+        "instance_type",
+        ["p5.xlarge", "p6.2xlarge", "t3.micro", "m5.large"],  # Mix of EFA and non-EFA instances
+    )
+    @pytest.mark.parametrize(
+        "image_name",
+        [
+            "ubuntu:20.04",
+            "nvidia/cuda:11.8-runtime-ubuntu20.04",
+            "python:3.9-slim",
+            "custom/image:latest",
+            f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}-custom",
+            f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}-devel-efa",
+            f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}",
+        ],
+    )
+    def test_no_patch_other_images(self, instance_type: str, image_name: str):
+        result = self._call_patch_base_image_for_aws_efa(
+            image_name, BackendType.AWS, instance_type
+        )
+        assert result == image_name
