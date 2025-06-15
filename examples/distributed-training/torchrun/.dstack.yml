@@ -1,7 +1,6 @@
 type: task
 name: train-distrib
 
-# The size of the cluster
 nodes: 2
 
 python: 3.12
@@ -21,6 +20,5 @@ commands:
       multinode.py 50 10
 
 resources:
-  gpu: 24GB:1..2
-  # Uncomment if using multiple GPUs
-  #shm_size: 24GB
+  gpu: 1..8
+  shm_size: 16GB

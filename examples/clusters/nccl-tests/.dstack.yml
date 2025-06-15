@@ -5,12 +5,9 @@ nodes: 2
 startup_order: workers-first
 stop_criteria: master-done
 
-# This image comes with MPI and NCCL tests pre-built
-image: dstackai/efa
 env:
   - NCCL_DEBUG=INFO
 commands:
-  - cd /root/nccl-tests/build
   - |
     if [ $DSTACK_NODE_RANK -eq 0 ]; then
       mpirun \
@@ -18,13 +15,12 @@ commands:
         --hostfile $DSTACK_MPI_HOSTFILE \
         -n $DSTACK_GPUS_NUM \
         -N $DSTACK_GPUS_PER_NODE \
-        --mca btl_tcp_if_exclude lo,docker0 \
         --bind-to none \
-        ./all_reduce_perf -b 8 -e 8G -f 2 -g 1
+        /opt/nccl-tests/build/all_reduce_perf -b 8 -e 8G -f 2 -g 1
     else
       sleep infinity
     fi
 
 resources:
-  gpu: nvidia:4:16GB
+  gpu: nvidia:1..8
   shm_size: 16GB

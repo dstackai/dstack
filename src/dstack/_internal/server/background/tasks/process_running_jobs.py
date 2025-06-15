@@ -1,4 +1,5 @@
 import asyncio
+import re
 from collections.abc import Iterable
 from datetime import timedelta, timezone
 from typing import Dict, List, Optional
@@ -7,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
+from dstack._internal import settings
 from dstack._internal.core.consts import DSTACK_RUNNER_HTTP_PORT, DSTACK_SHIM_HTTP_PORT
 from dstack._internal.core.errors import GatewayError
 from dstack._internal.core.models.backends.base import BackendType
@@ -441,6 +443,40 @@ def _should_wait_for_other_nodes(run: Run, job: Job, job_model: JobModel) -> boo
     return False
 
 
+def _patch_base_image_for_aws_efa(
+    job_spec: JobSpec, job_provisioning_data: JobProvisioningData
+) -> str:
+    image_name = job_spec.image_name
+
+    if job_provisioning_data.backend != BackendType.AWS:
+        return image_name
+
+    instance_type = job_provisioning_data.instance_type.name
+    efa_enabled_patterns = [
+        r"^p6\.",
+        r"^p5\.",
+        r"^p5e\.",
+        r"^p4d\.",
+        r"^p4de\.",
+        r"^g6\.",
+        r"^g6e\.",
+    ]
+
+    is_efa_enabled = any(re.match(pattern, instance_type) for pattern in efa_enabled_patterns)
+    if not is_efa_enabled:
+        return image_name
+
+    if not image_name.startswith(f"{settings.DSTACK_BASE_IMAGE}:"):
+        return image_name
+
+    if image_name.endswith("-base"):
+        return image_name[:-5] + "-devel-efa"
+    elif image_name.endswith("-devel"):
+        return image_name[:-6] + "-devel-efa"
+
+    return image_name
+
+
 @runner_ssh_tunnel(ports=[DSTACK_SHIM_HTTP_PORT], retries=1)
 def _process_provisioning_with_shim(
     ports: Dict[int, int],
@@ -517,14 +553,14 @@ def _process_provisioning_with_shim(
         cpu = None
         memory = None
         network_mode = NetworkMode.HOST
-
+    image_name = _patch_base_image_for_aws_efa(job_spec, job_provisioning_data)
     if shim_client.is_api_v2_supported():
         shim_client.submit_task(
             task_id=job_model.id,
             name=job_model.job_name,
             registry_username=registry_username,
             registry_password=registry_password,
-            image_name=job_spec.image_name,
+            image_name=image_name,
             container_user=container_user,
             privileged=job_spec.privileged,
             gpu=gpu,
@@ -545,7 +581,7 @@ def _process_provisioning_with_shim(
         submitted = shim_client.submit(
             username=registry_username,
             password=registry_password,
-            image_name=job_spec.image_name,
+            image_name=image_name,
             privileged=job_spec.privileged,
             container_name=job_model.job_name,
             container_user=container_user,

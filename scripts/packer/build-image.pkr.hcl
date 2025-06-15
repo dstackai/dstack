@@ -22,9 +22,4 @@ build {
   provisioner "shell" {
     inline = ["cd /tmp", "chmod +x install-docker.sh", "./install-docker.sh --version ${local.docker_version}"]
   }
-
-  provisioner "shell" {
-    environment_vars = ["IMAGE_VERSION=${var.image_version}"]
-    script           = "provisioners/pull-docker-images.sh"
-  }
 }
