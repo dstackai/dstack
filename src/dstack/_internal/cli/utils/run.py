@@ -36,29 +36,29 @@ def print_run_plan(
     job_plan = run_plan.job_plans[0]
 
     props = Table(box=None, show_header=False)
-    props.add_column(no_wrap=True)  # key
-    props.add_column()  # value
+    props.add_column(style="bold", no_wrap=True)
+    props.add_column(style="grey58")
 
     req = job_plan.job_spec.requirements
     pretty_req = req.pretty_format(resources_only=True)
-    max_price = f"${req.max_price:3f}".rstrip("0").rstrip(".") if req.max_price else "-"
+    max_price = f"${req.max_price:3f}".rstrip("0").rstrip(".") if req.max_price else None
     max_duration = (
         format_pretty_duration(job_plan.job_spec.max_duration)
         if job_plan.job_spec.max_duration
-        else "-"
+        else None
     )
+    idle_duration = None
+    inactivity_duration = None
     if include_run_properties:
-        inactivity_duration = None
         if isinstance(run_spec.configuration, DevEnvironmentConfiguration):
-            inactivity_duration = "-"
             if isinstance(run_spec.configuration.inactivity_duration, int):
                 inactivity_duration = format_pretty_duration(
                     run_spec.configuration.inactivity_duration
                 )
-        if job_plan.job_spec.retry is None:
-            retry = "-"
-        else:
+        if job_plan.job_spec.retry:
             retry = escape(job_plan.job_spec.retry.pretty_format())
+        else:
+            retry = None
 
         profile = run_spec.merged_profile
         creation_policy = profile.creation_policy
@@ -67,9 +67,7 @@ def print_run_plan(
         termination_policy, termination_idle_time = get_termination(
             profile, DEFAULT_RUN_TERMINATION_IDLE_TIME
         )
-        if termination_policy == TerminationPolicy.DONT_DESTROY:
-            idle_duration = "-"
-        else:
+        if termination_policy != TerminationPolicy.DONT_DESTROY:
             idle_duration = format_pretty_duration(termination_idle_time)
 
     if req.spot is None:
@@ -79,25 +77,26 @@ def print_run_plan(
     else:
         spot_policy = "on-demand"
 
-    def th(s: str) -> str:
-        return f"[bold]{s}[/bold]"
-
-    props.add_row(th("Project"), run_plan.project_name)
-    props.add_row(th("User"), run_plan.user)
+    props.add_row("Project", run_plan.project_name)
+    props.add_row("User", run_plan.user)
     if include_run_properties:
-        props.add_row(th("Configuration"), run_spec.configuration_path)
-        props.add_row(th("Type"), run_spec.configuration.type)
-    props.add_row(th("Resources"), pretty_req)
-    props.add_row(th("Spot policy"), spot_policy)
-    props.add_row(th("Max price"), max_price)
+        props.add_row("Type", run_spec.configuration.type)
+    props.add_row("Resources", pretty_req)
+    props.add_row("Spot policy", spot_policy)
+    if max_price:
+        props.add_row("Max price", max_price)
     if include_run_properties:
-        props.add_row(th("Retry policy"), retry)
-        props.add_row(th("Creation policy"), creation_policy)
-        props.add_row(th("Idle duration"), idle_duration)
-        props.add_row(th("Max duration"), max_duration)
-        if inactivity_duration is not None:  # None means n/a
-            props.add_row(th("Inactivity duration"), inactivity_duration)
-    props.add_row(th("Reservation"), run_spec.configuration.reservation or "-")
+        if retry:
+            props.add_row("Retry policy", retry)
+        props.add_row("Creation policy", creation_policy)
+    if idle_duration:
+        props.add_row("Idle duration", idle_duration)
+    if max_duration:
+        props.add_row("Max duration", max_duration)
+    if inactivity_duration:
+        props.add_row("Inactivity duration", inactivity_duration)
+    if run_spec.configuration.reservation:
+        props.add_row("Reservation", run_spec.configuration.reservation)
 
     offers = Table(box=None, expand=shutil.get_terminal_size(fallback=(120, 40)).columns <= 110)
     offers.add_column("#")
