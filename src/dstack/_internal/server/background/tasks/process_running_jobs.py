@@ -443,40 +443,6 @@ def _should_wait_for_other_nodes(run: Run, job: Job, job_model: JobModel) -> boo
     return False
 
 
-def _patch_base_image_for_aws_efa(
-    job_spec: JobSpec, job_provisioning_data: JobProvisioningData
-) -> str:
-    image_name = job_spec.image_name
-
-    if job_provisioning_data.backend != BackendType.AWS:
-        return image_name
-
-    instance_type = job_provisioning_data.instance_type.name
-    efa_enabled_patterns = [
-        r"^p6\.",
-        r"^p5\.",
-        r"^p5e\.",
-        r"^p4d\.",
-        r"^p4de\.",
-        r"^g6\.",
-        r"^g6e\.",
-    ]
-
-    is_efa_enabled = any(re.match(pattern, instance_type) for pattern in efa_enabled_patterns)
-    if not is_efa_enabled:
-        return image_name
-
-    if not image_name.startswith(f"{settings.DSTACK_BASE_IMAGE}:"):
-        return image_name
-
-    if image_name.endswith("-base"):
-        return image_name[:-5] + "-devel-efa"
-    elif image_name.endswith("-devel"):
-        return image_name[:-6] + "-devel-efa"
-
-    return image_name
-
-
 @runner_ssh_tunnel(ports=[DSTACK_SHIM_HTTP_PORT], retries=1)
 def _process_provisioning_with_shim(
     ports: Dict[int, int],
@@ -1005,3 +971,37 @@ def _get_instance_specific_gpu_devices(
             GPUDevice(path_on_host="/dev/nvidiactl", path_in_container="/dev/nvidiactl")
         )
     return gpu_devices
+
+
+def _patch_base_image_for_aws_efa(
+    job_spec: JobSpec, job_provisioning_data: JobProvisioningData
+) -> str:
+    image_name = job_spec.image_name
+
+    if job_provisioning_data.backend != BackendType.AWS:
+        return image_name
+
+    instance_type = job_provisioning_data.instance_type.name
+    efa_enabled_patterns = [
+        r"^p6\.",
+        r"^p5\.",
+        r"^p5e\.",
+        r"^p4d\.",
+        r"^p4de\.",
+        r"^g6\.",
+        r"^g6e\.",
+    ]
+
+    is_efa_enabled = any(re.match(pattern, instance_type) for pattern in efa_enabled_patterns)
+    if not is_efa_enabled:
+        return image_name
+
+    if not image_name.startswith(f"{settings.DSTACK_BASE_IMAGE}:"):
+        return image_name
+
+    if image_name.endswith("-base"):
+        return image_name[:-5] + "-devel-efa"
+    elif image_name.endswith("-devel"):
+        return image_name[:-6] + "-devel-efa"
+
+    return image_name
