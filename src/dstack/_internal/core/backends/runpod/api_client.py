@@ -239,6 +239,58 @@ class RunpodApiClient:
                 """
             }
         )
+        
+    def create_cluster(
+        self,
+        cluster_name: str,
+        gpu_type_id: str,
+        pod_count: int,
+        image_name: str,
+        type: str = "APPLICATION",
+        gpu_count_per_pod: Optional[int] = None,
+        template_id: Optional[str] = None,
+        network_volume_id: Optional[str] = None,
+        volume_in_gb: Optional[int] = None,
+        throughput: Optional[int] = None,
+        allowed_cuda_versions: Optional[List[str]] = None,
+        volume_key: Optional[str] = None,
+        data_center_id: Optional[str] = None,
+        start_jupyter: bool = False,
+        start_ssh: bool = False,
+        container_disk_in_gb: Optional[int] = None,
+        docker_args: Optional[str] = None,
+        env: Optional[Dict[str, Any]] = None,
+        volume_mount_path: Optional[str] = None,
+        ports: Optional[str] = None,
+    ) -> Dict:
+        resp = self._make_request(
+            {
+                "query": _generate_create_cluster_mutation(
+                    cluster_name,
+                    gpu_type_id,
+                    pod_count,
+                    image_name,
+                    type,
+                    gpu_count_per_pod,
+                    template_id,
+                    network_volume_id,
+                    volume_in_gb,
+                    throughput,
+                    allowed_cuda_versions,
+                    volume_key,
+                    data_center_id,
+                    start_jupyter,
+                    start_ssh,
+                    container_disk_in_gb,
+                    docker_args,
+                    env,
+                    volume_mount_path,
+                    ports,
+                )
+            }
+        )
+        data = resp.json()["data"]
+        return data["createCluster"]
 
     def _make_request(self, data: Optional[Dict[str, Any]] = None) -> Response:
         try:
