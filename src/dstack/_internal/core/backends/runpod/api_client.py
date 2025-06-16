@@ -239,15 +239,15 @@ class RunpodApiClient:
                 """
             }
         )
-        
+
     def create_cluster(
         self,
         cluster_name: str,
         gpu_type_id: str,
         pod_count: int,
+        gpu_count_per_pod: int,
         image_name: str,
-        type: str = "APPLICATION",
-        gpu_count_per_pod: Optional[int] = None,
+        cluster_type: str = "APPLICATION",
         template_id: Optional[str] = None,
         network_volume_id: Optional[str] = None,
         volume_in_gb: Optional[int] = None,
@@ -269,9 +269,9 @@ class RunpodApiClient:
                     cluster_name,
                     gpu_type_id,
                     pod_count,
-                    image_name,
-                    type,
                     gpu_count_per_pod,
+                    image_name,
+                    cluster_type,
                     template_id,
                     network_volume_id,
                     volume_in_gb,
@@ -291,6 +291,11 @@ class RunpodApiClient:
         )
         data = resp.json()["data"]
         return data["createCluster"]
+
+    def delete_cluster(self, cluster_id: str) -> bool:
+        resp = self._make_request({"query": _generate_delete_cluster_mutation(cluster_id)})
+        data = resp.json()["data"]
+        return data["deleteCluster"]
 
     def _make_request(self, data: Optional[Dict[str, Any]] = None) -> Response:
         try:
@@ -489,13 +494,28 @@ def _generate_pod_terminate_mutation(pod_id: str) -> str:
     """
 
 
+def _generate_delete_cluster_mutation(cluster_id: str) -> str:
+    """
+    Generates a mutation to delete a cluster.
+    """
+    return f"""
+    mutation {{
+        deleteCluster(
+            input: {{
+                id: "{cluster_id}"
+            }}
+        )
+    }}
+    """
+
+
 def _generate_create_cluster_mutation(
     cluster_name: str,
     gpu_type_id: str,
     pod_count: int,
+    gpu_count_per_pod: int,
     image_name: str,
-    type: str = "APPLICATION",
-    gpu_count_per_pod: Optional[int] = None,
+    cluster_type: str,
     template_id: Optional[str] = None,
     network_volume_id: Optional[str] = None,
     volume_in_gb: Optional[int] = None,
@@ -521,11 +541,10 @@ def _generate_create_cluster_mutation(
     input_fields.append(f'gpuTypeId: "{gpu_type_id}"')
     input_fields.append(f"podCount: {pod_count}")
     input_fields.append(f'imageName: "{image_name}"')
-    input_fields.append(f'type: "{type}"')
+    input_fields.append(f"type: {cluster_type}")
+    input_fields.append(f"gpuCountPerPod: {gpu_count_per_pod}")
 
     # ------------------------------ Optional Fields ----------------------------- #
-    if gpu_count_per_pod is not None:
-        input_fields.append(f"gpuCountPerPod: {gpu_count_per_pod}")
     if template_id is not None:
         input_fields.append(f'templateId: "{template_id}"')
     if network_volume_id is not None:
