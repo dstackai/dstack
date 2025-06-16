@@ -435,3 +435,100 @@ def _generate_pod_terminate_mutation(pod_id: str) -> str:
         podTerminate(input: {{ podId: "{pod_id}" }})
     }}
     """
+
+
+def _generate_create_cluster_mutation(
+    cluster_name: str,
+    gpu_type_id: str,
+    pod_count: int,
+    image_name: str,
+    type: str = "APPLICATION",
+    gpu_count_per_pod: Optional[int] = None,
+    template_id: Optional[str] = None,
+    network_volume_id: Optional[str] = None,
+    volume_in_gb: Optional[int] = None,
+    throughput: Optional[int] = None,
+    allowed_cuda_versions: Optional[List[str]] = None,
+    volume_key: Optional[str] = None,
+    data_center_id: Optional[str] = None,
+    start_jupyter: bool = False,
+    start_ssh: bool = False,
+    container_disk_in_gb: Optional[int] = None,
+    docker_args: Optional[str] = None,
+    env: Optional[Dict[str, Any]] = None,
+    volume_mount_path: Optional[str] = None,
+    ports: Optional[str] = None,
+) -> str:
+    """
+    Generates a mutation to create a cluster.
+    """
+    input_fields = []
+
+    # ------------------------------ Required Fields ----------------------------- #
+    input_fields.append(f'clusterName: "{cluster_name}"')
+    input_fields.append(f'gpuTypeId: "{gpu_type_id}"')
+    input_fields.append(f"podCount: {pod_count}")
+    input_fields.append(f'imageName: "{image_name}"')
+    input_fields.append(f'type: "{type}"')
+
+    # ------------------------------ Optional Fields ----------------------------- #
+    if gpu_count_per_pod is not None:
+        input_fields.append(f"gpuCountPerPod: {gpu_count_per_pod}")
+    if template_id is not None:
+        input_fields.append(f'templateId: "{template_id}"')
+    if network_volume_id is not None:
+        input_fields.append(f'networkVolumeId: "{network_volume_id}"')
+    if volume_in_gb is not None:
+        input_fields.append(f"volumeInGb: {volume_in_gb}")
+    if throughput is not None:
+        input_fields.append(f"throughput: {throughput}")
+    if allowed_cuda_versions is not None:
+        allowed_cuda_versions_string = ", ".join(
+            [f'"{version}"' for version in allowed_cuda_versions]
+        )
+        input_fields.append(f"allowedCudaVersions: [{allowed_cuda_versions_string}]")
+    if volume_key is not None:
+        input_fields.append(f'volumeKey: "{volume_key}"')
+    if data_center_id is not None:
+        input_fields.append(f'dataCenterId: "{data_center_id}"')
+    if start_jupyter:
+        input_fields.append("startJupyter: true")
+    if start_ssh:
+        input_fields.append("startSsh: true")
+    if container_disk_in_gb is not None:
+        input_fields.append(f"containerDiskInGb: {container_disk_in_gb}")
+    if docker_args is not None:
+        input_fields.append(f'dockerArgs: "{docker_args}"')
+    if env is not None:
+        env_string = ", ".join(
+            [f'{{ key: "{key}", value: "{value}" }}' for key, value in env.items()]
+        )
+        input_fields.append(f"env: [{env_string}]")
+    if volume_mount_path is not None:
+        input_fields.append(f'volumeMountPath: "{volume_mount_path}"')
+    if ports is not None:
+        ports = ports.replace(" ", "")
+        input_fields.append(f'ports: "{ports}"')
+
+    # Format input fields
+    input_string = ", ".join(input_fields)
+    return f"""
+        mutation {{
+          createCluster(
+            input: {{
+              {input_string}
+            }}
+          ) {{
+            id
+            name
+            pods {{
+              id
+              lastStatusChange
+              imageName
+              machine {{
+                podHostId
+              }}
+            }}
+          }}
+        }}
+        """
