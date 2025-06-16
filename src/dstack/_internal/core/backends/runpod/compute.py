@@ -273,7 +273,7 @@ def _get_volume_price(size: int) -> float:
     return 0.05 * size
 
 
-def _is_secure_cloud(region: str) -> str:
+def _is_secure_cloud(region: str) -> bool:
     """
     Secure cloud regions are datacenter IDs: CA-MTL-1, EU-NL-1, etc.
     Community cloud regions are country codes: CA, NL, etc.

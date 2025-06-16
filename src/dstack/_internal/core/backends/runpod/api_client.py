@@ -23,7 +23,19 @@ class RunpodApiClient:
         return True
 
     def get_user_details(self) -> Dict:
-        resp = self._make_request({"query": user_details_query, "variable": {}})
+        resp = self._make_request(
+            {
+                "query": """
+                query myself {
+                    myself {
+                        id
+                        authId
+                        email
+                    }
+                }
+                """
+            }
+        )
         return resp.json()
 
     def create_pod(
@@ -52,7 +64,7 @@ class RunpodApiClient:
     ) -> Dict:
         resp = self._make_request(
             {
-                "query": generate_pod_deployment_mutation(
+                "query": _generate_pod_deployment_mutation(
                     name,
                     image_name,
                     gpu_type_id,
@@ -108,12 +120,12 @@ class RunpodApiClient:
         return resp.json()["data"]["podEditJob"]["id"]
 
     def get_pod(self, pod_id: str) -> Dict:
-        resp = self._make_request({"query": generate_pod_query(pod_id)})
+        resp = self._make_request({"query": _generate_pod_query(pod_id)})
         data = resp.json()
         return data["data"]["pod"]
 
     def terminate_pod(self, pod_id: str) -> Dict:
-        resp = self._make_request({"query": generate_pod_terminate_mutation(pod_id)})
+        resp = self._make_request({"query": _generate_pod_terminate_mutation(pod_id)})
         data = resp.json()
         return data["data"]
 
@@ -213,7 +225,7 @@ class RunpodApiClient:
         )
         return response.json()["data"]["createNetworkVolume"]["id"]
 
-    def delete_network_volume(self, volume_id: str):
+    def delete_network_volume(self, volume_id: str) -> None:
         self._make_request(
             {
                 "query": f"""
@@ -228,7 +240,7 @@ class RunpodApiClient:
             }
         )
 
-    def _make_request(self, data: Any = None) -> Response:
+    def _make_request(self, data: Optional[Dict[str, Any]] = None) -> Response:
         try:
             response = requests.request(
                 method="POST",
@@ -250,7 +262,7 @@ class RunpodApiClient:
                 raise BackendInvalidCredentialsError(e.response.text)
             raise
 
-    def wait_for_instance(self, instance_id) -> Optional[Dict]:
+    def wait_for_instance(self, instance_id: str) -> Optional[Dict]:
         start = get_current_datetime()
         wait_for_instance_interval = 5
         # To change the status to "running," the image must be pulled and then started.
@@ -263,18 +275,7 @@ class RunpodApiClient:
         return
 
 
-user_details_query = """
-query myself {
-    myself {
-        id
-        authId
-        email
-    }
-}
-"""
-
-
-def generate_pod_query(pod_id: str) -> str:
+def _generate_pod_query(pod_id: str) -> str:
     """
     Generate a query for a specific GPU type
     """
@@ -319,26 +320,26 @@ def generate_pod_query(pod_id: str) -> str:
     """
 
 
-def generate_pod_deployment_mutation(
+def _generate_pod_deployment_mutation(
     name: str,
     image_name: str,
     gpu_type_id: str,
     cloud_type: str,
     support_public_ip: bool = True,
     start_ssh: bool = True,
-    data_center_id=None,
-    country_code=None,
-    gpu_count=None,
-    volume_in_gb=None,
-    container_disk_in_gb=None,
-    min_vcpu_count=None,
-    min_memory_in_gb=None,
-    docker_args=None,
-    ports=None,
-    volume_mount_path=None,
+    data_center_id: Optional[str] = None,
+    country_code: Optional[str] = None,
+    gpu_count: Optional[int] = None,
+    volume_in_gb: Optional[int] = None,
+    container_disk_in_gb: Optional[int] = None,
+    min_vcpu_count: Optional[int] = None,
+    min_memory_in_gb: Optional[int] = None,
+    docker_args: Optional[str] = None,
+    ports: Optional[str] = None,
+    volume_mount_path: Optional[str] = None,
     env: Optional[Dict[str, Any]] = None,
-    template_id=None,
-    network_volume_id=None,
+    template_id: Optional[str] = None,
+    network_volume_id: Optional[str] = None,
     allowed_cuda_versions: Optional[List[str]] = None,
     bid_per_gpu: Optional[float] = None,
 ) -> str:
@@ -425,7 +426,7 @@ def generate_pod_deployment_mutation(
         """
 
 
-def generate_pod_terminate_mutation(pod_id: str) -> str:
+def _generate_pod_terminate_mutation(pod_id: str) -> str:
     """
     Generates a mutation to terminate a pod.
     """
