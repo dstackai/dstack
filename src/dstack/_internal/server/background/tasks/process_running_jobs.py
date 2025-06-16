@@ -999,9 +999,9 @@ def _patch_base_image_for_aws_efa(
     if not image_name.startswith(f"{settings.DSTACK_BASE_IMAGE}:"):
         return image_name
 
-    if image_name.endswith("-base"):
-        return image_name[:-5] + "-devel-efa"
-    elif image_name.endswith("-devel"):
-        return image_name[:-6] + "-devel-efa"
+    if image_name.endswith(f"-base-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"):
+        return image_name[:-17] + f"-devel-efa-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"
+    elif image_name.endswith(f"-devel-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"):
+        return image_name[:-18] + f"-devel-efa-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"
 
     return image_name

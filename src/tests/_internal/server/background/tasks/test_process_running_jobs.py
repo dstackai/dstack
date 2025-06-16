@@ -931,11 +931,11 @@ class TestPatchBaseImageForAwsEfa:
         ],
     )
     def test_patch_aws_efa_instance_with_suffix(self, suffix: str, instance_type: str):
-        image_name = f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}{suffix}"
+        image_name = f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}{suffix}-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"
         result = self._call_patch_base_image_for_aws_efa(
             image_name, BackendType.AWS, instance_type
         )
-        expected = f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}-devel-efa"
+        expected = f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}-devel-efa-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"
         assert result == expected
 
     @pytest.mark.parametrize("suffix", ["-base", "-devel"])
@@ -954,11 +954,11 @@ class TestPatchBaseImageForAwsEfa:
         ],
     )
     def test_patch_all_efa_instance_types(self, instance_type: str, suffix: str):
-        image_name = f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}{suffix}"
+        image_name = f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}{suffix}-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"
         result = self._call_patch_base_image_for_aws_efa(
             image_name, BackendType.AWS, instance_type
         )
-        expected = f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}-devel-efa"
+        expected = f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}-devel-efa-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"
         assert result == expected
 
     @pytest.mark.parametrize("suffix", ["-base", "-devel"])
@@ -978,7 +978,7 @@ class TestPatchBaseImageForAwsEfa:
     def test_no_patch_non_aws_backends(
         self, backend: BackendType, suffix: str, instance_type: str
     ):
-        image_name = f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}{suffix}"
+        image_name = f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}{suffix}-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"
         result = self._call_patch_base_image_for_aws_efa(image_name, backend, instance_type)
         assert result == image_name
 

@@ -1,4 +1,6 @@
-FROM nvidia/cuda:12.1.1-base-ubuntu20.04
+ARG UBUNTU_VERSION
+
+FROM nvidia/cuda:12.1.1-base-ubuntu${UBUNTU_VERSION}.04
 
 ARG _UV_HOME="/opt/uv"
 
@@ -9,7 +11,7 @@ ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
 ENV PATH="${UV_INSTALL_DIR}:${PATH}"
 
 RUN export DEBIAN_FRONTEND=noninteractive \
-    && apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/3bf863cc.pub \
+    && apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu${UBUNTU_VERSION}04/x86_64/3bf863cc.pub \
     && apt-get update --fix-missing \
     && apt-get upgrade -y \
     && ln -fs /usr/share/zoneinfo/America/New_York /etc/localtime \

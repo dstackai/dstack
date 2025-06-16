@@ -52,6 +52,7 @@ jobs:
     strategy:
       matrix:
         flavor: ["base", "devel", "devel-efa"]
+        ubuntu_version: ["20", "22"]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -75,7 +76,7 @@ jobs:
           fi
           docker buildx build \
             --platform linux/amd64 \
-            --tag dstackai/${{ env.BUILD_DOCKER_REPO }}:${{ inputs.image_version }}-${{ matrix.flavor }} \
+            --tag dstackai/${{ env.BUILD_DOCKER_REPO }}:${{ inputs.image_version }}-${{ matrix.flavor }}-ubuntu${{ matrix.ubuntu_version }}.04 \
             --build-arg FLAVOR=${{ matrix.flavor }} \
             --provenance=false \
             --push \

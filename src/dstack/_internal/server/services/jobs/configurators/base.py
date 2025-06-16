@@ -58,7 +58,7 @@ def get_default_image(nvcc: bool = False) -> str:
     Args:
         nvcc: If True, returns 'devel' variant, otherwise 'base'.
     """
-    return f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}-{'devel' if nvcc else 'base'}"
+    return f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}-{'devel' if nvcc else 'base'}-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"
 
 
 class JobConfigurator(ABC):
