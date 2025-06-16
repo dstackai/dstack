@@ -148,6 +148,19 @@ class JobTerminationReason(str, Enum):
         }
         return mapping[self]
 
+    def to_retry_event(self) -> Optional[RetryEvent]:
+        """
+        Returns:
+            the retry event this termination reason triggers
+            or None if this termination reason should not be retried
+        """
+        mapping = {
+            self.FAILED_TO_START_DUE_TO_NO_CAPACITY: RetryEvent.NO_CAPACITY,
+            self.INTERRUPTED_BY_NO_CAPACITY: RetryEvent.INTERRUPTION,
+        }
+        default = RetryEvent.ERROR if self.to_status() == JobStatus.FAILED else None
+        return mapping.get(self, default)
+
 
 class Requirements(CoreModel):
     # TODO: Make requirements' fields required
