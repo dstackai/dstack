@@ -53,6 +53,8 @@ RUN cd /opt \
 
 # Final stage
 
+ARG UBUNTU_VERSION
+
 INCLUDE+ base/Dockerfile.common
 
 ENV NCCL_HOME=/opt/nccl
