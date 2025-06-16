@@ -1,7 +1,5 @@
 # syntax = edrevo/dockerfile-plus
 
-ARG UBUNTU_VERSION
-
 INCLUDE+ base/Dockerfile.common
 
 ENV NCCL_HOME=/usr/local

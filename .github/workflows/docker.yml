@@ -78,6 +78,7 @@ jobs:
             --platform linux/amd64 \
             --tag dstackai/${{ env.BUILD_DOCKER_REPO }}:${{ inputs.image_version }}-${{ matrix.flavor }}-ubuntu${{ matrix.ubuntu_version }}.04 \
             --build-arg FLAVOR=${{ matrix.flavor }} \
+            --build-arg UBUNTU_VERSION=${{ matrix.ubuntu_version }} \
             --provenance=false \
             --push \
             -f $FILE .
