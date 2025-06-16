@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional
+from typing import Optional
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
@@ -16,6 +16,7 @@ from dstack._internal.core.models.instances import InstanceStatus, InstanceType
 from dstack._internal.core.models.profiles import StartupOrder, UtilizationPolicy
 from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import (
+    JobProvisioningData,
     JobRuntimeData,
     JobSpec,
     JobStatus,
@@ -62,9 +63,6 @@ from dstack._internal.server.testing.common import (
 from dstack._internal.utils.common import get_current_datetime
 
 pytestmark = pytest.mark.usefixtures("image_config_mock")
-
-if TYPE_CHECKING:
-    from dstack._internal.core.models.runs import JobProvisioningData
 
 
 @pytest.fixture
@@ -319,7 +317,7 @@ class TestProcessRunningJobs:
         job_provisioning_data = get_job_provisioning_data(dockerized=True)
 
         with patch(
-            "dstack._internal.server.services.jobs.configurators.base.get_default_python_version"
+            "dstack._internal.server.services.jobs.configurators.base.get_default_python_verison"
         ) as PyVersion:
             PyVersion.return_value = "3.13"
             job = await create_job(
@@ -905,7 +903,7 @@ class TestPatchBaseImageForAwsEfa:
     @staticmethod
     def _create_job_provisioning_data_with_instance_type(
         backend: BackendType, instance_type: str
-    ) -> "JobProvisioningData":
+    ) -> JobProvisioningData:
         job_provisioning_data = get_job_provisioning_data(backend=backend)
         job_provisioning_data.instance_type = InstanceType(
             name=instance_type,

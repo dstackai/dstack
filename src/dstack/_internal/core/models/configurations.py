@@ -4,7 +4,6 @@ from enum import Enum
 from pathlib import PurePosixPath
 from typing import Any, Dict, List, Optional, Union
 
-from packaging import version
 from pydantic import Field, ValidationError, conint, constr, root_validator, validator
 from typing_extensions import Annotated, Literal
 
@@ -34,6 +33,14 @@ class RunConfigurationType(str, Enum):
     DEV_ENVIRONMENT = "dev-environment"
     TASK = "task"
     SERVICE = "service"
+
+
+class PythonVersion(str, Enum):
+    PY39 = "3.9"
+    PY310 = "3.10"
+    PY311 = "3.11"
+    PY312 = "3.12"
+    PY313 = "3.13"
 
 
 class PortMapping(CoreModel):
@@ -186,8 +193,8 @@ class BaseRunConfiguration(CoreModel):
         Optional[RegistryAuth], Field(description="Credentials for pulling a private Docker image")
     ] = None
     python: Annotated[
-        Optional[str],
-        Field(description="The version of Python. Mutually exclusive with `image`"),
+        Optional[PythonVersion],
+        Field(description="The major version of Python. Mutually exclusive with `image`"),
     ] = None
     nvcc: Annotated[
         Optional[bool],
@@ -241,22 +248,16 @@ class BaseRunConfiguration(CoreModel):
     setup: CommandsList = []
 
     @validator("python", pre=True, always=True)
-    def convert_python(cls, v, values) -> Optional[str]:
+    def convert_python(cls, v, values) -> Optional[PythonVersion]:
         if v is not None and values.get("image"):
-            raise ValueError("`image` and `python` are mutually exclusive fields")
-        if v is None:
-            return None
+            raise KeyError("`image` and `python` are mutually exclusive fields")
         if isinstance(v, float):
             v = str(v)
             if v == "3.1":
                 v = "3.10"
         if isinstance(v, str):
-            try:
-                version.parse(v)
-                return v
-            except version.InvalidVersion:
-                raise ValueError(f"Invalid Python version format: {v}")
-        raise ValueError(f"Python version must be a string, got {type(v)}")
+            return PythonVersion(v)
+        return v
 
     @validator("volumes", each_item=True)
     def convert_volumes(cls, v) -> MountPoint:
