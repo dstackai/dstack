@@ -5,22 +5,24 @@ from typing import List, Optional
 
 from dstack._internal.core.backends.base.backend import Compute
 from dstack._internal.core.backends.base.compute import (
+    ComputeWithGroupProvisioningSupport,
     ComputeWithVolumeSupport,
     generate_unique_instance_name,
     generate_unique_volume_name,
     get_docker_commands,
     get_job_instance_name,
 )
+from dstack._internal.core.backends.base.models import JobConfiguration
 from dstack._internal.core.backends.base.offers import get_catalog_offers
-from dstack._internal.core.backends.runpod.api_client import RunpodApiClient
+from dstack._internal.core.backends.runpod.api_client import RunpodApiClient, RunpodApiClientError
 from dstack._internal.core.backends.runpod.models import RunpodConfig
 from dstack._internal.core.consts import DSTACK_RUNNER_SSH_PORT
 from dstack._internal.core.errors import (
-    BackendError,
     ComputeError,
 )
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import RegistryAuth
+from dstack._internal.core.models.compute_groups import ComputeGroup, ComputeGroupProvisioningData
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceConfiguration,
@@ -42,6 +44,7 @@ CONTAINER_REGISTRY_AUTH_CLEANUP_INTERVAL = 60 * 60 * 24  # 24 hour
 
 class RunpodCompute(
     ComputeWithVolumeSupport,
+    ComputeWithGroupProvisioningSupport,
     Compute,
 ):
     _last_cleanup_time = None
@@ -173,14 +176,104 @@ class RunpodCompute(
             backend_data=None,
         )
 
+    def run_jobs(
+        self,
+        run: Run,
+        job_configurations: List[JobConfiguration],
+        instance_offer: InstanceOfferWithAvailability,
+        project_ssh_public_key: str,
+        project_ssh_private_key: str,
+    ) -> ComputeGroupProvisioningData:
+        master_job_configuration = job_configurations[0]
+        master_job = master_job_configuration.job
+        volumes = master_job_configuration.volumes
+        instance_config = InstanceConfiguration(
+            project_name=run.project_name,
+            instance_name=get_job_instance_name(run, master_job),
+            ssh_keys=[
+                SSHKey(public=run.run_spec.ssh_key_pub.strip()),
+                SSHKey(public=project_ssh_public_key.strip()),
+            ],
+            user=run.user,
+        )
+
+        pod_name = generate_unique_instance_name(instance_config, max_length=MAX_RESOURCE_NAME_LEN)
+        authorized_keys = instance_config.get_public_keys()
+        disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
+
+        network_volume_id = None
+        volume_mount_path = None
+        if len(volumes) > 1:
+            raise ComputeError("Mounting more than one network volume is not supported in runpod")
+        if len(volumes) == 1:
+            network_volume_id = volumes[0].volume_id
+            volume_mount_path = run.run_spec.configuration.volumes[0].path
+
+        pod_count = len(job_configurations)
+        gpu_count = len(instance_offer.instance.resources.gpus)
+        data_center_id = instance_offer.region
+
+        resp = self.api_client.create_cluster(
+            cluster_name=pod_name,
+            gpu_type_id=instance_offer.instance.name,
+            pod_count=pod_count,
+            gpu_count_per_pod=gpu_count,
+            image_name=master_job.job_spec.image_name,
+            template_id="runpod-torch-v21",  # FIXME
+            cluster_type="TRAINING",
+            data_center_id=data_center_id,
+            container_disk_in_gb=disk_size,
+            docker_args=_get_docker_args(authorized_keys),
+            ports=f"{DSTACK_RUNNER_SSH_PORT}/tcp",
+            network_volume_id=network_volume_id,
+            volume_mount_path=volume_mount_path,
+            env={"RUNPOD_POD_USER": "0"},
+        )
+
+        jpds = [
+            JobProvisioningData(
+                backend=instance_offer.backend,
+                instance_type=instance_offer.instance,
+                instance_id=pod["id"],
+                hostname=None,
+                internal_ip=None,
+                region=instance_offer.region,
+                price=instance_offer.price,
+                username="root",
+                dockerized=False,
+            )
+            for pod in resp["pods"]
+        ]
+        return ComputeGroupProvisioningData(
+            compute_group_id=resp["id"],
+            compute_group_name=resp["name"],
+            job_provisioning_datas=jpds,
+        )
+
     def terminate_instance(
         self, instance_id: str, region: str, backend_data: Optional[str] = None
-    ) -> None:
+    ):
         try:
             self.api_client.terminate_pod(instance_id)
-        except BackendError as e:
-            if e.args[0] == "Instance Not Found":
-                logger.debug("The instance with name %s not found", instance_id)
+        except RunpodApiClientError as e:
+            if len(e.errors) > 0 and e.errors[0]["message"] == "pod not found to terminate":
+                logger.debug("The instance %s not found. Skipping deletion.", instance_id)
+                return
+            raise
+
+    def terminate_compute_group(self, compute_group: ComputeGroup):
+        if compute_group.provisioning_data is None:
+            logger.error("Missing ComputeGroupProvisioningData. Cluster will not be deleted")
+            return
+        provisioning_data = compute_group.provisioning_data
+        try:
+            self.api_client.delete_cluster(provisioning_data.compute_group_id)
+        except RunpodApiClientError as e:
+            if len(e.errors) > 0 and e.errors[0]["extensions"]["code"] == "Cluster not found":
+                logger.debug(
+                    "The cluster %s not found. Skipping deletion.",
+                    provisioning_data.compute_group_id,
+                )
                 return
             raise
 

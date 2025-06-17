@@ -14,11 +14,13 @@ import yaml
 from cachetools import TTLCache, cachedmethod
 
 from dstack._internal import settings
+from dstack._internal.core.backends.base.models import JobConfiguration
 from dstack._internal.core.consts import (
     DSTACK_RUNNER_HTTP_PORT,
     DSTACK_RUNNER_SSH_PORT,
     DSTACK_SHIM_HTTP_PORT,
 )
+from dstack._internal.core.models.compute_groups import ComputeGroup, ComputeGroupProvisioningData
 from dstack._internal.core.models.configurations import DEFAULT_REPO_DIR
 from dstack._internal.core.models.gateways import (
     GatewayComputeConfiguration,
@@ -202,6 +204,23 @@ class ComputeWithCreateInstanceSupport(ABC):
                 for z in instance_offer.availability_zones
                 if z == volume.provisioning_data.availability_zone
             ]
+
+
+class ComputeWithGroupProvisioningSupport(ABC):
+    @abstractmethod
+    def run_jobs(
+        self,
+        run: Run,
+        job_configurations: List[JobConfiguration],
+        instance_offer: InstanceOfferWithAvailability,
+        project_ssh_public_key: str,
+        project_ssh_private_key: str,
+    ) -> ComputeGroupProvisioningData:
+        pass
+
+    @abstractmethod
+    def terminate_compute_group(self, compute_group: ComputeGroup):
+        pass
 
 
 class ComputeWithMultinodeSupport:

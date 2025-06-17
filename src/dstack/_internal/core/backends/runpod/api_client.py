@@ -11,6 +11,14 @@ from dstack._internal.utils.common import get_current_datetime
 API_URL = "https://api.runpod.io/graphql"
 
 
+class RunpodApiClientError(BackendError):
+    errors: List[Dict]
+
+    def __init__(self, errors: List[Dict]):
+        self.errors = errors
+        return super().__init__(errors)
+
+
 class RunpodApiClient:
     def __init__(self, api_key: str):
         self.api_key = api_key
@@ -306,10 +314,10 @@ class RunpodApiClient:
                 timeout=120,
             )
             response.raise_for_status()
-            if "errors" in response.json():
-                if "podTerminate" in response.json()["errors"][0]["path"]:
-                    raise BackendError("Instance Not Found")
-                raise BackendError(response.json()["errors"][0]["message"])
+            response_json = response.json()
+            # RunPod returns 200 on client errors
+            if "errors" in response_json:
+                raise RunpodApiClientError(errors=response_json["errors"])
             return response
         except requests.HTTPError as e:
             if e.response is not None and e.response.status_code in (
