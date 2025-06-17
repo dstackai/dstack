@@ -65,27 +65,27 @@ class RunpodApiClient:
         resp = self._make_request(
             {
                 "query": _generate_pod_deployment_mutation(
-                    name,
-                    image_name,
-                    gpu_type_id,
-                    cloud_type,
-                    support_public_ip,
-                    start_ssh,
-                    data_center_id,
-                    country_code,
-                    gpu_count,
-                    volume_in_gb,
-                    container_disk_in_gb,
-                    min_vcpu_count,
-                    min_memory_in_gb,
-                    docker_args,
-                    ports,
-                    volume_mount_path,
-                    env,
-                    template_id,
-                    network_volume_id,
-                    allowed_cuda_versions,
-                    bid_per_gpu,
+                    name=name,
+                    image_name=image_name,
+                    gpu_type_id=gpu_type_id,
+                    cloud_type=cloud_type,
+                    support_public_ip=support_public_ip,
+                    start_ssh=start_ssh,
+                    data_center_id=data_center_id,
+                    country_code=country_code,
+                    gpu_count=gpu_count,
+                    volume_in_gb=volume_in_gb,
+                    container_disk_in_gb=container_disk_in_gb,
+                    min_vcpu_count=min_vcpu_count,
+                    min_memory_in_gb=min_memory_in_gb,
+                    docker_args=docker_args,
+                    ports=ports,
+                    volume_mount_path=volume_mount_path,
+                    env=env,
+                    template_id=template_id,
+                    network_volume_id=network_volume_id,
+                    allowed_cuda_versions=allowed_cuda_versions,
+                    bid_per_gpu=bid_per_gpu,
                 )
             }
         )
@@ -247,8 +247,8 @@ class RunpodApiClient:
         pod_count: int,
         gpu_count_per_pod: int,
         image_name: str,
-        cluster_type: str = "APPLICATION",
-        template_id: Optional[str] = None,
+        template_id: str,
+        cluster_type: str = "TRAINING",
         network_volume_id: Optional[str] = None,
         volume_in_gb: Optional[int] = None,
         throughput: Optional[int] = None,
@@ -266,26 +266,26 @@ class RunpodApiClient:
         resp = self._make_request(
             {
                 "query": _generate_create_cluster_mutation(
-                    cluster_name,
-                    gpu_type_id,
-                    pod_count,
-                    gpu_count_per_pod,
-                    image_name,
-                    cluster_type,
-                    template_id,
-                    network_volume_id,
-                    volume_in_gb,
-                    throughput,
-                    allowed_cuda_versions,
-                    volume_key,
-                    data_center_id,
-                    start_jupyter,
-                    start_ssh,
-                    container_disk_in_gb,
-                    docker_args,
-                    env,
-                    volume_mount_path,
-                    ports,
+                    cluster_name=cluster_name,
+                    gpu_type_id=gpu_type_id,
+                    pod_count=pod_count,
+                    gpu_count_per_pod=gpu_count_per_pod,
+                    image_name=image_name,
+                    cluster_type=cluster_type,
+                    template_id=template_id,
+                    network_volume_id=network_volume_id,
+                    volume_in_gb=volume_in_gb,
+                    throughput=throughput,
+                    allowed_cuda_versions=allowed_cuda_versions,
+                    volume_key=volume_key,
+                    data_center_id=data_center_id,
+                    start_jupyter=start_jupyter,
+                    start_ssh=start_ssh,
+                    container_disk_in_gb=container_disk_in_gb,
+                    docker_args=docker_args,
+                    env=env,
+                    volume_mount_path=volume_mount_path,
+                    ports=ports,
                 )
             }
         )
@@ -516,7 +516,7 @@ def _generate_create_cluster_mutation(
     gpu_count_per_pod: int,
     image_name: str,
     cluster_type: str,
-    template_id: Optional[str] = None,
+    template_id: str,
     network_volume_id: Optional[str] = None,
     volume_in_gb: Optional[int] = None,
     throughput: Optional[int] = None,
@@ -543,10 +543,9 @@ def _generate_create_cluster_mutation(
     input_fields.append(f'imageName: "{image_name}"')
     input_fields.append(f"type: {cluster_type}")
     input_fields.append(f"gpuCountPerPod: {gpu_count_per_pod}")
+    input_fields.append(f'templateId: "{template_id}"')
 
     # ------------------------------ Optional Fields ----------------------------- #
-    if template_id is not None:
-        input_fields.append(f'templateId: "{template_id}"')
     if network_volume_id is not None:
         input_fields.append(f'networkVolumeId: "{network_volume_id}"')
     if volume_in_gb is not None:
