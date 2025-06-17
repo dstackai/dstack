@@ -1,4 +1,4 @@
-from typing import Annotated, List, Optional
+from typing import Annotated, List
 
 from pydantic import Field
 
@@ -8,7 +8,7 @@ from dstack._internal.core.models.users import ProjectRole
 
 class CreateProjectRequest(CoreModel):
     project_name: str
-    is_public: Optional[bool] = False
+    is_public: bool = False
 
 
 class UpdateProjectVisibilityRequest(CoreModel):
@@ -32,10 +32,8 @@ class SetProjectMembersRequest(CoreModel):
 
 
 class AddProjectMemberRequest(CoreModel):
-    # Always accept a list of members for cleaner API design
     members: List[MemberSetting]
 
 
 class RemoveProjectMemberRequest(CoreModel):
-    # Always accept a list of usernames for cleaner API design
     usernames: List[str]
