@@ -943,7 +943,7 @@ class TestPatchBaseImageForAwsEfa:
         "instance_type",
         [
             "p5.48xlarge",
-            "p5e.24xlarge",
+            "p5e.48xlarge",
             "p4d.24xlarge",
             "p4de.24xlarge",
             "g6.8xlarge",
