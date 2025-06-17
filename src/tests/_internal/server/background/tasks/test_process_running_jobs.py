@@ -338,7 +338,7 @@ class TestProcessRunningJobs:
             name="test-run-0-0",
             registry_username="",
             registry_password="",
-            image_name="dstackai/base:0.10-base",
+            image_name="dstackai/base:0.10-base-ubuntu22.04",
             container_user="root",
             privileged=privileged,
             gpu=None,
@@ -926,7 +926,7 @@ class TestPatchBaseImageForAwsEfa:
     @pytest.mark.parametrize(
         "suffix,instance_type",
         [
-            ("-base", "p6.xlarge"),
+            ("-base", "p6-b200.48xlarge"),
             ("-devel", "p5.48xlarge"),
         ],
     )
@@ -942,15 +942,12 @@ class TestPatchBaseImageForAwsEfa:
     @pytest.mark.parametrize(
         "instance_type",
         [
-            "p6.xlarge",
-            "p6.2xlarge",
-            "p5.xlarge",
             "p5.48xlarge",
             "p5e.xlarge",
             "p4d.24xlarge",
             "p4de.24xlarge",
-            "g6.xlarge",
-            "g6e.xlarge",
+            "g6.8xlarge",
+            "g6e.8xlarge",
         ],
     )
     def test_patch_all_efa_instance_types(self, instance_type: str, suffix: str):
@@ -985,7 +982,7 @@ class TestPatchBaseImageForAwsEfa:
     @pytest.mark.parametrize("suffix", ["-base", "-devel"])
     @pytest.mark.parametrize(
         "instance_type",
-        ["t3.micro", "m5.large", "c5.xlarge", "r5.2xlarge", "m6i.large"],
+        ["t3.micro", "m5.large", "c5.xlarge", "r5.2xlarge", "m6i.large", "g6.xlarge"],
     )
     def test_no_patch_non_efa_aws_instances(self, instance_type: str, suffix: str):
         image_name = f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}{suffix}"

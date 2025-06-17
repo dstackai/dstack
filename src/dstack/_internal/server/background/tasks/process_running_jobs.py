@@ -984,18 +984,18 @@ def _patch_base_image_for_aws_efa(
     instance_type = job_provisioning_data.instance_type.name
     efa_enabled_patterns = [
         # TODO: p6-b200 isn't supported yet in gpuhunt
-        r"^p6-b200\.",
-        r"^p5\.",
-        r"^p5e\.",
-        r"^p5en\.",
-        r"^p4d\.",
-        r"^p4de\.",
+        r"^p6-b200\.(48xlarge)$",
+        r"^p5\.(48xlarge)$",
+        r"^p5e\.(48xlarge)$",
+        r"^p5en\.(48xlarge)$",
+        r"^p4d\.(24xlarge)$",
+        r"^p4de\.(24xlarge)$",
         r"^g6\.(8xlarge|12xlarge|16xlarge|24xlarge|48xlarge)$",
         r"^g6e\.(8xlarge|12xlarge|16xlarge|24xlarge|48xlarge)$",
         r"^gr6\.8xlarge$",
         r"^g5\.(8xlarge|12xlarge|16xlarge|24xlarge|48xlarge)$",
         r"^g4dn\.(8xlarge|12xlarge|16xlarge|metal)$",
-        r"^p3dn\.",
+        r"^p3dn\.(24xlarge)$",
     ]
 
     is_efa_enabled = any(re.match(pattern, instance_type) for pattern in efa_enabled_patterns)
