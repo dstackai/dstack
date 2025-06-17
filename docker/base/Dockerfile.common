@@ -10,6 +10,11 @@ ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
 
 ENV PATH="${UV_INSTALL_DIR}:${PATH}"
 
+ENV OMPI_MCA_pml=^cm,ucx
+ENV OMPI_MCA_btl=tcp,self
+ENV OMPI_MCA_btl_tcp_if_exclude=lo,docker0
+ENV NCCL_SOCKET_IFNAME=^docker,lo
+
 RUN export DEBIAN_FRONTEND=noninteractive \
     && apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu${UBUNTU_VERSION}04/x86_64/3bf863cc.pub \
     && apt-get update --fix-missing \
