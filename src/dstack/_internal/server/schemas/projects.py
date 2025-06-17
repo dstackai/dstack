@@ -32,10 +32,8 @@ class SetProjectMembersRequest(CoreModel):
 
 
 class AddProjectMemberRequest(CoreModel):
-    # Always accept a list of members for cleaner API design
     members: List[MemberSetting]
 
 
 class RemoveProjectMemberRequest(CoreModel):
-    # Always accept a list of usernames for cleaner API design
     usernames: List[str]

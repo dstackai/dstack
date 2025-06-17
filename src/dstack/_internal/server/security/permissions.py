@@ -58,7 +58,7 @@ class ProjectAdmin:
             raise error_invalid_token()
         project = await get_project_model_by_name(session=session, project_name=project_name)
         if project is None:
-            raise error_forbidden()
+            raise error_not_found()
         if user.global_role == GlobalRole.ADMIN:
             return user, project
         project_role = get_user_project_role(user=user, project=project)
@@ -144,12 +144,15 @@ class ProjectMemberOrPublicAccess:
         raise error_forbidden()
 
 
-class ProjectManagerOrPublicJoin:
+class ProjectManagerOrPublicProject:
     """
     Allows:
-    1. Project managers to add any members
-    2. Any authenticated user to join public projects themselves
+    1. Project managers to perform member management operations
+    2. Access to public projects for any authenticated user
     """
+
+    def __init__(self):
+        self.project_manager = ProjectManager()
 
     async def __call__(
         self,
