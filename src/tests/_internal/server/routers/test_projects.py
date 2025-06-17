@@ -2134,33 +2134,6 @@ class TestUpdateProjectVisibility:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_project_manager_can_update_visibility(
-        self, test_db, session: AsyncSession, client: AsyncClient
-    ):
-        # Setup project with admin and manager
-        admin_user = await create_user(session=session, name="admin", global_role=GlobalRole.USER)
-        manager_user = await create_user(
-            session=session, name="manager", global_role=GlobalRole.USER
-        )
-        project = await create_project(session=session, owner=admin_user, is_public=False)
-        await add_project_member(
-            session=session, project=project, user=admin_user, project_role=ProjectRole.ADMIN
-        )
-        await add_project_member(
-            session=session, project=project, user=manager_user, project_role=ProjectRole.MANAGER
-        )
-
-        # Manager should be able to update visibility
-        response = await client.post(
-            f"/api/projects/{project.name}/update_visibility",
-            headers=get_auth_headers(manager_user.token),
-            json={"is_public": True},
-        )
-        assert response.status_code == 200
-        assert response.json()["is_public"] == True
-
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_regular_user_cannot_update_visibility(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):

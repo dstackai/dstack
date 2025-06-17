@@ -16,8 +16,9 @@ from dstack._internal.server.schemas.projects import (
 )
 from dstack._internal.server.security.permissions import (
     Authenticated,
+    ProjectAdmin,
     ProjectManager,
-    ProjectManagerOrPublicJoin,
+    ProjectManagerOrPublicProject,
     ProjectManagerOrSelfLeave,
     ProjectMemberOrPublicAccess,
 )
@@ -105,7 +106,7 @@ async def set_project_members(
 async def add_project_members(
     body: AddProjectMemberRequest,
     session: AsyncSession = Depends(get_session),
-    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectManagerOrPublicJoin()),
+    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectManagerOrPublicProject()),
 ) -> Project:
     user, project = user_project
     await projects.add_project_members(
@@ -143,7 +144,7 @@ async def remove_project_members(
 async def update_project_visibility(
     body: UpdateProjectVisibilityRequest,
     session: AsyncSession = Depends(get_session),
-    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectManager()),
+    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
 ) -> Project:
     user, project = user_project
     await projects.update_project_visibility(
