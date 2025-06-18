@@ -122,7 +122,7 @@ export const ProjectSettings: React.FC = () => {
     const changeVisibilityHandler = (is_public: boolean) => {
         updateProject({
             project_name: paramProjectName,
-            is_public,
+            is_public: is_public,
         })
             .unwrap()
             .then(() => {
