@@ -126,10 +126,10 @@ export const ProjectSettings: React.FC = () => {
 
     const debouncedMembersHandler = useCallback(debounce(changeMembersHandler, 1000), []);
 
-    const changeVisibilityHandler = (is_public: boolean) => {
+    const changeVisibilityHandler = (isPublic: boolean) => {
         updateProjectVisibility({
             project_name: paramProjectName,
-            is_public,
+            is_public: isPublic,
         })
             .unwrap()
             .then(() => {
@@ -232,7 +232,7 @@ export const ProjectSettings: React.FC = () => {
                                     {t('projects.edit.project_visibility_description')}
                                 </Box>
                                 <Toggle
-                                    checked={data.is_public}
+                                    checked={data.isPublic}
                                     onChange={(detail) => changeVisibilityHandler(detail.detail.checked)}
                                     disabled={!isProjectManager(data)}
                                 >

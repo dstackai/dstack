@@ -9,7 +9,7 @@ import { useAppSelector, useCollection, useNotifications } from 'hooks';
 import { selectUserData } from 'App/slice';
 import { ROUTES } from 'routes';
 import { useGetUserListQuery } from 'services/user';
-import { useAddProjectMemberMutation, useRemoveProjectMemberMutation } from 'services/project';
+import { useProjectMemberActions } from '../hooks/useProjectMemberActions';
 
 import { UserAutosuggest } from './UsersAutosuggest';
 
@@ -26,8 +26,7 @@ export const ProjectMembers: React.FC<IProps> = ({ members, loading, onChange, r
     const [selectedItems, setSelectedItems] = useState<TProjectMemberWithIndex[]>([]);
     const { data: usersData } = useGetUserListQuery();
     const userData = useAppSelector(selectUserData);
-    const [addMember, { isLoading: isAdding }] = useAddProjectMemberMutation();
-    const [removeMember, { isLoading: isRemoving }] = useRemoveProjectMemberMutation();
+    const { handleJoinProject, handleLeaveProject, isMemberActionLoading } = useProjectMemberActions();
 
     const { handleSubmit, control, getValues, setValue } = useForm<TFormValues>({
         defaultValues: { members: members ?? [] },
@@ -44,60 +43,9 @@ export const ProjectMembers: React.FC<IProps> = ({ members, loading, onChange, r
         return member?.project_role || null;
     }, [members, userData?.username]);
 
-    const isProjectOwner = useMemo(() => {
-        return userData?.username === project?.owner.username;
-    }, [userData?.username, project?.owner.username]);
+    const isProjectOwner = userData?.username === project?.owner.username;
 
     const isMember = currentUserRole !== null;
-    const isMemberActionLoading = isAdding || isRemoving;
-
-    const handleJoinProject = async () => {
-        if (!userData?.username || !project) return;
-        
-        try {
-            await addMember({
-                project_name: project.project_name,
-                username: userData.username,
-                project_role: 'user',
-            }).unwrap();
-            
-            pushNotification({
-                type: 'success',
-                content: t('projects.join_success'),
-            });
-        } catch (error) {
-            console.error('Failed to join project:', error);
-            pushNotification({
-                type: 'error',
-                content: t('projects.join_error'),
-            });
-        }
-    };
-
-    const handleLeaveProject = async () => {
-        if (!userData?.username || !project) return;
-        
-        try {
-            await removeMember({
-                project_name: project.project_name,
-                username: userData.username,
-            }).unwrap();
-            
-            pushNotification({
-                type: 'success',
-                content: t('projects.leave_success'),
-            });
-            
-            // Redirect to project list after successfully leaving
-            navigate(ROUTES.PROJECT.LIST);
-        } catch (error) {
-            console.error('Failed to leave project:', error);
-            pushNotification({
-                type: 'error',
-                content: t('projects.leave_error'),
-            });
-        }
-    };
 
     useEffect(() => {
         if (members) {
@@ -182,7 +130,7 @@ export const ProjectMembers: React.FC<IProps> = ({ members, loading, onChange, r
                 actions.unshift(
                     <Button
                         key="join"
-                        onClick={handleJoinProject}
+                        onClick={() => handleJoinProject(project.project_name, userData.username!)}
                         disabled={isMemberActionLoading}
                         variant="primary"
                     >
@@ -196,7 +144,7 @@ export const ProjectMembers: React.FC<IProps> = ({ members, loading, onChange, r
                 actions.unshift(
                     <Button
                         key="leave"
-                        onClick={handleLeaveProject}
+                        onClick={() => handleLeaveProject(project.project_name, userData.username!)}
                         disabled={isMemberActionLoading || !canLeave}
                         variant="normal"
                     >

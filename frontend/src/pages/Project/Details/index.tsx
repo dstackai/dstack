@@ -27,9 +27,7 @@ export const ProjectDetails: React.FC = () => {
         return getProjectRoleByUserName(project, userData.username);
     }, [project, userData?.username]);
 
-    const isProjectOwner = useMemo(() => {
-        return userData?.username === project?.owner.username;
-    }, [userData?.username, project?.owner.username]);
+    const isProjectOwner = userData?.username === project?.owner.username;
 
     const isMember = currentUserRole !== null;
     const isMemberActionLoading = isAdding || isRemoving;
