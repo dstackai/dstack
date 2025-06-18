@@ -14,6 +14,9 @@ DSTACK_USE_LATEST_FROM_BRANCH = os.getenv("DSTACK_USE_LATEST_FROM_BRANCH") is no
 
 DSTACK_BASE_IMAGE = os.getenv("DSTACK_BASE_IMAGE", "dstackai/base")
 DSTACK_BASE_IMAGE_VERSION = os.getenv("DSTACK_BASE_IMAGE_VERSION", version.base_image)
+DSTACK_BASE_IMAGE_UBUNTU_VERSION = os.getenv(
+    "DSTACK_BASE_IMAGE_UBUNTU_VERSION", version.base_image_ubuntu_version
+)
 
 
 class FeatureFlags:
