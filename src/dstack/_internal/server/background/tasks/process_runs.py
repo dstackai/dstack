@@ -20,7 +20,6 @@ from dstack._internal.core.models.runs import (
     RunStatus,
     RunTerminationReason,
 )
-from dstack._internal.server.background.metrics import run_metrics
 from dstack._internal.server.db import get_session_ctx
 from dstack._internal.server.models import JobModel, ProjectModel, RunModel
 from dstack._internal.server.services.jobs import (
@@ -29,6 +28,7 @@ from dstack._internal.server.services.jobs import (
     group_jobs_by_replica_latest,
 )
 from dstack._internal.server.services.locking import get_locker
+from dstack._internal.server.services.prometheus.push_metrics import run_metrics
 from dstack._internal.server.services.runs import (
     create_job_model_for_new_submission,
     fmt,
@@ -371,7 +371,7 @@ async def _process_active_run(session: AsyncSession, run_model: RunModel):
             new_status.name,
         )
         if run_model.status == RunStatus.SUBMITTED and new_status == RunStatus.PROVISIONING:
-            current_time = datetime.datetime.now(datetime.timezone.utc)
+            current_time = common.get_current_datetime()
             submit_to_provision_duration = (
                 current_time - run_model.submitted_at.replace(tzinfo=datetime.timezone.utc)
             ).total_seconds()
@@ -381,13 +381,11 @@ async def _process_active_run(session: AsyncSession, run_model: RunModel):
                 submit_to_provision_duration,
             )
             project_name = run_model.project.name
-            run_type = RunSpec.__response__.parse_raw(run_model.run_spec).configuration.type
             run_metrics.log_submit_to_provision_duration(
-                submit_to_provision_duration, project_name, run_type
+                submit_to_provision_duration, project_name, run_spec.configuration.type
             )
 
         if new_status == RunStatus.PENDING:
-            run_spec = RunSpec.__response__.parse_raw(run_model.run_spec)
             run_metrics.increment_pending_runs(run_model.project.name, run_spec.configuration.type)
 
         run_model.status = new_status

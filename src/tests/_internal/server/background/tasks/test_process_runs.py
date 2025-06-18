@@ -3,6 +3,7 @@ from typing import Union
 from unittest.mock import patch
 
 import pytest
+from freezegun import freeze_time
 from pydantic import parse_obj_as
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -28,6 +29,7 @@ from dstack._internal.server.testing.common import (
     get_job_provisioning_data,
     get_run_spec,
 )
+from dstack._internal.utils import common
 
 pytestmark = pytest.mark.usefixtures("image_config_mock")
 
@@ -72,10 +74,11 @@ async def make_run(
 class TestProcessRuns:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @freeze_time(datetime.datetime(2023, 1, 2, 3, 5, 20, tzinfo=datetime.timezone.utc))
     async def test_submitted_to_provisioning(self, test_db, session: AsyncSession):
         run = await make_run(session, status=RunStatus.SUBMITTED)
         await create_job(session=session, run=run, status=JobStatus.PROVISIONING)
-        current_time = datetime.datetime.now(datetime.timezone.utc)
+        current_time = common.get_current_datetime()
 
         expected_duration = (
             current_time - run.submitted_at.replace(tzinfo=datetime.timezone.utc)
@@ -91,9 +94,7 @@ class TestProcessRuns:
             assert args[1] == run.project.name
             assert args[2] == "service"
             # Assert the duration is close to our expected duration (within 0.05 second tolerance)
-            assert abs(args[0] - expected_duration) < 0.05, (
-                f"Expected duration ~{expected_duration:.3f}s, got {args[0]:.3f}s"
-            )
+            assert args[0] == expected_duration
 
         await session.refresh(run)
         assert run.status == RunStatus.PROVISIONING
@@ -233,11 +234,12 @@ class TestProcessRuns:
 class TestProcessRunsReplicas:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @freeze_time(datetime.datetime(2023, 1, 2, 3, 5, 20, tzinfo=datetime.timezone.utc))
     async def test_submitted_to_provisioning_if_any(self, test_db, session: AsyncSession):
         run = await make_run(session, status=RunStatus.SUBMITTED, replicas=2)
         await create_job(session=session, run=run, status=JobStatus.SUBMITTED, replica_num=0)
         await create_job(session=session, run=run, status=JobStatus.PROVISIONING, replica_num=1)
-        current_time = datetime.datetime.now(datetime.timezone.utc)
+        current_time = common.get_current_datetime()
 
         expected_duration = (
             current_time - run.submitted_at.replace(tzinfo=datetime.timezone.utc)
@@ -253,10 +255,7 @@ class TestProcessRunsReplicas:
             assert args[1] == run.project.name
             assert args[2] == "service"
             assert isinstance(args[0], float)
-            # Assert the duration is close to our expected duration (within 0.05 second tolerance)
-            assert abs(args[0] - expected_duration) < 0.05, (
-                f"Expected duration ~{expected_duration:.3f}s, got {args[0]:.3f}s"
-            )
+            assert args[0] == expected_duration
 
         await session.refresh(run)
         assert run.status == RunStatus.PROVISIONING

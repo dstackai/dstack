@@ -1,6 +1,6 @@
 from unittest.mock import MagicMock
 
-from dstack._internal.server.background.metrics import run_metrics
+from dstack._internal.server.services.prometheus.push_metrics import run_metrics
 
 
 class TestRunMetrics:
