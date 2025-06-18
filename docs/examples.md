@@ -74,6 +74,16 @@ hide:
             with RAGEN, verl, and Ray.
         </p>
     </a>
+    <a href="/examples/distributed-training/open-r1"
+       class="feature-cell sky">
+        <h3>
+            Open-R1
+        </h3>
+
+        <p>
+            Fine-tune to reproduce Deepseek-R1 with separate inference and training nodes.
+        </p>
+    </a>
 </div>
 
 

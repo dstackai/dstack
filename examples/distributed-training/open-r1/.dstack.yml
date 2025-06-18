@@ -1,0 +1,83 @@
+type: task
+name: open-r1-grpo
+
+# Size of the cluster
+nodes: 2
+
+python: 3.12
+
+nvcc: true
+
+# Required environment variables
+env:
+  - HF_TOKEN
+  - WANDB_API_KEY
+  - NCCL_DEBUG=INFO
+  # VLLM configuration
+  - USE_VLLM=true
+  - MODEL=Qwen/Qwen2.5-Coder-7B-Instruct
+  # Qwen2.5-Coder-7B-Instruct has 28 attention heads and should be divisible by TP and DP
+  - TP=4
+  - DP=2
+
+# Commands of the task
+commands:
+  - uv pip install vllm==0.8.5.post1
+  - uv pip install setuptools
+  - uv pip install https://github.com/Dao-AILab/flash-attention/releases/download/v2.7.4.post1/flash_attn-2.7.4.post1+cu12torch2.6cxx11abiFALSE-cp312-cp312-linux_x86_64.whl 
+  - git clone https://github.com/huggingface/open-r1.git
+  - cd open-r1
+  - uv pip install .
+  - |
+    # Get the last IP from DSTACK_NODES_IPS for vLLM node
+    VLLM_HOST=$(echo $DSTACK_NODES_IPS | tr ' ' '\n' | tail -n 1)
+    echo "VLLM host IP (last node): $VLLM_HOST"
+    
+    if [ "$USE_VLLM" = "true" ]; then
+      if [ "$DSTACK_NODE_RANK" -eq $(($DSTACK_NODES_NUM - 1)) ]; then
+        # Last Node runs VLLM server
+        echo "Starting VLLM server on Last Node (IP: $VLLM_HOST)"
+        trl vllm-serve --model $MODEL  --tensor_parallel_size $TP --data_parallel_size $DP --host 0.0.0.0
+      else
+        # Training node - adjust world size and nodes count for training
+        GPUS_PER_NODE=$(($DSTACK_GPUS_NUM / $DSTACK_NODES_NUM))
+        ADJUSTED_NODES_NUM=$(($DSTACK_NODES_NUM - 1))
+        ADJUSTED_GPUS_TOTAL=$(($GPUS_PER_NODE * $ADJUSTED_NODES_NUM))
+        # Other nodes run training
+        echo "Starting training with VLLM on $VLLM_HOST"
+        accelerate launch --config_file recipes/accelerate_configs/zero3.yaml \
+            --num_processes=$ADJUSTED_GPUS_TOTAL \
+            --num_machines=$ADJUSTED_NODES_NUM \
+            --machine_rank=$DSTACK_NODE_RANK \
+            --main_process_ip=$DSTACK_MASTER_NODE_IP \
+            --main_process_port=8008 \
+            src/open_r1/grpo.py \
+            --config recipes/Qwen2.5-1.5B-Instruct/grpo/config_demo.yaml \
+            --model_name_or_path $MODEL \
+            --output_dir /checkpoints/Qwen2.5-Coder-7B-Instruct-GRPO \
+            --hub_model_id sjbbihan/Qwen2.5-Coder-7B-Instruct \
+            --vllm_server_host=$VLLM_HOST
+      fi
+    else
+      # Standard training mode without VLLM
+      echo "Running standard training without VLLM"
+      accelerate launch --config_file recipes/accelerate_configs/zero3.yaml \
+            --num_processes=$DSTACK_GPUS_NUM \
+            --num_machines=$DSTACK_NODES_NUM \
+            --machine_rank=$DSTACK_NODE_RANK \
+            --main_process_ip=$DSTACK_MASTER_NODE_IP \
+            --main_process_port=8008 \
+            src/open_r1/grpo.py \
+            --config recipes/Qwen2.5-1.5B-Instruct/grpo/config_demo.yaml \
+            --model_name_or_path $MODEL \
+            --output_dir /checkpoints/Qwen2.5-Coder-7B-Instruct-GRPO \
+            --hub_model_id sjbbihan/Qwen2.5-Coder-7B-Instruct \
+            --use_vllm false
+    fi
+
+resources:
+  gpu: 80GB:8
+  shm_size: 128GB
+
+volumes:
+   - /checkpoints:/checkpoints
