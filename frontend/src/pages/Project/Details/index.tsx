@@ -50,7 +50,11 @@ export const ProjectDetails: React.FC = () => {
             
             return (
                 <Button
+<<<<<<< HEAD
                     onClick={() => handleLeaveProject(project.project_name, userData.username!, () => navigate(ROUTES.PROJECT.LIST))}
+=======
+                    onClick={() => handleLeaveProject(project.project_name, userData.username!)}
+>>>>>>> 7b42ba10 (refactor: use useProjectMemberActions in ProjectDetails)
                     disabled={isMemberActionLoading || !canLeave}
                     variant="normal"
                 >
