@@ -16,7 +16,7 @@ export const ProjectForm: React.FC<IProps> = ({ initialValues, onCancel, loading
 
     const formMethods = useForm<IProject>({
         defaultValues: {
-            is_public: false,
+            isPublic: false,
             ...initialValues,
         },
     });
@@ -87,7 +87,7 @@ export const ProjectForm: React.FC<IProps> = ({ initialValues, onCancel, loading
                                 label={t('projects.edit.is_public')}
                                 description={t('projects.edit.is_public_description')}
                                 control={control}
-                                name="is_public"
+                                name="isPublic"
                                 disabled={loading}
                             />
                         </SpaceBetween>

@@ -8,7 +8,7 @@ declare interface IProject {
     backends: TProjectBackend[]
     owner: IUser | {username: string},
     created_at: string,
-    is_public: boolean
+    isPublic: boolean
 }
 
 declare interface IProjectMember {
