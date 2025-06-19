@@ -185,7 +185,7 @@ class Run(ABC):
         self,
         start_time: Optional[datetime] = None,
         diagnose: bool = False,
-        replica_num: int = 0,
+        replica_num: Optional[int] = None,
         job_num: int = 0,
     ) -> Iterable[bytes]:
         """
