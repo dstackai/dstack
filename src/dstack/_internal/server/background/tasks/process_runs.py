@@ -385,7 +385,7 @@ async def _handle_run_replicas(
         )
         return
 
-    await _update_jobs_to_new_deployment_in_place(run_model)
+    await _update_jobs_to_new_deployment_in_place(run_model, run_spec)
     if _has_out_of_date_replicas(run_model):
         non_terminated_replica_count = len(
             {j.replica_num for j in run_model.jobs if not j.status.is_finished()}
@@ -425,7 +425,7 @@ async def _handle_run_replicas(
             )
 
 
-async def _update_jobs_to_new_deployment_in_place(run_model: RunModel) -> None:
+async def _update_jobs_to_new_deployment_in_place(run_model: RunModel, run_spec: RunSpec) -> None:
     """
     Bump deployment_num for jobs that do not require redeployment.
     """
@@ -436,7 +436,7 @@ async def _update_jobs_to_new_deployment_in_place(run_model: RunModel) -> None:
         if all(j.deployment_num == run_model.deployment_num for j in job_models):
             continue
         new_job_specs = await get_job_specs_from_run_spec(
-            run_spec=RunSpec.__response__.parse_raw(run_model.run_spec),
+            run_spec=run_spec,
             replica_num=replica_num,
         )
         assert len(new_job_specs) == len(job_models), (
