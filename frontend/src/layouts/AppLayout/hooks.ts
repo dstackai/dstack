@@ -43,15 +43,15 @@ export const useSideNavigation = () => {
             text: t('navigation.settings'),
             href: ROUTES.USER.DETAILS.FORMAT(userName),
         },
-        process.env.UI_VERSION === 'sky' && {
-            type: 'link',
-            text: t('navigation.billing'),
-            href: billingUrl,
-        },
         {
             type: 'link',
             text: t('users.projects'),
             href: userProjectsUrl,
+        },
+        process.env.UI_VERSION === 'sky' && {
+            type: 'link',
+            text: t('navigation.billing'),
+            href: billingUrl,
         },
     ].filter(Boolean);
 
