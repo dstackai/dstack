@@ -1132,6 +1132,9 @@ class TestApplyPlan:
         assert response.status_code == 200, response.json()
         await session.refresh(run_model)
         updated_run = run_model_to_run(run_model)
+        assert run.deployment_num == 0
+        assert updated_run.deployment_num == 1
+        assert run.run_spec.configuration.replicas == Range(min=1, max=1)
         assert updated_run.run_spec.configuration.replicas == Range(min=2, max=2)
 
 
