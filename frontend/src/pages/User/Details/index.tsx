@@ -63,16 +63,19 @@ export const UserDetails: React.FC = () => {
             label: t('users.settings'),
             id: UserDetailsTabTypeEnum.SETTINGS,
             href: ROUTES.USER.DETAILS.FORMAT(paramUserName),
+            content: <Outlet />,
         },
         {
             label: t('users.projects'),
             id: UserDetailsTabTypeEnum.PROJECTS,
             href: ROUTES.USER.PROJECTS.FORMAT(paramUserName),
+            content: <Outlet />,
         },
         process.env.UI_VERSION === 'sky' && {
             label: t('billing.title'),
             id: UserDetailsTabTypeEnum.BILLING,
             href: ROUTES.USER.BILLING.LIST.FORMAT(paramUserName),
+            content: <Outlet />,
         },
     ].filter(Boolean);
 
@@ -88,10 +91,7 @@ export const UserDetails: React.FC = () => {
                 }
             >
                 <SpaceBetween size="l">
-                    <div />
-                    <div />
-                    <Tabs withNavigation tabs={tabs} />
-                    <Outlet />
+                    <Tabs variant="container" withNavigation tabs={tabs} />
                 </SpaceBetween>
             </ContentLayout>
 
