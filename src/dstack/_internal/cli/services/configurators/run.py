@@ -599,6 +599,7 @@ def _is_ready_to_attach(run: Run) -> bool:
         ]
         or run._run.jobs[0].job_submissions[-1].status
         in [JobStatus.SUBMITTED, JobStatus.PROVISIONING, JobStatus.PULLING]
+        or run._run.is_deployment_in_progress()
     )
 
 
