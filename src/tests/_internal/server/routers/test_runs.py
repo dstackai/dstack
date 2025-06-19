@@ -385,6 +385,7 @@ def get_dev_env_run_dict(
                     {
                         "id": job_id,
                         "submission_num": 0,
+                        "deployment_num": 0,
                         "submitted_at": submitted_at,
                         "last_processed_at": last_processed_at,
                         "finished_at": finished_at,
@@ -404,6 +405,7 @@ def get_dev_env_run_dict(
         "latest_job_submission": {
             "id": job_id,
             "submission_num": 0,
+            "deployment_num": 0,
             "submitted_at": submitted_at,
             "last_processed_at": last_processed_at,
             "inactivity_secs": None,
@@ -419,6 +421,7 @@ def get_dev_env_run_dict(
         },
         "cost": 0.0,
         "service": None,
+        "deployment_num": 0,
         "termination_reason": None,
         "error": None,
         "deleted": deleted,
@@ -520,6 +523,7 @@ class TestListRuns:
                             {
                                 "id": str(job.id),
                                 "submission_num": 0,
+                                "deployment_num": 0,
                                 "submitted_at": run1_submitted_at.isoformat(),
                                 "last_processed_at": run1_submitted_at.isoformat(),
                                 "finished_at": None,
@@ -539,6 +543,7 @@ class TestListRuns:
                 "latest_job_submission": {
                     "id": str(job.id),
                     "submission_num": 0,
+                    "deployment_num": 0,
                     "submitted_at": run1_submitted_at.isoformat(),
                     "last_processed_at": run1_submitted_at.isoformat(),
                     "finished_at": None,
@@ -554,6 +559,7 @@ class TestListRuns:
                 },
                 "cost": 0,
                 "service": None,
+                "deployment_num": 0,
                 "termination_reason": None,
                 "error": None,
                 "deleted": False,
@@ -571,6 +577,7 @@ class TestListRuns:
                 "latest_job_submission": None,
                 "cost": 0,
                 "service": None,
+                "deployment_num": 0,
                 "termination_reason": None,
                 "error": None,
                 "deleted": False,

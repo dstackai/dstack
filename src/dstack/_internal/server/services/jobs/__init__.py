@@ -128,6 +128,7 @@ def job_model_to_job_submission(job_model: JobModel) -> JobSubmission:
     return JobSubmission(
         id=job_model.id,
         submission_num=job_model.submission_num,
+        deployment_num=job_model.deployment_num,
         submitted_at=job_model.submitted_at.replace(tzinfo=timezone.utc),
         last_processed_at=last_processed_at,
         finished_at=finished_at,

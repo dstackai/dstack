@@ -286,6 +286,8 @@ async def create_run(
         last_processed_at=submitted_at,
         jobs=[],
         priority=priority,
+        deployment_num=0,
+        desired_replica_count=1,
     )
     session.add(run)
     await session.commit()
@@ -318,6 +320,7 @@ async def create_job(
         job_num=job_num,
         job_name=run.run_name + f"-{job_num}-{replica_num}",
         replica_num=replica_num,
+        deployment_num=run.deployment_num,
         submission_num=submission_num,
         submitted_at=submitted_at,
         last_processed_at=last_processed_at,

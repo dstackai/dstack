@@ -289,6 +289,7 @@ class ClusterInfo(CoreModel):
 class JobSubmission(CoreModel):
     id: UUID4
     submission_num: int
+    deployment_num: int = 0  # default for compatibility with pre-TODO servers
     submitted_at: datetime
     last_processed_at: datetime
     finished_at: Optional[datetime]
@@ -516,6 +517,7 @@ class Run(CoreModel):
     latest_job_submission: Optional[JobSubmission]
     cost: float = 0
     service: Optional[ServiceSpec] = None
+    deployment_num: int = 0  # default for compatibility with pre-TODO servers
     # TODO: make error a computed field after migrating to pydanticV2
     error: Optional[str] = None
     deleted: Optional[bool] = None
@@ -577,6 +579,13 @@ class Run(CoreModel):
         ):
             return "retrying"
         return status.value
+
+    def is_deployment_in_progress(self) -> bool:
+        return any(
+            not j.job_submissions[-1].status.is_finished()
+            and j.job_submissions[-1].deployment_num != self.deployment_num
+            for j in self.jobs
+        )
 
 
 class JobPlan(CoreModel):

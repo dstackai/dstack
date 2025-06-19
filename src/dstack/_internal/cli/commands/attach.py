@@ -52,9 +52,9 @@ class AttachCommand(APIBaseCommand):
         )
         self._parser.add_argument(
             "--replica",
-            help="The replica number. Defaults to 0.",
+            help="The replica number. Defaults to any running replica.",
             type=int,
-            default=0,
+            required=None,
         )
         self._parser.add_argument(
             "--job",

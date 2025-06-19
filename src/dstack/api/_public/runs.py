@@ -31,6 +31,7 @@ from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import (
     Job,
     JobSpec,
+    JobStatus,
     RunPlan,
     RunSpec,
     RunStatus,
@@ -246,7 +247,7 @@ class Run(ABC):
         ssh_identity_file: Optional[PathLike] = None,
         bind_address: Optional[str] = None,
         ports_overrides: Optional[List[PortMapping]] = None,
-        replica_num: int = 0,
+        replica_num: Optional[int] = None,
         job_num: int = 0,
     ) -> bool:
         """
@@ -254,6 +255,7 @@ class Run(ABC):
 
         Args:
             ssh_identity_file: SSH keypair to access instances.
+            replica_num: replica_num or None to attach to any running replica.
 
         Raises:
             dstack.api.PortUsedError: If ports are in use or the run is attached by another process.
@@ -265,7 +267,9 @@ class Run(ABC):
 
         job = self._find_job(replica_num=replica_num, job_num=job_num)
         if job is None:
-            raise ClientError(f"Failed to find replica={replica_num} job={job_num}")
+            replica_repr = replica_num if replica_num is not None else "<any running>"
+            raise ClientError(f"Failed to find replica={replica_repr} job={job_num}")
+        replica_num = job.job_spec.replica_num
 
         name = self.name
         if replica_num != 0 or job_num != 0:
@@ -358,9 +362,14 @@ class Run(ABC):
             self._ssh_attach.detach()
             self._ssh_attach = None
 
-    def _find_job(self, replica_num: int, job_num: int) -> Optional[Job]:
+    def _find_job(self, replica_num: Optional[int], job_num: int) -> Optional[Job]:
         for j in self._run.jobs:
-            if j.job_spec.replica_num == replica_num and j.job_spec.job_num == job_num:
+            if (
+                replica_num is not None
+                and j.job_spec.replica_num == replica_num
+                or replica_num is None
+                and j.job_submissions[-1].status == JobStatus.RUNNING
+            ) and j.job_spec.job_num == job_num:
                 return j
         return None
 
