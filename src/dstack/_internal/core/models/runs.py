@@ -289,7 +289,7 @@ class ClusterInfo(CoreModel):
 class JobSubmission(CoreModel):
     id: UUID4
     submission_num: int
-    deployment_num: int = 0  # default for compatibility with pre-TODO servers
+    deployment_num: int = 0  # default for compatibility with pre-0.19.14 servers
     submitted_at: datetime
     last_processed_at: datetime
     finished_at: Optional[datetime]
@@ -517,7 +517,7 @@ class Run(CoreModel):
     latest_job_submission: Optional[JobSubmission]
     cost: float = 0
     service: Optional[ServiceSpec] = None
-    deployment_num: int = 0  # default for compatibility with pre-TODO servers
+    deployment_num: int = 0  # default for compatibility with pre-0.19.14 servers
     # TODO: make error a computed field after migrating to pydanticV2
     error: Optional[str] = None
     deleted: Optional[bool] = None
