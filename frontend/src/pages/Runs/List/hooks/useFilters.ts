@@ -5,8 +5,8 @@ import { ToggleProps } from '@cloudscape-design/components';
 import type { PropertyFilterProps } from 'components';
 
 import { useProjectFilter } from 'hooks/useProjectFilter';
-
-import { useGetUserListQuery } from '../../../../services/user';
+import { EMPTY_QUERY, requestParamsToTokens, tokensToRequestParams } from 'libs/filters';
+import { useGetUserListQuery } from 'services/user';
 
 type Args = {
     localStorePrefix: string;
@@ -14,30 +14,9 @@ type Args = {
 
 type RequestParamsKeys = keyof Pick<TRunsRequestParams, 'only_active' | 'project_name' | 'username'>;
 
-const FilterKeys: Record<string, RequestParamsKeys> = {
+const filterKeys: Record<string, RequestParamsKeys> = {
     PROJECT_NAME: 'project_name',
     USER_NAME: 'username',
-};
-
-const EMPTY_QUERY: PropertyFilterProps.Query = {
-    tokens: [],
-    operation: 'and',
-};
-
-const tokensToRequestParams = (tokens: PropertyFilterProps.Query['tokens'], onlyActive?: boolean) => {
-    const params = tokens.reduce((acc, token) => {
-        if (token.propertyKey) {
-            acc[token.propertyKey as RequestParamsKeys] = token.value;
-        }
-
-        return acc;
-    }, {} as Record<RequestParamsKeys, string>);
-
-    if (onlyActive) {
-        params['only_active'] = 'true';
-    }
-
-    return params;
 };
 
 export const useFilters = ({ localStorePrefix }: Args) => {
@@ -46,26 +25,9 @@ export const useFilters = ({ localStorePrefix }: Args) => {
     const { projectOptions } = useProjectFilter({ localStorePrefix });
     const { data: usersData } = useGetUserListQuery();
 
-    const [propertyFilterQuery, setPropertyFilterQuery] = useState<PropertyFilterProps.Query>(() => {
-        const tokens = [];
-
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-ignore
-        for (const [paramKey, paramValue] of searchParams.entries()) {
-            if (Object.values(FilterKeys).includes(paramKey)) {
-                tokens.push({ propertyKey: paramKey, operator: '=', value: paramValue });
-            }
-        }
-
-        if (!tokens.length) {
-            return EMPTY_QUERY;
-        }
-
-        return {
-            ...EMPTY_QUERY,
-            tokens,
-        };
-    });
+    const [propertyFilterQuery, setPropertyFilterQuery] = useState<PropertyFilterProps.Query>(() =>
+        requestParamsToTokens<RequestParamsKeys>({ searchParams, filterKeys }),
+    );
 
     const clearFilter = () => {
         setSearchParams({});
@@ -79,14 +41,14 @@ export const useFilters = ({ localStorePrefix }: Args) => {
         projectOptions.forEach(({ value }) => {
             if (value)
                 options.push({
-                    propertyKey: FilterKeys.PROJECT_NAME,
+                    propertyKey: filterKeys.PROJECT_NAME,
                     value,
                 });
         });
 
         usersData?.forEach(({ username }) => {
             options.push({
-                propertyKey: FilterKeys.USER_NAME,
+                propertyKey: filterKeys.USER_NAME,
                 value: username,
             });
         });
@@ -96,13 +58,13 @@ export const useFilters = ({ localStorePrefix }: Args) => {
 
     const filteringProperties = [
         {
-            key: FilterKeys.PROJECT_NAME,
+            key: filterKeys.PROJECT_NAME,
             operators: ['='],
             propertyLabel: 'Project',
             groupValuesLabel: 'Project values',
         },
         {
-            key: FilterKeys.USER_NAME,
+            key: filterKeys.USER_NAME,
             operators: ['='],
             propertyLabel: 'User',
         },
@@ -115,7 +77,7 @@ export const useFilters = ({ localStorePrefix }: Args) => {
             return !tokens.some((item, index) => token.propertyKey === item.propertyKey && index > tokenIndex);
         });
 
-        setSearchParams(tokensToRequestParams(filteredTokens, onlyActive));
+        setSearchParams(tokensToRequestParams<RequestParamsKeys>(filteredTokens, onlyActive));
 
         setPropertyFilterQuery({
             operation,
@@ -126,11 +88,11 @@ export const useFilters = ({ localStorePrefix }: Args) => {
     const onChangeOnlyActive: ToggleProps['onChange'] = ({ detail }) => {
         setOnlyActive(detail.checked);
 
-        setSearchParams(tokensToRequestParams(propertyFilterQuery.tokens, detail.checked));
+        setSearchParams(tokensToRequestParams<RequestParamsKeys>(propertyFilterQuery.tokens, detail.checked));
     };
 
     const filteringRequestParams = useMemo(() => {
-        const params = tokensToRequestParams(propertyFilterQuery.tokens);
+        const params = tokensToRequestParams<RequestParamsKeys>(propertyFilterQuery.tokens);
 
         return {
             ...params,
