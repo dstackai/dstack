@@ -1,0 +1,15 @@
+.runStatus {
+  display: flex;
+  align-items: center;
+  gap: 10px
+}
+
+.infoIcon {
+  position: relative;
+
+  [class*="awsui_popover"] {
+    & > div {
+      transform: translate(-8px, -14px);
+    }
+  }
+}
