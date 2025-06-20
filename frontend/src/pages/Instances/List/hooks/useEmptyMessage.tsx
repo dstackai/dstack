@@ -4,10 +4,10 @@ import { useTranslation } from 'react-i18next';
 import { Button, ListEmptyMessage } from 'components';
 
 export const useEmptyMessages = ({
-    clearFilters,
+    clearFilter,
     isDisabledClearFilter,
 }: {
-    clearFilters?: () => void;
+    clearFilter?: () => void;
     isDisabledClearFilter?: boolean;
 }) => {
     const { t } = useTranslation();
@@ -18,12 +18,12 @@ export const useEmptyMessages = ({
                 title={t('fleets.instances.empty_message_title')}
                 message={t('fleets.instances.empty_message_text')}
             >
-                <Button disabled={isDisabledClearFilter} onClick={clearFilters}>
+                <Button disabled={isDisabledClearFilter} onClick={clearFilter}>
                     {t('common.clearFilter')}
                 </Button>
             </ListEmptyMessage>
         );
-    }, [clearFilters, isDisabledClearFilter]);
+    }, [clearFilter, isDisabledClearFilter]);
 
     const renderNoMatchMessage = useCallback<() => React.ReactNode>(() => {
         return (
@@ -31,12 +31,12 @@ export const useEmptyMessages = ({
                 title={t('fleets.instances.nomatch_message_title')}
                 message={t('fleets.instances.nomatch_message_text')}
             >
-                <Button disabled={isDisabledClearFilter} onClick={clearFilters}>
+                <Button disabled={isDisabledClearFilter} onClick={clearFilter}>
                     {t('common.clearFilter')}
                 </Button>
             </ListEmptyMessage>
         );
-    }, [clearFilters, isDisabledClearFilter]);
+    }, [clearFilter, isDisabledClearFilter]);
 
     return { renderEmptyMessage, renderNoMatchMessage } as const;
 };

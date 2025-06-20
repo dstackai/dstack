@@ -11,7 +11,7 @@ import { DATE_TIME_FORMAT } from 'consts';
 import { useNotifications } from 'hooks';
 import { useProjectFilter } from 'hooks/useProjectFilter';
 import { getServerError } from 'libs';
-import { EMPTY_QUERY, requestParamsToTokens, tokensToRequestParams } from 'libs/filters';
+import { EMPTY_QUERY, requestParamsToTokens, tokensToRequestParams, tokensToSearchParams } from 'libs/filters';
 import { getStatusIconType } from 'libs/volumes';
 import { ROUTES } from 'routes';
 import { useDeleteVolumesMutation } from 'services/volume';
@@ -169,7 +169,7 @@ export const useFilters = (localStorePrefix = 'volume-list-page') => {
             return !tokens.some((item, index) => token.propertyKey === item.propertyKey && index > tokenIndex);
         });
 
-        setSearchParams(tokensToRequestParams<RequestParamsKeys>(filteredTokens, onlyActive));
+        setSearchParams(tokensToSearchParams<RequestParamsKeys>(filteredTokens, onlyActive));
 
         setPropertyFilterQuery({
             operation,
@@ -180,16 +180,18 @@ export const useFilters = (localStorePrefix = 'volume-list-page') => {
     const onChangeOnlyActive: ToggleProps['onChange'] = ({ detail }) => {
         setOnlyActive(detail.checked);
 
-        setSearchParams(tokensToRequestParams<RequestParamsKeys>(propertyFilterQuery.tokens, detail.checked));
+        setSearchParams(tokensToSearchParams<RequestParamsKeys>(propertyFilterQuery.tokens, detail.checked));
     };
 
     const filteringRequestParams = useMemo(() => {
-        const params = tokensToRequestParams<RequestParamsKeys>(propertyFilterQuery.tokens);
+        const params = tokensToRequestParams<RequestParamsKeys>({
+            tokens: propertyFilterQuery.tokens,
+        });
 
         return {
             ...params,
             only_active: onlyActive,
-        };
+        } as Partial<TVolumesListRequestParams>;
     }, [propertyFilterQuery, onlyActive]);
 
     return {
