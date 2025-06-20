@@ -1,0 +1,110 @@
+{
+    "time": "2025-06-20T12:10:28.926938",
+    "host_info": {
+        "OS": "Linux",
+        "Distro": "Ubuntu 20.04.6 LTS",
+        "Kernel": "5.15.0-138-generic",
+        "Hostname": "7330093c7194",
+        "Platform": "x86_64",
+        "Python": "3.8.10",
+        "Memory": "30.46 GB",
+        "Driver": "TT-KMD 1.33"
+    },
+    "host_sw_vers": {
+        "tt_smi": "3.0.15",
+        "pyluwen": "0.7.2"
+    },
+    "device_info": [
+        {
+            "smbus_telem": {
+                "BOARD_ID": "0x100018611902010",
+                "ENUM_VERSION": "0xba5e0001",
+                "DEVICE_ID": "0x401e1e52",
+                "ASIC_RO": "0x2df07",
+                "ASIC_IDD": "0xbf1",
+                "BOARD_ID_HIGH": "0x1000186",
+                "BOARD_ID_LOW": "0x11902010",
+                "ARC0_FW_VERSION": "0x2200000",
+                "ARC1_FW_VERSION": "0x2200000",
+                "ARC2_FW_VERSION": null,
+                "ARC3_FW_VERSION": "0x2200000",
+                "SPIBOOTROM_FW_VERSION": "0x30c0000",
+                "ETH_FW_VERSION": "0x6e000",
+                "M3_BL_FW_VERSION": "0x81020000",
+                "M3_APP_FW_VERSION": "0x50c0000",
+                "DDR_SPEED": null,
+                "DDR_STATUS": "0x2222222",
+                "ETH_STATUS0": "0x11111111",
+                "ETH_STATUS1": "0x11111111",
+                "PCIE_STATUS": "0x10440000",
+                "FAULTS": null,
+                "ARC0_HEALTH": "0x6b1943",
+                "ARC1_HEALTH": "0x275466",
+                "ARC2_HEALTH": null,
+                "ARC3_HEALTH": "0x42e0",
+                "FAN_SPEED": "0x4cbffff",
+                "AICLK": "0x3e801f4",
+                "AXICLK": "0x384",
+                "ARCCLK": "0x21c",
+                "THROTTLER": null,
+                "VCORE": "0x31b",
+                "ASIC_TEMPERATURE": "0x3690365",
+                "VREG_TEMPERATURE": null,
+                "BOARD_TEMPERATURE": "0x323433",
+                "TDP": "0x64000c",
+                "TDC": "0xf00010",
+                "VDD_LIMITS": "0x3e80320",
+                "THM_LIMITS": "0x53004b",
+                "WH_FW_DATE": "0x54010d33",
+                "ASIC_TMON0": "0x37324235",
+                "ASIC_TMON1": "0x382f",
+                "MVDDQ_POWER": "0x190000",
+                "GDDR_TRAIN_TEMP0": null,
+                "GDDR_TRAIN_TEMP1": null,
+                "BOOT_DATE": "0x56140b2a",
+                "RT_SECONDS": "0x6ca",
+                "AUX_STATUS": null,
+                "ETH_DEBUG_STATUS0": "0xccddddcc",
+                "ETH_DEBUG_STATUS1": "0xccdddddd",
+                "TT_FLASH_VERSION": "0x30200",
+                "FW_BUNDLE_VERSION": "0x50110000"
+            },
+            "board_info": {
+                "bus_id": "0000:01:00.0",
+                "board_type": "n150 L",
+                "board_id": "100018611902010",
+                "coords": "(0, 0, 0, 0)",
+                "dram_status": true,
+                "dram_speed": "12G",
+                "pcie_speed": 4,
+                "pcie_width": "4"
+            },
+            "telemetry": {
+                "voltage": "0.80",
+                "current": " 16.0",
+                "power": " 12.0",
+                "aiclk": " 500",
+                "asic_temperature": "54.3"
+            },
+            "firmwares": {
+                "fw_bundle_version": "80.17.0.0",
+                "tt_flash_version": "0.3.2.0",
+                "cm_fw": "2.32.0.0",
+                "cm_fw_date": "2025-04-01",
+                "eth_fw": "6.14.0",
+                "bm_bl_fw": "129.2.0.0",
+                "bm_app_fw": "5.12.0.0"
+            },
+            "limits": {
+                "vdd_min": "0.80",
+                "vdd_max": "1.00",
+                "tdp_limit": "100",
+                "tdc_limit": "240",
+                "asic_fmax": "1000",
+                "therm_trip_l1_limit": "83",
+                "thm_limit": "75",
+                "bus_peak_limit": null
+            }
+        }
+    ]
+} 

@@ -188,7 +188,67 @@ type ttDeviceInfo struct {
 
 type ttBoardInfo struct {
 	BoardType string `json:"board_type"`
-	BusID     string `json:"bus_id"`
+	BoardID   string `json:"board_id"`
+}
+
+func unmarshalTtSmiSnapshot(data []byte) (*ttSmiSnapshot, error) {
+	var snapshot ttSmiSnapshot
+	if err := json.Unmarshal(data, &snapshot); err != nil {
+		return nil, err
+	}
+	return &snapshot, nil
+}
+
+func getGpusFromTtSmiSnapshot(snapshot *ttSmiSnapshot) []GpuInfo {
+	// Group devices by board_id to aggregate memory for the same physical GPU
+	boardMap := make(map[string]*GpuInfo)
+	indexCounter := 0
+
+	for _, device := range snapshot.DeviceInfo {
+		boardID := device.BoardInfo.BoardID
+
+		// Extract board type without R/L suffix
+		boardType := strings.TrimSpace(device.BoardInfo.BoardType)
+		name := boardType
+
+		// Remove " R" or " L" suffix if present
+		if strings.HasSuffix(boardType, " R") {
+			name = boardType[:len(boardType)-2]
+		} else if strings.HasSuffix(boardType, " L") {
+			name = boardType[:len(boardType)-2]
+		}
+
+		// Determine base VRAM based on board type
+		baseVram := 0
+		if strings.HasPrefix(name, "n150") {
+			baseVram = 12 * 1024 // 12GB in MiB
+		} else if strings.HasPrefix(name, "n300") {
+			baseVram = 12 * 1024 // 12GB in MiB
+		}
+
+		if existingGpu, exists := boardMap[boardID]; exists {
+			// Aggregate VRAM for the same board_id
+			existingGpu.Vram += baseVram
+		} else {
+			// Create new GPU entry
+			boardMap[boardID] = &GpuInfo{
+				Vendor: common.GpuVendorTenstorrent,
+				Name:   name,
+				Vram:   baseVram,
+				ID:     boardID,
+				Index:  strconv.Itoa(indexCounter),
+			}
+			indexCounter++
+		}
+	}
+
+	// Convert map to slice
+	var gpus []GpuInfo
+	for _, gpu := range boardMap {
+		gpus = append(gpus, *gpu)
+	}
+
+	return gpus
 }
 
 func getTenstorrentGpuInfo(ctx context.Context) []GpuInfo {
@@ -218,43 +278,14 @@ func getTenstorrentGpuInfo(ctx context.Context) []GpuInfo {
 		return gpus
 	}
 
-	var ttSmiSnapshot ttSmiSnapshot
-	if err := json.Unmarshal([]byte(res.Stdout), &ttSmiSnapshot); err != nil {
+	ttSmiSnapshot, err := unmarshalTtSmiSnapshot([]byte(res.Stdout))
+	if err != nil {
 		log.Error(ctx, "cannot read tt-smi json", "err", err)
 		log.Debug(ctx, "tt-smi output", "stdout", res.Stdout)
 		return gpus
 	}
 
-	for i, device := range ttSmiSnapshot.DeviceInfo {
-		// Extract board type without R/L suffix
-		boardType := strings.TrimSpace(device.BoardInfo.BoardType)
-		name := boardType
-
-		// Remove " R" or " L" suffix if present
-		if strings.HasSuffix(boardType, " R") {
-			name = boardType[:len(boardType)-2]
-		} else if strings.HasSuffix(boardType, " L") {
-			name = boardType[:len(boardType)-2]
-		}
-
-		// Determine VRAM based on board type
-		vram := 0
-		if strings.HasPrefix(name, "n150") {
-			vram = 12 * 1024 // 12GB in MiB
-		} else if strings.HasPrefix(name, "n300") {
-			vram = 24 * 1024 // 24GB in MiB
-		}
-
-		gpus = append(gpus, GpuInfo{
-			Vendor: common.GpuVendorTenstorrent,
-			Name:   name,
-			Vram:   vram,
-			ID:     device.BoardInfo.BusID,
-			Index:  strconv.Itoa(i),
-		})
-	}
-
-	return gpus
+	return getGpusFromTtSmiSnapshot(ttSmiSnapshot)
 }
 
 func getAmdRenderNodePath(bdf string) (string, error) {
