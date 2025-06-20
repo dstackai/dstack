@@ -79,6 +79,7 @@ class TestListBackendTypes:
         assert response.json() == [
             "aws",
             "azure",
+            "cloudrift",
             "cudo",
             "datacrunch",
             "gcp",
