@@ -5,7 +5,7 @@ import { ToggleProps } from '@cloudscape-design/components';
 import type { PropertyFilterProps } from 'components';
 
 import { useProjectFilter } from 'hooks/useProjectFilter';
-import { EMPTY_QUERY, requestParamsToTokens, tokensToRequestParams } from 'libs/filters';
+import { EMPTY_QUERY, requestParamsToTokens, tokensToRequestParams, tokensToSearchParams } from 'libs/filters';
 import { useGetUserListQuery } from 'services/user';
 
 type Args = {
@@ -77,7 +77,7 @@ export const useFilters = ({ localStorePrefix }: Args) => {
             return !tokens.some((item, index) => token.propertyKey === item.propertyKey && index > tokenIndex);
         });
 
-        setSearchParams(tokensToRequestParams<RequestParamsKeys>(filteredTokens, onlyActive));
+        setSearchParams(tokensToSearchParams<RequestParamsKeys>(filteredTokens, onlyActive));
 
         setPropertyFilterQuery({
             operation,
@@ -88,16 +88,18 @@ export const useFilters = ({ localStorePrefix }: Args) => {
     const onChangeOnlyActive: ToggleProps['onChange'] = ({ detail }) => {
         setOnlyActive(detail.checked);
 
-        setSearchParams(tokensToRequestParams<RequestParamsKeys>(propertyFilterQuery.tokens, detail.checked));
+        setSearchParams(tokensToSearchParams<RequestParamsKeys>(propertyFilterQuery.tokens, detail.checked));
     };
 
     const filteringRequestParams = useMemo(() => {
-        const params = tokensToRequestParams<RequestParamsKeys>(propertyFilterQuery.tokens);
+        const params = tokensToRequestParams<RequestParamsKeys>({
+            tokens: propertyFilterQuery.tokens,
+        });
 
         return {
             ...params,
             only_active: onlyActive,
-        };
+        } as Partial<TRunsRequestParams>;
     }, [propertyFilterQuery, onlyActive]);
 
     return {

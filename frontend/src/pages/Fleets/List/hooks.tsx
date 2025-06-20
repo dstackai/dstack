@@ -9,7 +9,7 @@ import { Button, ListEmptyMessage, NavigateLink, StatusIndicator, TableProps } f
 
 import { DATE_TIME_FORMAT } from 'consts';
 import { useProjectFilter } from 'hooks/useProjectFilter';
-import { EMPTY_QUERY, requestParamsToTokens, tokensToRequestParams } from 'libs/filters';
+import { EMPTY_QUERY, requestParamsToTokens, tokensToRequestParams, tokensToSearchParams } from 'libs/filters';
 import { getFleetInstancesLinkText, getFleetPrice, getFleetStatusIconType } from 'libs/fleet';
 import { ROUTES } from 'routes';
 
@@ -76,7 +76,7 @@ export const useColumnsDefinitions = () => {
             id: 'instances',
             header: t('fleets.instances.title'),
             cell: (item) => (
-                <NavigateLink href={ROUTES.INSTANCES.LIST + `?fleetId=${item.id}`}>
+                <NavigateLink href={ROUTES.INSTANCES.LIST + `?fleet_ids=${item.id}`}>
                     {getFleetInstancesLinkText(item)}
                 </NavigateLink>
             ),
@@ -153,7 +153,7 @@ export const useFilters = (localStorePrefix = 'fleet-list-page') => {
             return !tokens.some((item, index) => token.propertyKey === item.propertyKey && index > tokenIndex);
         });
 
-        setSearchParams(tokensToRequestParams<RequestParamsKeys>(filteredTokens, onlyActive));
+        setSearchParams(tokensToSearchParams<RequestParamsKeys>(filteredTokens, onlyActive));
 
         setPropertyFilterQuery({
             operation,
@@ -164,16 +164,18 @@ export const useFilters = (localStorePrefix = 'fleet-list-page') => {
     const onChangeOnlyActive: ToggleProps['onChange'] = ({ detail }) => {
         setOnlyActive(detail.checked);
 
-        setSearchParams(tokensToRequestParams<RequestParamsKeys>(propertyFilterQuery.tokens, detail.checked));
+        setSearchParams(tokensToSearchParams<RequestParamsKeys>(propertyFilterQuery.tokens, detail.checked));
     };
 
     const filteringRequestParams = useMemo(() => {
-        const params = tokensToRequestParams<RequestParamsKeys>(propertyFilterQuery.tokens);
+        const params = tokensToRequestParams<RequestParamsKeys>({
+            tokens: propertyFilterQuery.tokens,
+        });
 
         return {
             ...params,
             only_active: onlyActive,
-        };
+        } as Partial<TFleetListRequestParams>;
     }, [propertyFilterQuery, onlyActive]);
 
     const isDisabledClearFilter = !propertyFilterQuery.tokens.length && !onlyActive;
