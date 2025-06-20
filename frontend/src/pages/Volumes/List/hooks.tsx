@@ -1,23 +1,26 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
+import { ToggleProps } from '@cloudscape-design/components';
 
+import type { PropertyFilterProps } from 'components';
 import { Button, ListEmptyMessage, NavigateLink, StatusIndicator } from 'components';
 
 import { DATE_TIME_FORMAT } from 'consts';
 import { useNotifications } from 'hooks';
-import { useLocalStorageState } from 'hooks/useLocalStorageState';
 import { useProjectFilter } from 'hooks/useProjectFilter';
 import { getServerError } from 'libs';
+import { EMPTY_QUERY, requestParamsToTokens, tokensToRequestParams } from 'libs/filters';
 import { getStatusIconType } from 'libs/volumes';
 import { ROUTES } from 'routes';
 import { useDeleteVolumesMutation } from 'services/volume';
 
 export const useVolumesTableEmptyMessages = ({
-    clearFilters,
+    clearFilter,
     isDisabledClearFilter,
 }: {
-    clearFilters?: () => void;
+    clearFilter?: () => void;
     isDisabledClearFilter?: boolean;
 }) => {
     const { t } = useTranslation();
@@ -25,7 +28,7 @@ export const useVolumesTableEmptyMessages = ({
     const renderEmptyMessage = (): React.ReactNode => {
         return (
             <ListEmptyMessage title={t('volume.empty_message_title')} message={t('volume.empty_message_text')}>
-                <Button disabled={isDisabledClearFilter} onClick={clearFilters}>
+                <Button disabled={isDisabledClearFilter} onClick={clearFilter}>
                     {t('common.clearFilter')}
                 </Button>
             </ListEmptyMessage>
@@ -35,7 +38,7 @@ export const useVolumesTableEmptyMessages = ({
     const renderNoMatchMessage = (): React.ReactNode => {
         return (
             <ListEmptyMessage title={t('volume.nomatch_message_title')} message={t('volume.nomatch_message_text')}>
-                <Button disabled={isDisabledClearFilter} onClick={clearFilters}>
+                <Button disabled={isDisabledClearFilter} onClick={clearFilter}>
                     {t('common.clearFilter')}
                 </Button>
             </ListEmptyMessage>
@@ -92,7 +95,7 @@ export const useColumnsDefinitions = () => {
         {
             id: 'finished',
             header: t('volume.finished'),
-            cell: (item: IVolume) => getVolumeFinised(item),
+            cell: (item: IVolume) => getVolumeFinished(item),
         },
         {
             id: 'price',
@@ -113,24 +116,91 @@ export const useColumnsDefinitions = () => {
     return { columns } as const;
 };
 
-export const useFilters = (localStorePrefix = 'volume-list-page') => {
-    const [onlyActive, setOnlyActive] = useLocalStorageState<boolean>(`${localStorePrefix}-is-active`, true);
-    const { selectedProject, setSelectedProject, projectOptions } = useProjectFilter({ localStorePrefix });
+type RequestParamsKeys = keyof Pick<TVolumesListRequestParams, 'only_active' | 'project_name'>;
 
-    const clearFilters = () => {
+const filterKeys: Record<string, RequestParamsKeys> = {
+    PROJECT_NAME: 'project_name',
+};
+
+export const useFilters = (localStorePrefix = 'volume-list-page') => {
+    const [searchParams, setSearchParams] = useSearchParams();
+    const [onlyActive, setOnlyActive] = useState(() => searchParams.get('only_active') === 'true');
+    const { projectOptions } = useProjectFilter({ localStorePrefix });
+
+    const [propertyFilterQuery, setPropertyFilterQuery] = useState<PropertyFilterProps.Query>(() =>
+        requestParamsToTokens<RequestParamsKeys>({ searchParams, filterKeys }),
+    );
+
+    const clearFilter = () => {
+        setSearchParams({});
         setOnlyActive(false);
-        setSelectedProject(null);
+        setPropertyFilterQuery(EMPTY_QUERY);
     };
 
-    const isDisabledClearFilter = !selectedProject && !onlyActive;
+    const isDisabledClearFilter = !propertyFilterQuery.tokens.length && !onlyActive;
+
+    const filteringOptions = useMemo(() => {
+        const options: PropertyFilterProps.FilteringOption[] = [];
+
+        projectOptions.forEach(({ value }) => {
+            if (value)
+                options.push({
+                    propertyKey: filterKeys.PROJECT_NAME,
+                    value,
+                });
+        });
+
+        return options;
+    }, [projectOptions]);
+
+    const filteringProperties = [
+        {
+            key: filterKeys.PROJECT_NAME,
+            operators: ['='],
+            propertyLabel: 'Project',
+            groupValuesLabel: 'Project values',
+        },
+    ];
+
+    const onChangePropertyFilter: PropertyFilterProps['onChange'] = ({ detail }) => {
+        const { tokens, operation } = detail;
+
+        const filteredTokens = tokens.filter((token, tokenIndex) => {
+            return !tokens.some((item, index) => token.propertyKey === item.propertyKey && index > tokenIndex);
+        });
+
+        setSearchParams(tokensToRequestParams<RequestParamsKeys>(filteredTokens, onlyActive));
+
+        setPropertyFilterQuery({
+            operation,
+            tokens: filteredTokens,
+        });
+    };
+
+    const onChangeOnlyActive: ToggleProps['onChange'] = ({ detail }) => {
+        setOnlyActive(detail.checked);
+
+        setSearchParams(tokensToRequestParams<RequestParamsKeys>(propertyFilterQuery.tokens, detail.checked));
+    };
+
+    const filteringRequestParams = useMemo(() => {
+        const params = tokensToRequestParams<RequestParamsKeys>(propertyFilterQuery.tokens);
+
+        return {
+            ...params,
+            only_active: onlyActive,
+        };
+    }, [propertyFilterQuery, onlyActive]);
 
     return {
-        projectOptions,
-        selectedProject,
-        setSelectedProject,
+        filteringRequestParams,
+        clearFilter,
+        propertyFilterQuery,
+        onChangePropertyFilter,
+        filteringOptions,
+        filteringProperties,
         onlyActive,
-        setOnlyActive,
-        clearFilters,
+        onChangeOnlyActive,
         isDisabledClearFilter,
     } as const;
 };
@@ -180,7 +250,7 @@ export const useVolumesDelete = () => {
     return { isDeleting, deleteVolumes };
 };
 
-const getVolumeFinised = (volume: IVolume): string => {
+const getVolumeFinished = (volume: IVolume): string => {
     if (!volume.deleted_at && volume.status != 'failed') {
         return '-';
     }
