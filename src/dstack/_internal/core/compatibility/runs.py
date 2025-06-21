@@ -97,6 +97,8 @@ def get_run_spec_excludes(run_spec: RunSpec) -> Optional[Dict]:
         configuration_excludes["rate_limits"] = True
     if configuration.shell is None:
         configuration_excludes["shell"] = True
+    if configuration.docker is None:
+        configuration_excludes["docker"] = True
     if configuration.priority is None:
         configuration_excludes["priority"] = True
     if configuration.startup_order is None:
