@@ -271,11 +271,11 @@ class BaseRunConfiguration(CoreModel):
 
     @validator("docker", pre=True, always=True)
     def _docker(cls, v, values) -> Optional[bool]:
-        if v is not None and values.get("image"):
+        if v is True and values.get("image"):
             raise KeyError("`image` and `docker` are mutually exclusive fields")
-        if v is not None and values.get("python"):
+        if v is True and values.get("python"):
             raise KeyError("`python` and `docker` are mutually exclusive fields")
-        if v is not None and values.get("nvcc"):
+        if v is True and values.get("nvcc"):
             raise KeyError("`nvcc` and `docker` are mutually exclusive fields")
         if v is True and values.get("privileged") is False:
             raise KeyError("`privileged` cannot be false when `docker` is true")

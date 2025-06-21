@@ -216,7 +216,9 @@ def get_dev_env_run_plan_dict(
                     "home_dir": "/root",
                     "image_name": image_name,
                     "user": None,
-                    "privileged": True if docker else privileged,
+                    "privileged": True
+                    if docker
+                    else (privileged if privileged is not None else False),
                     "job_name": f"{run_name}-0-0",
                     "replica_num": 0,
                     "job_num": 0,
@@ -249,7 +251,7 @@ def get_dev_env_run_plan_dict(
             }
         ],
         "current_resource": current_resource.dict() if current_resource else None,
-        "action": action,
+        "action": action.value,
     }
 
 
@@ -264,7 +266,7 @@ def get_dev_env_run_dict(
     last_processed_at: str = "2023-01-02T03:04:00+00:00",
     finished_at: Optional[str] = "2023-01-02T03:04:00+00:00",
     privileged: Optional[bool] = None,
-    docker: bool = False,
+    docker: Optional[bool] = None,
     deleted: bool = False,
 ) -> Dict:
     # When docker=True, commands should start with start-dockerd and use dind image
@@ -334,7 +336,7 @@ def get_dev_env_run_dict(
                 "privileged": privileged,
                 "init": [],
                 "ports": [],
-                "python": "3.13",
+                "python": "3.13" if not docker else None,
                 "nvcc": None,
                 "registry_auth": None,
                 "setup": [],
@@ -406,7 +408,9 @@ def get_dev_env_run_dict(
                     "home_dir": "/root",
                     "image_name": image_name,
                     "user": None,
-                    "privileged": privileged,
+                    "privileged": True
+                    if docker
+                    else (privileged if privileged is not None else False),
                     "job_name": f"{run_name}-0-0",
                     "replica_num": 0,
                     "job_num": 0,
@@ -830,7 +834,7 @@ class TestGetRunPlan:
             offers=[offer_aws, offer_runpod],
             total_offers=2,
             max_price=2.0,
-            privileged=False,
+            privileged=privileged,
         )
         run_spec = copy.deepcopy(run_plan_dict["run_spec"])
         if privileged is None:
@@ -1291,7 +1295,7 @@ class TestSubmitRun:
             finished_at=None,
             run_name="test-run",
             repo_id=repo.name,
-            privileged=bool(privileged),
+            privileged=privileged,
         )
         run_spec = copy.deepcopy(run_dict["run_spec"])
         if privileged is None:
