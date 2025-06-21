@@ -2,7 +2,7 @@ import type { RootState } from 'store';
 import { applyMode, Mode } from '@cloudscape-design/global-styles';
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 
-import { AUTH_DATA_STORAGE_KEY, MODE_STORAGE_KEY } from './constants';
+import { AUTH_DATA_STORAGE_KEY, MODE_STORAGE_KEY, TUTORIAL_SHOW_STARTUP_STORAGE_KEY } from './constants';
 import { getThemeMode } from './helpers';
 
 import { IAppState, ToolsTabs } from './types';
@@ -10,10 +10,19 @@ import { IAppState, ToolsTabs } from './types';
 const getInitialState = (): IAppState => {
     let authData = null;
     let storageData = null;
+    let showStartUp = true;
     let activeMode = getThemeMode();
 
     try {
         storageData = localStorage.getItem(AUTH_DATA_STORAGE_KEY);
+    } catch (e) {
+        console.log(e);
+    }
+
+    try {
+        showStartUp =
+            !localStorage.getItem(TUTORIAL_SHOW_STARTUP_STORAGE_KEY) ||
+            localStorage.getItem(TUTORIAL_SHOW_STARTUP_STORAGE_KEY) === 'true';
     } catch (e) {
         console.log(e);
     }
@@ -53,6 +62,7 @@ const getInitialState = (): IAppState => {
             discordCompleted: false,
             tallyCompleted: false,
             quickStartCompleted: false,
+            showStartUp,
         },
     };
 };
@@ -138,6 +148,19 @@ export const appSlice = createSlice({
                 ...action.payload,
             };
         },
+
+        setShowAtStartup: (state, action: PayloadAction<boolean>) => {
+            state.tutorialPanel = {
+                ...state.tutorialPanel,
+                showStartUp: action.payload,
+            };
+
+            try {
+                localStorage.setItem(TUTORIAL_SHOW_STARTUP_STORAGE_KEY, JSON.stringify(action.payload));
+            } catch (e) {
+                console.log(e);
+            }
+        },
     },
 });
 
@@ -152,6 +175,7 @@ export const {
     setToolsTab,
     openTutorialPanel,
     updateTutorialPanelState,
+    setShowAtStartup,
 } = appSlice.actions;
 export const selectUserData = (state: RootState) => state.app.userData;
 export const selectAuthToken = (state: RootState) => state.app.authData?.token;

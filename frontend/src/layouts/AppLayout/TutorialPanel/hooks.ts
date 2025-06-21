@@ -29,7 +29,7 @@ export const useTutorials = () => {
     const dispatch = useAppDispatch();
     const { billingUrl } = useSideNavigation();
     const useName = useAppSelector(selectUserName);
-    const { billingCompleted, configureCLICompleted, discordCompleted, tallyCompleted, quickStartCompleted } =
+    const { billingCompleted, configureCLICompleted, discordCompleted, tallyCompleted, quickStartCompleted, showStartUp } =
         useAppSelector(selectTutorialPanel);
 
     const { data: userBillingData } = useGetUserBillingInfoQuery({ username: useName ?? '' }, { skip: !useName });
@@ -48,7 +48,7 @@ export const useTutorials = () => {
                 }),
             );
 
-            if ((userBillingData.balance <= 0 || runsData.length === 0) && process.env.UI_VERSION === 'sky') {
+            if ((userBillingData.balance <= 0 || runsData.length === 0) && showStartUp && process.env.UI_VERSION === 'sky') {
                 dispatch(openTutorialPanel());
             }
 
