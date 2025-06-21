@@ -221,7 +221,7 @@ class JobConfigurator(ABC):
     def _privileged(self) -> bool:
         if self.run_spec.configuration.docker is True:
             return True
-        return self.run_spec.configuration.privileged is True
+        return self.run_spec.configuration.privileged
 
     def _single_branch(self) -> bool:
         if self.run_spec.configuration.single_branch is None:

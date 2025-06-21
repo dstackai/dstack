@@ -175,9 +175,7 @@ class BaseRunConfiguration(CoreModel):
             )
         ),
     ] = None
-    privileged: Annotated[
-        Optional[bool], Field(description="Run the container in privileged mode")
-    ] = None
+    privileged: Annotated[bool, Field(description="Run the container in privileged mode")] = False
     entrypoint: Annotated[Optional[str], Field(description="The Docker entrypoint")] = None
     working_dir: Annotated[
         Optional[str],
@@ -251,7 +249,7 @@ class BaseRunConfiguration(CoreModel):
     docker: Annotated[
         Optional[bool],
         Field(
-            description="Use Docker inside the container. Mutually exclusive with `image`, `python`, and `nvcc`"
+            description="Use Docker inside the container. Mutually exclusive with `image`, `python`, and `nvcc`. Overrides `privileged`"
         ),
     ] = None
     # deprecated since 0.18.31; task, service -- no effect; dev-environment -- executed right before `init`
@@ -277,8 +275,8 @@ class BaseRunConfiguration(CoreModel):
             raise KeyError("`python` and `docker` are mutually exclusive fields")
         if v is True and values.get("nvcc"):
             raise KeyError("`nvcc` and `docker` are mutually exclusive fields")
-        if v is True and values.get("privileged") is False:
-            raise KeyError("`privileged` cannot be false when `docker` is true")
+        # Ideally, we'd like to also prohibit privileged=False when docker=True,
+        #   but it's not possible to do so without breaking backwards compatibility.
         return v
 
     @validator("volumes", each_item=True)

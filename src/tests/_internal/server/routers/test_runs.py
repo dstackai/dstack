@@ -76,7 +76,7 @@ def get_dev_env_run_plan_dict(
     max_price: Optional[float] = None,
     action: ApplyAction = ApplyAction.CREATE,
     current_resource: Optional[Run] = None,
-    privileged: Optional[bool] = None,
+    privileged: bool = False,
     docker: bool = False,
     volumes: List[MountPoint] = [],
 ) -> Dict:
@@ -216,9 +216,7 @@ def get_dev_env_run_plan_dict(
                     "home_dir": "/root",
                     "image_name": image_name,
                     "user": None,
-                    "privileged": True
-                    if docker
-                    else (privileged if privileged is not None else False),
+                    "privileged": True if docker else privileged,
                     "job_name": f"{run_name}-0-0",
                     "replica_num": 0,
                     "job_num": 0,
@@ -265,7 +263,7 @@ def get_dev_env_run_dict(
     submitted_at: str = "2023-01-02T03:04:00+00:00",
     last_processed_at: str = "2023-01-02T03:04:00+00:00",
     finished_at: Optional[str] = "2023-01-02T03:04:00+00:00",
-    privileged: Optional[bool] = None,
+    privileged: bool = False,
     docker: Optional[bool] = None,
     deleted: bool = False,
 ) -> Dict:
@@ -408,9 +406,7 @@ def get_dev_env_run_dict(
                     "home_dir": "/root",
                     "image_name": image_name,
                     "user": None,
-                    "privileged": True
-                    if docker
-                    else (privileged if privileged is not None else False),
+                    "privileged": True if docker else privileged,
                     "job_name": f"{run_name}-0-0",
                     "replica_num": 0,
                     "job_num": 0,
@@ -796,10 +792,10 @@ class TestGetRunPlan:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
-    @pytest.mark.parametrize("privileged", [None, False])
+    @pytest.mark.parametrize("privileged", [False])
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_run_plan_privileged_false(
-        self, test_db, session: AsyncSession, client: AsyncClient, privileged: Optional[bool]
+        self, test_db, session: AsyncSession, client: AsyncClient, privileged: bool
     ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
@@ -1295,7 +1291,7 @@ class TestSubmitRun:
             finished_at=None,
             run_name="test-run",
             repo_id=repo.name,
-            privileged=privileged,
+            privileged=bool(privileged),
         )
         run_spec = copy.deepcopy(run_dict["run_spec"])
         if privileged is None:
