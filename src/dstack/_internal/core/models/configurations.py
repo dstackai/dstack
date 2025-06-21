@@ -175,7 +175,9 @@ class BaseRunConfiguration(CoreModel):
             )
         ),
     ] = None
-    privileged: Annotated[bool, Field(description="Run the container in privileged mode")] = False
+    privileged: Annotated[
+        Optional[bool], Field(description="Run the container in privileged mode")
+    ] = None
     entrypoint: Annotated[Optional[str], Field(description="The Docker entrypoint")] = None
     working_dir: Annotated[
         Optional[str],
@@ -194,12 +196,14 @@ class BaseRunConfiguration(CoreModel):
     ] = None
     python: Annotated[
         Optional[PythonVersion],
-        Field(description="The major version of Python. Mutually exclusive with `image`"),
+        Field(
+            description="The major version of Python. Mutually exclusive with `image` and `docker`"
+        ),
     ] = None
     nvcc: Annotated[
         Optional[bool],
         Field(
-            description="Use image with NVIDIA CUDA Compiler (NVCC) included. Mutually exclusive with `image`"
+            description="Use image with NVIDIA CUDA Compiler (NVCC) included. Mutually exclusive with `image` and `docker`"
         ),
     ] = None
     single_branch: Annotated[
@@ -244,6 +248,12 @@ class BaseRunConfiguration(CoreModel):
     volumes: Annotated[
         List[Union[MountPoint, str]], Field(description="The volumes mount points")
     ] = []
+    docker: Annotated[
+        Optional[bool],
+        Field(
+            description="Use Docker inside the container. Mutually exclusive with `image`, `python`, and `nvcc`"
+        ),
+    ] = None
     # deprecated since 0.18.31; task, service -- no effect; dev-environment -- executed right before `init`
     setup: CommandsList = []
 
@@ -257,6 +267,18 @@ class BaseRunConfiguration(CoreModel):
                 v = "3.10"
         if isinstance(v, str):
             return PythonVersion(v)
+        return v
+
+    @validator("docker", pre=True, always=True)
+    def _docker(cls, v, values) -> Optional[bool]:
+        if v is not None and values.get("image"):
+            raise KeyError("`image` and `docker` are mutually exclusive fields")
+        if v is not None and values.get("python"):
+            raise KeyError("`python` and `docker` are mutually exclusive fields")
+        if v is not None and values.get("nvcc"):
+            raise KeyError("`nvcc` and `docker` are mutually exclusive fields")
+        if v is True and values.get("privileged") is False:
+            raise KeyError("`privileged` cannot be false when `docker` is true")
         return v
 
     @validator("volumes", each_item=True)
