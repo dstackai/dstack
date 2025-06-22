@@ -548,11 +548,15 @@ class Run(CoreModel):
             retry_on_events = (
                 jobs[0].job_spec.retry.on_events if jobs and jobs[0].job_spec.retry else []
             )
+            job_status = (
+                jobs[0].job_submissions[-1].status if jobs and jobs[0].job_submissions else None
+            )
             termination_reason = Run.get_last_termination_reason(jobs[0]) if jobs else None
         except KeyError:
             return values
         values["status_message"] = Run._get_status_message(
             status=status,
+            job_status=job_status,
             retry_on_events=retry_on_events,
             termination_reason=termination_reason,
         )
@@ -568,9 +572,12 @@ class Run(CoreModel):
     @staticmethod
     def _get_status_message(
         status: RunStatus,
+        job_status: Optional[JobStatus],
         retry_on_events: List[RetryEvent],
         termination_reason: Optional[JobTerminationReason],
     ) -> str:
+        if job_status == JobStatus.PULLING:
+            return "pulling"
         # Currently, `retrying` is shown only for `no-capacity` events
         if (
             status in [RunStatus.SUBMITTED, RunStatus.PENDING]
