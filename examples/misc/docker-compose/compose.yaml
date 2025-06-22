@@ -1,6 +1,6 @@
 services:
   app:
-    image: ghcr.io/huggingface/chat-ui:sha-c83861a
+    image: ghcr.io/huggingface/chat-ui-db:0.9.5
     environment:
       HF_TOKEN: ${HF_TOKEN?}
       MONGODB_URL: mongodb://db:27017
@@ -16,7 +16,7 @@ services:
       - db
 
   tgi:
-    image: ghcr.io/huggingface/text-generation-inference:sha-704a58c
+    image: ghcr.io/huggingface/text-generation-inference:3.3.4
     volumes:
       - tgi_data:/data
     environment:

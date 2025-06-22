@@ -1,14 +1,12 @@
 type: service
 name: chat-ui-service
 
-privileged: true
-image: dstackai/dind
+docker: true
 env:
   - MODEL_ID=meta-llama/Llama-3.2-3B-Instruct
   - HF_TOKEN
 working_dir: examples/misc/docker-compose
 commands:
-  - start-dockerd
   - docker compose up
 port: 9000
 auth: false

@@ -16,7 +16,7 @@ name: vscode
 
 python: "3.11"
 # Uncomment to use a custom Docker image
-#image: dstackai/base:py3.13-0.7-cuda-12.1
+#image: huggingface/trl-latest-gpu
 ide: vscode
 
 # Uncomment to leverage spot instances
@@ -86,13 +86,11 @@ property with a list of commands to run at startup:
 
 ```yaml
 type: dev-environment
-# The name is optional, if not specified, generated randomly
 name: vscode
 
 python: "3.11"
 ide: vscode
 
-# Commands to run on startup
 init:
   - pip install wandb
 ```
@@ -129,23 +127,18 @@ resources:
 
 </div>
 
-The `cpu` property also allows you to specify the CPU architecture, `x86` or `arm`. Examples:
-`x86:16` (16 x86-64 cores), `arm:8..` (at least 8 ARM64 cores).
-If the architecture is not specified, `dstack` tries to infer it from the `gpu` specification
-using `x86` as the fallback value.
+The `cpu` property lets you set the architecture (`x86` or `arm`) and core count — e.g., `x86:16` (16 x86 cores), `arm:8..` (at least 8 ARM cores). 
+If not set, `dstack` infers it from the GPU or defaults to `x86`.
 
-The `gpu` property allows specifying not only memory size but also GPU vendor, names
-and their quantity. Examples: `nvidia` (one NVIDIA GPU), `A100` (one A100), `A10G,A100` (either A10G or A100),
-`A100:80GB` (one A100 of 80GB), `A100:2` (two A100), `24GB..40GB:2` (two GPUs between 24GB and 40GB),
-`A100:40GB:2` (two A100 GPUs of 40GB).
-If the vendor is not specified, `dstack` tries to infer it from the GPU name using `nvidia` as the fallback value.
+The `gpu` property lets you specify vendor, model, memory, and count — e.g., `nvidia` (one NVIDIA GPU), `A100` (one A100), `A10G,A100` (either), `A100:80GB` (one 80GB A100), `A100:2` (two A100), `24GB..40GB:2` (two GPUs with 24–40GB), `A100:40GB:2` (two 40GB A100s). 
+
+If vendor is omitted, `dstack` infers it from the model or defaults to `nvidia`.
 
 ??? info "Google Cloud TPU"
     To use TPUs, specify its architecture via the `gpu` property.
 
     ```yaml
     type: dev-environment
-    # The name is optional, if not specified, generated randomly
     name: vscode    
     
     ide: vscode
@@ -163,17 +156,50 @@ If the vendor is not specified, `dstack` tries to infer it from the GPU name usi
 > If you’re unsure which offers (hardware configurations) are available from the configured backends, use the
 > [`dstack offer`](../reference/cli/dstack/offer.md#list-gpu-offers) command to list them.
 
-### Python version
+### Docker
+
+#### Default image
 
 If you don't specify `image`, `dstack` uses its base Docker image pre-configured with 
-`python`, `pip`, `conda` (Miniforge), and essential CUDA drivers. 
-The `python` property determines which default Docker image is used.
+`uv`, `python`, `pip`, essential CUDA drivers, and NCCL tests (under `/opt/nccl-tests/build`). 
 
-??? info "nvcc"
-    By default, the base Docker image doesn’t include `nvcc`, which is required for building custom CUDA kernels. 
-    If you need `nvcc`, set the [`nvcc`](../reference/dstack.yml/dev-environment.md#nvcc) property to true.
+Set the `python` property to pre-install a specific version of Python.
 
-### Docker
+<div editor-title=".dstack.yml"> 
+
+```yaml
+type: dev-environment
+name: vscode
+
+python: 3.12
+
+ide: vscode
+```
+
+</div>
+
+#### NVCC
+
+By default, the base Docker image doesn’t include `nvcc`, which is required for building custom CUDA kernels. 
+If you need `nvcc`, set the [`nvcc`](../reference/dstack.yml/dev-environment.md#nvcc) property to true.
+
+<div editor-title=".dstack.yml"> 
+
+```yaml
+type: dev-environment
+name: vscode
+
+python: 3.12
+nvcc: true
+
+ide: vscode
+init:
+  - uv pip install flash_attn --no-build-isolation
+```
+
+</div>
+
+#### Custom image
 
 If you want, you can specify your own Docker image via `image`.
 
@@ -181,40 +207,64 @@ If you want, you can specify your own Docker image via `image`.
 
 ```yaml
 type: dev-environment
-# The name is optional, if not specified, generated randomly
 name: vscode    
 
-# Any custom Docker image
-image: ghcr.io/huggingface/text-generation-inference:latest
+image: huggingface/trl-latest-gpu
 
 ide: vscode
 ```
 
 </div>
 
-!!! info "Privileged mode"
-    To enable privileged mode, set [`privileged`](../reference/dstack.yml/dev-environment.md#privileged) to `true`.
-    This mode allows using [Docker and Docker Compose](../guides/protips.md#docker-and-docker-compose) inside `dstack` runs.
+#### Docker in Docker
 
-    Not supported with `runpod`, `vastai`, and `kubernetes`.
+Set `docker` to `true` to enable the `docker` CLI in your dev environment, e.g., to run or build Docker images, or use Docker Compose.
 
-??? info "Private registry"
-    Use the [`registry_auth`](../reference/dstack.yml/dev-environment.md#registry_auth) property to provide credentials for a private Docker registry. 
+<div editor-title=".dstack.yml"> 
 
-    ```yaml
-    type: dev-environment
-    # The name is optional, if not specified, generated randomly
-    name: vscode    
+```yaml
+type: dev-environment
+name: vscode
 
-    # Any private Docker image
-    image: ghcr.io/huggingface/text-generation-inference:latest
-    # Credentials of the private Docker registry
-    registry_auth:
-      username: peterschmidt85
-      password: ghp_e49HcZ9oYwBzUbcSk2080gXZOU2hiT9AeSR5
+docker: true
+
+ide: vscode
+init:
+  - docker run --gpus all nvidia/cuda:12.3.0-base-ubuntu22.04 nvidia-smi
+```
+
+</div>
+
+Cannot be used with `python` or `image`. Not supported on `runpod`, `vastai`, or `kubernetes`.
+
+#### Privileged mode
+
+To enable privileged mode, set [`privileged`](../reference/dstack.yml/dev-environment.md#privileged) to `true`.
+
+Not supported with `runpod`, `vastai`, and `kubernetes`.
+
+#### Private registry
     
-    ide: vscode
-    ```
+Use the [`registry_auth`](../reference/dstack.yml/dev-environment.md#registry_auth) property to provide credentials for a private Docker registry. 
+
+<div editor-title=".dstack.yml"> 
+
+```yaml
+type: dev-environment
+name: vscode
+
+env:
+  - NGC_API_KEY
+
+image: nvcr.io/nim/deepseek-ai/deepseek-r1-distill-llama-8b
+registry_auth:
+  username: $oauthtoken
+  password: ${{ env.NGC_API_KEY }}
+
+ide: vscode
+```
+
+</div>
 
 ### Environment variables
 
@@ -222,10 +272,8 @@ ide: vscode
 
 ```yaml
 type: dev-environment
-# The name is optional, if not specified, generated randomly
 name: vscode    
 
-# Environment variables
 env:
   - HF_TOKEN
   - HF_HUB_ENABLE_HF_TRANSFER=1
@@ -282,6 +330,7 @@ to automatically stop the dev environment after a configured period of inactivit
 ```yaml
 type: dev-environment
 name: vscode
+
 ide: vscode
 
 # Stop if inactive for 2 hours
@@ -296,12 +345,12 @@ If you go offline without stopping anything manually, the dev environment will a
 within about 3 minutes.
 
 If `inactivity_duration` is configured for your dev environment, you can see how long
-it has been inactive in `dstack ps --verbose`.
+it has been inactive in `dstack ps --verbose` (or `-v`).
 
 <div class="termy">
 
 ```shell
-$ dstack ps --verbose
+$ dstack ps -v
  NAME    BACKEND  RESOURCES       PRICE    STATUS                 SUBMITTED
  vscode  cudo     2xCPU, 8GB,     $0.0286  running                8 mins ago
                   100.0GB (disk)           (inactive for 2m 34s)
