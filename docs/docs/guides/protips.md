@@ -152,19 +152,36 @@ Set `docker` to `true` to enable the `docker` CLI in your dev environment, e.g.,
 ??? info "Volumes"
 
     To persist Docker data between runs (e.g. images, containers, volumes, etc), create a `dstack` [volume](../concepts/volumes.md)
-    and add attach it in your run configuration:
+    and add attach it in your run configuration.
+
+    === "Network volums"
     
-    ```yaml
-        type: dev-environment
-        name: vscode
-    
-        docker: true
-        ide: vscode
-    
-        volumes:
-          - name: docker-volume
-            path: /var/lib/docker
-    ```
+        ```yaml
+            type: dev-environment
+            name: vscode
+        
+            docker: true
+            ide: vscode
+        
+            volumes:
+              - name: docker-volume
+                path: /var/lib/docker
+        ```
+
+    === "Instance volumes"
+
+        ```yaml
+            type: dev-environment
+            name: vscode
+        
+            docker: true
+            ide: vscode
+        
+            volumes:
+              - name: /docker-volume
+                path: /var/lib/docker
+                optional: true
+        ```
 
 See more Docker examples [here](https://github.com/dstackai/dstack/tree/master/examples/misc/docker-compose).
 

@@ -16,9 +16,10 @@ auth: false
 
 resources:
   # Required resources
-  gpu: "nvidia:24GB"
+  gpu: 1
 
-# Uncomment to persist data
-#volumes:
-#  - name: my-dind-volume
-#    path: /var/lib/docker
+# Cache the Docker data
+volumes:
+  - instance_path: /root/.cache/docker-data
+    path: /var/lib/docker
+    optional: true
