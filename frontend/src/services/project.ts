@@ -4,6 +4,12 @@ import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { base64ToArrayBuffer } from 'libs';
 import fetchBaseQueryHeaders from 'libs/fetchBaseQueryHeaders';
 
+// Helper function to transform backend response to frontend format
+const transformProjectResponse = (project: any): IProject => ({
+    ...project,
+    isPublic: project.is_public,
+});
+
 export const projectApi = createApi({
     reducerPath: 'projectApi',
     refetchOnMountOrArgChange: true,
@@ -22,6 +28,9 @@ export const projectApi = createApi({
                 };
             },
 
+            transformResponse: (response: any[]): IProject[] => 
+                response.map(transformProjectResponse),
+
             providesTags: (result) =>
                 result
                     ? [...result.map(({ project_name }) => ({ type: 'Projects' as const, id: project_name })), 'Projects']
@@ -36,6 +45,8 @@ export const projectApi = createApi({
                 };
             },
 
+            transformResponse: transformProjectResponse,
+
             providesTags: (result) => (result ? [{ type: 'Projects' as const, id: result.project_name }] : []),
         }),
 
@@ -45,6 +56,8 @@ export const projectApi = createApi({
                 method: 'POST',
                 body: project,
             }),
+
+            transformResponse: transformProjectResponse,
 
             invalidatesTags: () => ['Projects'],
         }),
@@ -58,6 +71,8 @@ export const projectApi = createApi({
                 },
             }),
 
+            transformResponse: transformProjectResponse,
+
             invalidatesTags: (result, error, params) => [{ type: 'Projects' as const, id: params?.project_name }],
         }),
 
@@ -70,6 +85,8 @@ export const projectApi = createApi({
                 },
             }),
 
+            transformResponse: transformProjectResponse,
+
             invalidatesTags: (result, error, params) => [{ type: 'Projects' as const, id: params?.project_name }],
         }),
 
@@ -81,6 +98,8 @@ export const projectApi = createApi({
                     usernames: [username],
                 },
             }),
+
+            transformResponse: transformProjectResponse,
 
             invalidatesTags: (result, error, params) => [{ type: 'Projects' as const, id: params?.project_name }],
         }),
@@ -132,6 +151,7 @@ export const projectApi = createApi({
                 method: 'POST',
                 body: { is_public },
             }),
+            transformResponse: transformProjectResponse,
             invalidatesTags: (result, error, params) => [{ type: 'Projects' as const, id: params?.project_name }],
         }),
     }),

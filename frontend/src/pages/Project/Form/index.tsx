@@ -26,7 +26,13 @@ export const ProjectForm: React.FC<IProps> = ({ initialValues, onCancel, loading
     const onSubmit = (data: IProject) => {
         clearErrors();
 
-        onSubmitProp(data).catch((errorResponse) => {
+        // Transform frontend camelCase to backend snake_case
+        const backendData = {
+            project_name: data.project_name,
+            is_public: data.isPublic,
+        };
+
+        onSubmitProp(backendData as unknown as IProject).catch((errorResponse) => {
             const errorRequestData = errorResponse?.data;
 
             if (isResponseServerError(errorRequestData)) {
