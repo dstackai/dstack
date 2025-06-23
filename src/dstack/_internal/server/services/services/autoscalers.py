@@ -1,7 +1,7 @@
 import datetime
 import math
 from abc import ABC, abstractmethod
-from typing import List, Optional
+from typing import Optional
 
 from pydantic import BaseModel
 
@@ -23,14 +23,20 @@ class ReplicaInfo(BaseModel):
 
 class BaseServiceScaler(ABC):
     @abstractmethod
-    def scale(self, replicas: List[ReplicaInfo], stats: Optional[PerWindowStats]) -> int:
+    def get_desired_count(
+        self,
+        current_desired_count: int,
+        stats: Optional[PerWindowStats],
+        last_scaled_at: Optional[datetime.datetime],
+    ) -> int:
         """
         Args:
-            replicas: list of all replicas
             stats: service usage stats
+            current_desired_count: currently used desired count
+            last_scaled_at: last time service was scaled, None if it was never scaled yet
 
         Returns:
-            diff: number of replicas to add or remove
+            desired_count: desired count of replicas
         """
         pass
 
@@ -49,12 +55,14 @@ class ManualScaler(BaseServiceScaler):
         self.min_replicas = min_replicas
         self.max_replicas = max_replicas
 
-    def scale(self, replicas: List[ReplicaInfo], stats: Optional[PerWindowStats]) -> int:
-        active_replicas = [r for r in replicas if r.active]
-        target_replicas = len(active_replicas)
-        # clip the target replicas to the min and max values
-        target_replicas = min(max(target_replicas, self.min_replicas), self.max_replicas)
-        return target_replicas - len(active_replicas)
+    def get_desired_count(
+        self,
+        current_desired_count: int,
+        stats: Optional[PerWindowStats],
+        last_scaled_at: Optional[datetime.datetime],
+    ) -> int:
+        # clip the desired count to the min and max values
+        return min(max(current_desired_count, self.min_replicas), self.max_replicas)
 
 
 class RPSAutoscaler(BaseServiceScaler):
@@ -72,40 +80,43 @@ class RPSAutoscaler(BaseServiceScaler):
         self.scale_up_delay = scale_up_delay
         self.scale_down_delay = scale_down_delay
 
-    def scale(self, replicas: List[ReplicaInfo], stats: Optional[PerWindowStats]) -> int:
+    def get_desired_count(
+        self,
+        current_desired_count: int,
+        stats: Optional[PerWindowStats],
+        last_scaled_at: Optional[datetime.datetime],
+    ) -> int:
         if not stats:
-            return 0
+            return current_desired_count
 
         now = common_utils.get_current_datetime()
-        active_replicas = [r for r in replicas if r.active]
-        last_scaled_at = max((r.timestamp for r in replicas), default=None)
 
         # calculate the average RPS over the last minute
         rps = stats[60].requests / 60
-        target_replicas = math.ceil(rps / self.target)
-        # clip the target replicas to the min and max values
-        target_replicas = min(max(target_replicas, self.min_replicas), self.max_replicas)
+        new_desired_count = math.ceil(rps / self.target)
+        # clip the desired count to the min and max values
+        new_desired_count = min(max(new_desired_count, self.min_replicas), self.max_replicas)
 
-        if target_replicas > len(active_replicas):
-            if len(active_replicas) == 0:
+        if new_desired_count > current_desired_count:
+            if current_desired_count == 0:
                 # no replicas, scale up immediately
-                return target_replicas
+                return new_desired_count
             if (
                 last_scaled_at is not None
                 and (now - last_scaled_at).total_seconds() < self.scale_up_delay
             ):
                 # too early to scale up, wait for the delay
-                return 0
-            return target_replicas - len(active_replicas)
-        elif target_replicas < len(active_replicas):
+                return current_desired_count
+            return new_desired_count
+        elif new_desired_count < current_desired_count:
             if (
                 last_scaled_at is not None
                 and (now - last_scaled_at).total_seconds() < self.scale_down_delay
             ):
                 # too early to scale down, wait for the delay
-                return 0
-            return target_replicas - len(active_replicas)
-        return 0
+                return current_desired_count
+            return new_desired_count
+        return new_desired_count
 
 
 def get_service_scaler(conf: ServiceConfiguration) -> BaseServiceScaler:

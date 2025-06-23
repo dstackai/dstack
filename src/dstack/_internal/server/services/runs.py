@@ -439,6 +439,7 @@ async def apply_plan(
         .values(
             run_spec=run_spec.json(),
             priority=run_spec.configuration.priority,
+            deployment_num=current_resource.deployment_num + 1,
         )
     )
     run = await get_run_by_name(
@@ -501,6 +502,8 @@ async def submit_run(
             run_spec=run_spec.json(),
             last_processed_at=submitted_at,
             priority=run_spec.configuration.priority,
+            deployment_num=0,
+            desired_replica_count=1,  # a relevant value will be set in process_runs.py
         )
         session.add(run_model)
 
@@ -539,6 +542,7 @@ def create_job_model_for_new_submission(
         job_num=job.job_spec.job_num,
         job_name=f"{job.job_spec.job_name}",
         replica_num=job.job_spec.replica_num,
+        deployment_num=run_model.deployment_num,
         submission_num=len(job.job_submissions),
         submitted_at=now,
         last_processed_at=now,
@@ -662,13 +666,9 @@ def run_model_to_run(
         for job_num, job_submissions in itertools.groupby(
             replica_submissions, key=lambda j: j.job_num
         ):
-            job_spec = None
             submissions = []
+            job_model = None
             for job_model in job_submissions:
-                if job_spec is None:
-                    job_spec = JobSpec.__response__.parse_raw(job_model.job_spec_data)
-                    if not include_sensitive:
-                        _remove_job_spec_sensitive_info(job_spec)
                 if include_job_submissions:
                     job_submission = job_model_to_job_submission(job_model)
                     if return_in_api:
@@ -680,7 +680,11 @@ def run_model_to_run(
                             if job_submission.job_provisioning_data.ssh_port is None:
                                 job_submission.job_provisioning_data.ssh_port = 22
                     submissions.append(job_submission)
-            if job_spec is not None:
+            if job_model is not None:
+                # Use the spec from the latest submission. Submissions can have different specs
+                job_spec = JobSpec.__response__.parse_raw(job_model.job_spec_data)
+                if not include_sensitive:
+                    _remove_job_spec_sensitive_info(job_spec)
                 jobs.append(Job(job_spec=job_spec, job_submissions=submissions))
 
     run_spec = RunSpec.__response__.parse_raw(run_model.run_spec)
@@ -707,6 +711,7 @@ def run_model_to_run(
         jobs=jobs,
         latest_job_submission=latest_job_submission,
         service=service_spec,
+        deployment_num=run_model.deployment_num,
         deleted=run_model.deleted,
     )
     run.cost = _get_run_cost(run)
@@ -897,9 +902,24 @@ _UPDATABLE_SPEC_FIELDS = ["repo_code_hash", "configuration"]
 _CONF_UPDATABLE_FIELDS = ["priority"]
 _TYPE_SPECIFIC_CONF_UPDATABLE_FIELDS = {
     "dev-environment": ["inactivity_duration"],
-    # Most service fields can be updated via replica redeployment.
-    # TODO: Allow updating other fields when rolling deployment is supported.
-    "service": ["replicas", "scaling", "strip_prefix"],
+    "service": [
+        # in-place
+        "replicas",
+        "scaling",
+        # rolling deployment
+        "resources",
+        "volumes",
+        "image",
+        "user",
+        "privileged",
+        "entrypoint",
+        "python",
+        "nvcc",
+        "single_branch",
+        "env",
+        "shell",
+        "commands",
+    ],
 }
 
 
@@ -1004,34 +1024,33 @@ async def scale_run_replicas(session: AsyncSession, run_model: RunModel, replica
         abs(replicas_diff),
     )
 
-    # lists of (importance, replica_num, jobs)
+    # lists of (importance, is_out_of_date, replica_num, jobs)
     active_replicas = []
     inactive_replicas = []
 
     for replica_num, replica_jobs in group_jobs_by_replica_latest(run_model.jobs):
         statuses = set(job.status for job in replica_jobs)
+        deployment_num = replica_jobs[0].deployment_num  # same for all jobs
+        is_out_of_date = deployment_num < run_model.deployment_num
         if {JobStatus.TERMINATING, *JobStatus.finished_statuses()} & statuses:
             # if there are any terminating or finished jobs, the replica is inactive
-            inactive_replicas.append((0, replica_num, replica_jobs))
+            inactive_replicas.append((0, is_out_of_date, replica_num, replica_jobs))
         elif JobStatus.SUBMITTED in statuses:
             # if there are any submitted jobs, the replica is active and has the importance of 0
-            active_replicas.append((0, replica_num, replica_jobs))
+            active_replicas.append((0, is_out_of_date, replica_num, replica_jobs))
         elif {JobStatus.PROVISIONING, JobStatus.PULLING} & statuses:
             # if there are any provisioning or pulling jobs, the replica is active and has the importance of 1
-            active_replicas.append((1, replica_num, replica_jobs))
+            active_replicas.append((1, is_out_of_date, replica_num, replica_jobs))
         else:
             # all jobs are running, the replica is active and has the importance of 2
-            active_replicas.append((2, replica_num, replica_jobs))
+            active_replicas.append((2, is_out_of_date, replica_num, replica_jobs))
 
-    # sort by importance (desc) and replica_num (asc)
-    active_replicas.sort(key=lambda r: (-r[0], r[1]))
+    # sort by is_out_of_date (up-to-date first), importance (desc), and replica_num (asc)
+    active_replicas.sort(key=lambda r: (r[1], -r[0], r[2]))
     run_spec = RunSpec.__response__.parse_raw(run_model.run_spec)
 
     if replicas_diff < 0:
-        if len(active_replicas) + replicas_diff < run_spec.configuration.replicas.min:
-            raise ServerClientError("Can't scale down below the minimum number of replicas")
-
-        for _, _, replica_jobs in reversed(active_replicas[-abs(replicas_diff) :]):
+        for _, _, _, replica_jobs in reversed(active_replicas[-abs(replicas_diff) :]):
             # scale down the less important replicas first
             for job in replica_jobs:
                 if job.status.is_finished() or job.status == JobStatus.TERMINATING:
@@ -1040,18 +1059,15 @@ async def scale_run_replicas(session: AsyncSession, run_model: RunModel, replica
                 job.termination_reason = JobTerminationReason.SCALED_DOWN
                 # background task will process the job later
     else:
-        if len(active_replicas) + replicas_diff > run_spec.configuration.replicas.max:
-            raise ServerClientError("Can't scale up above the maximum number of replicas")
         scheduled_replicas = 0
 
         # rerun inactive replicas
-        for _, _, replica_jobs in inactive_replicas:
+        for _, _, _, replica_jobs in inactive_replicas:
             if scheduled_replicas == replicas_diff:
                 break
             await retry_run_replica_jobs(session, run_model, replica_jobs, only_failed=False)
             scheduled_replicas += 1
 
-        # create new replicas
         for replica_num in range(
             len(active_replicas) + scheduled_replicas, len(active_replicas) + replicas_diff
         ):
@@ -1068,7 +1084,14 @@ async def scale_run_replicas(session: AsyncSession, run_model: RunModel, replica
 async def retry_run_replica_jobs(
     session: AsyncSession, run_model: RunModel, latest_jobs: List[JobModel], *, only_failed: bool
 ):
-    for job_model in latest_jobs:
+    new_jobs = await get_jobs_from_run_spec(
+        RunSpec.__response__.parse_raw(run_model.run_spec),
+        replica_num=latest_jobs[0].replica_num,
+    )
+    assert len(new_jobs) == len(latest_jobs), (
+        "Changing the number of jobs within a replica is not yet supported"
+    )
+    for job_model, new_job in zip(latest_jobs, new_jobs):
         if not (job_model.status.is_finished() or job_model.status == JobStatus.TERMINATING):
             if only_failed:
                 # No need to resubmit, skip
@@ -1079,10 +1102,7 @@ async def retry_run_replica_jobs(
 
         new_job_model = create_job_model_for_new_submission(
             run_model=run_model,
-            job=Job(
-                job_spec=JobSpec.__response__.parse_raw(job_model.job_spec_data),
-                job_submissions=[],
-            ),
+            job=new_job,
             status=JobStatus.SUBMITTED,
         )
         # dirty hack to avoid passing all job submissions

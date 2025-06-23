@@ -319,9 +319,10 @@
       "search_placeholder": "Find runs",
       "empty_message_title": "No runs",
       "empty_message_text": "No runs to display.",
-      "quickstart_message_text": "No runs to display. Create a new one using the guide",
+      "quickstart_message_text": "Check out the quickstart guide to get started with dstack",
       "nomatch_message_title": "No matches",
       "nomatch_message_text": "We can't find a match. Try to change project or clear filter",
+      "filter_property_placeholder": "Filter runs by properties",
       "project": "Project",
       "project_placeholder": "Filtering by project",
       "repo": "Repository",
@@ -447,6 +448,7 @@
     "nomatch_message_text": "We can't find a match.",
     "nomatch_message_button_label": "Clear filter",
     "active_only": "Active fleets",
+    "filter_property_placeholder": "Filter fleets by properties",
     "statuses": {
       "active": "Active",
       "submitted": "Submitted",
@@ -456,6 +458,7 @@
     },
     "instances": {
       "active_only": "Active instances",
+      "filter_property_placeholder": "Filter instances by properties",
       "title": "Instances",
       "empty_message_title": "No instances",
       "empty_message_text": "No instances to display.",
@@ -493,6 +496,7 @@
     "delete_volumes_confirm_title": "Delete volumes",
     "delete_volumes_confirm_message": "Are you sure you want to delete these volumes?",
     "active_only": "Active volumes",
+    "filter_property_placeholder": "Filter volumes by properties",
 
     "name": "Name",
     "project": "Project name",

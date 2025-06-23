@@ -8,6 +8,7 @@ from dstack._internal.core.models.users import ProjectRole
 
 class CreateProjectRequest(CoreModel):
     project_name: str
+    is_public: bool = False
 
 
 class DeleteProjectsRequest(CoreModel):

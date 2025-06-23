@@ -4,7 +4,7 @@ from unittest.mock import patch
 import pytest
 
 from dstack._internal.proxy.gateway.schemas.stats import PerWindowStats, Stat
-from dstack._internal.server.services.services.autoscalers import ReplicaInfo, RPSAutoscaler
+from dstack._internal.server.services.services.autoscalers import BaseServiceScaler, RPSAutoscaler
 
 
 @pytest.fixture
@@ -24,113 +24,118 @@ def stats(rps: float) -> PerWindowStats:
     return {60: Stat(requests=int(rps * 60), request_time=0.1)}
 
 
-def replica(time: datetime.datetime, active: bool = True, timestamp: int = -3600) -> ReplicaInfo:
-    return ReplicaInfo(
-        active=active,
-        timestamp=time + datetime.timedelta(seconds=timestamp),
-    )
-
-
 class TestRPSAutoscaler:
-    def test_do_not_scale(self, rps_scaler, time):
-        assert rps_scaler.scale([replica(time, active=True)], stats(rps=10)) == 0
-
-    def test_scale_up(self, rps_scaler, time):
-        assert rps_scaler.scale([replica(time, active=True)], stats(rps=20)) == 1
-
-    def test_scale_up_high_load(self, rps_scaler, time):
+    def test_do_not_scale(self, rps_scaler: BaseServiceScaler, time: datetime.datetime) -> None:
         assert (
-            rps_scaler.scale(
-                [
-                    replica(time, active=True),
-                    replica(time, active=True),
-                ],
-                stats(rps=50),
-            )
-            == 3
-        )
-
-    def test_scale_up_replicas_limit(self, rps_scaler, time):
-        assert (
-            rps_scaler.scale(
-                [
-                    replica(time, active=True),
-                    replica(time, active=True),
-                ],
-                stats(rps=1000),
-            )
-            == 3
-        )
-
-    def test_scale_down(self, rps_scaler, time):
-        assert (
-            rps_scaler.scale(
-                [replica(time, active=True), replica(time, active=True)], stats(rps=5)
-            )
-            == -1
-        )
-
-    def test_scale_up_delayed_running(self, rps_scaler, time):
-        assert (
-            rps_scaler.scale(
-                [
-                    # submitted 1 minute ago, but the delay is 5 minutes
-                    replica(time, active=True, timestamp=-60),
-                ],
-                stats(rps=20),
-            )
-            == 0
-        )
-
-    def test_scale_up_delayed_terminated(self, rps_scaler, time):
-        assert (
-            rps_scaler.scale(
-                [
-                    replica(time, active=True),
-                    # terminated 1 minute ago, but the delay is 5 minutes
-                    replica(time, active=False, timestamp=-60),
-                ],
-                stats(rps=20),
-            )
-            == 0
-        )
-
-    def test_scale_down_delayed(self, rps_scaler, time):
-        assert (
-            rps_scaler.scale(
-                [
-                    replica(time, active=True),
-                    # submitted 5 minutes ago, but the delay is 10 minutes
-                    replica(time, active=True, timestamp=-5 * 60),
-                ],
-                stats(rps=5),
-            )
-            == 0
-        )
-
-    def test_scale_from_zero_immediately(self, rps_scaler, time):
-        assert rps_scaler.scale([], stats(rps=5)) == 1
-
-    def test_scale_from_zero_immediately_terminated(self, rps_scaler, time):
-        assert (
-            rps_scaler.scale(
-                [
-                    # terminated 1 minute ago, but there are requests
-                    replica(time, active=False, timestamp=-60),
-                ],
-                stats(rps=5),
+            rps_scaler.get_desired_count(
+                current_desired_count=1,
+                stats=stats(rps=10),
+                last_scaled_at=time - datetime.timedelta(seconds=3600),
             )
             == 1
         )
 
-    def test_scale_to_zero(self, rps_scaler, time):
+    def test_scale_up(self, rps_scaler: BaseServiceScaler, time: datetime.datetime) -> None:
         assert (
-            rps_scaler.scale(
-                [
-                    replica(time, active=True),
-                    replica(time, active=True),
-                ],
-                stats(rps=0),
+            rps_scaler.get_desired_count(
+                current_desired_count=1,
+                stats=stats(rps=20),
+                last_scaled_at=time - datetime.timedelta(seconds=3600),
             )
-            == -2
+            == 2
+        )
+
+    def test_scale_up_high_load(
+        self, rps_scaler: BaseServiceScaler, time: datetime.datetime
+    ) -> None:
+        assert (
+            rps_scaler.get_desired_count(
+                current_desired_count=2,
+                stats=stats(rps=50),
+                last_scaled_at=time - datetime.timedelta(seconds=3600),
+            )
+            == 5
+        )
+
+    def test_scale_up_replicas_limit(
+        self, rps_scaler: BaseServiceScaler, time: datetime.datetime
+    ) -> None:
+        assert (
+            rps_scaler.get_desired_count(
+                current_desired_count=2,
+                stats=stats(rps=1000),
+                last_scaled_at=time - datetime.timedelta(seconds=3600),
+            )
+            == 5
+        )
+
+    def test_scale_down(self, rps_scaler: BaseServiceScaler, time: datetime.datetime) -> None:
+        assert (
+            rps_scaler.get_desired_count(
+                current_desired_count=2,
+                stats=stats(rps=5),
+                last_scaled_at=time - datetime.timedelta(seconds=3600),
+            )
+            == 1
+        )
+
+    def test_scale_up_delayed(
+        self, rps_scaler: BaseServiceScaler, time: datetime.datetime
+    ) -> None:
+        assert (
+            rps_scaler.get_desired_count(
+                current_desired_count=1,
+                stats=stats(rps=20),
+                # last scaled 1 minute ago, but the delay is 5 minutes
+                last_scaled_at=time - datetime.timedelta(seconds=60),
+            )
+            == 1
+        )
+
+    def test_scale_down_delayed(
+        self, rps_scaler: BaseServiceScaler, time: datetime.datetime
+    ) -> None:
+        assert (
+            rps_scaler.get_desired_count(
+                current_desired_count=2,
+                stats=stats(rps=5),
+                # last scaled 5 minutes ago, but the delay is 10 minutes
+                last_scaled_at=time - datetime.timedelta(seconds=5 * 60),
+            )
+            == 2
+        )
+
+    def test_scale_from_zero_first_time(
+        self, rps_scaler: BaseServiceScaler, time: datetime.datetime
+    ) -> None:
+        assert (
+            rps_scaler.get_desired_count(
+                current_desired_count=0,
+                stats=stats(rps=5),
+                last_scaled_at=None,
+            )
+            == 1
+        )
+
+    def test_scale_from_zero_immediately(
+        self, rps_scaler: BaseServiceScaler, time: datetime.datetime
+    ) -> None:
+        assert (
+            rps_scaler.get_desired_count(
+                current_desired_count=0,
+                stats=stats(rps=5),
+                # last scaled 1 second ago, but there are requests
+                last_scaled_at=time - datetime.timedelta(seconds=1),
+            )
+            == 1
+        )
+
+    def test_scale_to_zero(self, rps_scaler: BaseServiceScaler, time: datetime.datetime) -> None:
+        assert (
+            rps_scaler.get_desired_count(
+                current_desired_count=2,
+                stats=stats(rps=0),
+                last_scaled_at=time - datetime.timedelta(seconds=3600),
+            )
+            == 0
         )

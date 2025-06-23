@@ -52,7 +52,7 @@ func NewServer(tempDir string, homeDir string, workingDir string, address string
 		wsDoneCh:     make(chan interface{}),
 
 		submitWaitDuration: 5 * time.Minute,
-		logsWaitDuration:   30 * time.Second,
+		logsWaitDuration:   5 * time.Minute,
 
 		executor: ex,
 

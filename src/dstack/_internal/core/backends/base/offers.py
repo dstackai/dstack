@@ -80,7 +80,6 @@ def catalog_item_to_offer(
         spot=item.spot,
         disk=Disk(size_mib=disk_size_mib),
     )
-    resources.description = resources.pretty_format()
     return InstanceOffer(
         backend=backend,
         instance=InstanceType(

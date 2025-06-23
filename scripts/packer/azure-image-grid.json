@@ -73,14 +73,6 @@
     },
     {
       "type": "shell",
-      "environment_vars": [
-        "IMAGE_REPO={{user `image_repo`}}",
-        "IMAGE_VERSION={{user `image_version`}}"
-      ],
-      "script": "provisioners/pull-docker-images.sh"
-    },
-    {
-      "type": "shell",
       "execute_command": "chmod +x {{ .Path }}; {{ .Vars }} sudo -E sh '{{ .Path }}'",
       "inline_shebang": "/bin/sh -x",
       "inline": ["/usr/sbin/waagent -force -deprovision+user && export HISTSIZE=0 && sync"]

@@ -514,7 +514,7 @@ class TestApplyFleetPlan:
                             "gpus": [],
                             "spot": False,
                             "disk": {"size_mib": 102400},
-                            "description": "",
+                            "description": "cpu=2 mem=0GB disk=100GB",
                         },
                     },
                     "name": f"{spec.configuration.name}-0",

@@ -170,7 +170,7 @@ def get_dev_env_run_plan_dict(
                         "/bin/bash",
                         "-i",
                         "-c",
-                        "uv venv --prompt workflow --seed /workflow/.venv > /dev/null 2>&1"
+                        "uv venv --python 3.13 --prompt workflow --seed /workflow/.venv > /dev/null 2>&1"
                         " && echo 'source /workflow/.venv/bin/activate' >> ~/.bashrc"
                         " && source /workflow/.venv/bin/activate"
                         " && (echo pip install ipykernel... && "
@@ -188,7 +188,7 @@ def get_dev_env_run_plan_dict(
                     ],
                     "env": {},
                     "home_dir": "/root",
-                    "image_name": "dstackai/base:py3.13-0.8-cuda-12.1",
+                    "image_name": "dstackai/base:0.10-base-ubuntu22.04",
                     "user": None,
                     "privileged": privileged,
                     "job_name": f"{run_name}-0-0",
@@ -334,7 +334,7 @@ def get_dev_env_run_dict(
                         "/bin/bash",
                         "-i",
                         "-c",
-                        "uv venv --prompt workflow --seed /workflow/.venv > /dev/null 2>&1"
+                        "uv venv --python 3.13 --prompt workflow --seed /workflow/.venv > /dev/null 2>&1"
                         " && echo 'source /workflow/.venv/bin/activate' >> ~/.bashrc"
                         " && source /workflow/.venv/bin/activate"
                         " && (echo pip install ipykernel... && "
@@ -352,7 +352,7 @@ def get_dev_env_run_dict(
                     ],
                     "env": {},
                     "home_dir": "/root",
-                    "image_name": "dstackai/base:py3.13-0.8-cuda-12.1",
+                    "image_name": "dstackai/base:0.10-base-ubuntu22.04",
                     "user": None,
                     "privileged": privileged,
                     "job_name": f"{run_name}-0-0",
@@ -385,6 +385,7 @@ def get_dev_env_run_dict(
                     {
                         "id": job_id,
                         "submission_num": 0,
+                        "deployment_num": 0,
                         "submitted_at": submitted_at,
                         "last_processed_at": last_processed_at,
                         "finished_at": finished_at,
@@ -404,6 +405,7 @@ def get_dev_env_run_dict(
         "latest_job_submission": {
             "id": job_id,
             "submission_num": 0,
+            "deployment_num": 0,
             "submitted_at": submitted_at,
             "last_processed_at": last_processed_at,
             "inactivity_secs": None,
@@ -419,6 +421,7 @@ def get_dev_env_run_dict(
         },
         "cost": 0.0,
         "service": None,
+        "deployment_num": 0,
         "termination_reason": None,
         "error": None,
         "deleted": deleted,
@@ -520,6 +523,7 @@ class TestListRuns:
                             {
                                 "id": str(job.id),
                                 "submission_num": 0,
+                                "deployment_num": 0,
                                 "submitted_at": run1_submitted_at.isoformat(),
                                 "last_processed_at": run1_submitted_at.isoformat(),
                                 "finished_at": None,
@@ -539,6 +543,7 @@ class TestListRuns:
                 "latest_job_submission": {
                     "id": str(job.id),
                     "submission_num": 0,
+                    "deployment_num": 0,
                     "submitted_at": run1_submitted_at.isoformat(),
                     "last_processed_at": run1_submitted_at.isoformat(),
                     "finished_at": None,
@@ -554,6 +559,7 @@ class TestListRuns:
                 },
                 "cost": 0,
                 "service": None,
+                "deployment_num": 0,
                 "termination_reason": None,
                 "error": None,
                 "deleted": False,
@@ -571,6 +577,7 @@ class TestListRuns:
                 "latest_job_submission": None,
                 "cost": 0,
                 "service": None,
+                "deployment_num": 0,
                 "termination_reason": None,
                 "error": None,
                 "deleted": False,
@@ -1125,6 +1132,9 @@ class TestApplyPlan:
         assert response.status_code == 200, response.json()
         await session.refresh(run_model)
         updated_run = run_model_to_run(run_model)
+        assert run.deployment_num == 0
+        assert updated_run.deployment_num == 1
+        assert run.run_spec.configuration.replicas == Range(min=1, max=1)
         assert updated_run.run_spec.configuration.replicas == Range(min=2, max=2)
 
 

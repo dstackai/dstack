@@ -422,9 +422,7 @@ Getting offers...
 
 ## Metrics
 
-While `dstack` allows the use of any third-party monitoring tools (e.g., Weights and Biases), you can also
-monitor container metrics such as CPU, memory, and GPU usage using the [built-in
-`dstack metrics` CLI command](../../blog/posts/dstack-metrics.md) or the corresponding API.
+`dstack` tracks essential metrics accessible via the CLI and UI. To access advanced metrics like DCGM, configure the server to export metrics to Prometheus. See [Metrics](metrics.md) for details.
 
 ## Service quotas
 
