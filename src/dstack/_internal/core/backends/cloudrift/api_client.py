@@ -74,7 +74,7 @@ class RiftClient:
 
         return vm_recipes
 
-    def get_vm_image_url(self) -> str | None:
+    def get_vm_image_url(self) -> Optional[str]:
         recipes = self.get_vm_recipies()
         ubuntu_images = []
         for recipe in recipes:
