@@ -150,7 +150,7 @@ async def create_project(
     return project_model_to_project(project_model)
 
 
-async def update_project_visibility(
+async def update_project(
     session: AsyncSession,
     user: UserModel,
     project: ProjectModel,

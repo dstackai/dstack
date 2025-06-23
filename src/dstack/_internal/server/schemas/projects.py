@@ -11,7 +11,7 @@ class CreateProjectRequest(CoreModel):
     is_public: bool = False
 
 
-class UpdateProjectVisibilityRequest(CoreModel):
+class UpdateProjectRequest(CoreModel):
     is_public: bool
 
 
