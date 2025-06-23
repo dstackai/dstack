@@ -6,7 +6,13 @@ import { ConfirmationDialog } from '../ConfirmationDialog';
 
 import { IProps } from './types';
 
-export const ButtonWithConfirmation: React.FC<IProps> = ({ confirmTitle, confirmContent, onClick, ...props }) => {
+export const ButtonWithConfirmation: React.FC<IProps> = ({
+    confirmTitle,
+    confirmContent,
+    onClick,
+    confirmButtonLabel,
+    ...props
+}) => {
     const [showDeleteConfirm, setShowConfirmDelete] = useState(false);
 
     const toggleDeleteConfirm = () => {
@@ -31,6 +37,7 @@ export const ButtonWithConfirmation: React.FC<IProps> = ({ confirmTitle, confirm
                 onConfirm={onConfirm}
                 title={confirmTitle}
                 content={content}
+                confirmButtonLabel={confirmButtonLabel}
             />
         </>
     );

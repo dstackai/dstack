@@ -51,11 +51,27 @@ export const useProjectMemberActions = () => {
             
             // Optionally call the success callback
             onLeaveSuccess?.();
-        } catch (error) {
+        } catch (error: any) {
             console.error('Failed to leave project:', error);
+            
+            // Extract the specific error message from the backend
+            let errorMessage = t('projects.leave_error');
+            if (error?.data?.detail) {
+                if (Array.isArray(error.data.detail)) {
+                    // Handle array format: [{msg: "error message"}]
+                    errorMessage = error.data.detail[0]?.msg || errorMessage;
+                } else if (typeof error.data.detail === 'string') {
+                    // Handle string format
+                    errorMessage = error.data.detail;
+                } else if (error.data.detail.msg) {
+                    // Handle object format: {msg: "error message"}
+                    errorMessage = error.data.detail.msg;
+                }
+            }
+            
             pushNotification({
                 type: 'error',
-                content: t('projects.leave_error'),
+                content: errorMessage,
             });
         }
     };

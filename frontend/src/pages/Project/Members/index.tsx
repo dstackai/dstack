@@ -138,10 +138,12 @@ export const ProjectMembers: React.FC<IProps> = ({ members, loading, onChange, r
                     </Button>
                 );
             } else {
-                // Prevent owners and admins from leaving their projects
-                const canLeave = !isProjectOwner && currentUserRole !== 'admin';
+                // Check if user is the last admin - if so, don't show leave button
+                const adminCount = project.members.filter(member => member.project_role === 'admin').length;
+                const isLastAdmin = currentUserRole === 'admin' && adminCount <= 1;
                 
-                if (canLeave) {
+                if (!isLastAdmin) {
+                    // Only show leave button if user is not the last admin
                     actions.unshift(
                         <Button
                             key="leave"

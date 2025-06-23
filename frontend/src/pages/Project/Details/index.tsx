@@ -45,26 +45,29 @@ export const ProjectDetails: React.FC = () => {
                 </Button>
             );
         } else {
-            // Prevent owners and admins from leaving their projects
-            const canLeave = !isProjectOwner && currentUserRole !== 'admin';
+            // Check if user is the last admin - if so, don't show leave button
+            const adminCount = project.members.filter(member => member.project_role === 'admin').length;
+            const isLastAdmin = currentUserRole === 'admin' && adminCount <= 1;
             
-            if (canLeave) {
-                return (
-                    <Button
-                        onClick={() => handleLeaveProject(project.project_name, userData.username!, () => navigate(ROUTES.PROJECT.LIST))}
-                        disabled={isMemberActionLoading}
-                        variant="normal"
-                    >
-                        {isMemberActionLoading 
-                                ? t('common.loading') 
-                                : t('projects.leave')
-                        }
-                    </Button>
-                );
+            if (isLastAdmin) {
+                // Don't show leave button for the last admin
+                return null;
             }
+            
+            // Allow leaving for all other members
+            return (
+                <Button
+                    onClick={() => handleLeaveProject(project.project_name, userData.username!, () => navigate(ROUTES.PROJECT.LIST))}
+                    disabled={isMemberActionLoading}
+                    variant="normal"
+                >
+                    {isMemberActionLoading 
+                            ? t('common.loading') 
+                            : t('projects.leave')
+                    }
+                </Button>
+            );
         }
-
-        return null;
     };
 
     return (

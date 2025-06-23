@@ -75,12 +75,18 @@ export const ProjectSettings: React.FC = () => {
     };
 
     const visibilityOptions = [
-        { label: t('projects.edit.visibility.private'), value: 'private' },
-        { label: t('projects.edit.visibility.public'), value: 'public' },
+        { label: t('projects.edit.visibility.private') || '', value: 'private' },
+        { label: t('projects.edit.visibility.public') || '', value: 'public' },
     ];
 
     const currentVisibility = data?.isPublic ? 'public' : 'private';
-    const selectedVisibility = visibilityOptions.find(option => option.value === currentVisibility) || visibilityOptions[0];
+    const [selectedVisibility, setSelectedVisibility] = useState(
+        data?.isPublic ? visibilityOptions[1] : visibilityOptions[0]
+    );
+
+    useEffect(() => {
+        setSelectedVisibility(data?.isPublic ? visibilityOptions[1] : visibilityOptions[0]);
+    }, [data]);
 
     const {
         data: backendsData,
@@ -268,8 +274,9 @@ export const ProjectSettings: React.FC = () => {
                                                 variant="danger-normal"
                                                 disabled={!isProjectManager(data)}
                                                 formAction="none"
-                                                onClick={() => changeVisibilityHandler(!data.isPublic)}
+                                                onClick={() => changeVisibilityHandler(selectedVisibility.value === 'public')}
                                                 confirmTitle={t('projects.edit.update_visibility_confirm_title')}
+                                                confirmButtonLabel={t('projects.edit.change_visibility')}
                                                 confirmContent={
                                                     <SpaceBetween size="s">
                                                         <Box variant="p" color="text-body-secondary">
@@ -277,9 +284,9 @@ export const ProjectSettings: React.FC = () => {
                                                         </Box>
                                                         <div className={styles.dangerSectionField}>
                                                             <SelectCSD
-                                                                disabled
                                                                 options={visibilityOptions}
                                                                 selectedOption={selectedVisibility}
+                                                                onChange={(event) => setSelectedVisibility(event.detail.selectedOption as { label: string; value: string })}
                                                                 expandToViewport={true}
                                                                 filteringType="auto"
                                                             />
