@@ -85,16 +85,6 @@ export const projectApi = createApi({
             invalidatesTags: (result, error, params) => [{ type: 'Projects' as const, id: params?.project_name }],
         }),
 
-        updateProjectVisibility: builder.mutation<IProject, { project_name: string; is_public: boolean }>({
-            query: ({ project_name, is_public }) => ({
-                url: API.PROJECTS.UPDATE_VISIBILITY(project_name),
-                method: 'POST',
-                body: { is_public },
-            }),
-
-            invalidatesTags: (result, error, params) => [{ type: 'Projects' as const, id: params?.project_name }],
-        }),
-
         deleteProjects: builder.mutation<void, IProject['project_name'][]>({
             query: (projectNames) => ({
                 url: API.PROJECTS.DELETE(),
@@ -154,7 +144,6 @@ export const {
     useUpdateProjectMembersMutation,
     useAddProjectMemberMutation,
     useRemoveProjectMemberMutation,
-    useUpdateProjectVisibilityMutation,
     useDeleteProjectsMutation,
     useGetProjectLogsQuery,
     useGetProjectReposQuery,

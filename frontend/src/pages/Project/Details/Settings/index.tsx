@@ -224,7 +224,7 @@ export const ProjectSettings: React.FC = () => {
                                     {t('projects.edit.project_visibility_description')}
                                 </Box>
                                 <Toggle
-                                    checked={data.is_public}
+                                    checked={data.isPublic}
                                     onChange={(detail) => changeVisibilityHandler(detail.detail.checked)}
                                     disabled={!isProjectManager(data)}
                                 >
