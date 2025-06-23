@@ -549,7 +549,9 @@ class Run(CoreModel):
                 jobs[0].job_spec.retry.on_events if jobs and jobs[0].job_spec.retry else []
             )
             job_status = (
-                jobs[0].job_submissions[-1].status if jobs and jobs[0].job_submissions else None
+                jobs[0].job_submissions[-1].status
+                if len(jobs) == 1 and jobs[0].job_submissions
+                else None
             )
             termination_reason = Run.get_last_termination_reason(jobs[0]) if jobs else None
         except KeyError:
