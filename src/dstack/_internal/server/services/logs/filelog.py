@@ -44,7 +44,7 @@ class FileLogStorage(LogStorage):
             with open(log_file_path) as f:
                 for line in f:
                     log_event = LogEvent.__response__.parse_raw(line)
-                    if request.start_time and log_event.timestamp < request.start_time:
+                    if request.start_time and log_event.timestamp <= request.start_time:
                         continue
                     if request.end_time is None or log_event.timestamp < request.end_time:
                         logs.append(log_event)

@@ -115,7 +115,7 @@ class TestFileLogStorage:
         job_submission_logs = log_storage.poll_logs(project, poll_request)
         assert len(job_submission_logs.logs) == 1
         assert job_submission_logs.logs[0].message == base64.b64encode(
-            "Log4".encode("utf-8")
+            "Log5".encode("utf-8")
         ).decode("utf-8")
 
 
