@@ -12,5 +12,5 @@ class PollLogsRequest(CoreModel):
     start_time: Optional[datetime]
     end_time: Optional[datetime]
     descending: bool = False
-    limit: int = Field(100, ge=0, le=1000)
+    limit: int = Field(100, ge=1, le=1000)
     diagnose: bool = False

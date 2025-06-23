@@ -55,6 +55,69 @@ class TestFileLogStorage:
             '{"timestamp": "2023-10-06T10:01:53.235000+00:00", "log_source": "stdout", "message": "V29ybGQ="}\n'
         )
 
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_poll_logs_with_limit(self, test_db, session: AsyncSession, tmp_path: Path):
+        project = await create_project(session=session)
+        log_storage = FileLogStorage(tmp_path)
+
+        # Write more logs than the limit
+        log_storage.write_logs(
+            project=project,
+            run_name="test_run",
+            job_submission_id=UUID("1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e"),
+            runner_logs=[
+                RunnerLogEvent(timestamp=1696586513234, message=b"Log1"),
+                RunnerLogEvent(timestamp=1696586513235, message=b"Log2"),
+                RunnerLogEvent(timestamp=1696586513236, message=b"Log3"),
+                RunnerLogEvent(timestamp=1696586513237, message=b"Log4"),
+                RunnerLogEvent(timestamp=1696586513238, message=b"Log5"),
+            ],
+            job_logs=[],
+        )
+        logs = log_storage.poll_logs(
+            project,
+            PollLogsRequest(
+                run_name="test_run",
+                job_submission_id=UUID("1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e"),
+                start_time=None,
+                end_time=None,
+                limit=1000,
+                diagnose=True,
+            ),
+        ).logs
+        assert len(logs) == 5
+
+        # Test with limit smaller than total logs (ascending)
+        poll_request = PollLogsRequest(
+            run_name="test_run",
+            job_submission_id=UUID("1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e"),
+            limit=3,
+            diagnose=True,
+        )
+        job_submission_logs = log_storage.poll_logs(project, poll_request)
+
+        # Should return only the first 3 logs in ascending order
+        assert len(job_submission_logs.logs) == 3
+        assert job_submission_logs.logs[0].message == base64.b64encode(
+            "Log1".encode("utf-8")
+        ).decode("utf-8")
+        assert job_submission_logs.logs[1].message == base64.b64encode(
+            "Log2".encode("utf-8")
+        ).decode("utf-8")
+        assert job_submission_logs.logs[2].message == base64.b64encode(
+            "Log3".encode("utf-8")
+        ).decode("utf-8")
+
+        # Test with limit of 1
+        poll_request.limit = 1
+        poll_request.start_time = logs[3].timestamp
+        job_submission_logs = log_storage.poll_logs(project, poll_request)
+        assert len(job_submission_logs.logs) == 1
+        assert job_submission_logs.logs[0].message == base64.b64encode(
+            "Log4".encode("utf-8")
+        ).decode("utf-8")
+
 
 class TestCloudWatchLogStorage:
     FAKE_NOW = datetime(2023, 10, 6, 10, 1, 54, tzinfo=timezone.utc)
