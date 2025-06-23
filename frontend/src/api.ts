@@ -56,6 +56,9 @@ export const API = {
         DETAILS: (name: IProject['project_name']) => `${API.PROJECTS.BASE()}/${name}`,
         DETAILS_INFO: (name: IProject['project_name']) => `${API.PROJECTS.DETAILS(name)}/get`,
         SET_MEMBERS: (name: IProject['project_name']) => `${API.PROJECTS.DETAILS(name)}/set_members`,
+        ADD_MEMBERS: (name: IProject['project_name']) => `${API.PROJECTS.DETAILS(name)}/add_members`,
+        REMOVE_MEMBERS: (name: IProject['project_name']) => `${API.PROJECTS.DETAILS(name)}/remove_members`,
+        UPDATE: (name: IProject['project_name']) => `${API.PROJECTS.DETAILS(name)}/update`,
 
         // Repos
         REPOS: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/repos`,
