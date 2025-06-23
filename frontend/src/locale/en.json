@@ -174,7 +174,6 @@
     "settings": "Settings",
     "join": "Join Project",
     "leave": "Leave Project",
-    "owner_cannot_leave": "Owner Cannot Leave",
     "join_success": "Successfully joined the project",
     "leave_success": "Successfully left the project",
     "join_error": "Failed to join project",

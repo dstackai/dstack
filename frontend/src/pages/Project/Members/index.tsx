@@ -141,21 +141,21 @@ export const ProjectMembers: React.FC<IProps> = ({ members, loading, onChange, r
                 // Prevent owners and admins from leaving their projects
                 const canLeave = !isProjectOwner && currentUserRole !== 'admin';
                 
-                actions.unshift(
-                    <Button
-                        key="leave"
-                        onClick={() => handleLeaveProject(project.project_name, userData.username!, () => navigate(ROUTES.PROJECT.LIST))}
-                        disabled={isMemberActionLoading || !canLeave}
-                        variant="normal"
-                    >
-                        {!canLeave 
-                            ? t('projects.owner_cannot_leave')
-                            : isMemberActionLoading 
+                if (canLeave) {
+                    actions.unshift(
+                        <Button
+                            key="leave"
+                            onClick={() => handleLeaveProject(project.project_name, userData.username!, () => navigate(ROUTES.PROJECT.LIST))}
+                            disabled={isMemberActionLoading}
+                            variant="normal"
+                        >
+                            {isMemberActionLoading 
                                 ? t('common.loading') 
                                 : t('projects.leave')
-                        }
-                    </Button>
-                );
+                            }
+                        </Button>
+                    );
+                }
             }
         }
 
