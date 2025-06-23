@@ -199,6 +199,9 @@
       "members_empty_message_text": "Select project's members",
       "update_members_success": "Members are updated",
       "update_visibility_success": "Project visibility updated successfully",
+      "update_visibility_confirm_title": "Change project visibility",
+      "update_visibility_confirm_message": "Are you sure you want to change the project visibility? This will affect who can access this project.",
+      "change_visibility": "Change visibility",
       "project_visibility": "Project Visibility",
       "project_visibility_description": "Control who can access this project",
       "make_project_public": "Make project public",
@@ -295,6 +298,10 @@
       "error_notification": "Update project error",
       "validation": {
         "user_name_format": "Only letters, numbers, - or _"
+      },
+      "visibility": {
+        "private": "Private",
+        "public": "Public"
       }
     },
     "create": {

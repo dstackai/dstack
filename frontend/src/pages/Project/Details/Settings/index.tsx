@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
 import { debounce } from 'lodash';
@@ -73,6 +73,14 @@ export const ProjectSettings: React.FC = () => {
         label: data?.owner.username,
         value: data?.owner.username,
     };
+
+    const visibilityOptions = [
+        { label: t('projects.edit.visibility.private'), value: 'private' },
+        { label: t('projects.edit.visibility.public'), value: 'public' },
+    ];
+
+    const currentVisibility = data?.isPublic ? 'public' : 'private';
+    const selectedVisibility = visibilityOptions.find(option => option.value === currentVisibility) || visibilityOptions[0];
 
     const {
         data: backendsData,
@@ -217,23 +225,6 @@ export const ProjectSettings: React.FC = () => {
 
                     <GatewaysTable gateways={gatewaysData} />
 
-                    {isAvailableProjectManaging && (
-                        <Container header={<Header variant="h2">{t('projects.edit.project_visibility')}</Header>}>
-                            <SpaceBetween size="s">
-                                <Box variant="p" color="text-body-secondary">
-                                    {t('projects.edit.project_visibility_description')}
-                                </Box>
-                                <Toggle
-                                    checked={data.isPublic}
-                                    onChange={(detail) => changeVisibilityHandler(detail.detail.checked)}
-                                    disabled={!isProjectManager(data)}
-                                >
-                                    {t('projects.edit.make_project_public')}
-                                </Toggle>
-                            </SpaceBetween>
-                        </Container>
-                    )}
-
                     <ProjectMembers
                         onChange={debouncedMembersHandler}
                         members={data.members}
@@ -261,6 +252,42 @@ export const ProjectSettings: React.FC = () => {
                                                 confirmContent={t('projects.edit.delete_project_confirm_message')}
                                             >
                                                 {t('common.delete')}
+                                            </ButtonWithConfirmation>
+                                        </div>
+                                    </>
+                                )}
+
+                                {isAvailableProjectManaging && (
+                                    <>
+                                        <Box variant="h5" color="text-body-secondary">
+                                            {t('projects.edit.project_visibility')}
+                                        </Box>
+
+                                        <div>
+                                            <ButtonWithConfirmation
+                                                variant="danger-normal"
+                                                disabled={!isProjectManager(data)}
+                                                formAction="none"
+                                                onClick={() => changeVisibilityHandler(!data.isPublic)}
+                                                confirmTitle={t('projects.edit.update_visibility_confirm_title')}
+                                                confirmContent={
+                                                    <SpaceBetween size="s">
+                                                        <Box variant="p" color="text-body-secondary">
+                                                            {t('projects.edit.update_visibility_confirm_message')}
+                                                        </Box>
+                                                        <div className={styles.dangerSectionField}>
+                                                            <SelectCSD
+                                                                disabled
+                                                                options={visibilityOptions}
+                                                                selectedOption={selectedVisibility}
+                                                                expandToViewport={true}
+                                                                filteringType="auto"
+                                                            />
+                                                        </div>
+                                                    </SpaceBetween>
+                                                }
+                                            >
+                                                {t('projects.edit.change_visibility')}
                                             </ButtonWithConfirmation>
                                         </div>
                                     </>
