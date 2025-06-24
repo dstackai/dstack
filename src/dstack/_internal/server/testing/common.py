@@ -820,6 +820,7 @@ def get_volume_configuration(
     region: str = "eu-west-1",
     size: Optional[Memory] = Memory(100),
     volume_id: Optional[str] = None,
+    idle_duration: Optional[Union[str, int, bool]] = None,
 ) -> VolumeConfiguration:
     return VolumeConfiguration(
         name=name,
@@ -827,6 +828,7 @@ def get_volume_configuration(
         region=region,
         size=size,
         volume_id=volume_id,
+        idle_duration=idle_duration,
     )
 
 
