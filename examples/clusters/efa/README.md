@@ -113,7 +113,7 @@ commands:
         -n $DSTACK_GPUS_NUM \
         -N $DSTACK_GPUS_PER_NODE \
         --bind-to none \
-        all_reduce_perf -b 8 -e 8G -f 2 -g 1
+        /opt/nccl-tests/build/all_reduce_perf -b 8 -e 8G -f 2 -g 1
     else
       sleep infinity
     fi
