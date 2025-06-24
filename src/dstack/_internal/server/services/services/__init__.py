@@ -3,6 +3,7 @@ Application logic related to `type: service` runs.
 """
 
 import uuid
+from datetime import datetime
 from typing import Optional
 from urllib.parse import urlparse
 
@@ -265,7 +266,7 @@ async def update_service_desired_replica_count(
     session: AsyncSession,
     run_model: RunModel,
     configuration: ServiceConfiguration,
-    last_scaled_at: Optional[int],
+    last_scaled_at: Optional[datetime],
 ) -> None:
     scaler = get_service_scaler(configuration)
     stats = None
