@@ -3,7 +3,6 @@ from typing import List
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload
 
 from dstack._internal.core.models.profiles import parse_duration
 from dstack._internal.core.models.volumes import VolumeStatus
@@ -31,13 +30,14 @@ async def process_idle_volumes(batch_size: int = 10):
                     VolumeModel.deleted == False,
                     VolumeModel.id.not_in(lockset),
                 )
-                .options(joinedload(VolumeModel.project))
-                .options(joinedload(VolumeModel.attachments))
                 .order_by(VolumeModel.last_processed_at.asc())
                 .limit(batch_size)
                 .with_for_update(skip_locked=True)
             )
             volume_models = list(res.unique().scalars().all())
+            # Manually load relationships to avoid outer join in the locked query
+            for volume_model in volume_models:
+                await session.refresh(volume_model, ["project", "attachments"])
             if not volume_models:
                 return
 
