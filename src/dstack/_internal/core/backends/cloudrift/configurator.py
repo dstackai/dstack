@@ -20,9 +20,6 @@ from dstack._internal.core.models.backends.base import (
     BackendType,
 )
 
-# TODO: Add all supported regions and default regions
-REGIONS = []
-
 
 class CloudRiftConfigurator(Configurator):
     TYPE = BackendType.CLOUDRIFT
@@ -32,13 +29,10 @@ class CloudRiftConfigurator(Configurator):
         self, config: CloudRiftBackendConfigWithCreds, default_creds_enabled: bool
     ):
         self._validate_creds(config.creds)
-        # TODO: Validate additional config parameters if any
 
     def create_backend(
         self, project_name: str, config: CloudRiftBackendConfigWithCreds
     ) -> BackendRecord:
-        if config.regions is None:
-            config.regions = REGIONS
         return BackendRecord(
             config=CloudRiftStoredConfig(
                 **CloudRiftBackendConfig.__response__.parse_obj(config).dict()

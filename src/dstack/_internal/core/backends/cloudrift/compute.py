@@ -16,6 +16,7 @@ from dstack._internal.core.models.instances import (
     InstanceOffer,
     InstanceOfferWithAvailability,
 )
+from dstack._internal.core.models.placement import PlacementGroup
 from dstack._internal.core.models.runs import JobProvisioningData, Requirements
 from dstack._internal.utils.logging import get_logger
 
@@ -63,9 +64,6 @@ class CloudRiftCompute(
             availability_offers.append(
                 InstanceOfferWithAvailability(**offer.dict(), availability=availability)
             )
-            logger.debug(
-                f"Offer {offer.instance.name} in region {offer.region} has availability: {availability}"
-            )
 
         return availability_offers
 
@@ -73,6 +71,7 @@ class CloudRiftCompute(
         self,
         instance_offer: InstanceOfferWithAvailability,
         instance_config: InstanceConfiguration,
+        placement_group: Optional[PlacementGroup],
     ) -> JobProvisioningData:
         commands = get_shim_commands(authorized_keys=instance_config.get_public_keys())
         startup_script = " ".join([" && ".join(commands)])
@@ -114,14 +113,22 @@ class CloudRiftCompute(
         project_ssh_private_key: str,
     ):
         instance_info = self.client.get_instance_by_id(provisioning_data.instance_id)
-        if instance_info:
-            vms = instance_info.get("virtual_machines", [])
-            if len(vms) > 0:
-                vm_ready = vms[0].get("ready", False)
-                if vm_ready:
-                    provisioning_data.hostname = instance_info.get("host_address", None)
 
-        pass
+        if not instance_info:
+            return
+
+        instance_mode = instance_info.get("node_mode", "")
+
+        if not instance_mode or instance_mode != "VirtualMachine":
+            return
+
+        vms = instance_info.get("virtual_machines", [])
+        if len(vms) == 0:
+            return
+
+        vm_ready = vms[0].get("ready", False)
+        if vm_ready:
+            provisioning_data.hostname = instance_info.get("host_address", None)
 
     def terminate_instance(
         self, instance_id: str, region: str, backend_data: Optional[str] = None

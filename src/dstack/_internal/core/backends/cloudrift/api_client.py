@@ -18,9 +18,7 @@ CLOUDRIFT_API_VERSION = "2025-05-29"
 
 class RiftClient:
     def __init__(self, api_key: Optional[str] = None):
-        self.server_address = CLOUDRIFT_SERVER_ADDRESS
         self.public_api_root = os.path.join(CLOUDRIFT_SERVER_ADDRESS, "api/v1")
-        self.internal_api_root = os.path.join(CLOUDRIFT_SERVER_ADDRESS, "internal")
         self.api_key = api_key
 
     def validate_api_key(self) -> bool:
@@ -31,7 +29,7 @@ class RiftClient:
         try:
             response = self._make_request("auth/me")
             if isinstance(response, dict):
-                return response.get("email", False)
+                return "email" in response
             return False
         except BackendInvalidCredentialsError:
             return False
@@ -46,7 +44,7 @@ class RiftClient:
             return response_data.get("instance_types", [])
         return []
 
-    def list_recipies(self) -> List[Dict]:
+    def list_recipes(self) -> List[Dict]:
         request_data = {}
         response_data = self._make_request("recipes/list", request_data)
         if isinstance(response_data, dict):
@@ -58,12 +56,12 @@ class RiftClient:
         Retrieves a list of VM recipes from the CloudRift API.
         Returns a list of dictionaries containing recipe information.
         """
-        recipe_group = self.list_recipies()
+        recipe_group = self.list_recipes()
         vm_recipes = []
         for group in recipe_group:
-            tags = group.get("tags ", [])
-            has_vm = "vm" in tags
-            if group.get("name", "").lower() != "linux" and not has_vm:
+            tags = group.get("tags", [])
+            has_vm = "vm" in map(str.lower, tags)
+            if group.get("name", "").lower() != "linux" or not has_vm:
                 continue
 
             recipes = group.get("recipes", [])
@@ -108,7 +106,6 @@ class RiftClient:
         request_data = {
             "config": {
                 "VirtualMachine": {
-                    # "cloudinit_url": "",
                     "cloudinit_commands": cmd,
                     "image_url": image_url,
                     "ssh_key": {"PublicKeys": ssh_keys},
@@ -153,23 +150,6 @@ class RiftClient:
 
         return None
 
-    def is_instance_ready(self, instance_id: str) -> bool:
-        """
-        Checks if the instance with the given ID is ready.
-        Returns True if the instance is ready, False otherwise.
-        """
-        instance_info = self.get_instance_by_id(instance_id)
-        if instance_info:
-            instance_type = instance_info.get("node_mode", "")
-            if instance_type == "VirtualMachine":
-                vms = instance_info.get("virtual_machines", [])
-                if len(vms) > 0:
-                    vm_ready = vms[0].get("ready", False)
-                    return vm_ready
-            else:
-                return instance_info.get("status", "") == "Active"
-        return False
-
     def terminate_instance(self, instance_id: str) -> bool:
         request_data = {"selector": {"ById": [instance_id]}}
         logger.debug("Terminating instance with request data: %s", request_data)
@@ -200,7 +180,7 @@ class RiftClient:
                 full_url,
                 headers=headers,
                 json={"version": version, "data": data},
-                timeout=120,
+                timeout=15,
                 **kwargs,
             )
 

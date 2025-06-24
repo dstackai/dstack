@@ -915,9 +915,9 @@ projects:
 
 ### CloudRift
 
-Log into your [CloudRift :material-arrow-top-right-thin:{ .external }](https://www.cloudrift.ai/console/) console, click `API Keys` in the sidebar and click the button to create a new API key.
+Log into your [CloudRift :material-arrow-top-right-thin:{ .external }](https://console.cloudrift.ai/) console, click `API Keys` in the sidebar and click the button to create a new API key.
 
-Ensure you've created a project with CloudRift,
+Ensure you've created a project with CloudRift.
 
 Then proceed to configuring the backend.
 
