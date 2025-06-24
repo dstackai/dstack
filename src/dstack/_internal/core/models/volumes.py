@@ -9,6 +9,7 @@ from typing_extensions import Annotated, Self
 
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import CoreModel
+from dstack._internal.core.models.profiles import parse_idle_duration
 from dstack._internal.core.models.resources import Memory
 from dstack._internal.utils.common import get_or_error
 from dstack._internal.utils.tags import tags_validator
@@ -44,6 +45,16 @@ class VolumeConfiguration(CoreModel):
         Optional[str],
         Field(description="The volume ID. Must be specified when registering external volumes"),
     ] = None
+    idle_duration: Annotated[
+        Optional[Union[str, int, bool]],
+        Field(
+            description=(
+                "Time to wait after volume is no longer used by any job before deleting it. "
+                "Defaults to keep the volume indefinitely. "
+                "Use the value 'off' to disable auto-cleanup."
+            )
+        ),
+    ] = None
     tags: Annotated[
         Optional[Dict[str, str]],
         Field(
@@ -56,6 +67,9 @@ class VolumeConfiguration(CoreModel):
     ] = None
 
     _validate_tags = validator("tags", pre=True, allow_reuse=True)(tags_validator)
+    _validate_idle_duration = validator("idle_duration", pre=True, allow_reuse=True)(
+        parse_idle_duration
+    )
 
     @property
     def size_gb(self) -> int:
