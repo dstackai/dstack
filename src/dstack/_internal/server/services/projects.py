@@ -253,7 +253,6 @@ async def add_project_members(
     )
     requesting_user_role = get_user_project_role(user=user, project=project)
 
-    # Check if this is a self-join to public project
     is_self_join_to_public = (
         len(members) == 1
         and project.is_public
@@ -261,12 +260,10 @@ async def add_project_members(
         and requesting_user_role is None
     )
 
-    # Check permissions: only managers/admins can add members, EXCEPT for self-join to public projects
     if not is_self_join_to_public:
         if requesting_user_role not in [ProjectRole.ADMIN, ProjectRole.MANAGER]:
             raise ForbiddenError("Access denied: insufficient permissions to add members")
 
-        # For project managers, check if they're trying to add admins
         if user.global_role != GlobalRole.ADMIN and requesting_user_role == ProjectRole.MANAGER:
             for member in members:
                 if member.project_role == ProjectRole.ADMIN:
@@ -274,7 +271,6 @@ async def add_project_members(
                         "Access denied: only global admins can add project admins"
                     )
     else:
-        # For self-join to public project, only allow USER role
         if members[0].project_role != ProjectRole.USER:
             raise ForbiddenError("Access denied: can only join public projects as user role")
 
@@ -605,14 +601,12 @@ async def remove_project_members(
     )
     requesting_user_role = get_user_project_role(user=user, project=project)
 
-    # Check if this is a self-leave (user removing themselves)
     is_self_leave = (
         len(usernames) == 1
         and (usernames[0] == user.name or usernames[0] == user.email)
         and requesting_user_role is not None
     )
 
-    # Check basic permissions: only managers/admins can remove members, EXCEPT for self-leave
     if not is_self_leave:
         if requesting_user_role not in [ProjectRole.ADMIN, ProjectRole.MANAGER]:
             raise ForbiddenError("Access denied: insufficient permissions to remove members")
