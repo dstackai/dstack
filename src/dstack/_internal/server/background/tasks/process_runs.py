@@ -62,7 +62,7 @@ async def _process_next_run():
                 )
                 .order_by(RunModel.last_processed_at.asc())
                 .limit(1)
-                .with_for_update(skip_locked=True)
+                .with_for_update(skip_locked=True, key_share=True)
             )
             run_model = res.scalar()
             if run_model is None:
@@ -74,7 +74,7 @@ async def _process_next_run():
                     JobModel.id.not_in(job_lockset),
                 )
                 .order_by(JobModel.id)  # take locks in order
-                .with_for_update(skip_locked=True)
+                .with_for_update(skip_locked=True, key_share=True)
             )
             job_models = res.scalars().all()
             if len(run_model.jobs) != len(job_models):

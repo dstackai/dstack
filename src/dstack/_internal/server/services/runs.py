@@ -589,7 +589,7 @@ async def stop_run(session: AsyncSession, run_model: RunModel, abort: bool):
         select(RunModel)
         .where(RunModel.id == run_model.id)
         .order_by(RunModel.id)  # take locks in order
-        .with_for_update()
+        .with_for_update(key_share=True)
         .execution_options(populate_existing=True)
     )
     run_model = res.scalar_one()
@@ -597,7 +597,7 @@ async def stop_run(session: AsyncSession, run_model: RunModel, abort: bool):
         select(JobModel)
         .where(JobModel.run_id == run_model.id)
         .order_by(JobModel.id)  # take locks in order
-        .with_for_update()
+        .with_for_update(key_share=True)
         .execution_options(populate_existing=True)
     )
     if run_model.status.is_finished():
@@ -633,7 +633,7 @@ async def delete_runs(
             select(RunModel)
             .where(RunModel.id.in_(run_ids))
             .order_by(RunModel.id)  # take locks in order
-            .with_for_update()
+            .with_for_update(key_share=True)
         )
         run_models = res.scalars().all()
         active_runs = [r for r in run_models if not r.status.is_finished()]

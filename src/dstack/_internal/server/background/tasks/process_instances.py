@@ -149,7 +149,7 @@ async def _process_next_instance():
                 .options(lazyload(InstanceModel.jobs))
                 .order_by(InstanceModel.last_processed_at.asc())
                 .limit(1)
-                .with_for_update(skip_locked=True)
+                .with_for_update(skip_locked=True, key_share=True)
             )
             instance = res.scalar()
             if instance is None:

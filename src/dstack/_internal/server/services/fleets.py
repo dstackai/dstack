@@ -532,7 +532,7 @@ async def delete_fleets(
             .options(selectinload(FleetModel.runs))
             .execution_options(populate_existing=True)
             .order_by(FleetModel.id)  # take locks in order
-            .with_for_update()
+            .with_for_update(key_share=True)
         )
         fleet_models = res.scalars().unique().all()
         fleets = [fleet_model_to_fleet(m) for m in fleet_models]

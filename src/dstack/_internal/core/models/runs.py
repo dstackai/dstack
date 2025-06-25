@@ -301,7 +301,7 @@ class JobSubmission(CoreModel):
     job_provisioning_data: Optional[JobProvisioningData]
     job_runtime_data: Optional[JobRuntimeData]
     # TODO: make status_message and error a computed field after migrating to pydanticV2
-    status_message: Optional[str]
+    status_message: Optional[str] = None
     error: Optional[str] = None
 
     @property
