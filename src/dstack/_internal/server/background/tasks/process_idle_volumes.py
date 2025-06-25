@@ -16,10 +16,7 @@ from dstack._internal.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
-async def process_idle_volumes(batch_size: int = 10):
-    """
-    Process volumes to check if they have exceeded their idle_duration and delete them.
-    """
+async def process_idle_volumes():
     lock, lockset = get_locker().get_lockset(VolumeModel.__tablename__)
     async with get_session_ctx() as session:
         async with lock:
@@ -31,22 +28,20 @@ async def process_idle_volumes(batch_size: int = 10):
                     VolumeModel.id.not_in(lockset),
                 )
                 .order_by(VolumeModel.last_processed_at.asc())
-                .limit(batch_size)
+                .limit(10)
                 .with_for_update(skip_locked=True)
             )
             volume_models = list(res.unique().scalars().all())
-            for volume_model in volume_models:
-                await session.refresh(volume_model, ["project", "attachments"])
             if not volume_models:
                 return
-
             for volume_model in volume_models:
+                await session.refresh(volume_model, ["project", "attachments"])
                 lockset.add(volume_model.id)
 
         try:
             volumes_to_delete = []
             for volume_model in volume_models:
-                if await _should_delete_idle_volume(volume_model):
+                if _should_delete_idle_volume(volume_model):
                     volumes_to_delete.append(volume_model)
 
             if volumes_to_delete:
@@ -54,13 +49,10 @@ async def process_idle_volumes(batch_size: int = 10):
 
         finally:
             for volume_model in volume_models:
-                lockset.difference_update([volume_model.id])
+                lockset.discard(volume_model.id)
 
 
-async def _should_delete_idle_volume(volume_model: VolumeModel) -> bool:
-    """
-    Check if a volume should be deleted based on its idle duration.
-    """
+def _should_delete_idle_volume(volume_model: VolumeModel) -> bool:
     configuration = get_volume_configuration(volume_model)
 
     if configuration.idle_duration is None:
@@ -82,10 +74,10 @@ async def _should_delete_idle_volume(volume_model: VolumeModel) -> bool:
 
     if idle_duration > idle_threshold:
         logger.info(
-            "Volume %s idle duration expired: idle time %s seconds, threshold %s seconds. Marking for deletion",
+            "Volume %s idle duration expired: idle time %.1f hours, threshold %.1f hours. Marking for deletion",
             volume_model.name,
-            idle_duration.total_seconds(),
-            idle_threshold.total_seconds(),
+            idle_duration.total_seconds() / 3600,
+            idle_threshold.total_seconds() / 3600,
         )
         return True
 
@@ -93,21 +85,22 @@ async def _should_delete_idle_volume(volume_model: VolumeModel) -> bool:
 
 
 def _get_volume_idle_duration(volume_model: VolumeModel) -> datetime.timedelta:
-    """
-    Calculate how long a volume has been idle.
-    A volume is considered idle from the time it was last processed by a job.
-    If it was never used by a job, use the created_at time.
-    """
-    last_time = volume_model.created_at.replace(tzinfo=datetime.timezone.utc)
+    reference_time = volume_model.created_at
     if volume_model.last_job_processed_at is not None:
-        last_time = volume_model.last_job_processed_at.replace(tzinfo=datetime.timezone.utc)
-    return get_current_datetime() - last_time
+        reference_time = volume_model.last_job_processed_at
+
+    reference_time_utc = reference_time.replace(tzinfo=datetime.timezone.utc)
+    current_time = get_current_datetime()
+
+    idle_duration = current_time - reference_time_utc
+
+    if idle_duration.total_seconds() < 0:
+        return datetime.timedelta(0)
+
+    return idle_duration
 
 
 async def _delete_idle_volumes(session: AsyncSession, volume_models: List[VolumeModel]):
-    """
-    Delete volumes that have exceeded their idle duration.
-    """
     volumes_by_project = {}
     for volume_model in volume_models:
         project = volume_model.project
