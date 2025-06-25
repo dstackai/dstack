@@ -35,13 +35,11 @@ async def process_idle_volumes(batch_size: int = 10):
                 .with_for_update(skip_locked=True)
             )
             volume_models = list(res.unique().scalars().all())
-            # Manually load relationships to avoid outer join in the locked query
             for volume_model in volume_models:
                 await session.refresh(volume_model, ["project", "attachments"])
             if not volume_models:
                 return
 
-            # Add to lockset
             for volume_model in volume_models:
                 lockset.add(volume_model.id)
 
@@ -55,7 +53,6 @@ async def process_idle_volumes(batch_size: int = 10):
                 await _delete_idle_volumes(session, volumes_to_delete)
 
         finally:
-            # Remove from lockset
             for volume_model in volume_models:
                 lockset.difference_update([volume_model.id])
 
@@ -64,28 +61,22 @@ async def _should_delete_idle_volume(volume_model: VolumeModel) -> bool:
     """
     Check if a volume should be deleted based on its idle duration.
     """
-    # Get volume configuration
     configuration = get_volume_configuration(volume_model)
 
-    # If no idle_duration is configured, don't delete
     if configuration.idle_duration is None:
         return False
 
-    # If idle_duration is disabled (negative value), don't delete
     if isinstance(configuration.idle_duration, int) and configuration.idle_duration < 0:
         return False
 
-    # Parse idle duration
     idle_duration_seconds = parse_duration(configuration.idle_duration)
     if idle_duration_seconds is None or idle_duration_seconds <= 0:
         return False
 
-    # Check if volume is currently attached to any instance
     if len(volume_model.attachments) > 0:
         logger.debug("Volume %s is still attached to instances, not deleting", volume_model.name)
         return False
 
-    # Calculate how long the volume has been idle
     idle_duration = _get_volume_idle_duration(volume_model)
     idle_threshold = datetime.timedelta(seconds=idle_duration_seconds)
 
@@ -117,7 +108,6 @@ async def _delete_idle_volumes(session: AsyncSession, volume_models: List[Volume
     """
     Delete volumes that have exceeded their idle duration.
     """
-    # Group volumes by project
     volumes_by_project = {}
     for volume_model in volume_models:
         project = volume_model.project
@@ -125,7 +115,6 @@ async def _delete_idle_volumes(session: AsyncSession, volume_models: List[Volume
             volumes_by_project[project] = []
         volumes_by_project[project].append(volume_model.name)
 
-    # Delete volumes by project
     for project, volume_names in volumes_by_project.items():
         logger.info("Deleting idle volumes for project %s: %s", project.name, volume_names)
         try:

@@ -740,5 +740,4 @@ async def _attach_volume(
     )
     instance.volume_attachments.append(volume_attachment_model)
 
-    # Update volume last_job_processed_at when it's attached to a job
     volume_model.last_job_processed_at = common_utils.get_current_datetime()
