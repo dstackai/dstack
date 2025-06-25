@@ -44,7 +44,6 @@ async def list_users_for_user(
     session: AsyncSession,
     user: UserModel,
 ) -> List[User]:
-    # Allow all authenticated users to see the user list for project collaboration
     return await list_all_users(session=session)
 
 
