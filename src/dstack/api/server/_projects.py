@@ -39,7 +39,6 @@ class ProjectsAPIClient(APIClientGroup):
         return parse_obj_as(Project.__response__, resp.json())
 
     def add_member(self, project_name: str, username: str, project_role: ProjectRole) -> Project:
-        # Convert single user to list format
         member_setting = MemberSetting(username=username, project_role=project_role)
         body = AddProjectMemberRequest(members=[member_setting])
         resp = self._request(f"/api/projects/{project_name}/add_members", body=body.json())
@@ -51,7 +50,6 @@ class ProjectsAPIClient(APIClientGroup):
         return parse_obj_as(Project.__response__, resp.json())
 
     def remove_member(self, project_name: str, username: str) -> Project:
-        # Convert single username to list format
         body = RemoveProjectMemberRequest(usernames=[username])
         resp = self._request(f"/api/projects/{project_name}/remove_members", body=body.json())
         return parse_obj_as(Project.__response__, resp.json())
