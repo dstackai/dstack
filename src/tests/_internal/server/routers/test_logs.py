@@ -74,7 +74,8 @@ class TestPollLogs:
                     "log_source": "stdout",
                     "message": "!",
                 },
-            ]
+            ],
+            "next_token": None,
         }
         response = await client.post(
             f"/api/project/{project.name}/logs/poll",
@@ -94,5 +95,6 @@ class TestPollLogs:
                     "log_source": "stdout",
                     "message": "!",
                 },
-            ]
+            ],
+            "next_token": None,
         }

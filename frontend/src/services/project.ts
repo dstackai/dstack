@@ -73,7 +73,7 @@ export const projectApi = createApi({
             invalidatesTags: () => ['Projects'],
         }),
 
-        getProjectLogs: builder.query<ILogItem[], TRequestLogsParams>({
+        getProjectLogs: builder.query<TResponseLogsParams, TRequestLogsParams>({
             query: ({ project_name, ...body }) => {
                 return {
                     url: API.PROJECTS.LOGS(project_name),
@@ -84,11 +84,17 @@ export const projectApi = createApi({
 
             keepUnusedDataFor: 0,
             providesTags: () => ['ProjectLogs'],
-            transformResponse: (response: { logs: ILogItem[] }) =>
-                response.logs.map((logItem) => ({
+            transformResponse: (response: { logs: ILogItem[]; next_token: string }) => {
+                const logs = response.logs.map((logItem) => ({
                     ...logItem,
                     message: base64ToArrayBuffer(logItem.message as string),
-                })),
+                }));
+
+                return {
+                    ...response,
+                    logs,
+                };
+            },
         }),
 
         getProjectRepos: builder.query<IRepo[], { project_name: string }>({
@@ -111,5 +117,6 @@ export const {
     useUpdateProjectMembersMutation,
     useDeleteProjectsMutation,
     useGetProjectLogsQuery,
+    useLazyGetProjectLogsQuery,
     useGetProjectReposQuery,
 } = projectApi;
