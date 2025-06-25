@@ -37,6 +37,6 @@ export interface IAppState {
         discordCompleted: boolean;
         tallyCompleted: boolean;
         quickStartCompleted: boolean;
-        showStartUp: boolean;
+        hideStartUp: boolean | null;
     };
 }

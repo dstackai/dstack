@@ -5,7 +5,7 @@ import { Box, Toggle, TutorialPanel as TutorialPanelGeneric, TutorialPanelProps 
 
 import { useAppDispatch, useAppSelector } from 'hooks';
 
-import { selectTutorialPanel, setShowAtStartup } from 'App/slice';
+import { selectTutorialPanel, setHideAtStartup } from 'App/slice';
 
 import { tutorialPanelI18nStrings } from './constants';
 import { useTutorials } from './hooks';
@@ -18,16 +18,16 @@ export const TutorialPanel: React.FC<Props> = () => {
     const dispatch = useAppDispatch();
     const { tutorials } = useTutorials();
     const tutorialRootRef = useRef<Root>(null);
-    const { showStartUp } = useAppSelector(selectTutorialPanel);
+    const { hideStartUp } = useAppSelector(selectTutorialPanel);
 
     const onChangeShowStartUp = (value: boolean) => {
-        dispatch(setShowAtStartup(value));
+        dispatch(setHideAtStartup(!value));
     };
 
     const renderShowAtStartup = () => {
         return (
             <Box padding={{ vertical: 'm' }}>
-                <Toggle onChange={({ detail }) => onChangeShowStartUp(detail.checked)} checked={showStartUp}>
+                <Toggle onChange={({ detail }) => onChangeShowStartUp(detail.checked)} checked={!hideStartUp}>
                     Show at startup
                 </Toggle>
             </Box>
@@ -48,7 +48,7 @@ export const TutorialPanel: React.FC<Props> = () => {
         if (tutorialRootRef.current) {
             tutorialRootRef.current.render(renderShowAtStartup());
         }
-    }, [showStartUp]);
+    }, [hideStartUp]);
 
     return <TutorialPanelGeneric i18nStrings={tutorialPanelI18nStrings} tutorials={tutorials} />;
 };

@@ -10,7 +10,7 @@ import { IAppState, ToolsTabs } from './types';
 const getInitialState = (): IAppState => {
     let authData = null;
     let storageData = null;
-    let showStartUp = true;
+    let hideStartUp: null | boolean = null;
     let activeMode = getThemeMode();
 
     try {
@@ -20,9 +20,13 @@ const getInitialState = (): IAppState => {
     }
 
     try {
-        showStartUp =
-            !localStorage.getItem(TUTORIAL_SHOW_STARTUP_STORAGE_KEY) ||
-            localStorage.getItem(TUTORIAL_SHOW_STARTUP_STORAGE_KEY) === 'true';
+        hideStartUp = (() => {
+            if (!localStorage.getItem(TUTORIAL_SHOW_STARTUP_STORAGE_KEY)) {
+                return null;
+            }
+
+            return localStorage.getItem(TUTORIAL_SHOW_STARTUP_STORAGE_KEY) === 'true';
+        })();
     } catch (e) {
         console.log(e);
     }
@@ -62,7 +66,7 @@ const getInitialState = (): IAppState => {
             discordCompleted: false,
             tallyCompleted: false,
             quickStartCompleted: false,
-            showStartUp,
+            hideStartUp,
         },
     };
 };
@@ -149,10 +153,10 @@ export const appSlice = createSlice({
             };
         },
 
-        setShowAtStartup: (state, action: PayloadAction<boolean>) => {
+        setHideAtStartup: (state, action: PayloadAction<boolean>) => {
             state.tutorialPanel = {
                 ...state.tutorialPanel,
-                showStartUp: action.payload,
+                hideStartUp: action.payload,
             };
 
             try {
@@ -175,7 +179,7 @@ export const {
     setToolsTab,
     openTutorialPanel,
     updateTutorialPanelState,
-    setShowAtStartup,
+    setHideAtStartup,
 } = appSlice.actions;
 export const selectUserData = (state: RootState) => state.app.userData;
 export const selectAuthToken = (state: RootState) => state.app.authData?.token;
