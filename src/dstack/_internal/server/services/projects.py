@@ -157,7 +157,6 @@ async def update_project(
     is_public: bool,
 ):
     """Update project visibility (public/private)."""
-    # Update the project visibility
     project.is_public = is_public
     await session.commit()
 
@@ -175,7 +174,6 @@ async def delete_projects(
         for project_name in projects_names:
             if project_name not in user_project_names:
                 raise ForbiddenError()
-        # Only check admin permissions for projects being deleted
         projects_to_delete = [p for p in user_projects if p.name in projects_names]
         for project in projects_to_delete:
             if not _is_project_admin(user=user, project=project):
@@ -201,7 +199,6 @@ async def set_project_members(
     project: ProjectModel,
     members: List[MemberSetting],
 ):
-    # reload with members
     project = await get_project_model_by_name_or_error(
         session=session,
         project_name=project.name,
@@ -226,7 +223,6 @@ async def set_project_members(
         select(UserModel).where((UserModel.name.in_(names)) | (UserModel.email.in_(names)))
     )
     users = res.scalars().all()
-    # Create lookup maps for both username and email
     username_to_user = {user.name: user for user in users}
     email_to_user = {user.email: user for user in users if user.email}
     for i, member in enumerate(members):
@@ -251,7 +247,6 @@ async def add_project_members(
     members: List[MemberSetting],
 ):
     """Add multiple members to a project."""
-    # reload with members
     project = await get_project_model_by_name_or_error(
         session=session,
         project_name=project.name,
@@ -263,7 +258,7 @@ async def add_project_members(
         len(members) == 1
         and project.is_public
         and (members[0].username == user.name or members[0].username == user.email)
-        and requesting_user_role is None  # User is not already a member
+        and requesting_user_role is None
     )
 
     # Check permissions: only managers/admins can add members, EXCEPT for self-join to public projects
@@ -283,23 +278,18 @@ async def add_project_members(
         if members[0].project_role != ProjectRole.USER:
             raise ForbiddenError("Access denied: can only join public projects as user role")
 
-    # Collect all usernames to query
     usernames = [member.username for member in members]
 
-    # Find all users (by username or email)
     res = await session.execute(
         select(UserModel).where((UserModel.name.in_(usernames)) | (UserModel.email.in_(usernames)))
     )
     users_found = res.scalars().all()
 
-    # Create lookup maps for both username and email
     username_to_user = {user.name: user for user in users_found}
     email_to_user = {user.email: user for user in users_found if user.email}
 
-    # Build a map from user_id to member for efficient existing member updates
     member_by_user_id = {m.user_id: m for m in project.members}
 
-    # Process each member to add
     for member_setting in members:
         user_to_add = username_to_user.get(member_setting.username) or email_to_user.get(
             member_setting.username
@@ -307,24 +297,20 @@ async def add_project_members(
         if user_to_add is None:
             raise ServerClientError(f"User not found: {member_setting.username}")
 
-        # Check if user is already a member
         if user_to_add.id in member_by_user_id:
-            # Update existing member role if different
             existing_member = member_by_user_id[user_to_add.id]
             if existing_member.project_role != member_setting.project_role:
                 existing_member.project_role = member_setting.project_role
         else:
-            # Add new member (let database handle member_num to avoid race conditions)
             await add_project_member(
                 session=session,
                 project=project,
                 user=user_to_add,
                 project_role=member_setting.project_role,
-                member_num=None,  # Let database auto-assign to avoid race conditions
+                member_num=None,
                 commit=False,
             )
-            # Update our local tracking for subsequent iterations
-            member_by_user_id[user_to_add.id] = None  # Placeholder to track addition
+            member_by_user_id[user_to_add.id] = None
 
     await session.commit()
 
@@ -596,11 +582,9 @@ def _is_project_admin(
     user: UserModel,
     project: ProjectModel,
 ) -> bool:
-    # Check if user is the project owner
     if user.id == project.owner_id:
         return True
 
-    # Check if user has admin role in project members
     for m in project.members:
         if user.id == m.user_id:
             if m.project_role == ProjectRole.ADMIN:
@@ -615,7 +599,6 @@ async def remove_project_members(
     usernames: List[str],
 ):
     """Remove multiple members from a project."""
-    # reload with members
     project = await get_project_model_by_name_or_error(
         session=session,
         project_name=project.name,
@@ -626,7 +609,7 @@ async def remove_project_members(
     is_self_leave = (
         len(usernames) == 1
         and (usernames[0] == user.name or usernames[0] == user.email)
-        and requesting_user_role is not None  # User is actually a member
+        and requesting_user_role is not None
     )
 
     # Check basic permissions: only managers/admins can remove members, EXCEPT for self-leave
@@ -634,20 +617,16 @@ async def remove_project_members(
         if requesting_user_role not in [ProjectRole.ADMIN, ProjectRole.MANAGER]:
             raise ForbiddenError("Access denied: insufficient permissions to remove members")
 
-    # Find all users to remove (by username or email)
     res = await session.execute(
         select(UserModel).where((UserModel.name.in_(usernames)) | (UserModel.email.in_(usernames)))
     )
     users_found = res.scalars().all()
 
-    # Create lookup maps
     username_to_user = {user.name: user for user in users_found}
     email_to_user = {user.email: user for user in users_found if user.email}
 
-    # Build a map from user_id to member for efficient member lookups
     member_by_user_id = {m.user_id: m for m in project.members}
 
-    # Find members to remove and validate permissions
     members_to_remove = []
     admin_removals = 0
 
@@ -656,24 +635,19 @@ async def remove_project_members(
         if user_to_remove is None:
             raise ServerClientError(f"User not found: {username}")
 
-        # Check if user is actually a member before trying to remove them
         if user_to_remove.id not in member_by_user_id:
             raise ServerClientError(f"User is not a member of this project: {username}")
 
-        # Get the member to remove
         member_to_remove = member_by_user_id[user_to_remove.id]
 
-        # Check if trying to remove project admin
         if member_to_remove.project_role == ProjectRole.ADMIN:
             if is_self_leave:
-                # For self-leave, check if user is the last admin
                 total_admins = sum(
                     1 for member in project.members if member.project_role == ProjectRole.ADMIN
                 )
                 if total_admins <= 1:
                     raise ServerClientError("Cannot leave project: you are the last admin")
             else:
-                # For manager/admin removing other admins, only global admins can do this
                 if user.global_role != GlobalRole.ADMIN:
                     raise ForbiddenError(
                         f"Access denied: only global admins can remove project admins (user: {username})"
@@ -682,7 +656,6 @@ async def remove_project_members(
 
         members_to_remove.append(member_to_remove)
 
-    # Check we're not removing all admins (for non-self-leave operations)
     if not is_self_leave:
         total_admins = sum(
             1 for member in project.members if member.project_role == ProjectRole.ADMIN
@@ -690,7 +663,6 @@ async def remove_project_members(
         if admin_removals >= total_admins:
             raise ServerClientError("Cannot remove all project admins")
 
-    # Remove all members
     for member in members_to_remove:
         await session.delete(member)
 

@@ -85,11 +85,9 @@ class ProjectManager:
         if project is None:
             raise error_not_found()
 
-        # Global admin can always manage projects
         if user.global_role == GlobalRole.ADMIN:
             return user, project
 
-        # Project managers and admins can manage projects
         project_role = get_user_project_role(user=user, project=project)
         if project_role in [ProjectRole.ADMIN, ProjectRole.MANAGER]:
             return user, project
@@ -167,16 +165,13 @@ class ProjectManagerOrPublicProject:
         if project is None:
             raise error_not_found()
 
-        # Global admin can always manage projects
         if user.global_role == GlobalRole.ADMIN:
             return user, project
 
-        # Project managers can add members
         project_role = get_user_project_role(user=user, project=project)
         if project_role in [ProjectRole.ADMIN, ProjectRole.MANAGER]:
             return user, project
 
-        # For public projects, any authenticated user can join (will be validated in service layer)
         if project.is_public:
             return user, project
 
@@ -203,11 +198,9 @@ class ProjectManagerOrSelfLeave:
         if project is None:
             raise error_not_found()
 
-        # Global admin can always manage projects
         if user.global_role == GlobalRole.ADMIN:
             return user, project
 
-        # Any project member can access (managers can remove others, members can leave)
         project_role = get_user_project_role(user=user, project=project)
         if project_role is not None:
             return user, project
