@@ -99,7 +99,7 @@ async def _process_next_submitted_job():
                     JobModel.id.not_in(lockset),
                 )
                 # Jobs are process in FIFO sorted by priority globally,
-                # thus runs from different project can "overtake" each other by using higher priorities.
+                # thus runs from different projects can "overtake" each other by using higher priorities.
                 # That's not a big problem as long as projects do not compete for the same compute resources.
                 # Jobs with lower priorities from other projects will be processed without major lag
                 # as long as new higher priority runs are not constantly submitted.
@@ -108,7 +108,12 @@ async def _process_next_submitted_job():
                 # there can be many projects and we are limited by the max DB connections.
                 .order_by(RunModel.priority.desc(), JobModel.last_processed_at.asc())
                 .limit(1)
-                .with_for_update(skip_locked=True)
+                .with_for_update(
+                    skip_locked=True,
+                    # Do not lock joined run, only job.
+                    # Locking run here may cause deadlock.
+                    of=JobModel,
+                )
             )
             job_model = res.scalar()
             if job_model is None:
