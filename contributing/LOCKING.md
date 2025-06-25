@@ -40,7 +40,6 @@ Concurrency is hard. Below you'll find common patterns and gotchas when working 
 
 This is a common sense approach. An alternative could be the inverse: job processing cannot run in parallel with run processing, so job processing takes run lock. This indirection complicates things and is discouraged. In this example, run processing should take job lock instead.
 
-
 **Start new transaction after acquiring a lock to see other transactions changes in SQLite.**
 
 ```python
@@ -76,6 +75,10 @@ unlock resources
 
 If a transaction releases a lock before committing changes, the changes may not be visible to another transaction that acquired the lock and relies upon seeing all committed changes.
 
-**Don't use joinedload when selecting .with_for_update()**
+**Don't use `joinedload` when selecting `.with_for_update()`**
 
 In fact, using `joinedload` and `.with_for_update()` will trigger an error because `joinedload` produces OUTER LEFT JOIN that cannot be used with SELECT FOR UPDATE. A regular `.join()` can be used to lock related resources but it may lead to no rows if there is no row to join. Usually, you'd select with `selectinload` or first select with  `.with_for_update()` without loading related attributes and then re-selecting with `joinedload` without `.with_for_update()`.
+
+**Always use `.with_for_update(key_share=True)` unless you plan to delete rows or update a primary key column**
+
+If you `SELECT FOR UPDATE` from a table that is referenced in a child table via a foreign key, it can lead to deadlocks if the child table is updated because Postgres will issue a `FOR KEY SHARE` lock on the parent table rows to ensure valid foreign keys. For this reason, you should always do `SELECT FOR NO KEY UPDATE` (.`with_for_update(key_share=True)`) if primary key columns are not modified. `SELECT FOR NO KEY UPDATE` is not blocked by a `FOR KEY SHARE` lock, so no deadlock.
