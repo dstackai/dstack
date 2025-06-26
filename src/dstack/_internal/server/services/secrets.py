@@ -60,6 +60,18 @@ async def delete_secrets(
     project: ProjectModel,
     names: List[str],
 ):
+    existing_secrets_query = await session.execute(
+        select(SecretModel).where(
+            SecretModel.project_id == project.id,
+            SecretModel.name.in_(names),
+        )
+    )
+    existing_names = [s.name for s in existing_secrets_query.scalars().all()]
+    missing_names = set(names) - set(existing_names)
+    if missing_names:
+        logger.warning("Secrets %s not found in project %s", list(missing_names), project.name)
+        raise ResourceNotExistsError(f"Secrets not found: {', '.join(missing_names)}")
+
     await session.execute(
         delete(SecretModel).where(
             SecretModel.project_id == project.id,
