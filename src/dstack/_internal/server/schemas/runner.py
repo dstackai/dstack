@@ -57,6 +57,7 @@ class SubmitBody(CoreModel):
                     "repo_data",
                     "configuration",
                     "configuration_path",
+                    "file_archives",
                 },
             }
         ),

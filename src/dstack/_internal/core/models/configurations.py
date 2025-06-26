@@ -10,6 +10,7 @@ from typing_extensions import Annotated, Literal
 from dstack._internal.core.errors import ConfigurationError
 from dstack._internal.core.models.common import CoreModel, Duration, RegistryAuth
 from dstack._internal.core.models.envs import Env
+from dstack._internal.core.models.files import FilePathMapping
 from dstack._internal.core.models.fleets import FleetConfiguration
 from dstack._internal.core.models.gateways import GatewayConfiguration
 from dstack._internal.core.models.profiles import ProfileParams, parse_off_duration
@@ -252,6 +253,10 @@ class BaseRunConfiguration(CoreModel):
             description="Use Docker inside the container. Mutually exclusive with `image`, `python`, and `nvcc`. Overrides `privileged`"
         ),
     ] = None
+    files: Annotated[
+        list[Union[FilePathMapping, str]],
+        Field(description="The local to container file path mappings"),
+    ] = []
     # deprecated since 0.18.31; task, service -- no effect; dev-environment -- executed right before `init`
     setup: CommandsList = []
 
@@ -283,6 +288,12 @@ class BaseRunConfiguration(CoreModel):
     def convert_volumes(cls, v) -> MountPoint:
         if isinstance(v, str):
             return parse_mount_point(v)
+        return v
+
+    @validator("files", each_item=True)
+    def convert_files(cls, v) -> FilePathMapping:
+        if isinstance(v, str):
+            return FilePathMapping.parse(v)
         return v
 
     @validator("user")

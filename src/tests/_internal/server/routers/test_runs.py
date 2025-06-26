@@ -153,6 +153,7 @@ def get_dev_env_run_plan_dict(
                 "shm_size": None,
             },
             "volumes": [json.loads(v.json()) for v in volumes],
+            "files": [],
             "backends": ["local", "aws", "azure", "gcp", "lambda", "runpod"],
             "regions": ["us"],
             "availability_zones": None,
@@ -174,6 +175,7 @@ def get_dev_env_run_plan_dict(
             "priority": 0,
         },
         "configuration_path": "dstack.yaml",
+        "file_archives": [],
         "profile": {
             "backends": ["local", "aws", "azure", "gcp", "lambda", "runpod"],
             "regions": ["us"],
@@ -348,6 +350,7 @@ def get_dev_env_run_dict(
                     "shm_size": None,
                 },
                 "volumes": [],
+                "files": [],
                 "backends": ["local", "aws", "azure", "gcp", "lambda"],
                 "regions": ["us"],
                 "availability_zones": None,
@@ -369,6 +372,7 @@ def get_dev_env_run_dict(
                 "priority": 0,
             },
             "configuration_path": "dstack.yaml",
+            "file_archives": [],
             "profile": {
                 "backends": ["local", "aws", "azure", "gcp", "lambda"],
                 "regions": ["us"],
@@ -494,6 +498,7 @@ def get_service_run_spec(
             "model": "test-model",
         },
         "configuration_path": "dstack.yaml",
+        "file_archives": [],
         "profile": {
             "name": "string",
         },
