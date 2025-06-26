@@ -3,6 +3,7 @@ from typing import Union, cast
 from unittest.mock import patch
 
 import pytest
+from freezegun import freeze_time
 from pydantic import parse_obj_as
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -30,6 +31,7 @@ from dstack._internal.server.testing.common import (
     get_job_provisioning_data,
     get_run_spec,
 )
+from dstack._internal.utils import common
 
 pytestmark = pytest.mark.usefixtures("image_config_mock")
 
@@ -80,10 +82,28 @@ async def make_run(
 class TestProcessRuns:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @freeze_time(datetime.datetime(2023, 1, 2, 3, 5, 20, tzinfo=datetime.timezone.utc))
     async def test_submitted_to_provisioning(self, test_db, session: AsyncSession):
         run = await make_run(session, status=RunStatus.SUBMITTED)
         await create_job(session=session, run=run, status=JobStatus.PROVISIONING)
-        await process_runs.process_runs()
+        current_time = common.get_current_datetime()
+
+        expected_duration = (
+            current_time - run.submitted_at.replace(tzinfo=datetime.timezone.utc)
+        ).total_seconds()
+
+        with patch(
+            "dstack._internal.server.background.tasks.process_runs.run_metrics"
+        ) as mock_run_metrics:
+            await process_runs.process_runs()
+
+            mock_run_metrics.log_submit_to_provision_duration.assert_called_once()
+            args = mock_run_metrics.log_submit_to_provision_duration.call_args[0]
+            assert args[1] == run.project.name
+            assert args[2] == "service"
+            # Assert the duration is close to our expected duration (within 0.05 second tolerance)
+            assert args[0] == expected_duration
+
         await session.refresh(run)
         assert run.status == RunStatus.PROVISIONING
 
@@ -103,7 +123,14 @@ class TestProcessRuns:
         run = await make_run(session, status=RunStatus.PROVISIONING)
         await create_job(session=session, run=run, status=JobStatus.PULLING)
 
-        await process_runs.process_runs()
+        with patch(
+            "dstack._internal.server.background.tasks.process_runs.run_metrics"
+        ) as mock_run_metrics:
+            await process_runs.process_runs()
+
+            mock_run_metrics.log_submit_to_provision_duration.assert_not_called()
+            mock_run_metrics.increment_pending_runs.assert_not_called()
+
         await session.refresh(run)
         assert run.status == RunStatus.PROVISIONING
 
@@ -161,9 +188,19 @@ class TestProcessRuns:
             instance=instance,
             job_provisioning_data=get_job_provisioning_data(),
         )
-        with patch("dstack._internal.utils.common.get_current_datetime") as datetime_mock:
+        with (
+            patch("dstack._internal.utils.common.get_current_datetime") as datetime_mock,
+            patch(
+                "dstack._internal.server.background.tasks.process_runs.run_metrics"
+            ) as mock_run_metrics,
+        ):
             datetime_mock.return_value = run.submitted_at + datetime.timedelta(minutes=3)
             await process_runs.process_runs()
+
+            mock_run_metrics.increment_pending_runs.assert_called_once_with(
+                run.project.name, "service"
+            )
+
         await session.refresh(run)
         assert run.status == RunStatus.PENDING
 
@@ -205,12 +242,29 @@ class TestProcessRuns:
 class TestProcessRunsReplicas:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @freeze_time(datetime.datetime(2023, 1, 2, 3, 5, 20, tzinfo=datetime.timezone.utc))
     async def test_submitted_to_provisioning_if_any(self, test_db, session: AsyncSession):
         run = await make_run(session, status=RunStatus.SUBMITTED, replicas=2)
         await create_job(session=session, run=run, status=JobStatus.SUBMITTED, replica_num=0)
         await create_job(session=session, run=run, status=JobStatus.PROVISIONING, replica_num=1)
+        current_time = common.get_current_datetime()
 
-        await process_runs.process_runs()
+        expected_duration = (
+            current_time - run.submitted_at.replace(tzinfo=datetime.timezone.utc)
+        ).total_seconds()
+
+        with patch(
+            "dstack._internal.server.background.tasks.process_runs.run_metrics"
+        ) as mock_run_metrics:
+            await process_runs.process_runs()
+
+            mock_run_metrics.log_submit_to_provision_duration.assert_called_once()
+            args = mock_run_metrics.log_submit_to_provision_duration.call_args[0]
+            assert args[1] == run.project.name
+            assert args[2] == "service"
+            assert isinstance(args[0], float)
+            assert args[0] == expected_duration
+
         await session.refresh(run)
         assert run.status == RunStatus.PROVISIONING
 
@@ -251,9 +305,19 @@ class TestProcessRunsReplicas:
             instance=await create_instance(session, project=run.project, spot=True),
             job_provisioning_data=get_job_provisioning_data(),
         )
-        with patch("dstack._internal.utils.common.get_current_datetime") as datetime_mock:
+        with (
+            patch("dstack._internal.utils.common.get_current_datetime") as datetime_mock,
+            patch(
+                "dstack._internal.server.background.tasks.process_runs.run_metrics"
+            ) as mock_run_metrics,
+        ):
             datetime_mock.return_value = run.submitted_at + datetime.timedelta(minutes=3)
             await process_runs.process_runs()
+
+            mock_run_metrics.increment_pending_runs.assert_called_once_with(
+                run.project.name, "service"
+            )
+
         await session.refresh(run)
         assert run.status == RunStatus.PENDING
 
