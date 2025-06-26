@@ -3,7 +3,7 @@ import { useFieldArray, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
-import { Button, FormSelect, Header, Link, ListEmptyMessage, Pagination, SpaceBetween, Table } from 'components';
+import { Button, ButtonWithConfirmation, FormSelect, Header, Link, ListEmptyMessage, Pagination, SpaceBetween, Table } from 'components';
 
 import { useAppSelector, useCollection, useNotifications } from 'hooks';
 import { selectUserData } from 'App/slice';
@@ -132,7 +132,7 @@ export const ProjectMembers: React.FC<IProps> = ({ members, loading, onChange, r
                         key="join"
                         onClick={() => handleJoinProject(project.project_name, userData.username!)}
                         disabled={isMemberActionLoading}
-                        variant="primary"
+                        variant="normal"
                     >
                         {isMemberActionLoading ? t('common.loading') : t('projects.join')}
                     </Button>
@@ -145,17 +145,20 @@ export const ProjectMembers: React.FC<IProps> = ({ members, loading, onChange, r
                 if (!isLastAdmin) {
                     // Only show leave button if user is not the last admin
                     actions.unshift(
-                        <Button
+                        <ButtonWithConfirmation
                             key="leave"
-                            onClick={() => handleLeaveProject(project.project_name, userData.username!, () => navigate(ROUTES.PROJECT.LIST))}
+                            onClick={() => handleLeaveProject(project.project_name, userData.username!)}
                             disabled={isMemberActionLoading}
-                            variant="normal"
+                            variant="danger-normal"
+                            confirmTitle={t('projects.leave_confirm_title')}
+                            confirmContent={t('projects.leave_confirm_message')}
+                            confirmButtonLabel={t('projects.leave')}
                         >
                             {isMemberActionLoading 
                                 ? t('common.loading') 
                                 : t('projects.leave')
                             }
-                        </Button>
+                        </ButtonWithConfirmation>
                     );
                 }
             }

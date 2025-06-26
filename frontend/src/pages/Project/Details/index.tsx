@@ -30,55 +30,8 @@ export const ProjectDetails: React.FC = () => {
 
     const isMember = currentUserRole !== null;
 
-    const renderJoinLeaveButton = () => {
-        // Only show button if user is authenticated and project is loaded
-        if (!userData?.username || !project) return null;
-
-        if (!isMember) {
-            return (
-                <Button
-                    onClick={() => handleJoinProject(project.project_name, userData.username!)}
-                    disabled={isMemberActionLoading}
-                    variant="primary"
-                >
-                    {isMemberActionLoading ? t('common.loading') : t('projects.join')}
-                </Button>
-            );
-        } else {
-            // Check if user is the last admin - if so, don't show leave button
-            const adminCount = project.members.filter(member => member.project_role === 'admin').length;
-            const isLastAdmin = currentUserRole === 'admin' && adminCount <= 1;
-            
-            if (isLastAdmin) {
-                // Don't show leave button for the last admin
-                return null;
-            }
-            
-            // Allow leaving for all other members
-            return (
-                <Button
-                    onClick={() => handleLeaveProject(project.project_name, userData.username!, () => navigate(ROUTES.PROJECT.LIST))}
-                    disabled={isMemberActionLoading}
-                    variant="normal"
-                >
-                    {isMemberActionLoading 
-                            ? t('common.loading') 
-                            : t('projects.leave')
-                    }
-                </Button>
-            );
-        }
-    };
-
     return (
-        <ContentLayout 
-            header={
-                <DetailsHeader 
-                    title={paramProjectName} 
-                    actionButtons={renderJoinLeaveButton()}
-                />
-            }
-        >
+        <ContentLayout header={<DetailsHeader title={paramProjectName}/>}>
             <Outlet />
         </ContentLayout>
     );
