@@ -32,23 +32,17 @@ using [Docker Compose :material-arrow-top-right-thin:{ .external }](https://docs
     type: task
     name: chat-ui-task
     
-    privileged: true
-    image: dstackai/dind
+    docker: true
     env:
       - MODEL_ID=meta-llama/Llama-3.2-3B-Instruct
       - HF_TOKEN
     working_dir: examples/misc/docker-compose
     commands:
-      - start-dockerd
       - docker compose up
     ports:
       - 9000
     
-    # Uncomment to leverage spot instances
-    #spot_policy: auto
-    
     resources:
-      # Required resources
       gpu: "nvidia:24GB"
     ```
     
