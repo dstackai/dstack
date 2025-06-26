@@ -204,25 +204,26 @@ class Run(ABC):
             job = self._find_job(replica_num=replica_num, job_num=job_num)
             if job is None:
                 return []
-            next_start_time = start_time
+            next_token = None
             while True:
                 resp = self._api_client.logs.poll(
                     project_name=self._project,
                     body=PollLogsRequest(
                         run_name=self.name,
                         job_submission_id=job.job_submissions[-1].id,
-                        start_time=next_start_time,
+                        start_time=start_time,
                         end_time=None,
                         descending=False,
                         limit=1000,
                         diagnose=diagnose,
+                        next_token=next_token,
                     ),
                 )
-                if len(resp.logs) == 0:
-                    return []
                 for log in resp.logs:
                     yield base64.b64decode(log.message)
-                next_start_time = resp.logs[-1].timestamp
+                next_token = resp.next_token
+                if next_token is None:
+                    break
 
     def refresh(self):
         """
