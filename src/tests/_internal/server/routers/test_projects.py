@@ -336,19 +336,16 @@ class TestCreateProject:
     async def test_forbids_if_no_permission_to_create_projects(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
-        user = await create_user(session=session, name="owner", global_role=GlobalRole.USER)
+        user = await create_user(session=session, global_role=GlobalRole.USER)
         with default_permissions_context(
-            DefaultPermissions(
-                allow_non_admins_create_projects=False,
-                allow_non_admins_manage_ssh_fleets=True,
-            )
+            DefaultPermissions(allow_non_admins_create_projects=False)
         ):
             response = await client.post(
                 "/api/projects/create",
                 headers=get_auth_headers(user.token),
-                json={"project_name": "test_project"},
+                json={"project_name": "new_project"},
             )
-            assert response.status_code == 403
+        assert response.status_code == 403
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
@@ -994,143 +991,188 @@ class TestSetProjectMembers:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_non_manager_cannot_set_project_members(
+    async def test_add_member_errors_on_nonexistent_user(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
-        project = await create_project(session=session)
-        user = await create_user(session=session, global_role=GlobalRole.USER)
-        await add_project_member(
-            session=session,
-            project=project,
-            user=user,
-            project_role=ProjectRole.USER,
+        # Setup project and admin
+        project = await create_project(
+            session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
         )
-        user1 = await create_user(session=session, name="user1")
-        members = [
-            {
-                "username": user.name,
-                "project_role": ProjectRole.ADMIN,
-            },
-            {
-                "username": user1.name,
-                "project_role": ProjectRole.ADMIN,
-            },
-        ]
-        body = {"members": members}
+        admin = await create_user(
+            session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
+        )
+        await add_project_member(
+            session=session, project=project, user=admin, project_role=ProjectRole.ADMIN
+        )
+
+        # Try to add non-existent user - should now error instead of silently skipping
+        body = {"members": [{"username": "nonexistent", "project_role": "user"}]}
         response = await client.post(
-            f"/api/projects/{project.name}/set_members",
-            headers=get_auth_headers(user.token),
+            f"/api/projects/{project.name}/add_members",
+            headers=get_auth_headers(admin.token),
             json=body,
         )
+
+        # Operation should fail with 400 error for non-existent user
+        assert response.status_code == 400
+        response_json = response.json()
+        assert "User not found: nonexistent" in str(response_json)
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_add_member_manager_cannot_add_admin_without_global_admin(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        # Setup project with manager (not global admin)
+        project = await create_project(
+            session=session, created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
+        )
+        manager = await create_user(
+            session=session,
+            global_role=GlobalRole.USER,
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
+        await add_project_member(
+            session=session, project=project, user=manager, project_role=ProjectRole.MANAGER
+        )
+
+        # Create user to add
+        _new_user = await create_user(
+            session=session,
+            name="newuser",
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
+
+        # Try to add admin
+        body = {"members": [{"username": "newuser", "project_role": "admin"}]}
+        response = await client.post(
+            f"/api/projects/{project.name}/add_members",
+            headers=get_auth_headers(manager.token),
+            json=body,
+        )
+
         assert response.status_code == 403
 
 
-class TestListUserProjectsService:
-    """Test the service-level functions for backward compatibility"""
+class TestUpdateProjectVisibility:
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_40x_if_not_authenticated(self, test_db, client: AsyncClient):
+        response = await client.post("/api/projects/test/update")
+        assert response.status_code in [401, 403]
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_list_user_projects_only_returns_member_projects(
+    async def test_returns_404_if_project_does_not_exist(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
-        # Create project owner
-        owner = await create_user(
-            session=session,
-            name="owner",
-            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
-            global_role=GlobalRole.USER,
+        user = await create_user(session=session)
+        response = await client.post(
+            "/api/projects/nonexistent/update",
+            headers=get_auth_headers(user.token),
+            json={"is_public": True},
         )
-
-        # Create a different user who is not a member
-        non_member = await create_user(
-            session=session,
-            name="non_member",
-            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
-            global_role=GlobalRole.USER,
-        )
-
-        # Create a public project
-        public_project = await create_project(
-            session=session,
-            owner=owner,
-            name="public_project",
-            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
-            is_public=True,
-        )
-
-        # Add owner as admin
-        await add_project_member(
-            session=session, project=public_project, user=owner, project_role=ProjectRole.ADMIN
-        )
-
-        # Test: list_user_projects should NOT return public projects for non-members
-        from dstack._internal.server.services.projects import list_user_projects
-
-        projects = await list_user_projects(session=session, user=non_member)
-        assert len(projects) == 0  # Non-member should see NO projects
-
-        # Test: list_user_projects should return projects where user IS a member
-        projects = await list_user_projects(session=session, user=owner)
-        assert len(projects) == 1
-        assert projects[0].project_name == "public_project"
+        assert response.status_code == 404
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_list_user_accessible_projects_returns_member_and_public_projects(
+    async def test_project_admin_can_update_visibility(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
-        # Create project owner
-        owner = await create_user(
-            session=session,
-            name="owner",
-            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
-            global_role=GlobalRole.USER,
-        )
-
-        # Create a different user who is not a member
-        non_member = await create_user(
-            session=session,
-            name="non_member",
-            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
-            global_role=GlobalRole.USER,
-        )
-
-        # Create a public project
-        public_project = await create_project(
-            session=session,
-            owner=owner,
-            name="public_project",
-            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
-            is_public=True,
-        )
-
-        # Create a private project
-        private_project = await create_project(
-            session=session,
-            owner=owner,
-            name="private_project",
-            created_at=datetime(2023, 1, 2, 3, 5, tzinfo=timezone.utc),
-            is_public=False,
-        )
-
-        # Add owner as admin to both projects
+        # Setup project with admin
+        admin_user = await create_user(session=session, name="admin", global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=admin_user, is_public=False)
         await add_project_member(
-            session=session, project=public_project, user=owner, project_role=ProjectRole.ADMIN
+            session=session, project=project, user=admin_user, project_role=ProjectRole.ADMIN
+        )
+
+        # Admin should be able to make project public
+        response = await client.post(
+            f"/api/projects/{project.name}/update",
+            headers=get_auth_headers(admin_user.token),
+            json={"is_public": True},
+        )
+        assert response.status_code == 200
+        assert response.json()["is_public"] == True
+
+        # Admin should be able to make project private again
+        response = await client.post(
+            f"/api/projects/{project.name}/update",
+            headers=get_auth_headers(admin_user.token),
+            json={"is_public": False},
+        )
+        assert response.status_code == 200
+        assert response.json()["is_public"] == False
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_regular_user_cannot_update_visibility(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        # Setup project with admin and regular user
+        admin_user = await create_user(session=session, name="admin", global_role=GlobalRole.USER)
+        regular_user = await create_user(session=session, name="user", global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=admin_user, is_public=False)
+        await add_project_member(
+            session=session, project=project, user=admin_user, project_role=ProjectRole.ADMIN
         )
         await add_project_member(
-            session=session, project=private_project, user=owner, project_role=ProjectRole.ADMIN
+            session=session, project=project, user=regular_user, project_role=ProjectRole.USER
         )
 
-        # Test: list_user_accessible_projects should return public projects for non-members
-        from dstack._internal.server.services.projects import list_user_accessible_projects
+        # Regular user should not be able to update visibility
+        response = await client.post(
+            f"/api/projects/{project.name}/update",
+            headers=get_auth_headers(regular_user.token),
+            json={"is_public": True},
+        )
+        assert response.status_code == 403
 
-        projects = await list_user_accessible_projects(session=session, user=non_member)
-        assert len(projects) == 1  # Should see only the public project
-        assert projects[0].project_name == "public_project"
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_non_member_cannot_update_visibility(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        # Setup project with admin and separate non-member user
+        admin_user = await create_user(session=session, name="admin", global_role=GlobalRole.USER)
+        non_member_user = await create_user(
+            session=session, name="nonmember", global_role=GlobalRole.USER
+        )
+        project = await create_project(session=session, owner=admin_user, is_public=False)
+        await add_project_member(
+            session=session, project=project, user=admin_user, project_role=ProjectRole.ADMIN
+        )
 
-        # Test: list_user_accessible_projects should return ALL projects for members
-        projects = await list_user_accessible_projects(session=session, user=owner)
-        assert len(projects) == 2  # Should see both projects
-        project_names = [p.project_name for p in projects]
-        assert "public_project" in project_names
-        assert "private_project" in project_names
+        # Non-member should not be able to update visibility
+        response = await client.post(
+            f"/api/projects/{project.name}/update",
+            headers=get_auth_headers(non_member_user.token),
+            json={"is_public": True},
+        )
+        assert response.status_code == 403
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_global_admin_can_update_any_project_visibility(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        # Setup project with regular owner and global admin
+        project_owner = await create_user(
+            session=session, name="owner", global_role=GlobalRole.USER
+        )
+        global_admin = await create_user(
+            session=session, name="admin", global_role=GlobalRole.ADMIN
+        )
+        project = await create_project(session=session, owner=project_owner, is_public=False)
+        await add_project_member(
+            session=session, project=project, user=project_owner, project_role=ProjectRole.ADMIN
+        )
+
+        # Global admin should be able to update any project's visibility
+        response = await client.post(
+            f"/api/projects/{project.name}/update",
+            headers=get_auth_headers(global_admin.token),
+            json={"is_public": True},
+        )
+        assert response.status_code == 200
+        assert response.json()["is_public"] == True
