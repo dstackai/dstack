@@ -28,7 +28,7 @@ from dstack._internal.server.services.jobs import (
     group_jobs_by_replica_latest,
 )
 from dstack._internal.server.services.locking import get_locker
-from dstack._internal.server.services.prometheus.push_metrics import run_metrics
+from dstack._internal.server.services.prometheus.client_metrics import run_metrics
 from dstack._internal.server.services.runs import (
     create_job_model_for_new_submission,
     fmt,

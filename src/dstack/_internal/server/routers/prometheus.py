@@ -1,15 +1,15 @@
 import os
 from typing import Annotated
 
+import prometheus_client
 from fastapi import APIRouter, Depends
 from fastapi.responses import PlainTextResponse
-from prometheus_client import generate_latest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.server import settings
 from dstack._internal.server.db import get_session
 from dstack._internal.server.security.permissions import OptionalServiceAccount
-from dstack._internal.server.services.prometheus import pull_metrics
+from dstack._internal.server.services.prometheus import custom_metrics
 from dstack._internal.server.utils.routers import error_not_found
 
 _auth = OptionalServiceAccount(os.getenv("DSTACK_PROMETHEUS_AUTH_TOKEN"))
@@ -27,6 +27,6 @@ async def get_prometheus_metrics(
 ) -> str:
     if not settings.ENABLE_PROMETHEUS_METRICS:
         raise error_not_found()
-    custom_metrics = await pull_metrics.get_metrics(session=session)
-    prometheus_metrics = generate_latest()
-    return custom_metrics + prometheus_metrics.decode()
+    custom_metrics_ = await custom_metrics.get_metrics(session=session)
+    client_metrics = prometheus_client.generate_latest().decode()
+    return custom_metrics_ + client_metrics
