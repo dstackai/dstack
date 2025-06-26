@@ -31,86 +31,74 @@ async def process_idle_volumes():
                 .limit(10)
                 .with_for_update(skip_locked=True)
             )
-            volume_models = list(res.unique().scalars().all())
-            if not volume_models:
+            volumes = list(res.unique().scalars().all())
+            if not volumes:
                 return
-            for volume_model in volume_models:
-                await session.refresh(volume_model, ["project", "attachments"])
-                lockset.add(volume_model.id)
+            for volume in volumes:
+                await session.refresh(volume, ["project", "attachments"])
+                lockset.add(volume.id)
 
         try:
-            volumes_to_delete = []
-            for volume_model in volume_models:
-                if _should_delete_idle_volume(volume_model):
-                    volumes_to_delete.append(volume_model)
+            to_delete = []
+            for volume in volumes:
+                if _should_delete_volume(volume):
+                    to_delete.append(volume)
 
-            if volumes_to_delete:
-                await _delete_idle_volumes(session, volumes_to_delete)
+            if to_delete:
+                await _delete_volumes(session, to_delete)
 
         finally:
-            for volume_model in volume_models:
-                lockset.discard(volume_model.id)
+            for volume in volumes:
+                lockset.discard(volume.id)
 
 
-def _should_delete_idle_volume(volume_model: VolumeModel) -> bool:
-    configuration = get_volume_configuration(volume_model)
+def _should_delete_volume(volume: VolumeModel) -> bool:
+    config = get_volume_configuration(volume)
 
-    if configuration.idle_duration is None:
+    if not config.idle_duration:
         return False
 
-    if isinstance(configuration.idle_duration, int) and configuration.idle_duration < 0:
+    if isinstance(config.idle_duration, int) and config.idle_duration < 0:
         return False
 
-    idle_duration_seconds = parse_duration(configuration.idle_duration)
-    if idle_duration_seconds is None or idle_duration_seconds <= 0:
+    duration_seconds = parse_duration(config.idle_duration)
+    if not duration_seconds or duration_seconds <= 0:
         return False
 
-    if len(volume_model.attachments) > 0:
-        logger.debug("Volume %s is still attached to instances, not deleting", volume_model.name)
+    if volume.attachments:
         return False
 
-    idle_duration = _get_volume_idle_duration(volume_model)
-    idle_threshold = datetime.timedelta(seconds=idle_duration_seconds)
+    idle_time = _get_idle_time(volume)
+    threshold = datetime.timedelta(seconds=duration_seconds)
 
-    if idle_duration > idle_threshold:
+    if idle_time > threshold:
         logger.info(
-            "Volume %s idle duration expired: idle time %.1f hours, threshold %.1f hours. Marking for deletion",
-            volume_model.name,
-            idle_duration.total_seconds() / 3600,
-            idle_threshold.total_seconds() / 3600,
+            "Deleting idle volume %s (idle %.1fh)", volume.name, idle_time.total_seconds() / 3600
         )
         return True
 
     return False
 
 
-def _get_volume_idle_duration(volume_model: VolumeModel) -> datetime.timedelta:
-    reference_time = volume_model.created_at
-    if volume_model.last_job_processed_at is not None:
-        reference_time = volume_model.last_job_processed_at
+def _get_idle_time(volume: VolumeModel) -> datetime.timedelta:
+    last_used = volume.last_job_processed_at or volume.created_at
+    last_used_utc = last_used.replace(tzinfo=datetime.timezone.utc)
+    now = get_current_datetime()
 
-    reference_time_utc = reference_time.replace(tzinfo=datetime.timezone.utc)
-    current_time = get_current_datetime()
-
-    idle_duration = current_time - reference_time_utc
-
-    if idle_duration.total_seconds() < 0:
-        return datetime.timedelta(0)
-
-    return idle_duration
+    idle_time = now - last_used_utc
+    return max(idle_time, datetime.timedelta(0))
 
 
-async def _delete_idle_volumes(session: AsyncSession, volume_models: List[VolumeModel]):
-    volumes_by_project = {}
-    for volume_model in volume_models:
-        project = volume_model.project
-        if project not in volumes_by_project:
-            volumes_by_project[project] = []
-        volumes_by_project[project].append(volume_model.name)
+async def _delete_volumes(session: AsyncSession, volumes: List[VolumeModel]):
+    by_project = {}
+    for volume in volumes:
+        project = volume.project
+        if project not in by_project:
+            by_project[project] = []
+        by_project[project].append(volume.name)
 
-    for project, volume_names in volumes_by_project.items():
-        logger.info("Deleting idle volumes for project %s: %s", project.name, volume_names)
+    for project, names in by_project.items():
         try:
-            await delete_volumes(session, project, volume_names)
+            await delete_volumes(session, project, names)
         except Exception as e:
-            logger.error("Failed to delete idle volumes for project %s: %s", project.name, str(e))
+            logger.error("Failed to delete volumes for project %s: %s", project.name, str(e))

@@ -290,15 +290,18 @@ async def process_terminating_job(
     job_model.instance_id = None
     instance_model.last_job_processed_at = common.get_current_datetime()
 
-    if jrd is not None and jrd.volume_names is not None:
-        volume_names = jrd.volume_names
-    else:
-        volume_names = [va.volume.name for va in instance_model.volume_attachments]
-    volume_models = await list_project_volume_models(
-        session=session, project=instance_model.project, names=volume_names
+    # Update volume timestamps
+    volume_names = (
+        jrd.volume_names
+        if jrd and jrd.volume_names
+        else [va.volume.name for va in instance_model.volume_attachments]
     )
-    for volume_model in volume_models:
-        volume_model.last_job_processed_at = common.get_current_datetime()
+    if volume_names:
+        volumes = await list_project_volume_models(
+            session=session, project=instance_model.project, names=volume_names
+        )
+        for volume in volumes:
+            volume.last_job_processed_at = common.get_current_datetime()
 
     logger.info(
         "%s: instance '%s' has been released, new status is %s",
