@@ -69,7 +69,6 @@ async def delete_secrets(
     existing_names = [s.name for s in existing_secrets_query.scalars().all()]
     missing_names = set(names) - set(existing_names)
     if missing_names:
-        logger.warning("Secrets %s not found in project %s", list(missing_names), project.name)
         raise ResourceNotExistsError(f"Secrets not found: {', '.join(missing_names)}")
 
     await session.execute(
