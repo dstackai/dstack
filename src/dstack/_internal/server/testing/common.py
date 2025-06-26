@@ -140,6 +140,7 @@ async def create_project(
     created_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
     ssh_private_key: str = "",
     ssh_public_key: str = "",
+    is_public: bool = False,
 ) -> ProjectModel:
     if owner is None:
         owner = await create_user(session=session, name="test_owner")
@@ -149,6 +150,7 @@ async def create_project(
         created_at=created_at,
         ssh_private_key=ssh_private_key,
         ssh_public_key=ssh_public_key,
+        is_public=is_public,
     )
     session.add(project)
     await session.commit()
@@ -263,6 +265,7 @@ async def create_run(
     run_id: Optional[UUID] = None,
     deleted: bool = False,
     priority: int = 0,
+    deployment_num: int = 0,
 ) -> RunModel:
     if run_spec is None:
         run_spec = get_run_spec(
@@ -284,6 +287,8 @@ async def create_run(
         last_processed_at=submitted_at,
         jobs=[],
         priority=priority,
+        deployment_num=deployment_num,
+        desired_replica_count=1,
     )
     session.add(run)
     await session.commit()
@@ -303,9 +308,12 @@ async def create_job(
     instance: Optional[InstanceModel] = None,
     job_num: int = 0,
     replica_num: int = 0,
+    deployment_num: Optional[int] = None,
     instance_assigned: bool = False,
     disconnected_at: Optional[datetime] = None,
 ) -> JobModel:
+    if deployment_num is None:
+        deployment_num = run.deployment_num
     run_spec = RunSpec.parse_raw(run.run_spec)
     job_spec = (await get_job_specs_from_run_spec(run_spec, replica_num=replica_num))[0]
     job_spec.job_num = job_num
@@ -316,6 +324,7 @@ async def create_job(
         job_num=job_num,
         job_name=run.run_name + f"-{job_num}-{replica_num}",
         replica_num=replica_num,
+        deployment_num=deployment_num,
         submission_num=submission_num,
         submitted_at=submitted_at,
         last_processed_at=last_processed_at,

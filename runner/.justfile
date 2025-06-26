@@ -45,7 +45,7 @@ build-runner-binary:
     #!/usr/bin/env bash
     set -e
     echo "Building runner for linux/amd64"
-    cd {{source_directory()}}/cmd/runner && GOOS=linux GOARCH=amd64 go build
+    cd {{source_directory()}}/cmd/runner && GOOS=linux GOARCH=amd64 go build -ldflags "-X 'main.Version=$version' -extldflags '-static'"
     echo "Runner build complete!"
 
 # Build shim
@@ -56,12 +56,12 @@ build-shim-binary:
     cd {{source_directory()}}/cmd/shim
     if [ -n "$shim_os" ] && [ -n "$shim_arch" ]; then
         echo "Building shim for $shim_os/$shim_arch"
-        GOOS=$shim_os GOARCH=$shim_arch go build
+        GOOS=$shim_os GOARCH=$shim_arch go build -ldflags "-X 'main.Version=$version' -extldflags '-static'"
     else
         echo "Building shim for current platform"
-        go build
+        go build -ldflags "-X 'main.Version=$version' -extldflags '-static'"
     fi
-    echo "Shim build complete!"
+    echo "Shim build (version: $version) complete!"
 
 # Build both runner and shim
 build-runner: build-runner-binary build-shim-binary

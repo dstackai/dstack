@@ -30,7 +30,7 @@ async def process_placement_groups():
                     PlacementGroupModel.id.not_in(lockset),
                 )
                 .order_by(PlacementGroupModel.id)  # take locks in order
-                .with_for_update(skip_locked=True)
+                .with_for_update(skip_locked=True, key_share=True)
             )
             placement_group_models = res.scalars().all()
             if len(placement_group_models) == 0:

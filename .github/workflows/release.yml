@@ -230,10 +230,12 @@ jobs:
       - name: Upload pip package
         run: |
           VERSION=${GITHUB_REF#refs/tags/}
-          BASE_IMAGE=$(cat src/dstack/version.py | grep base_image)
+          BASE_IMAGE=$(cat src/dstack/version.py | grep "base_image = ")
+          BASE_IMAGE_UBUNTU_VERSION=$(cat src/dstack/version.py | grep "base_image_ubuntu_version = ")
           echo "__version__ = \"$VERSION\"" > src/dstack/version.py
           echo "__is_release__ = True" >> src/dstack/version.py
           echo $BASE_IMAGE >> src/dstack/version.py
+          echo $BASE_IMAGE_UBUNTU_VERSION >> src/dstack/version.py
           cp README.md src
           uv build
           uv publish --username ${{ secrets.PYPI_USERNAME }} --password ${{ secrets.PYPI_PASSWORD }}   

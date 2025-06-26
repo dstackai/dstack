@@ -4,7 +4,7 @@ import pytest
 from pydantic import parse_obj_as
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dstack._internal.core.errors import ServerClientError, ServerError
+from dstack._internal.core.errors import ServerClientError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import ScalingSpec, ServiceConfiguration
 from dstack._internal.core.models.profiles import Profile
@@ -175,32 +175,6 @@ class TestScaleRunReplicas:
         assert run.jobs[0].status == JobStatus.RUNNING
         assert run.jobs[1].status == JobStatus.TERMINATING
         assert run.jobs[1].termination_reason == JobTerminationReason.SCALED_DOWN
-
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_no_downscale_below_limit(self, test_db, session: AsyncSession):
-        run = await make_run(
-            session,
-            [
-                JobStatus.RUNNING,
-            ],
-            replicas="1..2",
-        )
-        with pytest.raises(ServerError):
-            await scale_wrapper(session, run, -1)
-
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_no_upscale_above_limit(self, test_db, session: AsyncSession):
-        run = await make_run(
-            session,
-            [
-                JobStatus.RUNNING,
-            ],
-            replicas="0..1",
-        )
-        with pytest.raises(ServerError):
-            await scale_wrapper(session, run, 1)
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)

@@ -51,8 +51,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python: ["3.9", "3.10", "3.11", "3.12", "3.13"]
-        flavor: ["base", "devel"]
+        flavor: ["base", "devel", "devel-efa"]
+        ubuntu_version: ["22"]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -67,7 +67,21 @@ jobs:
         uses: docker/setup-qemu-action@v3
       - name: Build and upload to DockerHub
         run: |
-          docker buildx build --platform linux/amd64 --build-arg FLAVOR=${{ matrix.flavor }} --build-arg PYTHON=${{ matrix.python }} --push --provenance=false --tag dstackai/${{ env.BUILD_DOCKER_REPO }}:py${{ matrix.python }}-${{ inputs.image_version }}-cuda-12.1${{ matrix.flavor == 'devel' && '-devel' || '' }} -f base/Dockerfile .
+         if [ "${{ matrix.flavor }}" = "base" ]; then
+            FILE="base/Dockerfile"
+          elif [ "${{ matrix.flavor }}" = "devel" ]; then
+            FILE="base/Dockerfile"
+          else
+            FILE="base/efa/Dockerfile"
+          fi
+          docker buildx build \
+            --platform linux/amd64 \
+            --tag dstackai/${{ env.BUILD_DOCKER_REPO }}:${{ inputs.image_version }}-${{ matrix.flavor }}-ubuntu${{ matrix.ubuntu_version }}.04 \
+            --build-arg FLAVOR=${{ matrix.flavor }} \
+            --build-arg UBUNTU_VERSION=${{ matrix.ubuntu_version }} \
+            --provenance=false \
+            --push \
+            -f $FILE .
 
   build-aws-images:
     needs: build-docker

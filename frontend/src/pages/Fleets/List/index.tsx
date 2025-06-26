@@ -1,7 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Button, FormField, Header, Loader, SelectCSD, SpaceBetween, Table, Toggle } from 'components';
+import { Button, Header, Loader, PropertyFilter, SpaceBetween, Table, Toggle } from 'components';
 
 import { DEFAULT_TABLE_PAGE_SIZE } from 'consts';
 import { useBreadcrumbs, useCollection, useInfiniteScroll } from 'hooks';
@@ -24,18 +24,20 @@ export const FleetList: React.FC = () => {
     ]);
 
     const {
+        clearFilter,
+        propertyFilterQuery,
+        onChangePropertyFilter,
+        filteringOptions,
+        filteringProperties,
+        filteringRequestParams,
         onlyActive,
-        setOnlyActive,
+        onChangeOnlyActive,
         isDisabledClearFilter,
-        clearFilters,
-        projectOptions,
-        selectedProject,
-        setSelectedProject,
     } = useFilters();
 
     const { data, isLoading, refreshList, isLoadingMore } = useInfiniteScroll<IFleet, TFleetListRequestParams>({
         useLazyQuery: useLazyGetFleetsQuery,
-        args: { project_name: selectedProject?.value, only_active: onlyActive, limit: DEFAULT_TABLE_PAGE_SIZE },
+        args: { ...filteringRequestParams, limit: DEFAULT_TABLE_PAGE_SIZE },
 
         getPaginationParams: (lastFleet) => ({
             prev_created_at: lastFleet.created_at,
@@ -45,7 +47,7 @@ export const FleetList: React.FC = () => {
 
     const { columns } = useColumnsDefinitions();
     const { deleteFleets, isDeleting } = useDeleteFleet();
-    const { renderEmptyMessage, renderNoMatchMessage } = useEmptyMessages({ clearFilters, isDisabledClearFilter });
+    const { renderEmptyMessage, renderNoMatchMessage } = useEmptyMessages({ clearFilter, isDisabledClearFilter });
 
     const { items, collectionProps } = useCollection<IFleet>(data, {
         filtering: {
@@ -98,32 +100,27 @@ export const FleetList: React.FC = () => {
             }
             filter={
                 <div className={styles.filters}>
-                    <div className={styles.select}>
-                        <FormField label={t('projects.run.project')}>
-                            <SelectCSD
-                                disabled={!projectOptions?.length}
-                                options={projectOptions}
-                                selectedOption={selectedProject}
-                                onChange={(event) => {
-                                    setSelectedProject(event.detail.selectedOption);
-                                }}
-                                placeholder={t('projects.run.project_placeholder')}
-                                expandToViewport={true}
-                                filteringType="auto"
-                            />
-                        </FormField>
+                    <div className={styles.propertyFilter}>
+                        <PropertyFilter
+                            query={propertyFilterQuery}
+                            onChange={onChangePropertyFilter}
+                            expandToViewport
+                            hideOperations
+                            i18nStrings={{
+                                clearFiltersText: t('common.clearFilter'),
+                                filteringAriaLabel: t('fleets.filter_property_placeholder'),
+                                filteringPlaceholder: t('fleets.filter_property_placeholder'),
+                                operationAndText: 'and',
+                            }}
+                            filteringOptions={filteringOptions}
+                            filteringProperties={filteringProperties}
+                        />
                     </div>
 
                     <div className={styles.activeOnly}>
-                        <Toggle onChange={({ detail }) => setOnlyActive(detail.checked)} checked={onlyActive}>
+                        <Toggle onChange={onChangeOnlyActive} checked={onlyActive}>
                             {t('fleets.active_only')}
                         </Toggle>
-                    </div>
-
-                    <div className={styles.clear}>
-                        <Button formAction="none" onClick={clearFilters} disabled={isDisabledClearFilter}>
-                            {t('common.clearFilter')}
-                        </Button>
                     </div>
                 </div>
             }

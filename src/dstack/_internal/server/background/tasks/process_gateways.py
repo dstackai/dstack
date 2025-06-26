@@ -40,7 +40,7 @@ async def process_submitted_gateways():
                 .options(lazyload(GatewayModel.gateway_compute))
                 .order_by(GatewayModel.last_processed_at.asc())
                 .limit(1)
-                .with_for_update(skip_locked=True)
+                .with_for_update(skip_locked=True, key_share=True)
             )
             gateway_model = res.scalar()
             if gateway_model is None:

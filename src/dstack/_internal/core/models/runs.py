@@ -148,6 +148,19 @@ class JobTerminationReason(str, Enum):
         }
         return mapping[self]
 
+    def to_retry_event(self) -> Optional[RetryEvent]:
+        """
+        Returns:
+            the retry event this termination reason triggers
+            or None if this termination reason should not be retried
+        """
+        mapping = {
+            self.FAILED_TO_START_DUE_TO_NO_CAPACITY: RetryEvent.NO_CAPACITY,
+            self.INTERRUPTED_BY_NO_CAPACITY: RetryEvent.INTERRUPTION,
+        }
+        default = RetryEvent.ERROR if self.to_status() == JobStatus.FAILED else None
+        return mapping.get(self, default)
+
 
 class Requirements(CoreModel):
     # TODO: Make requirements' fields required
@@ -276,6 +289,7 @@ class ClusterInfo(CoreModel):
 class JobSubmission(CoreModel):
     id: UUID4
     submission_num: int
+    deployment_num: int = 0  # default for compatibility with pre-0.19.14 servers
     submitted_at: datetime
     last_processed_at: datetime
     finished_at: Optional[datetime]
@@ -287,7 +301,7 @@ class JobSubmission(CoreModel):
     job_provisioning_data: Optional[JobProvisioningData]
     job_runtime_data: Optional[JobRuntimeData]
     # TODO: make status_message and error a computed field after migrating to pydanticV2
-    status_message: Optional[str]
+    status_message: Optional[str] = None
     error: Optional[str] = None
 
     @property
@@ -354,7 +368,7 @@ class JobSubmission(CoreModel):
         error_mapping = {
             JobTerminationReason.INSTANCE_UNREACHABLE: "instance unreachable",
             JobTerminationReason.WAITING_INSTANCE_LIMIT_EXCEEDED: "waiting instance limit exceeded",
-            JobTerminationReason.VOLUME_ERROR: "waiting runner limit exceeded",
+            JobTerminationReason.VOLUME_ERROR: "volume error",
             JobTerminationReason.GATEWAY_ERROR: "gateway error",
             JobTerminationReason.SCALED_DOWN: "scaled down",
             JobTerminationReason.INACTIVITY_DURATION_EXCEEDED: "inactivity duration exceeded",
@@ -503,6 +517,7 @@ class Run(CoreModel):
     latest_job_submission: Optional[JobSubmission]
     cost: float = 0
     service: Optional[ServiceSpec] = None
+    deployment_num: int = 0  # default for compatibility with pre-0.19.14 servers
     # TODO: make error a computed field after migrating to pydanticV2
     error: Optional[str] = None
     deleted: Optional[bool] = None
@@ -533,11 +548,17 @@ class Run(CoreModel):
             retry_on_events = (
                 jobs[0].job_spec.retry.on_events if jobs and jobs[0].job_spec.retry else []
             )
+            job_status = (
+                jobs[0].job_submissions[-1].status
+                if len(jobs) == 1 and jobs[0].job_submissions
+                else None
+            )
             termination_reason = Run.get_last_termination_reason(jobs[0]) if jobs else None
         except KeyError:
             return values
         values["status_message"] = Run._get_status_message(
             status=status,
+            job_status=job_status,
             retry_on_events=retry_on_events,
             termination_reason=termination_reason,
         )
@@ -553,9 +574,12 @@ class Run(CoreModel):
     @staticmethod
     def _get_status_message(
         status: RunStatus,
+        job_status: Optional[JobStatus],
         retry_on_events: List[RetryEvent],
         termination_reason: Optional[JobTerminationReason],
     ) -> str:
+        if job_status == JobStatus.PULLING:
+            return "pulling"
         # Currently, `retrying` is shown only for `no-capacity` events
         if (
             status in [RunStatus.SUBMITTED, RunStatus.PENDING]
@@ -564,6 +588,13 @@ class Run(CoreModel):
         ):
             return "retrying"
         return status.value
+
+    def is_deployment_in_progress(self) -> bool:
+        return any(
+            not j.job_submissions[-1].status.is_finished()
+            and j.job_submissions[-1].deployment_num != self.deployment_num
+            for j in self.jobs
+        )
 
 
 class JobPlan(CoreModel):

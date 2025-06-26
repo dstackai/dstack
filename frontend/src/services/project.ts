@@ -4,6 +4,12 @@ import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { base64ToArrayBuffer } from 'libs';
 import fetchBaseQueryHeaders from 'libs/fetchBaseQueryHeaders';
 
+// Helper function to transform backend response to frontend format
+const transformProjectResponse = (project: any): IProject => ({
+    ...project,
+    isPublic: project.is_public,
+});
+
 export const projectApi = createApi({
     reducerPath: 'projectApi',
     refetchOnMountOrArgChange: true,
@@ -22,6 +28,9 @@ export const projectApi = createApi({
                 };
             },
 
+            transformResponse: (response: any[]): IProject[] => 
+                response.map(transformProjectResponse),
+
             providesTags: (result) =>
                 result
                     ? [...result.map(({ project_name }) => ({ type: 'Projects' as const, id: project_name })), 'Projects']
@@ -36,6 +45,8 @@ export const projectApi = createApi({
                 };
             },
 
+            transformResponse: transformProjectResponse,
+
             providesTags: (result) => (result ? [{ type: 'Projects' as const, id: result.project_name }] : []),
         }),
 
@@ -45,6 +56,8 @@ export const projectApi = createApi({
                 method: 'POST',
                 body: project,
             }),
+
+            transformResponse: transformProjectResponse,
 
             invalidatesTags: () => ['Projects'],
         }),
@@ -57,6 +70,36 @@ export const projectApi = createApi({
                     members,
                 },
             }),
+
+            transformResponse: transformProjectResponse,
+
+            invalidatesTags: (result, error, params) => [{ type: 'Projects' as const, id: params?.project_name }],
+        }),
+
+        addProjectMember: builder.mutation<IProject, { project_name: string; username: string; project_role?: string }>({
+            query: ({ project_name, username, project_role = 'user' }) => ({
+                url: API.PROJECTS.ADD_MEMBERS(project_name),
+                method: 'POST',
+                body: {
+                    members: [{ username, project_role }],
+                },
+            }),
+
+            transformResponse: transformProjectResponse,
+
+            invalidatesTags: (result, error, params) => [{ type: 'Projects' as const, id: params?.project_name }],
+        }),
+
+        removeProjectMember: builder.mutation<IProject, { project_name: string; username: string }>({
+            query: ({ project_name, username }) => ({
+                url: API.PROJECTS.REMOVE_MEMBERS(project_name),
+                method: 'POST',
+                body: {
+                    usernames: [username],
+                },
+            }),
+
+            transformResponse: transformProjectResponse,
 
             invalidatesTags: (result, error, params) => [{ type: 'Projects' as const, id: params?.project_name }],
         }),
@@ -101,6 +144,16 @@ export const projectApi = createApi({
 
             providesTags: () => ['ProjectRepos'],
         }),
+
+        updateProject: builder.mutation<IProject, { project_name: string; is_public: boolean }>({
+            query: ({ project_name, is_public }) => ({
+                url: API.PROJECTS.UPDATE(project_name),
+                method: 'POST',
+                body: { is_public },
+            }),
+            transformResponse: transformProjectResponse,
+            invalidatesTags: (result, error, params) => [{ type: 'Projects' as const, id: params?.project_name }],
+        }),
     }),
 });
 
@@ -109,7 +162,10 @@ export const {
     useGetProjectQuery,
     useCreateProjectMutation,
     useUpdateProjectMembersMutation,
+    useAddProjectMemberMutation,
+    useRemoveProjectMemberMutation,
     useDeleteProjectsMutation,
     useGetProjectLogsQuery,
     useGetProjectReposQuery,
+    useUpdateProjectMutation,
 } = projectApi;

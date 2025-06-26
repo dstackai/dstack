@@ -19,6 +19,8 @@ def get_apply_plan_excludes(plan: ApplyRunPlanInput) -> Optional[Dict]:
     if current_resource is not None:
         current_resource_excludes = {}
         current_resource_excludes["status_message"] = True
+        if current_resource.deployment_num == 0:
+            current_resource_excludes["deployment_num"] = True
         apply_plan_excludes["current_resource"] = current_resource_excludes
         current_resource_excludes["run_spec"] = get_run_spec_excludes(current_resource.run_spec)
         job_submissions_excludes = {}
@@ -36,6 +38,8 @@ def get_apply_plan_excludes(plan: ApplyRunPlanInput) -> Optional[Dict]:
             }
         if all(js.exit_status is None for js in job_submissions):
             job_submissions_excludes["exit_status"] = True
+        if all(js.deployment_num == 0 for js in job_submissions):
+            job_submissions_excludes["deployment_num"] = True
         latest_job_submission = current_resource.latest_job_submission
         if latest_job_submission is not None:
             latest_job_submission_excludes = {}
@@ -50,6 +54,8 @@ def get_apply_plan_excludes(plan: ApplyRunPlanInput) -> Optional[Dict]:
                 }
             if latest_job_submission.exit_status is None:
                 latest_job_submission_excludes["exit_status"] = True
+            if latest_job_submission.deployment_num == 0:
+                latest_job_submission_excludes["deployment_num"] = True
     return {"plan": apply_plan_excludes}
 
 
@@ -91,6 +97,8 @@ def get_run_spec_excludes(run_spec: RunSpec) -> Optional[Dict]:
         configuration_excludes["rate_limits"] = True
     if configuration.shell is None:
         configuration_excludes["shell"] = True
+    if configuration.docker is None:
+        configuration_excludes["docker"] = True
     if configuration.priority is None:
         configuration_excludes["priority"] = True
     if configuration.startup_order is None:

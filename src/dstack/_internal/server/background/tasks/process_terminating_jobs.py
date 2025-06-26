@@ -45,7 +45,7 @@ async def _process_next_terminating_job():
                 )
                 .order_by(JobModel.last_processed_at.asc())
                 .limit(1)
-                .with_for_update(skip_locked=True)
+                .with_for_update(skip_locked=True, key_share=True)
             )
             job_model = res.scalar()
             if job_model is None:
@@ -58,7 +58,7 @@ async def _process_next_terminating_job():
                         InstanceModel.id.not_in(instance_lockset),
                     )
                     .options(lazyload(InstanceModel.jobs))
-                    .with_for_update(skip_locked=True)
+                    .with_for_update(skip_locked=True, key_share=True)
                 )
                 instance_model = res.scalar()
                 if instance_model is None:

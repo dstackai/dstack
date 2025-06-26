@@ -65,14 +65,6 @@
     {
       "type": "shell",
       "script": "provisioners/install-nvidia-container-toolkit.sh"
-    },
-    {
-      "type": "shell",
-      "environment_vars": [
-        "IMAGE_REPO={{user `image_repo`}}",
-        "IMAGE_VERSION={{user `image_version`}}"
-      ],
-      "script": "provisioners/pull-docker-images.sh"
     }
   ]
 }

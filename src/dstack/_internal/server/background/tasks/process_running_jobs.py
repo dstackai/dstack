@@ -1,4 +1,5 @@
 import asyncio
+import re
 from collections.abc import Iterable
 from datetime import timedelta, timezone
 from typing import Dict, List, Optional
@@ -7,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
+from dstack._internal import settings
 from dstack._internal.core.consts import DSTACK_RUNNER_HTTP_PORT, DSTACK_SHIM_HTTP_PORT
 from dstack._internal.core.errors import GatewayError
 from dstack._internal.core.models.backends.base import BackendType
@@ -99,7 +101,7 @@ async def _process_next_running_job():
                 )
                 .order_by(JobModel.last_processed_at.asc())
                 .limit(1)
-                .with_for_update(skip_locked=True)
+                .with_for_update(skip_locked=True, key_share=True)
             )
             job_model = res.unique().scalar()
             if job_model is None:
@@ -517,14 +519,14 @@ def _process_provisioning_with_shim(
         cpu = None
         memory = None
         network_mode = NetworkMode.HOST
-
+    image_name = _patch_base_image_for_aws_efa(job_spec, job_provisioning_data)
     if shim_client.is_api_v2_supported():
         shim_client.submit_task(
             task_id=job_model.id,
             name=job_model.job_name,
             registry_username=registry_username,
             registry_password=registry_password,
-            image_name=job_spec.image_name,
+            image_name=image_name,
             container_user=container_user,
             privileged=job_spec.privileged,
             gpu=gpu,
@@ -545,7 +547,7 @@ def _process_provisioning_with_shim(
         submitted = shim_client.submit(
             username=registry_username,
             password=registry_password,
-            image_name=job_spec.image_name,
+            image_name=image_name,
             privileged=job_spec.privileged,
             container_name=job_model.job_name,
             container_user=container_user,
@@ -969,3 +971,43 @@ def _get_instance_specific_gpu_devices(
             GPUDevice(path_on_host="/dev/nvidiactl", path_in_container="/dev/nvidiactl")
         )
     return gpu_devices
+
+
+def _patch_base_image_for_aws_efa(
+    job_spec: JobSpec, job_provisioning_data: JobProvisioningData
+) -> str:
+    image_name = job_spec.image_name
+
+    if job_provisioning_data.backend != BackendType.AWS:
+        return image_name
+
+    instance_type = job_provisioning_data.instance_type.name
+    efa_enabled_patterns = [
+        # TODO: p6-b200 isn't supported yet in gpuhunt
+        r"^p6-b200\.(48xlarge)$",
+        r"^p5\.(48xlarge)$",
+        r"^p5e\.(48xlarge)$",
+        r"^p5en\.(48xlarge)$",
+        r"^p4d\.(24xlarge)$",
+        r"^p4de\.(24xlarge)$",
+        r"^g6\.(8xlarge|12xlarge|16xlarge|24xlarge|48xlarge)$",
+        r"^g6e\.(8xlarge|12xlarge|16xlarge|24xlarge|48xlarge)$",
+        r"^gr6\.8xlarge$",
+        r"^g5\.(8xlarge|12xlarge|16xlarge|24xlarge|48xlarge)$",
+        r"^g4dn\.(8xlarge|12xlarge|16xlarge|metal)$",
+        r"^p3dn\.(24xlarge)$",
+    ]
+
+    is_efa_enabled = any(re.match(pattern, instance_type) for pattern in efa_enabled_patterns)
+    if not is_efa_enabled:
+        return image_name
+
+    if not image_name.startswith(f"{settings.DSTACK_BASE_IMAGE}:"):
+        return image_name
+
+    if image_name.endswith(f"-base-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"):
+        return image_name[:-17] + f"-devel-efa-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"
+    elif image_name.endswith(f"-devel-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"):
+        return image_name[:-18] + f"-devel-efa-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"
+
+    return image_name

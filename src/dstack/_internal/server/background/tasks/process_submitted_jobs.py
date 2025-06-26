@@ -99,7 +99,7 @@ async def _process_next_submitted_job():
                     JobModel.id.not_in(lockset),
                 )
                 # Jobs are process in FIFO sorted by priority globally,
-                # thus runs from different project can "overtake" each other by using higher priorities.
+                # thus runs from different projects can "overtake" each other by using higher priorities.
                 # That's not a big problem as long as projects do not compete for the same compute resources.
                 # Jobs with lower priorities from other projects will be processed without major lag
                 # as long as new higher priority runs are not constantly submitted.
@@ -108,7 +108,13 @@ async def _process_next_submitted_job():
                 # there can be many projects and we are limited by the max DB connections.
                 .order_by(RunModel.priority.desc(), JobModel.last_processed_at.asc())
                 .limit(1)
-                .with_for_update(skip_locked=True)
+                .with_for_update(
+                    skip_locked=True,
+                    key_share=True,
+                    # Do not lock joined run, only job.
+                    # Locking run here may cause deadlock.
+                    of=JobModel,
+                )
             )
             job_model = res.scalar()
             if job_model is None:
@@ -201,7 +207,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
             )
             .options(lazyload(InstanceModel.jobs))
             .order_by(InstanceModel.id)  # take locks in order
-            .with_for_update()
+            .with_for_update(key_share=True)
         )
         pool_instances = list(res.unique().scalars().all())
         instances_ids = sorted([i.id for i in pool_instances])
@@ -326,7 +332,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         .where(VolumeModel.id.in_(volumes_ids))
         .options(selectinload(VolumeModel.user))
         .order_by(VolumeModel.id)  # take locks in order
-        .with_for_update()
+        .with_for_update(key_share=True)
     )
     async with get_locker().lock_ctx(VolumeModel.__tablename__, volumes_ids):
         if len(volume_models) > 0:

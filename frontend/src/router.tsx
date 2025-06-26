@@ -63,25 +63,21 @@ export const router = createBrowserRouter([
                 element: <ProjectDetails />,
                 children: [
                     {
-                        path: ROUTES.PROJECT.DETAILS.SETTINGS.TEMPLATE,
+                        index: true,
                         element: <ProjectSettings />,
                     },
-
                     {
                         path: ROUTES.PROJECT.BACKEND.ADD.TEMPLATE,
                         element: <BackendAdd />,
                     },
-
                     {
                         path: ROUTES.PROJECT.BACKEND.EDIT.TEMPLATE,
                         element: <BackendEdit />,
                     },
-
                     {
                         path: ROUTES.PROJECT.GATEWAY.ADD.TEMPLATE,
                         element: <AddGateway />,
                     },
-
                     {
                         path: ROUTES.PROJECT.GATEWAY.EDIT.TEMPLATE,
                         element: <EditGateway />,

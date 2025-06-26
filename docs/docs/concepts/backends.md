@@ -913,6 +913,28 @@ projects:
 
 </div>
 
+### CloudRift
+
+Log into your [CloudRift :material-arrow-top-right-thin:{ .external }](https://console.cloudrift.ai/) console, click `API Keys` in the sidebar and click the button to create a new API key.
+
+Ensure you've created a project with CloudRift.
+
+Then proceed to configuring the backend.
+
+<div editor-title="~/.dstack/server/config.yml">
+
+```yaml
+projects:
+  - name: main
+    backends:
+      - type: cloudrift
+        creds:
+          type: api_key
+          api_key: rift_2prgY1d0laOrf2BblTwx2B2d1zcf1zIp4tZYpj5j88qmNgz38pxNlpX3vAo
+```
+
+</div>
+
 ## On-prem servers
 
 ### SSH fleets
