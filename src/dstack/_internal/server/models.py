@@ -711,3 +711,22 @@ class JobPrometheusMetrics(BaseModel):
     collected_at: Mapped[datetime] = mapped_column(NaiveDateTime)
     # Raw Prometheus text response
     text: Mapped[str] = mapped_column(Text)
+
+
+class SecretModel(BaseModel):
+    __tablename__ = "secrets"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUIDType(binary=False), primary_key=True, default=uuid.uuid4
+    )
+
+    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
+    project: Mapped["ProjectModel"] = relationship()
+
+    created_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
+    updated_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
+
+    name: Mapped[str] = mapped_column(String(200))
+    value: Mapped[DecryptedString] = mapped_column(EncryptedString(2000))
+
+    __table_args__ = (Index("ix_project_id_name", project_id, name),)
