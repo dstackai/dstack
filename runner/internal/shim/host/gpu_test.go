@@ -23,7 +23,7 @@ func TestUnmarshalTtSmiSnapshot(t *testing.T) {
 	}{
 		{
 			name:     "valid single device",
-			filename: "valid_single_device.json",
+			filename: "tenstorrent/valid_single_device.json",
 			want: &ttSmiSnapshot{
 				DeviceInfo: []ttDeviceInfo{
 					{
@@ -38,7 +38,7 @@ func TestUnmarshalTtSmiSnapshot(t *testing.T) {
 		},
 		{
 			name:     "valid multiple devices",
-			filename: "valid_multiple_devices.json",
+			filename: "tenstorrent/valid_multiple_devices.json",
 			want: &ttSmiSnapshot{
 				DeviceInfo: []ttDeviceInfo{
 					{
@@ -95,7 +95,7 @@ func TestUnmarshalTtSmiSnapshot(t *testing.T) {
 		},
 		{
 			name:     "empty device info",
-			filename: "empty_device_info.json",
+			filename: "tenstorrent/empty_device_info.json",
 			want: &ttSmiSnapshot{
 				DeviceInfo: []ttDeviceInfo{},
 			},
@@ -103,19 +103,19 @@ func TestUnmarshalTtSmiSnapshot(t *testing.T) {
 		},
 		{
 			name:     "invalid JSON",
-			filename: "invalid_json.json",
+			filename: "tenstorrent/invalid_json.json",
 			want:     nil,
 			wantErr:  true,
 		},
 		{
 			name:     "missing device_info field",
-			filename: "missing_device_info.json",
+			filename: "tenstorrent/missing_device_info.json",
 			want:     &ttSmiSnapshot{DeviceInfo: nil},
 			wantErr:  false,
 		},
 		{
 			name:     "empty JSON",
-			filename: "empty_json.json",
+			filename: "tenstorrent/empty_json.json",
 			want:     &ttSmiSnapshot{DeviceInfo: nil},
 			wantErr:  false,
 		},
@@ -160,7 +160,7 @@ func TestUnmarshalTtSmiSnapshot(t *testing.T) {
 }
 
 func TestGetGpusFromTtSmiSnapshot(t *testing.T) {
-	data, err := loadTestData("single_n150_gpu.json")
+	data, err := loadTestData("tenstorrent/single_n150_gpu.json")
 	if err != nil {
 		t.Fatalf("Failed to load test data: %v", err)
 	}
@@ -187,7 +187,7 @@ func TestGetGpusFromTtSmiSnapshot(t *testing.T) {
 }
 
 func TestGetGpusFromTtSmiSnapshotMultipleDevices(t *testing.T) {
-	data, err := loadTestData("valid_multiple_devices.json")
+	data, err := loadTestData("tenstorrent/valid_multiple_devices.json")
 	if err != nil {
 		t.Fatalf("Failed to load test data: %v", err)
 	}
