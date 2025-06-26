@@ -99,7 +99,11 @@ class TestApplyArgs:
 
 class TestValidateGPUVendorAndImage:
     def prepare_conf(
-        self, *, image: Optional[str] = None, gpu_spec: Optional[str] = None
+        self,
+        *,
+        image: Optional[str] = None,
+        gpu_spec: Optional[str] = None,
+        docker: Optional[bool] = None,
     ) -> BaseRunConfiguration:
         conf_dict = {
             "type": "none",
@@ -110,6 +114,8 @@ class TestValidateGPUVendorAndImage:
             conf_dict["resources"] = {
                 "gpu": gpu_spec,
             }
+        if docker is not None:
+            conf_dict["docker"] = docker
         return BaseRunConfiguration.parse_obj(conf_dict)
 
     def validate(self, conf: BaseRunConfiguration) -> None:
@@ -199,6 +205,12 @@ class TestValidateGPUVendorAndImage:
         ):
             self.validate(conf)
 
+    @pytest.mark.parametrize("gpu_spec", ["AMD", "MI300X"])
+    def test_amd_vendor_docker_true_no_image(self, gpu_spec):
+        conf = self.prepare_conf(gpu_spec=gpu_spec, docker=True)
+        self.validate(conf)
+        assert conf.resources.gpu.vendor == AcceleratorVendor.AMD
+
     @pytest.mark.parametrize("gpu_spec", ["MI300X", "MI300x", "mi300x"])
     def test_amd_vendor_inferred_no_image(self, gpu_spec):
         conf = self.prepare_conf(gpu_spec=gpu_spec)
@@ -221,6 +233,12 @@ class TestValidateGPUVendorAndImage:
             ConfigurationError, match=r"`image` is required if `resources.gpu.vendor` is `amd`"
         ):
             self.validate(conf)
+
+    @pytest.mark.parametrize("gpu_spec", ["n150", "n300"])
+    def test_tenstorrent_docker_true_no_image(self, gpu_spec):
+        conf = self.prepare_conf(gpu_spec=gpu_spec, docker=True)
+        self.validate(conf)
+        assert conf.resources.gpu.vendor == AcceleratorVendor.TENSTORRENT
 
 
 class TestValidateCPUArchAndImage:
