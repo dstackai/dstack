@@ -171,6 +171,8 @@ class JobConfigurator(ABC):
         return result
 
     def _dstack_image_commands(self) -> List[str]:
+        if self.run_spec.configuration.docker is True:
+            return ["start-dockerd"]
         if (
             self.run_spec.configuration.image is not None
             or self.run_spec.configuration.entrypoint is not None
@@ -201,7 +203,9 @@ class JobConfigurator(ABC):
         return self.run_spec.configuration.home_dir
 
     def _image_name(self) -> str:
-        if self.run_spec.configuration.image is not None:
+        if self.run_spec.configuration.docker is True:
+            return settings.DSTACK_DIND_IMAGE
+        elif self.run_spec.configuration.image is not None:
             return self.run_spec.configuration.image
         return get_default_image(nvcc=bool(self.run_spec.configuration.nvcc))
 
@@ -215,6 +219,8 @@ class JobConfigurator(ABC):
         return UnixUser.parse(user)
 
     def _privileged(self) -> bool:
+        if self.run_spec.configuration.docker is True:
+            return True
         return self.run_spec.configuration.privileged
 
     def _single_branch(self) -> bool:
