@@ -715,6 +715,7 @@ class JobPrometheusMetrics(BaseModel):
 
 class SecretModel(BaseModel):
     __tablename__ = "secrets"
+    __table_args__ = (UniqueConstraint("project_id", "name", name="uq_secrets_project_id_name"),)
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUIDType(binary=False), primary_key=True, default=uuid.uuid4
@@ -728,5 +729,3 @@ class SecretModel(BaseModel):
 
     name: Mapped[str] = mapped_column(String(200))
     value: Mapped[DecryptedString] = mapped_column(EncryptedString(2000))
-
-    __table_args__ = (Index("ix_project_id_name", project_id, name),)

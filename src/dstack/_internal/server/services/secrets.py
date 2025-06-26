@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.errors import ResourceExistsError, ResourceNotExistsError
 from dstack._internal.core.models.secrets import Secret
-from dstack._internal.server.models import ProjectModel, SecretModel
+from dstack._internal.server.models import DecryptedString, ProjectModel, SecretModel
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -119,7 +119,7 @@ async def create_secret(
     secret_model = SecretModel(
         project_id=project.id,
         name=name,
-        value=value,
+        value=DecryptedString(plaintext=value),
     )
     try:
         async with session.begin_nested():
@@ -143,7 +143,7 @@ async def update_secret(
             SecretModel.name == name,
         )
         .values(
-            value=value,
+            value=DecryptedString(plaintext=value),
         )
     )
     await session.commit()

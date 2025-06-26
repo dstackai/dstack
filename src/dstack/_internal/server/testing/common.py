@@ -89,6 +89,7 @@ from dstack._internal.server.models import (
     RepoCredsModel,
     RepoModel,
     RunModel,
+    SecretModel,
     UserModel,
     VolumeAttachmentModel,
     VolumeModel,
@@ -915,6 +916,22 @@ async def create_job_prometheus_metrics(
     session.add(metrics)
     await session.commit()
     return metrics
+
+
+async def create_secret(
+    session: AsyncSession,
+    project: ProjectModel,
+    name: str,
+    value: str,
+):
+    secret_model = SecretModel(
+        project=project,
+        name=name,
+        value=DecryptedString(plaintext=value),
+    )
+    session.add(secret_model)
+    await session.commit()
+    return secret_model
 
 
 def get_private_key_string() -> str:
