@@ -16,6 +16,7 @@ from dstack._internal.server.schemas.projects import (
 )
 from dstack._internal.server.security.permissions import (
     Authenticated,
+    ProjectAdmin,
     ProjectManager,
     ProjectManagerOrPublicProject,
     ProjectManagerOrSelfLeave,
@@ -143,7 +144,7 @@ async def remove_project_members(
 async def update_project(
     body: UpdateProjectRequest,
     session: AsyncSession = Depends(get_session),
-    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectManager()),
+    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
 ) -> Project:
     user, project = user_project
     await projects.update_project(
