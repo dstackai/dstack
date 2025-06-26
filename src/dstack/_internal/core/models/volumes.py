@@ -45,13 +45,13 @@ class VolumeConfiguration(CoreModel):
         Optional[str],
         Field(description="The volume ID. Must be specified when registering external volumes"),
     ] = None
-    idle_duration: Annotated[
-        Optional[Union[str, int, bool]],
+    auto_cleanup_duration: Annotated[
+        Optional[Union[str, int]],
         Field(
             description=(
                 "Time to wait after volume is no longer used by any job before deleting it. "
                 "Defaults to keep the volume indefinitely. "
-                "Use the value 'off' to disable auto-cleanup."
+                "Use the value 'off' or -1 to disable auto-cleanup."
             )
         ),
     ] = None
@@ -67,9 +67,9 @@ class VolumeConfiguration(CoreModel):
     ] = None
 
     _validate_tags = validator("tags", pre=True, allow_reuse=True)(tags_validator)
-    _validate_idle_duration = validator("idle_duration", pre=True, allow_reuse=True)(
-        parse_idle_duration
-    )
+    _validate_auto_cleanup_duration = validator(
+        "auto_cleanup_duration", pre=True, allow_reuse=True
+    )(parse_idle_duration)
 
     @property
     def size_gb(self) -> int:

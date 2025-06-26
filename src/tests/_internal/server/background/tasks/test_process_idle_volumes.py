@@ -46,7 +46,7 @@ class TestProcessIdleVolumes:
         user = await create_user(session=session)
 
         config = get_volume_configuration(name="test-volume")
-        config.idle_duration = -1
+        config.auto_cleanup_duration = -1
 
         volume = await create_volume(
             session=session,
@@ -65,7 +65,7 @@ class TestProcessIdleVolumes:
         user = await create_user(session=session)
 
         config = get_volume_configuration(name="test-volume")
-        config.idle_duration = "1h"
+        config.auto_cleanup_duration = "1h"
 
         volume = await create_volume(
             session=session,
@@ -90,7 +90,7 @@ class TestProcessIdleVolumes:
         user = await create_user(session=session)
 
         config = get_volume_configuration(name="test-volume")
-        config.idle_duration = "1h"
+        config.auto_cleanup_duration = "1h"
 
         volume = await create_volume(
             session=session,
@@ -138,7 +138,7 @@ class TestProcessIdleVolumes:
         user = await create_user(session=session)
 
         config = get_volume_configuration(name="test-volume")
-        config.idle_duration = "1h"
+        config.auto_cleanup_duration = "1h"
 
         volume = await create_volume(
             session=session,

@@ -55,13 +55,13 @@ async def process_idle_volumes():
 def _should_delete_volume(volume: VolumeModel) -> bool:
     config = get_volume_configuration(volume)
 
-    if not config.idle_duration:
+    if not config.auto_cleanup_duration:
         return False
 
-    if isinstance(config.idle_duration, int) and config.idle_duration < 0:
+    if isinstance(config.auto_cleanup_duration, int) and config.auto_cleanup_duration < 0:
         return False
 
-    duration_seconds = parse_duration(config.idle_duration)
+    duration_seconds = parse_duration(config.auto_cleanup_duration)
     if not duration_seconds or duration_seconds <= 0:
         return False
 
@@ -100,5 +100,5 @@ async def _delete_volumes(session: AsyncSession, volumes: List[VolumeModel]):
     for project, names in by_project.items():
         try:
             await delete_volumes(session, project, names)
-        except Exception as e:
-            logger.error("Failed to delete volumes for project %s: %s", project.name, str(e))
+        except Exception:
+            logger.exception("Failed to delete volumes for project %s", project.name)
