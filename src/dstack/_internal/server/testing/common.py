@@ -77,6 +77,7 @@ from dstack._internal.core.models.volumes import (
 from dstack._internal.server.models import (
     BackendModel,
     DecryptedString,
+    FileArchiveModel,
     FleetModel,
     GatewayComputeModel,
     GatewayModel,
@@ -230,6 +231,22 @@ async def create_repo_creds(
     session.add(repo_creds)
     await session.commit()
     return repo_creds
+
+
+async def create_file_archive(
+    session: AsyncSession,
+    user_id: UUID,
+    blob_hash: str = "blob_hash",
+    blob: bytes = b"blob_content",
+) -> FileArchiveModel:
+    archive = FileArchiveModel(
+        user_id=user_id,
+        blob_hash=blob_hash,
+        blob=blob,
+    )
+    session.add(archive)
+    await session.commit()
+    return archive
 
 
 def get_run_spec(

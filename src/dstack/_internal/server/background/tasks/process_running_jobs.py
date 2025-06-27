@@ -1,5 +1,6 @@
 import asyncio
 import re
+import uuid
 from collections.abc import Iterable
 from datetime import timedelta, timezone
 from typing import Dict, List, Optional
@@ -14,6 +15,7 @@ from dstack._internal.core.errors import GatewayError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import NetworkMode, RegistryAuth
 from dstack._internal.core.models.configurations import DevEnvironmentConfiguration
+from dstack._internal.core.models.files import FileArchiveMapping
 from dstack._internal.core.models.instances import (
     InstanceStatus,
     RemoteConnectionInfo,
@@ -42,8 +44,10 @@ from dstack._internal.server.models import (
     ProjectModel,
     RepoModel,
     RunModel,
+    UserModel,
 )
 from dstack._internal.server.schemas.runner import GPUDevice, TaskStatus
+from dstack._internal.server.services import files as files_services
 from dstack._internal.server.services import logs as logs_services
 from dstack._internal.server.services import services
 from dstack._internal.server.services.instances import get_instance_ssh_private_keys
@@ -226,12 +230,20 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
                     fmt(job_model),
                     job_submission.age,
                 )
+                # FIXME: downloading file archives and code here is a waste of time if
+                # the runner is not ready yet
+                file_archives = await _get_job_file_archives(
+                    session=session,
+                    archive_mappings=run.run_spec.file_archives,
+                    user=run_model.user,
+                )
                 code = await _get_job_code(
                     session=session,
                     project=project,
                     repo=repo_model,
                     code_hash=run.run_spec.repo_code_hash,
                 )
+
                 success = await common_utils.run_async(
                     _submit_job_to_runner,
                     server_ssh_private_keys,
@@ -242,6 +254,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
                     job,
                     cluster_info,
                     code,
+                    file_archives,
                     secrets,
                     repo_creds,
                     success_if_not_available=False,
@@ -269,6 +282,13 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
             logger.debug(
                 "%s: process pulling job with shim, age=%s", fmt(job_model), job_submission.age
             )
+            # FIXME: downloading file archives and code here is a waste of time if
+            # the runner is not ready yet
+            file_archives = await _get_job_file_archives(
+                session=session,
+                archive_mappings=run.run_spec.file_archives,
+                user=run_model.user,
+            )
             code = await _get_job_code(
                 session=session,
                 project=project,
@@ -285,6 +305,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
                 job,
                 cluster_info,
                 code,
+                file_archives,
                 secrets,
                 repo_creds,
                 server_ssh_private_keys,
@@ -588,6 +609,7 @@ def _process_pulling_with_shim(
     job: Job,
     cluster_info: ClusterInfo,
     code: bytes,
+    file_archives: Iterable[tuple[uuid.UUID, bytes]],
     secrets: Dict[str, str],
     repo_credentials: Optional[RemoteRepoCreds],
     server_ssh_private_keys: tuple[str, Optional[str]],
@@ -663,6 +685,7 @@ def _process_pulling_with_shim(
         job=job,
         cluster_info=cluster_info,
         code=code,
+        file_archives=file_archives,
         secrets=secrets,
         repo_credentials=repo_credentials,
         success_if_not_available=True,
@@ -853,6 +876,43 @@ async def _get_job_code(
     return blob
 
 
+async def _get_job_file_archives(
+    session: AsyncSession,
+    archive_mappings: Iterable[FileArchiveMapping],
+    user: UserModel,
+) -> list[tuple[uuid.UUID, bytes]]:
+    archives: list[tuple[uuid.UUID, bytes]] = []
+    for archive_mapping in archive_mappings:
+        archive_id = archive_mapping.id
+        archive_blob = await _get_job_file_archive(
+            session=session, archive_id=archive_id, user=user
+        )
+        archives.append((archive_id, archive_blob))
+    return archives
+
+
+async def _get_job_file_archive(
+    session: AsyncSession, archive_id: uuid.UUID, user: UserModel
+) -> bytes:
+    archive_model = await files_services.get_archive_model(session, id=archive_id, user=user)
+    if archive_model is None:
+        return b""
+    if archive_model.blob is not None:
+        return archive_model.blob
+    storage = get_default_storage()
+    if storage is None:
+        return b""
+    blob = await common_utils.run_async(
+        storage.get_archive,
+        str(archive_model.user_id),
+        archive_model.blob_hash,
+    )
+    if blob is None:
+        logger.error("Failed to get file archive %s from storage", archive_id)
+        return b""
+    return blob
+
+
 @runner_ssh_tunnel(ports=[DSTACK_RUNNER_HTTP_PORT], retries=1)
 def _submit_job_to_runner(
     ports: Dict[int, int],
@@ -861,6 +921,7 @@ def _submit_job_to_runner(
     job: Job,
     cluster_info: ClusterInfo,
     code: bytes,
+    file_archives: Iterable[tuple[uuid.UUID, bytes]],
     secrets: Dict[str, str],
     repo_credentials: Optional[RemoteRepoCreds],
     success_if_not_available: bool,
@@ -900,6 +961,9 @@ def _submit_job_to_runner(
         repo_credentials=repo_credentials,
         instance_env=instance_env,
     )
+    logger.debug("%s: uploading file archive(s)", fmt(job_model))
+    for archive_id, archive in file_archives:
+        runner_client.upload_archive(archive_id, archive)
     logger.debug("%s: uploading code", fmt(job_model))
     runner_client.upload_code(code)
     logger.debug("%s: starting job", fmt(job_model))

@@ -27,16 +27,24 @@ def path_in_dir(path: PathLike, directory: PathLike) -> bool:
         return False
 
 
-def resolve_relative_path(path: str) -> PurePath:
+def normalize_path(path: PathLike) -> PurePath:
     path = PurePath(path)
-    if path.is_absolute():
-        raise ValueError("Path should be relative")
     stack = []
     for part in path.parts:
         if part == "..":
             if not stack:
-                raise ValueError("Path is outside of the repo")
+                raise ValueError("Path is outside of the top directory")
             stack.pop()
         else:
             stack.append(part)
     return PurePath(*stack)
+
+
+def resolve_relative_path(path: PathLike) -> PurePath:
+    path = PurePath(path)
+    if path.is_absolute():
+        raise ValueError("Path should be relative")
+    try:
+        return normalize_path(path)
+    except ValueError:
+        raise ValueError("Path is outside of the repo")

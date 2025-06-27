@@ -14,6 +14,7 @@ from dstack._internal.core.errors import (
 )
 from dstack._internal.utils.logging import get_logger
 from dstack.api.server._backends import BackendsAPIClient
+from dstack.api.server._files import FilesAPIClient
 from dstack.api.server._fleets import FleetsAPIClient
 from dstack.api.server._gateways import GatewaysAPIClient
 from dstack.api.server._logs import LogsAPIClient
@@ -47,6 +48,7 @@ class APIClient:
         logs: operations with logs
         gateways: operations with gateways
         volumes: operations with volumes
+        files: operations with files
     """
 
     def __init__(self, base_url: str, token: str):
@@ -110,6 +112,10 @@ class APIClient:
     @property
     def volumes(self) -> VolumesAPIClient:
         return VolumesAPIClient(self._request)
+
+    @property
+    def files(self) -> FilesAPIClient:
+        return FilesAPIClient(self._request)
 
     def _request(
         self,

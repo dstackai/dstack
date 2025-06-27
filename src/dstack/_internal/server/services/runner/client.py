@@ -109,6 +109,14 @@ class RunnerClient:
         )
         resp.raise_for_status()
 
+    def upload_archive(self, id: uuid.UUID, file: Union[BinaryIO, bytes]):
+        resp = requests.post(
+            self._url("/api/upload_archive"),
+            files={"archive": (str(id), file)},
+            timeout=UPLOAD_CODE_REQUEST_TIMEOUT,
+        )
+        resp.raise_for_status()
+
     def upload_code(self, file: Union[BinaryIO, bytes]):
         resp = requests.post(
             self._url("/api/upload_code"), data=file, timeout=UPLOAD_CODE_REQUEST_TIMEOUT
