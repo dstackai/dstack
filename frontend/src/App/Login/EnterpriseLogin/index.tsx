@@ -6,10 +6,11 @@ import { Box, NavigateLink, SpaceBetween } from 'components';
 import { UnauthorizedLayout } from 'layouts/UnauthorizedLayout';
 
 import { ROUTES } from 'routes';
-import { useGetEntraInfoQuery, useGetOktaInfoQuery } from 'services/auth';
+import { useGetEntraInfoQuery, useGetOktaInfoQuery, useGetGoogleInfoQuery } from 'services/auth';
 
 import { LoginByEntraID } from '../EntraID/LoginByEntraID';
 import { LoginByOkta } from '../LoginByOkta';
+import { LoginByGoogle } from '../LoginByGoogle';
 import { LoginByTokenForm } from '../LoginByTokenForm';
 
 import styles from './styles.module.scss';
@@ -18,9 +19,11 @@ export const EnterpriseLogin: React.FC = () => {
     const { t } = useTranslation();
     const { data: oktaData, isLoading: isLoadingOkta } = useGetOktaInfoQuery();
     const { data: entraData, isLoading: isLoadingEntra } = useGetEntraInfoQuery();
+    const { data: googleData, isLoading: isLoadingGoogle } = useGetGoogleInfoQuery();
 
     const oktaEnabled = oktaData?.enabled;
     const entraEnabled = entraData?.enabled;
+    const googleEnabled = googleData?.enabled;
 
     const isLoading = isLoadingOkta || isLoadingEntra;
     const isShowTokenForm = !oktaEnabled && !entraEnabled;
@@ -36,6 +39,7 @@ export const EnterpriseLogin: React.FC = () => {
                     {!isLoading && isShowTokenForm && <LoginByTokenForm />}
                     {!isLoadingOkta && oktaEnabled && <LoginByOkta className={styles.okta} />}
                     {!isLoadingEntra && entraEnabled && <LoginByEntraID className={styles.entra} />}
+                    {!isLoadingGoogle && googleEnabled && <LoginByGoogle className={styles.google} />}
 
                     {!isLoading && !isShowTokenForm && (
                         <Box color="text-body-secondary">
