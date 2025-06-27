@@ -7,6 +7,7 @@ from dstack._internal.server.background.tasks.process_gateways import (
     process_gateways_connections,
     process_submitted_gateways,
 )
+from dstack._internal.server.background.tasks.process_idle_volumes import process_idle_volumes
 from dstack._internal.server.background.tasks.process_instances import (
     process_instances,
 )
@@ -91,6 +92,9 @@ def start_background_tasks() -> AsyncIOScheduler:
     )
     _scheduler.add_job(
         process_submitted_volumes, IntervalTrigger(seconds=10, jitter=2), max_instances=5
+    )
+    _scheduler.add_job(
+        process_idle_volumes, IntervalTrigger(seconds=60, jitter=10), max_instances=1
     )
     _scheduler.add_job(process_placement_groups, IntervalTrigger(seconds=30, jitter=5))
     _scheduler.start()

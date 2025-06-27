@@ -74,11 +74,9 @@ def parse_off_duration(v: Optional[Union[int, str, bool]]) -> Optional[Union[str
     return parse_duration(v)
 
 
-def parse_idle_duration(v: Optional[Union[int, str, bool]]) -> Optional[Union[str, int, bool]]:
-    if v is False:
+def parse_idle_duration(v: Optional[Union[int, str]]) -> Optional[Union[str, int]]:
+    if v == "off" or v == -1:
         return -1
-    if v is True:
-        return None
     return parse_duration(v)
 
 

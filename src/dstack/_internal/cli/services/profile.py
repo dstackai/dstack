@@ -159,7 +159,7 @@ def apply_profile_args(
     if args.idle_duration is not None:
         profile_settings.idle_duration = args.idle_duration
     elif args.dont_destroy:
-        profile_settings.idle_duration = False
+        profile_settings.idle_duration = "off"
     if args.creation_policy_reuse:
         profile_settings.creation_policy = CreationPolicy.REUSE
 
