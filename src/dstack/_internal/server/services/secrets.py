@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 import sqlalchemy.exc
 from sqlalchemy import delete, select, update
@@ -12,9 +12,20 @@ from dstack._internal.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
-async def list_secrets(session: AsyncSession, project: ProjectModel) -> List[Secret]:
+async def list_secrets(
+    session: AsyncSession,
+    project: ProjectModel,
+) -> List[Secret]:
     secret_models = await list_project_secret_models(session=session, project=project)
     return [secret_model_to_secret(s, include_value=False) for s in secret_models]
+
+
+async def get_project_secrets_mapping(
+    session: AsyncSession,
+    project: ProjectModel,
+) -> Dict[str, str]:
+    secret_models = await list_project_secret_models(session=session, project=project)
+    return {s.name: s.value.get_plaintext_or_error() for s in secret_models}
 
 
 async def get_secret(
