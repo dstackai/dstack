@@ -82,6 +82,7 @@ from dstack._internal.server.services.offers import get_offers_by_requirements
 from dstack._internal.server.services.plugins import apply_plugin_policies
 from dstack._internal.server.services.projects import list_project_models, list_user_project_models
 from dstack._internal.server.services.resources import set_resources_defaults
+from dstack._internal.server.services.secrets import get_project_secrets_mapping
 from dstack._internal.server.services.users import get_user_model_by_name
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.random_names import generate_name
@@ -311,7 +312,12 @@ async def get_plan(
             ):
                 action = ApplyAction.UPDATE
 
-    jobs = await get_jobs_from_run_spec(effective_run_spec, replica_num=0)
+    secrets = await get_project_secrets_mapping(session=session, project=project)
+    jobs = await get_jobs_from_run_spec(
+        run_spec=effective_run_spec,
+        secrets=secrets,
+        replica_num=0,
+    )
 
     volumes = await get_job_configured_volumes(
         session=session,
@@ -462,6 +468,10 @@ async def submit_run(
         project=project,
         run_spec=run_spec,
     )
+    secrets = await get_project_secrets_mapping(
+        session=session,
+        project=project,
+    )
 
     lock_namespace = f"run_names_{project.name}"
     if get_db().dialect_name == "sqlite":
@@ -513,7 +523,11 @@ async def submit_run(
             await services.register_service(session, run_model, run_spec)
 
         for replica_num in range(replicas):
-            jobs = await get_jobs_from_run_spec(run_spec, replica_num=replica_num)
+            jobs = await get_jobs_from_run_spec(
+                run_spec=run_spec,
+                secrets=secrets,
+                replica_num=replica_num,
+            )
             for job in jobs:
                 job_model = create_job_model_for_new_submission(
                     run_model=run_model,
@@ -1068,10 +1082,20 @@ async def scale_run_replicas(session: AsyncSession, run_model: RunModel, replica
             await retry_run_replica_jobs(session, run_model, replica_jobs, only_failed=False)
             scheduled_replicas += 1
 
+        secrets = await get_project_secrets_mapping(
+            session=session,
+            project=run_model.project,
+        )
+
         for replica_num in range(
             len(active_replicas) + scheduled_replicas, len(active_replicas) + replicas_diff
         ):
-            jobs = await get_jobs_from_run_spec(run_spec, replica_num=replica_num)
+            # FIXME: Handle getting image configuration errors or skip it.
+            jobs = await get_jobs_from_run_spec(
+                run_spec=run_spec,
+                secrets=secrets,
+                replica_num=replica_num,
+            )
             for job in jobs:
                 job_model = create_job_model_for_new_submission(
                     run_model=run_model,
@@ -1084,8 +1108,14 @@ async def scale_run_replicas(session: AsyncSession, run_model: RunModel, replica
 async def retry_run_replica_jobs(
     session: AsyncSession, run_model: RunModel, latest_jobs: List[JobModel], *, only_failed: bool
 ):
+    # FIXME: Handle getting image configuration errors or skip it.
+    secrets = await get_project_secrets_mapping(
+        session=session,
+        project=run_model.project,
+    )
     new_jobs = await get_jobs_from_run_spec(
-        RunSpec.__response__.parse_raw(run_model.run_spec),
+        run_spec=RunSpec.__response__.parse_raw(run_model.run_spec),
+        secrets=secrets,
         replica_num=latest_jobs[0].replica_num,
     )
     assert len(new_jobs) == len(latest_jobs), (

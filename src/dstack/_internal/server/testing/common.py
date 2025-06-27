@@ -316,7 +316,9 @@ async def create_job(
     if deployment_num is None:
         deployment_num = run.deployment_num
     run_spec = RunSpec.parse_raw(run.run_spec)
-    job_spec = (await get_job_specs_from_run_spec(run_spec, replica_num=replica_num))[0]
+    job_spec = (
+        await get_job_specs_from_run_spec(run_spec=run_spec, secrets={}, replica_num=replica_num)
+    )[0]
     job_spec.job_num = job_num
     job = JobModel(
         project_id=run.project_id,

@@ -68,8 +68,13 @@ class JobConfigurator(ABC):
     # JobSSHKey should be shared for all jobs in a replica for inter-node communication.
     _job_ssh_key: Optional[JobSSHKey] = None
 
-    def __init__(self, run_spec: RunSpec):
+    def __init__(
+        self,
+        run_spec: RunSpec,
+        secrets: Optional[Dict[str, str]] = None,
+    ):
         self.run_spec = run_spec
+        self.secrets = secrets or {}
 
     async def get_job_specs(self, replica_num: int) -> List[JobSpec]:
         job_spec = await self._get_job_spec(replica_num=replica_num, job_num=0, jobs_per_replica=1)
@@ -98,10 +103,20 @@ class JobConfigurator(ABC):
     async def _get_image_config(self) -> ImageConfig:
         if self._image_config is not None:
             return self._image_config
+        interpolate = VariablesInterpolator({"secrets": self.secrets}).interpolate_or_error
+        registry_auth = self.run_spec.configuration.registry_auth
+        if registry_auth is not None:
+            try:
+                registry_auth = RegistryAuth(
+                    username=interpolate(registry_auth.username),
+                    password=interpolate(registry_auth.password),
+                )
+            except InterpolatorError as e:
+                raise ServerClientError(e.args[0])
         image_config = await run_async(
             _get_image_config,
             self._image_name(),
-            self.run_spec.configuration.registry_auth,
+            registry_auth,
         )
         self._image_config = image_config
         return image_config
