@@ -22,6 +22,12 @@ export const API = {
             AUTHORIZE: () => `${API.AUTH.ENTRA.BASE()}/authorize`,
             CALLBACK: () => `${API.AUTH.ENTRA.BASE()}/callback`,
         },
+        GOOGLE: {
+            BASE: () => `${API.AUTH.BASE()}/google`,
+            INFO: () => `${API.AUTH.GOOGLE.BASE()}/info`,
+            AUTHORIZE: () => `${API.AUTH.GOOGLE.BASE()}/authorize`,
+            CALLBACK: () => `${API.AUTH.GOOGLE.BASE()}/callback`,
+        },
     },
 
     USERS: {
