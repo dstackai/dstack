@@ -41,12 +41,13 @@ from dstack._internal.core.models.configurations import (
 )
 from dstack._internal.core.models.repos.base import Repo
 from dstack._internal.core.models.resources import CPUSpec
-from dstack._internal.core.models.runs import JobStatus, JobSubmission, RunStatus
+from dstack._internal.core.models.runs import JobStatus, JobSubmission, RunSpec, RunStatus
 from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.core.services.diff import diff_models
 from dstack._internal.utils.common import local_time
 from dstack._internal.utils.interpolator import InterpolatorError, VariablesInterpolator
 from dstack._internal.utils.logging import get_logger
+from dstack._internal.utils.nested_list import NestedList, NestedListItem
 from dstack.api._public.repos import get_ssh_keypair
 from dstack.api._public.runs import Run
 from dstack.api.utils import load_profile
@@ -102,25 +103,20 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
             confirm_message = f"Submit the run [code]{conf.name}[/]?"
         stop_run_name = None
         if run_plan.current_resource is not None:
-            changed_fields = []
-            if run_plan.action == ApplyAction.UPDATE:
-                diff = diff_models(
-                    run_plan.get_effective_run_spec().configuration,
-                    run_plan.current_resource.run_spec.configuration,
-                )
-                changed_fields = list(diff.keys())
-            if run_plan.action == ApplyAction.UPDATE and len(changed_fields) > 0:
+            diff = render_run_spec_diff(
+                run_plan.get_effective_run_spec(),
+                run_plan.current_resource.run_spec,
+            )
+            if run_plan.action == ApplyAction.UPDATE and diff is not None:
                 console.print(
                     f"Active run [code]{conf.name}[/] already exists."
-                    " Detected configuration changes that can be updated in-place:"
-                    f" {changed_fields}"
+                    f" Detected changes that [code]can[/] be updated in-place:\n{diff}"
                 )
                 confirm_message = "Update the run?"
-            elif run_plan.action == ApplyAction.UPDATE and len(changed_fields) == 0:
+            elif run_plan.action == ApplyAction.UPDATE and diff is None:
                 stop_run_name = run_plan.current_resource.run_spec.run_name
                 console.print(
-                    f"Active run [code]{conf.name}[/] already exists."
-                    " Detected no configuration changes."
+                    f"Active run [code]{conf.name}[/] already exists. Detected no changes."
                 )
                 if command_args.yes and not command_args.force:
                     console.print("Use --force to apply anyway.")
@@ -129,7 +125,8 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
             elif not run_plan.current_resource.status.is_finished():
                 stop_run_name = run_plan.current_resource.run_spec.run_name
                 console.print(
-                    f"Active run [code]{conf.name}[/] already exists and cannot be updated in-place."
+                    f"Active run [code]{conf.name}[/] already exists."
+                    f" Detected changes that [error]cannot[/] be updated in-place:\n{diff}"
                 )
                 confirm_message = "Stop and override the run?"
 
@@ -611,3 +608,47 @@ def _run_resubmitted(run: Run, current_job_submission: Optional[JobSubmission]) 
         not run.status.is_finished()
         and run._run.latest_job_submission.submitted_at > current_job_submission.submitted_at
     )
+
+
+def render_run_spec_diff(old_spec: RunSpec, new_spec: RunSpec) -> Optional[str]:
+    changed_spec_fields = list(diff_models(old_spec, new_spec))
+    if not changed_spec_fields:
+        return None
+    friendly_spec_field_names = {
+        "repo_id": "Repo ID",
+        "repo_code_hash": "Repo files",
+        "repo_data": "Repo state (branch, commit, or other)",
+        "ssh_key_pub": "Public SSH key",
+    }
+    nested_list = NestedList()
+    for spec_field in changed_spec_fields:
+        if spec_field == "merged_profile":
+            continue
+        elif spec_field == "configuration":
+            if type(old_spec.configuration) is not type(new_spec.configuration):
+                item = NestedListItem("Configuration type")
+            else:
+                item = NestedListItem(
+                    "Configuration properties:",
+                    children=[
+                        NestedListItem(field)
+                        for field in diff_models(old_spec.configuration, new_spec.configuration)
+                    ],
+                )
+        elif spec_field == "profile":
+            if type(old_spec.profile) is not type(new_spec.profile):
+                item = NestedListItem("Profile")
+            else:
+                item = NestedListItem(
+                    "Profile properties:",
+                    children=[
+                        NestedListItem(field)
+                        for field in diff_models(old_spec.profile, new_spec.profile)
+                    ],
+                )
+        elif spec_field in friendly_spec_field_names:
+            item = NestedListItem(friendly_spec_field_names[spec_field])
+        else:
+            item = NestedListItem(spec_field.replace("_", " ").capitalize())
+        nested_list.children.append(item)
+    return nested_list.render()

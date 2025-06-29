@@ -218,6 +218,12 @@ class JobSpec(CoreModel):
     volumes: Optional[List[MountPoint]] = None
     ssh_key: Optional[JobSSHKey] = None
     working_dir: Optional[str]
+    # `repo_data` is optional for client compatibility with pre-0.19.17 servers and for compatibility
+    # with jobs submitted before 0.19.17. All new jobs are expected to have non-None `repo_data`.
+    # For --no-repo runs, `repo_data` is `VirtualRunRepoData()`.
+    # TODO: confirm.
+    repo_data: Annotated[Optional[AnyRunRepoData], Field(discriminator="repo_type")] = None
+    repo_code_hash: Optional[str] = None
 
 
 class JobProvisioningData(CoreModel):

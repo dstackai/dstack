@@ -4,10 +4,12 @@ import tempfile
 import threading
 import time
 from abc import ABC
+from collections.abc import Iterator
+from contextlib import contextmanager
 from copy import copy
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Union
+from typing import BinaryIO, Dict, Iterable, List, Optional, Union
 from urllib.parse import urlparse
 
 from websocket import WebSocketApp
@@ -438,12 +440,16 @@ class RunCollection:
         """
         if repo is None:
             repo = VirtualRepo()
+            repo_code_hash = None
+        else:
+            with _prepare_code_file(repo) as (_, repo_code_hash):
+                pass
 
         run_spec = RunSpec(
             run_name=configuration.name,
             repo_id=repo.repo_id,
             repo_data=repo.run_repo_data,
-            repo_code_hash=None,  # `apply_plan` will fill it
+            repo_code_hash=repo_code_hash,
             working_dir=configuration.working_dir,
             configuration_path=configuration_path,
             configuration=configuration,
@@ -500,13 +506,11 @@ class RunCollection:
         else:
             # Do not upload the diff without a repo (a default virtual repo)
             # since upload_code() requires a repo to be initialized.
-            with tempfile.TemporaryFile("w+b") as fp:
-                run_spec.repo_code_hash = repo.write_code_file(fp)
-                fp.seek(0)
+            with _prepare_code_file(repo) as (fp, repo_code_hash):
                 self._api_client.repos.upload_code(
                     project_name=self._project,
                     repo_id=repo.repo_id,
-                    code_hash=run_spec.repo_code_hash,
+                    code_hash=repo_code_hash,
                     fp=fp,
                 )
 
@@ -647,6 +651,10 @@ class RunCollection:
         logger.warning("The get_plan() method is deprecated in favor of get_run_plan().")
         if repo is None:
             repo = VirtualRepo()
+            repo_code_hash = None
+        else:
+            with _prepare_code_file(repo) as (_, repo_code_hash):
+                pass
 
         if working_dir is None:
             working_dir = "."
@@ -683,7 +691,7 @@ class RunCollection:
             run_name=run_name,
             repo_id=repo.repo_id,
             repo_data=repo.run_repo_data,
-            repo_code_hash=None,  # `exec_plan` will fill it
+            repo_code_hash=repo_code_hash,
             working_dir=working_dir,
             configuration_path=configuration_path,
             configuration=configuration,
@@ -825,3 +833,11 @@ def _reserve_ports(
         ports[port_override.container_port] = port_override.local_port or 0
     logger.debug("Reserving ports: %s", ports)
     return PortsLock(ports).acquire()
+
+
+@contextmanager
+def _prepare_code_file(repo: Repo) -> Iterator[tuple[BinaryIO, str]]:
+    with tempfile.TemporaryFile("w+b") as fp:
+        repo_code_hash = repo.write_code_file(fp)
+        fp.seek(0)
+        yield fp, repo_code_hash

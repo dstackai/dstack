@@ -132,7 +132,7 @@ func TestExecutor_RemoteRepo(t *testing.T) {
 
 	var b bytes.Buffer
 	ex := makeTestExecutor(t)
-	ex.run.RunSpec.RepoData = schemas.RepoData{
+	ex.jobSpec.RepoData = &schemas.RepoData{
 		RepoType:        "remote",
 		RepoBranch:      "main",
 		RepoHash:        "2b83592e506ed6fe8e49f4eaa97c3866bc9402b1",
@@ -148,7 +148,7 @@ func TestExecutor_RemoteRepo(t *testing.T) {
 
 	err = ex.execJob(context.TODO(), io.Writer(&b))
 	assert.NoError(t, err)
-	expected := fmt.Sprintf("%s\r\n%s\r\n%s\r\n", ex.run.RunSpec.RepoData.RepoHash, ex.run.RunSpec.RepoData.RepoConfigName, ex.run.RunSpec.RepoData.RepoConfigEmail)
+	expected := fmt.Sprintf("%s\r\n%s\r\n%s\r\n", ex.getRepoData().RepoHash, ex.getRepoData().RepoConfigName, ex.getRepoData().RepoConfigEmail)
 	assert.Equal(t, expected, b.String())
 }
 
@@ -178,6 +178,7 @@ func makeTestExecutor(t *testing.T) *RunExecutor {
 			Env:         make(map[string]string),
 			MaxDuration: 0, // no timeout
 			WorkingDir:  &workingDir,
+			RepoData:    &schemas.RepoData{RepoType: "local"},
 		},
 		Secrets: make(map[string]string),
 		RepoCredentials: &schemas.RepoCredentials{

@@ -68,6 +68,9 @@ type JobSpec struct {
 	MaxDuration    int               `json:"max_duration"`
 	SSHKey         *SSHKey           `json:"ssh_key"`
 	WorkingDir     *string           `json:"working_dir"`
+	// `RepoData` is optional for compatibility with jobs submitted before 0.19.17.
+	// Use `RunExecutor.getRepoData()` to get non-nil `RepoData`.
+	RepoData *RepoData `json:"repo_data"`
 }
 
 type ClusterInfo struct {
