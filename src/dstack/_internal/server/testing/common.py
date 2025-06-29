@@ -1,5 +1,6 @@
 import json
 import uuid
+from collections.abc import Callable
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from typing import Dict, List, Literal, Optional, Union
@@ -252,18 +253,19 @@ async def create_file_archive(
 def get_run_spec(
     run_name: str,
     repo_id: str,
-    profile: Optional[Profile] = None,
+    configuration_path: str = "dstack.yaml",
+    profile: Union[Profile, Callable[[], Profile], None] = lambda: Profile(name="default"),
     configuration: Optional[AnyRunConfiguration] = None,
 ) -> RunSpec:
-    if profile is None:
-        profile = Profile(name="default")
+    if callable(profile):
+        profile = profile()
     return RunSpec(
         run_name=run_name,
         repo_id=repo_id,
         repo_data=LocalRunRepoData(repo_dir="/"),
         repo_code_hash=None,
         working_dir=".",
-        configuration_path="dstack.yaml",
+        configuration_path=configuration_path,
         configuration=configuration or DevEnvironmentConfiguration(ide="vscode"),
         profile=profile,
         ssh_key_pub="user_ssh_key",

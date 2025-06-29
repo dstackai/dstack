@@ -1,4 +1,5 @@
 import argparse
+from textwrap import dedent
 from typing import List, Optional, Tuple
 from unittest.mock import Mock
 
@@ -6,15 +7,22 @@ import pytest
 from gpuhunt import AcceleratorVendor
 
 from dstack._internal.cli.services.configurators import get_run_configurator_class
-from dstack._internal.cli.services.configurators.run import BaseRunConfigurator
+from dstack._internal.cli.services.configurators.run import (
+    BaseRunConfigurator,
+    render_run_spec_diff,
+)
 from dstack._internal.core.errors import ConfigurationError
+from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import RegistryAuth
 from dstack._internal.core.models.configurations import (
     BaseRunConfiguration,
+    DevEnvironmentConfiguration,
     PortMapping,
     TaskConfiguration,
 )
 from dstack._internal.core.models.envs import Env
+from dstack._internal.core.models.profiles import Profile
+from dstack._internal.server.testing.common import get_run_spec
 
 
 class TestApplyArgs:
@@ -288,3 +296,87 @@ class TestValidateCPUArchAndImage:
     def test_x86(self, cpu_spec: str, image: Optional[str]):
         conf = self.prepare_conf(cpu_spec=cpu_spec, gpu_spec="H100", image=image)
         self.validate(conf)
+
+
+class TestRenderRunSpecDiff:
+    def test_diff(self):
+        old = get_run_spec(
+            run_name="test",
+            repo_id="test-1",
+            configuration_path="1.dstack.yml",
+            profile=Profile(
+                backends=[BackendType.AWS],
+                regions=["us-west-1"],
+                name="test",
+                default=True,
+            ),
+            configuration=DevEnvironmentConfiguration(
+                name="test",
+                ide="vscode",
+                inactivity_duration=60,
+            ),
+        )
+        new = get_run_spec(
+            run_name="test",
+            repo_id="test-2",
+            configuration_path="2.dstack.yml",
+            profile=Profile(
+                backends=[BackendType.AWS],
+                regions=["us-west-2"],
+                name="test",
+                default=True,
+            ),
+            configuration=DevEnvironmentConfiguration(
+                name="test",
+                ide="cursor",
+                inactivity_duration=None,
+            ),
+        )
+        assert (
+            render_run_spec_diff(old, new)
+            == dedent(
+                """
+                - Repo ID
+                - Configuration path
+                - Configuration properties:
+                  - ide
+                  - inactivity_duration
+                - Profile properties:
+                  - regions
+                """
+            ).lstrip()
+        )
+
+    def test_field_type_change(self):
+        old = get_run_spec(
+            run_name="test",
+            repo_id="test",
+            profile=Profile(name="test"),
+            configuration=DevEnvironmentConfiguration(
+                name="test",
+                ide="vscode",
+            ),
+        )
+        new = get_run_spec(
+            run_name="test",
+            repo_id="test",
+            profile=None,
+            configuration=TaskConfiguration(
+                name="test",
+                commands=["sleep infinity"],
+            ),
+        )
+        assert (
+            render_run_spec_diff(old, new)
+            == dedent(
+                """
+                - Configuration type
+                - Profile
+                """
+            ).lstrip()
+        )
+
+    def test_no_diff(self):
+        old = get_run_spec(run_name="test", repo_id="test")
+        new = get_run_spec(run_name="test", repo_id="test")
+        assert render_run_spec_diff(old, new) is None
