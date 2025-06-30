@@ -29,22 +29,17 @@ commands:
   - cd open-r1
   - uv pip install .
   - |
-    # Get the last IP from DSTACK_NODES_IPS for vLLM node
-    VLLM_HOST=$(echo $DSTACK_NODES_IPS | tr ' ' '\n' | tail -n 1)
-    echo "VLLM host IP (last node): $VLLM_HOST"
-    
     if [ "$USE_VLLM" = "true" ]; then
+    # Get the last IP from DSTACK_NODES_IPS for vLLM node
+      VLLM_HOST=$(echo $DSTACK_NODES_IPS | tr ' ' '\n' | tail -n 1)
       if [ "$DSTACK_NODE_RANK" -eq $(($DSTACK_NODES_NUM - 1)) ]; then
         # Last Node runs VLLM server
-        echo "Starting VLLM server on Last Node (IP: $VLLM_HOST)"
         trl vllm-serve --model $MODEL  --tensor_parallel_size $TP --data_parallel_size $DP --host 0.0.0.0
       else
         # Training node - adjust world size and nodes count for training
-        GPUS_PER_NODE=$(($DSTACK_GPUS_NUM / $DSTACK_NODES_NUM))
         ADJUSTED_NODES_NUM=$(($DSTACK_NODES_NUM - 1))
-        ADJUSTED_GPUS_TOTAL=$(($GPUS_PER_NODE * $ADJUSTED_NODES_NUM))
+        ADJUSTED_GPUS_TOTAL=$(($DSTACK_GPUS_PER_NODE * $ADJUSTED_NODES_NUM))
         # Other nodes run training
-        echo "Starting training with VLLM on $VLLM_HOST"
         accelerate launch --config_file recipes/accelerate_configs/zero3.yaml \
             --num_processes=$ADJUSTED_GPUS_TOTAL \
             --num_machines=$ADJUSTED_NODES_NUM \
