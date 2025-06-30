@@ -191,10 +191,10 @@ extra:
     provider: google
     property: G-JX21114P7B
   social:
-    - icon: /fontawesome/brands/python
-      link: https://pypi.org/project/dstack
-    - icon: /fontawesome/brands/docker
-      link: https://hub.docker.com/r/dstackai/dstack
+    # - icon: /fontawesome/brands/python
+    #   link: https://pypi.org/project/dstack
+    # - icon: /fontawesome/brands/docker
+    #   link: https://hub.docker.com/r/dstackai/dstack
     - icon: /fontawesome/brands/github
       link: https://github.com/dstackai/dstack
     - icon: /fontawesome/brands/discord
@@ -286,8 +286,8 @@ nav:
         - TPU: examples/accelerators/tpu/index.md
         - Intel Gaudi: examples/accelerators/intel/index.md
         - Tenstorrent: examples/accelerators/tenstorrent/index.md
-    - Misc:
-        - Docker Compose: examples/misc/docker-compose/index.md
+#    - Misc:
+#        - Docker Compose: examples/misc/docker-compose/index.md
 #  - Community: community.md
 #  - Partners: partners.md
   - Blog:
