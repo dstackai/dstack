@@ -100,7 +100,7 @@ FAKE_NOW = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
 @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
 @pytest.mark.usefixtures("image_config_mock", "test_db", "enable_metrics")
 class TestGetPrometheusMetrics:
-    @patch("dstack._internal.server.routers.prometheus.generate_latest", lambda: BASE_HTTP_METRICS)
+    @patch("prometheus_client.generate_latest", lambda: BASE_HTTP_METRICS)
     async def test_returns_metrics(self, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session, name="test-user", global_role=GlobalRole.USER)
         offer = get_instance_offer_with_availability(
@@ -335,7 +335,7 @@ class TestGetPrometheusMetrics:
         )
         assert response.text.strip() == expected
 
-    @patch("dstack._internal.server.routers.prometheus.generate_latest", lambda: BASE_HTTP_METRICS)
+    @patch("prometheus_client.generate_latest", lambda: BASE_HTTP_METRICS)
     async def test_returns_empty_response_if_no_runs(self, client: AsyncClient):
         response = await client.get("/metrics")
         assert response.status_code == 200

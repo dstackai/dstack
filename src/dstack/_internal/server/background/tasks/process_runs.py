@@ -27,6 +27,7 @@ from dstack._internal.server.services.jobs import (
     group_jobs_by_replica_latest,
 )
 from dstack._internal.server.services.locking import get_locker
+from dstack._internal.server.services.prometheus.client_metrics import run_metrics
 from dstack._internal.server.services.runs import (
     fmt,
     process_terminating_run,
@@ -330,6 +331,24 @@ async def _process_active_run(session: AsyncSession, run_model: RunModel):
             run_model.status.name,
             new_status.name,
         )
+        if run_model.status == RunStatus.SUBMITTED and new_status == RunStatus.PROVISIONING:
+            current_time = common.get_current_datetime()
+            submit_to_provision_duration = (
+                current_time - run_model.submitted_at.replace(tzinfo=datetime.timezone.utc)
+            ).total_seconds()
+            logger.info(
+                "%s: run took %.2f seconds from submision to provisioning.",
+                fmt(run_model),
+                submit_to_provision_duration,
+            )
+            project_name = run_model.project.name
+            run_metrics.log_submit_to_provision_duration(
+                submit_to_provision_duration, project_name, run_spec.configuration.type
+            )
+
+        if new_status == RunStatus.PENDING:
+            run_metrics.increment_pending_runs(run_model.project.name, run_spec.configuration.type)
+
         run_model.status = new_status
         run_model.termination_reason = termination_reason
         # While a run goes to pending without provisioning, resubmission_attempt increases.

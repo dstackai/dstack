@@ -1,22 +1,52 @@
 import type { PropertyFilterProps } from 'components';
 
-export const tokensToRequestParams = <RequestParamsKeys extends string>(
+export const tokensToSearchParams = <RequestParamsKeys extends string>(
     tokens: PropertyFilterProps.Query['tokens'],
     onlyActive?: boolean,
 ) => {
-    const params: Record<RequestParamsKeys | 'only_active', string> = tokens.reduce((acc, token) => {
-        if (token.propertyKey) {
-            acc[token.propertyKey as RequestParamsKeys] = token.value;
-        }
+    const params = new URLSearchParams();
 
-        return acc;
-    }, {} as Record<RequestParamsKeys | 'only_active', string>);
+    tokens.forEach((token) => {
+        if (token.propertyKey) {
+            params.append(token.propertyKey as RequestParamsKeys, token.value);
+        }
+    });
 
     if (onlyActive) {
-        params['only_active'] = 'true';
+        params.append('only_active', 'true');
     }
 
     return params;
+};
+
+export const tokensToRequestParams = <RequestParamsKeys extends string>({
+    tokens,
+    arrayFieldKeys,
+}: {
+    tokens: PropertyFilterProps.Query['tokens'];
+    arrayFieldKeys?: RequestParamsKeys[];
+}) => {
+    return tokens.reduce<Record<RequestParamsKeys, string | string[]>>((acc, token) => {
+        const propertyKey = token.propertyKey as RequestParamsKeys;
+
+        if (!propertyKey) {
+            return acc;
+        }
+
+        if (arrayFieldKeys?.includes(propertyKey)) {
+            if (Array.isArray(acc[propertyKey])) {
+                acc[propertyKey].push(token.value);
+            } else {
+                acc[propertyKey] = [token.value];
+            }
+
+            return acc;
+        }
+
+        acc[propertyKey] = token.value;
+
+        return acc;
+    }, {} as Record<RequestParamsKeys, string>);
 };
 
 export const EMPTY_QUERY: PropertyFilterProps.Query = {

@@ -315,6 +315,21 @@ class CodeModel(BaseModel):
     blob: Mapped[Optional[bytes]] = mapped_column(LargeBinary)  # None means blob is stored on s3
 
 
+class FileArchiveModel(BaseModel):
+    __tablename__ = "file_archives"
+    __table_args__ = (
+        UniqueConstraint("user_id", "blob_hash", name="uq_file_archives_user_id_blob_hash"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUIDType(binary=False), primary_key=True, default=uuid.uuid4
+    )
+    user_id: Mapped["UserModel"] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    user: Mapped["UserModel"] = relationship()
+    blob_hash: Mapped[str] = mapped_column(Text)
+    blob: Mapped[Optional[bytes]] = mapped_column(LargeBinary)  # None means blob is stored on s3
+
+
 class RunModel(BaseModel):
     __tablename__ = "runs"
 

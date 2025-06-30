@@ -105,18 +105,18 @@ func DecodeJSONBody(w http.ResponseWriter, r *http.Request, dst interface{}, all
 func JSONResponseHandler(handler func(http.ResponseWriter, *http.Request) (interface{}, error)) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		status := 200
-		msg := ""
+		errMsg := ""
 		var apiErr *Error
 
 		body, err := handler(w, r)
 		if err != nil {
 			if errors.As(err, &apiErr) {
 				status = apiErr.Status
-				msg = apiErr.Error()
-				log.Warning(r.Context(), "API error", "err", apiErr.Err)
+				errMsg = apiErr.Error()
+				log.Warning(r.Context(), "API error", "err", errMsg, "status", status)
 			} else {
 				status = http.StatusInternalServerError
-				log.Error(r.Context(), "Unexpected API error", "err", err)
+				log.Error(r.Context(), "Unexpected API error", "err", err, "status", status)
 			}
 		}
 
@@ -125,7 +125,7 @@ func JSONResponseHandler(handler func(http.ResponseWriter, *http.Request) (inter
 			w.WriteHeader(status)
 			_ = json.NewEncoder(w).Encode(body)
 		} else {
-			http.Error(w, msg, status)
+			http.Error(w, errMsg, status)
 		}
 
 		log.Debug(r.Context(), "", "method", r.Method, "endpoint", r.URL.Path, "status", status)

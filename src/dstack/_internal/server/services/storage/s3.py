@@ -27,11 +27,8 @@ class S3Storage(BaseStorage):
         code_hash: str,
         blob: bytes,
     ):
-        self._client.put_object(
-            Bucket=self.bucket,
-            Key=self._get_code_key(project_id, repo_id, code_hash),
-            Body=blob,
-        )
+        key = self._get_code_key(project_id, repo_id, code_hash)
+        self._upload(key, blob)
 
     def get_code(
         self,
@@ -39,11 +36,32 @@ class S3Storage(BaseStorage):
         repo_id: str,
         code_hash: str,
     ) -> Optional[bytes]:
+        key = self._get_code_key(project_id, repo_id, code_hash)
+        return self._get(key)
+
+    def upload_archive(
+        self,
+        user_id: str,
+        archive_hash: str,
+        blob: bytes,
+    ):
+        key = self._get_archive_key(user_id, archive_hash)
+        self._upload(key, blob)
+
+    def get_archive(
+        self,
+        user_id: str,
+        archive_hash: str,
+    ) -> Optional[bytes]:
+        key = self._get_archive_key(user_id, archive_hash)
+        return self._get(key)
+
+    def _upload(self, key: str, blob: bytes):
+        self._client.put_object(Bucket=self.bucket, Key=key, Body=blob)
+
+    def _get(self, key: str) -> Optional[bytes]:
         try:
-            response = self._client.get_object(
-                Bucket=self.bucket,
-                Key=self._get_code_key(project_id, repo_id, code_hash),
-            )
+            response = self._client.get_object(Bucket=self.bucket, Key=key)
         except botocore.exceptions.ClientError as e:
             if e.response["Error"]["Code"] == "NoSuchKey":
                 return None

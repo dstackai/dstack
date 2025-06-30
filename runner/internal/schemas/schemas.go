@@ -47,6 +47,7 @@ type RunSpec struct {
 	RunName           string        `json:"run_name"`
 	RepoId            string        `json:"repo_id"`
 	RepoData          RepoData      `json:"repo_data"`
+	FileArchives      []FileArchive `json:"file_archives"`
 	Configuration     Configuration `json:"configuration"`
 	ConfigurationPath string        `json:"configuration_path"`
 }
@@ -94,6 +95,11 @@ type RepoData struct {
 
 	RepoConfigName  string `json:"repo_config_name"`
 	RepoConfigEmail string `json:"repo_config_email"`
+}
+
+type FileArchive struct {
+	Id   string `json:"id"`
+	Path string `json:"path"`
 }
 
 type Configuration struct {

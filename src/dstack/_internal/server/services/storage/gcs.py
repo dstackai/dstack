@@ -25,9 +25,8 @@ class GCSStorage(BaseStorage):
         code_hash: str,
         blob: bytes,
     ):
-        blob_name = self._get_code_key(project_id, repo_id, code_hash)
-        blob_obj = self._bucket.blob(blob_name)
-        blob_obj.upload_from_string(blob)
+        key = self._get_code_key(project_id, repo_id, code_hash)
+        self._upload(key, blob)
 
     def get_code(
         self,
@@ -35,10 +34,33 @@ class GCSStorage(BaseStorage):
         repo_id: str,
         code_hash: str,
     ) -> Optional[bytes]:
+        key = self._get_code_key(project_id, repo_id, code_hash)
+        return self._get(key)
+
+    def upload_archive(
+        self,
+        user_id: str,
+        archive_hash: str,
+        blob: bytes,
+    ):
+        key = self._get_archive_key(user_id, archive_hash)
+        self._upload(key, blob)
+
+    def get_archive(
+        self,
+        user_id: str,
+        archive_hash: str,
+    ) -> Optional[bytes]:
+        key = self._get_archive_key(user_id, archive_hash)
+        return self._get(key)
+
+    def _upload(self, key: str, blob: bytes):
+        blob_obj = self._bucket.blob(key)
+        blob_obj.upload_from_string(blob)
+
+    def _get(self, key: str) -> Optional[bytes]:
         try:
-            blob_name = self._get_code_key(project_id, repo_id, code_hash)
-            blob = self._bucket.blob(blob_name)
+            blob = self._bucket.blob(key)
         except NotFound:
             return None
-
         return blob.download_as_bytes()

@@ -23,6 +23,7 @@ from dstack._internal.server.background import start_background_tasks
 from dstack._internal.server.db import get_db, get_session_ctx, migrate
 from dstack._internal.server.routers import (
     backends,
+    files,
     fleets,
     gateways,
     instances,
@@ -197,6 +198,7 @@ def register_routes(app: FastAPI, ui: bool = True):
     app.include_router(service_proxy.router, prefix="/proxy/services", tags=["service-proxy"])
     app.include_router(model_proxy.router, prefix="/proxy/models", tags=["model-proxy"])
     app.include_router(prometheus.router)
+    app.include_router(files.router)
 
     @app.exception_handler(ForbiddenError)
     async def forbidden_error_handler(request: Request, exc: ForbiddenError):

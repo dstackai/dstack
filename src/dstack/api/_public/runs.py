@@ -17,6 +17,7 @@ from dstack._internal.core.consts import DSTACK_RUNNER_HTTP_PORT, DSTACK_RUNNER_
 from dstack._internal.core.errors import ClientError, ConfigurationError, ResourceNotExistsError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import AnyRunConfiguration, PortMapping
+from dstack._internal.core.models.files import FileArchiveMapping, FilePathMapping
 from dstack._internal.core.models.profiles import (
     CreationPolicy,
     Profile,
@@ -42,6 +43,7 @@ from dstack._internal.core.services.ssh.attach import SSHAttach
 from dstack._internal.core.services.ssh.ports import PortsLock
 from dstack._internal.server.schemas.logs import PollLogsRequest
 from dstack._internal.utils.common import get_or_error, make_proxy_url
+from dstack._internal.utils.files import create_file_archive
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.path import PathLike, path_in_dir
 from dstack.api.server import APIClient
@@ -204,25 +206,26 @@ class Run(ABC):
             job = self._find_job(replica_num=replica_num, job_num=job_num)
             if job is None:
                 return []
-            next_start_time = start_time
+            next_token = None
             while True:
                 resp = self._api_client.logs.poll(
                     project_name=self._project,
                     body=PollLogsRequest(
                         run_name=self.name,
                         job_submission_id=job.job_submissions[-1].id,
-                        start_time=next_start_time,
+                        start_time=start_time,
                         end_time=None,
                         descending=False,
                         limit=1000,
                         diagnose=diagnose,
+                        next_token=next_token,
                     ),
                 )
-                if len(resp.logs) == 0:
-                    return []
                 for log in resp.logs:
                     yield base64.b64decode(log.message)
-                next_start_time = resp.logs[-1].timestamp
+                next_token = resp.next_token
+                if next_token is None:
+                    break
 
     def refresh(self):
         """
@@ -475,20 +478,38 @@ class RunCollection:
             # TODO handle multiple jobs
             ports_lock = _reserve_ports(run_plan.job_plans[0].job_spec)
 
+        run_spec = run_plan.run_spec
+        configuration = run_spec.configuration
+
+        self._validate_configuration_files(configuration, run_spec.configuration_path)
+        for file_mapping in configuration.files:
+            assert isinstance(file_mapping, FilePathMapping)
+            with tempfile.TemporaryFile("w+b") as fp:
+                try:
+                    archive_hash = create_file_archive(file_mapping.local_path, fp)
+                except OSError as e:
+                    raise ClientError(f"failed to archive '{file_mapping.local_path}': {e}") from e
+                fp.seek(0)
+                archive = self._api_client.files.upload_archive(hash=archive_hash, fp=fp)
+            run_spec.file_archives.append(
+                FileArchiveMapping(id=archive.id, path=file_mapping.path)
+            )
+
         if repo is None:
             repo = VirtualRepo()
         else:
             # Do not upload the diff without a repo (a default virtual repo)
             # since upload_code() requires a repo to be initialized.
             with tempfile.TemporaryFile("w+b") as fp:
-                run_plan.run_spec.repo_code_hash = repo.write_code_file(fp)
+                run_spec.repo_code_hash = repo.write_code_file(fp)
                 fp.seek(0)
                 self._api_client.repos.upload_code(
                     project_name=self._project,
                     repo_id=repo.repo_id,
-                    code_hash=run_plan.run_spec.repo_code_hash,
+                    code_hash=run_spec.repo_code_hash,
                     fp=fp,
                 )
+
         run = self._api_client.runs.apply_plan(self._project, run_plan)
         return self._model_to_submitted_run(run, ports_lock)
 
@@ -760,6 +781,30 @@ class RunCollection:
             run,
             ports_lock,
         )
+
+    def _validate_configuration_files(
+        self, configuration: AnyRunConfiguration, configuration_path: Optional[PathLike]
+    ) -> None:
+        """
+        Expands, normalizes and validates local paths specified in
+        the `files` configuration property.
+        """
+        base_dir: Optional[Path] = None
+        if configuration_path is not None:
+            base_dir = Path(configuration_path).expanduser().resolve().parent
+        for file_mapping in configuration.files:
+            assert isinstance(file_mapping, FilePathMapping)
+            path = Path(file_mapping.local_path).expanduser()
+            if not path.is_absolute():
+                if base_dir is None:
+                    raise ConfigurationError(
+                        f"Path '{path}' is relative but `configuration_path` is not provided"
+                    )
+                else:
+                    path = base_dir / path
+            if not path.exists():
+                raise ConfigurationError(f"Path '{path}' specified in `files` does not exist")
+            file_mapping.local_path = str(path)
 
 
 def _reserve_ports(

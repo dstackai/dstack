@@ -1,4 +1,3 @@
-
 declare type TProjectBackend = {
     name: string,
     config: IBackendAWS | IBackendAzure | IBackendGCP | IBackendLambda | IBackendLocal | IBackendDstack
@@ -8,7 +7,8 @@ declare interface IProject {
     members: IProjectMember[],
     backends: TProjectBackend[]
     owner: IUser | {username: string},
-    created_at: string
+    created_at: string,
+    isPublic: boolean
 }
 
 declare interface IProjectMember {

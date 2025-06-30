@@ -398,9 +398,10 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
         else:
             has_amd_gpu = vendor == gpuhunt.AcceleratorVendor.AMD
             has_tt_gpu = vendor == gpuhunt.AcceleratorVendor.TENSTORRENT
-        if has_amd_gpu and conf.image is None:
+        # When docker=True, the system uses Docker-in-Docker image, so no custom image is required
+        if has_amd_gpu and conf.image is None and conf.docker is not True:
             raise ConfigurationError("`image` is required if `resources.gpu.vendor` is `amd`")
-        if has_tt_gpu and conf.image is None:
+        if has_tt_gpu and conf.image is None and conf.docker is not True:
             raise ConfigurationError(
                 "`image` is required if `resources.gpu.vendor` is `tenstorrent`"
             )

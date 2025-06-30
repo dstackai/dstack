@@ -8,7 +8,7 @@ import { Button, ListEmptyMessage, NavigateLink, TableProps } from 'components';
 
 import { DATE_TIME_FORMAT } from 'consts';
 import { useProjectFilter } from 'hooks/useProjectFilter';
-import { EMPTY_QUERY, requestParamsToTokens, tokensToRequestParams } from 'libs/filters';
+import { EMPTY_QUERY, requestParamsToTokens, tokensToRequestParams, tokensToSearchParams } from 'libs/filters';
 import { ROUTES } from 'routes';
 import { useGetUserListQuery } from 'services/user';
 
@@ -182,7 +182,7 @@ export const useFilters = (localStorePrefix = 'models-list-page') => {
             return !tokens.some((item, index) => token.propertyKey === item.propertyKey && index > tokenIndex);
         });
 
-        setSearchParams(tokensToRequestParams<RequestParamsKeys>(filteredTokens));
+        setSearchParams(tokensToSearchParams<RequestParamsKeys>(filteredTokens));
 
         setPropertyFilterQuery({
             operation,
@@ -191,11 +191,9 @@ export const useFilters = (localStorePrefix = 'models-list-page') => {
     };
 
     const filteringRequestParams = useMemo(() => {
-        const { only_active, ...params } = tokensToRequestParams<RequestParamsKeys>(propertyFilterQuery.tokens);
-
-        return {
-            ...params,
-        };
+        return tokensToRequestParams<RequestParamsKeys>({
+            tokens: propertyFilterQuery.tokens,
+        }) as Partial<TRunsRequestParams>;
     }, [propertyFilterQuery]);
 
     return {

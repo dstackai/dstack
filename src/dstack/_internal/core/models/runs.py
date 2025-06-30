@@ -12,6 +12,7 @@ from dstack._internal.core.models.configurations import (
     AnyRunConfiguration,
     RunConfiguration,
 )
+from dstack._internal.core.models.files import FileArchiveMapping
 from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
     InstanceType,
@@ -413,6 +414,10 @@ class RunSpec(CoreModel):
         Optional[str],
         Field(description="The hash of the repo diff. Can be omitted if there is no repo diff."),
     ] = None
+    file_archives: Annotated[
+        list[FileArchiveMapping],
+        Field(description="The list of file archive ID to container path mappings"),
+    ] = []
     working_dir: Annotated[
         Optional[str],
         Field(

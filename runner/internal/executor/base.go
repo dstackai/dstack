@@ -2,6 +2,7 @@ package executor
 
 import (
 	"context"
+	"io"
 
 	"github.com/dstackai/dstack/runner/internal/schemas"
 	"github.com/dstackai/dstack/runner/internal/types"
@@ -22,6 +23,7 @@ type Executor interface {
 		termination_message string,
 	)
 	SetRunnerState(state string)
+	AddFileArchive(id string, src io.Reader) error
 	Lock()
 	RLock()
 	RUnlock()

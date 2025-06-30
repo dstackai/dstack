@@ -97,6 +97,8 @@ def get_run_spec_excludes(run_spec: RunSpec) -> Optional[Dict]:
         configuration_excludes["rate_limits"] = True
     if configuration.shell is None:
         configuration_excludes["shell"] = True
+    if configuration.docker is None:
+        configuration_excludes["docker"] = True
     if configuration.priority is None:
         configuration_excludes["priority"] = True
     if configuration.startup_order is None:
@@ -107,6 +109,10 @@ def get_run_spec_excludes(run_spec: RunSpec) -> Optional[Dict]:
         configuration_excludes["stop_criteria"] = True
     if profile is not None and profile.stop_criteria is None:
         profile_excludes.add("stop_criteria")
+    if not configuration.files:
+        configuration_excludes["files"] = True
+    if not run_spec.file_archives:
+        spec_excludes["file_archives"] = True
 
     if configuration_excludes:
         spec_excludes["configuration"] = configuration_excludes

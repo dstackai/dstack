@@ -33,6 +33,7 @@ from dstack._internal.core.models.runs import (
     RunSpec,
 )
 from dstack._internal.core.models.volumes import Volume, VolumeMountPoint, VolumeStatus
+from dstack._internal.server import settings
 from dstack._internal.server.models import (
     InstanceModel,
     JobModel,
@@ -388,8 +389,10 @@ def _shim_submit_stop(ports: Dict[int, int], job_model: JobModel):
             message=job_model.termination_reason_message,
             timeout=0,
         )
-        # maybe somehow postpone removing old tasks to allow inspecting failed jobs?
-        shim_client.remove_task(task_id=job_model.id)
+        # maybe somehow postpone removing old tasks to allow inspecting failed jobs without
+        # the following setting?
+        if not settings.SERVER_KEEP_SHIM_TASKS:
+            shim_client.remove_task(task_id=job_model.id)
     else:
         shim_client.stop(force=True)
 

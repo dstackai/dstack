@@ -61,6 +61,7 @@ func NewServer(tempDir string, homeDir string, workingDir string, address string
 	r.AddHandler("GET", "/api/healthcheck", s.healthcheckGetHandler)
 	r.AddHandler("GET", "/api/metrics", s.metricsGetHandler)
 	r.AddHandler("POST", "/api/submit", s.submitPostHandler)
+	r.AddHandler("POST", "/api/upload_archive", s.uploadArchivePostHandler)
 	r.AddHandler("POST", "/api/upload_code", s.uploadCodePostHandler)
 	r.AddHandler("POST", "/api/run", s.runPostHandler)
 	r.AddHandler("GET", "/api/pull", s.pullGetHandler)

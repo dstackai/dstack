@@ -14,6 +14,7 @@ from dstack._internal.server.schemas.logs import PollLogsRequest
 from dstack._internal.server.schemas.runner import LogEvent as RunnerLogEvent
 from dstack._internal.server.services.logs.base import (
     LogStorage,
+    LogStorageError,
     b64encode_raw_message,
     unix_time_ms_to_datetime,
 )
@@ -29,7 +30,9 @@ class FileLogStorage(LogStorage):
             self.root = Path(root)
 
     def poll_logs(self, project: ProjectModel, request: PollLogsRequest) -> JobSubmissionLogs:
-        # TODO Respect request.limit to support pagination
+        if request.descending:
+            raise LogStorageError("descending: true is not supported")
+
         log_producer = LogProducer.RUNNER if request.diagnose else LogProducer.JOB
         log_file_path = self._get_log_file_path(
             project_name=project.name,
@@ -37,22 +40,53 @@ class FileLogStorage(LogStorage):
             job_submission_id=request.job_submission_id,
             producer=log_producer,
         )
+
+        start_line = 0
+        if request.next_token:
+            try:
+                start_line = int(request.next_token)
+                if start_line < 0:
+                    raise LogStorageError(
+                        f"Invalid next_token: {request.next_token}. Must be a non-negative integer."
+                    )
+            except ValueError:
+                raise LogStorageError(
+                    f"Invalid next_token: {request.next_token}. Must be a valid integer."
+                )
+
         logs = []
+        next_token = None
+        current_line = 0
+
         try:
             with open(log_file_path) as f:
-                for line in f:
-                    log_event = LogEvent.__response__.parse_raw(line)
-                    if request.start_time and log_event.timestamp <= request.start_time:
-                        continue
-                    if request.end_time is None or log_event.timestamp < request.end_time:
-                        logs.append(log_event)
-                    else:
-                        break
-        except IOError:
-            pass
-        if request.descending:
-            logs = list(reversed(logs))
-        return JobSubmissionLogs(logs=logs)
+                lines = f.readlines()
+
+            for i, line in enumerate(lines):
+                if current_line < start_line:
+                    current_line += 1
+                    continue
+
+                log_event = LogEvent.__response__.parse_raw(line)
+                current_line += 1
+
+                if request.start_time and log_event.timestamp <= request.start_time:
+                    continue
+                if request.end_time is not None and log_event.timestamp >= request.end_time:
+                    break
+
+                logs.append(log_event)
+
+                if len(logs) >= request.limit:
+                    # Only set next_token if there are more lines to read
+                    if current_line < len(lines):
+                        next_token = str(current_line)
+                    break
+
+        except IOError as e:
+            raise LogStorageError(f"Failed to read log file {log_file_path}: {e}")
+
+        return JobSubmissionLogs(logs=logs, next_token=next_token)
 
     def write_logs(
         self,
