@@ -1,3 +1,5 @@
+import asyncio
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
@@ -17,7 +19,14 @@ from dstack._internal.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
-async def process_fleets():
+async def process_fleets(batch_size: int = 1):
+    tasks = []
+    for _ in range(batch_size):
+        tasks.append(_process_next_fleet())
+    await asyncio.gather(*tasks)
+
+
+async def _process_next_fleet():
     lock, lockset = get_locker().get_lockset(FleetModel.__tablename__)
     async with get_session_ctx() as session:
         async with lock:

@@ -84,7 +84,12 @@ def start_background_tasks() -> AsyncIOScheduler:
         kwargs={"batch_size": 5},
         max_instances=2,
     )
-    _scheduler.add_job(process_fleets, IntervalTrigger(seconds=10, jitter=2))
+    _scheduler.add_job(
+        process_fleets,
+        IntervalTrigger(seconds=10, jitter=2),
+        kwargs={"batch_size": 5},
+        max_instances=2,
+    )
     _scheduler.add_job(process_gateways_connections, IntervalTrigger(seconds=15))
     _scheduler.add_job(
         process_submitted_gateways, IntervalTrigger(seconds=10, jitter=2), max_instances=5
