@@ -78,6 +78,7 @@ class SubmitBody(CoreModel):
                 "max_duration",
                 "ssh_key",
                 "working_dir",
+                "repo_data",
             }
         ),
     ]

@@ -912,7 +912,14 @@ def _validate_run_spec_and_set_defaults(run_spec: RunSpec):
     set_resources_defaults(run_spec.configuration.resources)
 
 
-_UPDATABLE_SPEC_FIELDS = ["repo_code_hash", "configuration"]
+_UPDATABLE_SPEC_FIELDS = ["configuration"]
+_TYPE_SPECIFIC_UPDATABLE_SPEC_FIELDS = {
+    "service": [
+        # rolling deployment
+        "repo_data",
+        "repo_code_hash",
+    ],
+}
 _CONF_UPDATABLE_FIELDS = ["priority"]
 _TYPE_SPECIFIC_CONF_UPDATABLE_FIELDS = {
     "dev-environment": ["inactivity_duration"],
@@ -949,11 +956,14 @@ def _can_update_run_spec(current_run_spec: RunSpec, new_run_spec: RunSpec) -> bo
 def _check_can_update_run_spec(current_run_spec: RunSpec, new_run_spec: RunSpec):
     spec_diff = diff_models(current_run_spec, new_run_spec)
     changed_spec_fields = list(spec_diff.keys())
+    updatable_spec_fields = _UPDATABLE_SPEC_FIELDS + _TYPE_SPECIFIC_UPDATABLE_SPEC_FIELDS.get(
+        new_run_spec.configuration.type, []
+    )
     for key in changed_spec_fields:
-        if key not in _UPDATABLE_SPEC_FIELDS:
+        if key not in updatable_spec_fields:
             raise ServerClientError(
                 f"Failed to update fields {changed_spec_fields}."
-                f" Can only update {_UPDATABLE_SPEC_FIELDS}."
+                f" Can only update {updatable_spec_fields}."
             )
     _check_can_update_configuration(current_run_spec.configuration, new_run_spec.configuration)
 

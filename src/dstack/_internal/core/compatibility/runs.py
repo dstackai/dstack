@@ -1,7 +1,7 @@
 from typing import Any, Dict, Optional
 
 from dstack._internal.core.models.configurations import ServiceConfiguration
-from dstack._internal.core.models.runs import ApplyRunPlanInput, JobSubmission, RunSpec
+from dstack._internal.core.models.runs import ApplyRunPlanInput, JobSpec, JobSubmission, RunSpec
 from dstack._internal.server.schemas.runs import GetRunPlanRequest
 
 
@@ -25,7 +25,10 @@ def get_apply_plan_excludes(plan: ApplyRunPlanInput) -> Optional[Dict]:
         current_resource_excludes["run_spec"] = get_run_spec_excludes(current_resource.run_spec)
         job_submissions_excludes = {}
         current_resource_excludes["jobs"] = {
-            "__all__": {"job_submissions": {"__all__": job_submissions_excludes}}
+            "__all__": {
+                "job_spec": get_job_spec_excludes([job.job_spec for job in current_resource.jobs]),
+                "job_submissions": {"__all__": job_submissions_excludes},
+            }
         }
         job_submissions = [js for j in current_resource.jobs for js in j.job_submissions]
         if all(map(_should_exclude_job_submission_jpd_cpu_arch, job_submissions)):
@@ -118,6 +121,24 @@ def get_run_spec_excludes(run_spec: RunSpec) -> Optional[Dict]:
         spec_excludes["configuration"] = configuration_excludes
     if profile_excludes:
         spec_excludes["profile"] = profile_excludes
+    if spec_excludes:
+        return spec_excludes
+    return None
+
+
+def get_job_spec_excludes(job_specs: list[JobSpec]) -> Optional[dict]:
+    """
+    Returns `job_spec` exclude mapping to exclude certain fields from the request.
+    Use this method to exclude new fields when they are not set to keep
+    clients backward-compatibility with older servers.
+    """
+    spec_excludes: dict[str, Any] = {}
+
+    if all(s.repo_code_hash is None for s in job_specs):
+        spec_excludes["repo_code_hash"] = True
+    if all(s.repo_data is None for s in job_specs):
+        spec_excludes["repo_data"] = True
+
     if spec_excludes:
         return spec_excludes
     return None

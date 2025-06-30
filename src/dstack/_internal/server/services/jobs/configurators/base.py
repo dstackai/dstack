@@ -149,6 +149,8 @@ class JobConfigurator(ABC):
             working_dir=self._working_dir(),
             volumes=self._volumes(job_num),
             ssh_key=self._ssh_key(jobs_per_replica),
+            repo_data=self.run_spec.repo_data,
+            repo_code_hash=self.run_spec.repo_code_hash,
         )
         return job_spec
 

@@ -251,7 +251,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
                     session=session,
                     project=project,
                     repo=repo_model,
-                    code_hash=run.run_spec.repo_code_hash,
+                    code_hash=_get_repo_code_hash(run, job),
                 )
 
                 success = await common_utils.run_async(
@@ -303,7 +303,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
                 session=session,
                 project=project,
                 repo=repo_model,
-                code_hash=run.run_spec.repo_code_hash,
+                code_hash=_get_repo_code_hash(run, job),
             )
             success = await common_utils.run_async(
                 _process_pulling_with_shim,
@@ -855,6 +855,19 @@ def _get_cluster_info(
         gpus_per_job=gpus_per_job,
     )
     return cluster_info
+
+
+def _get_repo_code_hash(run: Run, job: Job) -> Optional[str]:
+    # TODO: drop this function when supporting jobs submitted before 0.19.17 is no longer relevant.
+    if (
+        job.job_spec.repo_code_hash is None
+        and run.run_spec.repo_code_hash is not None
+        and job.job_submissions[-1].deployment_num == run.deployment_num
+    ):
+        # The job spec does not have `repo_code_hash`, because it was submitted before 0.19.17.
+        # Use `repo_code_hash` from the run.
+        return run.run_spec.repo_code_hash
+    return job.job_spec.repo_code_hash
 
 
 async def _get_job_code(

@@ -276,6 +276,14 @@ func (ex *RunExecutor) SetRunnerState(state string) {
 	ex.state = state
 }
 
+func (ex *RunExecutor) getRepoData() schemas.RepoData {
+	if ex.jobSpec.RepoData == nil {
+		// jobs submitted before 0.19.17 do not have jobSpec.RepoData
+		return ex.run.RunSpec.RepoData
+	}
+	return *ex.jobSpec.RepoData
+}
+
 func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error {
 	node_rank := ex.jobSpec.JobNum
 	nodes_num := ex.jobSpec.JobsPerReplica

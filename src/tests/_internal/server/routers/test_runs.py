@@ -244,6 +244,8 @@ def get_dev_env_run_plan_dict(
                     "volumes": volumes,
                     "ssh_key": None,
                     "working_dir": ".",
+                    "repo_code_hash": None,
+                    "repo_data": {"repo_dir": "/repo", "repo_type": "local"},
                 },
                 "offers": [json.loads(o.json()) for o in offers],
                 "total_offers": total_offers,
@@ -436,6 +438,8 @@ def get_dev_env_run_dict(
                     "volumes": [],
                     "ssh_key": None,
                     "working_dir": ".",
+                    "repo_code_hash": None,
+                    "repo_data": {"repo_dir": "/repo", "repo_type": "local"},
                 },
                 "job_submissions": [
                     {
