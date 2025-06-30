@@ -1,15 +1,24 @@
+import re
 from typing import Dict, List, Optional
 
 import sqlalchemy.exc
 from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dstack._internal.core.errors import ResourceExistsError, ResourceNotExistsError
+from dstack._internal.core.errors import (
+    ResourceExistsError,
+    ResourceNotExistsError,
+    ServerClientError,
+)
 from dstack._internal.core.models.secrets import Secret
 from dstack._internal.server.models import DecryptedString, ProjectModel, SecretModel
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
+
+
+_SECRET_NAME_REGEX = "^[A-Za-z0-9-_]{1,200}$"
+_SECRET_VALUE_MAX_LENGTH = 2000
 
 
 async def list_secrets(
@@ -49,6 +58,7 @@ async def create_or_update_secret(
     name: str,
     value: str,
 ) -> Secret:
+    _validate_secret(name=name, value=value)
     try:
         secret_model = await create_secret(
             session=session,
@@ -177,3 +187,18 @@ async def update_secret(
     if secret_model is None:
         raise ResourceNotExistsError()
     return secret_model
+
+
+def _validate_secret(name: str, value: str):
+    _validate_secret_name(name)
+    _validate_secret_value(value)
+
+
+def _validate_secret_name(name: str):
+    if re.match(_SECRET_NAME_REGEX, name) is None:
+        raise ServerClientError(f"Secret name should match regex '{_SECRET_NAME_REGEX}")
+
+
+def _validate_secret_value(value: str):
+    if len(value) > _SECRET_VALUE_MAX_LENGTH:
+        raise ServerClientError(f"Secret value length must not exceed {_SECRET_VALUE_MAX_LENGTH}")

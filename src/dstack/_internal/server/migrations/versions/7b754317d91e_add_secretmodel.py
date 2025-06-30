@@ -1,8 +1,8 @@
 """Add SecretModel
 
-Revision ID: 8d99ec1a4e87
+Revision ID: 7b754317d91e
 Revises: 35e90e1b0d3e
-Create Date: 2025-06-26 14:04:45.440433
+Create Date: 2025-06-30 10:20:07.288474
 
 """
 
@@ -13,7 +13,7 @@ from alembic import op
 import dstack._internal.server.models
 
 # revision identifiers, used by Alembic.
-revision = "8d99ec1a4e87"
+revision = "7b754317d91e"
 down_revision = "35e90e1b0d3e"
 branch_labels = None
 depends_on = None
@@ -30,9 +30,7 @@ def upgrade() -> None:
         sa.Column("created_at", dstack._internal.server.models.NaiveDateTime(), nullable=False),
         sa.Column("updated_at", dstack._internal.server.models.NaiveDateTime(), nullable=False),
         sa.Column("name", sa.String(length=200), nullable=False),
-        sa.Column(
-            "value", dstack._internal.server.models.EncryptedString(length=2000), nullable=False
-        ),
+        sa.Column("value", dstack._internal.server.models.EncryptedString(), nullable=False),
         sa.ForeignKeyConstraint(
             ["project_id"],
             ["projects.id"],

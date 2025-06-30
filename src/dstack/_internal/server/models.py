@@ -728,4 +728,4 @@ class SecretModel(BaseModel):
     updated_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
 
     name: Mapped[str] = mapped_column(String(200))
-    value: Mapped[DecryptedString] = mapped_column(EncryptedString(2000))
+    value: Mapped[DecryptedString] = mapped_column(EncryptedString())

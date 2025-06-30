@@ -166,6 +166,39 @@ class TestCreateOrUpdateSecret:
         await session.refresh(secret)
         assert secret.value.get_plaintext_or_error() == "new_value"
 
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.parametrize(
+        "name, value",
+        [
+            ("too_long_secret_value", "a" * 2001),
+            ("", "empty_name"),
+            ("@7&.", "wierd_name_chars"),
+        ],
+    )
+    async def test_rejects_bad_names_values(
+        self,
+        test_db,
+        session: AsyncSession,
+        client: AsyncClient,
+        name: str,
+        value,
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
+        )
+        response = await client.post(
+            f"/api/project/{project.name}/secrets/create_or_update",
+            headers=get_auth_headers(user.token),
+            json={"name": name, "value": value},
+        )
+        assert response.status_code == 400
+        res = await session.execute(select(SecretModel))
+        secret_model = res.scalar()
+        assert secret_model is None
+
 
 class TestDeleteSecrets:
     @pytest.mark.asyncio
