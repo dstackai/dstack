@@ -138,6 +138,8 @@ def get_job_spec_excludes(job_specs: list[JobSpec]) -> Optional[dict]:
         spec_excludes["repo_code_hash"] = True
     if all(s.repo_data is None for s in job_specs):
         spec_excludes["repo_data"] = True
+    if all(not s.file_archives for s in job_specs):
+        spec_excludes["file_archives"] = True
 
     if spec_excludes:
         return spec_excludes
