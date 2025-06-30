@@ -11,7 +11,7 @@ from dstack._internal.core.backends.base.configurator import Configurator
 from dstack._internal.core.backends.configurators import list_available_configurator_classes
 from dstack._internal.core.backends.local.compute import LocalCompute
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.server.settings import LOCAL_BACKEND_ENABLED
+from dstack._internal.settings import LOCAL_BACKEND_ENABLED
 
 
 def _get_backends_with_compute_feature(

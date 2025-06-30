@@ -35,7 +35,7 @@ from dstack._internal.core.models.instances import (
 from dstack._internal.core.models.runs import Requirements
 from dstack._internal.server import settings
 from dstack._internal.server.models import BackendModel, DecryptedString, ProjectModel
-from dstack._internal.server.settings import LOCAL_BACKEND_ENABLED
+from dstack._internal.settings import LOCAL_BACKEND_ENABLED
 from dstack._internal.utils.common import run_async
 from dstack._internal.utils.logging import get_logger
 

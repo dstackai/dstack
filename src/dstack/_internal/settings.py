@@ -19,6 +19,10 @@ DSTACK_BASE_IMAGE_UBUNTU_VERSION = os.getenv(
 )
 DSTACK_DIND_IMAGE = os.getenv("DSTACK_DIND_IMAGE", "dstackai/dind")
 
+# Development settings
+
+LOCAL_BACKEND_ENABLED = os.getenv("DSTACK_LOCAL_BACKEND_ENABLED") is not None
+
 
 class FeatureFlags:
     """
