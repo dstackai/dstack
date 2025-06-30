@@ -9,18 +9,25 @@ from dstack._internal.core.backends.base.compute import (
 )
 from dstack._internal.core.backends.base.configurator import Configurator
 from dstack._internal.core.backends.configurators import list_available_configurator_classes
+from dstack._internal.core.backends.local.compute import LocalCompute
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.server.settings import LOCAL_BACKEND_ENABLED
 
 
 def _get_backends_with_compute_feature(
     configurator_classes: list[type[Configurator]],
     compute_feature_class: type,
 ) -> list[BackendType]:
+    backend_types_and_computes = [
+        (configurator_class.TYPE, configurator_class.BACKEND_CLASS.COMPUTE_CLASS)
+        for configurator_class in configurator_classes
+    ]
+    if LOCAL_BACKEND_ENABLED:
+        backend_types_and_computes.append((BackendType.LOCAL, LocalCompute))
     backend_types = []
-    for configurator_class in configurator_classes:
-        compute_class = configurator_class.BACKEND_CLASS.COMPUTE_CLASS
+    for backend_type, compute_class in backend_types_and_computes:
         if issubclass(compute_class, compute_feature_class):
-            backend_types.append(configurator_class.TYPE)
+            backend_types.append(backend_type)
     return backend_types
 
 
@@ -28,7 +35,6 @@ _configurator_classes = list_available_configurator_classes()
 
 
 # The following backend lists do not include unavailable backends (i.e. backends missing deps).
-# TODO: Add LocalBackend to lists if it's enabled
 BACKENDS_WITH_CREATE_INSTANCE_SUPPORT = _get_backends_with_compute_feature(
     configurator_classes=_configurator_classes,
     compute_feature_class=ComputeWithCreateInstanceSupport,
