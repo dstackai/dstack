@@ -1,8 +1,8 @@
 """Add SecretModel
 
-Revision ID: 7b754317d91e
-Revises: 35e90e1b0d3e
-Create Date: 2025-06-30 10:20:07.288474
+Revision ID: 644b8a114187
+Revises: 5f1707c525d2
+Create Date: 2025-06-30 11:00:04.326290
 
 """
 
@@ -13,8 +13,8 @@ from alembic import op
 import dstack._internal.server.models
 
 # revision identifiers, used by Alembic.
-revision = "7b754317d91e"
-down_revision = "35e90e1b0d3e"
+revision = "644b8a114187"
+down_revision = "5f1707c525d2"
 branch_labels = None
 depends_on = None
 
