@@ -4,33 +4,33 @@ from pydantic import parse_obj_as
 
 from dstack._internal.core.models.secrets import Secret
 from dstack._internal.server.schemas.secrets import (
-    AddSecretRequest,
+    CreateOrUpdateSecretRequest,
     DeleteSecretsRequest,
-    GetSecretsRequest,
-    ListSecretsRequest,
+    GetSecretRequest,
 )
 from dstack.api.server._group import APIClientGroup
 
 
 class SecretsAPIClient(APIClientGroup):
-    def list(self, project_name: str, repo_id: str) -> List[Secret]:
-        body = ListSecretsRequest(repo_id=repo_id)
-        resp = self._request(f"/api/project/{project_name}/secrets/list", body=body.json())
+    def list(self, project_name: str) -> List[Secret]:
+        resp = self._request(f"/api/project/{project_name}/secrets/list")
         return parse_obj_as(List[Secret.__response__], resp.json())
 
-    def get(self, project_name: str, repo_id: str, secret_name: str) -> Secret:
-        raise NotImplementedError()
-        body = GetSecretsRequest(repo_id=repo_id)
+    def get(self, project_name: str, name: str) -> Secret:
+        body = GetSecretRequest(name=name)
         resp = self._request(f"/api/project/{project_name}/secrets/get", body=body.json())
         return parse_obj_as(Secret, resp.json())
 
-    def add(self, project_name: str, repo_id: str, secret_name: str, secret_value: str) -> Secret:
-        body = AddSecretRequest(
-            repo_id=repo_id, secret=Secret(name=secret_name, value=secret_value)
+    def create_or_update(self, project_name: str, name: str, value: str) -> Secret:
+        body = CreateOrUpdateSecretRequest(
+            name=name,
+            value=value,
         )
-        resp = self._request(f"/api/project/{project_name}/secrets/add", body=body.json())
+        resp = self._request(
+            f"/api/project/{project_name}/secrets/create_or_update", body=body.json()
+        )
         return parse_obj_as(Secret.__response__, resp.json())
 
-    def delete(self, project_name: str, repo_id: str, secrets_names: List[str]):
-        body = DeleteSecretsRequest(repo_id=repo_id, secrets_names=secrets_names)
+    def delete(self, project_name: str, names: List[str]):
+        body = DeleteSecretsRequest(secrets_names=names)
         self._request(f"/api/project/{project_name}/secrets/delete", body=body.json())

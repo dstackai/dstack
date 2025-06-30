@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from dstack._internal.core.errors import ServerClientError
 from dstack._internal.core.models.configurations import PortMapping, RunConfigurationType
@@ -17,7 +17,7 @@ INSTALL_IPYKERNEL = (
 class DevEnvironmentJobConfigurator(JobConfigurator):
     TYPE: RunConfigurationType = RunConfigurationType.DEV_ENVIRONMENT
 
-    def __init__(self, run_spec: RunSpec):
+    def __init__(self, run_spec: RunSpec, secrets: Dict[str, str]):
         if run_spec.configuration.ide == "vscode":
             __class = VSCodeDesktop
         elif run_spec.configuration.ide == "cursor":
@@ -29,7 +29,7 @@ class DevEnvironmentJobConfigurator(JobConfigurator):
             version=run_spec.configuration.version,
             extensions=["ms-python.python", "ms-toolsai.jupyter"],
         )
-        super().__init__(run_spec)
+        super().__init__(run_spec=run_spec, secrets=secrets)
 
     def _shell_commands(self) -> List[str]:
         commands = self.ide.get_install_commands()

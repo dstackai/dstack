@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Union
 
 import pytest
 from pydantic import parse_obj_as
@@ -30,7 +30,7 @@ async def make_run(
     session: AsyncSession,
     replicas_statuses: List[JobStatus],
     status: RunStatus = RunStatus.RUNNING,
-    replicas: str = 1,
+    replicas: Union[str, int] = 1,
 ) -> RunModel:
     project = await create_project(session=session)
     user = await create_user(session=session)
@@ -70,7 +70,7 @@ async def make_run(
             status=job_status,
             replica_num=replica_num,
         )
-    await session.refresh(run)
+    await session.refresh(run, attribute_names=["project", "jobs"])
     return run
 
 

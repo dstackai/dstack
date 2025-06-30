@@ -65,15 +65,23 @@ from dstack._internal.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
-async def get_jobs_from_run_spec(run_spec: RunSpec, replica_num: int) -> List[Job]:
+async def get_jobs_from_run_spec(
+    run_spec: RunSpec, secrets: Dict[str, str], replica_num: int
+) -> List[Job]:
     return [
         Job(job_spec=s, job_submissions=[])
-        for s in await get_job_specs_from_run_spec(run_spec, replica_num)
+        for s in await get_job_specs_from_run_spec(
+            run_spec=run_spec,
+            secrets=secrets,
+            replica_num=replica_num,
+        )
     ]
 
 
-async def get_job_specs_from_run_spec(run_spec: RunSpec, replica_num: int) -> List[JobSpec]:
-    job_configurator = _get_job_configurator(run_spec)
+async def get_job_specs_from_run_spec(
+    run_spec: RunSpec, secrets: Dict[str, str], replica_num: int
+) -> List[JobSpec]:
+    job_configurator = _get_job_configurator(run_spec=run_spec, secrets=secrets)
     job_specs = await job_configurator.get_job_specs(replica_num=replica_num)
     return job_specs
 
@@ -159,10 +167,10 @@ def delay_job_instance_termination(job_model: JobModel):
     job_model.remove_at = common.get_current_datetime() + timedelta(seconds=15)
 
 
-def _get_job_configurator(run_spec: RunSpec) -> JobConfigurator:
+def _get_job_configurator(run_spec: RunSpec, secrets: Dict[str, str]) -> JobConfigurator:
     configuration_type = RunConfigurationType(run_spec.configuration.type)
     configurator_class = _configuration_type_to_configurator_class_map[configuration_type]
-    return configurator_class(run_spec)
+    return configurator_class(run_spec=run_spec, secrets=secrets)
 
 
 _job_configurator_classes = [

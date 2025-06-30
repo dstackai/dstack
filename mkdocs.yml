@@ -221,6 +221,7 @@ nav:
           - Fleets: docs/concepts/fleets.md
           - Volumes: docs/concepts/volumes.md
           - Repos: docs/concepts/repos.md
+          - Secrets: docs/concepts/secrets.md
           - Projects: docs/concepts/projects.md
           - Gateways: docs/concepts/gateways.md
       - Guides:
@@ -254,6 +255,7 @@ nav:
             - dstack offer: docs/reference/cli/dstack/offer.md
             - dstack volume: docs/reference/cli/dstack/volume.md
             - dstack gateway: docs/reference/cli/dstack/gateway.md
+            - dstack secret: docs/reference/cli/dstack/secret.md
         - API:
             - Python API: docs/reference/api/python/index.md
             - REST API: docs/reference/api/rest/index.md

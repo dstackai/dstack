@@ -90,6 +90,7 @@ from dstack._internal.server.models import (
     RepoCredsModel,
     RepoModel,
     RunModel,
+    SecretModel,
     UserModel,
     VolumeAttachmentModel,
     VolumeModel,
@@ -332,7 +333,9 @@ async def create_job(
     if deployment_num is None:
         deployment_num = run.deployment_num
     run_spec = RunSpec.parse_raw(run.run_spec)
-    job_spec = (await get_job_specs_from_run_spec(run_spec, replica_num=replica_num))[0]
+    job_spec = (
+        await get_job_specs_from_run_spec(run_spec=run_spec, secrets={}, replica_num=replica_num)
+    )[0]
     job_spec.job_num = job_num
     job = JobModel(
         project_id=run.project_id,
@@ -932,6 +935,22 @@ async def create_job_prometheus_metrics(
     session.add(metrics)
     await session.commit()
     return metrics
+
+
+async def create_secret(
+    session: AsyncSession,
+    project: ProjectModel,
+    name: str,
+    value: str,
+):
+    secret_model = SecretModel(
+        project=project,
+        name=name,
+        value=DecryptedString(plaintext=value),
+    )
+    session.add(secret_model)
+    await session.commit()
+    return secret_model
 
 
 def get_private_key_string() -> str:

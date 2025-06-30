@@ -70,9 +70,10 @@ from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
 from dstack._internal.server.services.runs import (
     run_model_to_run,
 )
+from dstack._internal.server.services.secrets import get_project_secrets_mapping
 from dstack._internal.server.services.storage import get_default_storage
 from dstack._internal.utils import common as common_utils
-from dstack._internal.utils.interpolator import VariablesInterpolator
+from dstack._internal.utils.interpolator import InterpolatorError, VariablesInterpolator
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -181,7 +182,17 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
         common_utils.get_or_error(job_model.instance)
     )
 
-    secrets = {}  # TODO secrets
+    secrets = await get_project_secrets_mapping(session=session, project=project)
+
+    try:
+        _interpolate_secrets(secrets, job.job_spec)
+    except InterpolatorError as e:
+        logger.info("%s: terminating due to secrets interpolation error", fmt(job_model))
+        job_model.status = JobStatus.TERMINATING
+        job_model.termination_reason = JobTerminationReason.TERMINATED_BY_SERVER
+        job_model.termination_reason_message = e.args[0]
+        job_model.last_processed_at = common_utils.get_current_datetime()
+        return
 
     repo_creds_model = await get_repo_creds(session=session, repo=repo_model, user=run_model.user)
     repo_creds = repo_model_to_repo_head_with_creds(repo_model, repo_creds_model).repo_creds
@@ -218,7 +229,6 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
                     job_model,
                     job_provisioning_data,
                     volumes,
-                    secrets,
                     job.job_spec.registry_auth,
                     public_keys,
                     ssh_user,
@@ -327,8 +337,9 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
         else:
             if job_model.termination_reason:
                 logger.warning(
-                    "%s: failed because shim/runner returned an error, age=%s",
+                    "%s: failed due to %s, age=%s",
                     fmt(job_model),
+                    job_model.termination_reason.value,
                     job_submission.age,
                 )
                 job_model.status = JobStatus.TERMINATING
@@ -471,7 +482,6 @@ def _process_provisioning_with_shim(
     job_model: JobModel,
     job_provisioning_data: JobProvisioningData,
     volumes: List[Volume],
-    secrets: Dict[str, str],
     registry_auth: Optional[RegistryAuth],
     public_keys: List[str],
     ssh_user: str,
@@ -497,10 +507,8 @@ def _process_provisioning_with_shim(
     registry_username = ""
     registry_password = ""
     if registry_auth is not None:
-        logger.debug("%s: authenticating to the registry...", fmt(job_model))
-        interpolate = VariablesInterpolator({"secrets": secrets}).interpolate
-        registry_username = interpolate(registry_auth.username)
-        registry_password = interpolate(registry_auth.password)
+        registry_username = registry_auth.username
+        registry_password = registry_auth.password
 
     volume_mounts: List[VolumeMountPoint] = []
     instance_mounts: List[InstanceMountPoint] = []
@@ -957,7 +965,9 @@ def _submit_job_to_runner(
         run=run,
         job=job,
         cluster_info=cluster_info,
-        secrets=secrets,
+        # Do not send all the secrets since interpolation is already done by the server.
+        # TODO: Passing secrets may be necessary for filtering out secret values from logs.
+        secrets={},
         repo_credentials=repo_credentials,
         instance_env=instance_env,
     )
@@ -973,6 +983,16 @@ def _submit_job_to_runner(
     # do not log here, because the runner will send a new status
 
     return True
+
+
+def _interpolate_secrets(secrets: Dict[str, str], job_spec: JobSpec):
+    interpolate = VariablesInterpolator({"secrets": secrets}).interpolate_or_error
+    job_spec.env = {k: interpolate(v) for k, v in job_spec.env.items()}
+    if job_spec.registry_auth is not None:
+        job_spec.registry_auth = RegistryAuth(
+            username=interpolate(job_spec.registry_auth.username),
+            password=interpolate(job_spec.registry_auth.password),
+        )
 
 
 def _get_instance_specific_mounts(

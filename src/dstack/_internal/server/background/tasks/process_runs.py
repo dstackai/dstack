@@ -35,6 +35,7 @@ from dstack._internal.server.services.runs import (
     run_model_to_run,
     scale_run_replicas,
 )
+from dstack._internal.server.services.secrets import get_project_secrets_mapping
 from dstack._internal.server.services.services import update_service_desired_replica_count
 from dstack._internal.utils import common
 from dstack._internal.utils.logging import get_logger
@@ -404,7 +405,11 @@ async def _handle_run_replicas(
         )
         return
 
-    await _update_jobs_to_new_deployment_in_place(run_model, run_spec)
+    await _update_jobs_to_new_deployment_in_place(
+        session=session,
+        run_model=run_model,
+        run_spec=run_spec,
+    )
     if _has_out_of_date_replicas(run_model):
         non_terminated_replica_count = len(
             {j.replica_num for j in run_model.jobs if not j.status.is_finished()}
@@ -444,18 +449,25 @@ async def _handle_run_replicas(
             )
 
 
-async def _update_jobs_to_new_deployment_in_place(run_model: RunModel, run_spec: RunSpec) -> None:
+async def _update_jobs_to_new_deployment_in_place(
+    session: AsyncSession, run_model: RunModel, run_spec: RunSpec
+) -> None:
     """
     Bump deployment_num for jobs that do not require redeployment.
     """
-
+    secrets = await get_project_secrets_mapping(
+        session=session,
+        project=run_model.project,
+    )
     for replica_num, job_models in group_jobs_by_replica_latest(run_model.jobs):
         if all(j.status.is_finished() for j in job_models):
             continue
         if all(j.deployment_num == run_model.deployment_num for j in job_models):
             continue
+        # FIXME: Handle getting image configuration errors or skip it.
         new_job_specs = await get_job_specs_from_run_spec(
             run_spec=run_spec,
+            secrets=secrets,
             replica_num=replica_num,
         )
         assert len(new_job_specs) == len(job_models), (
