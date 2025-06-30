@@ -230,7 +230,7 @@ hide:
     </a>
 </div>
 
-## Misc
+<!-- ## Misc
 
 <div class="tx-landing__highlights_grid">
     <a href="/examples/misc/docker-compose"
@@ -243,4 +243,4 @@ hide:
             Use Docker and Docker Compose inside runs
         </p>
     </a>
-</div>
+</div> -->

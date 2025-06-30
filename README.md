@@ -14,8 +14,7 @@
 
 </div>
 
-`dstack` is an open-source alternative to Kubernetes and Slurm, designed to simplify GPU allocation and AI workload
-orchestration for ML teams across top clouds and on-prem clusters.
+`dstack` is an open-source container orchestrator that simplifies workload orchestration and drives GPU utilization for ML teams. It works with any GPU cloud, on-prem cluster, or accelerated hardware.
 
 #### Accelerators
 
@@ -32,8 +31,8 @@ orchestration for ML teams across top clouds and on-prem clusters.
 ## How does it work?
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://dstack.ai/static-assets/static-assets/images/dstack-architecture-diagram-v8-dark.svg"/>
-  <img src="https://dstack.ai/static-assets/static-assets/images/dstack-architecture-diagram-v8.svg" width="750" />
+  <source media="(prefers-color-scheme: dark)" srcset="https://dstack.ai/static-assets/static-assets/images/dstack-architecture-diagram-v10-dark.svg"/>
+  <img src="https://dstack.ai/static-assets/static-assets/images/dstack-architecture-diagram-v10.svg" width="750" />
 </picture>
 
 ### Installation
