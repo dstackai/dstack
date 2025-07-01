@@ -3,3 +3,5 @@
 
 cd frontend
 npm run precommit
+
+exit 1
