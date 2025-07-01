@@ -22,6 +22,7 @@ class {{ backend_name }}BackendConfig(CoreModel):
     It also serves as a base class for other backend config models.
     Should not include creds.
     """
+
     type: Annotated[
         Literal["{{ backend_name|lower }}"],
         Field(description="The type of backend"),
@@ -37,6 +38,7 @@ class {{ backend_name }}BackendConfigWithCreds({{ backend_name }}BackendConfig):
     """
     Same as `{{ backend_name }}BackendConfig` but also includes creds.
     """
+
     creds: Annotated[Any{{ backend_name }}Creds, Field(description="The credentials")]
 
 
@@ -48,6 +50,7 @@ class {{ backend_name }}StoredConfig({{ backend_name }}BackendConfig):
     The backend config used for config parameters in the DB.
     Can extend `{{ backend_name }}BackendConfig` with additional parameters.
     """
+
     pass
 
 
@@ -55,4 +58,5 @@ class {{ backend_name }}Config({{ backend_name }}StoredConfig):
     """
     The backend config used by `{{ backend_name }}Backend` and `{{ backend_name }}Compute`.
     """
+
     creds: Any{{ backend_name }}Creds

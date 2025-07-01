@@ -31,7 +31,12 @@ export const RunDetailsPage: React.FC = () => {
     const paramRunId = params.runId ?? '';
     const [pushNotification] = useNotifications();
 
-    const { data: runData, error: runError } = useGetRunQuery({
+    const {
+        data: runData,
+        error: runError,
+        isLoading,
+        refetch,
+    } = useGetRunQuery({
         project_name: paramProjectName,
         id: paramRunId,
     });
@@ -148,6 +153,13 @@ export const RunDetailsPage: React.FC = () => {
                                 {/*<Button onClick={deleteClickHandle} disabled={isDisabledDeleteButton}>*/}
                                 {/*    {t('common.delete')}*/}
                                 {/*</Button>*/}
+
+                                <Button
+                                    iconName="refresh"
+                                    disabled={isLoading}
+                                    ariaLabel={t('common.refresh')}
+                                    onClick={refetch}
+                                />
                             </>
                         }
                     />

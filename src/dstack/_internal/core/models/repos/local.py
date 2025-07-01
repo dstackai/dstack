@@ -84,9 +84,9 @@ class LocalRepo(Repo):
                 .add_custom_ignore_filename(".dstackignore")
                 .build()
             ):
-                path = entry.path().relative_to(repo_path.absolute())
-                if path != Path("."):
-                    t.add(path, recursive=False)
+                entry_path_within_repo = entry.path().relative_to(repo_path)
+                if entry_path_within_repo != Path("."):
+                    t.add(entry.path(), arcname=entry_path_within_repo, recursive=False)
         logger.debug("Code file size: %s", sizeof_fmt(fp.tell()))
         return get_sha256(fp)
 

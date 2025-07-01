@@ -1,15 +1,19 @@
-from typing import List
+from typing import List, Tuple
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from dstack._internal.core.models.runs import Run
+from dstack._internal.core.errors import ResourceNotExistsError
 from dstack._internal.core.models.secrets import Secret
+from dstack._internal.server.db import get_session
+from dstack._internal.server.models import ProjectModel, UserModel
 from dstack._internal.server.schemas.secrets import (
-    AddSecretRequest,
+    CreateOrUpdateSecretRequest,
     DeleteSecretsRequest,
-    GetSecretsRequest,
-    ListSecretsRequest,
+    GetSecretRequest,
 )
+from dstack._internal.server.security.permissions import ProjectAdmin
+from dstack._internal.server.services import secrets as secrets_services
 
 router = APIRouter(
     prefix="/api/project/{project_name}/secrets",
@@ -18,20 +22,58 @@ router = APIRouter(
 
 
 @router.post("/list")
-async def list_secrets(project_name: str, body: ListSecretsRequest) -> List[Run]:
-    pass
+async def list_secrets(
+    session: AsyncSession = Depends(get_session),
+    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
+) -> List[Secret]:
+    _, project = user_project
+    return await secrets_services.list_secrets(
+        session=session,
+        project=project,
+    )
 
 
 @router.post("/get")
-async def get_secret(project_name: str, body: GetSecretsRequest) -> Secret:
-    pass
+async def get_secret(
+    body: GetSecretRequest,
+    session: AsyncSession = Depends(get_session),
+    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
+) -> Secret:
+    _, project = user_project
+    secret = await secrets_services.get_secret(
+        session=session,
+        project=project,
+        name=body.name,
+    )
+    if secret is None:
+        raise ResourceNotExistsError()
+    return secret
 
 
-@router.post("/add")
-async def add_or_update_secret(project_name: str, body: AddSecretRequest) -> Secret:
-    pass
+@router.post("/create_or_update")
+async def create_or_update_secret(
+    body: CreateOrUpdateSecretRequest,
+    session: AsyncSession = Depends(get_session),
+    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
+) -> Secret:
+    _, project = user_project
+    return await secrets_services.create_or_update_secret(
+        session=session,
+        project=project,
+        name=body.name,
+        value=body.value,
+    )
 
 
 @router.post("/delete")
-async def delete_secrets(project_name: str, body: DeleteSecretsRequest):
-    pass
+async def delete_secrets(
+    body: DeleteSecretsRequest,
+    session: AsyncSession = Depends(get_session),
+    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
+):
+    _, project = user_project
+    await secrets_services.delete_secrets(
+        session=session,
+        project=project,
+        names=body.secrets_names,
+    )

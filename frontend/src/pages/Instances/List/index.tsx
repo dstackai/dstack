@@ -1,7 +1,7 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Button, FormField, Header, Loader, SelectCSD, SpaceBetween, Table, Toggle } from 'components';
+import { Button, Header, Loader, PropertyFilter, SpaceBetween, Table, Toggle } from 'components';
 
 import { DEFAULT_TABLE_PAGE_SIZE } from 'consts';
 import { useBreadcrumbs, useInfiniteScroll } from 'hooks';
@@ -29,28 +29,20 @@ export const List: React.FC = () => {
     const { columns } = useColumnsDefinitions();
 
     const {
+        filteringRequestParams,
+        clearFilter,
+        propertyFilterQuery,
+        onChangePropertyFilter,
+        filteringOptions,
+        filteringProperties,
         onlyActive,
-        setOnlyActive,
+        onChangeOnlyActive,
         isDisabledClearFilter,
-        clearFilters,
-        projectOptions,
-        selectedProject,
-        setSelectedProject,
-        selectedFleet,
     } = useFilters();
-
-    const args = useMemo<TInstanceListRequestParams>(() => {
-        return {
-            project_names: selectedProject?.value ? [selectedProject.value] : undefined,
-            only_active: onlyActive,
-            fleet_ids: selectedFleet?.value ? [selectedFleet.value] : undefined,
-            limit: DEFAULT_TABLE_PAGE_SIZE,
-        };
-    }, [selectedProject, selectedFleet, onlyActive]);
 
     const { data, isLoading, refreshList, isLoadingMore } = useInfiniteScroll<IInstance, TInstanceListRequestParams>({
         useLazyQuery: useLazyGetInstancesQuery,
-        args,
+        args: { ...filteringRequestParams, limit: DEFAULT_TABLE_PAGE_SIZE },
 
         getPaginationParams: (lastInstance) => ({
             prev_created_at: lastInstance.created,
@@ -60,7 +52,7 @@ export const List: React.FC = () => {
 
     const { deleteFleets, isDeleting } = useActions();
 
-    const { renderEmptyMessage, renderNoMatchMessage } = useEmptyMessages({ clearFilters, isDisabledClearFilter });
+    const { renderEmptyMessage, renderNoMatchMessage } = useEmptyMessages({ clearFilter, isDisabledClearFilter });
 
     const { items, collectionProps } = useCollection<IInstance>(data, {
         filtering: {
@@ -113,45 +105,27 @@ export const List: React.FC = () => {
             }
             filter={
                 <div className={styles.filters}>
-                    <div className={styles.select}>
-                        <FormField label={t('projects.run.project')}>
-                            <SelectCSD
-                                disabled={!projectOptions?.length}
-                                options={projectOptions}
-                                selectedOption={selectedProject}
-                                onChange={(event) => {
-                                    setSelectedProject(event.detail.selectedOption);
-                                }}
-                                placeholder={t('projects.run.project_placeholder')}
-                                expandToViewport={true}
-                                filteringType="auto"
-                            />
-                        </FormField>
-                    </div>
-
-                    <div className={styles.select}>
-                        <FormField label={t('fleets.fleet')}>
-                            <SelectCSD
-                                disabled
-                                options={[...(selectedFleet ? [selectedFleet] : [])]}
-                                selectedOption={selectedFleet}
-                                placeholder={t('fleets.fleet_placeholder')}
-                                expandToViewport={true}
-                                filteringType="auto"
-                            />
-                        </FormField>
+                    <div className={styles.propertyFilter}>
+                        <PropertyFilter
+                            query={propertyFilterQuery}
+                            onChange={onChangePropertyFilter}
+                            expandToViewport
+                            hideOperations
+                            i18nStrings={{
+                                clearFiltersText: t('common.clearFilter'),
+                                filteringAriaLabel: t('projects.run.filter_property_placeholder'),
+                                filteringPlaceholder: t('projects.run.filter_property_placeholder'),
+                                operationAndText: 'and',
+                            }}
+                            filteringOptions={filteringOptions}
+                            filteringProperties={filteringProperties}
+                        />
                     </div>
 
                     <div className={styles.activeOnly}>
-                        <Toggle onChange={({ detail }) => setOnlyActive(detail.checked)} checked={onlyActive}>
+                        <Toggle onChange={onChangeOnlyActive} checked={onlyActive}>
                             {t('fleets.instances.active_only')}
                         </Toggle>
-                    </div>
-
-                    <div className={styles.clear}>
-                        <Button formAction="none" onClick={clearFilters} disabled={isDisabledClearFilter}>
-                            {t('common.clearFilter')}
-                        </Button>
                     </div>
                 </div>
             }

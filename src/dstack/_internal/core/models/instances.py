@@ -48,28 +48,67 @@ class Resources(CoreModel):
     gpus: List[Gpu]
     spot: bool
     disk: Disk = Disk(size_mib=102400)  # the default value (100GB) for backward compatibility
+    # TODO: make description a computed field after migrating to pydanticV2
     description: str = ""
     cpu_arch: Optional[gpuhunt.CPUArchitecture] = None
 
-    def pretty_format(self, include_spot: bool = False) -> str:
+    @root_validator
+    def _description(cls, values) -> Dict:
+        try:
+            description = values["description"]
+            if not description:
+                cpus = values["cpus"]
+                memory_mib = values["memory_mib"]
+                gpus = values["gpus"]
+                disk_size_mib = values["disk"].size_mib
+                spot = values["spot"]
+                cpu_arch = values["cpu_arch"]
+                values["description"] = Resources._pretty_format(
+                    cpus, cpu_arch, memory_mib, disk_size_mib, gpus, spot, include_spot=True
+                )
+        except KeyError:
+            return values
+        return values
+
+    @staticmethod
+    def _pretty_format(
+        cpus: int,
+        cpu_arch: Optional[gpuhunt.CPUArchitecture],
+        memory_mib: int,
+        disk_size_mib: int,
+        gpus: List[Gpu],
+        spot: bool,
+        include_spot: bool = False,
+    ) -> str:
         resources = {}
-        if self.cpus > 0:
-            resources["cpus"] = self.cpus
-            resources["cpu_arch"] = self.cpu_arch
-        if self.memory_mib > 0:
-            resources["memory"] = f"{self.memory_mib / 1024:.0f}GB"
-        if self.disk.size_mib > 0:
-            resources["disk_size"] = f"{self.disk.size_mib / 1024:.0f}GB"
-        if self.gpus:
-            gpu = self.gpus[0]
+        if cpus > 0:
+            resources["cpus"] = cpus
+            resources["cpu_arch"] = cpu_arch
+        if memory_mib > 0:
+            resources["memory"] = f"{memory_mib / 1024:.0f}GB"
+        if disk_size_mib > 0:
+            resources["disk_size"] = f"{disk_size_mib / 1024:.0f}GB"
+        if gpus:
+            gpu = gpus[0]
             resources["gpu_name"] = gpu.name
-            resources["gpu_count"] = len(self.gpus)
+            resources["gpu_count"] = len(gpus)
             if gpu.memory_mib > 0:
                 resources["gpu_memory"] = f"{gpu.memory_mib / 1024:.0f}GB"
         output = pretty_resources(**resources)
-        if include_spot and self.spot:
+        if include_spot and spot:
             output += " (spot)"
         return output
+
+    def pretty_format(self, include_spot: bool = False) -> str:
+        return Resources._pretty_format(
+            self.cpus,
+            self.cpu_arch,
+            self.memory_mib,
+            self.disk.size_mib,
+            self.gpus,
+            self.spot,
+            include_spot,
+        )
 
 
 class InstanceType(CoreModel):

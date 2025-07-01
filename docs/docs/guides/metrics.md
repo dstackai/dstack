@@ -1,10 +1,46 @@
 # Metrics
 
+`dstack` automatically tracks essential metrics, which you can access via the CLI and UI.
+You can also configure the `dstack` server to export metrics to Prometheus—this is required to access advanced metrics such as those from DCGM.
+
+## UI
+
+To access metrics via the UI, open the page of the corresponding run or job and switch to the `Metrics` tab:
+
+![](https://dstack.ai/static-assets/static-assets/images/dstack-newsletter-metrics.png){ width=800 }
+
+This tab displays key CPU, memory, and GPU metrics collected during the last hour of the run or job.
+
+## CLI
+
+As an alternative to the UI, you can track real-time essential metrics via the CLI.
+The `dstack metrics` command displays the most recently tracked CPU, memory, and GPU metrics.
+
+<div class="termy">
+
+```shell
+dstack metrics gentle-mayfly-1
+
+ NAME             STATUS  CPU  MEMORY          GPU
+ gentle-mayfly-1  done    0%   16.27GB/2000GB  gpu=0 mem=72.48GB/80GB util=0%
+                                               gpu=1 mem=64.99GB/80GB util=0%
+                                               gpu=2 mem=580MB/80GB util=0%
+                                               gpu=3 mem=4MB/80GB util=0%
+                                               gpu=4 mem=4MB/80GB util=0%
+                                               gpu=5 mem=4MB/80GB util=0%
+                                               gpu=6 mem=4MB/80GB util=0%
+                                               gpu=7 mem=292MB/80GB util=0%
+```
+
+</div>
+
 ## Prometheus
 
-To collect and export fleet and run metrics to Prometheus, enable the
-`DSTACK_ENABLE_PROMETHEUS_METRICS` environment variable and configure Prometheus to fetch metrics from
+To enable exporting metrics to Prometheus, set the
+`DSTACK_ENABLE_PROMETHEUS_METRICS` environment variable and configure Prometheus to scrape metrics from
 `<dstack server URL>/metrics`.
+
+In addition to the essential metrics available via the CLI and UI, `dstack` exports additional metrics to Prometheus, including data on fleets, runs, jobs, and DCGM metrics.
 
 ??? info "NVIDIA DCGM"
     NVIDIA DCGM metrics are automatically collected for `aws`, `azure`, `gcp`, and `oci` backends, 
@@ -140,3 +176,21 @@ telemetry, and more.
     | `dstack_run_type`     | *string*  | Run configuration type | `task`, `dev-environment`              |
     | `dstack_backend`      | *string*  | Backend                | `aws`, `runpod`                        |
     | `dstack_gpu`          | *string?* | GPU name               | `H100`                                 |
+
+### Server health metrics
+
+These are operational metrics to monitor the health of the dstack server. For now, these only include HTTP metrics, but more will be added later.
+
+=== "Metrics"
+    | Name                                     | Type      | Description                       | Examples     |
+    |------------------------------------------|-----------|-----------------------------------|--------------|
+    | `dstack_server_requests_total` | *counter* | Total number of HTTP requests | `100.0` |
+    | `dstack_server_request_duration_seconds` | *histogram*   | HTTP request duration in seconds  | `1.0`|
+
+=== "Labels"
+    | Name                   | Type      | Description   | Examples                               |
+    |------------------------|-----------|:--------------|----------------------------------------|
+    | `method`  | *string*  | HTTP method  | `POST`                                 |
+    | `endpoint`    | *string* | Endpoint path    | `/api/project/main/repos/get`                             |
+    | `http_status`      | *string* | HTTP status code      | `200` |
+    | `project_name` | *string?*  | Project name  | `main`                           |

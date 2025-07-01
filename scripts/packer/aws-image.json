@@ -71,14 +71,6 @@
         "cd /tmp",
         "chmod +x install-docker.sh",
         "./install-docker.sh --version {{user `docker_version`}}"]
-    },
-    {
-      "type": "shell",
-      "environment_vars": [
-        "IMAGE_REPO={{user `image_repo`}}",
-        "IMAGE_VERSION={{user `image_version`}}"
-      ],
-      "script": "provisioners/pull-docker-images.sh"
     }
   ]
 }

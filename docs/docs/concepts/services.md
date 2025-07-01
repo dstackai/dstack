@@ -7,20 +7,20 @@ Services allow you to deploy models or web apps as secure and scalable endpoints
 First, define a service configuration as a YAML file in your project folder.
 The filename must end with `.dstack.yml` (e.g. `.dstack.yml` or `dev.dstack.yml` are both acceptable).
 
-<div editor-title="service.dstack.yml"> 
+<div editor-title=".dstack.yml"> 
 
 ```yaml
 type: service
 name: llama31
 
 # If `image` is not specified, dstack uses its default image
-python: "3.11"
+python: 3.12
 env:
   - HF_TOKEN
   - MODEL_ID=meta-llama/Meta-Llama-3.1-8B-Instruct
   - MAX_MODEL_LEN=4096
 commands:
-  - pip install vllm
+  - uv pip install vllm
   - vllm serve $MODEL_ID
     --max-model-len $MAX_MODEL_LEN
     --tensor-parallel-size $DSTACK_GPUS_NUM
@@ -43,7 +43,7 @@ To run a service, pass the configuration to [`dstack apply`](../reference/cli/ds
 
 ```shell
 $ HF_TOKEN=...
-$ dstack apply -f service.dstack.yml
+$ dstack apply -f .dstack.yml
 
  #  BACKEND  REGION    RESOURCES                    SPOT  PRICE
  1  runpod   CA-MTL-1  18xCPU, 100GB, A5000:24GB:2  yes   $0.22
@@ -125,25 +125,20 @@ You can configure the number of replicas as well as the auto-scaling rules.
 
 ```yaml
 type: service
-# The name is optional, if not specified, generated randomly
 name: llama31-service
 
-python: "3.10"
+python: 3.12
 
-# Required environment variables
 env:
   - HF_TOKEN
 commands:
-  - pip install vllm
+  - uv pip install vllm
   - vllm serve meta-llama/Meta-Llama-3.1-8B-Instruct --max-model-len 4096
-# Expose the port of the service
 port: 8000
 
 resources:
-  # Change to what is required
   gpu: 24GB
 
-# Minimum and maximum number of replicas
 replicas: 1..4
 scaling:
   # Requests per seconds
@@ -178,18 +173,15 @@ This can be disabled by setting `auth` to `false`.
 
 ```yaml
 type: service
-# The name is optional, if not specified, generated randomly
 name: http-server-service
 
 # Disable authorization
 auth: false
 
-python: "3.10"
+python: 3.12
 
-# Commands of the service
 commands:
   - python3 -m http.server
-# The port of the service
 port: 8000
 ```
 
@@ -209,7 +201,6 @@ type: service
 name: dash
 gateway: false
 
-# Disable authorization
 auth: false
 # Do not strip the path prefix
 strip_prefix: false
@@ -220,7 +211,7 @@ env:
   - DASH_ROUTES_PATHNAME_PREFIX=/proxy/services/main/dash/
 
 commands:
-  - pip install dash
+  - uv pip install dash
   # Assuming the Dash app is in your repo at app.py
   - python app.py
 
@@ -237,7 +228,7 @@ set [`strip_prefix`](../reference/dstack.yml/service.md#strip_prefix) to `false`
 If your app cannot be configured to work with a path prefix, you can host it
 on a dedicated domain name by setting up a [gateway](gateways.md).
 
-### Rate Limits { #rate-limits }
+### Rate limits { #rate-limits }
 
 If you have a [gateway](gateways.md), you can configure rate limits for your service
 using the [`rate_limits`](../reference/dstack.yml/service.md#rate_limits) property.
@@ -260,14 +251,9 @@ rate_limits:
 
 </div>
 
-The limit is specified in requests per second, but requests are tracked with millisecond
-granularity. For example, `rps: 4` means at most 1 request every 250 milliseconds.
-For most applications, it is recommended to set the `burst` property, which allows
-temporary bursts, but keeps the average request rate at the limit specified in `rps`.
+The rps limit sets the max requests per second, tracked in milliseconds (e.g., `rps: 4` means 1 request every 250 ms). Use `burst` to allow short spikes while keeping the average within `rps`.
 
-Rate limits are applied to the entire service regardless of the number of replicas.
-They are applied to each client separately, as determined by the client's IP address.
-If a client violates a limit, it receives an error with status code `429`.
+Limits apply to the whole service (all replicas) and per client (by IP). Clients exceeding the limit get a 429 error.
 
 ??? info "Partitioning key"
     Instead of partitioning requests by client IP address,
@@ -296,23 +282,23 @@ If a client violates a limit, it receives an error with status code `429`.
 If you specify memory size, you can either specify an explicit size (e.g. `24GB`) or a 
 range (e.g. `24GB..`, or `24GB..80GB`, or `..80GB`).
 
-<div editor-title="examples/llms/mixtral/vllm.dstack.yml"> 
+<div editor-title=".dstack.yml"> 
 
 ```yaml
 type: service
-# The name is optional, if not specified, generated randomly
 name: llama31-service
 
-python: "3.10"
-
-# Commands of the service
+python: 3.12
+env:
+  - HF_TOKEN
+  - MODEL_ID=meta-llama/Meta-Llama-3.1-8B-Instruct
+  - MAX_MODEL_LEN=4096
 commands:
-  - pip install vllm
-  - python -m vllm.entrypoints.openai.api_server
-    --model mistralai/Mixtral-8X7B-Instruct-v0.1
-    --host 0.0.0.0
-    --tensor-parallel-size $DSTACK_GPUS_NUM
-# Expose the port of the service
+  - uv pip install vllm
+  - |
+    vllm serve $MODEL_ID
+      --max-model-len $MAX_MODEL_LEN
+      --tensor-parallel-size $DSTACK_GPUS_NUM
 port: 8000
 
 resources:
@@ -327,18 +313,14 @@ resources:
 
 </div>
 
-The `cpu` property also allows you to specify the CPU architecture, `x86` or `arm`. Examples:
-`x86:16` (16 x86-64 cores), `arm:8..` (at least 8 ARM64 cores).
-If the architecture is not specified, `dstack` tries to infer it from the `gpu` specification
-using `x86` as the fallback value.
+The `cpu` property lets you set the architecture (`x86` or `arm`) and core count — e.g., `x86:16` (16 x86 cores), `arm:8..` (at least 8 ARM cores). 
+If not set, `dstack` infers it from the GPU or defaults to `x86`.
 
-The `gpu` property allows specifying not only memory size but also GPU vendor, names
-and their quantity. Examples: `nvidia` (one NVIDIA GPU), `A100` (one A100), `A10G,A100` (either A10G or A100),
-`A100:80GB` (one A100 of 80GB), `A100:2` (two A100), `24GB..40GB:2` (two GPUs between 24GB and 40GB),
-`A100:40GB:2` (two A100 GPUs of 40GB).
-If the vendor is not specified, `dstack` tries to infer it from the GPU name using `nvidia` as the fallback value.
+The `gpu` property lets you specify vendor, model, memory, and count — e.g., `nvidia` (one NVIDIA GPU), `A100` (one A100), `A10G,A100` (either), `A100:80GB` (one 80GB A100), `A100:2` (two A100), `24GB..40GB:2` (two GPUs with 24–40GB), `A100:40GB:2` (two 40GB A100s). 
 
-??? info "Google Cloud TPU"
+If vendor is omitted, `dstack` infers it from the model or defaults to `nvidia`.
+
+<!-- ??? info "Google Cloud TPU"
     To use TPUs, specify its architecture via the `gpu` property.
 
     ```yaml
@@ -361,7 +343,7 @@ If the vendor is not specified, `dstack` tries to infer it from the GPU name usi
       gpu: v5litepod-4
     ```
 
-    Currently, only 8 TPU cores can be specified, supporting single TPU device workloads. Multi-TPU support is coming soon.
+    Currently, only 8 TPU cores can be specified, supporting single TPU device workloads. Multi-TPU support is coming soon. -->
 
 ??? info "Shared memory"
     If you are using parallel communicating processes (e.g., dataloaders in PyTorch), you may need to configure 
@@ -370,131 +352,148 @@ If the vendor is not specified, `dstack` tries to infer it from the GPU name usi
 > If you’re unsure which offers (hardware configurations) are available from the configured backends, use the
 > [`dstack offer`](../reference/cli/dstack/offer.md#list-gpu-offers) command to list them.
 
-### Python version
+
+### Docker
+
+#### Default image
 
 If you don't specify `image`, `dstack` uses its base Docker image pre-configured with 
-`python`, `pip`, `conda` (Miniforge), and essential CUDA drivers. 
-The `python` property determines which default Docker image is used.
+`uv`, `python`, `pip`, essential CUDA drivers, and NCCL tests (under `/opt/nccl-tests/build`). 
 
-<div editor-title="service.dstack.yml"> 
+Set the `python` property to pre-install a specific version of Python.
+
+<!-- TODO: Add a relevant example -->
+
+<div editor-title=".dstack.yml"> 
 
 ```yaml
 type: service
-# The name is optional, if not specified, generated randomly
 name: http-server-service    
 
-# If `image` is not specified, dstack uses its base image
-python: "3.10"
+python: 3.12
 
-# Commands of the service
 commands:
   - python3 -m http.server
-# The port of the service
 port: 8000
 ```
 
 </div>
 
-??? info "nvcc"
-    By default, the base Docker image doesn’t include `nvcc`, which is required for building custom CUDA kernels. 
-    If you need `nvcc`, set the corresponding property to true.
+#### NVCC
 
-    <div editor-title="service.dstack.yml"> 
+By default, the base Docker image doesn’t include `nvcc`, which is required for building custom CUDA kernels. 
+If you need `nvcc`, set the [`nvcc`](../reference/dstack.yml/dev-environment.md#nvcc) property to true.
 
-    ```yaml
-    type: service
-    # The name is optional, if not specified, generated randomly
-    name: http-server-service    
-    
-    # If `image` is not specified, dstack uses its base image
-    python: "3.10"
-    # Ensure nvcc is installed (req. for Flash Attention) 
-    nvcc: true
+<!-- TODO: Add a relevant example -->
 
-     # Commands of the service
-    commands:
-      - python3 -m http.server
-    # The port of the service
-    port: 8000
-    ```
-    
-    </div>
+<div editor-title="service.dstack.yml"> 
 
-### Docker
+```yaml
+type: service
+name: http-server-service    
+
+python: 3.12
+nvcc: true
+
+commands:
+  - python3 -m http.server
+port: 8000
+```
+
+</div>
+
+#### Custom image
 
 If you want, you can specify your own Docker image via `image`.
 
-<div editor-title="service.dstack.yml">
+<div editor-title=".dstack.yml">
 
     ```yaml
     type: service
-    # The name is optional, if not specified, generated randomly
     name: http-server-service
 
-    # Any custom Docker image
-    image: dstackai/base:py3.13-0.7-cuda-12.1
+    image: python
     
-    # Commands of the service
     commands:
       - python3 -m http.server
-    # The port of the service
     port: 8000
     ```
 
 </div>
 
-!!! info "Privileged mode"
-    To enable privileged mode, set [`privileged`](../reference/dstack.yml/service.md#privileged) to `true`.
-    This mode allows using [Docker and Docker Compose](../guides/protips.md#docker-and-docker-compose) inside `dstack` runs.
+#### Docker in Docker
 
-    Not supported with `runpod`, `vastai`, and `kubernetes`.
+Set `docker` to `true` to enable the `docker` CLI in your service, e.g., to run Docker images or use Docker Compose.
 
-??? info "Private registry"
-    Use the [`registry_auth`](../reference/dstack.yml/service.md#registry_auth) property to provide credentials for a private Docker registry.
-
-    ```yaml
-    type: service
-    # The name is optional, if not specified, generated randomly
-    name: http-server-service
-    
-    # Any private Docker iamge
-    image: dstackai/base:py3.13-0.7-cuda-12.1
-    # Credentials of the private registry
-    registry_auth:
-      username: peterschmidt85
-      password: ghp_e49HcZ9oYwBzUbcSk2080gXZOU2hiT9AeSR5
-    
-    # Commands of the service  
-    commands:
-      - python3 -m http.server
-    # The port of the service
-    port: 8000
-    ```
-
-### Environment variables
-
-<div editor-title="service.dstack.yml">
+<div editor-title="examples/misc/docker-compose/service.dstack.yml"> 
 
 ```yaml
 type: service
-# The name is optional, if not specified, generated randomly
+name: chat-ui-task
+
+auth: false
+
+docker: true
+
+working_dir: examples/misc/docker-compose
+commands:
+  - docker compose up
+port: 9000
+```
+
+</div>
+
+Cannot be used with `python` or `image`. Not supported on `runpod`, `vastai`, or `kubernetes`.
+
+#### Privileged mode
+
+To enable privileged mode, set [`privileged`](../reference/dstack.yml/dev-environment.md#privileged) to `true`.
+
+Not supported with `runpod`, `vastai`, and `kubernetes`.
+
+#### Private registry
+    
+Use the [`registry_auth`](../reference/dstack.yml/dev-environment.md#registry_auth) property to provide credentials for a private Docker registry. 
+
+```yaml
+type: service
+name: serve-distill-deepseek
+
+env:
+  - NGC_API_KEY
+  - NIM_MAX_MODEL_LEN=4096
+
+image: nvcr.io/nim/deepseek-ai/deepseek-r1-distill-llama-8b
+registry_auth:
+  username: $oauthtoken
+  password: ${{ env.NGC_API_KEY }}
+port: 8000
+
+model: deepseek-ai/deepseek-r1-distill-llama-8b
+
+resources:
+  gpu: H100:1
+```
+    
+### Environment variables
+
+<div editor-title=".dstack.yml">
+
+```yaml
+type: service
 name: llama-2-7b-service
 
-python: "3.10"
+python: 3.12
 
-# Environment variables
 env:
   - HF_TOKEN
   - MODEL=NousResearch/Llama-2-7b-chat-hf
-# Commands of the service
 commands:
-  - pip install vllm
+  - uv pip install vllm
   - python -m vllm.entrypoints.openai.api_server --model $MODEL --port 8000
-# The port of the service
 port: 8000
 
 resources:
-  # Required GPU VRAM
   gpu: 24GB
 ```
 
@@ -512,17 +511,7 @@ resources:
     | `DSTACK_REPO_ID`        | The ID of the repo                      |
     | `DSTACK_GPUS_NUM`       | The total number of GPUs in the run     |
 
-### Spot policy
-
-By default, `dstack` uses on-demand instances. However, you can change that
-via the [`spot_policy`](../reference/dstack.yml/service.md#spot_policy) property. It accepts `spot`, `on-demand`, and `auto`.
-
-!!! info "Reference"
-    Services support many more configuration options,
-    incl. [`backends`](../reference/dstack.yml/service.md#backends), 
-    [`regions`](../reference/dstack.yml/service.md#regions), 
-    [`max_price`](../reference/dstack.yml/service.md#max_price), and
-    among [others](../reference/dstack.yml/service.md).
+<!-- TODO: Ellaborate on using environment variables in `registry_auth` -->
 
 ### Retry policy
 
@@ -530,8 +519,9 @@ By default, if `dstack` can't find capacity, or the service exits with an error,
 
 If you'd like `dstack` to automatically retry, configure the 
 [retry](../reference/dstack.yml/service.md#retry) property accordingly:
+<!-- TODO: Add a relevant example -->
 
-<div editor-title="service.dstack.yml">
+<div editor-title=".dstack.yml">
 
 ```yaml
 type: service
@@ -539,7 +529,6 @@ image: my-app:latest
 port: 80
 
 retry:
-  # Retry on specific events
   on_events: [no-capacity, error, interruption]
   # Retry for up to 1 hour
   duration: 1h
@@ -550,7 +539,53 @@ retry:
 If one replica of a multi-replica service fails with retry enabled,
 `dstack` will resubmit only the failed replica while keeping active replicas running.
 
+### Spot policy
+
+By default, `dstack` uses on-demand instances. However, you can change that
+via the [`spot_policy`](../reference/dstack.yml/service.md#spot_policy) property. It accepts `spot`, `on-demand`, and `auto`.
+
+### Utilization policy
+
+Sometimes it’s useful to track whether a service is fully utilizing all GPUs. While you can check this with
+[`dstack metrics`](../reference/cli/dstack/metrics.md), `dstack` also lets you set a policy to auto-terminate the run if any GPU is underutilized.
+
+Below is an example of a service that auto-terminate if any GPU stays below 10% utilization for 1 hour.
+
+<!-- TODO: Add a relevant example -->
+
+<div editor-title=".dstack.yml">
+
+```yaml
+type: service
+name: llama-2-7b-service
+
+python: 3.12
+env:
+  - HF_TOKEN
+  - MODEL=NousResearch/Llama-2-7b-chat-hf
+commands:
+  - uv pip install vllm
+  - python -m vllm.entrypoints.openai.api_server --model $MODEL --port 8000
+port: 8000
+
+resources:
+  gpu: 24GB
+
+utilization_policy:
+  min_gpu_utilization: 10
+  time_window: 1h
+```
+
+</div>
+
 --8<-- "docs/concepts/snippets/manage-fleets.ext"
+
+!!! info "Reference"
+    Services support many more configuration options,
+    incl. [`backends`](../reference/dstack.yml/service.md#backends), 
+    [`regions`](../reference/dstack.yml/service.md#regions), 
+    [`max_price`](../reference/dstack.yml/service.md#max_price), and
+    among [others](../reference/dstack.yml/service.md).
 
 --8<-- "docs/concepts/snippets/manage-runs.ext"
 

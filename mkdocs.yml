@@ -105,7 +105,7 @@ plugins:
         'blog/monitoring-gpu-usage.md': 'blog/posts/dstack-metrics.md'
         'blog/inactive-dev-environments-auto-shutdown.md': 'blog/posts/inactivity-duration.md'
         'blog/data-centers-and-private-clouds.md': 'blog/posts/gpu-blocks-and-proxy-jump.md'
-        'blog/distributed-training-with-aws-efa.md': 'blog/posts/efa.md'
+        'blog/distributed-training-with-aws-efa.md': 'examples/clusters/efa/index.md'
         'blog/dstack-stats.md': 'blog/posts/dstack-metrics.md'
         'docs/concepts/metrics.md': 'docs/guides/metrics.md'
         'docs/guides/monitoring.md': 'docs/guides/metrics.md'
@@ -122,6 +122,7 @@ plugins:
         'examples/deployment/trtllm/index.md': 'examples/inference/trtllm/index.md'
         'examples/fine-tuning/trl/index.md': 'examples/single-node-training/trl/index.md'
         'examples/fine-tuning/axolotl/index.md': 'examples/single-node-training/axolotl/index.md'
+        'blog/efa.md': 'examples/clusters/efa/index.md'
   - typeset
   - gen-files:
       scripts:  # always relative to mkdocs.yml
@@ -190,10 +191,10 @@ extra:
     provider: google
     property: G-JX21114P7B
   social:
-    - icon: /fontawesome/brands/python
-      link: https://pypi.org/project/dstack
-    - icon: /fontawesome/brands/docker
-      link: https://hub.docker.com/r/dstackai/dstack
+    # - icon: /fontawesome/brands/python
+    #   link: https://pypi.org/project/dstack
+    # - icon: /fontawesome/brands/docker
+    #   link: https://hub.docker.com/r/dstackai/dstack
     - icon: /fontawesome/brands/github
       link: https://github.com/dstackai/dstack
     - icon: /fontawesome/brands/discord
@@ -220,6 +221,7 @@ nav:
           - Fleets: docs/concepts/fleets.md
           - Volumes: docs/concepts/volumes.md
           - Repos: docs/concepts/repos.md
+          - Secrets: docs/concepts/secrets.md
           - Projects: docs/concepts/projects.md
           - Gateways: docs/concepts/gateways.md
       - Guides:
@@ -253,6 +255,7 @@ nav:
             - dstack offer: docs/reference/cli/dstack/offer.md
             - dstack volume: docs/reference/cli/dstack/volume.md
             - dstack gateway: docs/reference/cli/dstack/gateway.md
+            - dstack secret: docs/reference/cli/dstack/secret.md
         - API:
             - Python API: docs/reference/api/python/index.md
             - REST API: docs/reference/api/rest/index.md
@@ -271,8 +274,9 @@ nav:
     - Clusters:
         - NCCL tests: examples/clusters/nccl-tests/index.md
         - RCCL tests: examples/clusters/rccl-tests/index.md
-        - A3 Mega: examples/clusters/a3mega/index.md
-        - A3 High: examples/clusters/a3high/index.md
+        - GCP A3 Mega: examples/clusters/a3mega/index.md
+        - GCP A3 High: examples/clusters/a3high/index.md
+        - AWS EFA: examples/clusters/efa/index.md
     - Inference:
         - SGLang: examples/inference/sglang/index.md
         - vLLM: examples/inference/vllm/index.md
@@ -284,8 +288,8 @@ nav:
         - TPU: examples/accelerators/tpu/index.md
         - Intel Gaudi: examples/accelerators/intel/index.md
         - Tenstorrent: examples/accelerators/tenstorrent/index.md
-    - Misc:
-        - Docker Compose: examples/misc/docker-compose/index.md
+#    - Misc:
+#        - Docker Compose: examples/misc/docker-compose/index.md
 #  - Community: community.md
 #  - Partners: partners.md
   - Blog:

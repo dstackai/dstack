@@ -1,7 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Button, ButtonWithConfirmation, FormField, Header, Loader, SelectCSD, SpaceBetween, Table, Toggle } from 'components';
+import { Button, ButtonWithConfirmation, Header, Loader, PropertyFilter, SpaceBetween, Table, Toggle } from 'components';
 
 import { DEFAULT_TABLE_PAGE_SIZE } from 'consts';
 import { useBreadcrumbs, useCollection, useInfiniteScroll } from 'hooks';
@@ -15,25 +15,27 @@ import styles from './styles.module.scss';
 export const VolumeList: React.FC = () => {
     const { t } = useTranslation();
     const {
+        clearFilter,
+        propertyFilterQuery,
+        onChangePropertyFilter,
+        filteringOptions,
+        filteringProperties,
+        filteringRequestParams,
         onlyActive,
-        setOnlyActive,
+        onChangeOnlyActive,
         isDisabledClearFilter,
-        clearFilters,
-        projectOptions,
-        selectedProject,
-        setSelectedProject,
     } = useFilters();
 
     const { isDeleting, deleteVolumes } = useVolumesDelete();
 
     const { renderEmptyMessage, renderNoMatchMessage } = useVolumesTableEmptyMessages({
-        clearFilters,
+        clearFilter,
         isDisabledClearFilter,
     });
 
     const { data, isLoading, refreshList, isLoadingMore } = useInfiniteScroll<IVolume, TVolumesListRequestParams>({
         useLazyQuery: useLazyGetAllVolumesQuery,
-        args: { project_name: selectedProject?.value ?? undefined, only_active: onlyActive, limit: DEFAULT_TABLE_PAGE_SIZE },
+        args: { ...filteringRequestParams, limit: DEFAULT_TABLE_PAGE_SIZE },
 
         getPaginationParams: (lastFleet) => ({
             prev_created_at: lastFleet.created_at,
@@ -112,32 +114,27 @@ export const VolumeList: React.FC = () => {
             selectionType="multi"
             filter={
                 <div className={styles.filters}>
-                    <div className={styles.select}>
-                        <FormField label={t('projects.run.project')}>
-                            <SelectCSD
-                                disabled={!projectOptions?.length}
-                                options={projectOptions}
-                                selectedOption={selectedProject}
-                                onChange={(event) => {
-                                    setSelectedProject(event.detail.selectedOption);
-                                }}
-                                placeholder={t('projects.run.project_placeholder')}
-                                expandToViewport={true}
-                                filteringType="auto"
-                            />
-                        </FormField>
+                    <div className={styles.propertyFilter}>
+                        <PropertyFilter
+                            query={propertyFilterQuery}
+                            onChange={onChangePropertyFilter}
+                            expandToViewport
+                            hideOperations
+                            i18nStrings={{
+                                clearFiltersText: t('common.clearFilter'),
+                                filteringAriaLabel: t('projects.run.filter_property_placeholder'),
+                                filteringPlaceholder: t('projects.run.filter_property_placeholder'),
+                                operationAndText: 'and',
+                            }}
+                            filteringOptions={filteringOptions}
+                            filteringProperties={filteringProperties}
+                        />
                     </div>
 
                     <div className={styles.activeOnly}>
-                        <Toggle onChange={({ detail }) => setOnlyActive(detail.checked)} checked={onlyActive}>
+                        <Toggle onChange={onChangeOnlyActive} checked={onlyActive}>
                             {t('volume.active_only')}
                         </Toggle>
-                    </div>
-
-                    <div className={styles.clear}>
-                        <Button formAction="none" onClick={clearFilters} disabled={isDisabledClearFilter}>
-                            {t('common.clearFilter')}
-                        </Button>
                     </div>
                 </div>
             }

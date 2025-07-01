@@ -228,7 +228,7 @@ Below is the task configuration file of fine-tuning Llama 3.1 8B using TRL on th
 type: task
 name: trl-train
 
-python: "3.10"
+python: 3.12
 # Ensure nvcc is installed (req. for Flash Attention) 
 nvcc: true
 env:

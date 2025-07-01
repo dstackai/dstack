@@ -1,3 +1,4 @@
+from dstack._internal.core.models.profiles import RetryEvent
 from dstack._internal.core.models.runs import (
     JobStatus,
     JobSubmission,
@@ -20,10 +21,16 @@ def test_run_termination_reason_to_status_works_with_all_enum_variants():
         assert isinstance(run_status, RunStatus)
 
 
-def test_job_termination_reason_to_status_works_with_all_enum_varians():
+def test_job_termination_reason_to_status_works_with_all_enum_variants():
     for job_termination_reason in JobTerminationReason:
         job_status = job_termination_reason.to_status()
         assert isinstance(job_status, JobStatus)
+
+
+def test_job_termination_reason_to_retry_event_works_with_all_enum_variants():
+    for job_termination_reason in JobTerminationReason:
+        retry_event = job_termination_reason.to_retry_event()
+        assert retry_event is None or isinstance(retry_event, RetryEvent)
 
 
 # Will fail if JobTerminationReason value is added without updaing JobSubmission._get_error

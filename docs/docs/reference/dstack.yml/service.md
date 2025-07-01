@@ -185,3 +185,20 @@ The `service` configuration type allows running [services](../../concepts/servic
 
     * `volume-name:/container/path` for network volumes
     * `/instance/path:/container/path` for instance volumes
+
+### `files[n]` { #_files data-toc-label="files" }
+
+#SCHEMA# dstack._internal.core.models.files.FilePathMapping
+    overrides:
+      show_root_heading: false
+      type:
+        required: true
+
+??? info "Short syntax"
+
+    The short syntax for files is a colon-separated string in the form of `local_path[:path]` where
+    `path` is optional and can be omitted if it's equal to `local_path`.
+
+    * `~/.bashrc`, same as `~/.bashrc:~/.bashrc`
+    * `/opt/myorg`, same as `/opt/myorg/` and `/opt/myorg:/opt/myorg`
+    * `libs/patched_libibverbs.so.1:/lib/x86_64-linux-gnu/libibverbs.so.1`

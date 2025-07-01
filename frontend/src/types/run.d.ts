@@ -1,7 +1,7 @@
 declare type TRunsRequestParams = {
     project_name?: IProject['project_name'];
     repo_id?: string;
-    user_name?: string;
+    username?: string;
     only_active?: boolean;
     prev_submitted_at?: string;
     prev_run_id?: string;
@@ -128,15 +128,18 @@ declare interface IJob {
 
 declare interface IDevEnvironmentConfiguration {
     type: 'dev-environment';
+    priority?: number | null
 }
 
 declare interface ITaskConfiguration {
     type: 'task';
+    priority?: number | null
 }
 
 declare interface IServiceConfiguration {
     type: 'service';
     gateway: string | null;
+    priority?: number | null
 }
 declare interface IRunSpec {
     configuration: IDevEnvironmentConfiguration | ITaskConfiguration | IServiceConfiguration;
@@ -173,6 +176,7 @@ declare interface IRun {
     latest_job_submission?: IJobSubmission;
     cost: number;
     service: IRunService | null;
+    status_message?: string | null;
 }
 
 declare interface IMetricsItem {

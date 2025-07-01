@@ -5,8 +5,17 @@ import { format } from 'date-fns';
 import { NavigateLink, StatusIndicator } from 'components';
 
 import { DATE_TIME_FORMAT } from 'consts';
-import { getRepoNameFromRun, getRunError, getRunStatusMessage, getStatusIconColor, getStatusIconType } from 'libs/run';
+import {
+    getRepoNameFromRun,
+    getRunError,
+    getRunPriority,
+    getRunStatusMessage,
+    getStatusIconColor,
+    getStatusIconType,
+} from 'libs/run';
 import { ROUTES } from 'routes';
+
+import { finishedRunStatuses } from 'pages/Runs/constants';
 
 import {
     getRunListItemBackend,
@@ -65,8 +74,12 @@ export const useColumnsDefinitions = () => {
             id: 'status',
             header: t('projects.run.status'),
             cell: (item: IRun) => {
-                const status = item.latest_job_submission?.status ?? item.status;
-                const terminationReason = item.latest_job_submission?.termination_reason;
+                const status = finishedRunStatuses.includes(item.status)
+                    ? item.latest_job_submission?.status ?? item.status
+                    : item.status;
+                const terminationReason = finishedRunStatuses.includes(item.status)
+                    ? item.latest_job_submission?.termination_reason
+                    : null;
 
                 return (
                     <StatusIndicator
@@ -82,6 +95,11 @@ export const useColumnsDefinitions = () => {
             id: 'error',
             header: t('projects.run.error'),
             cell: (item: IRun) => getRunError(item),
+        },
+        {
+            id: 'priority',
+            header: t('projects.run.priority'),
+            cell: (item: IRun) => getRunPriority(item),
         },
         {
             id: 'cost',

@@ -5,13 +5,16 @@ go 1.23
 require (
 	github.com/alexellis/go-execute/v2 v2.2.1
 	github.com/bluekeyes/go-gitdiff v0.7.2
+	github.com/codeclysm/extract/v4 v4.0.0
 	github.com/creack/pty v1.1.24
 	github.com/docker/docker v26.0.0+incompatible
 	github.com/docker/go-connections v0.5.0
 	github.com/docker/go-units v0.5.0
 	github.com/go-git/go-git/v5 v5.12.0
 	github.com/golang/gddo v0.0.0-20210115222349-20d68f94ee1f
+	github.com/gorilla/websocket v1.5.1
 	github.com/inhies/go-bytesize v0.0.0-20220417184213-4913239db9cf
+	github.com/prometheus/procfs v0.15.1
 	github.com/shirou/gopsutil/v4 v4.24.11
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.10.0
@@ -78,12 +81,6 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20240401170217-c3f982113cda // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240401170217-c3f982113cda // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
-	gotest.tools/v3 v3.5.0 // indirect
-)
-
-require (
-	github.com/codeclysm/extract/v3 v3.1.1
-	github.com/gorilla/websocket v1.5.1
-	github.com/prometheus/procfs v0.15.1
 	gopkg.in/yaml.v3 v3.0.1 // indirect
+	gotest.tools/v3 v3.5.0 // indirect
 )

@@ -54,6 +54,7 @@ export const Payments: React.FC<IProps> = ({ payments, emptyMessageContent, isLo
         <Table
             {...collectionProps}
             columnDefinitions={columns}
+            variant="borderless"
             items={items}
             loading={isLoading}
             loadingText={t('common.loading')}

@@ -1,5 +1,6 @@
 import json
 import uuid
+from collections.abc import Callable
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from typing import Dict, List, Literal, Optional, Union
@@ -77,6 +78,7 @@ from dstack._internal.core.models.volumes import (
 from dstack._internal.server.models import (
     BackendModel,
     DecryptedString,
+    FileArchiveModel,
     FleetModel,
     GatewayComputeModel,
     GatewayModel,
@@ -89,6 +91,7 @@ from dstack._internal.server.models import (
     RepoCredsModel,
     RepoModel,
     RunModel,
+    SecretModel,
     UserModel,
     VolumeAttachmentModel,
     VolumeModel,
@@ -140,6 +143,7 @@ async def create_project(
     created_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
     ssh_private_key: str = "",
     ssh_public_key: str = "",
+    is_public: bool = False,
 ) -> ProjectModel:
     if owner is None:
         owner = await create_user(session=session, name="test_owner")
@@ -149,6 +153,7 @@ async def create_project(
         created_at=created_at,
         ssh_private_key=ssh_private_key,
         ssh_public_key=ssh_public_key,
+        is_public=is_public,
     )
     session.add(project)
     await session.commit()
@@ -230,21 +235,38 @@ async def create_repo_creds(
     return repo_creds
 
 
+async def create_file_archive(
+    session: AsyncSession,
+    user_id: UUID,
+    blob_hash: str = "blob_hash",
+    blob: bytes = b"blob_content",
+) -> FileArchiveModel:
+    archive = FileArchiveModel(
+        user_id=user_id,
+        blob_hash=blob_hash,
+        blob=blob,
+    )
+    session.add(archive)
+    await session.commit()
+    return archive
+
+
 def get_run_spec(
     run_name: str,
     repo_id: str,
-    profile: Optional[Profile] = None,
+    configuration_path: str = "dstack.yaml",
+    profile: Union[Profile, Callable[[], Profile], None] = lambda: Profile(name="default"),
     configuration: Optional[AnyRunConfiguration] = None,
 ) -> RunSpec:
-    if profile is None:
-        profile = Profile(name="default")
+    if callable(profile):
+        profile = profile()
     return RunSpec(
         run_name=run_name,
         repo_id=repo_id,
         repo_data=LocalRunRepoData(repo_dir="/"),
         repo_code_hash=None,
         working_dir=".",
-        configuration_path="dstack.yaml",
+        configuration_path=configuration_path,
         configuration=configuration or DevEnvironmentConfiguration(ide="vscode"),
         profile=profile,
         ssh_key_pub="user_ssh_key",
@@ -263,6 +285,7 @@ async def create_run(
     run_id: Optional[UUID] = None,
     deleted: bool = False,
     priority: int = 0,
+    deployment_num: int = 0,
 ) -> RunModel:
     if run_spec is None:
         run_spec = get_run_spec(
@@ -284,6 +307,8 @@ async def create_run(
         last_processed_at=submitted_at,
         jobs=[],
         priority=priority,
+        deployment_num=deployment_num,
+        desired_replica_count=1,
     )
     session.add(run)
     await session.commit()
@@ -303,11 +328,16 @@ async def create_job(
     instance: Optional[InstanceModel] = None,
     job_num: int = 0,
     replica_num: int = 0,
+    deployment_num: Optional[int] = None,
     instance_assigned: bool = False,
     disconnected_at: Optional[datetime] = None,
 ) -> JobModel:
+    if deployment_num is None:
+        deployment_num = run.deployment_num
     run_spec = RunSpec.parse_raw(run.run_spec)
-    job_spec = (await get_job_specs_from_run_spec(run_spec, replica_num=replica_num))[0]
+    job_spec = (
+        await get_job_specs_from_run_spec(run_spec=run_spec, secrets={}, replica_num=replica_num)
+    )[0]
     job_spec.job_num = job_num
     job = JobModel(
         project_id=run.project_id,
@@ -316,6 +346,7 @@ async def create_job(
         job_num=job_num,
         job_name=run.run_name + f"-{job_num}-{replica_num}",
         replica_num=replica_num,
+        deployment_num=deployment_num,
         submission_num=submission_num,
         submitted_at=submitted_at,
         last_processed_at=last_processed_at,
@@ -906,6 +937,22 @@ async def create_job_prometheus_metrics(
     session.add(metrics)
     await session.commit()
     return metrics
+
+
+async def create_secret(
+    session: AsyncSession,
+    project: ProjectModel,
+    name: str,
+    value: str,
+):
+    secret_model = SecretModel(
+        project=project,
+        name=name,
+        value=DecryptedString(plaintext=value),
+    )
+    session.add(secret_model)
+    await session.commit()
+    return secret_model
 
 
 def get_private_key_string() -> str:

@@ -132,7 +132,8 @@ class AWSCompute(
         availability_offers = []
         for offer in offers:
             availability = InstanceAvailability.UNKNOWN
-            if not _has_quota(regions_to_quotas[offer.region], offer.instance.name):
+            quota = _has_quota(regions_to_quotas[offer.region], offer.instance.name)
+            if quota is not None and not quota:
                 availability = InstanceAvailability.NO_QUOTA
             availability_offers.append(
                 InstanceOfferWithAvailability(
@@ -231,6 +232,7 @@ class AWSCompute(
                 image_id, username = aws_resources.get_image_id_and_username(
                     ec2_client=ec2_client,
                     cuda=len(instance_offer.instance.resources.gpus) > 0,
+                    instance_type=instance_offer.instance.name,
                     image_config=self.config.os_images,
                 )
                 response = ec2_resource.create_instances(
@@ -781,10 +783,18 @@ def _get_regions_to_quotas(
 ) -> Dict[str, Dict[str, int]]:
     def get_region_quotas(client: botocore.client.BaseClient) -> Dict[str, int]:
         region_quotas = {}
-        for page in client.get_paginator("list_service_quotas").paginate(ServiceCode="ec2"):
-            for q in page["Quotas"]:
-                if "On-Demand" in q["QuotaName"]:
-                    region_quotas[q["UsageMetric"]["MetricDimensions"]["Class"]] = q["Value"]
+        try:
+            for page in client.get_paginator("list_service_quotas").paginate(ServiceCode="ec2"):
+                for q in page["Quotas"]:
+                    if "On-Demand" in q["QuotaName"]:
+                        region_quotas[q["UsageMetric"]["MetricDimensions"]["Class"]] = q["Value"]
+        except botocore.exceptions.ClientError as e:
+            if len(e.args) > 0 and "TooManyRequestsException" in e.args[0]:
+                logger.warning(
+                    "Failed to get quotas due to rate limits. Quotas won't be accounted for."
+                )
+            else:
+                logger.exception(e)
         return region_quotas
 
     regions_to_quotas = {}
@@ -800,12 +810,15 @@ def _get_regions_to_quotas(
     return regions_to_quotas
 
 
-def _has_quota(quotas: Dict[str, int], instance_name: str) -> bool:
+def _has_quota(quotas: Dict[str, int], instance_name: str) -> Optional[bool]:
+    quota = quotas.get("Standard/OnDemand")
     if instance_name.startswith("p"):
-        return quotas.get("P/OnDemand", 0) > 0
+        quota = quotas.get("P/OnDemand")
     if instance_name.startswith("g"):
-        return quotas.get("G/OnDemand", 0) > 0
-    return quotas.get("Standard/OnDemand", 0) > 0
+        quota = quotas.get("G/OnDemand")
+    if quota is None:
+        return None
+    return quota > 0
 
 
 def _get_regions_to_zones(session: boto3.Session, regions: List[str]) -> Dict[str, List[str]]:

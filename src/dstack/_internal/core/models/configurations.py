@@ -10,6 +10,7 @@ from typing_extensions import Annotated, Literal
 from dstack._internal.core.errors import ConfigurationError
 from dstack._internal.core.models.common import CoreModel, Duration, RegistryAuth
 from dstack._internal.core.models.envs import Env
+from dstack._internal.core.models.files import FilePathMapping
 from dstack._internal.core.models.fleets import FleetConfiguration
 from dstack._internal.core.models.gateways import GatewayConfiguration
 from dstack._internal.core.models.profiles import ProfileParams, parse_off_duration
@@ -194,12 +195,14 @@ class BaseRunConfiguration(CoreModel):
     ] = None
     python: Annotated[
         Optional[PythonVersion],
-        Field(description="The major version of Python. Mutually exclusive with `image`"),
+        Field(
+            description="The major version of Python. Mutually exclusive with `image` and `docker`"
+        ),
     ] = None
     nvcc: Annotated[
         Optional[bool],
         Field(
-            description="Use image with NVIDIA CUDA Compiler (NVCC) included. Mutually exclusive with `image`"
+            description="Use image with NVIDIA CUDA Compiler (NVCC) included. Mutually exclusive with `image` and `docker`"
         ),
     ] = None
     single_branch: Annotated[
@@ -244,6 +247,16 @@ class BaseRunConfiguration(CoreModel):
     volumes: Annotated[
         List[Union[MountPoint, str]], Field(description="The volumes mount points")
     ] = []
+    docker: Annotated[
+        Optional[bool],
+        Field(
+            description="Use Docker inside the container. Mutually exclusive with `image`, `python`, and `nvcc`. Overrides `privileged`"
+        ),
+    ] = None
+    files: Annotated[
+        list[Union[FilePathMapping, str]],
+        Field(description="The local to container file path mappings"),
+    ] = []
     # deprecated since 0.18.31; task, service -- no effect; dev-environment -- executed right before `init`
     setup: CommandsList = []
 
@@ -259,10 +272,28 @@ class BaseRunConfiguration(CoreModel):
             return PythonVersion(v)
         return v
 
+    @validator("docker", pre=True, always=True)
+    def _docker(cls, v, values) -> Optional[bool]:
+        if v is True and values.get("image"):
+            raise KeyError("`image` and `docker` are mutually exclusive fields")
+        if v is True and values.get("python"):
+            raise KeyError("`python` and `docker` are mutually exclusive fields")
+        if v is True and values.get("nvcc"):
+            raise KeyError("`nvcc` and `docker` are mutually exclusive fields")
+        # Ideally, we'd like to also prohibit privileged=False when docker=True,
+        #   but it's not possible to do so without breaking backwards compatibility.
+        return v
+
     @validator("volumes", each_item=True)
     def convert_volumes(cls, v) -> MountPoint:
         if isinstance(v, str):
             return parse_mount_point(v)
+        return v
+
+    @validator("files", each_item=True)
+    def convert_files(cls, v) -> FilePathMapping:
+        if isinstance(v, str):
+            return FilePathMapping.parse(v)
         return v
 
     @validator("user")

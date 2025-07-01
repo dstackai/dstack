@@ -57,6 +57,7 @@ class SubmitBody(CoreModel):
                     "repo_data",
                     "configuration",
                     "configuration_path",
+                    "file_archives",
                 },
             }
         ),
@@ -77,6 +78,7 @@ class SubmitBody(CoreModel):
                 "max_duration",
                 "ssh_key",
                 "working_dir",
+                "repo_data",
             }
         ),
     ]

@@ -8,7 +8,7 @@ import { Terminal } from '@xterm/xterm';
 import { Container, Header, ListEmptyMessage, Loader, TextContent } from 'components';
 
 import { useAppSelector } from 'hooks';
-import { useGetProjectLogsQuery } from 'services/project';
+import { useLazyGetProjectLogsQuery } from 'services/project';
 
 import { selectSystemMode } from 'App/slice';
 
@@ -22,27 +22,70 @@ export const Logs: React.FC<IProps> = ({ className, projectName, runName, jobSub
     const { t } = useTranslation();
     const appliedTheme = useAppSelector(selectSystemMode);
 
-    const terminalInstance = useRef<Terminal>(new Terminal());
-
+    const terminalInstance = useRef<Terminal>(new Terminal({scrollback: 10000000}));
     const fitAddonInstance = useRef<FitAddon>(new FitAddon());
     const [logsData, setLogsData] = useState<ILogItem[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
+
+    const [getProjectLogs] = useLazyGetProjectLogsQuery();
+
+    const writeDataToTerminal = (logs: ILogItem[]) => {
+        logs.forEach((logItem) => {
+            terminalInstance.current.write(logItem.message);
+        });
+
+        fitAddonInstance.current.fit();
+    };
+
+    const getNextLogItems = (nextToken?: string) => {
+        setIsLoading(true);
+
+        if (!jobSubmissionId) {
+            return;
+        }
+
+        getProjectLogs({
+            project_name: projectName,
+            run_name: runName,
+            descending: false,
+            job_submission_id: jobSubmissionId ?? '',
+            next_token: nextToken,
+            limit: LIMIT_LOG_ROWS,
+        })
+            .unwrap()
+            .then((response) => {
+                setLogsData((old) => [...old, ...response.logs]);
+
+                writeDataToTerminal(response.logs);
+
+                if (response.next_token) {
+                    getNextLogItems(response.next_token);
+                } else {
+                    setIsLoading(false);
+                }
+            })
+            .catch(() => setIsLoading(false));
+    };
 
     useEffect(() => {
         if (appliedTheme === Mode.Light) {
             terminalInstance.current.options.theme = {
                 foreground: '#000716',
                 background: '#ffffff',
+                selectionBackground: '#B4D5FE',
             };
         } else {
             terminalInstance.current.options.theme = {
                 foreground: '#b6bec9',
-                background: '#0f1b2a',
+                background: '#161d26',
             };
         }
     }, [appliedTheme]);
 
     useEffect(() => {
         terminalInstance.current.loadAddon(fitAddonInstance.current);
+
+        getNextLogItems();
 
         const onResize = () => {
             fitAddonInstance.current.fit();
@@ -55,50 +98,27 @@ export const Logs: React.FC<IProps> = ({ className, projectName, runName, jobSub
         };
     }, []);
 
-    const {
-        data: fetchData,
-        isLoading,
-        isFetching: isFetchingLogs,
-    } = useGetProjectLogsQuery(
-        {
-            project_name: projectName,
-            run_name: runName,
-            descending: true,
-            job_submission_id: jobSubmissionId ?? '',
-            limit: LIMIT_LOG_ROWS,
-        },
-        {
-            skip: !jobSubmissionId,
-        },
-    );
-
-    useEffect(() => {
-        if (fetchData) {
-            const reversed = [...fetchData].reverse();
-            setLogsData((old) => [...reversed, ...old]);
-        }
-    }, [fetchData]);
-
     useEffect(() => {
         const element = document.getElementById('terminal');
 
-        if (logsData.length && terminalInstance.current && element) {
+        if (terminalInstance.current && element) {
             terminalInstance.current.open(element);
-
-            logsData.forEach((logItem) => {
-                terminalInstance.current.write(logItem.message);
-            });
-
-            fitAddonInstance.current.fit();
         }
-    }, [logsData]);
+    }, []);
 
     return (
         <div className={classNames(styles.logs, className)}>
-            <Container header={<Header variant="h2">{t('projects.run.log')}</Header>}>
+            <Container
+                header={
+                    <Header variant="h2">
+                        <div className={styles.headerContainer}>
+                            {t('projects.run.log')}
+                            <Loader show={isLoading} padding={'n'} className={classNames(styles.loader)} loadingText={''} />
+                        </div>
+                    </Header>
+                }
+            >
                 <TextContent>
-                    <Loader padding={'n'} className={classNames(styles.loader, { show: isLoading || isFetchingLogs })} />
-
                     {!isLoading && !logsData.length && (
                         <ListEmptyMessage
                             title={t('projects.run.log_empty_message_title')}

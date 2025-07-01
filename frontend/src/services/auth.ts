@@ -75,6 +75,30 @@ export const authApi = createApi({
                 body,
             }),
         }),
+
+        getGoogleInfo: builder.query<{ enabled: boolean }, void>({
+            query: () => {
+                return {
+                    url: API.AUTH.GOOGLE.INFO(),
+                    method: 'POST',
+                };
+            },
+        }),
+
+        googleAuthorize: builder.mutation<{ authorization_url: string }, void>({
+            query: () => ({
+                url: API.AUTH.GOOGLE.AUTHORIZE(),
+                method: 'POST',
+            }),
+        }),
+
+        googleCallback: builder.mutation<IUserWithCreds, { code: string; state: string }>({
+            query: (body) => ({
+                url: API.AUTH.GOOGLE.CALLBACK(),
+                method: 'POST',
+                body,
+            }),
+        }),
     }),
 });
 
@@ -87,4 +111,7 @@ export const {
     useGetEntraInfoQuery,
     useEntraAuthorizeMutation,
     useEntraCallbackMutation,
+    useGetGoogleInfoQuery,
+    useGoogleAuthorizeMutation,
+    useGoogleCallbackMutation,
 } = authApi;

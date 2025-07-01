@@ -7,6 +7,7 @@ import {
     Button,
     ConfirmationDialog,
     Header,
+    Link,
     ListEmptyMessage,
     NavigateLink,
     Pagination,
@@ -59,7 +60,7 @@ export const UserList: React.FC = () => {
         {
             id: 'email',
             header: t('users.email'),
-            cell: (item: IUser) => item.email ?? '-',
+            cell: (item: IUser) => (item.email ? <Link href={`mailto:${item.email}`}>{item.email}</Link> : '-'),
         },
         {
             id: 'global_role',

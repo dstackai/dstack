@@ -162,15 +162,26 @@ def get_runs_table(
 
     for run in runs:
         run = run._run  # TODO(egor-s): make public attribute
+        show_deployment_num = (
+            verbose
+            and run.run_spec.configuration.type == "service"
+            or run.is_deployment_in_progress()
+        )
+        merge_job_rows = len(run.jobs) == 1 and not show_deployment_num
 
         run_row: Dict[Union[str, int], Any] = {
-            "NAME": run.run_spec.run_name,
+            "NAME": run.run_spec.run_name
+            + (f" [secondary]deployment={run.deployment_num}[/]" if show_deployment_num else ""),
             "SUBMITTED": format_date(run.submitted_at),
+            "STATUS": (
+                run.latest_job_submission.status_message
+                if run.status.is_finished() and run.latest_job_submission
+                else run.status_message
+            ),
         }
         if run.error:
             run_row["ERROR"] = run.error
-        if len(run.jobs) != 1:
-            run_row["STATUS"] = run.status
+        if not merge_job_rows:
             add_row_from_dict(table, run_row)
 
         for job in run.jobs:
@@ -180,7 +191,12 @@ def get_runs_table(
                 inactive_for = format_duration_multiunit(latest_job_submission.inactivity_secs)
                 status += f" (inactive for {inactive_for})"
             job_row: Dict[Union[str, int], Any] = {
-                "NAME": f"  replica={job.job_spec.replica_num} job={job.job_spec.job_num}",
+                "NAME": f"  replica={job.job_spec.replica_num} job={job.job_spec.job_num}"
+                + (
+                    f" deployment={latest_job_submission.deployment_num}"
+                    if show_deployment_num
+                    else ""
+                ),
                 "STATUS": latest_job_submission.status_message,
                 "SUBMITTED": format_date(latest_job_submission.submitted_at),
                 "ERROR": latest_job_submission.error,
@@ -204,7 +220,7 @@ def get_runs_table(
                         "PRICE": f"${jpd.price:.4f}".rstrip("0").rstrip("."),
                     }
                 )
-            if len(run.jobs) == 1:
+            if merge_job_rows:
                 # merge rows
                 job_row.update(run_row)
             add_row_from_dict(table, job_row, style="secondary" if len(run.jobs) != 1 else None)

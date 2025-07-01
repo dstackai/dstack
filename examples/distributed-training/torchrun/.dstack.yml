@@ -1,0 +1,24 @@
+type: task
+name: train-distrib
+
+nodes: 2
+
+python: 3.12
+env:
+  - NCCL_DEBUG=INFO
+commands:
+  - git clone https://github.com/pytorch/examples.git pytorch-examples
+  - cd pytorch-examples/distributed/ddp-tutorial-series
+  - uv pip install -r requirements.txt
+  - |
+    torchrun \
+      --nproc-per-node=$DSTACK_GPUS_PER_NODE \
+      --node-rank=$DSTACK_NODE_RANK \
+      --nnodes=$DSTACK_NODES_NUM \
+      --master-addr=$DSTACK_MASTER_NODE_IP \
+      --master-port=12345 \
+      multinode.py 50 10
+
+resources:
+  gpu: 1..8
+  shm_size: 16GB

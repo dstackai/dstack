@@ -1,12 +1,15 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useFieldArray, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 
-import { Button, FormSelect, Header, Link, ListEmptyMessage, Pagination, Table } from 'components';
+import { Button, ButtonWithConfirmation, FormSelect, Header, Link, ListEmptyMessage, Pagination, SpaceBetween, Table } from 'components';
 
-import { useCollection } from 'hooks';
+import { useAppSelector, useCollection, useNotifications } from 'hooks';
+import { selectUserData } from 'App/slice';
 import { ROUTES } from 'routes';
 import { useGetUserListQuery } from 'services/user';
+import { useProjectMemberActions } from '../hooks/useProjectMemberActions';
 
 import { UserAutosuggest } from './UsersAutosuggest';
 
@@ -16,10 +19,14 @@ import { TRoleSelectOption } from 'pages/User/Form/types';
 
 import styles from './styles.module.scss';
 
-export const ProjectMembers: React.FC<IProps> = ({ members, loading, onChange, readonly, isAdmin }) => {
+export const ProjectMembers: React.FC<IProps> = ({ members, loading, onChange, readonly, isAdmin, project }) => {
     const { t } = useTranslation();
+    const navigate = useNavigate();
+    const [pushNotification] = useNotifications();
     const [selectedItems, setSelectedItems] = useState<TProjectMemberWithIndex[]>([]);
     const { data: usersData } = useGetUserListQuery();
+    const userData = useAppSelector(selectUserData);
+    const { handleJoinProject, handleLeaveProject, isMemberActionLoading } = useProjectMemberActions();
 
     const { handleSubmit, control, getValues, setValue } = useForm<TFormValues>({
         defaultValues: { members: members ?? [] },
@@ -29,6 +36,16 @@ export const ProjectMembers: React.FC<IProps> = ({ members, loading, onChange, r
         control,
         name: 'members',
     });
+
+    const currentUserRole = useMemo(() => {
+        if (!userData?.username) return null;
+        const member = members?.find(m => m.user.username === userData.username);
+        return member?.project_role || null;
+    }, [members, userData?.username]);
+
+    const isProjectOwner = userData?.username === project?.owner.username;
+
+    const isMember = currentUserRole !== null;
 
     useEffect(() => {
         if (members) {
@@ -60,7 +77,7 @@ export const ProjectMembers: React.FC<IProps> = ({ members, loading, onChange, r
         { label: t('roles.user'), value: 'user' },
     ];
 
-    const addMember = (username: string) => {
+    const addMemberHandler = (username: string) => {
         const selectedUser = usersData?.find((u) => u.username === username);
 
         if (selectedUser) {
@@ -88,6 +105,66 @@ export const ProjectMembers: React.FC<IProps> = ({ members, loading, onChange, r
         remove(selectedItems.map(({ index }) => index));
         setSelectedItems([]);
         onChangeHandler();
+    };
+
+    const renderMemberActions = () => {
+        const actions = [];
+
+        // Add management actions only if not readonly
+        if (!readonly) {
+            actions.push(
+                <Button
+                    key="delete"
+                    formAction="none"
+                    onClick={deleteSelectedMembers}
+                    disabled={!selectedItems.length}
+                >
+                    {t('common.delete')}
+                </Button>
+            );
+        }
+
+        // Add join/leave button if user is authenticated (available even in readonly mode)
+        if (userData?.username && project) {
+            if (!isMember) {
+                actions.unshift(
+                    <Button
+                        key="join"
+                        onClick={() => handleJoinProject(project.project_name, userData.username!)}
+                        disabled={isMemberActionLoading}
+                        variant="normal"
+                    >
+                        {isMemberActionLoading ? t('common.loading') : t('projects.join')}
+                    </Button>
+                );
+            } else {
+                // Check if user is the last admin - if so, don't show leave button
+                const adminCount = project.members.filter(member => member.project_role === 'admin').length;
+                const isLastAdmin = currentUserRole === 'admin' && adminCount <= 1;
+                
+                if (!isLastAdmin) {
+                    // Only show leave button if user is not the last admin
+                    actions.unshift(
+                        <ButtonWithConfirmation
+                            key="leave"
+                            onClick={() => handleLeaveProject(project.project_name, userData.username!)}
+                            disabled={isMemberActionLoading}
+                            variant="danger-normal"
+                            confirmTitle={t('projects.leave_confirm_title')}
+                            confirmContent={t('projects.leave_confirm_message')}
+                            confirmButtonLabel={t('projects.leave')}
+                        >
+                            {isMemberActionLoading 
+                                ? t('common.loading') 
+                                : t('projects.leave')
+                            }
+                        </ButtonWithConfirmation>
+                    );
+                }
+            }
+        }
+
+        return actions.length > 0 ? <SpaceBetween size="xs" direction="horizontal">{actions}</SpaceBetween> : undefined;
     };
 
     const COLUMN_DEFINITIONS = [
@@ -152,13 +229,7 @@ export const ProjectMembers: React.FC<IProps> = ({ members, loading, onChange, r
                     <Header
                         variant="h2"
                         counter={`(${items?.length})`}
-                        actions={
-                            readonly ? undefined : (
-                                <Button formAction="none" onClick={deleteSelectedMembers} disabled={!selectedItems.length}>
-                                    {t('common.delete')}
-                                </Button>
-                            )
-                        }
+                        actions={renderMemberActions()}
                     >
                         {t('projects.edit.members.section_title')}
                     </Header>
@@ -167,7 +238,7 @@ export const ProjectMembers: React.FC<IProps> = ({ members, loading, onChange, r
                     readonly ? undefined : (
                         <UserAutosuggest
                             disabled={loading}
-                            onSelect={({ detail }) => addMember(detail.value)}
+                            onSelect={({ detail }) => addMemberHandler(detail.value)}
                             optionsFilter={(options) => options.filter((o) => !fields.find((f) => f.user.username === o.value))}
                         />
                     )

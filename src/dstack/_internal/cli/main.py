@@ -17,6 +17,7 @@ from dstack._internal.cli.commands.metrics import MetricsCommand
 from dstack._internal.cli.commands.offer import OfferCommand
 from dstack._internal.cli.commands.project import ProjectCommand
 from dstack._internal.cli.commands.ps import PsCommand
+from dstack._internal.cli.commands.secrets import SecretCommand
 from dstack._internal.cli.commands.server import ServerCommand
 from dstack._internal.cli.commands.stats import StatsCommand
 from dstack._internal.cli.commands.stop import StopCommand
@@ -72,6 +73,7 @@ def main():
     MetricsCommand.register(subparsers)
     ProjectCommand.register(subparsers)
     PsCommand.register(subparsers)
+    SecretCommand.register(subparsers)
     ServerCommand.register(subparsers)
     StatsCommand.register(subparsers)
     StopCommand.register(subparsers)

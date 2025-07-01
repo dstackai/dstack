@@ -4,17 +4,14 @@
     flex-wrap: wrap;
     gap: 0 20px;
 
-    .select {
-        width: var(--select-width, 30%);
+    .propertyFilter {
+        max-width: 640px;
+        flex-grow: 1;
+        min-width: 0;
     }
 
     .activeOnly {
         display: flex;
-        align-items: center;
-        padding-top: 26px;
-    }
-
-    .clear {
-        padding-top: 26px;
+        padding-top: 7px;
     }
 }

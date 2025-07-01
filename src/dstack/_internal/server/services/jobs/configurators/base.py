@@ -50,11 +50,15 @@ def get_default_python_verison() -> str:
         )
 
 
-def get_default_image(python_version: str, nvcc: bool = False) -> str:
-    suffix = ""
-    if nvcc:
-        suffix = "-devel"
-    return f"{settings.DSTACK_BASE_IMAGE}:py{python_version}-{settings.DSTACK_BASE_IMAGE_VERSION}-cuda-12.1{suffix}"
+def get_default_image(nvcc: bool = False) -> str:
+    """
+    Note: May be overridden by dstack (e.g., EFA-enabled version for AWS EFA-capable instances).
+    See `dstack._internal.server.background.tasks.process_running_jobs._patch_base_image_for_aws_efa` for details.
+
+    Args:
+        nvcc: If True, returns 'devel' variant, otherwise 'base'.
+    """
+    return f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}-{'devel' if nvcc else 'base'}-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"
 
 
 class JobConfigurator(ABC):
@@ -64,8 +68,13 @@ class JobConfigurator(ABC):
     # JobSSHKey should be shared for all jobs in a replica for inter-node communication.
     _job_ssh_key: Optional[JobSSHKey] = None
 
-    def __init__(self, run_spec: RunSpec):
+    def __init__(
+        self,
+        run_spec: RunSpec,
+        secrets: Optional[Dict[str, str]] = None,
+    ):
         self.run_spec = run_spec
+        self.secrets = secrets or {}
 
     async def get_job_specs(self, replica_num: int) -> List[JobSpec]:
         job_spec = await self._get_job_spec(replica_num=replica_num, job_num=0, jobs_per_replica=1)
@@ -94,10 +103,20 @@ class JobConfigurator(ABC):
     async def _get_image_config(self) -> ImageConfig:
         if self._image_config is not None:
             return self._image_config
+        interpolate = VariablesInterpolator({"secrets": self.secrets}).interpolate_or_error
+        registry_auth = self.run_spec.configuration.registry_auth
+        if registry_auth is not None:
+            try:
+                registry_auth = RegistryAuth(
+                    username=interpolate(registry_auth.username),
+                    password=interpolate(registry_auth.password),
+                )
+            except InterpolatorError as e:
+                raise ServerClientError(e.args[0])
         image_config = await run_async(
             _get_image_config,
             self._image_name(),
-            self.run_spec.configuration.registry_auth,
+            registry_auth,
         )
         self._image_config = image_config
         return image_config
@@ -130,6 +149,8 @@ class JobConfigurator(ABC):
             working_dir=self._working_dir(),
             volumes=self._volumes(job_num),
             ssh_key=self._ssh_key(jobs_per_replica),
+            repo_data=self.run_spec.repo_data,
+            repo_code_hash=self.run_spec.repo_code_hash,
         )
         return job_spec
 
@@ -167,13 +188,15 @@ class JobConfigurator(ABC):
         return result
 
     def _dstack_image_commands(self) -> List[str]:
+        if self.run_spec.configuration.docker is True:
+            return ["start-dockerd"]
         if (
             self.run_spec.configuration.image is not None
             or self.run_spec.configuration.entrypoint is not None
         ):
             return []
         return [
-            f"uv venv --prompt workflow --seed {DEFAULT_REPO_DIR}/.venv > /dev/null 2>&1",
+            f"uv venv --python {self._python()} --prompt workflow --seed {DEFAULT_REPO_DIR}/.venv > /dev/null 2>&1",
             f"echo 'source {DEFAULT_REPO_DIR}/.venv/bin/activate' >> ~/.bashrc",
             f"source {DEFAULT_REPO_DIR}/.venv/bin/activate",
         ]
@@ -197,9 +220,11 @@ class JobConfigurator(ABC):
         return self.run_spec.configuration.home_dir
 
     def _image_name(self) -> str:
-        if self.run_spec.configuration.image is not None:
+        if self.run_spec.configuration.docker is True:
+            return settings.DSTACK_DIND_IMAGE
+        elif self.run_spec.configuration.image is not None:
             return self.run_spec.configuration.image
-        return get_default_image(self._python(), nvcc=bool(self.run_spec.configuration.nvcc))
+        return get_default_image(nvcc=bool(self.run_spec.configuration.nvcc))
 
     async def _user(self) -> Optional[UnixUser]:
         user = self.run_spec.configuration.user
@@ -211,6 +236,8 @@ class JobConfigurator(ABC):
         return UnixUser.parse(user)
 
     def _privileged(self) -> bool:
+        if self.run_spec.configuration.docker is True:
+            return True
         return self.run_spec.configuration.privileged
 
     def _single_branch(self) -> bool:

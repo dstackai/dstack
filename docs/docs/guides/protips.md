@@ -2,46 +2,6 @@
 
 Below are tips and tricks to use `dstack` more efficiently.
 
-## Fleets
-
-### Creation policy
-
-By default, when you run `dstack apply` with a dev environment, task, or service,
-`dstack` reuses `idle` instances from an existing [fleet](../concepts/fleets.md).
-If no `idle` instances match the requirements, `dstack` automatically creates a new fleet 
-using configured backends.
-
-To ensure `dstack apply` doesn't create a new fleet but reuses an existing one,
-pass `-R` (or `--reuse`) to `dstack apply`.
-
-<div class="termy">
-
-```shell
-$ dstack apply -R -f examples/.dstack.yml
-```
-
-</div>
-
-### Idle duration
-
-If a fleet is created automatically, it stays `idle` for 5 minutes by default and can be reused within that time.
-If the fleet is not reused within this period, it is automatically terminated.
-To change the default idle duration, set
-[`idle_duration`](../reference/dstack.yml/fleet.md#idle_duration) in the run configuration (e.g., `0s`, `1m`, or `off` for
-unlimited).
-
-> For greater control over fleet provisioning, configuration, and lifecycle management, it is recommended to use
-> [fleets](../concepts/fleets.md) directly.
-
-## Volumes
-
-To persist data across runs, it is recommended to use volumes.
-`dstack` supports two types of volumes: [network](../concepts/volumes.md#network) 
-(for persisting data even if the instance is interrupted)
-and [instance](../concepts/volumes.md#instance) (useful for persisting cached data across runs while the instance remains active).
-
-> If you use [SSH fleets](../concepts/fleets.md#ssh), you can mount network storage (e.g., NFS or SMB) to the hosts and access it in runs via instance volumes.
-
 ## Dev environments
 
 Before running a task or service, it's recommended that you first start with a dev environment. Dev environments
@@ -81,10 +41,10 @@ Tasks can be used not only for batch jobs but also for web applications.
 type: task
 name: streamlit-task
 
-python: "3.10"
+python: 3.12
 
 commands:
-  - pip3 install streamlit
+  - uv pip install streamlit
   - streamlit hello
 ports: 
   - 8501
@@ -126,33 +86,47 @@ This allows you to access the remote `8501` port on `localhost:8501` while the C
     [Services](../concepts/services.md) provide external access, `https`, replicas with autoscaling, OpenAI-compatible endpoint
     and other service features. If you don't need them, you can use [tasks](../concepts/tasks.md) for running apps.
 
-## Docker and Docker Compose
+## Utilization policy
 
-All backends except `runpod`, `vastai`, and `kubernetes` allow using Docker and Docker Compose 
-inside `dstack` runs. To do that, additional configuration steps are required:
+If you want your run to automatically terminate if any of GPUs are underutilized, you can specify `utilization_policy`.
 
-1. Set the `privileged` property to `true`.
-2. Set the `image` property to `dstackai/dind` (or another DinD image).
-3. For tasks and services, add `start-dockerd` as the first command. For dev environments, add `start-dockerd` as the first command
-   in the `init` property.
+Below is an example of a dev environment that auto-terminate if any GPU stays below 10% utilization for 1 hour.
 
-Note, `start-dockerd` is a part of `dstackai/dind` image, if you use a different DinD image,
-replace it with a corresponding command to start Docker daemon.
+<div editor-title=".dstack.yml">
+
+```yaml
+type: dev-environment
+name: my-dev
+
+python: 3.12
+ide: cursor
+
+resources:
+  gpu: H100:8
+
+utilization_policy:
+  min_gpu_utilization: 10
+  time_window: 1h
+```
+
+</div>
+
+## Docker in Docker
+
+Set `docker` to `true` to enable the `docker` CLI in your dev environment, e.g., to run or build Docker images, or use Docker Compose.
 
 === "Dev environment"
     <div editor-title="examples/misc/docker-compose/.dstack.yml">
 
     ```yaml
     type: dev-environment
-    name: vscode-dind
+    name: vscode
 
-    privileged: true
-    image: dstackai/dind
+    docker: true
 
     ide: vscode
-
     init:
-      - start-dockerd
+      - docker run --gpus all nvidia/cuda:12.3.0-base-ubuntu22.04 nvidia-smi
     ```
 
     </div>
@@ -162,14 +136,15 @@ replace it with a corresponding command to start Docker daemon.
 
     ```yaml
     type: task
-    name: task-dind
+    name: docker-nvidia-smi
 
-    privileged: true
-    image: dstackai/dind
+    docker: true
 
     commands:
-      - start-dockerd
-      - docker compose up
+      - docker run --gpus all nvidia/cuda:12.3.0-base-ubuntu22.04 nvidia-smi
+
+    resources:
+      gpu: 1
     ```
 
     </div>
@@ -177,45 +152,78 @@ replace it with a corresponding command to start Docker daemon.
 ??? info "Volumes"
 
     To persist Docker data between runs (e.g. images, containers, volumes, etc), create a `dstack` [volume](../concepts/volumes.md)
-    and add attach it in your run configuration:
+    and add attach it in your run configuration.
+
+    === "Network volums"
     
-    ```yaml
-        type: dev-environment
-        name: vscode-dind
-    
-        privileged: true
-        image: dstackai/dind
-        ide: vscode
-    
-        init:
-          - start-dockerd
-    
-        volumes:
-          - name: docker-volume
-            path: /var/lib/docker
-    ```
+        ```yaml
+            type: dev-environment
+            name: vscode
+        
+            docker: true
+            ide: vscode
+        
+            volumes:
+              - name: docker-volume
+                path: /var/lib/docker
+        ```
+
+    === "Instance volumes"
+
+        ```yaml
+            type: dev-environment
+            name: vscode
+        
+            docker: true
+            ide: vscode
+        
+            volumes:
+              - name: /docker-volume
+                path: /var/lib/docker
+                optional: true
+        ```
 
 See more Docker examples [here](https://github.com/dstackai/dstack/tree/master/examples/misc/docker-compose).
 
-## Projects
+## Fleets
 
-If you're using multiple `dstack` projects (e.g., from different `dstack` servers),  
-you can switch between them using the [`dstack project`](../reference/cli/dstack/project.md) command.
+### Creation policy
 
-Alternatively, you can install [`direnv` :material-arrow-top-right-thin:{ .external }](https://direnv.net/){:target="_blank"}  
-to automatically apply environment variables from the `.envrc` file in your project directory.
+By default, when you run `dstack apply` with a dev environment, task, or service,
+`dstack` reuses `idle` instances from an existing [fleet](../concepts/fleets.md).
+If no `idle` instances match the requirements, `dstack` automatically creates a new fleet 
+using configured backends.
 
-<div editor-title=".envrc"> 
+To ensure `dstack apply` doesn't create a new fleet but reuses an existing one,
+pass `-R` (or `--reuse`) to `dstack apply`.
+
+<div class="termy">
 
 ```shell
-export DSTACK_PROJECT=main
+$ dstack apply -R -f examples/.dstack.yml
 ```
 
 </div>
 
-Now, `dstack` will always use this project within this directory.
+### Idle duration
 
-Remember to add `.envrc` to `.gitignore` to avoid committing it to the repo. 
+If a fleet is created automatically, it stays `idle` for 5 minutes by default and can be reused within that time.
+If the fleet is not reused within this period, it is automatically terminated.
+To change the default idle duration, set
+[`idle_duration`](../reference/dstack.yml/fleet.md#idle_duration) in the run configuration (e.g., `0s`, `1m`, or `off` for
+unlimited).
+
+> For greater control over fleet provisioning, configuration, and lifecycle management, it is recommended to use
+> [fleets](../concepts/fleets.md) directly.
+
+## Volumes
+
+To persist data across runs, it is recommended to use volumes.
+`dstack` supports two types of volumes: [network](../concepts/volumes.md#network) 
+(for persisting data even if the instance is interrupted)
+and [instance](../concepts/volumes.md#instance) (useful for persisting cached data across runs while the instance remains active).
+
+> If you use [SSH fleets](../concepts/fleets.md#ssh), you can mount network storage (e.g., NFS or SMB) to the hosts and access it in runs via instance volumes.
 
 ## Environment variables
 
@@ -228,7 +236,7 @@ without assigning a value:
 type: dev-environment
 name: vscode
 
-python: "3.10"
+python: 3.12
 
 env:
   - HF_TOKEN
@@ -284,6 +292,56 @@ $ dstack apply -e HF_TOKEN=... -f .dstack.yml
 [//]: # ()
 [//]: # (Set `default` to `true` in your profile, and it will be applied automatically to any run.)
 
+## Retry policy
+
+By default, if `dstack` can't find available capacity, the run will fail.
+
+If you'd like `dstack` to automatically retry, configure the 
+[retry](../reference/dstack.yml/task.md#retry) property accordingly:
+
+<!-- TODO: Add a relevant example here -->
+
+<div editor-title=".dstack.yml">
+
+```yaml
+type: task
+name: train    
+
+python: 3.12
+
+commands:
+  - uv pip install -r fine-tuning/qlora/requirements.txt
+  - python fine-tuning/qlora/train.py
+
+retry:
+  on_events: [no-capacity]
+  # Retry for up to 1 hour
+  duration: 1h
+```
+
+</div>
+
+## Projects
+
+If you're using multiple `dstack` projects (e.g., from different `dstack` servers),  
+you can switch between them using the [`dstack project`](../reference/cli/dstack/project.md) command.
+
+??? info ".envrc"
+    Alternatively, you can install [`direnv` :material-arrow-top-right-thin:{ .external }](https://direnv.net/){:target="_blank"}  
+    to automatically apply environment variables from the `.envrc` file in your project directory.
+
+    <div editor-title=".envrc"> 
+
+    ```shell
+    export DSTACK_PROJECT=main
+    ```
+
+    </div>
+
+    Now, `dstack` will always use this project within this directory.
+
+    Remember to add `.envrc` to `.gitignore` to avoid committing it to the repo. 
+
 ## Attached mode
 
 By default, `dstack apply` runs in attached mode.
@@ -304,6 +362,8 @@ allows specifying not only memory size but also GPU vendor, names, their memory,
 The general format is: `<vendor>:<comma-sparated names>:<memory range>:<quantity range>`.
 
 Each component is optional. 
+
+<!-- TODO: Mention, if count is not specified, it's set to `1..` -->
 
 Ranges can be:
 
@@ -346,7 +406,7 @@ If you're not sure which offers (hardware configurations) are available with the
 <div class="termy">
 
 ```shell
-$ dstack offer --gpu H100:1.. --max-offers 10
+$ dstack offer --gpu H100 --max-offers 10
 Getting offers...
 ---> 100%
 
@@ -369,9 +429,7 @@ Getting offers...
 
 ## Metrics
 
-While `dstack` allows the use of any third-party monitoring tools (e.g., Weights and Biases), you can also
-monitor container metrics such as CPU, memory, and GPU usage using the [built-in
-`dstack metrics` CLI command](../../blog/posts/dstack-metrics.md) or the corresponding API.
+`dstack` tracks essential metrics accessible via the CLI and UI. To access advanced metrics like DCGM, configure the server to export metrics to Prometheus. See [Metrics](metrics.md) for details.
 
 ## Service quotas
 
@@ -430,5 +488,3 @@ corresponding service quotas for each type of instance in each region.
 Note, for AWS, GCP, and Azure, service quota values are measured with the number of CPUs rather than GPUs.
 
 [//]: # (TODO: Mention spot policy)
-
-[//]: # (TODO: Mention retry policy)

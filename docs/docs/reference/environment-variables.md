@@ -56,24 +56,29 @@ tasks, and services:
       type: task
       name: train-distrib
 
+      # The size of the cluster
       nodes: 2
-      python: "3.12"
 
+      python: 3.12
+      env:
+        - NCCL_DEBUG=INFO
       commands:
-        - git clone https://github.com/pytorch/examples.git
-        - cd examples/distributed/ddp-tutorial-series
-        - pip install -r requirements.txt
-        - torchrun
-          --nproc-per-node=$DSTACK_GPUS_PER_NODE
-          --node-rank=$DSTACK_NODE_RANK
-          --nnodes=$DSTACK_NODES_NUM
-          --master-addr=$DSTACK_MASTER_NODE_IP
-          --master-port=12345
-          multinode.py 50 10
+        - git clone https://github.com/pytorch/examples.git pytorch-examples
+        - cd pytorch-examples/distributed/ddp-tutorial-series
+        - uv pip install -r requirements.txt
+        - |
+          torchrun \
+            --nproc-per-node=$DSTACK_GPUS_PER_NODE \
+            --node-rank=$DSTACK_NODE_RANK \
+            --nnodes=$DSTACK_NODES_NUM \
+            --master-addr=$DSTACK_MASTER_NODE_IP \
+            --master-port=12345 \
+            multinode.py 50 10
 
       resources:
-        gpu: 24GB
-        shm_size: 24GB
+        gpu: 24GB:1..2
+        # Uncomment if using multiple GPUs
+        #shm_size: 24GB
      ```
 
 - `DSTACK_NODES_IPS`{ #DSTACK_NODES_IPS } – The list of internal IP addresses of all nodes delimited by `"\n"`.
@@ -112,6 +117,9 @@ For more details on the options below, refer to the [server deployment](../guide
 - `DSTACK_DEFAULT_SERVICE_CLIENT_MAX_BODY_SIZE`{ #DSTACK_DEFAULT_SERVICE_CLIENT_MAX_BODY_SIZE } – Request body size limit for services running with a gateway, in bytes. Defaults to 64 MiB.
 - `DSTACK_FORBID_SERVICES_WITHOUT_GATEWAY`{ #DSTACK_FORBID_SERVICES_WITHOUT_GATEWAY } – Forbids registering new services without a gateway if set to any value.
 - `DSTACK_SERVER_CODE_UPLOAD_LIMIT`{ #DSTACK_SERVER_CODE_UPLOAD_LIMIT } - The repo size limit when uploading diffs or local repos, in bytes. Set to 0 to disable size limits. Defaults to 2MiB.
+- `DSTACK_SERVER_S3_BUCKET`{ #DSTACK_SERVER_S3_BUCKET } - The bucket that repo diffs will be uploaded to if set. If unset, diffs are uploaded to the database.
+- `DSTACK_SERVER_S3_BUCKET_REGION`{ #DSTACK_SERVER_S3_BUCKET_REGION } - The region of the S3 Bucket.
+- `DSTACK_SERVER_GCS_BUCKET`{ #DSTACK_SERVER_GCD_BUCKET } - The bucket that repo diffs will be uploaded to if set. If unset, diffs are uploaded to the database.
 
 ??? info "Internal environment variables"
      The following environment variables are intended for development purposes:

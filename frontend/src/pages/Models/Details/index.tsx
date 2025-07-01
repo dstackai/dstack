@@ -330,7 +330,17 @@ export const ModelDetails: React.FC = () => {
                                 <ColumnLayout columns={4} variant="text-grid">
                                     <div>
                                         <Box variant="awsui-key-label">{t('models.details.run_name')}</Box>
-                                        <div>{modelData.run_name}</div>
+
+                                        <div>
+                                            <NavigateLink
+                                                href={ROUTES.PROJECT.DETAILS.RUNS.DETAILS.FORMAT(
+                                                    modelData.project_name,
+                                                    modelData.run_name ?? 'No run name',
+                                                )}
+                                            >
+                                                {modelData.run_name}
+                                            </NavigateLink>
+                                        </div>
                                     </div>
 
                                     <div>

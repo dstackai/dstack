@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams, useSearchParams } from 'react-router-dom';
 
-import { Box, Button, Container, Header, Hotspot, Loader, Modal, SpaceBetween } from 'components';
+import { Box, Button, Header, Hotspot, Loader, Modal, SpaceBetween } from 'components';
 import { PermissionGuard } from 'components/PermissionGuard';
 import { HotspotIds } from 'layouts/AppLayout/TutorialPanel/constants';
 
@@ -102,7 +102,9 @@ export const Billing: React.FC = () => {
 
     return (
         <SpaceBetween size="l">
-            <Container header={<Header variant="h2">{t('billing.balance')}</Header>}>
+            <div>
+                <Header variant="h2">{t('billing.balance')}</Header>
+
                 {isLoading && <Loader />}
 
                 {data && (
@@ -126,7 +128,7 @@ export const Billing: React.FC = () => {
                         </SpaceBetween>
                     </SpaceBetween>
                 )}
-            </Container>
+            </div>
 
             <Payments
                 payments={data?.billing_history ?? []}

@@ -135,7 +135,7 @@ export const FleetDetails: React.FC = () => {
                             <Box variant="awsui-key-label">{t('fleets.instances.title')}</Box>
 
                             <div>
-                                <NavigateLink href={ROUTES.INSTANCES.LIST + `?fleetId=${data.id}`}>
+                                <NavigateLink href={ROUTES.INSTANCES.LIST + `?fleet_ids=${data.id}`}>
                                     {getFleetInstancesLinkText(data)}
                                 </NavigateLink>
                             </div>

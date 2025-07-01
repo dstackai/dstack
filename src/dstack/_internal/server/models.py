@@ -202,6 +202,7 @@ class ProjectModel(BaseModel):
     name: Mapped[str] = mapped_column(String(50), unique=True)
     created_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
     deleted: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_public: Mapped[bool] = mapped_column(Boolean, default=False)
 
     owner_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     owner: Mapped[UserModel] = relationship(lazy="joined")
@@ -314,6 +315,21 @@ class CodeModel(BaseModel):
     blob: Mapped[Optional[bytes]] = mapped_column(LargeBinary)  # None means blob is stored on s3
 
 
+class FileArchiveModel(BaseModel):
+    __tablename__ = "file_archives"
+    __table_args__ = (
+        UniqueConstraint("user_id", "blob_hash", name="uq_file_archives_user_id_blob_hash"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUIDType(binary=False), primary_key=True, default=uuid.uuid4
+    )
+    user_id: Mapped["UserModel"] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    user: Mapped["UserModel"] = relationship()
+    blob_hash: Mapped[str] = mapped_column(Text)
+    blob: Mapped[Optional[bytes]] = mapped_column(LargeBinary)  # None means blob is stored on s3
+
+
 class RunModel(BaseModel):
     __tablename__ = "runs"
 
@@ -349,6 +365,8 @@ class RunModel(BaseModel):
     run_spec: Mapped[str] = mapped_column(Text)
     service_spec: Mapped[Optional[str]] = mapped_column(Text)
     priority: Mapped[int] = mapped_column(Integer, default=0)
+    deployment_num: Mapped[int] = mapped_column(Integer)
+    desired_replica_count: Mapped[int] = mapped_column(Integer)
 
     jobs: Mapped[List["JobModel"]] = relationship(
         back_populates="run", lazy="selectin", order_by="[JobModel.replica_num, JobModel.job_num]"
@@ -403,6 +421,7 @@ class JobModel(BaseModel):
     instance: Mapped[Optional["InstanceModel"]] = relationship(back_populates="jobs")
     used_instance_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUIDType(binary=False))
     replica_num: Mapped[int] = mapped_column(Integer)
+    deployment_num: Mapped[int] = mapped_column(Integer)
     job_runtime_data: Mapped[Optional[str]] = mapped_column(Text)
 
 
@@ -707,3 +726,21 @@ class JobPrometheusMetrics(BaseModel):
     collected_at: Mapped[datetime] = mapped_column(NaiveDateTime)
     # Raw Prometheus text response
     text: Mapped[str] = mapped_column(Text)
+
+
+class SecretModel(BaseModel):
+    __tablename__ = "secrets"
+    __table_args__ = (UniqueConstraint("project_id", "name", name="uq_secrets_project_id_name"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUIDType(binary=False), primary_key=True, default=uuid.uuid4
+    )
+
+    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
+    project: Mapped["ProjectModel"] = relationship()
+
+    created_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
+    updated_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
+
+    name: Mapped[str] = mapped_column(String(200))
+    value: Mapped[DecryptedString] = mapped_column(EncryptedString())

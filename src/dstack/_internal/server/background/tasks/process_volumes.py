@@ -33,7 +33,7 @@ async def process_submitted_volumes():
                 )
                 .order_by(VolumeModel.last_processed_at.asc())
                 .limit(1)
-                .with_for_update(skip_locked=True)
+                .with_for_update(skip_locked=True, key_share=True)
             )
             volume_model = res.scalar()
             if volume_model is None:

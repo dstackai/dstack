@@ -1,11 +1,5 @@
 # Installation
 
-[//]: # (??? info "dstack Sky")
-[//]: # (    If you don't want to host the `dstack` server yourself or would like to access GPU from the `dstack` marketplace, you can use)
-[//]: # (    `dstack`'s hosted version, proceed to [dstack Sky]&#40;#dstack-sky&#41;.)
-
-To use the open-source version of `dstack` with your own cloud accounts or on-prem clusters, follow this guide.
-
 > If you don't want to host the `dstack` server (or want to access GPU marketplace),
 > skip installation and proceed to [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"}.
 
@@ -13,13 +7,14 @@ To use the open-source version of `dstack` with your own cloud accounts or on-pr
 
 ### (Optional) Configure backends
 
-To use `dstack` with cloud providers, configure backends
-via the `~/.dstack/server/config.yml` file.
+Backends allow `dstack` to manage compute across various providers.
+They can be configured via `~/.dstack/server/config.yml` (or through the [project settings page](../concepts/projects.md#backends) in the UI).
 
 For more details on how to configure backends, check [Backends](../concepts/backends.md).
 
-> For using `dstack` with on-prem servers, create [SSH fleets](../concepts/fleets.md#ssh) 
-> once the server is up.
+??? info "SSH fleets"
+    For using `dstack` with on-prem servers, create [SSH fleets](../concepts/fleets.md#ssh) 
+    once the server is up.
 
 ### Start the server
 

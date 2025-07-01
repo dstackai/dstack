@@ -1,7 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Button, FormField, Header, Loader, SelectCSD, Table } from 'components';
+import { Button, Header, Loader, PropertyFilter, Table } from 'components';
 
 import { DEFAULT_TABLE_PAGE_SIZE } from 'consts';
 import { useBreadcrumbs, useCollection, useInfiniteScroll } from 'hooks';
@@ -19,9 +19,14 @@ import styles from './styles.module.scss';
 export const List: React.FC = () => {
     const { t } = useTranslation();
 
-    const { projectOptions, selectedProject, setSelectedProject, clearSelected } = useFilters({
-        projectSearchKey: 'project',
-    });
+    const {
+        clearFilter,
+        propertyFilterQuery,
+        onChangePropertyFilter,
+        filteringOptions,
+        filteringProperties,
+        filteringRequestParams,
+    } = useFilters();
 
     useBreadcrumbs([
         {
@@ -35,16 +40,12 @@ export const List: React.FC = () => {
 
     const { data, isLoading, refreshList, isLoadingMore } = useInfiniteScroll<IModelExtended, TRunsRequestParams>({
         useLazyQuery: useLazyGetModelsQuery,
-        args: { project_name: selectedProject?.value, limit: DEFAULT_TABLE_PAGE_SIZE },
+        args: { ...filteringRequestParams, limit: DEFAULT_TABLE_PAGE_SIZE },
 
         getPaginationParams: (lastModel) => ({ prev_submitted_at: lastModel.submitted_at }),
     });
 
-    const clearFilter = () => {
-        clearSelected();
-    };
-
-    const isDisabledClearFilter = !selectedProject;
+    const isDisabledClearFilter = !propertyFilterQuery.tokens.length;
 
     const { renderEmptyMessage, renderNoMatchMessage } = useEmptyMessages({
         clearFilter,
@@ -86,26 +87,21 @@ export const List: React.FC = () => {
             }
             filter={
                 <div className={styles.selectFilters}>
-                    <div className={styles.select}>
-                        <FormField label={t('projects.run.project')}>
-                            <SelectCSD
-                                disabled={!projectOptions?.length}
-                                options={projectOptions}
-                                selectedOption={selectedProject}
-                                onChange={(event) => {
-                                    setSelectedProject(event.detail.selectedOption);
-                                }}
-                                placeholder={t('projects.run.project_placeholder')}
-                                expandToViewport={true}
-                                filteringType="auto"
-                            />
-                        </FormField>
-                    </div>
-
-                    <div className={styles.clear}>
-                        <Button disabled={isDisabledClearFilter} formAction="none" onClick={clearSelected}>
-                            {t('common.clearFilter')}
-                        </Button>
+                    <div className={styles.propertyFilter}>
+                        <PropertyFilter
+                            query={propertyFilterQuery}
+                            onChange={onChangePropertyFilter}
+                            expandToViewport
+                            hideOperations
+                            i18nStrings={{
+                                clearFiltersText: t('common.clearFilter'),
+                                filteringAriaLabel: t('projects.run.filter_property_placeholder'),
+                                filteringPlaceholder: t('projects.run.filter_property_placeholder'),
+                                operationAndText: 'and',
+                            }}
+                            filteringOptions={filteringOptions}
+                            filteringProperties={filteringProperties}
+                        />
                     </div>
                 </div>
             }

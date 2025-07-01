@@ -7,6 +7,7 @@ import App from 'App';
 import { LoginByEntraIDCallback } from 'App/Login/EntraID/LoginByEntraIDCallback';
 import { LoginByGithubCallback } from 'App/Login/LoginByGithubCallback';
 import { LoginByOktaCallback } from 'App/Login/LoginByOktaCallback';
+import { LoginByGoogleCallback } from 'App/Login/LoginByGoogleCallback';
 import { TokenLogin } from 'App/Login/TokenLogin';
 import { Logout } from 'App/Logout';
 import { FleetDetails, FleetList } from 'pages/Fleets';
@@ -46,6 +47,10 @@ export const router = createBrowserRouter([
                 element: <LoginByEntraIDCallback />,
             },
             {
+                path: ROUTES.AUTH.GOOGLE_CALLBACK,
+                element: <LoginByGoogleCallback />,
+            },
+            {
                 path: ROUTES.AUTH.TOKEN,
                 element: <TokenLogin />,
             },
@@ -63,25 +68,21 @@ export const router = createBrowserRouter([
                 element: <ProjectDetails />,
                 children: [
                     {
-                        path: ROUTES.PROJECT.DETAILS.SETTINGS.TEMPLATE,
+                        index: true,
                         element: <ProjectSettings />,
                     },
-
                     {
                         path: ROUTES.PROJECT.BACKEND.ADD.TEMPLATE,
                         element: <BackendAdd />,
                     },
-
                     {
                         path: ROUTES.PROJECT.BACKEND.EDIT.TEMPLATE,
                         element: <BackendEdit />,
                     },
-
                     {
                         path: ROUTES.PROJECT.GATEWAY.ADD.TEMPLATE,
                         element: <AddGateway />,
                     },
-
                     {
                         path: ROUTES.PROJECT.GATEWAY.EDIT.TEMPLATE,
                         element: <EditGateway />,

@@ -1,27 +1,79 @@
+# syntax = edrevo/dockerfile-plus
+ARG UBUNTU_VERSION
+
+# Build stage
+FROM nvidia/cuda:12.1.1-base-ubuntu${UBUNTU_VERSION}.04 AS builder
+
+ENV NCCL_HOME=/opt/nccl
+ENV CUDA_HOME=/usr/local/cuda
+ENV OPEN_MPI_PATH=/usr/lib/x86_64-linux-gnu/openmpi
+
+# Prerequisites
+
+RUN export DEBIAN_FRONTEND=noninteractive \
+    && apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu${UBUNTU_VERSION}04/x86_64/3bf863cc.pub \
+    && apt-get update --fix-missing \
+    && apt-get upgrade -y \
+    && ln -fs /usr/share/zoneinfo/America/New_York /etc/localtime \
+    && apt-get install -y tzdata \
+    && dpkg-reconfigure --frontend noninteractive tzdata \
+    && cuda_version=$(echo ${CUDA_VERSION} | awk -F . '{ print $1"-"$2 }') \
+    && apt-get install -y --no-install-recommends \
+        cuda-libraries-dev-${cuda_version} \
+        cuda-nvcc-${cuda_version} \
+        libhwloc-dev \
+        autoconf \
+        automake \
+        libtool \
+        libopenmpi-dev \
+        git \
+        curl \
+        python3 \
+        build-essential
+
+# NCCL
+
+ARG NCCL_VERSION=2.26.2-1
+
+RUN cd /tmp \
+    && git clone https://github.com/NVIDIA/nccl.git -b v${NCCL_VERSION} \
+    && cd nccl \
+    && make -j$(nproc) src.build BUILDDIR=${NCCL_HOME}
+
+# NCCL tests
+
+RUN cd /opt \
+    && git clone https://github.com/NVIDIA/nccl-tests \
+    && cd nccl-tests \
+    && make -j$(nproc) \
+        MPI=1 \
+        MPI_HOME=${OPEN_MPI_PATH} \
+        CUDA_HOME=${CUDA_HOME} \
+        NCCL_HOME=${NCCL_HOME}
+
+# Final stage
+
+INCLUDE+ base/Dockerfile.common
+
+ENV NCCL_HOME=/opt/nccl
+
+COPY --from=builder ${NCCL_HOME} ${NCCL_HOME}
+COPY --from=builder /opt/nccl-tests/build /opt/nccl-tests/build
+
 ARG FLAVOR
-FROM nvidia/cuda:12.1.1-${FLAVOR}-ubuntu20.04
 
-ARG PYTHON
-ARG _UV_HOME="/opt/uv"
-ENV UV_PYTHON="${PYTHON}"
-ENV UV_INSTALL_DIR="${_UV_HOME}/bin"
-ENV UV_PYTHON_INSTALL_DIR="${_UV_HOME}/python"
-ENV UV_PYTHON_BIN_DIR="${UV_PYTHON_INSTALL_DIR}/bin"
-ENV UV_MANAGED_PYTHON=1
-ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
+# MPI, NVCC, and /etc/ld.so.conf.d
 
-ENV PATH="${UV_INSTALL_DIR}:${UV_PYTHON_BIN_DIR}:${PATH}"
-
-RUN export DEBIAN_FRONTEND=noninteractive && \
-    apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/3bf863cc.pub && \
-    apt-get update --fix-missing && \
-    apt-get upgrade -y && \
-    ln -fs /usr/share/zoneinfo/America/New_York /etc/localtime && \
-    apt-get install -y tzdata && \
-    dpkg-reconfigure --frontend noninteractive tzdata && \
-    apt-get install -y bzip2 ca-certificates curl build-essential git libglib2.0-0 libsm6 libxext6 libxrender1 mercurial openssh-server subversion wget && \
-    sed -i "s/.*PasswordAuthentication.*/PasswordAuthentication no/g" /etc/ssh/sshd_config && mkdir /run/sshd && \
-    mkdir ~/.ssh && chmod 700 ~/.ssh && touch ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys && rm /etc/ssh/ssh_host_*
-
-RUN curl -LsSf https://astral.sh/uv/install.sh | INSTALLER_NO_MODIFY_PATH=1 sh && \
-    uv python install --preview --default
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        openmpi-bin \
+    && if [ "$FLAVOR" = "devel" ]; then \
+        cuda_version=$(echo ${CUDA_VERSION} | awk -F . '{ print $1"-"$2 }') \
+        && apt-get install -y --no-install-recommends \
+            cuda-libraries-dev-${cuda_version} \
+            cuda-nvcc-${cuda_version} \
+            libhwloc-dev; \
+    fi \
+    && rm -rf /var/lib/apt/lists/* \
+    && echo "${NCCL_HOME}/lib" >> /etc/ld.so.conf.d/nccl.conf \
+    && ldconfig

@@ -1,20 +1,16 @@
 from typing import List
 
-from dstack._internal.core.models.secrets import Secret
-from dstack._internal.server.schemas.common import RepoRequest
+from dstack._internal.core.models.common import CoreModel
 
 
-class ListSecretsRequest(RepoRequest):
-    pass
+class GetSecretRequest(CoreModel):
+    name: str
 
 
-class GetSecretsRequest(RepoRequest):
-    pass
+class CreateOrUpdateSecretRequest(CoreModel):
+    name: str
+    value: str
 
 
-class AddSecretRequest(RepoRequest):
-    secret: Secret
-
-
-class DeleteSecretsRequest(RepoRequest):
+class DeleteSecretsRequest(CoreModel):
     secrets_names: List[str]

@@ -12,6 +12,7 @@ from dstack._internal.core.models.configurations import (
     AnyRunConfiguration,
     RunConfiguration,
 )
+from dstack._internal.core.models.files import FileArchiveMapping
 from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
     InstanceType,
@@ -148,6 +149,19 @@ class JobTerminationReason(str, Enum):
         }
         return mapping[self]
 
+    def to_retry_event(self) -> Optional[RetryEvent]:
+        """
+        Returns:
+            the retry event this termination reason triggers
+            or None if this termination reason should not be retried
+        """
+        mapping = {
+            self.FAILED_TO_START_DUE_TO_NO_CAPACITY: RetryEvent.NO_CAPACITY,
+            self.INTERRUPTED_BY_NO_CAPACITY: RetryEvent.INTERRUPTION,
+        }
+        default = RetryEvent.ERROR if self.to_status() == JobStatus.FAILED else None
+        return mapping.get(self, default)
+
 
 class Requirements(CoreModel):
     # TODO: Make requirements' fields required
@@ -204,6 +218,14 @@ class JobSpec(CoreModel):
     volumes: Optional[List[MountPoint]] = None
     ssh_key: Optional[JobSSHKey] = None
     working_dir: Optional[str]
+    # `repo_data` is optional for client compatibility with pre-0.19.17 servers and for compatibility
+    # with jobs submitted before 0.19.17. All new jobs are expected to have non-None `repo_data`.
+    # For --no-repo runs, `repo_data` is `VirtualRunRepoData()`.
+    repo_data: Annotated[Optional[AnyRunRepoData], Field(discriminator="repo_type")] = None
+    # `repo_code_hash` can be None because it is not used for the repo or because the job was
+    # submitted before 0.19.17. See `_get_repo_code_hash` on how to get the correct `repo_code_hash`
+    # TODO: drop this comment when supporting jobs submitted before 0.19.17 is no longer relevant.
+    repo_code_hash: Optional[str] = None
 
 
 class JobProvisioningData(CoreModel):
@@ -276,6 +298,7 @@ class ClusterInfo(CoreModel):
 class JobSubmission(CoreModel):
     id: UUID4
     submission_num: int
+    deployment_num: int = 0  # default for compatibility with pre-0.19.14 servers
     submitted_at: datetime
     last_processed_at: datetime
     finished_at: Optional[datetime]
@@ -287,7 +310,7 @@ class JobSubmission(CoreModel):
     job_provisioning_data: Optional[JobProvisioningData]
     job_runtime_data: Optional[JobRuntimeData]
     # TODO: make status_message and error a computed field after migrating to pydanticV2
-    status_message: Optional[str]
+    status_message: Optional[str] = None
     error: Optional[str] = None
 
     @property
@@ -354,7 +377,7 @@ class JobSubmission(CoreModel):
         error_mapping = {
             JobTerminationReason.INSTANCE_UNREACHABLE: "instance unreachable",
             JobTerminationReason.WAITING_INSTANCE_LIMIT_EXCEEDED: "waiting instance limit exceeded",
-            JobTerminationReason.VOLUME_ERROR: "waiting runner limit exceeded",
+            JobTerminationReason.VOLUME_ERROR: "volume error",
             JobTerminationReason.GATEWAY_ERROR: "gateway error",
             JobTerminationReason.SCALED_DOWN: "scaled down",
             JobTerminationReason.INACTIVITY_DURATION_EXCEEDED: "inactivity duration exceeded",
@@ -399,6 +422,10 @@ class RunSpec(CoreModel):
         Optional[str],
         Field(description="The hash of the repo diff. Can be omitted if there is no repo diff."),
     ] = None
+    file_archives: Annotated[
+        list[FileArchiveMapping],
+        Field(description="The list of file archive ID to container path mappings"),
+    ] = []
     working_dir: Annotated[
         Optional[str],
         Field(
@@ -496,12 +523,14 @@ class Run(CoreModel):
     submitted_at: datetime
     last_processed_at: datetime
     status: RunStatus
+    status_message: Optional[str] = None
     termination_reason: Optional[RunTerminationReason]
     run_spec: RunSpec
     jobs: List[Job]
     latest_job_submission: Optional[JobSubmission]
     cost: float = 0
     service: Optional[ServiceSpec] = None
+    deployment_num: int = 0  # default for compatibility with pre-0.19.14 servers
     # TODO: make error a computed field after migrating to pydanticV2
     error: Optional[str] = None
     deleted: Optional[bool] = None
@@ -523,6 +552,62 @@ class Run(CoreModel):
             return "server error"
         else:
             return None
+
+    @root_validator
+    def _status_message(cls, values) -> Dict:
+        try:
+            status = values["status"]
+            jobs: List[Job] = values["jobs"]
+            retry_on_events = (
+                jobs[0].job_spec.retry.on_events if jobs and jobs[0].job_spec.retry else []
+            )
+            job_status = (
+                jobs[0].job_submissions[-1].status
+                if len(jobs) == 1 and jobs[0].job_submissions
+                else None
+            )
+            termination_reason = Run.get_last_termination_reason(jobs[0]) if jobs else None
+        except KeyError:
+            return values
+        values["status_message"] = Run._get_status_message(
+            status=status,
+            job_status=job_status,
+            retry_on_events=retry_on_events,
+            termination_reason=termination_reason,
+        )
+        return values
+
+    @staticmethod
+    def get_last_termination_reason(job: "Job") -> Optional[JobTerminationReason]:
+        for submission in reversed(job.job_submissions):
+            if submission.termination_reason is not None:
+                return submission.termination_reason
+        return None
+
+    @staticmethod
+    def _get_status_message(
+        status: RunStatus,
+        job_status: Optional[JobStatus],
+        retry_on_events: List[RetryEvent],
+        termination_reason: Optional[JobTerminationReason],
+    ) -> str:
+        if job_status == JobStatus.PULLING:
+            return "pulling"
+        # Currently, `retrying` is shown only for `no-capacity` events
+        if (
+            status in [RunStatus.SUBMITTED, RunStatus.PENDING]
+            and termination_reason == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
+            and RetryEvent.NO_CAPACITY in retry_on_events
+        ):
+            return "retrying"
+        return status.value
+
+    def is_deployment_in_progress(self) -> bool:
+        return any(
+            not j.job_submissions[-1].status.is_finished()
+            and j.job_submissions[-1].deployment_num != self.deployment_num
+            for j in self.jobs
+        )
 
 
 class JobPlan(CoreModel):

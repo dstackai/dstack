@@ -29,7 +29,7 @@ export const useTutorials = () => {
     const dispatch = useAppDispatch();
     const { billingUrl } = useSideNavigation();
     const useName = useAppSelector(selectUserName);
-    const { billingCompleted, configureCLICompleted, discordCompleted, tallyCompleted, quickStartCompleted } =
+    const { billingCompleted, configureCLICompleted, discordCompleted, tallyCompleted, quickStartCompleted, hideStartUp } =
         useAppSelector(selectTutorialPanel);
 
     const { data: userBillingData } = useGetUserBillingInfoQuery({ username: useName ?? '' }, { skip: !useName });
@@ -41,14 +41,19 @@ export const useTutorials = () => {
 
     useEffect(() => {
         if (userBillingData && runsData && !completeIsChecked.current) {
-            dispatch(
-                updateTutorialPanelState({
-                    billingCompleted: userBillingData.balance > 0,
-                    configureCLICompleted: runsData.length > 0,
-                }),
-            );
+            const billingCompleted = userBillingData.balance > 0;
+            const configureCLICompleted = runsData.length > 0;
 
-            if ((userBillingData.balance <= 0 || runsData.length === 0) && process.env.UI_VERSION === 'sky') {
+            let tempHideStartUp = hideStartUp;
+
+            if (hideStartUp === null) {
+                tempHideStartUp = billingCompleted && configureCLICompleted;
+            }
+
+            // Set hideStartUp without updating localstorage
+            dispatch(updateTutorialPanelState({ billingCompleted, configureCLICompleted, hideStartUp: tempHideStartUp }));
+
+            if (!tempHideStartUp && process.env.UI_VERSION === 'sky') {
                 dispatch(openTutorialPanel());
             }
 

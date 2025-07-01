@@ -58,7 +58,7 @@ class ProjectAdmin:
             raise error_invalid_token()
         project = await get_project_model_by_name(session=session, project_name=project_name)
         if project is None:
-            raise error_forbidden()
+            raise error_not_found()
         if user.global_role == GlobalRole.ADMIN:
             return user, project
         project_role = get_user_project_role(user=user, project=project)
@@ -68,6 +68,10 @@ class ProjectAdmin:
 
 
 class ProjectManager:
+    """
+    Allows project admins and managers to manage projects.
+    """
+
     async def __call__(
         self,
         project_name: str,
@@ -79,12 +83,15 @@ class ProjectManager:
             raise error_invalid_token()
         project = await get_project_model_by_name(session=session, project_name=project_name)
         if project is None:
-            raise error_forbidden()
+            raise error_not_found()
+
         if user.global_role == GlobalRole.ADMIN:
             return user, project
+
         project_role = get_user_project_role(user=user, project=project)
         if project_role in [ProjectRole.ADMIN, ProjectRole.MANAGER]:
             return user, project
+
         raise error_forbidden()
 
 
@@ -97,6 +104,108 @@ class ProjectMember:
         token: HTTPAuthorizationCredentials = Security(HTTPBearer()),
     ) -> Tuple[UserModel, ProjectModel]:
         return await get_project_member(session, project_name, token.credentials)
+
+
+class ProjectMemberOrPublicAccess:
+    """
+    Allows access to project for:
+    - Global admins
+    - Project members
+    - Any authenticated user if the project is public
+    """
+
+    async def __call__(
+        self,
+        *,
+        session: AsyncSession = Depends(get_session),
+        project_name: str,
+        token: HTTPAuthorizationCredentials = Security(HTTPBearer()),
+    ) -> Tuple[UserModel, ProjectModel]:
+        user = await log_in_with_token(session=session, token=token.credentials)
+        if user is None:
+            raise error_invalid_token()
+
+        project = await get_project_model_by_name(session=session, project_name=project_name)
+        if project is None:
+            raise error_not_found()
+
+        if user.global_role == GlobalRole.ADMIN:
+            return user, project
+
+        project_role = get_user_project_role(user=user, project=project)
+        if project_role is not None:
+            return user, project
+
+        if project.is_public:
+            return user, project
+
+        raise error_forbidden()
+
+
+class ProjectManagerOrPublicProject:
+    """
+    Allows:
+    1. Project managers to perform member management operations
+    2. Access to public projects for any authenticated user
+    """
+
+    def __init__(self):
+        self.project_manager = ProjectManager()
+
+    async def __call__(
+        self,
+        project_name: str,
+        session: AsyncSession = Depends(get_session),
+        token: HTTPAuthorizationCredentials = Security(HTTPBearer()),
+    ) -> Tuple[UserModel, ProjectModel]:
+        user = await log_in_with_token(session=session, token=token.credentials)
+        if user is None:
+            raise error_invalid_token()
+        project = await get_project_model_by_name(session=session, project_name=project_name)
+        if project is None:
+            raise error_not_found()
+
+        if user.global_role == GlobalRole.ADMIN:
+            return user, project
+
+        project_role = get_user_project_role(user=user, project=project)
+        if project_role in [ProjectRole.ADMIN, ProjectRole.MANAGER]:
+            return user, project
+
+        if project.is_public:
+            return user, project
+
+        raise error_forbidden()
+
+
+class ProjectManagerOrSelfLeave:
+    """
+    Allows:
+    1. Project managers to remove any members
+    2. Any project member to leave (remove themselves)
+    """
+
+    async def __call__(
+        self,
+        project_name: str,
+        session: AsyncSession = Depends(get_session),
+        token: HTTPAuthorizationCredentials = Security(HTTPBearer()),
+    ) -> Tuple[UserModel, ProjectModel]:
+        user = await log_in_with_token(session=session, token=token.credentials)
+        if user is None:
+            raise error_invalid_token()
+        project = await get_project_model_by_name(session=session, project_name=project_name)
+        if project is None:
+            raise error_not_found()
+
+        if user.global_role == GlobalRole.ADMIN:
+            return user, project
+
+        project_role = get_user_project_role(user=user, project=project)
+        if project_role is not None:
+            return user, project
+
+        raise error_forbidden()
 
 
 class OptionalServiceAccount:
