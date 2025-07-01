@@ -36,7 +36,7 @@ export const FleetDetails: React.FC = () => {
     const { data, isLoading } = useGetFleetDetailsQuery(
         {
         projectName:
-        paramProjectName,
+            paramProjectName,
         fleetId:
         paramFleetId,
         },
