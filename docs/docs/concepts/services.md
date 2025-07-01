@@ -513,6 +513,91 @@ resources:
 
 <!-- TODO: Ellaborate on using environment variables in `registry_auth` -->
 
+### Files
+
+By default, `dstack` automatically mounts the [repo](repos.md) directory where you ran `dstack init` to any run configuration. 
+
+However, in some cases, you may not want to mount the entire directory (e.g., if it’s too large),
+or you might want to mount files outside of it. In such cases, you can use the [`files`](../reference/dstack.yml/dev-environment.md#files) property.
+
+<!-- TODO: Add a more relevant example -->
+
+<div editor-title="examples/.dstack.yml"> 
+
+```yaml
+type: service
+name: llama-2-7b-service
+
+files:
+  - .:examples  # Maps the directory where `.dstack.yml` to `/workflow/examples`
+  - ~/.ssh/id_rsa:/root/.ssh/id_rsa  # Maps `~/.ssh/id_rsa` to `/root/.ssh/id_rsa`
+
+python: 3.12
+
+env:
+  - HF_TOKEN
+  - MODEL=NousResearch/Llama-2-7b-chat-hf
+commands:
+  - uv pip install vllm
+  - python -m vllm.entrypoints.openai.api_server --model $MODEL --port 8000
+port: 8000
+
+resources:
+  gpu: 24GB
+```
+
+</div>
+
+Each entry maps a local directory or file to a path inside the container. Both local and container paths can be relative or absolute.
+
+- If the local path is relative, it’s resolved relative to the configuration file.
+- If the container path is relative, it’s resolved relative to `/workflow`.
+
+The container path is optional. If not specified, it will be automatically calculated.
+
+<!-- TODO: Add a more relevant example -->
+
+
+<div editor-title="examples/.dstack.yml"> 
+
+```yaml
+type: service
+name: llama-2-7b-service
+
+files:
+  - ../examples  # Maps `examples` (the parent directory of `.dstack.yml`) to `/workflow/examples`
+  - ~/.ssh/id_rsa  # Maps `~/.ssh/id_rsa` to `/root/.ssh/id_rsa`
+
+python: 3.12
+
+env:
+  - HF_TOKEN
+  - MODEL=NousResearch/Llama-2-7b-chat-hf
+commands:
+  - uv pip install vllm
+  - python -m vllm.entrypoints.openai.api_server --model $MODEL --port 8000
+port: 8000
+
+resources:
+  gpu: 24GB
+```
+
+</div>
+
+Note: If you want to use `files` without mounting the entire repo directory,
+make sure to pass `--no-repo` when running `dstack apply`:
+
+<div class="termy">
+
+```shell
+$ dstack apply -f examples/.dstack.yml --no-repo
+```
+
+</div>
+
+!!! warning "Experimental"
+    The `files` feature is experimental. Feedback is highly appreciated.
+    
 ### Retry policy
 
 By default, if `dstack` can't find capacity, or the service exits with an error, or the instance is interrupted, the run will fail.
