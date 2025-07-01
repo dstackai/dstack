@@ -38,7 +38,6 @@ export const FleetDetails: React.FC = () => {
             projectName:
 
 
-
 paramProjectName,
 
 fleetId: paramFleetId,

@@ -16,7 +16,7 @@
     "test": "jest",
     "test:update-snapshots": "jest -u",
     "generate-api": "npx @rtk-query/codegen-openapi openapi-config.ts",
-    "prepare": "husky",
+    "prepare": "cd .. && husky frontend/.husky",
     "precommit": "lint-staged"
   },
   "devDependencies": {
