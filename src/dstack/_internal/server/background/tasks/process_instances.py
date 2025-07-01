@@ -110,6 +110,8 @@ from dstack._internal.utils.ssh import (
     pkey_from_str,
 )
 
+MIN_PROCESSING_INTERVAL = timedelta(seconds=5)
+
 PENDING_JOB_RETRY_INTERVAL = timedelta(seconds=60)
 
 TERMINATION_DEADLINE_OFFSET = timedelta(minutes=20)
@@ -145,6 +147,8 @@ async def _process_next_instance():
                         ]
                     ),
                     InstanceModel.id.not_in(lockset),
+                    InstanceModel.last_processed_at
+                    < get_current_datetime().replace(tzinfo=None) - MIN_PROCESSING_INTERVAL,
                 )
                 .options(lazyload(InstanceModel.jobs))
                 .order_by(InstanceModel.last_processed_at.asc())

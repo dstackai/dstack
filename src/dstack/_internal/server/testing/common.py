@@ -560,10 +560,10 @@ async def create_instance(
     instance_id: Optional[UUID] = None,
     job: Optional[JobModel] = None,
     instance_num: int = 0,
-    backend: Optional[BackendType] = BackendType.DATACRUNCH,
+    backend: BackendType = BackendType.DATACRUNCH,
     termination_policy: Optional[TerminationPolicy] = None,
     termination_idle_time: int = DEFAULT_FLEET_TERMINATION_IDLE_TIME,
-    region: Optional[str] = "eu-west",
+    region: str = "eu-west",
     remote_connection_info: Optional[RemoteConnectionInfo] = None,
     offer: Optional[Union[InstanceOfferWithAvailability, Literal["auto"]]] = "auto",
     job_provisioning_data: Optional[Union[JobProvisioningData, Literal["auto"]]] = "auto",
@@ -572,6 +572,7 @@ async def create_instance(
     name: str = "test_instance",
     volumes: Optional[List[VolumeModel]] = None,
     price: float = 1.0,
+    last_processed_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
 ) -> InstanceModel:
     if instance_id is None:
         instance_id = uuid.uuid4()
@@ -608,6 +609,7 @@ async def create_instance(
         fleet=fleet,
         project=project,
         status=status,
+        last_processed_at=last_processed_at,
         unreachable=unreachable,
         created_at=created_at,
         started_at=created_at,
@@ -1038,7 +1040,7 @@ class ComputeMockSpec(
     ComputeWithVolumeSupport,
 ):
     """
-    Can be used to create Compute mocks that pass all isinstance asserts.
+    Can be used to create Compute mocks that pass all `isinstance()` asserts.
     """
 
     pass

@@ -79,6 +79,7 @@ from dstack._internal.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
+MIN_PROCESSING_INTERVAL = timedelta(seconds=5)
 # Minimum time before terminating active job in case of connectivity issues.
 # Should be sufficient to survive most problems caused by
 # the server network flickering and providers' glitches.
@@ -103,6 +104,9 @@ async def _process_next_running_job():
                         [JobStatus.PROVISIONING, JobStatus.PULLING, JobStatus.RUNNING]
                     ),
                     JobModel.id.not_in(lockset),
+                    JobModel.last_processed_at
+                    < common_utils.get_current_datetime().replace(tzinfo=None)
+                    - MIN_PROCESSING_INTERVAL,
                 )
                 .order_by(JobModel.last_processed_at.asc())
                 .limit(1)

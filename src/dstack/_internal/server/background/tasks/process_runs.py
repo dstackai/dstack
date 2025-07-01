@@ -41,6 +41,8 @@ from dstack._internal.utils import common
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
+
+MIN_PROCESSING_INTERVAL = datetime.timedelta(seconds=5)
 ROLLING_DEPLOYMENT_MAX_SURGE = 1  # at most one extra replica during rolling deployment
 
 
@@ -61,6 +63,8 @@ async def _process_next_run():
                 .where(
                     RunModel.status.not_in(RunStatus.finished_statuses()),
                     RunModel.id.not_in(run_lockset),
+                    RunModel.last_processed_at
+                    < common.get_current_datetime().replace(tzinfo=None) - MIN_PROCESSING_INTERVAL,
                 )
                 .order_by(RunModel.last_processed_at.asc())
                 .limit(1)
