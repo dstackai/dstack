@@ -133,16 +133,17 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 	ctx = log.WithLogger(ctx, log.NewEntry(logger, int(log.DefaultEntry.Logger.Level))) // todo loglevel
 	log.Info(ctx, "Run job", "log_level", log.GetLogger(ctx).Logger.Level.String())
 
-	if ex.jobSpec.User != nil {
-		if err := fillUser(ex.jobSpec.User); err != nil {
-			ex.SetJobStateWithTerminationReason(
-				ctx,
-				types.JobStateFailed,
-				types.TerminationReasonExecutorError,
-				fmt.Sprintf("Failed to fill in the job user fields (%s)", err),
-			)
-			return gerrors.Wrap(err)
-		}
+	if ex.jobSpec.User == nil {
+		ex.jobSpec.User = &schemas.User{Uid: &ex.currentUid}
+	}
+	if err := fillUser(ex.jobSpec.User); err != nil {
+		ex.SetJobStateWithTerminationReason(
+			ctx,
+			types.JobStateFailed,
+			types.TerminationReasonExecutorError,
+			fmt.Sprintf("Failed to fill in the job user fields (%s)", err),
+		)
+		return gerrors.Wrap(err)
 	}
 
 	if err := ex.setupFiles(ctx); err != nil {
@@ -331,15 +332,15 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 		cmd.Dir = workingDir
 	}
 
+	// User must be already set
 	user := ex.jobSpec.User
-	if user != nil {
+	if ex.currentUid == 0 {
 		log.Trace(
 			ctx, "Using credentials",
 			"uid", *user.Uid, "gid", *user.Gid, "groups", user.GroupIds,
 			"username", user.GetUsername(), "groupname", user.GetGroupname(),
 			"home", user.HomeDir,
 		)
-		log.Trace(ctx, "Current user", "uid", ex.currentUid)
 
 		// 1. Ideally, We should check uid, gid, and supplementary groups mismatches,
 		// but, for the sake of simplicity, we only check uid. Unprivileged runner
@@ -362,6 +363,8 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 			Gid:    *user.Gid,
 			Groups: user.GroupIds,
 		}
+	} else {
+		log.Info(ctx, "Current user is not root, cannot set process credentials", "uid", ex.currentUid)
 	}
 
 	envMap := NewEnvMap(ParseEnvList(os.Environ()), jobEnvs, ex.secrets)
