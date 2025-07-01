@@ -51,7 +51,7 @@ func (ex *RunExecutor) setupFiles(ctx context.Context) error {
 		}
 	}
 
-	for _, fa := range ex.run.RunSpec.FileArchives {
+	for _, fa := range ex.jobSpec.FileArchives {
 		log.Trace(ctx, "Extracting file archive", "id", fa.Id, "path", fa.Path)
 
 		p := path.Clean(fa.Path)

@@ -47,7 +47,6 @@ type RunSpec struct {
 	RunName           string        `json:"run_name"`
 	RepoId            string        `json:"repo_id"`
 	RepoData          RepoData      `json:"repo_data"`
-	FileArchives      []FileArchive `json:"file_archives"`
 	Configuration     Configuration `json:"configuration"`
 	ConfigurationPath string        `json:"configuration_path"`
 }
@@ -71,7 +70,8 @@ type JobSpec struct {
 	// `RepoData` is optional for compatibility with jobs submitted before 0.19.17.
 	// Use `RunExecutor.getRepoData()` to get non-nil `RepoData`.
 	// TODO: make required when supporting jobs submitted before 0.19.17 is no longer relevant.
-	RepoData *RepoData `json:"repo_data"`
+	RepoData     *RepoData     `json:"repo_data"`
+	FileArchives []FileArchive `json:"file_archives"`
 }
 
 type ClusterInfo struct {

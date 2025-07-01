@@ -226,6 +226,7 @@ class JobSpec(CoreModel):
     # submitted before 0.19.17. See `_get_repo_code_hash` on how to get the correct `repo_code_hash`
     # TODO: drop this comment when supporting jobs submitted before 0.19.17 is no longer relevant.
     repo_code_hash: Optional[str] = None
+    file_archives: list[FileArchiveMapping] = []
 
 
 class JobProvisioningData(CoreModel):
