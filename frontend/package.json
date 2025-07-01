@@ -128,7 +128,7 @@
     "yup": "^0.32.11"
   },
   "lint-staged": {
-    "*.{js,jsx,ts,tsx,vue}": [
+    "*.{js,jsx,ts,tsx}": [
       "eslint --fix",
       "git add"
     ]
