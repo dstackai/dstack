@@ -28,8 +28,7 @@ export const projectApi = createApi({
                 };
             },
 
-            transformResponse: (response: any[]): IProject[] => 
-                response.map(transformProjectResponse),
+            transformResponse: (response: any[]): IProject[] => response.map(transformProjectResponse),
 
             providesTags: (result) =>
                 result

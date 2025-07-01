@@ -1,5 +1,5 @@
-import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 
 import { useNotifications } from 'hooks';
 import { ROUTES } from 'routes';
@@ -14,14 +14,14 @@ export const useProjectMemberActions = () => {
 
     const handleJoinProject = async (projectName: string, username: string) => {
         if (!username || !projectName) return;
-        
+
         try {
             await addMember({
                 project_name: projectName,
                 username: username,
                 project_role: 'user',
             }).unwrap();
-            
+
             pushNotification({
                 type: 'success',
                 content: t('projects.join_success'),
@@ -37,23 +37,23 @@ export const useProjectMemberActions = () => {
 
     const handleLeaveProject = async (projectName: string, username: string, onLeaveSuccess?: () => void) => {
         if (!username || !projectName) return;
-        
+
         try {
             await removeMember({
                 project_name: projectName,
                 username: username,
             }).unwrap();
-            
+
             pushNotification({
                 type: 'success',
                 content: t('projects.leave_success'),
             });
-            
+
             // Optionally call the success callback
             onLeaveSuccess?.();
         } catch (error: any) {
             console.error('Failed to leave project:', error);
-            
+
             // Extract the specific error message from the backend
             let errorMessage = t('projects.leave_error');
             if (error?.data?.detail) {
@@ -68,7 +68,7 @@ export const useProjectMemberActions = () => {
                     errorMessage = error.data.detail.msg;
                 }
             }
-            
+
             pushNotification({
                 type: 'error',
                 content: errorMessage,
@@ -81,6 +81,6 @@ export const useProjectMemberActions = () => {
     return {
         handleJoinProject,
         handleLeaveProject,
-        isMemberActionLoading
+        isMemberActionLoading,
     };
-}; 
+};

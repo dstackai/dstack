@@ -26,27 +26,30 @@ export const tokensToRequestParams = <RequestParamsKeys extends string>({
     tokens: PropertyFilterProps.Query['tokens'];
     arrayFieldKeys?: RequestParamsKeys[];
 }) => {
-    return tokens.reduce<Record<RequestParamsKeys, string | string[]>>((acc, token) => {
-        const propertyKey = token.propertyKey as RequestParamsKeys;
+    return tokens.reduce<Record<RequestParamsKeys, string | string[]>>(
+        (acc, token) => {
+            const propertyKey = token.propertyKey as RequestParamsKeys;
 
-        if (!propertyKey) {
-            return acc;
-        }
-
-        if (arrayFieldKeys?.includes(propertyKey)) {
-            if (Array.isArray(acc[propertyKey])) {
-                acc[propertyKey].push(token.value);
-            } else {
-                acc[propertyKey] = [token.value];
+            if (!propertyKey) {
+                return acc;
             }
 
+            if (arrayFieldKeys?.includes(propertyKey)) {
+                if (Array.isArray(acc[propertyKey])) {
+                    acc[propertyKey].push(token.value);
+                } else {
+                    acc[propertyKey] = [token.value];
+                }
+
+                return acc;
+            }
+
+            acc[propertyKey] = token.value;
+
             return acc;
-        }
-
-        acc[propertyKey] = token.value;
-
-        return acc;
-    }, {} as Record<RequestParamsKeys, string>);
+        },
+        {} as Record<RequestParamsKeys, string>,
+    );
 };
 
 export const EMPTY_QUERY: PropertyFilterProps.Query = {

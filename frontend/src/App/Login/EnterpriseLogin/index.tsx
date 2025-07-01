@@ -6,11 +6,11 @@ import { Box, NavigateLink, SpaceBetween } from 'components';
 import { UnauthorizedLayout } from 'layouts/UnauthorizedLayout';
 
 import { ROUTES } from 'routes';
-import { useGetEntraInfoQuery, useGetOktaInfoQuery, useGetGoogleInfoQuery } from 'services/auth';
+import { useGetEntraInfoQuery, useGetGoogleInfoQuery, useGetOktaInfoQuery } from 'services/auth';
 
 import { LoginByEntraID } from '../EntraID/LoginByEntraID';
-import { LoginByOkta } from '../LoginByOkta';
 import { LoginByGoogle } from '../LoginByGoogle';
+import { LoginByOkta } from '../LoginByOkta';
 import { LoginByTokenForm } from '../LoginByTokenForm';
 
 import styles from './styles.module.scss';

@@ -25,13 +25,13 @@ import { useBreadcrumbs, useHelpPanel, useNotifications } from 'hooks';
 import { riseRouterException } from 'libs';
 import { ROUTES } from 'routes';
 import { useGetProjectQuery, useUpdateProjectMembersMutation, useUpdateProjectMutation } from 'services/project';
+import { useGetUserDataQuery } from 'services/user';
 
 import { useCheckAvailableProjectPermission } from 'pages/Project/hooks/useCheckAvailableProjectPermission';
 import { useConfigProjectCliCommand } from 'pages/Project/hooks/useConfigProjectCliComand';
 import { useDeleteProject } from 'pages/Project/hooks/useDeleteProject';
 import { ProjectMembers } from 'pages/Project/Members';
 import { getProjectRoleByUserName } from 'pages/Project/utils';
-import { useGetUserDataQuery } from 'services/user';
 
 import { useBackendsTable } from '../../Backends/hooks';
 import { BackendsTable } from '../../Backends/Table';
@@ -80,9 +80,7 @@ export const ProjectSettings: React.FC = () => {
     ];
 
     const currentVisibility = data?.isPublic ? 'public' : 'private';
-    const [selectedVisibility, setSelectedVisibility] = useState(
-        data?.isPublic ? visibilityOptions[1] : visibilityOptions[0]
-    );
+    const [selectedVisibility, setSelectedVisibility] = useState(data?.isPublic ? visibilityOptions[1] : visibilityOptions[0]);
 
     useEffect(() => {
         setSelectedVisibility(data?.isPublic ? visibilityOptions[1] : visibilityOptions[0]);
@@ -286,7 +284,14 @@ export const ProjectSettings: React.FC = () => {
                                                             <SelectCSD
                                                                 options={visibilityOptions}
                                                                 selectedOption={selectedVisibility}
-                                                                onChange={(event) => setSelectedVisibility(event.detail.selectedOption as { label: string; value: string })}
+                                                                onChange={(event) =>
+                                                                    setSelectedVisibility(
+                                                                        event.detail.selectedOption as {
+                                                                            label: string;
+                                                                            value: string;
+                                                                        },
+                                                                    )
+                                                                }
                                                                 expandToViewport={true}
                                                                 filteringType="auto"
                                                             />

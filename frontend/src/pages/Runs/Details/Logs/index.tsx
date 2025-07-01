@@ -22,7 +22,7 @@ export const Logs: React.FC<IProps> = ({ className, projectName, runName, jobSub
     const { t } = useTranslation();
     const appliedTheme = useAppSelector(selectSystemMode);
 
-    const terminalInstance = useRef<Terminal>(new Terminal({scrollback: 10000000}));
+    const terminalInstance = useRef<Terminal>(new Terminal({ scrollback: 10000000 }));
     const fitAddonInstance = useRef<FitAddon>(new FitAddon());
     const [logsData, setLogsData] = useState<ILogItem[]>([]);
     const [isLoading, setIsLoading] = useState(false);

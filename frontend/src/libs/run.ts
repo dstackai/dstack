@@ -2,6 +2,7 @@ import { get as _get } from 'lodash';
 import { StatusIndicatorProps } from '@cloudscape-design/components';
 
 import { capitalize } from 'libs';
+
 import { finishedRunStatuses } from '../pages/Runs/constants';
 
 import { IModelExtended } from '../pages/Models/List/types';
@@ -45,7 +46,7 @@ export const getStatusIconColor = (
     switch (status) {
         case 'submitted':
         case 'pending':
-                return 'blue';
+            return 'blue';
         case 'pulling':
             return 'green';
         case 'aborted':

@@ -51,7 +51,7 @@ export const RunDetails = () => {
     if (!runData) return null;
 
     const status = finishedRunStatuses.includes(runData.status)
-        ? runData.latest_job_submission?.status ?? runData.status
+        ? (runData.latest_job_submission?.status ?? runData.status)
         : runData.status;
     const terminationReason = finishedRunStatuses.includes(runData.status)
         ? runData.latest_job_submission?.termination_reason

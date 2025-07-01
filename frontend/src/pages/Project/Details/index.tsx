@@ -1,15 +1,17 @@
 import React, { useMemo } from 'react';
-import { Outlet, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { Outlet, useNavigate, useParams } from 'react-router-dom';
 
 import { Button, ContentLayout, DetailsHeader } from 'components';
 
 import { useAppSelector, useNotifications } from 'hooks';
-import { selectUserData } from 'App/slice';
 import { ROUTES } from 'routes';
-import { useGetProjectQuery, useAddProjectMemberMutation, useRemoveProjectMemberMutation } from 'services/project';
-import { getProjectRoleByUserName } from '../utils';
+import { useAddProjectMemberMutation, useGetProjectQuery, useRemoveProjectMemberMutation } from 'services/project';
+
+import { selectUserData } from 'App/slice';
+
 import { useProjectMemberActions } from '../hooks/useProjectMemberActions';
+import { getProjectRoleByUserName } from '../utils';
 
 export const ProjectDetails: React.FC = () => {
     const { t } = useTranslation();
@@ -18,7 +20,7 @@ export const ProjectDetails: React.FC = () => {
     const paramProjectName = params.projectName ?? '';
     const userData = useAppSelector(selectUserData);
     const { handleJoinProject, handleLeaveProject, isMemberActionLoading } = useProjectMemberActions();
-    
+
     const { data: project } = useGetProjectQuery({ name: paramProjectName });
 
     const currentUserRole = useMemo(() => {
@@ -31,7 +33,7 @@ export const ProjectDetails: React.FC = () => {
     const isMember = currentUserRole !== null;
 
     return (
-        <ContentLayout header={<DetailsHeader title={paramProjectName}/>}>
+        <ContentLayout header={<DetailsHeader title={paramProjectName} />}>
             <Outlet />
         </ContentLayout>
     );
