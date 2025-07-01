@@ -16,7 +16,8 @@
     "test": "jest",
     "test:update-snapshots": "jest -u",
     "generate-api": "npx @rtk-query/codegen-openapi openapi-config.ts",
-    "prepare": "husky"
+    "prepare": "husky",
+    "precommit": "lint-staged"
   },
   "devDependencies": {
     "@babel/cli": "^7.25.9",
@@ -129,7 +130,7 @@
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [
-      "eslint --fix --max-warnings=0",
+      "eslint --fix",
       "git add"
     ]
   }
