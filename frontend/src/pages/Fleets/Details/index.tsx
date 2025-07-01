@@ -37,11 +37,11 @@ export const FleetDetails: React.FC = () => {
         {
             projectName:
 
-            paramProjectName,
+        paramProjectName,
             fleetId:
 
 
-            paramFleetId,
+        paramFleetId,
         },
         {
             refetchOnMountOrArgChange: true,
