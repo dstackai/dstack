@@ -245,8 +245,10 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
             )
             job_model.instance_assigned = True
             job_model.last_processed_at = common_utils.get_current_datetime()
-            await session.commit()
-            return
+            if len(pool_instances) > 0:
+                await session.commit()
+                return
+            # If no instances were locked, we can proceed in the same transaction.
 
     if job_model.instance is not None:
         res = await session.execute(
