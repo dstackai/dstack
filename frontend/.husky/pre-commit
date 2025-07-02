@@ -1,7 +1,2 @@
-#!/usr/bin/env sh
-. "$(dirname -- "$0")/_/husky.sh"
-
 cd frontend
 npm run precommit
-
-exit 1
