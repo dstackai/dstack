@@ -10,7 +10,7 @@ module.exports = {
     mode: 'development',
     entry: [
         `webpack-dev-server/client?http://localhost:${port}`, // bundle the client for webpack-dev-server and connect to the provided endpoint
-        join(srcDir, 'index.tsx'), // the entry point of our App
+        join(srcDir, 'index.tsx') // the entry point of our App
     ],
     devServer: {
         port,
@@ -20,7 +20,7 @@ module.exports = {
         headers: {
             'Access-Control-Allow-Origin': '*',
             'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, PATCH, OPTIONS',
-            'Access-Control-Allow-Headers': 'X-Requested-With, content-type, Authorization',
+            'Access-Control-Allow-Headers': 'X-Requested-With, content-type, Authorization'
         },
         proxy: [
             {
@@ -30,16 +30,16 @@ module.exports = {
                 target: 'https://sky.dstack.ai/', //0ab1c6ee-3f7b-4839-a259-5e5c6074a97f
                 // target: 'https://sky-stage.dstack.ai/', //29001ee8-897c-47ea-bfec-819f56835ffe
                 // target: 'https://cloud.dstack.ai/', //0ab1c6ee-3f7b-4839-a259-5e5c6074a97f
-                logLevel: 'debug',
-            },
+                logLevel: 'debug'
+            }
         ],
         client: {
             overlay: {
                 runtimeErrors: (error) => {
                     return !error.message.includes('ResizeObserver loop completed with undelivered notifications');
-                },
-            },
-        },
+                }
+            }
+        }
     },
     devtool: 'cheap-module-source-map',
     plugins: [
@@ -57,7 +57,7 @@ module.exports = {
             // e.g. via import(/* webpackMode: "weak" */ './file.js')
             allowAsyncCycles: false,
             // set the current working directory for displaying module paths
-            cwd: process.cwd(),
+            cwd: process.cwd()
         }),
     ],
 };
