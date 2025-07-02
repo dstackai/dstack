@@ -1,13 +1,10 @@
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
 
 import { useNotifications } from 'hooks';
-import { ROUTES } from 'routes';
 import { useAddProjectMemberMutation, useRemoveProjectMemberMutation } from 'services/project';
 
 export const useProjectMemberActions = () => {
     const { t } = useTranslation();
-    const navigate = useNavigate();
     const [pushNotification] = useNotifications();
     const [addMember, { isLoading: isAdding }] = useAddProjectMemberMutation();
     const [removeMember, { isLoading: isRemoving }] = useRemoveProjectMemberMutation();
@@ -51,6 +48,7 @@ export const useProjectMemberActions = () => {
 
             // Optionally call the success callback
             onLeaveSuccess?.();
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (error: any) {
             console.error('Failed to leave project:', error);
 

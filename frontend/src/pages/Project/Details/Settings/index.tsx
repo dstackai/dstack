@@ -17,7 +17,6 @@ import {
     SelectCSD,
     SpaceBetween,
     StatusIndicator,
-    Toggle,
 } from 'components';
 import { HotspotIds } from 'layouts/AppLayout/TutorialPanel/constants';
 
@@ -79,7 +78,6 @@ export const ProjectSettings: React.FC = () => {
         { label: t('projects.edit.visibility.public') || '', value: 'public' },
     ];
 
-    const currentVisibility = data?.isPublic ? 'public' : 'private';
     const [selectedVisibility, setSelectedVisibility] = useState(data?.isPublic ? visibilityOptions[1] : visibilityOptions[0]);
 
     useEffect(() => {
@@ -121,6 +119,7 @@ export const ProjectSettings: React.FC = () => {
                     content: t('projects.edit.update_members_success'),
                 });
             })
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             .catch((error: any) => {
                 pushNotification({
                     type: 'error',
@@ -143,6 +142,7 @@ export const ProjectSettings: React.FC = () => {
                     content: t('projects.edit.update_visibility_success'),
                 });
             })
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             .catch((error: any) => {
                 pushNotification({
                     type: 'error',
@@ -160,6 +160,7 @@ export const ProjectSettings: React.FC = () => {
 
         deleteProject(data)
             .then(() => navigate(ROUTES.PROJECT.LIST))
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             .catch((error: any) => {
                 console.error('Delete project failed:', error);
             });

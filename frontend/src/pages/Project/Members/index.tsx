@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useFieldArray, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
 
 import {
     Button,
@@ -15,7 +14,7 @@ import {
     Table,
 } from 'components';
 
-import { useAppSelector, useCollection, useNotifications } from 'hooks';
+import { useAppSelector, useCollection } from 'hooks';
 import { ROUTES } from 'routes';
 import { useGetUserListQuery } from 'services/user';
 
@@ -32,8 +31,6 @@ import styles from './styles.module.scss';
 
 export const ProjectMembers: React.FC<IProps> = ({ members, loading, onChange, readonly, isAdmin, project }) => {
     const { t } = useTranslation();
-    const navigate = useNavigate();
-    const [pushNotification] = useNotifications();
     const [selectedItems, setSelectedItems] = useState<TProjectMemberWithIndex[]>([]);
     const { data: usersData } = useGetUserListQuery();
     const userData = useAppSelector(selectUserData);
@@ -53,8 +50,6 @@ export const ProjectMembers: React.FC<IProps> = ({ members, loading, onChange, r
         const member = members?.find((m) => m.user.username === userData.username);
         return member?.project_role || null;
     }, [members, userData?.username]);
-
-    const isProjectOwner = userData?.username === project?.owner.username;
 
     const isMember = currentUserRole !== null;
 
