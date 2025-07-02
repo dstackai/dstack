@@ -7,6 +7,7 @@ from sqlalchemy.orm import joinedload
 
 import dstack._internal.server.services.jobs as jobs_services
 from dstack._internal.core.consts import DSTACK_RUNNER_SSH_PORT
+from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import ServiceConfiguration
 from dstack._internal.core.models.instances import RemoteConnectionInfo, SSHConnectionParams
 from dstack._internal.core.models.runs import (
@@ -86,6 +87,8 @@ class ServerProxyRepo(BaseProxyRepo):
                     username=jpd.username,
                     port=jpd.ssh_port,
                 )
+                if jpd.backend == BackendType.LOCAL:
+                    ssh_proxy = None
             ssh_head_proxy: Optional[SSHConnectionParams] = None
             ssh_head_proxy_private_key: Optional[str] = None
             instance = get_or_error(job.instance)
