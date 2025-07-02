@@ -6,6 +6,13 @@ from pydantic import Field
 from pydantic_duality import DualBaseModel
 from typing_extensions import Annotated
 
+IncludeExcludeFieldType = Union[int, str]
+IncludeExcludeSetType = set[IncludeExcludeFieldType]
+IncludeExcludeDictType = dict[
+    IncludeExcludeFieldType, Union[bool, IncludeExcludeSetType, "IncludeExcludeDictType"]
+]
+IncludeExcludeType = Union[IncludeExcludeSetType, IncludeExcludeDictType]
+
 
 # DualBaseModel creates two classes for the model:
 # one with extra = "forbid" (CoreModel/CoreModel.__request__),
