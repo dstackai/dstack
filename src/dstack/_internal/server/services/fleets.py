@@ -362,7 +362,7 @@ async def create_fleet(
             select(func.pg_advisory_xact_lock(string_to_lock_id(lock_namespace)))
         )
 
-    lock, _ = get_locker().get_lockset(lock_namespace)
+    lock, _ = get_locker(get_db().dialect_name).get_lockset(lock_namespace)
     async with lock:
         if spec.configuration.name is not None:
             fleet_model = await get_project_fleet_model_by_name(
@@ -516,8 +516,8 @@ async def delete_fleets(
     await session.commit()
     logger.info("Deleting fleets: %s", [v.name for v in fleet_models])
     async with (
-        get_locker().lock_ctx(FleetModel.__tablename__, fleets_ids),
-        get_locker().lock_ctx(InstanceModel.__tablename__, instances_ids),
+        get_locker(get_db().dialect_name).lock_ctx(FleetModel.__tablename__, fleets_ids),
+        get_locker(get_db().dialect_name).lock_ctx(InstanceModel.__tablename__, instances_ids),
     ):
         # Refetch after lock
         # TODO lock instances with FOR UPDATE?

@@ -223,7 +223,7 @@ async def create_volume(
             select(func.pg_advisory_xact_lock(string_to_lock_id(lock_namespace)))
         )
 
-    lock, _ = get_locker().get_lockset(lock_namespace)
+    lock, _ = get_locker(get_db().dialect_name).get_lockset(lock_namespace)
     async with lock:
         if configuration.name is not None:
             volume_model = await get_project_volume_model_by_name(
@@ -262,7 +262,7 @@ async def delete_volumes(session: AsyncSession, project: ProjectModel, names: Li
     volumes_ids = sorted([v.id for v in volume_models])
     await session.commit()
     logger.info("Deleting volumes: %s", [v.name for v in volume_models])
-    async with get_locker().lock_ctx(VolumeModel.__tablename__, volumes_ids):
+    async with get_locker(get_db().dialect_name).lock_ctx(VolumeModel.__tablename__, volumes_ids):
         # Refetch after lock
         res = await session.execute(
             select(VolumeModel)

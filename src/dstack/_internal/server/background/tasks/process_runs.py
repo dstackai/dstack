@@ -19,7 +19,7 @@ from dstack._internal.core.models.runs import (
     RunStatus,
     RunTerminationReason,
 )
-from dstack._internal.server.db import get_session_ctx
+from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import JobModel, ProjectModel, RunModel
 from dstack._internal.server.services.jobs import (
     find_job,
@@ -54,8 +54,8 @@ async def process_runs(batch_size: int = 1):
 
 
 async def _process_next_run():
-    run_lock, run_lockset = get_locker().get_lockset(RunModel.__tablename__)
-    job_lock, job_lockset = get_locker().get_lockset(JobModel.__tablename__)
+    run_lock, run_lockset = get_locker(get_db().dialect_name).get_lockset(RunModel.__tablename__)
+    job_lock, job_lockset = get_locker(get_db().dialect_name).get_lockset(JobModel.__tablename__)
     async with get_session_ctx() as session:
         async with run_lock, job_lock:
             res = await session.execute(

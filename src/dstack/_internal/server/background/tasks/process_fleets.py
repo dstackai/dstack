@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from dstack._internal.core.models.fleets import FleetStatus
-from dstack._internal.server.db import get_session_ctx
+from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import FleetModel
 from dstack._internal.server.services.fleets import (
     is_fleet_empty,
@@ -27,7 +27,7 @@ async def process_fleets(batch_size: int = 1):
 
 
 async def _process_next_fleet():
-    lock, lockset = get_locker().get_lockset(FleetModel.__tablename__)
+    lock, lockset = get_locker(get_db().dialect_name).get_lockset(FleetModel.__tablename__)
     async with get_session_ctx() as session:
         async with lock:
             res = await session.execute(

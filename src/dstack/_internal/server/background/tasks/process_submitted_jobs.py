@@ -88,7 +88,7 @@ async def process_submitted_jobs(batch_size: int = 1):
 
 
 async def _process_next_submitted_job():
-    lock, lockset = get_locker().get_lockset(JobModel.__tablename__)
+    lock, lockset = get_locker(get_db().dialect_name).get_lockset(JobModel.__tablename__)
     async with get_session_ctx() as session:
         async with lock:
             res = await session.execute(
@@ -214,7 +214,9 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         if get_db().dialect_name == "sqlite":
             # Start new transaction to see committed changes after lock
             await session.commit()
-        async with get_locker().lock_ctx(InstanceModel.__tablename__, instances_ids):
+        async with get_locker(get_db().dialect_name).lock_ctx(
+            InstanceModel.__tablename__, instances_ids
+        ):
             # If another job freed the instance but is still trying to detach volumes,
             # do not provision on it to prevent attaching volumes that are currently detaching.
             detaching_instances_ids = await get_instances_ids_with_detaching_volumes(session)
@@ -334,7 +336,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         .order_by(VolumeModel.id)  # take locks in order
         .with_for_update(key_share=True)
     )
-    async with get_locker().lock_ctx(VolumeModel.__tablename__, volumes_ids):
+    async with get_locker(get_db().dialect_name).lock_ctx(VolumeModel.__tablename__, volumes_ids):
         if len(volume_models) > 0:
             await _attach_volumes(
                 session=session,
@@ -527,7 +529,9 @@ async def _get_next_instance_num(session: AsyncSession, fleet_model: FleetModel)
     if len(fleet_model.instances) == 0:
         # No instances means the fleet is not in the db yet, so don't lock.
         return 0
-    async with get_locker().lock_ctx(FleetModel.__tablename__, [fleet_model.id]):
+    async with get_locker(get_db().dialect_name).lock_ctx(
+        FleetModel.__tablename__, [fleet_model.id]
+    ):
         fleet_model = (
             (
                 await session.execute(

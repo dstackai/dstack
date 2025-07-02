@@ -28,7 +28,7 @@ async def process_gateways_connections():
 
 
 async def process_submitted_gateways():
-    lock, lockset = get_locker().get_lockset(GatewayModel.__tablename__)
+    lock, lockset = get_locker(get_db().dialect_name).get_lockset(GatewayModel.__tablename__)
     async with get_session_ctx() as session:
         async with lock:
             res = await session.execute(

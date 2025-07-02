@@ -482,7 +482,7 @@ async def submit_run(
             select(func.pg_advisory_xact_lock(string_to_lock_id(lock_namespace)))
         )
 
-    lock, _ = get_locker().get_lockset(lock_namespace)
+    lock, _ = get_locker(get_db().dialect_name).get_lockset(lock_namespace)
     async with lock:
         if run_spec.run_name is None:
             run_spec.run_name = await _generate_run_name(
@@ -587,7 +587,7 @@ async def stop_runs(
     run_models = res.scalars().all()
     run_ids = sorted([r.id for r in run_models])
     await session.commit()
-    async with get_locker().lock_ctx(RunModel.__tablename__, run_ids):
+    async with get_locker(get_db().dialect_name).lock_ctx(RunModel.__tablename__, run_ids):
         res = await session.execute(
             select(RunModel)
             .where(RunModel.id.in_(run_ids))
@@ -625,7 +625,7 @@ async def delete_runs(
     run_models = res.scalars().all()
     run_ids = sorted([r.id for r in run_models])
     await session.commit()
-    async with get_locker().lock_ctx(RunModel.__tablename__, run_ids):
+    async with get_locker(get_db().dialect_name).lock_ctx(RunModel.__tablename__, run_ids):
         res = await session.execute(
             select(RunModel)
             .where(RunModel.id.in_(run_ids))

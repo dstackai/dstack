@@ -7,7 +7,7 @@ from sqlalchemy.orm import joinedload
 
 from dstack._internal.core.backends.base.compute import ComputeWithPlacementGroupSupport
 from dstack._internal.core.errors import PlacementGroupInUseError
-from dstack._internal.server.db import get_session_ctx
+from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import PlacementGroupModel, ProjectModel
 from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services.locking import get_locker
@@ -19,7 +19,9 @@ logger = get_logger(__name__)
 
 
 async def process_placement_groups():
-    lock, lockset = get_locker().get_lockset(PlacementGroupModel.__tablename__)
+    lock, lockset = get_locker(get_db().dialect_name).get_lockset(
+        PlacementGroupModel.__tablename__
+    )
     async with get_session_ctx() as session:
         async with lock:
             res = await session.execute(

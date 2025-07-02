@@ -57,7 +57,7 @@ class Compute(ABC):
 
     def __init__(self):
         self._offers_cache_lock = threading.Lock()
-        self._offers_cache = TTLCache(maxsize=10, ttl=120)
+        self._offers_cache = TTLCache(maxsize=10, ttl=180)
 
     @abstractmethod
     def get_offers(

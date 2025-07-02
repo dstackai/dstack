@@ -38,7 +38,7 @@ from dstack._internal.core.models.runs import (
 )
 from dstack._internal.core.models.volumes import InstanceMountPoint, Volume, VolumeMountPoint
 from dstack._internal.server.background.tasks.common import get_provisioning_timeout
-from dstack._internal.server.db import get_session_ctx
+from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import (
     InstanceModel,
     JobModel,
@@ -95,7 +95,7 @@ async def process_running_jobs(batch_size: int = 1):
 
 
 async def _process_next_running_job():
-    lock, lockset = get_locker().get_lockset(JobModel.__tablename__)
+    lock, lockset = get_locker(get_db().dialect_name).get_lockset(JobModel.__tablename__)
     async with get_session_ctx() as session:
         async with lock:
             res = await session.execute(

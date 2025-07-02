@@ -73,7 +73,7 @@ from dstack._internal.core.models.runs import (
 from dstack._internal.core.services.profiles import get_retry
 from dstack._internal.server import settings as server_settings
 from dstack._internal.server.background.tasks.common import get_provisioning_timeout
-from dstack._internal.server.db import get_session_ctx
+from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import (
     FleetModel,
     InstanceModel,
@@ -131,7 +131,7 @@ async def process_instances(batch_size: int = 1):
 
 
 async def _process_next_instance():
-    lock, lockset = get_locker().get_lockset(InstanceModel.__tablename__)
+    lock, lockset = get_locker(get_db().dialect_name).get_lockset(InstanceModel.__tablename__)
     async with get_session_ctx() as session:
         async with lock:
             res = await session.execute(

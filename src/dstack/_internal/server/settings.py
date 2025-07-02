@@ -34,7 +34,7 @@ DB_POOL_SIZE = int(os.getenv("DSTACK_DB_POOL_SIZE", 20))
 DB_MAX_OVERFLOW = int(os.getenv("DSTACK_DB_MAX_OVERFLOW", 20))
 
 # Increases the size of processing batches
-# allowing to process more resource on one server replica.
+# allowing to process more resources on one server replica.
 # Not recommended to change on SQLite.
 # DSTACK_DB_POOL_SIZE and DSTACK_DB_MAX_OVERFLOW
 # must be increased proportionally to handle larger batches.

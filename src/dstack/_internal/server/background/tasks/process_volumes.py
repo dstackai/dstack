@@ -5,7 +5,7 @@ from sqlalchemy.orm import joinedload
 from dstack._internal.core.backends.base.compute import ComputeWithVolumeSupport
 from dstack._internal.core.errors import BackendError, BackendNotAvailable
 from dstack._internal.core.models.volumes import VolumeStatus
-from dstack._internal.server.db import get_session_ctx
+from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import (
     InstanceModel,
     ProjectModel,
@@ -22,7 +22,7 @@ logger = get_logger(__name__)
 
 
 async def process_submitted_volumes():
-    lock, lockset = get_locker().get_lockset(VolumeModel.__tablename__)
+    lock, lockset = get_locker(get_db().dialect_name).get_lockset(VolumeModel.__tablename__)
     async with get_session_ctx() as session:
         async with lock:
             res = await session.execute(
