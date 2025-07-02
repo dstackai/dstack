@@ -350,6 +350,12 @@ $ dstack apply -f examples/.dstack.yml --no-repo
 
 </div>
 
+??? info ".gitignore and .dstackignore"
+    `dstack` automatically excludes files and folders listed in `.gitignore` and `.dstackignore`.
+    
+    Uploads are limited to 2MB. To avoid exceeding this limit, make sure to exclude unnecessary files.
+    You can increase the default server limit by setting the `DSTACK_SERVER_CODE_UPLOAD_LIMIT` environment variable.
+
 !!! warning "Experimental"
     The `files` feature is experimental. Feedback is highly appreciated.
 
