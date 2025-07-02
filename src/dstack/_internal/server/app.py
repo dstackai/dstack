@@ -2,6 +2,7 @@ import asyncio
 import importlib.resources
 import os
 import time
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Awaitable, Callable, List
@@ -97,6 +98,8 @@ def create_app() -> FastAPI:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     configure_logging()
+    server_executor = ThreadPoolExecutor(max_workers=settings.SERVER_EXECUTOR_MAX_WORKERS)
+    asyncio.get_running_loop().set_default_executor(server_executor)
     await migrate()
     _print_dstack_logo()
     if not check_required_ssh_version():
