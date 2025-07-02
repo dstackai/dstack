@@ -912,13 +912,14 @@ def _validate_run_spec_and_set_defaults(run_spec: RunSpec):
     set_resources_defaults(run_spec.configuration.resources)
 
 
-_UPDATABLE_SPEC_FIELDS = ["configuration"]
+_UPDATABLE_SPEC_FIELDS = ["configuration_path", "configuration"]
 _TYPE_SPECIFIC_UPDATABLE_SPEC_FIELDS = {
     "service": [
         # rolling deployment
         "repo_data",
         "repo_code_hash",
         "file_archives",
+        "working_dir",
     ],
 }
 _CONF_UPDATABLE_FIELDS = ["priority"]
@@ -931,11 +932,13 @@ _TYPE_SPECIFIC_CONF_UPDATABLE_FIELDS = {
         # rolling deployment
         "resources",
         "volumes",
+        "docker",
         "files",
         "image",
         "user",
         "privileged",
         "entrypoint",
+        "working_dir",
         "python",
         "nvcc",
         "single_branch",
