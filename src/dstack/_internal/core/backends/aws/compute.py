@@ -101,6 +101,7 @@ class AWSCompute(
         # get_offers is already cached but we still cache its sub-functions
         # with more aggressive/longer caches.
         self._get_regions_to_quotas_cache_lock = threading.Lock()
+        self._get_regions_to_quotas_execution_lock = threading.Lock()
         self._get_regions_to_quotas_cache = TTLCache(maxsize=10, ttl=300)
         self._get_regions_to_zones_cache_lock = threading.Lock()
         self._get_regions_to_zones_cache = Cache(maxsize=10)
@@ -154,7 +155,10 @@ class AWSCompute(
             extra_filter=filter,
         )
         regions = list(set(i.region for i in offers))
-        regions_to_quotas = self._get_regions_to_quotas(self.session, regions)
+        with self._get_regions_to_quotas_execution_lock:
+            # Cache lock does not prevent concurrent execution.
+            # We use a separate lock to avoid requesting quotas in parallel and hitting rate limits.
+            regions_to_quotas = self._get_regions_to_quotas(self.session, regions)
         regions_to_zones = self._get_regions_to_zones(self.session, regions)
 
         availability_offers = []
