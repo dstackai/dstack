@@ -80,6 +80,9 @@ func extractFileArchive(ctx context.Context, archivePath string, targetPath stri
 	if err := mkdirAll(ctx, dir, uid, gid); err != nil {
 		return gerrors.Wrap(err)
 	}
+	if err := os.RemoveAll(targetPath); err != nil {
+		log.Warning(ctx, "Failed to remove", "path", targetPath, "err", err)
+	}
 
 	archive, err := os.Open(archivePath)
 	if err != nil {

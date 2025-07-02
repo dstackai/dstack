@@ -334,6 +334,9 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 
 	// User must be already set
 	user := ex.jobSpec.User
+	// Strictly speaking, we need CAP_SETUID and CAP_GUID (for Cmd.Start()->
+	// Cmd.SysProcAttr.Credential) and CAP_CHOWN (for startCommand()->os.Chown()),
+	// but for the sake of simplicity we instead check if we are root or not
 	if ex.currentUid == 0 {
 		log.Trace(
 			ctx, "Using credentials",
@@ -341,23 +344,9 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 			"username", user.GetUsername(), "groupname", user.GetGroupname(),
 			"home", user.HomeDir,
 		)
-
-		// 1. Ideally, We should check uid, gid, and supplementary groups mismatches,
-		// but, for the sake of simplicity, we only check uid. Unprivileged runner
-		// should not receive job requests where user credentials do not match the
-		// current user's ones in the first place (it should be handled by the server)
-		// 2. Strictly speaking, we need CAP_SETUID and CAP_GUID (for Cmd.Start()->
-		// Cmd.SysProcAttr.Credential) and CAP_CHOWN (for startCommand()->os.Chown()),
-		// but for the sake of simplicity we instead check if we are root or not
-		if *user.Uid != ex.currentUid && ex.currentUid != 0 {
-			return gerrors.Newf("cannot start job as %d, current uid is %d", *user.Uid, ex.currentUid)
-		}
-
 		if cmd.SysProcAttr == nil {
 			cmd.SysProcAttr = &syscall.SysProcAttr{}
 		}
-		// It's safe to setuid(2)/setgid(2)/setgroups(2) as unprivileged user if we use
-		// user's own credentials (basically, it's noop)
 		cmd.SysProcAttr.Credential = &syscall.Credential{
 			Uid:    *user.Uid,
 			Gid:    *user.Gid,
