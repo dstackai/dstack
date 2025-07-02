@@ -34,6 +34,7 @@ from dstack._internal.core.models.runs import (
     JobTerminationReason,
     Run,
     RunSpec,
+    RunStatus,
 )
 from dstack._internal.core.models.volumes import InstanceMountPoint, Volume, VolumeMountPoint
 from dstack._internal.server.background.tasks.common import get_provisioning_timeout
@@ -99,10 +100,12 @@ async def _process_next_running_job():
         async with lock:
             res = await session.execute(
                 select(JobModel)
+                .join(JobModel.run)
                 .where(
                     JobModel.status.in_(
                         [JobStatus.PROVISIONING, JobStatus.PULLING, JobStatus.RUNNING]
                     ),
+                    RunModel.status.not_in([RunStatus.TERMINATING]),
                     JobModel.id.not_in(lockset),
                     JobModel.last_processed_at
                     < common_utils.get_current_datetime().replace(tzinfo=None)
@@ -110,7 +113,11 @@ async def _process_next_running_job():
                 )
                 .order_by(JobModel.last_processed_at.asc())
                 .limit(1)
-                .with_for_update(skip_locked=True, key_share=True)
+                .with_for_update(
+                    skip_locked=True,
+                    key_share=True,
+                    of=JobModel,
+                )
             )
             job_model = res.unique().scalar()
             if job_model is None:
