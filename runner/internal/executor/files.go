@@ -39,67 +39,72 @@ func (ex *RunExecutor) setupFiles(ctx context.Context) error {
 	homeDir := ex.workingDir
 	uid := -1
 	gid := -1
-	if ex.jobSpec.User != nil {
-		if ex.jobSpec.User.HomeDir != "" {
-			homeDir = ex.jobSpec.User.HomeDir
-		}
-		if ex.jobSpec.User.Uid != nil {
-			uid = int(*ex.jobSpec.User.Uid)
-		}
-		if ex.jobSpec.User.Gid != nil {
-			gid = int(*ex.jobSpec.User.Gid)
-		}
+	// User must be already set
+	if ex.jobSpec.User.HomeDir != "" {
+		homeDir = ex.jobSpec.User.HomeDir
+	}
+	if ex.jobSpec.User.Uid != nil {
+		uid = int(*ex.jobSpec.User.Uid)
+	}
+	if ex.jobSpec.User.Gid != nil {
+		gid = int(*ex.jobSpec.User.Gid)
 	}
 
 	for _, fa := range ex.jobSpec.FileArchives {
-		log.Trace(ctx, "Extracting file archive", "id", fa.Id, "path", fa.Path)
-
-		p := path.Clean(fa.Path)
-		// `~username[/path/to]` is not supported
-		if p == "~" {
-			p = homeDir
-		} else if rest, found := strings.CutPrefix(p, "~/"); found {
-			p = path.Join(homeDir, rest)
-		} else if !path.IsAbs(p) {
-			p = path.Join(ex.workingDir, p)
-		}
-		dir, root := path.Split(p)
-		if err := mkdirAll(ctx, dir, uid, gid); err != nil {
-			return gerrors.Wrap(err)
-		}
-
-		if err := os.RemoveAll(p); err != nil {
-			log.Warning(ctx, "Failed to remove", "path", p, "err", err)
-		}
-
 		archivePath := path.Join(ex.archiveDir, fa.Id)
-		archive, err := os.Open(archivePath)
-		if err != nil {
+		if err := extractFileArchive(ctx, archivePath, fa.Path, ex.workingDir, uid, gid, homeDir); err != nil {
 			return gerrors.Wrap(err)
 		}
-		defer func() {
-			_ = archive.Close()
-			if err := os.Remove(archivePath); err != nil {
-				log.Warning(ctx, "Failed to remove archive", "path", archivePath, "err", err)
-			}
-		}()
+	}
 
-		var paths []string
-		repl := fmt.Sprintf("%s$2", root)
-		renameAndRemember := func(s string) string {
-			s = renameRegex.ReplaceAllString(s, repl)
-			paths = append(paths, s)
-			return s
-		}
-		if err := extract.Tar(ctx, archive, dir, renameAndRemember); err != nil {
-			return gerrors.Wrap(err)
-		}
+	if err := os.RemoveAll(ex.archiveDir); err != nil {
+		log.Warning(ctx, "Failed to remove file archives dir", "path", ex.archiveDir, "err", err)
+	}
 
-		if uid != -1 || gid != -1 {
-			for _, p := range paths {
-				if err := os.Chown(path.Join(dir, p), uid, gid); err != nil {
-					log.Warning(ctx, "Failed to chown", "path", p, "err", err)
-				}
+	return nil
+}
+
+func extractFileArchive(ctx context.Context, archivePath string, targetPath string, targetRoot string, uid int, gid int, homeDir string) error {
+	log.Trace(ctx, "Extracting file archive", "archive", archivePath, "target", targetPath)
+
+	targetPath = path.Clean(targetPath)
+	// `~username[/path/to]` is not supported
+	if targetPath == "~" {
+		targetPath = homeDir
+	} else if rest, found := strings.CutPrefix(targetPath, "~/"); found {
+		targetPath = path.Join(homeDir, rest)
+	} else if !path.IsAbs(targetPath) {
+		targetPath = path.Join(targetRoot, targetPath)
+	}
+	dir, root := path.Split(targetPath)
+	if err := mkdirAll(ctx, dir, uid, gid); err != nil {
+		return gerrors.Wrap(err)
+	}
+	if err := os.RemoveAll(targetPath); err != nil {
+		log.Warning(ctx, "Failed to remove", "path", targetPath, "err", err)
+	}
+
+	archive, err := os.Open(archivePath)
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+	defer archive.Close()
+
+	var paths []string
+	repl := fmt.Sprintf("%s$2", root)
+	renameAndRemember := func(s string) string {
+		s = renameRegex.ReplaceAllString(s, repl)
+		paths = append(paths, s)
+		return s
+	}
+	if err := extract.Tar(ctx, archive, dir, renameAndRemember); err != nil {
+		return gerrors.Wrap(err)
+	}
+
+	if uid != -1 || gid != -1 {
+		for _, p := range paths {
+			if err := os.Chown(path.Join(dir, p), uid, gid); err != nil {
+				log.Warning(ctx, "Failed to chown", "path", p, "err", err)
 			}
 		}
 	}

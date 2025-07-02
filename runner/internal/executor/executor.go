@@ -133,16 +133,17 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 	ctx = log.WithLogger(ctx, log.NewEntry(logger, int(log.DefaultEntry.Logger.Level))) // todo loglevel
 	log.Info(ctx, "Run job", "log_level", log.GetLogger(ctx).Logger.Level.String())
 
-	if ex.jobSpec.User != nil {
-		if err := fillUser(ex.jobSpec.User); err != nil {
-			ex.SetJobStateWithTerminationReason(
-				ctx,
-				types.JobStateFailed,
-				types.TerminationReasonExecutorError,
-				fmt.Sprintf("Failed to fill in the job user fields (%s)", err),
-			)
-			return gerrors.Wrap(err)
-		}
+	if ex.jobSpec.User == nil {
+		ex.jobSpec.User = &schemas.User{Uid: &ex.currentUid}
+	}
+	if err := fillUser(ex.jobSpec.User); err != nil {
+		ex.SetJobStateWithTerminationReason(
+			ctx,
+			types.JobStateFailed,
+			types.TerminationReasonExecutorError,
+			fmt.Sprintf("Failed to fill in the job user fields (%s)", err),
+		)
+		return gerrors.Wrap(err)
 	}
 
 	if err := ex.setupFiles(ctx); err != nil {
@@ -331,37 +332,28 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 		cmd.Dir = workingDir
 	}
 
+	// User must be already set
 	user := ex.jobSpec.User
-	if user != nil {
+	// Strictly speaking, we need CAP_SETUID and CAP_GUID (for Cmd.Start()->
+	// Cmd.SysProcAttr.Credential) and CAP_CHOWN (for startCommand()->os.Chown()),
+	// but for the sake of simplicity we instead check if we are root or not
+	if ex.currentUid == 0 {
 		log.Trace(
 			ctx, "Using credentials",
 			"uid", *user.Uid, "gid", *user.Gid, "groups", user.GroupIds,
 			"username", user.GetUsername(), "groupname", user.GetGroupname(),
 			"home", user.HomeDir,
 		)
-		log.Trace(ctx, "Current user", "uid", ex.currentUid)
-
-		// 1. Ideally, We should check uid, gid, and supplementary groups mismatches,
-		// but, for the sake of simplicity, we only check uid. Unprivileged runner
-		// should not receive job requests where user credentials do not match the
-		// current user's ones in the first place (it should be handled by the server)
-		// 2. Strictly speaking, we need CAP_SETUID and CAP_GUID (for Cmd.Start()->
-		// Cmd.SysProcAttr.Credential) and CAP_CHOWN (for startCommand()->os.Chown()),
-		// but for the sake of simplicity we instead check if we are root or not
-		if *user.Uid != ex.currentUid && ex.currentUid != 0 {
-			return gerrors.Newf("cannot start job as %d, current uid is %d", *user.Uid, ex.currentUid)
-		}
-
 		if cmd.SysProcAttr == nil {
 			cmd.SysProcAttr = &syscall.SysProcAttr{}
 		}
-		// It's safe to setuid(2)/setgid(2)/setgroups(2) as unprivileged user if we use
-		// user's own credentials (basically, it's noop)
 		cmd.SysProcAttr.Credential = &syscall.Credential{
 			Uid:    *user.Uid,
 			Gid:    *user.Gid,
 			Groups: user.GroupIds,
 		}
+	} else {
+		log.Info(ctx, "Current user is not root, cannot set process credentials", "uid", ex.currentUid)
 	}
 
 	envMap := NewEnvMap(ParseEnvList(os.Environ()), jobEnvs, ex.secrets)
