@@ -124,13 +124,13 @@ plugins:
         'examples/fine-tuning/axolotl/index.md': 'examples/single-node-training/axolotl/index.md'
         'blog/efa.md': 'examples/clusters/efa/index.md'
   - typeset
-  # - gen-files:
-  #     scripts:  # always relative to mkdocs.yml
-  #       - scripts/docs/gen_examples.py
-  #       - scripts/docs/gen_cli_reference.py
-  #       - scripts/docs/gen_openapi_reference.py
-  #       - scripts/docs/gen_schema_reference.py
-  #       - scripts/docs/gen_rest_plugin_spec_reference.py
+  - gen-files:
+      scripts:  # always relative to mkdocs.yml
+        - scripts/docs/gen_examples.py
+        - scripts/docs/gen_cli_reference.py
+        - scripts/docs/gen_openapi_reference.py
+        - scripts/docs/gen_schema_reference.py
+        - scripts/docs/gen_rest_plugin_spec_reference.py
   - mkdocstrings:
       handlers:
         python:
