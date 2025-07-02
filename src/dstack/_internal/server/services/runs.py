@@ -918,6 +918,7 @@ _TYPE_SPECIFIC_UPDATABLE_SPEC_FIELDS = {
         # rolling deployment
         "repo_data",
         "repo_code_hash",
+        "file_archives",
     ],
 }
 _CONF_UPDATABLE_FIELDS = ["priority"]
@@ -930,6 +931,7 @@ _TYPE_SPECIFIC_CONF_UPDATABLE_FIELDS = {
         # rolling deployment
         "resources",
         "volumes",
+        "files",
         "image",
         "user",
         "privileged",

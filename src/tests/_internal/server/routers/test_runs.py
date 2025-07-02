@@ -246,6 +246,7 @@ def get_dev_env_run_plan_dict(
                     "working_dir": ".",
                     "repo_code_hash": None,
                     "repo_data": {"repo_dir": "/repo", "repo_type": "local"},
+                    "file_archives": [],
                 },
                 "offers": [json.loads(o.json()) for o in offers],
                 "total_offers": total_offers,
@@ -440,6 +441,7 @@ def get_dev_env_run_dict(
                     "working_dir": ".",
                     "repo_code_hash": None,
                     "repo_data": {"repo_dir": "/repo", "repo_type": "local"},
+                    "file_archives": [],
                 },
                 "job_submissions": [
                     {

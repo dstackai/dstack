@@ -244,7 +244,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
                 # the runner is not ready yet
                 file_archives = await _get_job_file_archives(
                     session=session,
-                    archive_mappings=run.run_spec.file_archives,
+                    archive_mappings=job.job_spec.file_archives,
                     user=run_model.user,
                 )
                 code = await _get_job_code(
@@ -296,7 +296,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
             # the runner is not ready yet
             file_archives = await _get_job_file_archives(
                 session=session,
-                archive_mappings=run.run_spec.file_archives,
+                archive_mappings=job.job_spec.file_archives,
                 user=run_model.user,
             )
             code = await _get_job_code(

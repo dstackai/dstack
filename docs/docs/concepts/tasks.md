@@ -461,6 +461,104 @@ If you don't assign a value to an environment variable (see `HF_TOKEN` above),
     | `DSTACK_NODES_IPS`      | The list of internal IP addresses of all nodes delimited by "\n" |
     | `DSTACK_MPI_HOSTFILE`   | The path to a pre-populated MPI hostfile                         |
 
+### Files
+
+By default, `dstack` automatically mounts the [repo](repos.md) directory where you ran `dstack init` to any run configuration. 
+
+However, in some cases, you may not want to mount the entire directory (e.g., if it’s too large),
+or you might want to mount files outside of it. In such cases, you can use the [`files`](../reference/dstack.yml/dev-environment.md#files) property.
+
+<div editor-title="examples/.dstack.yml"> 
+
+```yaml
+type: task
+name: trl-sft
+
+files:
+  - .:examples  # Maps the directory where `.dstack.yml` to `/workflow/examples`
+  - ~/.ssh/id_rsa:/root/.ssh/id_rsa  # Maps `~/.ssh/id_rsa` to `/root/.ssh/id_rs
+
+python: 3.12
+
+env:
+  - HF_TOKEN
+  - HF_HUB_ENABLE_HF_TRANSFER=1
+  - MODEL=Qwen/Qwen2.5-0.5B
+  - DATASET=stanfordnlp/imdb
+
+commands:
+  - uv pip install trl
+  - | 
+    trl sft \
+      --model_name_or_path $MODEL --dataset_name $DATASET
+      --num_processes $DSTACK_GPUS_PER_NODE
+
+resources:
+  gpu: H100:1
+```
+
+</div>
+
+Each entry maps a local directory or file to a path inside the container. Both local and container paths can be relative or absolute.
+
+- If the local path is relative, it’s resolved relative to the configuration file.
+- If the container path is relative, it’s resolved relative to `/workflow`.
+
+The container path is optional. If not specified, it will be automatically calculated.
+
+<!-- TODO: Add a more elevant example -->
+
+<div editor-title="examples/.dstack.yml"> 
+
+```yaml
+type: task
+name: trl-sft    
+
+files:
+  - ../examples  # Maps `examples` (the parent directory of `.dstack.yml`) to `/workflow/examples`
+  - ~/.cache/huggingface/token  # Maps `~/.cache/huggingface/token` to `/root/~/.cache/huggingface/token`
+
+python: 3.12
+
+env:
+  - HF_TOKEN
+  - HF_HUB_ENABLE_HF_TRANSFER=1
+  - MODEL=Qwen/Qwen2.5-0.5B
+  - DATASET=stanfordnlp/imdb
+
+commands:
+  - uv pip install trl
+  - | 
+    trl sft \
+      --model_name_or_path $MODEL --dataset_name $DATASET
+      --num_processes $DSTACK_GPUS_PER_NODE
+
+resources:
+  gpu: H100:1
+```
+
+</div>
+
+Note: If you want to use `files` without mounting the entire repo directory,
+make sure to pass `--no-repo` when running `dstack apply`:
+
+<div class="termy">
+
+```shell
+$ dstack apply -f examples/.dstack.yml --no-repo
+```
+
+</div>
+
+??? info ".gitignore and .dstackignore"
+    `dstack` automatically excludes files and folders listed in `.gitignore` and `.dstackignore`.
+    
+    Uploads are limited to 2MB. To avoid exceeding this limit, make sure to exclude unnecessary files.
+    You can increase the default server limit by setting the `DSTACK_SERVER_CODE_UPLOAD_LIMIT` environment variable.
+
+!!! warning "Experimental"
+    The `files` feature is experimental. Feedback is highly appreciated.
+    
 ### Retry policy
 
 By default, if `dstack` can't find capacity, or the task exits with an error, or the instance is interrupted, 

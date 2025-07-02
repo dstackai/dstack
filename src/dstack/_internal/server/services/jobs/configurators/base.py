@@ -151,6 +151,7 @@ class JobConfigurator(ABC):
             ssh_key=self._ssh_key(jobs_per_replica),
             repo_data=self.run_spec.repo_data,
             repo_code_hash=self.run_spec.repo_code_hash,
+            file_archives=self.run_spec.file_archives,
         )
         return job_spec
 

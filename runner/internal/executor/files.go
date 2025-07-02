@@ -50,7 +50,7 @@ func (ex *RunExecutor) setupFiles(ctx context.Context) error {
 		gid = int(*ex.jobSpec.User.Gid)
 	}
 
-	for _, fa := range ex.run.RunSpec.FileArchives {
+	for _, fa := range ex.jobSpec.FileArchives {
 		archivePath := path.Join(ex.archiveDir, fa.Id)
 		if err := extractFileArchive(ctx, archivePath, fa.Path, ex.workingDir, uid, gid, homeDir); err != nil {
 			return gerrors.Wrap(err)
