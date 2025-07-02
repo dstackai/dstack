@@ -110,7 +110,7 @@ from dstack._internal.utils.ssh import (
     pkey_from_str,
 )
 
-MIN_PROCESSING_INTERVAL = timedelta(seconds=5)
+MIN_PROCESSING_INTERVAL = timedelta(seconds=10)
 
 PENDING_JOB_RETRY_INTERVAL = timedelta(seconds=60)
 

@@ -79,7 +79,7 @@ from dstack._internal.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
-MIN_PROCESSING_INTERVAL = timedelta(seconds=5)
+MIN_PROCESSING_INTERVAL = timedelta(seconds=10)
 # Minimum time before terminating active job in case of connectivity issues.
 # Should be sufficient to survive most problems caused by
 # the server network flickering and providers' glitches.
