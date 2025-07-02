@@ -1,5 +1,6 @@
 import shlex
 import sys
+import threading
 from abc import ABC, abstractmethod
 from pathlib import PurePosixPath
 from typing import Dict, List, Optional, Union
@@ -351,7 +352,10 @@ def _join_shell_commands(commands: List[str]) -> str:
     return " && ".join(commands)
 
 
-@cached(TTLCache(maxsize=2048, ttl=80))
+@cached(
+    cache=TTLCache(maxsize=2048, ttl=80),
+    lock=threading.Lock(),
+)
 def _get_image_config(image: str, registry_auth: Optional[RegistryAuth]) -> ImageConfig:
     try:
         return get_image_config(image, registry_auth).config
