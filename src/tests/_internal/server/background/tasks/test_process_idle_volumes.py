@@ -1,5 +1,4 @@
 import datetime
-from unittest.mock import patch
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -155,9 +154,10 @@ class TestProcessIdleVolumes:
         ).replace(tzinfo=None)
         await session.commit()
 
-        with patch(
-            "dstack._internal.server.background.tasks.process_idle_volumes.delete_volumes"
-        ) as mock:
-            await process_idle_volumes()
-            mock.assert_called_once()
-            assert mock.call_args[0][2] == ["test-volume"]
+        # Run the background task
+        await process_idle_volumes()
+
+        # Refresh the volume to see if it was marked as deleted
+        await session.refresh(volume)
+        assert volume.deleted is True
+        assert volume.deleted_at is not None

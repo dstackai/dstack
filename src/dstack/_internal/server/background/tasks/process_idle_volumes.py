@@ -1,15 +1,16 @@
 import datetime
 from typing import List
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from dstack._internal.core.models.profiles import parse_duration
 from dstack._internal.core.models.volumes import VolumeStatus
 from dstack._internal.server.db import get_session_ctx
 from dstack._internal.server.models import VolumeModel
 from dstack._internal.server.services.locking import get_locker
-from dstack._internal.server.services.volumes import delete_volumes, get_volume_configuration
+from dstack._internal.server.services.volumes import get_volume_configuration
 from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.logging import get_logger
 
@@ -19,9 +20,10 @@ logger = get_logger(__name__)
 async def process_idle_volumes():
     lock, lockset = get_locker().get_lockset(VolumeModel.__tablename__)
     async with get_session_ctx() as session:
+        # Take lock, select IDs, add to lockset, release lock
         async with lock:
             res = await session.execute(
-                select(VolumeModel)
+                select(VolumeModel.id)
                 .where(
                     VolumeModel.status == VolumeStatus.ACTIVE,
                     VolumeModel.deleted == False,
@@ -31,12 +33,21 @@ async def process_idle_volumes():
                 .limit(10)
                 .with_for_update(skip_locked=True)
             )
-            volumes = list(res.unique().scalars().all())
-            if not volumes:
+            volume_ids = list(res.scalars().all())
+            if not volume_ids:
                 return
-            for volume in volumes:
-                await session.refresh(volume, ["project", "attachments"])
-                lockset.add(volume.id)
+            for volume_id in volume_ids:
+                lockset.add(volume_id)
+
+        # Load volumes with related attributes in one query
+        res = await session.execute(
+            select(VolumeModel)
+            .where(VolumeModel.id.in_(volume_ids))
+            .options(selectinload(VolumeModel.project))
+            .options(selectinload(VolumeModel.attachments))
+            .execution_options(populate_existing=True)
+        )
+        volumes = list(res.unique().scalars().all())
 
         try:
             to_delete = []
@@ -45,11 +56,11 @@ async def process_idle_volumes():
                     to_delete.append(volume)
 
             if to_delete:
-                await _delete_volumes(session, to_delete)
+                await _delete_idle_volumes(session, to_delete)
 
         finally:
-            for volume in volumes:
-                lockset.discard(volume.id)
+            for volume_id in volume_ids:
+                lockset.discard(volume_id)
 
 
 def _should_delete_volume(volume: VolumeModel) -> bool:
@@ -89,16 +100,21 @@ def _get_idle_time(volume: VolumeModel) -> datetime.timedelta:
     return max(idle_time, datetime.timedelta(0))
 
 
-async def _delete_volumes(session: AsyncSession, volumes: List[VolumeModel]):
-    by_project = {}
+async def _delete_idle_volumes(session: AsyncSession, volumes: List[VolumeModel]):
+    """Delete idle volumes without using the delete_volumes function to avoid locking conflicts."""
     for volume in volumes:
-        project = volume.project
-        if project not in by_project:
-            by_project[project] = []
-        by_project[project].append(volume.name)
-
-    for project, names in by_project.items():
         try:
-            await delete_volumes(session, project, names)
+            # Mark volume as deleted
+            await session.execute(
+                update(VolumeModel)
+                .where(VolumeModel.id == volume.id)
+                .values(
+                    deleted=True,
+                    deleted_at=get_current_datetime(),
+                )
+            )
+            logger.info("Marked idle volume %s for deletion", volume.name)
         except Exception:
-            logger.exception("Failed to delete volumes for project %s", project.name)
+            logger.exception("Failed to mark volume %s for deletion", volume.name)
+
+    await session.commit()
