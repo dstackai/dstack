@@ -1,16 +1,26 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useFieldArray, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
 
-import { Button, ButtonWithConfirmation, FormSelect, Header, Link, ListEmptyMessage, Pagination, SpaceBetween, Table } from 'components';
+import {
+    Button,
+    ButtonWithConfirmation,
+    FormSelect,
+    Header,
+    Link,
+    ListEmptyMessage,
+    Pagination,
+    SpaceBetween,
+    Table,
+} from 'components';
 
-import { useAppSelector, useCollection, useNotifications } from 'hooks';
-import { selectUserData } from 'App/slice';
+import { useAppSelector, useCollection } from 'hooks';
 import { ROUTES } from 'routes';
 import { useGetUserListQuery } from 'services/user';
-import { useProjectMemberActions } from '../hooks/useProjectMemberActions';
 
+import { selectUserData } from 'App/slice';
+
+import { useProjectMemberActions } from '../hooks/useProjectMemberActions';
 import { UserAutosuggest } from './UsersAutosuggest';
 
 import { IProps, TFormValues, TProjectMemberWithIndex } from './types';
@@ -21,8 +31,6 @@ import styles from './styles.module.scss';
 
 export const ProjectMembers: React.FC<IProps> = ({ members, loading, onChange, readonly, isAdmin, project }) => {
     const { t } = useTranslation();
-    const navigate = useNavigate();
-    const [pushNotification] = useNotifications();
     const [selectedItems, setSelectedItems] = useState<TProjectMemberWithIndex[]>([]);
     const { data: usersData } = useGetUserListQuery();
     const userData = useAppSelector(selectUserData);
@@ -39,11 +47,9 @@ export const ProjectMembers: React.FC<IProps> = ({ members, loading, onChange, r
 
     const currentUserRole = useMemo(() => {
         if (!userData?.username) return null;
-        const member = members?.find(m => m.user.username === userData.username);
+        const member = members?.find((m) => m.user.username === userData.username);
         return member?.project_role || null;
     }, [members, userData?.username]);
-
-    const isProjectOwner = userData?.username === project?.owner.username;
 
     const isMember = currentUserRole !== null;
 
@@ -113,14 +119,9 @@ export const ProjectMembers: React.FC<IProps> = ({ members, loading, onChange, r
         // Add management actions only if not readonly
         if (!readonly) {
             actions.push(
-                <Button
-                    key="delete"
-                    formAction="none"
-                    onClick={deleteSelectedMembers}
-                    disabled={!selectedItems.length}
-                >
+                <Button key="delete" formAction="none" onClick={deleteSelectedMembers} disabled={!selectedItems.length}>
                     {t('common.delete')}
-                </Button>
+                </Button>,
             );
         }
 
@@ -135,13 +136,13 @@ export const ProjectMembers: React.FC<IProps> = ({ members, loading, onChange, r
                         variant="normal"
                     >
                         {isMemberActionLoading ? t('common.loading') : t('projects.join')}
-                    </Button>
+                    </Button>,
                 );
             } else {
                 // Check if user is the last admin - if so, don't show leave button
-                const adminCount = project.members.filter(member => member.project_role === 'admin').length;
+                const adminCount = project.members.filter((member) => member.project_role === 'admin').length;
                 const isLastAdmin = currentUserRole === 'admin' && adminCount <= 1;
-                
+
                 if (!isLastAdmin) {
                     // Only show leave button if user is not the last admin
                     actions.unshift(
@@ -154,17 +155,18 @@ export const ProjectMembers: React.FC<IProps> = ({ members, loading, onChange, r
                             confirmContent={t('projects.leave_confirm_message')}
                             confirmButtonLabel={t('projects.leave')}
                         >
-                            {isMemberActionLoading 
-                                ? t('common.loading') 
-                                : t('projects.leave')
-                            }
-                        </ButtonWithConfirmation>
+                            {isMemberActionLoading ? t('common.loading') : t('projects.leave')}
+                        </ButtonWithConfirmation>,
                     );
                 }
             }
         }
 
-        return actions.length > 0 ? <SpaceBetween size="xs" direction="horizontal">{actions}</SpaceBetween> : undefined;
+        return actions.length > 0 ? (
+            <SpaceBetween size="xs" direction="horizontal">
+                {actions}
+            </SpaceBetween>
+        ) : undefined;
     };
 
     const COLUMN_DEFINITIONS = [
@@ -218,7 +220,6 @@ export const ProjectMembers: React.FC<IProps> = ({ members, loading, onChange, r
     ];
 
     return (
-        // eslint-disable-next-line @typescript-eslint/no-empty-function
         <form onSubmit={handleSubmit(() => {})}>
             <Table
                 selectionType="multi"
@@ -227,11 +228,7 @@ export const ProjectMembers: React.FC<IProps> = ({ members, loading, onChange, r
                 columnDefinitions={COLUMN_DEFINITIONS}
                 items={items}
                 header={
-                    <Header
-                        variant="h2"
-                        counter={`(${items?.length})`}
-                        actions={renderMemberActions()}
-                    >
+                    <Header variant="h2" counter={`(${items?.length})`} actions={renderMemberActions()}>
                         {t('projects.edit.members.section_title')}
                     </Header>
                 }

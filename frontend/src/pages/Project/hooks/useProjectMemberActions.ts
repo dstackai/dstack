@@ -1,27 +1,24 @@
-import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
 import { useNotifications } from 'hooks';
-import { ROUTES } from 'routes';
 import { useAddProjectMemberMutation, useRemoveProjectMemberMutation } from 'services/project';
 
 export const useProjectMemberActions = () => {
     const { t } = useTranslation();
-    const navigate = useNavigate();
     const [pushNotification] = useNotifications();
     const [addMember, { isLoading: isAdding }] = useAddProjectMemberMutation();
     const [removeMember, { isLoading: isRemoving }] = useRemoveProjectMemberMutation();
 
     const handleJoinProject = async (projectName: string, username: string) => {
         if (!username || !projectName) return;
-        
+
         try {
             await addMember({
                 project_name: projectName,
                 username: username,
                 project_role: 'user',
             }).unwrap();
-            
+
             pushNotification({
                 type: 'success',
                 content: t('projects.join_success'),
@@ -37,23 +34,24 @@ export const useProjectMemberActions = () => {
 
     const handleLeaveProject = async (projectName: string, username: string, onLeaveSuccess?: () => void) => {
         if (!username || !projectName) return;
-        
+
         try {
             await removeMember({
                 project_name: projectName,
                 username: username,
             }).unwrap();
-            
+
             pushNotification({
                 type: 'success',
                 content: t('projects.leave_success'),
             });
-            
+
             // Optionally call the success callback
             onLeaveSuccess?.();
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (error: any) {
             console.error('Failed to leave project:', error);
-            
+
             // Extract the specific error message from the backend
             let errorMessage = t('projects.leave_error');
             if (error?.data?.detail) {
@@ -68,7 +66,7 @@ export const useProjectMemberActions = () => {
                     errorMessage = error.data.detail.msg;
                 }
             }
-            
+
             pushNotification({
                 type: 'error',
                 content: errorMessage,
@@ -81,6 +79,6 @@ export const useProjectMemberActions = () => {
     return {
         handleJoinProject,
         handleLeaveProject,
-        isMemberActionLoading
+        isMemberActionLoading,
     };
-}; 
+};

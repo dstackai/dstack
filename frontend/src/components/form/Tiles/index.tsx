@@ -13,7 +13,7 @@ export const FormTiles = <T extends FieldValues>({ name, control, onChange: onCh
             render={({ field: { onChange, ...fieldRest } }) => {
                 const onChangeSelect: TilesProps['onChange'] = (event) => {
                     onChange(event.detail.value);
-                    onChangeProp && onChangeProp(event);
+                    onChangeProp?.(event);
                 };
 
                 return <Tiles onChange={onChangeSelect} {...fieldRest} {...props} />;

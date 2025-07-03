@@ -5,6 +5,7 @@ import { base64ToArrayBuffer } from 'libs';
 import fetchBaseQueryHeaders from 'libs/fetchBaseQueryHeaders';
 
 // Helper function to transform backend response to frontend format
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const transformProjectResponse = (project: any): IProject => ({
     ...project,
     isPublic: project.is_public,
@@ -28,8 +29,8 @@ export const projectApi = createApi({
                 };
             },
 
-            transformResponse: (response: any[]): IProject[] => 
-                response.map(transformProjectResponse),
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            transformResponse: (response: any[]): IProject[] => response.map(transformProjectResponse),
 
             providesTags: (result) =>
                 result

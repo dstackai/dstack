@@ -75,7 +75,7 @@ export const useColumnsDefinitions = () => {
             header: t('projects.run.status'),
             cell: (item: IRun) => {
                 const status = finishedRunStatuses.includes(item.status)
-                    ? item.latest_job_submission?.status ?? item.status
+                    ? (item.latest_job_submission?.status ?? item.status)
                     : item.status;
                 const terminationReason = finishedRunStatuses.includes(item.status)
                     ? item.latest_job_submission?.termination_reason

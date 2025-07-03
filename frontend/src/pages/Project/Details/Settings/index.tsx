@@ -17,7 +17,6 @@ import {
     SelectCSD,
     SpaceBetween,
     StatusIndicator,
-    Toggle,
 } from 'components';
 import { HotspotIds } from 'layouts/AppLayout/TutorialPanel/constants';
 
@@ -25,13 +24,13 @@ import { useBreadcrumbs, useHelpPanel, useNotifications } from 'hooks';
 import { riseRouterException } from 'libs';
 import { ROUTES } from 'routes';
 import { useGetProjectQuery, useUpdateProjectMembersMutation, useUpdateProjectMutation } from 'services/project';
+import { useGetUserDataQuery } from 'services/user';
 
 import { useCheckAvailableProjectPermission } from 'pages/Project/hooks/useCheckAvailableProjectPermission';
 import { useConfigProjectCliCommand } from 'pages/Project/hooks/useConfigProjectCliComand';
 import { useDeleteProject } from 'pages/Project/hooks/useDeleteProject';
 import { ProjectMembers } from 'pages/Project/Members';
 import { getProjectRoleByUserName } from 'pages/Project/utils';
-import { useGetUserDataQuery } from 'services/user';
 
 import { useBackendsTable } from '../../Backends/hooks';
 import { BackendsTable } from '../../Backends/Table';
@@ -79,10 +78,7 @@ export const ProjectSettings: React.FC = () => {
         { label: t('projects.edit.visibility.public') || '', value: 'public' },
     ];
 
-    const currentVisibility = data?.isPublic ? 'public' : 'private';
-    const [selectedVisibility, setSelectedVisibility] = useState(
-        data?.isPublic ? visibilityOptions[1] : visibilityOptions[0]
-    );
+    const [selectedVisibility, setSelectedVisibility] = useState(data?.isPublic ? visibilityOptions[1] : visibilityOptions[0]);
 
     useEffect(() => {
         setSelectedVisibility(data?.isPublic ? visibilityOptions[1] : visibilityOptions[0]);
@@ -123,6 +119,7 @@ export const ProjectSettings: React.FC = () => {
                     content: t('projects.edit.update_members_success'),
                 });
             })
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             .catch((error: any) => {
                 pushNotification({
                     type: 'error',
@@ -145,6 +142,7 @@ export const ProjectSettings: React.FC = () => {
                     content: t('projects.edit.update_visibility_success'),
                 });
             })
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             .catch((error: any) => {
                 pushNotification({
                     type: 'error',
@@ -162,6 +160,7 @@ export const ProjectSettings: React.FC = () => {
 
         deleteProject(data)
             .then(() => navigate(ROUTES.PROJECT.LIST))
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             .catch((error: any) => {
                 console.error('Delete project failed:', error);
             });
@@ -286,7 +285,14 @@ export const ProjectSettings: React.FC = () => {
                                                             <SelectCSD
                                                                 options={visibilityOptions}
                                                                 selectedOption={selectedVisibility}
-                                                                onChange={(event) => setSelectedVisibility(event.detail.selectedOption as { label: string; value: string })}
+                                                                onChange={(event) =>
+                                                                    setSelectedVisibility(
+                                                                        event.detail.selectedOption as {
+                                                                            label: string;
+                                                                            value: string;
+                                                                        },
+                                                                    )
+                                                                }
                                                                 expandToViewport={true}
                                                                 filteringType="auto"
                                                             />
