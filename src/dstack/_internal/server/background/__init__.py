@@ -53,6 +53,13 @@ def start_background_tasks() -> AsyncIOScheduler:
     #
     # Using larger batches to process more resources can lead to DB connections exhaustion.
     # Users can set SERVER_BACKGROUND_PROCESSING_RATE to process more resources per replica.
+    #
+    # Potentially long tasks (e.g. provisioning) process one resource per transaction
+    # to avoid holding locks for other resources if one is slow to process.
+    # Still, the next batch won't be processed unless all resources are processed.
+    # So larger batches do not increase processing linearly.
+    # Consider increasing max_instances in that case.
+
     _scheduler.add_job(collect_metrics, IntervalTrigger(seconds=10), max_instances=1)
     _scheduler.add_job(delete_metrics, IntervalTrigger(minutes=5), max_instances=1)
     if settings.ENABLE_PROMETHEUS_METRICS:
@@ -60,12 +67,12 @@ def start_background_tasks() -> AsyncIOScheduler:
             collect_prometheus_metrics, IntervalTrigger(seconds=10), max_instances=1
         )
         _scheduler.add_job(delete_prometheus_metrics, IntervalTrigger(minutes=5), max_instances=1)
-    # process_submitted_jobs and process_instances max processing rate is 75 jobs(instances) per minute.
+    # process_submitted_jobs and process_instances max processing rate is 75 jobs/instances per minute.
     _scheduler.add_job(
         process_submitted_jobs,
         IntervalTrigger(seconds=4, jitter=2),
-        kwargs={"batch_size": 10 * settings.SERVER_BACKGROUND_PROCESSING_RATE},
-        max_instances=2,
+        kwargs={"batch_size": 5 * settings.SERVER_BACKGROUND_PROCESSING_RATE},
+        max_instances=4,
     )
     _scheduler.add_job(
         process_running_jobs,
@@ -89,7 +96,7 @@ def start_background_tasks() -> AsyncIOScheduler:
         process_instances,
         IntervalTrigger(seconds=4, jitter=2),
         kwargs={"batch_size": 5 * settings.SERVER_BACKGROUND_PROCESSING_RATE},
-        max_instances=2,
+        max_instances=4,
     )
     _scheduler.add_job(
         process_fleets,
