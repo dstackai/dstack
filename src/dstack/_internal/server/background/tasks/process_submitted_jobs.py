@@ -1,5 +1,6 @@
 import asyncio
 import uuid
+from datetime import datetime, timedelta
 from typing import List, Optional, Tuple
 
 from sqlalchemy import select
@@ -80,11 +81,30 @@ from dstack._internal.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
+# Track when we last processed a job.
+# This is needed for a trick:
+# If no tasks were processed recently, we force batch_size 1.
+# If there are lots of runs/jobs with same offers submitted,
+# we warm up the cache instead of requesting the offers concurrently.
+BATCH_SIZE_RESET_TIMEOUT = timedelta(minutes=2)
+last_processed_at: Optional[datetime] = None
+
+
 async def process_submitted_jobs(batch_size: int = 1):
     tasks = []
-    for _ in range(batch_size):
+    effective_batch_size = _get_effective_batch_size(batch_size)
+    for _ in range(effective_batch_size):
         tasks.append(_process_next_submitted_job())
     await asyncio.gather(*tasks)
+
+
+def _get_effective_batch_size(batch_size: int) -> int:
+    if (
+        last_processed_at is None
+        or last_processed_at < common_utils.get_current_datetime() - BATCH_SIZE_RESET_TIMEOUT
+    ):
+        return 1
+    return batch_size
 
 
 async def _process_next_submitted_job():
@@ -125,6 +145,8 @@ async def _process_next_submitted_job():
             await _process_submitted_job(session=session, job_model=job_model)
         finally:
             lockset.difference_update([job_model_id])
+        global last_processed_at
+        last_processed_at = common_utils.get_current_datetime()
 
 
 async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
