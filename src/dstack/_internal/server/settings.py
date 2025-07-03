@@ -33,12 +33,14 @@ ALEMBIC_MIGRATIONS_LOCATION = os.getenv(
 DB_POOL_SIZE = int(os.getenv("DSTACK_DB_POOL_SIZE", 20))
 DB_MAX_OVERFLOW = int(os.getenv("DSTACK_DB_MAX_OVERFLOW", 20))
 
-# Increases the size of processing batches
+# Scale the number of background processing tasks
 # allowing to process more resources on one server replica.
 # Not recommended to change on SQLite.
 # DSTACK_DB_POOL_SIZE and DSTACK_DB_MAX_OVERFLOW
-# must be increased proportionally to handle larger batches.
-SERVER_BACKGROUND_PROCESSING_RATE = int(os.getenv("DSTACK_SERVER_BACKGROUND_PROCESSING_RATE", 1))
+# must be increased proportionally.
+SERVER_BACKGROUND_PROCESSING_FACTOR = int(
+    os.getenv("DSTACK_SERVER_BACKGROUND_PROCESSING_FACTOR", 1)
+)
 
 SERVER_EXECUTOR_MAX_WORKERS = int(os.getenv("DSTACK_SERVER_EXECUTOR_MAX_WORKERS", 128))
 
