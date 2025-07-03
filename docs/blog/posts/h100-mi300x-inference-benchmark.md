@@ -6,8 +6,6 @@ slug: h100-mi300x-inference-benchmark
 image: https://dstack.ai/static-assets/static-assets/images/h100-mi300x-inference-benchmark-v2.png
 categories:
   - Benchmarks
-  - AMD
-  - NVIDIA
 ---
 
 # Exploring inference memory saturation effect: H100 vs MI300x

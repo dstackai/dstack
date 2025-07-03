@@ -64,6 +64,10 @@ plugins:
       blog_dir: blog
       post_url_format: "{slug}"
       blog_toc: true
+      categories_url_format: "{slug}"
+      archive: false
+      categories_name: Blog
+      categories_sort_reverse: true
   - social:
       cards_layout_options:
         background_color: "black"
@@ -288,12 +292,10 @@ nav:
         - TPU: examples/accelerators/tpu/index.md
         - Intel Gaudi: examples/accelerators/intel/index.md
         - Tenstorrent: examples/accelerators/tenstorrent/index.md
-#    - Misc:
-#        - Docker Compose: examples/misc/docker-compose/index.md
-#  - Community: community.md
-#  - Partners: partners.md
-  - Blog:
-      - blog/index.md
+  - Benchmarks: blog/benchmarks.md
+  - Case studies: blog/case-studies.md
+  - Blog: 
+    - blog/index.md
 #  - Discord: https://discord.gg/u8SmfwPpMd" target="_blank
 #  - Changelog: https://github.com/dstackai/dstack/releases" target="_blank
 #  - GitHub: https://github.com/dstackai/dstack" target="_blank

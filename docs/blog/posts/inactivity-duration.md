@@ -5,7 +5,7 @@ description: "dstack introduces a new feature that automatically detects and shu
 slug: inactivity-duration
 image: https://dstack.ai/static-assets/static-assets/images/inactive-dev-environments-auto-shutdown.png
 categories:
-  - Dev environments
+  - Releases
 ---
 
 # Auto-shutdown for inactive dev environments—no idle GPUs

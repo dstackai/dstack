@@ -5,8 +5,7 @@ description: "This tutorial walks you through how dstack can be used with Tensor
 slug: amd-on-tensorwave
 image: https://dstack.ai/static-assets/static-assets/images/dstack-tensorwave-v2.png
 categories:
-  - AMD
-  - SSH fleets
+  - Case studies
 ---
 
 # Using SSH fleets with TensorWave's private AMD cloud 

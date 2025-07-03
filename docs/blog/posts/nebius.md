@@ -5,8 +5,7 @@ description: "TBA"
 slug: nebius
 image: https://dstack.ai/static-assets/static-assets/images/dstack-nebius-v2.png
 categories:
-  - Cloud fleets
-  - NVIDIA
+  - Releases
 ---
 
 # Supporting GPU provisioning and orchestration on Nebius
