@@ -706,7 +706,12 @@ If `dstack` can apply all the detected changes without a full service restart, i
 
 During deployment, new and old replicas can coexist and handle requests simultaneously. If the service has multiple replicas, they are updated one by one &mdash; there can be at most one extra replica above the desired number of replicas, as determined by the `replicas` and `scaling` properties.
 
-You can track the deployment progress in the `dstack apply` output. The `deployment` number will be lower for old replicas and higher for new ones.
+You can track the deployment progress in the `dstack apply` output or in `dstack ps`. The `deployment` number will be lower for old replicas and higher for new ones.
+
+<!--
+    Not using termy for this example, since the example shows an intermediate CLI state,
+    not a completed command.
+-->
 
 ```shell
 $ dstack apply -f my-service.dstack.yml
