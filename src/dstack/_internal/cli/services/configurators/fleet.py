@@ -35,6 +35,7 @@ from dstack._internal.core.models.fleets import (
 )
 from dstack._internal.core.models.instances import InstanceAvailability, InstanceStatus, SSHKey
 from dstack._internal.core.models.repos.base import Repo
+from dstack._internal.core.services.diff import diff_models
 from dstack._internal.utils.common import local_time
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.ssh import convert_ssh_key_to_pem, generate_public_key, pkey_from_str
@@ -82,7 +83,18 @@ class FleetConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
             confirm_message += "Create the fleet?"
         else:
             action_message += f"Found fleet [code]{plan.spec.configuration.name}[/]."
-            if plan.current_resource.spec.configuration == plan.spec.configuration:
+            diff = diff_models(
+                old=plan.current_resource.spec.configuration,
+                new=plan.spec.configuration,
+                ignore={
+                    "ssh_config": {
+                        "ssh_key": True,
+                        "proxy_jump": {"ssh_key"},
+                        "hosts": {"__all__": {"ssh_key": True, "proxy_jump": {"ssh_key"}}},
+                    }
+                },
+            )
+            if not diff:
                 if command_args.yes and not command_args.force:
                     # --force is required only with --yes,
                     # otherwise we may ask for force apply interactively.

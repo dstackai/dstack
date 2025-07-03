@@ -1,19 +1,20 @@
-from typing import Any, Dict, Optional
+from typing import Optional
 
+from dstack._internal.core.models.common import IncludeExcludeDictType, IncludeExcludeSetType
 from dstack._internal.core.models.fleets import ApplyFleetPlanInput, FleetSpec
 from dstack._internal.core.models.instances import Instance
 
 
-def get_get_plan_excludes(fleet_spec: FleetSpec) -> Dict:
-    get_plan_excludes = {}
+def get_get_plan_excludes(fleet_spec: FleetSpec) -> IncludeExcludeDictType:
+    get_plan_excludes: IncludeExcludeDictType = {}
     spec_excludes = get_fleet_spec_excludes(fleet_spec)
     if spec_excludes:
         get_plan_excludes["spec"] = spec_excludes
     return get_plan_excludes
 
 
-def get_apply_plan_excludes(plan_input: ApplyFleetPlanInput) -> Dict:
-    apply_plan_excludes = {}
+def get_apply_plan_excludes(plan_input: ApplyFleetPlanInput) -> IncludeExcludeDictType:
+    apply_plan_excludes: IncludeExcludeDictType = {}
     spec_excludes = get_fleet_spec_excludes(plan_input.spec)
     if spec_excludes:
         apply_plan_excludes["spec"] = spec_excludes
@@ -28,23 +29,23 @@ def get_apply_plan_excludes(plan_input: ApplyFleetPlanInput) -> Dict:
     return {"plan": apply_plan_excludes}
 
 
-def get_create_fleet_excludes(fleet_spec: FleetSpec) -> Dict:
-    create_fleet_excludes = {}
+def get_create_fleet_excludes(fleet_spec: FleetSpec) -> IncludeExcludeDictType:
+    create_fleet_excludes: IncludeExcludeDictType = {}
     spec_excludes = get_fleet_spec_excludes(fleet_spec)
     if spec_excludes:
         create_fleet_excludes["spec"] = spec_excludes
     return create_fleet_excludes
 
 
-def get_fleet_spec_excludes(fleet_spec: FleetSpec) -> Optional[Dict]:
+def get_fleet_spec_excludes(fleet_spec: FleetSpec) -> Optional[IncludeExcludeDictType]:
     """
     Returns `fleet_spec` exclude mapping to exclude certain fields from the request.
     Use this method to exclude new fields when they are not set to keep
     clients backward-compatibility with older servers.
     """
-    spec_excludes: Dict[str, Any] = {}
-    configuration_excludes: Dict[str, Any] = {}
-    profile_excludes: set[str] = set()
+    spec_excludes: IncludeExcludeDictType = {}
+    configuration_excludes: IncludeExcludeDictType = {}
+    profile_excludes: IncludeExcludeSetType = set()
     profile = fleet_spec.profile
     if profile.fleets is None:
         profile_excludes.add("fleets")

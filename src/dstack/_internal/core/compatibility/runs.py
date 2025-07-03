@@ -1,29 +1,30 @@
-from typing import Any, Dict, Optional
+from typing import Optional
 
+from dstack._internal.core.models.common import IncludeExcludeDictType, IncludeExcludeSetType
 from dstack._internal.core.models.configurations import ServiceConfiguration
 from dstack._internal.core.models.runs import ApplyRunPlanInput, JobSpec, JobSubmission, RunSpec
 from dstack._internal.server.schemas.runs import GetRunPlanRequest
 
 
-def get_apply_plan_excludes(plan: ApplyRunPlanInput) -> Optional[Dict]:
+def get_apply_plan_excludes(plan: ApplyRunPlanInput) -> Optional[IncludeExcludeDictType]:
     """
     Returns `plan` exclude mapping to exclude certain fields from the request.
     Use this method to exclude new fields when they are not set to keep
     clients backward-compatibility with older servers.
     """
-    apply_plan_excludes = {}
+    apply_plan_excludes: IncludeExcludeDictType = {}
     run_spec_excludes = get_run_spec_excludes(plan.run_spec)
     if run_spec_excludes is not None:
         apply_plan_excludes["run_spec"] = run_spec_excludes
     current_resource = plan.current_resource
     if current_resource is not None:
-        current_resource_excludes = {}
+        current_resource_excludes: IncludeExcludeDictType = {}
         current_resource_excludes["status_message"] = True
         if current_resource.deployment_num == 0:
             current_resource_excludes["deployment_num"] = True
         apply_plan_excludes["current_resource"] = current_resource_excludes
         current_resource_excludes["run_spec"] = get_run_spec_excludes(current_resource.run_spec)
-        job_submissions_excludes = {}
+        job_submissions_excludes: IncludeExcludeDictType = {}
         current_resource_excludes["jobs"] = {
             "__all__": {
                 "job_spec": get_job_spec_excludes([job.job_spec for job in current_resource.jobs]),
@@ -45,7 +46,7 @@ def get_apply_plan_excludes(plan: ApplyRunPlanInput) -> Optional[Dict]:
             job_submissions_excludes["deployment_num"] = True
         latest_job_submission = current_resource.latest_job_submission
         if latest_job_submission is not None:
-            latest_job_submission_excludes = {}
+            latest_job_submission_excludes: IncludeExcludeDictType = {}
             current_resource_excludes["latest_job_submission"] = latest_job_submission_excludes
             if _should_exclude_job_submission_jpd_cpu_arch(latest_job_submission):
                 latest_job_submission_excludes["job_provisioning_data"] = {
@@ -62,12 +63,12 @@ def get_apply_plan_excludes(plan: ApplyRunPlanInput) -> Optional[Dict]:
     return {"plan": apply_plan_excludes}
 
 
-def get_get_plan_excludes(request: GetRunPlanRequest) -> Optional[Dict]:
+def get_get_plan_excludes(request: GetRunPlanRequest) -> Optional[IncludeExcludeDictType]:
     """
     Excludes new fields when they are not set to keep
     clients backward-compatibility with older servers.
     """
-    get_plan_excludes = {}
+    get_plan_excludes: IncludeExcludeDictType = {}
     run_spec_excludes = get_run_spec_excludes(request.run_spec)
     if run_spec_excludes is not None:
         get_plan_excludes["run_spec"] = run_spec_excludes
@@ -76,15 +77,15 @@ def get_get_plan_excludes(request: GetRunPlanRequest) -> Optional[Dict]:
     return get_plan_excludes
 
 
-def get_run_spec_excludes(run_spec: RunSpec) -> Optional[Dict]:
+def get_run_spec_excludes(run_spec: RunSpec) -> IncludeExcludeDictType:
     """
     Returns `run_spec` exclude mapping to exclude certain fields from the request.
     Use this method to exclude new fields when they are not set to keep
     clients backward-compatibility with older servers.
     """
-    spec_excludes: dict[str, Any] = {}
-    configuration_excludes: dict[str, Any] = {}
-    profile_excludes: set[str] = set()
+    spec_excludes: IncludeExcludeDictType = {}
+    configuration_excludes: IncludeExcludeDictType = {}
+    profile_excludes: IncludeExcludeSetType = set()
     configuration = run_spec.configuration
     profile = run_spec.profile
 
@@ -121,18 +122,16 @@ def get_run_spec_excludes(run_spec: RunSpec) -> Optional[Dict]:
         spec_excludes["configuration"] = configuration_excludes
     if profile_excludes:
         spec_excludes["profile"] = profile_excludes
-    if spec_excludes:
-        return spec_excludes
-    return None
+    return spec_excludes
 
 
-def get_job_spec_excludes(job_specs: list[JobSpec]) -> Optional[dict]:
+def get_job_spec_excludes(job_specs: list[JobSpec]) -> IncludeExcludeDictType:
     """
     Returns `job_spec` exclude mapping to exclude certain fields from the request.
     Use this method to exclude new fields when they are not set to keep
     clients backward-compatibility with older servers.
     """
-    spec_excludes: dict[str, Any] = {}
+    spec_excludes: IncludeExcludeDictType = {}
 
     if all(s.repo_code_hash is None for s in job_specs):
         spec_excludes["repo_code_hash"] = True
@@ -141,9 +140,7 @@ def get_job_spec_excludes(job_specs: list[JobSpec]) -> Optional[dict]:
     if all(not s.file_archives for s in job_specs):
         spec_excludes["file_archives"] = True
 
-    if spec_excludes:
-        return spec_excludes
-    return None
+    return spec_excludes
 
 
 def _should_exclude_job_submission_jpd_cpu_arch(job_submission: JobSubmission) -> bool:
