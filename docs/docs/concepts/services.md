@@ -681,6 +681,52 @@ utilization_policy:
 
 --8<-- "docs/concepts/snippets/manage-runs.ext"
 
+## Deployments
+
+To deploy a new version of the service, change its configuration or associated resources, such as files or repo contents. Then, re-run `dstack apply`.
+
+<div class="termy">
+
+```shell
+$ dstack apply -f my-service.dstack.yml
+
+Active run my-service already exists. Detected changes that can be updated in-place:
+- Repo state (branch, commit, or other)
+- File archives
+- Configuration properties:
+  - env
+  - files
+
+Update the run? [y/n]:
+```
+
+</div>
+
+If `dstack` can apply all the detected changes without a full service restart, it starts a rolling deployment. During the rolling deployment, `dstack` gradually updates the service replicas to the new version. First, it starts an extra replica. Then, it waits until this replica enters the `running` state. Finally, it terminates the old replica.
+
+During deployment, new and old replicas can coexist and handle requests simultaneously. If the service has multiple replicas, they are updated one by one &mdash; there can be at most one extra replica above the desired number of replicas, as determined by the `replicas` and `scaling` properties.
+
+You can track the deployment progress in the `dstack apply` output. The `deployment` number will be lower for old replicas and higher for new ones.
+
+```shell
+$ dstack apply -f my-service.dstack.yml
+
+⠋ Launching my-service...
+ NAME                            BACKEND          PRICE    STATUS       SUBMITTED
+ my-service deployment=1                                   running      11 mins ago
+   replica=0 job=0 deployment=0  aws (us-west-2)  $0.0026  terminating  11 mins ago
+   replica=1 job=0 deployment=1  aws (us-west-2)  $0.0026  running      1 min ago
+```
+
+A deployment stops either when all of the replicas are up to date or when the next deployment is submitted.
+
+<!-- NOTE: should be in sync with constants in server/services/runs.py -->
+
+Rolling deployments apply to the following configuration properties: `resources`, `volumes`, `docker`, `files`, `image`, `user`, `privileged`, `entrypoint`, `working_dir`, `python`, `nvcc`, `single_branch`, `env`, `shell`, `commands`. They also apply to changes to [repo](repos.md) or [file](#files) contents.
+
+??? info "Forcing a redeployment"
+    Sometimes you may want to run a rolling deployment even if `dstack` detects no changes to the configuration or associated resources. This can be useful if you've changed the project [secrets](secrets.md) or if you just want to gradually restart all service replicas. Currently, this can be achieved by making an insignificant change to the configuration, such as adding a dummy [environment variable](#environment-variables).
+
 !!! info "What's next?"
     1. Read about [dev environments](dev-environments.md), [tasks](tasks.md), and [repos](repos.md)
     2. Learn how to manage [fleets](fleets.md)
