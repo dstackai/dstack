@@ -33,7 +33,12 @@ from dstack._internal.core.backends.base.compute import (
     merge_tags,
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
-from dstack._internal.core.errors import ComputeError, NoCapacityError, PlacementGroupInUseError
+from dstack._internal.core.errors import (
+    ComputeError,
+    NoCapacityError,
+    PlacementGroupInUseError,
+    PlacementGroupNotSupportedError,
+)
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.gateways import (
@@ -46,7 +51,11 @@ from dstack._internal.core.models.instances import (
     InstanceOffer,
     InstanceOfferWithAvailability,
 )
-from dstack._internal.core.models.placement import PlacementGroup, PlacementGroupProvisioningData
+from dstack._internal.core.models.placement import (
+    PlacementGroup,
+    PlacementGroupProvisioningData,
+    PlacementStrategy,
+)
 from dstack._internal.core.models.resources import Memory, Range
 from dstack._internal.core.models.runs import JobProvisioningData, Requirements
 from dstack._internal.core.models.volumes import (
@@ -334,6 +343,8 @@ class AWSCompute(
         placement_group: PlacementGroup,
         master_instance_offer: InstanceOffer,
     ) -> PlacementGroupProvisioningData:
+        if not _offer_supports_placement_group(master_instance_offer, placement_group):
+            raise PlacementGroupNotSupportedError()
         ec2_client = self.session.client("ec2", region_name=placement_group.configuration.region)
         logger.debug("Creating placement group %s...", placement_group.name)
         ec2_client.create_placement_group(
@@ -370,6 +381,8 @@ class AWSCompute(
         placement_group: PlacementGroup,
         instance_offer: InstanceOffer,
     ) -> bool:
+        if not _offer_supports_placement_group(instance_offer, placement_group):
+            return False
         return (
             placement_group.configuration.backend == BackendType.AWS
             and placement_group.configuration.region == instance_offer.region
@@ -1057,6 +1070,15 @@ def _supported_instances(offer: InstanceOffer) -> bool:
         if offer.instance.name.startswith(family):
             return True
     return False
+
+
+def _offer_supports_placement_group(offer: InstanceOffer, placement_group: PlacementGroup) -> bool:
+    if placement_group.configuration.placement_strategy != PlacementStrategy.CLUSTER:
+        return True
+    for family in ["t3.", "t2."]:
+        if offer.instance.name.startswith(family):
+            return False
+    return True
 
 
 def _get_maximum_efa_interfaces(ec2_client: botocore.client.BaseClient, instance_type: str) -> int:

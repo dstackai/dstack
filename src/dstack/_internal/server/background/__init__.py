@@ -109,7 +109,7 @@ def start_background_tasks() -> AsyncIOScheduler:
             process_instances,
             IntervalTrigger(seconds=4, jitter=2),
             kwargs={"batch_size": 5},
-            max_instances=4 if replica == 0 else 1,
+            max_instances=2 if replica == 0 else 1,
         )
         _scheduler.add_job(
             process_fleets,

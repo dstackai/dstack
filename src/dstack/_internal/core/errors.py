@@ -110,6 +110,10 @@ class PlacementGroupInUseError(ComputeError):
     pass
 
 
+class PlacementGroupNotSupportedError(ComputeError):
+    pass
+
+
 class NotYetTerminated(ComputeError):
     """
     Used by Compute.terminate_instance to signal that instance termination is not complete

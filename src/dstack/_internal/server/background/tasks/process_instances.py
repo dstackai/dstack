@@ -45,6 +45,7 @@ from dstack._internal.core.consts import DSTACK_SHIM_HTTP_PORT
 from dstack._internal.core.errors import (
     BackendError,
     NotYetTerminated,
+    PlacementGroupNotSupportedError,
     ProvisioningError,
 )
 from dstack._internal.core.models.backends.base import BackendType
@@ -1067,6 +1068,12 @@ async def _create_placement_group(
             placement_group_model_to_placement_group(placement_group_model),
             master_instance_offer,
         )
+    except PlacementGroupNotSupportedError:
+        logger.debug(
+            "Skipping offer %s because placement group not supported",
+            master_instance_offer.instance.name,
+        )
+        return None
     except BackendError as e:
         logger.warning(
             "Failed to create placement group %s in %s/%s: %r",
