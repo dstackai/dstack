@@ -5,8 +5,7 @@ description: "TBA"
 slug: mpi
 image: https://dstack.ai/static-assets/static-assets/images/dstack-mpi-v2.png
 categories:
-  - SSH fleets
-  - Cloud fleets
+  - Releases
 ---
 
 # Supporting MPI and NCCL/RCCL tests 

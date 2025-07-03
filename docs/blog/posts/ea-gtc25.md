@@ -6,10 +6,11 @@ slug: ea-gtc25
 image: https://dstack.ai/static-assets/static-assets/images/dstack-ea-slide-2-background-min.png
 categories:
   - Case studies
-  - NVIDIA
+links:
+  - NVIDIA GTC 2025 ↗: https://www.nvidia.com/en-us/on-demand/session/gtc25-s73667/
 ---
 
-# Case study: how EA uses dstack to fast-track AI development
+# How EA uses dstack to fast-track AI development
 
 At NVIDIA GTC 2025, Electronic Arts [shared :material-arrow-top-right-thin:{ .external }](https://www.nvidia.com/en-us/on-demand/session/gtc25-s73667/){:target="_blank"} how they’re scaling AI development and managing infrastructure across teams. They highlighted using tools like `dstack` to provision GPUs quickly, flexibly, and cost-efficiently. This case study summarizes key insights from their talk.
 

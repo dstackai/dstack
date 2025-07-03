@@ -6,8 +6,6 @@ slug: h200-mi300x-deepskeek-benchmark
 image: https://dstack.ai/static-assets/static-assets/images/h200-mi300x-deepskeek-benchmark-v2.png
 categories:
   - Benchmarks
-  - AMD
-  - NVIDIA
 ---
 
 # DeepSeek R1 inference performance: MI300X vs. H200

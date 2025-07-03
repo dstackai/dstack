@@ -5,9 +5,7 @@ description: "TBA"
 slug: gh200-on-lambda
 image: https://dstack.ai/static-assets/static-assets/images/dstack-arm--gh200-lambda-min.png
 categories:
-  - ARM
-  - Cloud fleets
-  - SSH fleets
+  - Releases
 ---
 
 # Supporting ARM and NVIDIA GH200 on Lambda

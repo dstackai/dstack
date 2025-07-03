@@ -3,6 +3,8 @@ title: dstack Sky now supports your own cloud accounts
 date: 2024-06-11
 description: "With today's release, dstack Sky supports both options: accessing the GPU marketplace and using your own cloud accounts."  
 slug: dstack-sky-own-cloud-accounts
+categories:
+  - Releases
 ---
 
 # dstack Sky now supports your own cloud accounts
