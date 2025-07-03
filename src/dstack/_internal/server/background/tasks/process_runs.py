@@ -341,7 +341,7 @@ async def _process_active_run(session: AsyncSession, run_model: RunModel):
                 current_time - run_model.submitted_at.replace(tzinfo=datetime.timezone.utc)
             ).total_seconds()
             logger.info(
-                "%s: run took %.2f seconds from submision to provisioning.",
+                "%s: run took %.2f seconds from submission to provisioning.",
                 fmt(run_model),
                 submit_to_provision_duration,
             )
