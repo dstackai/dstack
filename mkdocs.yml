@@ -292,8 +292,8 @@ nav:
         - TPU: examples/accelerators/tpu/index.md
         - Intel Gaudi: examples/accelerators/intel/index.md
         - Tenstorrent: examples/accelerators/tenstorrent/index.md
-  - Benchmarks: blog/benchmarks/
-  - Case studies: blog/case-studies/
+  - Benchmarks: blog/benchmarks.md
+  - Case studies: blog/case-studies.md
   - Blog: 
     - blog/index.md
 #  - Discord: https://discord.gg/u8SmfwPpMd" target="_blank
