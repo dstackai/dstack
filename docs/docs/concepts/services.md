@@ -679,6 +679,55 @@ utilization_policy:
     [`max_price`](../reference/dstack.yml/service.md#max_price), and
     among [others](../reference/dstack.yml/service.md).
 
+## Rolling deployment
+
+To deploy a new version of a service that is already `running`, use `dstack apply`. `dstack` will automatically detect changes and update replicas one by one. New and old replicas coexist and handle requests simultaneously until deployment finishes.
+
+<div class="termy">
+
+```shell
+$ dstack apply -f my-service.dstack.yml
+
+Active run my-service already exists. Detected changes that can be updated in-place:
+- Repo state (branch, commit, or other)
+- File archives
+- Configuration properties:
+  - env
+  - files
+
+Update the run? [y/n]:
+```
+
+</div>
+
+You can track the deployment progress in both `dstack apply` or `dstack ps`. 
+Older replicas have lower `deployment` numbers; newer ones have higher.
+
+<!--
+    Not using termy for this example, since the example shows an intermediate CLI state,
+    not a completed command.
+-->
+
+```shell
+$ dstack apply -f my-service.dstack.yml
+
+⠋ Launching my-service...
+ NAME                            BACKEND          PRICE    STATUS       SUBMITTED
+ my-service deployment=1                                   running      11 mins ago
+   replica=0 job=0 deployment=0  aws (us-west-2)  $0.0026  terminating  11 mins ago
+   replica=1 job=0 deployment=1  aws (us-west-2)  $0.0026  running      1 min ago
+```
+
+The rolling deployment stops when all replicas are updated or when a new deployment is submitted.
+
+<!-- NOTE: should be in sync with constants in server/services/runs.py -->
+
+??? info "Force a redeployment"
+    `dstack` automatically detects changes to `resources`, `volumes`, `docker`, `files`, `image`, `user`, `privileged`, `entrypoint`, `working_dir`, `python`, `nvcc`, `single_branch`, `env`, `shell`, `commands`, and to [repo](repos.md) and [files](#files) contents.
+
+    To trigger a rolling deployment when no properties have changed (e.g., after updating [secrets](secrets.md) or to restart all replicas),
+    make a minor config change, such as adding a dummy [environment variable](#environment-variables).
+
 --8<-- "docs/concepts/snippets/manage-runs.ext"
 
 !!! info "What's next?"
