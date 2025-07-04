@@ -520,7 +520,8 @@ async def delete_fleets(
         get_locker(get_db().dialect_name).lock_ctx(InstanceModel.__tablename__, instances_ids),
     ):
         # Refetch after lock
-        # TODO lock instances with FOR UPDATE?
+        # TODO: Lock instances with FOR UPDATE?
+        # TODO: Do not lock fleet when deleting only instances
         res = await session.execute(
             select(FleetModel)
             .where(

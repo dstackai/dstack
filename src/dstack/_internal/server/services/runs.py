@@ -484,6 +484,7 @@ async def submit_run(
 
     lock, _ = get_locker(get_db().dialect_name).get_lockset(lock_namespace)
     async with lock:
+        # FIXME: delete_runs commits, so Postgres lock is released too early.
         if run_spec.run_name is None:
             run_spec.run_name = await _generate_run_name(
                 session=session,
