@@ -245,6 +245,23 @@ def register_routes(app: FastAPI, ui: bool = True):
         )
         return response
 
+    if settings.SERVER_PROFILING_ENABLED:
+        from pyinstrument import Profiler
+
+        @app.middleware("http")
+        async def profile_request(request: Request, call_next):
+            profiling = request.query_params.get("profile", False)
+            if profiling:
+                profiler = Profiler()
+                profiler.start()
+                respone = await call_next(request)
+                profiler.stop()
+                with open("profiling_results.html", "w+") as f:
+                    f.write(profiler.output_html())
+                return respone
+            else:
+                return await call_next(request)
+
     # this middleware must be defined after the log_request middleware
     @app.middleware("http")
     async def log_http_metrics(request: Request, call_next):

@@ -91,6 +91,7 @@ dev = [
     "ruff==0.11.6",  # should match .pre-commit-config.yaml
     "testcontainers>=4.9.2",
     "pytest-xdist>=3.6.1",
+    "pyinstrument>=5.0.0",
 ]
 
 [project.optional-dependencies]
