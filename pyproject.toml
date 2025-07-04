@@ -106,7 +106,7 @@ gateway = [
 server = [
     "fastapi",
     "starlette>=0.26.0",
-    "uvicorn",
+    "uvicorn[standard]",
     "aiorwlock",
     "aiocache",
     "httpx",
