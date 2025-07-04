@@ -99,7 +99,6 @@ def create_app() -> FastAPI:
 async def lifespan(app: FastAPI):
     configure_logging()
     server_executor = ThreadPoolExecutor(max_workers=settings.SERVER_EXECUTOR_MAX_WORKERS)
-    print(asyncio.get_running_loop())
     asyncio.get_running_loop().set_default_executor(server_executor)
     await migrate()
     _print_dstack_logo()
