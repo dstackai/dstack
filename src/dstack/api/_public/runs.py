@@ -1,4 +1,3 @@
-import base64
 import queue
 import tempfile
 import threading
