@@ -15,7 +15,6 @@ from dstack._internal.server.schemas.runner import LogEvent as RunnerLogEvent
 from dstack._internal.server.services.logs.base import (
     LogStorage,
     LogStorageError,
-    b64encode_raw_message,
     unix_time_ms_to_datetime,
 )
 
@@ -140,5 +139,5 @@ class FileLogStorage(LogStorage):
         return LogEvent(
             timestamp=unix_time_ms_to_datetime(runner_log_event.timestamp),
             log_source=LogEventSource.STDOUT,
-            message=b64encode_raw_message(runner_log_event.message),
+            message=runner_log_event.message.decode(),
         )

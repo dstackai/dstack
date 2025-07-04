@@ -17,7 +17,6 @@ from dstack._internal.server.schemas.runner import LogEvent as RunnerLogEvent
 from dstack._internal.server.services.logs.base import (
     LogStorage,
     LogStorageError,
-    b64encode_raw_message,
     datetime_to_unix_time_ms,
     unix_time_ms_to_datetime,
 )
@@ -238,8 +237,7 @@ class CloudWatchLogStorage(LogStorage):
                 skipped_future_events += 1
                 continue
             cw_event = self._runner_log_event_to_cloudwatch_event(event)
-            # as message is base64-encoded, length in bytes = length in code points.
-            message_size = len(cw_event["message"]) + self.MESSAGE_OVERHEAD_SIZE
+            message_size = len(event.message) + self.MESSAGE_OVERHEAD_SIZE
             if message_size > self.MESSAGE_MAX_SIZE:
                 # we should never hit this limit, as we use `io.Copy` to copy from pty to logs,
                 # which under the hood uses 32KiB buffer, see runner/internal/executor/executor.go,
@@ -271,7 +269,7 @@ class CloudWatchLogStorage(LogStorage):
     ) -> _CloudWatchLogEvent:
         return {
             "timestamp": runner_log_event.timestamp,
-            "message": b64encode_raw_message(runner_log_event.message),
+            "message": runner_log_event.message.decode(),
         }
 
     @contextmanager
