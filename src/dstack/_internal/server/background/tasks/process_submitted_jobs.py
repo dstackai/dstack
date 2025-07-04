@@ -86,6 +86,7 @@ logger = get_logger(__name__)
 # If no tasks were processed recently, we force batch_size 1.
 # If there are lots of runs/jobs with same offers submitted,
 # we warm up the cache instead of requesting the offers concurrently.
+# Mostly useful when runs are submitted via API without getting run plan first.
 BATCH_SIZE_RESET_TIMEOUT = timedelta(minutes=2)
 last_processed_at: Optional[datetime] = None
 
