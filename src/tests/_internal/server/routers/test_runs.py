@@ -33,7 +33,6 @@ from dstack._internal.core.models.runs import (
     ApplyRunPlanInput,
     JobSpec,
     JobStatus,
-    JobTerminationReason,
     Run,
     RunSpec,
     RunStatus,
@@ -1486,7 +1485,7 @@ class TestStopRuns:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_terminates_submitted_run(
+    async def test_marks_submitted_run_as_terminating(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
@@ -1504,7 +1503,7 @@ class TestStopRuns:
             repo=repo,
             user=user,
         )
-        job = await create_job(
+        await create_job(
             session=session,
             run=run,
         )
@@ -1517,13 +1516,10 @@ class TestStopRuns:
         await session.refresh(run)
         assert run.status == RunStatus.TERMINATING
         assert run.termination_reason == RunTerminationReason.STOPPED_BY_USER
-        await session.refresh(job)
-        assert job.status == JobStatus.TERMINATING
-        assert job.termination_reason == JobTerminationReason.TERMINATED_BY_USER
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_terminates_running_run(
+    async def test_marks_running_run_as_terminating(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
@@ -1547,7 +1543,7 @@ class TestStopRuns:
             project=project,
             status=InstanceStatus.BUSY,
         )
-        job = await create_job(
+        await create_job(
             session=session,
             run=run,
             job_provisioning_data=get_job_provisioning_data(),
@@ -1555,20 +1551,15 @@ class TestStopRuns:
             instance=instance,
             instance_assigned=True,
         )
-        with patch("dstack._internal.server.services.jobs._stop_runner") as stop_runner:
-            response = await client.post(
-                f"/api/project/{project.name}/runs/stop",
-                headers=get_auth_headers(user.token),
-                json={"runs_names": [run.run_name], "abort": False},
-            )
-            stop_runner.assert_called_once()
+        response = await client.post(
+            f"/api/project/{project.name}/runs/stop",
+            headers=get_auth_headers(user.token),
+            json={"runs_names": [run.run_name], "abort": False},
+        )
         assert response.status_code == 200
         await session.refresh(run)
         assert run.status == RunStatus.TERMINATING
         assert run.termination_reason == RunTerminationReason.STOPPED_BY_USER
-        await session.refresh(job)
-        assert job.status == JobStatus.TERMINATING
-        assert job.termination_reason == JobTerminationReason.TERMINATED_BY_USER
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)

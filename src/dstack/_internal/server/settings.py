@@ -27,10 +27,22 @@ LOG_FORMAT = os.getenv("DSTACK_SERVER_LOG_FORMAT", "rich").lower()
 ALEMBIC_MIGRATIONS_LOCATION = os.getenv(
     "DSTACK_ALEMBIC_MIGRATIONS_LOCATION", "dstack._internal.server:migrations"
 )
-# Users may want to increase pool size to support more concurrent resources
-# if their db supports many connections
-DB_POOL_SIZE = int(os.getenv("DSTACK_DB_POOL_SIZE", 10))
-DB_MAX_OVERFLOW = int(os.getenv("DSTACK_DB_MAX_OVERFLOW", 10))
+
+# Users may want to increase client pool size to support more concurrent resources
+# if their db supports many connections.
+DB_POOL_SIZE = int(os.getenv("DSTACK_DB_POOL_SIZE", 20))
+DB_MAX_OVERFLOW = int(os.getenv("DSTACK_DB_MAX_OVERFLOW", 20))
+
+# Scale the number of background processing tasks
+# allowing to process more resources on one server replica.
+# Not recommended to change on SQLite.
+# DSTACK_DB_POOL_SIZE and DSTACK_DB_MAX_OVERFLOW
+# must be increased proportionally.
+SERVER_BACKGROUND_PROCESSING_FACTOR = int(
+    os.getenv("DSTACK_SERVER_BACKGROUND_PROCESSING_FACTOR", 1)
+)
+
+SERVER_EXECUTOR_MAX_WORKERS = int(os.getenv("DSTACK_SERVER_EXECUTOR_MAX_WORKERS", 128))
 
 MAX_OFFERS_TRIED = int(os.getenv("DSTACK_SERVER_MAX_OFFERS_TRIED", 25))
 

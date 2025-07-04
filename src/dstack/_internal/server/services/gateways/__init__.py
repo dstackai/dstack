@@ -162,7 +162,7 @@ async def create_gateway(
             select(func.pg_advisory_xact_lock(string_to_lock_id(lock_namespace)))
         )
 
-    lock, _ = get_locker().get_lockset(lock_namespace)
+    lock, _ = get_locker(get_db().dialect_name).get_lockset(lock_namespace)
     async with lock:
         if configuration.name is None:
             configuration.name = await generate_gateway_name(session=session, project=project)
@@ -229,7 +229,9 @@ async def delete_gateways(
     gateways_ids = sorted([g.id for g in gateway_models])
     await session.commit()
     logger.info("Deleting gateways: %s", [g.name for g in gateway_models])
-    async with get_locker().lock_ctx(GatewayModel.__tablename__, gateways_ids):
+    async with get_locker(get_db().dialect_name).lock_ctx(
+        GatewayModel.__tablename__, gateways_ids
+    ):
         # Refetch after lock
         res = await session.execute(
             select(GatewayModel)

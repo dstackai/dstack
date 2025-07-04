@@ -19,7 +19,7 @@ from dstack._internal.core.models.runs import (
     RunStatus,
     RunTerminationReason,
 )
-from dstack._internal.server.db import get_session_ctx
+from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import JobModel, ProjectModel, RunModel
 from dstack._internal.server.services.jobs import (
     find_job,
@@ -41,6 +41,8 @@ from dstack._internal.utils import common
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
+
+MIN_PROCESSING_INTERVAL = datetime.timedelta(seconds=5)
 ROLLING_DEPLOYMENT_MAX_SURGE = 1  # at most one extra replica during rolling deployment
 
 
@@ -52,8 +54,8 @@ async def process_runs(batch_size: int = 1):
 
 
 async def _process_next_run():
-    run_lock, run_lockset = get_locker().get_lockset(RunModel.__tablename__)
-    job_lock, job_lockset = get_locker().get_lockset(JobModel.__tablename__)
+    run_lock, run_lockset = get_locker(get_db().dialect_name).get_lockset(RunModel.__tablename__)
+    job_lock, job_lockset = get_locker(get_db().dialect_name).get_lockset(JobModel.__tablename__)
     async with get_session_ctx() as session:
         async with run_lock, job_lock:
             res = await session.execute(
@@ -61,6 +63,8 @@ async def _process_next_run():
                 .where(
                     RunModel.status.not_in(RunStatus.finished_statuses()),
                     RunModel.id.not_in(run_lockset),
+                    RunModel.last_processed_at
+                    < common.get_current_datetime().replace(tzinfo=None) - MIN_PROCESSING_INTERVAL,
                 )
                 .order_by(RunModel.last_processed_at.asc())
                 .limit(1)
@@ -337,7 +341,7 @@ async def _process_active_run(session: AsyncSession, run_model: RunModel):
                 current_time - run_model.submitted_at.replace(tzinfo=datetime.timezone.utc)
             ).total_seconds()
             logger.info(
-                "%s: run took %.2f seconds from submision to provisioning.",
+                "%s: run took %.2f seconds from submission to provisioning.",
                 fmt(run_model),
                 submit_to_provision_duration,
             )

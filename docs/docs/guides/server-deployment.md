@@ -381,8 +381,20 @@ A single `dstack` server replica can support:
 * Up to 150 active jobs.
 * Up to 150 active instances.
 
-Having more active resources can affect server performance.
+Having more active resources will work but can affect server performance.
 If you hit these limits, consider using Postgres with multiple server replicas.
+You can also increase processing rates of a replica by setting the `DSTACK_SERVER_BACKGROUND_PROCESSING_FACTOR` environment variable.
+You should also increase `DSTACK_DB_POOL_SIZE` and `DSTACK_DB_MAX_OVERFLOW` proportionally.
+For example, to increase processing rates 4 times, set:
+
+```
+export DSTACK_SERVER_BACKGROUND_PROCESSING_FACTOR=4
+export DSTACK_DB_POOL_SIZE=80
+export DSTACK_DB_MAX_OVERFLOW=80
+```
+
+You have to ensure your Postgres installation supports that many connections by
+configuring [`max_connections`](https://www.postgresql.org/docs/current/runtime-config-connection.html#GUC-MAX-CONNECTIONS) and/or using connection pooler.
 
 ## FAQs
 

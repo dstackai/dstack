@@ -34,10 +34,11 @@ from dstack._internal.core.models.runs import (
     JobTerminationReason,
     Run,
     RunSpec,
+    RunStatus,
 )
 from dstack._internal.core.models.volumes import InstanceMountPoint, Volume, VolumeMountPoint
 from dstack._internal.server.background.tasks.common import get_provisioning_timeout
-from dstack._internal.server.db import get_session_ctx
+from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import (
     InstanceModel,
     JobModel,
@@ -79,6 +80,7 @@ from dstack._internal.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
+MIN_PROCESSING_INTERVAL = timedelta(seconds=10)
 # Minimum time before terminating active job in case of connectivity issues.
 # Should be sufficient to survive most problems caused by
 # the server network flickering and providers' glitches.
@@ -93,20 +95,29 @@ async def process_running_jobs(batch_size: int = 1):
 
 
 async def _process_next_running_job():
-    lock, lockset = get_locker().get_lockset(JobModel.__tablename__)
+    lock, lockset = get_locker(get_db().dialect_name).get_lockset(JobModel.__tablename__)
     async with get_session_ctx() as session:
         async with lock:
             res = await session.execute(
                 select(JobModel)
+                .join(JobModel.run)
                 .where(
                     JobModel.status.in_(
                         [JobStatus.PROVISIONING, JobStatus.PULLING, JobStatus.RUNNING]
                     ),
+                    RunModel.status.not_in([RunStatus.TERMINATING]),
                     JobModel.id.not_in(lockset),
+                    JobModel.last_processed_at
+                    < common_utils.get_current_datetime().replace(tzinfo=None)
+                    - MIN_PROCESSING_INTERVAL,
                 )
                 .order_by(JobModel.last_processed_at.asc())
                 .limit(1)
-                .with_for_update(skip_locked=True, key_share=True)
+                .with_for_update(
+                    skip_locked=True,
+                    key_share=True,
+                    of=JobModel,
+                )
             )
             job_model = res.unique().scalar()
             if job_model is None:

@@ -45,6 +45,7 @@ from dstack._internal.core.consts import DSTACK_SHIM_HTTP_PORT
 from dstack._internal.core.errors import (
     BackendError,
     NotYetTerminated,
+    PlacementGroupNotSupportedError,
     ProvisioningError,
 )
 from dstack._internal.core.models.backends.base import BackendType
@@ -73,7 +74,7 @@ from dstack._internal.core.models.runs import (
 from dstack._internal.core.services.profiles import get_retry
 from dstack._internal.server import settings as server_settings
 from dstack._internal.server.background.tasks.common import get_provisioning_timeout
-from dstack._internal.server.db import get_session_ctx
+from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import (
     FleetModel,
     InstanceModel,
@@ -110,6 +111,8 @@ from dstack._internal.utils.ssh import (
     pkey_from_str,
 )
 
+MIN_PROCESSING_INTERVAL = timedelta(seconds=10)
+
 PENDING_JOB_RETRY_INTERVAL = timedelta(seconds=60)
 
 TERMINATION_DEADLINE_OFFSET = timedelta(minutes=20)
@@ -129,7 +132,7 @@ async def process_instances(batch_size: int = 1):
 
 
 async def _process_next_instance():
-    lock, lockset = get_locker().get_lockset(InstanceModel.__tablename__)
+    lock, lockset = get_locker(get_db().dialect_name).get_lockset(InstanceModel.__tablename__)
     async with get_session_ctx() as session:
         async with lock:
             res = await session.execute(
@@ -145,6 +148,8 @@ async def _process_next_instance():
                         ]
                     ),
                     InstanceModel.id.not_in(lockset),
+                    InstanceModel.last_processed_at
+                    < get_current_datetime().replace(tzinfo=None) - MIN_PROCESSING_INTERVAL,
                 )
                 .options(lazyload(InstanceModel.jobs))
                 .order_by(InstanceModel.last_processed_at.asc())
@@ -1063,6 +1068,12 @@ async def _create_placement_group(
             placement_group_model_to_placement_group(placement_group_model),
             master_instance_offer,
         )
+    except PlacementGroupNotSupportedError:
+        logger.debug(
+            "Skipping offer %s because placement group not supported",
+            master_instance_offer.instance.name,
+        )
+        return None
     except BackendError as e:
         logger.warning(
             "Failed to create placement group %s in %s/%s: %r",

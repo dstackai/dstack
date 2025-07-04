@@ -1,9 +1,12 @@
+import asyncio
+from datetime import timedelta
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from dstack._internal.core.models.fleets import FleetStatus
-from dstack._internal.server.db import get_session_ctx
+from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import FleetModel
 from dstack._internal.server.services.fleets import (
     is_fleet_empty,
@@ -17,8 +20,18 @@ from dstack._internal.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
-async def process_fleets():
-    lock, lockset = get_locker().get_lockset(FleetModel.__tablename__)
+MIN_PROCESSING_INTERVAL = timedelta(seconds=30)
+
+
+async def process_fleets(batch_size: int = 1):
+    tasks = []
+    for _ in range(batch_size):
+        tasks.append(_process_next_fleet())
+    await asyncio.gather(*tasks)
+
+
+async def _process_next_fleet():
+    lock, lockset = get_locker(get_db().dialect_name).get_lockset(FleetModel.__tablename__)
     async with get_session_ctx() as session:
         async with lock:
             res = await session.execute(
@@ -26,6 +39,8 @@ async def process_fleets():
                 .where(
                     FleetModel.deleted == False,
                     FleetModel.id.not_in(lockset),
+                    FleetModel.last_processed_at
+                    < get_current_datetime().replace(tzinfo=None) - MIN_PROCESSING_INTERVAL,
                 )
                 .order_by(FleetModel.last_processed_at.asc())
                 .limit(1)
@@ -43,6 +58,7 @@ async def process_fleets():
 
 
 async def _process_fleet(session: AsyncSession, fleet_model: FleetModel):
+    logger.info("Processing fleet %s", fleet_model.name)
     # Refetch to load related attributes.
     # joinedload produces LEFT OUTER JOIN that can't be used with FOR UPDATE.
     res = await session.execute(

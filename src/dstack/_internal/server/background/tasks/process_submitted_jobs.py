@@ -1,5 +1,6 @@
 import asyncio
 import uuid
+from datetime import datetime, timedelta
 from typing import List, Optional, Tuple
 
 from sqlalchemy import select
@@ -80,15 +81,35 @@ from dstack._internal.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
+# Track when we last processed a job.
+# This is needed for a trick:
+# If no tasks were processed recently, we force batch_size 1.
+# If there are lots of runs/jobs with same offers submitted,
+# we warm up the cache instead of requesting the offers concurrently.
+# Mostly useful when runs are submitted via API without getting run plan first.
+BATCH_SIZE_RESET_TIMEOUT = timedelta(minutes=2)
+last_processed_at: Optional[datetime] = None
+
+
 async def process_submitted_jobs(batch_size: int = 1):
     tasks = []
-    for _ in range(batch_size):
+    effective_batch_size = _get_effective_batch_size(batch_size)
+    for _ in range(effective_batch_size):
         tasks.append(_process_next_submitted_job())
     await asyncio.gather(*tasks)
 
 
+def _get_effective_batch_size(batch_size: int) -> int:
+    if (
+        last_processed_at is None
+        or last_processed_at < common_utils.get_current_datetime() - BATCH_SIZE_RESET_TIMEOUT
+    ):
+        return 1
+    return batch_size
+
+
 async def _process_next_submitted_job():
-    lock, lockset = get_locker().get_lockset(JobModel.__tablename__)
+    lock, lockset = get_locker(get_db().dialect_name).get_lockset(JobModel.__tablename__)
     async with get_session_ctx() as session:
         async with lock:
             res = await session.execute(
@@ -125,6 +146,8 @@ async def _process_next_submitted_job():
             await _process_submitted_job(session=session, job_model=job_model)
         finally:
             lockset.difference_update([job_model_id])
+        global last_processed_at
+        last_processed_at = common_utils.get_current_datetime()
 
 
 async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
@@ -214,7 +237,9 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         if get_db().dialect_name == "sqlite":
             # Start new transaction to see committed changes after lock
             await session.commit()
-        async with get_locker().lock_ctx(InstanceModel.__tablename__, instances_ids):
+        async with get_locker(get_db().dialect_name).lock_ctx(
+            InstanceModel.__tablename__, instances_ids
+        ):
             # If another job freed the instance but is still trying to detach volumes,
             # do not provision on it to prevent attaching volumes that are currently detaching.
             detaching_instances_ids = await get_instances_ids_with_detaching_volumes(session)
@@ -243,8 +268,10 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
             )
             job_model.instance_assigned = True
             job_model.last_processed_at = common_utils.get_current_datetime()
-            await session.commit()
-            return
+            if len(pool_instances) > 0:
+                await session.commit()
+                return
+            # If no instances were locked, we can proceed in the same transaction.
 
     if job_model.instance is not None:
         res = await session.execute(
@@ -334,7 +361,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         .order_by(VolumeModel.id)  # take locks in order
         .with_for_update(key_share=True)
     )
-    async with get_locker().lock_ctx(VolumeModel.__tablename__, volumes_ids):
+    async with get_locker(get_db().dialect_name).lock_ctx(VolumeModel.__tablename__, volumes_ids):
         if len(volume_models) > 0:
             await _attach_volumes(
                 session=session,
@@ -527,7 +554,9 @@ async def _get_next_instance_num(session: AsyncSession, fleet_model: FleetModel)
     if len(fleet_model.instances) == 0:
         # No instances means the fleet is not in the db yet, so don't lock.
         return 0
-    async with get_locker().lock_ctx(FleetModel.__tablename__, [fleet_model.id]):
+    async with get_locker(get_db().dialect_name).lock_ctx(
+        FleetModel.__tablename__, [fleet_model.id]
+    ):
         fleet_model = (
             (
                 await session.execute(

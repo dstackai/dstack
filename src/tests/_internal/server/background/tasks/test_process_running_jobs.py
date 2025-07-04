@@ -224,6 +224,7 @@ class TestProcessRunningJobs:
             instance=instance,
             instance_assigned=True,
         )
+        last_processed_at = job.last_processed_at
         with (
             patch("dstack._internal.server.services.runner.ssh.SSHTunnel") as SSHTunnelMock,
             patch(
@@ -244,6 +245,8 @@ class TestProcessRunningJobs:
         assert job is not None
         assert job.status == JobStatus.RUNNING
         assert job.runner_timestamp == 1
+        job.last_processed_at = last_processed_at
+        await session.commit()
         with (
             patch("dstack._internal.server.services.runner.ssh.SSHTunnel") as SSHTunnelMock,
             patch(
@@ -776,6 +779,7 @@ class TestProcessRunningJobs:
             job_provisioning_data=get_job_provisioning_data(),
             instance=instance,
             instance_assigned=True,
+            last_processed_at=datetime(2023, 1, 1, 11, 30, tzinfo=timezone.utc),
         )
         for timestamp, gpu_util in samples:
             # two GPUs, the second one always 100% utilized

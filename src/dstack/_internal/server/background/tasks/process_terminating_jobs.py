@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, lazyload
 
 from dstack._internal.core.models.runs import JobStatus
-from dstack._internal.server.db import get_session_ctx
+from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import (
     InstanceModel,
     JobModel,
@@ -32,8 +32,10 @@ async def process_terminating_jobs(batch_size: int = 1):
 
 
 async def _process_next_terminating_job():
-    job_lock, job_lockset = get_locker().get_lockset(JobModel.__tablename__)
-    instance_lock, instance_lockset = get_locker().get_lockset(InstanceModel.__tablename__)
+    job_lock, job_lockset = get_locker(get_db().dialect_name).get_lockset(JobModel.__tablename__)
+    instance_lock, instance_lockset = get_locker(get_db().dialect_name).get_lockset(
+        InstanceModel.__tablename__
+    )
     async with get_session_ctx() as session:
         async with job_lock, instance_lock:
             res = await session.execute(

@@ -37,15 +37,31 @@ def get_scheduler() -> AsyncIOScheduler:
 
 
 def start_background_tasks() -> AsyncIOScheduler:
+    # We try to process as many resources as possible without exhausting DB connections.
+    #
+    # Quick tasks can process multiple resources per transaction.
+    # Potentially long tasks process one resource per transaction
+    # to avoid holding locks for all the resources if one is slow to process.
+    # Still, the next batch won't be processed unless all resources are processed,
+    # so larger batches do not increase processing rate linearly.
+    #
+    # The interval, batch_size, and max_instances determine background tasks processing rates.
+    # By default, one server replica can handle:
+    #
+    # * 150 active jobs with 2 minutes processing latency
+    # * 150 active runs with 2 minutes processing latency
+    # * 150 active instances with 2 minutes processing latency
+    #
+    # These latency numbers do not account for provisioning time,
+    # so it may be slower if a backend is slow to provision.
+    #
+    # Users can set SERVER_BACKGROUND_PROCESSING_FACTOR to process more resources per replica.
+    # They also need to increase max db connections on the client side and db side.
+    #
     # In-memory locking via locksets does not guarantee
     # that the first waiting for the lock will acquire it.
     # The jitter is needed to give all tasks a chance to acquire locks.
 
-    # The batch_size and interval determine background tasks processing rates.
-    # Currently one server replica can handle:
-    # * 150 active jobs with up to 2 minutes processing latency
-    # * 150 active runs with up to 2 minutes processing latency
-    # * 150 active instances with up to 2 minutes processing latency
     _scheduler.add_job(collect_metrics, IntervalTrigger(seconds=10), max_instances=1)
     _scheduler.add_job(delete_metrics, IntervalTrigger(minutes=5), max_instances=1)
     if settings.ENABLE_PROMETHEUS_METRICS:
@@ -53,38 +69,6 @@ def start_background_tasks() -> AsyncIOScheduler:
             collect_prometheus_metrics, IntervalTrigger(seconds=10), max_instances=1
         )
         _scheduler.add_job(delete_prometheus_metrics, IntervalTrigger(minutes=5), max_instances=1)
-    # process_submitted_jobs and process_instances max processing rate is 75 jobs(instances) per minute.
-    _scheduler.add_job(
-        process_submitted_jobs,
-        IntervalTrigger(seconds=4, jitter=2),
-        kwargs={"batch_size": 5},
-        max_instances=2,
-    )
-    _scheduler.add_job(
-        process_running_jobs,
-        IntervalTrigger(seconds=4, jitter=2),
-        kwargs={"batch_size": 5},
-        max_instances=2,
-    )
-    _scheduler.add_job(
-        process_terminating_jobs,
-        IntervalTrigger(seconds=4, jitter=2),
-        kwargs={"batch_size": 5},
-        max_instances=2,
-    )
-    _scheduler.add_job(
-        process_runs,
-        IntervalTrigger(seconds=2, jitter=1),
-        kwargs={"batch_size": 5},
-        max_instances=2,
-    )
-    _scheduler.add_job(
-        process_instances,
-        IntervalTrigger(seconds=4, jitter=2),
-        kwargs={"batch_size": 5},
-        max_instances=2,
-    )
-    _scheduler.add_job(process_fleets, IntervalTrigger(seconds=10, jitter=2))
     _scheduler.add_job(process_gateways_connections, IntervalTrigger(seconds=15))
     _scheduler.add_job(
         process_submitted_gateways, IntervalTrigger(seconds=10, jitter=2), max_instances=5
@@ -93,5 +77,45 @@ def start_background_tasks() -> AsyncIOScheduler:
         process_submitted_volumes, IntervalTrigger(seconds=10, jitter=2), max_instances=5
     )
     _scheduler.add_job(process_placement_groups, IntervalTrigger(seconds=30, jitter=5))
+    for replica in range(settings.SERVER_BACKGROUND_PROCESSING_FACTOR):
+        # Add multiple copies of tasks if requested.
+        # max_instances=1 for additional copies to avoid running too many tasks.
+        # Move other tasks here when they need per-replica scaling.
+        _scheduler.add_job(
+            process_submitted_jobs,
+            IntervalTrigger(seconds=4, jitter=2),
+            kwargs={"batch_size": 5},
+            max_instances=4 if replica == 0 else 1,
+        )
+        _scheduler.add_job(
+            process_running_jobs,
+            IntervalTrigger(seconds=4, jitter=2),
+            kwargs={"batch_size": 5},
+            max_instances=2 if replica == 0 else 1,
+        )
+        _scheduler.add_job(
+            process_terminating_jobs,
+            IntervalTrigger(seconds=4, jitter=2),
+            kwargs={"batch_size": 5},
+            max_instances=2 if replica == 0 else 1,
+        )
+        _scheduler.add_job(
+            process_runs,
+            IntervalTrigger(seconds=2, jitter=1),
+            kwargs={"batch_size": 5},
+            max_instances=2 if replica == 0 else 1,
+        )
+        _scheduler.add_job(
+            process_instances,
+            IntervalTrigger(seconds=4, jitter=2),
+            kwargs={"batch_size": 5},
+            max_instances=2 if replica == 0 else 1,
+        )
+        _scheduler.add_job(
+            process_fleets,
+            IntervalTrigger(seconds=10, jitter=2),
+            kwargs={"batch_size": 5},
+            max_instances=2 if replica == 0 else 1,
+        )
     _scheduler.start()
     return _scheduler
