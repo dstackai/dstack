@@ -224,7 +224,7 @@ class Run(ABC):
                     ),
                 )
                 for log in resp.logs:
-                    yield base64.b64decode(log.message)
+                    yield log.message.encode()
                 next_token = resp.next_token
                 if next_token is None:
                     break
