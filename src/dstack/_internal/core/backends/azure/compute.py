@@ -4,7 +4,6 @@ import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, List, Optional, Tuple
 
-import gpuhunt
 from azure.core.credentials import TokenCredential
 from azure.core.exceptions import ResourceExistsError, ResourceNotFoundError
 from azure.mgmt import compute as compute_mgmt
@@ -175,14 +174,7 @@ class AzureCompute(
             ),
             vm_size=instance_offer.instance.name,
             instance_name=instance_name,
-            user_data=get_user_data(
-                authorized_keys=ssh_pub_keys,
-                is_nvidia=(
-                    len(instance_offer.instance.resources.gpus) > 0
-                    and instance_offer.instance.resources.gpus[0].vendor
-                    == gpuhunt.AcceleratorVendor.NVIDIA
-                ),
-            ),
+            user_data=get_user_data(authorized_keys=ssh_pub_keys),
             ssh_pub_keys=ssh_pub_keys,
             spot=instance_offer.instance.resources.spot,
             disk_size=disk_size,

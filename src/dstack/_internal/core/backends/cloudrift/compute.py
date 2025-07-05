@@ -1,7 +1,5 @@
 from typing import Dict, List, Optional
 
-import gpuhunt
-
 from dstack._internal.core.backends.base.backend import Compute
 from dstack._internal.core.backends.base.compute import (
     ComputeWithCreateInstanceSupport,
@@ -75,14 +73,7 @@ class CloudRiftCompute(
         instance_config: InstanceConfiguration,
         placement_group: Optional[PlacementGroup],
     ) -> JobProvisioningData:
-        commands = get_shim_commands(
-            authorized_keys=instance_config.get_public_keys(),
-            is_nvidia=(
-                len(instance_offer.instance.resources.gpus) > 0
-                and instance_offer.instance.resources.gpus[0].vendor
-                == gpuhunt.AcceleratorVendor.NVIDIA
-            ),
-        )
+        commands = get_shim_commands(authorized_keys=instance_config.get_public_keys())
         startup_script = " ".join([" && ".join(commands)])
         logger.debug(
             f"Creating instance for offer {instance_offer.instance.name} in region {instance_offer.region} with commands: {startup_script}"

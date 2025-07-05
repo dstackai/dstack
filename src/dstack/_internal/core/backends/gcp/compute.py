@@ -6,7 +6,6 @@ from typing import Callable, Dict, List, Literal, Optional, Tuple
 
 import google.api_core.exceptions
 import google.cloud.compute_v1 as compute_v1
-import gpuhunt
 from cachetools import TTLCache, cachedmethod
 from google.cloud import tpu_v2
 from gpuhunt import KNOWN_TPUS
@@ -303,11 +302,6 @@ class GCPCompute(
                 user_data=_get_user_data(
                     authorized_keys=authorized_keys,
                     instance_type_name=instance_offer.instance.name,
-                    is_nvidia=(
-                        len(instance_offer.instance.resources.gpus) > 0
-                        and instance_offer.instance.resources.gpus[0].vendor
-                        == gpuhunt.AcceleratorVendor.NVIDIA
-                    ),
                 ),
                 authorized_keys=authorized_keys,
                 labels=labels,
@@ -915,7 +909,7 @@ def _get_gateway_image_id() -> str:
     return "projects/ubuntu-os-cloud/global/images/ubuntu-2204-jammy-v20230714"
 
 
-def _get_user_data(authorized_keys: List[str], instance_type_name: str, is_nvidia: bool) -> str:
+def _get_user_data(authorized_keys: List[str], instance_type_name: str) -> str:
     base_path = None
     bin_path = None
     backend_shim_env = None
@@ -938,7 +932,6 @@ def _get_user_data(authorized_keys: List[str], instance_type_name: str, is_nvidi
         base_path=base_path,
         bin_path=bin_path,
         backend_shim_env=backend_shim_env,
-        is_nvidia=is_nvidia,
     )
 
 
@@ -958,7 +951,7 @@ def _get_volume_price(size: int) -> float:
 
 def _get_tpu_startup_script(authorized_keys: List[str]) -> str:
     commands = get_shim_commands(
-        authorized_keys=authorized_keys, is_privileged=True, pjrt_device="TPU", is_nvidia=False
+        authorized_keys=authorized_keys, is_privileged=True, pjrt_device="TPU"
     )
     startup_script = " ".join([" && ".join(commands)])
     startup_script = "#! /bin/bash\n" + startup_script

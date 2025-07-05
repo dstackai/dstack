@@ -1,7 +1,6 @@
 import json
 from typing import List, Optional
 
-import gpuhunt
 import requests
 
 from dstack._internal.core.backends.base.backend import Compute
@@ -64,14 +63,7 @@ class TensorDockCompute(
         instance_name = generate_unique_instance_name(
             instance_config, max_length=MAX_INSTANCE_NAME_LEN
         )
-        commands = get_shim_commands(
-            authorized_keys=instance_config.get_public_keys(),
-            is_nvidia=(
-                len(instance_offer.instance.resources.gpus) > 0
-                and instance_offer.instance.resources.gpus[0].vendor
-                == gpuhunt.AcceleratorVendor.NVIDIA
-            ),
-        )
+        commands = get_shim_commands(authorized_keys=instance_config.get_public_keys())
         try:
             resp = self.api_client.deploy_single(
                 instance_name=instance_name,

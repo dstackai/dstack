@@ -5,7 +5,6 @@ import time
 from functools import cached_property
 from typing import List, Optional
 
-import gpuhunt
 from nebius.aio.operation import Operation as SDKOperation
 from nebius.aio.service_error import RequestError, StatusCode
 from nebius.api.nebius.common.v1 import Operation
@@ -175,11 +174,6 @@ class NebiusCompute(
                 user_data=get_user_data(
                     instance_config.get_public_keys(),
                     backend_specific_commands=SETUP_COMMANDS,
-                    is_nvidia=(
-                        len(instance_offer.instance.resources.gpus) > 0
-                        and instance_offer.instance.resources.gpus[0].vendor
-                        == gpuhunt.AcceleratorVendor.NVIDIA
-                    ),
                 ),
                 platform=platform,
                 preset=preset,

@@ -1,6 +1,5 @@
 from typing import List, Optional
 
-import gpuhunt
 import requests
 
 from dstack._internal.core.backends.base.backend import Compute
@@ -66,14 +65,7 @@ class CudoCompute(
         public_keys = instance_config.get_public_keys()
         memory_size = round(instance_offer.instance.resources.memory_mib / 1024)
         disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
-        commands = get_shim_commands(
-            authorized_keys=public_keys,
-            is_nvidia=(
-                len(instance_offer.instance.resources.gpus) > 0
-                and instance_offer.instance.resources.gpus[0].vendor
-                == gpuhunt.AcceleratorVendor.NVIDIA
-            ),
-        )
+        commands = get_shim_commands(authorized_keys=public_keys)
         gpus_no = len(instance_offer.instance.resources.gpus)
         shim_commands = " ".join([" && ".join(commands)])
         startup_script = (
