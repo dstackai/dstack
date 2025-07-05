@@ -511,12 +511,14 @@ def get_user_data(
     base_path: Optional[PathLike] = None,
     bin_path: Optional[PathLike] = None,
     backend_shim_env: Optional[Dict[str, str]] = None,
+    is_nvidia: bool = False,
 ) -> str:
     shim_commands = get_shim_commands(
         authorized_keys=authorized_keys,
         base_path=base_path,
         bin_path=bin_path,
         backend_shim_env=backend_shim_env,
+        is_nvidia=is_nvidia,
     )
     commands = (backend_specific_commands or []) + shim_commands
     return get_cloud_config(
@@ -558,8 +560,10 @@ def get_shim_commands(
     bin_path: Optional[PathLike] = None,
     backend_shim_env: Optional[Dict[str, str]] = None,
     arch: Optional[str] = None,
+    is_nvidia: bool = False,
 ) -> List[str]:
-    commands = get_shim_pre_start_commands(
+    commands = get_setup_cloud_instance_commands(is_nvidia=is_nvidia)
+    commands += get_shim_pre_start_commands(
         base_path=base_path,
         bin_path=bin_path,
         arch=arch,
@@ -639,6 +643,29 @@ def get_dstack_shim_download_url(arch: Optional[str] = None) -> str:
     version = get_dstack_runner_version()
     arch = normalize_arch(arch)
     return url_template.format(version=version, arch=arch)
+
+
+def get_setup_cloud_instance_commands(is_nvidia: bool) -> list[str]:
+    commands = []
+    if is_nvidia:
+        # Workaround for an NVIDIA container toolkit bug:
+        # https://github.com/NVIDIA/nvidia-container-toolkit/issues/48
+        # Attempts to patch /etc/docker/daemon.json while keeping any custom settings it may have.
+        commands.append(
+            (
+                "/bin/sh -c '"
+                "[ -f /etc/docker/daemon.json ]"
+                " && command -v jq >/dev/null"
+                " && command -v service >/dev/null"
+                " && ! grep -q native.cgroupdriver /etc/docker/daemon.json"
+                " && jq '\\''.\"exec-opts\" = (.\"exec-opts\" // [] + [\"native.cgroupdriver=cgroupfs\"])'\\'' /etc/docker/daemon.json > /tmp/daemon.json"
+                " && sudo mv /tmp/daemon.json /etc/docker/daemon.json"
+                " && sudo service docker restart"
+                " || true"
+                "'"
+            ),
+        )
+    return commands
 
 
 def get_shim_pre_start_commands(

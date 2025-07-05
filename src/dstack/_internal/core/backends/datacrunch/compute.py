@@ -1,5 +1,6 @@
 from typing import Dict, List, Optional
 
+import gpuhunt
 from datacrunch import DataCrunchClient
 from datacrunch.exceptions import APIException
 from datacrunch.instances.instances import Instance
@@ -103,7 +104,14 @@ class DataCrunchCompute(
                 )
             )
 
-        commands = get_shim_commands(authorized_keys=public_keys)
+        commands = get_shim_commands(
+            authorized_keys=public_keys,
+            is_nvidia=(
+                len(instance_offer.instance.resources.gpus) > 0
+                and instance_offer.instance.resources.gpus[0].vendor
+                == gpuhunt.AcceleratorVendor.NVIDIA
+            ),
+        )
         startup_script = " ".join([" && ".join(commands)])
         script_name = f"dstack-{instance_config.instance_name}.sh"
         startup_script_ids = _get_or_create_startup_scrpit(

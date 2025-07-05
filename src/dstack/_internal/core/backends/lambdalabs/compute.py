@@ -4,6 +4,8 @@ import tempfile
 from threading import Thread
 from typing import Dict, List, Optional
 
+import gpuhunt
+
 from dstack._internal.core.backends.base.compute import (
     Compute,
     ComputeWithCreateInstanceSupport,
@@ -96,6 +98,11 @@ class LambdaCompute(
             commands = get_shim_commands(
                 authorized_keys=[project_ssh_public_key],
                 arch=provisioning_data.instance_type.resources.cpu_arch,
+                is_nvidia=(
+                    len(provisioning_data.instance_type.resources.gpus) > 0
+                    and provisioning_data.instance_type.resources.gpus[0].vendor
+                    == gpuhunt.AcceleratorVendor.NVIDIA
+                ),
             )
             # shim is assumed to be run under root
             launch_command = "sudo sh -c '" + "&& ".join(commands) + "'"

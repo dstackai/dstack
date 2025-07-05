@@ -2,6 +2,7 @@ from concurrent.futures import ThreadPoolExecutor
 from functools import cached_property
 from typing import List, Optional
 
+import gpuhunt
 import oci
 
 from dstack._internal.core.backends.base.compute import (
@@ -139,7 +140,15 @@ class OCICompute(
             f"sudo iptables -I INPUT -s {resources.VCN_CIDR} -j ACCEPT",
             "sudo netfilter-persistent save",
         ]
-        cloud_init_user_data = get_user_data(instance_config.get_public_keys(), setup_commands)
+        cloud_init_user_data = get_user_data(
+            instance_config.get_public_keys(),
+            setup_commands,
+            is_nvidia=(
+                len(instance_offer.instance.resources.gpus) > 0
+                and instance_offer.instance.resources.gpus[0].vendor
+                == gpuhunt.AcceleratorVendor.NVIDIA
+            ),
+        )
 
         display_name = generate_unique_instance_name(instance_config)
         try:

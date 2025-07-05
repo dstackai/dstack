@@ -2,6 +2,7 @@ import json
 import re
 from typing import List, Optional
 
+import gpuhunt
 import requests
 
 from dstack._internal.core.backends.base.backend import Compute
@@ -86,6 +87,11 @@ class VultrCompute(
             user_data=get_user_data(
                 authorized_keys=instance_config.get_public_keys(),
                 backend_specific_commands=setup_commands,
+                is_nvidia=(
+                    len(instance_offer.instance.resources.gpus) > 0
+                    and instance_offer.instance.resources.gpus[0].vendor
+                    == gpuhunt.AcceleratorVendor.NVIDIA
+                ),
             ),
             vpc_id=vpc["id"],
         )
