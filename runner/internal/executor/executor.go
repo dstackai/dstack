@@ -28,6 +28,15 @@ import (
 	"github.com/prometheus/procfs"
 )
 
+// TODO: Tune these parameters for optimal experience/performance
+const (
+	// Output is flushed when the cursor doesn't move for this duration
+	AnsiStripFlushInterval = 500 * time.Millisecond
+
+	// Output is flushed regardless of cursor activity after this maximum delay
+	AnsiStripMaxDelay = 3 * time.Second
+)
+
 type RunExecutor struct {
 	tempDir    string
 	homeDir    string
@@ -132,7 +141,7 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 		}
 	}()
 
-	stripper := ansistrip.NewWriter(ex.runnerLogs, 500*time.Millisecond, 3*time.Second)
+	stripper := ansistrip.NewWriter(ex.runnerLogs, AnsiStripFlushInterval, AnsiStripMaxDelay)
 	logger := io.MultiWriter(runnerLogFile, os.Stdout, stripper)
 	ctx = log.WithLogger(ctx, log.NewEntry(logger, int(log.DefaultEntry.Logger.Level))) // todo loglevel
 	log.Info(ctx, "Run job", "log_level", log.GetLogger(ctx).Logger.Level.String())
@@ -439,7 +448,7 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 	defer func() { _ = ptm.Close() }()
 	defer func() { _ = cmd.Wait() }() // release resources if copy fails
 
-	stripper := ansistrip.NewWriter(ex.jobLogs, 500*time.Millisecond, 3*time.Second)
+	stripper := ansistrip.NewWriter(ex.jobLogs, AnsiStripFlushInterval, AnsiStripMaxDelay)
 	logger := io.MultiWriter(jobLogFile, ex.jobWsLogs, stripper)
 	_, err = io.Copy(logger, ptm)
 	if err != nil && !isPtyError(err) {
