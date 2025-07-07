@@ -35,12 +35,12 @@ project_router = APIRouter(
 )
 
 
-@root_router.post("/list")
+@root_router.post("/list", response_model=List[Fleet])
 async def list_fleets(
     body: ListFleetsRequest,
     session: AsyncSession = Depends(get_session),
     user: UserModel = Depends(Authenticated()),
-) -> List[Fleet]:
+):
     """
     Returns all fleets and instances within them visible to user sorted by descending `created_at`.
     `project_name` and `only_active` can be specified as filters.
@@ -62,11 +62,11 @@ async def list_fleets(
     )
 
 
-@project_router.post("/list")
+@project_router.post("/list", response_model=List[Fleet])
 async def list_project_fleets(
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
-) -> List[Fleet]:
+):
     """
     Returns all fleets in the project.
     """
@@ -76,12 +76,12 @@ async def list_project_fleets(
     )
 
 
-@project_router.post("/get")
+@project_router.post("/get", response_model=Fleet)
 async def get_fleet(
     body: GetFleetRequest,
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
-) -> Fleet:
+):
     """
     Returns a fleet given `name` or `id`.
     If given `name`, does not return deleted fleets.
@@ -96,12 +96,12 @@ async def get_fleet(
     return CustomORJSONResponse(fleet)
 
 
-@project_router.post("/get_plan")
+@project_router.post("/get_plan", response_model=FleetPlan)
 async def get_plan(
     body: GetFleetPlanRequest,
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
-) -> FleetPlan:
+):
     """
     Returns a fleet plan for the given fleet configuration.
     """
@@ -115,12 +115,12 @@ async def get_plan(
     return CustomORJSONResponse(plan)
 
 
-@project_router.post("/apply")
+@project_router.post("/apply", response_model=Fleet)
 async def apply_plan(
     body: ApplyFleetPlanRequest,
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
-) -> Fleet:
+):
     """
     Creates a new fleet or updates an existing fleet.
     Errors if the expected current resource from the plan does not match the current resource.
@@ -138,12 +138,12 @@ async def apply_plan(
     )
 
 
-@project_router.post("/create")
+@project_router.post("/create", response_model=Fleet)
 async def create_fleet(
     body: CreateFleetRequest,
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
-) -> Fleet:
+):
     """
     Creates a fleet given a fleet configuration.
     """
