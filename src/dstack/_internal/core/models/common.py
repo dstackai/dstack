@@ -1,8 +1,9 @@
 import re
 from enum import Enum
-from typing import Any, Union
+from typing import Any, Callable, Union
 
 import orjson
+from git import Optional
 from pydantic import Field
 from pydantic_duality import DualBaseModel
 from typing_extensions import Annotated
@@ -34,6 +35,37 @@ class CoreModel(DualBaseModel):
     class Config:
         json_loads = orjson.loads
         json_dumps = _orjson_dumps
+
+    def json(
+        self,
+        *,
+        include: Optional[IncludeExcludeType] = None,
+        exclude: Optional[IncludeExcludeType] = None,
+        by_alias: bool = False,
+        skip_defaults: Optional[bool] = None,  # ignore as it's deprecated
+        exclude_unset: bool = False,
+        exclude_defaults: bool = False,
+        exclude_none: bool = False,
+        encoder: Optional[Callable[[Any], Any]] = None,
+        models_as_dict: bool = True,  # does not seems to be needed by dstack or dependencies
+        **dumps_kwargs: Any,
+    ) -> str:
+        """
+        Override `json()` method so that it calls `dict()`.
+        Allows changing how models are serialized by overriding `dict()` only.
+        By default, `json()` won't call `dict()`, so changes applied in `dict()` won't take place.
+        """
+        data = self.dict(
+            by_alias=by_alias,
+            include=include,
+            exclude=exclude,
+            exclude_unset=exclude_unset,
+            exclude_defaults=exclude_defaults,
+            exclude_none=exclude_none,
+        )
+        if self.__custom_root_type__:
+            data = data["__root__"]
+        return self.__config__.json_dumps(data, default=encoder, **dumps_kwargs)
 
 
 class Duration(int):

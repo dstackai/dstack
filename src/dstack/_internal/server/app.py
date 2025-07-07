@@ -94,7 +94,6 @@ def create_app() -> FastAPI:
     app = FastAPI(
         docs_url="/api/docs",
         lifespan=lifespan,
-        default_response_class=CustomORJSONResponse,
     )
     app.state.proxy_dependency_injector = ServerProxyDependencyInjector()
     return app

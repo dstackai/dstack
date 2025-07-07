@@ -13,9 +13,12 @@ class CustomORJSONResponse(Response):
     """
     Custom JSONResponse that uses orjson for serialization.
 
-    It's recommended to return this class from routers directly
-    to avoid the FastAPI's jsonable_encoder overhead.
+    It's recommended to return this class from routers directly instead of
+    returning pydantic models to avoid the FastAPI's jsonable_encoder overhead.
     See https://fastapi.tiangolo.com/advanced/custom-response/#use-orjsonresponse.
+
+    Beware that FastAPI skips model validation when responses are returned directly.
+    If serialization needs to be modified, override `dict()` instead of adding validators.
     """
 
     media_type = "application/json"

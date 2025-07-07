@@ -382,14 +382,6 @@ class ResourcesSpec(CoreModel):
     gpu: Annotated[Optional[GPUSpec], Field(description="The GPU requirements")] = None
     disk: Annotated[Optional[DiskSpec], Field(description="The disk resources")] = DEFAULT_DISK
 
-    # TODO: Remove in 0.20. Added for backward compatibility.
-    @root_validator
-    def _post_validate(cls, values):
-        cpu = values.get("cpu")
-        if isinstance(cpu, CPUSpec) and cpu.arch in [None, gpuhunt.CPUArchitecture.X86]:
-            values["cpu"] = cpu.count
-        return values
-
     def pretty_format(self) -> str:
         # TODO: Remove in 0.20. Use self.cpu directly
         cpu = parse_obj_as(CPUSpec, self.cpu)
@@ -407,3 +399,18 @@ class ResourcesSpec(CoreModel):
             resources.update(disk_size=self.disk.size)
         res = pretty_resources(**resources)
         return res
+
+    def dict(self, *args, **kwargs) -> Dict:
+        # super() does not work with pydantic-duality
+        res = CoreModel.dict(self, *args, **kwargs)
+        self._update_serialized_cpu(res)
+        return res
+
+    # TODO: Remove in 0.20. Added for backward compatibility.
+    def _update_serialized_cpu(self, values: Dict):
+        cpu = values["cpu"]
+        if cpu:
+            arch = cpu.get("arch")
+            count = cpu.get("count")
+            if count and arch in [None, gpuhunt.CPUArchitecture.X86.value]:
+                values["cpu"] = count

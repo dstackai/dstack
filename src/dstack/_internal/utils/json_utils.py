@@ -1,6 +1,12 @@
 import orjson
 from pydantic import BaseModel
 
+FREEZEGUN = True
+try:
+    from freezegun.api import FakeDatetime
+except ImportError:
+    FREEZEGUN = False
+
 
 def orjson_default(obj):
     if isinstance(obj, float):
@@ -10,6 +16,9 @@ def orjson_default(obj):
         # Allows calling orjson.dumps() on pydantic models
         # (e.g. to return from the API)
         return obj.dict()
+    if FREEZEGUN:
+        if isinstance(obj, FakeDatetime):
+            return obj.isoformat()
     raise TypeError
 
 
