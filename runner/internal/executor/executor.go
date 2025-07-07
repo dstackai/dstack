@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	osuser "os/user"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -51,8 +52,19 @@ type RunExecutor struct {
 	timestamp       *MonotonicTimestamp
 
 	killDelay         time.Duration
-	connectionTracker *connections.ConnectionTracker
+	connectionTracker interface {
+		GetNoConnectionsSecs() int64
+		Track(ticker <-chan time.Time)
+		Stop()
+	}
 }
+
+// stubConnectionTracker is a no-op implementation for when procfs is not available (only required for tests on darwin)
+type stubConnectionTracker struct{}
+
+func (s *stubConnectionTracker) GetNoConnectionsSecs() int64   { return 0 }
+func (s *stubConnectionTracker) Track(ticker <-chan time.Time) {}
+func (s *stubConnectionTracker) Stop()                         {}
 
 func NewRunExecutor(tempDir string, homeDir string, workingDir string, sshPort int) (*RunExecutor, error) {
 	mu := &sync.RWMutex{}
@@ -65,15 +77,29 @@ func NewRunExecutor(tempDir string, homeDir string, workingDir string, sshPort i
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse current user uid: %w", err)
 	}
-	proc, err := procfs.NewDefaultFS()
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize procfs: %w", err)
+
+	// Try to initialize procfs, but don't fail if it's not available (e.g., on macOS)
+	var connectionTracker interface {
+		GetNoConnectionsSecs() int64
+		Track(ticker <-chan time.Time)
+		Stop()
 	}
-	connectionTracker := connections.NewConnectionTracker(connections.ConnectionTrackerConfig{
-		Port:            uint64(sshPort),
-		MinConnDuration: 10 * time.Second, // shorter connections are likely from dstack-server
-		Procfs:          proc,
-	})
+
+	if runtime.GOOS == "linux" {
+		proc, err := procfs.NewDefaultFS()
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize procfs: %w", err)
+		}
+		connectionTracker = connections.NewConnectionTracker(connections.ConnectionTrackerConfig{
+			Port:            uint64(sshPort),
+			MinConnDuration: 10 * time.Second, // shorter connections are likely from dstack-server
+			Procfs:          proc,
+		})
+	} else {
+		// Use stub connection tracker (only required for tests on darwin)
+		connectionTracker = &stubConnectionTracker{}
+	}
+
 	return &RunExecutor{
 		tempDir:    tempDir,
 		homeDir:    homeDir,
