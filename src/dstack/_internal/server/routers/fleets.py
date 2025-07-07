@@ -18,7 +18,10 @@ from dstack._internal.server.schemas.fleets import (
     ListFleetsRequest,
 )
 from dstack._internal.server.security.permissions import Authenticated, ProjectMember
-from dstack._internal.server.utils.routers import get_base_api_additional_responses
+from dstack._internal.server.utils.routers import (
+    CustomORJSONResponse,
+    get_base_api_additional_responses,
+)
 
 root_router = APIRouter(
     prefix="/api/fleets",
@@ -45,15 +48,17 @@ async def list_fleets(
     The results are paginated. To get the next page, pass `created_at` and `id` of
     the last fleet from the previous page as `prev_created_at` and `prev_id`.
     """
-    return await fleets_services.list_fleets(
-        session=session,
-        user=user,
-        project_name=body.project_name,
-        only_active=body.only_active,
-        prev_created_at=body.prev_created_at,
-        prev_id=body.prev_id,
-        limit=body.limit,
-        ascending=body.ascending,
+    return CustomORJSONResponse(
+        await fleets_services.list_fleets(
+            session=session,
+            user=user,
+            project_name=body.project_name,
+            only_active=body.only_active,
+            prev_created_at=body.prev_created_at,
+            prev_id=body.prev_id,
+            limit=body.limit,
+            ascending=body.ascending,
+        )
     )
 
 
@@ -66,7 +71,9 @@ async def list_project_fleets(
     Returns all fleets in the project.
     """
     _, project = user_project
-    return await fleets_services.list_project_fleets(session=session, project=project)
+    return CustomORJSONResponse(
+        await fleets_services.list_project_fleets(session=session, project=project)
+    )
 
 
 @project_router.post("/get")
@@ -86,7 +93,7 @@ async def get_fleet(
     )
     if fleet is None:
         raise ResourceNotExistsError()
-    return fleet
+    return CustomORJSONResponse(fleet)
 
 
 @project_router.post("/get_plan")
@@ -105,7 +112,7 @@ async def get_plan(
         user=user,
         spec=body.spec,
     )
-    return plan
+    return CustomORJSONResponse(plan)
 
 
 @project_router.post("/apply")
@@ -120,12 +127,14 @@ async def apply_plan(
     Use `force: true` to apply even if the current resource does not match.
     """
     user, project = user_project
-    return await fleets_services.apply_plan(
-        session=session,
-        user=user,
-        project=project,
-        plan=body.plan,
-        force=body.force,
+    return CustomORJSONResponse(
+        await fleets_services.apply_plan(
+            session=session,
+            user=user,
+            project=project,
+            plan=body.plan,
+            force=body.force,
+        )
     )
 
 
@@ -139,11 +148,13 @@ async def create_fleet(
     Creates a fleet given a fleet configuration.
     """
     user, project = user_project
-    return await fleets_services.create_fleet(
-        session=session,
-        project=project,
-        user=user,
-        spec=body.spec,
+    return CustomORJSONResponse(
+        await fleets_services.create_fleet(
+            session=session,
+            project=project,
+            user=user,
+            spec=body.spec,
+        )
     )
 
 
