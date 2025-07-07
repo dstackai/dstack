@@ -16,7 +16,7 @@ from dstack._internal.server.schemas.users import (
 )
 from dstack._internal.server.security.permissions import Authenticated, GlobalAdmin
 from dstack._internal.server.services import users
-from dstack._internal.server.utils.routers import get_base_api_additional_responses
+from dstack._internal.server.utils.routers import CustomORJSONResponse, get_base_api_additional_responses
 
 router = APIRouter(
     prefix="/api/users",
@@ -25,41 +25,45 @@ router = APIRouter(
 )
 
 
-@router.post("/list")
+@router.post("/list", response_model=List[User])
 async def list_users(
     session: AsyncSession = Depends(get_session),
     user: UserModel = Depends(Authenticated()),
-) -> List[User]:
-    return await users.list_users_for_user(session=session, user=user)
+):
+    return CustomORJSONResponse(
+        await users.list_users_for_user(session=session, user=user)
+    )
 
 
-@router.post("/get_my_user")
+@router.post("/get_my_user", response_model=User)
 async def get_my_user(
     user: UserModel = Depends(Authenticated()),
-) -> User:
-    return users.user_model_to_user(user)
+):
+    return CustomORJSONResponse(
+        users.user_model_to_user(user)
+    )
 
 
-@router.post("/get_user")
+@router.post("/get_user", response_model=UserWithCreds)
 async def get_user(
     body: GetUserRequest,
     session: AsyncSession = Depends(get_session),
     user: UserModel = Depends(Authenticated()),
-) -> UserWithCreds:
+):
     res = await users.get_user_with_creds_by_name(
         session=session, current_user=user, username=body.username
     )
     if res is None:
         raise ResourceNotExistsError()
-    return res
+    return CustomORJSONResponse(res)
 
 
-@router.post("/create")
+@router.post("/create", response_model=User)
 async def create_user(
     body: CreateUserRequest,
     session: AsyncSession = Depends(get_session),
     user: UserModel = Depends(GlobalAdmin()),
-) -> User:
+):
     res = await users.create_user(
         session=session,
         username=body.username,
@@ -67,15 +71,17 @@ async def create_user(
         email=body.email,
         active=body.active,
     )
-    return users.user_model_to_user(res)
+    return CustomORJSONResponse(
+        users.user_model_to_user(res)
+    )
 
 
-@router.post("/update")
+@router.post("/update", response_model=User)
 async def update_user(
     body: UpdateUserRequest,
     session: AsyncSession = Depends(get_session),
     user: UserModel = Depends(GlobalAdmin()),
-) -> User:
+):
     res = await users.update_user(
         session=session,
         username=body.username,
@@ -85,19 +91,23 @@ async def update_user(
     )
     if res is None:
         raise ResourceNotExistsError()
-    return users.user_model_to_user(res)
+    return CustomORJSONResponse(
+        users.user_model_to_user(res)
+    )
 
 
-@router.post("/refresh_token")
+@router.post("/refresh_token", response_model=UserWithCreds)
 async def refresh_token(
     body: RefreshTokenRequest,
     session: AsyncSession = Depends(get_session),
     user: UserModel = Depends(Authenticated()),
-) -> UserWithCreds:
+):
     res = await users.refresh_user_token(session=session, user=user, username=body.username)
     if res is None:
         raise ResourceNotExistsError()
-    return users.user_model_to_user_with_creds(res)
+    return CustomORJSONResponse(
+        users.user_model_to_user_with_creds(res)
+    )
 
 
 @router.post("/delete")

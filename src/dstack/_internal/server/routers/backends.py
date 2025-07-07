@@ -27,7 +27,7 @@ from dstack._internal.server.services.config import (
     get_backend_config_yaml,
     update_backend_config_yaml,
 )
-from dstack._internal.server.utils.routers import get_base_api_additional_responses
+from dstack._internal.server.utils.routers import CustomORJSONResponse, get_base_api_additional_responses
 
 root_router = APIRouter(
     prefix="/api/backends",
@@ -41,35 +41,37 @@ project_router = APIRouter(
 )
 
 
-@root_router.post("/list_types")
-async def list_backend_types() -> List[BackendType]:
-    return dstack._internal.core.backends.configurators.list_available_backend_types()
+@root_router.post("/list_types", response_model=List[BackendType])
+async def list_backend_types():
+    return CustomORJSONResponse(
+        dstack._internal.core.backends.configurators.list_available_backend_types()
+    )
 
 
-@project_router.post("/create")
+@project_router.post("/create", response_model=AnyBackendConfigWithCreds)
 async def create_backend(
     body: AnyBackendConfigWithCreds,
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
-) -> AnyBackendConfigWithCreds:
+):
     _, project = user_project
     config = await backends.create_backend(session=session, project=project, config=body)
     if settings.SERVER_CONFIG_ENABLED:
         await ServerConfigManager().sync_config(session=session)
-    return config
+    return CustomORJSONResponse(config)
 
 
-@project_router.post("/update")
+@project_router.post("/update", response_model=AnyBackendConfigWithCreds)
 async def update_backend(
     body: AnyBackendConfigWithCreds,
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
-) -> AnyBackendConfigWithCreds:
+):
     _, project = user_project
     config = await backends.update_backend(session=session, project=project, config=body)
     if settings.SERVER_CONFIG_ENABLED:
         await ServerConfigManager().sync_config(session=session)
-    return config
+    return CustomORJSONResponse(config)
 
 
 @project_router.post("/delete")
@@ -86,16 +88,16 @@ async def delete_backends(
         await ServerConfigManager().sync_config(session=session)
 
 
-@project_router.post("/{backend_name}/config_info")
+@project_router.post("/{backend_name}/config_info", response_model=AnyBackendConfigWithCreds)
 async def get_backend_config_info(
     backend_name: BackendType,
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
-) -> AnyBackendConfigWithCreds:
+):
     _, project = user_project
     config = await backends.get_backend_config(project=project, backend_type=backend_name)
     if config is None:
         raise ResourceNotExistsError()
-    return config
+    return CustomORJSONResponse(config)
 
 
 @project_router.post("/create_yaml")
@@ -126,10 +128,12 @@ async def update_backend_yaml(
     )
 
 
-@project_router.post("/{backend_name}/get_yaml")
+@project_router.post("/{backend_name}/get_yaml", response_model=BackendInfoYAML)
 async def get_backend_yaml(
     backend_name: BackendType,
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
-) -> BackendInfoYAML:
+):
     _, project = user_project
-    return await get_backend_config_yaml(project=project, backend_type=backend_name)
+    return CustomORJSONResponse(
+        await get_backend_config_yaml(project=project, backend_type=backend_name)
+    )

@@ -23,7 +23,7 @@ from dstack._internal.server.security.permissions import (
     ProjectMemberOrPublicAccess,
 )
 from dstack._internal.server.services import projects
-from dstack._internal.server.utils.routers import get_base_api_additional_responses
+from dstack._internal.server.utils.routers import CustomORJSONResponse, get_base_api_additional_responses
 
 router = APIRouter(
     prefix="/api/projects",
@@ -32,30 +32,34 @@ router = APIRouter(
 )
 
 
-@router.post("/list")
+@router.post("/list", response_model=List[Project])
 async def list_projects(
     session: AsyncSession = Depends(get_session),
     user: UserModel = Depends(Authenticated()),
-) -> List[Project]:
+):
     """
     Returns all projects visible to user sorted by descending `created_at`.
 
     `members` and `backends` are always empty - call `/api/projects/{project_name}/get` to retrieve them.
     """
-    return await projects.list_user_accessible_projects(session=session, user=user)
+    return CustomORJSONResponse(
+        await projects.list_user_accessible_projects(session=session, user=user)
+    )
 
 
-@router.post("/create")
+@router.post("/create", response_model=Project)
 async def create_project(
     body: CreateProjectRequest,
     session: AsyncSession = Depends(get_session),
     user: UserModel = Depends(Authenticated()),
-) -> Project:
-    return await projects.create_project(
-        session=session,
-        user=user,
-        project_name=body.project_name,
-        is_public=body.is_public,
+):
+    return CustomORJSONResponse(
+        await projects.create_project(
+            session=session,
+            user=user,
+            project_name=body.project_name,
+            is_public=body.is_public,
+        )
     )
 
 
@@ -72,23 +76,26 @@ async def delete_projects(
     )
 
 
-@router.post("/{project_name}/get")
+@router.post("/{project_name}/get", response_model=Project)
 async def get_project(
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMemberOrPublicAccess()),
-) -> Project:
+):
     _, project = user_project
-    return projects.project_model_to_project(project)
+    return CustomORJSONResponse(
+        projects.project_model_to_project(project)
+    )
 
 
 @router.post(
     "/{project_name}/set_members",
+    response_model=Project,
 )
 async def set_project_members(
     body: SetProjectMembersRequest,
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectManager()),
-) -> Project:
+):
     user, project = user_project
     await projects.set_project_members(
         session=session,
@@ -97,17 +104,20 @@ async def set_project_members(
         members=body.members,
     )
     await session.refresh(project)
-    return projects.project_model_to_project(project)
+    return CustomORJSONResponse(
+        projects.project_model_to_project(project)
+    )
 
 
 @router.post(
     "/{project_name}/add_members",
+    response_model=Project,
 )
 async def add_project_members(
     body: AddProjectMemberRequest,
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectManagerOrPublicProject()),
-) -> Project:
+):
     user, project = user_project
     await projects.add_project_members(
         session=session,
@@ -116,17 +126,20 @@ async def add_project_members(
         members=body.members,
     )
     await session.refresh(project)
-    return projects.project_model_to_project(project)
+    return CustomORJSONResponse(
+        projects.project_model_to_project(project)
+    )
 
 
 @router.post(
     "/{project_name}/remove_members",
+    response_model=Project,
 )
 async def remove_project_members(
     body: RemoveProjectMemberRequest,
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectManagerOrSelfLeave()),
-) -> Project:
+):
     user, project = user_project
     await projects.remove_project_members(
         session=session,
@@ -135,17 +148,20 @@ async def remove_project_members(
         usernames=body.usernames,
     )
     await session.refresh(project)
-    return projects.project_model_to_project(project)
+    return CustomORJSONResponse(
+        projects.project_model_to_project(project)
+    )
 
 
 @router.post(
     "/{project_name}/update",
+    response_model=Project,
 )
 async def update_project(
     body: UpdateProjectRequest,
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
-) -> Project:
+):
     user, project = user_project
     await projects.update_project(
         session=session,
@@ -154,4 +170,6 @@ async def update_project(
         is_public=body.is_public,
     )
     await session.refresh(project)
-    return projects.project_model_to_project(project)
+    return CustomORJSONResponse(
+        projects.project_model_to_project(project)
+    )

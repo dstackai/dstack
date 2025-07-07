@@ -12,6 +12,7 @@ from dstack._internal.server.security.permissions import Authenticated
 from dstack._internal.server.services import files
 from dstack._internal.server.settings import SERVER_CODE_UPLOAD_LIMIT
 from dstack._internal.server.utils.routers import (
+    CustomORJSONResponse,
     get_base_api_additional_responses,
     get_request_size,
 )
@@ -24,12 +25,12 @@ router = APIRouter(
 )
 
 
-@router.post("/get_archive_by_hash")
+@router.post("/get_archive_by_hash", response_model=FileArchive)
 async def get_archive_by_hash(
     body: GetFileArchiveByHashRequest,
     session: Annotated[AsyncSession, Depends(get_session)],
     user: Annotated[UserModel, Depends(Authenticated())],
-) -> FileArchive:
+):
     archive = await files.get_archive_by_hash(
         session=session,
         user=user,
@@ -37,16 +38,16 @@ async def get_archive_by_hash(
     )
     if archive is None:
         raise ResourceNotExistsError()
-    return archive
+    return CustomORJSONResponse(archive)
 
 
-@router.post("/upload_archive")
+@router.post("/upload_archive", response_model=FileArchive)
 async def upload_archive(
     request: Request,
     file: UploadFile,
     session: Annotated[AsyncSession, Depends(get_session)],
     user: Annotated[UserModel, Depends(Authenticated())],
-) -> FileArchive:
+):
     request_size = get_request_size(request)
     if SERVER_CODE_UPLOAD_LIMIT > 0 and request_size > SERVER_CODE_UPLOAD_LIMIT:
         diff_size_fmt = sizeof_fmt(request_size)
@@ -64,4 +65,4 @@ async def upload_archive(
         user=user,
         file=file,
     )
-    return archive
+    return CustomORJSONResponse(archive)

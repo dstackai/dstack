@@ -11,7 +11,7 @@ from dstack._internal.server.models import ProjectModel, UserModel
 from dstack._internal.server.security.permissions import ProjectMember
 from dstack._internal.server.services import metrics
 from dstack._internal.server.services.jobs import get_run_job_model
-from dstack._internal.server.utils.routers import get_base_api_additional_responses
+from dstack._internal.server.utils.routers import CustomORJSONResponse, get_base_api_additional_responses
 
 router = APIRouter(
     prefix="/api/project/{project_name}/metrics",
@@ -22,6 +22,7 @@ router = APIRouter(
 
 @router.get(
     "/job/{run_name}",
+    response_model=JobMetrics,
 )
 async def get_job_metrics(
     run_name: str,
@@ -32,7 +33,7 @@ async def get_job_metrics(
     before: Optional[datetime] = None,
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
-) -> JobMetrics:
+):
     """
     Returns job-level metrics such as hardware utilization
     given `run_name`, `replica_num`, and `job_num`.
@@ -63,10 +64,12 @@ async def get_job_metrics(
     if job_model is None:
         raise ResourceNotExistsError("Found no job with given parameters")
 
-    return await metrics.get_job_metrics(
-        session=session,
-        job_model=job_model,
-        limit=limit,
-        after=after,
-        before=before,
+    return CustomORJSONResponse(
+        await metrics.get_job_metrics(
+            session=session,
+            job_model=job_model,
+            limit=limit,
+            after=after,
+            before=before,
+        )
     )
