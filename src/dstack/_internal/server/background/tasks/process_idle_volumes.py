@@ -7,7 +7,7 @@ from sqlalchemy.orm import selectinload
 
 from dstack._internal.core.models.profiles import parse_duration
 from dstack._internal.core.models.volumes import VolumeStatus
-from dstack._internal.server.db import get_session_ctx
+from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import VolumeModel
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.volumes import get_volume_configuration
@@ -18,7 +18,7 @@ logger = get_logger(__name__)
 
 
 async def process_idle_volumes():
-    lock, lockset = get_locker().get_lockset(VolumeModel.__tablename__)
+    lock, lockset = get_locker(get_db().dialect_name).get_lockset(VolumeModel.__tablename__)
     async with get_session_ctx() as session:
         # Take lock, select IDs, add to lockset, release lock
         async with lock:
