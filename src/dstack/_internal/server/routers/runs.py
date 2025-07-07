@@ -69,12 +69,15 @@ async def list_runs(
     )
 
 
-@project_router.post("/get")
+@project_router.post(
+    "/get",
+    response_model=Run,
+)
 async def get_run(
     body: GetRunRequest,
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
-) -> Run:
+):
     """
     Returns a run given `run_name` or `id`.
     If given `run_name`, does not return deleted runs.
@@ -89,15 +92,18 @@ async def get_run(
     )
     if run is None:
         raise ResourceNotExistsError("Run not found")
-    return run
+    return CustomORJSONResponse(run)
 
 
-@project_router.post("/get_plan")
+@project_router.post(
+    "/get_plan",
+    response_model=RunPlan,
+)
 async def get_plan(
     body: GetRunPlanRequest,
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
-) -> RunPlan:
+):
     """
     Returns a run plan for the given run spec.
     This is an optional step before calling `/apply`.
@@ -110,15 +116,18 @@ async def get_plan(
         run_spec=body.run_spec,
         max_offers=body.max_offers,
     )
-    return run_plan
+    return CustomORJSONResponse(run_plan)
 
 
-@project_router.post("/apply")
+@project_router.post(
+    "/apply",
+    response_model=Run,
+)
 async def apply_plan(
     body: ApplyRunPlanRequest,
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
-) -> Run:
+):
     """
     Creates a new run or updates an existing run.
     Errors if the expected current resource from the plan does not match the current resource.
@@ -126,12 +135,14 @@ async def apply_plan(
     If the existing run is active and cannot be updated, it must be stopped first.
     """
     user, project = user_project
-    return await runs.apply_plan(
-        session=session,
-        user=user,
-        project=project,
-        plan=body.plan,
-        force=body.force,
+    return CustomORJSONResponse(
+        await runs.apply_plan(
+            session=session,
+            user=user,
+            project=project,
+            plan=body.plan,
+            force=body.force,
+        )
     )
 
 
