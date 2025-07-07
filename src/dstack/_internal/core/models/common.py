@@ -1,10 +1,13 @@
 import re
 from enum import Enum
-from typing import Union
+from typing import Any, Union
 
+import orjson
 from pydantic import Field
 from pydantic_duality import DualBaseModel
 from typing_extensions import Annotated
+
+from dstack._internal.utils.json_utils import get_orjson_options, orjson_default
 
 IncludeExcludeFieldType = Union[int, str]
 IncludeExcludeSetType = set[IncludeExcludeFieldType]
@@ -14,13 +17,23 @@ IncludeExcludeDictType = dict[
 IncludeExcludeType = Union[IncludeExcludeSetType, IncludeExcludeDictType]
 
 
+def _orjson_dumps(v: Any, *, default: Any) -> str:
+    return orjson.dumps(
+        v,
+        option=get_orjson_options(),
+        default=orjson_default,
+    ).decode()
+
+
 # DualBaseModel creates two classes for the model:
 # one with extra = "forbid" (CoreModel/CoreModel.__request__),
 # and another with extra = "ignore" (CoreModel.__response__).
 # This allows to use the same model both for a strict parsing of the user input and
 # for a permissive parsing of the server responses.
 class CoreModel(DualBaseModel):
-    pass
+    class Config:
+        json_loads = orjson.loads
+        json_dumps = _orjson_dumps
 
 
 class Duration(int):

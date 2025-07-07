@@ -18,7 +18,10 @@ from dstack._internal.server.schemas.runs import (
 )
 from dstack._internal.server.security.permissions import Authenticated, ProjectMember
 from dstack._internal.server.services import runs
-from dstack._internal.server.utils.routers import get_base_api_additional_responses
+from dstack._internal.server.utils.routers import (
+    CustomORJSONResponse,
+    get_base_api_additional_responses,
+)
 
 root_router = APIRouter(
     prefix="/api/runs",
@@ -32,12 +35,15 @@ project_router = APIRouter(
 )
 
 
-@root_router.post("/list")
+@root_router.post(
+    "/list",
+    response_model=List[Run],
+)
 async def list_runs(
     body: ListRunsRequest,
     session: AsyncSession = Depends(get_session),
     user: UserModel = Depends(Authenticated()),
-) -> List[Run]:
+):
     """
     Returns all runs visible to user sorted by descending `submitted_at`.
     `project_name`, `repo_id`, `username`, and `only_active` can be specified as filters.
@@ -47,17 +53,19 @@ async def list_runs(
     The results are paginated. To get the next page, pass `submitted_at` and `id` of
     the last run from the previous page as `prev_submitted_at` and `prev_run_id`.
     """
-    return await runs.list_user_runs(
-        session=session,
-        user=user,
-        project_name=body.project_name,
-        repo_id=body.repo_id,
-        username=body.username,
-        only_active=body.only_active,
-        prev_submitted_at=body.prev_submitted_at,
-        prev_run_id=body.prev_run_id,
-        limit=body.limit,
-        ascending=body.ascending,
+    return CustomORJSONResponse(
+        await runs.list_user_runs(
+            session=session,
+            user=user,
+            project_name=body.project_name,
+            repo_id=body.repo_id,
+            username=body.username,
+            only_active=body.only_active,
+            prev_submitted_at=body.prev_submitted_at,
+            prev_run_id=body.prev_run_id,
+            limit=body.limit,
+            ascending=body.ascending,
+        )
     )
 
 
