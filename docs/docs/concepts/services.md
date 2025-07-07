@@ -681,7 +681,7 @@ utilization_policy:
 
 ## Rolling deployment
 
-To deploy a new version of a service that is already `running`, use `dstack apply`. `dstack` will automatically detect changes and update replicas one by one. New and old replicas coexist and handle requests simultaneously until deployment finishes.
+To deploy a new version of a service that is already `running`, use `dstack apply`. `dstack` will automatically detect changes and suggest to update the run.
 
 <div class="termy">
 
@@ -699,6 +699,8 @@ Update the run? [y/n]:
 ```
 
 </div>
+
+To update a replica, `dstack` starts a new replica, then waits until it becomes `running`, then terminates the old replica. If the service has multiple replicas, they are updated one by one &mdash; `dstack` does not proceed to updating the next replica until the previous one was fully updated. New and old replicas can coexist and handle requests simultaneously until deployment finishes.
 
 You can track the deployment progress in both `dstack apply` or `dstack ps`. 
 Older replicas have lower `deployment` numbers; newer ones have higher.
@@ -720,10 +722,14 @@ $ dstack apply -f my-service.dstack.yml
 
 The rolling deployment stops when all replicas are updated or when a new deployment is submitted.
 
-<!-- NOTE: should be in sync with constants in server/services/runs.py -->
+??? info "Updatable properties"
+    <!-- NOTE: should be in sync with constants in server/services/runs.py -->
 
-??? info "Force a redeployment"
-    `dstack` automatically detects changes to `resources`, `volumes`, `docker`, `files`, `image`, `user`, `privileged`, `entrypoint`, `working_dir`, `python`, `nvcc`, `single_branch`, `env`, `shell`, `commands`, and to [repo](repos.md) and [files](#files) contents.
+    Rolling deployments apply to the following configuration properties: `resources`, `volumes`, `docker`, `files`, `image`, `user`, `privileged`, `entrypoint`, `working_dir`, `python`, `nvcc`, `single_branch`, `env`, `shell`, `commands`. They also apply to changes to [repo](repos.md) or [file](#files) contents.
+
+    Additionally, changes to `replicas` and `scaling` can be applied without redeploying replicas.
+
+    Changes to other properties will require a full service restart.
 
     To trigger a rolling deployment when no properties have changed (e.g., after updating [secrets](secrets.md) or to restart all replicas),
     make a minor config change, such as adding a dummy [environment variable](#environment-variables).

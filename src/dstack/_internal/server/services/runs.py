@@ -930,7 +930,7 @@ _TYPE_SPECIFIC_CONF_UPDATABLE_FIELDS = {
         "replicas",
         "scaling",
         # rolling deployment
-        # NOTE: keep this list in sync with the "Deployments" section in services.md
+        # NOTE: keep this list in sync with the "Rolling deployment" section in services.md
         "resources",
         "volumes",
         "docker",
