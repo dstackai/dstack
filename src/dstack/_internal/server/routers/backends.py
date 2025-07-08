@@ -27,7 +27,10 @@ from dstack._internal.server.services.config import (
     get_backend_config_yaml,
     update_backend_config_yaml,
 )
-from dstack._internal.server.utils.routers import CustomORJSONResponse, get_base_api_additional_responses
+from dstack._internal.server.utils.routers import (
+    CustomORJSONResponse,
+    get_base_api_additional_responses,
+)
 
 root_router = APIRouter(
     prefix="/api/backends",

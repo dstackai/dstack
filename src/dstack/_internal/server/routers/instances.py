@@ -9,7 +9,10 @@ from dstack._internal.server.db import get_session
 from dstack._internal.server.models import UserModel
 from dstack._internal.server.schemas.instances import ListInstancesRequest
 from dstack._internal.server.security.permissions import Authenticated
-from dstack._internal.server.utils.routers import CustomORJSONResponse, get_base_api_additional_responses
+from dstack._internal.server.utils.routers import (
+    CustomORJSONResponse,
+    get_base_api_additional_responses,
+)
 
 root_router = APIRouter(
     prefix="/api/instances",

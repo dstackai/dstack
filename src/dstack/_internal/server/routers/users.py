@@ -16,7 +16,10 @@ from dstack._internal.server.schemas.users import (
 )
 from dstack._internal.server.security.permissions import Authenticated, GlobalAdmin
 from dstack._internal.server.services import users
-from dstack._internal.server.utils.routers import CustomORJSONResponse, get_base_api_additional_responses
+from dstack._internal.server.utils.routers import (
+    CustomORJSONResponse,
+    get_base_api_additional_responses,
+)
 
 router = APIRouter(
     prefix="/api/users",
@@ -30,18 +33,14 @@ async def list_users(
     session: AsyncSession = Depends(get_session),
     user: UserModel = Depends(Authenticated()),
 ):
-    return CustomORJSONResponse(
-        await users.list_users_for_user(session=session, user=user)
-    )
+    return CustomORJSONResponse(await users.list_users_for_user(session=session, user=user))
 
 
 @router.post("/get_my_user", response_model=User)
 async def get_my_user(
     user: UserModel = Depends(Authenticated()),
 ):
-    return CustomORJSONResponse(
-        users.user_model_to_user(user)
-    )
+    return CustomORJSONResponse(users.user_model_to_user(user))
 
 
 @router.post("/get_user", response_model=UserWithCreds)
@@ -71,9 +70,7 @@ async def create_user(
         email=body.email,
         active=body.active,
     )
-    return CustomORJSONResponse(
-        users.user_model_to_user(res)
-    )
+    return CustomORJSONResponse(users.user_model_to_user(res))
 
 
 @router.post("/update", response_model=User)
@@ -91,9 +88,7 @@ async def update_user(
     )
     if res is None:
         raise ResourceNotExistsError()
-    return CustomORJSONResponse(
-        users.user_model_to_user(res)
-    )
+    return CustomORJSONResponse(users.user_model_to_user(res))
 
 
 @router.post("/refresh_token", response_model=UserWithCreds)
@@ -105,9 +100,7 @@ async def refresh_token(
     res = await users.refresh_user_token(session=session, user=user, username=body.username)
     if res is None:
         raise ResourceNotExistsError()
-    return CustomORJSONResponse(
-        users.user_model_to_user_with_creds(res)
-    )
+    return CustomORJSONResponse(users.user_model_to_user_with_creds(res))
 
 
 @router.post("/delete")

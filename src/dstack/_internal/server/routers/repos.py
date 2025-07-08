@@ -35,9 +35,7 @@ async def list_repos(
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
 ):
     _, project = user_project
-    return CustomORJSONResponse(
-        await repos.list_repos(session=session, project=project)
-    )
+    return CustomORJSONResponse(await repos.list_repos(session=session, project=project))
 
 
 @router.post("/get", response_model=RepoHeadWithCreds)

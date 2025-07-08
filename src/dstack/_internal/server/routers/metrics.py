@@ -11,7 +11,10 @@ from dstack._internal.server.models import ProjectModel, UserModel
 from dstack._internal.server.security.permissions import ProjectMember
 from dstack._internal.server.services import metrics
 from dstack._internal.server.services.jobs import get_run_job_model
-from dstack._internal.server.utils.routers import CustomORJSONResponse, get_base_api_additional_responses
+from dstack._internal.server.utils.routers import (
+    CustomORJSONResponse,
+    get_base_api_additional_responses,
+)
 
 router = APIRouter(
     prefix="/api/project/{project_name}/metrics",

@@ -13,7 +13,10 @@ from dstack._internal.server.security.permissions import (
     ProjectAdmin,
     ProjectMemberOrPublicAccess,
 )
-from dstack._internal.server.utils.routers import CustomORJSONResponse, get_base_api_additional_responses
+from dstack._internal.server.utils.routers import (
+    CustomORJSONResponse,
+    get_base_api_additional_responses,
+)
 
 router = APIRouter(
     prefix="/api/project/{project_name}/gateways",

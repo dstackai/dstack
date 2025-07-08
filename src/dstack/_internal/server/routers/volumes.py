@@ -15,7 +15,10 @@ from dstack._internal.server.schemas.volumes import (
     ListVolumesRequest,
 )
 from dstack._internal.server.security.permissions import Authenticated, ProjectMember
-from dstack._internal.server.utils.routers import CustomORJSONResponse, get_base_api_additional_responses
+from dstack._internal.server.utils.routers import (
+    CustomORJSONResponse,
+    get_base_api_additional_responses,
+)
 
 root_router = APIRouter(
     prefix="/api/volumes",

@@ -23,7 +23,10 @@ from dstack._internal.server.security.permissions import (
     ProjectMemberOrPublicAccess,
 )
 from dstack._internal.server.services import projects
-from dstack._internal.server.utils.routers import CustomORJSONResponse, get_base_api_additional_responses
+from dstack._internal.server.utils.routers import (
+    CustomORJSONResponse,
+    get_base_api_additional_responses,
+)
 
 router = APIRouter(
     prefix="/api/projects",
@@ -82,9 +85,7 @@ async def get_project(
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMemberOrPublicAccess()),
 ):
     _, project = user_project
-    return CustomORJSONResponse(
-        projects.project_model_to_project(project)
-    )
+    return CustomORJSONResponse(projects.project_model_to_project(project))
 
 
 @router.post(
@@ -104,9 +105,7 @@ async def set_project_members(
         members=body.members,
     )
     await session.refresh(project)
-    return CustomORJSONResponse(
-        projects.project_model_to_project(project)
-    )
+    return CustomORJSONResponse(projects.project_model_to_project(project))
 
 
 @router.post(
@@ -126,9 +125,7 @@ async def add_project_members(
         members=body.members,
     )
     await session.refresh(project)
-    return CustomORJSONResponse(
-        projects.project_model_to_project(project)
-    )
+    return CustomORJSONResponse(projects.project_model_to_project(project))
 
 
 @router.post(
@@ -148,9 +145,7 @@ async def remove_project_members(
         usernames=body.usernames,
     )
     await session.refresh(project)
-    return CustomORJSONResponse(
-        projects.project_model_to_project(project)
-    )
+    return CustomORJSONResponse(projects.project_model_to_project(project))
 
 
 @router.post(
@@ -170,6 +165,4 @@ async def update_project(
         is_public=body.is_public,
     )
     await session.refresh(project)
-    return CustomORJSONResponse(
-        projects.project_model_to_project(project)
-    )
+    return CustomORJSONResponse(projects.project_model_to_project(project))
