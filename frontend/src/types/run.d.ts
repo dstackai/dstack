@@ -7,6 +7,7 @@ declare type TRunsRequestParams = {
     prev_run_id?: string;
     limit?: number;
     ascending?: boolean;
+    job_submissions_limit?: number;
 };
 
 declare type TDeleteRunsRequestParams = {
