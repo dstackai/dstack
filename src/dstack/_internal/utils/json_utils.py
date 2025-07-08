@@ -1,3 +1,5 @@
+from typing import Any
+
 import orjson
 from pydantic import BaseModel
 
@@ -13,6 +15,22 @@ try:
     import asyncpg.pgproto.pgproto
 except ImportError:
     ASYNCPG = False
+
+
+def pydantic_orjson_dumps(v: Any, *, default: Any) -> str:
+    return orjson.dumps(
+        v,
+        option=get_orjson_default_options(),
+        default=orjson_default,
+    ).decode()
+
+
+def pydantic_orjson_dumps_with_indent(v: Any, *, default: Any) -> str:
+    return orjson.dumps(
+        v,
+        option=get_orjson_default_options() | orjson.OPT_INDENT_2,
+        default=orjson_default,
+    ).decode()
 
 
 def orjson_default(obj):

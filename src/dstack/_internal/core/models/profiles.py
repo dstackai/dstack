@@ -1,12 +1,14 @@
 from enum import Enum
 from typing import Any, Dict, List, Optional, Union, overload
 
+import orjson
 from pydantic import Field, root_validator, validator
 from typing_extensions import Annotated, Literal
 
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import CoreModel, Duration
 from dstack._internal.utils.common import list_enum_values_for_annotation
+from dstack._internal.utils.json_utils import pydantic_orjson_dumps_with_indent
 from dstack._internal.utils.tags import tags_validator
 
 DEFAULT_RETRY_DURATION = 3600
@@ -343,6 +345,9 @@ class ProfilesConfig(CoreModel):
     profiles: List[Profile]
 
     class Config:
+        json_loads = orjson.loads
+        json_dumps = pydantic_orjson_dumps_with_indent
+
         schema_extra = {"$schema": "http://json-schema.org/draft-07/schema#"}
 
     def default(self) -> Optional[Profile]:

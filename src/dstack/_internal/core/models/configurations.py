@@ -19,7 +19,9 @@ from dstack._internal.core.models.resources import Range, ResourcesSpec
 from dstack._internal.core.models.services import AnyModel, OpenAIChatModel
 from dstack._internal.core.models.unix import UnixUser
 from dstack._internal.core.models.volumes import MountPoint, VolumeConfiguration, parse_mount_point
-from dstack._internal.utils.json_utils import get_orjson_default_options, orjson_default
+from dstack._internal.utils.json_utils import (
+    pydantic_orjson_dumps_with_indent,
+)
 
 CommandsList = List[str]
 ValidPort = conint(gt=0, le=65536)
@@ -568,15 +570,6 @@ def parse_apply_configuration(data: dict) -> AnyApplyConfiguration:
 AnyDstackConfiguration = AnyApplyConfiguration
 
 
-# Custom _orjson_dumps for DstackConfiguration with indentation
-def _orjson_dumps(v: Any, *, default: Any) -> str:
-    return orjson.dumps(
-        v,
-        option=get_orjson_default_options() | orjson.OPT_INDENT_2,
-        default=orjson_default,
-    ).decode()
-
-
 class DstackConfiguration(CoreModel):
     __root__: Annotated[
         AnyDstackConfiguration,
@@ -585,7 +578,7 @@ class DstackConfiguration(CoreModel):
 
     class Config:
         json_loads = orjson.loads
-        json_dumps = _orjson_dumps
+        json_dumps = pydantic_orjson_dumps_with_indent
 
         @staticmethod
         def schema_extra(schema: Dict[str, Any]):
