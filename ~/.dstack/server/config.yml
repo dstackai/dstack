@@ -1,7 +1,0 @@
-projects:
-- name: main
-  backends:
-  - type: local
-    name: local
-encryption:
-  keys: [] 
