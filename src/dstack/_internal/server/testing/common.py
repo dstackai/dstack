@@ -31,6 +31,8 @@ from dstack._internal.core.models.fleets import (
     FleetSpec,
     FleetStatus,
     InstanceGroupPlacement,
+    SSHHostParams,
+    SSHParams,
 )
 from dstack._internal.core.models.gateways import GatewayComputeConfiguration, GatewayStatus
 from dstack._internal.core.models.instances import (
@@ -378,6 +380,7 @@ def get_job_provisioning_data(
     hostname: str = "127.0.0.4",
     internal_ip: Optional[str] = "127.0.0.4",
     price: float = 10.5,
+    instance_type: Optional[InstanceType] = None,
 ) -> JobProvisioningData:
     gpus = [
         Gpu(
@@ -386,14 +389,16 @@ def get_job_provisioning_data(
             vendor=gpuhunt.AcceleratorVendor.NVIDIA,
         )
     ] * gpu_count
-    return JobProvisioningData(
-        backend=backend,
-        instance_type=InstanceType(
+    if instance_type is None:
+        instance_type = InstanceType(
             name="instance",
             resources=Resources(
                 cpus=cpu_count, memory_mib=int(memory_gib * 1024), spot=spot, gpus=gpus
             ),
-        ),
+        )
+    return JobProvisioningData(
+        backend=backend,
+        instance_type=instance_type,
         instance_id="instance_id",
         hostname=hostname,
         internal_ip=internal_ip,
@@ -549,6 +554,31 @@ def get_fleet_configuration(
     )
 
 
+def get_ssh_fleet_configuration(
+    name: str = "test-fleet",
+    user: str = "ubuntu",
+    ssh_key: Optional[SSHKey] = None,
+    hosts: Optional[list[Union[SSHHostParams, str]]] = None,
+    network: Optional[str] = None,
+    placement: Optional[InstanceGroupPlacement] = None,
+) -> FleetConfiguration:
+    if ssh_key is None:
+        ssh_key = SSHKey(public="", private=get_private_key_string())
+    if hosts is None:
+        hosts = ["10.0.0.100"]
+    ssh_config = SSHParams(
+        user=user,
+        ssh_key=ssh_key,
+        hosts=hosts,
+        network=network,
+    )
+    return FleetConfiguration(
+        name=name,
+        ssh_config=ssh_config,
+        placement=placement,
+    )
+
+
 async def create_instance(
     session: AsyncSession,
     project: ProjectModel,
@@ -590,7 +620,9 @@ async def create_instance(
             internal_ip=None,
         )
     if offer == "auto":
-        offer = get_instance_offer_with_availability(backend=backend, region=region, spot=spot)
+        offer = get_instance_offer_with_availability(
+            backend=backend, region=region, spot=spot, price=price
+        )
     if profile is None:
         profile = Profile(name="test_name")
 
