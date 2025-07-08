@@ -10,7 +10,7 @@ require (
 	github.com/docker/docker v26.0.0+incompatible
 	github.com/docker/go-connections v0.5.0
 	github.com/docker/go-units v0.5.0
-	github.com/dstackai/ansistrip v0.0.5
+	github.com/dstackai/ansistrip v0.0.6
 	github.com/go-git/go-git/v5 v5.12.0
 	github.com/golang/gddo v0.0.0-20210115222349-20d68f94ee1f
 	github.com/gorilla/websocket v1.5.1

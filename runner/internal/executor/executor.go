@@ -35,6 +35,9 @@ const (
 
 	// Output is flushed regardless of cursor activity after this maximum delay
 	AnsiStripMaxDelay = 3 * time.Second
+
+	// Maximum buffer size for ansistrip
+	MaxBufferSize = 32 * 1024 // 32KB
 )
 
 type RunExecutor struct {
@@ -141,7 +144,8 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 		}
 	}()
 
-	stripper := ansistrip.NewWriter(ex.runnerLogs, AnsiStripFlushInterval, AnsiStripMaxDelay)
+	stripper := ansistrip.NewWriter(ex.runnerLogs, AnsiStripFlushInterval, AnsiStripMaxDelay, MaxBufferSize)
+	defer stripper.Close()
 	logger := io.MultiWriter(runnerLogFile, os.Stdout, stripper)
 	ctx = log.WithLogger(ctx, log.NewEntry(logger, int(log.DefaultEntry.Logger.Level))) // todo loglevel
 	log.Info(ctx, "Run job", "log_level", log.GetLogger(ctx).Logger.Level.String())
@@ -201,7 +205,6 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 		select {
 		case <-ctx.Done():
 			log.Error(ctx, "Job canceled")
-			stripper.Close()
 			ex.SetJobState(ctx, types.JobStateTerminated)
 			return gerrors.Wrap(err)
 		default:
@@ -210,7 +213,6 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 		select {
 		case <-timeoutCtx.Done():
 			log.Error(ctx, "Max duration exceeded", "max_duration", ex.jobSpec.MaxDuration)
-			stripper.Close()
 			ex.SetJobStateWithTerminationReason(
 				ctx,
 				types.JobStateTerminated,
@@ -221,7 +223,6 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 		default:
 		}
 
-		stripper.Close()
 		// todo fail reason?
 		log.Error(ctx, "Exec failed", "err", err)
 		var exitError *exec.ExitError
@@ -233,7 +234,6 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 		return gerrors.Wrap(err)
 	}
 
-	stripper.Close()
 	ex.SetJobStateWithExitStatus(ctx, types.JobStateDone, 0)
 	return nil
 }
@@ -448,7 +448,7 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 	defer func() { _ = ptm.Close() }()
 	defer func() { _ = cmd.Wait() }() // release resources if copy fails
 
-	stripper := ansistrip.NewWriter(ex.jobLogs, AnsiStripFlushInterval, AnsiStripMaxDelay)
+	stripper := ansistrip.NewWriter(ex.jobLogs, AnsiStripFlushInterval, AnsiStripMaxDelay, MaxBufferSize)
 	logger := io.MultiWriter(jobLogFile, ex.jobWsLogs, stripper)
 	_, err = io.Copy(logger, ptm)
 	if err != nil && !isPtyError(err) {
