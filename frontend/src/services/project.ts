@@ -1,7 +1,6 @@
 import { API } from 'api';
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 
-import { base64ToArrayBuffer } from 'libs';
 import fetchBaseQueryHeaders from 'libs/fetchBaseQueryHeaders';
 
 // Helper function to transform backend response to frontend format
@@ -131,7 +130,7 @@ export const projectApi = createApi({
             transformResponse: (response: { logs: ILogItem[]; next_token: string }) => {
                 const logs = response.logs.map((logItem) => ({
                     ...logItem,
-                    message: base64ToArrayBuffer(logItem.message as string),
+                    message: logItem.message,
                 }));
 
                 return {
