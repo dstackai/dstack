@@ -5,12 +5,19 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from dstack._internal.core.backends.base.compute import ComputeWithVolumeSupport
+from dstack._internal.core.errors import BackendNotAvailable
 from dstack._internal.core.models.profiles import parse_duration
 from dstack._internal.core.models.volumes import VolumeStatus
 from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import VolumeModel
+from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services.locking import get_locker
-from dstack._internal.server.services.volumes import get_volume_configuration
+from dstack._internal.server.services.volumes import (
+    get_volume_configuration,
+    volume_model_to_volume,
+)
+from dstack._internal.utils import common
 from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.logging import get_logger
 
@@ -43,6 +50,7 @@ async def process_idle_volumes():
             select(VolumeModel)
             .where(VolumeModel.id.in_(volume_ids))
             .options(selectinload(VolumeModel.project))
+            .options(selectinload(VolumeModel.user))
             .options(selectinload(VolumeModel.attachments))
             .execution_options(populate_existing=True)
         )
@@ -99,20 +107,63 @@ def _get_idle_time(volume: VolumeModel) -> datetime.timedelta:
 
 
 async def _delete_idle_volumes(session: AsyncSession, volumes: List[VolumeModel]):
-    """Mark idle volumes as deleted."""
-    for volume in volumes:
+    """Delete idle volumes from cloud providers and mark as deleted in database."""
+    for volume_model in volumes:
         try:
-            # Mark volume as deleted
+            # Try to delete from cloud provider first
+            await _delete_volume_from_cloud(session, volume_model)
+        except Exception:
+            logger.exception("Error when deleting volume %s from cloud", volume_model.name)
+
+        # Always mark as deleted in database, even if cloud deletion failed
+        try:
             await session.execute(
                 update(VolumeModel)
-                .where(VolumeModel.id == volume.id)
+                .where(VolumeModel.id == volume_model.id)
                 .values(
                     deleted=True,
                     deleted_at=get_current_datetime(),
                 )
             )
-            logger.info("Marked idle volume %s for deletion", volume.name)
+            logger.info("Deleted idle volume %s", volume_model.name)
         except Exception:
-            logger.exception("Failed to mark volume %s for deletion", volume.name)
+            logger.exception("Failed to mark volume %s as deleted in database", volume_model.name)
 
     await session.commit()
+
+
+async def _delete_volume_from_cloud(session: AsyncSession, volume_model: VolumeModel):
+    """Delete volume from cloud provider. Based on volumes.py:_delete_volume"""
+    volume = volume_model_to_volume(volume_model)
+
+    if volume.external:
+        # External volumes are not managed by dstack
+        return
+
+    if volume.provisioning_data is None:
+        # The volume wasn't provisioned so there is nothing to delete
+        return
+
+    if volume.provisioning_data.backend is None:
+        logger.error(
+            f"Failed to delete volume {volume_model.name}. volume.provisioning_data.backend is None."
+        )
+        return
+
+    try:
+        backend = await backends_services.get_project_backend_by_type_or_error(
+            project=volume_model.project,
+            backend_type=volume.provisioning_data.backend,
+        )
+    except BackendNotAvailable:
+        logger.error(
+            f"Failed to delete volume {volume_model.name}. Backend {volume.configuration.backend} not available."
+        )
+        return
+
+    compute = backend.compute()
+    assert isinstance(compute, ComputeWithVolumeSupport)
+    await common.run_async(
+        compute.delete_volume,
+        volume=volume,
+    )
