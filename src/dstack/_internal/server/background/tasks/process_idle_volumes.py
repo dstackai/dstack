@@ -20,7 +20,6 @@ logger = get_logger(__name__)
 async def process_idle_volumes():
     lock, lockset = get_locker(get_db().dialect_name).get_lockset(VolumeModel.__tablename__)
     async with get_session_ctx() as session:
-        # Take lock, select IDs, add to lockset, release lock
         async with lock:
             res = await session.execute(
                 select(VolumeModel.id)
@@ -59,8 +58,7 @@ async def process_idle_volumes():
                 await _delete_idle_volumes(session, to_delete)
 
         finally:
-            for volume_id in volume_ids:
-                lockset.discard(volume_id)
+            lockset.difference_update(volume_ids)
 
 
 def _should_delete_volume(volume: VolumeModel) -> bool:
@@ -101,7 +99,7 @@ def _get_idle_time(volume: VolumeModel) -> datetime.timedelta:
 
 
 async def _delete_idle_volumes(session: AsyncSession, volumes: List[VolumeModel]):
-    """Delete idle volumes without using the delete_volumes function to avoid locking conflicts."""
+    """Mark idle volumes as deleted."""
     for volume in volumes:
         try:
             # Mark volume as deleted
