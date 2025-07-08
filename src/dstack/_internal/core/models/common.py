@@ -8,7 +8,7 @@ from pydantic import Field
 from pydantic_duality import DualBaseModel
 from typing_extensions import Annotated
 
-from dstack._internal.utils.json_utils import get_orjson_options, orjson_default
+from dstack._internal.utils.json_utils import get_orjson_default_options, orjson_default
 
 IncludeExcludeFieldType = Union[int, str]
 IncludeExcludeSetType = set[IncludeExcludeFieldType]
@@ -21,7 +21,7 @@ IncludeExcludeType = Union[IncludeExcludeSetType, IncludeExcludeDictType]
 def _orjson_dumps(v: Any, *, default: Any) -> str:
     return orjson.dumps(
         v,
-        option=get_orjson_options(),
+        option=get_orjson_default_options(),
         default=orjson_default,
     ).decode()
 

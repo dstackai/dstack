@@ -32,5 +32,5 @@ def orjson_default(obj):
     raise TypeError
 
 
-def get_orjson_options() -> int:
+def get_orjson_default_options() -> int:
     return orjson.OPT_NON_STR_KEYS

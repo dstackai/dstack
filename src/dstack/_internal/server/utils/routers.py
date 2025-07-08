@@ -6,7 +6,7 @@ from packaging import version
 
 from dstack._internal.core.errors import ServerClientError, ServerClientErrorCode
 from dstack._internal.core.models.common import CoreModel
-from dstack._internal.utils.json_utils import get_orjson_options, orjson_default
+from dstack._internal.utils.json_utils import get_orjson_default_options, orjson_default
 
 
 class CustomORJSONResponse(Response):
@@ -26,7 +26,7 @@ class CustomORJSONResponse(Response):
     def render(self, content: Any) -> bytes:
         return orjson.dumps(
             content,
-            option=get_orjson_options(),
+            option=get_orjson_default_options(),
             default=orjson_default,
         )
 
