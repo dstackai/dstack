@@ -1,4 +1,3 @@
-import asyncpg.pgproto.pgproto
 import orjson
 from pydantic import BaseModel
 
