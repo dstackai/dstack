@@ -290,7 +290,6 @@ async def process_terminating_job(
     job_model.instance_id = None
     instance_model.last_job_processed_at = common.get_current_datetime()
 
-    # Update volume timestamps
     volume_names = (
         jrd.volume_names
         if jrd and jrd.volume_names

@@ -45,7 +45,6 @@ async def process_idle_volumes():
             for volume_id in volume_ids:
                 lockset.add(volume_id)
 
-        # Load volumes with related attributes in one query
         res = await session.execute(
             select(VolumeModel)
             .where(VolumeModel.id.in_(volume_ids))
@@ -110,12 +109,9 @@ async def _delete_idle_volumes(session: AsyncSession, volumes: List[VolumeModel]
     """Delete idle volumes from cloud providers and mark as deleted in database."""
     for volume_model in volumes:
         try:
-            # Try to delete from cloud provider first
             await _delete_volume_from_cloud(session, volume_model)
         except Exception:
             logger.exception("Error when deleting volume %s from cloud", volume_model.name)
-
-        # Always mark as deleted in database, even if cloud deletion failed
         try:
             await session.execute(
                 update(VolumeModel)
@@ -137,11 +133,9 @@ async def _delete_volume_from_cloud(session: AsyncSession, volume_model: VolumeM
     volume = volume_model_to_volume(volume_model)
 
     if volume.external:
-        # External volumes are not managed by dstack
         return
 
     if volume.provisioning_data is None:
-        # The volume wasn't provisioned so there is nothing to delete
         return
 
     if volume.provisioning_data.backend is None:
