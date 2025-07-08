@@ -33,12 +33,14 @@ class RunsAPIClient(APIClientGroup):
         prev_run_id: Optional[UUID] = None,
         limit: int = 100,
         ascending: bool = False,
+        job_submissions_limit: Optional[int] = None,
     ) -> List[Run]:
         body = ListRunsRequest(
             project_name=project_name,
             repo_id=repo_id,
             username=username,
             only_active=only_active,
+            job_submissions_limit=job_submissions_limit,
             prev_submitted_at=prev_submitted_at,
             prev_run_id=prev_run_id,
             limit=limit,

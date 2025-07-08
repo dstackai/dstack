@@ -105,6 +105,7 @@ async def list_user_runs(
     repo_id: Optional[str],
     username: Optional[str],
     only_active: bool,
+    job_submissions_limit: Optional[int],
     prev_submitted_at: Optional[datetime],
     prev_run_id: Optional[uuid.UUID],
     limit: int,
@@ -148,7 +149,11 @@ async def list_user_runs(
     runs = []
     for r in run_models:
         try:
-            runs.append(run_model_to_run(r, return_in_api=True))
+            runs.append(
+                run_model_to_run(
+                    r, return_in_api=True, job_submissions_limit=job_submissions_limit
+                )
+            )
         except pydantic.ValidationError:
             pass
     if len(run_models) > len(runs):
@@ -653,6 +658,7 @@ async def delete_runs(
 def run_model_to_run(
     run_model: RunModel,
     include_job_submissions: bool = True,
+    job_submissions_limit: Optional[int] = None,
     return_in_api: bool = False,
     include_sensitive: bool = False,
 ) -> Run:
@@ -666,6 +672,11 @@ def run_model_to_run(
         ):
             submissions = []
             job_model = None
+            if job_submissions_limit is not None:
+                if job_submissions_limit == 0:
+                    job_submissions = []
+                else:
+                    job_submissions = list(job_submissions)[-job_submissions_limit:]
             for job_model in job_submissions:
                 if include_job_submissions:
                     job_submission = job_model_to_job_submission(job_model)
