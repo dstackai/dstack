@@ -370,12 +370,12 @@ async def apply_plan(
             spec=spec,
         )
 
-    current_fleet_model = await get_project_fleet_model_by_name(
+    fleet_model = await get_project_fleet_model_by_name(
         session=session,
         project=project,
         name=configuration.name,
     )
-    if current_fleet_model is None:
+    if fleet_model is None:
         return await _create_fleet(
             session=session,
             project=project,
@@ -383,81 +383,44 @@ async def apply_plan(
             spec=spec,
         )
 
-    current_fleet = fleet_model_to_fleet(current_fleet_model)
-    _set_fleet_spec_defaults(current_fleet.spec)
-    current_fleet_sensitive = fleet_model_to_fleet(current_fleet_model, include_sensitive=True)
-    _set_fleet_spec_defaults(current_fleet_sensitive.spec)
-
-    if not force:
-        if plan.current_resource is not None:
-            _set_fleet_spec_defaults(plan.current_resource.spec)
-        if (
-            plan.current_resource is None
-            or plan.current_resource.id != current_fleet.id
-            or plan.current_resource.spec != current_fleet.spec
-        ):
-            raise ServerClientError(
-                "Failed to apply plan. Resource has been changed. Try again or use force apply."
-            )
-
-    _check_can_update_fleet_spec(current_fleet_sensitive.spec, spec)
-
-    spec_json = spec.json()
-    current_fleet_model.spec = spec_json
-
-    if (
-        current_fleet_sensitive.spec.configuration.ssh_config is not None
-        and spec.configuration.ssh_config is not None
+    instances_ids = sorted(i.id for i in fleet_model.instances if not i.deleted)
+    await session.commit()
+    async with (
+        get_locker(get_db().dialect_name).lock_ctx(FleetModel.__tablename__, [fleet_model.id]),
+        get_locker(get_db().dialect_name).lock_ctx(InstanceModel.__tablename__, instances_ids),
     ):
-        added_hosts, removed_hosts, changed_hosts = _calculate_ssh_hosts_changes(
-            current=current_fleet_sensitive.spec.configuration.ssh_config.hosts,
-            new=spec.configuration.ssh_config.hosts,
+        # Refetch after lock
+        # TODO: Lock instances with FOR UPDATE?
+        res = await session.execute(
+            select(FleetModel)
+            .where(
+                FleetModel.project_id == project.id,
+                FleetModel.id == fleet_model.id,
+                FleetModel.deleted == False,
+            )
+            .options(selectinload(FleetModel.instances))
+            .options(selectinload(FleetModel.runs))
+            .execution_options(populate_existing=True)
+            .order_by(FleetModel.id)  # take locks in order
+            .with_for_update(key_share=True)
         )
-        # `_check_can_update_fleet_spec` ensures hosts are not changed
-        assert not changed_hosts, changed_hosts
-        active_instance_nums: set[int] = set()
-        removed_instance_nums: list[int] = []
-        if removed_hosts or added_hosts:
-            for instance_model in current_fleet_model.instances:
-                if instance_model.deleted:
-                    continue
-                active_instance_nums.add(instance_model.instance_num)
-                rci = get_instance_remote_connection_info(instance_model)
-                if rci is None:
-                    logger.error(
-                        "Cloud instance %s in SSH fleet %s",
-                        instance_model.id,
-                        current_fleet_model.id,
-                    )
-                    continue
-                if rci.host in removed_hosts:
-                    removed_instance_nums.append(instance_model.instance_num)
-        if added_hosts:
-            await _check_ssh_hosts_not_yet_added(session, spec, current_fleet.id)
-            for host in added_hosts.values():
-                instance_num = _get_next_instance_num(active_instance_nums)
-                instance_model = await create_fleet_ssh_instance_model(
-                    project=project,
-                    spec=spec,
-                    ssh_params=spec.configuration.ssh_config,
-                    env=spec.configuration.env,
-                    instance_num=instance_num,
-                    host=host,
-                )
-                current_fleet_model.instances.append(instance_model)
-                active_instance_nums.add(instance_num)
-        if removed_instance_nums:
-            # Calls `session.commit()`, must be called last
-            await delete_fleets(
+        fleet_model = res.scalars().unique().one_or_none()
+        if fleet_model is not None:
+            return await _update_fleet(
                 session=session,
                 project=project,
-                user=user,
-                names=[current_fleet.name],
-                instance_nums=removed_instance_nums,
+                spec=spec,
+                current_resource=plan.current_resource,
+                force=force,
+                fleet_model=fleet_model,
             )
 
-    await session.commit()
-    return fleet_model_to_fleet(current_fleet_model)
+    return await _create_fleet(
+        session=session,
+        project=project,
+        user=user,
+        spec=spec,
+    )
 
 
 async def create_fleet(
@@ -732,6 +695,84 @@ async def _create_fleet(
                 fleet_model.instances.append(instance_model)
         await session.commit()
         return fleet_model_to_fleet(fleet_model)
+
+
+async def _update_fleet(
+    session: AsyncSession,
+    project: ProjectModel,
+    spec: FleetSpec,
+    current_resource: Optional[Fleet],
+    force: bool,
+    fleet_model: FleetModel,
+) -> Fleet:
+    fleet = fleet_model_to_fleet(fleet_model)
+    _set_fleet_spec_defaults(fleet.spec)
+    fleet_sensitive = fleet_model_to_fleet(fleet_model, include_sensitive=True)
+    _set_fleet_spec_defaults(fleet_sensitive.spec)
+
+    if not force:
+        if current_resource is not None:
+            _set_fleet_spec_defaults(current_resource.spec)
+        if (
+            current_resource is None
+            or current_resource.id != fleet.id
+            or current_resource.spec != fleet.spec
+        ):
+            raise ServerClientError(
+                "Failed to apply plan. Resource has been changed. Try again or use force apply."
+            )
+
+    _check_can_update_fleet_spec(fleet_sensitive.spec, spec)
+
+    spec_json = spec.json()
+    fleet_model.spec = spec_json
+
+    if (
+        fleet_sensitive.spec.configuration.ssh_config is not None
+        and spec.configuration.ssh_config is not None
+    ):
+        added_hosts, removed_hosts, changed_hosts = _calculate_ssh_hosts_changes(
+            current=fleet_sensitive.spec.configuration.ssh_config.hosts,
+            new=spec.configuration.ssh_config.hosts,
+        )
+        # `_check_can_update_fleet_spec` ensures hosts are not changed
+        assert not changed_hosts, changed_hosts
+        active_instance_nums: set[int] = set()
+        removed_instance_nums: list[int] = []
+        if removed_hosts or added_hosts:
+            for instance_model in fleet_model.instances:
+                if instance_model.deleted:
+                    continue
+                active_instance_nums.add(instance_model.instance_num)
+                rci = get_instance_remote_connection_info(instance_model)
+                if rci is None:
+                    logger.error(
+                        "Cloud instance %s in SSH fleet %s",
+                        instance_model.id,
+                        fleet_model.id,
+                    )
+                    continue
+                if rci.host in removed_hosts:
+                    removed_instance_nums.append(instance_model.instance_num)
+        if added_hosts:
+            await _check_ssh_hosts_not_yet_added(session, spec, fleet.id)
+            for host in added_hosts.values():
+                instance_num = _get_next_instance_num(active_instance_nums)
+                instance_model = await create_fleet_ssh_instance_model(
+                    project=project,
+                    spec=spec,
+                    ssh_params=spec.configuration.ssh_config,
+                    env=spec.configuration.env,
+                    instance_num=instance_num,
+                    host=host,
+                )
+                fleet_model.instances.append(instance_model)
+                active_instance_nums.add(instance_num)
+        if removed_instance_nums:
+            _terminate_fleet_instances(fleet_model, removed_instance_nums)
+
+    await session.commit()
+    return fleet_model_to_fleet(fleet_model)
 
 
 def _can_update_fleet_spec(current_fleet_spec: FleetSpec, new_fleet_spec: FleetSpec) -> bool:
