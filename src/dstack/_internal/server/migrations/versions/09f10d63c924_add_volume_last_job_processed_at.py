@@ -1,7 +1,7 @@
 """add_volume_last_job_processed_at
 
 Revision ID: 09f10d63c924
-Revises: 35e90e1b0d3e
+Revises: ffa99edd1988
 Create Date: 2025-06-24 11:41:39.588797
 
 """
@@ -13,7 +13,7 @@ import dstack._internal.server.models
 
 # revision identifiers, used by Alembic.
 revision = "09f10d63c924"
-down_revision = "35e90e1b0d3e"
+down_revision = "ffa99edd1988"
 branch_labels = None
 depends_on = None
 
