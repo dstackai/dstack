@@ -404,9 +404,6 @@ async def apply_plan(
 
     spec_json = spec.json()
     current_fleet_model.spec = spec_json
-    await session.execute(
-        update(FleetModel).where(FleetModel.id == current_fleet_model.id).values(spec=spec_json)
-    )
 
     if (
         current_fleet_sensitive.spec.configuration.ssh_config is not None
