@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from functools import wraps
 from typing import List, Literal, Optional, Tuple, TypeVar, Union, cast
 
-from sqlalchemy import and_, func, or_, select, update
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
