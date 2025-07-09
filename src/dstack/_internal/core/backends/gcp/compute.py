@@ -499,7 +499,7 @@ class GCPCompute(
         request.instance_resource = gcp_resources.create_instance_struct(
             disk_size=10,
             image_id=_get_gateway_image_id(),
-            machine_type="e2-small",
+            machine_type="e2-medium",
             accelerators=[],
             spot=False,
             user_data=get_gateway_user_data(configuration.ssh_key_pub),
