@@ -3,14 +3,14 @@ from typing import List
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import joinedload
 
 from dstack._internal.core.backends.base.compute import ComputeWithVolumeSupport
 from dstack._internal.core.errors import BackendNotAvailable
 from dstack._internal.core.models.profiles import parse_duration
 from dstack._internal.core.models.volumes import VolumeStatus
 from dstack._internal.server.db import get_db, get_session_ctx
-from dstack._internal.server.models import VolumeModel
+from dstack._internal.server.models import ProjectModel, VolumeModel
 from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.volumes import (
@@ -45,12 +45,13 @@ async def process_idle_volumes():
             for volume_id in volume_ids:
                 lockset.add(volume_id)
 
+        # Refetch volumes with proper relationship loading to avoid MissingGreenlet
         res = await session.execute(
             select(VolumeModel)
             .where(VolumeModel.id.in_(volume_ids))
-            .options(selectinload(VolumeModel.project))
-            .options(selectinload(VolumeModel.user))
-            .options(selectinload(VolumeModel.attachments))
+            .options(joinedload(VolumeModel.project).joinedload(ProjectModel.backends))
+            .options(joinedload(VolumeModel.user))
+            .options(joinedload(VolumeModel.attachments))
             .execution_options(populate_existing=True)
         )
         volumes = list(res.unique().scalars().all())
