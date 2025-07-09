@@ -28,6 +28,12 @@ import (
 	"github.com/prometheus/procfs"
 )
 
+type ConnectionTracker interface {
+	GetNoConnectionsSecs() int64
+	Track(ticker <-chan time.Time)
+	Stop()
+}
+
 type RunExecutor struct {
 	tempDir    string
 	homeDir    string
@@ -52,11 +58,7 @@ type RunExecutor struct {
 	timestamp       *MonotonicTimestamp
 
 	killDelay         time.Duration
-	connectionTracker interface {
-		GetNoConnectionsSecs() int64
-		Track(ticker <-chan time.Time)
-		Stop()
-	}
+	connectionTracker ConnectionTracker
 }
 
 // stubConnectionTracker is a no-op implementation for when procfs is not available (only required for tests on darwin)
@@ -79,11 +81,7 @@ func NewRunExecutor(tempDir string, homeDir string, workingDir string, sshPort i
 	}
 
 	// Try to initialize procfs, but don't fail if it's not available (e.g., on macOS)
-	var connectionTracker interface {
-		GetNoConnectionsSecs() int64
-		Track(ticker <-chan time.Time)
-		Stop()
-	}
+	var connectionTracker ConnectionTracker
 
 	if runtime.GOOS == "linux" {
 		proc, err := procfs.NewDefaultFS()
