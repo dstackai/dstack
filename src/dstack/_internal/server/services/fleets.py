@@ -413,6 +413,7 @@ async def apply_plan(
             current=current_fleet_sensitive.spec.configuration.ssh_config.hosts,
             new=spec.configuration.ssh_config.hosts,
         )
+        # `_check_can_update_fleet_spec` ensures hosts are not changed
         assert not changed_hosts, changed_hosts
         active_instance_nums: set[int] = set()
         removed_instance_nums: list[int] = []
