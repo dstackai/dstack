@@ -700,8 +700,7 @@ Update the run? [y/n]:
 
 </div>
 
-If approved, `dstack` updates each replica one by one—waiting for each to reach the `running` state before updating the next.
-New and old replicas coexist and handle requests in parallel.
+If approved, `dstack` gradually updates the service replicas. To update a replica, `dstack` starts a new replica, waits for it to become `running`, then terminates the old replica. This process is repeated for each replica, one at a time.
 
 You can track the progress of rolling deployment in both `dstack apply` or `dstack ps`. 
 Older replicas have lower `deployment` numbers; newer ones have higher.
