@@ -171,6 +171,8 @@ class JobTerminationReason(str, Enum):
         return mapping.get(self, default)
 
     def to_error(self) -> Optional[str]:
+        # Should return None for values that are already
+        # handled and shown in status_message.
         error_mapping = {
             JobTerminationReason.INSTANCE_UNREACHABLE: "instance unreachable",
             JobTerminationReason.WAITING_INSTANCE_LIMIT_EXCEEDED: "waiting instance limit exceeded",
