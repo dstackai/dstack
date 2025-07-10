@@ -2,6 +2,7 @@ import asyncio
 import datetime
 import uuid
 from datetime import timedelta, timezone
+from functools import partial
 from typing import List, Optional, Sequence
 
 import httpx
@@ -186,6 +187,7 @@ async def create_gateway(
         return gateway_model_to_gateway(gateway)
 
 
+# NOTE: dstack Sky imports and uses this function
 async def connect_to_gateway_with_retry(
     gateway_compute: GatewayComputeModel,
 ) -> Optional[GatewayConnection]:
@@ -380,6 +382,8 @@ async def get_or_add_gateway_connection(
 async def init_gateways(session: AsyncSession):
     res = await session.execute(
         select(GatewayComputeModel).where(
+            # FIXME: should not include computes related to gateways in the `provisioning` status.
+            # Causes warnings and delays when restarting the server during gateway provisioning.
             GatewayComputeModel.active == True,
             GatewayComputeModel.deleted == False,
         )
@@ -421,7 +425,8 @@ async def init_gateways(session: AsyncSession):
 
         for gateway_compute, error in await gather_map_async(
             await gateway_connections_pool.all(),
-            configure_gateway,
+            # Need several attempts to handle short gateway downtime after update
+            partial(configure_gateway, attempts=7),
             return_exceptions=True,
         ):
             if isinstance(error, Exception):
@@ -461,7 +466,11 @@ def _recently_updated(gateway_compute_model: GatewayComputeModel) -> bool:
     ) > get_current_datetime() - timedelta(seconds=60)
 
 
-async def configure_gateway(connection: GatewayConnection) -> None:
+# NOTE: dstack Sky imports and uses this function
+async def configure_gateway(
+    connection: GatewayConnection,
+    attempts: int = GATEWAY_CONFIGURE_ATTEMPTS,
+) -> None:
     """
     Try submitting gateway config several times in case gateway's HTTP server is not
     running yet
@@ -469,7 +478,7 @@ async def configure_gateway(connection: GatewayConnection) -> None:
 
     logger.debug("Configuring gateway %s", connection.ip_address)
 
-    for attempt in range(GATEWAY_CONFIGURE_ATTEMPTS - 1):
+    for attempt in range(attempts - 1):
         try:
             async with connection.client() as client:
                 await client.submit_gateway_config()
@@ -478,7 +487,7 @@ async def configure_gateway(connection: GatewayConnection) -> None:
             logger.debug(
                 "Failed attempt %s/%s at configuring gateway %s: %r",
                 attempt + 1,
-                GATEWAY_CONFIGURE_ATTEMPTS,
+                attempts,
                 connection.ip_address,
                 e,
             )

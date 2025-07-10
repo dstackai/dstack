@@ -16,6 +16,7 @@ from dstack._internal.server.services.gateways import (
     gateway_connections_pool,
 )
 from dstack._internal.server.services.locking import advisory_lock_ctx, get_locker
+from dstack._internal.server.services.logging import fmt
 from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.logging import get_logger
 
@@ -27,14 +28,14 @@ async def process_gateways_connections():
     await _process_active_connections()
 
 
-async def process_submitted_gateways():
+async def process_gateways():
     lock, lockset = get_locker(get_db().dialect_name).get_lockset(GatewayModel.__tablename__)
     async with get_session_ctx() as session:
         async with lock:
             res = await session.execute(
                 select(GatewayModel)
                 .where(
-                    GatewayModel.status == GatewayStatus.SUBMITTED,
+                    GatewayModel.status.in_([GatewayStatus.SUBMITTED, GatewayStatus.PROVISIONING]),
                     GatewayModel.id.not_in(lockset),
                 )
                 .options(lazyload(GatewayModel.gateway_compute))
@@ -48,7 +49,25 @@ async def process_submitted_gateways():
             lockset.add(gateway_model.id)
         try:
             gateway_model_id = gateway_model.id
-            await _process_submitted_gateway(session=session, gateway_model=gateway_model)
+            initial_status = gateway_model.status
+            if initial_status == GatewayStatus.SUBMITTED:
+                await _process_submitted_gateway(session=session, gateway_model=gateway_model)
+            elif initial_status == GatewayStatus.PROVISIONING:
+                await _process_provisioning_gateway(session=session, gateway_model=gateway_model)
+            else:
+                logger.error(
+                    "%s: unexpected gateway status %r", fmt(gateway_model), initial_status.upper()
+                )
+            if gateway_model.status != initial_status:
+                logger.info(
+                    "%s: gateway status has changed %s -> %s%s",
+                    fmt(gateway_model),
+                    initial_status.upper(),
+                    gateway_model.status.upper(),
+                    f": {gateway_model.status_message}" if gateway_model.status_message else "",
+                )
+            gateway_model.last_processed_at = get_current_datetime()
+            await session.commit()
         finally:
             lockset.difference_update([gateway_model_id])
 
@@ -89,7 +108,7 @@ async def _process_connection(conn: GatewayConnection):
 
 
 async def _process_submitted_gateway(session: AsyncSession, gateway_model: GatewayModel):
-    logger.info("Started gateway %s provisioning", gateway_model.name)
+    logger.info("%s: started gateway provisioning", fmt(gateway_model))
     # Refetch to load related attributes.
     # joinedload produces LEFT OUTER JOIN that can't be used with FOR UPDATE.
     res = await session.execute(
@@ -110,8 +129,6 @@ async def _process_submitted_gateway(session: AsyncSession, gateway_model: Gatew
     except BackendNotAvailable:
         gateway_model.status = GatewayStatus.FAILED
         gateway_model.status_message = "Backend not available"
-        gateway_model.last_processed_at = get_current_datetime()
-        await session.commit()
         return
 
     try:
@@ -123,53 +140,54 @@ async def _process_submitted_gateway(session: AsyncSession, gateway_model: Gatew
         )
         session.add(gateway_model)
         gateway_model.status = GatewayStatus.PROVISIONING
-        await session.commit()
-        await session.refresh(gateway_model)
     except BackendError as e:
-        logger.info(
-            "Failed to create gateway compute for gateway %s: %s", gateway_model.name, repr(e)
-        )
+        logger.info("%s: failed to create gateway compute: %r", fmt(gateway_model), e)
         gateway_model.status = GatewayStatus.FAILED
         status_message = f"Backend error: {repr(e)}"
         if len(e.args) > 0:
             status_message = str(e.args[0])
         gateway_model.status_message = status_message
-        gateway_model.last_processed_at = get_current_datetime()
-        await session.commit()
-        return
     except Exception as e:
-        logger.exception(
-            "Got exception when creating gateway compute for gateway %s", gateway_model.name
-        )
+        logger.exception("%s: got exception when creating gateway compute", fmt(gateway_model))
         gateway_model.status = GatewayStatus.FAILED
         gateway_model.status_message = f"Unexpected error: {repr(e)}"
-        gateway_model.last_processed_at = get_current_datetime()
-        await session.commit()
-        return
 
+
+async def _process_provisioning_gateway(
+    session: AsyncSession, gateway_model: GatewayModel
+) -> None:
+    # Refetch to load related attributes.
+    # joinedload produces LEFT OUTER JOIN that can't be used with FOR UPDATE.
+    res = await session.execute(
+        select(GatewayModel)
+        .where(GatewayModel.id == gateway_model.id)
+        .execution_options(populate_existing=True)
+    )
+    gateway_model = res.unique().scalar_one()
+
+    # FIXME: problems caused by blocking on connect_to_gateway_with_retry and configure_gateway:
+    # - cannot delete the gateway before it is provisioned because the DB model is locked
+    # - connection retry counter is reset on server restart
+    # - only one server replica is processing the gateway
+    # Easy to fix by doing only one connection/configuration attempt per processing iteration. The
+    # main challenge is applying the same provisioning model to the dstack Sky gateway to avoid
+    # maintaining a different model for Sky.
     connection = await gateways_services.connect_to_gateway_with_retry(
         gateway_model.gateway_compute
     )
     if connection is None:
         gateway_model.status = GatewayStatus.FAILED
         gateway_model.status_message = "Failed to connect to gateway"
-        gateway_model.last_processed_at = get_current_datetime()
         gateway_model.gateway_compute.deleted = True
-        await session.commit()
         return
-
     try:
         await gateways_services.configure_gateway(connection)
     except Exception:
-        logger.exception("Failed to configure gateway %s", gateway_model.name)
+        logger.exception("%s: failed to configure gateway", fmt(gateway_model))
         gateway_model.status = GatewayStatus.FAILED
         gateway_model.status_message = "Failed to configure gateway"
-        gateway_model.last_processed_at = get_current_datetime()
         await gateway_connections_pool.remove(gateway_model.gateway_compute.ip_address)
         gateway_model.gateway_compute.active = False
-        await session.commit()
         return
 
     gateway_model.status = GatewayStatus.RUNNING
-    gateway_model.last_processed_at = get_current_datetime()
-    await session.commit()
