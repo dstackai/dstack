@@ -556,6 +556,10 @@ class Run(CoreModel):
 
     @root_validator
     def _status_message(cls, values) -> Dict:
+        # FIXME: status_message should not require all job submissions for status calculation
+        # since it's very expensive and is not required for anything else.
+        # May return a different status if not all job submissions requested.
+        # TODO: Calculate status_message by looking at job models directly instead job submissions.
         try:
             status = values["status"]
             jobs: List[Job] = values["jobs"]

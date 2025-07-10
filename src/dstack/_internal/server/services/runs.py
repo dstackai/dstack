@@ -105,6 +105,8 @@ async def list_user_runs(
     repo_id: Optional[str],
     username: Optional[str],
     only_active: bool,
+    include_jobs: bool,
+    job_submissions_limit: Optional[int],
     prev_submitted_at: Optional[datetime],
     prev_run_id: Optional[uuid.UUID],
     limit: int,
@@ -148,7 +150,14 @@ async def list_user_runs(
     runs = []
     for r in run_models:
         try:
-            runs.append(run_model_to_run(r, return_in_api=True))
+            runs.append(
+                run_model_to_run(
+                    r,
+                    return_in_api=True,
+                    include_jobs=include_jobs,
+                    job_submissions_limit=job_submissions_limit,
+                )
+            )
         except pydantic.ValidationError:
             pass
     if len(run_models) > len(runs):
@@ -652,46 +661,26 @@ async def delete_runs(
 
 def run_model_to_run(
     run_model: RunModel,
-    include_job_submissions: bool = True,
+    include_jobs: bool = True,
+    job_submissions_limit: Optional[int] = None,
     return_in_api: bool = False,
     include_sensitive: bool = False,
 ) -> Run:
     jobs: List[Job] = []
-    run_jobs = sorted(run_model.jobs, key=lambda j: (j.replica_num, j.job_num, j.submission_num))
-    for replica_num, replica_submissions in itertools.groupby(
-        run_jobs, key=lambda j: j.replica_num
-    ):
-        for job_num, job_submissions in itertools.groupby(
-            replica_submissions, key=lambda j: j.job_num
-        ):
-            submissions = []
-            job_model = None
-            for job_model in job_submissions:
-                if include_job_submissions:
-                    job_submission = job_model_to_job_submission(job_model)
-                    if return_in_api:
-                        # Set default non-None values for 0.18 backward-compatibility
-                        # Remove in 0.19
-                        if job_submission.job_provisioning_data is not None:
-                            if job_submission.job_provisioning_data.hostname is None:
-                                job_submission.job_provisioning_data.hostname = ""
-                            if job_submission.job_provisioning_data.ssh_port is None:
-                                job_submission.job_provisioning_data.ssh_port = 22
-                    submissions.append(job_submission)
-            if job_model is not None:
-                # Use the spec from the latest submission. Submissions can have different specs
-                job_spec = JobSpec.__response__.parse_raw(job_model.job_spec_data)
-                if not include_sensitive:
-                    _remove_job_spec_sensitive_info(job_spec)
-                jobs.append(Job(job_spec=job_spec, job_submissions=submissions))
+    if include_jobs:
+        jobs = _get_run_jobs_with_submissions(
+            run_model=run_model,
+            job_submissions_limit=job_submissions_limit,
+            return_in_api=return_in_api,
+            include_sensitive=include_sensitive,
+        )
 
     run_spec = RunSpec.__response__.parse_raw(run_model.run_spec)
 
     latest_job_submission = None
-    if include_job_submissions:
+    if len(jobs) > 0 and len(jobs[0].job_submissions) > 0:
         # TODO(egor-s): does it make sense with replicas and multi-node?
-        if jobs:
-            latest_job_submission = jobs[0].job_submissions[-1]
+        latest_job_submission = jobs[0].job_submissions[-1]
 
     service_spec = None
     if run_model.service_spec is not None:
@@ -714,6 +703,47 @@ def run_model_to_run(
     )
     run.cost = _get_run_cost(run)
     return run
+
+
+def _get_run_jobs_with_submissions(
+    run_model: RunModel,
+    job_submissions_limit: Optional[int],
+    return_in_api: bool = False,
+    include_sensitive: bool = False,
+) -> List[Job]:
+    jobs: List[Job] = []
+    run_jobs = sorted(run_model.jobs, key=lambda j: (j.replica_num, j.job_num, j.submission_num))
+    for replica_num, replica_submissions in itertools.groupby(
+        run_jobs, key=lambda j: j.replica_num
+    ):
+        for job_num, job_models in itertools.groupby(replica_submissions, key=lambda j: j.job_num):
+            submissions = []
+            job_model = None
+            if job_submissions_limit is not None:
+                if job_submissions_limit == 0:
+                    # Take latest job submission to return its job_spec
+                    job_models = list(job_models)[-1:]
+                else:
+                    job_models = list(job_models)[-job_submissions_limit:]
+            for job_model in job_models:
+                if job_submissions_limit != 0:
+                    job_submission = job_model_to_job_submission(job_model)
+                    if return_in_api:
+                        # Set default non-None values for 0.18 backward-compatibility
+                        # Remove in 0.19
+                        if job_submission.job_provisioning_data is not None:
+                            if job_submission.job_provisioning_data.hostname is None:
+                                job_submission.job_provisioning_data.hostname = ""
+                            if job_submission.job_provisioning_data.ssh_port is None:
+                                job_submission.job_provisioning_data.ssh_port = 22
+                    submissions.append(job_submission)
+            if job_model is not None:
+                # Use the spec from the latest submission. Submissions can have different specs
+                job_spec = JobSpec.__response__.parse_raw(job_model.job_spec_data)
+                if not include_sensitive:
+                    _remove_job_spec_sensitive_info(job_spec)
+                jobs.append(Job(job_spec=job_spec, job_submissions=submissions))
+    return jobs
 
 
 async def _get_pool_offers(
