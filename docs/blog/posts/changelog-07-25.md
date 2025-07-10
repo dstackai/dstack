@@ -29,17 +29,17 @@ Active run my-service already exists. Detected changes that can be updated in-pl
   - files
 
 Update the run? [y/n]: y 
-
 ⠋ Launching my-service...
 
- NAME                            BACKEND          PRICE    STATUS       SUBMITTED
- my-service deployment=1                                   running      11 mins ago
-   replica=0 job=0 deployment=0  aws (us-west-2)  $0.0026  terminating  11 mins ago
-   replica=1 job=0 deployment=1  aws (us-west-2)  $0.0026  running      1 min ago
-
+ NAME                      BACKEND          PRICE    STATUS       SUBMITTED
+ my-service deployment=1                             running      11 mins ago
+   replica=0 deployment=0  aws (us-west-2)  $0.0026  terminating  11 mins ago
+   replica=1 deployment=1  aws (us-west-2)  $0.0026  running      1 min ago
 ```
 
 </div>
+
+<!-- more -->
 
 #### Secrets
 
