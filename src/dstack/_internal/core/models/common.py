@@ -1,9 +1,8 @@
 import re
 from enum import Enum
-from typing import Any, Callable, Union
+from typing import Any, Callable, Optional, Union
 
 import orjson
-from git import Optional
 from pydantic import Field
 from pydantic_duality import DualBaseModel
 from typing_extensions import Annotated
