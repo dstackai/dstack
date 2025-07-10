@@ -124,7 +124,11 @@ Postgres has no such limitation and is recommended for production deployment.
 
 ### PostgreSQL
 
-To store the server state in Postgres, set the `DSTACK_DATABASE_URL` environment variable.
+To store the server state in Postgres, set the `DSTACK_DATABASE_URL` environment variable:
+
+```shell
+$ DSTACK_DATABASE_URL=postgresql+asyncpg://user:password@db-host:5432/dstack dstack server
+```
 
 ??? info "Migrate from SQLite to PostgreSQL"
     You can migrate the existing state from SQLite to PostgreSQL using `pgloader`:
