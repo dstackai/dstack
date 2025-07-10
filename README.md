@@ -21,12 +21,13 @@
 `dstack` supports `NVIDIA`, `AMD`, `Google TPU`, `Intel Gaudi`, and `Tenstorrent` accelerators out of the box.
 
 ## Latest news ✨
-
+- [2025/07] [dstack 0.19.17: Secrets, Files, Rolling deployment](https://github.com/dstackai/dstack/releases/tag/0.19.17)
+- [2025/06] [dstack 0.19.16: Docker in Docker, CloudRift](https://github.com/dstackai/dstack/releases/tag/0.19.16)
+- [2025/06] [dstack 0.19.13: InfiniBand support in default images](https://github.com/dstackai/dstack/releases/tag/0.19.13)
+- [2025/06] [dstack 0.19.12: Simplified use of MPI](https://github.com/dstackai/dstack/releases/tag/0.19.12)
+- [2025/05] [dstack 0.19.10: Priorities](https://github.com/dstackai/dstack/releases/tag/0.19.10)
 - [2025/05] [dstack 0.19.8: Nebius clusters, GH200 on Lambda](https://github.com/dstackai/dstack/releases/tag/0.19.8)
 - [2025/04] [dstack 0.19.6: Tenstorrent, Plugins](https://github.com/dstackai/dstack/releases/tag/0.19.6)
-- [2025/04] [dstack 0.19.5: GCP A3 High clusters](https://github.com/dstackai/dstack/releases/tag/0.19.5)
-- [2025/04] [dstack 0.19.3: GCP A3 Mega clusters](https://github.com/dstackai/dstack/releases/tag/0.19.3)
-- [2025/03] [dstack 0.19.0: Prometheus](https://github.com/dstackai/dstack/releases/tag/0.19.0)
 
 ## How does it work?
 

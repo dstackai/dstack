@@ -3,7 +3,7 @@ date: 2024-03-11
 description: A managed service that enables you to get GPUs at competitive rates from a wide pool of providers. 
 slug: dstack-sky
 categories:
-  - Releases
+  - Changelog
 ---
 
 # Introducing dstack Sky
