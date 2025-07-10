@@ -134,6 +134,8 @@ def job_model_to_job_submission(job_model: JobModel) -> JobSubmission:
     finished_at = None
     if job_model.status.is_finished():
         finished_at = last_processed_at
+    status_message = _get_job_status_message(job_model)
+    error = _get_job_error(job_model)
     return JobSubmission(
         id=job_model.id,
         submission_num=job_model.submission_num,
@@ -143,11 +145,13 @@ def job_model_to_job_submission(job_model: JobModel) -> JobSubmission:
         finished_at=finished_at,
         inactivity_secs=job_model.inactivity_secs,
         status=job_model.status,
+        status_message=status_message,
         termination_reason=job_model.termination_reason,
         termination_reason_message=job_model.termination_reason_message,
         exit_status=job_model.exit_status,
         job_provisioning_data=job_provisioning_data,
         job_runtime_data=get_job_runtime_data(job_model),
+        error=error,
     )
 
 
@@ -693,3 +697,31 @@ def _get_job_mount_point_attached_volume(
             continue
         return volume
     raise ServerClientError("Failed to find an eligible volume for the mount point")
+
+
+def _get_job_status_message(job_model: JobModel) -> str:
+    if job_model.status == JobStatus.DONE:
+        return "exited (0)"
+    elif job_model.status == JobStatus.FAILED:
+        if job_model.termination_reason == JobTerminationReason.CONTAINER_EXITED_WITH_ERROR:
+            return f"exited ({job_model.exit_status})"
+        elif (
+            job_model.termination_reason == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
+        ):
+            return "no offers"
+        elif job_model.termination_reason == JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY:
+            return "interrupted"
+        else:
+            return "error"
+    elif job_model.status == JobStatus.TERMINATED:
+        if job_model.termination_reason == JobTerminationReason.TERMINATED_BY_USER:
+            return "stopped"
+        elif job_model.termination_reason == JobTerminationReason.ABORTED_BY_USER:
+            return "aborted"
+    return job_model.status.value
+
+
+def _get_job_error(job_model: JobModel) -> Optional[str]:
+    if job_model.termination_reason is None:
+        return None
+    return job_model.termination_reason.to_error()

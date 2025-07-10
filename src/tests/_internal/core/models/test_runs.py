@@ -1,9 +1,7 @@
 from dstack._internal.core.models.profiles import RetryEvent
 from dstack._internal.core.models.runs import (
     JobStatus,
-    JobSubmission,
     JobTerminationReason,
-    Run,
     RunStatus,
     RunTerminationReason,
 )
@@ -47,7 +45,7 @@ def test_get_error_returns_expected_messages():
     ]
 
     for reason in JobTerminationReason:
-        if JobSubmission._termination_reason_to_error(reason) is None:
+        if reason.to_error() is None:
             # Fail no-error reason is not in the list
             assert reason in no_error_reasons
 
@@ -62,6 +60,6 @@ def test_run_get_error_returns_none_for_specific_reasons():
     ]
 
     for reason in RunTerminationReason:
-        if Run._termination_reason_to_error(reason) is None:
+        if reason.to_error() is None:
             # Fail no-error reason is not in the list
             assert reason in no_error_reasons
