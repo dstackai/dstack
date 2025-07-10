@@ -4,6 +4,7 @@ from enum import Enum
 from pathlib import PurePosixPath
 from typing import Any, Dict, List, Optional, Union
 
+import orjson
 from pydantic import Field, ValidationError, conint, constr, root_validator, validator
 from typing_extensions import Annotated, Literal
 
@@ -18,6 +19,9 @@ from dstack._internal.core.models.resources import Range, ResourcesSpec
 from dstack._internal.core.models.services import AnyModel, OpenAIChatModel
 from dstack._internal.core.models.unix import UnixUser
 from dstack._internal.core.models.volumes import MountPoint, VolumeConfiguration, parse_mount_point
+from dstack._internal.utils.json_utils import (
+    pydantic_orjson_dumps_with_indent,
+)
 
 CommandsList = List[str]
 ValidPort = conint(gt=0, le=65536)
@@ -573,6 +577,9 @@ class DstackConfiguration(CoreModel):
     ]
 
     class Config:
+        json_loads = orjson.loads
+        json_dumps = pydantic_orjson_dumps_with_indent
+
         @staticmethod
         def schema_extra(schema: Dict[str, Any]):
             schema["$schema"] = "http://json-schema.org/draft-07/schema#"

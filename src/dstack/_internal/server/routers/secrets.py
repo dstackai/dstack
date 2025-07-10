@@ -14,6 +14,7 @@ from dstack._internal.server.schemas.secrets import (
 )
 from dstack._internal.server.security.permissions import ProjectAdmin
 from dstack._internal.server.services import secrets as secrets_services
+from dstack._internal.server.utils.routers import CustomORJSONResponse
 
 router = APIRouter(
     prefix="/api/project/{project_name}/secrets",
@@ -21,24 +22,26 @@ router = APIRouter(
 )
 
 
-@router.post("/list")
+@router.post("/list", response_model=List[Secret])
 async def list_secrets(
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
-) -> List[Secret]:
+):
     _, project = user_project
-    return await secrets_services.list_secrets(
-        session=session,
-        project=project,
+    return CustomORJSONResponse(
+        await secrets_services.list_secrets(
+            session=session,
+            project=project,
+        )
     )
 
 
-@router.post("/get")
+@router.post("/get", response_model=Secret)
 async def get_secret(
     body: GetSecretRequest,
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
-) -> Secret:
+):
     _, project = user_project
     secret = await secrets_services.get_secret(
         session=session,
@@ -47,21 +50,23 @@ async def get_secret(
     )
     if secret is None:
         raise ResourceNotExistsError()
-    return secret
+    return CustomORJSONResponse(secret)
 
 
-@router.post("/create_or_update")
+@router.post("/create_or_update", response_model=Secret)
 async def create_or_update_secret(
     body: CreateOrUpdateSecretRequest,
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
-) -> Secret:
+):
     _, project = user_project
-    return await secrets_services.create_or_update_secret(
-        session=session,
-        project=project,
-        name=body.name,
-        value=body.value,
+    return CustomORJSONResponse(
+        await secrets_services.create_or_update_secret(
+            session=session,
+            project=project,
+            name=body.name,
+            value=body.value,
+        )
     )
 
 

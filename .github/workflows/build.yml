@@ -240,8 +240,8 @@ jobs:
         run: uv sync
       - name: Generate json schema
         run: |
-          uv run python -c "from dstack._internal.core.models.configurations import DstackConfiguration; print(DstackConfiguration.schema_json(indent=2))" > configuration.json
-          uv run python -c "from dstack._internal.core.models.profiles import ProfilesConfig; print(ProfilesConfig.schema_json(indent=2))" > profiles.json
+          uv run python -c "from dstack._internal.core.models.configurations import DstackConfiguration; print(DstackConfiguration.schema_json())" > configuration.json
+          uv run python -c "from dstack._internal.core.models.profiles import ProfilesConfig; print(ProfilesConfig.schema_json())" > profiles.json
       - name: Upload json schema to S3
         run: |
           VERSION=$((${{ github.run_number }} + ${{ env.BUILD_INCREMENT }}))

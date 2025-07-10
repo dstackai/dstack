@@ -855,8 +855,8 @@ class TestGetPlan:
         assert response.json() == {
             "project_name": project.name,
             "user": user.name,
-            "spec": spec.dict(),
-            "effective_spec": spec.dict(),
+            "spec": json.loads(spec.json()),
+            "effective_spec": json.loads(spec.json()),
             "current_resource": None,
             "offers": [json.loads(o.json()) for o in offers],
             "total_offers": len(offers),
