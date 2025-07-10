@@ -33,6 +33,7 @@ class RunsAPIClient(APIClientGroup):
         prev_run_id: Optional[UUID] = None,
         limit: int = 100,
         ascending: bool = False,
+        include_jobs: bool = True,
         job_submissions_limit: Optional[int] = None,
     ) -> List[Run]:
         body = ListRunsRequest(
@@ -40,6 +41,7 @@ class RunsAPIClient(APIClientGroup):
             repo_id=repo_id,
             username=username,
             only_active=only_active,
+            include_jobs=include_jobs,
             job_submissions_limit=job_submissions_limit,
             prev_submitted_at=prev_submitted_at,
             prev_run_id=prev_run_id,

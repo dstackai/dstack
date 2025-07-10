@@ -13,12 +13,16 @@ class ListRunsRequest(CoreModel):
     repo_id: Optional[str] = None
     username: Optional[str] = None
     only_active: bool = False
+    include_jobs: bool = Field(
+        True,
+        description=("Whether to include `jobs` in the response"),
+    )
     job_submissions_limit: Optional[int] = Field(
         None,
         ge=0,
         description=(
             "Limit number of job submissions returned per job to avoid large responses."
-            "Drops old job submissions"
+            "Drops older job submissions. No effect with `include_jobs: false`"
         ),
     )
     prev_submitted_at: Optional[datetime] = None
