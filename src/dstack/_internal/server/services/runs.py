@@ -668,7 +668,7 @@ def run_model_to_run(
 ) -> Run:
     jobs: List[Job] = []
     if include_jobs:
-        jobs = _get_run_job_with_submissions(
+        jobs = _get_run_jobs_with_submissions(
             run_model=run_model,
             job_submissions_limit=job_submissions_limit,
             return_in_api=return_in_api,
@@ -705,7 +705,7 @@ def run_model_to_run(
     return run
 
 
-def _get_run_job_with_submissions(
+def _get_run_jobs_with_submissions(
     run_model: RunModel,
     job_submissions_limit: Optional[int],
     return_in_api: bool = False,
