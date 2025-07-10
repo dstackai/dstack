@@ -19,7 +19,7 @@ Previously, updating running services could cause downtime. The latest release f
 <div class="termy">
 
 ```shell
-$ dstack apply -f my-service.dstack.yml
+$ dstack apply -f .dstack.yml
 
 Active run my-service already exists. Detected changes that can be updated in-place:
 - Repo state (branch, commit, or other)
@@ -28,7 +28,15 @@ Active run my-service already exists. Detected changes that can be updated in-pl
   - env
   - files
 
-Update the run? [y/n]:
+Update the run? [y/n]: y 
+
+⠋ Launching my-service...
+
+ NAME                            BACKEND          PRICE    STATUS       SUBMITTED
+ my-service deployment=1                                   running      11 mins ago
+   replica=0 job=0 deployment=0  aws (us-west-2)  $0.0026  terminating  11 mins ago
+   replica=1 job=0 deployment=1  aws (us-west-2)  $0.0026  running      1 min ago
+
 ```
 
 </div>
@@ -184,7 +192,7 @@ Server-side performance has been improved. With optimized handling and backgroun
 
 #### Google SSO
 
-Alongside the open-source version, `dstack` also offers [dstack Enterprise](https://github.com/dstackai/dstack-enterprise)—which adds dedicated support and extra integrations like Single Sign-On (SSO). The latest release introduces support for configuring your company’s Google account for authentication.
+Alongside the open-source version, `dstack` also offers [dstack Enterprise :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack-enterprise){:target="_blank"} — which adds dedicated support and extra integrations like Single Sign-On (SSO). The latest release introduces support for configuring your company’s Google account for authentication.
 
 <img src="https://dstack.ai/static-assets/static-assets/images/dstack-enterprise-google-sso.png" width="630"/>
 
