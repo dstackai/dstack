@@ -61,6 +61,8 @@ async def list_runs(
             repo_id=body.repo_id,
             username=body.username,
             only_active=body.only_active,
+            include_jobs=body.include_jobs,
+            job_submissions_limit=body.job_submissions_limit,
             prev_submitted_at=body.prev_submitted_at,
             prev_run_id=body.prev_run_id,
             limit=body.limit,

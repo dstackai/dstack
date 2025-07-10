@@ -559,6 +559,10 @@ class Run(CoreModel):
             return self.status.value
 
         last_job = self.jobs[0]
+        # FIXME: status_message should not require all job submissions for status calculation
+        # since it's very expensive and is not required for anything else.
+        # May return a different status if not all job submissions requested.
+        # TODO: Calculate status_message by looking at job models directly instead job submissions.
         last_job_termination_reason = last_job.get_last_termination_reason()
 
         if len(self.jobs) == 1:

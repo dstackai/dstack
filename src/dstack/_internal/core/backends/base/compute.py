@@ -559,7 +559,8 @@ def get_shim_commands(
     backend_shim_env: Optional[Dict[str, str]] = None,
     arch: Optional[str] = None,
 ) -> List[str]:
-    commands = get_shim_pre_start_commands(
+    commands = get_setup_cloud_instance_commands()
+    commands += get_shim_pre_start_commands(
         base_path=base_path,
         bin_path=bin_path,
         arch=arch,
@@ -639,6 +640,23 @@ def get_dstack_shim_download_url(arch: Optional[str] = None) -> str:
     version = get_dstack_runner_version()
     arch = normalize_arch(arch)
     return url_template.format(version=version, arch=arch)
+
+
+def get_setup_cloud_instance_commands() -> list[str]:
+    return [
+        # Workaround for https://github.com/NVIDIA/nvidia-container-toolkit/issues/48
+        # Attempts to patch /etc/docker/daemon.json while keeping any custom settings it may have.
+        (
+            "/bin/sh -c '"  # wrap in /bin/sh to avoid interfering with other cloud init commands
+            " grep -q nvidia /etc/docker/daemon.json"
+            " && ! grep -q native.cgroupdriver /etc/docker/daemon.json"
+            " && jq '\\''.\"exec-opts\" = ((.\"exec-opts\" // []) + [\"native.cgroupdriver=cgroupfs\"])'\\'' /etc/docker/daemon.json > /tmp/daemon.json"
+            " && sudo mv /tmp/daemon.json /etc/docker/daemon.json"
+            " && sudo service docker restart"
+            " || true"
+            "'"
+        ),
+    ]
 
 
 def get_shim_pre_start_commands(
