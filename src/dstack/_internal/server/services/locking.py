@@ -172,7 +172,7 @@ async def _wait_to_lock_many(
     The keys must be sorted to prevent deadlock.
     """
     left_to_lock = keys.copy()
-    while len(left_to_lock) > 0:
+    while True:
         async with lock:
             locked_now_num = 0
             for key in left_to_lock:
@@ -182,4 +182,6 @@ async def _wait_to_lock_many(
                 locked.add(key)
                 locked_now_num += 1
             left_to_lock = left_to_lock[locked_now_num:]
+        if not left_to_lock:
+            return
         await asyncio.sleep(delay)

@@ -106,6 +106,14 @@ def get_instance_requirements(instance_model: InstanceModel) -> Requirements:
     return Requirements.__response__.parse_raw(instance_model.requirements)
 
 
+def get_instance_remote_connection_info(
+    instance_model: InstanceModel,
+) -> Optional[RemoteConnectionInfo]:
+    if instance_model.remote_connection_info is None:
+        return None
+    return RemoteConnectionInfo.__response__.parse_raw(instance_model.remote_connection_info)
+
+
 def get_instance_ssh_private_keys(instance_model: InstanceModel) -> tuple[str, Optional[str]]:
     """
     Returns a pair of SSH private keys: host key and optional proxy jump key.

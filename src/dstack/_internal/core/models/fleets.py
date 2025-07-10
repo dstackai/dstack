@@ -8,7 +8,7 @@ from pydantic import Field, root_validator, validator
 from typing_extensions import Annotated, Literal
 
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.common import CoreModel
+from dstack._internal.core.models.common import ApplyAction, CoreModel
 from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.instances import Instance, InstanceOfferWithAvailability, SSHKey
 from dstack._internal.core.models.profiles import (
@@ -324,6 +324,7 @@ class FleetPlan(CoreModel):
     offers: List[InstanceOfferWithAvailability]
     total_offers: int
     max_offer_price: Optional[float] = None
+    action: Optional[ApplyAction] = None  # default value for backward compatibility
 
     def get_effective_spec(self) -> FleetSpec:
         if self.effective_spec is not None:
