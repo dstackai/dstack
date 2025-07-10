@@ -246,6 +246,7 @@ def get_dev_env_run_plan_dict(
                     "repo_code_hash": None,
                     "repo_data": {"repo_dir": "/repo", "repo_type": "local"},
                     "file_archives": [],
+                    "service_port": None,
                 },
                 "offers": [json.loads(o.json()) for o in offers],
                 "total_offers": total_offers,
@@ -441,6 +442,7 @@ def get_dev_env_run_dict(
                     "repo_code_hash": None,
                     "repo_data": {"repo_dir": "/repo", "repo_type": "local"},
                     "file_archives": [],
+                    "service_port": None,
                 },
                 "job_submissions": [
                     {
@@ -1176,12 +1178,14 @@ class TestGetRunPlan:
                 ServiceConfiguration(
                     commands=["one", "two"],
                     port=80,
+                    gateway=None,
                     replicas=1,
                     scaling=None,
                 ),
                 ServiceConfiguration(
                     commands=["one", "two"],
-                    port=8080,  # not updatable
+                    port=8080,
+                    gateway="test-gateway",  # not updatable
                     replicas="2..4",
                     scaling=ScalingSpec(metric="rps", target=5),
                 ),

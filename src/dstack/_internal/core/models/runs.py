@@ -11,6 +11,7 @@ from dstack._internal.core.models.configurations import (
     DEFAULT_REPO_DIR,
     AnyRunConfiguration,
     RunConfiguration,
+    ServiceConfiguration,
 )
 from dstack._internal.core.models.files import FileArchiveMapping
 from dstack._internal.core.models.instances import (
@@ -227,6 +228,8 @@ class JobSpec(CoreModel):
     # TODO: drop this comment when supporting jobs submitted before 0.19.17 is no longer relevant.
     repo_code_hash: Optional[str] = None
     file_archives: list[FileArchiveMapping] = []
+    # None for non-services and pre-0.19.19 services. See `get_service_port`
+    service_port: Optional[int] = None
 
 
 class JobProvisioningData(CoreModel):
@@ -640,3 +643,11 @@ def get_policy_map(spot_policy: Optional[SpotPolicy], default: SpotPolicy) -> Op
         SpotPolicy.ONDEMAND: False,
     }
     return policy_map[spot_policy]
+
+
+def get_service_port(job_spec: JobSpec, configuration: ServiceConfiguration) -> int:
+    # Compatibility with pre-0.19.19 job specs that do not have the `service_port` property.
+    # TODO: drop when pre-0.19.19 jobs are no longer relevant.
+    if job_spec.service_port is None:
+        return configuration.port.container_port
+    return job_spec.service_port
