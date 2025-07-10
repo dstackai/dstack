@@ -67,7 +67,7 @@ plugins:
       categories_url_format: "{slug}"
       archive: false
       categories_name: Blog
-      categories_sort_reverse: true
+      # categories_sort_reverse: true
   - social:
       cards_layout_options:
         background_color: "black"
@@ -294,6 +294,7 @@ nav:
         - Tenstorrent: examples/accelerators/tenstorrent/index.md
   - Benchmarks: blog/benchmarks.md
   - Case studies: blog/case-studies.md
+  - Changelog: blog/changelog.md
   - Blog: 
     - blog/index.md
 #  - Discord: https://discord.gg/u8SmfwPpMd" target="_blank

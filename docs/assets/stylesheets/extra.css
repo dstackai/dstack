@@ -1318,7 +1318,7 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
         display: none;
     }
 
-    .md-tabs__item:nth-child(6) {
+    .md-tabs__item:nth-child(7) {
         display: none;
     }
 
@@ -1694,7 +1694,7 @@ a.md-go-to-action.secondary {
     background: white;
 }
 
-.md-post__content h2 a {
+.md-post__content :is(h2, h3, h4, h5, h6) a {
     color: rgba(0,0,0,0.87);
 }
 
