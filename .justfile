@@ -14,4 +14,4 @@ set allow-duplicate-recipes
 
 import "runner/.justfile"
 
-# TODO: Add frontend/justfile for managing frontend development tasks
+import "frontend/.justfile"
