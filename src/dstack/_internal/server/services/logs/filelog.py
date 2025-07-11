@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import List, Union
 from uuid import UUID
 
+from dstack._internal.core.errors import ServerClientError
 from dstack._internal.core.models.logs import (
     JobSubmissionLogs,
     LogEvent,
@@ -14,7 +15,6 @@ from dstack._internal.server.schemas.logs import PollLogsRequest
 from dstack._internal.server.schemas.runner import LogEvent as RunnerLogEvent
 from dstack._internal.server.services.logs.base import (
     LogStorage,
-    LogStorageError,
     b64encode_raw_message,
     unix_time_ms_to_datetime,
 )
@@ -30,9 +30,6 @@ class FileLogStorage(LogStorage):
             self.root = Path(root)
 
     def poll_logs(self, project: ProjectModel, request: PollLogsRequest) -> JobSubmissionLogs:
-        if request.descending:
-            raise LogStorageError("descending: true is not supported")
-
         log_producer = LogProducer.RUNNER if request.diagnose else LogProducer.JOB
         log_file_path = self._get_log_file_path(
             project_name=project.name,
@@ -46,11 +43,11 @@ class FileLogStorage(LogStorage):
             try:
                 start_line = int(request.next_token)
                 if start_line < 0:
-                    raise LogStorageError(
+                    raise ServerClientError(
                         f"Invalid next_token: {request.next_token}. Must be a non-negative integer."
                     )
             except ValueError:
-                raise LogStorageError(
+                raise ServerClientError(
                     f"Invalid next_token: {request.next_token}. Must be a valid integer."
                 )
 
@@ -59,9 +56,12 @@ class FileLogStorage(LogStorage):
         current_line = 0
 
         try:
+            # FIXME: Do not read all the lines in memory
             with open(log_file_path) as f:
                 lines = f.readlines()
-
+        except FileNotFoundError:
+            pass
+        else:
             for i, line in enumerate(lines):
                 if current_line < start_line:
                     current_line += 1
@@ -82,9 +82,6 @@ class FileLogStorage(LogStorage):
                     if current_line < len(lines):
                         next_token = str(current_line)
                     break
-
-        except IOError as e:
-            raise LogStorageError(f"Failed to read log file {log_file_path}: {e}")
 
         return JobSubmissionLogs(logs=logs, next_token=next_token)
 
