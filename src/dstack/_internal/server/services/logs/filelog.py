@@ -59,28 +59,39 @@ class FileLogStorage(LogStorage):
 
         try:
             with open(log_file_path) as f:
-                lines = f.readlines()
-
-            for i, line in enumerate(lines):
-                if current_line < start_line:
+                # Skip to start_line if needed
+                for _ in range(start_line):
+                    if f.readline() == '':
+                        # File is shorter than start_line
+                        return JobSubmissionLogs(logs=logs, next_token=next_token)
                     current_line += 1
-                    continue
 
-                log_event = LogEvent.__response__.parse_raw(line)
-                current_line += 1
+                # Read lines one by one
+                while True:
+                    line = f.readline()
+                    if line == '':  # EOF
+                        break
 
-                if request.start_time and log_event.timestamp <= request.start_time:
-                    continue
-                if request.end_time is not None and log_event.timestamp >= request.end_time:
-                    break
+                    current_line += 1
 
-                logs.append(log_event)
+                    try:
+                        log_event = LogEvent.__response__.parse_raw(line)
+                    except Exception:
+                        # Skip malformed lines
+                        continue
 
-                if len(logs) >= request.limit:
-                    # Only set next_token if there are more lines to read
-                    if current_line < len(lines):
-                        next_token = str(current_line)
-                    break
+                    if request.start_time and log_event.timestamp <= request.start_time:
+                        continue
+                    if request.end_time is not None and log_event.timestamp >= request.end_time:
+                        break
+
+                    logs.append(log_event)
+
+                    if len(logs) >= request.limit:
+                        # Check if there are more lines to read
+                        if f.readline() != '':
+                            next_token = str(current_line)
+                        break
 
         except IOError as e:
             raise LogStorageError(f"Failed to read log file {log_file_path}: {e}")
