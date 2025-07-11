@@ -473,12 +473,12 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 	defer func() { _ = cmd.Wait() }() // release resources if copy fails
 
 	stripper := ansistrip.NewWriter(ex.jobLogs, AnsiStripFlushInterval, AnsiStripMaxDelay, MaxBufferSize)
+	defer stripper.Close()
 	logger := io.MultiWriter(jobLogFile, ex.jobWsLogs, stripper)
 	_, err = io.Copy(logger, ptm)
 	if err != nil && !isPtyError(err) {
 		return gerrors.Wrap(err)
 	}
-	stripper.Close()
 	return gerrors.Wrap(cmd.Wait())
 }
 
