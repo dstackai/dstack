@@ -18,7 +18,11 @@ import dstack.api as api
 from dstack._internal.core.consts import DSTACK_RUNNER_HTTP_PORT, DSTACK_RUNNER_SSH_PORT
 from dstack._internal.core.errors import ClientError, ConfigurationError, ResourceNotExistsError
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.configurations import AnyRunConfiguration, PortMapping
+from dstack._internal.core.models.configurations import (
+    AnyRunConfiguration,
+    PortMapping,
+    ServiceConfiguration,
+)
 from dstack._internal.core.models.files import FileArchiveMapping, FilePathMapping
 from dstack._internal.core.models.profiles import (
     CreationPolicy,
@@ -38,6 +42,7 @@ from dstack._internal.core.models.runs import (
     RunPlan,
     RunSpec,
     RunStatus,
+    get_service_port,
 )
 from dstack._internal.core.models.runs import Run as RunModel
 from dstack._internal.core.services.logs import URLReplacer
@@ -163,7 +168,7 @@ class Run(ABC):
                 service_port = 443 if secure else 80
             ports = {
                 **ports,
-                self._run.run_spec.configuration.port.container_port: service_port,
+                get_or_error(get_or_error(self._ssh_attach).service_port): service_port,
             }
             path_prefix = url.path
         replace_urls = URLReplacer(
@@ -338,6 +343,10 @@ class Run(ABC):
             else:
                 container_user = "root"
 
+            service_port = None
+            if isinstance(self._run.run_spec.configuration, ServiceConfiguration):
+                service_port = get_service_port(job.job_spec, self._run.run_spec.configuration)
+
             self._ssh_attach = SSHAttach(
                 hostname=provisioning_data.hostname,
                 ssh_port=provisioning_data.ssh_port,
@@ -349,6 +358,7 @@ class Run(ABC):
                 run_name=name,
                 dockerized=provisioning_data.dockerized,
                 ssh_proxy=provisioning_data.ssh_proxy,
+                service_port=service_port,
                 local_backend=provisioning_data.backend == BackendType.LOCAL,
                 bind_address=bind_address,
             )

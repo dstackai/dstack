@@ -22,7 +22,7 @@ from dstack._internal.core.errors import (
 from dstack._internal.core.models.configurations import SERVICE_HTTPS_DEFAULT, ServiceConfiguration
 from dstack._internal.core.models.gateways import GatewayConfiguration, GatewayStatus
 from dstack._internal.core.models.instances import SSHConnectionParams
-from dstack._internal.core.models.runs import Run, RunSpec, ServiceModelSpec, ServiceSpec
+from dstack._internal.core.models.runs import JobSpec, Run, RunSpec, ServiceModelSpec, ServiceSpec
 from dstack._internal.server import settings
 from dstack._internal.server.models import GatewayModel, JobModel, ProjectModel, RunModel
 from dstack._internal.server.services.gateways import (
@@ -179,6 +179,7 @@ async def register_replica(
         async with conn.client() as client:
             await client.register_replica(
                 run=run,
+                job_spec=JobSpec.__response__.parse_raw(job_model.job_spec_data),
                 job_submission=job_submission,
                 ssh_head_proxy=ssh_head_proxy,
                 ssh_head_proxy_private_key=ssh_head_proxy_private_key,

@@ -398,8 +398,9 @@ class TaskConfiguration(
 
 class ServiceConfigurationParams(CoreModel):
     port: Annotated[
+        # NOTE: it's a PortMapping for historical reasons. Only `port.container_port` is used.
         Union[ValidPort, constr(regex=r"^[0-9]+:[0-9]+$"), PortMapping],
-        Field(description="The port, that application listens on or the mapping"),
+        Field(description="The port the application listens on"),
     ]
     gateway: Annotated[
         Optional[Union[bool, str]],

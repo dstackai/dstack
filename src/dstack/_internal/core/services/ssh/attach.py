@@ -64,6 +64,7 @@ class SSHAttach:
         run_name: str,
         dockerized: bool,
         ssh_proxy: Optional[SSHConnectionParams] = None,
+        service_port: Optional[int] = None,
         local_backend: bool = False,
         bind_address: Optional[str] = None,
     ):
@@ -90,6 +91,7 @@ class SSHAttach:
             },
         )
         self.ssh_proxy = ssh_proxy
+        self.service_port = service_port
 
         hosts: dict[str, dict[str, Union[str, int, FilePath]]] = {}
         self.hosts = hosts
