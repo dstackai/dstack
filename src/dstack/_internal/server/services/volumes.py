@@ -400,6 +400,23 @@ def _validate_volume_configuration(configuration: VolumeConfiguration):
         )
     if configuration.name is not None:
         validate_dstack_resource_name(configuration.name)
+    # External volumes (with volume_id) cannot have auto_cleanup_duration
+    if configuration.volume_id is not None and configuration.auto_cleanup_duration is not None:
+        if (
+            isinstance(configuration.auto_cleanup_duration, int)
+            and configuration.auto_cleanup_duration >= 0
+        ):
+            raise ServerClientError(
+                "External volumes (with volume_id) do not support auto_cleanup_duration. "
+                "Auto-cleanup only works for volumes created and managed by dstack."
+            )
+        elif isinstance(
+            configuration.auto_cleanup_duration, str
+        ) and configuration.auto_cleanup_duration not in ("off", "-1"):
+            raise ServerClientError(
+                "External volumes (with volume_id) do not support auto_cleanup_duration. "
+                "Auto-cleanup only works for volumes created and managed by dstack."
+            )
 
 
 async def _delete_volume(session: AsyncSession, project: ProjectModel, volume_model: VolumeModel):
