@@ -15,7 +15,6 @@ from dstack._internal.server.schemas.logs import PollLogsRequest
 from dstack._internal.server.schemas.runner import LogEvent as RunnerLogEvent
 from dstack._internal.server.services.logs.base import (
     LogStorage,
-    b64encode_raw_message,
     unix_time_ms_to_datetime,
 )
 
@@ -56,32 +55,42 @@ class FileLogStorage(LogStorage):
         current_line = 0
 
         try:
-            # FIXME: Do not read all the lines in memory
             with open(log_file_path) as f:
-                lines = f.readlines()
+                # Skip to start_line if needed
+                for _ in range(start_line):
+                    if f.readline() == "":
+                        # File is shorter than start_line
+                        return JobSubmissionLogs(logs=logs, next_token=next_token)
+                    current_line += 1
+
+                # Read lines one by one
+                while True:
+                    line = f.readline()
+                    if line == "":  # EOF
+                        break
+
+                    current_line += 1
+
+                    try:
+                        log_event = LogEvent.__response__.parse_raw(line)
+                    except Exception:
+                        # Skip malformed lines
+                        continue
+
+                    if request.start_time and log_event.timestamp <= request.start_time:
+                        continue
+                    if request.end_time is not None and log_event.timestamp >= request.end_time:
+                        break
+
+                    logs.append(log_event)
+
+                    if len(logs) >= request.limit:
+                        # Check if there are more lines to read
+                        if f.readline() != "":
+                            next_token = str(current_line)
+                        break
         except FileNotFoundError:
             pass
-        else:
-            for i, line in enumerate(lines):
-                if current_line < start_line:
-                    current_line += 1
-                    continue
-
-                log_event = LogEvent.__response__.parse_raw(line)
-                current_line += 1
-
-                if request.start_time and log_event.timestamp <= request.start_time:
-                    continue
-                if request.end_time is not None and log_event.timestamp >= request.end_time:
-                    break
-
-                logs.append(log_event)
-
-                if len(logs) >= request.limit:
-                    # Only set next_token if there are more lines to read
-                    if current_line < len(lines):
-                        next_token = str(current_line)
-                    break
 
         return JobSubmissionLogs(logs=logs, next_token=next_token)
 
@@ -137,5 +146,5 @@ class FileLogStorage(LogStorage):
         return LogEvent(
             timestamp=unix_time_ms_to_datetime(runner_log_event.timestamp),
             log_source=LogEventSource.STDOUT,
-            message=b64encode_raw_message(runner_log_event.message),
+            message=runner_log_event.message.decode(errors="replace"),
         )

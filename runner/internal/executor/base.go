@@ -10,7 +10,7 @@ import (
 
 type Executor interface {
 	GetHistory(timestamp int64) *schemas.PullResponse
-	GetJobLogsHistory() []schemas.LogEvent
+	GetJobWsLogsHistory() []schemas.LogEvent
 	GetRunnerState() string
 	Run(ctx context.Context) error
 	SetCodePath(codePath string)

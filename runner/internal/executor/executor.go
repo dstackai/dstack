@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/creack/pty"
+	"github.com/dstackai/ansistrip"
 	"github.com/dstackai/dstack/runner/consts"
 	"github.com/dstackai/dstack/runner/internal/connections"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
@@ -26,6 +27,18 @@ import (
 	"github.com/dstackai/dstack/runner/internal/schemas"
 	"github.com/dstackai/dstack/runner/internal/types"
 	"github.com/prometheus/procfs"
+)
+
+// TODO: Tune these parameters for optimal experience/performance
+const (
+	// Output is flushed when the cursor doesn't move for this duration
+	AnsiStripFlushInterval = 500 * time.Millisecond
+
+	// Output is flushed regardless of cursor activity after this maximum delay
+	AnsiStripMaxDelay = 3 * time.Second
+
+	// Maximum buffer size for ansistrip
+	MaxBufferSize = 32 * 1024 // 32KB
 )
 
 type ConnectionTracker interface {
@@ -54,6 +67,7 @@ type RunExecutor struct {
 	state           string
 	jobStateHistory []schemas.JobStateEvent
 	jobLogs         *appendWriter
+	jobWsLogs       *appendWriter
 	runnerLogs      *appendWriter
 	timestamp       *MonotonicTimestamp
 
@@ -110,6 +124,7 @@ func NewRunExecutor(tempDir string, homeDir string, workingDir string, sshPort i
 		state:           WaitSubmit,
 		jobStateHistory: make([]schemas.JobStateEvent, 0),
 		jobLogs:         newAppendWriter(mu, timestamp),
+		jobWsLogs:       newAppendWriter(mu, timestamp),
 		runnerLogs:      newAppendWriter(mu, timestamp),
 		timestamp:       timestamp,
 
@@ -153,7 +168,9 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 		}
 	}()
 
-	logger := io.MultiWriter(runnerLogFile, os.Stdout, ex.runnerLogs)
+	stripper := ansistrip.NewWriter(ex.runnerLogs, AnsiStripFlushInterval, AnsiStripMaxDelay, MaxBufferSize)
+	defer stripper.Close()
+	logger := io.MultiWriter(runnerLogFile, os.Stdout, stripper)
 	ctx = log.WithLogger(ctx, log.NewEntry(logger, int(log.DefaultEntry.Logger.Level))) // todo loglevel
 	log.Info(ctx, "Run job", "log_level", log.GetLogger(ctx).Logger.Level.String())
 
@@ -455,7 +472,9 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 	defer func() { _ = ptm.Close() }()
 	defer func() { _ = cmd.Wait() }() // release resources if copy fails
 
-	logger := io.MultiWriter(jobLogFile, ex.jobLogs)
+	stripper := ansistrip.NewWriter(ex.jobLogs, AnsiStripFlushInterval, AnsiStripMaxDelay, MaxBufferSize)
+	defer stripper.Close()
+	logger := io.MultiWriter(jobLogFile, ex.jobWsLogs, stripper)
 	_, err = io.Copy(logger, ptm)
 	if err != nil && !isPtyError(err) {
 		return gerrors.Wrap(err)

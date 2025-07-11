@@ -1,7 +1,7 @@
 declare interface ILogItem {
     log_source: 'stdout' | 'stderr';
     timestamp: string;
-    message: string | Uint8Array;
+    message: string;
 }
 
 declare type TRequestLogsParams = {

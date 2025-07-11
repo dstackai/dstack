@@ -1,4 +1,3 @@
-import base64
 import logging
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -52,8 +51,8 @@ class TestFileLogStorage:
             / "runner.log"
         )
         assert runner_log_path.read_text() == (
-            '{"timestamp":"2023-10-06T10:01:53.234000+00:00","log_source":"stdout","message":"SGVsbG8="}\n'
-            '{"timestamp":"2023-10-06T10:01:53.235000+00:00","log_source":"stdout","message":"V29ybGQ="}\n'
+            '{"timestamp":"2023-10-06T10:01:53.234000+00:00","log_source":"stdout","message":"Hello"}\n'
+            '{"timestamp":"2023-10-06T10:01:53.235000+00:00","log_source":"stdout","message":"World"}\n'
         )
 
     @pytest.mark.asyncio
@@ -120,12 +119,8 @@ class TestFileLogStorage:
         job_submission_logs = log_storage.poll_logs(project, poll_request)
 
         assert len(job_submission_logs.logs) == 2
-        assert job_submission_logs.logs[0].message == base64.b64encode(
-            "Log1".encode("utf-8")
-        ).decode("utf-8")
-        assert job_submission_logs.logs[1].message == base64.b64encode(
-            "Log2".encode("utf-8")
-        ).decode("utf-8")
+        assert job_submission_logs.logs[0].message == "Log1"
+        assert job_submission_logs.logs[1].message == "Log2"
         assert job_submission_logs.next_token == "2"  # Next line to read
 
         # Second page: use next_token
@@ -133,12 +128,8 @@ class TestFileLogStorage:
         job_submission_logs = log_storage.poll_logs(project, poll_request)
 
         assert len(job_submission_logs.logs) == 2
-        assert job_submission_logs.logs[0].message == base64.b64encode(
-            "Log3".encode("utf-8")
-        ).decode("utf-8")
-        assert job_submission_logs.logs[1].message == base64.b64encode(
-            "Log4".encode("utf-8")
-        ).decode("utf-8")
+        assert job_submission_logs.logs[0].message == "Log3"
+        assert job_submission_logs.logs[1].message == "Log4"
         assert job_submission_logs.next_token == "4"  # Next line to read
 
         # Third page: get remaining log
@@ -146,9 +137,7 @@ class TestFileLogStorage:
         job_submission_logs = log_storage.poll_logs(project, poll_request)
 
         assert len(job_submission_logs.logs) == 1
-        assert job_submission_logs.logs[0].message == base64.b64encode(
-            "Log5".encode("utf-8")
-        ).decode("utf-8")
+        assert job_submission_logs.logs[0].message == "Log5"
         assert job_submission_logs.next_token is None  # No more logs
 
     @pytest.mark.asyncio
@@ -183,12 +172,8 @@ class TestFileLogStorage:
         job_submission_logs = log_storage.poll_logs(project, poll_request)
 
         assert len(job_submission_logs.logs) == 2
-        assert job_submission_logs.logs[0].message == base64.b64encode(
-            "Log2".encode("utf-8")
-        ).decode("utf-8")
-        assert job_submission_logs.logs[1].message == base64.b64encode(
-            "Log3".encode("utf-8")
-        ).decode("utf-8")
+        assert job_submission_logs.logs[0].message == "Log2"
+        assert job_submission_logs.logs[1].message == "Log3"
         assert job_submission_logs.next_token is None
 
     @pytest.mark.asyncio
@@ -279,9 +264,7 @@ class TestFileLogStorage:
 
         # Should get Log3 first (timestamp > 235)
         assert len(job_submission_logs.logs) == 1
-        assert job_submission_logs.logs[0].message == base64.b64encode(
-            "Log3".encode("utf-8")
-        ).decode("utf-8")
+        assert job_submission_logs.logs[0].message == "Log3"
         assert job_submission_logs.next_token == "3"
 
         # Get next page
@@ -290,9 +273,7 @@ class TestFileLogStorage:
 
         # Should get Log4
         assert len(job_submission_logs.logs) == 1
-        assert job_submission_logs.logs[0].message == base64.b64encode(
-            "Log4".encode("utf-8")
-        ).decode("utf-8")
+        assert job_submission_logs.logs[0].message == "Log4"
         # Should not have next_token since we reached end of file
         assert job_submission_logs.next_token is None
 
@@ -359,9 +340,9 @@ class TestFileLogStorage:
         page1 = log_storage.poll_logs(project, poll_request)
 
         assert len(page1.logs) == 3
-        assert page1.logs[0].message == base64.b64encode("Log1".encode()).decode()
-        assert page1.logs[1].message == base64.b64encode("Log2".encode()).decode()
-        assert page1.logs[2].message == base64.b64encode("Log3".encode()).decode()
+        assert page1.logs[0].message == "Log1"
+        assert page1.logs[1].message == "Log2"
+        assert page1.logs[2].message == "Log3"
         assert page1.next_token == "3"  # Next line to read
 
         # Second page: use next_token
@@ -369,9 +350,9 @@ class TestFileLogStorage:
         page2 = log_storage.poll_logs(project, poll_request)
 
         assert len(page2.logs) == 3
-        assert page2.logs[0].message == base64.b64encode("Log4".encode()).decode()
-        assert page2.logs[1].message == base64.b64encode("Log5".encode()).decode()
-        assert page2.logs[2].message == base64.b64encode("Log6".encode()).decode()
+        assert page2.logs[0].message == "Log4"
+        assert page2.logs[1].message == "Log5"
+        assert page2.logs[2].message == "Log6"
         assert page2.next_token == "6"
 
         # Third page: get more logs
@@ -379,9 +360,9 @@ class TestFileLogStorage:
         page3 = log_storage.poll_logs(project, poll_request)
 
         assert len(page3.logs) == 3
-        assert page3.logs[0].message == base64.b64encode("Log7".encode()).decode()
-        assert page3.logs[1].message == base64.b64encode("Log8".encode()).decode()
-        assert page3.logs[2].message == base64.b64encode("Log9".encode()).decode()
+        assert page3.logs[0].message == "Log7"
+        assert page3.logs[1].message == "Log8"
+        assert page3.logs[2].message == "Log9"
         assert page3.next_token == "9"
 
         # Fourth page: get last log
@@ -389,8 +370,8 @@ class TestFileLogStorage:
         page4 = log_storage.poll_logs(project, poll_request)
 
         assert len(page4.logs) == 1
-        assert page4.logs[0].message == base64.b64encode("Log10".encode()).decode()
-        assert page4.next_token is None  # No more logs
+        assert page4.logs[0].message == "Log10"
+        assert page4.next_token is None
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
@@ -428,15 +409,15 @@ class TestFileLogStorage:
 
         page1 = log_storage.poll_logs(project, poll_request)
         assert len(page1.logs) == 2
-        assert page1.logs[0].message == base64.b64encode("Log3".encode()).decode()
-        assert page1.logs[1].message == base64.b64encode("Log4".encode()).decode()
+        assert page1.logs[0].message == "Log3"
+        assert page1.logs[1].message == "Log4"
         assert page1.next_token == "4"
 
         # Get next page
         poll_request.next_token = page1.next_token
         page2 = log_storage.poll_logs(project, poll_request)
         assert len(page2.logs) == 1
-        assert page2.logs[0].message == base64.b64encode("Log5".encode()).decode()
+        assert page2.logs[0].message == "Log5"
         assert page2.next_token is None
 
     @pytest.mark.asyncio
@@ -467,16 +448,16 @@ class TestFileLogStorage:
         result = log_storage.poll_logs(project, poll_request)
 
         assert len(result.logs) == 1
-        assert result.logs[0].message == base64.b64encode("OnlyLog".encode()).decode()
-        assert result.next_token is None  # No more logs available
+        assert result.logs[0].message == "OnlyLog"
+        assert result.next_token is None
 
         # Request with limit equal to available logs
         poll_request.limit = 1
         result = log_storage.poll_logs(project, poll_request)
 
         assert len(result.logs) == 1
-        assert result.logs[0].message == base64.b64encode("OnlyLog".encode()).decode()
-        assert result.next_token is None  # No more logs available
+        assert result.logs[0].message == "OnlyLog"
+        assert result.next_token is None
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
@@ -577,15 +558,9 @@ class TestPollLogsRequestValidation:
 
         # Should return only the first 3 logs and provide next_token
         assert len(job_submission_logs.logs) == 3
-        assert job_submission_logs.logs[0].message == base64.b64encode(
-            "Log1".encode("utf-8")
-        ).decode("utf-8")
-        assert job_submission_logs.logs[1].message == base64.b64encode(
-            "Log2".encode("utf-8")
-        ).decode("utf-8")
-        assert job_submission_logs.logs[2].message == base64.b64encode(
-            "Log3".encode("utf-8")
-        ).decode("utf-8")
+        assert job_submission_logs.logs[0].message == "Log1"
+        assert job_submission_logs.logs[1].message == "Log2"
+        assert job_submission_logs.logs[2].message == "Log3"
         # Should have next_token pointing to line 3 (fourth log)
         assert job_submission_logs.next_token == "3"
 
@@ -594,9 +569,7 @@ class TestPollLogsRequestValidation:
         poll_request.start_time = logs[3].timestamp
         job_submission_logs = log_storage.poll_logs(project, poll_request)
         assert len(job_submission_logs.logs) == 1
-        assert job_submission_logs.logs[0].message == base64.b64encode(
-            "Log5".encode("utf-8")
-        ).decode("utf-8")
+        assert job_submission_logs.logs[0].message == "Log5"
         # Should not have next_token since we reached end of file
         assert job_submission_logs.next_token is None
 
@@ -921,14 +894,14 @@ class TestCloudWatchLogStorage:
                 logGroupName="test-group",
                 logStreamName=expected_runner_stream,
                 logEvents=[
-                    {"timestamp": 1696586513234, "message": "SGVsbG8="},
+                    {"timestamp": 1696586513234, "message": "Hello"},
                 ],
             ),
             call(
                 logGroupName="test-group",
                 logStreamName=expected_job_stream,
                 logEvents=[
-                    {"timestamp": 1696586513235, "message": "V29ybGQ="},
+                    {"timestamp": 1696586513235, "message": "World"},
                 ],
             ),
         ]
@@ -1026,11 +999,11 @@ class TestCloudWatchLogStorage:
             logGroupName="test-group",
             logStreamName="test-proj/test-run/1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e/runner",
             logEvents=[
-                {"timestamp": 1696586513235, "message": "MQ=="},
-                {"timestamp": 1696586513236, "message": "Mg=="},
-                {"timestamp": 1696586513237, "message": "Mw=="},
-                {"timestamp": 1696586513237, "message": "NA=="},
-                {"timestamp": 1696586513237, "message": "NQ=="},
+                {"timestamp": 1696586513235, "message": "1"},
+                {"timestamp": 1696586513236, "message": "2"},
+                {"timestamp": 1696586513237, "message": "3"},
+                {"timestamp": 1696586513237, "message": "4"},
+                {"timestamp": 1696586513237, "message": "5"},
             ],
         )
         assert "events are not in chronological order" in caplog.text
@@ -1068,7 +1041,7 @@ class TestCloudWatchLogStorage:
         assert "skipping 1 past event(s)" in caplog.text
         assert "skipping 2 future event(s)" in caplog.text
         actual = [
-            base64.b64decode(e["message"]).decode()
+            e["message"]
             for c in mock_client.put_log_events.call_args_list
             for e in c.kwargs["logEvents"]
         ]
@@ -1113,8 +1086,8 @@ class TestCloudWatchLogStorage:
         messages: List[str],
         expected: List[List[str]],
     ):
-        # maximum 6 bytes: 12 (in base64) + 26 (overhead) = 34
-        monkeypatch.setattr(CloudWatchLogStorage, "MESSAGE_MAX_SIZE", 34)
+        # maximum 6 bytes: 6 (raw bytes) + 26 (overhead) = 32
+        monkeypatch.setattr(CloudWatchLogStorage, "MESSAGE_MAX_SIZE", 32)
         monkeypatch.setattr(CloudWatchLogStorage, "BATCH_MAX_SIZE", 60)
         log_storage.write_logs(
             project=project,
@@ -1128,7 +1101,7 @@ class TestCloudWatchLogStorage:
         )
         assert mock_client.put_log_events.call_count == len(expected)
         actual = [
-            [base64.b64decode(e["message"]).decode() for e in c.kwargs["logEvents"]]
+            [e["message"] for e in c.kwargs["logEvents"]]
             for c in mock_client.put_log_events.call_args_list
         ]
         assert actual == expected
@@ -1143,7 +1116,7 @@ class TestCloudWatchLogStorage:
                 [["111", "111", "111"], ["222"]],
             ],
             [
-                ["111", "111", "111"] + ["222", "222", "toolong", "", "222222"],
+                ["111", "111", "111"] + ["222", "222", "toolongtoolong", "", "222222"],
                 [["111", "111", "111"], ["222", "222", "222222"]],
             ],
         ],
@@ -1160,8 +1133,8 @@ class TestCloudWatchLogStorage:
         messages: List[str],
         expected: List[List[str]],
     ):
-        # maximum 6 bytes: 12 (in base64) + 26 (overhead) = 34
-        monkeypatch.setattr(CloudWatchLogStorage, "MESSAGE_MAX_SIZE", 34)
+        # maximum 6 bytes: 6 (raw bytes) + 26 (overhead) = 32
+        monkeypatch.setattr(CloudWatchLogStorage, "MESSAGE_MAX_SIZE", 32)
         monkeypatch.setattr(CloudWatchLogStorage, "EVENT_MAX_COUNT_IN_BATCH", 3)
         log_storage.write_logs(
             project=project,
@@ -1175,7 +1148,7 @@ class TestCloudWatchLogStorage:
         )
         assert mock_client.put_log_events.call_count == len(expected)
         actual = [
-            [base64.b64decode(e["message"]).decode() for e in c.kwargs["logEvents"]]
+            [e["message"] for e in c.kwargs["logEvents"]]
             for c in mock_client.put_log_events.call_args_list
         ]
         assert actual == expected
@@ -1218,7 +1191,7 @@ class TestCloudWatchLogStorage:
         expected = [["1", "2", "3"], ["4", "5", "6"], ["7"]]
         assert mock_client.put_log_events.call_count == len(expected)
         actual = [
-            [base64.b64decode(e["message"]).decode() for e in c.kwargs["logEvents"]]
+            [e["message"] for e in c.kwargs["logEvents"]]
             for c in mock_client.put_log_events.call_args_list
         ]
         assert actual == expected
@@ -1232,8 +1205,8 @@ class TestCloudWatchLogStorage:
         poll_logs_request: PollLogsRequest,
     ):
         mock_client.get_log_events.return_value["events"] = [
-            {"timestamp": 1696586513234, "message": "SGVsbG8="},
-            {"timestamp": 1696586513235, "message": "V29ybGQ="},
+            {"timestamp": 1696586513234, "message": "Hello"},
+            {"timestamp": 1696586513235, "message": "World"},
         ]
         poll_logs_request.limit = 2
         job_submission_logs = log_storage.poll_logs(project, poll_logs_request)
@@ -1242,12 +1215,12 @@ class TestCloudWatchLogStorage:
             LogEvent(
                 timestamp=datetime(2023, 10, 6, 10, 1, 53, 234000, tzinfo=timezone.utc),
                 log_source=LogEventSource.STDOUT,
-                message="SGVsbG8=",
+                message="Hello",
             ),
             LogEvent(
                 timestamp=datetime(2023, 10, 6, 10, 1, 53, 235000, tzinfo=timezone.utc),
                 log_source=LogEventSource.STDOUT,
-                message="V29ybGQ=",
+                message="World",
             ),
         ]
 
@@ -1260,8 +1233,8 @@ class TestCloudWatchLogStorage:
         poll_logs_request: PollLogsRequest,
     ):
         mock_client.get_log_events.return_value["events"] = [
-            {"timestamp": 1696586513234, "message": "SGVsbG8="},
-            {"timestamp": 1696586513235, "message": "V29ybGQ="},
+            {"timestamp": 1696586513234, "message": "Hello"},
+            {"timestamp": 1696586513235, "message": "World"},
         ]
         poll_logs_request.descending = True
         poll_logs_request.limit = 2
@@ -1271,12 +1244,12 @@ class TestCloudWatchLogStorage:
             LogEvent(
                 timestamp=datetime(2023, 10, 6, 10, 1, 53, 235000, tzinfo=timezone.utc),
                 log_source=LogEventSource.STDOUT,
-                message="V29ybGQ=",
+                message="World",
             ),
             LogEvent(
                 timestamp=datetime(2023, 10, 6, 10, 1, 53, 234000, tzinfo=timezone.utc),
                 log_source=LogEventSource.STDOUT,
-                message="SGVsbG8=",
+                message="Hello",
             ),
         ]
 
@@ -1292,8 +1265,8 @@ class TestCloudWatchLogStorage:
         # Setup response with nextForwardToken
         mock_client.get_log_events.return_value = {
             "events": [
-                {"timestamp": 1696586513234, "message": "SGVsbG8="},
-                {"timestamp": 1696586513235, "message": "V29ybGQ="},
+                {"timestamp": 1696586513234, "message": "Hello"},
+                {"timestamp": 1696586513235, "message": "World"},
             ],
             "nextBackwardToken": "bwd",
             "nextForwardToken": "fwd123",
@@ -1327,8 +1300,8 @@ class TestCloudWatchLogStorage:
         # Setup response with nextBackwardToken
         mock_client.get_log_events.return_value = {
             "events": [
-                {"timestamp": 1696586513234, "message": "SGVsbG8="},
-                {"timestamp": 1696586513235, "message": "V29ybGQ="},
+                {"timestamp": 1696586513234, "message": "Hello"},
+                {"timestamp": 1696586513235, "message": "World"},
             ],
             "nextBackwardToken": "bwd456",
             "nextForwardToken": "fwd",
@@ -1340,8 +1313,8 @@ class TestCloudWatchLogStorage:
 
         assert len(result.logs) == 2
         # Events should be reversed for descending order
-        assert result.logs[0].message == "V29ybGQ="
-        assert result.logs[1].message == "SGVsbG8="
+        assert result.logs[0].message == "World"
+        assert result.logs[1].message == "Hello"
         assert result.next_token == "bwd456"  # Should return nextBackwardToken
 
         # Verify API was called with correct parameters
@@ -1363,7 +1336,7 @@ class TestCloudWatchLogStorage:
         """Test that provided next_token is passed to CloudWatch API"""
         mock_client.get_log_events.return_value = {
             "events": [
-                {"timestamp": 1696586513234, "message": "SGVsbG8="},
+                {"timestamp": 1696586513234, "message": "Hello"},
             ],
             "nextBackwardToken": "bwd",
             "nextForwardToken": "new_fwd",
@@ -1419,7 +1392,7 @@ class TestCloudWatchLogStorage:
         """Test next_token behavior with time filtering"""
         mock_client.get_log_events.return_value = {
             "events": [
-                {"timestamp": 1696586513234, "message": "SGVsbG8="},
+                {"timestamp": 1696586513234, "message": "Hello"},
             ],
             "nextBackwardToken": "bwd_with_time",
             "nextForwardToken": "fwd_with_time",
@@ -1457,7 +1430,7 @@ class TestCloudWatchLogStorage:
         """Test behavior when CloudWatch doesn't return next tokens"""
         mock_client.get_log_events.return_value = {
             "events": [
-                {"timestamp": 1696586513234, "message": "SGVsbG8="},
+                {"timestamp": 1696586513234, "message": "Hello"},
             ],
             # No nextBackwardToken or nextForwardToken in response
         }
@@ -1479,7 +1452,7 @@ class TestCloudWatchLogStorage:
         """Test behavior when CloudWatch returns empty string tokens"""
         mock_client.get_log_events.return_value = {
             "events": [
-                {"timestamp": 1696586513234, "message": "SGVsbG8="},
+                {"timestamp": 1696586513234, "message": "Hello"},
             ],
             "nextBackwardToken": "",
             "nextForwardToken": "",
@@ -1504,8 +1477,8 @@ class TestCloudWatchLogStorage:
         mock_client.get_log_events.side_effect = [
             {
                 "events": [
-                    {"timestamp": 1696586513234, "message": "SGVsbG8="},
-                    {"timestamp": 1696586513235, "message": "V29ybGQ="},
+                    {"timestamp": 1696586513234, "message": "Hello"},
+                    {"timestamp": 1696586513235, "message": "World"},
                 ],
                 "nextBackwardToken": "bwd",
                 "nextForwardToken": "token_page2",
@@ -1513,7 +1486,7 @@ class TestCloudWatchLogStorage:
             # Second call - returns final logs without next_token
             {
                 "events": [
-                    {"timestamp": 1696586513236, "message": "IQ=="},
+                    {"timestamp": 1696586513236, "message": "!"},
                 ],
                 "nextBackwardToken": "final_bwd",
                 "nextForwardToken": "final_fwd",
@@ -1526,8 +1499,8 @@ class TestCloudWatchLogStorage:
         page1 = log_storage.poll_logs(project, poll_logs_request)
 
         assert len(page1.logs) == 2
-        assert page1.logs[0].message == "SGVsbG8="
-        assert page1.logs[1].message == "V29ybGQ="
+        assert page1.logs[0].message == "Hello"
+        assert page1.logs[1].message == "World"
         assert page1.next_token == "token_page2"
 
         # Second page using next_token
@@ -1535,7 +1508,7 @@ class TestCloudWatchLogStorage:
         page2 = log_storage.poll_logs(project, poll_logs_request)
 
         assert len(page2.logs) == 1
-        assert page2.logs[0].message == "IQ=="
+        assert page2.logs[0].message == "!"
         assert page2.next_token == "final_fwd"
 
         # Verify both API calls

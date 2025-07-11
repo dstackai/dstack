@@ -1,6 +1,6 @@
 module github.com/dstackai/dstack/runner
 
-go 1.23
+go 1.23.8
 
 require (
 	github.com/alexellis/go-execute/v2 v2.2.1
@@ -10,6 +10,7 @@ require (
 	github.com/docker/docker v26.0.0+incompatible
 	github.com/docker/go-connections v0.5.0
 	github.com/docker/go-units v0.5.0
+	github.com/dstackai/ansistrip v0.0.6
 	github.com/go-git/go-git/v5 v5.12.0
 	github.com/golang/gddo v0.0.0-20210115222349-20d68f94ee1f
 	github.com/gorilla/websocket v1.5.1
@@ -62,6 +63,7 @@ require (
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/sergi/go-diff v1.3.2-0.20230802210424-5b0b94c5c0d3 // indirect
 	github.com/skeema/knownhosts v1.2.2 // indirect
+	github.com/tidwall/btree v1.7.0 // indirect
 	github.com/tklauser/go-sysconf v0.3.12 // indirect
 	github.com/tklauser/numcpus v0.6.1 // indirect
 	github.com/ulikunitz/xz v0.5.12 // indirect

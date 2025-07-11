@@ -14,7 +14,6 @@ from dstack._internal.server.schemas.runner import LogEvent as RunnerLogEvent
 from dstack._internal.server.services.logs.base import (
     LogStorage,
     LogStorageError,
-    b64encode_raw_message,
     unix_time_ms_to_datetime,
 )
 from dstack._internal.utils.common import batched
@@ -137,15 +136,14 @@ class GCPLogStorage(LogStorage):
         with self.logger.batch() as batcher:
             for batch in batched(logs, self.MAX_BATCH_SIZE):
                 for log in batch:
-                    message = b64encode_raw_message(log.message)
+                    message = log.message.decode(errors="replace")
                     timestamp = unix_time_ms_to_datetime(log.timestamp)
-                    # as message is base64-encoded, length in bytes = length in code points
-                    if len(message) > self.MAX_RUNNER_MESSAGE_SIZE:
+                    if len(log.message) > self.MAX_RUNNER_MESSAGE_SIZE:
                         logger.error(
                             "Stream %s: skipping event at %s, message exceeds max size: %d > %d",
                             stream_name,
                             timestamp.isoformat(),
-                            len(message),
+                            len(log.message),
                             self.MAX_RUNNER_MESSAGE_SIZE,
                         )
                         continue
