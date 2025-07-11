@@ -24,6 +24,7 @@ from dstack._internal.core.models.instances import (
 )
 from dstack._internal.core.models.profiles import (
     CreationPolicy,
+    RetryEvent,
 )
 from dstack._internal.core.models.repos.virtual import DEFAULT_VIRTUAL_REPO_ID, VirtualRunRepoData
 from dstack._internal.core.models.runs import (
@@ -686,6 +687,8 @@ def run_model_to_run(
     if run_model.service_spec is not None:
         service_spec = ServiceSpec.__response__.parse_raw(run_model.service_spec)
 
+    status_message = _get_run_status_message(run_model)
+    error = _get_run_error(run_model)
     run = Run(
         id=run_model.id,
         project_name=run_model.project.name,
@@ -693,12 +696,14 @@ def run_model_to_run(
         submitted_at=run_model.submitted_at.replace(tzinfo=timezone.utc),
         last_processed_at=run_model.last_processed_at.replace(tzinfo=timezone.utc),
         status=run_model.status,
+        status_message=status_message,
         termination_reason=run_model.termination_reason,
         run_spec=run_spec,
         jobs=jobs,
         latest_job_submission=latest_job_submission,
         service=service_spec,
         deployment_num=run_model.deployment_num,
+        error=error,
         deleted=run_model.deleted,
     )
     run.cost = _get_run_cost(run)
@@ -744,6 +749,52 @@ def _get_run_jobs_with_submissions(
                     _remove_job_spec_sensitive_info(job_spec)
                 jobs.append(Job(job_spec=job_spec, job_submissions=submissions))
     return jobs
+
+
+def _get_run_status_message(run_model: RunModel) -> str:
+    if len(run_model.jobs) == 0:
+        return run_model.status.value
+
+    sorted_job_models = sorted(
+        run_model.jobs, key=lambda j: (j.replica_num, j.job_num, j.submission_num)
+    )
+    job_models_grouped_by_job = list(
+        list(jm)
+        for _, jm in itertools.groupby(sorted_job_models, key=lambda j: (j.replica_num, j.job_num))
+    )
+
+    if all(job_models[-1].status == JobStatus.PULLING for job_models in job_models_grouped_by_job):
+        # Show `pulling`` if last job submission of all jobs is pulling
+        return "pulling"
+
+    if run_model.status in [RunStatus.SUBMITTED, RunStatus.PENDING]:
+        # Show `retrying` if any job caused the run to retry
+        for job_models in job_models_grouped_by_job:
+            last_job_spec = JobSpec.__response__.parse_raw(job_models[-1].job_spec_data)
+            retry_on_events = last_job_spec.retry.on_events if last_job_spec.retry else []
+            last_job_termination_reason = _get_last_job_termination_reason(job_models)
+            if (
+                last_job_termination_reason
+                == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
+                and RetryEvent.NO_CAPACITY in retry_on_events
+            ):
+                # TODO: Show `retrying` for other retry events
+                return "retrying"
+
+    return run_model.status.value
+
+
+def _get_last_job_termination_reason(job_models: List[JobModel]) -> Optional[JobTerminationReason]:
+    for job_model in reversed(job_models):
+        if job_model.termination_reason is not None:
+            return job_model.termination_reason
+    return None
+
+
+def _get_run_error(run_model: RunModel) -> Optional[str]:
+    if run_model.termination_reason is None:
+        return None
+    return run_model.termination_reason.to_error()
 
 
 async def _get_pool_offers(

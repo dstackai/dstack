@@ -101,6 +101,14 @@ class RunTerminationReason(str, Enum):
         }
         return mapping[self]
 
+    def to_error(self) -> Optional[str]:
+        if self == RunTerminationReason.RETRY_LIMIT_EXCEEDED:
+            return "retry limit exceeded"
+        elif self == RunTerminationReason.SERVER_ERROR:
+            return "server error"
+        else:
+            return None
+
 
 class JobTerminationReason(str, Enum):
     # Set by the server
@@ -161,6 +169,24 @@ class JobTerminationReason(str, Enum):
         }
         default = RetryEvent.ERROR if self.to_status() == JobStatus.FAILED else None
         return mapping.get(self, default)
+
+    def to_error(self) -> Optional[str]:
+        # Should return None for values that are already
+        # handled and shown in status_message.
+        error_mapping = {
+            JobTerminationReason.INSTANCE_UNREACHABLE: "instance unreachable",
+            JobTerminationReason.WAITING_INSTANCE_LIMIT_EXCEEDED: "waiting instance limit exceeded",
+            JobTerminationReason.VOLUME_ERROR: "volume error",
+            JobTerminationReason.GATEWAY_ERROR: "gateway error",
+            JobTerminationReason.SCALED_DOWN: "scaled down",
+            JobTerminationReason.INACTIVITY_DURATION_EXCEEDED: "inactivity duration exceeded",
+            JobTerminationReason.TERMINATED_DUE_TO_UTILIZATION_POLICY: "utilization policy",
+            JobTerminationReason.PORTS_BINDING_FAILED: "ports binding failed",
+            JobTerminationReason.CREATING_CONTAINER_ERROR: "runner error",
+            JobTerminationReason.EXECUTOR_ERROR: "executor error",
+            JobTerminationReason.MAX_DURATION_EXCEEDED: "max duration exceeded",
+        }
+        return error_mapping.get(self)
 
 
 class Requirements(CoreModel):
@@ -305,13 +331,12 @@ class JobSubmission(CoreModel):
     finished_at: Optional[datetime]
     inactivity_secs: Optional[int]
     status: JobStatus
+    status_message: str = ""  # default for backward compatibility
     termination_reason: Optional[JobTerminationReason]
     termination_reason_message: Optional[str]
     exit_status: Optional[int]
     job_provisioning_data: Optional[JobProvisioningData]
     job_runtime_data: Optional[JobRuntimeData]
-    # TODO: make status_message and error a computed field after migrating to pydanticV2
-    status_message: Optional[str] = None
     error: Optional[str] = None
 
     @property
@@ -325,70 +350,10 @@ class JobSubmission(CoreModel):
             end_time = self.finished_at
         return end_time - self.submitted_at
 
-    def dict(self, *args, **kwargs) -> Dict:
-        status_message = self._get_status_message()
-        error = self._get_error()
-        # super() does not work with pydantic-duality
-        res = CoreModel.dict(self, *args, **kwargs)
-        res["status_message"] = status_message
-        res["error"] = error
-        return res
-
-    def _get_status_message(self) -> Optional[str]:
-        if self.status == JobStatus.DONE:
-            return "exited (0)"
-        elif self.status == JobStatus.FAILED:
-            if self.termination_reason == JobTerminationReason.CONTAINER_EXITED_WITH_ERROR:
-                return f"exited ({self.exit_status})"
-            elif (
-                self.termination_reason == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
-            ):
-                return "no offers"
-            elif self.termination_reason == JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY:
-                return "interrupted"
-            else:
-                return "error"
-        elif self.status == JobStatus.TERMINATED:
-            if self.termination_reason == JobTerminationReason.TERMINATED_BY_USER:
-                return "stopped"
-            elif self.termination_reason == JobTerminationReason.ABORTED_BY_USER:
-                return "aborted"
-        return self.status.value
-
-    def _get_error(self) -> Optional[str]:
-        return JobSubmission._termination_reason_to_error(
-            termination_reason=self.termination_reason
-        )
-
-    @staticmethod
-    def _termination_reason_to_error(
-        termination_reason: Optional[JobTerminationReason],
-    ) -> Optional[str]:
-        error_mapping = {
-            JobTerminationReason.INSTANCE_UNREACHABLE: "instance unreachable",
-            JobTerminationReason.WAITING_INSTANCE_LIMIT_EXCEEDED: "waiting instance limit exceeded",
-            JobTerminationReason.VOLUME_ERROR: "volume error",
-            JobTerminationReason.GATEWAY_ERROR: "gateway error",
-            JobTerminationReason.SCALED_DOWN: "scaled down",
-            JobTerminationReason.INACTIVITY_DURATION_EXCEEDED: "inactivity duration exceeded",
-            JobTerminationReason.TERMINATED_DUE_TO_UTILIZATION_POLICY: "utilization policy",
-            JobTerminationReason.PORTS_BINDING_FAILED: "ports binding failed",
-            JobTerminationReason.CREATING_CONTAINER_ERROR: "runner error",
-            JobTerminationReason.EXECUTOR_ERROR: "executor error",
-            JobTerminationReason.MAX_DURATION_EXCEEDED: "max duration exceeded",
-        }
-        return error_mapping.get(termination_reason)
-
 
 class Job(CoreModel):
     job_spec: JobSpec
     job_submissions: List[JobSubmission]
-
-    def get_last_termination_reason(self) -> Optional[JobTerminationReason]:
-        for submission in reversed(self.job_submissions):
-            if submission.termination_reason is not None:
-                return submission.termination_reason
-        return None
 
 
 class RunSpec(CoreModel):
@@ -519,7 +484,7 @@ class Run(CoreModel):
     submitted_at: datetime
     last_processed_at: datetime
     status: RunStatus
-    status_message: Optional[str] = None
+    status_message: str = ""  # default for backward compatibility
     termination_reason: Optional[RunTerminationReason] = None
     run_spec: RunSpec
     jobs: List[Job]
@@ -527,63 +492,8 @@ class Run(CoreModel):
     cost: float = 0
     service: Optional[ServiceSpec] = None
     deployment_num: int = 0  # default for compatibility with pre-0.19.14 servers
-    # TODO: make error a computed field after migrating to pydanticV2
     error: Optional[str] = None
     deleted: Optional[bool] = None
-
-    def dict(self, *args, **kwargs) -> Dict:
-        status_message = self._get_status_message()
-        error = self._get_error()
-        # super() does not work with pydantic-duality
-        res = CoreModel.dict(self, *args, **kwargs)
-        res["status_message"] = status_message
-        res["error"] = error
-        return res
-
-    def _get_error(self) -> Optional[str]:
-        return Run._termination_reason_to_error(termination_reason=self.termination_reason)
-
-    @staticmethod
-    def _termination_reason_to_error(
-        termination_reason: Optional[RunTerminationReason],
-    ) -> Optional[str]:
-        if termination_reason == RunTerminationReason.RETRY_LIMIT_EXCEEDED:
-            return "retry limit exceeded"
-        elif termination_reason == RunTerminationReason.SERVER_ERROR:
-            return "server error"
-        else:
-            return None
-
-    def _get_status_message(self) -> Optional[str]:
-        if len(self.jobs) == 0:
-            return self.status.value
-
-        last_job = self.jobs[0]
-        # FIXME: status_message should not require all job submissions for status calculation
-        # since it's very expensive and is not required for anything else.
-        # May return a different status if not all job submissions requested.
-        # TODO: Calculate status_message by looking at job models directly instead job submissions.
-        last_job_termination_reason = last_job.get_last_termination_reason()
-
-        if len(self.jobs) == 1:
-            # FIXME: Clarify why show "pulling" only in case of one job
-            if (
-                last_job.job_submissions
-                and last_job.job_submissions[-1].status == JobStatus.PULLING
-            ):
-                return "pulling"
-
-        retry_on_events = last_job.job_spec.retry.on_events if last_job.job_spec.retry else []
-        # Currently, `retrying` is shown only for `no-capacity` events
-        if (
-            self.status in [RunStatus.SUBMITTED, RunStatus.PENDING]
-            and last_job_termination_reason
-            == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
-            and RetryEvent.NO_CAPACITY in retry_on_events
-        ):
-            return "retrying"
-
-        return self.status.value
 
     def is_deployment_in_progress(self) -> bool:
         return any(
