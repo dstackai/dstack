@@ -61,7 +61,7 @@ class FileLogStorage(LogStorage):
             with open(log_file_path) as f:
                 # Skip to start_line if needed
                 for _ in range(start_line):
-                    if f.readline() == '':
+                    if f.readline() == "":
                         # File is shorter than start_line
                         return JobSubmissionLogs(logs=logs, next_token=next_token)
                     current_line += 1
@@ -69,7 +69,7 @@ class FileLogStorage(LogStorage):
                 # Read lines one by one
                 while True:
                     line = f.readline()
-                    if line == '':  # EOF
+                    if line == "":  # EOF
                         break
 
                     current_line += 1
@@ -89,7 +89,7 @@ class FileLogStorage(LogStorage):
 
                     if len(logs) >= request.limit:
                         # Check if there are more lines to read
-                        if f.readline() != '':
+                        if f.readline() != "":
                             next_token = str(current_line)
                         break
 
@@ -150,5 +150,5 @@ class FileLogStorage(LogStorage):
         return LogEvent(
             timestamp=unix_time_ms_to_datetime(runner_log_event.timestamp),
             log_source=LogEventSource.STDOUT,
-            message=runner_log_event.message.decode(),
+            message=runner_log_event.message.decode(errors="replace"),
         )

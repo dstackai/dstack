@@ -269,7 +269,7 @@ class CloudWatchLogStorage(LogStorage):
     ) -> _CloudWatchLogEvent:
         return {
             "timestamp": runner_log_event.timestamp,
-            "message": runner_log_event.message.decode(),
+            "message": runner_log_event.message.decode(errors="replace"),
         }
 
     @contextmanager

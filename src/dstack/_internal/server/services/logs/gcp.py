@@ -136,7 +136,7 @@ class GCPLogStorage(LogStorage):
         with self.logger.batch() as batcher:
             for batch in batched(logs, self.MAX_BATCH_SIZE):
                 for log in batch:
-                    message = log.message.decode()
+                    message = log.message.decode(errors="replace")
                     timestamp = unix_time_ms_to_datetime(log.timestamp)
                     if len(log.message) > self.MAX_RUNNER_MESSAGE_SIZE:
                         logger.error(
