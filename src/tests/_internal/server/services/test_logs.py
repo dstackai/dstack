@@ -13,6 +13,7 @@ from freezegun import freeze_time
 from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from dstack._internal.core.errors import ServerClientError
 from dstack._internal.core.models.logs import LogEvent, LogEventSource
 from dstack._internal.server.models import ProjectModel
 from dstack._internal.server.schemas.logs import PollLogsRequest
@@ -206,49 +207,22 @@ class TestFileLogStorage:
             limit=10,
             diagnose=True,
         )
-        with pytest.raises(
-            LogStorageError, match="Invalid next_token: invalid. Must be a valid integer."
-        ):
+        with pytest.raises(ServerClientError):
             log_storage.poll_logs(project, poll_request)
 
         # Test with negative next_token
         poll_request.next_token = "-1"
-        with pytest.raises(
-            LogStorageError, match="Invalid next_token: -1. Must be a non-negative integer."
-        ):
+        with pytest.raises(ServerClientError):
             log_storage.poll_logs(project, poll_request)
 
         # Test with float next_token
         poll_request.next_token = "1.5"
-        with pytest.raises(
-            LogStorageError, match="Invalid next_token: 1.5. Must be a valid integer."
-        ):
+        with pytest.raises(ServerClientError):
             log_storage.poll_logs(project, poll_request)
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_poll_logs_descending_raises_error(
-        self, test_db, session: AsyncSession, tmp_path: Path
-    ):
-        project = await create_project(session=session)
-        log_storage = FileLogStorage(tmp_path)
-
-        # Test that descending=True raises LogStorageError
-        poll_request = PollLogsRequest(
-            run_name="test_run",
-            job_submission_id=UUID("1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e"),
-            limit=10,
-            diagnose=True,
-            # Note: This bypasses schema validation for testing the implementation
-        )
-        poll_request.descending = True  # Set directly to bypass validation
-
-        with pytest.raises(LogStorageError, match="descending: true is not supported"):
-            log_storage.poll_logs(project, poll_request)
-
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_poll_logs_file_not_found_raises_error(
+    async def test_poll_logs_file_not_found_raises_no_error(
         self, test_db, session: AsyncSession, tmp_path: Path
     ):
         project = await create_project(session=session)
@@ -261,11 +235,7 @@ class TestFileLogStorage:
             limit=10,
             diagnose=True,
         )
-
-        with pytest.raises(
-            LogStorageError, match="Failed to read log file .* No such file or directory"
-        ):
-            log_storage.poll_logs(project, poll_request)
+        log_storage.poll_logs(project, poll_request)
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
