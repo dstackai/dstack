@@ -18,6 +18,3 @@ build-frontend:
     cd {{source_directory()}}
     npm run build
     cp -r build/ ../src/dstack/_internal/server/statics/
-
-
-
