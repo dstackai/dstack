@@ -4,8 +4,8 @@ from apscheduler.triggers.interval import IntervalTrigger
 from dstack._internal.server import settings
 from dstack._internal.server.background.tasks.process_fleets import process_fleets
 from dstack._internal.server.background.tasks.process_gateways import (
+    process_gateways,
     process_gateways_connections,
-    process_submitted_gateways,
 )
 from dstack._internal.server.background.tasks.process_instances import (
     process_instances,
@@ -70,9 +70,7 @@ def start_background_tasks() -> AsyncIOScheduler:
         )
         _scheduler.add_job(delete_prometheus_metrics, IntervalTrigger(minutes=5), max_instances=1)
     _scheduler.add_job(process_gateways_connections, IntervalTrigger(seconds=15))
-    _scheduler.add_job(
-        process_submitted_gateways, IntervalTrigger(seconds=10, jitter=2), max_instances=5
-    )
+    _scheduler.add_job(process_gateways, IntervalTrigger(seconds=10, jitter=2), max_instances=5)
     _scheduler.add_job(
         process_submitted_volumes, IntervalTrigger(seconds=10, jitter=2), max_instances=5
     )

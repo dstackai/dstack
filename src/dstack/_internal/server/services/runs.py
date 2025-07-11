@@ -24,6 +24,7 @@ from dstack._internal.core.models.instances import (
 )
 from dstack._internal.core.models.profiles import (
     CreationPolicy,
+    RetryEvent,
 )
 from dstack._internal.core.models.repos.virtual import DEFAULT_VIRTUAL_REPO_ID, VirtualRunRepoData
 from dstack._internal.core.models.runs import (
@@ -105,6 +106,8 @@ async def list_user_runs(
     repo_id: Optional[str],
     username: Optional[str],
     only_active: bool,
+    include_jobs: bool,
+    job_submissions_limit: Optional[int],
     prev_submitted_at: Optional[datetime],
     prev_run_id: Optional[uuid.UUID],
     limit: int,
@@ -148,7 +151,14 @@ async def list_user_runs(
     runs = []
     for r in run_models:
         try:
-            runs.append(run_model_to_run(r, return_in_api=True))
+            runs.append(
+                run_model_to_run(
+                    r,
+                    return_in_api=True,
+                    include_jobs=include_jobs,
+                    job_submissions_limit=job_submissions_limit,
+                )
+            )
         except pydantic.ValidationError:
             pass
     if len(run_models) > len(runs):
@@ -652,22 +662,76 @@ async def delete_runs(
 
 def run_model_to_run(
     run_model: RunModel,
-    include_job_submissions: bool = True,
+    include_jobs: bool = True,
+    job_submissions_limit: Optional[int] = None,
     return_in_api: bool = False,
     include_sensitive: bool = False,
 ) -> Run:
+    jobs: List[Job] = []
+    if include_jobs:
+        jobs = _get_run_jobs_with_submissions(
+            run_model=run_model,
+            job_submissions_limit=job_submissions_limit,
+            return_in_api=return_in_api,
+            include_sensitive=include_sensitive,
+        )
+
+    run_spec = RunSpec.__response__.parse_raw(run_model.run_spec)
+
+    latest_job_submission = None
+    if len(jobs) > 0 and len(jobs[0].job_submissions) > 0:
+        # TODO(egor-s): does it make sense with replicas and multi-node?
+        latest_job_submission = jobs[0].job_submissions[-1]
+
+    service_spec = None
+    if run_model.service_spec is not None:
+        service_spec = ServiceSpec.__response__.parse_raw(run_model.service_spec)
+
+    status_message = _get_run_status_message(run_model)
+    error = _get_run_error(run_model)
+    run = Run(
+        id=run_model.id,
+        project_name=run_model.project.name,
+        user=run_model.user.name,
+        submitted_at=run_model.submitted_at.replace(tzinfo=timezone.utc),
+        last_processed_at=run_model.last_processed_at.replace(tzinfo=timezone.utc),
+        status=run_model.status,
+        status_message=status_message,
+        termination_reason=run_model.termination_reason,
+        run_spec=run_spec,
+        jobs=jobs,
+        latest_job_submission=latest_job_submission,
+        service=service_spec,
+        deployment_num=run_model.deployment_num,
+        error=error,
+        deleted=run_model.deleted,
+    )
+    run.cost = _get_run_cost(run)
+    return run
+
+
+def _get_run_jobs_with_submissions(
+    run_model: RunModel,
+    job_submissions_limit: Optional[int],
+    return_in_api: bool = False,
+    include_sensitive: bool = False,
+) -> List[Job]:
     jobs: List[Job] = []
     run_jobs = sorted(run_model.jobs, key=lambda j: (j.replica_num, j.job_num, j.submission_num))
     for replica_num, replica_submissions in itertools.groupby(
         run_jobs, key=lambda j: j.replica_num
     ):
-        for job_num, job_submissions in itertools.groupby(
-            replica_submissions, key=lambda j: j.job_num
-        ):
+        for job_num, job_models in itertools.groupby(replica_submissions, key=lambda j: j.job_num):
             submissions = []
             job_model = None
-            for job_model in job_submissions:
-                if include_job_submissions:
+            if job_submissions_limit is not None:
+                if job_submissions_limit == 0:
+                    # Take latest job submission to return its job_spec
+                    job_models = list(job_models)[-1:]
+                else:
+                    job_models = list(job_models)[-job_submissions_limit:]
+            for job_model in job_models:
+                if job_submissions_limit != 0:
                     job_submission = job_model_to_job_submission(job_model)
                     if return_in_api:
                         # Set default non-None values for 0.18 backward-compatibility
@@ -684,36 +748,53 @@ def run_model_to_run(
                 if not include_sensitive:
                     _remove_job_spec_sensitive_info(job_spec)
                 jobs.append(Job(job_spec=job_spec, job_submissions=submissions))
+    return jobs
 
-    run_spec = RunSpec.__response__.parse_raw(run_model.run_spec)
 
-    latest_job_submission = None
-    if include_job_submissions:
-        # TODO(egor-s): does it make sense with replicas and multi-node?
-        if jobs:
-            latest_job_submission = jobs[0].job_submissions[-1]
+def _get_run_status_message(run_model: RunModel) -> str:
+    if len(run_model.jobs) == 0:
+        return run_model.status.value
 
-    service_spec = None
-    if run_model.service_spec is not None:
-        service_spec = ServiceSpec.__response__.parse_raw(run_model.service_spec)
-
-    run = Run(
-        id=run_model.id,
-        project_name=run_model.project.name,
-        user=run_model.user.name,
-        submitted_at=run_model.submitted_at.replace(tzinfo=timezone.utc),
-        last_processed_at=run_model.last_processed_at.replace(tzinfo=timezone.utc),
-        status=run_model.status,
-        termination_reason=run_model.termination_reason,
-        run_spec=run_spec,
-        jobs=jobs,
-        latest_job_submission=latest_job_submission,
-        service=service_spec,
-        deployment_num=run_model.deployment_num,
-        deleted=run_model.deleted,
+    sorted_job_models = sorted(
+        run_model.jobs, key=lambda j: (j.replica_num, j.job_num, j.submission_num)
     )
-    run.cost = _get_run_cost(run)
-    return run
+    job_models_grouped_by_job = list(
+        list(jm)
+        for _, jm in itertools.groupby(sorted_job_models, key=lambda j: (j.replica_num, j.job_num))
+    )
+
+    if all(job_models[-1].status == JobStatus.PULLING for job_models in job_models_grouped_by_job):
+        # Show `pulling`` if last job submission of all jobs is pulling
+        return "pulling"
+
+    if run_model.status in [RunStatus.SUBMITTED, RunStatus.PENDING]:
+        # Show `retrying` if any job caused the run to retry
+        for job_models in job_models_grouped_by_job:
+            last_job_spec = JobSpec.__response__.parse_raw(job_models[-1].job_spec_data)
+            retry_on_events = last_job_spec.retry.on_events if last_job_spec.retry else []
+            last_job_termination_reason = _get_last_job_termination_reason(job_models)
+            if (
+                last_job_termination_reason
+                == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
+                and RetryEvent.NO_CAPACITY in retry_on_events
+            ):
+                # TODO: Show `retrying` for other retry events
+                return "retrying"
+
+    return run_model.status.value
+
+
+def _get_last_job_termination_reason(job_models: List[JobModel]) -> Optional[JobTerminationReason]:
+    for job_model in reversed(job_models):
+        if job_model.termination_reason is not None:
+            return job_model.termination_reason
+    return None
+
+
+def _get_run_error(run_model: RunModel) -> Optional[str]:
+    if run_model.termination_reason is None:
+        return None
+    return run_model.termination_reason.to_error()
 
 
 async def _get_pool_offers(
@@ -914,6 +995,8 @@ _TYPE_SPECIFIC_CONF_UPDATABLE_FIELDS = {
         "replicas",
         "scaling",
         # rolling deployment
+        # NOTE: keep this list in sync with the "Rolling deployment" section in services.md
+        "port",
         "resources",
         "volumes",
         "docker",

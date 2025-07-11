@@ -679,6 +679,61 @@ utilization_policy:
     [`max_price`](../reference/dstack.yml/service.md#max_price), and
     among [others](../reference/dstack.yml/service.md).
 
+## Rolling deployment
+
+To deploy a new version of a service that is already `running`, use `dstack apply`. `dstack` will automatically detect changes and suggest a rolling deployment update.
+
+<div class="termy">
+
+```shell
+$ dstack apply -f my-service.dstack.yml
+
+Active run my-service already exists. Detected changes that can be updated in-place:
+- Repo state (branch, commit, or other)
+- File archives
+- Configuration properties:
+  - env
+  - files
+
+Update the run? [y/n]:
+```
+
+</div>
+
+If approved, `dstack` gradually updates the service replicas. To update a replica, `dstack` starts a new replica, waits for it to become `running`, then terminates the old replica. This process is repeated for each replica, one at a time.
+
+You can track the progress of rolling deployment in both `dstack apply` or `dstack ps`. 
+Older replicas have lower `deployment` numbers; newer ones have higher.
+
+<!--
+    Not using termy for this example, since the example shows an intermediate CLI state,
+    not a completed command.
+-->
+
+```shell
+$ dstack apply -f my-service.dstack.yml
+
+⠋ Launching my-service...
+ NAME                            BACKEND          PRICE    STATUS       SUBMITTED
+ my-service deployment=1                                   running      11 mins ago
+   replica=0 job=0 deployment=0  aws (us-west-2)  $0.0026  terminating  11 mins ago
+   replica=1 job=0 deployment=1  aws (us-west-2)  $0.0026  running      1 min ago
+```
+
+The rolling deployment stops when all replicas are updated or when a new deployment is submitted.
+
+??? info "Supported properties"
+    <!-- NOTE: should be in sync with constants in server/services/runs.py -->
+
+    Rolling deployment supports changes to the following properties: `port`, `resources`, `volumes`, `docker`, `files`, `image`, `user`, `privileged`, `entrypoint`, `working_dir`, `python`, `nvcc`, `single_branch`, `env`, `shell`, `commands`, as well as changes to [repo](repos.md) or [file](#files) contents.
+
+    Changes to `replicas` and `scaling` can be applied without redeploying replicas.
+
+    Changes to other properties require a full service restart.
+
+    To trigger a rolling deployment when no properties have changed (e.g., after updating [secrets](secrets.md) or to restart all replicas),  
+    make a minor config change, such as adding a dummy [environment variable](#environment-variables).
+
 --8<-- "docs/concepts/snippets/manage-runs.ext"
 
 !!! info "What's next?"

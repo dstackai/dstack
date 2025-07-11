@@ -8,6 +8,7 @@ import google.api_core.exceptions
 import google.cloud.compute_v1 as compute_v1
 from cachetools import TTLCache, cachedmethod
 from google.cloud import tpu_v2
+from google.cloud.compute_v1.types.compute import Instance
 from gpuhunt import KNOWN_TPUS
 
 import dstack._internal.core.backends.gcp.auth as auth
@@ -19,6 +20,7 @@ from dstack._internal.core.backends.base.compute import (
     ComputeWithGatewaySupport,
     ComputeWithMultinodeSupport,
     ComputeWithPlacementGroupSupport,
+    ComputeWithPrivateGatewaySupport,
     ComputeWithVolumeSupport,
     generate_unique_gateway_instance_name,
     generate_unique_instance_name,
@@ -83,6 +85,7 @@ class GCPCompute(
     ComputeWithMultinodeSupport,
     ComputeWithPlacementGroupSupport,
     ComputeWithGatewaySupport,
+    ComputeWithPrivateGatewaySupport,
     ComputeWithVolumeSupport,
     Compute,
 ):
@@ -395,11 +398,7 @@ class GCPCompute(
         if instance.status in ["PROVISIONING", "STAGING"]:
             return
         if instance.status == "RUNNING":
-            if allocate_public_ip:
-                hostname = instance.network_interfaces[0].access_configs[0].nat_i_p
-            else:
-                hostname = instance.network_interfaces[0].network_i_p
-            provisioning_data.hostname = hostname
+            provisioning_data.hostname = _get_instance_ip(instance, allocate_public_ip)
             provisioning_data.internal_ip = instance.network_interfaces[0].network_i_p
             return
         raise ProvisioningError(
@@ -500,7 +499,7 @@ class GCPCompute(
         request.instance_resource = gcp_resources.create_instance_struct(
             disk_size=10,
             image_id=_get_gateway_image_id(),
-            machine_type="e2-small",
+            machine_type="e2-medium",
             accelerators=[],
             spot=False,
             user_data=get_gateway_user_data(configuration.ssh_key_pub),
@@ -512,6 +511,7 @@ class GCPCompute(
             service_account=self.config.vm_service_account,
             network=self.config.vpc_resource_name,
             subnetwork=subnetwork,
+            allocate_public_ip=configuration.public_ip,
         )
         operation = self.instances_client.insert(request=request)
         gcp_resources.wait_for_extended_operation(operation, "instance creation")
@@ -522,7 +522,7 @@ class GCPCompute(
             instance_id=instance_name,
             region=configuration.region,  # used for instance termination
             availability_zone=zone,
-            ip_address=instance.network_interfaces[0].access_configs[0].nat_i_p,
+            ip_address=_get_instance_ip(instance, configuration.public_ip),
             backend_data=json.dumps({"zone": zone}),
         )
 
@@ -1024,3 +1024,9 @@ def _is_tpu_provisioning_data(provisioning_data: JobProvisioningData) -> bool:
         backend_data_dict = json.loads(provisioning_data.backend_data)
         is_tpu = backend_data_dict.get("is_tpu", False)
     return is_tpu
+
+
+def _get_instance_ip(instance: Instance, public_ip: bool) -> str:
+    if public_ip:
+        return instance.network_interfaces[0].access_configs[0].nat_i_p
+    return instance.network_interfaces[0].network_i_p

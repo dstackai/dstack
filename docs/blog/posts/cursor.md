@@ -5,7 +5,7 @@ description: "TBA"
 slug: cursor
 image: https://dstack.ai/static-assets/static-assets/images/dstack-cursor-v2.png
 categories:
-  - Releases
+  - Changelog
 ---
 
 # Accessing dev environments with Cursor

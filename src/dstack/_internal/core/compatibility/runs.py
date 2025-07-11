@@ -3,7 +3,16 @@ from typing import Optional
 from dstack._internal.core.models.common import IncludeExcludeDictType, IncludeExcludeSetType
 from dstack._internal.core.models.configurations import ServiceConfiguration
 from dstack._internal.core.models.runs import ApplyRunPlanInput, JobSpec, JobSubmission, RunSpec
-from dstack._internal.server.schemas.runs import GetRunPlanRequest
+from dstack._internal.server.schemas.runs import GetRunPlanRequest, ListRunsRequest
+
+
+def get_list_runs_excludes(list_runs_request: ListRunsRequest) -> IncludeExcludeSetType:
+    excludes = set()
+    if list_runs_request.include_jobs:
+        excludes.add("include_jobs")
+    if list_runs_request.job_submissions_limit is None:
+        excludes.add("job_submissions_limit")
+    return excludes
 
 
 def get_apply_plan_excludes(plan: ApplyRunPlanInput) -> Optional[IncludeExcludeDictType]:
@@ -139,6 +148,8 @@ def get_job_spec_excludes(job_specs: list[JobSpec]) -> IncludeExcludeDictType:
         spec_excludes["repo_data"] = True
     if all(not s.file_archives for s in job_specs):
         spec_excludes["file_archives"] = True
+    if all(s.service_port is None for s in job_specs):
+        spec_excludes["service_port"] = True
 
     return spec_excludes
 

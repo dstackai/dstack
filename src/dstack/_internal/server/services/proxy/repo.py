@@ -12,10 +12,12 @@ from dstack._internal.core.models.configurations import ServiceConfiguration
 from dstack._internal.core.models.instances import RemoteConnectionInfo, SSHConnectionParams
 from dstack._internal.core.models.runs import (
     JobProvisioningData,
+    JobSpec,
     JobStatus,
     RunSpec,
     RunStatus,
     ServiceSpec,
+    get_service_port,
 )
 from dstack._internal.core.models.services import AnyModel
 from dstack._internal.proxy.lib.models import (
@@ -97,9 +99,10 @@ class ServerProxyRepo(BaseProxyRepo):
                 if rci.ssh_proxy is not None:
                     ssh_head_proxy = rci.ssh_proxy
                     ssh_head_proxy_private_key = get_or_error(rci.ssh_proxy_keys)[0].private
+            job_spec: JobSpec = JobSpec.__response__.parse_raw(job.job_spec_data)
             replica = Replica(
                 id=job.id.hex,
-                app_port=run_spec.configuration.port.container_port,
+                app_port=get_service_port(job_spec, run_spec.configuration),
                 ssh_destination=ssh_destination,
                 ssh_port=ssh_port,
                 ssh_proxy=ssh_proxy,

@@ -246,6 +246,7 @@ def get_dev_env_run_plan_dict(
                     "repo_code_hash": None,
                     "repo_data": {"repo_dir": "/repo", "repo_type": "local"},
                     "file_archives": [],
+                    "service_port": None,
                 },
                 "offers": [json.loads(o.json()) for o in offers],
                 "total_offers": total_offers,
@@ -441,6 +442,7 @@ def get_dev_env_run_dict(
                     "repo_code_hash": None,
                     "repo_data": {"repo_dir": "/repo", "repo_type": "local"},
                     "file_archives": [],
+                    "service_port": None,
                 },
                 "job_submissions": [
                     {
@@ -706,6 +708,108 @@ class TestListRuns:
         assert response2.status_code == 200, response2_json
         assert len(response2_json) == 1
         assert response2_json[0]["id"] == str(run2.id)
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_limits_job_submissions(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        repo = await create_repo(
+            session=session,
+            project_id=project.id,
+        )
+        run_submitted_at = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            submitted_at=run_submitted_at,
+        )
+        run_spec = RunSpec.parse_raw(run.run_spec)
+        await create_job(
+            session=session,
+            run=run,
+            submitted_at=run_submitted_at,
+            last_processed_at=run_submitted_at,
+        )
+        job2 = await create_job(
+            session=session,
+            run=run,
+            submitted_at=run_submitted_at,
+            last_processed_at=run_submitted_at,
+        )
+        job2_spec = JobSpec.parse_raw(job2.job_spec_data)
+        response = await client.post(
+            "/api/runs/list",
+            headers=get_auth_headers(user.token),
+            json={"job_submissions_limit": 1},
+        )
+        assert response.status_code == 200, response.json()
+        assert response.json() == [
+            {
+                "id": str(run.id),
+                "project_name": project.name,
+                "user": user.name,
+                "submitted_at": run_submitted_at.isoformat(),
+                "last_processed_at": run_submitted_at.isoformat(),
+                "status": "submitted",
+                "status_message": "submitted",
+                "run_spec": run_spec.dict(),
+                "jobs": [
+                    {
+                        "job_spec": job2_spec.dict(),
+                        "job_submissions": [
+                            {
+                                "id": str(job2.id),
+                                "submission_num": 0,
+                                "deployment_num": 0,
+                                "submitted_at": run_submitted_at.isoformat(),
+                                "last_processed_at": run_submitted_at.isoformat(),
+                                "finished_at": None,
+                                "inactivity_secs": None,
+                                "status": "submitted",
+                                "status_message": "submitted",
+                                "termination_reason": None,
+                                "termination_reason_message": None,
+                                "error": None,
+                                "exit_status": None,
+                                "job_provisioning_data": None,
+                                "job_runtime_data": None,
+                            }
+                        ],
+                    }
+                ],
+                "latest_job_submission": {
+                    "id": str(job2.id),
+                    "submission_num": 0,
+                    "deployment_num": 0,
+                    "submitted_at": run_submitted_at.isoformat(),
+                    "last_processed_at": run_submitted_at.isoformat(),
+                    "finished_at": None,
+                    "inactivity_secs": None,
+                    "status": "submitted",
+                    "status_message": "submitted",
+                    "termination_reason_message": None,
+                    "termination_reason": None,
+                    "error": None,
+                    "exit_status": None,
+                    "job_provisioning_data": None,
+                    "job_runtime_data": None,
+                },
+                "cost": 0,
+                "service": None,
+                "deployment_num": 0,
+                "termination_reason": None,
+                "error": None,
+                "deleted": False,
+            },
+        ]
 
 
 class TestGetRun:
@@ -1074,12 +1178,14 @@ class TestGetRunPlan:
                 ServiceConfiguration(
                     commands=["one", "two"],
                     port=80,
+                    gateway=None,
                     replicas=1,
                     scaling=None,
                 ),
                 ServiceConfiguration(
                     commands=["one", "two"],
-                    port=8080,  # not updatable
+                    port=8080,
+                    gateway="test-gateway",  # not updatable
                     replicas="2..4",
                     scaling=ScalingSpec(metric="rps", target=5),
                 ),

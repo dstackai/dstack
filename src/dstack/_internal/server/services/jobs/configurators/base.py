@@ -15,6 +15,7 @@ from dstack._internal.core.models.configurations import (
     PortMapping,
     PythonVersion,
     RunConfigurationType,
+    ServiceConfiguration,
 )
 from dstack._internal.core.models.profiles import (
     DEFAULT_STOP_DURATION,
@@ -153,6 +154,7 @@ class JobConfigurator(ABC):
             repo_data=self.run_spec.repo_data,
             repo_code_hash=self.run_spec.repo_code_hash,
             file_archives=self.run_spec.file_archives,
+            service_port=self._service_port(),
         )
         return job_spec
 
@@ -305,6 +307,11 @@ class JobConfigurator(ABC):
                 public=public.decode(),
             )
         return self._job_ssh_key
+
+    def _service_port(self) -> Optional[int]:
+        if isinstance(self.run_spec.configuration, ServiceConfiguration):
+            return self.run_spec.configuration.port.container_port
+        return None
 
 
 def interpolate_job_volumes(

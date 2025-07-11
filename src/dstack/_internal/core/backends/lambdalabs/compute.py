@@ -1,4 +1,5 @@
 import hashlib
+import shlex
 import subprocess
 import tempfile
 from threading import Thread
@@ -98,7 +99,7 @@ class LambdaCompute(
                 arch=provisioning_data.instance_type.resources.cpu_arch,
             )
             # shim is assumed to be run under root
-            launch_command = "sudo sh -c '" + "&& ".join(commands) + "'"
+            launch_command = "sudo sh -c " + shlex.quote(" && ".join(commands))
             thread = Thread(
                 target=_start_runner,
                 kwargs={

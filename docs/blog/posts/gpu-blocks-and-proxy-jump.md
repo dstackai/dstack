@@ -5,7 +5,7 @@ description: "TBA"
 slug: gpu-blocks-and-proxy-jump
 image: https://dstack.ai/static-assets/static-assets/images/data-centers-and-private-clouds.png
 categories:
-  - Releases
+  - Changelog
 ---
 
 # Introducing GPU blocks and proxy jump for SSH fleets

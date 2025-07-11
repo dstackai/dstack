@@ -11,6 +11,7 @@ from dstack._internal.core.models.configurations import (
     DEFAULT_REPO_DIR,
     AnyRunConfiguration,
     RunConfiguration,
+    ServiceConfiguration,
 )
 from dstack._internal.core.models.files import FileArchiveMapping
 from dstack._internal.core.models.instances import (
@@ -101,6 +102,14 @@ class RunTerminationReason(str, Enum):
         }
         return mapping[self]
 
+    def to_error(self) -> Optional[str]:
+        if self == RunTerminationReason.RETRY_LIMIT_EXCEEDED:
+            return "retry limit exceeded"
+        elif self == RunTerminationReason.SERVER_ERROR:
+            return "server error"
+        else:
+            return None
+
 
 class JobTerminationReason(str, Enum):
     # Set by the server
@@ -161,6 +170,24 @@ class JobTerminationReason(str, Enum):
         }
         default = RetryEvent.ERROR if self.to_status() == JobStatus.FAILED else None
         return mapping.get(self, default)
+
+    def to_error(self) -> Optional[str]:
+        # Should return None for values that are already
+        # handled and shown in status_message.
+        error_mapping = {
+            JobTerminationReason.INSTANCE_UNREACHABLE: "instance unreachable",
+            JobTerminationReason.WAITING_INSTANCE_LIMIT_EXCEEDED: "waiting instance limit exceeded",
+            JobTerminationReason.VOLUME_ERROR: "volume error",
+            JobTerminationReason.GATEWAY_ERROR: "gateway error",
+            JobTerminationReason.SCALED_DOWN: "scaled down",
+            JobTerminationReason.INACTIVITY_DURATION_EXCEEDED: "inactivity duration exceeded",
+            JobTerminationReason.TERMINATED_DUE_TO_UTILIZATION_POLICY: "utilization policy",
+            JobTerminationReason.PORTS_BINDING_FAILED: "ports binding failed",
+            JobTerminationReason.CREATING_CONTAINER_ERROR: "runner error",
+            JobTerminationReason.EXECUTOR_ERROR: "executor error",
+            JobTerminationReason.MAX_DURATION_EXCEEDED: "max duration exceeded",
+        }
+        return error_mapping.get(self)
 
 
 class Requirements(CoreModel):
@@ -227,6 +254,8 @@ class JobSpec(CoreModel):
     # TODO: drop this comment when supporting jobs submitted before 0.19.17 is no longer relevant.
     repo_code_hash: Optional[str] = None
     file_archives: list[FileArchiveMapping] = []
+    # None for non-services and pre-0.19.19 services. See `get_service_port`
+    service_port: Optional[int] = None
 
 
 class JobProvisioningData(CoreModel):
@@ -305,13 +334,12 @@ class JobSubmission(CoreModel):
     finished_at: Optional[datetime]
     inactivity_secs: Optional[int]
     status: JobStatus
+    status_message: str = ""  # default for backward compatibility
     termination_reason: Optional[JobTerminationReason]
     termination_reason_message: Optional[str]
     exit_status: Optional[int]
     job_provisioning_data: Optional[JobProvisioningData]
     job_runtime_data: Optional[JobRuntimeData]
-    # TODO: make status_message and error a computed field after migrating to pydanticV2
-    status_message: Optional[str] = None
     error: Optional[str] = None
 
     @property
@@ -324,71 +352,6 @@ class JobSubmission(CoreModel):
         if self.finished_at is not None:
             end_time = self.finished_at
         return end_time - self.submitted_at
-
-    @root_validator
-    def _status_message(cls, values) -> Dict:
-        try:
-            status = values["status"]
-            termination_reason = values["termination_reason"]
-            exit_code = values["exit_status"]
-        except KeyError:
-            return values
-        values["status_message"] = JobSubmission._get_status_message(
-            status=status,
-            termination_reason=termination_reason,
-            exit_status=exit_code,
-        )
-        return values
-
-    @staticmethod
-    def _get_status_message(
-        status: JobStatus,
-        termination_reason: Optional[JobTerminationReason],
-        exit_status: Optional[int],
-    ) -> str:
-        if status == JobStatus.DONE:
-            return "exited (0)"
-        elif status == JobStatus.FAILED:
-            if termination_reason == JobTerminationReason.CONTAINER_EXITED_WITH_ERROR:
-                return f"exited ({exit_status})"
-            elif termination_reason == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY:
-                return "no offers"
-            elif termination_reason == JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY:
-                return "interrupted"
-            else:
-                return "error"
-        elif status == JobStatus.TERMINATED:
-            if termination_reason == JobTerminationReason.TERMINATED_BY_USER:
-                return "stopped"
-            elif termination_reason == JobTerminationReason.ABORTED_BY_USER:
-                return "aborted"
-        return status.value
-
-    @root_validator
-    def _error(cls, values) -> Dict:
-        try:
-            termination_reason = values["termination_reason"]
-        except KeyError:
-            return values
-        values["error"] = JobSubmission._get_error(termination_reason=termination_reason)
-        return values
-
-    @staticmethod
-    def _get_error(termination_reason: Optional[JobTerminationReason]) -> Optional[str]:
-        error_mapping = {
-            JobTerminationReason.INSTANCE_UNREACHABLE: "instance unreachable",
-            JobTerminationReason.WAITING_INSTANCE_LIMIT_EXCEEDED: "waiting instance limit exceeded",
-            JobTerminationReason.VOLUME_ERROR: "volume error",
-            JobTerminationReason.GATEWAY_ERROR: "gateway error",
-            JobTerminationReason.SCALED_DOWN: "scaled down",
-            JobTerminationReason.INACTIVITY_DURATION_EXCEEDED: "inactivity duration exceeded",
-            JobTerminationReason.TERMINATED_DUE_TO_UTILIZATION_POLICY: "utilization policy",
-            JobTerminationReason.PORTS_BINDING_FAILED: "ports binding failed",
-            JobTerminationReason.CREATING_CONTAINER_ERROR: "runner error",
-            JobTerminationReason.EXECUTOR_ERROR: "executor error",
-            JobTerminationReason.MAX_DURATION_EXCEEDED: "max duration exceeded",
-        }
-        return error_mapping.get(termination_reason)
 
 
 class Job(CoreModel):
@@ -524,84 +487,16 @@ class Run(CoreModel):
     submitted_at: datetime
     last_processed_at: datetime
     status: RunStatus
-    status_message: Optional[str] = None
-    termination_reason: Optional[RunTerminationReason]
+    status_message: str = ""  # default for backward compatibility
+    termination_reason: Optional[RunTerminationReason] = None
     run_spec: RunSpec
     jobs: List[Job]
-    latest_job_submission: Optional[JobSubmission]
+    latest_job_submission: Optional[JobSubmission] = None
     cost: float = 0
     service: Optional[ServiceSpec] = None
     deployment_num: int = 0  # default for compatibility with pre-0.19.14 servers
-    # TODO: make error a computed field after migrating to pydanticV2
     error: Optional[str] = None
     deleted: Optional[bool] = None
-
-    @root_validator
-    def _error(cls, values) -> Dict:
-        try:
-            termination_reason = values["termination_reason"]
-        except KeyError:
-            return values
-        values["error"] = Run._get_error(termination_reason=termination_reason)
-        return values
-
-    @staticmethod
-    def _get_error(termination_reason: Optional[RunTerminationReason]) -> Optional[str]:
-        if termination_reason == RunTerminationReason.RETRY_LIMIT_EXCEEDED:
-            return "retry limit exceeded"
-        elif termination_reason == RunTerminationReason.SERVER_ERROR:
-            return "server error"
-        else:
-            return None
-
-    @root_validator
-    def _status_message(cls, values) -> Dict:
-        try:
-            status = values["status"]
-            jobs: List[Job] = values["jobs"]
-            retry_on_events = (
-                jobs[0].job_spec.retry.on_events if jobs and jobs[0].job_spec.retry else []
-            )
-            job_status = (
-                jobs[0].job_submissions[-1].status
-                if len(jobs) == 1 and jobs[0].job_submissions
-                else None
-            )
-            termination_reason = Run.get_last_termination_reason(jobs[0]) if jobs else None
-        except KeyError:
-            return values
-        values["status_message"] = Run._get_status_message(
-            status=status,
-            job_status=job_status,
-            retry_on_events=retry_on_events,
-            termination_reason=termination_reason,
-        )
-        return values
-
-    @staticmethod
-    def get_last_termination_reason(job: "Job") -> Optional[JobTerminationReason]:
-        for submission in reversed(job.job_submissions):
-            if submission.termination_reason is not None:
-                return submission.termination_reason
-        return None
-
-    @staticmethod
-    def _get_status_message(
-        status: RunStatus,
-        job_status: Optional[JobStatus],
-        retry_on_events: List[RetryEvent],
-        termination_reason: Optional[JobTerminationReason],
-    ) -> str:
-        if job_status == JobStatus.PULLING:
-            return "pulling"
-        # Currently, `retrying` is shown only for `no-capacity` events
-        if (
-            status in [RunStatus.SUBMITTED, RunStatus.PENDING]
-            and termination_reason == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
-            and RetryEvent.NO_CAPACITY in retry_on_events
-        ):
-            return "retrying"
-        return status.value
 
     def is_deployment_in_progress(self) -> bool:
         return any(
@@ -658,3 +553,11 @@ def get_policy_map(spot_policy: Optional[SpotPolicy], default: SpotPolicy) -> Op
         SpotPolicy.ONDEMAND: False,
     }
     return policy_map[spot_policy]
+
+
+def get_service_port(job_spec: JobSpec, configuration: ServiceConfiguration) -> int:
+    # Compatibility with pre-0.19.19 job specs that do not have the `service_port` property.
+    # TODO: drop when pre-0.19.19 jobs are no longer relevant.
+    if job_spec.service_port is None:
+        return configuration.port.container_port
+    return job_spec.service_port

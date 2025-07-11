@@ -1,9 +1,7 @@
 from dstack._internal.core.models.profiles import RetryEvent
 from dstack._internal.core.models.runs import (
     JobStatus,
-    JobSubmission,
     JobTerminationReason,
-    Run,
     RunStatus,
     RunTerminationReason,
 )
@@ -33,8 +31,9 @@ def test_job_termination_reason_to_retry_event_works_with_all_enum_variants():
         assert retry_event is None or isinstance(retry_event, RetryEvent)
 
 
-# Will fail if JobTerminationReason value is added without updaing JobSubmission._get_error
+# Will fail if JobTerminationReason value is added without updating JobSubmission._get_error
 def test_get_error_returns_expected_messages():
+    # already handled and shown in status_message
     no_error_reasons = [
         JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
         JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY,
@@ -47,7 +46,7 @@ def test_get_error_returns_expected_messages():
     ]
 
     for reason in JobTerminationReason:
-        if JobSubmission._get_error(reason) is None:
+        if reason.to_error() is None:
             # Fail no-error reason is not in the list
             assert reason in no_error_reasons
 
@@ -62,6 +61,6 @@ def test_run_get_error_returns_none_for_specific_reasons():
     ]
 
     for reason in RunTerminationReason:
-        if Run._get_error(reason) is None:
+        if reason.to_error() is None:
             # Fail no-error reason is not in the list
             assert reason in no_error_reasons
