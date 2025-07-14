@@ -274,6 +274,13 @@ func (d *DockerRunner) Run(ctx context.Context, taskID string) error {
 	cfg := task.config
 	var err error
 
+	runnerDir, err := d.dockerParams.MakeRunnerDir(task.containerName)
+	if err != nil {
+		return tracerr.Wrap(err)
+	}
+	task.runnerDir = runnerDir
+	log.Debug(ctx, "runner dir", "task", task.ID, "path", runnerDir)
+
 	if cfg.GPU != 0 {
 		gpuIDs, err := d.gpuLock.Acquire(ctx, cfg.GPU)
 		if err != nil {
@@ -335,7 +342,10 @@ func (d *DockerRunner) Run(ctx context.Context, taskID string) error {
 	if err := d.tasks.Update(task); err != nil {
 		return tracerr.Errorf("%w: failed to update task %s: %w", ErrInternal, task.ID, err)
 	}
-	if err = pullImage(pullCtx, d.client, cfg); err != nil {
+	// Although it's called "runner dir", we also use it for shim task-related data.
+	// Maybe we should rename it to "task dir" (including the `/root/.dstack/runners` dir on the host).
+	pullLogPath := filepath.Join(runnerDir, "pull.log")
+	if err = pullImage(pullCtx, d.client, cfg, pullLogPath); err != nil {
 		errMessage := fmt.Sprintf("pullImage error: %s", err.Error())
 		log.Error(ctx, errMessage)
 		task.SetStatusTerminated(string(types.TerminationReasonCreatingContainerError), errMessage)
@@ -655,7 +665,7 @@ func mountDisk(ctx context.Context, deviceName, mountPoint string, fsRootPerms o
 	return nil
 }
 
-func pullImage(ctx context.Context, client docker.APIClient, taskConfig TaskConfig) error {
+func pullImage(ctx context.Context, client docker.APIClient, taskConfig TaskConfig, logPath string) error {
 	if !strings.Contains(taskConfig.ImageName, ":") {
 		taskConfig.ImageName += ":latest"
 	}
@@ -685,51 +695,70 @@ func pullImage(ctx context.Context, client docker.APIClient, taskConfig TaskConf
 	if err != nil {
 		return tracerr.Wrap(err)
 	}
-	defer func() { _ = reader.Close() }()
+	defer reader.Close()
+
+	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
+	if err != nil {
+		return tracerr.Wrap(err)
+	}
+	defer logFile.Close()
+
+	teeReader := io.TeeReader(reader, logFile)
 
 	current := make(map[string]uint)
 	total := make(map[string]uint)
 
-	type ProgressDetail struct {
-		Current uint `json:"current"`
-		Total   uint `json:"total"`
-	}
-	type Progress struct {
-		Id             string         `json:"id"`
-		Status         string         `json:"status"`
-		ProgressDetail ProgressDetail `json:"progressDetail"` //nolint:tagliatelle
-		Error          string         `json:"error"`
+	// dockerd reports pulling progress as a stream of JSON Lines. The format of records is not documented in the API documentation,
+	// although it's occasionally mentioned, e.g., https://docs.docker.com/reference/api/engine/version-history/#v148-api-changes
+
+	// https://github.com/moby/moby/blob/e77ff99ede5ee5952b3a9227863552ae6e5b6fb1/pkg/jsonmessage/jsonmessage.go#L144
+	// All fields are optional
+	type PullMessage struct {
+		Id             string `json:"id"` // layer id
+		Status         string `json:"status"`
+		ProgressDetail struct {
+			Current uint `json:"current"` // bytes
+			Total   uint `json:"total"`   // bytes
+		} `json:"progressDetail"`
+		ErrorDetail struct {
+			Message string `json:"message"`
+		} `json:"errorDetail"`
 	}
 
-	var status bool
+	var pullCompleted bool
 	pullErrors := make([]string, 0)
 
-	scanner := bufio.NewScanner(reader)
+	scanner := bufio.NewScanner(teeReader)
 	for scanner.Scan() {
 		line := scanner.Bytes()
-		var progressRow Progress
-		if err := json.Unmarshal(line, &progressRow); err != nil {
+		var pullMessage PullMessage
+		if err := json.Unmarshal(line, &pullMessage); err != nil {
 			continue
 		}
-		if progressRow.Status == "Downloading" {
-			current[progressRow.Id] = progressRow.ProgressDetail.Current
-			total[progressRow.Id] = progressRow.ProgressDetail.Total
+		if pullMessage.Status == "Downloading" {
+			current[pullMessage.Id] = pullMessage.ProgressDetail.Current
+			total[pullMessage.Id] = pullMessage.ProgressDetail.Total
 		}
-		if progressRow.Status == "Download complete" {
-			current[progressRow.Id] = total[progressRow.Id]
+		if pullMessage.Status == "Download complete" {
+			current[pullMessage.Id] = total[pullMessage.Id]
 		}
-		if progressRow.Error != "" {
-			log.Error(ctx, "error pulling image", "name", taskConfig.ImageName, "err", progressRow.Error)
-			pullErrors = append(pullErrors, progressRow.Error)
+		if pullMessage.ErrorDetail.Message != "" {
+			log.Error(ctx, "error pulling image", "name", taskConfig.ImageName, "err", pullMessage.ErrorDetail.Message)
+			pullErrors = append(pullErrors, pullMessage.ErrorDetail.Message)
 		}
-		if strings.HasPrefix(progressRow.Status, "Status:") {
-			status = true
-			log.Debug(ctx, progressRow.Status)
+		// If the pull is successful, the last two entries must be:
+		// "Digest: sha256:<hash>"
+		// "Status: <message>"
+		// where <message> is either "Downloaded newer image for <tag>" or "Image is up to date for <tag>".
+		// See: https://github.com/moby/moby/blob/e77ff99ede5ee5952b3a9227863552ae6e5b6fb1/daemon/containerd/image_pull.go#L134-L152
+		// See: https://github.com/moby/moby/blob/e77ff99ede5ee5952b3a9227863552ae6e5b6fb1/daemon/containerd/image_pull.go#L257-L263
+		if strings.HasPrefix(pullMessage.Status, "Status:") {
+			pullCompleted = true
+			log.Debug(ctx, pullMessage.Status)
 		}
 	}
 
 	duration := time.Since(startTime)
-
 	var currentBytes uint
 	var totalBytes uint
 	for _, v := range current {
@@ -738,9 +767,13 @@ func pullImage(ctx context.Context, client docker.APIClient, taskConfig TaskConf
 	for _, v := range total {
 		totalBytes += v
 	}
-
 	speed := bytesize.New(float64(currentBytes) / duration.Seconds())
-	if status && currentBytes == totalBytes {
+
+	if err := ctx.Err(); err != nil {
+		return tracerr.Errorf("image pull interrupted: downloaded %d bytes out of %d (%s/s): %w", currentBytes, totalBytes, speed, err)
+	}
+
+	if pullCompleted {
 		log.Debug(ctx, "image successfully pulled", "bytes", currentBytes, "bps", speed)
 	} else {
 		return tracerr.Errorf(
@@ -749,21 +782,11 @@ func pullImage(ctx context.Context, client docker.APIClient, taskConfig TaskConf
 		)
 	}
 
-	err = ctx.Err()
-	if err != nil {
-		return tracerr.Errorf("imagepull interrupted: downloaded %d bytes out of %d (%s/s): %w", currentBytes, totalBytes, speed, err)
-	}
 	return nil
 }
 
 func (d *DockerRunner) createContainer(ctx context.Context, task *Task) error {
-	runnerDir, err := d.dockerParams.MakeRunnerDir(task.containerName)
-	if err != nil {
-		return tracerr.Wrap(err)
-	}
-	task.runnerDir = runnerDir
-
-	mounts, err := d.dockerParams.DockerMounts(runnerDir)
+	mounts, err := d.dockerParams.DockerMounts(task.runnerDir)
 	if err != nil {
 		return tracerr.Wrap(err)
 	}
