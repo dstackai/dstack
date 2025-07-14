@@ -151,7 +151,8 @@ async def lifespan(app: FastAPI):
     )
     if settings.SERVER_S3_BUCKET is not None or settings.SERVER_GCS_BUCKET is not None:
         init_default_storage()
-    scheduler = start_background_tasks()
+    if settings.SERVER_DISABLE_BACKGROUND_PROCESSING is not None:
+        scheduler = start_background_tasks()
     dstack_version = DSTACK_VERSION if DSTACK_VERSION else "(no version)"
     logger.info(f"The admin token is {admin.token.get_plaintext_or_error()}", {"show_path": False})
     logger.info(
