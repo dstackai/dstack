@@ -17,12 +17,6 @@ depends_on = None
 
 
 def upgrade() -> None:
-    with op.batch_alter_table("jobs", schema=None) as batch_op:
-        batch_op.add_column(sa.Column("deployment_num", sa.Integer(), nullable=True))
-    with op.batch_alter_table("jobs", schema=None) as batch_op:
-        batch_op.execute("UPDATE jobs SET deployment_num = 0")
-        batch_op.alter_column("deployment_num", nullable=False)
-
     with op.batch_alter_table("runs", schema=None) as batch_op:
         batch_op.add_column(sa.Column("deployment_num", sa.Integer(), nullable=True))
         batch_op.add_column(sa.Column("desired_replica_count", sa.Integer(), nullable=True))
@@ -31,6 +25,12 @@ def upgrade() -> None:
         batch_op.execute("UPDATE runs SET desired_replica_count = 1")
         batch_op.alter_column("deployment_num", nullable=False)
         batch_op.alter_column("desired_replica_count", nullable=False)
+
+    with op.batch_alter_table("jobs", schema=None) as batch_op:
+        batch_op.add_column(sa.Column("deployment_num", sa.Integer(), nullable=True))
+    with op.batch_alter_table("jobs", schema=None) as batch_op:
+        batch_op.execute("UPDATE jobs SET deployment_num = 0")
+        batch_op.alter_column("deployment_num", nullable=False)
 
 
 def downgrade() -> None:
