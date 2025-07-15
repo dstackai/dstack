@@ -293,6 +293,19 @@ async def process_terminating_job(
     # so that stuck volumes don't prevent the instance from terminating.
     job_model.instance_id = None
     instance_model.last_job_processed_at = common.get_current_datetime()
+
+    volume_names = (
+        jrd.volume_names
+        if jrd and jrd.volume_names
+        else [va.volume.name for va in instance_model.volume_attachments]
+    )
+    if volume_names:
+        volumes = await list_project_volume_models(
+            session=session, project=instance_model.project, names=volume_names
+        )
+        for volume in volumes:
+            volume.last_job_processed_at = common.get_current_datetime()
+
     logger.info(
         "%s: instance '%s' has been released, new status is %s",
         fmt(job_model),
