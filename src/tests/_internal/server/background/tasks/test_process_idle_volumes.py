@@ -1,4 +1,5 @@
 import datetime
+from unittest.mock import Mock, patch
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,6 +13,7 @@ from dstack._internal.server.background.tasks.process_idle_volumes import (
 )
 from dstack._internal.server.models import VolumeAttachmentModel
 from dstack._internal.server.testing.common import (
+    ComputeMockSpec,
     create_instance,
     create_project,
     create_user,
@@ -24,6 +26,61 @@ from dstack._internal.server.testing.common import (
 @pytest.mark.asyncio
 @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
 class TestProcessIdleVolumes:
+    async def test_deletes_idle_volumes(self, test_db, session: AsyncSession):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+
+        config1 = get_volume_configuration(
+            name="test-volume",
+            auto_cleanup_duration="1h",
+        )
+        config2 = get_volume_configuration(
+            name="test-volume",
+            auto_cleanup_duration="3h",
+        )
+        volume1 = await create_volume(
+            session=session,
+            project=project,
+            user=user,
+            status=VolumeStatus.ACTIVE,
+            backend=BackendType.AWS,
+            configuration=config1,
+            volume_provisioning_data=get_volume_provisioning_data(),
+            last_job_processed_at=datetime.datetime.now(datetime.timezone.utc)
+            - datetime.timedelta(hours=2),
+        )
+        volume2 = await create_volume(
+            session=session,
+            project=project,
+            user=user,
+            status=VolumeStatus.ACTIVE,
+            backend=BackendType.AWS,
+            configuration=config2,
+            volume_provisioning_data=get_volume_provisioning_data(),
+            last_job_processed_at=datetime.datetime.now(datetime.timezone.utc)
+            - datetime.timedelta(hours=2),
+        )
+        await session.commit()
+
+        with patch(
+            "dstack._internal.server.services.backends.get_project_backend_by_type_or_error"
+        ) as m:
+            aws_mock = Mock()
+            m.return_value = aws_mock
+            aws_mock.compute.return_value = Mock(spec=ComputeMockSpec)
+            await process_idle_volumes()
+
+        await session.refresh(volume1)
+        await session.refresh(volume2)
+        assert volume1.deleted
+        assert volume1.deleted_at is not None
+        assert not volume2.deleted
+        assert volume2.deleted_at is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+class TestShouldDeleteVolume:
     async def test_no_idle_duration(self, test_db, session: AsyncSession):
         project = await create_project(session=session)
         user = await create_user(session=session)
@@ -131,33 +188,3 @@ class TestProcessIdleVolumes:
         volume.last_job_processed_at = None
         idle_time = _get_idle_time(volume)
         assert idle_time.total_seconds() >= 7000
-
-    async def test_integration(self, test_db, session: AsyncSession):
-        project = await create_project(session=session)
-        user = await create_user(session=session)
-
-        config = get_volume_configuration(name="test-volume")
-        config.auto_cleanup_duration = "1h"
-
-        volume = await create_volume(
-            session=session,
-            project=project,
-            user=user,
-            status=VolumeStatus.ACTIVE,
-            backend=BackendType.AWS,
-            configuration=config,
-            volume_provisioning_data=get_volume_provisioning_data(),
-        )
-
-        volume.last_job_processed_at = (
-            datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=2)
-        ).replace(tzinfo=None)
-        await session.commit()
-
-        # Run the background task
-        await process_idle_volumes()
-
-        # Refresh the volume to see if it was marked as deleted
-        await session.refresh(volume)
-        assert volume.deleted is True
-        assert volume.deleted_at is not None

@@ -1,7 +1,7 @@
 import datetime
 from typing import List
 
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
@@ -37,7 +37,7 @@ async def process_idle_volumes():
                 )
                 .order_by(VolumeModel.last_processed_at.asc())
                 .limit(10)
-                .with_for_update(skip_locked=True)
+                .with_for_update(skip_locked=True, key_share=True)
             )
             volume_ids = list(res.scalars().all())
             if not volume_ids:
@@ -45,7 +45,6 @@ async def process_idle_volumes():
             for volume_id in volume_ids:
                 lockset.add(volume_id)
 
-        # Refetch volumes with proper relationship loading to avoid MissingGreenlet
         res = await session.execute(
             select(VolumeModel)
             .where(VolumeModel.id.in_(volume_ids))
@@ -54,89 +53,65 @@ async def process_idle_volumes():
             .options(joinedload(VolumeModel.attachments))
             .execution_options(populate_existing=True)
         )
-        volumes = list(res.unique().scalars().all())
-
+        volume_models = list(res.unique().scalars().all())
         try:
-            to_delete = []
-            for volume in volumes:
-                if _should_delete_volume(volume):
-                    to_delete.append(volume)
-
-            if to_delete:
-                await _delete_idle_volumes(session, to_delete)
-
+            volumes_to_delete = [v for v in volume_models if _should_delete_volume(v)]
+            if not volumes_to_delete:
+                return
+            await _delete_idle_volumes(session, volumes_to_delete)
         finally:
             lockset.difference_update(volume_ids)
 
 
 def _should_delete_volume(volume: VolumeModel) -> bool:
-    config = get_volume_configuration(volume)
-
-    if not config.auto_cleanup_duration:
+    if volume.attachments:
         return False
 
-    if isinstance(config.auto_cleanup_duration, int) and config.auto_cleanup_duration < 0:
+    config = get_volume_configuration(volume)
+    if not config.auto_cleanup_duration:
         return False
 
     duration_seconds = parse_duration(config.auto_cleanup_duration)
     if not duration_seconds or duration_seconds <= 0:
         return False
 
-    if volume.attachments:
-        return False
-
     idle_time = _get_idle_time(volume)
     threshold = datetime.timedelta(seconds=duration_seconds)
-
-    if idle_time > threshold:
-        logger.info(
-            "Deleting idle volume %s (idle %.1fh)", volume.name, idle_time.total_seconds() / 3600
-        )
-        return True
-
-    return False
+    return idle_time > threshold
 
 
 def _get_idle_time(volume: VolumeModel) -> datetime.timedelta:
     last_used = volume.last_job_processed_at or volume.created_at
     last_used_utc = last_used.replace(tzinfo=datetime.timezone.utc)
-    now = get_current_datetime()
-
-    idle_time = now - last_used_utc
+    idle_time = get_current_datetime() - last_used_utc
     return max(idle_time, datetime.timedelta(0))
 
 
 async def _delete_idle_volumes(session: AsyncSession, volumes: List[VolumeModel]):
-    """Delete idle volumes from cloud providers and mark as deleted in database."""
+    # Note: Multiple volumes are deleted in the same transaction,
+    # so long deletion of one volume may block processing other volumes.
     for volume_model in volumes:
+        logger.info("Deleting idle volume %s", volume_model.name)
         try:
-            await _delete_volume_from_cloud(session, volume_model)
+            await _delete_idle_volume(session, volume_model)
         except Exception:
-            logger.exception("Error when deleting volume %s from cloud", volume_model.name)
-        try:
-            await session.execute(
-                update(VolumeModel)
-                .where(VolumeModel.id == volume_model.id)
-                .values(
-                    deleted=True,
-                    deleted_at=get_current_datetime(),
-                )
-            )
-            logger.info("Deleted idle volume %s", volume_model.name)
-        except Exception:
-            logger.exception("Failed to mark volume %s as deleted in database", volume_model.name)
+            logger.exception("Error when deleting idle volume %s", volume_model.name)
+
+        volume_model.deleted = True
+        volume_model.deleted_at = get_current_datetime()
+
+        logger.info("Deleted idle volume %s", volume_model.name)
 
     await session.commit()
 
 
-async def _delete_volume_from_cloud(session: AsyncSession, volume_model: VolumeModel):
-    """Delete volume from cloud provider. Based on volumes.py:_delete_volume"""
+async def _delete_idle_volume(session: AsyncSession, volume_model: VolumeModel):
     volume = volume_model_to_volume(volume_model)
 
-    if volume.external:
-        return
-
     if volume.provisioning_data is None:
+        logger.error(
+            f"Failed to delete volume {volume_model.name}. volume.provisioning_data is None."
+        )
         return
 
     if volume.provisioning_data.backend is None:
