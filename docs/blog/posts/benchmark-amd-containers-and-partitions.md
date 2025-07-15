@@ -481,8 +481,11 @@ All source code and findings are available in [our GitHub repo :material-arrow-t
 
 ## What's next?
 
-* Benchmark VM performance, as it's another common way to share GPU resources.
+Benchmark the performance impact of VMs vs bare-metal for inference and training, to quantify virtualization overhead.
 
-!!! info "Acknowledgments"
-    Big thanks to [Hot Aisle :material-arrow-top-right-thin:{ .external }](https://hotaisle.xyz/){:target="_blank"} for providing the compute power behind these benchmarks. 
-    If you’re looking for fast AMD GPU bare-metal or VM instances, they’re definitely worth checking out.
+## Acknowledgments
+
+#### Hot Aisle
+    
+Big thanks to [Hot Aisle :material-arrow-top-right-thin:{ .external }](https://hotaisle.xyz/){:target="_blank"} for providing the compute power behind these benchmarks. 
+If you’re looking for fast AMD GPU bare-metal or VM instances, they’re definitely worth checking out.

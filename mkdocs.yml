@@ -67,7 +67,7 @@ plugins:
       categories_url_format: "{slug}"
       archive: false
       categories_name: Blog
-      # categories_sort_reverse: true
+      categories_sort_reverse: true
   - social:
       cards_layout_options:
         background_color: "black"
@@ -292,9 +292,9 @@ nav:
         - TPU: examples/accelerators/tpu/index.md
         - Intel Gaudi: examples/accelerators/intel/index.md
         - Tenstorrent: examples/accelerators/tenstorrent/index.md
-  - Benchmarks: blog/benchmarks.md
-  - Case studies: blog/case-studies.md
   - Changelog: blog/changelog.md
+  - Case studies: blog/case-studies.md
+  - Benchmarks: blog/benchmarks.md
   - Blog: 
     - blog/index.md
 #  - Discord: https://discord.gg/u8SmfwPpMd" target="_blank
