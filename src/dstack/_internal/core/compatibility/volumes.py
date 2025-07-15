@@ -30,4 +30,6 @@ def _get_volume_configuration_excludes(
     configuration_excludes: IncludeExcludeDictType = {}
     if configuration.tags is None:
         configuration_excludes["tags"] = True
+    if configuration.auto_cleanup_duration is None:
+        configuration_excludes["auto_cleanup_duration"] = True
     return configuration_excludes
