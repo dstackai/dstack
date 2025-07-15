@@ -151,8 +151,10 @@ async def lifespan(app: FastAPI):
     )
     if settings.SERVER_S3_BUCKET is not None or settings.SERVER_GCS_BUCKET is not None:
         init_default_storage()
-    if settings.SERVER_DISABLE_BACKGROUND_PROCESSING is not None:
+    if settings.SERVER_BACKGROUND_PROCESSING_ENABLED:
         scheduler = start_background_tasks()
+    else:
+        logger.info("Background processing is disabled")
     dstack_version = DSTACK_VERSION if DSTACK_VERSION else "(no version)"
     logger.info(f"The admin token is {admin.token.get_plaintext_or_error()}", {"show_path": False})
     logger.info(
@@ -162,7 +164,8 @@ async def lifespan(app: FastAPI):
     for func in _ON_STARTUP_HOOKS:
         await func(app)
     yield
-    scheduler.shutdown()
+    if settings.SERVER_BACKGROUND_PROCESSING_ENABLED:
+        scheduler.shutdown()
     await gateway_connections_pool.remove_all()
     service_conn_pool = await get_injector_from_app(app).get_service_connection_pool()
     await service_conn_pool.remove_all()
