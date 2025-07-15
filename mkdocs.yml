@@ -172,7 +172,7 @@ markdown_extensions:
   - pymdownx.tasklist:
       custom_checkbox: true
   - toc:
-      toc_depth: 5
+      toc_depth: 3
       permalink: true
   - attr_list
   - md_in_html
