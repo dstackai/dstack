@@ -10,6 +10,7 @@ import { instanceApi } from 'services/instance';
 import { mainApi } from 'services/mainApi';
 import { projectApi } from 'services/project';
 import { runApi } from 'services/run';
+import { secretApi } from 'services/secrets';
 import { serverApi } from 'services/server';
 import { userApi } from 'services/user';
 import { volumeApi } from 'services/volume';
@@ -30,6 +31,7 @@ export const store = configureStore({
         [authApi.reducerPath]: authApi.reducer,
         [serverApi.reducerPath]: serverApi.reducer,
         [volumeApi.reducerPath]: volumeApi.reducer,
+        [secretApi.reducerPath]: secretApi.reducer,
         [mainApi.reducerPath]: mainApi.reducer,
     },
 
@@ -47,6 +49,7 @@ export const store = configureStore({
             .concat(authApi.middleware)
             .concat(serverApi.middleware)
             .concat(volumeApi.middleware)
+            .concat(secretApi.middleware)
             .concat(mainApi.middleware),
 });
 
