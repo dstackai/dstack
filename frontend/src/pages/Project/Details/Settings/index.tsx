@@ -36,6 +36,7 @@ import { useBackendsTable } from '../../Backends/hooks';
 import { BackendsTable } from '../../Backends/Table';
 import { GatewaysTable } from '../../Gateways';
 import { useGatewaysTable } from '../../Gateways/hooks';
+import { ProjectSecrets } from '../../Secrets';
 import { CLI_INFO } from './constants';
 
 import styles from './styles.module.scss';
@@ -237,6 +238,8 @@ export const ProjectSettings: React.FC = () => {
                         isAdmin={isProjectAdmin(data)}
                         project={data}
                     />
+
+                    <ProjectSecrets project={data} />
 
                     <Container header={<Header variant="h2">{t('common.danger_zone')}</Header>}>
                         <SpaceBetween size="l">
