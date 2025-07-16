@@ -62,17 +62,17 @@ class TestPollLogs:
                 {
                     "timestamp": "2023-10-06T10:01:53.234234+00:00",
                     "log_source": "stdout",
-                    "message": "Hello",
+                    "message": "SGVsbG8=",
                 },
                 {
                     "timestamp": "2023-10-06T10:01:53.234235+00:00",
                     "log_source": "stdout",
-                    "message": "World",
+                    "message": "V29ybGQ=",
                 },
                 {
                     "timestamp": "2023-10-06T10:01:53.234236+00:00",
                     "log_source": "stdout",
-                    "message": "!",
+                    "message": "IQ==",
                 },
             ],
             "next_token": None,
@@ -93,7 +93,7 @@ class TestPollLogs:
                 {
                     "timestamp": "2023-10-06T10:01:53.234236+00:00",
                     "log_source": "stdout",
-                    "message": "!",
+                    "message": "IQ==",
                 },
             ],
             "next_token": None,

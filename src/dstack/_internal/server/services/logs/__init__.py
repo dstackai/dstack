@@ -8,7 +8,7 @@ from dstack._internal.server.models import ProjectModel
 from dstack._internal.server.schemas.logs import PollLogsRequest
 from dstack._internal.server.schemas.runner import LogEvent as RunnerLogEvent
 from dstack._internal.server.services.logs.aws import BOTO_AVAILABLE, CloudWatchLogStorage
-from dstack._internal.server.services.logs.base import LogStorage, LogStorageError
+from dstack._internal.server.services.logs.base import LogStorage, LogStorageError, b64encode_raw_message
 from dstack._internal.server.services.logs.filelog import FileLogStorage
 from dstack._internal.server.services.logs.gcp import GCP_LOGGING_AVAILABLE, GCPLogStorage
 from dstack._internal.utils.common import run_async
@@ -75,4 +75,11 @@ def write_logs(
 
 
 async def poll_logs_async(project: ProjectModel, request: PollLogsRequest) -> JobSubmissionLogs:
-    return await run_async(get_log_storage().poll_logs, project=project, request=request)
+    job_submission_logs = await run_async(get_log_storage().poll_logs, project=project, request=request)
+    # Logs are stored in plaintext but transmitted in base64 for API/CLI backward compatibility.
+    # Old logs stored in base64 are encoded twice for transmission and shown as base64 in CLI/UI.
+    # We live with that.
+    # TODO: Drop base64 encoding in 0.20.
+    for log_event in job_submission_logs.logs:
+        log_event.message = b64encode_raw_message(log_event.message.encode())
+    return job_submission_logs

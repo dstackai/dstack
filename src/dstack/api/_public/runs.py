@@ -1,6 +1,7 @@
 import queue
 import tempfile
 import threading
+import base64
 import time
 from abc import ABC
 from collections.abc import Iterator
@@ -228,7 +229,7 @@ class Run(ABC):
                     ),
                 )
                 for log in resp.logs:
-                    yield log.message.encode()
+                    yield base64.b64decode(log.message)
                 next_token = resp.next_token
                 if next_token is None:
                     break
