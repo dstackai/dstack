@@ -4,6 +4,8 @@ import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { base64ToArrayBuffer } from 'libs';
 import fetchBaseQueryHeaders from 'libs/fetchBaseQueryHeaders';
 
+const decoder = new TextDecoder('utf-8');
+
 // Helper function to transform backend response to frontend format
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const transformProjectResponse = (project: any): IProject => ({
@@ -131,7 +133,7 @@ export const projectApi = createApi({
             transformResponse: (response: { logs: ILogItem[]; next_token: string }) => {
                 const logs = response.logs.map((logItem) => ({
                     ...logItem,
-                    message: base64ToArrayBuffer(logItem.message as string),
+                    message: decoder.decode(base64ToArrayBuffer(logItem.message)),
                 }));
 
                 return {

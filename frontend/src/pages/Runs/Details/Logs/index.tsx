@@ -31,7 +31,7 @@ export const Logs: React.FC<IProps> = ({ className, projectName, runName, jobSub
 
     const writeDataToTerminal = (logs: ILogItem[]) => {
         logs.forEach((logItem) => {
-            terminalInstance.current.write(logItem.message);
+            terminalInstance.current.write(logItem.message.replace(/(?<!\r)\n/g, '\r\n'));
         });
 
         fitAddonInstance.current.fit();
