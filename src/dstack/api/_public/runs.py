@@ -1,3 +1,4 @@
+import base64
 import queue
 import tempfile
 import threading
@@ -228,7 +229,7 @@ class Run(ABC):
                     ),
                 )
                 for log in resp.logs:
-                    yield log.message.encode()
+                    yield base64.b64decode(log.message)
                 next_token = resp.next_token
                 if next_token is None:
                     break
