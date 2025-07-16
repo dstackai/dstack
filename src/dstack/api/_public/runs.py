@@ -1,7 +1,7 @@
+import base64
 import queue
 import tempfile
 import threading
-import base64
 import time
 from abc import ABC
 from collections.abc import Iterator
