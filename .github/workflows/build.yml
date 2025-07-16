@@ -42,11 +42,10 @@ jobs:
         working-directory: frontend
     steps:
       - uses: actions/checkout@v4
-      - uses: stefanoeb/eslint-action@1.0.2
       - name: Install modules
         run: npm install
       - name: Run Eslint
-        run: eslint --ext .js,.jsx,.ts,.tsx --max-warnings=0 --no-warn-ignored
+        run: npm run precommit
 
   frontend-build:
     runs-on: ubuntu-latest
