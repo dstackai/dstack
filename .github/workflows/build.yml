@@ -35,6 +35,18 @@ jobs:
       - run: uv tool install pre-commit
       - run: pre-commit run -a --show-diff-on-failure
 
+  frontend-lint:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install modules
+        run: npm install
+      - name: Run Eslint
+        run: eslint --ext .js,.jsx,.ts,.tsx --max-warnings=0 --no-warn-ignored
+
   frontend-build:
     runs-on: ubuntu-latest
     defaults:
