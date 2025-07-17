@@ -1,43 +1,55 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import classNames from 'classnames';
-import { Mode } from '@cloudscape-design/global-styles';
-import { FitAddon } from '@xterm/addon-fit';
-import { Terminal } from '@xterm/xterm';
 
-import { Container, Header, ListEmptyMessage, Loader, TextContent } from 'components';
+import { Code, Container, Header, ListEmptyMessage, Loader, TextContent } from 'components';
 
-import { useAppSelector } from 'hooks';
 import { useLazyGetProjectLogsQuery } from 'services/project';
 
-import { selectSystemMode } from 'App/slice';
+import { decodeLogs } from './helpers';
 
 import { IProps } from './types';
 
 import styles from './styles.module.scss';
 
 const LIMIT_LOG_ROWS = 1000;
+const LOADING_SCROLL_GAP = 300;
 
 export const Logs: React.FC<IProps> = ({ className, projectName, runName, jobSubmissionId }) => {
     const { t } = useTranslation();
-    const appliedTheme = useAppSelector(selectSystemMode);
+    const codeRef = useRef<HTMLDivElement>(null);
+    const nextTokenRef = useRef<string | undefined>(undefined);
+    const scrollPositionByBottom = useRef<number>(0);
 
-    const terminalInstance = useRef<Terminal>(new Terminal({ scrollback: 10000000 }));
-    const fitAddonInstance = useRef<FitAddon>(new FitAddon());
     const [logsData, setLogsData] = useState<ILogItem[]>([]);
     const [isLoading, setIsLoading] = useState(false);
-
     const [getProjectLogs] = useLazyGetProjectLogsQuery();
 
-    const writeDataToTerminal = (logs: ILogItem[]) => {
-        logs.forEach((logItem) => {
-            terminalInstance.current.write(logItem.message.replace(/(?<!\r)\n/g, '\r\n'));
-        });
+    const saveScrollPositionByBottom = () => {
+        if (!codeRef.current) return;
 
-        fitAddonInstance.current.fit();
+        const { clientHeight, scrollHeight, scrollTop } = codeRef.current;
+        scrollPositionByBottom.current = scrollHeight - clientHeight - scrollTop;
     };
 
-    const getNextLogItems = (nextToken?: string) => {
+    const restoreScrollPositionByBottom = () => {
+        if (!codeRef.current) return;
+
+        const { clientHeight, scrollHeight } = codeRef.current;
+        codeRef.current.scrollTo(0, scrollHeight - clientHeight - scrollPositionByBottom.current);
+    };
+
+    const checkNeedMoreLoadingData = () => {
+        if (!codeRef.current) return;
+
+        const { clientHeight, scrollHeight } = codeRef.current;
+
+        if (scrollHeight - clientHeight <= LOADING_SCROLL_GAP) {
+            getLogItems();
+        }
+    };
+
+    const getLogItems = (nextToken?: string) => {
         setIsLoading(true);
 
         if (!jobSubmissionId) {
@@ -47,64 +59,69 @@ export const Logs: React.FC<IProps> = ({ className, projectName, runName, jobSub
         getProjectLogs({
             project_name: projectName,
             run_name: runName,
-            descending: false,
-            job_submission_id: jobSubmissionId ?? '',
+            descending: true,
+            job_submission_id: jobSubmissionId,
             next_token: nextToken,
             limit: LIMIT_LOG_ROWS,
         })
             .unwrap()
             .then((response) => {
-                setLogsData((old) => [...old, ...response.logs]);
-
-                writeDataToTerminal(response.logs);
-
-                if (response.next_token) {
-                    getNextLogItems(response.next_token);
-                } else {
-                    setIsLoading(false);
-                }
+                saveScrollPositionByBottom();
+                const reversed = response.logs.toReversed();
+                setLogsData((old) => [...decodeLogs(reversed), ...old]);
+                nextTokenRef.current = response.next_token;
+                setIsLoading(false);
             })
             .catch(() => setIsLoading(false));
     };
 
-    useEffect(() => {
-        if (appliedTheme === Mode.Light) {
-            terminalInstance.current.options.theme = {
-                foreground: '#000716',
-                background: '#ffffff',
-                selectionBackground: '#B4D5FE',
-            };
-        } else {
-            terminalInstance.current.options.theme = {
-                foreground: '#b6bec9',
-                background: '#161d26',
-            };
+    const getNextLogItems = () => {
+        if (nextTokenRef.current) {
+            getLogItems(nextTokenRef.current);
         }
-    }, [appliedTheme]);
+    };
 
     useEffect(() => {
-        terminalInstance.current.loadAddon(fitAddonInstance.current);
+        getLogItems();
+    }, []);
 
-        getNextLogItems();
+    useLayoutEffect(() => {
+        if (logsData.length && logsData.length <= LIMIT_LOG_ROWS) {
+            scrollToBottom();
+        } else {
+            restoreScrollPositionByBottom();
+        }
 
-        const onResize = () => {
-            fitAddonInstance.current.fit();
-        };
+        if (logsData.length) checkNeedMoreLoadingData();
+    }, [logsData]);
 
-        window.addEventListener('resize', onResize);
+    const onScroll = useCallback<EventListener>(
+        (event) => {
+            const element = event.target as HTMLDivElement;
+
+            if (element.scrollTop <= LOADING_SCROLL_GAP && !isLoading) {
+                getNextLogItems();
+            }
+        },
+        [isLoading, logsData],
+    );
+
+    useEffect(() => {
+        if (!codeRef.current) return;
+
+        codeRef.current.addEventListener('scroll', onScroll);
 
         return () => {
-            window.removeEventListener('resize', onResize);
+            if (codeRef.current) codeRef.current.removeEventListener('scroll', onScroll);
         };
-    }, []);
+    }, [codeRef.current, onScroll]);
 
-    useEffect(() => {
-        const element = document.getElementById('terminal');
+    const scrollToBottom = () => {
+        if (!codeRef.current) return;
 
-        if (terminalInstance.current && element) {
-            terminalInstance.current.open(element);
-        }
-    }, []);
+        const { clientHeight, scrollHeight } = codeRef.current;
+        codeRef.current.scrollTo(0, scrollHeight - clientHeight);
+    };
 
     return (
         <div className={classNames(styles.logs, className)}>
@@ -126,7 +143,11 @@ export const Logs: React.FC<IProps> = ({ className, projectName, runName, jobSub
                         />
                     )}
 
-                    <div className={styles.terminal} id="terminal" />
+                    <Code className={styles.terminal} ref={codeRef}>
+                        {logsData.map((log, i) => (
+                            <p key={i}>{log.message}</p>
+                        ))}
+                    </Code>
                 </TextContent>
             </Container>
         </div>

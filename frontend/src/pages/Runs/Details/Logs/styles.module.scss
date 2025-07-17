@@ -56,6 +56,11 @@
                 .terminal {
                     flex-grow: 1;
                     min-height: 0;
+                    overflow-y: auto;
+
+                    p {
+                        padding: 0 !important;
+                    }
                 }
 
                 .scroll {
