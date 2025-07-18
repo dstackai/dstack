@@ -43,9 +43,9 @@ To enable exporting metrics to Prometheus, set the
 In addition to the essential metrics available via the CLI and UI, `dstack` exports additional metrics to Prometheus, including data on fleets, runs, jobs, and DCGM metrics.
 
 ??? info "NVIDIA DCGM"
-    NVIDIA DCGM metrics are automatically collected for `aws`, `azure`, `gcp`, and `oci` backends, 
+    NVIDIA DCGM metrics are automatically collected for `aws`, `azure`, `gcp`, and `oci` backends,
     as well as for [SSH fleets](../concepts/fleets.md#ssh).
-    
+
     To ensure NVIDIA DCGM metrics are collected from SSH fleets, ensure the `datacenter-gpu-manager-4-core`,
     `datacenter-gpu-manager-4-proprietary`, and `datacenter-gpu-manager-exporter` packages are installed on the hosts.
 
@@ -112,6 +112,9 @@ telemetry, and more.
     | `dstack_job_memory_total_bytes`                 | *gauge*   | Total memory allocated for the job, bytes                                                  | `4009754624.0` |
     | `dstack_job_memory_usage_bytes`                 | *gauge*   | Memory used by the job (including cache), bytes                                            | `339017728.0`  |
     | `dstack_job_memory_working_set_bytes`           | *gauge*   | Memory used by the job (not including cache), bytes                                        | `147251200.0`  |
+    | `dstack_job_gpu_usage_ratio`                    | *gauge*   | Job GPU usage, percent (as 0.0-1.0)                                                        | `0.93`         |
+    | `dstack_job_gpu_memory_total_bytes`             | *gauge*   | Total GPU memory allocated for the job, bytes                                              | `8589934592.0` |
+    | `dstack_job_gpu_memory_usage_bytes`             | *gauge*   | GPU memory used by the job, bytes                                                          | `1048576.0`    |
     | `DCGM_FI_DEV_GPU_UTIL`                          | *gauge*   | GPU utilization (in %)                                                                     |                |
     | `DCGM_FI_DEV_MEM_COPY_UTIL`                     | *gauge*   | Memory utilization (in %)                                                                  |                |
     | `DCGM_FI_DEV_ENC_UTIL`                          | *gauge*   | Encoder utilization (in %)                                                                 |                |
@@ -176,6 +179,9 @@ telemetry, and more.
     | `dstack_run_type`     | *string*  | Run configuration type | `task`, `dev-environment`              |
     | `dstack_backend`      | *string*  | Backend                | `aws`, `runpod`                        |
     | `dstack_gpu`          | *string?* | GPU name               | `H100`                                 |
+    | `dstack_gpu_num`[^1]  | *integer* | GPU number (0-based)   | `0`                                    |
+
+    [^1]: For `dstack_gpu_*` metrics only.
 
 ### Server health metrics
 
