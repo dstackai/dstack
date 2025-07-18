@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from typing import List, Optional
 
 import pydantic
+from apscheduler.triggers.cron import CronTrigger
 from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
@@ -511,6 +512,12 @@ async def submit_run(
         )
 
         submitted_at = common_utils.get_current_datetime()
+        initial_status = RunStatus.SUBMITTED
+        initial_replicas = 1
+        if run_spec.merged_profile.schedule is not None:
+            initial_status = RunStatus.PENDING
+            initial_replicas = 0
+
         run_model = RunModel(
             id=uuid.uuid4(),
             project_id=project.id,
@@ -519,21 +526,21 @@ async def submit_run(
             user_id=user.id,
             run_name=run_spec.run_name,
             submitted_at=submitted_at,
-            status=RunStatus.SUBMITTED,
+            status=initial_status,
             run_spec=run_spec.json(),
             last_processed_at=submitted_at,
             priority=run_spec.configuration.priority,
             deployment_num=0,
             desired_replica_count=1,  # a relevant value will be set in process_runs.py
+            next_triggered_at=_get_next_triggered_at(run_spec),
         )
         session.add(run_model)
 
-        replicas = 1
         if run_spec.configuration.type == "service":
-            replicas = run_spec.configuration.replicas.min
+            initial_replicas = run_spec.configuration.replicas.min
             await services.register_service(session, run_model, run_spec)
 
-        for replica_num in range(replicas):
+        for replica_num in range(initial_replicas):
             jobs = await get_jobs_from_run_spec(
                 run_spec=run_spec,
                 secrets=secrets,
@@ -1059,7 +1066,7 @@ def _check_can_update_configuration(
             )
 
 
-async def process_terminating_run(session: AsyncSession, run: RunModel):
+async def process_terminating_run(session: AsyncSession, run_model: RunModel):
     """
     Used by both `process_runs` and `stop_run` to process a TERMINATING run.
     Stops the jobs gracefully and marks them as TERMINATING.
@@ -1067,44 +1074,54 @@ async def process_terminating_run(session: AsyncSession, run: RunModel):
     When all jobs are terminated, assigns a finished status to the run.
     Caller must acquire the lock on run.
     """
-    assert run.termination_reason is not None
-    job_termination_reason = run.termination_reason.to_job_termination_reason()
+    assert run_model.termination_reason is not None
+    run = run_model_to_run(run_model, include_jobs=False)
+    job_termination_reason = run_model.termination_reason.to_job_termination_reason()
 
     unfinished_jobs_count = 0
-    for job in run.jobs:
-        if job.status.is_finished():
+    for job_model in run_model.jobs:
+        if job_model.status.is_finished():
             continue
         unfinished_jobs_count += 1
-        if job.status == JobStatus.TERMINATING:
+        if job_model.status == JobStatus.TERMINATING:
             if job_termination_reason == JobTerminationReason.ABORTED_BY_USER:
                 # Override termination reason so that
                 # abort actions such as volume force detach are triggered
-                job.termination_reason = job_termination_reason
+                job_model.termination_reason = job_termination_reason
             continue
 
-        if job.status == JobStatus.RUNNING and job_termination_reason not in {
+        if job_model.status == JobStatus.RUNNING and job_termination_reason not in {
             JobTerminationReason.ABORTED_BY_USER,
             JobTerminationReason.DONE_BY_RUNNER,
         }:
             # Send a signal to stop the job gracefully
-            await stop_runner(session, job)
-            delay_job_instance_termination(job)
-        job.status = JobStatus.TERMINATING
-        job.termination_reason = job_termination_reason
-        job.last_processed_at = common_utils.get_current_datetime()
+            await stop_runner(session, job_model)
+            delay_job_instance_termination(job_model)
+        job_model.status = JobStatus.TERMINATING
+        job_model.termination_reason = job_termination_reason
+        job_model.last_processed_at = common_utils.get_current_datetime()
 
     if unfinished_jobs_count == 0:
-        if run.service_spec is not None:
+        if run_model.service_spec is not None:
             try:
-                await services.unregister_service(session, run)
+                await services.unregister_service(session, run_model)
             except Exception as e:
-                logger.warning("%s: failed to unregister service: %s", fmt(run), repr(e))
-        run.status = run.termination_reason.to_status()
+                logger.warning("%s: failed to unregister service: %s", fmt(run_model), repr(e))
+        if (
+            run.run_spec.merged_profile.schedule is not None
+            and run_model.termination_reason
+            not in [RunTerminationReason.ABORTED_BY_USER, RunTerminationReason.STOPPED_BY_USER]
+        ):
+            run_model.next_triggered_at = _get_next_triggered_at(run.run_spec)
+            run_model.status = RunStatus.PENDING
+        else:
+            run_model.status = run_model.termination_reason.to_status()
+
         logger.info(
             "%s: run status has changed TERMINATING -> %s, reason: %s",
-            fmt(run),
-            run.status.name,
-            run.termination_reason.name,
+            fmt(run_model),
+            run_model.status.name,
+            run_model.termination_reason.name,
         )
 
 
@@ -1224,3 +1241,16 @@ async def retry_run_replica_jobs(
 
 def _remove_job_spec_sensitive_info(spec: JobSpec):
     spec.ssh_key = None
+
+
+def _get_next_triggered_at(run_spec: RunSpec) -> Optional[datetime]:
+    if run_spec.merged_profile.schedule is None:
+        return None
+    cron_trigger = CronTrigger.from_crontab(
+        run_spec.merged_profile.schedule.cron,
+        timezone=timezone.utc,
+    )
+    return cron_trigger.get_next_fire_time(
+        previous_fire_time=None,
+        now=common_utils.get_current_datetime(),
+    )

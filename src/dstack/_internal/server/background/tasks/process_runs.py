@@ -135,8 +135,21 @@ async def _process_run(session: AsyncSession, run_model: RunModel):
 async def _process_pending_run(session: AsyncSession, run_model: RunModel):
     """Jobs are not created yet"""
     run = run_model_to_run(run_model)
-    if not _pending_run_ready_for_resubmission(run_model, run):
-        logger.debug("%s: pending run is not yet ready for resubmission", fmt(run_model))
+
+    # TODO: Do not select such runs in the first place to avoid redundant processing
+    if (
+        run_model.resubmission_attempt == 0
+        and run_model.next_triggered_at is not None
+        and run_model.next_triggered_at.replace(tzinfo=datetime.timezone.utc)
+        > common.get_current_datetime()
+    ):
+        logger.debug("%s: scheduled run is not yet ready for submission", fmt(run_model))
+        return
+
+    if run_model.resubmission_attempt > 0 and not _retrying_run_ready_for_resubmission(
+        run_model, run
+    ):
+        logger.debug("%s: retrying run is not yet ready for resubmission", fmt(run_model))
         return
 
     run_model.desired_replica_count = 1
@@ -160,7 +173,7 @@ async def _process_pending_run(session: AsyncSession, run_model: RunModel):
     logger.info("%s: run status has changed PENDING -> SUBMITTED", fmt(run_model))
 
 
-def _pending_run_ready_for_resubmission(run_model: RunModel, run: Run) -> bool:
+def _retrying_run_ready_for_resubmission(run_model: RunModel, run: Run) -> bool:
     if run.latest_job_submission is None:
         # Should not be possible
         return True
@@ -197,7 +210,7 @@ async def _process_active_run(session: AsyncSession, run_model: RunModel):
     We handle fails, scaling, and status changes.
     """
     run = run_model_to_run(run_model)
-    run_spec = RunSpec.__response__.parse_raw(run_model.run_spec)
+    run_spec = run.run_spec
     retry_single_job = _can_retry_single_job(run_spec)
 
     run_statuses: Set[RunStatus] = set()
