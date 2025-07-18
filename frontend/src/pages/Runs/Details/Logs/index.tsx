@@ -79,7 +79,7 @@ export const Logs: React.FC<IProps> = ({ className, projectName, runName, jobSub
             .then((response) => {
                 saveScrollPositionByBottom();
                 const reversed = response.logs.toReversed();
-                setLogsData((old) => [...decodeLogs(reversed), ...old]);
+                setLogsData((old) => [...reversed, ...old]);
                 nextTokenRef.current = response.next_token;
                 setIsLoading(false);
             })
