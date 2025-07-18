@@ -1,11 +1,12 @@
-import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import classNames from 'classnames';
 
-import { Code, Container, Header, ListEmptyMessage, Loader, TextContent } from 'components';
+import { Box, Code, Container, Header, ListEmptyMessage, Loader, TextContent, Toggle } from 'components';
 
 import { useLazyGetProjectLogsQuery } from 'services/project';
 
+import { useLocalStorageState } from '../../../../hooks/useLocalStorageState';
 import { decodeLogs } from './helpers';
 
 import { IProps } from './types';
@@ -24,6 +25,16 @@ export const Logs: React.FC<IProps> = ({ className, projectName, runName, jobSub
     const [logsData, setLogsData] = useState<ILogItem[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [getProjectLogs] = useLazyGetProjectLogsQuery();
+    const [isEnabledDecoding, setIsEnabledDecoding] = useLocalStorageState('enable-encode-logs', false);
+    // const [isShowTimestamp, setIsShowTimestamp] = useLocalStorageState('enable-showing-timestamp-logs', false);
+
+    const logsForView = useMemo(() => {
+        if (isEnabledDecoding) {
+            return decodeLogs(logsData);
+        }
+
+        return logsData;
+    }, [logsData, isEnabledDecoding]);
 
     const saveScrollPositionByBottom = () => {
         if (!codeRef.current) return;
@@ -86,14 +97,14 @@ export const Logs: React.FC<IProps> = ({ className, projectName, runName, jobSub
     }, []);
 
     useLayoutEffect(() => {
-        if (logsData.length && logsData.length <= LIMIT_LOG_ROWS) {
+        if (logsForView.length && logsForView.length <= LIMIT_LOG_ROWS) {
             scrollToBottom();
         } else {
             restoreScrollPositionByBottom();
         }
 
-        if (logsData.length) checkNeedMoreLoadingData();
-    }, [logsData]);
+        if (logsForView.length) checkNeedMoreLoadingData();
+    }, [logsForView]);
 
     const onScroll = useCallback<EventListener>(
         (event) => {
@@ -103,7 +114,7 @@ export const Logs: React.FC<IProps> = ({ className, projectName, runName, jobSub
                 getNextLogItems();
             }
         },
-        [isLoading, logsData],
+        [isLoading, logsForView],
     );
 
     useEffect(() => {
@@ -127,27 +138,57 @@ export const Logs: React.FC<IProps> = ({ className, projectName, runName, jobSub
         <div className={classNames(styles.logs, className)}>
             <Container
                 header={
-                    <Header variant="h2">
-                        <div className={styles.headerContainer}>
-                            {t('projects.run.log')}
-                            <Loader show={isLoading} padding={'n'} className={classNames(styles.loader)} loadingText={''} />
+                    <div className={styles.headerContainer}>
+                        <div className={styles.headerTitle}>
+                            <Header variant="h2">{t('projects.run.log')}</Header>
                         </div>
-                    </Header>
+
+                        <Loader
+                            show={isLoading && Boolean(logsForView.length)}
+                            padding={'n'}
+                            className={styles.loader}
+                            loadingText={''}
+                        />
+
+                        <div className={styles.switchers}>
+                            <Box>
+                                <Toggle
+                                    onChange={({ detail }) => setIsEnabledDecoding(detail.checked)}
+                                    checked={isEnabledDecoding}
+                                >
+                                    Decode
+                                </Toggle>
+                            </Box>
+
+                            {/*<Box>*/}
+                            {/*    <Toggle onChange={({ detail }) => setIsShowTimestamp(detail.checked)} checked={isShowTimestamp}>*/}
+                            {/*        Show timestamp*/}
+                            {/*    </Toggle>*/}
+                            {/*</Box>*/}
+                        </div>
+                    </div>
                 }
             >
                 <TextContent>
-                    {!isLoading && !logsData.length && (
+                    {!isLoading && !logsForView.length && (
                         <ListEmptyMessage
                             title={t('projects.run.log_empty_message_title')}
                             message={t('projects.run.log_empty_message_text')}
                         />
                     )}
 
-                    <Code className={styles.terminal} ref={codeRef}>
-                        {logsData.map((log, i) => (
-                            <p key={i}>{log.message}</p>
-                        ))}
-                    </Code>
+                    {!logsForView.length && <Loader show={isLoading} className={styles.mainLoader} />}
+
+                    {Boolean(logsForView.length) && (
+                        <Code className={styles.terminal} ref={codeRef}>
+                            {logsForView.map((log, i) => (
+                                <p key={i}>
+                                    {/*{isShowTimestamp && <span className={styles.timestamp}>{log.timestamp}</span>}*/}
+                                    {log.message}
+                                </p>
+                            ))}
+                        </Code>
+                    )}
                 </TextContent>
             </Container>
         </div>
