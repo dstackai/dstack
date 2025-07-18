@@ -92,6 +92,11 @@ export const Logs: React.FC<IProps> = ({ className, projectName, runName, jobSub
         }
     };
 
+    const toggleDecodeLogs = () => {
+        saveScrollPositionByBottom();
+        setIsEnabledDecoding(!isEnabledDecoding);
+    };
+
     useEffect(() => {
         getLogItems();
     }, []);
@@ -157,7 +162,7 @@ export const Logs: React.FC<IProps> = ({ className, projectName, runName, jobSub
                                     formAction="none"
                                     iconName="gen-ai"
                                     variant={isEnabledDecoding ? 'primary' : 'icon'}
-                                    onClick={() => setIsEnabledDecoding(!isEnabledDecoding)}
+                                    onClick={toggleDecodeLogs}
                                 />
                             </Box>
 
