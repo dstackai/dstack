@@ -517,6 +517,8 @@ async def submit_run(
         if run_spec.merged_profile.schedule is not None:
             initial_status = RunStatus.PENDING
             initial_replicas = 0
+        elif run_spec.configuration.type == "service":
+            initial_replicas = run_spec.configuration.replicas.min
 
         run_model = RunModel(
             id=uuid.uuid4(),
@@ -537,7 +539,6 @@ async def submit_run(
         session.add(run_model)
 
         if run_spec.configuration.type == "service":
-            initial_replicas = run_spec.configuration.replicas.min
             await services.register_service(session, run_model, run_spec)
 
         for replica_num in range(initial_replicas):
