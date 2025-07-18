@@ -77,6 +77,10 @@
                     overflow-y: auto;
                     background-color: awsui.$color-background-layout-main;
 
+                    code {
+                        color: awsui.$color-text-body-default !important;
+                    }
+
                     p {
                         padding: 0 !important;
                         font-size: awsui.$font-size-body-s !important;
