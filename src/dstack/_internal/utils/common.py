@@ -225,27 +225,6 @@ def remove_prefix(text: str, prefix: str) -> str:
 T = TypeVar("T")
 
 
-def split_chunks(iterable: Iterable[T], chunk_size: int) -> Iterable[List[T]]:
-    """
-    Splits an iterable into chunks of at most `chunk_size` items.
-
-    >>> list(split_chunks([1, 2, 3, 4, 5], 2))
-    [[1, 2], [3, 4], [5]]
-    """
-
-    if chunk_size < 1:
-        raise ValueError(f"chunk_size should be a positive integer, not {chunk_size}")
-
-    chunk = []
-    for item in iterable:
-        chunk.append(item)
-        if len(chunk) == chunk_size:
-            yield chunk
-            chunk = []
-    if chunk:
-        yield chunk
-
-
 MEMORY_UNITS = {
     "B": 1,
     "K": 2**10,
@@ -283,7 +262,17 @@ def get_or_error(v: Optional[T]) -> T:
     return v
 
 
+# TODO: drop after dropping Python 3.11
 def batched(seq: Iterable[T], n: int) -> Iterable[List[T]]:
+    """
+    Roughly equivalent to itertools.batched from Python 3.12.
+
+    >>> list(batched([1, 2, 3, 4, 5], 2))
+    [[1, 2], [3, 4], [5]]
+    """
+
+    if n < 1:
+        raise ValueError(f"n should be a positive integer, not {n}")
     it = iter(seq)
     return iter(lambda: list(itertools.islice(it, n)), [])
 
