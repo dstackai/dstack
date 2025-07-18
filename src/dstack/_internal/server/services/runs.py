@@ -979,6 +979,12 @@ def _validate_run_spec_and_set_defaults(run_spec: RunSpec):
         raise ServerClientError(
             f"Maximum utilization_policy.time_window is {settings.SERVER_METRICS_RUNNING_TTL_SECONDS}s"
         )
+    if (
+        run_spec.merged_profile.schedule
+        and run_spec.configuration.type == "service"
+        and run_spec.configuration.replicas.min == 0
+    ):
+        raise ServerClientError("Scheduled services with autoscaling to zero are not supported")
     if run_spec.configuration.priority is None:
         run_spec.configuration.priority = RUN_PRIORITY_DEFAULT
     set_resources_defaults(run_spec.configuration.resources)
