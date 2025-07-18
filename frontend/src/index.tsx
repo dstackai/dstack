@@ -12,7 +12,6 @@ import 'ace-builds/css/ace.css';
 import 'ace-builds/css/theme/cloud_editor.css';
 import 'ace-builds/css/theme/cloud_editor_dark.css';
 import 'assets/css/index.css';
-import '@xterm/xterm/css/xterm.css';
 
 import 'locale';
 

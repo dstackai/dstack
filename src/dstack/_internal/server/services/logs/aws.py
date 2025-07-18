@@ -55,6 +55,8 @@ class CloudWatchLogStorage(LogStorage):
     PAST_EVENT_MAX_DELTA = int((timedelta(days=14)).total_seconds()) * 1000 - CLOCK_DRIFT
     # "None of the log events in the batch can be more than 2 hours in the future."
     FUTURE_EVENT_MAX_DELTA = int((timedelta(hours=2)).total_seconds()) * 1000 - CLOCK_DRIFT
+    # Maximum number of retries when polling for log events to skip empty pages.
+    MAX_RETRIES = 10
 
     def __init__(self, *, group: str, region: Optional[str] = None) -> None:
         with self._wrap_boto_errors():
@@ -80,7 +82,7 @@ class CloudWatchLogStorage(LogStorage):
         next_token: Optional[str] = None
         with self._wrap_boto_errors():
             try:
-                cw_events, next_token = self._get_log_events(stream, request)
+                cw_events, next_token = self._get_log_events_with_retry(stream, request)
             except botocore.exceptions.ClientError as e:
                 if not self._is_resource_not_found_exception(e):
                     raise
@@ -101,7 +103,45 @@ class CloudWatchLogStorage(LogStorage):
             )
             for cw_event in cw_events
         ]
-        return JobSubmissionLogs(logs=logs, next_token=next_token if len(logs) > 0 else None)
+        return JobSubmissionLogs(logs=logs, next_token=next_token)
+
+    def _get_log_events_with_retry(
+        self, stream: str, request: PollLogsRequest
+    ) -> Tuple[List[_CloudWatchLogEvent], Optional[str]]:
+        current_request = request
+        previous_next_token = request.next_token
+
+        for attempt in range(self.MAX_RETRIES):
+            cw_events, next_token = self._get_log_events(stream, current_request)
+
+            if cw_events:
+                return cw_events, next_token
+
+            if not next_token:
+                return [], None
+
+            if next_token == previous_next_token:
+                return [], None
+
+            previous_next_token = next_token
+            current_request = PollLogsRequest(
+                run_name=request.run_name,
+                job_submission_id=request.job_submission_id,
+                start_time=request.start_time,
+                end_time=request.end_time,
+                descending=request.descending,
+                next_token=next_token,
+                limit=request.limit,
+                diagnose=request.diagnose,
+            )
+
+        if not request.descending:
+            logger.debug(
+                "Stream %s: exhausted %d retries without finding logs, returning empty response",
+                stream,
+                self.MAX_RETRIES,
+            )
+        return [], next_token if request.descending else None
 
     def _get_log_events(
         self, stream: str, request: PollLogsRequest
@@ -115,7 +155,7 @@ class CloudWatchLogStorage(LogStorage):
         }
 
         if request.start_time:
-            parameters["startTime"] = datetime_to_unix_time_ms(request.start_time) + 1
+            parameters["startTime"] = datetime_to_unix_time_ms(request.start_time)
 
         if request.end_time:
             parameters["endTime"] = datetime_to_unix_time_ms(request.end_time)

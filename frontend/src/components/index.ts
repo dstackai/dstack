@@ -56,7 +56,6 @@ export { default as PropertyFilter } from '@cloudscape-design/components/propert
 export type { PropertyFilterProps } from '@cloudscape-design/components/property-filter';
 export type { LineChartProps } from '@cloudscape-design/components/line-chart/interfaces';
 export type { ModalProps } from '@cloudscape-design/components/modal';
-export type { TilesProps } from '@cloudscape-design/components/tiles';
 
 // custom components
 export { NavigateLink } from './NavigateLink';
