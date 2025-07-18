@@ -2,11 +2,11 @@ import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useSta
 import { useTranslation } from 'react-i18next';
 import classNames from 'classnames';
 
-import { Box, Code, Container, Header, ListEmptyMessage, Loader, TextContent, Toggle } from 'components';
+import { Box, Button, Code, Container, Header, ListEmptyMessage, Loader, TextContent } from 'components';
 
+import { useLocalStorageState } from 'hooks/useLocalStorageState';
 import { useLazyGetProjectLogsQuery } from 'services/project';
 
-import { useLocalStorageState } from '../../../../hooks/useLocalStorageState';
 import { decodeLogs } from './helpers';
 
 import { IProps } from './types';
@@ -152,12 +152,13 @@ export const Logs: React.FC<IProps> = ({ className, projectName, runName, jobSub
 
                         <div className={styles.switchers}>
                             <Box>
-                                <Toggle
-                                    onChange={({ detail }) => setIsEnabledDecoding(detail.checked)}
-                                    checked={isEnabledDecoding}
-                                >
-                                    Decode
-                                </Toggle>
+                                <Button
+                                    ariaLabel="Legacy mode"
+                                    formAction="none"
+                                    iconName="gen-ai"
+                                    variant={isEnabledDecoding ? 'primary' : 'icon'}
+                                    onClick={() => setIsEnabledDecoding(!isEnabledDecoding)}
+                                />
                             </Box>
 
                             {/*<Box>*/}
