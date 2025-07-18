@@ -36,6 +36,7 @@ dependencies = [
     "argcomplete>=3.5.0",
     "ignore-python>=0.2.0",
     "orjson",
+    "apscheduler<4",
 ]
 
 [project.urls]
@@ -117,7 +118,6 @@ server = [
     "sqlalchemy[asyncio]>=2.0.0",
     "sqlalchemy_utils>=0.40.0",
     "alembic>=1.10.2",
-    "apscheduler<4",
     "aiosqlite",
     "docker>=6.0.0",
     "python-dxf==12.1.0",

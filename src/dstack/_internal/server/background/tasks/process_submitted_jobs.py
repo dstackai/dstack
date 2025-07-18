@@ -167,10 +167,9 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
     )
     run_model = res.unique().scalar_one()
     project = run_model.project
-    run_spec = RunSpec.__response__.parse_raw(run_model.run_spec)
-    profile = run_spec.merged_profile
-
     run = run_model_to_run(run_model)
+    run_spec = run.run_spec
+    profile = run_spec.merged_profile
     job = find_job(run.jobs, job_model.replica_num, job_model.job_num)
 
     master_job = find_job(run.jobs, job_model.replica_num, 0)

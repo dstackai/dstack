@@ -5,6 +5,9 @@ class RunMetrics:
     """Wrapper class for run-related Prometheus metrics."""
 
     def __init__(self):
+        # submit_to_provision_duration reflects real provisioning time
+        # but does not reflect how quickly provisioning processing works
+        # since it includes scheduling time, retrying, etc.
         self._submit_to_provision_duration = Histogram(
             "dstack_submit_to_provision_duration_seconds",
             "Time from when a run has been submitted and first job provisioning",

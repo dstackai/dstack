@@ -2,7 +2,7 @@ import asyncio
 import datetime
 from typing import List, Optional, Set, Tuple
 
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
@@ -56,15 +56,44 @@ async def process_runs(batch_size: int = 1):
 async def _process_next_run():
     run_lock, run_lockset = get_locker(get_db().dialect_name).get_lockset(RunModel.__tablename__)
     job_lock, job_lockset = get_locker(get_db().dialect_name).get_lockset(JobModel.__tablename__)
+    now = common.get_current_datetime().replace(tzinfo=None)
     async with get_session_ctx() as session:
         async with run_lock, job_lock:
             res = await session.execute(
                 select(RunModel)
                 .where(
-                    RunModel.status.not_in(RunStatus.finished_statuses()),
                     RunModel.id.not_in(run_lockset),
-                    RunModel.last_processed_at
-                    < common.get_current_datetime().replace(tzinfo=None) - MIN_PROCESSING_INTERVAL,
+                    RunModel.last_processed_at < now - MIN_PROCESSING_INTERVAL,
+                    # Filter out runs that don't need to be processed.
+                    # This is only to reduce unnecessary commits.
+                    # Otherwise, we could fetch all active runs and filter them when processing.
+                    or_(
+                        # Active non-pending runs:
+                        RunModel.status.not_in(
+                            RunStatus.finished_statuses() + [RunStatus.PENDING]
+                        ),
+                        # Retrying runs:
+                        and_(
+                            RunModel.status == RunStatus.PENDING,
+                            RunModel.resubmission_attempt > 0,
+                        ),
+                        # Scheduled ready runs:
+                        and_(
+                            RunModel.status == RunStatus.PENDING,
+                            RunModel.resubmission_attempt == 0,
+                            RunModel.next_triggered_at.is_not(None),
+                            RunModel.next_triggered_at < now,
+                        ),
+                        # Scaled-to-zero runs:
+                        # Such runs cannot be scheduled, thus we check next_triggered_at.
+                        # If we allow scheduled services with downscaling to zero
+                        # This check won't pass.
+                        and_(
+                            RunModel.status == RunStatus.PENDING,
+                            RunModel.resubmission_attempt == 0,
+                            RunModel.next_triggered_at.is_(None),
+                        ),
+                    ),
                 )
                 .order_by(RunModel.last_processed_at.asc())
                 .limit(1)
@@ -135,8 +164,12 @@ async def _process_run(session: AsyncSession, run_model: RunModel):
 async def _process_pending_run(session: AsyncSession, run_model: RunModel):
     """Jobs are not created yet"""
     run = run_model_to_run(run_model)
-    if not _pending_run_ready_for_resubmission(run_model, run):
-        logger.debug("%s: pending run is not yet ready for resubmission", fmt(run_model))
+
+    # TODO: Do not select such runs in the first place to avoid redundant processing
+    if run_model.resubmission_attempt > 0 and not _retrying_run_ready_for_resubmission(
+        run_model, run
+    ):
+        logger.debug("%s: retrying run is not yet ready for resubmission", fmt(run_model))
         return
 
     run_model.desired_replica_count = 1
@@ -160,7 +193,7 @@ async def _process_pending_run(session: AsyncSession, run_model: RunModel):
     logger.info("%s: run status has changed PENDING -> SUBMITTED", fmt(run_model))
 
 
-def _pending_run_ready_for_resubmission(run_model: RunModel, run: Run) -> bool:
+def _retrying_run_ready_for_resubmission(run_model: RunModel, run: Run) -> bool:
     if run.latest_job_submission is None:
         # Should not be possible
         return True
@@ -197,7 +230,7 @@ async def _process_active_run(session: AsyncSession, run_model: RunModel):
     We handle fails, scaling, and status changes.
     """
     run = run_model_to_run(run_model)
-    run_spec = RunSpec.__response__.parse_raw(run_model.run_spec)
+    run_spec = run.run_spec
     retry_single_job = _can_retry_single_job(run_spec)
 
     run_statuses: Set[RunStatus] = set()

@@ -8,9 +8,9 @@ from pydantic import parse_obj_as
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import dstack._internal.server.background.tasks.process_runs as process_runs
-from dstack._internal.core.models.configurations import ServiceConfiguration
+from dstack._internal.core.models.configurations import ServiceConfiguration, TaskConfiguration
 from dstack._internal.core.models.instances import InstanceStatus
-from dstack._internal.core.models.profiles import Profile
+from dstack._internal.core.models.profiles import Profile, ProfileRetry, Schedule
 from dstack._internal.core.models.resources import Range
 from dstack._internal.core.models.runs import (
     JobSpec,
@@ -406,6 +406,134 @@ class TestProcessRunsReplicas:
         assert run.jobs[1].replica_num == 0
         assert run.jobs[2].status == JobStatus.SUBMITTED
         assert run.jobs[2].replica_num == 1
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_submits_scheduled_run(self, test_db, session: AsyncSession):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(
+            session=session,
+            project_id=project.id,
+        )
+        run_name = "test_run"
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            run_name=run_name,
+            configuration=TaskConfiguration(
+                nodes=1,
+                schedule=Schedule(cron="15 * * * *"),  # can be anything
+                commands=["echo Hi!"],
+            ),
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_name=run_name,
+            run_spec=run_spec,
+            status=RunStatus.PENDING,
+            next_triggered_at=datetime.datetime(2023, 1, 2, 3, 15, tzinfo=datetime.timezone.utc),
+        )
+        with freeze_time(datetime.datetime(2023, 1, 2, 3, 10, tzinfo=datetime.timezone.utc)):
+            # Too early to schedule
+            await process_runs.process_runs()
+        await session.refresh(run)
+        assert run.status == RunStatus.PENDING
+        with freeze_time(datetime.datetime(2023, 1, 2, 3, 16, tzinfo=datetime.timezone.utc)):
+            # It's time to schedule
+            await process_runs.process_runs()
+        await session.refresh(run)
+        assert run.status == RunStatus.SUBMITTED
+        assert len(run.jobs) == 1
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_retries_scheduled_run(self, test_db, session: AsyncSession):
+        """
+        Scheduled run must be retried according to `retry` even if it's too early to schedule.
+        """
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(
+            session=session,
+            project_id=project.id,
+        )
+        run_name = "test_run"
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            run_name=run_name,
+            configuration=TaskConfiguration(
+                nodes=1,
+                schedule=Schedule(cron="15 * * * *"),
+                retry=ProfileRetry(duration="1h"),
+                commands=["echo Hi!"],
+            ),
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_name=run_name,
+            run_spec=run_spec,
+            status=RunStatus.PENDING,
+            resubmission_attempt=1,
+            next_triggered_at=datetime.datetime(2023, 1, 2, 3, 15, tzinfo=datetime.timezone.utc),
+        )
+        await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.FAILED,
+            last_processed_at=datetime.datetime(2023, 1, 2, 3, 0, tzinfo=datetime.timezone.utc),
+        )
+        with freeze_time(datetime.datetime(2023, 1, 2, 3, 10, tzinfo=datetime.timezone.utc)):
+            # Too early to schedule but ready to retry
+            await process_runs.process_runs()
+        await session.refresh(run)
+        assert run.status == RunStatus.SUBMITTED
+        assert len(run.jobs) == 2
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_schedules_terminating_run(self, test_db, session: AsyncSession):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(
+            session=session,
+            project_id=project.id,
+        )
+        run_name = "test_run"
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            run_name=run_name,
+            configuration=TaskConfiguration(
+                nodes=1,
+                schedule=Schedule(cron="15 * * * *"),
+                commands=["echo Hi!"],
+            ),
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_name=run_name,
+            run_spec=run_spec,
+            status=RunStatus.TERMINATING,
+            termination_reason=RunTerminationReason.ALL_JOBS_DONE,
+            resubmission_attempt=1,
+        )
+        with freeze_time(datetime.datetime(2023, 1, 2, 3, 10, tzinfo=datetime.timezone.utc)):
+            # Too early to schedule but ready to retry
+            await process_runs.process_runs()
+        await session.refresh(run)
+        assert run.status == RunStatus.PENDING
+        assert run.next_triggered_at is not None
+        assert run.next_triggered_at.replace(tzinfo=datetime.timezone.utc) == datetime.datetime(
+            2023, 1, 2, 3, 15, tzinfo=datetime.timezone.utc
+        )
 
 
 @pytest.mark.asyncio
