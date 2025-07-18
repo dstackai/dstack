@@ -12,7 +12,7 @@ import { IProps } from './types';
 
 import styles from './styles.module.scss';
 
-const LIMIT_LOG_ROWS = 1000;
+const LIMIT_LOG_ROWS = 100;
 const LOADING_SCROLL_GAP = 300;
 
 export const Logs: React.FC<IProps> = ({ className, projectName, runName, jobSubmissionId }) => {
