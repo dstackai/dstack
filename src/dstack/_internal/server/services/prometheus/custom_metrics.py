@@ -1,4 +1,5 @@
 import itertools
+import json
 from collections import defaultdict
 from collections.abc import Generator, Iterable
 from datetime import timezone
@@ -177,6 +178,19 @@ async def get_job_metrics(session: AsyncSession) -> Iterable[Metric]:
             metrics.add_sample(_JOB_CPU_TIME, labels, jmp.cpu_usage_micro / 1_000_000)
             metrics.add_sample(_JOB_MEMORY_USAGE, labels, jmp.memory_usage_bytes)
             metrics.add_sample(_JOB_MEMORY_WORKING_SET, labels, jmp.memory_working_set_bytes)
+            if gpus:
+                gpu_memory_total = gpus[0].memory_mib * 1024 * 1024
+                for gpu_num, (gpu_util, gpu_memory_usage) in enumerate(
+                    zip(
+                        json.loads(jmp.gpus_util_percent),
+                        json.loads(jmp.gpus_memory_usage_bytes),
+                    )
+                ):
+                    gpu_labels = labels.copy()
+                    gpu_labels["dstack_gpu_num"] = gpu_num
+                    metrics.add_sample(_JOB_GPU_USAGE_RATIO, gpu_labels, gpu_util / 100)
+                    metrics.add_sample(_JOB_GPU_MEMORY_TOTAL, gpu_labels, gpu_memory_total)
+                    metrics.add_sample(_JOB_GPU_MEMORY_USAGE, gpu_labels, gpu_memory_usage)
         jpm = job_prometheus_metrics.get(job.id)
         if jpm is not None:
             for metric in text_string_to_metric_families(jpm.text):
@@ -202,6 +216,9 @@ _JOB_CPU_TIME = "dstack_job_cpu_time_seconds_total"
 _JOB_MEMORY_TOTAL = "dstack_job_memory_total_bytes"
 _JOB_MEMORY_USAGE = "dstack_job_memory_usage_bytes"
 _JOB_MEMORY_WORKING_SET = "dstack_job_memory_working_set_bytes"
+_JOB_GPU_USAGE_RATIO = "dstack_job_gpu_usage_ratio"
+_JOB_GPU_MEMORY_TOTAL = "dstack_job_gpu_memory_total_bytes"
+_JOB_GPU_MEMORY_USAGE = "dstack_job_gpu_memory_usage_bytes"
 
 
 class _Metrics(dict[str, Metric]):
@@ -259,6 +276,9 @@ class _JobMetrics(_Metrics):
         (_JOB_MEMORY_TOTAL, _GAUGE, "Total memory allocated for the job, bytes"),
         (_JOB_MEMORY_USAGE, _GAUGE, "Memory used by the job (including cache), bytes"),
         (_JOB_MEMORY_WORKING_SET, _GAUGE, "Memory used by the job (not including cache), bytes"),
+        (_JOB_GPU_USAGE_RATIO, _GAUGE, "Job GPU usage, percent (as 0.0-1.0)"),
+        (_JOB_GPU_MEMORY_TOTAL, _GAUGE, "Total GPU memory allocated for the job, bytes"),
+        (_JOB_GPU_MEMORY_USAGE, _GAUGE, "GPU memory used by the job, bytes"),
     ]
 
 

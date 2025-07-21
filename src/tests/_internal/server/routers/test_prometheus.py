@@ -109,6 +109,7 @@ class TestGetPrometheusMetrics:
             memory_gib=128,
             gpu_count=2,
             gpu_name="V4",
+            gpu_memory_gib=16,
             price=12,
         )
         project_2 = await _create_project(session, "project-2", user)
@@ -140,6 +141,8 @@ class TestGetPrometheusMetrics:
             """),
         )
         project_1 = await _create_project(session, "project-1", user)
+        # jrd.offer.instance.resources has higher priority than jpd.instance_type.resources,
+        # should be ignored
         jpd_1_1 = get_job_provisioning_data(backend=BackendType.AWS, gpu_count=4, gpu_name="T4")
         jrd_1_1 = get_job_runtime_data(offer=offer)
         job_1_1 = await _create_job(
@@ -176,6 +179,8 @@ class TestGetPrometheusMetrics:
             cpu_usage_micro=3_500_000,
             memory_working_set_bytes=3_221_225_472,
             memory_usage_bytes=4_294_967_296,
+            gpus_util_percent=[80, 90],
+            gpus_memory_usage_bytes=[1_073_741_824, 2_147_483_648],
         )
         # Older, ignored
         await create_job_metrics_point(
@@ -316,6 +321,18 @@ class TestGetPrometheusMetrics:
             # HELP dstack_job_memory_working_set_bytes Memory used by the job (not including cache), bytes
             # TYPE dstack_job_memory_working_set_bytes gauge
             dstack_job_memory_working_set_bytes{{dstack_project_name="project-1",dstack_user_name="test-user",dstack_run_name="run-1",dstack_run_id="{job_1_1.run_id}",dstack_job_name="run-1-0-0",dstack_job_id="{job_1_1.id}",dstack_job_num="0",dstack_replica_num="0",dstack_run_type="dev-environment",dstack_backend="aws",dstack_gpu="V4"}} 3221225472.0
+            # HELP dstack_job_gpu_usage_ratio Job GPU usage, percent (as 0.0-1.0)
+            # TYPE dstack_job_gpu_usage_ratio gauge
+            dstack_job_gpu_usage_ratio{{dstack_project_name="project-1",dstack_user_name="test-user",dstack_run_name="run-1",dstack_run_id="{job_1_1.run_id}",dstack_job_name="run-1-0-0",dstack_job_id="{job_1_1.id}",dstack_job_num="0",dstack_replica_num="0",dstack_run_type="dev-environment",dstack_backend="aws",dstack_gpu="V4",dstack_gpu_num="0"}} 0.8
+            dstack_job_gpu_usage_ratio{{dstack_project_name="project-1",dstack_user_name="test-user",dstack_run_name="run-1",dstack_run_id="{job_1_1.run_id}",dstack_job_name="run-1-0-0",dstack_job_id="{job_1_1.id}",dstack_job_num="0",dstack_replica_num="0",dstack_run_type="dev-environment",dstack_backend="aws",dstack_gpu="V4",dstack_gpu_num="1"}} 0.9
+            # HELP dstack_job_gpu_memory_total_bytes Total GPU memory allocated for the job, bytes
+            # TYPE dstack_job_gpu_memory_total_bytes gauge
+            dstack_job_gpu_memory_total_bytes{{dstack_project_name="project-1",dstack_user_name="test-user",dstack_run_name="run-1",dstack_run_id="{job_1_1.run_id}",dstack_job_name="run-1-0-0",dstack_job_id="{job_1_1.id}",dstack_job_num="0",dstack_replica_num="0",dstack_run_type="dev-environment",dstack_backend="aws",dstack_gpu="V4",dstack_gpu_num="0"}} 17179869184.0
+            dstack_job_gpu_memory_total_bytes{{dstack_project_name="project-1",dstack_user_name="test-user",dstack_run_name="run-1",dstack_run_id="{job_1_1.run_id}",dstack_job_name="run-1-0-0",dstack_job_id="{job_1_1.id}",dstack_job_num="0",dstack_replica_num="0",dstack_run_type="dev-environment",dstack_backend="aws",dstack_gpu="V4",dstack_gpu_num="1"}} 17179869184.0
+            # HELP dstack_job_gpu_memory_usage_bytes GPU memory used by the job, bytes
+            # TYPE dstack_job_gpu_memory_usage_bytes gauge
+            dstack_job_gpu_memory_usage_bytes{{dstack_project_name="project-1",dstack_user_name="test-user",dstack_run_name="run-1",dstack_run_id="{job_1_1.run_id}",dstack_job_name="run-1-0-0",dstack_job_id="{job_1_1.id}",dstack_job_num="0",dstack_replica_num="0",dstack_run_type="dev-environment",dstack_backend="aws",dstack_gpu="V4",dstack_gpu_num="0"}} 1073741824.0
+            dstack_job_gpu_memory_usage_bytes{{dstack_project_name="project-1",dstack_user_name="test-user",dstack_run_name="run-1",dstack_run_id="{job_1_1.run_id}",dstack_job_name="run-1-0-0",dstack_job_id="{job_1_1.id}",dstack_job_num="0",dstack_replica_num="0",dstack_run_type="dev-environment",dstack_backend="aws",dstack_gpu="V4",dstack_gpu_num="1"}} 2147483648.0
             # HELP FIELD_1 Test field 1
             # TYPE FIELD_1 gauge
             FIELD_1{{gpu="0",dstack_project_name="project-1",dstack_user_name="test-user",dstack_run_name="run-1",dstack_run_id="{job_1_1.run_id}",dstack_job_name="run-1-0-0",dstack_job_id="{job_1_1.id}",dstack_job_num="0",dstack_replica_num="0",dstack_run_type="dev-environment",dstack_backend="aws",dstack_gpu="V4"}} 350.0
