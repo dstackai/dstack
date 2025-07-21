@@ -48,16 +48,7 @@ class FileLogStorage(LogStorage):
     ) -> JobSubmissionLogs:
         start_line = 0
         if request.next_token:
-            try:
-                start_line = int(request.next_token)
-                if start_line < 0:
-                    raise ServerClientError(
-                        f"Invalid next_token: {request.next_token}. Must be a non-negative integer."
-                    )
-            except ValueError:
-                raise ServerClientError(
-                    f"Invalid next_token: {request.next_token}. Must be a valid integer."
-                )
+            start_line = self._next_token(request)
 
         logs = []
         next_token = None
@@ -106,17 +97,7 @@ class FileLogStorage(LogStorage):
     def _poll_logs_descending(
         self, log_file_path: Path, request: PollLogsRequest
     ) -> JobSubmissionLogs:
-        start_offset = None
-        if request.next_token:
-            try:
-                start_offset = int(request.next_token)
-                if start_offset < 0:
-                    raise ValueError("Offset must be non-negative")
-            except (ValueError, TypeError):
-                raise ServerClientError(
-                    f"Invalid next_token for descending read: {request.next_token}. "
-                    f"Must be a non-negative integer offset."
-                )
+        start_offset = self._next_token(request)
 
         candidate_logs = []
 
@@ -250,3 +231,17 @@ class FileLogStorage(LogStorage):
             log_source=LogEventSource.STDOUT,
             message=runner_log_event.message.decode(errors="replace"),
         )
+
+    def _next_token(self, request: PollLogsRequest) -> Optional[int]:
+        next_token = request.next_token
+        if next_token is None:
+            return None
+        try:
+            value = int(next_token)
+            if value < 0:
+                raise ValueError("Offset must be non-negative")
+            return value
+        except (ValueError, TypeError):
+            raise ServerClientError(
+                f"Invalid next_token: {next_token}. Must be a non-negative integer."
+            )
