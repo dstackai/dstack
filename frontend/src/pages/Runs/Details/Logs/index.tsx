@@ -56,7 +56,7 @@ export const Logs: React.FC<IProps> = ({ className, projectName, runName, jobSub
         const { clientHeight, scrollHeight } = codeRef.current;
 
         if (scrollHeight - clientHeight <= LOADING_SCROLL_GAP) {
-            getLogItems();
+            getNextLogItems();
         }
     };
 
