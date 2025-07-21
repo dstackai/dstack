@@ -138,12 +138,30 @@ class FileLogStorage(LogStorage):
         filepath: Path, start_offset: Optional[int] = None, chunk_size: int = 8192
     ) -> Generator[Tuple[bytes, int], None, None]:
         """
-        A memory-efficient generator that yields lines from a file in reverse order with their start byte offsets. 
-        It always starts at the file’s end, so reading top lines of large files may be slow.
+        A generator that yields lines from a file in reverse order, along with the byte
+        offset of the start of each line. This is memory-efficient for large files.
         """
         with open(filepath, "rb") as f:
             f.seek(0, os.SEEK_END)
-            cursor = f.tell()
+            file_size = f.tell()
+            cursor = file_size
+
+            # If a start_offset is provided, optimize by starting the read
+            # from a more specific location instead of the end of the file.
+            if start_offset is not None and start_offset < file_size:
+                # To get the full content of the line that straddles the offset,
+                # we need to find its end (the next newline character).
+                f.seek(start_offset)
+                chunk = f.read(chunk_size)
+                newline_pos = chunk.find(b"\n")
+                if newline_pos != -1:
+                    # Found the end of the line. The cursor for reverse reading
+                    # should start from this point to include the full line.
+                    cursor = start_offset + newline_pos + 1
+                else:
+                    # No newline found, which means the rest of the file is one line.
+                    # The default cursor pointing to file_size is correct.
+                    pass
 
             buffer = b""
 
