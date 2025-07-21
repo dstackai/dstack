@@ -117,10 +117,7 @@ class CloudWatchLogStorage(LogStorage):
             if cw_events:
                 return cw_events, next_token
 
-            if not next_token:
-                return [], None
-
-            if next_token == previous_next_token:
+            if not next_token or next_token == previous_next_token:
                 return [], None
 
             previous_next_token = next_token
