@@ -141,6 +141,11 @@ class CloudWatchLogStorage(LogStorage):
                 stream,
                 self.MAX_RETRIES,
             )
+        # Only return the next token after exhausting retries if going descending—
+        # AWS CloudWatch guarantees more logs in that case. In ascending mode,
+        # next token is always returned, even if no logs remain.
+        # So descending works reliably; ascending has limits if gaps are too large.
+        # In the future, UI/CLI should handle retries, and we can return next token for ascending too.
         return [], next_token if request.descending else None
 
     def _get_log_events(
