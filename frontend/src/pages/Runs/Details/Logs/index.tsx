@@ -56,7 +56,7 @@ export const Logs: React.FC<IProps> = ({ className, projectName, runName, jobSub
         const { clientHeight, scrollHeight } = codeRef.current;
 
         if (scrollHeight - clientHeight <= LOADING_SCROLL_GAP) {
-            getLogItems();
+            getNextLogItems();
         }
     };
 
@@ -79,7 +79,13 @@ export const Logs: React.FC<IProps> = ({ className, projectName, runName, jobSub
             .then((response) => {
                 saveScrollPositionByBottom();
                 const reversed = response.logs.toReversed();
-                setLogsData((old) => [...reversed, ...old]);
+
+                if (nextToken) {
+                    setLogsData((old) => [...reversed, ...old]);
+                } else {
+                    setLogsData(reversed);
+                }
+
                 nextTokenRef.current = response.next_token;
                 setIsLoading(false);
             })
