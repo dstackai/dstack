@@ -1253,11 +1253,14 @@ def _remove_job_spec_sensitive_info(spec: JobSpec):
 def _get_next_triggered_at(run_spec: RunSpec) -> Optional[datetime]:
     if run_spec.merged_profile.schedule is None:
         return None
-    cron_trigger = CronTrigger.from_crontab(
-        run_spec.merged_profile.schedule.cron,
-        timezone=timezone.utc,
-    )
-    return cron_trigger.get_next_fire_time(
-        previous_fire_time=None,
-        now=common_utils.get_current_datetime(),
-    )
+    now = common_utils.get_current_datetime()
+    fire_times = []
+    for cron in run_spec.merged_profile.schedule.crons:
+        cron_trigger = CronTrigger.from_crontab(cron, timezone=timezone.utc)
+        fire_times.append(
+            cron_trigger.get_next_fire_time(
+                previous_fire_time=None,
+                now=now,
+            )
+        )
+    return min(fire_times)

@@ -170,20 +170,34 @@ class UtilizationPolicy(CoreModel):
 
 class Schedule(CoreModel):
     cron: Annotated[
-        Optional[str],
+        Union[List[str], str],
         Field(
             description=(
-                "The UTC time when the run needs to be started specified using POSIX cron syntax"
+                "A cron expression or a list of cron expressions specifying the UTC time when the run needs to be started"
             )
         ),
-    ] = None
+    ]
 
     @validator("cron")
-    def _validate_cron(cls, v) -> Optional[str]:
-        if v is None:
-            return None
-        validate_cron(v)
-        return v
+    def _validate_cron(cls, v: Union[List[str], str]) -> List[str]:
+        if isinstance(v, str):
+            values = [v]
+        else:
+            values = v
+        if len(values) == 0:
+            raise ValueError("At least one cron expression must be specified")
+        for value in values:
+            validate_cron(value)
+        return values
+
+    @property
+    def crons(self) -> List[str]:
+        """
+        Access `cron` attribute as a list.
+        """
+        if isinstance(self.cron, str):
+            return [self.cron]
+        return self.cron
 
 
 class ProfileParams(CoreModel):
