@@ -58,7 +58,11 @@ This command lists the projects configured on the client.
 
 ```shell
 $ dstack project list --help
-#GENERATE#
+usage: dstack project list [-h]
+
+options:
+  -h, --help  show this help message and exit
+
 ```
 
 </div>
@@ -71,7 +75,14 @@ This command sets the given project as default.
 
 ```shell
 $ dstack project set-default --help
-#GENERATE#
+usage: dstack project set-default [-h] name
+
+positional arguments:
+  name        The name of the project to set as default
+
+options:
+  -h, --help  show this help message and exit
+
 ```
 
 </div>
