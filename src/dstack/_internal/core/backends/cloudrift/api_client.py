@@ -155,8 +155,20 @@ class RiftClient:
         logger.debug("Terminating instance with request data: %s", request_data)
         response_data = self._make_request("instances/terminate", request_data)
         if isinstance(response_data, dict):
+            logger.debug("Terminating instance with response: %s", response_data)
             info = response_data.get("terminated", [])
-            return len(info) > 0
+            is_terminated = len(info) > 0
+            if not is_terminated:
+                # check if the instance is already terminated
+                instance_info = self.get_instance_by_id(instance_id)
+                is_terminated = instance_info is None or instance_info.get("status") == "Inactive"
+                logger.debug(
+                    "Instance %s is already terminated: %s response: %s",
+                    instance_id,
+                    is_terminated,
+                    instance_info,
+                )
+            return is_terminated
 
         return False
 
