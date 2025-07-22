@@ -1,7 +1,7 @@
 import asyncio
 import datetime
 import uuid
-from datetime import timedelta, timezone
+from datetime import timedelta
 from functools import partial
 from typing import List, Optional, Sequence
 
@@ -557,7 +557,7 @@ def gateway_model_to_gateway(gateway_model: GatewayModel) -> Gateway:
         region=gateway_model.region,
         wildcard_domain=gateway_model.wildcard_domain,
         default=gateway_model.project.default_gateway_id == gateway_model.id,
-        created_at=gateway_model.created_at.replace(tzinfo=timezone.utc),
+        created_at=gateway_model.created_at,
         status=gateway_model.status,
         status_message=gateway_model.status_message,
         configuration=configuration,

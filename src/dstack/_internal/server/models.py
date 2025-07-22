@@ -1,6 +1,6 @@
 import enum
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Callable, List, Optional, Union
 
 from sqlalchemy import (
@@ -51,9 +51,10 @@ logger = get_logger(__name__)
 
 class NaiveDateTime(TypeDecorator):
     """
-    A custom type decorator that ensures datetime objects are offset-naive when stored in the database.
-    This is needed because we use datetimes in UTC only and store them as offset-naive.
-    Some databases (e.g. Postgres) throw an error if the timezone is set.
+    A custom type decorator that ensures datetime objects are offset-naive when stored in the database
+    and offset-aware with UTC timezone when loaded from the database.
+    This is because we use datetimes in UTC everywhere, and
+    some databases (e.g. Postgres) throw an error if the timezone is set.
     """
 
     impl = DateTime
@@ -65,7 +66,9 @@ class NaiveDateTime(TypeDecorator):
         return value
 
     def process_result_value(self, value, dialect):
-        return value
+        if value is None:
+            return None
+        return value.replace(tzinfo=timezone.utc)
 
 
 class DecryptedString(CoreModel):

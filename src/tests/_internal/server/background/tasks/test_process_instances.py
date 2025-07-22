@@ -246,10 +246,7 @@ class TestCheckShim:
 
         assert instance is not None
         assert instance.status == InstanceStatus.TERMINATING
-        assert (
-            instance.termination_deadline.replace(tzinfo=dt.timezone.utc)
-            == termination_deadline_time
-        )
+        assert instance.termination_deadline == termination_deadline_time
         assert instance.termination_reason == "Termination deadline"
         assert instance.health_status == health_status
 

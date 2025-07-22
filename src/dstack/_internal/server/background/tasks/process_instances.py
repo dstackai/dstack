@@ -104,7 +104,10 @@ from dstack._internal.server.services.placement import (
 from dstack._internal.server.services.runner import client as runner_client
 from dstack._internal.server.services.runner.client import HealthStatus
 from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
-from dstack._internal.utils.common import get_current_datetime, run_async
+from dstack._internal.utils.common import (
+    get_current_datetime,
+    run_async,
+)
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.network import get_ip_from_network, is_ip_among_addresses
 from dstack._internal.utils.ssh import (
@@ -149,7 +152,7 @@ async def _process_next_instance():
                     ),
                     InstanceModel.id.not_in(lockset),
                     InstanceModel.last_processed_at
-                    < get_current_datetime().replace(tzinfo=None) - MIN_PROCESSING_INTERVAL,
+                    < get_current_datetime() - MIN_PROCESSING_INTERVAL,
                 )
                 .options(lazyload(InstanceModel.jobs))
                 .order_by(InstanceModel.last_processed_at.asc())
@@ -461,7 +464,7 @@ def _deploy_instance(
 
 async def _create_instance(session: AsyncSession, instance: InstanceModel) -> None:
     if instance.last_retry_at is not None:
-        last_retry = instance.last_retry_at.replace(tzinfo=datetime.timezone.utc)
+        last_retry = instance.last_retry_at
         if get_current_datetime() < last_retry + timedelta(minutes=1):
             return
 
@@ -801,7 +804,7 @@ async def _check_instance(instance: InstanceModel) -> None:
             instance.name,
             extra={"instance_name": instance.name},
         )
-        deadline = instance.termination_deadline.replace(tzinfo=datetime.timezone.utc)
+        deadline = instance.termination_deadline
         if get_current_datetime() > deadline:
             instance.status = InstanceStatus.TERMINATING
             instance.termination_reason = "Termination deadline"
@@ -956,18 +959,12 @@ async def _terminate(instance: InstanceModel) -> None:
 
 def _next_termination_retry_at(instance: InstanceModel) -> datetime.datetime:
     assert instance.last_termination_retry_at is not None
-    return (
-        instance.last_termination_retry_at.replace(tzinfo=datetime.timezone.utc)
-        + TERMINATION_RETRY_TIMEOUT
-    )
+    return instance.last_termination_retry_at + TERMINATION_RETRY_TIMEOUT
 
 
 def _get_termination_deadline(instance: InstanceModel) -> datetime.datetime:
     assert instance.first_termination_retry_at is not None
-    return (
-        instance.first_termination_retry_at.replace(tzinfo=datetime.timezone.utc)
-        + TERMINATION_RETRY_MAX_DURATION
-    )
+    return instance.first_termination_retry_at + TERMINATION_RETRY_MAX_DURATION
 
 
 def _need_to_wait_fleet_provisioning(instance: InstanceModel) -> bool:
@@ -1102,27 +1099,26 @@ async def _create_placement_group(
 
 
 def _get_instance_idle_duration(instance: InstanceModel) -> datetime.timedelta:
-    last_time = instance.created_at.replace(tzinfo=datetime.timezone.utc)
+    last_time = instance.created_at
     if instance.last_job_processed_at is not None:
-        last_time = instance.last_job_processed_at.replace(tzinfo=datetime.timezone.utc)
+        last_time = instance.last_job_processed_at
     return get_current_datetime() - last_time
 
 
 def _get_retry_duration_deadline(instance: InstanceModel, retry: Retry) -> datetime.datetime:
-    return instance.created_at.replace(tzinfo=datetime.timezone.utc) + timedelta(
-        seconds=retry.duration
-    )
+    return instance.created_at + timedelta(seconds=retry.duration)
 
 
 def _get_provisioning_deadline(
     instance: InstanceModel,
     job_provisioning_data: JobProvisioningData,
 ) -> datetime.datetime:
+    assert instance.started_at is not None
     timeout_interval = get_provisioning_timeout(
         backend_type=job_provisioning_data.get_base_backend(),
         instance_type_name=job_provisioning_data.instance_type.name,
     )
-    return instance.started_at.replace(tzinfo=datetime.timezone.utc) + timeout_interval
+    return instance.started_at + timeout_interval
 
 
 def _ssh_keys_to_pkeys(ssh_keys: list[SSHKey]) -> list[PKey]:

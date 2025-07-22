@@ -40,7 +40,7 @@ async def _process_next_fleet():
                     FleetModel.deleted == False,
                     FleetModel.id.not_in(lockset),
                     FleetModel.last_processed_at
-                    < get_current_datetime().replace(tzinfo=None) - MIN_PROCESSING_INTERVAL,
+                    < get_current_datetime() - MIN_PROCESSING_INTERVAL,
                 )
                 .order_by(FleetModel.last_processed_at.asc())
                 .limit(1)
