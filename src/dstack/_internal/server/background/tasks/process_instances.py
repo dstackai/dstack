@@ -106,7 +106,6 @@ from dstack._internal.server.services.runner.client import HealthStatus
 from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
 from dstack._internal.utils.common import (
     get_current_datetime,
-    get_current_tz_naive_datetime,
     run_async,
 )
 from dstack._internal.utils.logging import get_logger
@@ -153,7 +152,7 @@ async def _process_next_instance():
                     ),
                     InstanceModel.id.not_in(lockset),
                     InstanceModel.last_processed_at
-                    < get_current_tz_naive_datetime() - MIN_PROCESSING_INTERVAL,
+                    < get_current_datetime() - MIN_PROCESSING_INTERVAL,
                 )
                 .options(lazyload(InstanceModel.jobs))
                 .order_by(InstanceModel.last_processed_at.asc())

@@ -14,7 +14,7 @@ from dstack._internal.server.services.fleets import (
 )
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.placement import schedule_fleet_placement_groups_deletion
-from dstack._internal.utils.common import get_current_datetime, get_current_tz_naive_datetime
+from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -40,7 +40,7 @@ async def _process_next_fleet():
                     FleetModel.deleted == False,
                     FleetModel.id.not_in(lockset),
                     FleetModel.last_processed_at
-                    < get_current_tz_naive_datetime() - MIN_PROCESSING_INTERVAL,
+                    < get_current_datetime() - MIN_PROCESSING_INTERVAL,
                 )
                 .order_by(FleetModel.last_processed_at.asc())
                 .limit(1)

@@ -56,7 +56,7 @@ async def process_runs(batch_size: int = 1):
 async def _process_next_run():
     run_lock, run_lockset = get_locker(get_db().dialect_name).get_lockset(RunModel.__tablename__)
     job_lock, job_lockset = get_locker(get_db().dialect_name).get_lockset(JobModel.__tablename__)
-    now = common.get_current_tz_naive_datetime()
+    now = common.get_current_datetime()
     async with get_session_ctx() as session:
         async with run_lock, job_lock:
             res = await session.execute(

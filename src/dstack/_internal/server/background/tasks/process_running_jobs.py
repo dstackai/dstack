@@ -108,7 +108,7 @@ async def _process_next_running_job():
                     RunModel.status.not_in([RunStatus.TERMINATING]),
                     JobModel.id.not_in(lockset),
                     JobModel.last_processed_at
-                    < common_utils.get_current_tz_naive_datetime() - MIN_PROCESSING_INTERVAL,
+                    < common_utils.get_current_datetime() - MIN_PROCESSING_INTERVAL,
                 )
                 .order_by(JobModel.last_processed_at.asc())
                 .limit(1)

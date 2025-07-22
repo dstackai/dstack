@@ -20,7 +20,6 @@ from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.logging import fmt
 from dstack._internal.utils.common import (
     get_current_datetime,
-    get_current_tz_naive_datetime,
     get_or_error,
 )
 from dstack._internal.utils.logging import get_logger
@@ -49,7 +48,7 @@ async def _process_next_terminating_job():
                     JobModel.status == JobStatus.TERMINATING,
                     or_(
                         JobModel.remove_at.is_(None),
-                        JobModel.remove_at < get_current_tz_naive_datetime(),
+                        JobModel.remove_at < get_current_datetime(),
                     ),
                 )
                 .order_by(JobModel.last_processed_at.asc())
