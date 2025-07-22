@@ -11,15 +11,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 import dstack._internal.utils.random_names as random_names
-from dstack._internal.core.backends import (
-    BACKENDS_WITH_GATEWAY_SUPPORT,
-    BACKENDS_WITH_PRIVATE_GATEWAY_SUPPORT,
-)
 from dstack._internal.core.backends.base.compute import (
     Compute,
     ComputeWithGatewaySupport,
     get_dstack_gateway_wheel,
     get_dstack_runner_version,
+)
+from dstack._internal.core.backends.features import (
+    BACKENDS_WITH_GATEWAY_SUPPORT,
+    BACKENDS_WITH_PRIVATE_GATEWAY_SUPPORT,
 )
 from dstack._internal.core.errors import (
     GatewayError,

@@ -12,10 +12,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, lazyload
 
 from dstack._internal import settings
-from dstack._internal.core.backends import (
-    BACKENDS_WITH_CREATE_INSTANCE_SUPPORT,
-    BACKENDS_WITH_PLACEMENT_GROUPS_SUPPORT,
-)
 from dstack._internal.core.backends.base.compute import (
     ComputeWithCreateInstanceSupport,
     ComputeWithPlacementGroupSupport,
@@ -26,6 +22,10 @@ from dstack._internal.core.backends.base.compute import (
     get_dstack_working_dir,
     get_shim_env,
     get_shim_pre_start_commands,
+)
+from dstack._internal.core.backends.features import (
+    BACKENDS_WITH_CREATE_INSTANCE_SUPPORT,
+    BACKENDS_WITH_PLACEMENT_GROUPS_SUPPORT,
 )
 from dstack._internal.core.backends.remote.provisioning import (
     detect_cpu_arch,
