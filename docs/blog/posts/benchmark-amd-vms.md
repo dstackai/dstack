@@ -69,7 +69,7 @@ This demonstrates that from a model training and hardware utilization perspectiv
 
 This initial benchmark deliberately focused on a single-GPU setup to establish a baseline. A more production-representative evaluation would compare multi-GPU VMs with multi-GPU bare-metal systems. In multi-GPU inference, bare-metal’s direct hardware access could offer an advantage. For distributed training, however, where all GPUs are fully engaged, the performance between VM and bare-metal would likely be even closer. 
 
-Furthermore, it's important to note that the performance gap in virtualized setups can often be narrowed significantly with expert hypervisor tuning, such as CPU pinning and NUMA node alignment.
+Furthermore, it's important to note that the performance gap in virtualized setups can potentially be narrowed significantly with expert hypervisor tuning, such as CPU pinning and NUMA node alignment.
 
 **Multi-node**
 
@@ -199,10 +199,9 @@ python3 trl/scripts/sft.py \
     --lora_alpha 16
 ```
 
-<!-- ## Source code
+## Source code
 
-All source code and findings are available in [our GitHub repo :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/benchmarks/tree/main/amd/baremetal_vms){:target="_blank"}. -->
-
+All source code and findings are available in our [GitHub repo :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/benchmarks/tree/main/amd/single_gpu_vm_vs_bare-metal){:target="_blank"}.
 
 ## References
 
