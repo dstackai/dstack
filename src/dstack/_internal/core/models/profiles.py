@@ -8,6 +8,7 @@ from typing_extensions import Annotated, Literal
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import CoreModel, Duration
 from dstack._internal.utils.common import list_enum_values_for_annotation
+from dstack._internal.utils.cron import validate_cron
 from dstack._internal.utils.json_utils import pydantic_orjson_dumps_with_indent
 from dstack._internal.utils.tags import tags_validator
 
@@ -167,6 +168,38 @@ class UtilizationPolicy(CoreModel):
         return v
 
 
+class Schedule(CoreModel):
+    cron: Annotated[
+        Union[List[str], str],
+        Field(
+            description=(
+                "A cron expression or a list of cron expressions specifying the UTC time when the run needs to be started"
+            )
+        ),
+    ]
+
+    @validator("cron")
+    def _validate_cron(cls, v: Union[List[str], str]) -> List[str]:
+        if isinstance(v, str):
+            values = [v]
+        else:
+            values = v
+        if len(values) == 0:
+            raise ValueError("At least one cron expression must be specified")
+        for value in values:
+            validate_cron(value)
+        return values
+
+    @property
+    def crons(self) -> List[str]:
+        """
+        Access `cron` attribute as a list.
+        """
+        if isinstance(self.cron, str):
+            return [self.cron]
+        return self.cron
+
+
 class ProfileParams(CoreModel):
     backends: Annotated[
         Optional[List[BackendType]],
@@ -280,6 +313,10 @@ class ProfileParams(CoreModel):
                 f" Defaults to `{StopCriteria.ALL_DONE.value}`"
             )
         ),
+    ] = None
+    schedule: Annotated[
+        Optional[Schedule],
+        Field(description=("The schedule for starting the run at specified time")),
     ] = None
     fleets: Annotated[
         Optional[list[str]], Field(description="The fleets considered for reuse")

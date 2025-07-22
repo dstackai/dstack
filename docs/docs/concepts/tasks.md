@@ -651,6 +651,58 @@ utilization_policy:
 
 </div>
 
+### Schedule
+
+Specify `schedule` to start a task periodically at specific UTC times using the cron syntax:
+
+<div editor-title=".dstack.yml">
+
+```yaml
+type: task
+name: train
+
+python: 3.12
+commands:
+  - uv pip install -r fine-tuning/qlora/requirements.txt
+  - python fine-tuning/qlora/train.py
+
+resources:
+  gpu: H100:8
+
+schedule:
+  cron: "15 23 * * *" # everyday at 23:15 UTC
+```
+
+</div>
+
+??? info "Cron syntax"
+    `dstack` supports [POSIX cron syntax](https://pubs.opengroup.org/onlinepubs/9699919799/utilities/crontab.html#tag_20_25_07). One exception is that days of the week are started from Monday instead of Sunday so `0` corresponds to Monday.
+    
+    The month and day of week fields accept abbreviated English month and weekday names (`jan–de`c and `mon–sun`) respectively.
+
+    A cron expression consists of five fields:
+
+    ```
+    ┌───────────── minute (0-59)
+    │ ┌───────────── hour (0-23)
+    │ │ ┌───────────── day of the month (1-31)
+    │ │ │ ┌───────────── month (1-12 or jan-dec)
+    │ │ │ │ ┌───────────── day of the week (0-6 or mon-sun)
+    │ │ │ │ │
+    │ │ │ │ │
+    │ │ │ │ │
+    * * * * *
+    ```
+
+    The following operators can be used in any of the fields:
+
+    | Operator | Description           | Example                                                                 |
+    |----------|-----------------------|-------------------------------------------------------------------------|
+    | `*`      | Any value             | `0 * * * *` runs every hour at minute 0                                 |
+    | `,`      | Value list separator  | `15,45 10 * * *` runs at 10:15 and 10:45 every day.                     |
+    | `-`      | Range of values       | `0 1-3 * * *` runs at 1:00, 2:00, and 3:00 every day.                   |
+    | `/`      | Step values           | `*/10 8-10 * * *` runs every 10 minutes during the hours 8:00 to 10:59. |
+
 ### Spot policy
 
 By default, `dstack` uses on-demand instances. However, you can change that

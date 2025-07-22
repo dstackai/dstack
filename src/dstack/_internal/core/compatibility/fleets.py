@@ -57,6 +57,8 @@ def get_fleet_spec_excludes(fleet_spec: FleetSpec) -> Optional[IncludeExcludeDic
         profile_excludes.add("startup_order")
     if profile.stop_criteria is None:
         profile_excludes.add("stop_criteria")
+    if profile.schedule is None:
+        profile_excludes.add("schedule")
     if configuration_excludes:
         spec_excludes["configuration"] = configuration_excludes
     if profile_excludes:

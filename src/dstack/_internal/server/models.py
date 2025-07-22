@@ -355,6 +355,7 @@ class RunModel(BaseModel):
     run_name: Mapped[str] = mapped_column(String(100))
     submitted_at: Mapped[datetime] = mapped_column(NaiveDateTime)
     last_processed_at: Mapped[datetime] = mapped_column(NaiveDateTime)
+    next_triggered_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
     status: Mapped[RunStatus] = mapped_column(Enum(RunStatus))
     termination_reason: Mapped[Optional[RunTerminationReason]] = mapped_column(
         Enum(RunTerminationReason)

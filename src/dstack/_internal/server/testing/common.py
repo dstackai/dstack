@@ -68,6 +68,7 @@ from dstack._internal.core.models.runs import (
     Requirements,
     RunSpec,
     RunStatus,
+    RunTerminationReason,
 )
 from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.core.models.volumes import (
@@ -282,12 +283,15 @@ async def create_run(
     user: UserModel,
     run_name: str = "test-run",
     status: RunStatus = RunStatus.SUBMITTED,
+    termination_reason: Optional[RunTerminationReason] = None,
     submitted_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
     run_spec: Optional[RunSpec] = None,
     run_id: Optional[UUID] = None,
     deleted: bool = False,
     priority: int = 0,
     deployment_num: int = 0,
+    resubmission_attempt: int = 0,
+    next_triggered_at: Optional[datetime] = None,
 ) -> RunModel:
     if run_spec is None:
         run_spec = get_run_spec(
@@ -305,12 +309,15 @@ async def create_run(
         submitted_at=submitted_at,
         run_name=run_name,
         status=status,
+        termination_reason=termination_reason,
         run_spec=run_spec.json(),
         last_processed_at=submitted_at,
         jobs=[],
         priority=priority,
         deployment_num=deployment_num,
         desired_replica_count=1,
+        resubmission_attempt=resubmission_attempt,
+        next_triggered_at=next_triggered_at,
     )
     session.add(run)
     await session.commit()
