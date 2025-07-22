@@ -120,6 +120,14 @@ The `service` configuration type allows running [services](../../concepts/servic
       type:
         required: true
 
+### `schedule`
+
+#SCHEMA# dstack._internal.core.models.profiles.Schedule
+    overrides:
+      show_root_heading: false
+      type:
+        required: true
+
 ### `resources`
 
 #SCHEMA# dstack._internal.core.models.resources.ResourcesSpec
