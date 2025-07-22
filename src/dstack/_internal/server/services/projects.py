@@ -1,5 +1,4 @@
 import uuid
-from datetime import timezone
 from typing import Awaitable, Callable, List, Optional, Tuple
 
 from sqlalchemy import delete, select, update
@@ -537,7 +536,7 @@ def project_model_to_project(
         project_id=project_model.id,
         project_name=project_model.name,
         owner=users.user_model_to_user(project_model.owner),
-        created_at=project_model.created_at.replace(tzinfo=timezone.utc),
+        created_at=project_model.created_at,
         backends=backends,
         members=members,
         is_public=project_model.is_public,

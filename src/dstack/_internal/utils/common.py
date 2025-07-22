@@ -29,6 +29,10 @@ def get_current_datetime() -> datetime:
     return datetime.now(tz=timezone.utc)
 
 
+def get_current_tz_naive_datetime() -> datetime:
+    return datetime.now(tz=None)
+
+
 def get_milliseconds_since_epoch() -> int:
     return int(round(time.time() * 1000))
 

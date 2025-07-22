@@ -2,7 +2,6 @@ import itertools
 import json
 from collections import defaultdict
 from collections.abc import Generator, Iterable
-from datetime import timezone
 from typing import ClassVar
 from uuid import UUID
 
@@ -80,7 +79,7 @@ async def get_instance_metrics(session: AsyncSession) -> Iterable[Metric]:
             "dstack_backend": instance.backend.value if instance.backend is not None else "",
             "dstack_gpu": gpu,
         }
-        duration = (now - instance.created_at.replace(tzinfo=timezone.utc)).total_seconds()
+        duration = (now - instance.created_at).total_seconds()
         metrics.add_sample(_INSTANCE_DURATION, labels, duration)
         metrics.add_sample(_INSTANCE_PRICE, labels, instance.price or 0.0)
         metrics.add_sample(_INSTANCE_GPU_COUNT, labels, gpu_count)
@@ -167,7 +166,7 @@ async def get_job_metrics(session: AsyncSession) -> Iterable[Metric]:
             "dstack_backend": jpd.get_base_backend().value,
             "dstack_gpu": gpus[0].name if gpus else "",
         }
-        duration = (now - job.submitted_at.replace(tzinfo=timezone.utc)).total_seconds()
+        duration = (now - job.submitted_at).total_seconds()
         metrics.add_sample(_JOB_DURATION, labels, duration)
         metrics.add_sample(_JOB_PRICE, labels, price)
         metrics.add_sample(_JOB_GPU_COUNT, labels, len(gpus))

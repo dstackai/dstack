@@ -1405,7 +1405,7 @@ class TestApplyPlan:
         run = res.scalar()
         assert run is not None
         assert run.status == RunStatus.PENDING
-        assert run.next_triggered_at == datetime(2023, 1, 2, 3, 10)
+        assert run.next_triggered_at == datetime(2023, 1, 2, 3, 10, tzinfo=timezone.utc)
 
 
 class TestSubmitRun:

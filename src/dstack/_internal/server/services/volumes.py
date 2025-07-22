@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import List, Optional
 
 from sqlalchemy import and_, func, or_, select, update
@@ -320,15 +320,15 @@ def volume_model_to_volume(volume_model: VolumeModel) -> Volume:
         )
     deleted_at = None
     if volume_model.deleted_at is not None:
-        deleted_at = volume_model.deleted_at.replace(tzinfo=timezone.utc)
+        deleted_at = volume_model.deleted_at
     volume = Volume(
         name=volume_model.name,
         project_name=volume_model.project.name,
         user=volume_model.user.name,
         configuration=configuration,
         external=configuration.volume_id is not None,
-        created_at=volume_model.created_at.replace(tzinfo=timezone.utc),
-        last_processed_at=volume_model.last_processed_at.replace(tzinfo=timezone.utc),
+        created_at=volume_model.created_at,
+        last_processed_at=volume_model.last_processed_at,
         status=volume_model.status,
         status_message=volume_model.status_message,
         deleted=volume_model.deleted,

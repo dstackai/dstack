@@ -21,6 +21,7 @@ from dstack._internal.server.testing.common import (
     get_volume_configuration,
     get_volume_provisioning_data,
 )
+from dstack._internal.utils.common import get_current_datetime
 
 
 @pytest.mark.asyncio
@@ -159,15 +160,11 @@ class TestShouldDeleteVolume:
         )
 
         # Not exceeded - 30 minutes ago
-        volume.last_job_processed_at = (
-            datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(minutes=30)
-        ).replace(tzinfo=None)
+        volume.last_job_processed_at = get_current_datetime() - datetime.timedelta(minutes=30)
         assert not _should_delete_volume(volume)
 
         # Exceeded - 2 hours ago
-        volume.last_job_processed_at = (
-            datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=2)
-        ).replace(tzinfo=None)
+        volume.last_job_processed_at = get_current_datetime() - datetime.timedelta(hours=2)
         assert _should_delete_volume(volume)
 
     async def test_never_used_volume(self, test_db, session: AsyncSession):

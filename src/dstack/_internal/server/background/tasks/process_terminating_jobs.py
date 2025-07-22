@@ -18,7 +18,11 @@ from dstack._internal.server.services.jobs import (
 )
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.logging import fmt
-from dstack._internal.utils.common import get_current_datetime, get_or_error
+from dstack._internal.utils.common import (
+    get_current_datetime,
+    get_current_tz_naive_datetime,
+    get_or_error,
+)
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -43,7 +47,10 @@ async def _process_next_terminating_job():
                 .where(
                     JobModel.id.not_in(job_lockset),
                     JobModel.status == JobStatus.TERMINATING,
-                    or_(JobModel.remove_at.is_(None), JobModel.remove_at < get_current_datetime()),
+                    or_(
+                        JobModel.remove_at.is_(None),
+                        JobModel.remove_at < get_current_tz_naive_datetime(),
+                    ),
                 )
                 .order_by(JobModel.last_processed_at.asc())
                 .limit(1)

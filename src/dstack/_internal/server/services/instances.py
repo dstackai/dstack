@@ -1,6 +1,6 @@
 import uuid
 from collections.abc import Container, Iterable
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Dict, List, Literal, Optional, Union
 
 import gpuhunt
@@ -62,7 +62,7 @@ def instance_model_to_instance(instance_model: InstanceModel) -> Instance:
         status=instance_model.status,
         unreachable=instance_model.unreachable,
         termination_reason=instance_model.termination_reason,
-        created=instance_model.created_at.replace(tzinfo=timezone.utc),
+        created=instance_model.created_at,
         total_blocks=instance_model.total_blocks,
         busy_blocks=instance_model.busy_blocks,
     )

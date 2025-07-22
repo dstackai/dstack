@@ -2,7 +2,7 @@ import asyncio
 import re
 import uuid
 from collections.abc import Iterable
-from datetime import timedelta, timezone
+from datetime import timedelta
 from typing import Dict, List, Optional
 
 from sqlalchemy import select
@@ -108,8 +108,7 @@ async def _process_next_running_job():
                     RunModel.status.not_in([RunStatus.TERMINATING]),
                     JobModel.id.not_in(lockset),
                     JobModel.last_processed_at
-                    < common_utils.get_current_datetime().replace(tzinfo=None)
-                    - MIN_PROCESSING_INTERVAL,
+                    < common_utils.get_current_tz_naive_datetime() - MIN_PROCESSING_INTERVAL,
                 )
                 .order_by(JobModel.last_processed_at.asc())
                 .limit(1)
@@ -801,7 +800,7 @@ def _should_terminate_job_due_to_disconnect(job_model: JobModel) -> bool:
         return False
     return (
         common_utils.get_current_datetime()
-        > job_model.disconnected_at.replace(tzinfo=timezone.utc) + JOB_DISCONNECTED_RETRY_TIMEOUT
+        > job_model.disconnected_at + JOB_DISCONNECTED_RETRY_TIMEOUT
     )
 
 

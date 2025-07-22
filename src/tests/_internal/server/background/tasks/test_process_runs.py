@@ -88,9 +88,7 @@ class TestProcessRuns:
         await create_job(session=session, run=run, status=JobStatus.PROVISIONING)
         current_time = common.get_current_datetime()
 
-        expected_duration = (
-            current_time - run.submitted_at.replace(tzinfo=datetime.timezone.utc)
-        ).total_seconds()
+        expected_duration = (current_time - run.submitted_at).total_seconds()
 
         with patch(
             "dstack._internal.server.background.tasks.process_runs.run_metrics"
@@ -249,9 +247,7 @@ class TestProcessRunsReplicas:
         await create_job(session=session, run=run, status=JobStatus.PROVISIONING, replica_num=1)
         current_time = common.get_current_datetime()
 
-        expected_duration = (
-            current_time - run.submitted_at.replace(tzinfo=datetime.timezone.utc)
-        ).total_seconds()
+        expected_duration = (current_time - run.submitted_at).total_seconds()
 
         with patch(
             "dstack._internal.server.background.tasks.process_runs.run_metrics"
@@ -531,7 +527,7 @@ class TestProcessRunsReplicas:
         await session.refresh(run)
         assert run.status == RunStatus.PENDING
         assert run.next_triggered_at is not None
-        assert run.next_triggered_at.replace(tzinfo=datetime.timezone.utc) == datetime.datetime(
+        assert run.next_triggered_at == datetime.datetime(
             2023, 1, 2, 3, 15, tzinfo=datetime.timezone.utc
         )
 

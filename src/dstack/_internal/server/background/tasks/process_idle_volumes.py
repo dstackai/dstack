@@ -82,8 +82,7 @@ def _should_delete_volume(volume: VolumeModel) -> bool:
 
 def _get_idle_time(volume: VolumeModel) -> datetime.timedelta:
     last_used = volume.last_job_processed_at or volume.created_at
-    last_used_utc = last_used.replace(tzinfo=datetime.timezone.utc)
-    idle_time = get_current_datetime() - last_used_utc
+    idle_time = get_current_datetime() - last_used
     return max(idle_time, datetime.timedelta(0))
 
 

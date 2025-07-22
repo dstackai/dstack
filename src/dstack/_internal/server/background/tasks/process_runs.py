@@ -56,7 +56,7 @@ async def process_runs(batch_size: int = 1):
 async def _process_next_run():
     run_lock, run_lockset = get_locker(get_db().dialect_name).get_lockset(RunModel.__tablename__)
     job_lock, job_lockset = get_locker(get_db().dialect_name).get_lockset(JobModel.__tablename__)
-    now = common.get_current_datetime().replace(tzinfo=None)
+    now = common.get_current_tz_naive_datetime()
     async with get_session_ctx() as session:
         async with run_lock, job_lock:
             res = await session.execute(
@@ -370,9 +370,7 @@ async def _process_active_run(session: AsyncSession, run_model: RunModel):
         )
         if run_model.status == RunStatus.SUBMITTED and new_status == RunStatus.PROVISIONING:
             current_time = common.get_current_datetime()
-            submit_to_provision_duration = (
-                current_time - run_model.submitted_at.replace(tzinfo=datetime.timezone.utc)
-            ).total_seconds()
+            submit_to_provision_duration = (current_time - run_model.submitted_at).total_seconds()
             logger.info(
                 "%s: run took %.2f seconds from submission to provisioning.",
                 fmt(run_model),

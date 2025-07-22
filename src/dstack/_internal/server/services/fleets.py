@@ -1,6 +1,6 @@
 import uuid
 from collections.abc import Callable
-from datetime import datetime, timezone
+from datetime import datetime
 from functools import wraps
 from typing import List, Literal, Optional, Tuple, TypeVar, Union, cast
 
@@ -600,7 +600,7 @@ def fleet_model_to_fleet(
         name=fleet_model.name,
         project_name=fleet_model.project.name,
         spec=spec,
-        created_at=fleet_model.created_at.replace(tzinfo=timezone.utc),
+        created_at=fleet_model.created_at,
         status=fleet_model.status,
         status_message=fleet_model.status_message,
         instances=instances,
