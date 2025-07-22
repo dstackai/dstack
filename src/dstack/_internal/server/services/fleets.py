@@ -8,8 +8,8 @@ from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
-from dstack._internal.core.backends import BACKENDS_WITH_CREATE_INSTANCE_SUPPORT
 from dstack._internal.core.backends.base.backend import Backend
+from dstack._internal.core.backends.features import BACKENDS_WITH_CREATE_INSTANCE_SUPPORT
 from dstack._internal.core.errors import (
     ForbiddenError,
     ResourceExistsError,
