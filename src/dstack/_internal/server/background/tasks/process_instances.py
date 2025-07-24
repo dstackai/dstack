@@ -160,7 +160,7 @@ async def _process_next_instance():
                 .options(joinedload(InstanceModel.project).load_only(ProjectModel.ssh_private_key))
                 .order_by(InstanceModel.last_processed_at.asc())
                 .limit(1)
-                .with_for_update(skip_locked=True, key_share=True)
+                .with_for_update(skip_locked=True, key_share=True, of=InstanceModel)
             )
             instance = res.scalar()
             if instance is None:
