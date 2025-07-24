@@ -173,41 +173,43 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
             await session.commit()
             return
 
-    cluster_info = _get_cluster_info(
-        jobs=run.jobs,
-        replica_num=job.job_spec.replica_num,
-        job_provisioning_data=job_provisioning_data,
-        job_runtime_data=job_submission.job_runtime_data,
-    )
-
-    volumes = await get_job_attached_volumes(
-        session=session,
-        project=project,
-        run_spec=run.run_spec,
-        job_num=job.job_spec.job_num,
-        job_provisioning_data=job_provisioning_data,
-    )
-
     server_ssh_private_keys = get_instance_ssh_private_keys(
         common_utils.get_or_error(job_model.instance)
     )
 
-    secrets = await get_project_secrets_mapping(session=session, project=project)
-
-    try:
-        _interpolate_secrets(secrets, job.job_spec)
-    except InterpolatorError as e:
-        logger.info("%s: terminating due to secrets interpolation error", fmt(job_model))
-        job_model.status = JobStatus.TERMINATING
-        job_model.termination_reason = JobTerminationReason.TERMINATED_BY_SERVER
-        job_model.termination_reason_message = e.args[0]
-        job_model.last_processed_at = common_utils.get_current_datetime()
-        return
-
-    repo_creds_model = await get_repo_creds(session=session, repo=repo_model, user=run_model.user)
-    repo_creds = repo_model_to_repo_head_with_creds(repo_model, repo_creds_model).repo_creds
-
     initial_status = job_model.status
+    if initial_status in [JobStatus.PROVISIONING, JobStatus.PULLING]:
+        cluster_info = _get_cluster_info(
+            jobs=run.jobs,
+            replica_num=job.job_spec.replica_num,
+            job_provisioning_data=job_provisioning_data,
+            job_runtime_data=job_submission.job_runtime_data,
+        )
+
+        volumes = await get_job_attached_volumes(
+            session=session,
+            project=project,
+            run_spec=run.run_spec,
+            job_num=job.job_spec.job_num,
+            job_provisioning_data=job_provisioning_data,
+        )
+
+        repo_creds_model = await get_repo_creds(
+            session=session, repo=repo_model, user=run_model.user
+        )
+        repo_creds = repo_model_to_repo_head_with_creds(repo_model, repo_creds_model).repo_creds
+
+        secrets = await get_project_secrets_mapping(session=session, project=project)
+        try:
+            _interpolate_secrets(secrets, job.job_spec)
+        except InterpolatorError as e:
+            logger.info("%s: terminating due to secrets interpolation error", fmt(job_model))
+            job_model.status = JobStatus.TERMINATING
+            job_model.termination_reason = JobTerminationReason.TERMINATED_BY_SERVER
+            job_model.termination_reason_message = e.args[0]
+            job_model.last_processed_at = common_utils.get_current_datetime()
+            return
+
     if initial_status == JobStatus.PROVISIONING:
         if job_provisioning_data.hostname is None:
             await _wait_for_instance_provisioning_data(job_model=job_model)
