@@ -95,9 +95,10 @@ async def _process_next_run():
                         ),
                     ),
                 )
+                .options(joinedload(RunModel.jobs).load_only(JobModel.id))
                 .order_by(RunModel.last_processed_at.asc())
                 .limit(1)
-                .with_for_update(skip_locked=True, key_share=True)
+                .with_for_update(skip_locked=True, key_share=True, of=RunModel)
             )
             run_model = res.scalar()
             if run_model is None:
