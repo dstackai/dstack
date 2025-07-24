@@ -10,7 +10,7 @@ from dstack._internal.core.errors import BackendNotAvailable
 from dstack._internal.core.models.profiles import parse_duration
 from dstack._internal.core.models.volumes import VolumeStatus
 from dstack._internal.server.db import get_db, get_session_ctx
-from dstack._internal.server.models import ProjectModel, VolumeModel
+from dstack._internal.server.models import ProjectModel, UserModel, VolumeModel
 from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.volumes import (
@@ -49,7 +49,7 @@ async def process_idle_volumes():
             select(VolumeModel)
             .where(VolumeModel.id.in_(volume_ids))
             .options(joinedload(VolumeModel.project).joinedload(ProjectModel.backends))
-            .options(joinedload(VolumeModel.user))
+            .options(joinedload(VolumeModel.user).load_only(UserModel.name))
             .options(joinedload(VolumeModel.attachments))
             .execution_options(populate_existing=True)
         )

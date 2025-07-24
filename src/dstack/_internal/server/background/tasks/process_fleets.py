@@ -7,7 +7,7 @@ from sqlalchemy.orm import joinedload
 
 from dstack._internal.core.models.fleets import FleetStatus
 from dstack._internal.server.db import get_db, get_session_ctx
-from dstack._internal.server.models import FleetModel
+from dstack._internal.server.models import FleetModel, InstanceModel, JobModel, RunModel
 from dstack._internal.server.services.fleets import (
     is_fleet_empty,
     is_fleet_in_use,
@@ -64,9 +64,11 @@ async def _process_fleet(session: AsyncSession, fleet_model: FleetModel):
     res = await session.execute(
         select(FleetModel)
         .where(FleetModel.id == fleet_model.id)
-        .options(joinedload(FleetModel.project))
-        .options(joinedload(FleetModel.instances))
-        .options(joinedload(FleetModel.runs))
+        .options(joinedload(FleetModel.instances).load_only(InstanceModel.deleted))
+        .options(
+            joinedload(FleetModel.instances).joinedload(InstanceModel.jobs).load_only(JobModel.id)
+        )
+        .options(joinedload(FleetModel.runs).load_only(RunModel.status))
         .execution_options(populate_existing=True)
     )
     fleet_model = res.unique().scalar_one()
