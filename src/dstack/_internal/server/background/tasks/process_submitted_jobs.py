@@ -43,6 +43,7 @@ from dstack._internal.server.models import (
     JobModel,
     ProjectModel,
     RunModel,
+    UserModel,
     VolumeAttachmentModel,
     VolumeModel,
 )
@@ -162,7 +163,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         select(RunModel)
         .where(RunModel.id == job_model.run_id)
         .options(joinedload(RunModel.project).joinedload(ProjectModel.backends))
-        .options(joinedload(RunModel.user))
+        .options(joinedload(RunModel.user).load_only(UserModel.name))
         .options(joinedload(RunModel.fleet).joinedload(FleetModel.instances))
     )
     run_model = res.unique().scalar_one()
@@ -356,7 +357,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
     await session.execute(
         select(VolumeModel)
         .where(VolumeModel.id.in_(volumes_ids))
-        .options(selectinload(VolumeModel.user))
+        .options(joinedload(VolumeModel.user).load_only(UserModel.name))
         .order_by(VolumeModel.id)  # take locks in order
         .with_for_update(key_share=True)
     )
