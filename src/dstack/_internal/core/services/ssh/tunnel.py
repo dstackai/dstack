@@ -236,6 +236,13 @@ class SSHTunnel:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
 
+    async def __aenter__(self):
+        await self.aopen()
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self.aclose()
+
     def _get_proxy_command(self) -> Optional[str]:
         proxy_command: Optional[str] = None
         for params, identity_path in self.ssh_proxies:

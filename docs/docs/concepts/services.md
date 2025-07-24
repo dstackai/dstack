@@ -783,7 +783,7 @@ The rolling deployment stops when all replicas are updated or when a new deploym
 ??? info "Supported properties"
     <!-- NOTE: should be in sync with constants in server/services/runs.py -->
 
-    Rolling deployment supports changes to the following properties: `port`, `resources`, `volumes`, `docker`, `files`, `image`, `user`, `privileged`, `entrypoint`, `working_dir`, `python`, `nvcc`, `single_branch`, `env`, `shell`, `commands`, as well as changes to [repo](repos.md) or [file](#files) contents.
+    Rolling deployment supports changes to the following properties: `port`, `probes`, `resources`, `volumes`, `docker`, `files`, `image`, `user`, `privileged`, `entrypoint`, `working_dir`, `python`, `nvcc`, `single_branch`, `env`, `shell`, `commands`, as well as changes to [repo](repos.md) or [file](#files) contents.
 
     Changes to `replicas` and `scaling` can be applied without redeploying replicas.
 
@@ -791,6 +791,8 @@ The rolling deployment stops when all replicas are updated or when a new deploym
 
     To trigger a rolling deployment when no properties have changed (e.g., after updating [secrets](secrets.md) or to restart all replicas),  
     make a minor config change, such as adding a dummy [environment variable](#environment-variables).
+
+<!-- TODO: probes -->
 
 --8<-- "docs/concepts/snippets/manage-runs.ext"
 

@@ -52,6 +52,7 @@ from dstack._internal.server.services.jobs.configurators.dev import DevEnvironme
 from dstack._internal.server.services.jobs.configurators.service import ServiceJobConfigurator
 from dstack._internal.server.services.jobs.configurators.task import TaskJobConfigurator
 from dstack._internal.server.services.logging import fmt
+from dstack._internal.server.services.probes import probe_model_to_probe
 from dstack._internal.server.services.runner import client
 from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
 from dstack._internal.server.services.volumes import (
@@ -152,6 +153,9 @@ def job_model_to_job_submission(job_model: JobModel) -> JobSubmission:
         job_provisioning_data=job_provisioning_data,
         job_runtime_data=get_job_runtime_data(job_model),
         error=error,
+        # TODO: This is only needed for API responses, yet currently  we always have to load probes
+        # into the job model for `job_model_to_job_submission` to work.
+        probes=[probe_model_to_probe(pm) for pm in job_model.probes],
     )
 
 

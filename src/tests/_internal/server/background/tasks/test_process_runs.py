@@ -644,6 +644,7 @@ class TestRollingDeployment:
             == "new"
         )
 
+    # TODO: test with probes
     @pytest.mark.parametrize(
         "new_replica_status", [JobStatus.SUBMITTED, JobStatus.PROVISIONING, JobStatus.PULLING]
     )

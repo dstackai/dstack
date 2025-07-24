@@ -90,6 +90,7 @@ from dstack._internal.server.models import (
     JobModel,
     JobPrometheusMetrics,
     PlacementGroupModel,
+    ProbeModel,
     ProjectModel,
     RepoCredsModel,
     RepoModel,
@@ -437,6 +438,25 @@ def get_job_runtime_data(
         offer=offer,
         volume_names=volume_names,
     )
+
+
+async def create_probe(
+    session: AsyncSession,
+    job: JobModel,
+    probe_num: int = 0,
+    due: datetime = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc),
+) -> ProbeModel:
+    probe = ProbeModel(
+        name=f"{job.job_name}-{probe_num}",
+        job=job,
+        probe_num=probe_num,
+        due=due,
+        success_streak=0,
+        active=True,
+    )
+    session.add(probe)
+    await session.commit()
+    return probe
 
 
 async def create_gateway(

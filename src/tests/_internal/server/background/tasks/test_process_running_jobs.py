@@ -96,6 +96,8 @@ def runner_client_mock(monkeypatch: pytest.MonkeyPatch) -> Mock:
 
 
 class TestProcessRunningJobs:
+    # TODO: test creates probes on PULLING->RUNNING transition
+
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_leaves_provisioning_job_unchanged_if_runner_not_alive(

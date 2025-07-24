@@ -18,6 +18,7 @@ from dstack._internal.server.background.tasks.process_metrics import (
 from dstack._internal.server.background.tasks.process_placement_groups import (
     process_placement_groups,
 )
+from dstack._internal.server.background.tasks.process_probes import process_probes
 from dstack._internal.server.background.tasks.process_prometheus_metrics import (
     collect_prometheus_metrics,
     delete_prometheus_metrics,
@@ -63,6 +64,7 @@ def start_background_tasks() -> AsyncIOScheduler:
     # that the first waiting for the lock will acquire it.
     # The jitter is needed to give all tasks a chance to acquire locks.
 
+    _scheduler.add_job(process_probes, IntervalTrigger(seconds=3, jitter=1))
     _scheduler.add_job(collect_metrics, IntervalTrigger(seconds=10), max_instances=1)
     _scheduler.add_job(delete_metrics, IntervalTrigger(minutes=5), max_instances=1)
     if settings.ENABLE_PROMETHEUS_METRICS:
