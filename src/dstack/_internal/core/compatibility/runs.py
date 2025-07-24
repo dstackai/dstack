@@ -120,6 +120,7 @@ def get_run_spec_excludes(run_spec: RunSpec) -> IncludeExcludeDictType:
         profile_excludes.add("startup_order")
     if configuration.stop_criteria is None:
         configuration_excludes["stop_criteria"] = True
+    # TODO: probes
     if profile is not None and profile.stop_criteria is None:
         profile_excludes.add("stop_criteria")
     if not configuration.files:
@@ -154,6 +155,7 @@ def get_job_spec_excludes(job_specs: list[JobSpec]) -> IncludeExcludeDictType:
         spec_excludes["file_archives"] = True
     if all(s.service_port is None for s in job_specs):
         spec_excludes["service_port"] = True
+    # TODO: probes
 
     return spec_excludes
 

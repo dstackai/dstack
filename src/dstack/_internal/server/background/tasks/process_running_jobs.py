@@ -42,6 +42,7 @@ from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import (
     InstanceModel,
     JobModel,
+    ProbeModel,
     ProjectModel,
     RepoModel,
     RunModel,
@@ -137,6 +138,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
         select(JobModel)
         .where(JobModel.id == job_model.id)
         .options(joinedload(JobModel.instance).joinedload(InstanceModel.project))
+        .options(joinedload(JobModel.probes))
         .execution_options(populate_existing=True)
     )
     job_model = res.unique().scalar_one()
@@ -146,7 +148,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
         .options(joinedload(RunModel.project).joinedload(ProjectModel.backends))
         .options(joinedload(RunModel.user))
         .options(joinedload(RunModel.repo))
-        .options(joinedload(RunModel.jobs))
+        .options(joinedload(RunModel.jobs).joinedload(JobModel.probes))
     )
     run_model = res.unique().scalar_one()
     repo_model = run_model.repo
@@ -408,6 +410,18 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
             )
             job_model.status = JobStatus.TERMINATING
             job_model.termination_reason = JobTerminationReason.GATEWAY_ERROR
+        else:
+            for probe_num in range(len(job.job_spec.probes)):
+                session.add(
+                    ProbeModel(
+                        name=f"{job_model.job_name}-{probe_num}",
+                        job=job_model,
+                        probe_num=probe_num,
+                        due=common_utils.get_current_datetime(),
+                        success_streak=0,
+                        active=True,
+                    )
+                )
 
     if job_model.status == JobStatus.RUNNING:
         await _check_gpu_utilization(session, job_model, job)

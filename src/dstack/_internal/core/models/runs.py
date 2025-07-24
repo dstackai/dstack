@@ -10,6 +10,7 @@ from dstack._internal.core.models.common import ApplyAction, CoreModel, NetworkM
 from dstack._internal.core.models.configurations import (
     DEFAULT_REPO_DIR,
     AnyRunConfiguration,
+    ProbeConfig,
     RunConfiguration,
     ServiceConfiguration,
 )
@@ -256,6 +257,7 @@ class JobSpec(CoreModel):
     file_archives: list[FileArchiveMapping] = []
     # None for non-services and pre-0.19.19 services. See `get_service_port`
     service_port: Optional[int] = None
+    probes: list[ProbeConfig] = []
 
 
 class JobProvisioningData(CoreModel):
@@ -325,6 +327,10 @@ class ClusterInfo(CoreModel):
     gpus_per_job: int
 
 
+class Probe(CoreModel):
+    success_streak: int
+
+
 class JobSubmission(CoreModel):
     id: UUID4
     submission_num: int
@@ -341,6 +347,7 @@ class JobSubmission(CoreModel):
     job_provisioning_data: Optional[JobProvisioningData]
     job_runtime_data: Optional[JobRuntimeData]
     error: Optional[str] = None
+    probes: list[Probe] = []
 
     @property
     def age(self) -> timedelta:

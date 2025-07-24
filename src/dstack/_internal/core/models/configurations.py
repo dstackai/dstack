@@ -14,7 +14,7 @@ from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.files import FilePathMapping
 from dstack._internal.core.models.fleets import FleetConfiguration
 from dstack._internal.core.models.gateways import GatewayConfiguration
-from dstack._internal.core.models.profiles import ProfileParams, parse_off_duration
+from dstack._internal.core.models.profiles import ProfileParams, parse_duration, parse_off_duration
 from dstack._internal.core.models.resources import Range, ResourcesSpec
 from dstack._internal.core.models.services import AnyModel, OpenAIChatModel
 from dstack._internal.core.models.unix import UnixUser
@@ -32,6 +32,8 @@ RUN_PRIOTIRY_MIN = 0
 RUN_PRIOTIRY_MAX = 100
 RUN_PRIORITY_DEFAULT = 0
 DEFAULT_REPO_DIR = "/workflow"
+MIN_PROBE_TIMEOUT = 1
+MIN_PROBE_INTERVAL = 1
 
 
 class RunConfigurationType(str, Enum):
@@ -160,6 +162,58 @@ class RateLimit(CoreModel):
             ),
         ),
     ] = 0
+
+
+class ProbeConfig(CoreModel):
+    type: Literal["http"]  # expect other probe types in the future, namely `exec`
+    url: Annotated[str, Field(description="The URL to request")] = "/"
+    timeout: Annotated[
+        Union[int, str],
+        Field(description=("Maximum amount of time the HTTP request is allowed to take")),
+    ] = "10s"
+    interval: Annotated[
+        Union[int, str],
+        Field(
+            description=(
+                "Minimum amount of time between the end of one probe execution"
+                " and the start of the next"
+            )
+        ),
+    ] = "15s"
+    ready_after: Annotated[
+        int,
+        Field(
+            ge=1,
+            description=(
+                "The number of consecutive successful probe executions required for the job"
+                " to be considered ready. Used during rolling deployments"
+            ),
+        ),
+    ] = 1
+
+    class Config:
+        frozen = True
+
+    @validator("timeout")
+    def parse_timeout(cls, v: Union[int, str]) -> int:
+        parsed = parse_duration(v)
+        if parsed < MIN_PROBE_TIMEOUT:
+            raise ValueError(f"Probe timeout cannot be shorter than {MIN_PROBE_TIMEOUT}s")
+        return parsed
+
+    @validator("interval")
+    def parse_interval(cls, v: Union[int, str]) -> int:
+        parsed = parse_duration(v)
+        if parsed < MIN_PROBE_INTERVAL:
+            raise ValueError(f"Probe interval cannot be shorter than {MIN_PROBE_INTERVAL}s")
+        return parsed
+
+    @validator("url")
+    def validate_url(cls, v: str) -> str:
+        # TODO: stricter constraints to avoid HTTPX URL parsing errors
+        if not v.startswith("/"):
+            raise ValueError("Must start with `/`")
+        return v
 
 
 class BaseRunConfiguration(CoreModel):
@@ -448,6 +502,10 @@ class ServiceConfigurationParams(CoreModel):
         Field(description="The auto-scaling rules. Required if `replicas` is set to a range"),
     ] = None
     rate_limits: Annotated[list[RateLimit], Field(description="Rate limiting rules")] = []
+    probes: Annotated[
+        list[ProbeConfig],
+        Field(unique_items=True, description="List of probes used to determine job health"),
+    ] = []
 
     @validator("port")
     def convert_port(cls, v) -> PortMapping:

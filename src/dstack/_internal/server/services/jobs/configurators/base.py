@@ -13,6 +13,7 @@ from dstack._internal.core.models.common import RegistryAuth
 from dstack._internal.core.models.configurations import (
     DEFAULT_REPO_DIR,
     PortMapping,
+    ProbeConfig,
     PythonVersion,
     RunConfigurationType,
     ServiceConfiguration,
@@ -155,6 +156,7 @@ class JobConfigurator(ABC):
             repo_code_hash=self.run_spec.repo_code_hash,
             file_archives=self.run_spec.file_archives,
             service_port=self._service_port(),
+            probes=self._probes(),
         )
         return job_spec
 
@@ -312,6 +314,11 @@ class JobConfigurator(ABC):
         if isinstance(self.run_spec.configuration, ServiceConfiguration):
             return self.run_spec.configuration.port.container_port
         return None
+
+    def _probes(self) -> list[ProbeConfig]:
+        if isinstance(self.run_spec.configuration, ServiceConfiguration):
+            return self.run_spec.configuration.probes
+        return []
 
 
 def interpolate_job_volumes(
