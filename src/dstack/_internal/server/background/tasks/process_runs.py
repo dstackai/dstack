@@ -20,7 +20,13 @@ from dstack._internal.core.models.runs import (
     RunTerminationReason,
 )
 from dstack._internal.server.db import get_db, get_session_ctx
-from dstack._internal.server.models import JobModel, ProjectModel, RunModel, UserModel
+from dstack._internal.server.models import (
+    InstanceModel,
+    JobModel,
+    ProjectModel,
+    RunModel,
+    UserModel,
+)
 from dstack._internal.server.services.jobs import (
     find_job,
     get_job_specs_from_run_spec,
@@ -136,7 +142,11 @@ async def _process_run(session: AsyncSession, run_model: RunModel):
         .execution_options(populate_existing=True)
         .options(joinedload(RunModel.project).load_only(ProjectModel.id, ProjectModel.name))
         .options(joinedload(RunModel.user).load_only(UserModel.name))
-        .options(selectinload(RunModel.jobs).joinedload(JobModel.instance))
+        .options(
+            selectinload(RunModel.jobs)
+            .joinedload(JobModel.instance)
+            .load_only(InstanceModel.fleet_id)
+        )
         .execution_options(populate_existing=True)
     )
     run_model = res.unique().scalar_one()
