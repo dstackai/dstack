@@ -20,7 +20,7 @@ from dstack._internal.core.models.runs import (
     RunTerminationReason,
 )
 from dstack._internal.server.db import get_db, get_session_ctx
-from dstack._internal.server.models import JobModel, ProjectModel, RunModel
+from dstack._internal.server.models import JobModel, ProjectModel, RunModel, UserModel
 from dstack._internal.server.services.jobs import (
     find_job,
     get_job_specs_from_run_spec,
@@ -129,14 +129,12 @@ async def _process_next_run():
 async def _process_run(session: AsyncSession, run_model: RunModel):
     logger.debug("%s: processing run", fmt(run_model))
     # Refetch to load related attributes.
-    # joinedload produces LEFT OUTER JOIN that can't be used with FOR UPDATE.
     res = await session.execute(
         select(RunModel)
         .where(RunModel.id == run_model.id)
         .execution_options(populate_existing=True)
-        .options(joinedload(RunModel.project).joinedload(ProjectModel.backends))
-        .options(joinedload(RunModel.user))
-        .options(joinedload(RunModel.repo))
+        .options(joinedload(RunModel.project).load_only(ProjectModel.id, ProjectModel.name))
+        .options(joinedload(RunModel.user).load_only(UserModel.name))
         .options(selectinload(RunModel.jobs).joinedload(JobModel.instance))
         .execution_options(populate_existing=True)
     )
