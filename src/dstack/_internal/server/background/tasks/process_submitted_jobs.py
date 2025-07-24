@@ -359,7 +359,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         .where(VolumeModel.id.in_(volumes_ids))
         .options(joinedload(VolumeModel.user).load_only(UserModel.name))
         .order_by(VolumeModel.id)  # take locks in order
-        .with_for_update(key_share=True)
+        .with_for_update(key_share=True, of=VolumeModel)
     )
     async with get_locker(get_db().dialect_name).lock_ctx(VolumeModel.__tablename__, volumes_ids):
         if len(volume_models) > 0:
