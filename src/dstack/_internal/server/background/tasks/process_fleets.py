@@ -60,7 +60,6 @@ async def _process_next_fleet():
 async def _process_fleet(session: AsyncSession, fleet_model: FleetModel):
     logger.debug("Processing fleet %s", fleet_model.name)
     # Refetch to load related attributes.
-    # joinedload produces LEFT OUTER JOIN that can't be used with FOR UPDATE.
     res = await session.execute(
         select(FleetModel)
         .where(FleetModel.id == fleet_model.id)

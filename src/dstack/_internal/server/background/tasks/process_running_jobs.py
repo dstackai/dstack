@@ -132,7 +132,6 @@ async def _process_next_running_job():
 
 async def _process_running_job(session: AsyncSession, job_model: JobModel):
     # Refetch to load related attributes.
-    # joinedload produces LEFT OUTER JOIN that can't be used with FOR UPDATE.
     res = await session.execute(
         select(JobModel)
         .where(JobModel.id == job_model.id)

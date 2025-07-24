@@ -154,7 +154,6 @@ async def _process_next_submitted_job():
 async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
     logger.debug("%s: provisioning has started", fmt(job_model))
     # Refetch to load related attributes.
-    # joinedload produces LEFT OUTER JOIN that can't be used with FOR UPDATE.
     res = await session.execute(
         select(JobModel).where(JobModel.id == job_model.id).options(joinedload(JobModel.instance))
     )
