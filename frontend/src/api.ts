@@ -98,6 +98,13 @@ export const API = {
         // METRICS
         JOB_METRICS: (projectName: IProject['project_name'], runName: IRun['run_spec']['run_name']) =>
             `${API.BASE()}/project/${projectName}/metrics/job/${runName}`,
+
+        // SECRETS
+        SECRETS_LIST: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/secrets/list`,
+        SECRET_GET: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/secrets/get`,
+        SECRETS_UPDATE: (projectName: IProject['project_name']) =>
+            `${API.BASE()}/project/${projectName}/secrets/create_or_update`,
+        SECRETS_DELETE: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/secrets/delete`,
     },
 
     BACKENDS: {

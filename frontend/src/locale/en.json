@@ -297,6 +297,15 @@
         "name": "User name",
         "role": "Project role"
       },
+      "secrets": {
+        "section_title": "Secrets",
+        "empty_message_title": "No secrets",
+        "empty_message_text": "No secrets to display.",
+        "name": "Secret name",
+        "value": "Secret value",
+        "delete_confirm_title": "Delete secrets",
+        "delete_confirm_message": "Are you sure you want to delete these secrets?"
+      },
       "error_notification": "Update project error",
       "validation": {
         "user_name_format": "Only letters, numbers, - or _"
