@@ -422,6 +422,9 @@ async def list_project_models(
     return list(res.scalars().all())
 
 
+# TODO: Do not load ProjectModel.backends and ProjectModel.members by default when getting project
+
+
 async def get_project_model_by_name(
     session: AsyncSession, project_name: str, ignore_case: bool = True
 ) -> Optional[ProjectModel]:
