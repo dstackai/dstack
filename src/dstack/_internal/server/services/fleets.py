@@ -49,6 +49,7 @@ from dstack._internal.server.db import get_db
 from dstack._internal.server.models import (
     FleetModel,
     InstanceModel,
+    JobModel,
     ProjectModel,
     UserModel,
 )
@@ -398,7 +399,11 @@ async def apply_plan(
                 FleetModel.id == fleet_model.id,
                 FleetModel.deleted == False,
             )
-            .options(selectinload(FleetModel.instances))
+            .options(
+                selectinload(FleetModel.instances)
+                .joinedload(InstanceModel.jobs)
+                .load_only(JobModel.id)
+            )
             .options(selectinload(FleetModel.runs))
             .execution_options(populate_existing=True)
             .order_by(FleetModel.id)  # take locks in order
@@ -563,7 +568,11 @@ async def delete_fleets(
                 FleetModel.name.in_(names),
                 FleetModel.deleted == False,
             )
-            .options(selectinload(FleetModel.instances))
+            .options(
+                selectinload(FleetModel.instances)
+                .joinedload(InstanceModel.jobs)
+                .load_only(JobModel.id)
+            )
             .options(selectinload(FleetModel.runs))
             .execution_options(populate_existing=True)
             .order_by(FleetModel.id)  # take locks in order

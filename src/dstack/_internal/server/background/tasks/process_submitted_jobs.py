@@ -5,7 +5,7 @@ from typing import List, Optional, Tuple
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, lazyload, load_only, selectinload
+from sqlalchemy.orm import joinedload, load_only, selectinload
 
 from dstack._internal.core.backends.base.backend import Backend
 from dstack._internal.core.backends.base.compute import ComputeWithVolumeSupport
@@ -229,7 +229,6 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
                 InstanceModel.deleted == False,
                 InstanceModel.total_blocks > InstanceModel.busy_blocks,
             )
-            .options(lazyload(InstanceModel.jobs))
             .order_by(InstanceModel.id)  # take locks in order
             .with_for_update(key_share=True)
         )

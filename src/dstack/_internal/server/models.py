@@ -619,7 +619,7 @@ class InstanceModel(BaseModel):
     total_blocks: Mapped[Optional[int]] = mapped_column(Integer)
     busy_blocks: Mapped[int] = mapped_column(Integer, default=0)
 
-    jobs: Mapped[list["JobModel"]] = relationship(back_populates="instance", lazy="joined")
+    jobs: Mapped[list["JobModel"]] = relationship(back_populates="instance")
     last_job_processed_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
 
     volume_attachments: Mapped[List["VolumeAttachmentModel"]] = relationship(
