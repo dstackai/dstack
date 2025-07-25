@@ -25,10 +25,11 @@ from dstack._internal.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
+BATCH_SIZE = 10
 MIN_PROCESSING_INTERVAL = timedelta(seconds=30)
 
 
-async def process_fleets(batch_size: int = 1):
+async def process_fleets():
     lock, lockset = get_locker(get_db().dialect_name).get_lockset(FleetModel.__tablename__)
     async with get_session_ctx() as session:
         async with lock:
@@ -42,7 +43,7 @@ async def process_fleets(batch_size: int = 1):
                 )
                 .options(load_only(FleetModel.id))
                 .order_by(FleetModel.last_processed_at.asc())
-                .limit(batch_size)
+                .limit(BATCH_SIZE)
                 .with_for_update(skip_locked=True, key_share=True)
             )
             fleet_models = list(res.scalars().all())

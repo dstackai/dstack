@@ -5,7 +5,7 @@ from typing import List, Optional, Tuple
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, lazyload, selectinload
+from sqlalchemy.orm import joinedload, lazyload, load_only, selectinload
 
 from dstack._internal.core.backends.base.backend import Backend
 from dstack._internal.core.backends.base.compute import ComputeWithVolumeSupport
@@ -120,6 +120,7 @@ async def _process_next_submitted_job():
                     JobModel.status == JobStatus.SUBMITTED,
                     JobModel.id.not_in(lockset),
                 )
+                .options(load_only(JobModel.id))
                 # Jobs are process in FIFO sorted by priority globally,
                 # thus runs from different projects can "overtake" each other by using higher priorities.
                 # That's not a big problem as long as projects do not compete for the same compute resources.
@@ -152,7 +153,6 @@ async def _process_next_submitted_job():
 
 
 async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
-    logger.debug("%s: provisioning has started", fmt(job_model))
     # Refetch to load related attributes.
     res = await session.execute(
         select(JobModel).where(JobModel.id == job_model.id).options(joinedload(JobModel.instance))
@@ -166,6 +166,8 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         .options(joinedload(RunModel.fleet).joinedload(FleetModel.instances))
     )
     run_model = res.unique().scalar_one()
+    logger.debug("%s: provisioning has started", fmt(job_model))
+
     project = run_model.project
     run = run_model_to_run(run_model)
     run_spec = run.run_spec

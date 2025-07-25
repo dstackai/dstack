@@ -4,7 +4,7 @@ from typing import List, Optional, Set, Tuple
 
 from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, selectinload
+from sqlalchemy.orm import joinedload, load_only, selectinload
 
 import dstack._internal.server.services.services.autoscalers as autoscalers
 from dstack._internal.core.errors import ServerError
@@ -102,6 +102,7 @@ async def _process_next_run():
                     ),
                 )
                 .options(joinedload(RunModel.jobs).load_only(JobModel.id))
+                .options(load_only(RunModel.id))
                 .order_by(RunModel.last_processed_at.asc())
                 .limit(1)
                 .with_for_update(skip_locked=True, key_share=True, of=RunModel)
@@ -134,7 +135,6 @@ async def _process_next_run():
 
 
 async def _process_run(session: AsyncSession, run_model: RunModel):
-    logger.debug("%s: processing run", fmt(run_model))
     # Refetch to load related attributes.
     res = await session.execute(
         select(RunModel)
@@ -150,6 +150,7 @@ async def _process_run(session: AsyncSession, run_model: RunModel):
         .execution_options(populate_existing=True)
     )
     run_model = res.unique().scalar_one()
+    logger.debug("%s: processing run", fmt(run_model))
     try:
         if run_model.status == RunStatus.PENDING:
             await _process_pending_run(session, run_model)
