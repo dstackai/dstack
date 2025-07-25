@@ -359,7 +359,7 @@ class RunModel(BaseModel):
     submitted_at: Mapped[datetime] = mapped_column(NaiveDateTime)
     last_processed_at: Mapped[datetime] = mapped_column(NaiveDateTime)
     next_triggered_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
-    status: Mapped[RunStatus] = mapped_column(Enum(RunStatus))
+    status: Mapped[RunStatus] = mapped_column(Enum(RunStatus), index=True)
     termination_reason: Mapped[Optional[RunTerminationReason]] = mapped_column(
         Enum(RunTerminationReason)
     )
@@ -400,7 +400,7 @@ class JobModel(BaseModel):
     submission_num: Mapped[int] = mapped_column(Integer)
     submitted_at: Mapped[datetime] = mapped_column(NaiveDateTime)
     last_processed_at: Mapped[datetime] = mapped_column(NaiveDateTime)
-    status: Mapped[JobStatus] = mapped_column(Enum(JobStatus))
+    status: Mapped[JobStatus] = mapped_column(Enum(JobStatus), index=True)
     termination_reason: Mapped[Optional[JobTerminationReason]] = mapped_column(
         Enum(JobTerminationReason)
     )
@@ -528,7 +528,7 @@ class FleetModel(BaseModel):
     deleted: Mapped[bool] = mapped_column(Boolean, default=False)
     deleted_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
 
-    status: Mapped[FleetStatus] = mapped_column(Enum(FleetStatus))
+    status: Mapped[FleetStatus] = mapped_column(Enum(FleetStatus), index=True)
     status_message: Mapped[Optional[str]] = mapped_column(Text)
 
     spec: Mapped[str] = mapped_column(Text)
@@ -568,7 +568,7 @@ class InstanceModel(BaseModel):
     fleet_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("fleets.id"))
     fleet: Mapped[Optional["FleetModel"]] = relationship(back_populates="instances")
 
-    status: Mapped[InstanceStatus] = mapped_column(Enum(InstanceStatus))
+    status: Mapped[InstanceStatus] = mapped_column(Enum(InstanceStatus), index=True)
     unreachable: Mapped[bool] = mapped_column(Boolean)
 
     # VM
@@ -653,7 +653,7 @@ class VolumeModel(BaseModel):
     deleted: Mapped[bool] = mapped_column(Boolean, default=False)
     deleted_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
 
-    status: Mapped[VolumeStatus] = mapped_column(Enum(VolumeStatus))
+    status: Mapped[VolumeStatus] = mapped_column(Enum(VolumeStatus), index=True)
     status_message: Mapped[Optional[str]] = mapped_column(Text)
 
     configuration: Mapped[str] = mapped_column(Text)
