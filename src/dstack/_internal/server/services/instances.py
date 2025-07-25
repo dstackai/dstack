@@ -34,7 +34,6 @@ from dstack._internal.core.models.profiles import (
     TerminationPolicy,
 )
 from dstack._internal.core.models.runs import JobProvisioningData, Requirements
-from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.core.models.volumes import Volume
 from dstack._internal.core.services.profiles import get_termination
 from dstack._internal.server.models import (
@@ -44,7 +43,7 @@ from dstack._internal.server.models import (
     UserModel,
 )
 from dstack._internal.server.services.offers import generate_shared_offer
-from dstack._internal.server.services.projects import list_project_models, list_user_project_models
+from dstack._internal.server.services.projects import list_user_project_models
 from dstack._internal.utils import common as common_utils
 from dstack._internal.utils.logging import get_logger
 
@@ -372,18 +371,15 @@ async def list_user_instances(
     limit: int,
     ascending: bool,
 ) -> List[Instance]:
-    if user.global_role == GlobalRole.ADMIN:
-        projects = await list_project_models(session=session)
-    else:
-        projects = await list_user_project_models(session=session, user=user)
-    if not projects:
-        return []
-
+    projects = await list_user_project_models(
+        session=session,
+        user=user,
+        only_names=True,
+    )
     if project_names is not None:
-        projects = [proj for proj in projects if proj.name in project_names]
+        projects = [p for p in projects if p.name in project_names]
         if len(projects) == 0:
             return []
-
     instance_models = await list_projects_instance_models(
         session=session,
         projects=projects,

@@ -4,7 +4,7 @@ from typing import Awaitable, Callable, List, Optional, Tuple
 from sqlalchemy import delete, select, update
 from sqlalchemy import func as safunc
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import QueryableAttribute, joinedload, load_only
 
 from dstack._internal.core.backends.configurators import get_configurator
 from dstack._internal.core.backends.dstack.models import (
@@ -53,13 +53,12 @@ async def list_user_projects(
     user: UserModel,
 ) -> List[Project]:
     """
-    Returns projects where the user is a member.
+    Returns projects where the user is a member or all projects for global admins.
     """
-    if user.global_role == GlobalRole.ADMIN:
-        projects = await list_project_models(session=session)
-    else:
-        projects = await list_user_project_models(session=session, user=user)
-
+    projects = await list_user_project_models(
+        session=session,
+        user=user,
+    )
     projects = sorted(projects, key=lambda p: p.created_at)
     return [
         project_model_to_project(p, include_backends=False, include_members=False)
@@ -79,7 +78,7 @@ async def list_user_accessible_projects(
     if user.global_role == GlobalRole.ADMIN:
         projects = await list_project_models(session=session)
     else:
-        member_projects = await list_user_project_models(session=session, user=user)
+        member_projects = await list_member_project_models(session=session, user=user)
         public_projects = await list_public_non_member_project_models(session=session, user=user)
         projects = member_projects + public_projects
 
@@ -166,7 +165,7 @@ async def delete_projects(
     projects_names: List[str],
 ):
     if user.global_role != GlobalRole.ADMIN:
-        user_projects = await list_user_project_models(
+        user_projects = await list_member_project_models(
             session=session, user=user, include_members=True
         )
         user_project_names = [p.name for p in user_projects]
@@ -340,7 +339,23 @@ async def clear_project_members(
 async def list_user_project_models(
     session: AsyncSession,
     user: UserModel,
+    only_names: bool = False,
+) -> List[ProjectModel]:
+    load_only_attrs = []
+    if only_names:
+        load_only_attrs += [ProjectModel.id, ProjectModel.name]
+    if user.global_role == GlobalRole.ADMIN:
+        return await list_project_models(session=session, load_only_attrs=load_only_attrs)
+    return await list_member_project_models(
+        session=session, user=user, load_only_attrs=load_only_attrs
+    )
+
+
+async def list_member_project_models(
+    session: AsyncSession,
+    user: UserModel,
     include_members: bool = False,
+    load_only_attrs: Optional[List[QueryableAttribute]] = None,
 ) -> List[ProjectModel]:
     """
     List project models for a user where they are a member.
@@ -348,6 +363,8 @@ async def list_user_project_models(
     options = []
     if include_members:
         options.append(joinedload(ProjectModel.members))
+    if load_only_attrs:
+        options.append(load_only(*load_only_attrs))
     res = await session.execute(
         select(ProjectModel)
         .where(
@@ -394,9 +411,13 @@ async def list_user_owned_project_models(
 
 async def list_project_models(
     session: AsyncSession,
+    load_only_attrs: Optional[List[QueryableAttribute]] = None,
 ) -> List[ProjectModel]:
+    options = []
+    if load_only_attrs:
+        options.append(load_only(*load_only_attrs))
     res = await session.execute(
-        select(ProjectModel).where(ProjectModel.deleted == False),
+        select(ProjectModel).where(ProjectModel.deleted == False).options(*options)
     )
     return list(res.scalars().all())
 
