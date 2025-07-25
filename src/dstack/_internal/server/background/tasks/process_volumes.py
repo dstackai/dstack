@@ -7,6 +7,7 @@ from dstack._internal.core.errors import BackendError, BackendNotAvailable
 from dstack._internal.core.models.volumes import VolumeStatus
 from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import (
+    FleetModel,
     InstanceModel,
     ProjectModel,
     VolumeAttachmentModel,
@@ -49,7 +50,6 @@ async def process_submitted_volumes():
 async def _process_submitted_volume(session: AsyncSession, volume_model: VolumeModel):
     logger.info("Started submitted volume %s processing", volume_model.name)
     # Refetch to load related attributes.
-    # joinedload produces LEFT OUTER JOIN that can't be used with FOR UPDATE.
     res = await session.execute(
         select(VolumeModel)
         .where(VolumeModel.id == volume_model.id)
@@ -59,6 +59,7 @@ async def _process_submitted_volume(session: AsyncSession, volume_model: VolumeM
             joinedload(VolumeModel.attachments)
             .joinedload(VolumeAttachmentModel.instance)
             .joinedload(InstanceModel.fleet)
+            .load_only(FleetModel.name)
         )
         .execution_options(populate_existing=True)
     )

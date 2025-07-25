@@ -132,7 +132,6 @@ async def _process_next_running_job():
 
 async def _process_running_job(session: AsyncSession, job_model: JobModel):
     # Refetch to load related attributes.
-    # joinedload produces LEFT OUTER JOIN that can't be used with FOR UPDATE.
     res = await session.execute(
         select(JobModel)
         .where(JobModel.id == job_model.id)
@@ -143,7 +142,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
     res = await session.execute(
         select(RunModel)
         .where(RunModel.id == job_model.run_id)
-        .options(joinedload(RunModel.project).joinedload(ProjectModel.backends))
+        .options(joinedload(RunModel.project))
         .options(joinedload(RunModel.user))
         .options(joinedload(RunModel.repo))
         .options(joinedload(RunModel.jobs))
@@ -163,139 +162,141 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
 
     job = find_job(run.jobs, job_model.replica_num, job_model.job_num)
 
-    # Wait until all other jobs in the replica are provisioned
-    for other_job in run.jobs:
-        if (
-            other_job.job_spec.replica_num == job.job_spec.replica_num
-            and other_job.job_submissions[-1].status == JobStatus.SUBMITTED
-        ):
+    initial_status = job_model.status
+    if initial_status in [JobStatus.PROVISIONING, JobStatus.PULLING]:
+        # Wait until all other jobs in the replica are provisioned
+        for other_job in run.jobs:
+            if (
+                other_job.job_spec.replica_num == job.job_spec.replica_num
+                and other_job.job_submissions[-1].status == JobStatus.SUBMITTED
+            ):
+                job_model.last_processed_at = common_utils.get_current_datetime()
+                await session.commit()
+                return
+
+        cluster_info = _get_cluster_info(
+            jobs=run.jobs,
+            replica_num=job.job_spec.replica_num,
+            job_provisioning_data=job_provisioning_data,
+            job_runtime_data=job_submission.job_runtime_data,
+        )
+
+        volumes = await get_job_attached_volumes(
+            session=session,
+            project=project,
+            run_spec=run.run_spec,
+            job_num=job.job_spec.job_num,
+            job_provisioning_data=job_provisioning_data,
+        )
+
+        repo_creds_model = await get_repo_creds(
+            session=session, repo=repo_model, user=run_model.user
+        )
+        repo_creds = repo_model_to_repo_head_with_creds(repo_model, repo_creds_model).repo_creds
+
+        secrets = await get_project_secrets_mapping(session=session, project=project)
+        try:
+            _interpolate_secrets(secrets, job.job_spec)
+        except InterpolatorError as e:
+            logger.info("%s: terminating due to secrets interpolation error", fmt(job_model))
+            job_model.status = JobStatus.TERMINATING
+            job_model.termination_reason = JobTerminationReason.TERMINATED_BY_SERVER
+            job_model.termination_reason_message = e.args[0]
             job_model.last_processed_at = common_utils.get_current_datetime()
-            await session.commit()
             return
-
-    cluster_info = _get_cluster_info(
-        jobs=run.jobs,
-        replica_num=job.job_spec.replica_num,
-        job_provisioning_data=job_provisioning_data,
-        job_runtime_data=job_submission.job_runtime_data,
-    )
-
-    volumes = await get_job_attached_volumes(
-        session=session,
-        project=project,
-        run_spec=run.run_spec,
-        job_num=job.job_spec.job_num,
-        job_provisioning_data=job_provisioning_data,
-    )
 
     server_ssh_private_keys = get_instance_ssh_private_keys(
         common_utils.get_or_error(job_model.instance)
     )
 
-    secrets = await get_project_secrets_mapping(session=session, project=project)
-
-    try:
-        _interpolate_secrets(secrets, job.job_spec)
-    except InterpolatorError as e:
-        logger.info("%s: terminating due to secrets interpolation error", fmt(job_model))
-        job_model.status = JobStatus.TERMINATING
-        job_model.termination_reason = JobTerminationReason.TERMINATED_BY_SERVER
-        job_model.termination_reason_message = e.args[0]
-        job_model.last_processed_at = common_utils.get_current_datetime()
-        return
-
-    repo_creds_model = await get_repo_creds(session=session, repo=repo_model, user=run_model.user)
-    repo_creds = repo_model_to_repo_head_with_creds(repo_model, repo_creds_model).repo_creds
-
-    initial_status = job_model.status
     if initial_status == JobStatus.PROVISIONING:
         if job_provisioning_data.hostname is None:
             await _wait_for_instance_provisioning_data(job_model=job_model)
+            job_model.last_processed_at = common_utils.get_current_datetime()
+            await session.commit()
+            return
+        if _should_wait_for_other_nodes(run, job, job_model):
+            job_model.last_processed_at = common_utils.get_current_datetime()
+            await session.commit()
+            return
+
+        # fails are acceptable until timeout is exceeded
+        if job_provisioning_data.dockerized:
+            logger.debug(
+                "%s: process provisioning job with shim, age=%s",
+                fmt(job_model),
+                job_submission.age,
+            )
+            ssh_user = job_provisioning_data.username
+            user_ssh_key = run.run_spec.ssh_key_pub.strip()
+            public_keys = [project.ssh_public_key.strip(), user_ssh_key]
+            if job_provisioning_data.backend == BackendType.LOCAL:
+                # No need to update ~/.ssh/authorized_keys when running shim locally
+                user_ssh_key = ""
+            success = await common_utils.run_async(
+                _process_provisioning_with_shim,
+                server_ssh_private_keys,
+                job_provisioning_data,
+                None,
+                run,
+                job_model,
+                job_provisioning_data,
+                volumes,
+                job.job_spec.registry_auth,
+                public_keys,
+                ssh_user,
+                user_ssh_key,
+            )
         else:
-            if _should_wait_for_other_nodes(run, job, job_model):
-                job_model.last_processed_at = common_utils.get_current_datetime()
-                await session.commit()
-                return
+            logger.debug(
+                "%s: process provisioning job without shim, age=%s",
+                fmt(job_model),
+                job_submission.age,
+            )
+            # FIXME: downloading file archives and code here is a waste of time if
+            # the runner is not ready yet
+            file_archives = await _get_job_file_archives(
+                session=session,
+                archive_mappings=job.job_spec.file_archives,
+                user=run_model.user,
+            )
+            code = await _get_job_code(
+                session=session,
+                project=project,
+                repo=repo_model,
+                code_hash=_get_repo_code_hash(run, job),
+            )
 
-            # fails are acceptable until timeout is exceeded
-            if job_provisioning_data.dockerized:
-                logger.debug(
-                    "%s: process provisioning job with shim, age=%s",
+            success = await common_utils.run_async(
+                _submit_job_to_runner,
+                server_ssh_private_keys,
+                job_provisioning_data,
+                None,
+                run,
+                job_model,
+                job,
+                cluster_info,
+                code,
+                file_archives,
+                secrets,
+                repo_creds,
+                success_if_not_available=False,
+            )
+
+        if not success:
+            # check timeout
+            if job_submission.age > get_provisioning_timeout(
+                backend_type=job_provisioning_data.get_base_backend(),
+                instance_type_name=job_provisioning_data.instance_type.name,
+            ):
+                logger.warning(
+                    "%s: failed because runner has not become available in time, age=%s",
                     fmt(job_model),
                     job_submission.age,
                 )
-                ssh_user = job_provisioning_data.username
-                user_ssh_key = run.run_spec.ssh_key_pub.strip()
-                public_keys = [project.ssh_public_key.strip(), user_ssh_key]
-                if job_provisioning_data.backend == BackendType.LOCAL:
-                    # No need to update ~/.ssh/authorized_keys when running shim locally
-                    user_ssh_key = ""
-                success = await common_utils.run_async(
-                    _process_provisioning_with_shim,
-                    server_ssh_private_keys,
-                    job_provisioning_data,
-                    None,
-                    run,
-                    job_model,
-                    job_provisioning_data,
-                    volumes,
-                    job.job_spec.registry_auth,
-                    public_keys,
-                    ssh_user,
-                    user_ssh_key,
-                )
-            else:
-                logger.debug(
-                    "%s: process provisioning job without shim, age=%s",
-                    fmt(job_model),
-                    job_submission.age,
-                )
-                # FIXME: downloading file archives and code here is a waste of time if
-                # the runner is not ready yet
-                file_archives = await _get_job_file_archives(
-                    session=session,
-                    archive_mappings=job.job_spec.file_archives,
-                    user=run_model.user,
-                )
-                code = await _get_job_code(
-                    session=session,
-                    project=project,
-                    repo=repo_model,
-                    code_hash=_get_repo_code_hash(run, job),
-                )
-
-                success = await common_utils.run_async(
-                    _submit_job_to_runner,
-                    server_ssh_private_keys,
-                    job_provisioning_data,
-                    None,
-                    run,
-                    job_model,
-                    job,
-                    cluster_info,
-                    code,
-                    file_archives,
-                    secrets,
-                    repo_creds,
-                    success_if_not_available=False,
-                )
-
-            if not success:
-                # check timeout
-                if job_submission.age > get_provisioning_timeout(
-                    backend_type=job_provisioning_data.get_base_backend(),
-                    instance_type_name=job_provisioning_data.instance_type.name,
-                ):
-                    logger.warning(
-                        "%s: failed because runner has not become available in time, age=%s",
-                        fmt(job_model),
-                        job_submission.age,
-                    )
-                    job_model.status = JobStatus.TERMINATING
-                    job_model.termination_reason = (
-                        JobTerminationReason.WAITING_RUNNER_LIMIT_EXCEEDED
-                    )
-                    # instance will be emptied by process_terminating_jobs
+                job_model.status = JobStatus.TERMINATING
+                job_model.termination_reason = JobTerminationReason.WAITING_RUNNER_LIMIT_EXCEEDED
+                # instance will be emptied by process_terminating_jobs
 
     else:  # fails are not acceptable
         if initial_status == JobStatus.PULLING:

@@ -9,7 +9,7 @@ from dstack._internal.core.consts import DSTACK_RUNNER_HTTP_PORT
 from dstack._internal.core.models.runs import JobStatus
 from dstack._internal.server import settings
 from dstack._internal.server.db import get_session_ctx
-from dstack._internal.server.models import InstanceModel, JobMetricsPoint, JobModel
+from dstack._internal.server.models import InstanceModel, JobMetricsPoint, JobModel, ProjectModel
 from dstack._internal.server.schemas.runner import MetricsResponse
 from dstack._internal.server.services.instances import get_instance_ssh_private_keys
 from dstack._internal.server.services.jobs import get_job_provisioning_data, get_job_runtime_data
@@ -31,7 +31,11 @@ async def collect_metrics():
         res = await session.execute(
             select(JobModel)
             .where(JobModel.status.in_([JobStatus.RUNNING]))
-            .options(joinedload(JobModel.instance).joinedload(InstanceModel.project))
+            .options(
+                joinedload(JobModel.instance)
+                .joinedload(InstanceModel.project)
+                .load_only(ProjectModel.ssh_private_key)
+            )
             .order_by(JobModel.last_processed_at.asc())
             .limit(MAX_JOBS_FETCHED)
         )
