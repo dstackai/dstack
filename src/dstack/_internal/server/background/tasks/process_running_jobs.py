@@ -7,7 +7,7 @@ from typing import Dict, List, Optional
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, load_only
 
 from dstack._internal import settings
 from dstack._internal.core.consts import DSTACK_RUNNER_HTTP_PORT, DSTACK_SHIM_HTTP_PORT
@@ -110,6 +110,7 @@ async def _process_next_running_job():
                     JobModel.last_processed_at
                     < common_utils.get_current_datetime() - MIN_PROCESSING_INTERVAL,
                 )
+                .options(load_only(JobModel.id))
                 .order_by(JobModel.last_processed_at.asc())
                 .limit(1)
                 .with_for_update(

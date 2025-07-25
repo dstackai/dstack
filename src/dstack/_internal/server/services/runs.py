@@ -8,7 +8,7 @@ import pydantic
 from apscheduler.triggers.cron import CronTrigger
 from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, selectinload
+from sqlalchemy.orm import joinedload
 
 import dstack._internal.utils.common as common_utils
 from dstack._internal.core.errors import (
@@ -43,7 +43,6 @@ from dstack._internal.core.models.runs import (
     RunTerminationReason,
     ServiceSpec,
 )
-from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.core.models.volumes import (
     InstanceMountPoint,
     Volume,
@@ -82,7 +81,7 @@ from dstack._internal.server.services.locking import get_locker, string_to_lock_
 from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.offers import get_offers_by_requirements
 from dstack._internal.server.services.plugins import apply_plugin_policies
-from dstack._internal.server.services.projects import list_project_models, list_user_project_models
+from dstack._internal.server.services.projects import list_user_project_models
 from dstack._internal.server.services.resources import set_resources_defaults
 from dstack._internal.server.services.secrets import get_project_secrets_mapping
 from dstack._internal.server.services.users import get_user_model_by_name
@@ -116,10 +115,11 @@ async def list_user_runs(
 ) -> List[Run]:
     if project_name is None and repo_id is not None:
         return []
-    if user.global_role == GlobalRole.ADMIN:
-        projects = await list_project_models(session=session)
-    else:
-        projects = await list_user_project_models(session=session, user=user)
+    projects = await list_user_project_models(
+        session=session,
+        user=user,
+        only_names=True,
+    )
     runs_user = None
     if username is not None:
         runs_user = await get_user_model_by_name(session=session, username=username)
@@ -218,9 +218,9 @@ async def list_projects_run_models(
     res = await session.execute(
         select(RunModel)
         .where(*filters)
+        .options(joinedload(RunModel.user).load_only(UserModel.name))
         .order_by(*order_by)
         .limit(limit)
-        .options(selectinload(RunModel.user))
     )
     run_models = list(res.scalars().all())
     return run_models

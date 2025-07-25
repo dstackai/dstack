@@ -79,6 +79,11 @@ def start_background_tasks() -> AsyncIOScheduler:
         process_idle_volumes, IntervalTrigger(seconds=60, jitter=10), max_instances=1
     )
     _scheduler.add_job(process_placement_groups, IntervalTrigger(seconds=30, jitter=5))
+    _scheduler.add_job(
+        process_fleets,
+        IntervalTrigger(seconds=10, jitter=2),
+        max_instances=1,
+    )
     for replica in range(settings.SERVER_BACKGROUND_PROCESSING_FACTOR):
         # Add multiple copies of tasks if requested.
         # max_instances=1 for additional copies to avoid running too many tasks.
@@ -110,12 +115,6 @@ def start_background_tasks() -> AsyncIOScheduler:
         _scheduler.add_job(
             process_instances,
             IntervalTrigger(seconds=4, jitter=2),
-            kwargs={"batch_size": 5},
-            max_instances=2 if replica == 0 else 1,
-        )
-        _scheduler.add_job(
-            process_fleets,
-            IntervalTrigger(seconds=10, jitter=2),
             kwargs={"batch_size": 5},
             max_instances=2 if replica == 0 else 1,
         )

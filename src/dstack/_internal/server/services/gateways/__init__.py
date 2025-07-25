@@ -86,15 +86,6 @@ async def get_gateway_by_name(
     return gateway_model_to_gateway(gateway)
 
 
-async def get_project_default_gateway(
-    session: AsyncSession, project: ProjectModel
-) -> Optional[Gateway]:
-    gateway: Optional[GatewayModel] = project.default_gateway
-    if gateway is None:
-        return None
-    return gateway_model_to_gateway(gateway)
-
-
 async def create_gateway_compute(
     project_name: str,
     backend_compute: Compute,
@@ -181,9 +172,9 @@ async def create_gateway(
         session.add(gateway)
         await session.commit()
 
-        if project.default_gateway is None or configuration.default:
+        default_gateway = await get_project_default_gateway_model(session=session, project=project)
+        if default_gateway is None or configuration.default:
             await set_default_gateway(session=session, project=project, name=configuration.name)
-
         return gateway_model_to_gateway(gateway)
 
 
@@ -347,6 +338,15 @@ async def get_project_gateway_model_by_name(
         )
     )
     return res.scalar()
+
+
+async def get_project_default_gateway_model(
+    session: AsyncSession, project: ProjectModel
+) -> Optional[GatewayModel]:
+    res = await session.execute(
+        select(GatewayModel).where(GatewayModel.id == project.default_gateway_id)
+    )
+    return res.scalar_one_or_none()
 
 
 async def generate_gateway_name(session: AsyncSession, project: ProjectModel) -> str:

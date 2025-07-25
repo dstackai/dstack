@@ -49,6 +49,7 @@ from dstack._internal.server.db import get_db
 from dstack._internal.server.models import (
     FleetModel,
     InstanceModel,
+    JobModel,
     ProjectModel,
     UserModel,
 )
@@ -66,7 +67,6 @@ from dstack._internal.server.services.plugins import apply_plugin_policies
 from dstack._internal.server.services.projects import (
     get_member,
     get_member_permissions,
-    list_project_models,
     list_user_project_models,
 )
 from dstack._internal.server.services.resources import set_resources_defaults
@@ -87,10 +87,11 @@ async def list_fleets(
     limit: int,
     ascending: bool,
 ) -> List[Fleet]:
-    if user.global_role == GlobalRole.ADMIN:
-        projects = await list_project_models(session=session)
-    else:
-        projects = await list_user_project_models(session=session, user=user)
+    projects = await list_user_project_models(
+        session=session,
+        user=user,
+        only_names=True,
+    )
     if project_name is not None:
         projects = [p for p in projects if p.name == project_name]
     fleet_models = await list_projects_fleet_models(
@@ -398,7 +399,11 @@ async def apply_plan(
                 FleetModel.id == fleet_model.id,
                 FleetModel.deleted == False,
             )
-            .options(selectinload(FleetModel.instances))
+            .options(
+                selectinload(FleetModel.instances)
+                .joinedload(InstanceModel.jobs)
+                .load_only(JobModel.id)
+            )
             .options(selectinload(FleetModel.runs))
             .execution_options(populate_existing=True)
             .order_by(FleetModel.id)  # take locks in order
@@ -563,7 +568,11 @@ async def delete_fleets(
                 FleetModel.name.in_(names),
                 FleetModel.deleted == False,
             )
-            .options(selectinload(FleetModel.instances))
+            .options(
+                selectinload(FleetModel.instances)
+                .joinedload(InstanceModel.jobs)
+                .load_only(JobModel.id)
+            )
             .options(selectinload(FleetModel.runs))
             .execution_options(populate_existing=True)
             .order_by(FleetModel.id)  # take locks in order

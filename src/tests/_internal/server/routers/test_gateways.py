@@ -7,10 +7,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from dstack._internal.core.errors import DstackError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
-from dstack._internal.server.services.gateways import (
-    gateway_model_to_gateway,
-    get_project_default_gateway,
-)
 from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.testing.common import (
     ComputeMockSpec,
@@ -291,32 +287,6 @@ class TestCreateGateway:
 
 
 class TestDefaultGateway:
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_get_default_gateway(self, test_db, session: AsyncSession, client: AsyncClient):
-        project = await create_project(session)
-        backend = await create_backend(session, project.id)
-        gateway = await create_gateway(session, project.id, backend.id)
-        async with session.begin():
-            project.default_gateway_id = gateway.id
-            session.add(project)
-
-        res = await get_project_default_gateway(session, project)
-        assert res is not None
-        assert res.dict() == gateway_model_to_gateway(gateway).dict()
-
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_default_gateway_is_missing(
-        self, test_db, session: AsyncSession, client: AsyncClient
-    ):
-        project = await create_project(session)
-        backend = await create_backend(session, project.id)
-        await create_gateway(session, project.id, backend.id)
-
-        res = await get_project_default_gateway(session, project)
-        assert res is None
-
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_only_admin_can_set_default_gateway(
