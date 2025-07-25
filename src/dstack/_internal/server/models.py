@@ -547,7 +547,6 @@ class InstanceModel(BaseModel):
 
     instance_num: Mapped[int] = mapped_column(Integer, default=0)
 
-    # instance
     created_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
     last_processed_at: Mapped[datetime] = mapped_column(
         NaiveDateTime, default=get_current_datetime
@@ -584,7 +583,6 @@ class InstanceModel(BaseModel):
     requirements: Mapped[Optional[str]] = mapped_column(Text)
     instance_configuration: Mapped[Optional[str]] = mapped_column(Text)
 
-    # temination policy
     termination_policy: Mapped[Optional[TerminationPolicy]] = mapped_column(String(100))
     # TODO: Suggestion: do not assign DEFAULT_FLEET_TERMINATION_IDLE_TIME as the default here
     # (make Optional instead; also instead of -1)
@@ -602,11 +600,9 @@ class InstanceModel(BaseModel):
     first_termination_retry_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
     last_termination_retry_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
 
-    # backend
     backend: Mapped[Optional[BackendType]] = mapped_column(EnumAsString(BackendType, 100))
     backend_data: Mapped[Optional[str]] = mapped_column(Text)
 
-    # offer
     offer: Mapped[Optional[str]] = mapped_column(Text)
     region: Mapped[Optional[str]] = mapped_column(String(2000))
     price: Mapped[Optional[float]] = mapped_column(Float)
@@ -626,7 +622,7 @@ class InstanceModel(BaseModel):
         back_populates="instance",
         # Add delete-orphan option so that removing entries from volume_attachments
         # automatically marks them for deletion.
-        # SQLalchemy requires delete when using delete-orphan.
+        # SQLAlchemy requires delete when using delete-orphan.
         cascade="save-update, merge, delete-orphan, delete",
     )
 
