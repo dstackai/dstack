@@ -1,6 +1,6 @@
 import itertools
 import json
-from datetime import timedelta, timezone
+from datetime import timedelta
 from typing import Dict, Iterable, List, Optional, Tuple
 from uuid import UUID
 
@@ -130,7 +130,7 @@ def job_model_to_job_submission(job_model: JobModel) -> JobSubmission:
         ):
             backend_data = json.loads(job_provisioning_data.backend_data)
             job_provisioning_data.backend = backend_data["base_backend"]
-    last_processed_at = job_model.last_processed_at.replace(tzinfo=timezone.utc)
+    last_processed_at = job_model.last_processed_at
     finished_at = None
     if job_model.status.is_finished():
         finished_at = last_processed_at
@@ -140,7 +140,7 @@ def job_model_to_job_submission(job_model: JobModel) -> JobSubmission:
         id=job_model.id,
         submission_num=job_model.submission_num,
         deployment_num=job_model.deployment_num,
-        submitted_at=job_model.submitted_at.replace(tzinfo=timezone.utc),
+        submitted_at=job_model.submitted_at,
         last_processed_at=last_processed_at,
         finished_at=finished_at,
         inactivity_secs=job_model.inactivity_secs,
@@ -231,10 +231,7 @@ async def process_terminating_job(
     Graceful stop should already be done by `process_terminating_run`.
     Caller must acquire the locks on the job and the job's instance.
     """
-    if (
-        job_model.remove_at is not None
-        and job_model.remove_at.replace(tzinfo=timezone.utc) > common.get_current_datetime()
-    ):
+    if job_model.remove_at is not None and job_model.remove_at > common.get_current_datetime():
         # it's too early to terminate the instance
         return
 
@@ -293,6 +290,19 @@ async def process_terminating_job(
     # so that stuck volumes don't prevent the instance from terminating.
     job_model.instance_id = None
     instance_model.last_job_processed_at = common.get_current_datetime()
+
+    volume_names = (
+        jrd.volume_names
+        if jrd and jrd.volume_names
+        else [va.volume.name for va in instance_model.volume_attachments]
+    )
+    if volume_names:
+        volumes = await list_project_volume_models(
+            session=session, project=instance_model.project, names=volume_names
+        )
+        for volume in volumes:
+            volume.last_job_processed_at = common.get_current_datetime()
+
     logger.info(
         "%s: instance '%s' has been released, new status is %s",
         fmt(job_model),
@@ -537,13 +547,12 @@ def _should_force_detach_volume(job_model: JobModel, stop_duration: Optional[int
     return (
         job_model.volumes_detached_at is not None
         and common.get_current_datetime()
-        > job_model.volumes_detached_at.replace(tzinfo=timezone.utc) + MIN_FORCE_DETACH_WAIT_PERIOD
+        > job_model.volumes_detached_at + MIN_FORCE_DETACH_WAIT_PERIOD
         and (
             job_model.termination_reason == JobTerminationReason.ABORTED_BY_USER
             or stop_duration is not None
             and common.get_current_datetime()
-            > job_model.volumes_detached_at.replace(tzinfo=timezone.utc)
-            + timedelta(seconds=stop_duration)
+            > job_model.volumes_detached_at + timedelta(seconds=stop_duration)
         )
     )
 

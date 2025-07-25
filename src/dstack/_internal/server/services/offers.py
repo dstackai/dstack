@@ -2,13 +2,13 @@ from typing import List, Literal, Optional, Tuple, Union
 
 import gpuhunt
 
-from dstack._internal.core.backends import (
+from dstack._internal.core.backends.base.backend import Backend
+from dstack._internal.core.backends.base.compute import ComputeWithPlacementGroupSupport
+from dstack._internal.core.backends.features import (
     BACKENDS_WITH_CREATE_INSTANCE_SUPPORT,
     BACKENDS_WITH_MULTINODE_SUPPORT,
     BACKENDS_WITH_RESERVATION_SUPPORT,
 )
-from dstack._internal.core.backends.base.backend import Backend
-from dstack._internal.core.backends.base.compute import ComputeWithPlacementGroupSupport
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,

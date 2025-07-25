@@ -43,6 +43,7 @@ from dstack._internal.server.models import (
     JobModel,
     ProjectModel,
     RunModel,
+    UserModel,
     VolumeAttachmentModel,
     VolumeModel,
 )
@@ -153,7 +154,6 @@ async def _process_next_submitted_job():
 async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
     logger.debug("%s: provisioning has started", fmt(job_model))
     # Refetch to load related attributes.
-    # joinedload produces LEFT OUTER JOIN that can't be used with FOR UPDATE.
     res = await session.execute(
         select(JobModel).where(JobModel.id == job_model.id).options(joinedload(JobModel.instance))
     )
@@ -162,15 +162,14 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         select(RunModel)
         .where(RunModel.id == job_model.run_id)
         .options(joinedload(RunModel.project).joinedload(ProjectModel.backends))
-        .options(joinedload(RunModel.user))
+        .options(joinedload(RunModel.user).load_only(UserModel.name))
         .options(joinedload(RunModel.fleet).joinedload(FleetModel.instances))
     )
     run_model = res.unique().scalar_one()
     project = run_model.project
-    run_spec = RunSpec.__response__.parse_raw(run_model.run_spec)
-    profile = run_spec.merged_profile
-
     run = run_model_to_run(run_model)
+    run_spec = run.run_spec
+    profile = run_spec.merged_profile
     job = find_job(run.jobs, job_model.replica_num, job_model.job_num)
 
     master_job = find_job(run.jobs, job_model.replica_num, 0)
@@ -357,9 +356,9 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
     await session.execute(
         select(VolumeModel)
         .where(VolumeModel.id.in_(volumes_ids))
-        .options(selectinload(VolumeModel.user))
+        .options(joinedload(VolumeModel.user).load_only(UserModel.name))
         .order_by(VolumeModel.id)  # take locks in order
-        .with_for_update(key_share=True)
+        .with_for_update(key_share=True, of=VolumeModel)
     )
     async with get_locker(get_db().dialect_name).lock_ctx(VolumeModel.__tablename__, volumes_ids):
         if len(volume_models) > 0:
@@ -739,3 +738,5 @@ async def _attach_volume(
         attachment_data=attachment_data.json(),
     )
     instance.volume_attachments.append(volume_attachment_model)
+
+    volume_model.last_job_processed_at = common_utils.get_current_datetime()

@@ -26,7 +26,7 @@ from dstack import version
 from dstack._internal.core.backends.oci.region import OCIRegionClient
 from dstack._internal.core.errors import BackendError
 from dstack._internal.core.models.instances import InstanceOffer
-from dstack._internal.utils.common import split_chunks
+from dstack._internal.utils.common import batched
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -667,21 +667,21 @@ def add_security_group_rules(
     security_group_id: str, rules: Iterable[SecurityRule], client: oci.core.VirtualNetworkClient
 ) -> None:
     rules_details = map(SecurityRule.to_sdk_add_rule_details, rules)
-    for chunk in split_chunks(rules_details, ADD_SECURITY_RULES_MAX_CHUNK_SIZE):
+    for batch in batched(rules_details, ADD_SECURITY_RULES_MAX_CHUNK_SIZE):
         client.add_network_security_group_security_rules(
             security_group_id,
-            oci.core.models.AddNetworkSecurityGroupSecurityRulesDetails(security_rules=chunk),
+            oci.core.models.AddNetworkSecurityGroupSecurityRulesDetails(security_rules=batch),
         )
 
 
 def remove_security_group_rules(
     security_group_id: str, rule_ids: Iterable[str], client: oci.core.VirtualNetworkClient
 ) -> None:
-    for chunk in split_chunks(rule_ids, REMOVE_SECURITY_RULES_MAX_CHUNK_SIZE):
+    for batch in batched(rule_ids, REMOVE_SECURITY_RULES_MAX_CHUNK_SIZE):
         client.remove_network_security_group_security_rules(
             security_group_id,
             oci.core.models.RemoveNetworkSecurityGroupSecurityRulesDetails(
-                security_rule_ids=chunk
+                security_rule_ids=batch
             ),
         )
 

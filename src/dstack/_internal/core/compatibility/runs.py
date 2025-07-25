@@ -126,6 +126,10 @@ def get_run_spec_excludes(run_spec: RunSpec) -> IncludeExcludeDictType:
         configuration_excludes["files"] = True
     if not run_spec.file_archives:
         spec_excludes["file_archives"] = True
+    if configuration.schedule is None:
+        configuration_excludes["schedule"] = True
+    if profile is not None and profile.schedule is None:
+        profile_excludes.add("schedule")
 
     if configuration_excludes:
         spec_excludes["configuration"] = configuration_excludes

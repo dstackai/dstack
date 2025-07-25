@@ -1,10 +1,11 @@
 from datetime import datetime, timedelta, timezone
-from typing import Any, Iterable, List
+from typing import Any, Iterable
 
 import pytest
 from freezegun import freeze_time
 
 from dstack._internal.utils.common import (
+    batched,
     concat_url_path,
     format_duration_multiunit,
     local_time,
@@ -12,7 +13,6 @@ from dstack._internal.utils.common import (
     parse_memory,
     pretty_date,
     sizeof_fmt,
-    split_chunks,
 )
 
 
@@ -138,9 +138,9 @@ class TestParseMemory:
         assert parse_memory(memory, as_untis=as_units) == expected
 
 
-class TestSplitChunks:
+class TestBatched:
     @pytest.mark.parametrize(
-        ("iterable", "chunk_size", "expected_chunks"),
+        ("iterable", "n", "expected_batches"),
         [
             ([1, 2, 3, 4], 2, [[1, 2], [3, 4]]),
             ([1, 2, 3], 2, [[1, 2], [3]]),
@@ -151,15 +151,15 @@ class TestSplitChunks:
             ((x for x in range(5)), 3, [[0, 1, 2], [3, 4]]),
         ],
     )
-    def test_split_chunks(
-        self, iterable: Iterable[Any], chunk_size: int, expected_chunks: List[List[Any]]
+    def test_batched(
+        self, iterable: Iterable[Any], n: int, expected_batches: list[list[Any]]
     ) -> None:
-        assert list(split_chunks(iterable, chunk_size)) == expected_chunks
+        assert list(batched(iterable, n)) == expected_batches
 
-    @pytest.mark.parametrize("chunk_size", [0, -1])
-    def test_raises_on_invalid_chunk_size(self, chunk_size: int) -> None:
+    @pytest.mark.parametrize("n", [0, -1])
+    def test_raises_on_invalid_n(self, n: int) -> None:
         with pytest.raises(ValueError):
-            list(split_chunks([1, 2, 3], chunk_size))
+            list(batched([1, 2, 3], n))
 
 
 @pytest.mark.parametrize(

@@ -1,6 +1,6 @@
 import uuid
 from collections.abc import Container, Iterable
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Dict, List, Literal, Optional, Union
 
 import gpuhunt
@@ -8,11 +8,11 @@ from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
-from dstack._internal.core.backends import BACKENDS_WITH_MULTINODE_SUPPORT
 from dstack._internal.core.backends.base.offers import (
     offer_to_catalog_item,
     requirements_to_query_filter,
 )
+from dstack._internal.core.backends.features import BACKENDS_WITH_MULTINODE_SUPPORT
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.instances import (
@@ -62,7 +62,7 @@ def instance_model_to_instance(instance_model: InstanceModel) -> Instance:
         status=instance_model.status,
         unreachable=instance_model.unreachable,
         termination_reason=instance_model.termination_reason,
-        created=instance_model.created_at.replace(tzinfo=timezone.utc),
+        created=instance_model.created_at,
         total_blocks=instance_model.total_blocks,
         busy_blocks=instance_model.busy_blocks,
     )

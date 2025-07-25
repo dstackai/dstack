@@ -1,5 +1,6 @@
+import os
 from pathlib import Path
-from typing import List, Union
+from typing import Generator, List, Optional, Tuple, Union
 from uuid import UUID
 
 from dstack._internal.core.errors import ServerClientError
@@ -37,18 +38,17 @@ class FileLogStorage(LogStorage):
             producer=log_producer,
         )
 
+        if request.descending:
+            return self._poll_logs_descending(log_file_path, request)
+        else:
+            return self._poll_logs_ascending(log_file_path, request)
+
+    def _poll_logs_ascending(
+        self, log_file_path: Path, request: PollLogsRequest
+    ) -> JobSubmissionLogs:
         start_line = 0
         if request.next_token:
-            try:
-                start_line = int(request.next_token)
-                if start_line < 0:
-                    raise ServerClientError(
-                        f"Invalid next_token: {request.next_token}. Must be a non-negative integer."
-                    )
-            except ValueError:
-                raise ServerClientError(
-                    f"Invalid next_token: {request.next_token}. Must be a valid integer."
-                )
+            start_line = self._next_token(request)
 
         logs = []
         next_token = None
@@ -93,6 +93,102 @@ class FileLogStorage(LogStorage):
             pass
 
         return JobSubmissionLogs(logs=logs, next_token=next_token)
+
+    def _poll_logs_descending(
+        self, log_file_path: Path, request: PollLogsRequest
+    ) -> JobSubmissionLogs:
+        start_offset = self._next_token(request)
+
+        candidate_logs = []
+
+        try:
+            line_generator = self._read_lines_reversed(log_file_path, start_offset)
+
+            for line_bytes, line_start_offset in line_generator:
+                try:
+                    line_str = line_bytes.decode("utf-8")
+                    log_event = LogEvent.__response__.parse_raw(line_str)
+                except Exception:
+                    continue  # Skip malformed lines
+
+                if request.end_time is not None and log_event.timestamp > request.end_time:
+                    continue
+                if request.start_time and log_event.timestamp <= request.start_time:
+                    break
+
+                candidate_logs.append((log_event, line_start_offset))
+
+                if len(candidate_logs) > request.limit:
+                    break
+        except FileNotFoundError:
+            return JobSubmissionLogs(logs=[], next_token=None)
+
+        logs = [log for log, offset in candidate_logs[: request.limit]]
+        next_token = None
+        if len(candidate_logs) > request.limit:
+            # We fetched one more than the limit, so there are more pages.
+            # The next token should point to the start of the last log we are returning.
+            _last_log_event, last_log_offset = candidate_logs[request.limit - 1]
+            next_token = str(last_log_offset)
+
+        return JobSubmissionLogs(logs=logs, next_token=next_token)
+
+    @staticmethod
+    def _read_lines_reversed(
+        filepath: Path, start_offset: Optional[int] = None, chunk_size: int = 8192
+    ) -> Generator[Tuple[bytes, int], None, None]:
+        """
+        A generator that yields lines from a file in reverse order, along with the byte
+        offset of the start of each line. This is memory-efficient for large files.
+        """
+        with open(filepath, "rb") as f:
+            f.seek(0, os.SEEK_END)
+            file_size = f.tell()
+            cursor = file_size
+
+            # If a start_offset is provided, optimize by starting the read
+            # from a more specific location instead of the end of the file.
+            if start_offset is not None and start_offset < file_size:
+                # To get the full content of the line that straddles the offset,
+                # we need to find its end (the next newline character).
+                f.seek(start_offset)
+                chunk = f.read(chunk_size)
+                newline_pos = chunk.find(b"\n")
+                if newline_pos != -1:
+                    # Found the end of the line. The cursor for reverse reading
+                    # should start from this point to include the full line.
+                    cursor = start_offset + newline_pos + 1
+                else:
+                    # No newline found, which means the rest of the file is one line.
+                    # The default cursor pointing to file_size is correct.
+                    pass
+
+            buffer = b""
+
+            while cursor > 0:
+                seek_pos = max(0, cursor - chunk_size)
+                amount_to_read = cursor - seek_pos
+                f.seek(seek_pos)
+                chunk = f.read(amount_to_read)
+                cursor = seek_pos
+
+                buffer = chunk + buffer
+
+                while b"\n" in buffer:
+                    newline_pos = buffer.rfind(b"\n")
+                    line = buffer[newline_pos + 1 :]
+                    line_start_offset = cursor + newline_pos + 1
+
+                    # Skip lines that start at or after the start_offset
+                    if start_offset is None or line_start_offset < start_offset:
+                        yield line, line_start_offset
+
+                    buffer = buffer[:newline_pos]
+
+            # The remaining buffer is the first line of the file.
+            # Only yield it if we're not using start_offset or if it starts before start_offset
+            if buffer and (start_offset is None or 0 < start_offset):
+                yield buffer, 0
 
     def write_logs(
         self,
@@ -148,3 +244,17 @@ class FileLogStorage(LogStorage):
             log_source=LogEventSource.STDOUT,
             message=runner_log_event.message.decode(errors="replace"),
         )
+
+    def _next_token(self, request: PollLogsRequest) -> Optional[int]:
+        next_token = request.next_token
+        if next_token is None:
+            return None
+        try:
+            value = int(next_token)
+            if value < 0:
+                raise ValueError("Offset must be non-negative")
+            return value
+        except (ValueError, TypeError):
+            raise ServerClientError(
+                f"Invalid next_token: {next_token}. Must be a non-negative integer."
+            )

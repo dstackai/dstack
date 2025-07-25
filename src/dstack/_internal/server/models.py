@@ -1,6 +1,6 @@
 import enum
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Callable, List, Optional, Union
 
 from sqlalchemy import (
@@ -51,9 +51,10 @@ logger = get_logger(__name__)
 
 class NaiveDateTime(TypeDecorator):
     """
-    A custom type decorator that ensures datetime objects are offset-naive when stored in the database.
-    This is needed because we use datetimes in UTC only and store them as offset-naive.
-    Some databases (e.g. Postgres) throw an error if the timezone is set.
+    A custom type decorator that ensures datetime objects are offset-naive when stored in the database
+    and offset-aware with UTC timezone when loaded from the database.
+    This is because we use datetimes in UTC everywhere, and
+    some databases (e.g. Postgres) throw an error if the timezone is set.
     """
 
     impl = DateTime
@@ -65,7 +66,9 @@ class NaiveDateTime(TypeDecorator):
         return value
 
     def process_result_value(self, value, dialect):
-        return value
+        if value is None:
+            return None
+        return value.replace(tzinfo=timezone.utc)
 
 
 class DecryptedString(CoreModel):
@@ -355,6 +358,7 @@ class RunModel(BaseModel):
     run_name: Mapped[str] = mapped_column(String(100))
     submitted_at: Mapped[datetime] = mapped_column(NaiveDateTime)
     last_processed_at: Mapped[datetime] = mapped_column(NaiveDateTime)
+    next_triggered_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
     status: Mapped[RunStatus] = mapped_column(Enum(RunStatus))
     termination_reason: Mapped[Optional[RunTerminationReason]] = mapped_column(
         Enum(RunTerminationReason)
@@ -645,6 +649,7 @@ class VolumeModel(BaseModel):
     last_processed_at: Mapped[datetime] = mapped_column(
         NaiveDateTime, default=get_current_datetime
     )
+    last_job_processed_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
     deleted: Mapped[bool] = mapped_column(Boolean, default=False)
     deleted_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
 

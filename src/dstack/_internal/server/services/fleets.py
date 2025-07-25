@@ -1,6 +1,6 @@
 import uuid
 from collections.abc import Callable
-from datetime import datetime, timezone
+from datetime import datetime
 from functools import wraps
 from typing import List, Literal, Optional, Tuple, TypeVar, Union, cast
 
@@ -8,8 +8,8 @@ from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
-from dstack._internal.core.backends import BACKENDS_WITH_CREATE_INSTANCE_SUPPORT
 from dstack._internal.core.backends.base.backend import Backend
+from dstack._internal.core.backends.features import BACKENDS_WITH_CREATE_INSTANCE_SUPPORT
 from dstack._internal.core.errors import (
     ForbiddenError,
     ResourceExistsError,
@@ -600,7 +600,7 @@ def fleet_model_to_fleet(
         name=fleet_model.name,
         project_name=fleet_model.project.name,
         spec=spec,
-        created_at=fleet_model.created_at.replace(tzinfo=timezone.utc),
+        created_at=fleet_model.created_at,
         status=fleet_model.status,
         status_message=fleet_model.status_message,
         instances=instances,

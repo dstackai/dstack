@@ -9,7 +9,12 @@ from sqlalchemy.orm import joinedload
 from dstack._internal.core.consts import DSTACK_SHIM_HTTP_PORT
 from dstack._internal.core.models.runs import JobStatus
 from dstack._internal.server.db import get_session_ctx
-from dstack._internal.server.models import InstanceModel, JobModel, JobPrometheusMetrics
+from dstack._internal.server.models import (
+    InstanceModel,
+    JobModel,
+    JobPrometheusMetrics,
+    ProjectModel,
+)
 from dstack._internal.server.services.instances import get_instance_ssh_private_keys
 from dstack._internal.server.services.jobs import get_job_provisioning_data, get_job_runtime_data
 from dstack._internal.server.services.runner import client
@@ -43,7 +48,11 @@ async def collect_prometheus_metrics():
                     JobPrometheusMetrics.collected_at < cutoff,
                 ),
             )
-            .options(joinedload(JobModel.instance).joinedload(InstanceModel.project))
+            .options(
+                joinedload(JobModel.instance)
+                .joinedload(InstanceModel.project)
+                .load_only(ProjectModel.ssh_private_key)
+            )
             .order_by(JobModel.last_processed_at.asc())
             .limit(MAX_JOBS_FETCHED)
         )

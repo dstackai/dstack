@@ -7,6 +7,7 @@ from uuid import UUID
 
 import pytest
 from fastapi.testclient import TestClient
+from freezegun import freeze_time
 from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -28,6 +29,7 @@ from dstack._internal.core.models.instances import (
     InstanceType,
     Resources,
 )
+from dstack._internal.core.models.profiles import Schedule
 from dstack._internal.core.models.resources import Range
 from dstack._internal.core.models.runs import (
     ApplyRunPlanInput,
@@ -168,6 +170,7 @@ def get_dev_env_run_plan_dict(
             "utilization_policy": None,
             "startup_order": None,
             "stop_criteria": None,
+            "schedule": None,
             "reservation": None,
             "fleets": None,
             "tags": None,
@@ -192,6 +195,7 @@ def get_dev_env_run_plan_dict(
             "utilization_policy": None,
             "startup_order": None,
             "stop_criteria": None,
+            "schedule": None,
             "reservation": None,
             "fleets": None,
             "tags": None,
@@ -369,6 +373,7 @@ def get_dev_env_run_dict(
                 "utilization_policy": None,
                 "startup_order": None,
                 "stop_criteria": None,
+                "schedule": None,
                 "reservation": None,
                 "fleets": None,
                 "tags": None,
@@ -393,6 +398,7 @@ def get_dev_env_run_dict(
                 "utilization_policy": None,
                 "startup_order": None,
                 "stop_criteria": None,
+                "schedule": None,
                 "reservation": None,
                 "fleets": None,
                 "tags": None,
@@ -1365,6 +1371,41 @@ class TestApplyPlan:
         assert updated_run.deployment_num == 1
         assert run.run_spec.configuration.replicas == Range(min=1, max=1)
         assert updated_run.run_spec.configuration.replicas == Range(min=2, max=2)
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_creates_pending_run_if_run_is_scheduled(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        repo = await create_repo(session=session, project_id=project.id)
+        run_spec = get_run_spec(
+            run_name="test-run",
+            repo_id=repo.name,
+        )
+        run_spec.configuration.schedule = Schedule(cron=["5 * * * *", "10 * * * *"])
+        with freeze_time(datetime(2023, 1, 2, 3, 9, tzinfo=timezone.utc)):
+            response = await client.post(
+                f"/api/project/{project.name}/runs/apply",
+                headers=get_auth_headers(user.token),
+                json={
+                    "plan": {
+                        "run_spec": json.loads(run_spec.json()),
+                        "current_resource": None,
+                    },
+                    "force": False,
+                },
+            )
+        assert response.status_code == 200, response.json()
+        res = await session.execute(select(RunModel))
+        run = res.scalar()
+        assert run is not None
+        assert run.status == RunStatus.PENDING
+        assert run.next_triggered_at == datetime(2023, 1, 2, 3, 10, tzinfo=timezone.utc)
 
 
 class TestSubmitRun:

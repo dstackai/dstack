@@ -110,7 +110,6 @@ async def _process_connection(conn: GatewayConnection):
 async def _process_submitted_gateway(session: AsyncSession, gateway_model: GatewayModel):
     logger.info("%s: started gateway provisioning", fmt(gateway_model))
     # Refetch to load related attributes.
-    # joinedload produces LEFT OUTER JOIN that can't be used with FOR UPDATE.
     res = await session.execute(
         select(GatewayModel)
         .where(GatewayModel.id == gateway_model.id)
@@ -157,7 +156,6 @@ async def _process_provisioning_gateway(
     session: AsyncSession, gateway_model: GatewayModel
 ) -> None:
     # Refetch to load related attributes.
-    # joinedload produces LEFT OUTER JOIN that can't be used with FOR UPDATE.
     res = await session.execute(
         select(GatewayModel)
         .where(GatewayModel.id == gateway_model.id)

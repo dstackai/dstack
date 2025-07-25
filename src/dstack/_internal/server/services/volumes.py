@@ -1,13 +1,13 @@
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import List, Optional
 
 from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
-from dstack._internal.core.backends import BACKENDS_WITH_VOLUMES_SUPPORT
 from dstack._internal.core.backends.base.compute import ComputeWithVolumeSupport
+from dstack._internal.core.backends.features import BACKENDS_WITH_VOLUMES_SUPPORT
 from dstack._internal.core.errors import (
     BackendNotAvailable,
     ResourceExistsError,
@@ -320,15 +320,15 @@ def volume_model_to_volume(volume_model: VolumeModel) -> Volume:
         )
     deleted_at = None
     if volume_model.deleted_at is not None:
-        deleted_at = volume_model.deleted_at.replace(tzinfo=timezone.utc)
+        deleted_at = volume_model.deleted_at
     volume = Volume(
         name=volume_model.name,
         project_name=volume_model.project.name,
         user=volume_model.user.name,
         configuration=configuration,
         external=configuration.volume_id is not None,
-        created_at=volume_model.created_at.replace(tzinfo=timezone.utc),
-        last_processed_at=volume_model.last_processed_at.replace(tzinfo=timezone.utc),
+        created_at=volume_model.created_at,
+        last_processed_at=volume_model.last_processed_at,
         status=volume_model.status,
         status_message=volume_model.status_message,
         deleted=volume_model.deleted,
@@ -400,6 +400,19 @@ def _validate_volume_configuration(configuration: VolumeConfiguration):
         )
     if configuration.name is not None:
         validate_dstack_resource_name(configuration.name)
+
+    if configuration.volume_id is not None and configuration.auto_cleanup_duration is not None:
+        if (
+            isinstance(configuration.auto_cleanup_duration, int)
+            and configuration.auto_cleanup_duration > 0
+        ) or (
+            isinstance(configuration.auto_cleanup_duration, str)
+            and configuration.auto_cleanup_duration not in ("off", "-1")
+        ):
+            raise ServerClientError(
+                "External volumes (with volume_id) do not support auto_cleanup_duration. "
+                "Auto-cleanup only works for volumes created and managed by dstack."
+            )
 
 
 async def _delete_volume(session: AsyncSession, project: ProjectModel, volume_model: VolumeModel):

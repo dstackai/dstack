@@ -68,6 +68,7 @@ from dstack._internal.core.models.runs import (
     Requirements,
     RunSpec,
     RunStatus,
+    RunTerminationReason,
 )
 from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.core.models.volumes import (
@@ -282,12 +283,15 @@ async def create_run(
     user: UserModel,
     run_name: str = "test-run",
     status: RunStatus = RunStatus.SUBMITTED,
+    termination_reason: Optional[RunTerminationReason] = None,
     submitted_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
     run_spec: Optional[RunSpec] = None,
     run_id: Optional[UUID] = None,
     deleted: bool = False,
     priority: int = 0,
     deployment_num: int = 0,
+    resubmission_attempt: int = 0,
+    next_triggered_at: Optional[datetime] = None,
 ) -> RunModel:
     if run_spec is None:
         run_spec = get_run_spec(
@@ -305,12 +309,15 @@ async def create_run(
         submitted_at=submitted_at,
         run_name=run_name,
         status=status,
+        termination_reason=termination_reason,
         run_spec=run_spec.json(),
         last_processed_at=submitted_at,
         jobs=[],
         priority=priority,
         deployment_num=deployment_num,
         desired_replica_count=1,
+        resubmission_attempt=resubmission_attempt,
+        next_triggered_at=next_triggered_at,
     )
     session.add(run)
     await session.commit()
@@ -774,6 +781,7 @@ async def create_volume(
     status: VolumeStatus = VolumeStatus.SUBMITTED,
     created_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
     last_processed_at: Optional[datetime] = None,
+    last_job_processed_at: Optional[datetime] = None,
     configuration: Optional[VolumeConfiguration] = None,
     volume_provisioning_data: Optional[VolumeProvisioningData] = None,
     deleted_at: Optional[datetime] = None,
@@ -791,6 +799,7 @@ async def create_volume(
         status=status,
         created_at=created_at,
         last_processed_at=last_processed_at,
+        last_job_processed_at=last_job_processed_at,
         configuration=configuration.json(),
         volume_provisioning_data=volume_provisioning_data.json()
         if volume_provisioning_data
@@ -852,6 +861,7 @@ def get_volume_configuration(
     region: str = "eu-west-1",
     size: Optional[Memory] = Memory(100),
     volume_id: Optional[str] = None,
+    auto_cleanup_duration: Optional[Union[str, int]] = None,
 ) -> VolumeConfiguration:
     return VolumeConfiguration(
         name=name,
@@ -859,6 +869,7 @@ def get_volume_configuration(
         region=region,
         size=size,
         volume_id=volume_id,
+        auto_cleanup_duration=auto_cleanup_duration,
     )
 
 

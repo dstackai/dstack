@@ -26,8 +26,9 @@ func TestDocker_SSHServer(t *testing.T) {
 	t.Parallel()
 
 	params := &dockerParametersMock{
-		commands: []string{"echo 1"},
-		sshPort:  nextPort(),
+		commands:  []string{"echo 1"},
+		sshPort:   nextPort(),
+		runnerDir: t.TempDir(),
 	}
 
 	timeout := 180 // seconds
@@ -58,6 +59,7 @@ func TestDocker_SSHServerConnect(t *testing.T) {
 		commands:     []string{"sleep 5"},
 		sshPort:      nextPort(),
 		publicSSHKey: string(publicBytes),
+		runnerDir:    t.TempDir(),
 	}
 
 	timeout := 180 // seconds
@@ -103,7 +105,8 @@ func TestDocker_ShmNoexecByDefault(t *testing.T) {
 	t.Parallel()
 
 	params := &dockerParametersMock{
-		commands: []string{"mount | grep '/dev/shm .*size=65536k' | grep noexec"},
+		commands:  []string{"mount | grep '/dev/shm .*size=65536k' | grep noexec"},
+		runnerDir: t.TempDir(),
 	}
 
 	timeout := 180 // seconds
@@ -125,7 +128,8 @@ func TestDocker_ShmExecIfSizeSpecified(t *testing.T) {
 	t.Parallel()
 
 	params := &dockerParametersMock{
-		commands: []string{"mount | grep '/dev/shm .*size=1024k' | grep -v noexec"},
+		commands:  []string{"mount | grep '/dev/shm .*size=1024k' | grep -v noexec"},
+		runnerDir: t.TempDir(),
 	}
 
 	timeout := 180 // seconds
@@ -148,6 +152,7 @@ type dockerParametersMock struct {
 	commands     []string
 	sshPort      int
 	publicSSHKey string
+	runnerDir    string
 }
 
 func (c *dockerParametersMock) DockerPrivileged() bool {
@@ -184,7 +189,7 @@ func (c *dockerParametersMock) DockerMounts(string) ([]mount.Mount, error) {
 }
 
 func (c *dockerParametersMock) MakeRunnerDir(string) (string, error) {
-	return "", nil
+	return c.runnerDir, nil
 }
 
 /* Utilities */

@@ -9,13 +9,9 @@ from paramiko.ssh_exception import PasswordRequiredException
 from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, lazyload
+from sqlalchemy.orm import joinedload
 
 from dstack._internal import settings
-from dstack._internal.core.backends import (
-    BACKENDS_WITH_CREATE_INSTANCE_SUPPORT,
-    BACKENDS_WITH_PLACEMENT_GROUPS_SUPPORT,
-)
 from dstack._internal.core.backends.base.compute import (
     ComputeWithCreateInstanceSupport,
     ComputeWithPlacementGroupSupport,
@@ -26,6 +22,10 @@ from dstack._internal.core.backends.base.compute import (
     get_dstack_working_dir,
     get_shim_env,
     get_shim_pre_start_commands,
+)
+from dstack._internal.core.backends.features import (
+    BACKENDS_WITH_CREATE_INSTANCE_SUPPORT,
+    BACKENDS_WITH_PLACEMENT_GROUPS_SUPPORT,
 )
 from dstack._internal.core.backends.remote.provisioning import (
     detect_cpu_arch,
@@ -78,6 +78,7 @@ from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import (
     FleetModel,
     InstanceModel,
+    JobModel,
     PlacementGroupModel,
     ProjectModel,
 )
@@ -104,7 +105,11 @@ from dstack._internal.server.services.placement import (
 from dstack._internal.server.services.runner import client as runner_client
 from dstack._internal.server.services.runner.client import HealthStatus
 from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
-from dstack._internal.utils.common import get_current_datetime, run_async
+from dstack._internal.utils.common import (
+    get_current_datetime,
+    get_or_error,
+    run_async,
+)
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.network import get_ip_from_network, is_ip_among_addresses
 from dstack._internal.utils.ssh import (
@@ -149,12 +154,13 @@ async def _process_next_instance():
                     ),
                     InstanceModel.id.not_in(lockset),
                     InstanceModel.last_processed_at
-                    < get_current_datetime().replace(tzinfo=None) - MIN_PROCESSING_INTERVAL,
+                    < get_current_datetime() - MIN_PROCESSING_INTERVAL,
                 )
-                .options(lazyload(InstanceModel.jobs))
+                .options(joinedload(InstanceModel.jobs).load_only(JobModel.id, JobModel.status))
+                .options(joinedload(InstanceModel.project).load_only(ProjectModel.ssh_private_key))
                 .order_by(InstanceModel.last_processed_at.asc())
                 .limit(1)
-                .with_for_update(skip_locked=True, key_share=True)
+                .with_for_update(skip_locked=True, key_share=True, of=InstanceModel)
             )
             instance = res.scalar()
             if instance is None:
@@ -168,23 +174,22 @@ async def _process_next_instance():
 
 
 async def _process_instance(session: AsyncSession, instance: InstanceModel):
-    # Refetch to load related attributes.
-    # joinedload produces LEFT OUTER JOIN that can't be used with FOR UPDATE.
-    res = await session.execute(
-        select(InstanceModel)
-        .where(InstanceModel.id == instance.id)
-        .options(joinedload(InstanceModel.project).joinedload(ProjectModel.backends))
-        .options(joinedload(InstanceModel.jobs))
-        .options(joinedload(InstanceModel.fleet).joinedload(FleetModel.instances))
-        .execution_options(populate_existing=True)
-    )
-    instance = res.unique().scalar_one()
-    if (
-        instance.status == InstanceStatus.IDLE
-        and instance.termination_policy == TerminationPolicy.DESTROY_AFTER_IDLE
-        and not instance.jobs
+    if instance.status in (
+        InstanceStatus.PENDING,
+        InstanceStatus.TERMINATING,
     ):
-        await _mark_terminating_if_idle_duration_expired(instance)
+        # Refetch to load related attributes.
+        # Load related attributes only for statuses that always need them.
+        res = await session.execute(
+            select(InstanceModel)
+            .where(InstanceModel.id == instance.id)
+            .options(joinedload(InstanceModel.project).joinedload(ProjectModel.backends))
+            .options(joinedload(InstanceModel.jobs).load_only(JobModel.id, JobModel.status))
+            .options(joinedload(InstanceModel.fleet).joinedload(FleetModel.instances))
+            .execution_options(populate_existing=True)
+        )
+        instance = res.unique().scalar_one()
+
     if instance.status == InstanceStatus.PENDING:
         if instance.remote_connection_info is not None:
             await _add_remote(instance)
@@ -198,7 +203,9 @@ async def _process_instance(session: AsyncSession, instance: InstanceModel):
         InstanceStatus.IDLE,
         InstanceStatus.BUSY,
     ):
-        await _check_instance(instance)
+        idle_duration_expired = _check_and_mark_terminating_if_idle_duration_expired(instance)
+        if not idle_duration_expired:
+            await _check_instance(session, instance)
     elif instance.status == InstanceStatus.TERMINATING:
         await _terminate(instance)
 
@@ -206,7 +213,13 @@ async def _process_instance(session: AsyncSession, instance: InstanceModel):
     await session.commit()
 
 
-async def _mark_terminating_if_idle_duration_expired(instance: InstanceModel):
+def _check_and_mark_terminating_if_idle_duration_expired(instance: InstanceModel):
+    if not (
+        instance.status == InstanceStatus.IDLE
+        and instance.termination_policy == TerminationPolicy.DESTROY_AFTER_IDLE
+        and not instance.jobs
+    ):
+        return False
     idle_duration = _get_instance_idle_duration(instance)
     idle_seconds = instance.termination_idle_time
     delta = datetime.timedelta(seconds=idle_seconds)
@@ -222,6 +235,8 @@ async def _mark_terminating_if_idle_duration_expired(instance: InstanceModel):
                 "instance_status": instance.status.value,
             },
         )
+        return True
+    return False
 
 
 async def _add_remote(instance: InstanceModel) -> None:
@@ -461,7 +476,7 @@ def _deploy_instance(
 
 async def _create_instance(session: AsyncSession, instance: InstanceModel) -> None:
     if instance.last_retry_at is not None:
-        last_retry = instance.last_retry_at.replace(tzinfo=datetime.timezone.utc)
+        last_retry = instance.last_retry_at
         if get_current_datetime() < last_retry + timedelta(minutes=1):
             return
 
@@ -700,7 +715,7 @@ def _mark_terminated(instance: InstanceModel, termination_reason: str) -> None:
     )
 
 
-async def _check_instance(instance: InstanceModel) -> None:
+async def _check_instance(session: AsyncSession, instance: InstanceModel) -> None:
     if (
         instance.status == InstanceStatus.BUSY
         and instance.jobs
@@ -719,12 +734,16 @@ async def _check_instance(instance: InstanceModel) -> None:
         )
         return
 
-    job_provisioning_data = JobProvisioningData.__response__.parse_raw(
-        instance.job_provisioning_data
-    )
+    job_provisioning_data = get_or_error(get_instance_provisioning_data(instance))
     if job_provisioning_data.hostname is None:
+        res = await session.execute(
+            select(ProjectModel)
+            .where(ProjectModel.id == instance.id)
+            .options(joinedload(ProjectModel.backends))
+        )
+        project = res.scalar_one()
         await _wait_for_instance_provisioning_data(
-            project=instance.project,
+            project=project,
             instance=instance,
             job_provisioning_data=job_provisioning_data,
         )
@@ -801,7 +820,7 @@ async def _check_instance(instance: InstanceModel) -> None:
             instance.name,
             extra={"instance_name": instance.name},
         )
-        deadline = instance.termination_deadline.replace(tzinfo=datetime.timezone.utc)
+        deadline = instance.termination_deadline
         if get_current_datetime() > deadline:
             instance.status = InstanceStatus.TERMINATING
             instance.termination_reason = "Termination deadline"
@@ -956,18 +975,12 @@ async def _terminate(instance: InstanceModel) -> None:
 
 def _next_termination_retry_at(instance: InstanceModel) -> datetime.datetime:
     assert instance.last_termination_retry_at is not None
-    return (
-        instance.last_termination_retry_at.replace(tzinfo=datetime.timezone.utc)
-        + TERMINATION_RETRY_TIMEOUT
-    )
+    return instance.last_termination_retry_at + TERMINATION_RETRY_TIMEOUT
 
 
 def _get_termination_deadline(instance: InstanceModel) -> datetime.datetime:
     assert instance.first_termination_retry_at is not None
-    return (
-        instance.first_termination_retry_at.replace(tzinfo=datetime.timezone.utc)
-        + TERMINATION_RETRY_MAX_DURATION
-    )
+    return instance.first_termination_retry_at + TERMINATION_RETRY_MAX_DURATION
 
 
 def _need_to_wait_fleet_provisioning(instance: InstanceModel) -> bool:
@@ -1102,27 +1115,26 @@ async def _create_placement_group(
 
 
 def _get_instance_idle_duration(instance: InstanceModel) -> datetime.timedelta:
-    last_time = instance.created_at.replace(tzinfo=datetime.timezone.utc)
+    last_time = instance.created_at
     if instance.last_job_processed_at is not None:
-        last_time = instance.last_job_processed_at.replace(tzinfo=datetime.timezone.utc)
+        last_time = instance.last_job_processed_at
     return get_current_datetime() - last_time
 
 
 def _get_retry_duration_deadline(instance: InstanceModel, retry: Retry) -> datetime.datetime:
-    return instance.created_at.replace(tzinfo=datetime.timezone.utc) + timedelta(
-        seconds=retry.duration
-    )
+    return instance.created_at + timedelta(seconds=retry.duration)
 
 
 def _get_provisioning_deadline(
     instance: InstanceModel,
     job_provisioning_data: JobProvisioningData,
 ) -> datetime.datetime:
+    assert instance.started_at is not None
     timeout_interval = get_provisioning_timeout(
         backend_type=job_provisioning_data.get_base_backend(),
         instance_type_name=job_provisioning_data.instance_type.name,
     )
-    return instance.started_at.replace(tzinfo=datetime.timezone.utc) + timeout_interval
+    return instance.started_at + timeout_interval
 
 
 def _ssh_keys_to_pkeys(ssh_keys: list[SSHKey]) -> list[PKey]:

@@ -2,7 +2,6 @@ import hashlib
 import os
 import re
 import uuid
-from datetime import timezone
 from typing import Awaitable, Callable, List, Optional, Tuple
 
 from sqlalchemy import delete, select, update
@@ -44,7 +43,9 @@ async def list_users_for_user(
     session: AsyncSession,
     user: UserModel,
 ) -> List[User]:
-    return await list_all_users(session=session)
+    if user.global_role == GlobalRole.ADMIN:
+        return await list_all_users(session=session)
+    return [user_model_to_user(user)]
 
 
 async def list_all_users(
@@ -193,7 +194,7 @@ def user_model_to_user(user_model: UserModel) -> User:
     return User(
         id=user_model.id,
         username=user_model.name,
-        created_at=user_model.created_at.replace(tzinfo=timezone.utc),
+        created_at=user_model.created_at,
         global_role=user_model.global_role,
         email=user_model.email,
         active=user_model.active,
@@ -205,7 +206,7 @@ def user_model_to_user_with_creds(user_model: UserModel) -> UserWithCreds:
     return UserWithCreds(
         id=user_model.id,
         username=user_model.name,
-        created_at=user_model.created_at.replace(tzinfo=timezone.utc),
+        created_at=user_model.created_at,
         global_role=user_model.global_role,
         email=user_model.email,
         active=user_model.active,
