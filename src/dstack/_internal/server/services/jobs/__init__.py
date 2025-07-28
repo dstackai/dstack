@@ -7,7 +7,7 @@ from uuid import UUID
 import requests
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, load_only
 
 import dstack._internal.server.services.backends as backends_services
 from dstack._internal.core.backends.base.backend import Backend
@@ -559,11 +559,13 @@ def _should_force_detach_volume(job_model: JobModel, stop_duration: Optional[int
 
 async def get_instances_ids_with_detaching_volumes(session: AsyncSession) -> List[UUID]:
     res = await session.execute(
-        select(JobModel).where(
+        select(JobModel)
+        .where(
             JobModel.status == JobStatus.TERMINATING,
             JobModel.used_instance_id.is_not(None),
             JobModel.volumes_detached_at.is_not(None),
         )
+        .options(load_only(JobModel.used_instance_id))
     )
     job_models = res.scalars().all()
     return [jm.used_instance_id for jm in job_models if jm.used_instance_id]
