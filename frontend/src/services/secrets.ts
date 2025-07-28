@@ -24,7 +24,7 @@ export const secretApi = createApi({
                 result ? [...result.map(({ id }) => ({ type: 'Secrets' as const, id: id })), 'Secrets'] : ['Secrets'],
         }),
 
-        getSecret: builder.query<IProjectSecret, { project_name: IProject['project_name']; name: IProjectSecret['name'][] }>({
+        getSecret: builder.query<IProjectSecret, { project_name: IProject['project_name']; name: IProjectSecret['name'] }>({
             query: ({ project_name, name }) => ({
                 url: API.PROJECTS.SECRET_GET(project_name),
                 method: 'POST',
@@ -63,4 +63,10 @@ export const secretApi = createApi({
     }),
 });
 
-export const { useGetAllSecretsQuery, useGetSecretQuery, useUpdateSecretMutation, useDeleteSecretsMutation } = secretApi;
+export const {
+    useGetAllSecretsQuery,
+    useGetSecretQuery,
+    useLazyGetSecretQuery,
+    useUpdateSecretMutation,
+    useDeleteSecretsMutation,
+} = secretApi;

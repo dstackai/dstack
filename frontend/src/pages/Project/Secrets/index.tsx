@@ -1,57 +1,35 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { useFieldArray, useForm } from 'react-hook-form';
+import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { Button, ButtonWithConfirmation, Header, ListEmptyMessage, Modal, Pagination, SpaceBetween, Table } from 'components';
+
+import { useCollection, useNotifications } from 'hooks';
 import {
-    Button,
-    ButtonWithConfirmation,
-    FormInput,
-    Header,
-    ListEmptyMessage,
-    Pagination,
-    SpaceBetween,
-    Table,
-} from 'components';
+    useDeleteSecretsMutation,
+    useGetAllSecretsQuery,
+    useLazyGetSecretQuery,
+    useUpdateSecretMutation,
+} from 'services/secrets';
 
-import { useCollection } from 'hooks';
-import { useDeleteSecretsMutation, useGetAllSecretsQuery, useUpdateSecretMutation } from 'services/secrets';
+import { getServerError } from '../../../libs';
+import { SecretForm } from './Form';
 
-import { IProps, TFormSecretValue, TFormValues, TProjectSecretWithIndex } from './types';
+import { IProps, TFormValues } from './types';
 
 import styles from './styles.module.scss';
 
 export const ProjectSecrets: React.FC<IProps> = ({ project, loading }) => {
     const { t } = useTranslation();
-    const [editableRowIndex, setEditableRowIndex] = useState<number | null>(null);
+    const [initialFormValues, setInitialFormValues] = useState<TFormValues | undefined>();
     const projectName = project?.project_name ?? '';
+    const [pushNotification] = useNotifications();
 
     const { data, isLoading, isFetching } = useGetAllSecretsQuery({ project_name: projectName });
     const [updateSecret, { isLoading: isUpdating }] = useUpdateSecretMutation();
     const [deleteSecret, { isLoading: isDeleting }] = useDeleteSecretsMutation();
+    const [getSecret, { isLoading: isGettingSecrets }] = useLazyGetSecretQuery();
 
-    const { handleSubmit, control, getValues, setValue } = useForm<TFormValues>({
-        defaultValues: { secrets: [] },
-    });
-
-    useEffect(() => {
-        if (data) {
-            setValue(
-                'secrets',
-                data.map((s) => ({ ...s, serverId: s.id })),
-            );
-        }
-    }, [data]);
-
-    const { fields, append, remove } = useFieldArray({
-        control,
-        name: 'secrets',
-    });
-
-    const fieldsWithIndex = useMemo(() => {
-        return fields.map<TProjectSecretWithIndex>((field, index) => ({ ...field, index }));
-    }, [fields]);
-
-    const { items, paginationProps, collectionProps } = useCollection(fieldsWithIndex, {
+    const { items, paginationProps, collectionProps } = useCollection(data ?? [], {
         filtering: {
             empty: (
                 <ListEmptyMessage
@@ -70,112 +48,72 @@ export const ProjectSecrets: React.FC<IProps> = ({ project, loading }) => {
         const names = selectedItems?.map((s) => s.name ?? '');
 
         if (names?.length) {
-            deleteSecret({ project_name: projectName, names }).then(() => {
-                selectedItems?.forEach((s) => remove(s.index));
-            });
+            deleteSecret({ project_name: projectName, names });
         }
     };
 
-    const removeSecretByIndex = (index: number) => {
-        const secretData = getValues().secrets?.[index];
-
-        if (!secretData || !secretData.name) {
-            return;
-        }
-
-        deleteSecret({ project_name: projectName, names: [secretData.name] }).then(() => {
-            remove(index);
-        });
+    const removeSecretByName = (name: IProjectSecret['name']) => {
+        deleteSecret({ project_name: projectName, names: [name] });
     };
 
-    const saveSecretByIndex = (index: number) => {
-        const secretData = getValues().secrets?.[index];
-
-        if (!secretData || !secretData.name || !secretData.value) {
+    const updateOrCreateSecret = ({ name, value }: TFormValues) => {
+        if (!name || !value) {
             return;
         }
 
-        updateSecret({ project_name: projectName, name: secretData.name, value: secretData.value })
+        updateSecret({ project_name: projectName, name, value })
             .unwrap()
-            .then(() => {
-                setEditableRowIndex(null);
+            .then(() => setInitialFormValues(undefined))
+            .catch((error) => {
+                pushNotification({
+                    type: 'error',
+                    content: t('common.server_error', { error: getServerError(error) }),
+                });
             });
     };
 
-    const isDisabledEditableRowActions = loading || isLoading || isFetching || isUpdating;
-    const isDisabledNotEditableRowActions = loading || isLoading || isFetching || isDeleting;
+    const editSecret = ({ name }: IProjectSecret) => {
+        getSecret({ project_name: projectName, name })
+            .unwrap()
+            .then((secret) => setInitialFormValues(secret));
+    };
+
+    const closeModal = () => setInitialFormValues(undefined);
+
+    const isDisabledActions = loading || isLoading || isFetching || isDeleting || isGettingSecrets;
 
     const COLUMN_DEFINITIONS = [
         {
             id: 'name',
             header: t('projects.edit.secrets.name'),
-            cell: (field: TFormSecretValue & { index: number }) => {
-                const isEditable = editableRowIndex === field.index;
-
-                return (
-                    <div className={styles.value}>
-                        <div className={styles.valueFieldWrapper}>
-                            <FormInput
-                                key={field.name}
-                                control={control}
-                                name={`secrets.${field.index}.name`}
-                                disabled={loading || !isEditable || !!field.serverId}
-                            />
-                        </div>
-                    </div>
-                );
-            },
+            cell: (secret: IProjectSecret) => secret.name,
         },
         {
             id: 'value',
             header: t('projects.edit.secrets.value'),
-            cell: (field: TFormSecretValue & { index: number }) => {
-                const isEditable = editableRowIndex === field.index;
-
+            cell: (secret: IProjectSecret) => {
                 return (
                     <div className={styles.value}>
-                        <div className={styles.valueFieldWrapper}>
-                            <FormInput
-                                readOnly={!isEditable}
-                                key={field.value}
-                                control={control}
-                                name={`secrets.${field.index}.value`}
-                                disabled={loading || !isEditable}
-                            />
-                        </div>
+                        <div className={styles.valueFieldWrapper}>************************</div>
 
                         <div className={styles.buttonsWrapper}>
-                            {isEditable && (
-                                <Button
-                                    disabled={isDisabledEditableRowActions}
-                                    formAction="none"
-                                    onClick={() => saveSecretByIndex(field.index)}
-                                    variant="icon"
-                                    iconName="check"
-                                />
-                            )}
+                            <Button
+                                disabled={isDisabledActions}
+                                formAction="none"
+                                onClick={() => editSecret(secret)}
+                                variant="icon"
+                                iconName="edit"
+                            />
 
-                            {!isEditable && (
-                                <Button
-                                    disabled={isDisabledNotEditableRowActions}
-                                    formAction="none"
-                                    onClick={() => setEditableRowIndex(field.index)}
-                                    variant="icon"
-                                    iconName="edit"
-                                />
-                            )}
-
-                            {!isEditable && (
-                                <ButtonWithConfirmation
-                                    disabled={isDisabledNotEditableRowActions}
-                                    formAction="none"
-                                    onClick={() => removeSecretByIndex(field.index)}
-                                    confirmTitle={t('projects.edit.secrets.delete_confirm_title')}
-                                    confirmContent={t('projects.edit.secrets.delete_confirm_message')}
-                                    variant="icon"
-                                    iconName="remove"
-                                />
-                            )}
+                            <ButtonWithConfirmation
+                                disabled={isDisabledActions}
+                                formAction="none"
+                                onClick={() => removeSecretByName(secret.name)}
+                                confirmTitle={t('projects.edit.secrets.delete_confirm_title')}
+                                confirmContent={t('projects.edit.secrets.delete_confirm_message', { name: secret.name })}
+                                variant="icon"
+                                iconName="remove"
+                            />
                         </div>
                     </div>
                 );
@@ -184,8 +122,7 @@ export const ProjectSecrets: React.FC<IProps> = ({ project, loading }) => {
     ];
 
     const addSecretHandler = () => {
-        append({});
-        setEditableRowIndex(fields.length);
+        setInitialFormValues({});
     };
 
     const renderActions = () => {
@@ -196,11 +133,11 @@ export const ProjectSecrets: React.FC<IProps> = ({ project, loading }) => {
 
             <ButtonWithConfirmation
                 key="delete"
-                disabled={isDisabledNotEditableRowActions || !selectedItems?.length}
+                disabled={isDisabledActions || !selectedItems?.length}
                 formAction="none"
                 onClick={deleteSelectedSecrets}
-                confirmTitle={t('projects.edit.secrets.delete_confirm_title')}
-                confirmContent={t('projects.edit.secrets.delete_confirm_message')}
+                confirmTitle={t('projects.edit.secrets.multiple_delete_confirm_title')}
+                confirmContent={t('projects.edit.secrets.multiple_delete_confirm_message', { count: selectedItems?.length })}
             >
                 {t('common.delete')}
             </ButtonWithConfirmation>,
@@ -213,8 +150,10 @@ export const ProjectSecrets: React.FC<IProps> = ({ project, loading }) => {
         ) : undefined;
     };
 
+    const isShowModal = !!initialFormValues;
+
     return (
-        <form onSubmit={handleSubmit(() => {})}>
+        <>
             <Table
                 {...collectionProps}
                 selectionType="multi"
@@ -228,6 +167,23 @@ export const ProjectSecrets: React.FC<IProps> = ({ project, loading }) => {
                 }
                 pagination={<Pagination {...paginationProps} />}
             />
-        </form>
+
+            <Modal
+                header={
+                    initialFormValues?.id ? t('projects.edit.secrets.update_secret') : t('projects.edit.secrets.create_secret')
+                }
+                visible={isShowModal}
+                onDismiss={closeModal}
+            >
+                {isShowModal && (
+                    <SecretForm
+                        initialValues={initialFormValues}
+                        onSubmit={updateOrCreateSecret}
+                        loading={isLoading || isUpdating}
+                        onCancel={closeModal}
+                    />
+                )}
+            </Modal>
+        </>
     );
 };
