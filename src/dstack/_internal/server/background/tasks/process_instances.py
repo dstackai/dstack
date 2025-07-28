@@ -738,10 +738,10 @@ async def _check_instance(session: AsyncSession, instance: InstanceModel) -> Non
     if job_provisioning_data.hostname is None:
         res = await session.execute(
             select(ProjectModel)
-            .where(ProjectModel.id == instance.id)
+            .where(ProjectModel.id == instance.project_id)
             .options(joinedload(ProjectModel.backends))
         )
-        project = res.scalar_one()
+        project = res.unique().scalar_one()
         await _wait_for_instance_provisioning_data(
             project=project,
             instance=instance,
