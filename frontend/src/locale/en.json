@@ -309,6 +309,8 @@
         "delete_confirm_message": "Are you sure you want to delete the {{name}} secret?",
         "multiple_delete_confirm_title": "Delete secrets",
         "multiple_delete_confirm_message": "Are you sure you want to delete {{count}} secrets?",
+        "not_permissions_title": "Permission denied",
+        "not_permissions_description": "You don't have permission for managing secrets",
         "validation": {
           "secret_name_format": "Invalid secret name"
         }

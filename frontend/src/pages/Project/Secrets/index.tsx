@@ -3,15 +3,16 @@ import { useTranslation } from 'react-i18next';
 
 import { Button, ButtonWithConfirmation, Header, ListEmptyMessage, Modal, Pagination, SpaceBetween, Table } from 'components';
 
-import { useCollection, useNotifications } from 'hooks';
+import { useCollection, useNotifications, usePermissionGuard } from 'hooks';
+import { getServerError } from 'libs';
 import {
     useDeleteSecretsMutation,
     useGetAllSecretsQuery,
     useLazyGetSecretQuery,
     useUpdateSecretMutation,
 } from 'services/secrets';
+import { GlobalUserRole, ProjectUserRole } from 'types';
 
-import { getServerError } from '../../../libs';
 import { SecretForm } from './Form';
 
 import { IProps, TFormValues } from './types';
@@ -24,17 +25,30 @@ export const ProjectSecrets: React.FC<IProps> = ({ project, loading }) => {
     const projectName = project?.project_name ?? '';
     const [pushNotification] = useNotifications();
 
-    const { data, isLoading, isFetching } = useGetAllSecretsQuery({ project_name: projectName });
+    const [hasPermissionForSecretsManaging] = usePermissionGuard({
+        allowedProjectRoles: [ProjectUserRole.ADMIN],
+        allowedGlobalRoles: [GlobalUserRole.ADMIN],
+    });
+
+    const { data, isLoading, isFetching } = useGetAllSecretsQuery(
+        { project_name: projectName },
+        { skip: !hasPermissionForSecretsManaging },
+    );
     const [updateSecret, { isLoading: isUpdating }] = useUpdateSecretMutation();
     const [deleteSecret, { isLoading: isDeleting }] = useDeleteSecretsMutation();
     const [getSecret, { isLoading: isGettingSecrets }] = useLazyGetSecretQuery();
 
     const { items, paginationProps, collectionProps } = useCollection(data ?? [], {
         filtering: {
-            empty: (
+            empty: hasPermissionForSecretsManaging ? (
                 <ListEmptyMessage
                     title={t('projects.edit.secrets.empty_message_title')}
                     message={t('projects.edit.secrets.empty_message_text')}
+                />
+            ) : (
+                <ListEmptyMessage
+                    title={t('projects.edit.secrets.not_permissions_title')}
+                    message={t('projects.edit.secrets.not_permissions_description')}
                 />
             ),
         },
@@ -126,6 +140,10 @@ export const ProjectSecrets: React.FC<IProps> = ({ project, loading }) => {
     };
 
     const renderActions = () => {
+        if (!hasPermissionForSecretsManaging) {
+            return null;
+        }
+
         const actions = [
             <Button key="add" formAction="none" onClick={addSecretHandler}>
                 {t('common.add')}
@@ -161,29 +179,37 @@ export const ProjectSecrets: React.FC<IProps> = ({ project, loading }) => {
                 items={items}
                 loading={isLoading}
                 header={
-                    <Header variant="h2" counter={`(${items?.length})`} actions={renderActions()}>
+                    <Header
+                        variant="h2"
+                        counter={hasPermissionForSecretsManaging ? `(${items?.length})` : ''}
+                        actions={renderActions()}
+                    >
                         {t('projects.edit.secrets.section_title')}
                     </Header>
                 }
                 pagination={<Pagination {...paginationProps} />}
             />
 
-            <Modal
-                header={
-                    initialFormValues?.id ? t('projects.edit.secrets.update_secret') : t('projects.edit.secrets.create_secret')
-                }
-                visible={isShowModal}
-                onDismiss={closeModal}
-            >
-                {isShowModal && (
-                    <SecretForm
-                        initialValues={initialFormValues}
-                        onSubmit={updateOrCreateSecret}
-                        loading={isLoading || isUpdating}
-                        onCancel={closeModal}
-                    />
-                )}
-            </Modal>
+            {hasPermissionForSecretsManaging && (
+                <Modal
+                    header={
+                        initialFormValues?.id
+                            ? t('projects.edit.secrets.update_secret')
+                            : t('projects.edit.secrets.create_secret')
+                    }
+                    visible={isShowModal}
+                    onDismiss={closeModal}
+                >
+                    {isShowModal && (
+                        <SecretForm
+                            initialValues={initialFormValues}
+                            onSubmit={updateOrCreateSecret}
+                            loading={isLoading || isUpdating}
+                            onCancel={closeModal}
+                        />
+                    )}
+                </Modal>
+            )}
         </>
     );
 };
