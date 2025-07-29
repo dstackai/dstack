@@ -55,6 +55,15 @@ except ImportError:
     pass
 
 try:
+    from dstack._internal.core.backends.hotaisle.configurator import (
+        HotaisleConfigurator,
+    )
+
+    _CONFIGURATOR_CLASSES.append(HotaisleConfigurator)
+except ImportError:
+    pass
+
+try:
     from dstack._internal.core.backends.kubernetes.configurator import (
         KubernetesConfigurator,
     )
