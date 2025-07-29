@@ -75,6 +75,7 @@ from dstack._internal.server.services.runs import (
 from dstack._internal.server.services.volumes import (
     volume_model_to_volume,
 )
+from dstack._internal.server.utils import sentry_utils
 from dstack._internal.utils import common as common_utils
 from dstack._internal.utils import env as env_utils
 from dstack._internal.utils.logging import get_logger
@@ -109,6 +110,7 @@ def _get_effective_batch_size(batch_size: int) -> int:
     return batch_size
 
 
+@sentry_utils.instrument_background_task
 async def _process_next_submitted_job():
     lock, lockset = get_locker(get_db().dialect_name).get_lockset(JobModel.__tablename__)
     async with get_session_ctx() as session:

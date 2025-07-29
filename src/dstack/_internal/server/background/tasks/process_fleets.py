@@ -19,6 +19,7 @@ from dstack._internal.server.services.fleets import (
     is_fleet_in_use,
 )
 from dstack._internal.server.services.locking import get_locker
+from dstack._internal.server.utils import sentry_utils
 from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.logging import get_logger
 
@@ -29,6 +30,7 @@ BATCH_SIZE = 10
 MIN_PROCESSING_INTERVAL = timedelta(seconds=30)
 
 
+@sentry_utils.instrument_background_task
 async def process_fleets():
     lock, lockset = get_locker(get_db().dialect_name).get_lockset(FleetModel.__tablename__)
     async with get_session_ctx() as session:

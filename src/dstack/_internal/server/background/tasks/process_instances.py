@@ -105,6 +105,7 @@ from dstack._internal.server.services.placement import (
 from dstack._internal.server.services.runner import client as runner_client
 from dstack._internal.server.services.runner.client import HealthStatus
 from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
+from dstack._internal.server.utils import sentry_utils
 from dstack._internal.utils.common import (
     get_current_datetime,
     get_or_error,
@@ -136,6 +137,7 @@ async def process_instances(batch_size: int = 1):
     await asyncio.gather(*tasks)
 
 
+@sentry_utils.instrument_background_task
 async def _process_next_instance():
     lock, lockset = get_locker(get_db().dialect_name).get_lockset(InstanceModel.__tablename__)
     async with get_session_ctx() as session:

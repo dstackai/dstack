@@ -17,6 +17,7 @@ from dstack._internal.server.services.volumes import (
     get_volume_configuration,
     volume_model_to_volume,
 )
+from dstack._internal.server.utils import sentry_utils
 from dstack._internal.utils import common
 from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.logging import get_logger
@@ -24,6 +25,7 @@ from dstack._internal.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
+@sentry_utils.instrument_background_task
 async def process_idle_volumes():
     lock, lockset = get_locker(get_db().dialect_name).get_lockset(VolumeModel.__tablename__)
     async with get_session_ctx() as session:
