@@ -12,12 +12,14 @@ from dstack._internal.server.models import PlacementGroupModel, ProjectModel
 from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.placement import placement_group_model_to_placement_group
+from dstack._internal.server.utils import sentry_utils
 from dstack._internal.utils.common import get_current_datetime, run_async
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
 
+@sentry_utils.instrument_background_task
 async def process_placement_groups():
     lock, lockset = get_locker(get_db().dialect_name).get_lockset(
         PlacementGroupModel.__tablename__

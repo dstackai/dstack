@@ -18,6 +18,7 @@ from dstack._internal.server.services.jobs import (
 )
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.logging import fmt
+from dstack._internal.server.utils import sentry_utils
 from dstack._internal.utils.common import (
     get_current_datetime,
     get_or_error,
@@ -34,6 +35,7 @@ async def process_terminating_jobs(batch_size: int = 1):
     await asyncio.gather(*tasks)
 
 
+@sentry_utils.instrument_background_task
 async def _process_next_terminating_job():
     job_lock, job_lockset = get_locker(get_db().dialect_name).get_lockset(JobModel.__tablename__)
     instance_lock, instance_lockset = get_locker(get_db().dialect_name).get_lockset(

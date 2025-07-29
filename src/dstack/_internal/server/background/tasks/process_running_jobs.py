@@ -73,6 +73,7 @@ from dstack._internal.server.services.runs import (
 )
 from dstack._internal.server.services.secrets import get_project_secrets_mapping
 from dstack._internal.server.services.storage import get_default_storage
+from dstack._internal.server.utils import sentry_utils
 from dstack._internal.utils import common as common_utils
 from dstack._internal.utils.interpolator import InterpolatorError, VariablesInterpolator
 from dstack._internal.utils.logging import get_logger
@@ -94,6 +95,7 @@ async def process_running_jobs(batch_size: int = 1):
     await asyncio.gather(*tasks)
 
 
+@sentry_utils.instrument_background_task
 async def _process_next_running_job():
     lock, lockset = get_locker(get_db().dialect_name).get_lockset(JobModel.__tablename__)
     async with get_session_ctx() as session:
@@ -159,6 +161,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
         job_model.status = JobStatus.TERMINATING
         job_model.termination_reason = JobTerminationReason.TERMINATED_BY_SERVER
         job_model.last_processed_at = common_utils.get_current_datetime()
+        await session.commit()
         return
 
     job = find_job(run.jobs, job_model.replica_num, job_model.job_num)
@@ -204,6 +207,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
             job_model.termination_reason = JobTerminationReason.TERMINATED_BY_SERVER
             job_model.termination_reason_message = e.args[0]
             job_model.last_processed_at = common_utils.get_current_datetime()
+            await session.commit()
             return
 
     server_ssh_private_keys = get_instance_ssh_private_keys(

@@ -15,6 +15,7 @@ from dstack._internal.server.services.instances import get_instance_ssh_private_
 from dstack._internal.server.services.jobs import get_job_provisioning_data, get_job_runtime_data
 from dstack._internal.server.services.runner import client
 from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
+from dstack._internal.server.utils import sentry_utils
 from dstack._internal.utils.common import batched, get_current_datetime, get_or_error, run_async
 from dstack._internal.utils.logging import get_logger
 
@@ -26,6 +27,7 @@ BATCH_SIZE = 10
 MIN_COLLECT_INTERVAL_SECONDS = 9
 
 
+@sentry_utils.instrument_background_task
 async def collect_metrics():
     async with get_session_ctx() as session:
         res = await session.execute(
@@ -45,6 +47,7 @@ async def collect_metrics():
         await _collect_jobs_metrics(batch)
 
 
+@sentry_utils.instrument_background_task
 async def delete_metrics():
     now_timestamp_micro = int(get_current_datetime().timestamp() * 1_000_000)
     running_timestamp_micro_cutoff = (

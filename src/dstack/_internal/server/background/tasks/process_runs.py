@@ -43,6 +43,7 @@ from dstack._internal.server.services.runs import (
 )
 from dstack._internal.server.services.secrets import get_project_secrets_mapping
 from dstack._internal.server.services.services import update_service_desired_replica_count
+from dstack._internal.server.utils import sentry_utils
 from dstack._internal.utils import common
 from dstack._internal.utils.logging import get_logger
 
@@ -59,6 +60,7 @@ async def process_runs(batch_size: int = 1):
     await asyncio.gather(*tasks)
 
 
+@sentry_utils.instrument_background_task
 async def _process_next_run():
     run_lock, run_lockset = get_locker(get_db().dialect_name).get_lockset(RunModel.__tablename__)
     job_lock, job_lockset = get_locker(get_db().dialect_name).get_lockset(JobModel.__tablename__)
