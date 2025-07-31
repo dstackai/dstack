@@ -21,6 +21,6 @@ repos:
     hooks:
       - id: frontend-pre-commit
         name: frontend-pre-commit
-        entry: bash -c "cd frontend && npm run precommit"
+        entry: bash -c "cd frontend && npm install && npm run precommit"
         language: system
         pass_filenames: false
