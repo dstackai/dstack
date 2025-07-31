@@ -24,7 +24,7 @@ env:
   PIP_PROGRESS_BAR: off
 
 jobs:
-  python-lint:
+  code-lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -34,18 +34,6 @@ jobs:
           python-version: 3.11
       - run: uv tool install pre-commit
       - run: pre-commit run -a --show-diff-on-failure
-
-  frontend-lint:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: frontend
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install modules
-        run: npm install
-      - name: Run Eslint
-        run: npm run precommit
 
   frontend-build:
     runs-on: ubuntu-latest
