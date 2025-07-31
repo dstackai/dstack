@@ -13,7 +13,9 @@ const getInitialState = (): IAppState => {
     let hideStartUp: null | boolean = null;
     let activeMode = getThemeMode();
 
-    try {storageData = localStorage.getItem(AUTH_DATA_STORAGE_KEY);} catch (e) {
+    try {
+        storageData = localStorage.getItem(AUTH_DATA_STORAGE_KEY);
+    } catch (e) {
         console.log(e);
     }
 
