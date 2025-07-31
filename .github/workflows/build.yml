@@ -68,7 +68,7 @@ jobs:
           path: frontend/build
 
   python-test:
-    needs: [python-lint, frontend-build]
+    needs: [code-lint, frontend-build]
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
