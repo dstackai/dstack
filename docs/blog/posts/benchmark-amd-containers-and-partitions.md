@@ -14,10 +14,10 @@ Our new benchmark explores two important areas for optimizing AI workloads on AM
 
 <img src="https://dstack.ai/static-assets/static-assets/images/benchmark-amd-containers-and-partitions.png" width="630"/>
 
+<!-- more -->
+
 This benchmark was supported by [Hot Aisle :material-arrow-top-right-thin:{ .external }](https://hotaisle.xyz/){:target="_blank"},
 a provider of AMD GPU bare-metal and VM infrastructure.
-
-<!-- more -->
 
 ## Benchmark 1: Bare-metal vs containers
 
