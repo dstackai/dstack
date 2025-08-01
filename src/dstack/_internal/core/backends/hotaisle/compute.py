@@ -184,10 +184,11 @@ def _launch_runner(
     ssh_private_key: str,
     launch_command: str,
 ):
+    daemonized_command = f"{launch_command.rstrip('&')} >/tmp/dstack-shim.log 2>&1 & disown"
     _run_ssh_command(
         hostname=hostname,
         ssh_private_key=ssh_private_key,
-        command=launch_command,
+        command=daemonized_command,
     )
 
 
