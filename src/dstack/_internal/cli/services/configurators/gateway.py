@@ -121,7 +121,7 @@ class GatewayConfigurator(BaseApplyConfigurator):
                     time.sleep(LIVE_TABLE_PROVISION_INTERVAL_SECS)
                     gateway = self.api.client.gateways.get(self.api.project, gateway.name)
         except KeyboardInterrupt:
-            if confirm_ask("Delete the gateway before exiting?"):
+            if not command_args.yes and confirm_ask("Delete the gateway before exiting?"):
                 with console.status("Deleting gateway..."):
                     self.api.client.gateways.delete(
                         project_name=self.api.project,

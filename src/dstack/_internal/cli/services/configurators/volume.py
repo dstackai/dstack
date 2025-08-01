@@ -110,7 +110,7 @@ class VolumeConfigurator(BaseApplyConfigurator):
                     time.sleep(LIVE_TABLE_PROVISION_INTERVAL_SECS)
                     volume = self.api.client.volumes.get(self.api.project, volume.name)
         except KeyboardInterrupt:
-            if confirm_ask("Delete the volume before exiting?"):
+            if not command_args.yes and confirm_ask("Delete the volume before exiting?"):
                 with console.status("Deleting volume..."):
                     self.api.client.volumes.delete(
                         project_name=self.api.project, names=[volume.name]

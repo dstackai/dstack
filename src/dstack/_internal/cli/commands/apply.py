@@ -108,8 +108,6 @@ class ApplyCommand(APIBaseCommand):
 
             super()._command(args)
             if not args.yes and args.configuration_file == APPLY_STDIN_NAME:
-                # FIXME: probably does not work since dstack apply can ask questions futher,
-                # e.g. whether to terminate a resource on ctrl+c or not
                 raise CLIError("Cannot read configuration from stdin if -y/--yes is not specified")
             if args.repo and args.no_repo:
                 raise CLIError("Either --repo or --no-repo can be specified")
