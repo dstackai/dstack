@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 // import { useNavigate } from 'react-router-dom';
-import { /*Button,*/ NavigateLink } from 'components';
+import { /*Button,*/ NavigateLink, StatusIndicator } from 'components';
 
 // import { ButtonWithConfirmation } from 'components/ButtonWithConfirmation';
 import { ROUTES } from 'routes';
@@ -67,6 +67,15 @@ export const useColumnsDefinitions = ({ loading, onDeleteClick }: hookArgs) => {
                         {/*    )}*/}
                         {/*</div>*/}
                     </div>
+                ),
+            },
+            {
+                id: 'visibility',
+                header: t('projects.edit.project_visibility'),
+                cell: (project: IProject) => (
+                    <StatusIndicator type={project.isPublic ? 'success' : 'pending'}>
+                        {project.isPublic ? t('projects.edit.visibility.public') : t('projects.edit.visibility.private')}
+                    </StatusIndicator>
                 ),
             },
         ];

@@ -2,7 +2,7 @@
 title: "Using Docker and Docker Compose inside GPU-enabled containers"
 date: 2024-10-30
 description: "The latest release of dstack allows for the direct use of Docker and Docker Compose within run configurations."
-image: https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-docker-inside-containers.png?raw=true
+image: https://dstack.ai/static-assets/static-assets/images/dstack-docker-inside-containers.png
 slug: docker-inside-containers
 ---
 
@@ -82,7 +82,7 @@ One of the obvious use cases for this feature is when you need to use Docker Com
 For example, the Hugging Face Chat UI requires a MongoDB database, so using Docker Compose to run it is 
 the easiest way:
 
-<img src="https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-docker-compose-terminal.png?raw=true" width="750"/>
+<img src="https://dstack.ai/static-assets/static-assets/images/dstack-docker-compose-terminal.png" width="750"/>
 
 ### docker build
 

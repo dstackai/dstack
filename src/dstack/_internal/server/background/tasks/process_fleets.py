@@ -1,23 +1,38 @@
+from datetime import timedelta
+from typing import List
+
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, load_only
 
 from dstack._internal.core.models.fleets import FleetStatus
-from dstack._internal.server.db import get_session_ctx
-from dstack._internal.server.models import FleetModel, PlacementGroupModel
+from dstack._internal.server.db import get_db, get_session_ctx
+from dstack._internal.server.models import (
+    FleetModel,
+    InstanceModel,
+    JobModel,
+    PlacementGroupModel,
+    RunModel,
+)
 from dstack._internal.server.services.fleets import (
     is_fleet_empty,
     is_fleet_in_use,
 )
 from dstack._internal.server.services.locking import get_locker
+from dstack._internal.server.utils import sentry_utils
 from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
 
+BATCH_SIZE = 10
+MIN_PROCESSING_INTERVAL = timedelta(seconds=30)
+
+
+@sentry_utils.instrument_background_task
 async def process_fleets():
-    lock, lockset = get_locker().get_lockset(FleetModel.__tablename__)
+    lock, lockset = get_locker(get_db().dialect_name).get_lockset(FleetModel.__tablename__)
     async with get_session_ctx() as session:
         async with lock:
             res = await session.execute(
@@ -25,59 +40,65 @@ async def process_fleets():
                 .where(
                     FleetModel.deleted == False,
                     FleetModel.id.not_in(lockset),
+                    FleetModel.last_processed_at
+                    < get_current_datetime() - MIN_PROCESSING_INTERVAL,
                 )
+                .options(load_only(FleetModel.id))
                 .order_by(FleetModel.last_processed_at.asc())
-                .limit(1)
-                .with_for_update(skip_locked=True)
+                .limit(BATCH_SIZE)
+                .with_for_update(skip_locked=True, key_share=True)
             )
-            fleet_model = res.scalar()
-            if fleet_model is None:
-                return
-            lockset.add(fleet_model.id)
+            fleet_models = list(res.scalars().all())
+            fleet_ids = [fm.id for fm in fleet_models]
+            for fleet_id in fleet_ids:
+                lockset.add(fleet_id)
         try:
-            fleet_model_id = fleet_model.id
-            await _process_fleet(session=session, fleet_model=fleet_model)
+            await _process_fleets(session=session, fleet_models=fleet_models)
         finally:
-            lockset.difference_update([fleet_model_id])
+            lockset.difference_update(fleet_ids)
 
 
-async def _process_fleet(session: AsyncSession, fleet_model: FleetModel):
+async def _process_fleets(session: AsyncSession, fleet_models: List[FleetModel]):
+    fleet_ids = [fm.id for fm in fleet_models]
     # Refetch to load related attributes.
-    # joinedload produces LEFT OUTER JOIN that can't be used with FOR UPDATE.
     res = await session.execute(
         select(FleetModel)
-        .where(FleetModel.id == fleet_model.id)
-        .options(joinedload(FleetModel.project))
-        .options(joinedload(FleetModel.instances))
-        .options(joinedload(FleetModel.runs))
+        .where(FleetModel.id.in_(fleet_ids))
+        .options(joinedload(FleetModel.instances).load_only(InstanceModel.deleted))
+        .options(
+            joinedload(FleetModel.instances).joinedload(InstanceModel.jobs).load_only(JobModel.id)
+        )
+        .options(joinedload(FleetModel.runs).load_only(RunModel.status))
         .execution_options(populate_existing=True)
     )
-    fleet_model = res.unique().scalar_one()
-    await _autodelete_fleet(session=session, fleet_model=fleet_model)
+    fleet_models = list(res.unique().scalars().all())
+
+    deleted_fleets_ids = []
+    now = get_current_datetime()
+    for fleet_model in fleet_models:
+        deleted = _autodelete_fleet(fleet_model)
+        if deleted:
+            deleted_fleets_ids.append(fleet_model.id)
+        fleet_model.last_processed_at = now
+
+    await session.execute(
+        update(PlacementGroupModel)
+        .where(
+            PlacementGroupModel.fleet_id.in_(deleted_fleets_ids),
+        )
+        .values(fleet_deleted=True)
+    )
+    await session.commit()
 
 
-async def _autodelete_fleet(session: AsyncSession, fleet_model: FleetModel):
+def _autodelete_fleet(fleet_model: FleetModel) -> bool:
     # Currently all empty fleets are autodeleted.
     # TODO: If fleets with `nodes: 0..` are supported, their deletion should be skipped.
     if is_fleet_in_use(fleet_model) or not is_fleet_empty(fleet_model):
-        fleet_model.last_processed_at = get_current_datetime()
-        await session.commit()
-        return
+        return False
 
     logger.info("Automatic cleanup of an empty fleet %s", fleet_model.name)
     fleet_model.status = FleetStatus.TERMINATED
     fleet_model.deleted = True
-    fleet_model.last_processed_at = get_current_datetime()
-    await _mark_placement_groups_as_ready_for_deletion(session=session, fleet_model=fleet_model)
-    await session.commit()
     logger.info("Fleet %s deleted", fleet_model.name)
-
-
-async def _mark_placement_groups_as_ready_for_deletion(
-    session: AsyncSession, fleet_model: FleetModel
-):
-    await session.execute(
-        update(PlacementGroupModel)
-        .where(PlacementGroupModel.fleet_id == fleet_model.id)
-        .values(fleet_deleted=True)
-    )
+    return True

@@ -71,7 +71,7 @@ To delete a gateway, pass the gateway configuration to [`dstack delete`](../refe
 <div class="termy">
 
 ```shell
-$ dstack delete -f examples/deployment/gateway.dstack.yml
+$ dstack delete -f examples/inference/gateway.dstack.yml
 ```
 
 </div>

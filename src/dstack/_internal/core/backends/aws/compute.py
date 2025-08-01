@@ -1,14 +1,21 @@
+import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Dict, List, Optional, Tuple
 
 import boto3
 import botocore.client
 import botocore.exceptions
+from cachetools import Cache, TTLCache, cachedmethod
+from cachetools.keys import hashkey
 from pydantic import ValidationError
 
 import dstack._internal.core.backends.aws.resources as aws_resources
 from dstack._internal import settings
-from dstack._internal.core.backends.aws.models import AWSAccessKeyCreds, AWSConfig
+from dstack._internal.core.backends.aws.models import (
+    AWSAccessKeyCreds,
+    AWSConfig,
+    AWSOSImageConfig,
+)
 from dstack._internal.core.backends.base.compute import (
     Compute,
     ComputeWithCreateInstanceSupport,
@@ -26,7 +33,12 @@ from dstack._internal.core.backends.base.compute import (
     merge_tags,
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
-from dstack._internal.core.errors import ComputeError, NoCapacityError, PlacementGroupInUseError
+from dstack._internal.core.errors import (
+    ComputeError,
+    NoCapacityError,
+    PlacementGroupInUseError,
+    PlacementGroupNotSupportedError,
+)
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.gateways import (
@@ -39,7 +51,11 @@ from dstack._internal.core.models.instances import (
     InstanceOffer,
     InstanceOfferWithAvailability,
 )
-from dstack._internal.core.models.placement import PlacementGroup, PlacementGroupProvisioningData
+from dstack._internal.core.models.placement import (
+    PlacementGroup,
+    PlacementGroupProvisioningData,
+    PlacementStrategy,
+)
 from dstack._internal.core.models.resources import Memory, Range
 from dstack._internal.core.models.runs import JobProvisioningData, Requirements
 from dstack._internal.core.models.volumes import (
@@ -66,6 +82,10 @@ class AWSVolumeBackendData(CoreModel):
     iops: int
 
 
+def _ec2client_cache_methodkey(self, ec2_client, *args, **kwargs):
+    return hashkey(*args, **kwargs)
+
+
 class AWSCompute(
     ComputeWithCreateInstanceSupport,
     ComputeWithMultinodeSupport,
@@ -86,6 +106,24 @@ class AWSCompute(
             )
         else:  # default creds
             self.session = boto3.Session()
+        # Caches to avoid redundant API calls when provisioning many instances
+        # get_offers is already cached but we still cache its sub-functions
+        # with more aggressive/longer caches.
+        self._get_regions_to_quotas_cache_lock = threading.Lock()
+        self._get_regions_to_quotas_execution_lock = threading.Lock()
+        self._get_regions_to_quotas_cache = TTLCache(maxsize=10, ttl=300)
+        self._get_regions_to_zones_cache_lock = threading.Lock()
+        self._get_regions_to_zones_cache = Cache(maxsize=10)
+        self._get_vpc_id_subnet_id_or_error_cache_lock = threading.Lock()
+        self._get_vpc_id_subnet_id_or_error_cache = TTLCache(maxsize=100, ttl=600)
+        self._get_maximum_efa_interfaces_cache_lock = threading.Lock()
+        self._get_maximum_efa_interfaces_cache = Cache(maxsize=100)
+        self._get_subnets_availability_zones_cache_lock = threading.Lock()
+        self._get_subnets_availability_zones_cache = Cache(maxsize=100)
+        self._create_security_group_cache_lock = threading.Lock()
+        self._create_security_group_cache = TTLCache(maxsize=100, ttl=600)
+        self._get_image_id_and_username_cache_lock = threading.Lock()
+        self._get_image_id_and_username_cache = TTLCache(maxsize=100, ttl=600)
 
     def get_offers(
         self, requirements: Optional[Requirements] = None
@@ -126,13 +164,17 @@ class AWSCompute(
             extra_filter=filter,
         )
         regions = list(set(i.region for i in offers))
-        regions_to_quotas = _get_regions_to_quotas(self.session, regions)
-        regions_to_zones = _get_regions_to_zones(self.session, regions)
+        with self._get_regions_to_quotas_execution_lock:
+            # Cache lock does not prevent concurrent execution.
+            # We use a separate lock to avoid requesting quotas in parallel and hitting rate limits.
+            regions_to_quotas = self._get_regions_to_quotas(self.session, regions)
+        regions_to_zones = self._get_regions_to_zones(self.session, regions)
 
         availability_offers = []
         for offer in offers:
             availability = InstanceAvailability.UNKNOWN
-            if not _has_quota(regions_to_quotas[offer.region], offer.instance.name):
+            quota = _has_quota(regions_to_quotas[offer.region], offer.instance.name)
+            if quota is not None and not quota:
                 availability = InstanceAvailability.NO_QUOTA
             availability_offers.append(
                 InstanceOfferWithAvailability(
@@ -159,6 +201,7 @@ class AWSCompute(
         self,
         instance_offer: InstanceOfferWithAvailability,
         instance_config: InstanceConfiguration,
+        placement_group: Optional[PlacementGroup],
     ) -> JobProvisioningData:
         project_name = instance_config.project_name
         ec2_resource = self.session.resource("ec2", region_name=instance_offer.region)
@@ -184,21 +227,24 @@ class AWSCompute(
         tags = aws_resources.filter_invalid_tags(tags)
 
         disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
-        max_efa_interfaces = _get_maximum_efa_interfaces(
-            ec2_client=ec2_client, instance_type=instance_offer.instance.name
+        max_efa_interfaces = self._get_maximum_efa_interfaces(
+            ec2_client=ec2_client,
+            region=instance_offer.region,
+            instance_type=instance_offer.instance.name,
         )
         enable_efa = max_efa_interfaces > 0
         is_capacity_block = False
         try:
-            vpc_id, subnet_ids = get_vpc_id_subnet_id_or_error(
+            vpc_id, subnet_ids = self._get_vpc_id_subnet_id_or_error(
                 ec2_client=ec2_client,
                 config=self.config,
                 region=instance_offer.region,
                 allocate_public_ip=allocate_public_ip,
                 availability_zones=zones,
             )
-            subnet_id_to_az_map = aws_resources.get_subnets_availability_zones(
+            subnet_id_to_az_map = self._get_subnets_availability_zones(
                 ec2_client=ec2_client,
+                region=instance_offer.region,
                 subnet_ids=subnet_ids,
             )
             if instance_config.reservation:
@@ -227,10 +273,18 @@ class AWSCompute(
             tried_zones.add(az)
             try:
                 logger.debug("Trying provisioning %s in %s", instance_offer.instance.name, az)
-                image_id, username = aws_resources.get_image_id_and_username(
+                image_id, username = self._get_image_id_and_username(
                     ec2_client=ec2_client,
+                    region=instance_offer.region,
                     cuda=len(instance_offer.instance.resources.gpus) > 0,
+                    instance_type=instance_offer.instance.name,
                     image_config=self.config.os_images,
+                )
+                security_group_id = self._create_security_group(
+                    ec2_client=ec2_client,
+                    region=instance_offer.region,
+                    project_id=project_name,
+                    vpc_id=vpc_id,
                 )
                 response = ec2_resource.create_instances(
                     **aws_resources.create_instances_struct(
@@ -240,15 +294,11 @@ class AWSCompute(
                         iam_instance_profile=self.config.iam_instance_profile,
                         user_data=get_user_data(authorized_keys=instance_config.get_public_keys()),
                         tags=aws_resources.make_tags(tags),
-                        security_group_id=aws_resources.create_security_group(
-                            ec2_client=ec2_client,
-                            project_id=project_name,
-                            vpc_id=vpc_id,
-                        ),
+                        security_group_id=security_group_id,
                         spot=instance_offer.instance.resources.spot,
                         subnet_id=subnet_id,
                         allocate_public_ip=allocate_public_ip,
-                        placement_group_name=instance_config.placement_group_name,
+                        placement_group_name=placement_group.name if placement_group else None,
                         enable_efa=enable_efa,
                         max_efa_interfaces=max_efa_interfaces,
                         reservation_id=instance_config.reservation,
@@ -291,7 +341,10 @@ class AWSCompute(
     def create_placement_group(
         self,
         placement_group: PlacementGroup,
+        master_instance_offer: InstanceOffer,
     ) -> PlacementGroupProvisioningData:
+        if not _offer_supports_placement_group(master_instance_offer, placement_group):
+            raise PlacementGroupNotSupportedError()
         ec2_client = self.session.client("ec2", region_name=placement_group.configuration.region)
         logger.debug("Creating placement group %s...", placement_group.name)
         ec2_client.create_placement_group(
@@ -323,6 +376,18 @@ class AWSCompute(
                 raise e
         logger.debug("Deleted placement group %s", placement_group.name)
 
+    def is_suitable_placement_group(
+        self,
+        placement_group: PlacementGroup,
+        instance_offer: InstanceOffer,
+    ) -> bool:
+        if not _offer_supports_placement_group(instance_offer, placement_group):
+            return False
+        return (
+            placement_group.configuration.backend == BackendType.AWS
+            and placement_group.configuration.region == instance_offer.region
+        )
+
     def create_gateway(
         self,
         configuration: GatewayComputeConfiguration,
@@ -347,7 +412,7 @@ class AWSCompute(
         tags = aws_resources.filter_invalid_tags(tags)
         tags = aws_resources.make_tags(tags)
 
-        vpc_id, subnets_ids = get_vpc_id_subnet_id_or_error(
+        vpc_id, subnets_ids = self._get_vpc_id_subnet_id_or_error(
             ec2_client=ec2_client,
             config=self.config,
             region=configuration.region,
@@ -599,9 +664,12 @@ class AWSCompute(
                 raise e
         logger.debug("Deleted EBS volume %s", volume.configuration.name)
 
-    def attach_volume(self, volume: Volume, instance_id: str) -> VolumeAttachmentData:
+    def attach_volume(
+        self, volume: Volume, provisioning_data: JobProvisioningData
+    ) -> VolumeAttachmentData:
         ec2_client = self.session.client("ec2", region_name=volume.configuration.region)
 
+        instance_id = provisioning_data.instance_id
         device_names = aws_resources.list_available_device_names(
             ec2_client=ec2_client, instance_id=instance_id
         )
@@ -634,9 +702,12 @@ class AWSCompute(
         logger.debug("Attached EBS volume %s to instance %s", volume.volume_id, instance_id)
         return VolumeAttachmentData(device_name=device_name)
 
-    def detach_volume(self, volume: Volume, instance_id: str, force: bool = False):
+    def detach_volume(
+        self, volume: Volume, provisioning_data: JobProvisioningData, force: bool = False
+    ):
         ec2_client = self.session.client("ec2", region_name=volume.configuration.region)
 
+        instance_id = provisioning_data.instance_id
         logger.debug("Detaching EBS volume %s from instance %s", volume.volume_id, instance_id)
         attachment_data = get_or_error(volume.get_attachment_data_for_instance(instance_id))
         try:
@@ -655,9 +726,10 @@ class AWSCompute(
             raise e
         logger.debug("Detached EBS volume %s from instance %s", volume.volume_id, instance_id)
 
-    def is_volume_detached(self, volume: Volume, instance_id: str) -> bool:
+    def is_volume_detached(self, volume: Volume, provisioning_data: JobProvisioningData) -> bool:
         ec2_client = self.session.client("ec2", region_name=volume.configuration.region)
 
+        instance_id = provisioning_data.instance_id
         logger.debug("Getting EBS volume %s status", volume.volume_id)
         response = ec2_client.describe_volumes(VolumeIds=[volume.volume_id])
         volumes_infos = response.get("Volumes")
@@ -674,6 +746,165 @@ class AWSCompute(
                 return False
             return True
         return True
+
+    def _get_regions_to_quotas_key(
+        self,
+        session: boto3.Session,
+        regions: List[str],
+    ) -> tuple:
+        return hashkey(tuple(regions))
+
+    @cachedmethod(
+        cache=lambda self: self._get_regions_to_quotas_cache,
+        key=_get_regions_to_quotas_key,
+        lock=lambda self: self._get_regions_to_quotas_cache_lock,
+    )
+    def _get_regions_to_quotas(
+        self,
+        session: boto3.Session,
+        regions: List[str],
+    ) -> Dict[str, Dict[str, int]]:
+        return _get_regions_to_quotas(session=session, regions=regions)
+
+    def _get_regions_to_zones_key(
+        self,
+        session: boto3.Session,
+        regions: List[str],
+    ) -> tuple:
+        return hashkey(tuple(regions))
+
+    @cachedmethod(
+        cache=lambda self: self._get_regions_to_zones_cache,
+        key=_get_regions_to_zones_key,
+        lock=lambda self: self._get_regions_to_zones_cache_lock,
+    )
+    def _get_regions_to_zones(
+        self,
+        session: boto3.Session,
+        regions: List[str],
+    ) -> Dict[str, List[str]]:
+        return _get_regions_to_zones(session=session, regions=regions)
+
+    def _get_vpc_id_subnet_id_or_error_cache_key(
+        self,
+        ec2_client: botocore.client.BaseClient,
+        config: AWSConfig,
+        region: str,
+        allocate_public_ip: bool,
+        availability_zones: Optional[List[str]] = None,
+    ) -> tuple:
+        return hashkey(
+            region, allocate_public_ip, tuple(availability_zones) if availability_zones else None
+        )
+
+    @cachedmethod(
+        cache=lambda self: self._get_vpc_id_subnet_id_or_error_cache,
+        key=_get_vpc_id_subnet_id_or_error_cache_key,
+        lock=lambda self: self._get_vpc_id_subnet_id_or_error_cache_lock,
+    )
+    def _get_vpc_id_subnet_id_or_error(
+        self,
+        ec2_client: botocore.client.BaseClient,
+        config: AWSConfig,
+        region: str,
+        allocate_public_ip: bool,
+        availability_zones: Optional[List[str]] = None,
+    ) -> Tuple[str, List[str]]:
+        return get_vpc_id_subnet_id_or_error(
+            ec2_client=ec2_client,
+            config=config,
+            region=region,
+            allocate_public_ip=allocate_public_ip,
+            availability_zones=availability_zones,
+        )
+
+    @cachedmethod(
+        cache=lambda self: self._get_maximum_efa_interfaces_cache,
+        key=_ec2client_cache_methodkey,
+        lock=lambda self: self._get_maximum_efa_interfaces_cache_lock,
+    )
+    def _get_maximum_efa_interfaces(
+        self,
+        ec2_client: botocore.client.BaseClient,
+        region: str,
+        instance_type: str,
+    ) -> int:
+        return _get_maximum_efa_interfaces(
+            ec2_client=ec2_client,
+            instance_type=instance_type,
+        )
+
+    def _get_subnets_availability_zones_key(
+        self,
+        ec2_client: botocore.client.BaseClient,
+        region: str,
+        subnet_ids: List[str],
+    ) -> tuple:
+        return hashkey(region, tuple(subnet_ids))
+
+    @cachedmethod(
+        cache=lambda self: self._get_subnets_availability_zones_cache,
+        key=_get_subnets_availability_zones_key,
+        lock=lambda self: self._get_subnets_availability_zones_cache_lock,
+    )
+    def _get_subnets_availability_zones(
+        self,
+        ec2_client: botocore.client.BaseClient,
+        region: str,
+        subnet_ids: List[str],
+    ) -> Dict[str, str]:
+        return aws_resources.get_subnets_availability_zones(
+            ec2_client=ec2_client,
+            subnet_ids=subnet_ids,
+        )
+
+    @cachedmethod(
+        cache=lambda self: self._create_security_group_cache,
+        key=_ec2client_cache_methodkey,
+        lock=lambda self: self._create_security_group_cache_lock,
+    )
+    def _create_security_group(
+        self,
+        ec2_client: botocore.client.BaseClient,
+        region: str,
+        project_id: str,
+        vpc_id: Optional[str],
+    ) -> str:
+        return aws_resources.create_security_group(
+            ec2_client=ec2_client,
+            project_id=project_id,
+            vpc_id=vpc_id,
+        )
+
+    def _get_image_id_and_username_cache_key(
+        self,
+        ec2_client: botocore.client.BaseClient,
+        region: str,
+        cuda: bool,
+        instance_type: str,
+        image_config: Optional[AWSOSImageConfig] = None,
+    ) -> tuple:
+        return hashkey(region, cuda, instance_type, image_config.json() if image_config else None)
+
+    @cachedmethod(
+        cache=lambda self: self._get_image_id_and_username_cache,
+        key=_get_image_id_and_username_cache_key,
+        lock=lambda self: self._get_image_id_and_username_cache_lock,
+    )
+    def _get_image_id_and_username(
+        self,
+        ec2_client: botocore.client.BaseClient,
+        region: str,
+        cuda: bool,
+        instance_type: str,
+        image_config: Optional[AWSOSImageConfig] = None,
+    ) -> tuple[str, str]:
+        return aws_resources.get_image_id_and_username(
+            ec2_client=ec2_client,
+            cuda=cuda,
+            instance_type=instance_type,
+            image_config=image_config,
+        )
 
 
 def get_vpc_id_subnet_id_or_error(
@@ -762,14 +993,22 @@ def _get_regions_to_quotas(
 ) -> Dict[str, Dict[str, int]]:
     def get_region_quotas(client: botocore.client.BaseClient) -> Dict[str, int]:
         region_quotas = {}
-        for page in client.get_paginator("list_service_quotas").paginate(ServiceCode="ec2"):
-            for q in page["Quotas"]:
-                if "On-Demand" in q["QuotaName"]:
-                    region_quotas[q["UsageMetric"]["MetricDimensions"]["Class"]] = q["Value"]
+        try:
+            for page in client.get_paginator("list_service_quotas").paginate(ServiceCode="ec2"):
+                for q in page["Quotas"]:
+                    if "On-Demand" in q["QuotaName"]:
+                        region_quotas[q["UsageMetric"]["MetricDimensions"]["Class"]] = q["Value"]
+        except botocore.exceptions.ClientError as e:
+            if len(e.args) > 0 and "TooManyRequestsException" in e.args[0]:
+                logger.warning(
+                    "Failed to get quotas due to rate limits. Quotas won't be accounted for."
+                )
+            else:
+                logger.exception(e)
         return region_quotas
 
     regions_to_quotas = {}
-    with ThreadPoolExecutor(max_workers=8) as executor:
+    with ThreadPoolExecutor(max_workers=12) as executor:
         future_to_region = {}
         for region in regions:
             future = executor.submit(
@@ -781,17 +1020,20 @@ def _get_regions_to_quotas(
     return regions_to_quotas
 
 
-def _has_quota(quotas: Dict[str, int], instance_name: str) -> bool:
+def _has_quota(quotas: Dict[str, int], instance_name: str) -> Optional[bool]:
+    quota = quotas.get("Standard/OnDemand")
     if instance_name.startswith("p"):
-        return quotas.get("P/OnDemand", 0) > 0
+        quota = quotas.get("P/OnDemand")
     if instance_name.startswith("g"):
-        return quotas.get("G/OnDemand", 0) > 0
-    return quotas.get("Standard/OnDemand", 0) > 0
+        quota = quotas.get("G/OnDemand")
+    if quota is None:
+        return None
+    return quota > 0
 
 
 def _get_regions_to_zones(session: boto3.Session, regions: List[str]) -> Dict[str, List[str]]:
     regions_to_zones = {}
-    with ThreadPoolExecutor(max_workers=8) as executor:
+    with ThreadPoolExecutor(max_workers=12) as executor:
         future_to_region = {}
         for region in regions:
             future = executor.submit(
@@ -807,22 +1049,36 @@ def _get_regions_to_zones(session: boto3.Session, regions: List[str]) -> Dict[st
 
 def _supported_instances(offer: InstanceOffer) -> bool:
     for family in [
+        "m7i.",
+        "c7i.",
+        "r7i.",
+        "t3.",
         "t2.small",
         "c5.",
         "m5.",
-        "g4dn.",
-        "g5.",
+        "p5.",
+        "p5e.",
+        "p4d.",
+        "p4de.",
+        "p3.",
         "g6.",
         "g6e.",
         "gr6.",
-        "p3.",
-        "p4d.",
-        "p4de.",
-        "p5.",
+        "g5.",
+        "g4dn.",
     ]:
         if offer.instance.name.startswith(family):
             return True
     return False
+
+
+def _offer_supports_placement_group(offer: InstanceOffer, placement_group: PlacementGroup) -> bool:
+    if placement_group.configuration.placement_strategy != PlacementStrategy.CLUSTER:
+        return True
+    for family in ["t3.", "t2."]:
+        if offer.instance.name.startswith(family):
+            return False
+    return True
 
 
 def _get_maximum_efa_interfaces(ec2_client: botocore.client.BaseClient, instance_type: str) -> int:

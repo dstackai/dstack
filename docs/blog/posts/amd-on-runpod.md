@@ -4,7 +4,7 @@ date: 2024-08-21
 description: "dstack, the open-source AI container orchestration platform, adds support for AMD accelerators, with RunPod as the first supported cloud provider."  
 slug: amd-on-runpod
 categories:
-  - AMD
+  - Changelog
 ---
 
 # Supporting AMD accelerators on RunPod
@@ -42,7 +42,7 @@ you can now specify an AMD GPU under `resources`. Below are a few examples.
     Here's an example of a [service](../../docs/concepts/services.md) that deploys
     Llama 3.1 70B in FP16 using [TGI :material-arrow-top-right-thin:{ .external }](https://huggingface.co/docs/text-generation-inference/en/installation_amd){:target="_blank"}.
     
-    <div editor-title="examples/deployment/tgi/amd/service.dstack.yml"> 
+    <div editor-title="examples/inference/tgi/amd/service.dstack.yml"> 
     
     ```yaml
     type: service
@@ -106,7 +106,7 @@ cloud resources and run the configuration.
     If you specify `model` when running a service, `dstack` will automatically register the model on
     an OpenAI-compatible endpoint and allow you to use it for chat via the control plane UI.
     
-    <img src="https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-control-plane-model-llama31.png?raw=true" width="750px" />
+    <img src="https://dstack.ai/static-assets/static-assets/images/dstack-control-plane-model-llama31.png" width="750px" />
 
 ## What's next?
 

@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { isEqual } from 'lodash';
 import { UseLazyQuery /*, UseQueryStateOptions*/ } from '@reduxjs/toolkit/dist/query/react/buildHooks';
 import { QueryDefinition } from '@reduxjs/toolkit/query';
 
@@ -25,9 +26,10 @@ export const useInfiniteScroll = <DataItem, Args extends InfinityListArgs>({
     const [data, setData] = useState<ListResponse<DataItem>>([]);
     const scrollElement = useRef<HTMLElement>(document.documentElement);
     const isLoadingRef = useRef<boolean>(false);
-    const lastRequestParams = useRef<TRunsRequestParams | undefined>(undefined);
+    const lastRequestParams = useRef<Args | undefined>(undefined);
     const [disabledMore, setDisabledMore] = useState(false);
     const { limit, ...argsProp } = args;
+    const lastArgsProps = useRef<Partial<Args>>(null);
 
     const [getItems, { isLoading, isFetching }] = useLazyQuery({ ...args } as Args);
 
@@ -53,8 +55,11 @@ export const useInfiniteScroll = <DataItem, Args extends InfinityListArgs>({
     };
 
     useEffect(() => {
-        getEmptyList();
-    }, Object.values(argsProp));
+        if (!isEqual(argsProp, lastArgsProps.current)) {
+            getEmptyList();
+            lastArgsProps.current = argsProp as Args;
+        }
+    }, [argsProp, lastArgsProps]);
 
     const getMore = async () => {
         if (isLoadingRef.current || disabledMore) {

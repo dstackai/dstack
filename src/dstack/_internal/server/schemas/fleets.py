@@ -1,11 +1,11 @@
 from datetime import datetime
-from typing import List, Optional
+from typing import Annotated, List, Optional
 from uuid import UUID
 
 from pydantic import Field
 
 from dstack._internal.core.models.common import CoreModel
-from dstack._internal.core.models.fleets import FleetSpec
+from dstack._internal.core.models.fleets import ApplyFleetPlanInput, FleetSpec
 
 
 class ListFleetsRequest(CoreModel):
@@ -24,6 +24,16 @@ class GetFleetRequest(CoreModel):
 
 class GetFleetPlanRequest(CoreModel):
     spec: FleetSpec
+
+
+class ApplyFleetPlanRequest(CoreModel):
+    plan: ApplyFleetPlanInput
+    force: Annotated[
+        bool,
+        Field(
+            description="Use `force: true` to apply even if the expected resource does not match."
+        ),
+    ]
 
 
 class CreateFleetRequest(CoreModel):

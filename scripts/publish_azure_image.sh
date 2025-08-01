@@ -20,7 +20,7 @@ function get_image_definition {
 }
 
 # We create a separate image definition for each dstack version since
-# gallery-image-version can't be in one-to-one correspondance with dstack versions
+# gallery-image-version can't be in one-to-one correspondence with dstack versions
 # (it has to follow semver, e.g. no rc)
 function create_image_definition() {
     echo Creating image definition...
@@ -33,7 +33,8 @@ function create_image_definition() {
         --sku $image_definition \
         --os-type Linux \
         --os-state generalized \
-        --hyper-v-generation V2
+        --hyper-v-generation V2 \
+        --features DiskControllerTypes=SCSI,NVMe
 }
 
 function create_image_version() {

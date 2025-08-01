@@ -1,0 +1,26 @@
+type: task
+name: nccl-tests
+
+nodes: 2
+startup_order: workers-first
+stop_criteria: master-done
+
+env:
+  - NCCL_DEBUG=INFO
+commands:
+  - |
+    if [ $DSTACK_NODE_RANK -eq 0 ]; then
+      mpirun \
+        --allow-run-as-root \
+        --hostfile $DSTACK_MPI_HOSTFILE \
+        -n $DSTACK_GPUS_NUM \
+        -N $DSTACK_GPUS_PER_NODE \
+        --bind-to none \
+        /opt/nccl-tests/build/all_reduce_perf -b 8 -e 8G -f 2 -g 1
+    else
+      sleep infinity
+    fi
+
+resources:
+  gpu: nvidia:1..8
+  shm_size: 16GB

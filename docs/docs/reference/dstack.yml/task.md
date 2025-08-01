@@ -26,6 +26,14 @@ The `task` configuration type allows running [tasks](../../concepts/tasks.md).
       type:
         required: true
 
+### `schedule`
+
+#SCHEMA# dstack._internal.core.models.profiles.Schedule
+    overrides:
+      show_root_heading: false
+      type:
+        required: true
+
 ### `resources`
 
 #SCHEMA# dstack._internal.core.models.resources.ResourcesSpec
@@ -35,7 +43,15 @@ The `task` configuration type allows running [tasks](../../concepts/tasks.md).
         required: true
       item_id_prefix: resources-
 
-#### `resouces.gpu` { #resources-gpu data-toc-label="gpu" }
+#### `resources.cpu` { #resources-cpu data-toc-label="cpu" }
+
+#SCHEMA# dstack._internal.core.models.resources.CPUSpec
+    overrides:
+      show_root_heading: false
+      type:
+        required: true
+
+#### `resources.gpu` { #resources-gpu data-toc-label="gpu" }
 
 #SCHEMA# dstack._internal.core.models.resources.GPUSpec
     overrides:
@@ -43,7 +59,7 @@ The `task` configuration type allows running [tasks](../../concepts/tasks.md).
       type:
         required: true
 
-#### `resouces.disk` { #resources-disk data-toc-label="disk" }
+#### `resources.disk` { #resources-disk data-toc-label="disk" }
 
 #SCHEMA# dstack._internal.core.models.resources.DiskSpec
     overrides:
@@ -83,3 +99,20 @@ The `task` configuration type allows running [tasks](../../concepts/tasks.md).
 
     * `volume-name:/container/path` for network volumes
     * `/instance/path:/container/path` for instance volumes
+
+### `files[n]` { #_files data-toc-label="files" }
+
+#SCHEMA# dstack._internal.core.models.files.FilePathMapping
+    overrides:
+      show_root_heading: false
+      type:
+        required: true
+
+??? info "Short syntax"
+
+    The short syntax for files is a colon-separated string in the form of `local_path[:path]` where
+    `path` is optional and can be omitted if it's equal to `local_path`.
+
+    * `~/.bashrc`, same as `~/.bashrc:~/.bashrc`
+    * `/opt/myorg`, same as `/opt/myorg/` and `/opt/myorg:/opt/myorg`
+    * `libs/patched_libibverbs.so.1:/lib/x86_64-linux-gnu/libibverbs.so.1`

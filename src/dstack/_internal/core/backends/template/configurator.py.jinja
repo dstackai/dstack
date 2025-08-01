@@ -19,9 +19,6 @@ from dstack._internal.core.models.backends.base import (
     BackendType,
 )
 
-# TODO: Add all supported regions and default regions
-REGIONS = []
-
 
 class {{ backend_name }}Configurator(Configurator):
     TYPE = BackendType.{{ backend_name|upper }}
@@ -31,13 +28,11 @@ class {{ backend_name }}Configurator(Configurator):
         self, config: {{ backend_name }}BackendConfigWithCreds, default_creds_enabled: bool
     ):
         self._validate_creds(config.creds)
-        # TODO: Validate additional config parameters if any
+        # TODO: If possible, validate config.regions and any other config parameters
 
     def create_backend(
         self, project_name: str, config: {{ backend_name }}BackendConfigWithCreds
     ) -> BackendRecord:
-        if config.regions is None:
-            config.regions = REGIONS
         return BackendRecord(
             config={{ backend_name }}StoredConfig(
                 **{{ backend_name }}BackendConfig.__response__.parse_obj(config).dict()

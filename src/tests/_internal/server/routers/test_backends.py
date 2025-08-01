@@ -1,6 +1,8 @@
 import json
 import sys
+from collections.abc import Sequence
 from datetime import datetime, timezone
+from typing import Any, Optional
 from unittest.mock import Mock, patch
 
 import pytest
@@ -57,6 +59,18 @@ SAMPLE_OCI_SUBNETS = {
 }
 
 
+def _nebius_project(
+    id: str = "project-e00test",
+    name: str = "default-project-eu-north1",
+    region: str = "eu-north1",
+):
+    project = Mock()
+    project.metadata.id = id
+    project.metadata.name = name
+    project.status.region = region
+    return project
+
+
 class TestListBackendTypes:
     @pytest.mark.asyncio
     async def test_returns_backend_types(self, client: AsyncClient):
@@ -65,6 +79,7 @@ class TestListBackendTypes:
         assert response.json() == [
             "aws",
             "azure",
+            "cloudrift",
             "cudo",
             "datacrunch",
             "gcp",
@@ -195,29 +210,6 @@ class TestCreateBackend:
     @pytest.mark.skipif(sys.version_info < (3, 10), reason="Nebius requires Python 3.10")
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     class TestNebius:
-        async def test_creates(self, test_db, session: AsyncSession, client: AsyncClient):
-            user = await create_user(session=session, global_role=GlobalRole.USER)
-            project = await create_project(session=session, owner=user)
-            await add_project_member(
-                session=session, project=project, user=user, project_role=ProjectRole.ADMIN
-            )
-            body = {
-                "type": "nebius",
-                "creds": FAKE_NEBIUS_SERVICE_ACCOUNT_CREDS,
-            }
-            with patch(
-                "dstack._internal.core.backends.nebius.resources.get_region_to_project_id_map"
-            ) as get_region_to_project_id_map:
-                get_region_to_project_id_map.return_value = {"eu-north1": "project-e00test"}
-                response = await client.post(
-                    f"/api/project/{project.name}/backends/create",
-                    headers=get_auth_headers(user.token),
-                    json=body,
-                )
-            assert response.status_code == 200, response.json()
-            res = await session.execute(select(BackendModel))
-            assert len(res.scalars().all()) == 1
-
         async def test_not_creates_with_invalid_creds(
             self, test_db, session: AsyncSession, client: AsyncClient
         ):
@@ -231,9 +223,9 @@ class TestCreateBackend:
                 "creds": FAKE_NEBIUS_SERVICE_ACCOUNT_CREDS,
             }
             with patch(
-                "dstack._internal.core.backends.nebius.resources.get_region_to_project_id_map"
-            ) as get_region_to_project_id_map:
-                get_region_to_project_id_map.side_effect = ValueError()
+                "dstack._internal.core.backends.nebius.resources.list_tenant_projects"
+            ) as projects_mock:
+                projects_mock.side_effect = ValueError()
                 response = await client.post(
                     f"/api/project/{project.name}/backends/create",
                     headers=get_auth_headers(user.token),
@@ -243,8 +235,107 @@ class TestCreateBackend:
             res = await session.execute(select(BackendModel))
             assert len(res.scalars().all()) == 0
 
-        async def test_creates_with_regions(
-            self, test_db, session: AsyncSession, client: AsyncClient
+        @pytest.mark.parametrize(
+            ("config_regions", "config_projects", "mocked_projects", "error"),
+            [
+                pytest.param(
+                    None,
+                    None,
+                    [_nebius_project()],
+                    None,
+                    id="default",
+                ),
+                pytest.param(
+                    ["eu-north1"],
+                    None,
+                    [
+                        _nebius_project(
+                            "project-e00test", "default-project-eu-north1", "eu-north1"
+                        ),
+                        _nebius_project("project-e01test", "default-project-eu-west1", "eu-west1"),
+                    ],
+                    None,
+                    id="with-regions",
+                ),
+                pytest.param(
+                    ["xx-xxxx1"],
+                    None,
+                    [_nebius_project()],
+                    "do not exist in this Nebius tenancy",
+                    id="error-invalid-regions",
+                ),
+                pytest.param(
+                    ["eu-north1"],
+                    None,
+                    [
+                        _nebius_project(
+                            "project-e00test0", "default-project-eu-north1", "eu-north1"
+                        ),
+                        _nebius_project("project-e00test1", "non-default-project", "eu-north1"),
+                    ],
+                    None,
+                    id="finds-default-project-among-many",
+                ),
+                pytest.param(
+                    ["eu-north1"],
+                    None,
+                    [
+                        _nebius_project("project-e00test0", "non-default-project-0", "eu-north1"),
+                        _nebius_project("project-e00test1", "non-default-project-1", "eu-north1"),
+                    ],
+                    "Could not find the default project in region eu-north1",
+                    id="error-no-default-project",
+                ),
+                pytest.param(
+                    None,
+                    ["project-e00test0"],
+                    [
+                        _nebius_project("project-e00test0", "non-default-project-0", "eu-north1"),
+                        _nebius_project("project-e00test1", "non-default-project-1", "eu-north1"),
+                    ],
+                    None,
+                    id="with-projects",
+                ),
+                pytest.param(
+                    None,
+                    ["project-e00xxxx"],
+                    [_nebius_project()],
+                    "not found in this Nebius tenancy",
+                    id="error-invalid-projects",
+                ),
+                pytest.param(
+                    None,
+                    ["project-e00test0", "project-e00test1"],
+                    [
+                        _nebius_project("project-e00test0", "non-default-project-0", "eu-north1"),
+                        _nebius_project("project-e00test1", "non-default-project-1", "eu-north1"),
+                    ],
+                    "both belong to the same region",
+                    id="error-multiple-projects-in-same-region",
+                ),
+                pytest.param(
+                    ["eu-north1"],
+                    ["project-e00test"],
+                    [
+                        _nebius_project(
+                            "project-e00test", "default-project-eu-north1", "eu-north1"
+                        ),
+                        _nebius_project("project-e01test", "default-project-eu-west1", "eu-west1"),
+                    ],
+                    None,
+                    id="with-regions-and-projects",
+                ),
+            ],
+        )
+        async def test_create(
+            self,
+            test_db,
+            session: AsyncSession,
+            client: AsyncClient,
+            config_regions: Optional[list[str]],
+            config_projects: Optional[list[str]],
+            mocked_projects: Sequence[Any],
+            error: Optional[str],
         ):
             user = await create_user(session=session, global_role=GlobalRole.USER)
             project = await create_project(session=session, owner=user)
@@ -254,49 +345,27 @@ class TestCreateBackend:
             body = {
                 "type": "nebius",
                 "creds": FAKE_NEBIUS_SERVICE_ACCOUNT_CREDS,
-                "regions": ["eu-north1"],
+                "regions": config_regions,
+                "projects": config_projects,
             }
             with patch(
-                "dstack._internal.core.backends.nebius.resources.get_region_to_project_id_map"
-            ) as get_region_to_project_id_map:
-                get_region_to_project_id_map.return_value = {
-                    "eu-north1": "project-e00test",
-                    "eu-west1": "project-e01test",
-                }
+                "dstack._internal.core.backends.nebius.resources.list_tenant_projects"
+            ) as projects_mock:
+                projects_mock.return_value = mocked_projects
                 response = await client.post(
                     f"/api/project/{project.name}/backends/create",
                     headers=get_auth_headers(user.token),
                     json=body,
                 )
-            assert response.status_code == 200, response.json()
-            res = await session.execute(select(BackendModel))
-            assert len(res.scalars().all()) == 1
-
-        async def test_not_creates_with_invalid_regions(
-            self, test_db, session: AsyncSession, client: AsyncClient
-        ):
-            user = await create_user(session=session, global_role=GlobalRole.USER)
-            project = await create_project(session=session, owner=user)
-            await add_project_member(
-                session=session, project=project, user=user, project_role=ProjectRole.ADMIN
-            )
-            body = {
-                "type": "nebius",
-                "creds": FAKE_NEBIUS_SERVICE_ACCOUNT_CREDS,
-                "regions": ["xx-xxxx1"],
-            }
-            with patch(
-                "dstack._internal.core.backends.nebius.resources.get_region_to_project_id_map"
-            ) as get_region_to_project_id_map:
-                get_region_to_project_id_map.return_value = {"eu-north1": "project-e00test"}
-                response = await client.post(
-                    f"/api/project/{project.name}/backends/create",
-                    headers=get_auth_headers(user.token),
-                    json=body,
-                )
-            assert response.status_code == 400, response.json()
-            res = await session.execute(select(BackendModel))
-            assert len(res.scalars().all()) == 0
+            if not error:
+                assert response.status_code == 200, response.json()
+                res = await session.execute(select(BackendModel))
+                assert len(res.scalars().all()) == 1
+            else:
+                assert response.status_code == 400, response.json()
+                assert error in response.json()["detail"][0]["msg"]
+                res = await session.execute(select(BackendModel))
+                assert len(res.scalars().all()) == 0
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)

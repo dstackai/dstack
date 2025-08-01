@@ -27,6 +27,7 @@ export const Preferences: React.FC = () => {
                     { id: 'error', label: t('projects.run.error') },
                     { id: 'cost', label: t('projects.run.cost') },
                     // hidden by default
+                    { id: 'priority', label: t('projects.run.priority') },
                     { id: 'finished_at', label: t('projects.run.finished_at') },
                     { id: 'project', label: t('projects.run.project') },
                     { id: 'hub_user_name', label: t('projects.run.hub_user_name') },

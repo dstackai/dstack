@@ -399,7 +399,7 @@ Here are the examples of LoRA fine-tuning of `Deepseek-V2-Lite` and GRPO fine-tu
     ```
     </div>
 
-Note, the `GRPO` fine-tuning of `DeepSeek-R1-Distill-Qwen-1.5B` consumes up to 135GB of vRAM.
+Note, the `GRPO` fine-tuning of `DeepSeek-R1-Distill-Qwen-1.5B` consumes up to 135GB of VRAM.
 
 ### Intel Gaudi
 
@@ -472,7 +472,7 @@ on NVIDIA GPU using HuggingFace's [TRL :material-arrow-top-right-thin:{ .externa
     type: task
     name: trl-train
 
-    python: "3.10"
+    python: 3.12
 
     env:
       - WANDB_API_KEY
@@ -514,7 +514,7 @@ on NVIDIA GPU using HuggingFace's [TRL :material-arrow-top-right-thin:{ .externa
     type: task
     name: trl-train-deepseek-v2
 
-    python: "3.10"
+    python: 3.12
     nvcc: true
     env:
       - WANDB_API_KEY
@@ -569,7 +569,7 @@ on NVIDIA GPU using HuggingFace's [TRL :material-arrow-top-right-thin:{ .externa
         --bnb_4bit_compute_dtype "bfloat16"
 
     resources:
-      # Consumes ~25GB of vRAM for QLoRA fine-tuning deepseek-ai/DeepSeek-V2-Lite
+      # Consumes ~25GB of VRAM for QLoRA fine-tuning deepseek-ai/DeepSeek-V2-Lite
       gpu: 48GB
     ```
     </div>

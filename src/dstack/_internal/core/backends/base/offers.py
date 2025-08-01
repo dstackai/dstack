@@ -2,6 +2,7 @@ from dataclasses import asdict
 from typing import Callable, List, Optional
 
 import gpuhunt
+from pydantic import parse_obj_as
 
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
@@ -11,13 +12,14 @@ from dstack._internal.core.models.instances import (
     InstanceType,
     Resources,
 )
-from dstack._internal.core.models.resources import DEFAULT_DISK, Memory, Range
+from dstack._internal.core.models.resources import DEFAULT_DISK, CPUSpec, Memory, Range
 from dstack._internal.core.models.runs import Requirements
 
 # Offers not supported by all dstack versions are hidden behind one or more flags.
 # This list enables the flags that are currently supported.
 SUPPORTED_GPUHUNT_FLAGS = [
     "oci-spot",
+    "lambda-arm",
 ]
 
 
@@ -71,13 +73,13 @@ def catalog_item_to_offer(
     if disk_size_mib is None:
         return None
     resources = Resources(
+        cpu_arch=item.cpu_arch,
         cpus=item.cpu,
         memory_mib=round(item.memory * 1024),
         gpus=gpus,
         spot=item.spot,
         disk=Disk(size_mib=disk_size_mib),
     )
-    resources.description = resources.pretty_format()
     return InstanceOffer(
         backend=backend,
         instance=InstanceType(
@@ -90,6 +92,9 @@ def catalog_item_to_offer(
 
 
 def offer_to_catalog_item(offer: InstanceOffer) -> gpuhunt.CatalogItem:
+    cpu_arch = offer.instance.resources.cpu_arch
+    if cpu_arch is None:
+        cpu_arch = gpuhunt.CPUArchitecture.X86
     gpu_count = len(offer.instance.resources.gpus)
     gpu_vendor = None
     gpu_name = None
@@ -104,6 +109,7 @@ def offer_to_catalog_item(offer: InstanceOffer) -> gpuhunt.CatalogItem:
         instance_name=offer.instance.name,
         location=offer.region,
         price=offer.price,
+        cpu_arch=cpu_arch,
         cpu=offer.instance.resources.cpus,
         memory=offer.instance.resources.memory_mib / 1024,
         gpu_count=gpu_count,
@@ -125,8 +131,11 @@ def requirements_to_query_filter(req: Optional[Requirements]) -> gpuhunt.QueryFi
 
     res = req.resources
     if res.cpu:
-        q.min_cpu = res.cpu.min
-        q.max_cpu = res.cpu.max
+        # TODO: Remove in 0.20. Use res.cpu directly
+        cpu = parse_obj_as(CPUSpec, res.cpu)
+        q.cpu_arch = cpu.arch
+        q.min_cpu = cpu.count.min
+        q.max_cpu = cpu.count.max
     if res.memory:
         q.min_memory = res.memory.min
         q.max_memory = res.memory.max

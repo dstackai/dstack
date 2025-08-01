@@ -14,10 +14,13 @@ from dstack._internal.server.schemas.repos import (
 )
 from dstack._internal.server.security.permissions import ProjectMember
 from dstack._internal.server.services import repos
+from dstack._internal.server.settings import SERVER_CODE_UPLOAD_LIMIT
 from dstack._internal.server.utils.routers import (
+    CustomORJSONResponse,
     get_base_api_additional_responses,
-    request_size_exceeded,
+    get_request_size,
 )
+from dstack._internal.utils.common import sizeof_fmt
 
 router = APIRouter(
     prefix="/api/project/{project_name}/repos",
@@ -26,21 +29,21 @@ router = APIRouter(
 )
 
 
-@router.post("/list")
+@router.post("/list", response_model=List[RepoHead])
 async def list_repos(
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
-) -> List[RepoHead]:
+):
     _, project = user_project
-    return await repos.list_repos(session=session, project=project)
+    return CustomORJSONResponse(await repos.list_repos(session=session, project=project))
 
 
-@router.post("/get")
+@router.post("/get", response_model=RepoHeadWithCreds)
 async def get_repo(
     body: GetRepoRequest,
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
-) -> RepoHeadWithCreds:
+):
     user, project = user_project
     repo = await repos.get_repo(
         session=session,
@@ -51,7 +54,7 @@ async def get_repo(
     )
     if repo is None:
         raise ResourceNotExistsError()
-    return repo
+    return CustomORJSONResponse(repo)
 
 
 @router.post("/init")
@@ -94,10 +97,17 @@ async def upload_code(
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
 ):
-    if request_size_exceeded(request, limit=2 * 2**20):
+    request_size = get_request_size(request)
+    if SERVER_CODE_UPLOAD_LIMIT > 0 and request_size > SERVER_CODE_UPLOAD_LIMIT:
+        diff_size_fmt = sizeof_fmt(request_size)
+        limit_fmt = sizeof_fmt(SERVER_CODE_UPLOAD_LIMIT)
+        if diff_size_fmt == limit_fmt:
+            diff_size_fmt = f"{request_size}B"
+            limit_fmt = f"{SERVER_CODE_UPLOAD_LIMIT}B"
         raise ServerClientError(
-            "Repo diff size exceeds the limit of 2MB. "
-            "Use .gitignore to exclude large files from the repo."
+            f"Repo diff size is {diff_size_fmt}, which exceeds the limit of {limit_fmt}."
+            " Use .gitignore to exclude large files from the repo."
+            " This limit can be modified by setting the DSTACK_SERVER_CODE_UPLOAD_LIMIT environment variable."
         )
     _, project = user_project
     await repos.upload_code(

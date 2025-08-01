@@ -17,7 +17,15 @@ from dstack._internal.cli.utils.common import (
 )
 from dstack._internal.cli.utils.fleet import get_fleets_table
 from dstack._internal.cli.utils.rich import MultiItemStatus
-from dstack._internal.core.errors import ConfigurationError, ResourceNotExistsError
+from dstack._internal.core.errors import (
+    CLIError,
+    ConfigurationError,
+    MethodNotAllowedError,
+    ResourceNotExistsError,
+    ServerClientError,
+    URLNotFoundError,
+)
+from dstack._internal.core.models.common import ApplyAction
 from dstack._internal.core.models.configurations import ApplyConfigurationType
 from dstack._internal.core.models.fleets import (
     Fleet,
@@ -28,9 +36,11 @@ from dstack._internal.core.models.fleets import (
 )
 from dstack._internal.core.models.instances import InstanceAvailability, InstanceStatus, SSHKey
 from dstack._internal.core.models.repos.base import Repo
+from dstack._internal.core.services.diff import diff_models
 from dstack._internal.utils.common import local_time
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.ssh import convert_ssh_key_to_pem, generate_public_key, pkey_from_str
+from dstack.api._public import Client
 from dstack.api.utils import load_profile
 
 logger = get_logger(__name__)
@@ -63,7 +73,14 @@ class FleetConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
                 spec=spec,
             )
         _print_plan_header(plan)
+        if plan.action is not None:
+            self._apply_plan(plan, command_args)
+        else:
+            # Old servers don't support spec update
+            self._apply_plan_on_old_server(plan, command_args)
 
+    def _apply_plan(self, plan: FleetPlan, command_args: argparse.Namespace):
+        delete_fleet_name: Optional[str] = None
         action_message = ""
         confirm_message = ""
         if plan.current_resource is None:
@@ -74,7 +91,108 @@ class FleetConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
             confirm_message += "Create the fleet?"
         else:
             action_message += f"Found fleet [code]{plan.spec.configuration.name}[/]."
-            if plan.current_resource.spec.configuration == plan.spec.configuration:
+            if plan.action == ApplyAction.CREATE:
+                delete_fleet_name = plan.current_resource.name
+                action_message += (
+                    " Configuration changes detected. Cannot update the fleet in-place"
+                )
+                confirm_message += "Re-create the fleet?"
+            elif plan.current_resource.spec == plan.effective_spec:
+                if command_args.yes and not command_args.force:
+                    # --force is required only with --yes,
+                    # otherwise we may ask for force apply interactively.
+                    console.print(
+                        "No configuration changes detected. Use --force to apply anyway."
+                    )
+                    return
+                delete_fleet_name = plan.current_resource.name
+                action_message += " No configuration changes detected."
+                confirm_message += "Re-create the fleet?"
+            else:
+                action_message += " Configuration changes detected."
+                confirm_message += "Update the fleet in-place?"
+
+        console.print(action_message)
+        if not command_args.yes and not confirm_ask(confirm_message):
+            console.print("\nExiting...")
+            return
+
+        if delete_fleet_name is not None:
+            with console.status("Deleting existing fleet..."):
+                self.api.client.fleets.delete(
+                    project_name=self.api.project, names=[delete_fleet_name]
+                )
+                # Fleet deletion is async. Wait for fleet to be deleted.
+                while True:
+                    try:
+                        self.api.client.fleets.get(
+                            project_name=self.api.project, name=delete_fleet_name
+                        )
+                    except ResourceNotExistsError:
+                        break
+                    else:
+                        time.sleep(1)
+
+        try:
+            with console.status("Applying plan..."):
+                fleet = self.api.client.fleets.apply_plan(project_name=self.api.project, plan=plan)
+        except ServerClientError as e:
+            raise CLIError(e.msg)
+        if command_args.detach:
+            console.print("Fleet configuration submitted. Exiting...")
+            return
+        try:
+            with MultiItemStatus(
+                f"Provisioning [code]{fleet.name}[/]...", console=console
+            ) as live:
+                while not _finished_provisioning(fleet):
+                    table = get_fleets_table([fleet])
+                    live.update(table)
+                    time.sleep(LIVE_TABLE_PROVISION_INTERVAL_SECS)
+                    fleet = self.api.client.fleets.get(self.api.project, fleet.name)
+        except KeyboardInterrupt:
+            if confirm_ask("Delete the fleet before exiting?"):
+                with console.status("Deleting fleet..."):
+                    self.api.client.fleets.delete(
+                        project_name=self.api.project, names=[fleet.name]
+                    )
+            else:
+                console.print("Exiting... Fleet provisioning will continue in the background.")
+            return
+        console.print(
+            get_fleets_table(
+                [fleet],
+                verbose=_failed_provisioning(fleet),
+                format_date=local_time,
+            )
+        )
+        if _failed_provisioning(fleet):
+            console.print("\n[error]Some instances failed. Check the table above for errors.[/]")
+            exit(1)
+
+    def _apply_plan_on_old_server(self, plan: FleetPlan, command_args: argparse.Namespace):
+        action_message = ""
+        confirm_message = ""
+        if plan.current_resource is None:
+            if plan.spec.configuration.name is not None:
+                action_message += (
+                    f"Fleet [code]{plan.spec.configuration.name}[/] does not exist yet."
+                )
+            confirm_message += "Create the fleet?"
+        else:
+            action_message += f"Found fleet [code]{plan.spec.configuration.name}[/]."
+            diff = diff_models(
+                old=plan.current_resource.spec.configuration,
+                new=plan.spec.configuration,
+                reset={
+                    "ssh_config": {
+                        "ssh_key": True,
+                        "proxy_jump": {"ssh_key"},
+                        "hosts": {"__all__": {"ssh_key": True, "proxy_jump": {"ssh_key"}}},
+                    }
+                },
+            )
+            if not diff:
                 if command_args.yes and not command_args.force:
                     # --force is required only with --yes,
                     # otherwise we may ask for force apply interactively.
@@ -109,11 +227,11 @@ class FleetConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
                     else:
                         time.sleep(1)
 
-        with console.status("Creating fleet..."):
-            fleet = self.api.client.fleets.create(
-                project_name=self.api.project,
-                spec=spec,
-            )
+        try:
+            with console.status("Applying plan..."):
+                fleet = _apply_plan(self.api, plan)
+        except ServerClientError as e:
+            raise CLIError(e.msg)
         if command_args.detach:
             console.print("Fleet configuration submitted. Exiting...")
             return
@@ -239,32 +357,34 @@ def _print_plan_header(plan: FleetPlan):
     def th(s: str) -> str:
         return f"[bold]{s}[/bold]"
 
+    spec = plan.get_effective_spec()
+
     configuration_table = Table(box=None, show_header=False)
     configuration_table.add_column(no_wrap=True)  # key
     configuration_table.add_column()  # value
 
     configuration_table.add_row(th("Project"), plan.project_name)
     configuration_table.add_row(th("User"), plan.user)
-    configuration_table.add_row(th("Configuration"), plan.spec.configuration_path or "?")
-    configuration_table.add_row(th("Type"), plan.spec.configuration.type)
+    configuration_table.add_row(th("Configuration"), spec.configuration_path or "?")
+    configuration_table.add_row(th("Type"), spec.configuration.type)
 
     fleet_type = "cloud"
-    nodes = plan.spec.configuration.nodes or "-"
-    placement = plan.spec.configuration.placement or InstanceGroupPlacement.ANY
-    reservation = plan.spec.configuration.reservation
+    nodes = spec.configuration.nodes or "-"
+    placement = spec.configuration.placement or InstanceGroupPlacement.ANY
+    reservation = spec.configuration.reservation
     backends = None
-    if plan.spec.configuration.backends is not None:
-        backends = ", ".join(b.value for b in plan.spec.configuration.backends)
+    if spec.configuration.backends is not None:
+        backends = ", ".join(b.value for b in spec.configuration.backends)
     regions = None
-    if plan.spec.configuration.regions is not None:
-        regions = ", ".join(plan.spec.configuration.regions)
+    if spec.configuration.regions is not None:
+        regions = ", ".join(spec.configuration.regions)
     resources = None
-    if plan.spec.configuration.resources is not None:
-        resources = plan.spec.configuration.resources.pretty_format()
-    spot_policy = plan.spec.merged_profile.spot_policy
-    if plan.spec.configuration.ssh_config is not None:
+    if spec.configuration.resources is not None:
+        resources = spec.configuration.resources.pretty_format()
+    spot_policy = spec.merged_profile.spot_policy
+    if spec.configuration.ssh_config is not None:
         fleet_type = "ssh"
-        nodes = len(plan.spec.configuration.ssh_config.hosts)
+        nodes = len(spec.configuration.ssh_config.hosts)
         resources = None
         spot_policy = None
 
@@ -312,7 +432,7 @@ def _print_plan_header(plan: FleetPlan):
             offer.instance.name,
             resources.pretty_format(),
             "yes" if resources.spot else "no",
-            f"${offer.price:g}",
+            f"${offer.price:3f}".rstrip("0").rstrip("."),
             availability,
             style=None if index == 1 else "secondary",
         )
@@ -350,3 +470,17 @@ def _failed_provisioning(fleet: Fleet) -> bool:
         if instance.status == InstanceStatus.TERMINATED:
             return True
     return False
+
+
+def _apply_plan(api: Client, plan: FleetPlan) -> Fleet:
+    try:
+        return api.client.fleets.apply_plan(
+            project_name=api.project,
+            plan=plan,
+        )
+    except (URLNotFoundError, MethodNotAllowedError):
+        # TODO: Remove in 0.20
+        return api.client.fleets.create(
+            project_name=api.project,
+            spec=plan.spec,
+        )

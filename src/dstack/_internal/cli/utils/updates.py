@@ -57,10 +57,22 @@ def _is_last_check_time_outdated() -> bool:
     )
 
 
+def is_update_available(current_version: str, latest_version: str) -> bool:
+    """
+    Return True if latest_version is newer than current_version.
+    Pre-releases are only considered if the current version is also a pre-release.
+    """
+    _current_version = pkg_version.parse(str(current_version))
+    _latest_version = pkg_version.parse(str(latest_version))
+    return _current_version < _latest_version and (
+        not _latest_version.is_prerelease or _current_version.is_prerelease
+    )
+
+
 def _check_version():
     latest_version = get_latest_version()
     if latest_version is not None:
-        if pkg_version.parse(str(version.__version__)) < pkg_version.parse(latest_version):
+        if is_update_available(version.__version__, latest_version):
             console.print(f"A new version of dstack is available: [code]{latest_version}[/]\n")
 
 

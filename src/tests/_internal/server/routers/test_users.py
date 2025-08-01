@@ -22,19 +22,71 @@ class TestListUsers:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_returns_users(self, test_db, session: AsyncSession, client: AsyncClient):
-        user = await create_user(
+    async def test_admins_see_all_users(self, test_db, session: AsyncSession, client: AsyncClient):
+        admin = await create_user(
             session=session,
+            name="admin",
             created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+            global_role=GlobalRole.ADMIN,
         )
-        response = await client.post("/api/users/list", headers=get_auth_headers(user.token))
+        other_user = await create_user(
+            session=session,
+            name="other_user",
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+            global_role=GlobalRole.USER,
+        )
+        response = await client.post("/api/users/list", headers=get_auth_headers(admin.token))
         assert response.status_code in [200]
         assert response.json() == [
             {
-                "id": str(user.id),
-                "username": user.name,
+                "id": str(admin.id),
+                "username": admin.name,
                 "created_at": "2023-01-02T03:04:00+00:00",
-                "global_role": user.global_role,
+                "global_role": admin.global_role,
+                "email": None,
+                "active": True,
+                "permissions": {
+                    "can_create_projects": True,
+                },
+            },
+            {
+                "id": str(other_user.id),
+                "username": other_user.name,
+                "created_at": "2023-01-02T03:04:00+00:00",
+                "global_role": other_user.global_role,
+                "email": None,
+                "active": True,
+                "permissions": {
+                    "can_create_projects": True,
+                },
+            },
+        ]
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_non_admins_see_only_themselves(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        await create_user(
+            session=session,
+            name="admin",
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+            global_role=GlobalRole.ADMIN,
+        )
+        other_user = await create_user(
+            session=session,
+            name="other_user",
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+            global_role=GlobalRole.USER,
+        )
+        response = await client.post("/api/users/list", headers=get_auth_headers(other_user.token))
+        assert response.status_code in [200]
+        assert response.json() == [
+            {
+                "id": str(other_user.id),
+                "username": other_user.name,
+                "created_at": "2023-01-02T03:04:00+00:00",
+                "global_role": other_user.global_role,
                 "email": None,
                 "active": True,
                 "permissions": {

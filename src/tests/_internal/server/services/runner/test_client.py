@@ -331,6 +331,7 @@ class TestShimClientV2(BaseShimClientTest):
             volumes=[volume],
             volume_mounts=[VolumeMountPoint(name="vol", path="/vol")],
             instance_mounts=[InstanceMountPoint(instance_path="/mnt/nfs/home", path="/home")],
+            gpu_devices=[],
             host_ssh_user="dstack",
             host_ssh_keys=["host_key"],
             container_ssh_keys=["project_key", "user_key"],
@@ -365,6 +366,7 @@ class TestShimClientV2(BaseShimClientTest):
             "instance_mounts": [
                 {"instance_path": "/mnt/nfs/home", "path": "/home", "optional": False}
             ],
+            "gpu_devices": [],
             "host_ssh_user": "dstack",
             "host_ssh_keys": ["host_key"],
             "container_ssh_keys": ["project_key", "user_key"],

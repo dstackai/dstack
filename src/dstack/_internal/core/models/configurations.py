@@ -1,14 +1,17 @@
 import re
 from collections import Counter
 from enum import Enum
+from pathlib import PurePosixPath
 from typing import Any, Dict, List, Optional, Union
 
+import orjson
 from pydantic import Field, ValidationError, conint, constr, root_validator, validator
 from typing_extensions import Annotated, Literal
 
 from dstack._internal.core.errors import ConfigurationError
 from dstack._internal.core.models.common import CoreModel, Duration, RegistryAuth
 from dstack._internal.core.models.envs import Env
+from dstack._internal.core.models.files import FilePathMapping
 from dstack._internal.core.models.fleets import FleetConfiguration
 from dstack._internal.core.models.gateways import GatewayConfiguration
 from dstack._internal.core.models.profiles import ProfileParams, parse_off_duration
@@ -16,12 +19,19 @@ from dstack._internal.core.models.resources import Range, ResourcesSpec
 from dstack._internal.core.models.services import AnyModel, OpenAIChatModel
 from dstack._internal.core.models.unix import UnixUser
 from dstack._internal.core.models.volumes import MountPoint, VolumeConfiguration, parse_mount_point
+from dstack._internal.utils.json_utils import (
+    pydantic_orjson_dumps_with_indent,
+)
 
 CommandsList = List[str]
 ValidPort = conint(gt=0, le=65536)
 MAX_INT64 = 2**63 - 1
 SERVICE_HTTPS_DEFAULT = True
 STRIP_PREFIX_DEFAULT = True
+RUN_PRIOTIRY_MIN = 0
+RUN_PRIOTIRY_MAX = 100
+RUN_PRIORITY_DEFAULT = 0
+DEFAULT_REPO_DIR = "/workflow"
 
 
 class RunConfigurationType(str, Enum):
@@ -76,7 +86,8 @@ class ScalingSpec(CoreModel):
         Field(
             description="The target value of the metric. "
             "The number of replicas is calculated based on this number and automatically adjusts "
-            "(scales up or down) as this metric changes"
+            "(scales up or down) as this metric changes",
+            gt=0,
         ),
     ]
     scale_up_delay: Annotated[
@@ -176,7 +187,7 @@ class BaseRunConfiguration(CoreModel):
         Field(
             description=(
                 "The path to the working directory inside the container."
-                " It's specified relative to the repository directory (`/workflow`) and should be inside it."
+                f" It's specified relative to the repository directory (`{DEFAULT_REPO_DIR}`) and should be inside it."
                 ' Defaults to `"."` '
             )
         ),
@@ -188,12 +199,14 @@ class BaseRunConfiguration(CoreModel):
     ] = None
     python: Annotated[
         Optional[PythonVersion],
-        Field(description="The major version of Python. Mutually exclusive with `image`"),
+        Field(
+            description="The major version of Python. Mutually exclusive with `image` and `docker`"
+        ),
     ] = None
     nvcc: Annotated[
         Optional[bool],
         Field(
-            description="Use image with NVIDIA CUDA Compiler (NVCC) included. Mutually exclusive with `image`"
+            description="Use image with NVIDIA CUDA Compiler (NVCC) included. Mutually exclusive with `image` and `docker`"
         ),
     ] = None
     single_branch: Annotated[
@@ -210,14 +223,46 @@ class BaseRunConfiguration(CoreModel):
         Env,
         Field(description="The mapping or the list of environment variables"),
     ] = Env()
-    # deprecated since 0.18.31; task, service -- no effect; dev-environment -- executed right before `init`
-    setup: CommandsList = []
+    shell: Annotated[
+        Optional[str],
+        Field(
+            description=(
+                "The shell used to run commands."
+                " Allowed values are `sh`, `bash`, or an absolute path, e.g., `/usr/bin/zsh`."
+                " Defaults to `/bin/sh` if the `image` is specified, `/bin/bash` otherwise"
+            )
+        ),
+    ] = None
     resources: Annotated[
         ResourcesSpec, Field(description="The resources requirements to run the configuration")
     ] = ResourcesSpec()
+    priority: Annotated[
+        Optional[int],
+        Field(
+            ge=RUN_PRIOTIRY_MIN,
+            le=RUN_PRIOTIRY_MAX,
+            description=(
+                f"The priority of the run, an integer between `{RUN_PRIOTIRY_MIN}` and `{RUN_PRIOTIRY_MAX}`."
+                " `dstack` tries to provision runs with higher priority first."
+                f" Defaults to `{RUN_PRIORITY_DEFAULT}`"
+            ),
+        ),
+    ] = None
     volumes: Annotated[
         List[Union[MountPoint, str]], Field(description="The volumes mount points")
     ] = []
+    docker: Annotated[
+        Optional[bool],
+        Field(
+            description="Use Docker inside the container. Mutually exclusive with `image`, `python`, and `nvcc`. Overrides `privileged`"
+        ),
+    ] = None
+    files: Annotated[
+        list[Union[FilePathMapping, str]],
+        Field(description="The local to container file path mappings"),
+    ] = []
+    # deprecated since 0.18.31; task, service -- no effect; dev-environment -- executed right before `init`
+    setup: CommandsList = []
 
     @validator("python", pre=True, always=True)
     def convert_python(cls, v, values) -> Optional[PythonVersion]:
@@ -231,10 +276,28 @@ class BaseRunConfiguration(CoreModel):
             return PythonVersion(v)
         return v
 
+    @validator("docker", pre=True, always=True)
+    def _docker(cls, v, values) -> Optional[bool]:
+        if v is True and values.get("image"):
+            raise KeyError("`image` and `docker` are mutually exclusive fields")
+        if v is True and values.get("python"):
+            raise KeyError("`python` and `docker` are mutually exclusive fields")
+        if v is True and values.get("nvcc"):
+            raise KeyError("`nvcc` and `docker` are mutually exclusive fields")
+        # Ideally, we'd like to also prohibit privileged=False when docker=True,
+        #   but it's not possible to do so without breaking backwards compatibility.
+        return v
+
     @validator("volumes", each_item=True)
     def convert_volumes(cls, v) -> MountPoint:
         if isinstance(v, str):
             return parse_mount_point(v)
+        return v
+
+    @validator("files", each_item=True)
+    def convert_files(cls, v) -> FilePathMapping:
+        if isinstance(v, str):
+            return FilePathMapping.parse(v)
         return v
 
     @validator("user")
@@ -243,6 +306,17 @@ class BaseRunConfiguration(CoreModel):
             return None
         UnixUser.parse(v)
         return v
+
+    @validator("shell")
+    def validate_shell(cls, v) -> Optional[str]:
+        if v is None:
+            return None
+        if v in ["sh", "bash"]:
+            return v
+        path = PurePosixPath(v)
+        if path.is_absolute():
+            return v
+        raise ValueError("The value must be `sh`, `bash`, or an absolute path")
 
 
 class BaseRunConfigurationWithPorts(BaseRunConfiguration):
@@ -261,7 +335,7 @@ class BaseRunConfigurationWithPorts(BaseRunConfiguration):
 
 
 class BaseRunConfigurationWithCommands(BaseRunConfiguration):
-    commands: Annotated[CommandsList, Field(description="The bash commands to run")] = []
+    commands: Annotated[CommandsList, Field(description="The shell commands to run")] = []
 
     @root_validator
     def check_image_or_commands_present(cls, values):
@@ -276,7 +350,7 @@ class DevEnvironmentConfigurationParams(CoreModel):
         Field(description="The IDE to run. Supported values include `vscode` and `cursor`"),
     ]
     version: Annotated[Optional[str], Field(description="The version of the IDE")] = None
-    init: Annotated[CommandsList, Field(description="The bash commands to run on startup")] = []
+    init: Annotated[CommandsList, Field(description="The shell commands to run on startup")] = []
     inactivity_duration: Annotated[
         Optional[Union[Literal["off"], int, bool, str]],
         Field(
@@ -324,8 +398,9 @@ class TaskConfiguration(
 
 class ServiceConfigurationParams(CoreModel):
     port: Annotated[
+        # NOTE: it's a PortMapping for historical reasons. Only `port.container_port` is used.
         Union[ValidPort, constr(regex=r"^[0-9]+:[0-9]+$"), PortMapping],
-        Field(description="The port, that application listens on or the mapping"),
+        Field(description="The port the application listens on"),
     ]
     gateway: Annotated[
         Optional[Union[bool, str]],
@@ -401,7 +476,7 @@ class ServiceConfigurationParams(CoreModel):
             raise ValueError("The minimum number of replicas must be greater than or equal to 0")
         if v.max < v.min:
             raise ValueError(
-                "The maximum number of replicas must be greater than or equal to the minium number of replicas"
+                "The maximum number of replicas must be greater than or equal to the minimum number of replicas"
             )
         return v
 
@@ -503,6 +578,9 @@ class DstackConfiguration(CoreModel):
     ]
 
     class Config:
+        json_loads = orjson.loads
+        json_dumps = pydantic_orjson_dumps_with_indent
+
         @staticmethod
         def schema_extra(schema: Dict[str, Any]):
             schema["$schema"] = "http://json-schema.org/draft-07/schema#"

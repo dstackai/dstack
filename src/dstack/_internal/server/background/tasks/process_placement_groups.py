@@ -7,19 +7,23 @@ from sqlalchemy.orm import joinedload
 
 from dstack._internal.core.backends.base.compute import ComputeWithPlacementGroupSupport
 from dstack._internal.core.errors import PlacementGroupInUseError
-from dstack._internal.server.db import get_session_ctx
+from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import PlacementGroupModel, ProjectModel
 from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.placement import placement_group_model_to_placement_group
+from dstack._internal.server.utils import sentry_utils
 from dstack._internal.utils.common import get_current_datetime, run_async
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
 
+@sentry_utils.instrument_background_task
 async def process_placement_groups():
-    lock, lockset = get_locker().get_lockset(PlacementGroupModel.__tablename__)
+    lock, lockset = get_locker(get_db().dialect_name).get_lockset(
+        PlacementGroupModel.__tablename__
+    )
     async with get_session_ctx() as session:
         async with lock:
             res = await session.execute(
@@ -30,7 +34,7 @@ async def process_placement_groups():
                     PlacementGroupModel.id.not_in(lockset),
                 )
                 .order_by(PlacementGroupModel.id)  # take locks in order
-                .with_for_update(skip_locked=True)
+                .with_for_update(skip_locked=True, key_share=True)
             )
             placement_group_models = res.scalars().all()
             if len(placement_group_models) == 0:
@@ -66,7 +70,7 @@ async def _delete_placement_groups(
 
 
 async def _delete_placement_group(placement_group_model: PlacementGroupModel):
-    logger.info("Deleting placement group %s", placement_group_model.name)
+    logger.debug("Deleting placement group %s", placement_group_model.name)
     placement_group = placement_group_model_to_placement_group(placement_group_model)
     if placement_group.provisioning_data is None:
         logger.error(

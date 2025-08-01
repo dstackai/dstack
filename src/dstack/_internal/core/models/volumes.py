@@ -9,6 +9,7 @@ from typing_extensions import Annotated, Self
 
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import CoreModel
+from dstack._internal.core.models.profiles import parse_idle_duration
 from dstack._internal.core.models.resources import Memory
 from dstack._internal.utils.common import get_or_error
 from dstack._internal.utils.tags import tags_validator
@@ -44,6 +45,16 @@ class VolumeConfiguration(CoreModel):
         Optional[str],
         Field(description="The volume ID. Must be specified when registering external volumes"),
     ] = None
+    auto_cleanup_duration: Annotated[
+        Optional[Union[str, int]],
+        Field(
+            description=(
+                "Time to wait after volume is no longer used by any job before deleting it. "
+                "Defaults to keep the volume indefinitely. "
+                "Use the value 'off' or -1 to disable auto-cleanup."
+            )
+        ),
+    ] = None
     tags: Annotated[
         Optional[Dict[str, str]],
         Field(
@@ -56,6 +67,9 @@ class VolumeConfiguration(CoreModel):
     ] = None
 
     _validate_tags = validator("tags", pre=True, allow_reuse=True)(tags_validator)
+    _validate_auto_cleanup_duration = validator(
+        "auto_cleanup_duration", pre=True, allow_reuse=True
+    )(parse_idle_duration)
 
     @property
     def size_gb(self) -> int:
@@ -104,11 +118,14 @@ class Volume(CoreModel):
     configuration: VolumeConfiguration
     external: bool
     created_at: datetime
+    last_processed_at: datetime
     status: VolumeStatus
     status_message: Optional[str] = None
     deleted: bool
+    deleted_at: Optional[datetime] = None
     volume_id: Optional[str] = None  # id of the volume in the cloud
     provisioning_data: Optional[VolumeProvisioningData] = None
+    cost: float = 0
     attachments: Optional[List[VolumeAttachment]] = None
     # attachment_data is deprecated in favor of attachments.
     # It's only set for volumes that were attached before attachments.
@@ -156,7 +173,7 @@ class VolumeMountPoint(CoreModel):
             description=(
                 "The network volume name or the list of network volume names to mount."
                 " If a list is specified, one of the volumes in the list will be mounted."
-                " Specify volumes from different backends/regions to increase availability."
+                " Specify volumes from different backends/regions to increase availability"
             )
         ),
     ]

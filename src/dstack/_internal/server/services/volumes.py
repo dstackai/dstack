@@ -1,19 +1,18 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta
 from typing import List, Optional
 
 from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
-from dstack._internal.core.backends import BACKENDS_WITH_VOLUMES_SUPPORT
 from dstack._internal.core.backends.base.compute import ComputeWithVolumeSupport
+from dstack._internal.core.backends.features import BACKENDS_WITH_VOLUMES_SUPPORT
 from dstack._internal.core.errors import (
     BackendNotAvailable,
     ResourceExistsError,
     ServerClientError,
 )
-from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.core.models.volumes import (
     Volume,
     VolumeAttachment,
@@ -21,6 +20,7 @@ from dstack._internal.core.models.volumes import (
     VolumeConfiguration,
     VolumeInstance,
     VolumeProvisioningData,
+    VolumeSpec,
     VolumeStatus,
 )
 from dstack._internal.core.services import validate_dstack_resource_name
@@ -38,7 +38,8 @@ from dstack._internal.server.services.locking import (
     get_locker,
     string_to_lock_id,
 )
-from dstack._internal.server.services.projects import list_project_models, list_user_project_models
+from dstack._internal.server.services.plugins import apply_plugin_policies
+from dstack._internal.server.services.projects import list_user_project_models
 from dstack._internal.utils import common, random_names
 from dstack._internal.utils.logging import get_logger
 
@@ -55,10 +56,11 @@ async def list_volumes(
     limit: int,
     ascending: bool,
 ) -> List[Volume]:
-    if user.global_role == GlobalRole.ADMIN:
-        projects = await list_project_models(session=session)
-    else:
-        projects = await list_user_project_models(session=session, user=user)
+    projects = await list_user_project_models(
+        session=session,
+        user=user,
+        only_names=True,
+    )
     if project_name is not None:
         projects = [p for p in projects if p.name == project_name]
     volume_models = await list_projects_volume_models(
@@ -203,18 +205,25 @@ async def create_volume(
     user: UserModel,
     configuration: VolumeConfiguration,
 ) -> Volume:
+    spec = await apply_plugin_policies(
+        user=user.name,
+        project=project.name,
+        # Create pseudo spec until the volume API is updated to accept spec
+        spec=VolumeSpec(configuration=configuration),
+    )
+    configuration = spec.configuration
     _validate_volume_configuration(configuration)
 
     lock_namespace = f"volume_names_{project.name}"
     if get_db().dialect_name == "sqlite":
-        # Start new transaction to see commited changes after lock
+        # Start new transaction to see committed changes after lock
         await session.commit()
     elif get_db().dialect_name == "postgresql":
         await session.execute(
             select(func.pg_advisory_xact_lock(string_to_lock_id(lock_namespace)))
         )
 
-    lock, _ = get_locker().get_lockset(lock_namespace)
+    lock, _ = get_locker(get_db().dialect_name).get_lockset(lock_namespace)
     async with lock:
         if configuration.name is not None:
             volume_model = await get_project_volume_model_by_name(
@@ -253,7 +262,7 @@ async def delete_volumes(session: AsyncSession, project: ProjectModel, names: Li
     volumes_ids = sorted([v.id for v in volume_models])
     await session.commit()
     logger.info("Deleting volumes: %s", [v.name for v in volume_models])
-    async with get_locker().lock_ctx(VolumeModel.__tablename__, volumes_ids):
+    async with get_locker(get_db().dialect_name).lock_ctx(VolumeModel.__tablename__, volumes_ids):
         # Refetch after lock
         res = await session.execute(
             select(VolumeModel)
@@ -266,7 +275,7 @@ async def delete_volumes(session: AsyncSession, project: ProjectModel, names: Li
             .options(selectinload(VolumeModel.attachments))
             .execution_options(populate_existing=True)
             .order_by(VolumeModel.id)  # take locks in order
-            .with_for_update()
+            .with_for_update(key_share=True)
         )
         volume_models = res.scalars().unique().all()
         for volume_model in volume_models:
@@ -309,22 +318,29 @@ def volume_model_to_volume(volume_model: VolumeModel) -> Volume:
                 attachment_data=get_attachment_data(volume_attachment_model),
             )
         )
-    return Volume(
+    deleted_at = None
+    if volume_model.deleted_at is not None:
+        deleted_at = volume_model.deleted_at
+    volume = Volume(
         name=volume_model.name,
         project_name=volume_model.project.name,
         user=volume_model.user.name,
         configuration=configuration,
         external=configuration.volume_id is not None,
-        created_at=volume_model.created_at.replace(tzinfo=timezone.utc),
+        created_at=volume_model.created_at,
+        last_processed_at=volume_model.last_processed_at,
         status=volume_model.status,
         status_message=volume_model.status_message,
         deleted=volume_model.deleted,
+        deleted_at=deleted_at,
         volume_id=vpd.volume_id if vpd is not None else None,
         provisioning_data=vpd,
         attachments=attachments,
         attachment_data=vad,
         id=volume_model.id,
     )
+    volume.cost = _get_volume_cost(volume)
+    return volume
 
 
 def get_volume_configuration(volume_model: VolumeModel) -> VolumeConfiguration:
@@ -385,6 +401,19 @@ def _validate_volume_configuration(configuration: VolumeConfiguration):
     if configuration.name is not None:
         validate_dstack_resource_name(configuration.name)
 
+    if configuration.volume_id is not None and configuration.auto_cleanup_duration is not None:
+        if (
+            isinstance(configuration.auto_cleanup_duration, int)
+            and configuration.auto_cleanup_duration > 0
+        ) or (
+            isinstance(configuration.auto_cleanup_duration, str)
+            and configuration.auto_cleanup_duration not in ("off", "-1")
+        ):
+            raise ServerClientError(
+                "External volumes (with volume_id) do not support auto_cleanup_duration. "
+                "Auto-cleanup only works for volumes created and managed by dstack."
+            )
+
 
 async def _delete_volume(session: AsyncSession, project: ProjectModel, volume_model: VolumeModel):
     volume = volume_model_to_volume(volume_model)
@@ -416,4 +445,24 @@ async def _delete_volume(session: AsyncSession, project: ProjectModel, volume_mo
     await common.run_async(
         compute.delete_volume,
         volume=volume,
+    )
+
+
+# Clouds charge volumes assuming 30-day months, e.g. https://aws.amazon.com/ebs/pricing/
+_VOLUME_PRICING_PERIOD = timedelta(days=30)
+
+
+def _get_volume_cost(volume: Volume) -> float:
+    if volume.provisioning_data is None or volume.provisioning_data.price is None:
+        return 0.0
+    finished_at = common.get_current_datetime()
+    if volume.deleted_at:
+        finished_at = volume.deleted_at
+    elif not volume.status.is_active():
+        finished_at = volume.last_processed_at
+    volume_age = finished_at - volume.created_at
+    return (
+        volume_age.total_seconds()
+        * volume.provisioning_data.price
+        / _VOLUME_PRICING_PERIOD.total_seconds()
     )

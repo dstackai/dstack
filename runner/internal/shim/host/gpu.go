@@ -7,28 +7,22 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 
 	execute "github.com/alexellis/go-execute/v2"
+	"github.com/dstackai/dstack/runner/internal/common"
 	"github.com/dstackai/dstack/runner/internal/log"
 )
 
-const amdSmiImage = "un1def/amd-smi:6.2.2-0"
-
-type GpuVendor string
-
 const (
-	GpuVendorNone   GpuVendor = "none"
-	GpuVendorNvidia GpuVendor = "nvidia"
-	GpuVendorAmd    GpuVendor = "amd"
-	GpuVendorIntel  GpuVendor = "intel"
+	amdSmiImage = "dstackai/amd-smi:latest"
+	ttSmiImage  = "dstackai/tt-smi:latest"
 )
 
 type GpuInfo struct {
-	Vendor GpuVendor
+	Vendor common.GpuVendor
 	Name   string
 	Vram   int // MiB
 	// NVIDIA: uuid field from nvidia-smi, "globally unique immutable alphanumeric identifier of the GPU",
@@ -47,28 +41,17 @@ type GpuInfo struct {
 	Index string
 }
 
-func GetGpuVendor() GpuVendor {
-	if _, err := os.Stat("/dev/kfd"); !errors.Is(err, os.ErrNotExist) {
-		return GpuVendorAmd
-	}
-	if _, err := os.Stat("/dev/nvidiactl"); !errors.Is(err, os.ErrNotExist) {
-		return GpuVendorNvidia
-	}
-	if _, err := os.Stat("/dev/accel"); !errors.Is(err, os.ErrNotExist) {
-		return GpuVendorIntel
-	}
-	return GpuVendorNone
-}
-
 func GetGpuInfo(ctx context.Context) []GpuInfo {
-	switch gpuVendor := GetGpuVendor(); gpuVendor {
-	case GpuVendorNvidia:
+	switch gpuVendor := common.GetGpuVendor(); gpuVendor {
+	case common.GpuVendorNvidia:
 		return getNvidiaGpuInfo(ctx)
-	case GpuVendorAmd:
+	case common.GpuVendorAmd:
 		return getAmdGpuInfo(ctx)
-	case GpuVendorIntel:
+	case common.GpuVendorIntel:
 		return getIntelGpuInfo(ctx)
-	case GpuVendorNone:
+	case common.GpuVendorTenstorrent:
+		return getTenstorrentGpuInfo(ctx)
+	case common.GpuVendorNone:
 		return []GpuInfo{}
 	}
 	return []GpuInfo{}
@@ -115,7 +98,7 @@ func getNvidiaGpuInfo(ctx context.Context) []GpuInfo {
 			vram = 0
 		}
 		gpus = append(gpus, GpuInfo{
-			Vendor: GpuVendorNvidia,
+			Vendor: common.GpuVendorNvidia,
 			Name:   strings.TrimSpace(record[0]),
 			Vram:   vram,
 			ID:     strings.TrimSpace(record[2]),
@@ -186,13 +169,123 @@ func getAmdGpuInfo(ctx context.Context) []GpuInfo {
 			continue
 		}
 		gpus = append(gpus, GpuInfo{
-			Vendor:         GpuVendorAmd,
+			Vendor:         common.GpuVendorAmd,
 			Name:           amdGpu.Asic.Name,
 			Vram:           amdGpu.Vram.Size.Value,
 			RenderNodePath: renderNodePath,
 		})
 	}
 	return gpus
+}
+
+type ttSmiSnapshot struct {
+	DeviceInfo []ttDeviceInfo `json:"device_info"`
+}
+
+type ttDeviceInfo struct {
+	BoardInfo ttBoardInfo `json:"board_info"`
+}
+
+type ttBoardInfo struct {
+	BoardType string `json:"board_type"`
+	BoardID   string `json:"board_id"`
+}
+
+func unmarshalTtSmiSnapshot(data []byte) (*ttSmiSnapshot, error) {
+	var snapshot ttSmiSnapshot
+	if err := json.Unmarshal(data, &snapshot); err != nil {
+		return nil, err
+	}
+	return &snapshot, nil
+}
+
+func getGpusFromTtSmiSnapshot(snapshot *ttSmiSnapshot) []GpuInfo {
+	// Group devices by board_id to aggregate memory for the same physical GPU
+	boardMap := make(map[string]*GpuInfo)
+	indexCounter := 0
+
+	for _, device := range snapshot.DeviceInfo {
+		boardID := device.BoardInfo.BoardID
+
+		// Extract board type without R/L suffix
+		boardType := strings.TrimSpace(device.BoardInfo.BoardType)
+		name := boardType
+
+		// Remove " R" or " L" suffix if present
+		if strings.HasSuffix(boardType, " R") {
+			name = boardType[:len(boardType)-2]
+		} else if strings.HasSuffix(boardType, " L") {
+			name = boardType[:len(boardType)-2]
+		}
+
+		// Determine base VRAM based on board type
+		baseVram := 0
+		if strings.HasPrefix(name, "n150") {
+			baseVram = 12 * 1024 // 12GB in MiB
+		} else if strings.HasPrefix(name, "n300") {
+			baseVram = 12 * 1024 // 12GB in MiB
+		}
+
+		if existingGpu, exists := boardMap[boardID]; exists {
+			// Aggregate VRAM for the same board_id
+			existingGpu.Vram += baseVram
+		} else {
+			// Create new GPU entry
+			boardMap[boardID] = &GpuInfo{
+				Vendor: common.GpuVendorTenstorrent,
+				Name:   name,
+				Vram:   baseVram,
+				ID:     boardID,
+				Index:  strconv.Itoa(indexCounter),
+			}
+			indexCounter++
+		}
+	}
+
+	// Convert map to slice
+	var gpus []GpuInfo
+	for _, gpu := range boardMap {
+		gpus = append(gpus, *gpu)
+	}
+
+	return gpus
+}
+
+func getTenstorrentGpuInfo(ctx context.Context) []GpuInfo {
+	gpus := []GpuInfo{}
+
+	cmd := execute.ExecTask{
+		Command: "docker",
+		Args: []string{
+			"run",
+			"--rm",
+			"--device", "/dev/tenstorrent",
+			ttSmiImage,
+			"-s",
+		},
+		StreamStdio: false,
+	}
+	res, err := cmd.Execute(ctx)
+	if err != nil {
+		log.Error(ctx, "failed to execute tt-smi", "err", err)
+		return gpus
+	}
+	if res.ExitCode != 0 {
+		log.Error(
+			ctx, "failed to execute tt-smi",
+			"exitcode", res.ExitCode, "stdout", res.Stdout, "stderr", res.Stderr,
+		)
+		return gpus
+	}
+
+	ttSmiSnapshot, err := unmarshalTtSmiSnapshot([]byte(res.Stdout))
+	if err != nil {
+		log.Error(ctx, "cannot read tt-smi json", "err", err)
+		log.Debug(ctx, "tt-smi output", "stdout", res.Stdout)
+		return gpus
+	}
+
+	return getGpusFromTtSmiSnapshot(ttSmiSnapshot)
 }
 
 func getAmdRenderNodePath(bdf string) (string, error) {
@@ -251,7 +344,7 @@ func getIntelGpuInfo(ctx context.Context) []GpuInfo {
 			vram = 0
 		}
 		gpus = append(gpus, GpuInfo{
-			Vendor: GpuVendorIntel,
+			Vendor: common.GpuVendorIntel,
 			Name:   strings.TrimSpace(record[0]),
 			Vram:   vram,
 			Index:  strings.TrimSpace(record[2]),

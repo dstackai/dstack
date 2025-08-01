@@ -1,6 +1,6 @@
 import uuid
 from collections.abc import Container, Iterable
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Dict, List, Literal, Optional, Union
 
 import gpuhunt
@@ -8,11 +8,11 @@ from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
-from dstack._internal.core.backends import BACKENDS_WITH_MULTINODE_SUPPORT
 from dstack._internal.core.backends.base.offers import (
     offer_to_catalog_item,
     requirements_to_query_filter,
 )
+from dstack._internal.core.backends.features import BACKENDS_WITH_MULTINODE_SUPPORT
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.instances import (
@@ -34,7 +34,6 @@ from dstack._internal.core.models.profiles import (
     TerminationPolicy,
 )
 from dstack._internal.core.models.runs import JobProvisioningData, Requirements
-from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.core.models.volumes import Volume
 from dstack._internal.core.services.profiles import get_termination
 from dstack._internal.server.models import (
@@ -44,7 +43,7 @@ from dstack._internal.server.models import (
     UserModel,
 )
 from dstack._internal.server.services.offers import generate_shared_offer
-from dstack._internal.server.services.projects import list_project_models, list_user_project_models
+from dstack._internal.server.services.projects import list_user_project_models
 from dstack._internal.utils import common as common_utils
 from dstack._internal.utils.logging import get_logger
 
@@ -62,7 +61,7 @@ def instance_model_to_instance(instance_model: InstanceModel) -> Instance:
         status=instance_model.status,
         unreachable=instance_model.unreachable,
         termination_reason=instance_model.termination_reason,
-        created=instance_model.created_at.replace(tzinfo=timezone.utc),
+        created=instance_model.created_at,
         total_blocks=instance_model.total_blocks,
         busy_blocks=instance_model.busy_blocks,
     )
@@ -104,6 +103,14 @@ def get_instance_profile(instance_model: InstanceModel) -> Profile:
 
 def get_instance_requirements(instance_model: InstanceModel) -> Requirements:
     return Requirements.__response__.parse_raw(instance_model.requirements)
+
+
+def get_instance_remote_connection_info(
+    instance_model: InstanceModel,
+) -> Optional[RemoteConnectionInfo]:
+    if instance_model.remote_connection_info is None:
+        return None
+    return RemoteConnectionInfo.__response__.parse_raw(instance_model.remote_connection_info)
 
 
 def get_instance_ssh_private_keys(instance_model: InstanceModel) -> tuple[str, Optional[str]]:
@@ -235,6 +242,7 @@ def get_shared_pool_instances_with_offers(
     *,
     idle_only: bool = False,
     fleet_model: Optional[FleetModel] = None,
+    multinode: bool = False,
     volumes: Optional[List[List[Volume]]] = None,
 ) -> list[tuple[InstanceModel, InstanceOfferWithAvailability]]:
     instances_with_offers: list[tuple[InstanceModel, InstanceOfferWithAvailability]] = []
@@ -243,19 +251,22 @@ def get_shared_pool_instances_with_offers(
         pool_instances=pool_instances,
         profile=profile,
         fleet_model=fleet_model,
-        multinode=False,
+        multinode=multinode,
         volumes=volumes,
         shared=True,
     )
     for instance in filtered_instances:
         if idle_only and instance.status not in [InstanceStatus.IDLE, InstanceStatus.BUSY]:
             continue
+        if multinode and instance.busy_blocks > 0:
+            continue
         offer = get_instance_offer(instance)
         if offer is None:
             continue
         total_blocks = common_utils.get_or_error(instance.total_blocks)
         idle_blocks = total_blocks - instance.busy_blocks
-        for blocks in range(1, total_blocks + 1):
+        min_blocks = total_blocks if multinode else 1
+        for blocks in range(min_blocks, total_blocks + 1):
             shared_offer = generate_shared_offer(offer, blocks, total_blocks)
             catalog_item = offer_to_catalog_item(shared_offer)
             if gpuhunt.matches(catalog_item, query_filter):
@@ -360,18 +371,15 @@ async def list_user_instances(
     limit: int,
     ascending: bool,
 ) -> List[Instance]:
-    if user.global_role == GlobalRole.ADMIN:
-        projects = await list_project_models(session=session)
-    else:
-        projects = await list_user_project_models(session=session, user=user)
-    if not projects:
-        return []
-
+    projects = await list_user_project_models(
+        session=session,
+        user=user,
+        only_names=True,
+    )
     if project_names is not None:
-        projects = [proj for proj in projects if proj.name in project_names]
+        projects = [p for p in projects if p.name in project_names]
         if len(projects) == 0:
             return []
-
     instance_models = await list_projects_instance_models(
         session=session,
         projects=projects,
@@ -408,7 +416,6 @@ async def create_instance_model(
     requirements: Requirements,
     instance_name: str,
     instance_num: int,
-    placement_group_name: Optional[str],
     reservation: Optional[str],
     blocks: Union[Literal["auto"], int],
     tags: Optional[Dict[str, str]],
@@ -427,7 +434,6 @@ async def create_instance_model(
         user=user.name,
         ssh_keys=[project_ssh_key],
         instance_id=str(instance_id),
-        placement_group_name=placement_group_name,
         reservation=reservation,
         tags=tags,
     )

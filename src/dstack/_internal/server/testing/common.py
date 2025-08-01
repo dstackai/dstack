@@ -1,8 +1,9 @@
 import json
 import uuid
+from collections.abc import Callable
 from contextlib import contextmanager
 from datetime import datetime, timezone
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Literal, Optional, Union
 from uuid import UUID
 
 import gpuhunt
@@ -25,7 +26,14 @@ from dstack._internal.core.models.configurations import (
     DevEnvironmentConfiguration,
 )
 from dstack._internal.core.models.envs import Env
-from dstack._internal.core.models.fleets import FleetConfiguration, FleetSpec, FleetStatus
+from dstack._internal.core.models.fleets import (
+    FleetConfiguration,
+    FleetSpec,
+    FleetStatus,
+    InstanceGroupPlacement,
+    SSHHostParams,
+    SSHParams,
+)
 from dstack._internal.core.models.gateways import GatewayComputeConfiguration, GatewayStatus
 from dstack._internal.core.models.instances import (
     Disk,
@@ -51,7 +59,7 @@ from dstack._internal.core.models.profiles import (
 )
 from dstack._internal.core.models.repos.base import RepoType
 from dstack._internal.core.models.repos.local import LocalRunRepoData
-from dstack._internal.core.models.resources import Memory, Range, ResourcesSpec
+from dstack._internal.core.models.resources import CPUSpec, Memory, Range, ResourcesSpec
 from dstack._internal.core.models.runs import (
     JobProvisioningData,
     JobRuntimeData,
@@ -60,6 +68,7 @@ from dstack._internal.core.models.runs import (
     Requirements,
     RunSpec,
     RunStatus,
+    RunTerminationReason,
 )
 from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.core.models.volumes import (
@@ -72,6 +81,7 @@ from dstack._internal.core.models.volumes import (
 from dstack._internal.server.models import (
     BackendModel,
     DecryptedString,
+    FileArchiveModel,
     FleetModel,
     GatewayComputeModel,
     GatewayModel,
@@ -84,6 +94,7 @@ from dstack._internal.server.models import (
     RepoCredsModel,
     RepoModel,
     RunModel,
+    SecretModel,
     UserModel,
     VolumeAttachmentModel,
     VolumeModel,
@@ -135,6 +146,7 @@ async def create_project(
     created_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
     ssh_private_key: str = "",
     ssh_public_key: str = "",
+    is_public: bool = False,
 ) -> ProjectModel:
     if owner is None:
         owner = await create_user(session=session, name="test_owner")
@@ -144,6 +156,7 @@ async def create_project(
         created_at=created_at,
         ssh_private_key=ssh_private_key,
         ssh_public_key=ssh_public_key,
+        is_public=is_public,
     )
     session.add(project)
     await session.commit()
@@ -225,21 +238,38 @@ async def create_repo_creds(
     return repo_creds
 
 
+async def create_file_archive(
+    session: AsyncSession,
+    user_id: UUID,
+    blob_hash: str = "blob_hash",
+    blob: bytes = b"blob_content",
+) -> FileArchiveModel:
+    archive = FileArchiveModel(
+        user_id=user_id,
+        blob_hash=blob_hash,
+        blob=blob,
+    )
+    session.add(archive)
+    await session.commit()
+    return archive
+
+
 def get_run_spec(
     run_name: str,
     repo_id: str,
-    profile: Optional[Profile] = None,
+    configuration_path: str = "dstack.yaml",
+    profile: Union[Profile, Callable[[], Profile], None] = lambda: Profile(name="default"),
     configuration: Optional[AnyRunConfiguration] = None,
 ) -> RunSpec:
-    if profile is None:
-        profile = Profile(name="default")
+    if callable(profile):
+        profile = profile()
     return RunSpec(
         run_name=run_name,
         repo_id=repo_id,
         repo_data=LocalRunRepoData(repo_dir="/"),
         repo_code_hash=None,
         working_dir=".",
-        configuration_path="dstack.yaml",
+        configuration_path=configuration_path,
         configuration=configuration or DevEnvironmentConfiguration(ide="vscode"),
         profile=profile,
         ssh_key_pub="user_ssh_key",
@@ -253,10 +283,15 @@ async def create_run(
     user: UserModel,
     run_name: str = "test-run",
     status: RunStatus = RunStatus.SUBMITTED,
+    termination_reason: Optional[RunTerminationReason] = None,
     submitted_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
     run_spec: Optional[RunSpec] = None,
     run_id: Optional[UUID] = None,
     deleted: bool = False,
+    priority: int = 0,
+    deployment_num: int = 0,
+    resubmission_attempt: int = 0,
+    next_triggered_at: Optional[datetime] = None,
 ) -> RunModel:
     if run_spec is None:
         run_spec = get_run_spec(
@@ -274,9 +309,15 @@ async def create_run(
         submitted_at=submitted_at,
         run_name=run_name,
         status=status,
+        termination_reason=termination_reason,
         run_spec=run_spec.json(),
         last_processed_at=submitted_at,
         jobs=[],
+        priority=priority,
+        deployment_num=deployment_num,
+        desired_replica_count=1,
+        resubmission_attempt=resubmission_attempt,
+        next_triggered_at=next_triggered_at,
     )
     session.add(run)
     await session.commit()
@@ -296,17 +337,25 @@ async def create_job(
     instance: Optional[InstanceModel] = None,
     job_num: int = 0,
     replica_num: int = 0,
+    deployment_num: Optional[int] = None,
     instance_assigned: bool = False,
+    disconnected_at: Optional[datetime] = None,
 ) -> JobModel:
+    if deployment_num is None:
+        deployment_num = run.deployment_num
     run_spec = RunSpec.parse_raw(run.run_spec)
-    job_spec = (await get_job_specs_from_run_spec(run_spec, replica_num=replica_num))[0]
+    job_spec = (
+        await get_job_specs_from_run_spec(run_spec=run_spec, secrets={}, replica_num=replica_num)
+    )[0]
+    job_spec.job_num = job_num
     job = JobModel(
         project_id=run.project_id,
         run_id=run.id,
         run_name=run.run_name,
         job_num=job_num,
-        job_name=run.run_name + f"-0-{replica_num}",
+        job_name=run.run_name + f"-{job_num}-{replica_num}",
         replica_num=replica_num,
+        deployment_num=deployment_num,
         submission_num=submission_num,
         submitted_at=submitted_at,
         last_processed_at=last_processed_at,
@@ -318,6 +367,7 @@ async def create_job(
         instance=instance,
         instance_assigned=instance_assigned,
         used_instance_id=instance.id if instance is not None else None,
+        disconnected_at=disconnected_at,
     )
     session.add(job)
     await session.commit()
@@ -337,6 +387,7 @@ def get_job_provisioning_data(
     hostname: str = "127.0.0.4",
     internal_ip: Optional[str] = "127.0.0.4",
     price: float = 10.5,
+    instance_type: Optional[InstanceType] = None,
 ) -> JobProvisioningData:
     gpus = [
         Gpu(
@@ -345,14 +396,16 @@ def get_job_provisioning_data(
             vendor=gpuhunt.AcceleratorVendor.NVIDIA,
         )
     ] * gpu_count
-    return JobProvisioningData(
-        backend=backend,
-        instance_type=InstanceType(
+    if instance_type is None:
+        instance_type = InstanceType(
             name="instance",
             resources=Resources(
                 cpus=cpu_count, memory_mib=int(memory_gib * 1024), spot=spot, gpus=gpus
             ),
-        ),
+        )
+    return JobProvisioningData(
+        backend=backend,
+        instance_type=instance_type,
         instance_id="instance_id",
         hostname=hostname,
         internal_ip=internal_ip,
@@ -461,6 +514,7 @@ async def create_fleet(
     status: FleetStatus = FleetStatus.ACTIVE,
     deleted: bool = False,
     name: Optional[str] = None,
+    last_processed_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
 ) -> FleetModel:
     if fleet_id is None:
         fleet_id = uuid.uuid4()
@@ -478,6 +532,7 @@ async def create_fleet(
         spec=spec.json(),
         instances=[],
         runs=[],
+        last_processed_at=last_processed_at,
     )
     session.add(fm)
     await session.commit()
@@ -497,10 +552,37 @@ def get_fleet_spec(conf: Optional[FleetConfiguration] = None) -> FleetSpec:
 def get_fleet_configuration(
     name: str = "test-fleet",
     nodes: Range[int] = Range(min=1, max=1),
+    placement: Optional[InstanceGroupPlacement] = None,
 ) -> FleetConfiguration:
     return FleetConfiguration(
         name=name,
         nodes=nodes,
+        placement=placement,
+    )
+
+
+def get_ssh_fleet_configuration(
+    name: str = "test-fleet",
+    user: str = "ubuntu",
+    ssh_key: Optional[SSHKey] = None,
+    hosts: Optional[list[Union[SSHHostParams, str]]] = None,
+    network: Optional[str] = None,
+    placement: Optional[InstanceGroupPlacement] = None,
+) -> FleetConfiguration:
+    if ssh_key is None:
+        ssh_key = SSHKey(public="", private=get_private_key_string())
+    if hosts is None:
+        hosts = ["10.0.0.100"]
+    ssh_config = SSHParams(
+        user=user,
+        ssh_key=ssh_key,
+        hosts=hosts,
+        network=network,
+    )
+    return FleetConfiguration(
+        name=name,
+        ssh_config=ssh_config,
+        placement=placement,
     )
 
 
@@ -524,17 +606,18 @@ async def create_instance(
     termination_idle_time: int = DEFAULT_FLEET_TERMINATION_IDLE_TIME,
     region: str = "eu-west",
     remote_connection_info: Optional[RemoteConnectionInfo] = None,
-    offer: Optional[InstanceOfferWithAvailability] = None,
-    job_provisioning_data: Optional[JobProvisioningData] = None,
+    offer: Optional[Union[InstanceOfferWithAvailability, Literal["auto"]]] = "auto",
+    job_provisioning_data: Optional[Union[JobProvisioningData, Literal["auto"]]] = "auto",
     total_blocks: Optional[int] = 1,
     busy_blocks: int = 0,
     name: str = "test_instance",
     volumes: Optional[List[VolumeModel]] = None,
     price: float = 1.0,
+    last_processed_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
 ) -> InstanceModel:
     if instance_id is None:
         instance_id = uuid.uuid4()
-    if job_provisioning_data is None:
+    if job_provisioning_data == "auto":
         job_provisioning_data = get_job_provisioning_data(
             dockerized=True,
             backend=backend,
@@ -543,13 +626,15 @@ async def create_instance(
             hostname="running_instance.ip",
             internal_ip=None,
         )
-    if offer is None:
-        offer = get_instance_offer_with_availability(backend=backend, region=region, spot=spot)
+    if offer == "auto":
+        offer = get_instance_offer_with_availability(
+            backend=backend, region=region, spot=spot, price=price
+        )
     if profile is None:
         profile = Profile(name="test_name")
 
     if requirements is None:
-        requirements = Requirements(resources=ResourcesSpec(cpu=1))
+        requirements = Requirements(resources=ResourcesSpec(cpu=CPUSpec.parse("1")))
 
     if instance_configuration is None:
         instance_configuration = get_instance_configuration()
@@ -567,12 +652,13 @@ async def create_instance(
         fleet=fleet,
         project=project,
         status=status,
+        last_processed_at=last_processed_at,
         unreachable=unreachable,
         created_at=created_at,
         started_at=created_at,
         finished_at=finished_at,
-        job_provisioning_data=job_provisioning_data.json(),
-        offer=offer.json(),
+        job_provisioning_data=job_provisioning_data.json() if job_provisioning_data else None,
+        offer=offer.json() if offer else None,
         price=price,
         region=region,
         backend=backend,
@@ -659,20 +745,7 @@ def get_remote_connection_info(
     env: Optional[Union[Env, dict]] = None,
 ):
     if ssh_keys is None:
-        ssh_keys = [
-            SSHKey(
-                public="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIO6mJxVbNtm0zXgMLvByrhXJCmJRveSrJxLB5/OzcyCk",
-                private="""
-                    -----BEGIN OPENSSH PRIVATE KEY-----
-                    b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
-                    QyNTUxOQAAACDupicVWzbZtM14DC7wcq4VyQpiUb3kqycSwefzs3MgpAAAAJCiWa5Volmu
-                    VQAAAAtzc2gtZWQyNTUxOQAAACDupicVWzbZtM14DC7wcq4VyQpiUb3kqycSwefzs3MgpA
-                    AAAEAncHi4AhS6XdMp5Gzd+IMse/4ekyQ54UngByf0Sp0uH+6mJxVbNtm0zXgMLvByrhXJ
-                    CmJRveSrJxLB5/OzcyCkAAAACWRlZkBkZWZwYwECAwQ=
-                    -----END OPENSSH PRIVATE KEY-----
-                """,
-            )
-        ]
+        ssh_keys = [get_ssh_key()]
     if env is None:
         env = Env()
     elif isinstance(env, dict):
@@ -686,12 +759,29 @@ def get_remote_connection_info(
     )
 
 
+def get_ssh_key() -> SSHKey:
+    return SSHKey(
+        public="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIO6mJxVbNtm0zXgMLvByrhXJCmJRveSrJxLB5/OzcyCk",
+        private="""
+                    -----BEGIN OPENSSH PRIVATE KEY-----
+                    b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
+                    QyNTUxOQAAACDupicVWzbZtM14DC7wcq4VyQpiUb3kqycSwefzs3MgpAAAAJCiWa5Volmu
+                    VQAAAAtzc2gtZWQyNTUxOQAAACDupicVWzbZtM14DC7wcq4VyQpiUb3kqycSwefzs3MgpA
+                    AAAEAncHi4AhS6XdMp5Gzd+IMse/4ekyQ54UngByf0Sp0uH+6mJxVbNtm0zXgMLvByrhXJ
+                    CmJRveSrJxLB5/OzcyCkAAAACWRlZkBkZWZwYwECAwQ=
+                    -----END OPENSSH PRIVATE KEY-----
+                """,
+    )
+
+
 async def create_volume(
     session: AsyncSession,
     project: ProjectModel,
     user: UserModel,
     status: VolumeStatus = VolumeStatus.SUBMITTED,
     created_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+    last_processed_at: Optional[datetime] = None,
+    last_job_processed_at: Optional[datetime] = None,
     configuration: Optional[VolumeConfiguration] = None,
     volume_provisioning_data: Optional[VolumeProvisioningData] = None,
     deleted_at: Optional[datetime] = None,
@@ -700,12 +790,16 @@ async def create_volume(
 ) -> VolumeModel:
     if configuration is None:
         configuration = get_volume_configuration(backend=backend, region=region)
+    if last_processed_at is None:
+        last_processed_at = created_at
     vm = VolumeModel(
         project=project,
         user_id=user.id,
         name=configuration.name,
         status=status,
         created_at=created_at,
+        last_processed_at=last_processed_at,
+        last_job_processed_at=last_job_processed_at,
         configuration=configuration.json(),
         volume_provisioning_data=volume_provisioning_data.json()
         if volume_provisioning_data
@@ -727,9 +821,11 @@ def get_volume(
     configuration: Optional[VolumeConfiguration] = None,
     external: bool = False,
     created_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+    last_processed_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
     status: VolumeStatus = VolumeStatus.ACTIVE,
     status_message: Optional[str] = None,
     deleted: bool = False,
+    deleted_at: Optional[datetime] = None,
     volume_id: Optional[str] = None,
     provisioning_data: Optional[VolumeProvisioningData] = None,
     attachments: Optional[List[VolumeAttachment]] = None,
@@ -748,9 +844,11 @@ def get_volume(
         configuration=configuration,
         external=external,
         created_at=created_at,
+        last_processed_at=last_processed_at,
         status=status,
         status_message=status_message,
         deleted=deleted,
+        deleted_at=deleted_at,
         volume_id=volume_id,
         provisioning_data=provisioning_data,
         attachments=attachments,
@@ -763,6 +861,7 @@ def get_volume_configuration(
     region: str = "eu-west-1",
     size: Optional[Memory] = Memory(100),
     volume_id: Optional[str] = None,
+    auto_cleanup_duration: Optional[Union[str, int]] = None,
 ) -> VolumeConfiguration:
     return VolumeConfiguration(
         name=name,
@@ -770,6 +869,7 @@ def get_volume_configuration(
         region=region,
         size=size,
         volume_id=volume_id,
+        auto_cleanup_duration=auto_cleanup_duration,
     )
 
 
@@ -777,6 +877,7 @@ def get_volume_provisioning_data(
     volume_id: str = "vol-1234",
     size_gb: int = 100,
     availability_zone: Optional[str] = None,
+    price: Optional[float] = 1.0,
     backend_data: Optional[str] = None,
     backend: Optional[BackendType] = None,
 ) -> VolumeProvisioningData:
@@ -785,6 +886,7 @@ def get_volume_provisioning_data(
         volume_id=volume_id,
         size_gb=size_gb,
         availability_zone=availability_zone,
+        price=price,
         backend_data=backend_data,
     )
 
@@ -884,6 +986,22 @@ async def create_job_prometheus_metrics(
     return metrics
 
 
+async def create_secret(
+    session: AsyncSession,
+    project: ProjectModel,
+    name: str,
+    value: str,
+):
+    secret_model = SecretModel(
+        project=project,
+        name=name,
+        value=DecryptedString(plaintext=value),
+    )
+    session.add(secret_model)
+    await session.commit()
+    return secret_model
+
+
 def get_private_key_string() -> str:
     return """
 -----BEGIN RSA PRIVATE KEY-----
@@ -969,7 +1087,7 @@ class ComputeMockSpec(
     ComputeWithVolumeSupport,
 ):
     """
-    Can be used to create Compute mocks that pass all isinstance asserts.
+    Can be used to create Compute mocks that pass all `isinstance()` asserts.
     """
 
     pass

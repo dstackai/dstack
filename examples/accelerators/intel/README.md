@@ -12,7 +12,7 @@ using [TGI on Gaudi :material-arrow-top-right-thin:{ .external }](https://github
 and [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/HabanaAI/vllm-fork){:target="_blank"}.
 
 === "TGI"
-    <div editor-title="examples/deployment/tgi/intel/.dstack.yml"> 
+    <div editor-title="examples/inference/tgi/intel/.dstack.yml"> 
     
     ```yaml
     type: service
@@ -60,7 +60,7 @@ and [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/Haban
 
 === "vLLM"
 
-    <div editor-title="examples/deployment/vllm/intel/.dstack.yml"> 
+    <div editor-title="examples/inference/vllm/intel/.dstack.yml"> 
     
     ```yaml
     type: service
@@ -102,7 +102,7 @@ using [Optimum for Intel Gaudi :material-arrow-top-right-thin:{ .external }](htt
 and [DeepSpeed :material-arrow-top-right-thin:{ .external }](https://docs.habana.ai/en/latest/PyTorch/DeepSpeed/DeepSpeed_User_Guide/DeepSpeed_User_Guide.html#deepspeed-user-guide){:target="_blank"} with 
 the [`lvwerra/stack-exchange-paired` :material-arrow-top-right-thin:{ .external }](https://huggingface.co/datasets/lvwerra/stack-exchange-paired){:target="_blank"} dataset. 
     
-<div editor-title="examples/fine-tuning/trl/intel/.dstack.yml">
+<div editor-title="examples/single-node-training/trl/intel/.dstack.yml">
     
 ```yaml
 type: task
@@ -162,7 +162,7 @@ Once the configuration is ready, run `dstack apply -f <configuration file>`.
 <div class="termy">
 
 ```shell
-$ dstack apply -f examples/deployment/vllm/.dstack.yml
+$ dstack apply -f examples/inference/vllm/.dstack.yml
 
  #  BACKEND  REGION    RESOURCES                    SPOT  PRICE     
  1  ssh      remote    152xCPU,1007GB,8xGaudi2:96GB yes   $0     idle 

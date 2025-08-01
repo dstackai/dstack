@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 from unittest.mock import MagicMock, Mock, patch
@@ -7,16 +7,21 @@ import pytest
 from freezegun import freeze_time
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from dstack._internal import settings
 from dstack._internal.core.errors import SSHError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import NetworkMode
 from dstack._internal.core.models.configurations import DevEnvironmentConfiguration
-from dstack._internal.core.models.instances import InstanceStatus
-from dstack._internal.core.models.profiles import UtilizationPolicy
+from dstack._internal.core.models.instances import InstanceStatus, InstanceType
+from dstack._internal.core.models.profiles import StartupOrder, UtilizationPolicy
+from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import (
+    JobProvisioningData,
     JobRuntimeData,
+    JobSpec,
     JobStatus,
     JobTerminationReason,
+    Requirements,
     RunStatus,
 )
 from dstack._internal.core.models.volumes import (
@@ -24,8 +29,11 @@ from dstack._internal.core.models.volumes import (
     VolumeMountPoint,
     VolumeStatus,
 )
-from dstack._internal.server import settings
-from dstack._internal.server.background.tasks.process_running_jobs import process_running_jobs
+from dstack._internal.server import settings as server_settings
+from dstack._internal.server.background.tasks.process_running_jobs import (
+    _patch_base_image_for_aws_efa,
+    process_running_jobs,
+)
 from dstack._internal.server.schemas.runner import (
     HealthcheckResponse,
     JobStateEvent,
@@ -216,12 +224,13 @@ class TestProcessRunningJobs:
             instance=instance,
             instance_assigned=True,
         )
+        last_processed_at = job.last_processed_at
         with (
             patch("dstack._internal.server.services.runner.ssh.SSHTunnel") as SSHTunnelMock,
             patch(
                 "dstack._internal.server.services.runner.client.RunnerClient"
             ) as RunnerClientMock,
-            patch.object(settings, "SERVER_DIR_PATH", tmp_path),
+            patch.object(server_settings, "SERVER_DIR_PATH", tmp_path),
         ):
             runner_client_mock = RunnerClientMock.return_value
             runner_client_mock.pull.return_value = PullResponse(
@@ -236,6 +245,8 @@ class TestProcessRunningJobs:
         assert job is not None
         assert job.status == JobStatus.RUNNING
         assert job.runner_timestamp == 1
+        job.last_processed_at = last_processed_at
+        await session.commit()
         with (
             patch("dstack._internal.server.services.runner.ssh.SSHTunnel") as SSHTunnelMock,
             patch(
@@ -244,7 +255,7 @@ class TestProcessRunningJobs:
         ):
             runner_client_mock = RunnerClientMock.return_value
             runner_client_mock.pull.return_value = PullResponse(
-                job_states=[JobStateEvent(timestamp=1, state=JobStatus.DONE)],
+                job_states=[JobStateEvent(timestamp=1, state=JobStatus.DONE, exit_status=0)],
                 job_logs=[],
                 runner_logs=[],
                 last_updated=2,
@@ -255,6 +266,7 @@ class TestProcessRunningJobs:
         assert job is not None
         assert job.status == JobStatus.TERMINATING
         assert job.termination_reason == JobTerminationReason.DONE_BY_RUNNER
+        assert job.exit_status == 0
         assert job.runner_timestamp == 2
 
     @pytest.mark.asyncio
@@ -329,7 +341,7 @@ class TestProcessRunningJobs:
             name="test-run-0-0",
             registry_username="",
             registry_password="",
-            image_name="dstackai/base:py3.13-0.7-cuda-12.1",
+            image_name="dstackai/base:0.10-base-ubuntu22.04",
             container_user="root",
             privileged=privileged,
             gpu=None,
@@ -340,6 +352,7 @@ class TestProcessRunningJobs:
             volumes=[volume_model_to_volume(volume)],
             volume_mounts=[VolumeMountPoint(name="my-vol", path="/volume")],
             instance_mounts=[InstanceMountPoint(instance_path="/root/.cache", path="/cache")],
+            gpu_devices=[],
             host_ssh_user="ubuntu",
             host_ssh_keys=["user_ssh_key"],
             container_ssh_keys=[project_ssh_pub_key, "user_ssh_key"],
@@ -488,6 +501,17 @@ class TestProcessRunningJobs:
             assert SSHTunnelMock.call_count == 3
         await session.refresh(job)
         assert job is not None
+        assert job.disconnected_at is not None
+        assert job.status == JobStatus.PULLING
+        with (
+            patch("dstack._internal.server.services.runner.ssh.SSHTunnel") as SSHTunnelMock,
+            patch("dstack._internal.server.services.runner.ssh.time.sleep"),
+            freeze_time(job.disconnected_at + timedelta(minutes=5)),
+        ):
+            SSHTunnelMock.side_effect = SSHError
+            await process_running_jobs()
+            assert SSHTunnelMock.call_count == 3
+        await session.refresh(job)
         assert job.status == JobStatus.TERMINATING
         assert job.termination_reason == JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY
         assert job.remove_at is None
@@ -755,6 +779,7 @@ class TestProcessRunningJobs:
             job_provisioning_data=get_job_provisioning_data(),
             instance=instance,
             instance_assigned=True,
+            last_processed_at=datetime(2023, 1, 1, 11, 30, tzinfo=timezone.utc),
         )
         for timestamp, gpu_util in samples:
             # two GPUs, the second one always 100% utilized
@@ -792,3 +817,202 @@ class TestProcessRunningJobs:
         else:
             assert job.termination_reason is None
             assert job.termination_reason_message is None
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_master_job_waits_for_workers(self, test_db, session: AsyncSession):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(
+            session=session,
+            project_id=project.id,
+        )
+        run_spec = get_run_spec(
+            run_name="test-run",
+            repo_id=repo.name,
+        )
+        run_spec.configuration.startup_order = StartupOrder.WORKERS_FIRST
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_spec=run_spec,
+        )
+        instance1 = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.BUSY,
+        )
+        instance2 = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.BUSY,
+        )
+        job_provisioning_data = get_job_provisioning_data(dockerized=False)
+        master_job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.PROVISIONING,
+            job_provisioning_data=job_provisioning_data,
+            instance_assigned=True,
+            instance=instance1,
+            job_num=0,
+            last_processed_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
+        worker_job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.PROVISIONING,
+            job_provisioning_data=job_provisioning_data,
+            instance_assigned=True,
+            instance=instance2,
+            job_num=1,
+            last_processed_at=datetime(2023, 1, 2, 3, 5, tzinfo=timezone.utc),
+        )
+        await process_running_jobs()
+        await session.refresh(master_job)
+        assert master_job.status == JobStatus.PROVISIONING
+        worker_job.status = JobStatus.RUNNING
+        # To guarantee master_job is processed next
+        master_job.last_processed_at = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
+        await session.commit()
+        with (
+            patch("dstack._internal.server.services.runner.ssh.SSHTunnel"),
+            patch(
+                "dstack._internal.server.services.runner.client.RunnerClient"
+            ) as RunnerClientMock,
+        ):
+            runner_client_mock = RunnerClientMock.return_value
+            runner_client_mock.healthcheck.return_value = HealthcheckResponse(
+                service="dstack-runner", version="0.0.1.dev2"
+            )
+            await process_running_jobs()
+        await session.refresh(master_job)
+        assert master_job.status == JobStatus.RUNNING
+
+
+class TestPatchBaseImageForAwsEfa:
+    @staticmethod
+    def _create_job_spec(image_name: str) -> "JobSpec":
+        return JobSpec(
+            job_num=0,
+            job_name="test-job",
+            commands=["echo hello"],
+            env={},
+            image_name=image_name,
+            requirements=Requirements(resources=ResourcesSpec()),
+        )
+
+    @staticmethod
+    def _create_job_provisioning_data_with_instance_type(
+        backend: BackendType, instance_type: str
+    ) -> JobProvisioningData:
+        job_provisioning_data = get_job_provisioning_data(backend=backend)
+        job_provisioning_data.instance_type = InstanceType(
+            name=instance_type,
+            resources=job_provisioning_data.instance_type.resources,
+        )
+        return job_provisioning_data
+
+    @staticmethod
+    def _call_patch_base_image_for_aws_efa(
+        image_name: str, backend: BackendType, instance_type: str
+    ) -> str:
+        job_spec = TestPatchBaseImageForAwsEfa._create_job_spec(image_name)
+        job_provisioning_data = (
+            TestPatchBaseImageForAwsEfa._create_job_provisioning_data_with_instance_type(
+                backend, instance_type
+            )
+        )
+        return _patch_base_image_for_aws_efa(job_spec, job_provisioning_data)
+
+    @pytest.mark.parametrize(
+        "suffix,instance_type",
+        [
+            ("-base", "p6-b200.48xlarge"),
+            ("-devel", "p5.48xlarge"),
+        ],
+    )
+    def test_patch_aws_efa_instance_with_suffix(self, suffix: str, instance_type: str):
+        image_name = f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}{suffix}-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"
+        result = self._call_patch_base_image_for_aws_efa(
+            image_name, BackendType.AWS, instance_type
+        )
+        expected = f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}-devel-efa-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"
+        assert result == expected
+
+    @pytest.mark.parametrize("suffix", ["-base", "-devel"])
+    @pytest.mark.parametrize(
+        "instance_type",
+        [
+            "p5.48xlarge",
+            "p5e.48xlarge",
+            "p4d.24xlarge",
+            "p4de.24xlarge",
+            "g6.8xlarge",
+            "g6e.8xlarge",
+        ],
+    )
+    def test_patch_all_efa_instance_types(self, instance_type: str, suffix: str):
+        image_name = f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}{suffix}-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"
+        result = self._call_patch_base_image_for_aws_efa(
+            image_name, BackendType.AWS, instance_type
+        )
+        expected = f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}-devel-efa-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"
+        assert result == expected
+
+    @pytest.mark.parametrize("suffix", ["-base", "-devel"])
+    @pytest.mark.parametrize(
+        "backend",
+        [BackendType.GCP, BackendType.AZURE, BackendType.LAMBDA, BackendType.LOCAL],
+    )
+    @pytest.mark.parametrize(
+        "instance_type",
+        [
+            "standard-4",
+            "p5.xlarge",
+            "p6.2xlarge",
+            "g6.xlarge",
+        ],  # Mix of generic and EFA-named types
+    )
+    def test_no_patch_non_aws_backends(
+        self, backend: BackendType, suffix: str, instance_type: str
+    ):
+        image_name = f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}{suffix}-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"
+        result = self._call_patch_base_image_for_aws_efa(image_name, backend, instance_type)
+        assert result == image_name
+
+    @pytest.mark.parametrize("suffix", ["-base", "-devel"])
+    @pytest.mark.parametrize(
+        "instance_type",
+        ["t3.micro", "m5.large", "c5.xlarge", "r5.2xlarge", "m6i.large", "g6.xlarge"],
+    )
+    def test_no_patch_non_efa_aws_instances(self, instance_type: str, suffix: str):
+        image_name = f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}{suffix}"
+        result = self._call_patch_base_image_for_aws_efa(
+            image_name, BackendType.AWS, instance_type
+        )
+        assert result == image_name
+
+    @pytest.mark.parametrize(
+        "instance_type",
+        ["p5.xlarge", "p6.2xlarge", "t3.micro", "m5.large"],  # Mix of EFA and non-EFA instances
+    )
+    @pytest.mark.parametrize(
+        "image_name",
+        [
+            "ubuntu:20.04",
+            "nvidia/cuda:11.8-runtime-ubuntu20.04",
+            "python:3.9-slim",
+            "custom/image:latest",
+            f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}-custom",
+            f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}-devel-efa",
+            f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}",
+        ],
+    )
+    def test_no_patch_other_images(self, instance_type: str, image_name: str):
+        result = self._call_patch_base_image_for_aws_efa(
+            image_name, BackendType.AWS, instance_type
+        )
+        assert result == image_name

@@ -5,12 +5,12 @@ import { Outlet, useNavigate, useParams } from 'react-router-dom';
 import { ConfirmationDialog, ContentLayout, SpaceBetween, Tabs } from 'components';
 import { DetailsHeader } from 'components';
 
-import { useNotifications, usePermissionGuard } from 'hooks';
+import { useNotifications /* usePermissionGuard*/ } from 'hooks';
 import { getServerError, riseRouterException } from 'libs';
 import { ROUTES } from 'routes';
 import { useDeleteUsersMutation, useGetUserQuery } from 'services/user';
 
-import { GlobalUserRole } from '../../../types';
+// import { GlobalUserRole } from '../../../types';
 import { UserDetailsTabTypeEnum } from './types';
 
 export { Settings as UserSettings } from './Settings';
@@ -24,9 +24,9 @@ export const UserDetails: React.FC = () => {
     const paramUserName = params.userName ?? '';
     const navigate = useNavigate();
     const { error: userError } = useGetUserQuery({ name: paramUserName });
-    const [deleteUsers, { isLoading: isDeleting }] = useDeleteUsersMutation();
+    const [deleteUsers /*, { isLoading: isDeleting }*/] = useDeleteUsersMutation();
     const [pushNotification] = useNotifications();
-    const [isAvailableDeleteUser] = usePermissionGuard({ allowedGlobalRoles: [GlobalUserRole.ADMIN] });
+    // const [isAvailableDeleteUser] = usePermissionGuard({ allowedGlobalRoles: [GlobalUserRole.ADMIN] });
 
     useEffect(() => {
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -63,16 +63,19 @@ export const UserDetails: React.FC = () => {
             label: t('users.settings'),
             id: UserDetailsTabTypeEnum.SETTINGS,
             href: ROUTES.USER.DETAILS.FORMAT(paramUserName),
-        },
-        process.env.UI_VERSION === 'sky' && {
-            label: t('billing.title'),
-            id: UserDetailsTabTypeEnum.BILLING,
-            href: ROUTES.USER.BILLING.LIST.FORMAT(paramUserName),
+            content: <Outlet />,
         },
         {
             label: t('users.projects'),
             id: UserDetailsTabTypeEnum.PROJECTS,
             href: ROUTES.USER.PROJECTS.FORMAT(paramUserName),
+            content: <Outlet />,
+        },
+        process.env.UI_VERSION === 'sky' && {
+            label: t('billing.title'),
+            id: UserDetailsTabTypeEnum.BILLING,
+            href: ROUTES.USER.BILLING.LIST.FORMAT(paramUserName),
+            content: <Outlet />,
         },
     ].filter(Boolean);
 
@@ -88,10 +91,7 @@ export const UserDetails: React.FC = () => {
                 }
             >
                 <SpaceBetween size="l">
-                    <div />
-                    <div />
-                    <Tabs withNavigation tabs={tabs} />
-                    <Outlet />
+                    <Tabs variant="container" withNavigation tabs={tabs} />
                 </SpaceBetween>
             </ContentLayout>
 

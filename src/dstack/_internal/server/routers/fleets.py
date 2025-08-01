@@ -9,6 +9,7 @@ from dstack._internal.core.models.fleets import Fleet, FleetPlan
 from dstack._internal.server.db import get_session
 from dstack._internal.server.models import ProjectModel, UserModel
 from dstack._internal.server.schemas.fleets import (
+    ApplyFleetPlanRequest,
     CreateFleetRequest,
     DeleteFleetInstancesRequest,
     DeleteFleetsRequest,
@@ -17,7 +18,10 @@ from dstack._internal.server.schemas.fleets import (
     ListFleetsRequest,
 )
 from dstack._internal.server.security.permissions import Authenticated, ProjectMember
-from dstack._internal.server.utils.routers import get_base_api_additional_responses
+from dstack._internal.server.utils.routers import (
+    CustomORJSONResponse,
+    get_base_api_additional_responses,
+)
 
 root_router = APIRouter(
     prefix="/api/fleets",
@@ -31,12 +35,12 @@ project_router = APIRouter(
 )
 
 
-@root_router.post("/list")
+@root_router.post("/list", response_model=List[Fleet])
 async def list_fleets(
     body: ListFleetsRequest,
     session: AsyncSession = Depends(get_session),
     user: UserModel = Depends(Authenticated()),
-) -> List[Fleet]:
+):
     """
     Returns all fleets and instances within them visible to user sorted by descending `created_at`.
     `project_name` and `only_active` can be specified as filters.
@@ -44,36 +48,40 @@ async def list_fleets(
     The results are paginated. To get the next page, pass `created_at` and `id` of
     the last fleet from the previous page as `prev_created_at` and `prev_id`.
     """
-    return await fleets_services.list_fleets(
-        session=session,
-        user=user,
-        project_name=body.project_name,
-        only_active=body.only_active,
-        prev_created_at=body.prev_created_at,
-        prev_id=body.prev_id,
-        limit=body.limit,
-        ascending=body.ascending,
+    return CustomORJSONResponse(
+        await fleets_services.list_fleets(
+            session=session,
+            user=user,
+            project_name=body.project_name,
+            only_active=body.only_active,
+            prev_created_at=body.prev_created_at,
+            prev_id=body.prev_id,
+            limit=body.limit,
+            ascending=body.ascending,
+        )
     )
 
 
-@project_router.post("/list")
+@project_router.post("/list", response_model=List[Fleet])
 async def list_project_fleets(
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
-) -> List[Fleet]:
+):
     """
     Returns all fleets in the project.
     """
     _, project = user_project
-    return await fleets_services.list_project_fleets(session=session, project=project)
+    return CustomORJSONResponse(
+        await fleets_services.list_project_fleets(session=session, project=project)
+    )
 
 
-@project_router.post("/get")
+@project_router.post("/get", response_model=Fleet)
 async def get_fleet(
     body: GetFleetRequest,
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
-) -> Fleet:
+):
     """
     Returns a fleet given `name` or `id`.
     If given `name`, does not return deleted fleets.
@@ -85,15 +93,15 @@ async def get_fleet(
     )
     if fleet is None:
         raise ResourceNotExistsError()
-    return fleet
+    return CustomORJSONResponse(fleet)
 
 
-@project_router.post("/get_plan")
+@project_router.post("/get_plan", response_model=FleetPlan)
 async def get_plan(
     body: GetFleetPlanRequest,
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
-) -> FleetPlan:
+):
     """
     Returns a fleet plan for the given fleet configuration.
     """
@@ -104,24 +112,49 @@ async def get_plan(
         user=user,
         spec=body.spec,
     )
-    return plan
+    return CustomORJSONResponse(plan)
 
 
-@project_router.post("/create")
+@project_router.post("/apply", response_model=Fleet)
+async def apply_plan(
+    body: ApplyFleetPlanRequest,
+    session: AsyncSession = Depends(get_session),
+    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
+):
+    """
+    Creates a new fleet or updates an existing fleet.
+    Errors if the expected current resource from the plan does not match the current resource.
+    Use `force: true` to apply even if the current resource does not match.
+    """
+    user, project = user_project
+    return CustomORJSONResponse(
+        await fleets_services.apply_plan(
+            session=session,
+            user=user,
+            project=project,
+            plan=body.plan,
+            force=body.force,
+        )
+    )
+
+
+@project_router.post("/create", response_model=Fleet)
 async def create_fleet(
     body: CreateFleetRequest,
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
-) -> Fleet:
+):
     """
     Creates a fleet given a fleet configuration.
     """
     user, project = user_project
-    return await fleets_services.create_fleet(
-        session=session,
-        project=project,
-        user=user,
-        spec=body.spec,
+    return CustomORJSONResponse(
+        await fleets_services.create_fleet(
+            session=session,
+            project=project,
+            user=user,
+            spec=body.spec,
+        )
     )
 
 

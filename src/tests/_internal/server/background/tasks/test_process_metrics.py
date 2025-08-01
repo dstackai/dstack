@@ -94,7 +94,7 @@ class TestDeleteMetrics:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     @freeze_time(datetime(2023, 1, 2, 3, 5, 20, tzinfo=timezone.utc))
-    async def test_deletes_old_metrics(self, test_db, session: AsyncSession):
+    async def test_deletes_old_metrics_running_job(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
@@ -113,6 +113,7 @@ class TestDeleteMetrics:
         job = await create_job(
             session=session,
             run=run,
+            status=JobStatus.RUNNING,
         )
         await create_job_metrics_point(
             session=session,
@@ -129,7 +130,57 @@ class TestDeleteMetrics:
             job_model=job,
             timestamp=datetime(2023, 1, 2, 3, 5, 10, tzinfo=timezone.utc),
         )
-        with patch.object(settings, "SERVER_METRICS_TTL_SECONDS", 15):
+        with patch.multiple(
+            settings, SERVER_METRICS_RUNNING_TTL_SECONDS=15, SERVER_METRICS_FINISHED_TTL_SECONDS=0
+        ):
+            await delete_metrics()
+        res = await session.execute(select(JobMetricsPoint))
+        points = res.scalars().all()
+        assert len(points) == 1
+        assert points[0].id == last_metric.id
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @freeze_time(datetime(2023, 1, 2, 3, 5, 20, tzinfo=timezone.utc))
+    async def test_deletes_old_metrics_finished_job(self, test_db, session: AsyncSession):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        repo = await create_repo(
+            session=session,
+            project_id=project.id,
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.FAILED,
+        )
+        await create_job_metrics_point(
+            session=session,
+            job_model=job,
+            timestamp=datetime(2023, 1, 2, 3, 4, 10, tzinfo=timezone.utc),
+        )
+        await create_job_metrics_point(
+            session=session,
+            job_model=job,
+            timestamp=datetime(2023, 1, 2, 3, 4, 20, tzinfo=timezone.utc),
+        )
+        last_metric = await create_job_metrics_point(
+            session=session,
+            job_model=job,
+            timestamp=datetime(2023, 1, 2, 3, 5, 10, tzinfo=timezone.utc),
+        )
+        with patch.multiple(
+            settings, SERVER_METRICS_RUNNING_TTL_SECONDS=0, SERVER_METRICS_FINISHED_TTL_SECONDS=15
+        ):
             await delete_metrics()
         res = await session.execute(select(JobMetricsPoint))
         points = res.scalars().all()

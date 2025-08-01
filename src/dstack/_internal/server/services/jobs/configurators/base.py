@@ -1,17 +1,21 @@
 import shlex
 import sys
+import threading
 from abc import ABC, abstractmethod
+from pathlib import PurePosixPath
 from typing import Dict, List, Optional, Union
 
 from cachetools import TTLCache, cached
 
-import dstack.version as version
+from dstack._internal import settings
 from dstack._internal.core.errors import DockerRegistryError, ServerClientError
 from dstack._internal.core.models.common import RegistryAuth
 from dstack._internal.core.models.configurations import (
+    DEFAULT_REPO_DIR,
     PortMapping,
     PythonVersion,
     RunConfigurationType,
+    ServiceConfiguration,
 )
 from dstack._internal.core.models.profiles import (
     DEFAULT_STOP_DURATION,
@@ -48,22 +52,31 @@ def get_default_python_verison() -> str:
         )
 
 
-def get_default_image(python_version: str, nvcc: bool = False) -> str:
-    suffix = ""
-    if nvcc:
-        suffix = "-devel"
-    return f"dstackai/base:py{python_version}-{version.base_image}-cuda-12.1{suffix}"
+def get_default_image(nvcc: bool = False) -> str:
+    """
+    Note: May be overridden by dstack (e.g., EFA-enabled version for AWS EFA-capable instances).
+    See `dstack._internal.server.background.tasks.process_running_jobs._patch_base_image_for_aws_efa` for details.
+
+    Args:
+        nvcc: If True, returns 'devel' variant, otherwise 'base'.
+    """
+    return f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}-{'devel' if nvcc else 'base'}-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"
 
 
 class JobConfigurator(ABC):
     TYPE: RunConfigurationType
 
     _image_config: Optional[ImageConfig] = None
-    # JobSSHKey should be shared for all jobs in a replica for inter-node communitation.
+    # JobSSHKey should be shared for all jobs in a replica for inter-node communication.
     _job_ssh_key: Optional[JobSSHKey] = None
 
-    def __init__(self, run_spec: RunSpec):
+    def __init__(
+        self,
+        run_spec: RunSpec,
+        secrets: Optional[Dict[str, str]] = None,
+    ):
         self.run_spec = run_spec
+        self.secrets = secrets or {}
 
     async def get_job_specs(self, replica_num: int) -> List[JobSpec]:
         job_spec = await self._get_job_spec(replica_num=replica_num, job_num=0, jobs_per_replica=1)
@@ -92,10 +105,20 @@ class JobConfigurator(ABC):
     async def _get_image_config(self) -> ImageConfig:
         if self._image_config is not None:
             return self._image_config
+        interpolate = VariablesInterpolator({"secrets": self.secrets}).interpolate_or_error
+        registry_auth = self.run_spec.configuration.registry_auth
+        if registry_auth is not None:
+            try:
+                registry_auth = RegistryAuth(
+                    username=interpolate(registry_auth.username),
+                    password=interpolate(registry_auth.password),
+                )
+            except InterpolatorError as e:
+                raise ServerClientError(e.args[0])
         image_config = await run_async(
             _get_image_config,
             self._image_name(),
-            self.run_spec.configuration.registry_auth,
+            registry_auth,
         )
         self._image_config = image_config
         return image_config
@@ -128,19 +151,32 @@ class JobConfigurator(ABC):
             working_dir=self._working_dir(),
             volumes=self._volumes(job_num),
             ssh_key=self._ssh_key(jobs_per_replica),
+            repo_data=self.run_spec.repo_data,
+            repo_code_hash=self.run_spec.repo_code_hash,
+            file_archives=self.run_spec.file_archives,
+            service_port=self._service_port(),
         )
         return job_spec
+
+    def _shell(self) -> str:
+        shell = self.run_spec.configuration.shell
+        if shell is not None:
+            path = PurePosixPath(shell)
+            if path.is_absolute():
+                return shell
+            return str("/bin" / path)
+        if self.run_spec.configuration.image is None:  # dstackai/base
+            return "/bin/bash"
+        return "/bin/sh"
 
     async def _commands(self) -> List[str]:
         if self.run_spec.configuration.entrypoint is not None:  # docker-like format
             entrypoint = shlex.split(self.run_spec.configuration.entrypoint)
             commands = self.run_spec.configuration.commands
-        elif self.run_spec.configuration.image is None:  # dstackai/base
-            entrypoint = ["/bin/bash", "-i", "-c"]
-            commands = [_join_shell_commands(self._shell_commands())]
-        elif self._shell_commands():  # custom docker image with shell commands
-            entrypoint = ["/bin/sh", "-i", "-c"]
-            commands = [_join_shell_commands(self._shell_commands())]
+        elif shell_commands := self._shell_commands():
+            entrypoint = [self._shell(), "-i", "-c"]
+            dstack_image_commands = self._dstack_image_commands()
+            commands = [_join_shell_commands(dstack_image_commands + shell_commands)]
         else:  # custom docker image without commands
             image_config = await self._get_image_config()
             entrypoint = image_config.entrypoint or []
@@ -154,6 +190,20 @@ class JobConfigurator(ABC):
             )
 
         return result
+
+    def _dstack_image_commands(self) -> List[str]:
+        if self.run_spec.configuration.docker is True:
+            return ["start-dockerd"]
+        if (
+            self.run_spec.configuration.image is not None
+            or self.run_spec.configuration.entrypoint is not None
+        ):
+            return []
+        return [
+            f"uv venv --python {self._python()} --prompt workflow --seed {DEFAULT_REPO_DIR}/.venv > /dev/null 2>&1",
+            f"echo 'source {DEFAULT_REPO_DIR}/.venv/bin/activate' >> ~/.bashrc",
+            f"source {DEFAULT_REPO_DIR}/.venv/bin/activate",
+        ]
 
     def _app_specs(self) -> List[AppSpec]:
         specs = []
@@ -174,9 +224,11 @@ class JobConfigurator(ABC):
         return self.run_spec.configuration.home_dir
 
     def _image_name(self) -> str:
-        if self.run_spec.configuration.image is not None:
+        if self.run_spec.configuration.docker is True:
+            return settings.DSTACK_DIND_IMAGE
+        elif self.run_spec.configuration.image is not None:
             return self.run_spec.configuration.image
-        return get_default_image(self._python(), nvcc=bool(self.run_spec.configuration.nvcc))
+        return get_default_image(nvcc=bool(self.run_spec.configuration.nvcc))
 
     async def _user(self) -> Optional[UnixUser]:
         user = self.run_spec.configuration.user
@@ -188,6 +240,8 @@ class JobConfigurator(ABC):
         return UnixUser.parse(user)
 
     def _privileged(self) -> bool:
+        if self.run_spec.configuration.docker is True:
+            return True
         return self.run_spec.configuration.privileged
 
     def _single_branch(self) -> bool:
@@ -254,6 +308,11 @@ class JobConfigurator(ABC):
             )
         return self._job_ssh_key
 
+    def _service_port(self) -> Optional[int]:
+        if isinstance(self.run_spec.configuration, ServiceConfiguration):
+            return self.run_spec.configuration.port.container_port
+        return None
+
 
 def interpolate_job_volumes(
     run_volumes: List[Union[MountPoint, str]],
@@ -303,7 +362,10 @@ def _join_shell_commands(commands: List[str]) -> str:
     return " && ".join(commands)
 
 
-@cached(TTLCache(maxsize=2048, ttl=80))
+@cached(
+    cache=TTLCache(maxsize=2048, ttl=80),
+    lock=threading.Lock(),
+)
 def _get_image_config(image: str, registry_auth: Optional[RegistryAuth]) -> ImageConfig:
     try:
         return get_image_config(image, registry_auth).config

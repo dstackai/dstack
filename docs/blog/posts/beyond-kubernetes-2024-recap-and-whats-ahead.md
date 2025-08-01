@@ -3,13 +3,7 @@ title: "Beyond Kubernetes: 2024 recap and what's next for AI infra"
 date: 2024-12-10
 description: "Reflecting on key milestones from 2024, and looking ahead to the next steps in simplifying AI infrastructure orchestration."  
 slug: beyond-kubernetes-2024-recap-and-whats-ahead
-image: https://github.com/dstackai/static-assets/blob/main/static-assets/images/beyond-kubernetes-2024-recap-and-whats-ahead.png?raw=true
-categories:
-  - AMD
-  - NVIDIA
-  - Volumes
-  - Cloud fleets
-  - SSH fleets
+image: https://dstack.ai/static-assets/static-assets/images/beyond-kubernetes-2024-recap-and-whats-ahead.png
 ---
 
 # Beyond Kubernetes: 2024 recap and what's ahead for AI infra 
@@ -110,7 +104,7 @@ efficient manner.
 
 ### NVIDIA
 
-NVIDIA remains the top accelerator supported by `dstack`. Recently, we introduced a [NIM example](../../examples/deployment/nim/index.md) 
+NVIDIA remains the top accelerator supported by `dstack`. Recently, we introduced a [NIM example](../../examples/inference/nim/index.md) 
 for model deployment, and we continue to enhance support for the rest of NVIDIA's ecosystem.
 
 ### AMD

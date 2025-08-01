@@ -3,11 +3,9 @@ title: "DeepSeek R1 inference performance: MI300X vs. H200"
 date: 2025-03-18
 description: "TBA"
 slug: h200-mi300x-deepskeek-benchmark
-image: https://github.com/dstackai/static-assets/blob/main/static-assets/images/h200-mi300x-deepskeek-benchmark-v2.png?raw=true
+image: https://dstack.ai/static-assets/static-assets/images/h200-mi300x-deepskeek-benchmark-v2.png
 categories:
   - Benchmarks
-  - AMD
-  - NVIDIA
 ---
 
 # DeepSeek R1 inference performance: MI300X vs. H200
@@ -20,7 +18,7 @@ In this benchmark, we evaluate the performance of three inference backends—SGL
 configurations: 8x NVIDIA H200 and 8x AMD MI300X. Our goal is to compare throughput, latency, and overall efficiency to
 determine the optimal backend and hardware pairing for DeepSeek-R1's demanding requirements.
 
-<img src="https://github.com/dstackai/static-assets/blob/main/static-assets/images/h200-mi300x-deepskeek-benchmark-v2.png?raw=true" width="630"/>
+<img src="https://dstack.ai/static-assets/static-assets/images/h200-mi300x-deepskeek-benchmark-v2.png" width="630"/>
 
 This benchmark was made possible through the generous support of our partners at
 [Vultr :material-arrow-top-right-thin:{ .external }](https://www.vultr.com/){:target="_blank"} and 

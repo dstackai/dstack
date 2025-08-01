@@ -4,7 +4,7 @@ date: 2024-09-10
 description: "Learn how to use TPUs with dstack for fine-tuning and deploying LLMs, leveraging open-source tools like Hugging Face’s Optimum TPU and vLLM."  
 slug: tpu-on-gcp
 categories:
-  - TPU
+  - Changelog
 ---
 
 # Using TPUs for fine-tuning and deploying LLMs
@@ -50,7 +50,7 @@ and [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/vllm-
 
 === "Optimum TPU"
 
-    <div editor-title="examples/deployment/optimum-tpu/service.dstack.yml"> 
+    <div editor-title="examples/inference/optimum-tpu/service.dstack.yml"> 
     
     ```yaml
     type: service
@@ -83,7 +83,7 @@ and [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/vllm-
     the official Docker image can be used instead of `dstackai/optimum-tpu:llama31`.
 
 === "vLLM"
-    <div editor-title="examples/deployment/vllm/service-tpu.dstack.yml"> 
+    <div editor-title="examples/inference/vllm/service-tpu.dstack.yml"> 
     
     ```yaml
     type: service
@@ -126,7 +126,7 @@ and [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/vllm-
     If you specify `model` when running a service, `dstack` will automatically register the model on
     an OpenAI-compatible endpoint and allow you to use it for chat via the control plane UI.
     
-    <img src="https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-control-plane-model-llama31.png?raw=true" width="750px" />
+    <img src="https://dstack.ai/static-assets/static-assets/images/dstack-control-plane-model-llama31.png" width="750px" />
 
 ### Memory requirements
 
@@ -158,7 +158,7 @@ Below is an example of fine-tuning Llama 3.1 8B using [Optimum TPU :material-arr
 and the [Abirate/english_quotes :material-arrow-top-right-thin:{ .external }](https://huggingface.co/datasets/Abirate/english_quotes){:target="_blank"}
 dataset.
 
-<div editor-title="examples/fine-tuning/optimum-tpu/llama31/train.dstack.yml"> 
+<div editor-title="examples/single-node-training/optimum-tpu/llama31/train.dstack.yml"> 
 
 ```yaml
 type: task
@@ -171,8 +171,8 @@ env:
 commands:
   - git clone -b add_llama_31_support https://github.com/dstackai/optimum-tpu.git
   - mkdir -p optimum-tpu/examples/custom/
-  - cp examples/fine-tuning/optimum-tpu/llama31/train.py optimum-tpu/examples/custom/train.py
-  - cp examples/fine-tuning/optimum-tpu/llama31/config.yaml optimum-tpu/examples/custom/config.yaml
+  - cp examples/single-node-training/optimum-tpu/llama31/train.py optimum-tpu/examples/custom/train.py
+  - cp examples/single-node-training/optimum-tpu/llama31/config.yaml optimum-tpu/examples/custom/config.yaml
   - cd optimum-tpu
   - pip install -e . -f https://storage.googleapis.com/libtpu-releases/index.html
   - pip install datasets evaluate

@@ -118,7 +118,8 @@ jobs:
     strategy:
       matrix:
         include:
-          - { goos: "linux", goarch: "amd64", runson: "ubuntu-latest" }
+          - { goos: "linux", goarch: "amd64" }
+          - { goos: "linux", goarch: "arm64" }
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -131,7 +132,6 @@ jobs:
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
-          ACTIONSOS: ${{ matrix.runson }}
           CGO_ENABLED: 0
         run: |
           VERSION=${GITHUB_REF#refs/tags/}
@@ -230,10 +230,12 @@ jobs:
       - name: Upload pip package
         run: |
           VERSION=${GITHUB_REF#refs/tags/}
-          BASE_IMAGE=$(cat src/dstack/version.py | grep base_image)
+          BASE_IMAGE=$(cat src/dstack/version.py | grep "base_image = ")
+          BASE_IMAGE_UBUNTU_VERSION=$(cat src/dstack/version.py | grep "base_image_ubuntu_version = ")
           echo "__version__ = \"$VERSION\"" > src/dstack/version.py
           echo "__is_release__ = True" >> src/dstack/version.py
           echo $BASE_IMAGE >> src/dstack/version.py
+          echo $BASE_IMAGE_UBUNTU_VERSION >> src/dstack/version.py
           cp README.md src
           uv build
           uv publish --username ${{ secrets.PYPI_USERNAME }} --password ${{ secrets.PYPI_PASSWORD }}   
@@ -309,8 +311,8 @@ jobs:
         run: uv sync
       - name: Generate json schema
         run: |
-          uv run python -c "from dstack._internal.core.models.configurations import DstackConfiguration; print(DstackConfiguration.schema_json(indent=2))" > configuration.json
-          uv run python -c "from dstack._internal.core.models.profiles import ProfilesConfig; print(ProfilesConfig.schema_json(indent=2))" > profiles.json
+          uv run python -c "from dstack._internal.core.models.configurations import DstackConfiguration; print(DstackConfiguration.schema_json())" > configuration.json
+          uv run python -c "from dstack._internal.core.models.profiles import ProfilesConfig; print(ProfilesConfig.schema_json())" > profiles.json
       - name: Upload json schema to S3
         run: |
           VERSION=${GITHUB_REF#refs/tags/}

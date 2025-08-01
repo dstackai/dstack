@@ -17,7 +17,6 @@ from dstack._internal.server.schemas.runner import LogEvent as RunnerLogEvent
 from dstack._internal.server.services.logs.base import (
     LogStorage,
     LogStorageError,
-    b64encode_raw_message,
     datetime_to_unix_time_ms,
     unix_time_ms_to_datetime,
 )
@@ -56,6 +55,8 @@ class CloudWatchLogStorage(LogStorage):
     PAST_EVENT_MAX_DELTA = int((timedelta(days=14)).total_seconds()) * 1000 - CLOCK_DRIFT
     # "None of the log events in the batch can be more than 2 hours in the future."
     FUTURE_EVENT_MAX_DELTA = int((timedelta(hours=2)).total_seconds()) * 1000 - CLOCK_DRIFT
+    # Maximum number of retries when polling for log events to skip empty pages.
+    MAX_RETRIES = 10
 
     def __init__(self, *, group: str, region: Optional[str] = None) -> None:
         with self._wrap_boto_errors():
@@ -78,14 +79,22 @@ class CloudWatchLogStorage(LogStorage):
             project.name, request.run_name, request.job_submission_id, log_producer
         )
         cw_events: List[_CloudWatchLogEvent]
+        next_token: Optional[str] = None
         with self._wrap_boto_errors():
             try:
-                cw_events = self._get_log_events(stream, request)
+                cw_events, next_token = self._get_log_events_with_retry(stream, request)
             except botocore.exceptions.ClientError as e:
                 if not self._is_resource_not_found_exception(e):
                     raise
-                logger.debug("Stream %s not found, returning dummy response", stream)
-                cw_events = []
+                # Check if the group exists to distinguish between group not found vs stream not found
+                try:
+                    self._check_group_exists(self._group)
+                    # Group exists, so the error must be due to missing stream
+                    logger.debug("Stream %s not found, returning dummy response", stream)
+                    cw_events = []
+                except LogStorageError:
+                    # Group doesn't exist, re-raise the LogStorageError
+                    raise
         logs = [
             LogEvent(
                 timestamp=unix_time_ms_to_datetime(cw_event["timestamp"]),
@@ -94,51 +103,83 @@ class CloudWatchLogStorage(LogStorage):
             )
             for cw_event in cw_events
         ]
-        return JobSubmissionLogs(logs=logs)
+        return JobSubmissionLogs(logs=logs, next_token=next_token)
 
-    def _get_log_events(self, stream: str, request: PollLogsRequest) -> List[_CloudWatchLogEvent]:
-        limit = request.limit
+    def _get_log_events_with_retry(
+        self, stream: str, request: PollLogsRequest
+    ) -> Tuple[List[_CloudWatchLogEvent], Optional[str]]:
+        current_request = request
+        previous_next_token = request.next_token
+
+        for attempt in range(self.MAX_RETRIES):
+            cw_events, next_token = self._get_log_events(stream, current_request)
+
+            if cw_events:
+                return cw_events, next_token
+
+            if not next_token or next_token == previous_next_token:
+                return [], None
+
+            previous_next_token = next_token
+            current_request = PollLogsRequest(
+                run_name=request.run_name,
+                job_submission_id=request.job_submission_id,
+                start_time=request.start_time,
+                end_time=request.end_time,
+                descending=request.descending,
+                next_token=next_token,
+                limit=request.limit,
+                diagnose=request.diagnose,
+            )
+
+        if not request.descending:
+            logger.debug(
+                "Stream %s: exhausted %d retries without finding logs, returning empty response",
+                stream,
+                self.MAX_RETRIES,
+            )
+        # Only return the next token after exhausting retries if going descending—
+        # AWS CloudWatch guarantees more logs in that case. In ascending mode,
+        # next token is always returned, even if no logs remain.
+        # So descending works reliably; ascending has limits if gaps are too large.
+        # In the future, UI/CLI should handle retries, and we can return next token for ascending too.
+        return [], next_token if request.descending else None
+
+    def _get_log_events(
+        self, stream: str, request: PollLogsRequest
+    ) -> Tuple[List[_CloudWatchLogEvent], Optional[str]]:
+        start_from_head = not request.descending
         parameters = {
             "logGroupName": self._group,
             "logStreamName": stream,
-            "limit": limit,
+            "limit": request.limit,
+            "startFromHead": start_from_head,
         }
-        start_from_head = not request.descending
-        parameters["startFromHead"] = start_from_head
+
         if request.start_time:
-            # XXX: Since callers use start_time/end_time for pagination, one millisecond is added
-            # to avoid an infinite loop because startTime boundary is inclusive.
-            parameters["startTime"] = datetime_to_unix_time_ms(request.start_time) + 1
+            parameters["startTime"] = datetime_to_unix_time_ms(request.start_time)
+
         if request.end_time:
-            # No need to substract one millisecond in this case, though, seems that endTime is
-            # exclusive, that is, time interval boundaries are [startTime, entTime)
             parameters["endTime"] = datetime_to_unix_time_ms(request.end_time)
-        # "Partially full or empty pages don't necessarily mean that pagination is finished.
-        # As long as the nextBackwardToken or nextForwardToken returned is NOT equal to the
-        # nextToken that you passed into the API call, there might be more log events available."
-        events: List[_CloudWatchLogEvent] = []
-        next_token: Optional[str] = None
+        elif start_from_head:
+            # When startFromHead=true and no endTime is provided, set endTime to "now"
+            # to prevent infinite pagination as new logs arrive faster than we can read them
+            parameters["endTime"] = datetime_to_unix_time_ms(datetime.now(timezone.utc))
+
+        if request.next_token:
+            parameters["nextToken"] = request.next_token
+
+        response = self._client.get_log_events(**parameters)
+
+        events = response.get("events", [])
         next_token_key = "nextForwardToken" if start_from_head else "nextBackwardToken"
-        # Limit max tries to avoid a possible infinite loop if the API is misbehaving
-        tries_left = 10
-        while tries_left:
-            if next_token is not None:
-                parameters["nextToken"] = next_token
-            response = self._client.get_log_events(**parameters)
-            if start_from_head:
-                events.extend(response["events"])
-            else:
-                # Regardless of the startFromHead value log events are arranged in
-                # chronological order, from earliest to latest.
-                events.extend(reversed(response["events"]))
-            if len(events) >= limit:
-                return events[:limit]
-            if response[next_token_key] == next_token:
-                return events
-            next_token = response[next_token_key]
-            tries_left -= 1
-        logger.warning("too many requests to stream %s, returning partial response", stream)
-        return events
+        next_token = response.get(next_token_key)
+
+        # TODO: The code below is not going to be used until we migrate from base64-encoded logs to plain text logs.
+        if request.descending:
+            events = list(reversed(events))
+
+        return events, next_token
 
     def write_logs(
         self,
@@ -238,8 +279,7 @@ class CloudWatchLogStorage(LogStorage):
                 skipped_future_events += 1
                 continue
             cw_event = self._runner_log_event_to_cloudwatch_event(event)
-            # as message is base64-encoded, length in bytes = length in code points.
-            message_size = len(cw_event["message"]) + self.MESSAGE_OVERHEAD_SIZE
+            message_size = len(event.message) + self.MESSAGE_OVERHEAD_SIZE
             if message_size > self.MESSAGE_MAX_SIZE:
                 # we should never hit this limit, as we use `io.Copy` to copy from pty to logs,
                 # which under the hood uses 32KiB buffer, see runner/internal/executor/executor.go,
@@ -271,7 +311,7 @@ class CloudWatchLogStorage(LogStorage):
     ) -> _CloudWatchLogEvent:
         return {
             "timestamp": runner_log_event.timestamp,
-            "message": b64encode_raw_message(runner_log_event.message),
+            "message": runner_log_event.message.decode(errors="replace"),
         }
 
     @contextmanager

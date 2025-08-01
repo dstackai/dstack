@@ -7,9 +7,9 @@ from pydantic import parse_obj_as
 
 from dstack._internal.core.consts import DSTACK_RUNNER_SSH_PORT
 from dstack._internal.core.errors import GatewayError
-from dstack._internal.core.models.configurations import RateLimit
+from dstack._internal.core.models.configurations import RateLimit, ServiceConfiguration
 from dstack._internal.core.models.instances import SSHConnectionParams
-from dstack._internal.core.models.runs import JobSubmission, Run
+from dstack._internal.core.models.runs import JobSpec, JobSubmission, Run, get_service_port
 from dstack._internal.proxy.gateway.schemas.stats import ServiceStats
 from dstack._internal.server import settings
 
@@ -80,13 +80,15 @@ class GatewayClient:
     async def register_replica(
         self,
         run: Run,
+        job_spec: JobSpec,
         job_submission: JobSubmission,
         ssh_head_proxy: Optional[SSHConnectionParams],
         ssh_head_proxy_private_key: Optional[str],
     ):
+        assert isinstance(run.run_spec.configuration, ServiceConfiguration)
         payload = {
             "job_id": job_submission.id.hex,
-            "app_port": run.run_spec.configuration.port.container_port,
+            "app_port": get_service_port(job_spec, run.run_spec.configuration),
             "ssh_head_proxy": ssh_head_proxy.dict() if ssh_head_proxy is not None else None,
             "ssh_head_proxy_private_key": ssh_head_proxy_private_key,
         }

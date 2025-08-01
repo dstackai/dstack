@@ -5,6 +5,8 @@ from pydantic import Field, root_validator
 from dstack._internal.core.backends.base.models import fill_data
 from dstack._internal.core.models.common import CoreModel
 
+DEFAULT_PROJECT_NAME_PREFIX = "default"
+
 
 class NebiusServiceAccountCreds(CoreModel):
     type: Annotated[Literal["service_account"], Field(description="The type of credentials")] = (
@@ -70,9 +72,28 @@ class NebiusBackendConfig(CoreModel):
         Literal["nebius"],
         Field(description="The type of backend"),
     ] = "nebius"
+    projects: Annotated[
+        Optional[list[str]],
+        Field(
+            description=(
+                "The list of allowed Nebius project IDs."
+                " Omit to use the default project in each region."
+                " The project is considered default if it is the only project in the region"
+                f" or if its name starts with `{DEFAULT_PROJECT_NAME_PREFIX}`"
+            )
+        ),
+    ] = None
     regions: Annotated[
         Optional[list[str]],
-        Field(description="The list of Nebius regions. Omit to use all regions"),
+        Field(description="The list of allowed Nebius regions. Omit to allow all regions"),
+    ] = None
+    fabrics: Annotated[
+        Optional[list[str]],
+        Field(
+            description=(
+                "The list of allowed fabrics for InfiniBand clusters. Omit to allow all fabrics"
+            )
+        ),
     ] = None
 
 

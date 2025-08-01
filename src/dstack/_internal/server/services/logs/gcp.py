@@ -1,5 +1,4 @@
-import time
-from typing import Iterable, List
+from typing import List
 from uuid import UUID
 
 from dstack._internal.core.errors import ServerClientError
@@ -15,7 +14,6 @@ from dstack._internal.server.schemas.runner import LogEvent as RunnerLogEvent
 from dstack._internal.server.services.logs.base import (
     LogStorage,
     LogStorageError,
-    b64encode_raw_message,
     unix_time_ms_to_datetime,
 )
 from dstack._internal.utils.common import batched
@@ -25,7 +23,8 @@ GCP_LOGGING_AVAILABLE = True
 try:
     import google.api_core.exceptions
     import google.auth.exceptions
-    from google.cloud import logging
+    from google.cloud import logging_v2
+    from google.cloud.logging_v2.types import ListLogEntriesRequest
 except ImportError:
     GCP_LOGGING_AVAILABLE = False
 
@@ -50,7 +49,7 @@ class GCPLogStorage(LogStorage):
 
     def __init__(self, project_id: str):
         try:
-            self.client = logging.Client(project=project_id)
+            self.client = logging_v2.Client(project=project_id)
             self.logger = self.client.logger(name=self.LOG_NAME)
             self.logger.list_entries(max_results=1)
             # Python client doesn't seem to support dry_run,
@@ -64,6 +63,7 @@ class GCPLogStorage(LogStorage):
             raise LogStorageError("Insufficient permissions")
 
     def poll_logs(self, project: ProjectModel, request: PollLogsRequest) -> JobSubmissionLogs:
+        # TODO: GCP may return logs in random order when events have the same timestamp.
         producer = LogProducer.RUNNER if request.diagnose else LogProducer.JOB
         stream_name = self._get_stream_name(
             project_name=project.name,
@@ -78,23 +78,27 @@ class GCPLogStorage(LogStorage):
             log_filters.append(f'timestamp < "{request.end_time.isoformat()}"')
         log_filter = " AND ".join(log_filters)
 
-        order_by = logging.DESCENDING if request.descending else logging.ASCENDING
+        order_by = logging_v2.DESCENDING if request.descending else logging_v2.ASCENDING
         try:
-            entries: Iterable[logging.LogEntry] = self.logger.list_entries(
-                filter_=log_filter,
+            # Use low-level API to get access to next_page_token
+            request_obj = ListLogEntriesRequest(
+                resource_names=[f"projects/{self.client.project}"],
+                filter=log_filter,
                 order_by=order_by,
-                max_results=request.limit,
-                # Specify max possible page_size (<=1000) to reduce number of API calls.
                 page_size=request.limit,
+                page_token=request.next_token,
             )
+            response = self.client._logging_api._gapic_api.list_log_entries(request=request_obj)
+
             logs = [
                 LogEvent(
                     timestamp=entry.timestamp,
-                    message=entry.payload["message"],
+                    message=entry.json_payload.get("message"),
                     log_source=LogEventSource.STDOUT,
                 )
-                for entry in entries
+                for entry in response.entries
             ]
+            next_token = response.next_page_token or None
         except google.api_core.exceptions.ResourceExhausted as e:
             logger.warning("GCP Logging exception: %s", repr(e))
             # GCP Logging has severely low quota of 60 reads/min for entries.list
@@ -102,11 +106,7 @@ class GCPLogStorage(LogStorage):
                 "GCP Logging read request limit exceeded."
                 " It's recommended to increase default entries.list request quota from 60 per minute."
             )
-        # We intentionally make reading logs slow to prevent hitting GCP quota.
-        # This doesn't help with many concurrent clients but
-        # should help with one client reading all logs sequentially.
-        time.sleep(1)
-        return JobSubmissionLogs(logs=logs)
+        return JobSubmissionLogs(logs=logs, next_token=next_token if len(logs) > 0 else None)
 
     def write_logs(
         self,
@@ -136,15 +136,14 @@ class GCPLogStorage(LogStorage):
         with self.logger.batch() as batcher:
             for batch in batched(logs, self.MAX_BATCH_SIZE):
                 for log in batch:
-                    message = b64encode_raw_message(log.message)
+                    message = log.message.decode(errors="replace")
                     timestamp = unix_time_ms_to_datetime(log.timestamp)
-                    # as message is base64-encoded, length in bytes = length in code points
-                    if len(message) > self.MAX_RUNNER_MESSAGE_SIZE:
+                    if len(log.message) > self.MAX_RUNNER_MESSAGE_SIZE:
                         logger.error(
                             "Stream %s: skipping event at %s, message exceeds max size: %d > %d",
                             stream_name,
                             timestamp.isoformat(),
-                            len(message),
+                            len(log.message),
                             self.MAX_RUNNER_MESSAGE_SIZE,
                         )
                         continue

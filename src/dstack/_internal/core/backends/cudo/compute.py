@@ -18,6 +18,7 @@ from dstack._internal.core.models.instances import (
     InstanceConfiguration,
     InstanceOfferWithAvailability,
 )
+from dstack._internal.core.models.placement import PlacementGroup
 from dstack._internal.core.models.runs import JobProvisioningData, Requirements
 from dstack._internal.utils.logging import get_logger
 
@@ -58,17 +59,19 @@ class CudoCompute(
         self,
         instance_offer: InstanceOfferWithAvailability,
         instance_config: InstanceConfiguration,
+        placement_group: Optional[PlacementGroup],
     ) -> JobProvisioningData:
         vm_id = generate_unique_instance_name(instance_config, max_length=MAX_RESOURCE_NAME_LEN)
         public_keys = instance_config.get_public_keys()
         memory_size = round(instance_offer.instance.resources.memory_mib / 1024)
         disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
-        commands = get_shim_commands(authorized_keys=public_keys)
         gpus_no = len(instance_offer.instance.resources.gpus)
-        shim_commands = " ".join([" && ".join(commands)])
-        startup_script = (
-            shim_commands if gpus_no > 0 else f"{install_docker_script()} && {shim_commands}"
-        )
+        if gpus_no > 0:
+            # we'll need jq for patching /etc/docker/daemon.json, see get_shim_commands()
+            commands = install_jq_commands()
+        else:
+            commands = install_docker_commands()
+        commands += get_shim_commands(authorized_keys=public_keys)
 
         try:
             resp_data = self.api_client.create_virtual_machine(
@@ -83,7 +86,7 @@ class CudoCompute(
                 memory_gib=memory_size,
                 vcpus=instance_offer.instance.resources.cpus,
                 vm_id=vm_id,
-                start_script=startup_script,
+                start_script=" && ".join(commands),
                 password=None,
                 customSshKeys=public_keys,
             )
@@ -145,10 +148,23 @@ class CudoCompute(
 
 
 def _get_image_id(cuda: bool) -> str:
-    image_name = "ubuntu-2204-nvidia-535-docker-v20240214" if cuda else "ubuntu-2204"
+    image_name = "ubuntu-2204-nvidia-535-docker-v20241017" if cuda else "ubuntu-2204"
     return image_name
 
 
-def install_docker_script():
-    commands = 'export DEBIAN_FRONTEND="noninteractive" && mkdir -p /etc/apt/keyrings && curl --max-time 60 -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null && apt-get update && apt-get --assume-yes install docker-ce docker-ce-cli containerd.io docker-compose-plugin'
-    return commands
+def install_jq_commands():
+    return [
+        "export DEBIAN_FRONTEND=noninteractive",
+        "apt-get --assume-yes install jq",
+    ]
+
+
+def install_docker_commands():
+    return [
+        "export DEBIAN_FRONTEND=noninteractive",
+        "mkdir -p /etc/apt/keyrings",
+        "curl --max-time 60 -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg",
+        'echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null',
+        "apt-get update",
+        "apt-get --assume-yes install docker-ce docker-ce-cli containerd.io docker-compose-plugin",
+    ]

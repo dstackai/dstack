@@ -270,6 +270,19 @@ components:
           type: string
           default: ""
           description: Mount point inside container
+    
+    GPUDevice:
+      title: shim.GPUDevice
+      type: object
+      properties:
+        path_on_host:
+          type: string
+          default: ""
+          description: Instance (host) path
+        path_in_container:
+          type: string
+          default: ""
+          description: Path inside container
 
     HealthcheckResponse:
       title: shim.api.HealthcheckResponse
@@ -437,6 +450,11 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/InstanceMountPoint"
+          default: []
+        gpu_devices:
+          type: array
+          items:
+            $ref: "#/components/schemas/GPUDevice"
           default: []
         host_ssh_user:
           type: string

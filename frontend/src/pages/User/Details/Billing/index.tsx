@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams, useSearchParams } from 'react-router-dom';
 
-import { Box, Button, Container, Header, Hotspot, Loader, Modal, SpaceBetween } from 'components';
+import { Box, Button, Header, Hotspot, Loader, Modal, SpaceBetween } from 'components';
 import { PermissionGuard } from 'components/PermissionGuard';
 import { HotspotIds } from 'layouts/AppLayout/TutorialPanel/constants';
 
@@ -12,7 +12,7 @@ import { ROUTES } from 'routes';
 import {
     useGetUserBillingInfoQuery,
     useUserBillingCheckoutSessionMutation,
-    useUserBillingPortalSessionMutation,
+    // useUserBillingPortalSessionMutation,
 } from 'services/user';
 import { GlobalUserRole } from 'types';
 
@@ -37,7 +37,7 @@ export const Billing: React.FC = () => {
 
     const { data, isLoading } = useGetUserBillingInfoQuery({ username: paramUserName });
     const [billingCheckout, { isLoading: isLoadingBillingCheckout }] = useUserBillingCheckoutSessionMutation();
-    const [billingPortalSession, { isLoading: isLoadingBillingPortalSession }] = useUserBillingPortalSessionMutation();
+    // const [billingPortalSession, { isLoading: isLoadingBillingPortalSession }] = useUserBillingPortalSessionMutation();
 
     useBreadcrumbs([
         {
@@ -81,27 +81,30 @@ export const Billing: React.FC = () => {
         setShowPaymentModal(true);
     };
 
-    const editPaymentMethod = () => {
-        billingPortalSession({
-            username: paramUserName,
-        })
-            .unwrap()
-            .then((data) => goToUrl(data.url))
-            .catch((error) => {
-                pushNotification({
-                    type: 'error',
-                    content: t('common.server_error', { error: getServerError(error) }),
-                });
-            })
-            .finally(closeModal);
-    };
+    // const editPaymentMethod = () => {
+    //     billingPortalSession({
+    //         username: paramUserName,
+    //     })
+    //         .unwrap()
+    //         .then((data) => goToUrl(data.url))
+    //         .catch((error) => {
+    //             pushNotification({
+    //                 type: 'error',
+    //                 content: t('common.server_error', { error: getServerError(error) }),
+    //             });
+    //         })
+    //         .finally(closeModal);
+    // };
+
     const closeModal = () => {
         setShowPaymentModal(false);
     };
 
     return (
         <SpaceBetween size="l">
-            <Container header={<Header variant="h2">{t('billing.balance')}</Header>}>
+            <div>
+                <Header variant="h2">{t('billing.balance')}</Header>
+
                 {isLoading && <Loader />}
 
                 {data && (
@@ -125,7 +128,7 @@ export const Billing: React.FC = () => {
                         </SpaceBetween>
                     </SpaceBetween>
                 )}
-            </Container>
+            </div>
 
             <Payments
                 payments={data?.billing_history ?? []}

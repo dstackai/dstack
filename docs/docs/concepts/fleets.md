@@ -63,16 +63,34 @@ Once the status of instances changes to `idle`, they can be used by dev environm
 
 To ensure instances are interconnected (e.g., for
 [distributed tasks](tasks.md#distributed-tasks)), set `placement` to `cluster`. 
-This ensures all instances are provisioned in the same backend and region with optimal inter-node connectivity
+This ensures all instances are provisioned with optimal inter-node connectivity.
 
 ??? info "AWS"
-    `dstack` automatically enables the Elastic Fabric Adapter for all
-    [EFA-capable instance types :material-arrow-top-right-thin:{ .external }](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/efa.html#efa-instance-types){:target="_blank"}.
-    If the `aws` backend config has `public_ips: false` set, `dstack` enables the maximum number of interfaces supported by the instance.
-    Otherwise, if instances have public IPs, only one EFA interface is enabled per instance due to AWS limitations.
+    When you create a cloud fleet with AWS, [Elastic Fabric Adapter networking :material-arrow-top-right-thin:{ .external }](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/efa.html){:target="_blank"} is automatically configured if it’s supported for the corresponding instance type.
+    Note, EFA requires the `public_ips` to be set to `false` in the `aws` backend configuration.
+    Otherwise, instances are only connected by the default VPC subnet.
 
-> The `cluster` placement is supported only for `aws`, `azure`, `gcp`, `oci`, and `vultr`
-> backends.
+    Refer to the [EFA](../../examples/clusters/efa/index.md) example for more details.
+
+??? info "GCP"
+    When you create a cloud fleet with GCP, for the A3 Mega and A3 High instance types, [GPUDirect-TCPXO and GPUDirect-TCPX :material-arrow-top-right-thin:{ .external }](https://cloud.google.com/kubernetes-engine/docs/how-to/gpu-bandwidth-gpudirect-tcpx-autopilot){:target="_blank"} networking is automatically configured.
+
+    !!! info "Backend configuration"    
+        Note, GPUDirect-TCPXO and GPUDirect-TCPX require `extra_vpcs` to be configured  in the `gcp` backend configuration.
+        Refer to the [A3 Mega](../../examples/clusters/a3mega/index.md) and 
+        [A3 High](../../examples/clusters/a3high/index.md) examples for more details.
+
+??? info "Nebius"
+    When you create a cloud fleet with Nebius, [InfiniBand networking :material-arrow-top-right-thin:{ .external }](https://docs.nebius.com/compute/clusters/gpu){:target="_blank"} is automatically configured if it’s supported for the corresponding instance type.
+    Otherwise, instances are only connected by the default VPC subnet.
+
+    An InfiniBand fabric for the cluster is selected automatically. If you prefer to use some specific fabrics, configure them in the
+    [backend settings](../reference/server/config.yml.md#nebius).
+
+The `cluster` placement is supported for `aws`, `azure`, `gcp`, `nebius`, `oci`, and `vultr`
+backends.
+
+> For more details on optimal inter-node connectivity, read the [Clusters](../guides/clusters.md) guide.
 
 #### Resources
 
@@ -120,6 +138,9 @@ and their quantity. Examples: `nvidia` (one NVIDIA GPU), `A100` (one A100), `A10
     ```
 
     Currently, only 8 TPU cores can be specified, supporting single TPU device workloads. Multi-TPU support is coming soon.
+
+> If you’re unsure which offers (hardware configurations) are available from the configured backends, use the
+> [`dstack offer`](../reference/cli/dstack/offer.md#list-gpu-offers) command to list them.
 
 #### Blocks { #cloud-blocks }
 
@@ -242,22 +263,30 @@ Define a fleet configuration as a YAML file in your project directory. The file 
 </div>
 
 ??? info "Requirements" 
-    1.&nbsp;Hosts should be pre-installed with Docker.
+    1.&nbsp;Hosts must be pre-installed with Docker.
 
     === "NVIDIA"
-        2.&nbsp;Hosts with NVIDIA GPUs should also be pre-installed with CUDA 12.1 and
+        2.&nbsp;Hosts with NVIDIA GPUs must also be pre-installed with CUDA 12.1 and
         [NVIDIA Container Toolkit :material-arrow-top-right-thin:{ .external }](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html).
 
     === "AMD"
-        2.&nbsp;Hosts with AMD GPUs should also be pre-installed with AMDGPU-DKMS kernel driver (e.g. via
+        2.&nbsp;Hosts with AMD GPUs must also be pre-installed with AMDGPU-DKMS kernel driver (e.g. via
         [native package manager :material-arrow-top-right-thin:{ .external }](https://rocm.docs.amd.com/projects/install-on-linux/en/latest/install/native-install/index.html)
         or [AMDGPU installer :material-arrow-top-right-thin:{ .external }](https://rocm.docs.amd.com/projects/install-on-linux/en/latest/install/amdgpu-install.html).)
 
     === "Intel Gaudi"
-        2.&nbsp;Hosts with Intel Gaudi accelerators should be pre-installed with [Gaudi software and drivers](https://docs.habana.ai/en/latest/Installation_Guide/Driver_Installation.html#driver-installation).
-        This should include the drivers, `hl-smi`, and Habana Container Runtime.
+        2.&nbsp;Hosts with Intel Gaudi accelerators must be pre-installed with [Gaudi software and drivers](https://docs.habana.ai/en/latest/Installation_Guide/Driver_Installation.html#driver-installation).
+        This must include the drivers, `hl-smi`, and Habana Container Runtime.
 
-    3.&nbsp;The user specified should have passwordless `sudo` access.
+    === "Tenstorrent"
+        2.&nbsp;Hosts with Tenstorrent accelerators must be pre-installed with [Tenstorrent software](https://docs.tenstorrent.com/getting-started/README.html#software-installation).
+        This must include the drivers, `tt-smi`, and HugePages.
+
+    3.&nbsp;The user specified must have passwordless `sudo` access.
+
+    4.&nbsp;The SSH server must be running and configured with `AllowTcpForwarding yes` in `/etc/ssh/sshd_config`.
+
+    5.&nbsp;The firewall must allow SSH and should forbid any other connections from external networks. For `placement: cluster` fleets, it should also allow any communication between fleet nodes.
 
 To create or update the fleet, pass the fleet configuration to [`dstack apply`](../reference/cli/dstack/apply.md):
 
@@ -288,20 +317,18 @@ Once the status of instances changes to `idle`, they can be used by dev environm
 If the hosts are interconnected (i.e. share the same network), set `placement` to `cluster`. 
 This is required if you'd like to use the fleet for [distributed tasks](tasks.md#distributed-tasks).
 
-##### Network
-    
-By default, `dstack` automatically detects the network shared by the hosts. 
-However, it's possible to configure it explicitly via 
-the [`network`](../reference/dstack.yml/fleet.md#network) property.
+??? info "Network"  
+    By default, `dstack` automatically detects the network shared by the hosts. 
+    However, it's possible to configure it explicitly via 
+    the [`network`](../reference/dstack.yml/fleet.md#network) property.
 
-[//]: # (TODO: Provide an example and more detail)
+    [//]: # (TODO: Provide an example and more detail)
+
+> For more details on optimal inter-node connectivity, read the [Clusters](../guides/clusters.md) guide.
 
 #### Blocks { #ssh-blocks }
 
-By default, a single job occupies the entire instance, so if the instance has 8 GPUs, the job will use all of them.
-
-To make it more efficient, you can set the blocks property to specify how many blocks you’d like the instance to be
-divided into, allowing multiple jobs to use these blocks concurrently.
+By default, a job uses the entire instance—e.g., all 8 GPUs. To allow multiple jobs on the same instance, set the `blocks` property to divide the instance. Each job can then use one or more blocks, up to the full instance.
 
 <div editor-title=".dstack.yml">
 
@@ -315,24 +342,25 @@ divided into, allowing multiple jobs to use these blocks concurrently.
       hosts:
         - hostname: 3.255.177.51
           blocks: 4
-        - hostaname: 3.255.177.52
+        - hostname: 3.255.177.52
           # As many as possible, according to numbers of GPUs and CPUs
           blocks: auto
-        - hostaname: 3.255.177.53
+        - hostname: 3.255.177.53
           # Do not sclice. This is the default value, may be omitted
           blocks: 1
     ```
 
 </div>
 
-For instance, with 8 GPUs, 128 CPUs, and 2TB of memory, setting blocks to 8 would assign 1 GPU, 16 CPUs, and 256 GB of
-memory to each block. These blocks can be used concurrently, and a single job can occupy multiple blocks if needed.
+All resources (GPU, CPU, memory) are split evenly across blocks, while disk is shared.
 
-> GPUs and CPUs must be divisible by the number of blocks. All resources (GPU, CPU, memory) are split proportionally,
-> except disk storage, which is shared.
+For example, with 8 GPUs, 128 CPUs, and 2TB RAM, setting `blocks` to `8` gives each block 1 GPU, 16 CPUs, and 256 GB RAM.
 
-You can also set `blocks` to `auto`, which automatically sets the number of blocks to match the number of GPUs.
+Set `blocks` to `auto` to match the number of blocks to the number of GPUs.
 
+!!! info "Distributed tasks"
+    Distributed tasks require exclusive access to all host resources and therefore must use all blocks on each node.
+    
 #### Environment variables
 
 If needed, you can specify environment variables that will be used by `dstack-shim` and passed to containers.
@@ -447,5 +475,6 @@ Alternatively, you can delete a fleet by passing the fleet name  to `dstack flee
 To terminate and delete specific instances from a fleet, pass `-i INSTANCE_NUM`.
 
 !!! info "What's next?"
-    1. Read about [dev environments](dev-environments.md), [tasks](tasks.md), and
+    1. Check [dev environments](dev-environments.md), [tasks](tasks.md), and
     [services](services.md)
+    2. Read the [Clusters](../guides/clusters.md) guide

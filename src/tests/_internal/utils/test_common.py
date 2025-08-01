@@ -1,17 +1,18 @@
 from datetime import datetime, timedelta, timezone
-from typing import Any, Iterable, List
+from typing import Any, Iterable
 
 import pytest
 from freezegun import freeze_time
 
 from dstack._internal.utils.common import (
+    batched,
     concat_url_path,
     format_duration_multiunit,
     local_time,
     make_proxy_url,
     parse_memory,
     pretty_date,
-    split_chunks,
+    sizeof_fmt,
 )
 
 
@@ -137,9 +138,9 @@ class TestParseMemory:
         assert parse_memory(memory, as_untis=as_units) == expected
 
 
-class TestSplitChunks:
+class TestBatched:
     @pytest.mark.parametrize(
-        ("iterable", "chunk_size", "expected_chunks"),
+        ("iterable", "n", "expected_batches"),
         [
             ([1, 2, 3, 4], 2, [[1, 2], [3, 4]]),
             ([1, 2, 3], 2, [[1, 2], [3]]),
@@ -150,15 +151,15 @@ class TestSplitChunks:
             ((x for x in range(5)), 3, [[0, 1, 2], [3, 4]]),
         ],
     )
-    def test_split_chunks(
-        self, iterable: Iterable[Any], chunk_size: int, expected_chunks: List[List[Any]]
+    def test_batched(
+        self, iterable: Iterable[Any], n: int, expected_batches: list[list[Any]]
     ) -> None:
-        assert list(split_chunks(iterable, chunk_size)) == expected_chunks
+        assert list(batched(iterable, n)) == expected_batches
 
-    @pytest.mark.parametrize("chunk_size", [0, -1])
-    def test_raises_on_invalid_chunk_size(self, chunk_size: int) -> None:
+    @pytest.mark.parametrize("n", [0, -1])
+    def test_raises_on_invalid_n(self, n: int) -> None:
         with pytest.raises(ValueError):
-            list(split_chunks([1, 2, 3], chunk_size))
+            list(batched([1, 2, 3], n))
 
 
 @pytest.mark.parametrize(
@@ -211,3 +212,26 @@ def test_concat_url_path(a: str, b: str, result: str) -> None:
 )
 def test_make_proxy_url(server_url, proxy_url, expected_url):
     assert make_proxy_url(server_url, proxy_url) == expected_url
+
+
+class TestSizeofFmt:
+    @pytest.mark.parametrize(
+        ("num", "suffix", "expected"),
+        [
+            (0, "B", "0.0B"),
+            (1023, "B", "1023.0B"),
+            (1024, "B", "1.0KiB"),
+            (1536, "B", "1.5KiB"),
+            (1048576, "B", "1.0MiB"),
+            (1073741824, "B", "1.0GiB"),
+            (1099511627776, "B", "1.0TiB"),
+            (1125899906842624, "B", "1.0PiB"),
+            (1152921504606846976, "B", "1.0EiB"),
+            (1180591620717411303424, "B", "1.0ZiB"),
+            (1208925819614629174706176, "B", "1.0YiB"),
+            (2000, "", "2.0Ki"),
+            (3000000, "Hz", "2.9MiHz"),
+        ],
+    )
+    def test_sizeof_fmt(self, num: int, suffix: str, expected: str) -> None:
+        assert sizeof_fmt(num, suffix) == expected

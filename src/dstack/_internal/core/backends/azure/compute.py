@@ -62,6 +62,7 @@ from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
     InstanceType,
 )
+from dstack._internal.core.models.placement import PlacementGroup
 from dstack._internal.core.models.resources import Memory, Range
 from dstack._internal.core.models.runs import JobProvisioningData, Requirements
 from dstack._internal.utils.logging import get_logger
@@ -109,6 +110,7 @@ class AzureCompute(
         self,
         instance_offer: InstanceOfferWithAvailability,
         instance_config: InstanceConfiguration,
+        placement_group: Optional[PlacementGroup],
     ) -> JobProvisioningData:
         instance_name = generate_unique_instance_name(
             instance_config, max_length=azure_resources.MAX_RESOURCE_NAME_LEN
@@ -136,6 +138,10 @@ class AzureCompute(
             location=location,
         )
 
+        managed_identity_resource_group, managed_identity_name = parse_vm_managed_identity(
+            self.config.vm_managed_identity
+        )
+
         base_tags = {
             "owner": "dstack",
             "dstack_project": instance_config.project_name,
@@ -159,7 +165,8 @@ class AzureCompute(
             network_security_group=network_security_group,
             network=network,
             subnet=subnet,
-            managed_identity=None,
+            managed_identity_name=managed_identity_name,
+            managed_identity_resource_group=managed_identity_resource_group,
             image_reference=_get_image_ref(
                 compute_client=self._compute_client,
                 location=location,
@@ -255,7 +262,8 @@ class AzureCompute(
             network_security_group=network_security_group,
             network=network,
             subnet=subnet,
-            managed_identity=None,
+            managed_identity_name=None,
+            managed_identity_resource_group=None,
             image_reference=_get_gateway_image_ref(),
             vm_size="Standard_B1ms",
             instance_name=instance_name,
@@ -338,6 +346,21 @@ def get_resource_group_network_subnet_or_error(
     return resource_group, network_name, subnet_name
 
 
+def parse_vm_managed_identity(
+    vm_managed_identity: Optional[str],
+) -> Tuple[Optional[str], Optional[str]]:
+    if vm_managed_identity is None:
+        return None, None
+    try:
+        resource_group, managed_identity = vm_managed_identity.split("/")
+        return resource_group, managed_identity
+    except Exception:
+        raise ComputeError(
+            "`vm_managed_identity` specified in incorrect format."
+            " Supported format: 'managedIdentityResourceGroup/managedIdentityName'"
+        )
+
+
 def _parse_config_vpc_id(vpc_id: str) -> Tuple[str, str]:
     resource_group, network_name = vpc_id.split("/")
     return resource_group, network_name
@@ -368,9 +391,9 @@ class VMImageVariant(enum.Enum):
 
 
 _SUPPORTED_VM_SERIES_PATTERNS = [
-    r"D(\d+)s_v3",  # Dsv3-series
-    r"E(\d+)i?s_v4",  # Esv4-series
-    r"E(\d+)-(\d+)s_v4",  # Esv4-series (constrained vCPU)
+    r"D(\d+)s_v6",  # Dsv6-series (general purpose)
+    r"E(\d+)i?s_v6",  # Esv6-series (memory optimized)
+    r"F(\d+)s_v2",  # Fsv2-series (compute optimized)
     r"NC(\d+)s_v3",  # NCv3-series [V100 16GB]
     r"NC(\d+)as_T4_v3",  # NCasT4_v3-series [T4]
     r"ND(\d+)rs_v2",  # NDv2-series [8xV100 32GB]
@@ -378,6 +401,11 @@ _SUPPORTED_VM_SERIES_PATTERNS = [
     r"NC(\d+)ads_A100_v4",  # NC A100 v4-series [A100 80GB]
     r"ND(\d+)asr_v4",  # ND A100 v4-series [8xA100 40GB]
     r"ND(\d+)amsr_A100_v4",  # NDm A100 v4-series [8xA100 80GB]
+    # Deprecated series
+    # TODO: Remove after several releases
+    r"D(\d+)s_v3",  # Dsv3-series (general purpose)
+    r"E(\d+)i?s_v4",  # Esv4-series (memory optimized)
+    r"E(\d+)-(\d+)s_v4",  # Esv4-series (constrained vCPU)
 ]
 _SUPPORTED_VM_SERIES_PATTERN = (
     "^Standard_(" + "|".join(f"({s})" for s in _SUPPORTED_VM_SERIES_PATTERNS) + ")$"
@@ -466,7 +494,8 @@ def _launch_instance(
     network_security_group: str,
     network: str,
     subnet: str,
-    managed_identity: Optional[str],
+    managed_identity_name: Optional[str],
+    managed_identity_resource_group: Optional[str],
     image_reference: ImageReference,
     vm_size: str,
     instance_name: str,
@@ -487,6 +516,20 @@ def _launch_instance(
     if allocate_public_ip:
         public_ip_address_configuration = VirtualMachinePublicIPAddressConfiguration(
             name="public_ip_config",
+        )
+    managed_identity = None
+    if managed_identity_name is not None:
+        if managed_identity_resource_group is None:
+            managed_identity_resource_group = resource_group
+        managed_identity = VirtualMachineIdentity(
+            type=ResourceIdentityType.USER_ASSIGNED,
+            user_assigned_identities={
+                azure_utils.get_managed_identity_id(
+                    subscription_id,
+                    managed_identity_resource_group,
+                    managed_identity_name,
+                ): UserAssignedIdentitiesValue(),
+            },
         )
     try:
         poller = compute_client.virtual_machines.begin_create_or_update(
@@ -552,16 +595,7 @@ def _launch_instance(
                 ),
                 priority="Spot" if spot else "Regular",
                 eviction_policy="Delete" if spot else None,
-                identity=None
-                if managed_identity is None
-                else VirtualMachineIdentity(
-                    type=ResourceIdentityType.USER_ASSIGNED,
-                    user_assigned_identities={
-                        azure_utils.get_managed_identity_id(
-                            subscription_id, resource_group, managed_identity
-                        ): UserAssignedIdentitiesValue()
-                    },
-                ),
+                identity=managed_identity,
                 user_data=base64.b64encode(user_data.encode()).decode(),
                 tags=tags,
             ),

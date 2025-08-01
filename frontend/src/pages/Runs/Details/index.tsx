@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Outlet, useNavigate, useParams } from 'react-router-dom';
+import { Outlet, /*useNavigate,*/ useParams } from 'react-router-dom';
 import Button from '@cloudscape-design/components/button';
 
 import { ContentLayout, DetailsHeader, Tabs } from 'components';
@@ -10,7 +10,11 @@ import { getServerError, riseRouterException } from 'libs';
 import { ROUTES } from 'routes';
 import { useDeleteRunsMutation, useGetRunQuery, useStopRunsMutation } from 'services/run';
 
-import { isAvailableAbortingForRun, isAvailableDeletingForRun, isAvailableStoppingForRun } from '../utils';
+import {
+    isAvailableAbortingForRun,
+    isAvailableStoppingForRun,
+    // isAvailableDeletingForRun,
+} from '../utils';
 
 import styles from './styles.module.scss';
 
@@ -21,13 +25,18 @@ enum CodeTab {
 
 export const RunDetailsPage: React.FC = () => {
     const { t } = useTranslation();
-    const navigate = useNavigate();
+    // const navigate = useNavigate();
     const params = useParams();
     const paramProjectName = params.projectName ?? '';
     const paramRunId = params.runId ?? '';
     const [pushNotification] = useNotifications();
 
-    const { data: runData, error: runError } = useGetRunQuery({
+    const {
+        data: runData,
+        error: runError,
+        isLoading,
+        refetch,
+    } = useGetRunQuery({
         project_name: paramProjectName,
         id: paramRunId,
     });
@@ -41,7 +50,7 @@ export const RunDetailsPage: React.FC = () => {
     }, [runError]);
 
     const [stopRun, { isLoading: isStopping }] = useStopRunsMutation();
-    const [deleteRun, { isLoading: isDeleting }] = useDeleteRunsMutation();
+    const [, /* deleteRun ,*/ { isLoading: isDeleting }] = useDeleteRunsMutation();
 
     useBreadcrumbs([
         {
@@ -100,30 +109,30 @@ export const RunDetailsPage: React.FC = () => {
             });
     };
 
-    const deleteClickHandle = () => {
-        if (!runData) {
-            return;
-        }
-
-        deleteRun({
-            project_name: paramProjectName,
-            runs_names: [runData.run_spec.run_name],
-        })
-            .unwrap()
-            .then(() => {
-                navigate(ROUTES.RUNS.LIST);
-            })
-            .catch((error) => {
-                pushNotification({
-                    type: 'error',
-                    content: t('common.server_error', { error: getServerError(error) }),
-                });
-            });
-    };
+    // const deleteClickHandle = () => {
+    //     if (!runData) {
+    //         return;
+    //     }
+    //
+    //     deleteRun({
+    //         project_name: paramProjectName,
+    //         runs_names: [runData.run_spec.run_name],
+    //     })
+    //         .unwrap()
+    //         .then(() => {
+    //             navigate(ROUTES.RUNS.LIST);
+    //         })
+    //         .catch((error) => {
+    //             pushNotification({
+    //                 type: 'error',
+    //                 content: t('common.server_error', { error: getServerError(error) }),
+    //             });
+    //         });
+    // };
 
     const isDisabledAbortButton = !runData || !isAvailableAbortingForRun(runData.status) || isStopping || isDeleting;
     const isDisabledStopButton = !runData || !isAvailableStoppingForRun(runData.status) || isStopping || isDeleting;
-    const isDisabledDeleteButton = !runData || !isAvailableDeletingForRun(runData.status) || isStopping || isDeleting;
+    // const isDisabledDeleteButton = !runData || !isAvailableDeletingForRun(runData.status) || isStopping || isDeleting;
 
     return (
         <div className={styles.page}>
@@ -144,6 +153,13 @@ export const RunDetailsPage: React.FC = () => {
                                 {/*<Button onClick={deleteClickHandle} disabled={isDisabledDeleteButton}>*/}
                                 {/*    {t('common.delete')}*/}
                                 {/*</Button>*/}
+
+                                <Button
+                                    iconName="refresh"
+                                    disabled={isLoading}
+                                    ariaLabel={t('common.refresh')}
+                                    onClick={refetch}
+                                />
                             </>
                         }
                     />

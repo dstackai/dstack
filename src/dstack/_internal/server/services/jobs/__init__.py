@@ -1,13 +1,13 @@
 import itertools
 import json
-from datetime import timedelta, timezone
+from datetime import timedelta
 from typing import Dict, Iterable, List, Optional, Tuple
 from uuid import UUID
 
 import requests
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, load_only
 
 import dstack._internal.server.services.backends as backends_services
 from dstack._internal.core.backends.base.backend import Backend
@@ -33,6 +33,7 @@ from dstack._internal.core.models.runs import (
     RunSpec,
 )
 from dstack._internal.core.models.volumes import Volume, VolumeMountPoint, VolumeStatus
+from dstack._internal.server import settings
 from dstack._internal.server.models import (
     InstanceModel,
     JobModel,
@@ -64,15 +65,23 @@ from dstack._internal.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
-async def get_jobs_from_run_spec(run_spec: RunSpec, replica_num: int) -> List[Job]:
+async def get_jobs_from_run_spec(
+    run_spec: RunSpec, secrets: Dict[str, str], replica_num: int
+) -> List[Job]:
     return [
         Job(job_spec=s, job_submissions=[])
-        for s in await get_job_specs_from_run_spec(run_spec, replica_num)
+        for s in await get_job_specs_from_run_spec(
+            run_spec=run_spec,
+            secrets=secrets,
+            replica_num=replica_num,
+        )
     ]
 
 
-async def get_job_specs_from_run_spec(run_spec: RunSpec, replica_num: int) -> List[JobSpec]:
-    job_configurator = _get_job_configurator(run_spec)
+async def get_job_specs_from_run_spec(
+    run_spec: RunSpec, secrets: Dict[str, str], replica_num: int
+) -> List[JobSpec]:
+    job_configurator = _get_job_configurator(run_spec=run_spec, secrets=secrets)
     job_specs = await job_configurator.get_job_specs(replica_num=replica_num)
     return job_specs
 
@@ -121,22 +130,28 @@ def job_model_to_job_submission(job_model: JobModel) -> JobSubmission:
         ):
             backend_data = json.loads(job_provisioning_data.backend_data)
             job_provisioning_data.backend = backend_data["base_backend"]
-    last_processed_at = job_model.last_processed_at.replace(tzinfo=timezone.utc)
+    last_processed_at = job_model.last_processed_at
     finished_at = None
     if job_model.status.is_finished():
         finished_at = last_processed_at
+    status_message = _get_job_status_message(job_model)
+    error = _get_job_error(job_model)
     return JobSubmission(
         id=job_model.id,
         submission_num=job_model.submission_num,
-        submitted_at=job_model.submitted_at.replace(tzinfo=timezone.utc),
+        deployment_num=job_model.deployment_num,
+        submitted_at=job_model.submitted_at,
         last_processed_at=last_processed_at,
         finished_at=finished_at,
         inactivity_secs=job_model.inactivity_secs,
         status=job_model.status,
+        status_message=status_message,
         termination_reason=job_model.termination_reason,
         termination_reason_message=job_model.termination_reason_message,
+        exit_status=job_model.exit_status,
         job_provisioning_data=job_provisioning_data,
         job_runtime_data=get_job_runtime_data(job_model),
+        error=error,
     )
 
 
@@ -156,10 +171,10 @@ def delay_job_instance_termination(job_model: JobModel):
     job_model.remove_at = common.get_current_datetime() + timedelta(seconds=15)
 
 
-def _get_job_configurator(run_spec: RunSpec) -> JobConfigurator:
+def _get_job_configurator(run_spec: RunSpec, secrets: Dict[str, str]) -> JobConfigurator:
     configuration_type = RunConfigurationType(run_spec.configuration.type)
     configurator_class = _configuration_type_to_configurator_class_map[configuration_type]
-    return configurator_class(run_spec)
+    return configurator_class(run_spec=run_spec, secrets=secrets)
 
 
 _job_configurator_classes = [
@@ -216,10 +231,7 @@ async def process_terminating_job(
     Graceful stop should already be done by `process_terminating_run`.
     Caller must acquire the locks on the job and the job's instance.
     """
-    if (
-        job_model.remove_at is not None
-        and job_model.remove_at.replace(tzinfo=timezone.utc) > common.get_current_datetime()
-    ):
+    if job_model.remove_at is not None and job_model.remove_at > common.get_current_datetime():
         # it's too early to terminate the instance
         return
 
@@ -278,6 +290,19 @@ async def process_terminating_job(
     # so that stuck volumes don't prevent the instance from terminating.
     job_model.instance_id = None
     instance_model.last_job_processed_at = common.get_current_datetime()
+
+    volume_names = (
+        jrd.volume_names
+        if jrd and jrd.volume_names
+        else [va.volume.name for va in instance_model.volume_attachments]
+    )
+    if volume_names:
+        volumes = await list_project_volume_models(
+            session=session, project=instance_model.project, names=volume_names
+        )
+        for volume in volumes:
+            volume.last_job_processed_at = common.get_current_datetime()
+
     logger.info(
         "%s: instance '%s' has been released, new status is %s",
         fmt(job_model),
@@ -378,8 +403,10 @@ def _shim_submit_stop(ports: Dict[int, int], job_model: JobModel):
             message=job_model.termination_reason_message,
             timeout=0,
         )
-        # maybe somehow postpone removing old tasks to allow inspecting failed jobs?
-        shim_client.remove_task(task_id=job_model.id)
+        # maybe somehow postpone removing old tasks to allow inspecting failed jobs without
+        # the following setting?
+        if not settings.SERVER_KEEP_SHIM_TASKS:
+            shim_client.remove_task(task_id=job_model.id)
     else:
         shim_client.stop(force=True)
 
@@ -469,20 +496,20 @@ async def _detach_volume_from_job_instance(
             await run_async(
                 compute.detach_volume,
                 volume=volume,
-                instance_id=jpd.instance_id,
+                provisioning_data=jpd,
                 force=False,
             )
             # For some backends, the volume may be detached immediately
             detached = await run_async(
                 compute.is_volume_detached,
                 volume=volume,
-                instance_id=jpd.instance_id,
+                provisioning_data=jpd,
             )
         else:
             detached = await run_async(
                 compute.is_volume_detached,
                 volume=volume,
-                instance_id=jpd.instance_id,
+                provisioning_data=jpd,
             )
             if not detached and _should_force_detach_volume(job_model, job_spec.stop_duration):
                 logger.info(
@@ -493,7 +520,7 @@ async def _detach_volume_from_job_instance(
                 await run_async(
                     compute.detach_volume,
                     volume=volume,
-                    instance_id=jpd.instance_id,
+                    provisioning_data=jpd,
                     force=True,
                 )
                 # Let the next iteration check if force detach worked
@@ -520,24 +547,25 @@ def _should_force_detach_volume(job_model: JobModel, stop_duration: Optional[int
     return (
         job_model.volumes_detached_at is not None
         and common.get_current_datetime()
-        > job_model.volumes_detached_at.replace(tzinfo=timezone.utc) + MIN_FORCE_DETACH_WAIT_PERIOD
+        > job_model.volumes_detached_at + MIN_FORCE_DETACH_WAIT_PERIOD
         and (
             job_model.termination_reason == JobTerminationReason.ABORTED_BY_USER
             or stop_duration is not None
             and common.get_current_datetime()
-            > job_model.volumes_detached_at.replace(tzinfo=timezone.utc)
-            + timedelta(seconds=stop_duration)
+            > job_model.volumes_detached_at + timedelta(seconds=stop_duration)
         )
     )
 
 
 async def get_instances_ids_with_detaching_volumes(session: AsyncSession) -> List[UUID]:
     res = await session.execute(
-        select(JobModel).where(
+        select(JobModel)
+        .where(
             JobModel.status == JobStatus.TERMINATING,
             JobModel.used_instance_id.is_not(None),
             JobModel.volumes_detached_at.is_not(None),
         )
+        .options(load_only(JobModel.used_instance_id))
     )
     job_models = res.scalars().all()
     return [jm.used_instance_id for jm in job_models if jm.used_instance_id]
@@ -680,3 +708,31 @@ def _get_job_mount_point_attached_volume(
             continue
         return volume
     raise ServerClientError("Failed to find an eligible volume for the mount point")
+
+
+def _get_job_status_message(job_model: JobModel) -> str:
+    if job_model.status == JobStatus.DONE:
+        return "exited (0)"
+    elif job_model.status == JobStatus.FAILED:
+        if job_model.termination_reason == JobTerminationReason.CONTAINER_EXITED_WITH_ERROR:
+            return f"exited ({job_model.exit_status})"
+        elif (
+            job_model.termination_reason == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
+        ):
+            return "no offers"
+        elif job_model.termination_reason == JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY:
+            return "interrupted"
+        else:
+            return "error"
+    elif job_model.status == JobStatus.TERMINATED:
+        if job_model.termination_reason == JobTerminationReason.TERMINATED_BY_USER:
+            return "stopped"
+        elif job_model.termination_reason == JobTerminationReason.ABORTED_BY_USER:
+            return "aborted"
+    return job_model.status.value
+
+
+def _get_job_error(job_model: JobModel) -> Optional[str]:
+    if job_model.termination_reason is None:
+        return None
+    return job_model.termination_reason.to_error()

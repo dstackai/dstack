@@ -1,8 +1,9 @@
 import math
+from collections.abc import Mapping
 from typing import Any, Dict, Generic, List, Optional, Tuple, TypeVar, Union
 
 import gpuhunt
-from pydantic import Field, root_validator, validator
+from pydantic import Field, parse_obj_as, root_validator, validator
 from pydantic.generics import GenericModel
 from typing_extensions import Annotated
 
@@ -125,7 +126,68 @@ class ComputeCapability(Tuple[int, int]):
 
 DEFAULT_CPU_COUNT = Range[int](min=2)
 DEFAULT_MEMORY_SIZE = Range[Memory](min=Memory.parse("8GB"))
-DEFAULT_GPU_COUNT = Range[int](min=1, max=1)
+DEFAULT_GPU_COUNT = Range[int](min=1)
+
+
+class CPUSpec(CoreModel):
+    class Config:
+        @staticmethod
+        def schema_extra(schema: Dict[str, Any]):
+            add_extra_schema_types(
+                schema["properties"]["count"],
+                extra_types=[{"type": "integer"}, {"type": "string"}],
+            )
+
+    arch: Annotated[
+        Optional[gpuhunt.CPUArchitecture],
+        Field(description="The CPU architecture, one of: `x86`, `arm`"),
+    ] = None
+    count: Annotated[Range[int], Field(description="The number of CPU cores")] = DEFAULT_CPU_COUNT
+
+    @classmethod
+    def __get_validators__(cls):
+        yield cls.parse
+        yield cls.validate
+
+    @classmethod
+    def parse(cls, v: Any) -> Any:
+        if isinstance(v, int):
+            v = str(v)
+        if isinstance(v, str):
+            tokens = v.replace(" ", "").split(":")
+            spec = {}
+            for token in tokens:
+                if not token:
+                    raise ValueError(f"CPU spec contains empty token: {v}")
+                if ".." in token or token.isdigit():
+                    if "count" in spec:
+                        raise ValueError(f"CPU spec count conflict: {v}")
+                    spec["count"] = token
+                else:
+                    try:
+                        arch = gpuhunt.CPUArchitecture.cast(token)
+                    except ValueError:
+                        raise ValueError(f"Invalid CPU architecture: {v}")
+                    if "arch" in spec:
+                        raise ValueError(f"CPU spec arch conflict: {v}")
+                    spec["arch"] = arch
+            return spec
+        # Range and min/max dict - for backward compatibility
+        if isinstance(v, Range):
+            return {"arch": None, "count": v}
+        if isinstance(v, Mapping) and v.keys() == {"min", "max"}:
+            return {"arch": None, "count": v}
+        return v
+
+    @validator("arch", pre=True)
+    def _validate_arch(cls, v: Any) -> Any:
+        if v is None:
+            return None
+        if isinstance(v, gpuhunt.CPUArchitecture):
+            return v
+        if isinstance(v, str):
+            return gpuhunt.CPUArchitecture.cast(v)
+        return v
 
 
 class GPUSpec(CoreModel):
@@ -246,6 +308,8 @@ class GPUSpec(CoreModel):
         v = v.lower()
         if v == "tpu":
             return gpuhunt.AcceleratorVendor.GOOGLE
+        if v == "tt":
+            return gpuhunt.AcceleratorVendor.TENSTORRENT
         return gpuhunt.AcceleratorVendor.cast(v)
 
 
@@ -300,7 +364,10 @@ class ResourcesSpec(CoreModel):
                 extra_types=[{"type": "integer"}, {"type": "string"}],
             )
 
-    cpu: Annotated[Range[int], Field(description="The number of CPU cores")] = DEFAULT_CPU_COUNT
+    # TODO: Remove Range[int] in 0.20. Range[int] for backward compatibility only.
+    cpu: Annotated[Union[CPUSpec, Range[int]], Field(description="The CPU requirements")] = (
+        CPUSpec()
+    )
     memory: Annotated[Range[Memory], Field(description="The RAM size (e.g., `8GB`)")] = (
         DEFAULT_MEMORY_SIZE
     )
@@ -316,7 +383,9 @@ class ResourcesSpec(CoreModel):
     disk: Annotated[Optional[DiskSpec], Field(description="The disk resources")] = DEFAULT_DISK
 
     def pretty_format(self) -> str:
-        resources: Dict[str, Any] = dict(cpus=self.cpu, memory=self.memory)
+        # TODO: Remove in 0.20. Use self.cpu directly
+        cpu = parse_obj_as(CPUSpec, self.cpu)
+        resources: Dict[str, Any] = dict(cpu_arch=cpu.arch, cpus=cpu.count, memory=self.memory)
         if self.gpu:
             gpu = self.gpu
             resources.update(
@@ -330,3 +399,18 @@ class ResourcesSpec(CoreModel):
             resources.update(disk_size=self.disk.size)
         res = pretty_resources(**resources)
         return res
+
+    def dict(self, *args, **kwargs) -> Dict:
+        # super() does not work with pydantic-duality
+        res = CoreModel.dict(self, *args, **kwargs)
+        self._update_serialized_cpu(res)
+        return res
+
+    # TODO: Remove in 0.20. Added for backward compatibility.
+    def _update_serialized_cpu(self, values: Dict):
+        cpu = values["cpu"]
+        if cpu:
+            arch = cpu.get("arch")
+            count = cpu.get("count")
+            if count and arch in [None, gpuhunt.CPUArchitecture.X86.value]:
+                values["cpu"] = count

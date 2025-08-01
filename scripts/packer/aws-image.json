@@ -11,6 +11,7 @@
     "build_prefix": "",
     "ami_regions": "",
     "ami_groups": "",
+    "image_repo": "",
     "image_version": ""
   },
   "builders": [
@@ -70,11 +71,6 @@
         "cd /tmp",
         "chmod +x install-docker.sh",
         "./install-docker.sh --version {{user `docker_version`}}"]
-    },
-    {
-      "type": "shell",
-      "environment_vars": ["IMAGE_VERSION={{user `image_version`}}"],
-      "script": "provisioners/pull-docker-images.sh"
     }
   ]
 }

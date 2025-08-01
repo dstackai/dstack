@@ -207,5 +207,5 @@ Something not working? See the [troubleshooting](guides/troubleshooting.md) guid
 
 !!! info "What's next?"
     1. Read about [backends](concepts/backends.md),  [dev environments](concepts/dev-environments.md), [tasks](concepts/tasks.md), and [services](concepts/services.md)
-    2. Join [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd)
-    3. Browse [examples](https://dstack.ai/examples)
+    2. Browse [examples](../examples.md)
+    3. Join [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd)

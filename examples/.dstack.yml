@@ -1,15 +1,12 @@
 type: dev-environment
-# The name is optional, if not specified, generated randomly
-name: vscode
+name: cursor
 
-python: "3.11"
-# Uncomment to use a custom Docker image
-#image: dstackai/base:py3.13-0.7-cuda-12.1
+python: 3.12
+ide: cursor
 
-ide: vscode
-
-# Use either spot or on-demand instances
-spot_policy: auto
+files: 
+  - .:examples
+  - ~/.ssh/id_rsa:/root/.ssh/id_rsa
 
 resources:
   gpu: 1

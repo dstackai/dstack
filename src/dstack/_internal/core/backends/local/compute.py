@@ -15,6 +15,7 @@ from dstack._internal.core.models.instances import (
     InstanceType,
     Resources,
 )
+from dstack._internal.core.models.placement import PlacementGroup
 from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
 from dstack._internal.core.models.volumes import Volume, VolumeProvisioningData
 from dstack._internal.utils.logging import get_logger
@@ -53,6 +54,7 @@ class LocalCompute(
         self,
         instance_offer: InstanceOfferWithAvailability,
         instance_config: InstanceConfiguration,
+        placement_group: Optional[PlacementGroup],
     ) -> JobProvisioningData:
         return JobProvisioningData(
             backend=instance_offer.backend,
@@ -108,8 +110,10 @@ class LocalCompute(
     def delete_volume(self, volume: Volume):
         pass
 
-    def attach_volume(self, volume: Volume, instance_id: str):
+    def attach_volume(self, volume: Volume, provisioning_data: JobProvisioningData):
         pass
 
-    def detach_volume(self, volume: Volume, instance_id: str, force: bool = False):
+    def detach_volume(
+        self, volume: Volume, provisioning_data: JobProvisioningData, force: bool = False
+    ):
         pass

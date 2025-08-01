@@ -11,6 +11,7 @@ type JobStateEvent struct {
 	Timestamp          int64                   `json:"timestamp"`
 	TerminationReason  types.TerminationReason `json:"termination_reason"`
 	TerminationMessage string                  `json:"termination_message"`
+	ExitStatus         *int                    `json:"exit_status"`
 }
 
 type LogEvent struct {
@@ -19,8 +20,9 @@ type LogEvent struct {
 }
 
 type SubmitBody struct {
-	RunSpec         RunSpec           `json:"run_spec"`
+	Run             Run               `json:"run"`
 	JobSpec         JobSpec           `json:"job_spec"`
+	JobSubmission   JobSubmission     `json:"job_submission"`
 	ClusterInfo     ClusterInfo       `json:"cluster_info"`
 	Secrets         map[string]string `json:"secrets"`
 	RepoCredentials *RepoCredentials  `json:"repo_credentials"`
@@ -36,12 +38,21 @@ type PullResponse struct {
 	// todo Result
 }
 
+type Run struct {
+	Id      string  `json:"id"`
+	RunSpec RunSpec `json:"run_spec"`
+}
+
 type RunSpec struct {
 	RunName           string        `json:"run_name"`
 	RepoId            string        `json:"repo_id"`
 	RepoData          RepoData      `json:"repo_data"`
 	Configuration     Configuration `json:"configuration"`
 	ConfigurationPath string        `json:"configuration_path"`
+}
+
+type JobSubmission struct {
+	Id string `json:"id"`
 }
 
 type JobSpec struct {
@@ -56,6 +67,11 @@ type JobSpec struct {
 	MaxDuration    int               `json:"max_duration"`
 	SSHKey         *SSHKey           `json:"ssh_key"`
 	WorkingDir     *string           `json:"working_dir"`
+	// `RepoData` is optional for compatibility with jobs submitted before 0.19.17.
+	// Use `RunExecutor.getRepoData()` to get non-nil `RepoData`.
+	// TODO: make required when supporting jobs submitted before 0.19.17 is no longer relevant.
+	RepoData     *RepoData     `json:"repo_data"`
+	FileArchives []FileArchive `json:"file_archives"`
 }
 
 type ClusterInfo struct {
@@ -83,6 +99,11 @@ type RepoData struct {
 
 	RepoConfigName  string `json:"repo_config_name"`
 	RepoConfigEmail string `json:"repo_config_email"`
+}
+
+type FileArchive struct {
+	Id   string `json:"id"`
+	Path string `json:"path"`
 }
 
 type Configuration struct {

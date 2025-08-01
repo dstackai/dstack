@@ -32,6 +32,7 @@
     "login_github": "Sign in with GitHub",
     "login_okta": "Sign in with Okta",
     "login_entra": "Sign in with EntraID",
+    "login_google": "Sign in with Google",
     "general": "General",
     "test": "Test",
     "local_storage_unavailable": "Local Storage is unavailable",
@@ -46,7 +47,8 @@
     "discord": "Discord",
     "danger_zone": "Danger Zone",
     "control_plane": "Control plane",
-    "refresh": "Refresh"
+    "refresh": "Refresh",
+    "quickstart": "Quickstart"
   },
 
   "auth": {
@@ -171,6 +173,14 @@
     "runs": "Runs",
     "tags": "Tags",
     "settings": "Settings",
+    "join": "Join",
+    "leave_confirm_title": "Leave project",
+    "leave_confirm_message": "Are you sure you want to leave this project?",
+    "leave": "Leave",
+    "join_success": "Successfully joined the project",
+    "leave_success": "Successfully left the project",
+    "join_error": "Failed to join project",
+    "leave_error": "Failed to leave project",
     "card": {
       "backend": "Backend",
       "settings": "Settings"
@@ -180,6 +190,8 @@
       "project_name": "Project name",
       "owner": "Owner",
       "project_name_description": "Only latin characters, dashes, underscores, and digits",
+      "is_public": "Make project public",
+      "is_public_description": "Public projects can be accessed by any user without being a member",
       "backend": "Backend",
       "backend_config": "Backend config",
       "backend_config_description": "Specify the backend config in the YAML format. Click Info for examples.",
@@ -188,6 +200,13 @@
       "members_empty_message_title": "No members",
       "members_empty_message_text": "Select project's members",
       "update_members_success": "Members are updated",
+      "update_visibility_success": "Project visibility updated successfully",
+      "update_visibility_confirm_title": "Change project visibility",
+      "update_visibility_confirm_message": "Are you sure you want to change the project visibility? This will affect who can access this project.",
+      "change_visibility": "Change visibility",
+      "project_visibility": "Project visibility",
+      "project_visibility_description": "Control who can access this project",
+      "make_project_public": "Make project public",
       "delete_project_confirm_title": "Delete project",
       "delete_project_confirm_message": "Are you sure you want to delete this project?",
       "delete_projects_confirm_title": "Delete projects",
@@ -278,9 +297,31 @@
         "name": "User name",
         "role": "Project role"
       },
+      "secrets": {
+        "section_title": "Secrets",
+        "empty_message_title": "No secrets",
+        "empty_message_text": "No secrets to display.",
+        "name": "Secret name",
+        "value": "Secret value",
+        "create_secret": "Create secret",
+        "update_secret": "Update secret",
+        "delete_confirm_title": "Delete secret",
+        "delete_confirm_message": "Are you sure you want to delete the {{name}} secret?",
+        "multiple_delete_confirm_title": "Delete secrets",
+        "multiple_delete_confirm_message": "Are you sure you want to delete {{count}} secrets?",
+        "not_permissions_title": "No permissions",
+        "not_permissions_description": "You don't have permissions for managing secrets",
+        "validation": {
+          "secret_name_format": "Invalid secret name"
+        }
+      },
       "error_notification": "Update project error",
       "validation": {
         "user_name_format": "Only letters, numbers, - or _"
+      },
+      "visibility": {
+        "private": "Private",
+        "public": "Public"
       }
     },
     "create": {
@@ -318,8 +359,10 @@
       "search_placeholder": "Find runs",
       "empty_message_title": "No runs",
       "empty_message_text": "No runs to display.",
+      "quickstart_message_text": "Check out the quickstart guide to get started with dstack",
       "nomatch_message_title": "No matches",
       "nomatch_message_text": "We can't find a match. Try to change project or clear filter",
+      "filter_property_placeholder": "Filter runs by properties",
       "project": "Project",
       "project_placeholder": "Filtering by project",
       "repo": "Repository",
@@ -334,6 +377,7 @@
       "workflow_name": "Workflow",
       "configuration": "Configuration",
       "instance": "Instance",
+      "priority": "Priority",
       "provider_name": "Provider",
       "status": "Status",
       "submitted_at": "Submitted",
@@ -444,6 +488,7 @@
     "nomatch_message_text": "We can't find a match.",
     "nomatch_message_button_label": "Clear filter",
     "active_only": "Active fleets",
+    "filter_property_placeholder": "Filter fleets by properties",
     "statuses": {
       "active": "Active",
       "submitted": "Submitted",
@@ -453,6 +498,7 @@
     },
     "instances": {
       "active_only": "Active instances",
+      "filter_property_placeholder": "Filter instances by properties",
       "title": "Instances",
       "empty_message_title": "No instances",
       "empty_message_text": "No instances to display.",
@@ -490,15 +536,17 @@
     "delete_volumes_confirm_title": "Delete volumes",
     "delete_volumes_confirm_message": "Are you sure you want to delete these volumes?",
     "active_only": "Active volumes",
+    "filter_property_placeholder": "Filter volumes by properties",
 
     "name": "Name",
     "project": "Project name",
     "region": "Region",
     "backend": "Backend",
     "status": "Status",
-    "created_at": "Created at",
-    "price": "Price",
-
+    "created": "Created",
+    "finished": "Finished",
+    "price": "Price (per month)",
+    "cost": "Cost",
     "statuses": {
       "failed": "Failed",
       "submitted": "Submitted",

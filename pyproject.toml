@@ -32,8 +32,11 @@ dependencies = [
     "python-multipart>=0.0.16",
     "filelock",
     "psutil",
-    "gpuhunt>=0.1.2,<0.2.0",
+    "gpuhunt==0.1.6",
     "argcomplete>=3.5.0",
+    "ignore-python>=0.2.0",
+    "orjson",
+    "apscheduler<4",
 ]
 
 [project.urls]
@@ -54,9 +57,15 @@ dstack = "dstack._internal.cli.main:main"
 [tool.hatch.version]
 path = "src/dstack/version.py"
 
-[tool.hatch.build.targets.wheel.shared-data]
-"src/dstack/_internal/proxy/gateway/resources" = "dstack/_internal/proxy/gateway/resources"
-"src/dstack/_internal/server/statics" = "dstack/_internal/server/statics"
+[tool.hatch.build.targets.sdist]
+artifacts = [
+    "src/dstack/_internal/server/statics/**",
+]
+
+[tool.hatch.build.targets.wheel]
+artifacts = [
+    "src/dstack/_internal/server/statics/**",
+]
 
 [tool.hatch.metadata.hooks.fancy-pypi-readme]
 content-type = "text/markdown"
@@ -71,7 +80,6 @@ ignore-case = true
 
 [dependency-groups]
 dev = [
-    "build>=1.2.2.post1",
     "httpx>=0.28.1",
     "pre-commit>=4.2.0",
     "pytest-asyncio>=0.23.8",
@@ -82,9 +90,10 @@ dev = [
     "requests-mock>=1.12.1",
     "openai>=1.68.2",
     "freezegun>=1.5.1",
-    "ruff>=0.11.2",
+    "ruff==0.11.6",  # should match .pre-commit-config.yaml
     "testcontainers>=4.9.2",
     "pytest-xdist>=3.6.1",
+    "pyinstrument>=5.0.0",
 ]
 
 [project.optional-dependencies]
@@ -100,7 +109,7 @@ gateway = [
 server = [
     "fastapi",
     "starlette>=0.26.0",
-    "uvicorn",
+    "uvicorn[standard]",
     "aiorwlock",
     "aiocache",
     "httpx",
@@ -109,7 +118,6 @@ server = [
     "sqlalchemy[asyncio]>=2.0.0",
     "sqlalchemy_utils>=0.40.0",
     "alembic>=1.10.2",
-    "apscheduler<4",
     "aiosqlite",
     "docker>=6.0.0",
     "python-dxf==12.1.0",
@@ -119,9 +127,10 @@ server = [
     "python-json-logger>=3.1.0",
     "prometheus-client",
     "grpcio>=1.50",
+    "backports.entry-points-selectable",
 ]
 aws = [
-    "boto3",
+    "boto3>=1.38.13",
     "botocore",
     "dstack[server]",
 ]
@@ -132,6 +141,7 @@ azure = [
     "azure-mgmt-network>=23.0.0,<28.0.0",
     "azure-mgmt-resource>=22.0.0",
     "azure-mgmt-authorization>=3.0.0",
+    "azure-mgmt-msi>=7.0.0",
     "dstack[server]",
 ]
 gcp = [
@@ -153,12 +163,16 @@ kubernetes = [
     "dstack[server]",
 ]
 lambda = [
-    "boto3",
+    "boto3>=1.38.13",
     "botocore",
     "dstack[server]",
 ]
 oci = [
-    "oci",
+    "oci>=2.150.0",
+    "cryptography>=44.0.3",
+    # pyopenssl is indirect to avoid uv falling back to the old version
+    # due to an upper limit from oci
+    "pyopenssl>=23.2.0",
     "dstack[server]",
 ]
 nebius = [

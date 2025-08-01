@@ -3,10 +3,9 @@ title: "Exporting fleet and run metrics to Prometheus"
 date: 2025-04-01
 description: "TBA"
 slug: prometheus
-image: https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-prometheus-v3.png?raw=true
+image: https://dstack.ai/static-assets/static-assets/images/dstack-prometheus-v3.png
 categories:
-  - Monitoring
-  - NVIDIA
+  - Changelog
 ---
 
 # Exporting GPU, cost, and other metrics to Prometheus
@@ -21,7 +20,7 @@ While `dstack` provides key metrics through its UI and [`dstack metrics`](dstack
 using their own monitoring tools. To support this, we’ve introduced a new endpoint that allows real-time exporting all collected
 metrics—covering fleets and runs—directly to Prometheus.
 
-<img src="https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-prometheus-v3.png?raw=true" width="630"/>
+<img src="https://dstack.ai/static-assets/static-assets/images/dstack-prometheus-v3.png" width="630"/>
 
 <!-- more -->
 
@@ -36,7 +35,7 @@ Once Prometheus is set up, it will automatically pull metrics from the `dstack` 
 With metrics now in Prometheus, you can use Grafana to create dashboards, whether to monitor all projects at once or
 drill down into specific projects or users.
 
-<img src="https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-prometheus-grafana-dark.png?raw=true" width="800"/>
+<img src="https://dstack.ai/static-assets/static-assets/images/dstack-prometheus-grafana-dark.png" width="800"/>
 
 Overall, `dstack` collects three groups of metrics:
 
@@ -46,7 +45,7 @@ Overall, `dstack` collects three groups of metrics:
 | **Runs**   | Run metrics include run counters for each user in each project.                                                                                                   |
 | **Jobs**   | A run consists of one or more jobs, each mapped to a container. Job metrics offer insights into execution time, cost, GPU model, NVIDIA DCGM telemetry, and more. |
 
-For a full list of available metrics and labels, check out [Metrics](../../docs/concepts/metrics.md).
+For a full list of available metrics and labels, check out [Metrics](../../docs/guides/metrics.md).
 
 ??? info "NVIDIA"
     NVIDIA DCGM metrics are automatically collected for `aws`, `azure`, `gcp`, and `oci` backends,
@@ -60,7 +59,7 @@ For a full list of available metrics and labels, check out [Metrics](../../docs/
     only accessible through the UI and the [`dstack metrics`](dstack-metrics.md) CLI.
 
 !!! info "What's next?"
-    1. See [Metrics](../../docs/concepts/metrics.md)
+    1. See [Metrics](../../docs/guides/metrics.md)
     1. Check [dev environments](../../docs/concepts/dev-environments.md),
        [tasks](../../docs/concepts/tasks.md), [services](../../docs/concepts/services.md),
        and [fleets](../../docs/concepts/fleets.md)

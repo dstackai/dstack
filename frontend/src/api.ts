@@ -22,6 +22,12 @@ export const API = {
             AUTHORIZE: () => `${API.AUTH.ENTRA.BASE()}/authorize`,
             CALLBACK: () => `${API.AUTH.ENTRA.BASE()}/callback`,
         },
+        GOOGLE: {
+            BASE: () => `${API.AUTH.BASE()}/google`,
+            INFO: () => `${API.AUTH.GOOGLE.BASE()}/info`,
+            AUTHORIZE: () => `${API.AUTH.GOOGLE.BASE()}/authorize`,
+            CALLBACK: () => `${API.AUTH.GOOGLE.BASE()}/callback`,
+        },
     },
 
     USERS: {
@@ -56,6 +62,9 @@ export const API = {
         DETAILS: (name: IProject['project_name']) => `${API.PROJECTS.BASE()}/${name}`,
         DETAILS_INFO: (name: IProject['project_name']) => `${API.PROJECTS.DETAILS(name)}/get`,
         SET_MEMBERS: (name: IProject['project_name']) => `${API.PROJECTS.DETAILS(name)}/set_members`,
+        ADD_MEMBERS: (name: IProject['project_name']) => `${API.PROJECTS.DETAILS(name)}/add_members`,
+        REMOVE_MEMBERS: (name: IProject['project_name']) => `${API.PROJECTS.DETAILS(name)}/remove_members`,
+        UPDATE: (name: IProject['project_name']) => `${API.PROJECTS.DETAILS(name)}/update`,
 
         // Repos
         REPOS: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/repos`,
@@ -89,6 +98,13 @@ export const API = {
         // METRICS
         JOB_METRICS: (projectName: IProject['project_name'], runName: IRun['run_spec']['run_name']) =>
             `${API.BASE()}/project/${projectName}/metrics/job/${runName}`,
+
+        // SECRETS
+        SECRETS_LIST: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/secrets/list`,
+        SECRET_GET: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/secrets/get`,
+        SECRETS_UPDATE: (projectName: IProject['project_name']) =>
+            `${API.BASE()}/project/${projectName}/secrets/create_or_update`,
+        SECRETS_DELETE: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/secrets/delete`,
     },
 
     BACKENDS: {

@@ -12,6 +12,18 @@ DSTACK_RELEASE = os.getenv("DSTACK_RELEASE") is not None or version.__is_release
 DSTACK_USE_LATEST_FROM_BRANCH = os.getenv("DSTACK_USE_LATEST_FROM_BRANCH") is not None
 
 
+DSTACK_BASE_IMAGE = os.getenv("DSTACK_BASE_IMAGE", "dstackai/base")
+DSTACK_BASE_IMAGE_VERSION = os.getenv("DSTACK_BASE_IMAGE_VERSION", version.base_image)
+DSTACK_BASE_IMAGE_UBUNTU_VERSION = os.getenv(
+    "DSTACK_BASE_IMAGE_UBUNTU_VERSION", version.base_image_ubuntu_version
+)
+DSTACK_DIND_IMAGE = os.getenv("DSTACK_DIND_IMAGE", "dstackai/dind")
+
+# Development settings
+
+LOCAL_BACKEND_ENABLED = os.getenv("DSTACK_LOCAL_BACKEND_ENABLED") is not None
+
+
 class FeatureFlags:
     """
     dstack feature flags. Feature flags are temporary and can be used when developing

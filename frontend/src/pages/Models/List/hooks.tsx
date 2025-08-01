@@ -1,13 +1,16 @@
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
 
-import { Button, ListEmptyMessage, NavigateLink, SelectCSDProps, TableProps } from 'components';
+import type { PropertyFilterProps } from 'components';
+import { Button, ListEmptyMessage, NavigateLink, TableProps } from 'components';
 
 import { DATE_TIME_FORMAT } from 'consts';
 import { useProjectFilter } from 'hooks/useProjectFilter';
+import { EMPTY_QUERY, requestParamsToTokens, tokensToRequestParams, tokensToSearchParams } from 'libs/filters';
 import { ROUTES } from 'routes';
+import { useGetUserListQuery } from 'services/user';
 
 import { getModelGateway } from '../helpers';
 
@@ -116,49 +119,89 @@ export const useEmptyMessages = ({
     return { renderEmptyMessage, renderNoMatchMessage } as const;
 };
 
-type Args = {
-    projectSearchKey?: string;
-    localStorePrefix?: string;
+type RequestParamsKeys = keyof Pick<TRunsRequestParams, 'project_name' | 'username'>;
+
+const filterKeys: Record<string, RequestParamsKeys> = {
+    PROJECT_NAME: 'project_name',
+    USER_NAME: 'username',
 };
 
-export const useFilters = ({ projectSearchKey, localStorePrefix = 'models-list-page' }: Args) => {
-    const [searchParams] = useSearchParams();
-    const { selectedProject, setSelectedProject, projectOptions } = useProjectFilter({ localStorePrefix });
+export const useFilters = (localStorePrefix = 'models-list-page') => {
+    const [searchParams, setSearchParams] = useSearchParams();
+    const { projectOptions } = useProjectFilter({ localStorePrefix });
+    const { data: usersData } = useGetUserListQuery();
 
-    const setSelectedOptionFromParams = (
-        searchKey: string,
-        options: SelectCSDProps.Options | null,
-        set: (option: SelectCSDProps.Option) => void,
-    ) => {
-        const searchValue = searchParams.get(searchKey);
+    const [propertyFilterQuery, setPropertyFilterQuery] = useState<PropertyFilterProps.Query>(() =>
+        requestParamsToTokens<RequestParamsKeys>({ searchParams, filterKeys }),
+    );
 
-        if (!searchValue || !options?.length) return;
-
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-ignore
-        const selectedOption = options.find((option) => option?.value === searchValue);
-
-        if (selectedOption) set(selectedOption);
+    const clearFilter = () => {
+        setSearchParams({});
+        setPropertyFilterQuery(EMPTY_QUERY);
     };
 
-    useEffect(() => {
-        if (!projectSearchKey) return;
+    const filteringOptions = useMemo(() => {
+        const options: PropertyFilterProps.FilteringOption[] = [];
 
-        setSelectedOptionFromParams(projectSearchKey, projectOptions, setSelectedProject);
-    }, [searchParams, projectSearchKey, projectOptions]);
+        projectOptions.forEach(({ value }) => {
+            if (value)
+                options.push({
+                    propertyKey: filterKeys.PROJECT_NAME,
+                    value,
+                });
+        });
 
-    const clearSelected = () => {
-        setSelectedProject(null);
+        usersData?.forEach(({ username }) => {
+            options.push({
+                propertyKey: filterKeys.USER_NAME,
+                value: username,
+            });
+        });
+
+        return options;
+    }, [projectOptions, usersData]);
+
+    const filteringProperties = [
+        {
+            key: filterKeys.PROJECT_NAME,
+            operators: ['='],
+            propertyLabel: 'Project',
+            groupValuesLabel: 'Project values',
+        },
+        {
+            key: filterKeys.USER_NAME,
+            operators: ['='],
+            propertyLabel: 'User',
+        },
+    ];
+
+    const onChangePropertyFilter: PropertyFilterProps['onChange'] = ({ detail }) => {
+        const { tokens, operation } = detail;
+
+        const filteredTokens = tokens.filter((token, tokenIndex) => {
+            return !tokens.some((item, index) => token.propertyKey === item.propertyKey && index > tokenIndex);
+        });
+
+        setSearchParams(tokensToSearchParams<RequestParamsKeys>(filteredTokens));
+
+        setPropertyFilterQuery({
+            operation,
+            tokens: filteredTokens,
+        });
     };
 
-    const setSelectedProjectHandle = (project: SelectCSDProps.Option | null) => {
-        setSelectedProject(project);
-    };
+    const filteringRequestParams = useMemo(() => {
+        return tokensToRequestParams<RequestParamsKeys>({
+            tokens: propertyFilterQuery.tokens,
+        }) as Partial<TRunsRequestParams>;
+    }, [propertyFilterQuery]);
 
     return {
-        projectOptions,
-        selectedProject,
-        setSelectedProject: setSelectedProjectHandle,
-        clearSelected,
+        filteringRequestParams,
+        clearFilter,
+        propertyFilterQuery,
+        onChangePropertyFilter,
+        filteringOptions,
+        filteringProperties,
     } as const;
 };

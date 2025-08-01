@@ -1,112 +1,206 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import classNames from 'classnames';
-import { Mode } from '@cloudscape-design/global-styles';
-import { FitAddon } from '@xterm/addon-fit';
-import { Terminal } from '@xterm/xterm';
 
-import { Container, Header, ListEmptyMessage, Loader, TextContent } from 'components';
+import { Box, Button, Code, Container, Header, ListEmptyMessage, Loader, TextContent } from 'components';
 
-import { useAppSelector } from 'hooks';
-import { useGetProjectLogsQuery } from 'services/project';
+import { useLocalStorageState } from 'hooks/useLocalStorageState';
+import { useLazyGetProjectLogsQuery } from 'services/project';
 
-import { selectSystemMode } from 'App/slice';
+import { decodeLogs } from './helpers';
 
 import { IProps } from './types';
 
 import styles from './styles.module.scss';
 
-const LIMIT_LOG_ROWS = 1000;
+const LIMIT_LOG_ROWS = 100;
+const LOADING_SCROLL_GAP = 300;
 
 export const Logs: React.FC<IProps> = ({ className, projectName, runName, jobSubmissionId }) => {
     const { t } = useTranslation();
-    const appliedTheme = useAppSelector(selectSystemMode);
+    const codeRef = useRef<HTMLDivElement>(null);
+    const nextTokenRef = useRef<string | undefined>(undefined);
+    const scrollPositionByBottom = useRef<number>(0);
 
-    const terminalInstance = useRef<Terminal>(new Terminal());
-
-    const fitAddonInstance = useRef<FitAddon>(new FitAddon());
     const [logsData, setLogsData] = useState<ILogItem[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const [getProjectLogs] = useLazyGetProjectLogsQuery();
+    const [isEnabledDecoding, setIsEnabledDecoding] = useLocalStorageState('enable-encode-logs', false);
+    // const [isShowTimestamp, setIsShowTimestamp] = useLocalStorageState('enable-showing-timestamp-logs', false);
 
-    useEffect(() => {
-        if (appliedTheme === Mode.Light) {
-            terminalInstance.current.options.theme = {
-                foreground: '#000716',
-                background: '#ffffff',
-            };
-        } else {
-            terminalInstance.current.options.theme = {
-                foreground: '#b6bec9',
-                background: '#0f1b2a',
-            };
+    const logsForView = useMemo(() => {
+        if (isEnabledDecoding) {
+            return decodeLogs(logsData);
         }
-    }, [appliedTheme]);
 
-    useEffect(() => {
-        terminalInstance.current.loadAddon(fitAddonInstance.current);
+        return logsData;
+    }, [logsData, isEnabledDecoding]);
 
-        const onResize = () => {
-            fitAddonInstance.current.fit();
-        };
+    const saveScrollPositionByBottom = () => {
+        if (!codeRef.current) return;
 
-        window.addEventListener('resize', onResize);
+        const { clientHeight, scrollHeight, scrollTop } = codeRef.current;
+        scrollPositionByBottom.current = scrollHeight - clientHeight - scrollTop;
+    };
 
-        return () => {
-            window.removeEventListener('resize', onResize);
-        };
-    }, []);
+    const restoreScrollPositionByBottom = () => {
+        if (!codeRef.current) return;
 
-    const {
-        data: fetchData,
-        isLoading,
-        isFetching: isFetchingLogs,
-    } = useGetProjectLogsQuery(
-        {
+        const { clientHeight, scrollHeight } = codeRef.current;
+        codeRef.current.scrollTo(0, scrollHeight - clientHeight - scrollPositionByBottom.current);
+    };
+
+    const checkNeedMoreLoadingData = () => {
+        if (!codeRef.current) return;
+
+        const { clientHeight, scrollHeight } = codeRef.current;
+
+        if (scrollHeight - clientHeight <= LOADING_SCROLL_GAP) {
+            getNextLogItems();
+        }
+    };
+
+    const getLogItems = (nextToken?: string) => {
+        setIsLoading(true);
+
+        if (!jobSubmissionId) {
+            return;
+        }
+
+        getProjectLogs({
             project_name: projectName,
             run_name: runName,
             descending: true,
-            job_submission_id: jobSubmissionId ?? '',
+            job_submission_id: jobSubmissionId,
+            next_token: nextToken,
             limit: LIMIT_LOG_ROWS,
+        })
+            .unwrap()
+            .then((response) => {
+                saveScrollPositionByBottom();
+                const reversed = response.logs.toReversed();
+
+                if (nextToken) {
+                    setLogsData((old) => [...reversed, ...old]);
+                } else {
+                    setLogsData(reversed);
+                }
+
+                nextTokenRef.current = response.next_token;
+                setIsLoading(false);
+            })
+            .catch(() => setIsLoading(false));
+    };
+
+    const getNextLogItems = () => {
+        if (nextTokenRef.current) {
+            getLogItems(nextTokenRef.current);
+        }
+    };
+
+    const toggleDecodeLogs = () => {
+        saveScrollPositionByBottom();
+        setIsEnabledDecoding(!isEnabledDecoding);
+    };
+
+    useEffect(() => {
+        getLogItems();
+    }, []);
+
+    useLayoutEffect(() => {
+        if (logsForView.length && logsForView.length <= LIMIT_LOG_ROWS) {
+            scrollToBottom();
+        } else {
+            restoreScrollPositionByBottom();
+        }
+
+        if (logsForView.length) checkNeedMoreLoadingData();
+    }, [logsForView]);
+
+    const onScroll = useCallback<EventListener>(
+        (event) => {
+            const element = event.target as HTMLDivElement;
+
+            if (element.scrollTop <= LOADING_SCROLL_GAP && !isLoading) {
+                getNextLogItems();
+            }
         },
-        {
-            skip: !jobSubmissionId,
-        },
+        [isLoading, logsForView],
     );
 
     useEffect(() => {
-        if (fetchData) {
-            const reversed = [...fetchData].reverse();
-            setLogsData((old) => [...reversed, ...old]);
-        }
-    }, [fetchData]);
+        if (!codeRef.current) return;
 
-    useEffect(() => {
-        const element = document.getElementById('terminal');
+        codeRef.current.addEventListener('scroll', onScroll);
 
-        if (logsData.length && terminalInstance.current && element) {
-            terminalInstance.current.open(element);
+        return () => {
+            if (codeRef.current) codeRef.current.removeEventListener('scroll', onScroll);
+        };
+    }, [codeRef.current, onScroll]);
 
-            logsData.forEach((logItem) => {
-                terminalInstance.current.write(logItem.message);
-            });
+    const scrollToBottom = () => {
+        if (!codeRef.current) return;
 
-            fitAddonInstance.current.fit();
-        }
-    }, [logsData]);
+        const { clientHeight, scrollHeight } = codeRef.current;
+        codeRef.current.scrollTo(0, scrollHeight - clientHeight);
+    };
 
     return (
         <div className={classNames(styles.logs, className)}>
-            <Container header={<Header variant="h2">{t('projects.run.log')}</Header>}>
-                <TextContent>
-                    <Loader padding={'n'} className={classNames(styles.loader, { show: isLoading || isFetchingLogs })} />
+            <Container
+                header={
+                    <div className={styles.headerContainer}>
+                        <div className={styles.headerTitle}>
+                            <Header variant="h2">{t('projects.run.log')}</Header>
+                        </div>
 
-                    {!isLoading && !logsData.length && (
+                        <Loader
+                            show={isLoading && Boolean(logsForView.length)}
+                            padding={'n'}
+                            className={styles.loader}
+                            loadingText={''}
+                        />
+
+                        <div className={styles.switchers}>
+                            <Box>
+                                <Button
+                                    ariaLabel="Legacy mode"
+                                    formAction="none"
+                                    iconName="gen-ai"
+                                    variant={isEnabledDecoding ? 'primary' : 'icon'}
+                                    onClick={toggleDecodeLogs}
+                                />
+                            </Box>
+
+                            {/*<Box>*/}
+                            {/*    <Toggle onChange={({ detail }) => setIsShowTimestamp(detail.checked)} checked={isShowTimestamp}>*/}
+                            {/*        Show timestamp*/}
+                            {/*    </Toggle>*/}
+                            {/*</Box>*/}
+                        </div>
+                    </div>
+                }
+            >
+                <TextContent>
+                    {!isLoading && !logsForView.length && (
                         <ListEmptyMessage
                             title={t('projects.run.log_empty_message_title')}
                             message={t('projects.run.log_empty_message_text')}
                         />
                     )}
 
-                    <div className={styles.terminal} id="terminal" />
+                    {!logsForView.length && <Loader show={isLoading} className={styles.mainLoader} />}
+
+                    {Boolean(logsForView.length) && (
+                        <Code className={styles.terminal} ref={codeRef}>
+                            {logsForView.map((log, i) => (
+                                <p key={i}>
+                                    {/*{isShowTimestamp && <span className={styles.timestamp}>{log.timestamp}</span>}*/}
+                                    {log.message}
+                                </p>
+                            ))}
+                        </Code>
+                    )}
                 </TextContent>
             </Container>
         </div>

@@ -3,10 +3,9 @@ title: Supporting Intel Gaudi AI accelerators with SSH fleets
 date: 2025-02-21
 description: "dstack now supports Intel Gaudi accelerators with SSH fleets, simplifying container orchestration across private clouds and data centers."  
 slug: intel-gaudi
-image: https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-intel-gaudi-and-intel-tiber-cloud.png-v2?raw=true
+image: https://dstack.ai/static-assets/static-assets/images/dstack-intel-gaudi-and-intel-tiber-cloud.png-v2
 categories:
-  - Intel Gaudi
-  - SSH fleets
+  - Changelog
 ---
 
 # Supporting Intel Gaudi AI accelerators with SSH fleets
@@ -17,7 +16,7 @@ just leading cloud providers and on-prem environments but also a wide range of a
 With our latest release, we’re adding support
 for Intel Gaudi AI Accelerator and launching a new partnership with Intel.
 
-<img src="https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-intel-gaudi-and-intel-tiber-cloud-v2.png?raw=true" width="630"/>
+<img src="https://dstack.ai/static-assets/static-assets/images/dstack-intel-gaudi-and-intel-tiber-cloud-v2.png" width="630"/>
 
 <!-- more -->
 
@@ -98,7 +97,7 @@ model using [Optimum for Intel Gaudi :material-arrow-top-right-thin:{ .external 
 and [DeepSpeed :material-arrow-top-right-thin:{ .external }](https://docs.habana.ai/en/latest/PyTorch/DeepSpeed/DeepSpeed_User_Guide/DeepSpeed_User_Guide.html#deepspeed-user-guide){:target="_blank"} with 
 the [`lvwerra/stack-exchange-paired` :material-arrow-top-right-thin:{ .external }](https://huggingface.co/datasets/lvwerra/stack-exchange-paired){:target="_blank"} dataset:
 
-<div editor-title="examples/fine-tuning/trl/intel/.dstack.yml">
+<div editor-title="examples/single-node-training/trl/intel/.dstack.yml">
     
 ```yaml
 type: task
@@ -152,7 +151,7 @@ Submit the task using the [`dstack apply`](../../docs/reference/cli/dstack/apply
 <div class="termy">
 
 ```shell
-$ dstack apply -f examples/fine-tuning/trl/intel/.dstack.yml -R
+$ dstack apply -f examples/single-node-training/trl/intel/.dstack.yml -R
 ```
 
 </div>

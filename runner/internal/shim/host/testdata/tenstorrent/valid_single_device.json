@@ -1,0 +1,46 @@
+{
+	"time": "2025-06-20T12:10:28.926938",
+	"host_info": {
+		"OS": "Linux",
+		"Distro": "Ubuntu 20.04.6 LTS",
+		"Kernel": "5.15.0-138-generic",
+		"Hostname": "7330093c7194",
+		"Platform": "x86_64",
+		"Python": "3.8.10",
+		"Memory": "30.46 GB",
+		"Driver": "TT-KMD 1.33"
+	},
+	"host_sw_vers": {
+		"tt_smi": "3.0.15",
+		"pyluwen": "0.7.2"
+	},
+	"device_info": [
+		{
+			"smbus_telem": {
+				"temp": 45.2,
+				"power": 12.5
+			},
+			"board_info": {
+				"bus_id": "0000:01:00.0",
+				"board_type": "n150 L",
+				"board_id": "100018611902010",
+				"coords": "(0, 0, 0, 0)",
+				"dram_status": true,
+				"dram_speed": "12G",
+				"pcie_speed": 4,
+				"pcie_width": "4"
+			},
+			"telemetry": {
+				"temperature": 45.2,
+				"power_consumption": 12.5
+			},
+			"firmwares": {
+				"version": "1.2.3"
+			},
+			"limits": {
+				"max_temp": 85.0,
+				"max_power": 25.0
+			}
+		}
+	]
+} 

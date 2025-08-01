@@ -1,23 +1,28 @@
 import asyncio
+import re
+import uuid
 from collections.abc import Iterable
 from datetime import timedelta
 from typing import Dict, List, Optional
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, load_only
 
+from dstack._internal import settings
 from dstack._internal.core.consts import DSTACK_RUNNER_HTTP_PORT, DSTACK_SHIM_HTTP_PORT
 from dstack._internal.core.errors import GatewayError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import NetworkMode, RegistryAuth
 from dstack._internal.core.models.configurations import DevEnvironmentConfiguration
+from dstack._internal.core.models.files import FileArchiveMapping
 from dstack._internal.core.models.instances import (
     InstanceStatus,
     RemoteConnectionInfo,
     SSHConnectionParams,
 )
 from dstack._internal.core.models.metrics import Metric
+from dstack._internal.core.models.profiles import StartupOrder
 from dstack._internal.core.models.repos import RemoteRepoCreds
 from dstack._internal.core.models.runs import (
     ClusterInfo,
@@ -29,18 +34,21 @@ from dstack._internal.core.models.runs import (
     JobTerminationReason,
     Run,
     RunSpec,
+    RunStatus,
 )
 from dstack._internal.core.models.volumes import InstanceMountPoint, Volume, VolumeMountPoint
 from dstack._internal.server.background.tasks.common import get_provisioning_timeout
-from dstack._internal.server.db import get_session_ctx
+from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import (
     InstanceModel,
     JobModel,
     ProjectModel,
     RepoModel,
     RunModel,
+    UserModel,
 )
-from dstack._internal.server.schemas.runner import TaskStatus
+from dstack._internal.server.schemas.runner import GPUDevice, TaskStatus
+from dstack._internal.server.services import files as files_services
 from dstack._internal.server.services import logs as logs_services
 from dstack._internal.server.services import services
 from dstack._internal.server.services.instances import get_instance_ssh_private_keys
@@ -63,12 +71,21 @@ from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
 from dstack._internal.server.services.runs import (
     run_model_to_run,
 )
+from dstack._internal.server.services.secrets import get_project_secrets_mapping
 from dstack._internal.server.services.storage import get_default_storage
+from dstack._internal.server.utils import sentry_utils
 from dstack._internal.utils import common as common_utils
-from dstack._internal.utils.interpolator import VariablesInterpolator
+from dstack._internal.utils.interpolator import InterpolatorError, VariablesInterpolator
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
+
+
+MIN_PROCESSING_INTERVAL = timedelta(seconds=10)
+# Minimum time before terminating active job in case of connectivity issues.
+# Should be sufficient to survive most problems caused by
+# the server network flickering and providers' glitches.
+JOB_DISCONNECTED_RETRY_TIMEOUT = timedelta(minutes=2)
 
 
 async def process_running_jobs(batch_size: int = 1):
@@ -78,21 +95,31 @@ async def process_running_jobs(batch_size: int = 1):
     await asyncio.gather(*tasks)
 
 
+@sentry_utils.instrument_background_task
 async def _process_next_running_job():
-    lock, lockset = get_locker().get_lockset(JobModel.__tablename__)
+    lock, lockset = get_locker(get_db().dialect_name).get_lockset(JobModel.__tablename__)
     async with get_session_ctx() as session:
         async with lock:
             res = await session.execute(
                 select(JobModel)
+                .join(JobModel.run)
                 .where(
                     JobModel.status.in_(
                         [JobStatus.PROVISIONING, JobStatus.PULLING, JobStatus.RUNNING]
                     ),
+                    RunModel.status.not_in([RunStatus.TERMINATING]),
                     JobModel.id.not_in(lockset),
+                    JobModel.last_processed_at
+                    < common_utils.get_current_datetime() - MIN_PROCESSING_INTERVAL,
                 )
+                .options(load_only(JobModel.id))
                 .order_by(JobModel.last_processed_at.asc())
                 .limit(1)
-                .with_for_update(skip_locked=True)
+                .with_for_update(
+                    skip_locked=True,
+                    key_share=True,
+                    of=JobModel,
+                )
             )
             job_model = res.unique().scalar()
             if job_model is None:
@@ -108,7 +135,6 @@ async def _process_next_running_job():
 
 async def _process_running_job(session: AsyncSession, job_model: JobModel):
     # Refetch to load related attributes.
-    # joinedload produces LEFT OUTER JOIN that can't be used with FOR UPDATE.
     res = await session.execute(
         select(JobModel)
         .where(JobModel.id == job_model.id)
@@ -119,7 +145,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
     res = await session.execute(
         select(RunModel)
         .where(RunModel.id == job_model.run_id)
-        .options(joinedload(RunModel.project).joinedload(ProjectModel.backends))
+        .options(joinedload(RunModel.project))
         .options(joinedload(RunModel.user))
         .options(joinedload(RunModel.repo))
         .options(joinedload(RunModel.jobs))
@@ -135,144 +161,165 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
         job_model.status = JobStatus.TERMINATING
         job_model.termination_reason = JobTerminationReason.TERMINATED_BY_SERVER
         job_model.last_processed_at = common_utils.get_current_datetime()
+        await session.commit()
         return
 
     job = find_job(run.jobs, job_model.replica_num, job_model.job_num)
 
-    # Wait until all other jobs in the replica are provisioned
-    for other_job in run.jobs:
-        if (
-            other_job.job_spec.replica_num == job.job_spec.replica_num
-            and other_job.job_submissions[-1].status == JobStatus.SUBMITTED
-        ):
+    initial_status = job_model.status
+    if initial_status in [JobStatus.PROVISIONING, JobStatus.PULLING]:
+        # Wait until all other jobs in the replica are provisioned
+        for other_job in run.jobs:
+            if (
+                other_job.job_spec.replica_num == job.job_spec.replica_num
+                and other_job.job_submissions[-1].status == JobStatus.SUBMITTED
+            ):
+                job_model.last_processed_at = common_utils.get_current_datetime()
+                await session.commit()
+                return
+
+        cluster_info = _get_cluster_info(
+            jobs=run.jobs,
+            replica_num=job.job_spec.replica_num,
+            job_provisioning_data=job_provisioning_data,
+            job_runtime_data=job_submission.job_runtime_data,
+        )
+
+        volumes = await get_job_attached_volumes(
+            session=session,
+            project=project,
+            run_spec=run.run_spec,
+            job_num=job.job_spec.job_num,
+            job_provisioning_data=job_provisioning_data,
+        )
+
+        repo_creds_model = await get_repo_creds(
+            session=session, repo=repo_model, user=run_model.user
+        )
+        repo_creds = repo_model_to_repo_head_with_creds(repo_model, repo_creds_model).repo_creds
+
+        secrets = await get_project_secrets_mapping(session=session, project=project)
+        try:
+            _interpolate_secrets(secrets, job.job_spec)
+        except InterpolatorError as e:
+            logger.info("%s: terminating due to secrets interpolation error", fmt(job_model))
+            job_model.status = JobStatus.TERMINATING
+            job_model.termination_reason = JobTerminationReason.TERMINATED_BY_SERVER
+            job_model.termination_reason_message = e.args[0]
             job_model.last_processed_at = common_utils.get_current_datetime()
             await session.commit()
             return
-
-    cluster_info = _get_cluster_info(
-        jobs=run.jobs,
-        replica_num=job.job_spec.replica_num,
-        job_provisioning_data=job_provisioning_data,
-        job_runtime_data=job_submission.job_runtime_data,
-    )
-
-    volumes = await get_job_attached_volumes(
-        session=session,
-        project=project,
-        run_spec=run.run_spec,
-        job_num=job.job_spec.job_num,
-        job_provisioning_data=job_provisioning_data,
-    )
 
     server_ssh_private_keys = get_instance_ssh_private_keys(
         common_utils.get_or_error(job_model.instance)
     )
 
-    secrets = {}  # TODO secrets
-
-    repo_creds_model = await get_repo_creds(session=session, repo=repo_model, user=run_model.user)
-    repo_creds = repo_model_to_repo_head_with_creds(repo_model, repo_creds_model).repo_creds
-
-    initial_status = job_model.status
     if initial_status == JobStatus.PROVISIONING:
         if job_provisioning_data.hostname is None:
             await _wait_for_instance_provisioning_data(job_model=job_model)
+            job_model.last_processed_at = common_utils.get_current_datetime()
+            await session.commit()
+            return
+        if _should_wait_for_other_nodes(run, job, job_model):
+            job_model.last_processed_at = common_utils.get_current_datetime()
+            await session.commit()
+            return
+
+        # fails are acceptable until timeout is exceeded
+        if job_provisioning_data.dockerized:
+            logger.debug(
+                "%s: process provisioning job with shim, age=%s",
+                fmt(job_model),
+                job_submission.age,
+            )
+            ssh_user = job_provisioning_data.username
+            user_ssh_key = run.run_spec.ssh_key_pub.strip()
+            public_keys = [project.ssh_public_key.strip(), user_ssh_key]
+            if job_provisioning_data.backend == BackendType.LOCAL:
+                # No need to update ~/.ssh/authorized_keys when running shim locally
+                user_ssh_key = ""
+            success = await common_utils.run_async(
+                _process_provisioning_with_shim,
+                server_ssh_private_keys,
+                job_provisioning_data,
+                None,
+                run,
+                job_model,
+                job_provisioning_data,
+                volumes,
+                job.job_spec.registry_auth,
+                public_keys,
+                ssh_user,
+                user_ssh_key,
+            )
         else:
-            # Wait until all other jobs in the replica have IPs assigned.
-            # This is needed to ensure cluster_info has all IPs set.
-            for other_job in run.jobs:
-                if (
-                    other_job.job_spec.replica_num == job.job_spec.replica_num
-                    and other_job.job_submissions[-1].status == JobStatus.PROVISIONING
-                    and other_job.job_submissions[-1].job_provisioning_data is not None
-                    and other_job.job_submissions[-1].job_provisioning_data.hostname is None
-                ):
-                    job_model.last_processed_at = common_utils.get_current_datetime()
-                    await session.commit()
-                    return
+            logger.debug(
+                "%s: process provisioning job without shim, age=%s",
+                fmt(job_model),
+                job_submission.age,
+            )
+            # FIXME: downloading file archives and code here is a waste of time if
+            # the runner is not ready yet
+            file_archives = await _get_job_file_archives(
+                session=session,
+                archive_mappings=job.job_spec.file_archives,
+                user=run_model.user,
+            )
+            code = await _get_job_code(
+                session=session,
+                project=project,
+                repo=repo_model,
+                code_hash=_get_repo_code_hash(run, job),
+            )
 
-            # fails are acceptable until timeout is exceeded
-            if job_provisioning_data.dockerized:
-                logger.debug(
-                    "%s: process provisioning job with shim, age=%s",
+            success = await common_utils.run_async(
+                _submit_job_to_runner,
+                server_ssh_private_keys,
+                job_provisioning_data,
+                None,
+                run,
+                job_model,
+                job,
+                cluster_info,
+                code,
+                file_archives,
+                secrets,
+                repo_creds,
+                success_if_not_available=False,
+            )
+
+        if not success:
+            # check timeout
+            if job_submission.age > get_provisioning_timeout(
+                backend_type=job_provisioning_data.get_base_backend(),
+                instance_type_name=job_provisioning_data.instance_type.name,
+            ):
+                logger.warning(
+                    "%s: failed because runner has not become available in time, age=%s",
                     fmt(job_model),
                     job_submission.age,
                 )
-                ssh_user = job_provisioning_data.username
-                user_ssh_key = run.run_spec.ssh_key_pub.strip()
-                public_keys = [project.ssh_public_key.strip(), user_ssh_key]
-                if job_provisioning_data.backend == BackendType.LOCAL:
-                    # No need to update ~/.ssh/authorized_keys when running shim localy
-                    user_ssh_key = ""
-                success = await common_utils.run_async(
-                    _process_provisioning_with_shim,
-                    server_ssh_private_keys,
-                    job_provisioning_data,
-                    None,
-                    run,
-                    job_model,
-                    job_provisioning_data,
-                    volumes,
-                    secrets,
-                    job.job_spec.registry_auth,
-                    public_keys,
-                    ssh_user,
-                    user_ssh_key,
-                )
-            else:
-                logger.debug(
-                    "%s: process provisioning job without shim, age=%s",
-                    fmt(job_model),
-                    job_submission.age,
-                )
-                code = await _get_job_code(
-                    session=session,
-                    project=project,
-                    repo=repo_model,
-                    code_hash=run.run_spec.repo_code_hash,
-                )
-                success = await common_utils.run_async(
-                    _submit_job_to_runner,
-                    server_ssh_private_keys,
-                    job_provisioning_data,
-                    None,
-                    run,
-                    job_model,
-                    job,
-                    cluster_info,
-                    code,
-                    secrets,
-                    repo_creds,
-                    success_if_not_available=False,
-                )
-
-            if not success:
-                # check timeout
-                if job_submission.age > get_provisioning_timeout(
-                    backend_type=job_provisioning_data.get_base_backend(),
-                    instance_type_name=job_provisioning_data.instance_type.name,
-                ):
-                    logger.warning(
-                        "%s: failed because runner has not become available in time, age=%s",
-                        fmt(job_model),
-                        job_submission.age,
-                    )
-                    job_model.status = JobStatus.TERMINATING
-                    job_model.termination_reason = (
-                        JobTerminationReason.WAITING_RUNNER_LIMIT_EXCEEDED
-                    )
-                    # instance will be emptied by process_terminating_jobs
+                job_model.status = JobStatus.TERMINATING
+                job_model.termination_reason = JobTerminationReason.WAITING_RUNNER_LIMIT_EXCEEDED
+                # instance will be emptied by process_terminating_jobs
 
     else:  # fails are not acceptable
         if initial_status == JobStatus.PULLING:
             logger.debug(
                 "%s: process pulling job with shim, age=%s", fmt(job_model), job_submission.age
             )
+            # FIXME: downloading file archives and code here is a waste of time if
+            # the runner is not ready yet
+            file_archives = await _get_job_file_archives(
+                session=session,
+                archive_mappings=job.job_spec.file_archives,
+                user=run_model.user,
+            )
             code = await _get_job_code(
                 session=session,
                 project=project,
                 repo=repo_model,
-                code_hash=run.run_spec.repo_code_hash,
+                code_hash=_get_repo_code_hash(run, job),
             )
             success = await common_utils.run_async(
                 _process_pulling_with_shim,
@@ -284,6 +331,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
                 job,
                 cluster_info,
                 code,
+                file_archives,
                 secrets,
                 repo_creds,
                 server_ssh_private_keys,
@@ -299,19 +347,39 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
                 run_model,
                 job_model,
             )
-            if not success:
-                job_model.termination_reason = JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY
 
-        if not success:  # kill the job
-            logger.warning(
-                "%s: failed because runner is not available or return an error,  age=%s",
-                fmt(job_model),
-                job_submission.age,
-            )
-            job_model.status = JobStatus.TERMINATING
-            if not job_model.termination_reason:
-                job_model.termination_reason = JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY
-            # job will be terminated and instance will be emptied by process_terminating_jobs
+        if success:
+            job_model.disconnected_at = None
+        else:
+            if job_model.termination_reason:
+                logger.warning(
+                    "%s: failed due to %s, age=%s",
+                    fmt(job_model),
+                    job_model.termination_reason.value,
+                    job_submission.age,
+                )
+                job_model.status = JobStatus.TERMINATING
+                # job will be terminated and instance will be emptied by process_terminating_jobs
+            else:
+                # No job_model.termination_reason set means ssh connection failed
+                if job_model.disconnected_at is None:
+                    job_model.disconnected_at = common_utils.get_current_datetime()
+                if _should_terminate_job_due_to_disconnect(job_model):
+                    logger.warning(
+                        "%s: failed because instance is unreachable, age=%s",
+                        fmt(job_model),
+                        job_submission.age,
+                    )
+                    # TODO: Replace with JobTerminationReason.INSTANCE_UNREACHABLE in 0.20 or
+                    # when CLI <= 0.19.8 is no longer supported
+                    job_model.termination_reason = JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY
+                    job_model.status = JobStatus.TERMINATING
+                else:
+                    logger.warning(
+                        "%s: is unreachable, waiting for the instance to become reachable again, age=%s",
+                        fmt(job_model),
+                        job_submission.age,
+                    )
 
     if (
         initial_status != job_model.status
@@ -381,6 +449,48 @@ async def _wait_for_instance_provisioning_data(job_model: JobModel):
     job_model.job_provisioning_data = job_model.instance.job_provisioning_data
 
 
+def _should_wait_for_other_nodes(run: Run, job: Job, job_model: JobModel) -> bool:
+    for other_job in run.jobs:
+        if (
+            other_job.job_spec.replica_num == job.job_spec.replica_num
+            and other_job.job_submissions[-1].status == JobStatus.PROVISIONING
+            and other_job.job_submissions[-1].job_provisioning_data is not None
+            and other_job.job_submissions[-1].job_provisioning_data.hostname is None
+        ):
+            logger.debug(
+                "%s: waiting for other job to have IP assigned",
+                fmt(job_model),
+            )
+            return True
+    master_job = find_job(run.jobs, job.job_spec.replica_num, 0)
+    if (
+        job.job_spec.job_num != 0
+        and run.run_spec.merged_profile.startup_order == StartupOrder.MASTER_FIRST
+        and master_job.job_submissions[-1].status != JobStatus.RUNNING
+    ):
+        logger.debug(
+            "%s: waiting for master job to become running",
+            fmt(job_model),
+        )
+        return True
+    if (
+        job.job_spec.job_num == 0
+        and run.run_spec.merged_profile.startup_order == StartupOrder.WORKERS_FIRST
+    ):
+        for other_job in run.jobs:
+            if (
+                other_job.job_spec.replica_num == job.job_spec.replica_num
+                and other_job.job_spec.job_num != job.job_spec.job_num
+                and other_job.job_submissions[-1].status != JobStatus.RUNNING
+            ):
+                logger.debug(
+                    "%s: waiting for worker job to become running",
+                    fmt(job_model),
+                )
+                return True
+    return False
+
+
 @runner_ssh_tunnel(ports=[DSTACK_SHIM_HTTP_PORT], retries=1)
 def _process_provisioning_with_shim(
     ports: Dict[int, int],
@@ -388,7 +498,6 @@ def _process_provisioning_with_shim(
     job_model: JobModel,
     job_provisioning_data: JobProvisioningData,
     volumes: List[Volume],
-    secrets: Dict[str, str],
     registry_auth: Optional[RegistryAuth],
     public_keys: List[str],
     ssh_user: str,
@@ -414,10 +523,8 @@ def _process_provisioning_with_shim(
     registry_username = ""
     registry_password = ""
     if registry_auth is not None:
-        logger.debug("%s: authenticating to the registry...", fmt(job_model))
-        interpolate = VariablesInterpolator({"secrets": secrets}).interpolate
-        registry_username = interpolate(registry_auth.username)
-        registry_password = interpolate(registry_auth.password)
+        registry_username = registry_auth.username
+        registry_password = registry_auth.password
 
     volume_mounts: List[VolumeMountPoint] = []
     instance_mounts: List[InstanceMountPoint] = []
@@ -438,6 +545,10 @@ def _process_provisioning_with_shim(
         job_provisioning_data.backend, job_provisioning_data.instance_type.name
     )
 
+    gpu_devices = _get_instance_specific_gpu_devices(
+        job_provisioning_data.backend, job_provisioning_data.instance_type.name
+    )
+
     container_user = "root"
 
     job_runtime_data = get_job_runtime_data(job_model)
@@ -453,14 +564,14 @@ def _process_provisioning_with_shim(
         cpu = None
         memory = None
         network_mode = NetworkMode.HOST
-
+    image_name = _patch_base_image_for_aws_efa(job_spec, job_provisioning_data)
     if shim_client.is_api_v2_supported():
         shim_client.submit_task(
             task_id=job_model.id,
             name=job_model.job_name,
             registry_username=registry_username,
             registry_password=registry_password,
-            image_name=job_spec.image_name,
+            image_name=image_name,
             container_user=container_user,
             privileged=job_spec.privileged,
             gpu=gpu,
@@ -471,6 +582,7 @@ def _process_provisioning_with_shim(
             volumes=volumes,
             volume_mounts=volume_mounts,
             instance_mounts=instance_mounts,
+            gpu_devices=gpu_devices,
             host_ssh_user=ssh_user,
             host_ssh_keys=[ssh_key] if ssh_key else [],
             container_ssh_keys=public_keys,
@@ -480,7 +592,7 @@ def _process_provisioning_with_shim(
         submitted = shim_client.submit(
             username=registry_username,
             password=registry_password,
-            image_name=job_spec.image_name,
+            image_name=image_name,
             privileged=job_spec.privileged,
             container_name=job_model.job_name,
             container_user=container_user,
@@ -521,6 +633,7 @@ def _process_pulling_with_shim(
     job: Job,
     cluster_info: ClusterInfo,
     code: bytes,
+    file_archives: Iterable[tuple[uuid.UUID, bytes]],
     secrets: Dict[str, str],
     repo_credentials: Optional[RemoteRepoCreds],
     server_ssh_private_keys: tuple[str, Optional[str]],
@@ -538,7 +651,7 @@ def _process_pulling_with_shim(
     if shim_client.is_api_v2_supported():  # raises error if shim is down, causes retry
         task = shim_client.get_task(job_model.id)
 
-        # If task goes to terminated before the job is submitted to runner, then an error occured
+        # If task goes to terminated before the job is submitted to runner, then an error occurred
         if task.status == TaskStatus.TERMINATED:
             logger.warning(
                 "shim failed to execute job %s: %s (%s)",
@@ -567,7 +680,7 @@ def _process_pulling_with_shim(
     else:
         shim_status = shim_client.pull()  # raises error if shim is down, causes retry
 
-        # If shim goes to pending before the job is submitted to runner, then an error occured
+        # If shim goes to pending before the job is submitted to runner, then an error occurred
         if (
             shim_status.state == "pending"
             and shim_status.result is not None
@@ -596,6 +709,7 @@ def _process_pulling_with_shim(
         job=job,
         cluster_info=cluster_info,
         code=code,
+        file_archives=file_archives,
         secrets=secrets,
         repo_credentials=repo_credentials,
         success_if_not_available=True,
@@ -646,6 +760,10 @@ def _process_running(
                 )
             if latest_state_event.termination_message:
                 job_model.termination_reason_message = latest_state_event.termination_message
+        if (exit_status := latest_state_event.exit_status) is not None:
+            job_model.exit_status = exit_status
+            if exit_status != 0:
+                logger.info("%s: non-zero exit status %s", fmt(job_model), exit_status)
     else:
         _terminate_if_inactivity_duration_exceeded(run_model, job_model, resp.no_connections_secs)
     if job_model.status != previous_status:
@@ -681,6 +799,15 @@ def _terminate_if_inactivity_duration_exceeded(
             f"The job was inactive for {no_connections_secs} seconds,"
             f" exceeding the inactivity_duration of {conf.inactivity_duration} seconds"
         )
+
+
+def _should_terminate_job_due_to_disconnect(job_model: JobModel) -> bool:
+    if job_model.disconnected_at is None:
+        return False
+    return (
+        common_utils.get_current_datetime()
+        > job_model.disconnected_at + JOB_DISCONNECTED_RETRY_TIMEOUT
+    )
 
 
 async def _check_gpu_utilization(session: AsyncSession, job_model: JobModel, job: Job) -> None:
@@ -746,6 +873,19 @@ def _get_cluster_info(
     return cluster_info
 
 
+def _get_repo_code_hash(run: Run, job: Job) -> Optional[str]:
+    # TODO: drop this function when supporting jobs submitted before 0.19.17 is no longer relevant.
+    if (
+        job.job_spec.repo_code_hash is None
+        and run.run_spec.repo_code_hash is not None
+        and job.job_submissions[-1].deployment_num == run.deployment_num
+    ):
+        # The job spec does not have `repo_code_hash`, because it was submitted before 0.19.17.
+        # Use `repo_code_hash` from the run.
+        return run.run_spec.repo_code_hash
+    return job.job_spec.repo_code_hash
+
+
 async def _get_job_code(
     session: AsyncSession, project: ProjectModel, repo: RepoModel, code_hash: Optional[str]
 ) -> bytes:
@@ -773,6 +913,43 @@ async def _get_job_code(
     return blob
 
 
+async def _get_job_file_archives(
+    session: AsyncSession,
+    archive_mappings: Iterable[FileArchiveMapping],
+    user: UserModel,
+) -> list[tuple[uuid.UUID, bytes]]:
+    archives: list[tuple[uuid.UUID, bytes]] = []
+    for archive_mapping in archive_mappings:
+        archive_id = archive_mapping.id
+        archive_blob = await _get_job_file_archive(
+            session=session, archive_id=archive_id, user=user
+        )
+        archives.append((archive_id, archive_blob))
+    return archives
+
+
+async def _get_job_file_archive(
+    session: AsyncSession, archive_id: uuid.UUID, user: UserModel
+) -> bytes:
+    archive_model = await files_services.get_archive_model(session, id=archive_id, user=user)
+    if archive_model is None:
+        return b""
+    if archive_model.blob is not None:
+        return archive_model.blob
+    storage = get_default_storage()
+    if storage is None:
+        return b""
+    blob = await common_utils.run_async(
+        storage.get_archive,
+        str(archive_model.user_id),
+        archive_model.blob_hash,
+    )
+    if blob is None:
+        logger.error("Failed to get file archive %s from storage", archive_id)
+        return b""
+    return blob
+
+
 @runner_ssh_tunnel(ports=[DSTACK_RUNNER_HTTP_PORT], retries=1)
 def _submit_job_to_runner(
     ports: Dict[int, int],
@@ -781,6 +958,7 @@ def _submit_job_to_runner(
     job: Job,
     cluster_info: ClusterInfo,
     code: bytes,
+    file_archives: Iterable[tuple[uuid.UUID, bytes]],
     secrets: Dict[str, str],
     repo_credentials: Optional[RemoteRepoCreds],
     success_if_not_available: bool,
@@ -813,13 +991,18 @@ def _submit_job_to_runner(
         return success_if_not_available
 
     runner_client.submit_job(
-        run_spec=run.run_spec,
-        job_spec=job.job_spec,
+        run=run,
+        job=job,
         cluster_info=cluster_info,
-        secrets=secrets,
+        # Do not send all the secrets since interpolation is already done by the server.
+        # TODO: Passing secrets may be necessary for filtering out secret values from logs.
+        secrets={},
         repo_credentials=repo_credentials,
         instance_env=instance_env,
     )
+    logger.debug("%s: uploading file archive(s)", fmt(job_model))
+    for archive_id, archive in file_archives:
+        runner_client.upload_archive(archive_id, archive)
     logger.debug("%s: uploading code", fmt(job_model))
     runner_client.upload_code(code)
     logger.debug("%s: starting job", fmt(job_model))
@@ -831,17 +1014,113 @@ def _submit_job_to_runner(
     return True
 
 
+def _interpolate_secrets(secrets: Dict[str, str], job_spec: JobSpec):
+    interpolate = VariablesInterpolator({"secrets": secrets}).interpolate_or_error
+    job_spec.env = {k: interpolate(v) for k, v in job_spec.env.items()}
+    if job_spec.registry_auth is not None:
+        job_spec.registry_auth = RegistryAuth(
+            username=interpolate(job_spec.registry_auth.username),
+            password=interpolate(job_spec.registry_auth.password),
+        )
+
+
 def _get_instance_specific_mounts(
     backend_type: BackendType, instance_type_name: str
 ) -> List[InstanceMountPoint]:
-    if backend_type == BackendType.GCP and instance_type_name == "a3-megagpu-8g":
-        return [
-            InstanceMountPoint(
-                instance_path="/dev/aperture_devices", path="/dev/aperture_devices"
-            ),
-            InstanceMountPoint(instance_path="/var/lib/tcpxo/lib64", path="/var/lib/tcpxo/lib64"),
-            InstanceMountPoint(
-                instance_path="/var/lib/fastrak/lib64", path="/var/lib/fastrak/lib64"
-            ),
-        ]
+    if backend_type == BackendType.GCP:
+        if instance_type_name == "a3-megagpu-8g":
+            return [
+                InstanceMountPoint(
+                    instance_path="/dev/aperture_devices",
+                    path="/dev/aperture_devices",
+                ),
+                InstanceMountPoint(
+                    instance_path="/var/lib/tcpxo/lib64",
+                    path="/var/lib/tcpxo/lib64",
+                ),
+                InstanceMountPoint(
+                    instance_path="/var/lib/fastrak/lib64",
+                    path="/var/lib/fastrak/lib64",
+                ),
+            ]
+        if instance_type_name in ["a3-edgegpu-8g", "a3-highgpu-8g"]:
+            return [
+                InstanceMountPoint(
+                    instance_path="/var/lib/nvidia/lib64",
+                    path="/usr/local/nvidia/lib64",
+                ),
+                InstanceMountPoint(
+                    instance_path="/var/lib/nvidia/bin",
+                    path="/usr/local/nvidia/bin",
+                ),
+                InstanceMountPoint(
+                    instance_path="/var/lib/tcpx/lib64",
+                    path="/usr/local/tcpx/lib64",
+                ),
+                InstanceMountPoint(
+                    instance_path="/run/tcpx",
+                    path="/run/tcpx",
+                ),
+            ]
     return []
+
+
+def _get_instance_specific_gpu_devices(
+    backend_type: BackendType, instance_type_name: str
+) -> List[GPUDevice]:
+    gpu_devices = []
+    if backend_type == BackendType.GCP and instance_type_name in [
+        "a3-edgegpu-8g",
+        "a3-highgpu-8g",
+    ]:
+        for i in range(8):
+            gpu_devices.append(
+                GPUDevice(path_on_host=f"/dev/nvidia{i}", path_in_container=f"/dev/nvidia{i}")
+            )
+        gpu_devices.append(
+            GPUDevice(path_on_host="/dev/nvidia-uvm", path_in_container="/dev/nvidia-uvm")
+        )
+        gpu_devices.append(
+            GPUDevice(path_on_host="/dev/nvidiactl", path_in_container="/dev/nvidiactl")
+        )
+    return gpu_devices
+
+
+def _patch_base_image_for_aws_efa(
+    job_spec: JobSpec, job_provisioning_data: JobProvisioningData
+) -> str:
+    image_name = job_spec.image_name
+
+    if job_provisioning_data.backend != BackendType.AWS:
+        return image_name
+
+    instance_type = job_provisioning_data.instance_type.name
+    efa_enabled_patterns = [
+        # TODO: p6-b200 isn't supported yet in gpuhunt
+        r"^p6-b200\.(48xlarge)$",
+        r"^p5\.(48xlarge)$",
+        r"^p5e\.(48xlarge)$",
+        r"^p5en\.(48xlarge)$",
+        r"^p4d\.(24xlarge)$",
+        r"^p4de\.(24xlarge)$",
+        r"^g6\.(8xlarge|12xlarge|16xlarge|24xlarge|48xlarge)$",
+        r"^g6e\.(8xlarge|12xlarge|16xlarge|24xlarge|48xlarge)$",
+        r"^gr6\.8xlarge$",
+        r"^g5\.(8xlarge|12xlarge|16xlarge|24xlarge|48xlarge)$",
+        r"^g4dn\.(8xlarge|12xlarge|16xlarge|metal)$",
+        r"^p3dn\.(24xlarge)$",
+    ]
+
+    is_efa_enabled = any(re.match(pattern, instance_type) for pattern in efa_enabled_patterns)
+    if not is_efa_enabled:
+        return image_name
+
+    if not image_name.startswith(f"{settings.DSTACK_BASE_IMAGE}:"):
+        return image_name
+
+    if image_name.endswith(f"-base-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"):
+        return image_name[:-17] + f"-devel-efa-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"
+    elif image_name.endswith(f"-devel-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"):
+        return image_name[:-18] + f"-devel-efa-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"
+
+    return image_name

@@ -8,9 +8,12 @@ from typing_extensions import Annotated
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import ApplyAction, CoreModel, NetworkMode, RegistryAuth
 from dstack._internal.core.models.configurations import (
+    DEFAULT_REPO_DIR,
     AnyRunConfiguration,
     RunConfiguration,
+    ServiceConfiguration,
 )
+from dstack._internal.core.models.files import FileArchiveMapping
 from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
     InstanceType,
@@ -99,11 +102,20 @@ class RunTerminationReason(str, Enum):
         }
         return mapping[self]
 
+    def to_error(self) -> Optional[str]:
+        if self == RunTerminationReason.RETRY_LIMIT_EXCEEDED:
+            return "retry limit exceeded"
+        elif self == RunTerminationReason.SERVER_ERROR:
+            return "server error"
+        else:
+            return None
+
 
 class JobTerminationReason(str, Enum):
     # Set by the server
     FAILED_TO_START_DUE_TO_NO_CAPACITY = "failed_to_start_due_to_no_capacity"
     INTERRUPTED_BY_NO_CAPACITY = "interrupted_by_no_capacity"
+    INSTANCE_UNREACHABLE = "instance_unreachable"
     WAITING_INSTANCE_LIMIT_EXCEEDED = "waiting_instance_limit_exceeded"
     WAITING_RUNNER_LIMIT_EXCEEDED = "waiting_runner_limit_exceeded"
     TERMINATED_BY_USER = "terminated_by_user"
@@ -126,6 +138,7 @@ class JobTerminationReason(str, Enum):
         mapping = {
             self.FAILED_TO_START_DUE_TO_NO_CAPACITY: JobStatus.FAILED,
             self.INTERRUPTED_BY_NO_CAPACITY: JobStatus.FAILED,
+            self.INSTANCE_UNREACHABLE: JobStatus.FAILED,
             self.WAITING_INSTANCE_LIMIT_EXCEEDED: JobStatus.FAILED,
             self.WAITING_RUNNER_LIMIT_EXCEEDED: JobStatus.FAILED,
             self.TERMINATED_BY_USER: JobStatus.TERMINATED,
@@ -145,8 +158,36 @@ class JobTerminationReason(str, Enum):
         }
         return mapping[self]
 
-    def pretty_repr(self) -> str:
-        return " ".join(self.value.split("_")).capitalize()
+    def to_retry_event(self) -> Optional[RetryEvent]:
+        """
+        Returns:
+            the retry event this termination reason triggers
+            or None if this termination reason should not be retried
+        """
+        mapping = {
+            self.FAILED_TO_START_DUE_TO_NO_CAPACITY: RetryEvent.NO_CAPACITY,
+            self.INTERRUPTED_BY_NO_CAPACITY: RetryEvent.INTERRUPTION,
+        }
+        default = RetryEvent.ERROR if self.to_status() == JobStatus.FAILED else None
+        return mapping.get(self, default)
+
+    def to_error(self) -> Optional[str]:
+        # Should return None for values that are already
+        # handled and shown in status_message.
+        error_mapping = {
+            JobTerminationReason.INSTANCE_UNREACHABLE: "instance unreachable",
+            JobTerminationReason.WAITING_INSTANCE_LIMIT_EXCEEDED: "waiting instance limit exceeded",
+            JobTerminationReason.VOLUME_ERROR: "volume error",
+            JobTerminationReason.GATEWAY_ERROR: "gateway error",
+            JobTerminationReason.SCALED_DOWN: "scaled down",
+            JobTerminationReason.INACTIVITY_DURATION_EXCEEDED: "inactivity duration exceeded",
+            JobTerminationReason.TERMINATED_DUE_TO_UTILIZATION_POLICY: "utilization policy",
+            JobTerminationReason.PORTS_BINDING_FAILED: "ports binding failed",
+            JobTerminationReason.CREATING_CONTAINER_ERROR: "runner error",
+            JobTerminationReason.EXECUTOR_ERROR: "executor error",
+            JobTerminationReason.MAX_DURATION_EXCEEDED: "max duration exceeded",
+        }
+        return error_mapping.get(self)
 
 
 class Requirements(CoreModel):
@@ -162,7 +203,7 @@ class Requirements(CoreModel):
             if self.spot is not None:
                 res += f", {'spot' if self.spot else 'on-demand'}"
             if self.max_price is not None:
-                res += f" under ${self.max_price:g} per hour"
+                res += f" under ${self.max_price:3f}".rstrip("0").rstrip(".") + " per hour"
         return res
 
 
@@ -204,6 +245,17 @@ class JobSpec(CoreModel):
     volumes: Optional[List[MountPoint]] = None
     ssh_key: Optional[JobSSHKey] = None
     working_dir: Optional[str]
+    # `repo_data` is optional for client compatibility with pre-0.19.17 servers and for compatibility
+    # with jobs submitted before 0.19.17. All new jobs are expected to have non-None `repo_data`.
+    # For --no-repo runs, `repo_data` is `VirtualRunRepoData()`.
+    repo_data: Annotated[Optional[AnyRunRepoData], Field(discriminator="repo_type")] = None
+    # `repo_code_hash` can be None because it is not used for the repo or because the job was
+    # submitted before 0.19.17. See `_get_repo_code_hash` on how to get the correct `repo_code_hash`
+    # TODO: drop this comment when supporting jobs submitted before 0.19.17 is no longer relevant.
+    repo_code_hash: Optional[str] = None
+    file_archives: list[FileArchiveMapping] = []
+    # None for non-services and pre-0.19.19 services. See `get_service_port`
+    service_port: Optional[int] = None
 
 
 class JobProvisioningData(CoreModel):
@@ -262,9 +314,9 @@ class JobRuntimeData(CoreModel):
     # or not applicable (container-based backends)
     ports: Optional[dict[int, int]] = None
     # List of volumes used by the job
-    volume_names: Optional[list[str]] = None  # None for backward compalibility
+    volume_names: Optional[list[str]] = None  # None for backward compatibility
     # Virtual shared offer
-    offer: Optional[InstanceOfferWithAvailability] = None  # None for backward compalibility
+    offer: Optional[InstanceOfferWithAvailability] = None  # None for backward compatibility
 
 
 class ClusterInfo(CoreModel):
@@ -276,15 +328,19 @@ class ClusterInfo(CoreModel):
 class JobSubmission(CoreModel):
     id: UUID4
     submission_num: int
+    deployment_num: int = 0  # default for compatibility with pre-0.19.14 servers
     submitted_at: datetime
     last_processed_at: datetime
     finished_at: Optional[datetime]
     inactivity_secs: Optional[int]
     status: JobStatus
+    status_message: str = ""  # default for backward compatibility
     termination_reason: Optional[JobTerminationReason]
     termination_reason_message: Optional[str]
+    exit_status: Optional[int]
     job_provisioning_data: Optional[JobProvisioningData]
     job_runtime_data: Optional[JobRuntimeData]
+    error: Optional[str] = None
 
     @property
     def age(self) -> timedelta:
@@ -330,12 +386,16 @@ class RunSpec(CoreModel):
         Optional[str],
         Field(description="The hash of the repo diff. Can be omitted if there is no repo diff."),
     ] = None
+    file_archives: Annotated[
+        list[FileArchiveMapping],
+        Field(description="The list of file archive ID to container path mappings"),
+    ] = []
     working_dir: Annotated[
         Optional[str],
         Field(
             description=(
                 "The path to the working directory inside the container."
-                " It's specified relative to the repository directory (`/workflow`) and should be inside it."
+                f" It's specified relative to the repository directory (`{DEFAULT_REPO_DIR}`) and should be inside it."
                 ' Defaults to `"."`.'
             )
         ),
@@ -357,6 +417,8 @@ class RunSpec(CoreModel):
             description="The contents of the SSH public key that will be used to connect to the run."
         ),
     ]
+    # merged_profile stores profile parameters merged from profile and configuration.
+    # Read profile parameters from merged_profile instead of profile directly.
     # TODO: make merged_profile a computed field after migrating to pydanticV2
     merged_profile: Annotated[Profile, Field(exclude=True)] = None
 
@@ -425,23 +487,23 @@ class Run(CoreModel):
     submitted_at: datetime
     last_processed_at: datetime
     status: RunStatus
-    termination_reason: Optional[RunTerminationReason]
+    status_message: str = ""  # default for backward compatibility
+    termination_reason: Optional[RunTerminationReason] = None
     run_spec: RunSpec
     jobs: List[Job]
-    latest_job_submission: Optional[JobSubmission]
+    latest_job_submission: Optional[JobSubmission] = None
     cost: float = 0
     service: Optional[ServiceSpec] = None
-    # TODO: make error a computed field after migrating to pydanticV2
+    deployment_num: int = 0  # default for compatibility with pre-0.19.14 servers
     error: Optional[str] = None
     deleted: Optional[bool] = None
 
-    @root_validator
-    def _error(cls, values) -> Dict:
-        values["error"] = _get_run_error(
-            run_termination_reason=values["termination_reason"],
-            run_jobs=values["jobs"],
+    def is_deployment_in_progress(self) -> bool:
+        return any(
+            not j.job_submissions[-1].status.is_finished()
+            and j.job_submissions[-1].deployment_num != self.deployment_num
+            for j in self.jobs
         )
-        return values
 
 
 class JobPlan(CoreModel):
@@ -455,9 +517,15 @@ class RunPlan(CoreModel):
     project_name: str
     user: str
     run_spec: RunSpec
+    effective_run_spec: Optional[RunSpec] = None
     job_plans: List[JobPlan]
     current_resource: Optional[Run] = None
     action: ApplyAction
+
+    def get_effective_run_spec(self) -> RunSpec:
+        if self.effective_run_spec is not None:
+            return self.effective_run_spec
+        return self.run_spec
 
 
 class ApplyRunPlanInput(CoreModel):
@@ -487,29 +555,9 @@ def get_policy_map(spot_policy: Optional[SpotPolicy], default: SpotPolicy) -> Op
     return policy_map[spot_policy]
 
 
-def _get_run_error(
-    run_termination_reason: Optional[RunTerminationReason],
-    run_jobs: List[Job],
-) -> str:
-    if run_termination_reason is None:
-        return ""
-    if len(run_jobs) > 1:
-        return run_termination_reason.name
-    run_job_termination_reason = _get_run_job_termination_reason(run_jobs)
-    # For failed runs, also show termination reason to provide more context.
-    # For other run statuses, the job termination reason will duplicate run status.
-    if run_job_termination_reason is not None and run_termination_reason in [
-        RunTerminationReason.JOB_FAILED,
-        RunTerminationReason.SERVER_ERROR,
-        RunTerminationReason.RETRY_LIMIT_EXCEEDED,
-    ]:
-        return f"{run_termination_reason.name}\n({run_job_termination_reason.name})"
-    return run_termination_reason.name
-
-
-def _get_run_job_termination_reason(run_jobs: List[Job]) -> Optional[JobTerminationReason]:
-    for job in run_jobs:
-        if len(job.job_submissions) > 0:
-            if job.job_submissions[-1].termination_reason is not None:
-                return job.job_submissions[-1].termination_reason
-    return None
+def get_service_port(job_spec: JobSpec, configuration: ServiceConfiguration) -> int:
+    # Compatibility with pre-0.19.19 job specs that do not have the `service_port` property.
+    # TODO: drop when pre-0.19.19 jobs are no longer relevant.
+    if job_spec.service_port is None:
+        return configuration.port.container_port
+    return job_spec.service_port

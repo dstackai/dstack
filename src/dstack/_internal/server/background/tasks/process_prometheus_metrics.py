@@ -9,11 +9,17 @@ from sqlalchemy.orm import joinedload
 from dstack._internal.core.consts import DSTACK_SHIM_HTTP_PORT
 from dstack._internal.core.models.runs import JobStatus
 from dstack._internal.server.db import get_session_ctx
-from dstack._internal.server.models import InstanceModel, JobModel, JobPrometheusMetrics
+from dstack._internal.server.models import (
+    InstanceModel,
+    JobModel,
+    JobPrometheusMetrics,
+    ProjectModel,
+)
 from dstack._internal.server.services.instances import get_instance_ssh_private_keys
 from dstack._internal.server.services.jobs import get_job_provisioning_data, get_job_runtime_data
 from dstack._internal.server.services.runner import client
 from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
+from dstack._internal.server.utils import sentry_utils
 from dstack._internal.server.utils.common import gather_map_async
 from dstack._internal.utils.common import batched, get_current_datetime, get_or_error, run_async
 from dstack._internal.utils.logging import get_logger
@@ -29,6 +35,7 @@ MIN_COLLECT_INTERVAL_SECONDS = 9
 METRICS_TTL_SECONDS = 600
 
 
+@sentry_utils.instrument_background_task
 async def collect_prometheus_metrics():
     now = get_current_datetime()
     cutoff = now - timedelta(seconds=MIN_COLLECT_INTERVAL_SECONDS)
@@ -43,7 +50,11 @@ async def collect_prometheus_metrics():
                     JobPrometheusMetrics.collected_at < cutoff,
                 ),
             )
-            .options(joinedload(JobModel.instance).joinedload(InstanceModel.project))
+            .options(
+                joinedload(JobModel.instance)
+                .joinedload(InstanceModel.project)
+                .load_only(ProjectModel.ssh_private_key)
+            )
             .order_by(JobModel.last_processed_at.asc())
             .limit(MAX_JOBS_FETCHED)
         )
@@ -52,6 +63,7 @@ async def collect_prometheus_metrics():
         await _collect_jobs_metrics(batch, now)
 
 
+@sentry_utils.instrument_background_task
 async def delete_prometheus_metrics():
     now = get_current_datetime()
     cutoff = now - timedelta(seconds=METRICS_TTL_SECONDS)
@@ -99,11 +111,14 @@ async def _collect_jobs_metrics(job_models: list[JobModel], collected_at: dateti
 
 
 async def _collect_job_metrics(job_model: JobModel) -> Optional[str]:
-    ssh_private_keys = get_instance_ssh_private_keys(get_or_error(job_model.instance))
     jpd = get_job_provisioning_data(job_model)
-    jrd = get_job_runtime_data(job_model)
     if jpd is None:
         return None
+    if not jpd.dockerized:
+        # Container-based backend, no shim
+        return None
+    ssh_private_keys = get_instance_ssh_private_keys(get_or_error(job_model.instance))
+    jrd = get_job_runtime_data(job_model)
     try:
         res = await run_async(
             _pull_job_metrics,

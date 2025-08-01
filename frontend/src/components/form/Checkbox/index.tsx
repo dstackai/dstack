@@ -43,7 +43,7 @@ export const FormCheckbox = <T extends FieldValues>({
                             checked={value}
                             onChange={(event) => {
                                 onChange(event.detail.checked);
-                                onChangeProp && onChangeProp(event);
+                                onChangeProp?.(event);
                             }}
                         >
                             {checkboxLabel}

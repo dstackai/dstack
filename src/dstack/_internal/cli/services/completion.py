@@ -75,6 +75,11 @@ class GatewayNameCompleter(BaseAPINameCompleter):
         return [r.name for r in api.client.gateways.list(api.project)]
 
 
+class SecretNameCompleter(BaseAPINameCompleter):
+    def fetch_resource_names(self, api: Client) -> Iterable[str]:
+        return [r.name for r in api.client.secrets.list(api.project)]
+
+
 class ProjectNameCompleter(BaseCompleter):
     """
     Completer for local project names.

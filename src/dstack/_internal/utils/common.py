@@ -1,4 +1,5 @@
 import asyncio
+import enum
 import itertools
 import re
 import time
@@ -83,6 +84,8 @@ def pretty_date(time: datetime) -> str:
 
 
 def pretty_resources(
+    *,
+    cpu_arch: Optional[Any] = None,
     cpus: Optional[Any] = None,
     memory: Optional[Any] = None,
     gpu_count: Optional[Any] = None,
@@ -110,25 +113,35 @@ def pretty_resources(
     """
     parts = []
     if cpus is not None:
-        parts.append(f"{cpus}xCPU")
+        cpu_arch_lower: Optional[str] = None
+        if isinstance(cpu_arch, enum.Enum):
+            cpu_arch_lower = str(cpu_arch.value).lower()
+        elif isinstance(cpu_arch, str):
+            cpu_arch_lower = cpu_arch.lower()
+        if cpu_arch_lower == "arm":
+            cpu_arch_prefix = "arm:"
+        else:
+            cpu_arch_prefix = ""
+        parts.append(f"cpu={cpu_arch_prefix}{cpus}")
     if memory is not None:
-        parts.append(f"{memory}")
+        parts.append(f"mem={memory}")
+    if disk_size:
+        parts.append(f"disk={disk_size}")
     if gpu_count:
         gpu_parts = []
+        gpu_parts.append(f"{gpu_name or 'gpu'}")
         if gpu_memory is not None:
             gpu_parts.append(f"{gpu_memory}")
+        if gpu_count is not None:
+            gpu_parts.append(f"{gpu_count}")
         if total_gpu_memory is not None:
-            gpu_parts.append(f"total {total_gpu_memory}")
+            gpu_parts.append(f"{total_gpu_memory}")
         if compute_capability is not None:
             gpu_parts.append(f"{compute_capability}")
 
-        gpu = f"{gpu_count}x{gpu_name or 'GPU'}"
-        if gpu_parts:
-            gpu += f" ({', '.join(gpu_parts)})"
+        gpu = ":".join(gpu_parts)
         parts.append(gpu)
-    if disk_size:
-        parts.append(f"{disk_size} (disk)")
-    return ", ".join(parts)
+    return " ".join(parts)
 
 
 def since(timestamp: str) -> datetime:
@@ -212,27 +225,6 @@ def remove_prefix(text: str, prefix: str) -> str:
 T = TypeVar("T")
 
 
-def split_chunks(iterable: Iterable[T], chunk_size: int) -> Iterable[List[T]]:
-    """
-    Splits an iterable into chunks of at most `chunk_size` items.
-
-    >>> list(split_chunks([1, 2, 3, 4, 5], 2))
-    [[1, 2], [3, 4], [5]]
-    """
-
-    if chunk_size < 1:
-        raise ValueError(f"chunk_size should be a positive integer, not {chunk_size}")
-
-    chunk = []
-    for item in iterable:
-        chunk.append(item)
-        if len(chunk) == chunk_size:
-            yield chunk
-            chunk = []
-    if chunk:
-        yield chunk
-
-
 MEMORY_UNITS = {
     "B": 1,
     "K": 2**10,
@@ -270,7 +262,17 @@ def get_or_error(v: Optional[T]) -> T:
     return v
 
 
+# TODO: drop after dropping Python 3.11
 def batched(seq: Iterable[T], n: int) -> Iterable[List[T]]:
+    """
+    Roughly equivalent to itertools.batched from Python 3.12.
+
+    >>> list(batched([1, 2, 3, 4, 5], 2))
+    [[1, 2], [3, 4], [5]]
+    """
+
+    if n < 1:
+        raise ValueError(f"n should be a positive integer, not {n}")
     it = iter(seq)
     return iter(lambda: list(itertools.islice(it, n)), [])
 
@@ -301,3 +303,7 @@ def make_proxy_url(server_url: str, proxy_url: str) -> str:
         path=concat_url_path(server.path, proxy.path),
     )
     return proxy.geturl()
+
+
+def list_enum_values_for_annotation(enum_class: type[enum.Enum]) -> str:
+    return ", ".join(f"`{e.value}`" for e in enum_class)

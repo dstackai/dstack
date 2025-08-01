@@ -62,6 +62,15 @@ class AzureBackendConfig(CoreModel):
             )
         ),
     ] = None
+    vm_managed_identity: Annotated[
+        Optional[str],
+        Field(
+            description=(
+                "The managed identity to associate with provisioned VMs."
+                " Must have a format `managedIdentityResourceGroup/managedIdentityName`"
+            )
+        ),
+    ] = None
     tags: Annotated[
         Optional[Dict[str, str]],
         Field(description="The tags that will be assigned to resources created by `dstack`"),

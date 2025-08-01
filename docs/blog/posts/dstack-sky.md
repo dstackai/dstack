@@ -2,6 +2,8 @@
 date: 2024-03-11
 description: A managed service that enables you to get GPUs at competitive rates from a wide pool of providers. 
 slug: dstack-sky
+categories:
+  - Changelog
 ---
 
 # Introducing dstack Sky
@@ -40,8 +42,8 @@ set up with `dstack Sky`.
 <div class="termy">
 
 ```shell
-$ dstack config --url https://sky.dstack.ai \
-    --project my-awesome-project \
+$ dstack project add --name my-awesome-project \
+    --url https://sky.dstack.ai \
     --token ca1ee60b-7b3f-8943-9a25-6974c50efa75
 ```
 

@@ -16,7 +16,7 @@ name: vscode
 
 python: "3.11"
 # Uncomment to use a custom Docker image
-#image: dstackai/base:py3.13-0.7-cuda-12.1
+#image: huggingface/trl-latest-gpu
 ide: vscode
 
 # Uncomment to leverage spot instances
@@ -86,15 +86,300 @@ property with a list of commands to run at startup:
 
 ```yaml
 type: dev-environment
-# The name is optional, if not specified, generated randomly
 name: vscode
 
 python: "3.11"
 ide: vscode
 
-# Commands to run on startup
 init:
   - pip install wandb
+```
+
+</div>
+
+### Resources
+
+When you specify a resource value like `cpu` or `memory`,
+you can either use an exact value (e.g. `24GB`) or a 
+range (e.g. `24GB..`, or `24GB..80GB`, or `..80GB`).
+
+<div editor-title=".dstack.yml"> 
+
+```yaml
+type: dev-environment
+# The name is optional, if not specified, generated randomly
+name: vscode    
+
+ide: vscode
+
+resources:
+  # 16 or more x86_64 cores
+  cpu: 16..
+  # 200GB or more RAM
+  memory: 200GB..
+  # 4 GPUs from 40GB to 80GB
+  gpu: 40GB..80GB:4
+  # Shared memory (required by multi-gpu)
+  shm_size: 16GB
+  # Disk size
+  disk: 500GB
+```
+
+</div>
+
+The `cpu` property lets you set the architecture (`x86` or `arm`) and core count — e.g., `x86:16` (16 x86 cores), `arm:8..` (at least 8 ARM cores). 
+If not set, `dstack` infers it from the GPU or defaults to `x86`.
+
+The `gpu` property lets you specify vendor, model, memory, and count — e.g., `nvidia` (one NVIDIA GPU), `A100` (one A100), `A10G,A100` (either), `A100:80GB` (one 80GB A100), `A100:2` (two A100), `24GB..40GB:2` (two GPUs with 24–40GB), `A100:40GB:2` (two 40GB A100s). 
+
+If vendor is omitted, `dstack` infers it from the model or defaults to `nvidia`.
+
+??? info "Google Cloud TPU"
+    To use TPUs, specify its architecture via the `gpu` property.
+
+    ```yaml
+    type: dev-environment
+    name: vscode    
+    
+    ide: vscode
+    
+    resources:
+      gpu: v2-8
+    ```
+
+    Currently, only 8 TPU cores can be specified, supporting single TPU device workloads. Multi-TPU support is coming soon.
+
+??? info "Shared memory"
+    If you are using parallel communicating processes (e.g., dataloaders in PyTorch), you may need to configure 
+    `shm_size`, e.g. set it to `16GB`.
+
+> If you’re unsure which offers (hardware configurations) are available from the configured backends, use the
+> [`dstack offer`](../reference/cli/dstack/offer.md#list-gpu-offers) command to list them.
+
+### Docker
+
+#### Default image
+
+If you don't specify `image`, `dstack` uses its base Docker image pre-configured with 
+`uv`, `python`, `pip`, essential CUDA drivers, and NCCL tests (under `/opt/nccl-tests/build`). 
+
+Set the `python` property to pre-install a specific version of Python.
+
+<div editor-title=".dstack.yml"> 
+
+```yaml
+type: dev-environment
+name: vscode
+
+python: 3.12
+
+ide: vscode
+```
+
+</div>
+
+#### NVCC
+
+By default, the base Docker image doesn’t include `nvcc`, which is required for building custom CUDA kernels. 
+If you need `nvcc`, set the [`nvcc`](../reference/dstack.yml/dev-environment.md#nvcc) property to true.
+
+<div editor-title=".dstack.yml"> 
+
+```yaml
+type: dev-environment
+name: vscode
+
+python: 3.12
+nvcc: true
+
+ide: vscode
+init:
+  - uv pip install flash_attn --no-build-isolation
+```
+
+</div>
+
+#### Custom image
+
+If you want, you can specify your own Docker image via `image`.
+
+<div editor-title=".dstack.yml"> 
+
+```yaml
+type: dev-environment
+name: vscode    
+
+image: huggingface/trl-latest-gpu
+
+ide: vscode
+```
+
+</div>
+
+#### Docker in Docker
+
+Set `docker` to `true` to enable the `docker` CLI in your dev environment, e.g., to run or build Docker images, or use Docker Compose.
+
+<div editor-title=".dstack.yml"> 
+
+```yaml
+type: dev-environment
+name: vscode
+
+docker: true
+
+ide: vscode
+init:
+  - docker run --gpus all nvidia/cuda:12.3.0-base-ubuntu22.04 nvidia-smi
+```
+
+</div>
+
+Cannot be used with `python` or `image`. Not supported on `runpod`, `vastai`, or `kubernetes`.
+
+#### Privileged mode
+
+To enable privileged mode, set [`privileged`](../reference/dstack.yml/dev-environment.md#privileged) to `true`.
+
+Not supported with `runpod`, `vastai`, and `kubernetes`.
+
+#### Private registry
+    
+Use the [`registry_auth`](../reference/dstack.yml/dev-environment.md#registry_auth) property to provide credentials for a private Docker registry. 
+
+<div editor-title=".dstack.yml"> 
+
+```yaml
+type: dev-environment
+name: vscode
+
+env:
+  - NGC_API_KEY
+
+image: nvcr.io/nim/deepseek-ai/deepseek-r1-distill-llama-8b
+registry_auth:
+  username: $oauthtoken
+  password: ${{ env.NGC_API_KEY }}
+
+ide: vscode
+```
+
+</div>
+
+### Environment variables
+
+<div editor-title=".dstack.yml"> 
+
+```yaml
+type: dev-environment
+name: vscode    
+
+env:
+  - HF_TOKEN
+  - HF_HUB_ENABLE_HF_TRANSFER=1
+
+ide: vscode
+```
+
+</div>
+
+If you don't assign a value to an environment variable (see `HF_TOKEN` above), 
+`dstack` will require the value to be passed via the CLI or set in the current process.
+
+??? info "System environment variables"
+    The following environment variables are available in any run by default:
+    
+    | Name                    | Description                             |
+    |-------------------------|-----------------------------------------|
+    | `DSTACK_RUN_NAME`       | The name of the run                     |
+    | `DSTACK_REPO_ID`        | The ID of the repo                      |
+    | `DSTACK_GPUS_NUM`       | The total number of GPUs in the run     |
+
+### Files
+
+By default, `dstack` automatically mounts the [repo](repos.md) directory where you ran `dstack init` to any run configuration. 
+
+However, in some cases, you may not want to mount the entire directory (e.g., if it’s too large),
+or you might want to mount files outside of it. In such cases, you can use the [`files`](../reference/dstack.yml/dev-environment.md#files) property.
+
+<div editor-title="examples/.dstack.yml"> 
+
+```yaml
+type: dev-environment
+name: vscode    
+
+files:
+  - .:examples  # Maps the directory where `.dstack.yml` to `/workflow/examples`
+  - ~/.ssh/id_rsa:/root/.ssh/id_rsa  # Maps `~/.ssh/id_rsa` to `/root/.ssh/id_rsa`
+
+ide: vscode
+```
+
+</div>
+
+Each entry maps a local directory or file to a path inside the container. Both local and container paths can be relative or absolute.
+
+- If the local path is relative, it’s resolved relative to the configuration file.
+- If the container path is relative, it’s resolved relative to `/workflow`.
+
+The container path is optional. If not specified, it will be automatically calculated.
+
+<div editor-title="examples/.dstack.yml"> 
+
+```yaml
+type: dev-environment
+name: vscode    
+
+files:
+  - ../examples  # Maps `examples` (the parent directory of `.dstack.yml`) to `/workflow/examples`
+  - ~/.ssh/id_rsa  # Maps `~/.ssh/id_rsa` to `/root/.ssh/id_rsa`
+
+ide: vscode
+```
+
+</div>
+
+Note: If you want to use `files` without mounting the entire repo directory,
+make sure to pass `--no-repo` when running `dstack apply`:
+
+<div class="termy">
+
+```shell
+$ dstack apply -f examples/.dstack.yml --no-repo
+```
+
+</div>
+
+??? info ".gitignore and .dstackignore"
+    `dstack` automatically excludes files and folders listed in `.gitignore` and `.dstackignore`.
+    
+    Uploads are limited to 2MB. To avoid exceeding this limit, make sure to exclude unnecessary files.
+    You can increase the default server limit by setting the `DSTACK_SERVER_CODE_UPLOAD_LIMIT` environment variable.
+
+!!! warning "Experimental"
+    The `files` feature is experimental. Feedback is highly appreciated.
+
+### Retry policy
+
+By default, if `dstack` can't find capacity or the instance is interrupted, the run will fail.
+
+If you'd like `dstack` to automatically retry, configure the 
+[retry](../reference/dstack.yml/dev-environment.md#retry) property accordingly:
+
+<div editor-title=".dstack.yml">
+
+```yaml
+type: dev-environment
+# The name is optional, if not specified, generated randomly
+name: vscode    
+
+ide: vscode
+
+retry:
+  # Retry on specific events
+  on_events: [no-capacity, error, interruption]
+  # Retry for up to 1 hour
+  duration: 1h
 ```
 
 </div>
@@ -109,6 +394,7 @@ to automatically stop the dev environment after a configured period of inactivit
 ```yaml
 type: dev-environment
 name: vscode
+
 ide: vscode
 
 # Stop if inactive for 2 hours
@@ -123,12 +409,12 @@ If you go offline without stopping anything manually, the dev environment will a
 within about 3 minutes.
 
 If `inactivity_duration` is configured for your dev environment, you can see how long
-it has been inactive in `dstack ps --verbose`.
+it has been inactive in `dstack ps --verbose` (or `-v`).
 
 <div class="termy">
 
 ```shell
-$ dstack ps --verbose
+$ dstack ps -v
  NAME    BACKEND  RESOURCES       PRICE    STATUS                 SUBMITTED
  vscode  cudo     2xCPU, 8GB,     $0.0286  running                8 mins ago
                   100.0GB (disk)           (inactive for 2m 34s)
@@ -159,147 +445,83 @@ the inactivity timer will be reset within a few seconds.
 > The latter determines how soon the underlying cloud instance will be terminated
 > _after_ the dev environment is stopped.
 
-### Resources
+### Utilization policy
 
-When you specify a resource value like `cpu` or `memory`,
-you can either use an exact value (e.g. `24GB`) or a 
-range (e.g. `24GB..`, or `24GB..80GB`, or `..80GB`).
+Sometimes it’s useful to track whether a dev environment is fully utilizing all GPUs. While you can check this with
+[`dstack metrics`](../reference/cli/dstack/metrics.md), `dstack` also lets you set a policy to auto-terminate the run if any GPU is underutilized.
 
-<div editor-title=".dstack.yml"> 
+Below is an example of a dev environment that auto-terminate if any GPU stays below 10% utilization for 1 hour.
+
+<div editor-title=".dstack.yml">
 
 ```yaml
 type: dev-environment
-# The name is optional, if not specified, generated randomly
-name: vscode    
+name: my-dev
 
-ide: vscode
+python: 3.12
+ide: cursor
 
 resources:
-  # 200GB or more RAM
-  memory: 200GB..
-  # 4 GPUs from 40GB to 80GB
-  gpu: 40GB..80GB:4
-  # Shared memory (required by multi-gpu)
-  shm_size: 16GB
-  # Disk size
-  disk: 500GB
+  gpu: H100:8
+
+utilization_policy:
+  min_gpu_utilization: 10
+  time_window: 1h
 ```
 
 </div>
 
-The `gpu` property allows specifying not only memory size but also GPU vendor, names
-and their quantity. Examples: `nvidia` (one NVIDIA GPU), `A100` (one A100), `A10G,A100` (either A10G or A100),
-`A100:80GB` (one A100 of 80GB), `A100:2` (two A100), `24GB..40GB:2` (two GPUs between 24GB and 40GB),
-`A100:40GB:2` (two A100 GPUs of 40GB).
+### Schedule
 
-??? info "Google Cloud TPU"
-    To use TPUs, specify its architecture via the `gpu` property.
+Specify `schedule` to start a dev environment periodically at specific UTC times using the cron syntax:
 
-    ```yaml
-    type: dev-environment
-    # The name is optional, if not specified, generated randomly
-    name: vscode    
-    
-    ide: vscode
-    
-    resources:
-      gpu: v2-8
-    ```
-
-    Currently, only 8 TPU cores can be specified, supporting single TPU device workloads. Multi-TPU support is coming soon.
-
-??? info "Shared memory"
-    If you are using parallel communicating processes (e.g., dataloaders in PyTorch), you may need to configure 
-    `shm_size`, e.g. set it to `16GB`.
-
-### Python version
-
-If you don't specify `image`, `dstack` uses its base Docker image pre-configured with 
-`python`, `pip`, `conda` (Miniforge), and essential CUDA drivers. 
-The `python` property determines which default Docker image is used.
-
-??? info "nvcc"
-    By default, the base Docker image doesn’t include `nvcc`, which is required for building custom CUDA kernels. 
-    If you need `nvcc`, set the [`nvcc`](../reference/dstack.yml/dev-environment.md#nvcc) property to true.
-
-### Docker
-
-If you want, you can specify your own Docker image via `image`.
-
-<div editor-title=".dstack.yml"> 
+<div editor-title=".dstack.yml">
 
 ```yaml
 type: dev-environment
-# The name is optional, if not specified, generated randomly
-name: vscode    
-
-# Any custom Docker image
-image: ghcr.io/huggingface/text-generation-inference:latest
-
 ide: vscode
+schedule:
+  cron: "0 8 * * mon-fri" # at 8:00 UTC from Monday through Friday
 ```
 
 </div>
 
-!!! info "Privileged mode"
-    To enable privileged mode, set [`privileged`](../reference/dstack.yml/dev-environment.md#privileged) to `true`.
-    This mode allows using [Docker and Docker Compose](../guides/protips.md#docker-and-docker-compose) inside `dstack` runs.
+The `schedule` property can be combined with `max_duration` or `utilization_policy` to shutdown the dev environment automatically when it's not needed.
 
-    Not supported with `runpod`, `vastai`, and `kubernetes`.
-
-??? info "Private registry"
-    Use the [`registry_auth`](../reference/dstack.yml/dev-environment.md#registry_auth) property to provide credentials for a private Docker registry. 
-
-    ```yaml
-    type: dev-environment
-    # The name is optional, if not specified, generated randomly
-    name: vscode    
-
-    # Any private Docker image
-    image: ghcr.io/huggingface/text-generation-inference:latest
-    # Credentials of the private Docker registry
-    registry_auth:
-      username: peterschmidt85
-      password: ghp_e49HcZ9oYwBzUbcSk2080gXZOU2hiT9AeSR5
+??? info "Cron syntax"
+    `dstack` supports [POSIX cron syntax](https://pubs.opengroup.org/onlinepubs/9699919799/utilities/crontab.html#tag_20_25_07). One exception is that days of the week are started from Monday instead of Sunday so `0` corresponds to Monday.
     
-    ide: vscode
+    The month and day of week fields accept abbreviated English month and weekday names (`jan–dec` and `mon–sun`) respectively.
+
+    A cron expression consists of five fields:
+
+    ```
+    ┌───────────── minute (0-59)
+    │ ┌───────────── hour (0-23)
+    │ │ ┌───────────── day of the month (1-31)
+    │ │ │ ┌───────────── month (1-12 or jan-dec)
+    │ │ │ │ ┌───────────── day of the week (0-6 or mon-sun)
+    │ │ │ │ │
+    │ │ │ │ │
+    │ │ │ │ │
+    * * * * *
     ```
 
-### Environment variables
+    The following operators can be used in any of the fields:
 
-<div editor-title=".dstack.yml"> 
-
-```yaml
-type: dev-environment
-# The name is optional, if not specified, generated randomly
-name: vscode    
-
-# Environment variables
-env:
-  - HF_TOKEN
-  - HF_HUB_ENABLE_HF_TRANSFER=1
-
-ide: vscode
-```
-
-</div>
-
-If you don't assign a value to an environment variable (see `HF_TOKEN` above), 
-`dstack` will require the value to be passed via the CLI or set in the current process.
-
-??? info "System environment variables"
-    The following environment variables are available in any run by default:
-    
-    | Name                    | Description                             |
-    |-------------------------|-----------------------------------------|
-    | `DSTACK_RUN_NAME`       | The name of the run                     |
-    | `DSTACK_REPO_ID`        | The ID of the repo                      |
-    | `DSTACK_GPUS_NUM`       | The total number of GPUs in the run     |
+    | Operator | Description           | Example                                                                 |
+    |----------|-----------------------|-------------------------------------------------------------------------|
+    | `*`      | Any value             | `0 * * * *` runs every hour at minute 0                                 |
+    | `,`      | Value list separator  | `15,45 10 * * *` runs at 10:15 and 10:45 every day.                     |
+    | `-`      | Range of values       | `0 1-3 * * *` runs at 1:00, 2:00, and 3:00 every day.                   |
+    | `/`      | Step values           | `*/10 8-10 * * *` runs every 10 minutes during the hours 8:00 to 10:59. |
 
 ### Spot policy
 
 By default, `dstack` uses on-demand instances. However, you can change that
 via the [`spot_policy`](../reference/dstack.yml/dev-environment.md#spot_policy) property. It accepts `spot`, `on-demand`, and `auto`.
+
+--8<-- "docs/concepts/snippets/manage-fleets.ext"
 
 !!! info "Reference"
     Dev environments support many more configuration options,
@@ -309,32 +531,6 @@ via the [`spot_policy`](../reference/dstack.yml/dev-environment.md#spot_policy) 
     [`max_duration`](../reference/dstack.yml/dev-environment.md#max_duration), 
     among [others](../reference/dstack.yml/dev-environment.md).
 
-### Retry policy
-
-By default, if `dstack` can't find capacity or the instance is interrupted, the run will fail.
-
-If you'd like `dstack` to automatically retry, configure the 
-[retry](../reference/dstack.yml/dev-environment.md#retry) property accordingly:
-
-<div editor-title=".dstack.yml">
-
-```yaml
-type: dev-environment
-# The name is optional, if not specified, generated randomly
-name: vscode    
-
-ide: vscode
-
-retry:
-  # Retry on specific events
-  on_events: [no-capacity, error, interruption]
-  # Retry for up to 1 hour
-  duration: 1h
-```
-
-</div>
-
---8<-- "docs/concepts/snippets/manage-fleets.ext"
 
 --8<-- "docs/concepts/snippets/manage-runs.ext"
 

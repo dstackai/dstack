@@ -3,9 +3,9 @@ title: Introducing GPU blocks and proxy jump for SSH fleets
 date: 2025-02-18
 description: "TBA"  
 slug: gpu-blocks-and-proxy-jump
-image: https://github.com/dstackai/static-assets/blob/main/static-assets/images/data-centers-and-private-clouds.png?raw=true
+image: https://dstack.ai/static-assets/static-assets/images/data-centers-and-private-clouds.png
 categories:
-  - SSH fleets
+  - Changelog
 ---
 
 # Introducing GPU blocks and proxy jump for SSH fleets
@@ -21,7 +21,7 @@ Originally, `dstack` was focused on public clouds. With the new release, `dstack
 extends support to data centers and private clouds, offering a simpler, AI-native solution that replaces Kubernetes and
 Slurm.
 
-<img src="https://github.com/dstackai/static-assets/blob/main/static-assets/images/data-centers-and-private-clouds.png?raw=true" width="630"/>
+<img src="https://dstack.ai/static-assets/static-assets/images/data-centers-and-private-clouds.png" width="630"/>
 
 <!-- more -->
 

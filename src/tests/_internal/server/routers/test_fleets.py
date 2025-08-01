@@ -10,7 +10,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.fleets import FleetConfiguration, FleetStatus, SSHParams
+from dstack._internal.core.models.fleets import (
+    FleetConfiguration,
+    FleetStatus,
+    InstanceGroupPlacement,
+    SSHParams,
+)
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceOfferWithAvailability,
@@ -21,6 +26,7 @@ from dstack._internal.core.models.instances import (
 )
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.models import FleetModel, InstanceModel
+from dstack._internal.server.services.fleets import fleet_model_to_fleet
 from dstack._internal.server.services.permissions import DefaultPermissions
 from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.testing.common import (
@@ -35,7 +41,11 @@ from dstack._internal.server.testing.common import (
     get_auth_headers,
     get_fleet_configuration,
     get_fleet_spec,
+    get_instance_offer_with_availability,
+    get_job_provisioning_data,
     get_private_key_string,
+    get_remote_connection_info,
+    get_ssh_fleet_configuration,
 )
 
 pytestmark = pytest.mark.usefixtures("image_config_mock")
@@ -292,13 +302,13 @@ class TestGetFleet:
         assert response.status_code == 400
 
 
-class TestCreateFleet:
+class TestApplyFleetPlan:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_40x_if_not_authenticated(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
-        response = await client.post("/api/project/main/fleets/create")
+        response = await client.post("/api/project/main/fleets/apply")
         assert response.status_code == 403
 
     @pytest.mark.asyncio
@@ -314,9 +324,9 @@ class TestCreateFleet:
         with patch("uuid.uuid4") as m:
             m.return_value = UUID("1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e")
             response = await client.post(
-                f"/api/project/{project.name}/fleets/create",
+                f"/api/project/{project.name}/fleets/apply",
                 headers=get_auth_headers(user.token),
-                json={"spec": spec.dict()},
+                json={"plan": {"spec": spec.dict()}, "force": False},
             )
         assert response.status_code == 200
         assert response.json() == {
@@ -364,6 +374,9 @@ class TestCreateFleet:
                     "creation_policy": None,
                     "idle_duration": None,
                     "utilization_policy": None,
+                    "startup_order": None,
+                    "stop_criteria": None,
+                    "schedule": None,
                     "name": "",
                     "default": False,
                     "reservation": None,
@@ -413,23 +426,20 @@ class TestCreateFleet:
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
-        spec = get_fleet_spec(
-            conf=FleetConfiguration(
-                name="test-ssh-fleet",
-                ssh_config=SSHParams(
-                    user="ubuntu",
-                    ssh_key=SSHKey(public="", private=get_private_key_string()),
-                    hosts=["1.1.1.1"],
-                    network=None,
-                ),
-            )
+        conf = get_ssh_fleet_configuration(
+            name="test-ssh-fleet",
+            user="ubuntu",
+            ssh_key=SSHKey(public="", private=get_private_key_string()),
+            hosts=["1.1.1.1"],
+            network=None,
         )
+        spec = get_fleet_spec(conf=conf)
         with patch("uuid.uuid4") as m:
             m.return_value = UUID("1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e")
             response = await client.post(
-                f"/api/project/{project.name}/fleets/create",
+                f"/api/project/{project.name}/fleets/apply",
                 headers=get_auth_headers(user.token),
-                json={"spec": spec.dict()},
+                json={"plan": {"spec": spec.dict()}, "force": False},
             )
         assert response.status_code == 200, response.json()
         assert response.json() == {
@@ -485,6 +495,9 @@ class TestCreateFleet:
                     "creation_policy": None,
                     "idle_duration": None,
                     "utilization_policy": None,
+                    "startup_order": None,
+                    "stop_criteria": None,
+                    "schedule": None,
                     "name": "",
                     "default": False,
                     "reservation": None,
@@ -504,12 +517,13 @@ class TestCreateFleet:
                     "instance_type": {
                         "name": "ssh",
                         "resources": {
+                            "cpu_arch": None,
                             "cpus": 2,
                             "memory_mib": 8,
                             "gpus": [],
                             "spot": False,
                             "disk": {"size_mib": 102400},
-                            "description": "",
+                            "description": "cpu=2 mem=0GB disk=100GB",
                         },
                     },
                     "name": f"{spec.configuration.name}-0",
@@ -538,6 +552,213 @@ class TestCreateFleet:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @freeze_time(datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc), real_asyncio=True)
+    async def test_updates_ssh_fleet(self, test_db, session: AsyncSession, client: AsyncClient):
+        user = await create_user(session, global_role=GlobalRole.USER)
+        project = await create_project(session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        current_conf = get_ssh_fleet_configuration(
+            name="test-ssh-fleet",
+            user="ubuntu",
+            ssh_key=SSHKey(public="", private=get_private_key_string()),
+            hosts=["10.0.0.100"],
+            network=None,
+        )
+        current_spec = get_fleet_spec(conf=current_conf)
+        spec = current_spec.copy(deep=True)
+        # 10.0.0.100 removed, 10.0.0.101 added
+        spec.configuration.ssh_config.hosts = ["10.0.0.101"]
+
+        fleet = await create_fleet(session=session, project=project, spec=current_spec)
+        instance_type = InstanceType(
+            name="ssh",
+            resources=Resources(cpus=2, memory_mib=8, gpus=[], spot=False),
+        )
+        instance = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            backend=BackendType.REMOTE,
+            name="test-ssh-fleet-0",
+            region="remote",
+            price=0.0,
+            status=InstanceStatus.IDLE,
+            offer=get_instance_offer_with_availability(
+                backend=BackendType.REMOTE,
+                region="remote",
+                price=0.0,
+            ),
+            job_provisioning_data=get_job_provisioning_data(
+                instance_type=instance_type,
+                hostname="10.0.0.100",
+            ),
+            remote_connection_info=get_remote_connection_info(host="10.0.0.100"),
+        )
+
+        with patch("uuid.uuid4") as m:
+            m.return_value = UUID("1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e")
+            response = await client.post(
+                f"/api/project/{project.name}/fleets/apply",
+                headers=get_auth_headers(user.token),
+                json={
+                    "plan": {
+                        "spec": spec.dict(),
+                        "current_resource": _fleet_model_to_json_dict(fleet),
+                    },
+                    "force": False,
+                },
+            )
+
+        assert response.status_code == 200, response.json()
+        assert response.json() == {
+            "id": str(fleet.id),
+            "name": spec.configuration.name,
+            "project_name": project.name,
+            "spec": {
+                "configuration_path": spec.configuration_path,
+                "configuration": {
+                    "env": {},
+                    "ssh_config": {
+                        "user": "ubuntu",
+                        "port": None,
+                        "identity_file": None,
+                        "ssh_key": None,  # should not return ssh_key
+                        "proxy_jump": None,
+                        "hosts": ["10.0.0.101"],
+                        "network": None,
+                    },
+                    "nodes": None,
+                    "placement": None,
+                    "resources": {
+                        "cpu": {"min": 2, "max": None},
+                        "memory": {"min": 8.0, "max": None},
+                        "shm_size": None,
+                        "gpu": None,
+                        "disk": {"size": {"min": 100.0, "max": None}},
+                    },
+                    "backends": None,
+                    "regions": None,
+                    "availability_zones": None,
+                    "instance_types": None,
+                    "spot_policy": None,
+                    "retry": None,
+                    "max_price": None,
+                    "idle_duration": None,
+                    "type": "fleet",
+                    "name": spec.configuration.name,
+                    "reservation": None,
+                    "blocks": 1,
+                    "tags": None,
+                },
+                "profile": {
+                    "backends": None,
+                    "regions": None,
+                    "availability_zones": None,
+                    "instance_types": None,
+                    "spot_policy": None,
+                    "retry": None,
+                    "max_duration": None,
+                    "stop_duration": None,
+                    "max_price": None,
+                    "creation_policy": None,
+                    "idle_duration": None,
+                    "utilization_policy": None,
+                    "startup_order": None,
+                    "stop_criteria": None,
+                    "schedule": None,
+                    "name": "",
+                    "default": False,
+                    "reservation": None,
+                    "fleets": None,
+                    "tags": None,
+                },
+                "autocreated": False,
+            },
+            "created_at": "2023-01-02T03:04:00+00:00",
+            "status": "active",
+            "status_message": None,
+            "instances": [
+                {
+                    "id": str(instance.id),
+                    "project_name": project.name,
+                    "backend": "remote",
+                    "instance_type": {
+                        "name": "ssh",
+                        "resources": {
+                            "cpu_arch": None,
+                            "cpus": 2,
+                            "memory_mib": 8,
+                            "gpus": [],
+                            "spot": False,
+                            "disk": {"size_mib": 102400},
+                            "description": "cpu=2 mem=0GB disk=100GB",
+                        },
+                    },
+                    "name": "test-ssh-fleet-0",
+                    "fleet_id": str(fleet.id),
+                    "fleet_name": "test-ssh-fleet",
+                    "instance_num": 0,
+                    "job_name": None,
+                    "hostname": "10.0.0.100",
+                    "status": "terminating",
+                    "unreachable": False,
+                    "termination_reason": None,
+                    "created": "2023-01-02T03:04:00+00:00",
+                    "region": "remote",
+                    "availability_zone": None,
+                    "price": 0.0,
+                    "total_blocks": 1,
+                    "busy_blocks": 0,
+                },
+                {
+                    "id": "1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e",
+                    "project_name": project.name,
+                    "backend": "remote",
+                    "instance_type": {
+                        "name": "ssh",
+                        "resources": {
+                            "cpu_arch": None,
+                            "cpus": 2,
+                            "memory_mib": 8,
+                            "gpus": [],
+                            "spot": False,
+                            "disk": {"size_mib": 102400},
+                            "description": "cpu=2 mem=0GB disk=100GB",
+                        },
+                    },
+                    "name": "test-ssh-fleet-1",
+                    "fleet_id": str(fleet.id),
+                    "fleet_name": "test-ssh-fleet",
+                    "instance_num": 1,
+                    "job_name": None,
+                    "hostname": "10.0.0.101",
+                    "status": "pending",
+                    "unreachable": False,
+                    "termination_reason": None,
+                    "created": "2023-01-02T03:04:00+00:00",
+                    "region": "remote",
+                    "availability_zone": None,
+                    "price": 0.0,
+                    "total_blocks": 1,
+                    "busy_blocks": 0,
+                },
+            ],
+        }
+        res = await session.execute(select(FleetModel))
+        assert res.scalar_one()
+        await session.refresh(instance)
+        assert instance.status == InstanceStatus.TERMINATING
+        res = await session.execute(
+            select(InstanceModel).where(InstanceModel.id == "1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e")
+        )
+        instance = res.unique().scalar_one()
+        assert instance.status == InstanceStatus.PENDING
+        assert instance.remote_connection_info is not None
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     @freeze_time(datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
     async def test_errors_if_ssh_key_is_bad(
         self, test_db, session: AsyncSession, client: AsyncClient
@@ -559,9 +780,9 @@ class TestCreateFleet:
             )
         )
         response = await client.post(
-            f"/api/project/{project.name}/fleets/create",
+            f"/api/project/{project.name}/fleets/apply",
             headers=get_auth_headers(user.token),
-            json={"spec": spec.dict()},
+            json={"plan": {"spec": spec.dict()}, "force": False},
         )
         assert response.status_code == 400
 
@@ -590,9 +811,9 @@ class TestCreateFleet:
             DefaultPermissions(allow_non_admins_manage_ssh_fleets=False)
         ):
             response = await client.post(
-                f"/api/project/{project.name}/fleets/create",
+                f"/api/project/{project.name}/fleets/apply",
                 headers=get_auth_headers(user.token),
-                json={"spec": spec.dict()},
+                json={"plan": {"spec": spec.dict()}, "force": False},
             )
         assert response.status_code in [401, 403]
 
@@ -815,7 +1036,9 @@ class TestGetPlan:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_returns_plan(self, test_db, session: AsyncSession, client: AsyncClient):
+    async def test_returns_create_plan_for_new_fleet(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
@@ -850,9 +1073,91 @@ class TestGetPlan:
         assert response.json() == {
             "project_name": project.name,
             "user": user.name,
-            "spec": spec.dict(),
+            "spec": json.loads(spec.json()),
+            "effective_spec": json.loads(spec.json()),
             "current_resource": None,
             "offers": [json.loads(o.json()) for o in offers],
             "total_offers": len(offers),
             "max_offer_price": 1.0,
+            "action": "create",
         }
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_update_plan_for_existing_fleet(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        conf = get_ssh_fleet_configuration(hosts=["10.0.0.100"])
+        spec = get_fleet_spec(conf=conf)
+        effective_spec = spec.copy(deep=True)
+        effective_spec.configuration.ssh_config.ssh_key = None
+        current_spec = spec.copy(deep=True)
+        # `hosts` can be updated in-place
+        current_spec.configuration.ssh_config.hosts = ["10.0.0.100", "10.0.0.101"]
+        fleet = await create_fleet(session=session, project=project, spec=current_spec)
+
+        response = await client.post(
+            f"/api/project/{project.name}/fleets/get_plan",
+            headers=get_auth_headers(user.token),
+            json={"spec": spec.dict()},
+        )
+
+        assert response.status_code == 200
+        assert response.json() == {
+            "project_name": project.name,
+            "user": user.name,
+            "spec": spec.dict(),
+            "effective_spec": effective_spec.dict(),
+            "current_resource": _fleet_model_to_json_dict(fleet),
+            "offers": [],
+            "total_offers": 0,
+            "max_offer_price": None,
+            "action": "update",
+        }
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_create_plan_for_existing_fleet(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        conf = get_ssh_fleet_configuration(placement=InstanceGroupPlacement.ANY)
+        spec = get_fleet_spec(conf=conf)
+        effective_spec = spec.copy(deep=True)
+        effective_spec.configuration.ssh_config.ssh_key = None
+        current_spec = spec.copy(deep=True)
+        # `placement` cannot be updated in-place
+        current_spec.configuration.placement = InstanceGroupPlacement.CLUSTER
+        fleet = await create_fleet(session=session, project=project, spec=current_spec)
+
+        response = await client.post(
+            f"/api/project/{project.name}/fleets/get_plan",
+            headers=get_auth_headers(user.token),
+            json={"spec": spec.dict()},
+        )
+
+        assert response.status_code == 200
+        assert response.json() == {
+            "project_name": project.name,
+            "user": user.name,
+            "spec": spec.dict(),
+            "effective_spec": effective_spec.dict(),
+            "current_resource": _fleet_model_to_json_dict(fleet),
+            "offers": [],
+            "total_offers": 0,
+            "max_offer_price": None,
+            "action": "create",
+        }
+
+
+def _fleet_model_to_json_dict(fleet: FleetModel) -> dict:
+    return json.loads(fleet_model_to_fleet(fleet).json())

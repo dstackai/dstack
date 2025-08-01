@@ -1,7 +1,8 @@
 import asyncio
 import datetime
 import uuid
-from datetime import timedelta, timezone
+from datetime import timedelta
+from functools import partial
 from typing import List, Optional, Sequence
 
 import httpx
@@ -10,15 +11,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 import dstack._internal.utils.random_names as random_names
-from dstack._internal.core.backends import (
-    BACKENDS_WITH_GATEWAY_SUPPORT,
-    BACKENDS_WITH_PRIVATE_GATEWAY_SUPPORT,
-)
 from dstack._internal.core.backends.base.compute import (
     Compute,
     ComputeWithGatewaySupport,
     get_dstack_gateway_wheel,
     get_dstack_runner_version,
+)
+from dstack._internal.core.backends.features import (
+    BACKENDS_WITH_GATEWAY_SUPPORT,
+    BACKENDS_WITH_PRIVATE_GATEWAY_SUPPORT,
 )
 from dstack._internal.core.errors import (
     GatewayError,
@@ -31,13 +32,19 @@ from dstack._internal.core.models.gateways import (
     Gateway,
     GatewayComputeConfiguration,
     GatewayConfiguration,
+    GatewaySpec,
     GatewayStatus,
     LetsEncryptGatewayCertificate,
 )
 from dstack._internal.core.services import validate_dstack_resource_name
 from dstack._internal.server import settings
 from dstack._internal.server.db import get_db
-from dstack._internal.server.models import GatewayComputeModel, GatewayModel, ProjectModel
+from dstack._internal.server.models import (
+    GatewayComputeModel,
+    GatewayModel,
+    ProjectModel,
+    UserModel,
+)
 from dstack._internal.server.services.backends import (
     check_backend_type_available,
     get_project_backend_by_type_or_error,
@@ -50,6 +57,7 @@ from dstack._internal.server.services.locking import (
     get_locker,
     string_to_lock_id,
 )
+from dstack._internal.server.services.plugins import apply_plugin_policies
 from dstack._internal.server.utils.common import gather_map_async
 from dstack._internal.utils.common import get_current_datetime, run_async
 from dstack._internal.utils.crypto import generate_rsa_key_pair_bytes
@@ -73,15 +81,6 @@ async def get_gateway_by_name(
     session: AsyncSession, project: ProjectModel, name: str
 ) -> Optional[Gateway]:
     gateway = await get_project_gateway_model_by_name(session=session, project=project, name=name)
-    if gateway is None:
-        return None
-    return gateway_model_to_gateway(gateway)
-
-
-async def get_project_default_gateway(
-    session: AsyncSession, project: ProjectModel
-) -> Optional[Gateway]:
-    gateway: Optional[GatewayModel] = project.default_gateway
     if gateway is None:
         return None
     return gateway_model_to_gateway(gateway)
@@ -129,9 +128,17 @@ async def create_gateway_compute(
 
 async def create_gateway(
     session: AsyncSession,
+    user: UserModel,
     project: ProjectModel,
     configuration: GatewayConfiguration,
 ) -> Gateway:
+    spec = await apply_plugin_policies(
+        user=user.name,
+        project=project.name,
+        # Create pseudo spec until the gateway API is updated to accept spec
+        spec=GatewaySpec(configuration=configuration),
+    )
+    configuration = spec.configuration
     _validate_gateway_configuration(configuration)
 
     backend_model, _ = await get_project_backend_with_model_by_type_or_error(
@@ -140,14 +147,14 @@ async def create_gateway(
 
     lock_namespace = f"gateway_names_{project.name}"
     if get_db().dialect_name == "sqlite":
-        # Start new transaction to see commited changes after lock
+        # Start new transaction to see committed changes after lock
         await session.commit()
     elif get_db().dialect_name == "postgresql":
         await session.execute(
             select(func.pg_advisory_xact_lock(string_to_lock_id(lock_namespace)))
         )
 
-    lock, _ = get_locker().get_lockset(lock_namespace)
+    lock, _ = get_locker(get_db().dialect_name).get_lockset(lock_namespace)
     async with lock:
         if configuration.name is None:
             configuration.name = await generate_gateway_name(session=session, project=project)
@@ -165,12 +172,13 @@ async def create_gateway(
         session.add(gateway)
         await session.commit()
 
-        if project.default_gateway is None or configuration.default:
+        default_gateway = await get_project_default_gateway_model(session=session, project=project)
+        if default_gateway is None or configuration.default:
             await set_default_gateway(session=session, project=project, name=configuration.name)
-
         return gateway_model_to_gateway(gateway)
 
 
+# NOTE: dstack Sky imports and uses this function
 async def connect_to_gateway_with_retry(
     gateway_compute: GatewayComputeModel,
 ) -> Optional[GatewayConnection]:
@@ -214,7 +222,9 @@ async def delete_gateways(
     gateways_ids = sorted([g.id for g in gateway_models])
     await session.commit()
     logger.info("Deleting gateways: %s", [g.name for g in gateway_models])
-    async with get_locker().lock_ctx(GatewayModel.__tablename__, gateways_ids):
+    async with get_locker(get_db().dialect_name).lock_ctx(
+        GatewayModel.__tablename__, gateways_ids
+    ):
         # Refetch after lock
         res = await session.execute(
             select(GatewayModel)
@@ -225,7 +235,7 @@ async def delete_gateways(
             .options(selectinload(GatewayModel.gateway_compute))
             .execution_options(populate_existing=True)
             .order_by(GatewayModel.id)  # take locks in order
-            .with_for_update()
+            .with_for_update(key_share=True)
         )
         gateway_models = res.scalars().all()
         for gateway_model in gateway_models:
@@ -330,6 +340,15 @@ async def get_project_gateway_model_by_name(
     return res.scalar()
 
 
+async def get_project_default_gateway_model(
+    session: AsyncSession, project: ProjectModel
+) -> Optional[GatewayModel]:
+    res = await session.execute(
+        select(GatewayModel).where(GatewayModel.id == project.default_gateway_id)
+    )
+    return res.scalar_one_or_none()
+
+
 async def generate_gateway_name(session: AsyncSession, project: ProjectModel) -> str:
     gateways = await list_project_gateway_models(session=session, project=project)
     names = {g.name for g in gateways}
@@ -363,6 +382,8 @@ async def get_or_add_gateway_connection(
 async def init_gateways(session: AsyncSession):
     res = await session.execute(
         select(GatewayComputeModel).where(
+            # FIXME: should not include computes related to gateways in the `provisioning` status.
+            # Causes warnings and delays when restarting the server during gateway provisioning.
             GatewayComputeModel.active == True,
             GatewayComputeModel.deleted == False,
         )
@@ -404,7 +425,8 @@ async def init_gateways(session: AsyncSession):
 
         for gateway_compute, error in await gather_map_async(
             await gateway_connections_pool.all(),
-            configure_gateway,
+            # Need several attempts to handle short gateway downtime after update
+            partial(configure_gateway, attempts=7),
             return_exceptions=True,
         ):
             if isinstance(error, Exception):
@@ -444,7 +466,11 @@ def _recently_updated(gateway_compute_model: GatewayComputeModel) -> bool:
     ) > get_current_datetime() - timedelta(seconds=60)
 
 
-async def configure_gateway(connection: GatewayConnection) -> None:
+# NOTE: dstack Sky imports and uses this function
+async def configure_gateway(
+    connection: GatewayConnection,
+    attempts: int = GATEWAY_CONFIGURE_ATTEMPTS,
+) -> None:
     """
     Try submitting gateway config several times in case gateway's HTTP server is not
     running yet
@@ -452,7 +478,7 @@ async def configure_gateway(connection: GatewayConnection) -> None:
 
     logger.debug("Configuring gateway %s", connection.ip_address)
 
-    for attempt in range(GATEWAY_CONFIGURE_ATTEMPTS - 1):
+    for attempt in range(attempts - 1):
         try:
             async with connection.client() as client:
                 await client.submit_gateway_config()
@@ -461,7 +487,7 @@ async def configure_gateway(connection: GatewayConnection) -> None:
             logger.debug(
                 "Failed attempt %s/%s at configuring gateway %s: %r",
                 attempt + 1,
-                GATEWAY_CONFIGURE_ATTEMPTS,
+                attempts,
                 connection.ip_address,
                 e,
             )
@@ -531,7 +557,7 @@ def gateway_model_to_gateway(gateway_model: GatewayModel) -> Gateway:
         region=gateway_model.region,
         wildcard_domain=gateway_model.wildcard_domain,
         default=gateway_model.project.default_gateway_id == gateway_model.id,
-        created_at=gateway_model.created_at.replace(tzinfo=timezone.utc),
+        created_at=gateway_model.created_at,
         status=gateway_model.status,
         status_message=gateway_model.status_message,
         configuration=configuration,

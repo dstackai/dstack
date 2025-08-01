@@ -1,19 +1,15 @@
 # Backends
 
-To use `dstack` with cloud providers, configure backends
-via the [`~/.dstack/server/config.yml`](../reference/server/config.yml.md) file.
-The server loads this file on startup. 
+Backends allow `dstack` to manage compute across various providers.
+They can be configured via `~/.dstack/server/config.yml` (or through the [project settings page](../concepts/projects.md#backends) in the UI). 
 
-Alternatively, you can configure backends on the [project settings page](../concepts/projects.md#backends) via UI.
+See below for examples of backend configurations.
 
-> For using `dstack` with on-prem servers, no backend configuration is required.
-> Use [SSH fleets](../concepts/fleets.md#ssh) instead once the server is up.
+??? info "SSH fleets"
+    For using `dstack` with on-prem servers, no backend configuration is required.
+    Use [SSH fleets](../concepts/fleets.md#ssh) instead once the server is up.
 
-Below examples of how to configure backends via `~/.dstack/server/config.yml`.
-
-## Cloud providers
-
-### AWS
+## AWS
 
 There are two ways to configure AWS: using an access key or using the default credentials.
 
@@ -248,7 +244,7 @@ There are two ways to configure AWS: using an access key or using the default cr
         * Docker is installed
         * (For NVIDIA instances) NVIDIA/CUDA drivers and NVIDIA Container Toolkit are installed
 
-### Azure
+## Azure
 
 There are two ways to configure Azure: using a client secret or using the default credentials.
 
@@ -338,6 +334,8 @@ There are two ways to configure Azure: using a client secret or using the defaul
                     "Microsoft.Compute/disks/write",
                     "Microsoft.Compute/disks/read",
                     "Microsoft.Compute/disks/delete",
+                    "Microsoft.ManagedIdentity/userAssignedIdentities/assign/action",
+                    "Microsoft.ManagedIdentity/userAssignedIdentities/read",
                     "Microsoft.Network/networkSecurityGroups/*",
                     "Microsoft.Network/locations/*",
                     "Microsoft.Network/virtualNetworks/*",
@@ -397,7 +395,7 @@ There are two ways to configure Azure: using a client secret or using the defaul
     Using private subnets assumes that both the `dstack` server and users can access the configured VPC's private subnets.
     Additionally, private subnets must have outbound internet connectivity provided by [NAT Gateway or other mechanism](https://learn.microsoft.com/en-us/azure/nat-gateway/nat-overview).
 
-### GCP
+## GCP
 
 There are two ways to configure GCP: using a service account or using the default credentials.
 
@@ -529,7 +527,11 @@ gcloud projects list --format="json(projectId)"
         ```
     
         </div>
-    
+
+        If you specify a non-default VPC, ensure it has a firewall rule
+        allowing all traffic within the VPC. This is needed for multi-node tasks to work.
+        The default VPC already permits traffic within the VPC.
+
     === "Shared VPC"
     
         <div editor-title="~/.dstack/server/config.yml">
@@ -577,7 +579,7 @@ gcloud projects list --format="json(projectId)"
     Using private subnets assumes that both the `dstack` server and users can access the configured VPC's private subnets.
     Additionally, [Cloud NAT](https://cloud.google.com/nat/docs/overview) must be configured to provide access to external resources for provisioned instances.
 
-### Lambda
+## Lambda
 
 Log into your [Lambda Cloud :material-arrow-top-right-thin:{ .external }](https://lambdalabs.com/service/gpu-cloud) account, click API keys in the sidebar, and then click the `Generate API key`
 button to create a new API key.
@@ -598,7 +600,7 @@ projects:
 
 </div>
 
-### Nebius
+## Nebius
 
 Log into your [Nebius AI Cloud :material-arrow-top-right-thin:{ .external }](https://console.eu.nebius.com/) account, navigate to Access, and select Service Accounts. Create a service account, add it to the editors group, and upload its authorized key.
 
@@ -643,12 +645,31 @@ projects:
 
     </div>
 
+??? info "Projects"
+    If you have multiple projects per region, specify which ones to use, at most one per region.
+
+    <div editor-title="~/.dstack/server/config.yml">
+
+    ```yaml
+    type: nebius
+    projects:
+    - project-e00jt6t095t1ahrg4re30
+    - project-e01iahuh3cklave4ao1nv
+    creds:
+      type: service_account
+      service_account_id: serviceaccount-e00dhnv9ftgb3cqmej
+      public_key_id: publickey-e00ngaex668htswqy4
+      private_key_file: ~/path/to/key.pem
+    ```
+
+    </div>
+
 !!! info "Python version"
     Nebius is only supported if `dstack server` is running on Python 3.10 or higher.
 
 
 
-### RunPod
+## RunPod
 
 Log into your [RunPod :material-arrow-top-right-thin:{ .external }](https://www.runpod.io/console/) console, click Settings in the sidebar, expand the `API Keys` section, and click
 the button to create a Read & Write key.
@@ -706,7 +727,7 @@ projects:
 
     </div>
 
-### Vultr
+## Vultr
 
 Log into your [Vultr :material-arrow-top-right-thin:{ .external }](https://www.vultr.com/) account, click `Account` in the sidebar, select `API`, find the `Personal Access Token` panel and click the `Enable API` button. In the `Access Control` panel, allow API requests from all addresses or from the subnet where your `dstack` server is deployed.
 
@@ -726,7 +747,7 @@ projects:
 
 </div>
 
-### Vast.ai
+## Vast.ai
 
 Log into your [Vast.ai :material-arrow-top-right-thin:{ .external }](https://cloud.vast.ai/) account, click Account in the sidebar, and copy your
 API Key.
@@ -749,7 +770,7 @@ projects:
 
 Also, the `vastai` backend supports on-demand instances only. Spot instance support coming soon.
 
-### TensorDock
+<!-- ## TensorDock
 
 Log into your [TensorDock :material-arrow-top-right-thin:{ .external }](https://dashboard.tensordock.com/) account, click Developers in the sidebar, and use the `Create an Authorization` section to create a new authorization key.
 
@@ -770,9 +791,9 @@ projects:
 
 </div>
 
-The `tensordock` backend supports on-demand instances only. Spot instance support coming soon.
+The `tensordock` backend supports on-demand instances only. Spot instance support coming soon. -->
 
-### CUDO
+## CUDO
 
 Log into your [CUDO Compute :material-arrow-top-right-thin:{ .external }](https://compute.cudo.org/) account, click API keys in the sidebar, and click the `Create an API key` button.
 
@@ -793,7 +814,7 @@ projects:
 
 </div>
 
-### OCI
+## OCI
 
 There are two ways to configure OCI: using client credentials or using the default credentials.
 
@@ -867,7 +888,7 @@ There are two ways to configure OCI: using client credentials or using the defau
         compartment_id: ocid1.compartment.oc1..aaaaaaaa
     ```
 
-### DataCrunch
+## DataCrunch
 
 Log into your [DataCrunch :material-arrow-top-right-thin:{ .external }](https://cloud.datacrunch.io/) account, click Keys in the sidebar, find `REST API Credentials` area and then click the `Generate Credentials` button.
 
@@ -888,14 +909,29 @@ projects:
 
 </div>
 
-## On-prem servers
+## CloudRift
 
-### SSH fleets
+Log into your [CloudRift :material-arrow-top-right-thin:{ .external }](https://console.cloudrift.ai/) console, click `API Keys` in the sidebar and click the button to create a new API key.
 
-> For using `dstack` with on-prem servers, no backend configuration is required.
-> See [SSH fleets](fleets.md#ssh) for more details. 
+Ensure you've created a project with CloudRift.
 
-### Kubernetes
+Then proceed to configuring the backend.
+
+<div editor-title="~/.dstack/server/config.yml">
+
+```yaml
+projects:
+  - name: main
+    backends:
+      - type: cloudrift
+        creds:
+          type: api_key
+          api_key: rift_2prgY1d0laOrf2BblTwx2B2d1zcf1zIp4tZYpj5j88qmNgz38pxNlpX3vAo
+```
+
+</div>
+
+## Kubernetes
 
 To configure a Kubernetes backend, specify the path to the kubeconfig file,
 and the port that `dstack` can use for proxying SSH traffic.
@@ -988,8 +1024,9 @@ In case of a self-managed cluster, also specify the IP address of any node in th
 ## dstack Sky
 
 If you're using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"},
-backends are pre-configured to use compute from `dstack`'s marketplace.
+backends come pre-configured to use compute from the dstack marketplace. However, you can update the configuration via UI
+to use your own cloud accounts instead.
 
-You can reconfigure backends via the UI, to use your own cloud accounts instead.
-
-[//]: # (TODO: Add link to the server config reference page)
+!!! info "What's next"
+    1. See the [`~/.dstack/server/config.yml`](../reference/server/config.yml.md) reference
+    2. Check [Projects](../concepts/projects.md)

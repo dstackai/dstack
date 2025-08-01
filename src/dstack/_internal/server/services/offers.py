@@ -2,18 +2,20 @@ from typing import List, Literal, Optional, Tuple, Union
 
 import gpuhunt
 
-from dstack._internal.core.backends import (
+from dstack._internal.core.backends.base.backend import Backend
+from dstack._internal.core.backends.base.compute import ComputeWithPlacementGroupSupport
+from dstack._internal.core.backends.features import (
     BACKENDS_WITH_CREATE_INSTANCE_SUPPORT,
     BACKENDS_WITH_MULTINODE_SUPPORT,
     BACKENDS_WITH_RESERVATION_SUPPORT,
 )
-from dstack._internal.core.backends.base.backend import Backend
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
     InstanceType,
     Resources,
 )
+from dstack._internal.core.models.placement import PlacementGroup
 from dstack._internal.core.models.profiles import Profile
 from dstack._internal.core.models.runs import JobProvisioningData, Requirements
 from dstack._internal.core.models.volumes import Volume
@@ -31,6 +33,7 @@ async def get_offers_by_requirements(
     volumes: Optional[List[List[Volume]]] = None,
     privileged: bool = False,
     instance_mounts: bool = False,
+    placement_group: Optional[PlacementGroup] = None,
     blocks: Union[int, Literal["auto"]] = 1,
 ) -> List[Tuple[Backend, InstanceOfferWithAvailability]]:
     backends: List[Backend] = await backends_services.get_project_backends(project=project)
@@ -114,6 +117,18 @@ async def get_offers_by_requirements(
                 ]
                 if new_offer.availability_zones:
                     new_offers.append((b, new_offer))
+        offers = new_offers
+
+    if placement_group is not None:
+        new_offers = []
+        for b, o in offers:
+            for backend in backends:
+                compute = backend.compute()
+                if isinstance(
+                    compute, ComputeWithPlacementGroupSupport
+                ) and compute.is_suitable_placement_group(placement_group, o):
+                    new_offers.append((b, o))
+                    break
         offers = new_offers
 
     if profile.instance_types is not None:

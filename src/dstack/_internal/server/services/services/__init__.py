@@ -3,6 +3,7 @@ Application logic related to `type: service` runs.
 """
 
 import uuid
+from datetime import datetime
 from typing import Optional
 from urllib.parse import urlparse
 
@@ -21,15 +22,17 @@ from dstack._internal.core.errors import (
 from dstack._internal.core.models.configurations import SERVICE_HTTPS_DEFAULT, ServiceConfiguration
 from dstack._internal.core.models.gateways import GatewayConfiguration, GatewayStatus
 from dstack._internal.core.models.instances import SSHConnectionParams
-from dstack._internal.core.models.runs import Run, RunSpec, ServiceModelSpec, ServiceSpec
+from dstack._internal.core.models.runs import JobSpec, Run, RunSpec, ServiceModelSpec, ServiceSpec
 from dstack._internal.server import settings
 from dstack._internal.server.models import GatewayModel, JobModel, ProjectModel, RunModel
 from dstack._internal.server.services.gateways import (
     get_gateway_configuration,
     get_or_add_gateway_connection,
+    get_project_default_gateway_model,
     get_project_gateway_model_by_name,
 )
 from dstack._internal.server.services.logging import fmt
+from dstack._internal.server.services.services.autoscalers import get_service_scaler
 from dstack._internal.server.services.services.options import get_service_options
 from dstack._internal.utils.logging import get_logger
 
@@ -50,7 +53,9 @@ async def register_service(session: AsyncSession, run_model: RunModel, run_spec:
     elif run_spec.configuration.gateway == False:
         gateway = None
     else:
-        gateway = run_model.project.default_gateway
+        gateway = await get_project_default_gateway_model(
+            session=session, project=run_model.project
+        )
 
     if gateway is not None:
         service_spec = await _register_service_in_gateway(session, run_model, run_spec, gateway)
@@ -177,6 +182,7 @@ async def register_replica(
         async with conn.client() as client:
             await client.register_replica(
                 run=run,
+                job_spec=JobSpec.__response__.parse_raw(job_model.job_spec_data),
                 job_submission=job_submission,
                 ssh_head_proxy=ssh_head_proxy,
                 ssh_head_proxy_private_key=ssh_head_proxy_private_key,
@@ -258,3 +264,21 @@ def _get_gateway_https(configuration: GatewayConfiguration) -> bool:
     if configuration.certificate is not None and configuration.certificate.type == "lets-encrypt":
         return True
     return False
+
+
+async def update_service_desired_replica_count(
+    session: AsyncSession,
+    run_model: RunModel,
+    configuration: ServiceConfiguration,
+    last_scaled_at: Optional[datetime],
+) -> None:
+    scaler = get_service_scaler(configuration)
+    stats = None
+    if run_model.gateway_id is not None:
+        conn = await get_or_add_gateway_connection(session, run_model.gateway_id)
+        stats = await conn.get_stats(run_model.project.name, run_model.run_name)
+    run_model.desired_replica_count = scaler.get_desired_count(
+        current_desired_count=run_model.desired_replica_count,
+        stats=stats,
+        last_scaled_at=last_scaled_at,
+    )

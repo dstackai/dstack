@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from textwrap import dedent
 from typing import Optional
+from unittest.mock import patch
 
 import pytest
 from freezegun import freeze_time
@@ -35,6 +36,55 @@ from dstack._internal.server.testing.common import (
     get_run_spec,
 )
 
+BASE_HTTP_METRICS = b"""
+# HELP python_gc_objects_collected_total Objects collected during gc
+# TYPE python_gc_objects_collected_total counter
+python_gc_objects_collected_total{generation="0"} 13159.0
+python_gc_objects_collected_total{generation="1"} 1583.0
+python_gc_objects_collected_total{generation="2"} 81.0
+# HELP python_gc_objects_uncollectable_total Uncollectable objects found during GC
+# TYPE python_gc_objects_uncollectable_total counter
+python_gc_objects_uncollectable_total{generation="0"} 0.0
+python_gc_objects_uncollectable_total{generation="1"} 0.0
+python_gc_objects_uncollectable_total{generation="2"} 0.0
+# HELP python_gc_collections_total Number of times this generation was collected
+# TYPE python_gc_collections_total counter
+python_gc_collections_total{generation="0"} 1609.0
+python_gc_collections_total{generation="1"} 146.0
+python_gc_collections_total{generation="2"} 9.0
+# HELP python_info Python platform information
+# TYPE python_info gauge
+python_info{implementation="CPython",major="3",minor="12",patchlevel="2",version="3.12.2"} 1.0
+# HELP dstack_server_requests_total Total number of HTTP requests
+# TYPE dstack_server_requests_total counter
+dstack_server_requests_total{endpoint="/metrics",http_status="200",method="GET",project_name="None"} 1.0
+# HELP dstack_server_requests_created Total number of HTTP requests
+# TYPE dstack_server_requests_created gauge
+dstack_server_requests_created{endpoint="/metrics",http_status="200",method="GET",project_name="None"} 1.67262864e+09
+# HELP dstack_server_request_duration_seconds HTTP request duration in seconds
+# TYPE dstack_server_request_duration_seconds histogram
+dstack_server_request_duration_seconds_bucket{endpoint="/metrics",http_status="200",le="0.005",method="GET",project_name="None"} 1.0
+dstack_server_request_duration_seconds_bucket{endpoint="/metrics",http_status="200",le="0.01",method="GET",project_name="None"} 1.0
+dstack_server_request_duration_seconds_bucket{endpoint="/metrics",http_status="200",le="0.025",method="GET",project_name="None"} 1.0
+dstack_server_request_duration_seconds_bucket{endpoint="/metrics",http_status="200",le="0.05",method="GET",project_name="None"} 1.0
+dstack_server_request_duration_seconds_bucket{endpoint="/metrics",http_status="200",le="0.075",method="GET",project_name="None"} 1.0
+dstack_server_request_duration_seconds_bucket{endpoint="/metrics",http_status="200",le="0.1",method="GET",project_name="None"} 1.0
+dstack_server_request_duration_seconds_bucket{endpoint="/metrics",http_status="200",le="0.25",method="GET",project_name="None"} 1.0
+dstack_server_request_duration_seconds_bucket{endpoint="/metrics",http_status="200",le="0.5",method="GET",project_name="None"} 1.0
+dstack_server_request_duration_seconds_bucket{endpoint="/metrics",http_status="200",le="0.75",method="GET",project_name="None"} 1.0
+dstack_server_request_duration_seconds_bucket{endpoint="/metrics",http_status="200",le="1.0",method="GET",project_name="None"} 1.0
+dstack_server_request_duration_seconds_bucket{endpoint="/metrics",http_status="200",le="2.5",method="GET",project_name="None"} 1.0
+dstack_server_request_duration_seconds_bucket{endpoint="/metrics",http_status="200",le="5.0",method="GET",project_name="None"} 1.0
+dstack_server_request_duration_seconds_bucket{endpoint="/metrics",http_status="200",le="7.5",method="GET",project_name="None"} 1.0
+dstack_server_request_duration_seconds_bucket{endpoint="/metrics",http_status="200",le="10.0",method="GET",project_name="None"} 1.0
+dstack_server_request_duration_seconds_bucket{endpoint="/metrics",http_status="200",le="+Inf",method="GET",project_name="None"} 1.0
+dstack_server_request_duration_seconds_count{endpoint="/metrics",http_status="200",method="GET",project_name="None"} 1.0
+dstack_server_request_duration_seconds_sum{endpoint="/metrics",http_status="200",method="GET",project_name="None"} 0.0
+# HELP dstack_server_request_duration_seconds_created HTTP request duration in seconds
+# TYPE dstack_server_request_duration_seconds_created gauge
+dstack_server_request_duration_seconds_created{endpoint="/metrics",http_status="200",method="GET",project_name="None"} 1.67262864e+09
+"""
+
 
 @pytest.fixture
 def enable_metrics(monkeypatch: pytest.MonkeyPatch):
@@ -50,6 +100,7 @@ FAKE_NOW = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
 @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
 @pytest.mark.usefixtures("image_config_mock", "test_db", "enable_metrics")
 class TestGetPrometheusMetrics:
+    @patch("prometheus_client.generate_latest", lambda: BASE_HTTP_METRICS)
     async def test_returns_metrics(self, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session, name="test-user", global_role=GlobalRole.USER)
         offer = get_instance_offer_with_availability(
@@ -58,6 +109,7 @@ class TestGetPrometheusMetrics:
             memory_gib=128,
             gpu_count=2,
             gpu_name="V4",
+            gpu_memory_gib=16,
             price=12,
         )
         project_2 = await _create_project(session, "project-2", user)
@@ -89,6 +141,8 @@ class TestGetPrometheusMetrics:
             """),
         )
         project_1 = await _create_project(session, "project-1", user)
+        # jrd.offer.instance.resources has higher priority than jpd.instance_type.resources,
+        # should be ignored
         jpd_1_1 = get_job_provisioning_data(backend=BackendType.AWS, gpu_count=4, gpu_name="T4")
         jrd_1_1 = get_job_runtime_data(offer=offer)
         job_1_1 = await _create_job(
@@ -125,6 +179,8 @@ class TestGetPrometheusMetrics:
             cpu_usage_micro=3_500_000,
             memory_working_set_bytes=3_221_225_472,
             memory_usage_bytes=4_294_967_296,
+            gpus_util_percent=[80, 90],
+            gpus_memory_usage_bytes=[1_073_741_824, 2_147_483_648],
         )
         # Older, ignored
         await create_job_metrics_point(
@@ -200,7 +256,8 @@ class TestGetPrometheusMetrics:
         response = await client.get("/metrics")
 
         assert response.status_code == 200
-        assert response.text == dedent(f"""\
+        expected = (
+            dedent(f"""\
             # HELP dstack_instance_duration_seconds_total Total seconds the instance is running
             # TYPE dstack_instance_duration_seconds_total counter
             dstack_instance_duration_seconds_total{{dstack_project_name="project-1",dstack_fleet_name="test-fleet",dstack_fleet_id="{fleet.id}",dstack_instance_name="test-instance",dstack_instance_id="{instance.id}",dstack_instance_type="test-type",dstack_backend="aws",dstack_gpu="V4"}} 3600.0
@@ -264,6 +321,18 @@ class TestGetPrometheusMetrics:
             # HELP dstack_job_memory_working_set_bytes Memory used by the job (not including cache), bytes
             # TYPE dstack_job_memory_working_set_bytes gauge
             dstack_job_memory_working_set_bytes{{dstack_project_name="project-1",dstack_user_name="test-user",dstack_run_name="run-1",dstack_run_id="{job_1_1.run_id}",dstack_job_name="run-1-0-0",dstack_job_id="{job_1_1.id}",dstack_job_num="0",dstack_replica_num="0",dstack_run_type="dev-environment",dstack_backend="aws",dstack_gpu="V4"}} 3221225472.0
+            # HELP dstack_job_gpu_usage_ratio Job GPU usage, percent (as 0.0-1.0)
+            # TYPE dstack_job_gpu_usage_ratio gauge
+            dstack_job_gpu_usage_ratio{{dstack_project_name="project-1",dstack_user_name="test-user",dstack_run_name="run-1",dstack_run_id="{job_1_1.run_id}",dstack_job_name="run-1-0-0",dstack_job_id="{job_1_1.id}",dstack_job_num="0",dstack_replica_num="0",dstack_run_type="dev-environment",dstack_backend="aws",dstack_gpu="V4",dstack_gpu_num="0"}} 0.8
+            dstack_job_gpu_usage_ratio{{dstack_project_name="project-1",dstack_user_name="test-user",dstack_run_name="run-1",dstack_run_id="{job_1_1.run_id}",dstack_job_name="run-1-0-0",dstack_job_id="{job_1_1.id}",dstack_job_num="0",dstack_replica_num="0",dstack_run_type="dev-environment",dstack_backend="aws",dstack_gpu="V4",dstack_gpu_num="1"}} 0.9
+            # HELP dstack_job_gpu_memory_total_bytes Total GPU memory allocated for the job, bytes
+            # TYPE dstack_job_gpu_memory_total_bytes gauge
+            dstack_job_gpu_memory_total_bytes{{dstack_project_name="project-1",dstack_user_name="test-user",dstack_run_name="run-1",dstack_run_id="{job_1_1.run_id}",dstack_job_name="run-1-0-0",dstack_job_id="{job_1_1.id}",dstack_job_num="0",dstack_replica_num="0",dstack_run_type="dev-environment",dstack_backend="aws",dstack_gpu="V4",dstack_gpu_num="0"}} 17179869184.0
+            dstack_job_gpu_memory_total_bytes{{dstack_project_name="project-1",dstack_user_name="test-user",dstack_run_name="run-1",dstack_run_id="{job_1_1.run_id}",dstack_job_name="run-1-0-0",dstack_job_id="{job_1_1.id}",dstack_job_num="0",dstack_replica_num="0",dstack_run_type="dev-environment",dstack_backend="aws",dstack_gpu="V4",dstack_gpu_num="1"}} 17179869184.0
+            # HELP dstack_job_gpu_memory_usage_bytes GPU memory used by the job, bytes
+            # TYPE dstack_job_gpu_memory_usage_bytes gauge
+            dstack_job_gpu_memory_usage_bytes{{dstack_project_name="project-1",dstack_user_name="test-user",dstack_run_name="run-1",dstack_run_id="{job_1_1.run_id}",dstack_job_name="run-1-0-0",dstack_job_id="{job_1_1.id}",dstack_job_num="0",dstack_replica_num="0",dstack_run_type="dev-environment",dstack_backend="aws",dstack_gpu="V4",dstack_gpu_num="0"}} 1073741824.0
+            dstack_job_gpu_memory_usage_bytes{{dstack_project_name="project-1",dstack_user_name="test-user",dstack_run_name="run-1",dstack_run_id="{job_1_1.run_id}",dstack_job_name="run-1-0-0",dstack_job_id="{job_1_1.id}",dstack_job_num="0",dstack_replica_num="0",dstack_run_type="dev-environment",dstack_backend="aws",dstack_gpu="V4",dstack_gpu_num="1"}} 2147483648.0
             # HELP FIELD_1 Test field 1
             # TYPE FIELD_1 gauge
             FIELD_1{{gpu="0",dstack_project_name="project-1",dstack_user_name="test-user",dstack_run_name="run-1",dstack_run_id="{job_1_1.run_id}",dstack_job_name="run-1-0-0",dstack_job_id="{job_1_1.id}",dstack_job_num="0",dstack_replica_num="0",dstack_run_type="dev-environment",dstack_backend="aws",dstack_gpu="V4"}} 350.0
@@ -278,11 +347,16 @@ class TestGetPrometheusMetrics:
             FIELD_2{{gpu="0",dstack_project_name="project-1",dstack_user_name="test-user",dstack_run_name="run-1",dstack_run_id="{job_1_1.run_id}",dstack_job_name="run-1-0-0",dstack_job_id="{job_1_1.id}",dstack_job_num="0",dstack_replica_num="0",dstack_run_type="dev-environment",dstack_backend="aws",dstack_gpu="V4"}} 337325.0 1395066363000
             FIELD_2{{gpu="1",dstack_project_name="project-1",dstack_user_name="test-user",dstack_run_name="run-1",dstack_run_id="{job_1_1.run_id}",dstack_job_name="run-1-0-0",dstack_job_id="{job_1_1.id}",dstack_job_num="0",dstack_replica_num="0",dstack_run_type="dev-environment",dstack_backend="aws",dstack_gpu="V4"}} 987169.0 1395066363010
         """)
+            + "\n"
+            + BASE_HTTP_METRICS.decode().strip()
+        )
+        assert response.text.strip() == expected
 
+    @patch("prometheus_client.generate_latest", lambda: BASE_HTTP_METRICS)
     async def test_returns_empty_response_if_no_runs(self, client: AsyncClient):
         response = await client.get("/metrics")
         assert response.status_code == 200
-        assert response.text == "\n"
+        assert response.text.strip() == BASE_HTTP_METRICS.decode().strip()
 
     async def test_returns_404_if_not_enabled(
         self, monkeypatch: pytest.MonkeyPatch, client: AsyncClient

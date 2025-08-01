@@ -9,12 +9,24 @@ from dstack._internal.core.models.runs import ApplyRunPlanInput, RunSpec
 
 
 class ListRunsRequest(CoreModel):
-    project_name: Optional[str]
-    repo_id: Optional[str]
-    username: Optional[str]
+    project_name: Optional[str] = None
+    repo_id: Optional[str] = None
+    username: Optional[str] = None
     only_active: bool = False
-    prev_submitted_at: Optional[datetime]
-    prev_run_id: Optional[UUID]
+    include_jobs: bool = Field(
+        True,
+        description=("Whether to include `jobs` in the response"),
+    )
+    job_submissions_limit: Optional[int] = Field(
+        None,
+        ge=0,
+        description=(
+            "Limit number of job submissions returned per job to avoid large responses."
+            "Drops older job submissions. No effect with `include_jobs: false`"
+        ),
+    )
+    prev_submitted_at: Optional[datetime] = None
+    prev_run_id: Optional[UUID] = None
     limit: int = Field(100, ge=0, le=100)
     ascending: bool = False
 
@@ -26,6 +38,9 @@ class GetRunRequest(CoreModel):
 
 class GetRunPlanRequest(CoreModel):
     run_spec: RunSpec
+    max_offers: Optional[int] = Field(
+        description="The maximum number of offers to return", ge=1, le=10000
+    )
 
 
 class SubmitRunRequest(CoreModel):

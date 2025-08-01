@@ -1,0 +1,32 @@
+type: service
+name: serve-r1
+
+# Specify the image built with `examples/inference/trtllm/build-image.dstack.yml`
+image: dstackai/tensorrt_llm:9b931c0f6305aefa3660e6fb84a76a42c0eef167 
+env:
+  - MAX_BATCH_SIZE=256
+  - MAX_NUM_TOKENS=16384
+  - MAX_SEQ_LENGTH=16384
+  - EXPERT_PARALLEL=4
+  - PIPELINE_PARALLEL=1
+  - HF_HUB_ENABLE_HF_TRANSFER=1
+commands:
+  - pip install -U "huggingface_hub[cli]"
+  - pip install hf_transfer
+  - huggingface-cli download deepseek-ai/DeepSeek-R1 --local-dir DeepSeek-R1
+  - trtllm-serve
+          --backend pytorch
+          --max_batch_size $MAX_BATCH_SIZE
+          --max_num_tokens $MAX_NUM_TOKENS
+          --max_seq_len $MAX_SEQ_LENGTH
+          --tp_size $DSTACK_GPUS_NUM
+          --ep_size $EXPERT_PARALLEL
+          --pp_size $PIPELINE_PARALLEL
+          DeepSeek-R1
+port: 8000
+model: deepseek-ai/DeepSeek-R1
+
+resources:
+  gpu: 8:H200
+  shm_size: 32GB
+  disk: 2000GB..

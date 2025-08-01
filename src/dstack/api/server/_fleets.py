@@ -1,9 +1,15 @@
-from typing import Any, Dict, List, Optional
+from typing import List, Union
 
 from pydantic import parse_obj_as
 
-from dstack._internal.core.models.fleets import Fleet, FleetPlan, FleetSpec
+from dstack._internal.core.compatibility.fleets import (
+    get_apply_plan_excludes,
+    get_create_fleet_excludes,
+    get_get_plan_excludes,
+)
+from dstack._internal.core.models.fleets import ApplyFleetPlanInput, Fleet, FleetPlan, FleetSpec
 from dstack._internal.server.schemas.fleets import (
+    ApplyFleetPlanRequest,
     CreateFleetRequest,
     DeleteFleetInstancesRequest,
     DeleteFleetsRequest,
@@ -32,18 +38,20 @@ class FleetsAPIClient(APIClientGroup):
         spec: FleetSpec,
     ) -> FleetPlan:
         body = GetFleetPlanRequest(spec=spec)
-        body_json = body.json(exclude=_get_fleet_spec_excludes(spec))
+        body_json = body.json(exclude=get_get_plan_excludes(spec))
         resp = self._request(f"/api/project/{project_name}/fleets/get_plan", body=body_json)
         return parse_obj_as(FleetPlan.__response__, resp.json())
 
-    def create(
+    def apply_plan(
         self,
         project_name: str,
-        spec: FleetSpec,
+        plan: Union[FleetPlan, ApplyFleetPlanInput],
+        force: bool = False,
     ) -> Fleet:
-        body = CreateFleetRequest(spec=spec)
-        body_json = body.json(exclude=_get_fleet_spec_excludes(spec))
-        resp = self._request(f"/api/project/{project_name}/fleets/create", body=body_json)
+        plan_input = ApplyFleetPlanInput.__response__.parse_obj(plan)
+        body = ApplyFleetPlanRequest(plan=plan_input, force=force)
+        body_json = body.json(exclude=get_apply_plan_excludes(plan_input))
+        resp = self._request(f"/api/project/{project_name}/fleets/apply", body=body_json)
         return parse_obj_as(Fleet.__response__, resp.json())
 
     def delete(self, project_name: str, names: List[str]) -> None:
@@ -54,27 +62,14 @@ class FleetsAPIClient(APIClientGroup):
         body = DeleteFleetInstancesRequest(name=name, instance_nums=instance_nums)
         self._request(f"/api/project/{project_name}/fleets/delete_instances", body=body.json())
 
-
-def _get_fleet_spec_excludes(fleet_spec: FleetSpec) -> Optional[Dict]:
-    """
-    Returns `fleet_spec` exclude mapping to exclude certain fields from the request.
-    Use this method to exclude new fields when they are not set to keep
-    clients backward-compatibility with older servers.
-    """
-    spec_excludes: Dict[str, Any] = {}
-    configuration_excludes: Dict[str, Any] = {}
-    profile_excludes: set[str] = set()
-    profile = fleet_spec.profile
-    if profile.fleets is None:
-        profile_excludes.add("fleets")
-    if fleet_spec.configuration.tags is None:
-        configuration_excludes["tags"] = True
-    if profile.tags is None:
-        profile_excludes.add("tags")
-    if configuration_excludes:
-        spec_excludes["configuration"] = configuration_excludes
-    if profile_excludes:
-        spec_excludes["profile"] = profile_excludes
-    if spec_excludes:
-        return {"spec": spec_excludes}
-    return None
+    # Deprecated
+    # TODO: Remove in 0.20
+    def create(
+        self,
+        project_name: str,
+        spec: FleetSpec,
+    ) -> Fleet:
+        body = CreateFleetRequest(spec=spec)
+        body_json = body.json(exclude=get_create_fleet_excludes(spec))
+        resp = self._request(f"/api/project/{project_name}/fleets/create", body=body_json)
+        return parse_obj_as(Fleet.__response__, resp.json())

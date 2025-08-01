@@ -3,11 +3,9 @@ title: "Exploring inference memory saturation effect: H100 vs MI300x"
 date: 2024-12-05
 description: "This benchmark explores how GPU memory saturation affects LLM inference performance and cost, comparing NVIDIA H100 and AMD MI300x."
 slug: h100-mi300x-inference-benchmark
-image: https://github.com/dstackai/static-assets/blob/main/static-assets/images/h100-mi300x-inference-benchmark-v2.png?raw=true
+image: https://dstack.ai/static-assets/static-assets/images/h100-mi300x-inference-benchmark-v2.png
 categories:
   - Benchmarks
-  - AMD
-  - NVIDIA
 ---
 
 # Exploring inference memory saturation effect: H100 vs MI300x
@@ -21,7 +19,7 @@ replica on 4xMI300x and 8xMI300x
 
 Finally, we extrapolate performance projections for upcoming GPUs like NVIDIA H200, B200, and AMD MI325x, MI350x.
 
-<img src="https://github.com/dstackai/static-assets/blob/main/static-assets/images/h100-mi300x-inference-benchmark-v2.png?raw=true" width="630"/>
+<img src="https://dstack.ai/static-assets/static-assets/images/h100-mi300x-inference-benchmark-v2.png" width="630"/>
 
 This benchmark is made possible through the generous support of our friends at
 [Hot Aisle :material-arrow-top-right-thin:{ .external }](https://hotaisle.xyz/){:target="_blank"} and 
@@ -58,7 +56,7 @@ who provided high-end hardware.
 
 ### Cost per token
 
-<img src="https://github.com/dstackai/static-assets/blob/main/static-assets/images/h100-mi300x-inference-benchmark-cpt.png?raw=true" width="750">
+<img src="https://dstack.ai/static-assets/static-assets/images/h100-mi300x-inference-benchmark-cpt.png" width="750">
 
 As prompt and batch sizes grow, the NVIDIA H100 reaches memory limits, causing a sharp drop in cost-effectiveness. In
 contrast, the 1 FP8 8xMI300x configuration is the most cost-efficient for large prompts.
@@ -66,16 +64,16 @@ contrast, the 1 FP8 8xMI300x configuration is the most cost-efficient for large 
 For large prompts, two parallel replicas running on 4xMI300x lose their cost advantage compared to a single replica on
 8xMI300x. The latter offers 51% more memory for the KV cache, improving throughput and reducing cost per token.
 
-<img src="https://github.com/dstackai/static-assets/blob/main/static-assets/images/h100-mi300x-inference-benchmark-online-requests.png?raw=true" width="750">
+<img src="https://dstack.ai/static-assets/static-assets/images/h100-mi300x-inference-benchmark-online-requests.png" width="750">
 
 While 4xMI300x is a cost-effective alternative to 8xH100 for smaller load profiles, it underperforms in online serving.
 8xH100 SXM5 processes 74% more requests per second and reduces TTFT by at least 50% at all QPS levels.
 
-<img src="https://github.com/dstackai/static-assets/blob/main/static-assets/images/h100-mi300x-inference-benchmark-online-ttft.png?raw=true" width="750">
+<img src="https://dstack.ai/static-assets/static-assets/images/h100-mi300x-inference-benchmark-online-ttft.png" width="750">
 
 ### Throughput
 
-<img src="https://github.com/dstackai/static-assets/blob/main/static-assets/images/h100-mi300x-inference-benchmark-throughput.png?raw=true" width="750">
+<img src="https://dstack.ai/static-assets/static-assets/images/h100-mi300x-inference-benchmark-throughput.png" width="750">
 
 With large prompts and batch sizes, two replicas on 4xMI300x GPUs hit memory saturation when total tokens (prompt
 length x batch size) exceed the available memory for the KV cache. This forces the inference engine to compute KV
@@ -94,12 +92,12 @@ setup, an 8xH200 would process around 2,186 tokens per second (3.4 × 643), thou
 
 #### Replicas on 4xMi300x
 
-<img src="https://github.com/dstackai/static-assets/blob/main/static-assets/images/h100-mi300x-inference-benchmark-throughput-2048.png?raw=true" width="750">
+<img src="https://dstack.ai/static-assets/static-assets/images/h100-mi300x-inference-benchmark-throughput-2048.png" width="750">
 
 Running two replicas on 4xMI300x delivers better throughput for small to medium prompts than a single replica on
 8xMI300x. 
 
-<img src="https://github.com/dstackai/static-assets/blob/main/static-assets/images/h100-mi300x-inference-benchmark-throughput-32784.png?raw=true" width="750">
+<img src="https://dstack.ai/static-assets/static-assets/images/h100-mi300x-inference-benchmark-throughput-32784.png" width="750">
 
 This boost comes from distributing the Llama 3.1 405B model across four GPUs, enabling parallel execution. For
 small prompts, a single replica underutilizes the GPUs. Running two replicas doubles the batch size, improving GPU
@@ -107,7 +105,7 @@ utilization and efficiency.
 
 ### Time To First Token
 
-<img src="https://github.com/dstackai/static-assets/blob/main/static-assets/images/h100-mi300x-inference-benchmark-ttft-qps-1000.png?raw=true" width="750">
+<img src="https://dstack.ai/static-assets/static-assets/images/h100-mi300x-inference-benchmark-ttft-qps-1000.png" width="750">
 
 The 4xMI300x setup provides 768 GB of memory (4 GPUs × 192 GB each), compared to 640 GB with 8xH100 (8 GPUs × 80 GB
 each). However, at 1000 QPS, TTFT for 4xMI300x is over twice as long as for 8xH100
@@ -119,7 +117,7 @@ Despite offering more memory, 4xMI300x lacks the parallelism of 8xH100, leading 
 
 ### Time to Serve 1 Request
 
-<img src="https://github.com/dstackai/static-assets/blob/main/static-assets/images/h100-mi300x-inference-benchmark-time-1-request.png?raw=true" width="750">
+<img src="https://dstack.ai/static-assets/static-assets/images/h100-mi300x-inference-benchmark-time-1-request.png" width="750">
 
 Processing a single large prompt request with 8xMI300x takes around 11.25 seconds. This latency is mainly due to
 computational demands during the prefill phase, where KV tensors are computed.

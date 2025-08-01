@@ -8,6 +8,11 @@ from dstack._internal.core.models.users import ProjectRole
 
 class CreateProjectRequest(CoreModel):
     project_name: str
+    is_public: bool = False
+
+
+class UpdateProjectRequest(CoreModel):
+    is_public: bool
 
 
 class DeleteProjectsRequest(CoreModel):
@@ -24,3 +29,11 @@ class MemberSetting(CoreModel):
 
 class SetProjectMembersRequest(CoreModel):
     members: List[MemberSetting]
+
+
+class AddProjectMemberRequest(CoreModel):
+    members: List[MemberSetting]
+
+
+class RemoveProjectMemberRequest(CoreModel):
+    usernames: List[str]

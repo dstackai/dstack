@@ -4,6 +4,7 @@ from typing import List, Optional, Tuple
 
 import azure.core.exceptions
 from azure.core.credentials import TokenCredential
+from azure.mgmt import msi as msi_mgmt
 from azure.mgmt import network as network_mgmt
 from azure.mgmt import resource as resource_mgmt
 from azure.mgmt import subscription as subscription_mgmt
@@ -97,6 +98,7 @@ class AzureConfigurator(Configurator):
         self._check_config_locations(config)
         self._check_config_tags(config)
         self._check_config_resource_group(config=config, credential=credential)
+        self._check_config_vm_managed_identity(config=config, credential=credential)
         self._check_config_vpc(config=config, credential=credential)
 
     def create_backend(
@@ -259,6 +261,25 @@ class AzureConfigurator(Configurator):
                         future.result()
                     except BackendError as e:
                         raise ServerClientError(e.args[0])
+
+    def _check_config_vm_managed_identity(
+        self, config: AzureBackendConfigWithCreds, credential: auth.AzureCredential
+    ):
+        try:
+            resource_group, identity_name = compute.parse_vm_managed_identity(
+                config.vm_managed_identity
+            )
+        except BackendError as e:
+            raise ServerClientError(e.args[0])
+        if resource_group is None or identity_name is None:
+            return
+        msi_client = msi_mgmt.ManagedServiceIdentityClient(credential, config.subscription_id)
+        try:
+            msi_client.user_assigned_identities.get(resource_group, identity_name)
+        except azure.core.exceptions.ResourceNotFoundError:
+            raise ServerClientError(
+                f"Managed identity {identity_name} not found in resource group {resource_group}"
+            )
 
     def _set_client_creds_tenant_id(
         self,
