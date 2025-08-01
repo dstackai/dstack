@@ -17,3 +17,10 @@ repos:
     rev: v5.0.0
     hooks:
       - id: end-of-file-fixer
+  - repo: local
+    hooks:
+      - id: frontend-pre-commit
+        name: frontend-pre-commit
+        entry: bash -c "cd frontend && npm install && npm run precommit"
+        language: system
+        pass_filenames: false
