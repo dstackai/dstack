@@ -1,10 +1,10 @@
 import argparse
-from pathlib import Path
 
 from argcomplete import FilesCompleter
 
 from dstack._internal.cli.commands import APIBaseCommand
 from dstack._internal.cli.services.configurators import (
+    APPLY_STDIN_NAME,
     get_apply_configurator_class,
     load_apply_configuration,
 )
@@ -40,9 +40,12 @@ class ApplyCommand(APIBaseCommand):
         self._parser.add_argument(
             "-f",
             "--file",
-            type=Path,
             metavar="FILE",
-            help="The path to the configuration file. Defaults to [code]$PWD/.dstack.yml[/]",
+            help=(
+                "The path to the configuration file."
+                " Specify [code]-[/] to read configuration from stdin."
+                " Defaults to [code]$PWD/.dstack.yml[/]"
+            ),
             dest="configuration_file",
         ).completer = FilesCompleter(allowednames=["*.yml", "*.yaml"])
         self._parser.add_argument(
@@ -104,6 +107,8 @@ class ApplyCommand(APIBaseCommand):
                 return
 
             super()._command(args)
+            if not args.yes and args.configuration_file == APPLY_STDIN_NAME:
+                raise CLIError("Cannot read configuration from stdin if -y/--yes is not specified")
             if args.repo and args.no_repo:
                 raise CLIError("Either --repo or --no-repo can be specified")
             repo = None
