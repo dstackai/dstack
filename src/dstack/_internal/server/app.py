@@ -13,6 +13,7 @@ from fastapi.datastructures import URL
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from prometheus_client import Counter, Histogram
+from sentry_sdk.types import SamplingContext
 
 from dstack._internal.cli.utils.common import console
 from dstack._internal.core.errors import ForbiddenError, ServerClientError
@@ -82,16 +83,6 @@ REQUEST_DURATION = Histogram(
 
 
 def create_app() -> FastAPI:
-    if settings.SENTRY_DSN is not None:
-        sentry_sdk.init(
-            dsn=settings.SENTRY_DSN,
-            release=DSTACK_VERSION,
-            environment=settings.SERVER_ENVIRONMENT,
-            enable_tracing=True,
-            traces_sample_rate=settings.SENTRY_TRACES_SAMPLE_RATE,
-            profiles_sample_rate=settings.SENTRY_PROFILES_SAMPLE_RATE,
-        )
-
     app = FastAPI(
         docs_url="/api/docs",
         lifespan=lifespan,
@@ -103,6 +94,15 @@ def create_app() -> FastAPI:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     configure_logging()
+    if settings.SENTRY_DSN is not None:
+        sentry_sdk.init(
+            dsn=settings.SENTRY_DSN,
+            release=DSTACK_VERSION,
+            environment=settings.SERVER_ENVIRONMENT,
+            enable_tracing=True,
+            traces_sampler=_sentry_traces_sampler,
+            profiles_sample_rate=settings.SENTRY_PROFILES_SAMPLE_RATE,
+        )
     server_executor = ThreadPoolExecutor(max_workers=settings.SERVER_EXECUTOR_MAX_WORKERS)
     asyncio.get_running_loop().set_default_executor(server_executor)
     await migrate()
@@ -382,3 +382,15 @@ def _print_dstack_logo():
 ╰━━┻━━┻╯╱╰╯╰━━┻╯
 [/]"""
     )
+
+
+def _sentry_traces_sampler(sampling_context: SamplingContext) -> float:
+    parent_sampling_decision = sampling_context["parent_sampled"]
+    if parent_sampling_decision is not None:
+        return float(parent_sampling_decision)
+    transaction_context = sampling_context["transaction_context"]
+    name = transaction_context.get("name")
+    if name is not None:
+        if name.startswith("background."):
+            return settings.SENTRY_TRACES_BACKGROUND_SAMPLE_RATE
+    return settings.SENTRY_TRACES_SAMPLE_RATE

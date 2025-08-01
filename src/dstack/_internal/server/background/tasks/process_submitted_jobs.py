@@ -5,7 +5,7 @@ from typing import List, Optional, Tuple
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, lazyload, selectinload
+from sqlalchemy.orm import joinedload, load_only, selectinload
 
 from dstack._internal.core.backends.base.backend import Backend
 from dstack._internal.core.backends.base.compute import ComputeWithVolumeSupport
@@ -43,6 +43,7 @@ from dstack._internal.server.models import (
     JobModel,
     ProjectModel,
     RunModel,
+    UserModel,
     VolumeAttachmentModel,
     VolumeModel,
 )
@@ -74,6 +75,7 @@ from dstack._internal.server.services.runs import (
 from dstack._internal.server.services.volumes import (
     volume_model_to_volume,
 )
+from dstack._internal.server.utils import sentry_utils
 from dstack._internal.utils import common as common_utils
 from dstack._internal.utils import env as env_utils
 from dstack._internal.utils.logging import get_logger
@@ -108,6 +110,7 @@ def _get_effective_batch_size(batch_size: int) -> int:
     return batch_size
 
 
+@sentry_utils.instrument_background_task
 async def _process_next_submitted_job():
     lock, lockset = get_locker(get_db().dialect_name).get_lockset(JobModel.__tablename__)
     async with get_session_ctx() as session:
@@ -119,6 +122,7 @@ async def _process_next_submitted_job():
                     JobModel.status == JobStatus.SUBMITTED,
                     JobModel.id.not_in(lockset),
                 )
+                .options(load_only(JobModel.id))
                 # Jobs are process in FIFO sorted by priority globally,
                 # thus runs from different projects can "overtake" each other by using higher priorities.
                 # That's not a big problem as long as projects do not compete for the same compute resources.
@@ -151,9 +155,7 @@ async def _process_next_submitted_job():
 
 
 async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
-    logger.debug("%s: provisioning has started", fmt(job_model))
     # Refetch to load related attributes.
-    # joinedload produces LEFT OUTER JOIN that can't be used with FOR UPDATE.
     res = await session.execute(
         select(JobModel).where(JobModel.id == job_model.id).options(joinedload(JobModel.instance))
     )
@@ -162,10 +164,12 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         select(RunModel)
         .where(RunModel.id == job_model.run_id)
         .options(joinedload(RunModel.project).joinedload(ProjectModel.backends))
-        .options(joinedload(RunModel.user))
+        .options(joinedload(RunModel.user).load_only(UserModel.name))
         .options(joinedload(RunModel.fleet).joinedload(FleetModel.instances))
     )
     run_model = res.unique().scalar_one()
+    logger.debug("%s: provisioning has started", fmt(job_model))
+
     project = run_model.project
     run = run_model_to_run(run_model)
     run_spec = run.run_spec
@@ -227,7 +231,6 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
                 InstanceModel.deleted == False,
                 InstanceModel.total_blocks > InstanceModel.busy_blocks,
             )
-            .options(lazyload(InstanceModel.jobs))
             .order_by(InstanceModel.id)  # take locks in order
             .with_for_update(key_share=True)
         )
@@ -356,9 +359,9 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
     await session.execute(
         select(VolumeModel)
         .where(VolumeModel.id.in_(volumes_ids))
-        .options(selectinload(VolumeModel.user))
+        .options(joinedload(VolumeModel.user).load_only(UserModel.name))
         .order_by(VolumeModel.id)  # take locks in order
-        .with_for_update(key_share=True)
+        .with_for_update(key_share=True, of=VolumeModel)
     )
     async with get_locker(get_db().dialect_name).lock_ctx(VolumeModel.__tablename__, volumes_ids):
         if len(volume_models) > 0:

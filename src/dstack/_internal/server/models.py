@@ -359,7 +359,7 @@ class RunModel(BaseModel):
     submitted_at: Mapped[datetime] = mapped_column(NaiveDateTime)
     last_processed_at: Mapped[datetime] = mapped_column(NaiveDateTime)
     next_triggered_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
-    status: Mapped[RunStatus] = mapped_column(Enum(RunStatus))
+    status: Mapped[RunStatus] = mapped_column(Enum(RunStatus), index=True)
     termination_reason: Mapped[Optional[RunTerminationReason]] = mapped_column(
         Enum(RunTerminationReason)
     )
@@ -400,7 +400,7 @@ class JobModel(BaseModel):
     submission_num: Mapped[int] = mapped_column(Integer)
     submitted_at: Mapped[datetime] = mapped_column(NaiveDateTime)
     last_processed_at: Mapped[datetime] = mapped_column(NaiveDateTime)
-    status: Mapped[JobStatus] = mapped_column(Enum(JobStatus))
+    status: Mapped[JobStatus] = mapped_column(Enum(JobStatus), index=True)
     termination_reason: Mapped[Optional[JobTerminationReason]] = mapped_column(
         Enum(JobTerminationReason)
     )
@@ -531,7 +531,7 @@ class FleetModel(BaseModel):
     deleted: Mapped[bool] = mapped_column(Boolean, default=False)
     deleted_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
 
-    status: Mapped[FleetStatus] = mapped_column(Enum(FleetStatus))
+    status: Mapped[FleetStatus] = mapped_column(Enum(FleetStatus), index=True)
     status_message: Mapped[Optional[str]] = mapped_column(Text)
 
     spec: Mapped[str] = mapped_column(Text)
@@ -550,7 +550,6 @@ class InstanceModel(BaseModel):
 
     instance_num: Mapped[int] = mapped_column(Integer, default=0)
 
-    # instance
     created_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
     last_processed_at: Mapped[datetime] = mapped_column(
         NaiveDateTime, default=get_current_datetime
@@ -571,7 +570,7 @@ class InstanceModel(BaseModel):
     fleet_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("fleets.id"))
     fleet: Mapped[Optional["FleetModel"]] = relationship(back_populates="instances")
 
-    status: Mapped[InstanceStatus] = mapped_column(Enum(InstanceStatus))
+    status: Mapped[InstanceStatus] = mapped_column(Enum(InstanceStatus), index=True)
     unreachable: Mapped[bool] = mapped_column(Boolean)
 
     # VM
@@ -587,7 +586,6 @@ class InstanceModel(BaseModel):
     requirements: Mapped[Optional[str]] = mapped_column(Text)
     instance_configuration: Mapped[Optional[str]] = mapped_column(Text)
 
-    # temination policy
     termination_policy: Mapped[Optional[TerminationPolicy]] = mapped_column(String(100))
     # TODO: Suggestion: do not assign DEFAULT_FLEET_TERMINATION_IDLE_TIME as the default here
     # (make Optional instead; also instead of -1)
@@ -605,11 +603,9 @@ class InstanceModel(BaseModel):
     first_termination_retry_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
     last_termination_retry_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
 
-    # backend
     backend: Mapped[Optional[BackendType]] = mapped_column(EnumAsString(BackendType, 100))
     backend_data: Mapped[Optional[str]] = mapped_column(Text)
 
-    # offer
     offer: Mapped[Optional[str]] = mapped_column(Text)
     region: Mapped[Optional[str]] = mapped_column(String(2000))
     price: Mapped[Optional[float]] = mapped_column(Float)
@@ -622,14 +618,14 @@ class InstanceModel(BaseModel):
     total_blocks: Mapped[Optional[int]] = mapped_column(Integer)
     busy_blocks: Mapped[int] = mapped_column(Integer, default=0)
 
-    jobs: Mapped[list["JobModel"]] = relationship(back_populates="instance", lazy="joined")
+    jobs: Mapped[list["JobModel"]] = relationship(back_populates="instance")
     last_job_processed_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
 
     volume_attachments: Mapped[List["VolumeAttachmentModel"]] = relationship(
         back_populates="instance",
         # Add delete-orphan option so that removing entries from volume_attachments
         # automatically marks them for deletion.
-        # SQLalchemy requires delete when using delete-orphan.
+        # SQLAlchemy requires delete when using delete-orphan.
         cascade="save-update, merge, delete-orphan, delete",
     )
 
@@ -656,7 +652,7 @@ class VolumeModel(BaseModel):
     deleted: Mapped[bool] = mapped_column(Boolean, default=False)
     deleted_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
 
-    status: Mapped[VolumeStatus] = mapped_column(Enum(VolumeStatus))
+    status: Mapped[VolumeStatus] = mapped_column(Enum(VolumeStatus), index=True)
     status_message: Mapped[Optional[str]] = mapped_column(Text)
 
     configuration: Mapped[str] = mapped_column(Text)

@@ -28,6 +28,7 @@ from dstack._internal.server.models import GatewayModel, JobModel, ProjectModel,
 from dstack._internal.server.services.gateways import (
     get_gateway_configuration,
     get_or_add_gateway_connection,
+    get_project_default_gateway_model,
     get_project_gateway_model_by_name,
 )
 from dstack._internal.server.services.logging import fmt
@@ -52,7 +53,9 @@ async def register_service(session: AsyncSession, run_model: RunModel, run_spec:
     elif run_spec.configuration.gateway == False:
         gateway = None
     else:
-        gateway = run_model.project.default_gateway
+        gateway = await get_project_default_gateway_model(
+            session=session, project=run_model.project
+        )
 
     if gateway is not None:
         service_spec = await _register_service_in_gateway(session, run_model, run_spec, gateway)

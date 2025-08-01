@@ -13,7 +13,6 @@ from dstack._internal.core.errors import (
     ResourceExistsError,
     ServerClientError,
 )
-from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.core.models.volumes import (
     Volume,
     VolumeAttachment,
@@ -40,7 +39,7 @@ from dstack._internal.server.services.locking import (
     string_to_lock_id,
 )
 from dstack._internal.server.services.plugins import apply_plugin_policies
-from dstack._internal.server.services.projects import list_project_models, list_user_project_models
+from dstack._internal.server.services.projects import list_user_project_models
 from dstack._internal.utils import common, random_names
 from dstack._internal.utils.logging import get_logger
 
@@ -57,10 +56,11 @@ async def list_volumes(
     limit: int,
     ascending: bool,
 ) -> List[Volume]:
-    if user.global_role == GlobalRole.ADMIN:
-        projects = await list_project_models(session=session)
-    else:
-        projects = await list_user_project_models(session=session, user=user)
+    projects = await list_user_project_models(
+        session=session,
+        user=user,
+        only_names=True,
+    )
     if project_name is not None:
         projects = [p for p in projects if p.name == project_name]
     volume_models = await list_projects_volume_models(

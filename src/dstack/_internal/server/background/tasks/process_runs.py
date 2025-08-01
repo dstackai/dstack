@@ -4,7 +4,7 @@ from typing import List, Optional, Set, Tuple
 
 from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, selectinload
+from sqlalchemy.orm import joinedload, load_only, selectinload
 
 import dstack._internal.server.services.services.autoscalers as autoscalers
 from dstack._internal.core.errors import ServerError
@@ -20,7 +20,13 @@ from dstack._internal.core.models.runs import (
     RunTerminationReason,
 )
 from dstack._internal.server.db import get_db, get_session_ctx
-from dstack._internal.server.models import JobModel, ProjectModel, RunModel
+from dstack._internal.server.models import (
+    InstanceModel,
+    JobModel,
+    ProjectModel,
+    RunModel,
+    UserModel,
+)
 from dstack._internal.server.services.jobs import (
     find_job,
     get_job_specs_from_run_spec,
@@ -38,6 +44,7 @@ from dstack._internal.server.services.runs import (
 )
 from dstack._internal.server.services.secrets import get_project_secrets_mapping
 from dstack._internal.server.services.services import update_service_desired_replica_count
+from dstack._internal.server.utils import sentry_utils
 from dstack._internal.utils import common
 from dstack._internal.utils.logging import get_logger
 
@@ -54,6 +61,7 @@ async def process_runs(batch_size: int = 1):
     await asyncio.gather(*tasks)
 
 
+@sentry_utils.instrument_background_task
 async def _process_next_run():
     run_lock, run_lockset = get_locker(get_db().dialect_name).get_lockset(RunModel.__tablename__)
     job_lock, job_lockset = get_locker(get_db().dialect_name).get_lockset(JobModel.__tablename__)
@@ -96,9 +104,11 @@ async def _process_next_run():
                         ),
                     ),
                 )
+                .options(joinedload(RunModel.jobs).load_only(JobModel.id))
+                .options(load_only(RunModel.id))
                 .order_by(RunModel.last_processed_at.asc())
                 .limit(1)
-                .with_for_update(skip_locked=True, key_share=True)
+                .with_for_update(skip_locked=True, key_share=True, of=RunModel)
             )
             run_model = res.scalar()
             if run_model is None:
@@ -128,21 +138,22 @@ async def _process_next_run():
 
 
 async def _process_run(session: AsyncSession, run_model: RunModel):
-    logger.debug("%s: processing run", fmt(run_model))
     # Refetch to load related attributes.
-    # joinedload produces LEFT OUTER JOIN that can't be used with FOR UPDATE.
     res = await session.execute(
         select(RunModel)
         .where(RunModel.id == run_model.id)
         .execution_options(populate_existing=True)
-        .options(joinedload(RunModel.project).joinedload(ProjectModel.backends))
-        .options(joinedload(RunModel.user))
-        .options(joinedload(RunModel.repo))
-        .options(selectinload(RunModel.jobs).joinedload(JobModel.instance))
-        .options(selectinload(RunModel.jobs).joinedload(JobModel.probes))
+        .options(joinedload(RunModel.project).load_only(ProjectModel.id, ProjectModel.name))
+        .options(joinedload(RunModel.user).load_only(UserModel.name))
+        .options(
+            selectinload(RunModel.jobs)
+            .joinedload(JobModel.instance)
+            .load_only(InstanceModel.fleet_id)
+        )
         .execution_options(populate_existing=True)
     )
     run_model = res.unique().scalar_one()
+    logger.debug("%s: processing run", fmt(run_model))
     try:
         if run_model.status == RunStatus.PENDING:
             await _process_pending_run(session, run_model)

@@ -9,7 +9,7 @@ from paramiko.ssh_exception import PasswordRequiredException
 from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, lazyload
+from sqlalchemy.orm import joinedload
 
 from dstack._internal import settings
 from dstack._internal.core.backends.base.compute import (
@@ -78,6 +78,7 @@ from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import (
     FleetModel,
     InstanceModel,
+    JobModel,
     PlacementGroupModel,
     ProjectModel,
 )
@@ -104,8 +105,10 @@ from dstack._internal.server.services.placement import (
 from dstack._internal.server.services.runner import client as runner_client
 from dstack._internal.server.services.runner.client import HealthStatus
 from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
+from dstack._internal.server.utils import sentry_utils
 from dstack._internal.utils.common import (
     get_current_datetime,
+    get_or_error,
     run_async,
 )
 from dstack._internal.utils.logging import get_logger
@@ -134,6 +137,7 @@ async def process_instances(batch_size: int = 1):
     await asyncio.gather(*tasks)
 
 
+@sentry_utils.instrument_background_task
 async def _process_next_instance():
     lock, lockset = get_locker(get_db().dialect_name).get_lockset(InstanceModel.__tablename__)
     async with get_session_ctx() as session:
@@ -154,10 +158,11 @@ async def _process_next_instance():
                     InstanceModel.last_processed_at
                     < get_current_datetime() - MIN_PROCESSING_INTERVAL,
                 )
-                .options(lazyload(InstanceModel.jobs))
+                .options(joinedload(InstanceModel.jobs).load_only(JobModel.id, JobModel.status))
+                .options(joinedload(InstanceModel.project).load_only(ProjectModel.ssh_private_key))
                 .order_by(InstanceModel.last_processed_at.asc())
                 .limit(1)
-                .with_for_update(skip_locked=True, key_share=True)
+                .with_for_update(skip_locked=True, key_share=True, of=InstanceModel)
             )
             instance = res.scalar()
             if instance is None:
@@ -171,23 +176,22 @@ async def _process_next_instance():
 
 
 async def _process_instance(session: AsyncSession, instance: InstanceModel):
-    # Refetch to load related attributes.
-    # joinedload produces LEFT OUTER JOIN that can't be used with FOR UPDATE.
-    res = await session.execute(
-        select(InstanceModel)
-        .where(InstanceModel.id == instance.id)
-        .options(joinedload(InstanceModel.project).joinedload(ProjectModel.backends))
-        .options(joinedload(InstanceModel.jobs))
-        .options(joinedload(InstanceModel.fleet).joinedload(FleetModel.instances))
-        .execution_options(populate_existing=True)
-    )
-    instance = res.unique().scalar_one()
-    if (
-        instance.status == InstanceStatus.IDLE
-        and instance.termination_policy == TerminationPolicy.DESTROY_AFTER_IDLE
-        and not instance.jobs
+    if instance.status in (
+        InstanceStatus.PENDING,
+        InstanceStatus.TERMINATING,
     ):
-        await _mark_terminating_if_idle_duration_expired(instance)
+        # Refetch to load related attributes.
+        # Load related attributes only for statuses that always need them.
+        res = await session.execute(
+            select(InstanceModel)
+            .where(InstanceModel.id == instance.id)
+            .options(joinedload(InstanceModel.project).joinedload(ProjectModel.backends))
+            .options(joinedload(InstanceModel.jobs).load_only(JobModel.id, JobModel.status))
+            .options(joinedload(InstanceModel.fleet).joinedload(FleetModel.instances))
+            .execution_options(populate_existing=True)
+        )
+        instance = res.unique().scalar_one()
+
     if instance.status == InstanceStatus.PENDING:
         if instance.remote_connection_info is not None:
             await _add_remote(instance)
@@ -201,7 +205,9 @@ async def _process_instance(session: AsyncSession, instance: InstanceModel):
         InstanceStatus.IDLE,
         InstanceStatus.BUSY,
     ):
-        await _check_instance(instance)
+        idle_duration_expired = _check_and_mark_terminating_if_idle_duration_expired(instance)
+        if not idle_duration_expired:
+            await _check_instance(session, instance)
     elif instance.status == InstanceStatus.TERMINATING:
         await _terminate(instance)
 
@@ -209,7 +215,13 @@ async def _process_instance(session: AsyncSession, instance: InstanceModel):
     await session.commit()
 
 
-async def _mark_terminating_if_idle_duration_expired(instance: InstanceModel):
+def _check_and_mark_terminating_if_idle_duration_expired(instance: InstanceModel):
+    if not (
+        instance.status == InstanceStatus.IDLE
+        and instance.termination_policy == TerminationPolicy.DESTROY_AFTER_IDLE
+        and not instance.jobs
+    ):
+        return False
     idle_duration = _get_instance_idle_duration(instance)
     idle_seconds = instance.termination_idle_time
     delta = datetime.timedelta(seconds=idle_seconds)
@@ -225,6 +237,8 @@ async def _mark_terminating_if_idle_duration_expired(instance: InstanceModel):
                 "instance_status": instance.status.value,
             },
         )
+        return True
+    return False
 
 
 async def _add_remote(instance: InstanceModel) -> None:
@@ -703,7 +717,7 @@ def _mark_terminated(instance: InstanceModel, termination_reason: str) -> None:
     )
 
 
-async def _check_instance(instance: InstanceModel) -> None:
+async def _check_instance(session: AsyncSession, instance: InstanceModel) -> None:
     if (
         instance.status == InstanceStatus.BUSY
         and instance.jobs
@@ -722,12 +736,16 @@ async def _check_instance(instance: InstanceModel) -> None:
         )
         return
 
-    job_provisioning_data = JobProvisioningData.__response__.parse_raw(
-        instance.job_provisioning_data
-    )
+    job_provisioning_data = get_or_error(get_instance_provisioning_data(instance))
     if job_provisioning_data.hostname is None:
+        res = await session.execute(
+            select(ProjectModel)
+            .where(ProjectModel.id == instance.project_id)
+            .options(joinedload(ProjectModel.backends))
+        )
+        project = res.unique().scalar_one()
         await _wait_for_instance_provisioning_data(
-            project=instance.project,
+            project=project,
             instance=instance,
             job_provisioning_data=job_provisioning_data,
         )

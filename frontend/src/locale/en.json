@@ -297,6 +297,24 @@
         "name": "User name",
         "role": "Project role"
       },
+      "secrets": {
+        "section_title": "Secrets",
+        "empty_message_title": "No secrets",
+        "empty_message_text": "No secrets to display.",
+        "name": "Secret name",
+        "value": "Secret value",
+        "create_secret": "Create secret",
+        "update_secret": "Update secret",
+        "delete_confirm_title": "Delete secret",
+        "delete_confirm_message": "Are you sure you want to delete the {{name}} secret?",
+        "multiple_delete_confirm_title": "Delete secrets",
+        "multiple_delete_confirm_message": "Are you sure you want to delete {{count}} secrets?",
+        "not_permissions_title": "No permissions",
+        "not_permissions_description": "You don't have permissions for managing secrets",
+        "validation": {
+          "secret_name_format": "Invalid secret name"
+        }
+      },
       "error_notification": "Update project error",
       "validation": {
         "user_name_format": "Only letters, numbers, - or _"

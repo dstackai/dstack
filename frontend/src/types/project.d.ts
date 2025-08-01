@@ -1,27 +1,33 @@
 declare type TProjectBackend = {
-    name: string,
-    config: IBackendAWS | IBackendAzure | IBackendGCP | IBackendLambda | IBackendLocal | IBackendDstack
-}
+    name: string;
+    config: IBackendAWS | IBackendAzure | IBackendGCP | IBackendLambda | IBackendLocal | IBackendDstack;
+};
 declare interface IProject {
-    project_name: string,
-    members: IProjectMember[],
-    backends: TProjectBackend[]
-    owner: IUser | {username: string},
-    created_at: string,
-    isPublic: boolean
+    project_name: string;
+    members: IProjectMember[];
+    backends: TProjectBackend[];
+    owner: IUser | { username: string };
+    created_at: string;
+    isPublic: boolean;
 }
 
 declare interface IProjectMember {
-    project_role: TProjectRole,
-    user: IUser | {username: string}
+    project_role: TProjectRole;
+    user: IUser | { username: string };
 }
 
 declare type TSetProjectMembersParams = {
-    project_name: string,
+    project_name: string;
     members: Array<{
-        project_role: TProjectRole,
-        username: string
-    }>
-}
+        project_role: TProjectRole;
+        username: string;
+    }>;
+};
 
-declare type TProjectRole = TUserRole | 'manager'
+declare type TProjectRole = TUserRole | 'manager';
+
+declare interface IProjectSecret {
+    id: string;
+    name: string;
+    value?: string;
+}

@@ -224,7 +224,7 @@ class TestCheckShim:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_check_shim_terminate_instance_by_dedaline(self, test_db, session: AsyncSession):
+    async def test_check_shim_terminate_instance_by_deadline(self, test_db, session: AsyncSession):
         project = await create_project(session=session)
         instance = await create_instance(
             session=session,
@@ -306,6 +306,7 @@ class TestCheckShim:
         ) as healthcheck:
             healthcheck.return_value = HealthStatus(healthy=True, reason="OK")
             await process_instances()
+            healthcheck.assert_called()
 
         await session.refresh(instance)
 
@@ -329,7 +330,7 @@ class TestTerminateIdleTime:
         await process_instances()
         await session.refresh(instance)
         assert instance is not None
-        assert instance.status == InstanceStatus.TERMINATED
+        assert instance.status == InstanceStatus.TERMINATING
         assert instance.termination_reason == "Idle timeout"
 
 

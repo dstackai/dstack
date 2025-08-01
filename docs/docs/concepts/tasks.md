@@ -678,7 +678,7 @@ schedule:
 ??? info "Cron syntax"
     `dstack` supports [POSIX cron syntax](https://pubs.opengroup.org/onlinepubs/9699919799/utilities/crontab.html#tag_20_25_07). One exception is that days of the week are started from Monday instead of Sunday so `0` corresponds to Monday.
     
-    The month and day of week fields accept abbreviated English month and weekday names (`jan–de`c and `mon–sun`) respectively.
+    The month and day of week fields accept abbreviated English month and weekday names (`jan–dec` and `mon–sun`) respectively.
 
     A cron expression consists of five fields:
 

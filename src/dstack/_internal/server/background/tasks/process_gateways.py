@@ -17,6 +17,7 @@ from dstack._internal.server.services.gateways import (
 )
 from dstack._internal.server.services.locking import advisory_lock_ctx, get_locker
 from dstack._internal.server.services.logging import fmt
+from dstack._internal.server.utils import sentry_utils
 from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.logging import get_logger
 
@@ -28,6 +29,7 @@ async def process_gateways_connections():
     await _process_active_connections()
 
 
+@sentry_utils.instrument_background_task
 async def process_gateways():
     lock, lockset = get_locker(get_db().dialect_name).get_lockset(GatewayModel.__tablename__)
     async with get_session_ctx() as session:
@@ -110,7 +112,6 @@ async def _process_connection(conn: GatewayConnection):
 async def _process_submitted_gateway(session: AsyncSession, gateway_model: GatewayModel):
     logger.info("%s: started gateway provisioning", fmt(gateway_model))
     # Refetch to load related attributes.
-    # joinedload produces LEFT OUTER JOIN that can't be used with FOR UPDATE.
     res = await session.execute(
         select(GatewayModel)
         .where(GatewayModel.id == gateway_model.id)
@@ -157,7 +158,6 @@ async def _process_provisioning_gateway(
     session: AsyncSession, gateway_model: GatewayModel
 ) -> None:
     # Refetch to load related attributes.
-    # joinedload produces LEFT OUTER JOIN that can't be used with FOR UPDATE.
     res = await session.execute(
         select(GatewayModel)
         .where(GatewayModel.id == gateway_model.id)
