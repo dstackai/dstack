@@ -173,7 +173,7 @@ class APIClient:
                 raise ClientError(
                     f"Unexpected error: status code {resp.status_code}"
                     f" when requesting {resp.request.url}."
-                    " Check server logs or run with DSTACK_CLI_LOG_LEVEL=DEBUG to see more details"
+                    " Check the server logs for backend issues, and the CLI logs at (~/.dstack/logs/cli/latest.log) local CLI output"
                 )
         return resp
 
