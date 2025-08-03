@@ -111,7 +111,7 @@ $ curl http://127.0.0.1:3000/proxy/models/main/chat/completions \
 
 </div>
 
-When a [gateway](https://dstack.ai/docs/concepts/gateways.md) is configured, the OpenAI-compatible endpoint 
+When a [gateway](https://dstack.ai/docs/concepts/gateways/) is configured, the OpenAI-compatible endpoint 
 is available at `https://gateway.<gateway domain>/`.
 
 ## Source code
