@@ -115,7 +115,7 @@ $ curl http://127.0.0.1:3000/proxy/services/main/llama32/v1/chat/completions \
 
 </div>
 
-When a [gateway](https://dstack.ai/docs/concepts/gateways.md) is configured, the service endpoint 
+When a [gateway](https://dstack.ai/docs/concepts/gateways/) is configured, the service endpoint 
 is available at `https://<run name>.<gateway domain>/`.
 
 [//]: # (TODO: https://github.com/dstackai/dstack/issues/1777)

@@ -124,7 +124,7 @@ Additionally, the model is available via `dstack`'s control plane UI:
 
 ![](https://dstack.ai/static-assets/static-assets/images/dstack-tenstorrent-model-ui.png){ width=800 }
 
-When a [gateway](https://dstack.ai/docs/concepts/gateways.md) is configured, the service endpoint 
+When a [gateway](https://dstack.ai/docs/concepts/gateways/) is configured, the service endpoint 
 is available at `https://<run name>.<gateway domain>/`.
 
 > Services support many options, including authentication, auto-scaling policies, etc. To learn more, refer to [Services](https://dstack.ai/docs/concepts/services).
