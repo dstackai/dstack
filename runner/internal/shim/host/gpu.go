@@ -200,38 +200,38 @@ func unmarshalTtSmiSnapshot(data []byte) (*ttSmiSnapshot, error) {
 }
 
 func getGpusFromTtSmiSnapshot(snapshot *ttSmiSnapshot) []GpuInfo {
-	// Group devices by board_id to aggregate memory for the same physical GPU
-	boardMap := make(map[string]*GpuInfo)
+	// Create a map to track "L" devices and their corresponding "R" devices
+	// Each "L" device becomes a separate GPU
+	lDeviceMap := make(map[string]*GpuInfo)
 	indexCounter := 0
 
-	for _, device := range snapshot.DeviceInfo {
+	// First pass: identify all "L" and "R" devices
+	for i, device := range snapshot.DeviceInfo {
 		boardID := device.BoardInfo.BoardID
-
-		// Extract board type without R/L suffix
 		boardType := strings.TrimSpace(device.BoardInfo.BoardType)
-		name := boardType
 
-		// Remove " R" or " L" suffix if present
-		if strings.HasSuffix(boardType, " R") {
-			name = boardType[:len(boardType)-2]
-		} else if strings.HasSuffix(boardType, " L") {
-			name = boardType[:len(boardType)-2]
-		}
+		// Determine if this is an "L" device
+		isLDevice := strings.HasSuffix(boardType, " L")
 
-		// Determine base VRAM based on board type
-		baseVram := 0
-		if strings.HasPrefix(name, "n150") {
-			baseVram = 12 * 1024 // 12GB in MiB
-		} else if strings.HasPrefix(name, "n300") {
-			baseVram = 12 * 1024 // 12GB in MiB
-		}
+		if isLDevice {
+			// Create unique identifier for this "L" device
+			uniqueID := fmt.Sprintf("%s_L_%d", boardID, i)
 
-		if existingGpu, exists := boardMap[boardID]; exists {
-			// Aggregate VRAM for the same board_id
-			existingGpu.Vram += baseVram
-		} else {
-			// Create new GPU entry
-			boardMap[boardID] = &GpuInfo{
+			// Extract base name without L suffix
+			name := boardType[:len(boardType)-2]
+
+			// Determine base VRAM based on board type
+			baseVram := 0
+			if strings.HasPrefix(name, "n150") {
+				baseVram = 12 * 1024 // 12GB in MiB
+			} else if strings.HasPrefix(name, "n300") {
+				baseVram = 12 * 1024 // 12GB in MiB
+			} else if strings.HasPrefix(name, "tt-galaxy-wh") {
+				baseVram = 12 * 1024 // 12GB in MiB
+			}
+
+			// Create new GPU entry for "L" device
+			lDeviceMap[uniqueID] = &GpuInfo{
 				Vendor: common.GpuVendorTenstorrent,
 				Name:   name,
 				Vram:   baseVram,
@@ -242,10 +242,88 @@ func getGpusFromTtSmiSnapshot(snapshot *ttSmiSnapshot) []GpuInfo {
 		}
 	}
 
+	// Second pass: add memory from "R" devices to corresponding "L" devices
+	for _, device := range snapshot.DeviceInfo {
+		boardID := device.BoardInfo.BoardID
+		boardType := strings.TrimSpace(device.BoardInfo.BoardType)
+
+		if strings.HasSuffix(boardType, " R") {
+			// Find the corresponding "L" device with the same board_id
+			// Since we need to match "R" to "L", we'll use the board_id as the key
+			// and add memory to the first "L" device we find with that board_id
+			for _, gpu := range lDeviceMap {
+				if gpu.ID == boardID {
+					// Extract base name without R suffix
+					name := boardType[:len(boardType)-2]
+
+					// Determine base VRAM based on board type
+					baseVram := 0
+					if strings.HasPrefix(name, "n150") {
+						baseVram = 12 * 1024 // 12GB in MiB
+					} else if strings.HasPrefix(name, "n300") {
+						baseVram = 12 * 1024 // 12GB in MiB
+					}
+
+					// Add memory to the "L" device
+					gpu.Vram += baseVram
+					break // Only add to the first matching "L" device
+				}
+			}
+		}
+	}
+
+	// Handle devices without L/R suffix (backward compatibility)
+	for i, device := range snapshot.DeviceInfo {
+		boardID := device.BoardInfo.BoardID
+		boardType := strings.TrimSpace(device.BoardInfo.BoardType)
+
+		if !strings.HasSuffix(boardType, " L") && !strings.HasSuffix(boardType, " R") {
+			// For devices without L/R suffix, treat them as standalone GPUs
+			// This maintains backward compatibility with existing data
+			uniqueID := fmt.Sprintf("%s_standalone_%d", boardID, i)
+
+			// Determine base VRAM based on board type
+			baseVram := 0
+			if strings.HasPrefix(boardType, "n150") {
+				baseVram = 12 * 1024 // 12GB in MiB
+			} else if strings.HasPrefix(boardType, "n300") {
+				baseVram = 12 * 1024 // 12GB in MiB
+			}
+
+			// Check if we already have a GPU with this board_id (old behavior)
+			existingGpu := false
+			for _, gpu := range lDeviceMap {
+				if gpu.ID == boardID {
+					gpu.Vram += baseVram
+					existingGpu = true
+					break
+				}
+			}
+
+			if !existingGpu {
+				// Create new GPU entry
+				lDeviceMap[uniqueID] = &GpuInfo{
+					Vendor: common.GpuVendorTenstorrent,
+					Name:   boardType,
+					Vram:   baseVram,
+					ID:     boardID,
+					Index:  strconv.Itoa(indexCounter),
+				}
+				indexCounter++
+			}
+		}
+	}
+
 	// Convert map to slice
 	var gpus []GpuInfo
-	for _, gpu := range boardMap {
+	for _, gpu := range lDeviceMap {
 		gpus = append(gpus, *gpu)
+	}
+
+	// Sort by the original index to ensure consistent ordering
+	// We'll reassign indices sequentially based on the original order
+	for i := range gpus {
+		gpus[i].Index = strconv.Itoa(i)
 	}
 
 	return gpus

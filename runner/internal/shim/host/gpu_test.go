@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"testing"
 
 	"github.com/dstackai/dstack/runner/internal/common"
@@ -235,5 +236,56 @@ func TestGetGpusFromTtSmiSnapshotMultipleDevices(t *testing.T) {
 		if gpu.Vendor != common.GpuVendorTenstorrent {
 			t.Errorf("GPU %s: vendor = %v, want %v", boardID, gpu.Vendor, common.GpuVendorTenstorrent)
 		}
+	}
+}
+
+func TestGetGpusFromTtSmiSnapshotGalaxy(t *testing.T) {
+	data, err := loadTestData("tenstorrent/galaxy.json")
+	if err != nil {
+		t.Fatalf("Failed to load test data: %v", err)
+	}
+	snapshot, err := unmarshalTtSmiSnapshot(data)
+	if err != nil {
+		t.Fatalf("Failed to unmarshal snapshot: %v", err)
+	}
+
+	gpus := getGpusFromTtSmiSnapshot(snapshot)
+
+	// Galaxy.json contains 32 devices with board_type "tt-galaxy-wh L"
+	// Each "L" device should be treated as a separate GPU
+	// Each "tt-galaxy-wh" device has 12GB VRAM
+	if len(gpus) != 32 {
+		t.Errorf("getGpusFromTtSmiSnapshot() returned %d GPUs, want 32", len(gpus))
+	}
+
+	// Calculate total VRAM: 32 devices × 12GB = 384GB
+	totalVram := 32 * 12 * 1024 // 32 devices × 12GB × 1024 MiB/GB
+	actualTotalVram := 0
+
+	// Verify all GPUs have the correct properties
+	for i, gpu := range gpus {
+		if gpu.Vendor != common.GpuVendorTenstorrent {
+			t.Errorf("GPU[%d] vendor = %v, want %v", i, gpu.Vendor, common.GpuVendorTenstorrent)
+		}
+		if gpu.Name != "tt-galaxy-wh" {
+			t.Errorf("GPU[%d] name = %s, want tt-galaxy-wh", i, gpu.Name)
+		}
+		if gpu.ID != "100035100000000" {
+			t.Errorf("GPU[%d] ID = %s, want 100035100000000", i, gpu.ID)
+		}
+		if gpu.Vram != 12*1024 {
+			t.Errorf("GPU[%d] VRAM = %d, want %d", i, gpu.Vram, 12*1024)
+		}
+		// Verify indices are sequential (0, 1, 2, ..., 31)
+		expectedIndex := strconv.Itoa(i)
+		if gpu.Index != expectedIndex {
+			t.Errorf("GPU[%d] index = %s, want %s", i, gpu.Index, expectedIndex)
+		}
+		actualTotalVram += gpu.Vram
+	}
+
+	// Verify total VRAM is 384GB
+	if actualTotalVram != totalVram {
+		t.Errorf("Total VRAM = %d MiB, want %d MiB (384GB)", actualTotalVram, totalVram)
 	}
 }
