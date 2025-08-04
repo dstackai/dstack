@@ -7,6 +7,7 @@ import { Box, Button, Code, Container, Header, ListEmptyMessage, Loader, TextCon
 import { useLocalStorageState } from 'hooks/useLocalStorageState';
 import { useLazyGetProjectLogsQuery } from 'services/project';
 
+import { LogRow } from './components/LogRow';
 import { decodeLogs } from './helpers';
 
 import { IProps } from './types';
@@ -201,12 +202,13 @@ export const Logs: React.FC<IProps> = ({ className, projectName, runName, jobSub
 
                     {Boolean(logsForView.length) && (
                         <Code className={styles.terminal} ref={codeRef}>
-                            {logsForView.map((log, i) => (
-                                <p key={i}>
-                                    {isShowTimestamp && <span className={styles.timestamp}>{log.timestamp}</span>}
-                                    {log.message}
-                                </p>
-                            ))}
+                            <table>
+                                <tbody>
+                                    {logsForView.map((log, i) => (
+                                        <LogRow logItem={log} key={i} isShowTimestamp={isShowTimestamp} />
+                                    ))}
+                                </tbody>
+                            </table>
                         </Code>
                     )}
                 </TextContent>

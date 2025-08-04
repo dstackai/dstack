@@ -85,13 +85,36 @@
                         color: awsui.$color-text-body-default !important;
                     }
 
-                    p {
-                        padding: 0 !important;
+                    .logItem {
                         font-size: awsui.$font-size-body-s !important;
                         line-height: awsui.$line-height-body-s !important;
 
+                        .toggleCollapse {
+                            position: relative;
+                            top: -3px;
+                            vertical-align: middle;
+                            cursor: pointer;
+
+                            &.hidden {
+                                opacity: 0;
+                                pointer-events: none;
+                            }
+                        }
+
                         .timestamp {
-                            padding-right: 8px;
+                            vertical-align: top;
+                            padding-right: 16px;
+                        }
+
+                        .messageCol {
+                            vertical-align: top;
+                        }
+
+                        .message {
+                            overflow-y: hidden;
+                            &.collapsed {
+                                max-height: calc(awsui.$line-height-body-s * 2);
+                            }
                         }
                     }
                 }
