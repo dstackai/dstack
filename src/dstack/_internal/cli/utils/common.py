@@ -1,6 +1,7 @@
 import logging
 import os
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Dict, Union
 
 from rich.console import Console
@@ -37,10 +38,8 @@ def cli_error(e: DstackError) -> CLIError:
     return CLIError(*e.args)
 
 
-def configure_logging():
-    dstack_logger = logging.getLogger("dstack")
-    dstack_logger.handlers.clear()
-
+def _get_cli_log_file() -> Path:
+    """Get the CLI log file path, rotating the previous log if needed."""
     log_dir = get_dstack_dir() / "logs" / "cli"
     log_file = log_dir / "latest.log"
 
@@ -59,6 +58,16 @@ def configure_logging():
 
             log_file.rename(rotated_file)
 
+    log_dir.mkdir(parents=True, exist_ok=True)
+    return log_file
+
+
+def configure_logging():
+    dstack_logger = logging.getLogger("dstack")
+    dstack_logger.handlers.clear()
+
+    log_file = _get_cli_log_file()
+
     level_names = logging.getLevelNamesMapping()
     stdout_level_name = os.getenv("DSTACK_CLI_LOG_LEVEL", "INFO").upper()
     stdout_level = level_names[stdout_level_name]
@@ -71,8 +80,6 @@ def configure_logging():
 
     file_level_name = os.getenv("DSTACK_CLI_FILE_LOG_LEVEL", "DEBUG").upper()
     file_level = level_names[file_level_name]
-
-    log_dir.mkdir(parents=True, exist_ok=True)
 
     file_handler = logging.FileHandler(log_file)
     file_handler.setFormatter(
