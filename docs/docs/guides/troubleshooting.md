@@ -17,7 +17,7 @@ Include server logs, CLI outputs, and configuration samples. Avoid using screens
 #### Server logs
 
 To get more detailed server logs, set the `DSTACK_SERVER_LOG_LEVEL` 
-environment variables to `debug`. By default, it is set to `INFO`.
+environment variable to `DEBUG`. By default, it is set to `INFO`.
 
 #### CLI logs
 
