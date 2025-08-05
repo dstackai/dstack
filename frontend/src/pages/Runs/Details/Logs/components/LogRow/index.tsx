@@ -42,7 +42,7 @@ export const LogRow: React.FC<{
                     <span className={cn(styles.toggleCollapse, { [styles.hidden]: !showChevron })} onClick={toggleCollapsed}>
                         <Icon name={collapsed ? 'caret-right-filled' : 'caret-down-filled'} />
                     </span>{' '}
-                    {logItem.timestamp}
+                    {new Date(logItem.timestamp).toISOString()}
                 </td>
             )}
             <td className={styles.messageCol}>
