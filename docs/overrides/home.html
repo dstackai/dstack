@@ -39,8 +39,6 @@
                 {delay: 0, value: 'The admin token is d7ad7f92-9f35-470d-be0e-c7645ce71a4c', class: 'newline'},
                 {delay: 0, value: 'The dstack server 0.19.2 is running at http://127.0.0.1:3000', class: 'newline'},
                 {delay: 0, value: ' ', class: 'newline'},
-                {delay: 0, value: ' ', class: 'newline'},
-                {delay: 0, value: ' ', class: 'newline'},
             ]
         }
     );
@@ -52,38 +50,46 @@
     <div class="md-grid md-typeset">
         <div class="tx-landing__hero">
             <div class="tx-landing__hero_text">
-                <h1>Container orchestration for AI teams</h1>
+                <h1>The orchestration layer for modern ML teams</h1>
 
                 <p>
-                    <span class="highlight">dstack</span> is an open-source container orchestrator that simplifies workload orchestration 
-                    and drives GPU utilization for ML teams. It works with any GPU cloud, on-prem cluster, or accelerated hardware.
+                    <span class="highlight">dstack</span> gives your team a single control plane to run development, training, and inference
+                    jobs on GPU—whether on hyperscalers, neoclouds, or your on-prem hardware. Avoid vendor lock-in and minimize GPU spend.
                 </p>
             </div>
 
             <div class="tx-landing__hero_buttons">
                 <div class="tx-landing__hero_button_container">
-                    <a href="/docs/installation"
-                       class="md-button md-button--primary shell"
+                    <a href="/docs/installation" target="_blank"
+                       class="md-button md-button--primary"
                         style="min-width: 225px;  margin-right: 10px">
-                        <span>uv tool install "dstack[all]"</span>
-                        <span class="icon"><svg viewBox="0 0 13 10" xmlns="http://www.w3.org/2000/svg"><path d="M12.823 4.164L8.954.182a.592.592 0 0 0-.854 0 .635.635 0 0 0 0 .88l2.836 2.92H.604A.614.614 0 0 0 0 4.604c0 .344.27.622.604.622h10.332L8.1 8.146a.635.635 0 0 0 0 .88.594.594 0 0 0 .854 0l3.869-3.982a.635.635 0 0 0 0-.88z" fill-rule="nonzero" fill="currentColor" class="fill-main"></path></svg></span>
+                        <span>Install open-source</span>
+                        <!-- <span class="icon"><svg viewBox="0 0 13 10" xmlns="http://www.w3.org/2000/svg"><path d="M12.823 4.164L8.954.182a.592.592 0 0 0-.854 0 .635.635 0 0 0 0 .88l2.836 2.92H.604A.614.614 0 0 0 0 4.604c0 .344.27.622.604.622h10.332L8.1 8.146a.635.635 0 0 0 0 .88.594.594 0 0 0 .854 0l3.869-3.982a.635.635 0 0 0 0-.88z" fill-rule="nonzero" fill="currentColor" class="fill-main"></path></svg></span> -->
+                    </a>
+
+                    <a href="https://sky.dstack.ai" target="_blank" 
+                       class="md-button md-button--primary sky external"
+                        style="min-width: 225px;">
+                        <span>Sign up free</span>
                     </a>
                 </div>
+            </div>
+            <div class="tx-landing__hero_button_container_text" style="text-align: center; font-size: 85%; margin-top: 25px;">
+                The entire setup takes minutes.
             </div>
         </div>
 
         <div class="tx-landing__major_feature">
             <div class="section">
                 <div class="block margin right">
-                    <h2>Unified compute layer for AI</h2>
+                    <h2>One control plane for all your GPUs</h2>
                     <p>
-                        <span class="highlight">dstack</span> redefines the container orchestration layer for AI workloads, 
-                        tailoring the developer experience for ML teams while keeping it open and vendor-agnostic.
+                        Instead of wrestling with complex Helm charts and Kubernetes operators, <span class="highlight">dstack</span> provides a simple, declarative way to
+                        manage clusters, containerized dev environments, training, and inference.
                     </p>
 
-                    <p>
-                        <span class="highlight">dstack</span> natively integrates with leading GPU clouds 
-                        and on-prem clusters, regardless of hardware vendor.
+                    <p>This container-native interface makes your team more productive and your GPU usage more efficient—leading to lower
+                        costs and faster iteration.
                     </p>
 
                     <!-- TODO: Add `Why dstack?` -->
@@ -157,20 +163,20 @@
                 </div>
 
                 <div class="block margin">
-                    <h2>Backends</h2>
+                    <h2>Run on any cloud. Or all of them.</h2>
                     <p>
-                        <span class="highlight">dstack</span> manages instances and clusters via native GPU cloud integration for efficient provisioning with its built-in scheduler. 
-                        It also runs smoothly on Kubernetes if that fits your environment. 
+                        <span class="highlight">dstack</span> natively provisions GPU instances and clusters across your preferred cloud
+                        providers—maximizing efficiency and minimizing overhead.
                     </p>
                     
                     <p>
-                        In both cases, <span class="highlight">dstack</span> acts as an enhanced control plane, making AI compute orchestration more efficient.
+                        Connect GPU clouds directly to <span class="highlight">dstack</span> natively, or run <span class="highlight">dstack</span> on top of Kubernetes if needed.
                     </p>
 
                     <p>
                         <a href="/docs/concepts/backends" target="_blank"
                             class="md-button md-button-secondary small">
-                            <span>Learn more</span>
+                            <span>Backends</span>
                             <span class="icon"><svg viewBox="0 0 13 10" xmlns="http://www.w3.org/2000/svg"><path d="M12.823 4.164L8.954.182a.592.592 0 0 0-.854 0 .635.635 0 0 0 0 .88l2.836 2.92H.604A.614.614 0 0 0 0 4.604c0 .344.27.622.604.622h10.332L8.1 8.146a.635.635 0 0 0 0 .88.594.594 0 0 0 .854 0l3.869-3.982a.635.635 0 0 0 0-.88z" fill-rule="nonzero" fill="currentColor" class="fill-main"></path></svg></span>
                         </a>
                     </p>
@@ -181,16 +187,22 @@
         <div class="tx-landing__major_feature">
             <div class="section">
                 <div class="block margin right">
-                    <h2>SSH fleets</h2>
+                    <h2>Bring your own compute</h2>
 
                     <p>
-                        Bare-metal and manually provisioned clusters can be connected to <span class="highlight">dstack</span> using SSH fleets.
+                        Have bare-metal servers or on-prem GPU clusters? <span class="highlight">dstack</span> makes it easy to integrate them
+                        and manage everything alongside your cloud resources.
+                    </p>
+                    
+                    <p>With SSH fleets, you can connect any existing cluster in minutes. Once added to <span
+                            class="highlight">dstack</span>, it's a first-class resource &mdash; available for dev environments, tasks, and
+                        services.
                     </p>
 
                     <p>
                         <a href="/docs/concepts/fleets#ssh" target="_blank"
                             class="md-button md-button-secondary small">
-                            <span>Learn more</span>
+                            <span>SSH fleets</span>
                             <span class="icon"><svg viewBox="0 0 13 10" xmlns="http://www.w3.org/2000/svg"><path d="M12.823 4.164L8.954.182a.592.592 0 0 0-.854 0 .635.635 0 0 0 0 .88l2.836 2.92H.604A.614.614 0 0 0 0 4.604c0 .344.27.622.604.622h10.332L8.1 8.146a.635.635 0 0 0 0 .88.594.594 0 0 0 .854 0l3.869-3.982a.635.635 0 0 0 0-.88z" fill-rule="nonzero" fill="currentColor" class="fill-main"></path></svg></span>
                         </a>
                     </p>
@@ -212,17 +224,19 @@
                 </div>
 
                 <div class="block margin left">
-                    <h2>Dev environments</h2>
+                    <h2>Code locally, run remotely</h2>
                     <p>
-                        Before running training jobs or deploying model endpoints, ML engineers often experiment with
-                        their code in a desktop IDE while using cloud or on-prem GPU machines.
-                        Dev environments simplify and streamline this process.
+                        Before training or deployment, ML engineers explore and debug their code.
+                    </p>
+
+                    <p><span class="highlight">dstack</span>'s dev environments make it easy to connect your 
+                        desktop IDE to powerful cloud or on-prem GPUs—streamlining the entire development loop.
                     </p>
 
                     <p>
                         <a href="/docs/dev-environments" target="_blank"
                            class="md-button md-button-secondary small">
-                           <span>Learn more</span>
+                           <span>Dev environments</span>
                            <span class="icon"><svg viewBox="0 0 13 10" xmlns="http://www.w3.org/2000/svg"><path d="M12.823 4.164L8.954.182a.592.592 0 0 0-.854 0 .635.635 0 0 0 0 .88l2.836 2.92H.604A.614.614 0 0 0 0 4.604c0 .344.27.622.604.622h10.332L8.1 8.146a.635.635 0 0 0 0 .88.594.594 0 0 0 .854 0l3.869-3.982a.635.635 0 0 0 0-.88z" fill-rule="nonzero" fill="currentColor" class="fill-main"></path></svg></span>
                         </a>
                     </p>
@@ -233,18 +247,20 @@
         <div class="tx-landing__major_feature">
             <div class="section">
                 <div class="block margin right">
-                    <h2>Tasks</h2>
+                    <h2>Run complex training with simple config</h2>
 
                     <p>
-                        Tasks simplify the process of scheduling jobs on either optimized clusters or individual
-                        instances. They can be used for pre-training or fine-tuning models, as well as for running any
-                        AI or data workloads that require efficient GPU utilization.
+                        Move from single-instance experiments to multi-node distributed training without friction. <span
+                            class="highlight">dstack</span> lets you define complex jobs with a simple configuration, 
+                            handling the scheduling and orchestration for you.
                     </p>
+
+                    <p>This allows your team to focus on research while ensuring that expensive cluster resources are utilized efficiently.</p>
 
                     <p>
                         <a href="/docs/concepts/tasks" target="_blank"
                             class="md-button md-button-secondary small">
-                            <span>Learn more</span>
+                            <span>Tasks</span>
                             <span class="icon"><svg viewBox="0 0 13 10" xmlns="http://www.w3.org/2000/svg"><path d="M12.823 4.164L8.954.182a.592.592 0 0 0-.854 0 .635.635 0 0 0 0 .88l2.836 2.92H.604A.614.614 0 0 0 0 4.604c0 .344.27.622.604.622h10.332L8.1 8.146a.635.635 0 0 0 0 .88.594.594 0 0 0 .854 0l3.869-3.982a.635.635 0 0 0 0-.88z" fill-rule="nonzero" fill="currentColor" class="fill-main"></path></svg></span>
                         </a>
                     </p>
@@ -265,7 +281,7 @@
                 </div>
 
                 <div class="block margin left">
-                    <h2>Services</h2>
+                    <h2>Deploy scalable, OpenAI-compatible endpoints</h2>
 
                     <p>
                         With <span class="highlight">dstack</span>, you can easily deploy any model as a secure,
@@ -276,7 +292,7 @@
                     <p>
                         <a href="/docs/concepts/services" target="_blank"
                             class="md-button md-button-secondary small">
-                            <span>Learn more</span>
+                            <span>Services</span>
                             <span class="icon"><svg viewBox="0 0 13 10" xmlns="http://www.w3.org/2000/svg"><path d="M12.823 4.164L8.954.182a.592.592 0 0 0-.854 0 .635.635 0 0 0 0 .88l2.836 2.92H.604A.614.614 0 0 0 0 4.604c0 .344.27.622.604.622h10.332L8.1 8.146a.635.635 0 0 0 0 .88.594.594 0 0 0 .854 0l3.869-3.982a.635.635 0 0 0 0-.88z" fill-rule="nonzero" fill="currentColor" class="fill-main"></path></svg></span>
                         </a>
                     </p>
@@ -385,45 +401,6 @@
             </div>
         </div>
 
-        <span id="get-started"></span>
-
-        <br><br><br>
-
-        <div class="tx-landing__highlights_text">
-            <h2>Get started in minutes</h2>
-        </div>
-
-        <div class="tx-landing__major_feature">
-            <div class="section">
-                <div class="block margin right">
-                    <p>Install <span class="highlight">dstack</span> on your laptop via <span class="highlight">uv</span>
-                        and start it using the CLI, or deploy it anywhere with the <span class="highlight">dstackai/dstack</span> Docker image.</p>
-
-                    <p>Set up backends or SSH fleets, then add your team.</p>
-
-                    <p>
-                        <a href="/docs/installation"
-                           class="md-button md-button--primary small"
-                            style="margin-right: 10px">
-                            <span>Installation</span>
-                            <span class="icon"><svg viewBox="0 0 13 10" xmlns="http://www.w3.org/2000/svg"><path d="M12.823 4.164L8.954.182a.592.592 0 0 0-.854 0 .635.635 0 0 0 0 .88l2.836 2.92H.604A.614.614 0 0 0 0 4.604c0 .344.27.622.604.622h10.332L8.1 8.146a.635.635 0 0 0 0 .88.594.594 0 0 0 .854 0l3.869-3.982a.635.635 0 0 0 0-.88z" fill-rule="nonzero" fill="currentColor" class="fill-main"></path></svg></span>
-                        </a>
-
-                        <a href="/docs/" class="md-button md-button-secondary small"
-                           style="">
-                            Quickstart
-                        </a>
-                    </p>
-                </div>
-
-                <div class="block large" style="width: 700px">
-                    <div id="get-started-code-snippet">
-
-                    </div>
-                </div>
-            </div>
-        </div>
-
         <div class="tx-faq">
             <div class="tx-landing__highlights_text">
                 <h2>FAQ</h2>
@@ -514,7 +491,7 @@
                 Have questions, or need help?
                 <br>
                 <a href="https://discord.gg/u8SmfwPpMd" target="_blank"
-                    class="md-button md-button-secondary discord external" style="min-width: 175px;">
+                    class="md-button md-button-secondary discord" style="min-width: 175px;">
                     Discord
                 </a>
                 <a href="https://calendly.com/dstackai/discovery-call" target="_blank"
@@ -524,29 +501,46 @@
             </p>
         </div>
 
+        <span id="get-started"></span>
+
         <br><br><br>
 
-        <div class="tx-landing__bottom_cta">
-            <div class="tx-landing__bottom_cta_card enterprise">
-                <h2>dstack Enterprise</h2>
+        <div class="tx-landing__highlights_text">
+            <h2>Get started in minutes</h2>
+        </div>
 
-                <div class="tx-landing__bottom_cta_card_panel">
-                    <div class="tx-landing__bottom_cta_card_text">
-                        <p>Looking for a self-hosted <span class="highlight">dstack</span> with SSO, governance
-                            controls, and
-                            enterprise support?</p>
-                    </div>
-                    <div class="tx-landing__bottom_cta_card_button_panel">
-                        <div>
-                            <a href="https://calendly.com/dstackai/discovery-call" target="_blank"
-                                class="md-button md-button--primary external small">
-                                <span>Request a trial</span>
-                            </a>
-                        </div>
+        <div class="tx-landing__major_feature">
+            <div class="section">
+                <div class="block margin right">
+                    <p>Install <span class="highlight">dstack</span> on your laptop via <span class="highlight">uv</span>
+                        and start it using the CLI, or deploy it anywhere with the <span class="highlight">dstackai/dstack</span> Docker image.</p>
+
+                    <p>Set up backends or SSH fleets, then add your team.</p>
+
+                    <p>
+                        <a href="/docs/installation" target="_blank"
+                           class="md-button md-button--primary small"
+                            style="margin-right: 10px">
+                            <span>Installation</span>
+                            <span class="icon"><svg viewBox="0 0 13 10" xmlns="http://www.w3.org/2000/svg"><path d="M12.823 4.164L8.954.182a.592.592 0 0 0-.854 0 .635.635 0 0 0 0 .88l2.836 2.92H.604A.614.614 0 0 0 0 4.604c0 .344.27.622.604.622h10.332L8.1 8.146a.635.635 0 0 0 0 .88.594.594 0 0 0 .854 0l3.869-3.982a.635.635 0 0 0 0-.88z" fill-rule="nonzero" fill="currentColor" class="fill-main"></path></svg></span>
+                        </a>
+
+                        <a href="/docs/quickstart" target="_blank" class="md-button md-button-secondary small"
+                           style="">
+                            Quickstart
+                        </a>
+                    </p>
+                </div>
+
+                <div class="block large">
+                    <div id="get-started-code-snippet">
+
                     </div>
                 </div>
             </div>
+        </div>
 
+        <div class="tx-landing__bottom_cta">
             <div class="tx-landing__bottom_cta_card sky">
                 <h2>dstack Sky</h2>
 
@@ -567,6 +561,29 @@
                         <div class="tx-landing__bottom_cta_card_button_subheader">
                             Already have an account? <a href="https://sky.dstack.ai" target="_blank"
                                 class="tx-footer__section-link external">Sign in</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tx-landing__bottom_cta_card enterprise">
+                <h2>dstack Enterprise</h2>
+
+                <div class="tx-landing__bottom_cta_card_panel">
+                    <div class="tx-landing__bottom_cta_card_text">
+                        <p>Looking for a self-hosted <span class="highlight">dstack</span> with SSO, governance
+                            controls, and enterprise support?</p>
+                    </div>
+                    <div class="tx-landing__bottom_cta_card_button_panel">
+                        <div>
+                            <a href="https://calendly.com/dstackai/discovery-call" target="_blank"
+                                class="md-button md-button--primary external small">
+                                <span>Get a demo</span>
+                            </a>
+                        </div>
+
+                        <div class="tx-landing__bottom_cta_card_button_subheader">
+                            Talk to our experts and learn.
                         </div>
                     </div>
                 </div>

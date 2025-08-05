@@ -241,8 +241,8 @@
 .md-typeset .md-button {
     margin-top: 1.2rem;
     margin-bottom: 1.5rem;
-    font-size: 20px;
-    font-weight: 400 !important;
+    font-size: 19px;
+    font-weight: 300 !important;
     text-align: center;
     border-radius: 3px;
     border-color: transparent;
@@ -298,7 +298,7 @@
     background: rgba(0, 0, 0, 0.87);
     border: 1.5px solid rgba(0, 0, 0, 0.87);
     border-radius: 3px;
-    font-weight: 400 !important;
+    font-weight: 300 !important;
     /*margin-right: 10px;*/
 }
 
@@ -337,11 +337,11 @@
 }
 
 .md-button--primary.external:after, .md-button--primary.sky.external:after {
-    content: url('data:image/svg+xml,<svg fill="white" xmlns="http://www.w3.org/2000/svg" width="21px" height="21px" viewBox="0 0 16 16"><polygon points="5 4.31 5 5.69 9.33 5.69 2.51 12.51 3.49 13.49 10.31 6.67 10.31 11 11.69 11 11.69 4.31 5 4.31" data-v-e1bdab2c=""></polygon></svg>');
+    content: url('data:image/svg+xml,<svg fill="white" xmlns="http://www.w3.org/2000/svg" width="19px" height="19px" viewBox="0 0 16 16"><polygon points="5 4.31 5 5.69 9.33 5.69 2.51 12.51 3.49 13.49 10.31 6.67 10.31 11 11.69 11 11.69 4.31 5 4.31" data-v-e1bdab2c=""></polygon></svg>');
     line-height: 14px;
     margin-left: 5px;
     position: relative;
-    top: 2px;
+    top: 2.5px;
     margin-right: -7px;
 }
 
@@ -815,6 +815,10 @@
 
 /*.tx-landing__trusted_by*/ [data-ty="input"]:before, [data-ty-prompt]:before {
     color: #e37cff;
+}
+
+#get-started-code-snippet[data-termynal] {
+    font-size: 14px !important;
 }
 
 /*.tx-landing__trusted_by*/ [data-termynal] {
