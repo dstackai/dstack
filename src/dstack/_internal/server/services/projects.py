@@ -197,6 +197,10 @@ async def set_project_members(
     project: ProjectModel,
     members: List[MemberSetting],
 ):
+    usernames = {m.username for m in members}
+    if len(usernames) != len(members):
+        raise ServerClientError("Cannot add same user multiple times")
+
     project = await get_project_model_by_name_or_error(
         session=session,
         project_name=project.name,
@@ -245,6 +249,10 @@ async def add_project_members(
     members: List[MemberSetting],
 ):
     """Add multiple members to a project."""
+    usernames = {m.username for m in members}
+    if len(usernames) != len(members):
+        raise ServerClientError("Cannot add same user multiple times")
+
     project = await get_project_model_by_name_or_error(
         session=session,
         project_name=project.name,
@@ -259,7 +267,10 @@ async def add_project_members(
     )
 
     if not is_self_join_to_public:
-        if requesting_user_role not in [ProjectRole.ADMIN, ProjectRole.MANAGER]:
+        if user.global_role != GlobalRole.ADMIN and requesting_user_role not in [
+            ProjectRole.ADMIN,
+            ProjectRole.MANAGER,
+        ]:
             raise ForbiddenError("Access denied: insufficient permissions to add members")
 
         if user.global_role != GlobalRole.ADMIN and requesting_user_role == ProjectRole.MANAGER:
@@ -271,8 +282,6 @@ async def add_project_members(
     else:
         if members[0].project_role != ProjectRole.USER:
             raise ForbiddenError("Access denied: can only join public projects as user role")
-
-    usernames = [member.username for member in members]
 
     res = await session.execute(
         select(UserModel).where((UserModel.name.in_(usernames)) | (UserModel.email.in_(usernames)))
@@ -628,7 +637,10 @@ async def remove_project_members(
     )
 
     if not is_self_leave:
-        if requesting_user_role not in [ProjectRole.ADMIN, ProjectRole.MANAGER]:
+        if user.global_role != GlobalRole.ADMIN and requesting_user_role not in [
+            ProjectRole.ADMIN,
+            ProjectRole.MANAGER,
+        ]:
             raise ForbiddenError("Access denied: insufficient permissions to remove members")
 
     res = await session.execute(

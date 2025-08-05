@@ -14,7 +14,7 @@ import {
     Table,
 } from 'components';
 
-import { useAppSelector, useCollection } from 'hooks';
+import { useAppSelector, useCollection, useNotifications } from 'hooks';
 import { ROUTES } from 'routes';
 import { useGetUserListQuery } from 'services/user';
 
@@ -35,6 +35,7 @@ export const ProjectMembers: React.FC<IProps> = ({ members, loading, onChange, r
     const { data: usersData } = useGetUserListQuery();
     const userData = useAppSelector(selectUserData);
     const { handleJoinProject, handleLeaveProject, isMemberActionLoading } = useProjectMemberActions();
+    const [pushNotification] = useNotifications();
 
     const { handleSubmit, control, getValues, setValue } = useForm<TFormValues>({
         defaultValues: { members: members ?? [] },
@@ -84,6 +85,17 @@ export const ProjectMembers: React.FC<IProps> = ({ members, loading, onChange, r
     ];
 
     const addMemberHandler = (username: string) => {
+        const existingMembers = getValues('members');
+        const isDuplicate = existingMembers.some((member) => member.user.username === username);
+
+        if (isDuplicate) {
+            pushNotification({
+                type: 'error',
+                content: `User "${username}" is already a member of this project`,
+            });
+            return;
+        }
+
         const selectedUser = usersData?.find((u) => u.username === username);
 
         if (selectedUser) {

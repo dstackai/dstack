@@ -991,6 +991,37 @@ class TestSetProjectMembers:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_cannot_set_same_user_twice(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session, global_role=GlobalRole.ADMIN)
+        user1 = await create_user(session=session, name="user1")
+        members = [
+            {
+                "username": user1.name,
+                "project_role": ProjectRole.ADMIN,
+            },
+            {
+                "username": user1.name,
+                "project_role": ProjectRole.ADMIN,
+            },
+        ]
+        body = {"members": members}
+        response = await client.post(
+            f"/api/projects/{project.name}/set_members",
+            headers=get_auth_headers(user.token),
+            json=body,
+        )
+        assert response.status_code == 400
+        res = await session.execute(select(MemberModel))
+        members = res.scalars().all()
+        assert len(members) == 0
+
+
+class TestAddProjectMembers:
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_add_member_errors_on_nonexistent_user(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -1052,6 +1083,35 @@ class TestSetProjectMembers:
         )
 
         assert response.status_code == 403
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_cannot_add_same_user_twice(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session, global_role=GlobalRole.ADMIN)
+        user1 = await create_user(session=session, name="user1")
+        members = [
+            {
+                "username": user1.name,
+                "project_role": ProjectRole.ADMIN,
+            },
+            {
+                "username": user1.name,
+                "project_role": ProjectRole.ADMIN,
+            },
+        ]
+        body = {"members": members}
+        response = await client.post(
+            f"/api/projects/{project.name}/add_members",
+            headers=get_auth_headers(user.token),
+            json=body,
+        )
+        assert response.status_code == 400, response.json()
+        res = await session.execute(select(MemberModel))
+        members = res.scalars().all()
+        assert len(members) == 0
 
 
 class TestUpdateProjectVisibility:
