@@ -75,6 +75,7 @@ class TestPollLogs:
                     "message": "IQ==",
                 },
             ],
+            "external_url": None,
             "next_token": None,
         }
         response = await client.post(
@@ -96,5 +97,6 @@ class TestPollLogs:
                     "message": "IQ==",
                 },
             ],
+            "external_url": None,
             "next_token": None,
         }
