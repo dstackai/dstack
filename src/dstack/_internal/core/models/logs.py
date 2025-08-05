@@ -23,4 +23,5 @@ class LogEvent(CoreModel):
 
 class JobSubmissionLogs(CoreModel):
     logs: List[LogEvent]
-    next_token: Optional[str]
+    external_url: Optional[str] = None
+    next_token: Optional[str] = None

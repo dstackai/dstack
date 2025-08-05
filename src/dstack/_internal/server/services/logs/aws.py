@@ -1,5 +1,7 @@
 import itertools
 import operator
+import urllib
+import urllib.parse
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from typing import Iterator, List, Optional, Set, Tuple, TypedDict
@@ -64,6 +66,7 @@ class CloudWatchLogStorage(LogStorage):
             self._client = session.client("logs")
             self._check_group_exists(group)
         self._group = group
+        self._region = self._client.meta.region_name
         # Stores names of already created streams.
         # XXX: This set acts as an unbound cache. If this becomes a problem (in case of _very_ long
         # running server and/or lots of jobs, consider replacing it with an LRU cache, e.g.,
@@ -103,7 +106,11 @@ class CloudWatchLogStorage(LogStorage):
             )
             for cw_event in cw_events
         ]
-        return JobSubmissionLogs(logs=logs, next_token=next_token)
+        return JobSubmissionLogs(
+            logs=logs,
+            external_url=self._get_stream_external_url(stream),
+            next_token=next_token,
+        )
 
     def _get_log_events_with_retry(
         self, stream: str, request: PollLogsRequest
@@ -180,6 +187,11 @@ class CloudWatchLogStorage(LogStorage):
             events = list(reversed(events))
 
         return events, next_token
+
+    def _get_stream_external_url(self, stream: str) -> str:
+        quoted_group = urllib.parse.quote(self._group, safe="")
+        quoted_stream = urllib.parse.quote(stream, safe="")
+        return f"https://console.aws.amazon.com/cloudwatch/home?region={self._region}#logsV2:log-groups/log-group/{quoted_group}/log-events/{quoted_stream}"
 
     def write_logs(
         self,

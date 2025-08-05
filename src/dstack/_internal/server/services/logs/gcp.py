@@ -1,3 +1,4 @@
+import urllib.parse
 from typing import List
 from uuid import UUID
 
@@ -48,6 +49,7 @@ class GCPLogStorage(LogStorage):
     # (https://cloud.google.com/logging/docs/analyze/custom-index).
 
     def __init__(self, project_id: str):
+        self.project_id = project_id
         try:
             self.client = logging_v2.Client(project=project_id)
             self.logger = self.client.logger(name=self.LOG_NAME)
@@ -106,7 +108,11 @@ class GCPLogStorage(LogStorage):
                 "GCP Logging read request limit exceeded."
                 " It's recommended to increase default entries.list request quota from 60 per minute."
             )
-        return JobSubmissionLogs(logs=logs, next_token=next_token if len(logs) > 0 else None)
+        return JobSubmissionLogs(
+            logs=logs,
+            external_url=self._get_stream_extrnal_url(stream_name),
+            next_token=next_token if len(logs) > 0 else None,
+        )
 
     def write_logs(
         self,
@@ -162,3 +168,12 @@ class GCPLogStorage(LogStorage):
         self, project_name: str, run_name: str, job_submission_id: UUID, producer: LogProducer
     ) -> str:
         return f"{project_name}-{run_name}-{job_submission_id}-{producer.value}"
+
+    def _get_stream_extrnal_url(self, stream_name: str) -> str:
+        log_name_resource_name = self._get_log_name_resource_name()
+        query = f'logName="{log_name_resource_name}" AND labels.stream="{stream_name}"'
+        quoted_query = urllib.parse.quote(query, safe="")
+        return f"https://console.cloud.google.com/logs/query;query={quoted_query}?project={self.project_id}"
+
+    def _get_log_name_resource_name(self) -> str:
+        return f"projects/{self.project_id}/logs/{self.LOG_NAME}"
