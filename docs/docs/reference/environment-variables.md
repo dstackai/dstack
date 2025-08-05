@@ -147,7 +147,7 @@ For more details on the options below, refer to the [server deployment](../guide
 
 The following environment variables are supported by the CLI.
 
-- `DSTACK_CLI_LOG_LEVEL`{ #DSTACK_CLI_LOG_LEVEL } – Configures CLI logging level. Defaults to `INFO`.
+- `DSTACK_CLI_LOG_LEVEL`{ #DSTACK_CLI_LOG_LEVEL } – Sets the logging level for CLI output to stdout. Defaults to `INFO`.
 
 Example:
 
@@ -155,6 +155,19 @@ Example:
 
 ```shell
 $ DSTACK_CLI_LOG_LEVEL=debug dstack apply -f .dstack.yml
+```
+
+</div>
+
+- `DSTACK_CLI_FILE_LOG_LEVEL`{ #DSTACK_CLI_FILE_LOG_LEVEL } – Sets the logging level for CLI log files. Defaults to `DEBUG`.
+
+<div class="termy">
+
+```shell
+$ find ~/.dstack/logs/cli/
+
+ ~/.dstack/logs/cli/latest.log
+ ~/.dstack/logs/cli/2025-07-31.log
 ```
 
 </div>

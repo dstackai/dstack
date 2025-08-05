@@ -14,8 +14,14 @@ If you have a question or need help, feel free to ask it in our [Discord server]
 Make sure to provide clear, detailed steps to reproduce the issue. 
 Include server logs, CLI outputs, and configuration samples. Avoid using screenshots for logs or errors—use text instead. 
 
-To get more detailed logs, make sure to set the `DSTACK_CLI_LOG_LEVEL` and `DSTACK_SERVER_LOG_LEVEL` 
-environment variables to `debug` when running the CLI and the server, respectively.
+#### Server logs
+
+To get more detailed server logs, set the `DSTACK_SERVER_LOG_LEVEL` 
+environment variable to `DEBUG`. By default, it is set to `INFO`.
+
+#### CLI logs
+
+CLI logs are located in `~/.dstack/logs/cli`, and the default log level is `DEBUG`.
 
 > See these examples for well-reported issues: [this :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/1640){:target="_blank"}
 and [this :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/1551){:target="_blank"}.

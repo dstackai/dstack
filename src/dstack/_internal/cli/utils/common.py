@@ -1,5 +1,7 @@
 import logging
 import os
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Dict, Union
 
 from rich.console import Console
@@ -9,6 +11,7 @@ from rich.theme import Theme
 
 from dstack._internal.cli.utils.rich import DstackRichHandler
 from dstack._internal.core.errors import CLIError, DstackError
+from dstack._internal.utils.common import get_dstack_dir
 
 _colors = {
     "secondary": "grey58",
@@ -35,12 +38,59 @@ def cli_error(e: DstackError) -> CLIError:
     return CLIError(*e.args)
 
 
+def _get_cli_log_file() -> Path:
+    """Get the CLI log file path, rotating the previous log if needed."""
+    log_dir = get_dstack_dir() / "logs" / "cli"
+    log_file = log_dir / "latest.log"
+
+    if log_file.exists():
+        file_mtime = datetime.fromtimestamp(log_file.stat().st_mtime, tz=timezone.utc)
+        current_date = datetime.now(timezone.utc).date()
+
+        if file_mtime.date() < current_date:
+            date_str = file_mtime.strftime("%Y-%m-%d")
+            rotated_file = log_dir / f"{date_str}.log"
+
+            counter = 1
+            while rotated_file.exists():
+                rotated_file = log_dir / f"{date_str}-{counter}.log"
+                counter += 1
+
+            log_file.rename(rotated_file)
+
+    log_dir.mkdir(parents=True, exist_ok=True)
+    return log_file
+
+
 def configure_logging():
     dstack_logger = logging.getLogger("dstack")
-    dstack_logger.setLevel(os.getenv("DSTACK_CLI_LOG_LEVEL", "INFO").upper())
-    handler = DstackRichHandler(console=console)
-    handler.setFormatter(logging.Formatter(fmt="%(message)s", datefmt="[%X]"))
-    dstack_logger.addHandler(handler)
+    dstack_logger.handlers.clear()
+
+    log_file = _get_cli_log_file()
+
+    level_names = logging.getLevelNamesMapping()
+    stdout_level_name = os.getenv("DSTACK_CLI_LOG_LEVEL", "INFO").upper()
+    stdout_level = level_names[stdout_level_name]
+    dstack_logger.setLevel(stdout_level)
+
+    stdout_handler = DstackRichHandler(console=console)
+    stdout_handler.setFormatter(logging.Formatter(fmt="%(message)s", datefmt="[%X]"))
+    stdout_handler.setLevel(stdout_level)
+    dstack_logger.addHandler(stdout_handler)
+
+    file_level_name = os.getenv("DSTACK_CLI_FILE_LOG_LEVEL", "DEBUG").upper()
+    file_level = level_names[file_level_name]
+
+    file_handler = logging.FileHandler(log_file)
+    file_handler.setFormatter(
+        logging.Formatter(
+            fmt="%(asctime)s - %(name)s - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
+        )
+    )
+    file_handler.setLevel(file_level)
+    dstack_logger.addHandler(file_handler)
+
+    dstack_logger.setLevel(min(stdout_level, file_level))
 
 
 def confirm_ask(prompt, **kwargs) -> bool:
