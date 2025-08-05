@@ -116,7 +116,9 @@ async def get_run_job_model(
     return res.scalar_one_or_none()
 
 
-def job_model_to_job_submission(job_model: JobModel) -> JobSubmission:
+def job_model_to_job_submission(
+    job_model: JobModel, include_probes: bool = False
+) -> JobSubmission:
     job_provisioning_data = get_job_provisioning_data(job_model)
     if job_provisioning_data is not None:
         # TODO remove after transitioning to computed fields
@@ -137,6 +139,9 @@ def job_model_to_job_submission(job_model: JobModel) -> JobSubmission:
         finished_at = last_processed_at
     status_message = _get_job_status_message(job_model)
     error = _get_job_error(job_model)
+    probes = []
+    if include_probes:
+        probes = [probe_model_to_probe(pm) for pm in job_model.probes]
     return JobSubmission(
         id=job_model.id,
         submission_num=job_model.submission_num,
@@ -153,9 +158,7 @@ def job_model_to_job_submission(job_model: JobModel) -> JobSubmission:
         job_provisioning_data=job_provisioning_data,
         job_runtime_data=get_job_runtime_data(job_model),
         error=error,
-        # TODO: This is only needed for API responses, yet currently  we always have to load probes
-        # into the job model for `job_model_to_job_submission` to work.
-        probes=[probe_model_to_probe(pm) for pm in job_model.probes],
+        probes=probes,
     )
 
 

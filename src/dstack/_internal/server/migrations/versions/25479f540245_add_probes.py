@@ -1,8 +1,8 @@
 """Add probes
 
-Revision ID: b12995977787
-Revises: ec02a26a256c
-Create Date: 2025-07-22 15:33:25.321369
+Revision ID: 25479f540245
+Revises: 50dd7ea98639
+Create Date: 2025-08-03 19:51:07.722217
 
 """
 
@@ -13,8 +13,8 @@ from alembic import op
 import dstack._internal.server.models
 
 # revision identifiers, used by Alembic.
-revision = "b12995977787"
-down_revision = "ec02a26a256c"
+revision = "25479f540245"
+down_revision = "50dd7ea98639"
 branch_labels = None
 depends_on = None
 

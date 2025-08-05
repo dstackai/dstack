@@ -140,7 +140,6 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
         select(JobModel)
         .where(JobModel.id == job_model.id)
         .options(joinedload(JobModel.instance).joinedload(InstanceModel.project))
-        .options(joinedload(JobModel.probes))
         .execution_options(populate_existing=True)
     )
     job_model = res.unique().scalar_one()
@@ -150,7 +149,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
         .options(joinedload(RunModel.project))
         .options(joinedload(RunModel.user))
         .options(joinedload(RunModel.repo))
-        .options(joinedload(RunModel.jobs).joinedload(JobModel.probes))
+        .options(joinedload(RunModel.jobs))
     )
     run_model = res.unique().scalar_one()
     repo_model = run_model.repo

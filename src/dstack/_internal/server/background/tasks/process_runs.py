@@ -23,6 +23,7 @@ from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import (
     InstanceModel,
     JobModel,
+    ProbeModel,
     ProjectModel,
     RunModel,
     UserModel,
@@ -149,6 +150,11 @@ async def _process_run(session: AsyncSession, run_model: RunModel):
             selectinload(RunModel.jobs)
             .joinedload(JobModel.instance)
             .load_only(InstanceModel.fleet_id)
+        )
+        .options(
+            selectinload(RunModel.jobs)
+            .joinedload(JobModel.probes)
+            .load_only(ProbeModel.success_streak)
         )
         .execution_options(populate_existing=True)
     )

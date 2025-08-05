@@ -5,7 +5,7 @@ from rich.markup import escape
 from rich.table import Table
 
 from dstack._internal.cli.utils.common import NO_OFFERS_WARNING, add_row_from_dict, console
-from dstack._internal.core.models.configurations import DevEnvironmentConfiguration, ProbeConfig
+from dstack._internal.core.models.configurations import DevEnvironmentConfiguration
 from dstack._internal.core.models.instances import InstanceAvailability
 from dstack._internal.core.models.profiles import (
     DEFAULT_RUN_TERMINATION_IDLE_TIME,
@@ -14,6 +14,7 @@ from dstack._internal.core.models.profiles import (
 from dstack._internal.core.models.runs import (
     JobStatus,
     Probe,
+    ProbeSpec,
     RunPlan,
 )
 from dstack._internal.core.services.profiles import get_termination
@@ -241,13 +242,14 @@ def get_runs_table(
 
 
 def _format_job_probes(
-    probe_configs: list[ProbeConfig], probes: list[Probe], job_status: JobStatus
+    probe_specs: list[ProbeSpec], probes: list[Probe], job_status: JobStatus
 ) -> str:
     if not probes or job_status != JobStatus.RUNNING:
         return ""
     statuses = []
-    for probe_config, probe in zip(probe_configs, probes):
-        if probe.success_streak >= probe_config.ready_after:
+    for probe_spec, probe in zip(probe_specs, probes):
+        # NOTE: the symbols are documented in concepts/services.md, keep in sync.
+        if probe.success_streak >= probe_spec.ready_after:
             status = "[code]✓[/]"
         elif probe.success_streak > 0:
             status = "[warning]~[/]"

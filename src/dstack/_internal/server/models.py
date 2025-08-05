@@ -428,7 +428,7 @@ class JobModel(BaseModel):
     deployment_num: Mapped[int] = mapped_column(Integer)
     job_runtime_data: Mapped[Optional[str]] = mapped_column(Text)
     probes: Mapped[list["ProbeModel"]] = relationship(
-        back_populates="job", lazy="selectin", order_by="ProbeModel.probe_num"
+        back_populates="job", order_by="ProbeModel.probe_num"
     )
 
 

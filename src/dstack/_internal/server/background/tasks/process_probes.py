@@ -12,8 +12,7 @@ from sqlalchemy import select, update
 from sqlalchemy.orm import joinedload
 
 from dstack._internal.core.errors import SSHError
-from dstack._internal.core.models.configurations import ProbeConfig
-from dstack._internal.core.models.runs import JobSpec, JobStatus
+from dstack._internal.core.models.runs import JobSpec, JobStatus, ProbeSpec
 from dstack._internal.core.services.ssh.tunnel import (
     SSH_DEFAULT_OPTIONS,
     IPSocket,
@@ -64,7 +63,7 @@ async def process_probes():
                     .joinedload(JobModel.instance)
                     .joinedload(InstanceModel.project)
                 )
-                .options(joinedload(ProbeModel.job).joinedload(JobModel.probes))
+                .options(joinedload(ProbeModel.job))
                 .execution_options(populate_existing=True)
             )
             probes = res.unique().scalars().all()
@@ -73,35 +72,33 @@ async def process_probes():
                     probe.active = False
                 else:
                     job_spec: JobSpec = JobSpec.__response__.parse_raw(probe.job.job_spec_data)
-                    probe_config = job_spec.probes[probe.probe_num]
+                    probe_spec = job_spec.probes[probe.probe_num]
                     # Schedule the next probe execution in case this execution is interrupted
                     probe.due = get_current_datetime() + _get_probe_async_processing_timeout(
-                        probe_config
+                        probe_spec
                     )
                     # Execute the probe asynchronously outside of the DB session
-                    PROBES_SCHEDULER.add_job(partial(_process_probe_async, probe, probe_config))
+                    PROBES_SCHEDULER.add_job(partial(_process_probe_async, probe, probe_spec))
+            await session.commit()
         finally:
             probe_lockset.difference_update(probe_ids)
 
 
-async def _process_probe_async(probe: ProbeModel, probe_config: ProbeConfig) -> None:
+async def _process_probe_async(probe: ProbeModel, probe_spec: ProbeSpec) -> None:
     start = get_current_datetime()
     logger.debug("%s: processing probe", fmt(probe))
-    success = await _execute_probe(probe, probe_config)
+    success = await _execute_probe(probe, probe_spec)
 
     async with get_session_ctx() as session:
         async with get_locker(get_db().dialect_name).lock_ctx(
             ProbeModel.__tablename__, [probe.id]
         ):
-            assert isinstance(probe_config.interval, int), (
-                "Expected probe interval to be parsed by validator"
-            )
             await session.execute(
                 update(ProbeModel)
                 .where(ProbeModel.id == probe.id)
                 .values(
                     success_streak=0 if not success else ProbeModel.success_streak + 1,
-                    due=get_current_datetime() + timedelta(seconds=probe_config.interval),
+                    due=get_current_datetime() + timedelta(seconds=probe_spec.interval),
                 )
             )
     logger.debug(
@@ -111,7 +108,7 @@ async def _process_probe_async(probe: ProbeModel, probe_config: ProbeConfig) -> 
     )
 
 
-async def _execute_probe(probe: ProbeModel, probe_config: ProbeConfig) -> bool:
+async def _execute_probe(probe: ProbeModel, probe_spec: ProbeSpec) -> bool:
     """
     Returns:
         Whether probe execution was successful.
@@ -119,12 +116,9 @@ async def _execute_probe(probe: ProbeModel, probe_config: ProbeConfig) -> bool:
 
     try:
         async with _get_service_replica_client(probe.job) as client:
-            assert isinstance(probe_config.timeout, int), (
-                "Expected probe timeout to be parsed by validator"
-            )
             resp = await client.get(
-                "http://dstack" + probe_config.url,
-                timeout=probe_config.timeout,
+                "http://dstack" + probe_spec.url,
+                timeout=probe_spec.timeout,
             )
             logger.debug("%s: probe status code: %s", fmt(probe), resp.status_code)
             return resp.is_success
@@ -133,12 +127,9 @@ async def _execute_probe(probe: ProbeModel, probe_config: ProbeConfig) -> bool:
         return False
 
 
-def _get_probe_async_processing_timeout(probe_config: ProbeConfig) -> timedelta:
-    assert isinstance(probe_config.timeout, int), (
-        "Expected probe timeout to be parsed by validator"
-    )
+def _get_probe_async_processing_timeout(probe_spec: ProbeSpec) -> timedelta:
     return (
-        timedelta(seconds=probe_config.timeout)
+        timedelta(seconds=probe_spec.timeout)
         + SSH_CONNECT_TIMEOUT
         + PROCESSING_OVERHEAD_TIMEOUT  # slow db queries and other unforeseen conditions
     )

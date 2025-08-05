@@ -11,6 +11,10 @@ from dstack._internal import settings
 from dstack._internal.core.errors import DockerRegistryError, ServerClientError
 from dstack._internal.core.models.common import RegistryAuth
 from dstack._internal.core.models.configurations import (
+    DEFAULT_PROBE_INTERVAL,
+    DEFAULT_PROBE_READY_AFTER,
+    DEFAULT_PROBE_TIMEOUT,
+    DEFAULT_PROBE_URL,
     DEFAULT_REPO_DIR,
     PortMapping,
     ProbeConfig,
@@ -27,6 +31,7 @@ from dstack._internal.core.models.runs import (
     AppSpec,
     JobSpec,
     JobSSHKey,
+    ProbeSpec,
     Requirements,
     Retry,
     RunSpec,
@@ -315,9 +320,9 @@ class JobConfigurator(ABC):
             return self.run_spec.configuration.port.container_port
         return None
 
-    def _probes(self) -> list[ProbeConfig]:
+    def _probes(self) -> list[ProbeSpec]:
         if isinstance(self.run_spec.configuration, ServiceConfiguration):
-            return self.run_spec.configuration.probes
+            return list(map(_probe_config_to_spec, self.run_spec.configuration.probes))
         return []
 
 
@@ -358,6 +363,16 @@ def interpolate_job_volumes(
             )
         )
     return job_volumes
+
+
+def _probe_config_to_spec(c: ProbeConfig) -> ProbeSpec:
+    return ProbeSpec(
+        type=c.type,
+        url=c.url if c.url is not None else DEFAULT_PROBE_URL,
+        timeout=c.timeout if c.timeout is not None else DEFAULT_PROBE_TIMEOUT,
+        interval=c.interval if c.interval is not None else DEFAULT_PROBE_INTERVAL,
+        ready_after=c.ready_after if c.ready_after is not None else DEFAULT_PROBE_READY_AFTER,
+    )
 
 
 def _join_shell_commands(commands: List[str]) -> str:

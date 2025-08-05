@@ -369,6 +369,7 @@ async def create_job(
         instance_assigned=instance_assigned,
         used_instance_id=instance.id if instance is not None else None,
         disconnected_at=disconnected_at,
+        probes=[],
     )
     session.add(job)
     await session.commit()
@@ -445,13 +446,14 @@ async def create_probe(
     job: JobModel,
     probe_num: int = 0,
     due: datetime = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc),
+    success_streak: int = 0,
 ) -> ProbeModel:
     probe = ProbeModel(
         name=f"{job.job_name}-{probe_num}",
         job=job,
         probe_num=probe_num,
         due=due,
-        success_streak=0,
+        success_streak=success_streak,
         active=True,
     )
     session.add(probe)
