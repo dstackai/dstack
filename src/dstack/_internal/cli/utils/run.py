@@ -12,11 +12,15 @@ from dstack._internal.core.models.profiles import (
     TerminationPolicy,
 )
 from dstack._internal.core.models.runs import (
+    JobStatus,
+    Probe,
+    ProbeSpec,
     RunPlan,
 )
 from dstack._internal.core.services.profiles import get_termination
 from dstack._internal.utils.common import (
     DateFormatter,
+    batched,
     format_duration_multiunit,
     format_pretty_duration,
     pretty_date,
@@ -156,6 +160,12 @@ def get_runs_table(
         table.add_column("INSTANCE TYPE", no_wrap=True, ratio=1)
     table.add_column("PRICE", style="grey58", ratio=1)
     table.add_column("STATUS", no_wrap=True, ratio=1)
+    if verbose or any(
+        run._run.is_deployment_in_progress()
+        and any(job.job_submissions[-1].probes for job in run._run.jobs)
+        for run in runs
+    ):
+        table.add_column("PROBES", ratio=1)
     table.add_column("SUBMITTED", style="grey58", no_wrap=True, ratio=1)
     if verbose:
         table.add_column("ERROR", no_wrap=True, ratio=2)
@@ -198,6 +208,9 @@ def get_runs_table(
                     else ""
                 ),
                 "STATUS": latest_job_submission.status_message,
+                "PROBES": _format_job_probes(
+                    job.job_spec.probes, latest_job_submission.probes, latest_job_submission.status
+                ),
                 "SUBMITTED": format_date(latest_job_submission.submitted_at),
                 "ERROR": latest_job_submission.error,
             }
@@ -226,3 +239,22 @@ def get_runs_table(
             add_row_from_dict(table, job_row, style="secondary" if len(run.jobs) != 1 else None)
 
     return table
+
+
+def _format_job_probes(
+    probe_specs: list[ProbeSpec], probes: list[Probe], job_status: JobStatus
+) -> str:
+    if not probes or job_status != JobStatus.RUNNING:
+        return ""
+    statuses = []
+    for probe_spec, probe in zip(probe_specs, probes):
+        # NOTE: the symbols are documented in concepts/services.md, keep in sync.
+        if probe.success_streak >= probe_spec.ready_after:
+            status = "[code]✓[/]"
+        elif probe.success_streak > 0:
+            status = "[warning]~[/]"
+        else:
+            status = "[error]×[/]"
+        statuses.append(status)
+    # split into whitespace-delimited batches to allow column wrapping
+    return " ".join("".join(batch) for batch in batched(statuses, 5))

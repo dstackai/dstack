@@ -22,6 +22,7 @@ from dstack._internal.proxy.lib.deps import get_injector_from_app
 from dstack._internal.proxy.lib.routers import model_proxy
 from dstack._internal.server import settings
 from dstack._internal.server.background import start_background_tasks
+from dstack._internal.server.background.tasks.process_probes import PROBES_SCHEDULER
 from dstack._internal.server.db import get_db, get_session_ctx, migrate
 from dstack._internal.server.routers import (
     backends,
@@ -155,6 +156,7 @@ async def lifespan(app: FastAPI):
         scheduler = start_background_tasks()
     else:
         logger.info("Background processing is disabled")
+    PROBES_SCHEDULER.start()
     dstack_version = DSTACK_VERSION if DSTACK_VERSION else "(no version)"
     logger.info(f"The admin token is {admin.token.get_plaintext_or_error()}", {"show_path": False})
     logger.info(
@@ -166,6 +168,7 @@ async def lifespan(app: FastAPI):
     yield
     if settings.SERVER_BACKGROUND_PROCESSING_ENABLED:
         scheduler.shutdown()
+    PROBES_SCHEDULER.shutdown(wait=False)
     await gateway_connections_pool.remove_all()
     service_conn_pool = await get_injector_from_app(app).get_service_connection_pool()
     await service_conn_pool.remove_all()

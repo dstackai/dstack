@@ -1,4 +1,5 @@
 import datetime
+from collections.abc import Iterable
 from typing import Union, cast
 from unittest.mock import patch
 
@@ -8,7 +9,11 @@ from pydantic import parse_obj_as
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import dstack._internal.server.background.tasks.process_runs as process_runs
-from dstack._internal.core.models.configurations import ServiceConfiguration, TaskConfiguration
+from dstack._internal.core.models.configurations import (
+    ProbeConfig,
+    ServiceConfiguration,
+    TaskConfiguration,
+)
 from dstack._internal.core.models.instances import InstanceStatus
 from dstack._internal.core.models.profiles import Profile, ProfileRetry, Schedule
 from dstack._internal.core.models.resources import Range
@@ -24,6 +29,7 @@ from dstack._internal.server.models import RunModel
 from dstack._internal.server.testing.common import (
     create_instance,
     create_job,
+    create_probe,
     create_project,
     create_repo,
     create_run,
@@ -42,6 +48,7 @@ async def make_run(
     replicas: Union[str, int] = 1,
     deployment_num: int = 0,
     image: str = "ubuntu:latest",
+    probes: Iterable[ProbeConfig] = (),
 ) -> RunModel:
     project = await create_project(session=session)
     user = await create_user(session=session)
@@ -63,6 +70,7 @@ async def make_run(
             port=8000,
             replicas=parse_obj_as(Range[int], replicas),
             image=image,
+            probes=list(probes),
         ),
     )
     run = await create_run(
@@ -699,7 +707,56 @@ class TestRollingDeployment:
             == "new"
         )
 
-    async def test_stops_out_of_date_replica(self, test_db, session: AsyncSession) -> None:
+    async def test_not_stops_out_of_date_replica_until_new_replica_is_ready(
+        self, test_db, session: AsyncSession
+    ) -> None:
+        run = await make_run(session, status=RunStatus.RUNNING, replicas=2, probes=[])
+        for replica_num in range(2):
+            await create_job(
+                session=session,
+                run=run,
+                status=JobStatus.RUNNING,
+                replica_num=replica_num,
+            )
+
+        run_spec: RunSpec = RunSpec.__response__.parse_raw(run.run_spec)
+        assert isinstance(run_spec.configuration, ServiceConfiguration)
+        run_spec.configuration.probes = [
+            ProbeConfig(type="http", ready_after=1),
+            ProbeConfig(type="http", ready_after=2),
+        ]
+        run.run_spec = run_spec.json()
+        run.deployment_num += 1
+        new_job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            replica_num=2,
+        )
+        await create_probe(session, new_job, probe_num=0, success_streak=1)  # ready
+        await create_probe(session, new_job, probe_num=1, success_streak=0)  # not ready
+        await session.commit()
+
+        await process_runs.process_runs()
+        await session.refresh(run)
+        assert run.status == RunStatus.RUNNING
+        assert len(run.jobs) == 3
+        # All replicas remain as-is:
+        # - cannot yet start a new replica - there are already 3 non-terminated replicas
+        #   (3 = 2 desired + 1 max_surge)
+        # - cannot yet stop an out-of-date replica - that would only leave one ready replica,
+        #   which is less than the desired count (2)
+        for replica_num in range(2):
+            assert run.jobs[replica_num].status == JobStatus.RUNNING
+            assert run.jobs[replica_num].replica_num == replica_num
+            assert run.jobs[replica_num].deployment_num == 0
+        assert run.jobs[2].status == JobStatus.RUNNING
+        assert run.jobs[2].replica_num == 2
+        assert run.jobs[2].deployment_num == 1
+
+    async def test_stops_out_of_date_replica_without_probes(
+        self, test_db, session: AsyncSession
+    ) -> None:
         run = await make_run(session, status=RunStatus.RUNNING, replicas=2, image="old")
         for replica_num in range(2):
             await create_job(
@@ -720,6 +777,68 @@ class TestRollingDeployment:
             status=JobStatus.RUNNING,
             replica_num=2,
         )
+        await session.commit()
+
+        await process_runs.process_runs()
+        await session.refresh(run)
+        assert run.status == RunStatus.RUNNING
+        assert len(run.jobs) == 3
+        # one old replica remains as-is
+        assert run.jobs[0].status == JobStatus.RUNNING
+        assert run.jobs[0].replica_num == 0
+        assert run.jobs[0].deployment_num == 0
+        assert (
+            cast(JobSpec, JobSpec.__response__.parse_raw(run.jobs[0].job_spec_data)).image_name
+            == "old"
+        )
+        # another old replica is terminated
+        assert run.jobs[1].status == JobStatus.TERMINATING
+        assert run.jobs[1].termination_reason == JobTerminationReason.SCALED_DOWN
+        assert run.jobs[1].replica_num == 1
+        assert run.jobs[1].deployment_num == 0
+        assert (
+            cast(JobSpec, JobSpec.__response__.parse_raw(run.jobs[1].job_spec_data)).image_name
+            == "old"
+        )
+        # the new replica remains as-is
+        assert run.jobs[2].status == JobStatus.RUNNING
+        assert run.jobs[2].replica_num == 2
+        assert run.jobs[2].deployment_num == 1
+        assert (
+            cast(JobSpec, JobSpec.__response__.parse_raw(run.jobs[2].job_spec_data)).image_name
+            == "new"
+        )
+
+    async def test_stops_out_of_date_replica_with_probes(
+        self, test_db, session: AsyncSession
+    ) -> None:
+        run = await make_run(session, status=RunStatus.RUNNING, replicas=2, image="old", probes=[])
+        for replica_num in range(2):
+            await create_job(
+                session=session,
+                run=run,
+                status=JobStatus.RUNNING,
+                replica_num=replica_num,
+            )
+
+        run_spec: RunSpec = RunSpec.__response__.parse_raw(run.run_spec)
+        assert isinstance(run_spec.configuration, ServiceConfiguration)
+        run_spec.configuration.image = "new"
+        run_spec.configuration.probes = [
+            ProbeConfig(type="http", ready_after=1),
+            ProbeConfig(type="http", ready_after=2),
+        ]
+        run.run_spec = run_spec.json()
+        run.deployment_num += 1
+        new_job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            replica_num=2,
+        )
+        # both probes ready for the new replica => can stop an old replica
+        await create_probe(session, new_job, probe_num=0, success_streak=1)
+        await create_probe(session, new_job, probe_num=1, success_streak=2)
         await session.commit()
 
         await process_runs.process_runs()
@@ -920,6 +1039,73 @@ class TestRollingDeployment:
         assert run.status == RunStatus.PROVISIONING
         assert len(run.jobs) == 3
         # The two out of date replicas transition from pulling to terminating immediately.
+        # No need to keep these replicas - they don't contribute to reaching the desired count.
+        assert run.jobs[0].status == JobStatus.TERMINATING
+        assert run.jobs[0].replica_num == 0
+        assert run.jobs[0].deployment_num == 0
+        assert (
+            cast(JobSpec, JobSpec.__response__.parse_raw(run.jobs[0].job_spec_data)).image_name
+            == "old"
+        )
+        assert run.jobs[1].status == JobStatus.TERMINATING
+        assert run.jobs[1].termination_reason == JobTerminationReason.SCALED_DOWN
+        assert run.jobs[1].replica_num == 1
+        assert run.jobs[1].deployment_num == 0
+        assert (
+            cast(JobSpec, JobSpec.__response__.parse_raw(run.jobs[1].job_spec_data)).image_name
+            == "old"
+        )
+        # The new replica remains as-is
+        assert run.jobs[2].status == new_replica_status
+        assert run.jobs[2].replica_num == 2
+        assert run.jobs[2].deployment_num == 1
+        assert (
+            cast(JobSpec, JobSpec.__response__.parse_raw(run.jobs[2].job_spec_data)).image_name
+            == "new"
+        )
+
+    @pytest.mark.parametrize(
+        "new_replica_status", [JobStatus.SUBMITTED, JobStatus.PROVISIONING, JobStatus.PULLING]
+    )
+    async def test_stops_non_ready_out_of_date_replicas_unconditionally(
+        self, test_db, session: AsyncSession, new_replica_status: JobStatus
+    ) -> None:
+        run = await make_run(
+            session,
+            status=RunStatus.RUNNING,
+            replicas=2,
+            image="old",
+            probes=[ProbeConfig(type="http")],
+        )
+        for replica_num in range(2):
+            job = await create_job(
+                session=session,
+                run=run,
+                status=JobStatus.RUNNING,
+                replica_num=replica_num,
+            )
+            await create_probe(session, job, success_streak=0)  # failed probe
+
+        run_spec: RunSpec = RunSpec.__response__.parse_raw(run.run_spec)
+        assert isinstance(run_spec.configuration, ServiceConfiguration)
+        run_spec.configuration.image = "new"
+        run.run_spec = run_spec.json()
+        run.deployment_num += 1
+        await create_job(
+            session=session,
+            run=run,
+            status=new_replica_status,
+            replica_num=2,
+        )
+        await session.commit()
+
+        await process_runs.process_runs()
+        await session.refresh(run)
+        for job in run.jobs:
+            await session.refresh(job)
+        assert run.status == RunStatus.RUNNING
+        assert len(run.jobs) == 3
+        # The two out of date replicas with failed probes transition to terminating immediately.
         # No need to keep these replicas - they don't contribute to reaching the desired count.
         assert run.jobs[0].status == JobStatus.TERMINATING
         assert run.jobs[0].replica_num == 0

@@ -251,6 +251,7 @@ def get_dev_env_run_plan_dict(
                     "repo_data": {"repo_dir": "/repo", "repo_type": "local"},
                     "file_archives": [],
                     "service_port": None,
+                    "probes": [],
                 },
                 "offers": [json.loads(o.json()) for o in offers],
                 "total_offers": total_offers,
@@ -449,6 +450,7 @@ def get_dev_env_run_dict(
                     "repo_data": {"repo_dir": "/repo", "repo_type": "local"},
                     "file_archives": [],
                     "service_port": None,
+                    "probes": [],
                 },
                 "job_submissions": [
                     {
@@ -467,6 +469,7 @@ def get_dev_env_run_dict(
                         "exit_status": None,
                         "job_provisioning_data": None,
                         "job_runtime_data": None,
+                        "probes": [],
                     }
                 ],
             }
@@ -487,6 +490,7 @@ def get_dev_env_run_dict(
             "exit_status": None,
             "job_provisioning_data": None,
             "job_runtime_data": None,
+            "probes": [],
         },
         "cost": 0.0,
         "service": None,
@@ -606,6 +610,7 @@ class TestListRuns:
                                 "exit_status": None,
                                 "job_provisioning_data": None,
                                 "job_runtime_data": None,
+                                "probes": [],
                             }
                         ],
                     }
@@ -626,6 +631,7 @@ class TestListRuns:
                     "exit_status": None,
                     "job_provisioning_data": None,
                     "job_runtime_data": None,
+                    "probes": [],
                 },
                 "cost": 0,
                 "service": None,
@@ -787,6 +793,7 @@ class TestListRuns:
                                 "exit_status": None,
                                 "job_provisioning_data": None,
                                 "job_runtime_data": None,
+                                "probes": [],
                             }
                         ],
                     }
@@ -807,6 +814,7 @@ class TestListRuns:
                     "exit_status": None,
                     "job_provisioning_data": None,
                     "job_runtime_data": None,
+                    "probes": [],
                 },
                 "cost": 0,
                 "service": None,
@@ -1542,7 +1550,7 @@ class TestSubmitRun:
         )
         body = {"run_spec": run_dict["run_spec"]}
         with patch("uuid.uuid4") as uuid_mock:
-            uuid_mock.return_value = run_dict["id"]
+            uuid_mock.return_value = UUID(run_dict["id"])
             response = await client.post(
                 f"/api/project/{project.name}/runs/submit",
                 headers=get_auth_headers(user.token),
@@ -1584,7 +1592,7 @@ class TestSubmitRun:
         )
         body = {"run_spec": run_dict["run_spec"]}
         with patch("uuid.uuid4") as uuid_mock:
-            uuid_mock.return_value = run_dict["id"]
+            uuid_mock.return_value = UUID(run_dict["id"])
             response = await client.post(
                 f"/api/project/{project.name}/runs/submit",
                 headers=get_auth_headers(user.token),

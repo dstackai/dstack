@@ -52,6 +52,7 @@ from dstack._internal.server.services.jobs.configurators.dev import DevEnvironme
 from dstack._internal.server.services.jobs.configurators.service import ServiceJobConfigurator
 from dstack._internal.server.services.jobs.configurators.task import TaskJobConfigurator
 from dstack._internal.server.services.logging import fmt
+from dstack._internal.server.services.probes import probe_model_to_probe
 from dstack._internal.server.services.runner import client
 from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
 from dstack._internal.server.services.volumes import (
@@ -115,7 +116,9 @@ async def get_run_job_model(
     return res.scalar_one_or_none()
 
 
-def job_model_to_job_submission(job_model: JobModel) -> JobSubmission:
+def job_model_to_job_submission(
+    job_model: JobModel, include_probes: bool = False
+) -> JobSubmission:
     job_provisioning_data = get_job_provisioning_data(job_model)
     if job_provisioning_data is not None:
         # TODO remove after transitioning to computed fields
@@ -136,6 +139,9 @@ def job_model_to_job_submission(job_model: JobModel) -> JobSubmission:
         finished_at = last_processed_at
     status_message = _get_job_status_message(job_model)
     error = _get_job_error(job_model)
+    probes = []
+    if include_probes:
+        probes = [probe_model_to_probe(pm) for pm in job_model.probes]
     return JobSubmission(
         id=job_model.id,
         submission_num=job_model.submission_num,
@@ -152,6 +158,7 @@ def job_model_to_job_submission(job_model: JobModel) -> JobSubmission:
         job_provisioning_data=job_provisioning_data,
         job_runtime_data=get_job_runtime_data(job_model),
         error=error,
+        probes=probes,
     )
 
 

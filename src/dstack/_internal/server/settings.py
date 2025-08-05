@@ -1,3 +1,7 @@
+"""
+Environment variables read by the dstack server. Documented in reference/environment-variables.md
+"""
+
 import os
 import warnings
 from pathlib import Path
@@ -50,6 +54,8 @@ SERVER_BACKGROUND_PROCESSING_ENABLED = not SERVER_BACKGROUND_PROCESSING_DISABLED
 SERVER_EXECUTOR_MAX_WORKERS = int(os.getenv("DSTACK_SERVER_EXECUTOR_MAX_WORKERS", 128))
 
 MAX_OFFERS_TRIED = int(os.getenv("DSTACK_SERVER_MAX_OFFERS_TRIED", 25))
+MAX_PROBES_PER_JOB = int(os.getenv("DSTACK_SERVER_MAX_PROBES_PER_JOB", 10))
+MAX_PROBE_TIMEOUT = int(os.getenv("DSTACK_SERVER_MAX_PROBE_TIMEOUT", 60 * 5))
 
 SERVER_CONFIG_DISABLED = os.getenv("DSTACK_SERVER_CONFIG_DISABLED") is not None
 SERVER_CONFIG_ENABLED = not SERVER_CONFIG_DISABLED

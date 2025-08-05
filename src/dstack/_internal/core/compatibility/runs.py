@@ -53,6 +53,8 @@ def get_apply_plan_excludes(plan: ApplyRunPlanInput) -> Optional[IncludeExcludeD
             job_submissions_excludes["exit_status"] = True
         if all(js.deployment_num == 0 for js in job_submissions):
             job_submissions_excludes["deployment_num"] = True
+        if all(not js.probes for js in job_submissions):
+            job_submissions_excludes["probes"] = True
         latest_job_submission = current_resource.latest_job_submission
         if latest_job_submission is not None:
             latest_job_submission_excludes: IncludeExcludeDictType = {}
@@ -69,6 +71,8 @@ def get_apply_plan_excludes(plan: ApplyRunPlanInput) -> Optional[IncludeExcludeD
                 latest_job_submission_excludes["exit_status"] = True
             if latest_job_submission.deployment_num == 0:
                 latest_job_submission_excludes["deployment_num"] = True
+            if not latest_job_submission.probes:
+                latest_job_submission_excludes["probes"] = True
     return {"plan": apply_plan_excludes}
 
 
@@ -120,6 +124,8 @@ def get_run_spec_excludes(run_spec: RunSpec) -> IncludeExcludeDictType:
         profile_excludes.add("startup_order")
     if configuration.stop_criteria is None:
         configuration_excludes["stop_criteria"] = True
+    if isinstance(configuration, ServiceConfiguration) and not configuration.probes:
+        configuration_excludes["probes"] = True
     if profile is not None and profile.stop_criteria is None:
         profile_excludes.add("stop_criteria")
     if not configuration.files:
@@ -154,6 +160,8 @@ def get_job_spec_excludes(job_specs: list[JobSpec]) -> IncludeExcludeDictType:
         spec_excludes["file_archives"] = True
     if all(s.service_port is None for s in job_specs):
         spec_excludes["service_port"] = True
+    if all(not s.probes for s in job_specs):
+        spec_excludes["probes"] = True
 
     return spec_excludes
 

@@ -187,6 +187,53 @@ port: 8000
 
 </div>
 
+### Probes
+
+Configure one or more HTTP probes to periodically check the health of the service.
+
+<div editor-title="service.dstack.yml">
+
+```yaml
+type: service
+name: my-service
+port: 80
+image: my-app:latest
+probes:
+- type: http
+  url: /health
+  interval: 15s
+```
+
+</div>
+
+You can track probe statuses in `dstack ps --verbose`.
+
+<div class="termy">
+
+```shell
+$ dstack ps --verbose
+
+ NAME                            BACKEND          STATUS   PROBES  SUBMITTED
+ my-service deployment=1                          running          11 mins ago
+   replica=0 job=0 deployment=0  aws (us-west-2)  running  ✓       11 mins ago
+   replica=1 job=0 deployment=1  aws (us-west-2)  running  ×       1 min ago
+```
+
+</div>
+
+??? info "Probe statuses"
+    The following symbols are used for probe statuses:
+
+    - `×` &mdash; the last probe execution failed.
+    - `~` &mdash; the last probe execution succeeded, but the [`ready_after`](../reference/dstack.yml/service.md#ready_after) threshold is not yet reached.
+    - `✓` &mdash; the last `ready_after` probe executions succeeded.
+
+    If multiple probes are configured for the service, their statuses are displayed in the order in which the probes appear in the configuration.
+
+Probes are executed for each service replica while the replica is `running`. Probe statuses do not affect how `dstack` handles replicas, except during [rolling deployments](#rolling-deployment).
+
+See the [reference](../reference/dstack.yml/service.md#probes) for more probe configuration options.
+
 ### Path prefix { #path-prefix }
 
 If your `dstack` project doesn't have a [gateway](gateways.md), services are hosted with the
@@ -758,7 +805,7 @@ Update the run? [y/n]:
 
 </div>
 
-If approved, `dstack` gradually updates the service replicas. To update a replica, `dstack` starts a new replica, waits for it to become `running`, then terminates the old replica. This process is repeated for each replica, one at a time.
+If approved, `dstack` gradually updates the service replicas. To update a replica, `dstack` starts a new replica, waits for it to become `running` and for all of its [probes](#probes) to pass, then terminates the old replica. This process is repeated for each replica, one at a time.
 
 You can track the progress of rolling deployment in both `dstack apply` or `dstack ps`. 
 Older replicas have lower `deployment` numbers; newer ones have higher.
@@ -783,7 +830,7 @@ The rolling deployment stops when all replicas are updated or when a new deploym
 ??? info "Supported properties"
     <!-- NOTE: should be in sync with constants in server/services/runs.py -->
 
-    Rolling deployment supports changes to the following properties: `port`, `resources`, `volumes`, `docker`, `files`, `image`, `user`, `privileged`, `entrypoint`, `working_dir`, `python`, `nvcc`, `single_branch`, `env`, `shell`, `commands`, as well as changes to [repo](repos.md) or [file](#files) contents.
+    Rolling deployment supports changes to the following properties: `port`, `probes`, `resources`, `volumes`, `docker`, `files`, `image`, `user`, `privileged`, `entrypoint`, `working_dir`, `python`, `nvcc`, `single_branch`, `env`, `shell`, `commands`, as well as changes to [repo](repos.md) or [file](#files) contents.
 
     Changes to `replicas` and `scaling` can be applied without redeploying replicas.
 

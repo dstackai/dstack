@@ -5,13 +5,19 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 from freezegun import freeze_time
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from dstack._internal import settings
 from dstack._internal.core.errors import SSHError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import NetworkMode
-from dstack._internal.core.models.configurations import DevEnvironmentConfiguration
+from dstack._internal.core.models.configurations import (
+    DevEnvironmentConfiguration,
+    ProbeConfig,
+    ServiceConfiguration,
+)
 from dstack._internal.core.models.instances import InstanceStatus, InstanceType
 from dstack._internal.core.models.profiles import StartupOrder, UtilizationPolicy
 from dstack._internal.core.models.resources import ResourcesSpec
@@ -34,6 +40,7 @@ from dstack._internal.server.background.tasks.process_running_jobs import (
     _patch_base_image_for_aws_efa,
     process_running_jobs,
 )
+from dstack._internal.server.models import JobModel
 from dstack._internal.server.schemas.runner import (
     HealthcheckResponse,
     JobStateEvent,
@@ -890,6 +897,65 @@ class TestProcessRunningJobs:
             await process_running_jobs()
         await session.refresh(master_job)
         assert master_job.status == JobStatus.RUNNING
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.parametrize("probe_count", [0, 1, 2])
+    async def test_creates_probe_models(
+        self,
+        test_db,
+        probe_count: int,
+        session: AsyncSession,
+        ssh_tunnel_mock: Mock,
+        shim_client_mock: Mock,
+        runner_client_mock: Mock,
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_spec=get_run_spec(
+                run_name="test",
+                repo_id=repo.name,
+                configuration=ServiceConfiguration(
+                    port=80,
+                    image="ubuntu",
+                    probes=[ProbeConfig(type="http", url=f"/{i}") for i in range(probe_count)],
+                ),
+            ),
+        )
+        instance = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.BUSY,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.PULLING,
+            job_provisioning_data=get_job_provisioning_data(dockerized=True),
+            instance=instance,
+            instance_assigned=True,
+        )
+        shim_client_mock.get_task.return_value.status = TaskStatus.RUNNING
+
+        assert len(job.probes) == 0
+        await process_running_jobs()
+
+        await session.refresh(job)
+        job = (
+            await session.execute(
+                select(JobModel)
+                .where(JobModel.id == job.id)
+                .options(selectinload(JobModel.probes))
+            )
+        ).scalar_one()
+        assert job.status == JobStatus.RUNNING
+        assert [p.probe_num for p in job.probes] == list(range(probe_count))
 
 
 class TestPatchBaseImageForAwsEfa:

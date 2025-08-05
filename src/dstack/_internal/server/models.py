@@ -427,6 +427,9 @@ class JobModel(BaseModel):
     replica_num: Mapped[int] = mapped_column(Integer)
     deployment_num: Mapped[int] = mapped_column(Integer)
     job_runtime_data: Mapped[Optional[str]] = mapped_column(Text)
+    probes: Mapped[list["ProbeModel"]] = relationship(
+        back_populates="job", order_by="ProbeModel.probe_num"
+    )
 
 
 class GatewayModel(BaseModel):
@@ -727,6 +730,24 @@ class JobPrometheusMetrics(BaseModel):
     collected_at: Mapped[datetime] = mapped_column(NaiveDateTime)
     # Raw Prometheus text response
     text: Mapped[str] = mapped_column(Text)
+
+
+class ProbeModel(BaseModel):
+    __tablename__ = "probes"
+    __table_args__ = (UniqueConstraint("job_id", "probe_num", name="uq_probes_job_id_probe_num"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUIDType(binary=False), primary_key=True, default=uuid.uuid4
+    )
+    name: Mapped[str] = mapped_column(String(100))
+
+    job_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("jobs.id"), primary_key=True)
+    job: Mapped["JobModel"] = relationship(back_populates="probes")
+
+    probe_num: Mapped[int] = mapped_column(Integer)  # index in JobSpec.probes
+    due: Mapped[datetime] = mapped_column(NaiveDateTime)
+    success_streak: Mapped[int] = mapped_column(BigInteger)
+    active: Mapped[bool] = mapped_column(Boolean)
 
 
 class SecretModel(BaseModel):

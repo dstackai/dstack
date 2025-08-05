@@ -2,7 +2,9 @@ from typing import List, Union
 
 import pytest
 from pydantic import parse_obj_as
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload, selectinload
 
 from dstack._internal.core.errors import ServerClientError
 from dstack._internal.core.models.backends.base import BackendType
@@ -10,7 +12,10 @@ from dstack._internal.core.models.configurations import ScalingSpec, ServiceConf
 from dstack._internal.core.models.profiles import Profile
 from dstack._internal.core.models.resources import Range
 from dstack._internal.core.models.runs import JobStatus, JobTerminationReason, RunStatus
-from dstack._internal.server.models import RunModel
+from dstack._internal.server.models import (
+    JobModel,
+    RunModel,
+)
 from dstack._internal.server.services.jobs import check_can_attach_job_volumes
 from dstack._internal.server.services.runs import scale_run_replicas
 from dstack._internal.server.testing.common import (
@@ -64,14 +69,21 @@ async def make_run(
         status=status,
     )
     for replica_num, job_status in enumerate(replicas_statuses):
-        await create_job(
+        job = await create_job(
             session=session,
             run=run,
             status=job_status,
             replica_num=replica_num,
         )
-    await session.refresh(run, attribute_names=["project", "jobs"])
-    return run
+        run.jobs.append(job)
+    res = await session.execute(
+        select(RunModel)
+        .where(RunModel.id == run.id)
+        .options(joinedload(RunModel.project))
+        .options(selectinload(RunModel.jobs).joinedload(JobModel.probes))
+        .execution_options(populate_existing=True)
+    )
+    return res.unique().scalar_one()
 
 
 async def scale_wrapper(session: AsyncSession, run: RunModel, diff: int):

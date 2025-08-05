@@ -23,6 +23,7 @@ from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import (
     InstanceModel,
     JobModel,
+    ProbeModel,
     ProjectModel,
     RunModel,
     UserModel,
@@ -36,6 +37,7 @@ from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.prometheus.client_metrics import run_metrics
 from dstack._internal.server.services.runs import (
     fmt,
+    is_replica_ready,
     process_terminating_run,
     retry_run_replica_jobs,
     run_model_to_run,
@@ -148,6 +150,11 @@ async def _process_run(session: AsyncSession, run_model: RunModel):
             selectinload(RunModel.jobs)
             .joinedload(JobModel.instance)
             .load_only(InstanceModel.fleet_id)
+        )
+        .options(
+            selectinload(RunModel.jobs)
+            .joinedload(JobModel.probes)
+            .load_only(ProbeModel.success_streak)
         )
         .execution_options(populate_existing=True)
     )
@@ -472,22 +479,22 @@ async def _handle_run_replicas(
             )
 
         replicas_to_stop_count = 0
-        # stop any out-of-date replicas that are not running
-        replicas_to_stop_count += len(
-            {
-                j.replica_num
-                for j in run_model.jobs
-                if j.status
-                not in [JobStatus.RUNNING, JobStatus.TERMINATING] + JobStatus.finished_statuses()
-                and j.deployment_num < run_model.deployment_num
-            }
+        # stop any out-of-date replicas that are not ready
+        replicas_to_stop_count += sum(
+            any(j.deployment_num < run_model.deployment_num for j in jobs)
+            and any(
+                j.status not in [JobStatus.TERMINATING] + JobStatus.finished_statuses()
+                for j in jobs
+            )
+            and not is_replica_ready(jobs)
+            for _, jobs in group_jobs_by_replica_latest(run_model.jobs)
         )
-        running_replica_count = len(
-            {j.replica_num for j in run_model.jobs if j.status == JobStatus.RUNNING}
+        ready_replica_count = sum(
+            is_replica_ready(jobs) for _, jobs in group_jobs_by_replica_latest(run_model.jobs)
         )
-        if running_replica_count > run_model.desired_replica_count:
-            # stop excessive running out-of-date replicas
-            replicas_to_stop_count += running_replica_count - run_model.desired_replica_count
+        if ready_replica_count > run_model.desired_replica_count:
+            # stop excessive ready out-of-date replicas
+            replicas_to_stop_count += ready_replica_count - run_model.desired_replica_count
         if replicas_to_stop_count:
             await scale_run_replicas(
                 session,

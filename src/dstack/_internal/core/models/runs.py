@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Dict, List, Literal, Optional, Type
 
 from pydantic import UUID4, Field, root_validator
 from typing_extensions import Annotated
@@ -223,6 +223,14 @@ class JobSSHKey(CoreModel):
     public: str
 
 
+class ProbeSpec(CoreModel):
+    type: Literal["http"]  # expect other probe types in the future, namely `exec`
+    url: str
+    timeout: int
+    interval: int
+    ready_after: int
+
+
 class JobSpec(CoreModel):
     replica_num: int = 0  # default value for backward compatibility
     job_num: int
@@ -256,6 +264,7 @@ class JobSpec(CoreModel):
     file_archives: list[FileArchiveMapping] = []
     # None for non-services and pre-0.19.19 services. See `get_service_port`
     service_port: Optional[int] = None
+    probes: list[ProbeSpec] = []
 
 
 class JobProvisioningData(CoreModel):
@@ -325,6 +334,10 @@ class ClusterInfo(CoreModel):
     gpus_per_job: int
 
 
+class Probe(CoreModel):
+    success_streak: int
+
+
 class JobSubmission(CoreModel):
     id: UUID4
     submission_num: int
@@ -341,6 +354,7 @@ class JobSubmission(CoreModel):
     job_provisioning_data: Optional[JobProvisioningData]
     job_runtime_data: Optional[JobRuntimeData]
     error: Optional[str] = None
+    probes: list[Probe] = []
 
     @property
     def age(self) -> timedelta:

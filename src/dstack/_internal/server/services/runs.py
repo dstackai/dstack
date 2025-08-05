@@ -1,6 +1,7 @@
 import itertools
 import math
 import uuid
+from collections.abc import Iterable
 from datetime import datetime, timezone
 from typing import List, Optional
 
@@ -8,7 +9,7 @@ import pydantic
 from apscheduler.triggers.cron import CronTrigger
 from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, selectinload
 
 import dstack._internal.utils.common as common_utils
 from dstack._internal.core.errors import (
@@ -17,7 +18,11 @@ from dstack._internal.core.errors import (
     ServerClientError,
 )
 from dstack._internal.core.models.common import ApplyAction
-from dstack._internal.core.models.configurations import RUN_PRIORITY_DEFAULT, AnyRunConfiguration
+from dstack._internal.core.models.configurations import (
+    RUN_PRIORITY_DEFAULT,
+    AnyRunConfiguration,
+    ServiceConfiguration,
+)
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceOfferWithAvailability,
@@ -219,6 +224,7 @@ async def list_projects_run_models(
         select(RunModel)
         .where(*filters)
         .options(joinedload(RunModel.user).load_only(UserModel.name))
+        .options(selectinload(RunModel.jobs).joinedload(JobModel.probes))
         .order_by(*order_by)
         .limit(limit)
     )
@@ -260,6 +266,7 @@ async def get_run_by_name(
             RunModel.deleted == False,
         )
         .options(joinedload(RunModel.user))
+        .options(selectinload(RunModel.jobs).joinedload(JobModel.probes))
     )
     run_model = res.scalar()
     if run_model is None:
@@ -279,6 +286,7 @@ async def get_run_by_id(
             RunModel.id == run_id,
         )
         .options(joinedload(RunModel.user))
+        .options(selectinload(RunModel.jobs).joinedload(JobModel.probes))
     )
     run_model = res.scalar()
     if run_model is None:
@@ -557,8 +565,8 @@ async def submit_run(
         await session.commit()
         await session.refresh(run_model)
 
-        run = run_model_to_run(run_model, return_in_api=True)
-        return run
+        run = await get_run_by_id(session, project, run_model.id)
+        return common_utils.get_or_error(run)
 
 
 def create_job_model_for_new_submission(
@@ -583,6 +591,7 @@ def create_job_model_for_new_submission(
         termination_reason=None,
         job_spec_data=job.job_spec.json(),
         job_provisioning_data=None,
+        probes=[],
     )
 
 
@@ -740,7 +749,9 @@ def _get_run_jobs_with_submissions(
                     job_models = list(job_models)[-job_submissions_limit:]
             for job_model in job_models:
                 if job_submissions_limit != 0:
-                    job_submission = job_model_to_job_submission(job_model)
+                    job_submission = job_model_to_job_submission(
+                        job_model, include_probes=return_in_api
+                    )
                     if return_in_api:
                         # Set default non-None values for 0.18 backward-compatibility
                         # Remove in 0.19
@@ -980,12 +991,22 @@ def _validate_run_spec_and_set_defaults(run_spec: RunSpec):
         raise ServerClientError(
             f"Maximum utilization_policy.time_window is {settings.SERVER_METRICS_RUNNING_TTL_SECONDS}s"
         )
-    if (
-        run_spec.merged_profile.schedule
-        and run_spec.configuration.type == "service"
-        and run_spec.configuration.replicas.min == 0
-    ):
-        raise ServerClientError("Scheduled services with autoscaling to zero are not supported")
+    if isinstance(run_spec.configuration, ServiceConfiguration):
+        if run_spec.merged_profile.schedule and run_spec.configuration.replicas.min == 0:
+            raise ServerClientError(
+                "Scheduled services with autoscaling to zero are not supported"
+            )
+        if len(run_spec.configuration.probes) > settings.MAX_PROBES_PER_JOB:
+            raise ServerClientError(
+                f"Cannot configure more than {settings.MAX_PROBES_PER_JOB} probes"
+            )
+        if any(
+            p.timeout is not None and p.timeout > settings.MAX_PROBE_TIMEOUT
+            for p in run_spec.configuration.probes
+        ):
+            raise ServerClientError(
+                f"Probe timeout cannot be longer than {settings.MAX_PROBE_TIMEOUT}s"
+            )
     if run_spec.configuration.priority is None:
         run_spec.configuration.priority = RUN_PRIORITY_DEFAULT
     set_resources_defaults(run_spec.configuration.resources)
@@ -1011,6 +1032,7 @@ _TYPE_SPECIFIC_CONF_UPDATABLE_FIELDS = {
         # rolling deployment
         # NOTE: keep this list in sync with the "Rolling deployment" section in services.md
         "port",
+        "probes",
         "resources",
         "volumes",
         "docker",
@@ -1161,9 +1183,12 @@ async def scale_run_replicas(session: AsyncSession, run_model: RunModel, replica
         elif {JobStatus.PROVISIONING, JobStatus.PULLING} & statuses:
             # if there are any provisioning or pulling jobs, the replica is active and has the importance of 1
             active_replicas.append((1, is_out_of_date, replica_num, replica_jobs))
-        else:
-            # all jobs are running, the replica is active and has the importance of 2
+        elif not is_replica_ready(replica_jobs):
+            # all jobs are running, but probes are failing, the replica is active and has the importance of 2
             active_replicas.append((2, is_out_of_date, replica_num, replica_jobs))
+        else:
+            # all jobs are running and ready, the replica is active and has the importance of 3
+            active_replicas.append((3, is_out_of_date, replica_num, replica_jobs))
 
     # sort by is_out_of_date (up-to-date first), importance (desc), and replica_num (asc)
     active_replicas.sort(key=lambda r: (r[1], -r[0], r[2]))
@@ -1244,6 +1269,17 @@ async def retry_run_replica_jobs(
         # dirty hack to avoid passing all job submissions
         new_job_model.submission_num = job_model.submission_num + 1
         session.add(new_job_model)
+
+
+def is_replica_ready(jobs: Iterable[JobModel]) -> bool:
+    if not all(job.status == JobStatus.RUNNING for job in jobs):
+        return False
+    for job in jobs:
+        job_spec: JobSpec = JobSpec.__response__.parse_raw(job.job_spec_data)
+        for probe_spec, probe in zip(job_spec.probes, job.probes):
+            if probe.success_streak < probe_spec.ready_after:
+                return False
+    return True
 
 
 def _remove_job_spec_sensitive_info(spec: JobSpec):
