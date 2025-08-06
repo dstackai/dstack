@@ -129,7 +129,7 @@ async def create_repo(
     repo = RepoModel(
         project_id=project.id,
         name=repo_id,
-        type=repo_info.repo_type,
+        type=RepoType(repo_info.repo_type),
         info=repo_info.json(),
     )
     try:
