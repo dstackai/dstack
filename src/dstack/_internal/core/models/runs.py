@@ -344,15 +344,17 @@ class JobSubmission(CoreModel):
     deployment_num: int = 0  # default for compatibility with pre-0.19.14 servers
     submitted_at: datetime
     last_processed_at: datetime
-    finished_at: Optional[datetime]
-    inactivity_secs: Optional[int]
+    finished_at: Optional[datetime] = None
+    inactivity_secs: Optional[int] = None
     status: JobStatus
     status_message: str = ""  # default for backward compatibility
-    termination_reason: Optional[JobTerminationReason]
-    termination_reason_message: Optional[str]
-    exit_status: Optional[int]
-    job_provisioning_data: Optional[JobProvisioningData]
-    job_runtime_data: Optional[JobRuntimeData]
+    # termination_reason stores JobTerminationReason.
+    # str allows adding new enum members without breaking compatibility with old clients.
+    termination_reason: Optional[str] = None
+    termination_reason_message: Optional[str] = None
+    exit_status: Optional[int] = None
+    job_provisioning_data: Optional[JobProvisioningData] = None
+    job_runtime_data: Optional[JobRuntimeData] = None
     error: Optional[str] = None
     probes: list[Probe] = []
 
@@ -502,7 +504,9 @@ class Run(CoreModel):
     last_processed_at: datetime
     status: RunStatus
     status_message: str = ""  # default for backward compatibility
-    termination_reason: Optional[RunTerminationReason] = None
+    # termination_reason stores RunTerminationReason.
+    # str allows adding new enum members without breaking compatibility with old clients.
+    termination_reason: Optional[str] = None
     run_spec: RunSpec
     jobs: List[Job]
     latest_job_submission: Optional[JobSubmission] = None

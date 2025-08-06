@@ -714,7 +714,9 @@ def run_model_to_run(
         last_processed_at=run_model.last_processed_at,
         status=run_model.status,
         status_message=status_message,
-        termination_reason=run_model.termination_reason,
+        termination_reason=run_model.termination_reason.value
+        if run_model.termination_reason
+        else None,
         run_spec=run_spec,
         jobs=jobs,
         latest_job_submission=latest_job_submission,

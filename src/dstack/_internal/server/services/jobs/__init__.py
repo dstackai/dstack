@@ -152,7 +152,9 @@ def job_model_to_job_submission(
         inactivity_secs=job_model.inactivity_secs,
         status=job_model.status,
         status_message=status_message,
-        termination_reason=job_model.termination_reason,
+        termination_reason=job_model.termination_reason.value
+        if job_model.termination_reason
+        else None,
         termination_reason_message=job_model.termination_reason_message,
         exit_status=job_model.exit_status,
         job_provisioning_data=job_provisioning_data,
