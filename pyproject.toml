@@ -121,7 +121,7 @@ server = [
     "aiosqlite",
     "docker>=6.0.0",
     "python-dxf==12.1.0",
-    "sentry-sdk[fastapi]",
+    "sentry-sdk[fastapi]>=2.27.0",
     "alembic-postgresql-enum",
     "asyncpg",
     "python-json-logger>=3.1.0",
