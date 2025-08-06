@@ -29,11 +29,15 @@ type ShimServer struct {
 	runner TaskRunner
 
 	dcgmExporter *dcgm.DCGMExporter
+	dcgmWrapper  *dcgm.DCGMWrapper
 
 	version string
 }
 
-func NewShimServer(ctx context.Context, address string, runner TaskRunner, dcgmExporter *dcgm.DCGMExporter, version string) *ShimServer {
+func NewShimServer(
+	ctx context.Context, address string, version string,
+	runner TaskRunner, dcgmExporter *dcgm.DCGMExporter, dcgmWrapper *dcgm.DCGMWrapper,
+) *ShimServer {
 	r := api.NewRouter()
 	s := &ShimServer{
 		HttpServer: &http.Server{
@@ -45,12 +49,14 @@ func NewShimServer(ctx context.Context, address string, runner TaskRunner, dcgmE
 		runner: runner,
 
 		dcgmExporter: dcgmExporter,
+		dcgmWrapper:  dcgmWrapper,
 
 		version: version,
 	}
 
 	// The healthcheck endpoint should stay backward compatible, as it is used for negotiation
 	r.AddHandler("GET", "/api/healthcheck", s.HealthcheckHandler)
+	r.AddHandler("GET", "/api/instance/health", s.InstanceHealthHandler)
 	r.AddHandler("GET", "/api/tasks", s.TaskListHandler)
 	r.AddHandler("GET", "/api/tasks/{id}", s.TaskInfoHandler)
 	r.AddHandler("POST", "/api/tasks", s.TaskSubmitHandler)

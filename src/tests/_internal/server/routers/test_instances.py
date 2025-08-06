@@ -15,6 +15,7 @@ from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.testing.common import (
     create_fleet,
     create_instance,
+    create_instance_health_check,
     create_project,
     create_user,
     get_auth_headers,
@@ -265,3 +266,109 @@ class TestListInstances:
     async def test_not_authenticated(self, client: AsyncClient, data) -> None:
         resp = await client.post("/api/instances/list", json={})
         assert resp.status_code == 403
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+@pytest.mark.usefixtures("test_db")
+class TestGetInstanceHealthChecks:
+    async def test_returns_403_if_not_project_member(
+        self, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        response = await client.post(
+            f"/api/project/{project.name}/instances/get_instance_health_checks",
+            headers=get_auth_headers(user.token),
+            json={
+                "fleet_name": "test",
+                "instance_num": 0,
+            },
+        )
+        assert response.status_code == 403
+
+    async def test_returns_400_if_instance_not_found(
+        self, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session, project=project, user=user, project_role=ProjectRole.USER
+        )
+
+        response = await client.post(
+            f"/api/project/{project.name}/instances/get_instance_health_checks",
+            headers=get_auth_headers(user.token),
+            json={
+                "fleet_name": "test",
+                "instance_num": 0,
+            },
+        )
+        assert response.status_code == 400
+
+    async def test_returns_health_checks(self, session: AsyncSession, client: AsyncClient):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        fleet = await create_fleet(session=session, project=project)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+        )
+        await create_instance_health_check(
+            session=session,
+            instance=instance,
+            collected_at=dt.datetime(2025, 1, 1, 12, 0, tzinfo=dt.timezone.utc),
+            response="{}",
+        )
+        health_response_with_dcgm = """
+            {
+                "dcgm": {
+                    "overall_health": 20,
+                    "incidents": [{
+                        "system": 16,
+                        "health": 20,
+                        "error_message": "Detected 333 volatile double-bit ECC error(s) in GPU 0.",
+                        "error_code": 4,
+                        "entity_group_id": 1,
+                        "entity_id": 0
+                    }]
+                }
+            }
+        """
+        await create_instance_health_check(
+            session=session,
+            instance=instance,
+            collected_at=dt.datetime(2025, 1, 1, 12, 1, tzinfo=dt.timezone.utc),
+            response=health_response_with_dcgm,
+        )
+
+        response = await client.post(
+            f"/api/project/{project.name}/instances/get_instance_health_checks",
+            headers=get_auth_headers(user.token),
+            json={
+                "fleet_name": fleet.name,
+                "instance_num": instance.instance_num,
+            },
+        )
+
+        assert response.status_code == 200
+        assert response.json() == {
+            "health_checks": [
+                {
+                    "collected_at": "2025-01-01T12:01:00+00:00",
+                    "status": "failure",
+                    "events": [
+                        {
+                            "timestamp": "2025-01-01T12:01:00+00:00",
+                            "status": "failure",
+                            "message": "Detected 333 volatile double-bit ECC error(s) in GPU 0.",
+                        }
+                    ],
+                },
+                {"collected_at": "2025-01-01T12:00:00+00:00", "status": "healthy", "events": []},
+            ]
+        }

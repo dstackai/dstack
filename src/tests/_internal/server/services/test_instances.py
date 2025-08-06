@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 import dstack._internal.server.services.instances as instances_services
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.health import HealthStatus
 from dstack._internal.core.models.instances import (
     Instance,
     InstanceStatus,
@@ -130,6 +131,8 @@ class TestInstanceModelToInstance:
             instance_num=0,
             hostname="hostname_test",
             status=InstanceStatus.PENDING,
+            unreachable=False,
+            health_status=HealthStatus.WARNING,
             created=created,
             region="eu-west-1",
             price=1.0,
@@ -143,6 +146,7 @@ class TestInstanceModelToInstance:
             instance_num=0,
             status=InstanceStatus.PENDING,
             unreachable=False,
+            health=HealthStatus.WARNING,
             project=project,
             job_provisioning_data='{"ssh_proxy":null, "backend":"local","hostname":"hostname_test","region":"eu-west","price":1.0,"username":"user1","ssh_port":12345,"dockerized":false,"instance_id":"test_instance","instance_type": {"name": "instance", "resources": {"cpus": 1, "memory_mib": 512, "gpus": [], "spot": false, "disk": {"size_mib": 102400}, "description":""}}}',
             offer='{"price":"LOCAL", "price":1.0, "backend":"local", "region":"eu-west-1", "availability":"available","instance": {"name": "instance", "resources": {"cpus": 1, "memory_mib": 512, "gpus": [], "spot": false, "disk": {"size_mib": 102400}, "description":""}}}',

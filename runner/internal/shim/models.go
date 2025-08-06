@@ -33,6 +33,10 @@ type CLIArgs struct {
 		Interval int // milliseconds
 	}
 
+	DCGM struct {
+		Address string
+	}
+
 	Docker struct {
 		ConcatinatedPublicSSHKeys string
 		Privileged                bool

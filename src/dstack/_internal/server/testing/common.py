@@ -35,6 +35,7 @@ from dstack._internal.core.models.fleets import (
     SSHParams,
 )
 from dstack._internal.core.models.gateways import GatewayComputeConfiguration, GatewayStatus
+from dstack._internal.core.models.health import HealthStatus
 from dstack._internal.core.models.instances import (
     Disk,
     Gpu,
@@ -85,6 +86,7 @@ from dstack._internal.server.models import (
     FleetModel,
     GatewayComputeModel,
     GatewayModel,
+    InstanceHealthCheckModel,
     InstanceModel,
     JobMetricsPoint,
     JobModel,
@@ -614,6 +616,7 @@ async def create_instance(
     fleet: Optional[FleetModel] = None,
     status: InstanceStatus = InstanceStatus.IDLE,
     unreachable: bool = False,
+    health_status: HealthStatus = HealthStatus.HEALTHY,
     created_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
     finished_at: Optional[datetime] = None,
     spot: bool = False,
@@ -676,6 +679,7 @@ async def create_instance(
         status=status,
         last_processed_at=last_processed_at,
         unreachable=unreachable,
+        health=health_status,
         created_at=created_at,
         started_at=created_at,
         finished_at=finished_at,
@@ -794,6 +798,24 @@ def get_ssh_key() -> SSHKey:
                     -----END OPENSSH PRIVATE KEY-----
                 """,
     )
+
+
+async def create_instance_health_check(
+    session: AsyncSession,
+    instance: InstanceModel,
+    collected_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+    status: HealthStatus = HealthStatus.HEALTHY,
+    response: str = "{}",
+) -> InstanceHealthCheckModel:
+    health_check = InstanceHealthCheckModel(
+        instance_id=instance.id,
+        collected_at=collected_at,
+        status=status,
+        response=response,
+    )
+    session.add(health_check)
+    await session.commit()
+    return health_check
 
 
 async def create_volume(
