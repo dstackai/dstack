@@ -1,5 +1,4 @@
 import logging
-import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Union
@@ -9,6 +8,7 @@ from rich.prompt import Confirm
 from rich.table import Table
 from rich.theme import Theme
 
+from dstack._internal import settings
 from dstack._internal.cli.utils.rich import DstackRichHandler
 from dstack._internal.core.errors import CLIError, DstackError
 from dstack._internal.utils.common import get_dstack_dir
@@ -68,18 +68,10 @@ def configure_logging():
 
     log_file = _get_cli_log_file()
 
-    level_names = logging.getLevelNamesMapping()
-    stdout_level_name = os.getenv("DSTACK_CLI_LOG_LEVEL", "INFO").upper()
-    stdout_level = level_names[stdout_level_name]
-    dstack_logger.setLevel(stdout_level)
-
     stdout_handler = DstackRichHandler(console=console)
     stdout_handler.setFormatter(logging.Formatter(fmt="%(message)s", datefmt="[%X]"))
-    stdout_handler.setLevel(stdout_level)
+    stdout_handler.setLevel(settings.CLI_LOG_LEVEL)
     dstack_logger.addHandler(stdout_handler)
-
-    file_level_name = os.getenv("DSTACK_CLI_FILE_LOG_LEVEL", "DEBUG").upper()
-    file_level = level_names[file_level_name]
 
     file_handler = logging.FileHandler(log_file)
     file_handler.setFormatter(
@@ -87,10 +79,11 @@ def configure_logging():
             fmt="%(asctime)s - %(name)s - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
         )
     )
-    file_handler.setLevel(file_level)
+    file_handler.setLevel(settings.CLI_FILE_LOG_LEVEL)
     dstack_logger.addHandler(file_handler)
 
-    dstack_logger.setLevel(min(stdout_level, file_level))
+    # the logger allows all messages, filtering is done by the handlers
+    dstack_logger.setLevel(logging.DEBUG)
 
 
 def confirm_ask(prompt, **kwargs) -> bool:
