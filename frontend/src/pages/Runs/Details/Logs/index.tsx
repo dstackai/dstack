@@ -23,6 +23,7 @@ export const Logs: React.FC<IProps> = ({ className, projectName, runName, jobSub
     const scrollPositionByBottom = useRef<number>(0);
 
     const [logsData, setLogsData] = useState<ILogItem[]>([]);
+    const [externalLink, setExternalLink] = useState<string | undefined>();
     const [isLoading, setIsLoading] = useState(false);
     const [getProjectLogs] = useLazyGetProjectLogsQuery();
     const [isEnabledDecoding, setIsEnabledDecoding] = useLocalStorageState('enable-encode-logs', false);
@@ -84,6 +85,7 @@ export const Logs: React.FC<IProps> = ({ className, projectName, runName, jobSub
                     setLogsData((old) => [...reversed, ...old]);
                 } else {
                     setLogsData(reversed);
+                    setExternalLink(response.external_url);
                 }
 
                 nextTokenRef.current = response.next_token;
@@ -153,6 +155,10 @@ export const Logs: React.FC<IProps> = ({ className, projectName, runName, jobSub
                         <div className={styles.headerTitle}>
                             <Header variant="h2">{t('projects.run.log')}</Header>
                         </div>
+
+                        {externalLink && (
+                            <Button target="_blank" formAction="none" iconName="external" href={externalLink} variant="icon" />
+                        )}
 
                         <Loader
                             show={isLoading && Boolean(logsForView.length)}

@@ -18,5 +18,6 @@ declare type TRequestLogsParams = {
 
 declare type TResponseLogsParams = {
     logs: ILogItem[];
+    external_url?: string;
     next_token?: string;
 };
