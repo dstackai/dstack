@@ -1,3 +1,5 @@
+//go:build linux
+
 package dcgm
 
 import (
@@ -49,7 +51,7 @@ func TestDCGMWrapperGetHealth(t *testing.T) {
 
 // Utils. Must be called after NewDCGMWrapper(), as it indirectly calls dlopen("libdcgm.so.4")
 
-func getDCGMWrapper(t *testing.T) *DCGMWrapper {
+func getDCGMWrapper(t *testing.T) DCGMWrapperInterface {
 	dcgmw, err := NewDCGMWrapper("")
 	if err != nil && strings.Contains(err.Error(), "libdcgm.so") {
 		t.Skip("Skipping test that requires ligdcm.so")
@@ -73,7 +75,7 @@ func getGpuID(t *testing.T) uint {
 	return gpuIDs[0]
 }
 
-func injectError(t *testing.T, gpuID uint, fieldID godcgm.Short, fieldType uint, value interface{}) {
+func injectError(t *testing.T, gpuID uint, fieldID godcgm.Short, fieldType uint, value any) {
 	t.Helper()
 	err := godcgm.InjectFieldValue(gpuID, fieldID, fieldType, 0, time.Now().UnixMicro(), value)
 	require.NoError(t, err)
