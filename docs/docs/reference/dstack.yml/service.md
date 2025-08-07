@@ -116,6 +116,17 @@ The `service` configuration type allows running [services](../../concepts/servic
       type:
         required: true
 
+##### `probes[n].headers`
+
+###### `probes[n].headers[m]`
+
+#SCHEMA# dstack._internal.core.models.configurations.HTTPHeaderSpec
+    overrides:
+      show_root_heading: false
+      type:
+        required: true
+
+
 ### `retry`
 
 #SCHEMA# dstack._internal.core.models.profiles.ProfileRetry

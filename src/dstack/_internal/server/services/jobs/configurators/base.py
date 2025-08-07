@@ -12,6 +12,7 @@ from dstack._internal.core.errors import DockerRegistryError, ServerClientError
 from dstack._internal.core.models.common import RegistryAuth
 from dstack._internal.core.models.configurations import (
     DEFAULT_PROBE_INTERVAL,
+    DEFAULT_PROBE_METHOD,
     DEFAULT_PROBE_READY_AFTER,
     DEFAULT_PROBE_TIMEOUT,
     DEFAULT_PROBE_URL,
@@ -372,6 +373,9 @@ def _probe_config_to_spec(c: ProbeConfig) -> ProbeSpec:
         timeout=c.timeout if c.timeout is not None else DEFAULT_PROBE_TIMEOUT,
         interval=c.interval if c.interval is not None else DEFAULT_PROBE_INTERVAL,
         ready_after=c.ready_after if c.ready_after is not None else DEFAULT_PROBE_READY_AFTER,
+        method=c.method if c.method is not None else DEFAULT_PROBE_METHOD,
+        headers=c.headers,
+        body=c.body,
     )
 
 

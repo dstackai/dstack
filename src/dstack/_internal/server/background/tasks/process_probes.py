@@ -116,9 +116,13 @@ async def _execute_probe(probe: ProbeModel, probe_spec: ProbeSpec) -> bool:
 
     try:
         async with _get_service_replica_client(probe.job) as client:
-            resp = await client.get(
-                "http://dstack" + probe_spec.url,
+            resp = await client.request(
+                method=probe_spec.method,
+                url="http://dstack" + probe_spec.url,
+                headers=[(h.name, h.value) for h in probe_spec.headers],
+                data=probe_spec.body,
                 timeout=probe_spec.timeout,
+                follow_redirects=False,
             )
             logger.debug("%s: probe status code: %s", fmt(probe), resp.status_code)
             return resp.is_success

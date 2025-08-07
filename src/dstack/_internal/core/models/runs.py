@@ -8,8 +8,11 @@ from typing_extensions import Annotated
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import ApplyAction, CoreModel, NetworkMode, RegistryAuth
 from dstack._internal.core.models.configurations import (
+    DEFAULT_PROBE_METHOD,
     DEFAULT_REPO_DIR,
     AnyRunConfiguration,
+    HTTPHeaderSpec,
+    HTTPMethod,
     RunConfiguration,
     ServiceConfiguration,
 )
@@ -226,6 +229,9 @@ class JobSSHKey(CoreModel):
 class ProbeSpec(CoreModel):
     type: Literal["http"]  # expect other probe types in the future, namely `exec`
     url: str
+    method: HTTPMethod = DEFAULT_PROBE_METHOD
+    headers: list[HTTPHeaderSpec] = []
+    body: Optional[str] = None
     timeout: int
     interval: int
     ready_after: int

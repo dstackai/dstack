@@ -8,6 +8,7 @@ from dstack._internal.utils.common import (
     batched,
     concat_url_path,
     format_duration_multiunit,
+    has_duplicates,
     local_time,
     make_proxy_url,
     parse_memory,
@@ -122,6 +123,30 @@ class TestFormatDurationMultiunit:
     def test_forbids_negative(self) -> None:
         with pytest.raises(ValueError):
             format_duration_multiunit(-1)
+
+
+@pytest.mark.parametrize(
+    "iterable, expected",
+    [
+        ([1, 2, 3, 4], False),
+        ([1, 2, 3, 4, 2], True),
+        (iter([1, 2, 3, 4]), False),
+        (iter([1, 2, 3, 4, 2]), True),
+        ("abcde", False),
+        ("hello", True),
+        ([1, "a"], False),
+        ([1, "a", 1], True),
+        ([[1, 2], [3, 4]], False),
+        ([[1, 2], [1, 2]], True),
+        ([{"a": "b"}, {"a": "c"}], False),
+        ([{"a": "b"}, {"a": "b"}], True),
+        ([{}, {}], True),
+        ([], False),
+        ([1], False),
+    ],
+)
+def test_has_duplicates(iterable, expected):
+    assert has_duplicates(iterable) == expected
 
 
 class TestParseMemory:

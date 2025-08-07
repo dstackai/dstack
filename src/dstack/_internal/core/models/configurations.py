@@ -19,6 +19,7 @@ from dstack._internal.core.models.resources import Range, ResourcesSpec
 from dstack._internal.core.models.services import AnyModel, OpenAIChatModel
 from dstack._internal.core.models.unix import UnixUser
 from dstack._internal.core.models.volumes import MountPoint, VolumeConfiguration, parse_mount_point
+from dstack._internal.utils.common import has_duplicates
 from dstack._internal.utils.json_utils import (
     pydantic_orjson_dumps_with_indent,
 )
@@ -38,6 +39,7 @@ DEFAULT_PROBE_URL = "/"
 DEFAULT_PROBE_TIMEOUT = 10
 DEFAULT_PROBE_INTERVAL = 15
 DEFAULT_PROBE_READY_AFTER = 1
+DEFAULT_PROBE_METHOD = "get"
 MAX_PROBE_URL_LEN = 2048
 
 
@@ -169,10 +171,53 @@ class RateLimit(CoreModel):
     ] = 0
 
 
+HTTPMethod = Literal["get", "post", "put", "delete", "patch", "head"]
+
+
+class HTTPHeaderSpec(CoreModel):
+    name: Annotated[
+        str,
+        Field(
+            description="The name of the HTTP header",
+            min_length=1,
+            max_length=256,
+        ),
+    ]
+    value: Annotated[
+        str,
+        Field(
+            description="The value of the HTTP header",
+            min_length=1,
+            max_length=2048,
+        ),
+    ]
+
+
 class ProbeConfig(CoreModel):
     type: Literal["http"]  # expect other probe types in the future, namely `exec`
     url: Annotated[
         Optional[str], Field(description=f"The URL to request. Defaults to `{DEFAULT_PROBE_URL}`")
+    ] = None
+    method: Annotated[
+        Optional[HTTPMethod],
+        Field(
+            description=(
+                "The HTTP method to use for the probe (e.g., `get`, `post`, etc.)."
+                f" Defaults to `{DEFAULT_PROBE_METHOD}`"
+            )
+        ),
+    ] = None
+    headers: Annotated[
+        list[HTTPHeaderSpec],
+        Field(description="A list of HTTP headers to include in the request", max_items=16),
+    ] = []
+    body: Annotated[
+        Optional[str],
+        Field(
+            description="The HTTP request body to send with the probe",
+            min_length=1,
+            max_length=2048,
+        ),
     ] = None
     timeout: Annotated[
         Optional[Union[int, str]],
@@ -203,9 +248,6 @@ class ProbeConfig(CoreModel):
         ),
     ] = None
 
-    class Config:
-        frozen = True
-
     @validator("timeout")
     def parse_timeout(cls, v: Optional[Union[int, str]]) -> Optional[int]:
         if v is None:
@@ -235,6 +277,13 @@ class ProbeConfig(CoreModel):
         if not v.isprintable():
             raise ValueError("Cannot contain non-printable characters")
         return v
+
+    @root_validator
+    def validate_body_matches_method(cls, values):
+        method: HTTPMethod = values["method"]
+        if values["body"] is not None and method in ["get", "head"]:
+            raise ValueError(f"Cannot set request body for the `{method}` method")
+        return values
 
 
 class BaseRunConfiguration(CoreModel):
@@ -592,7 +641,7 @@ class ServiceConfigurationParams(CoreModel):
 
     @validator("probes")
     def validate_probes(cls, v: list[ProbeConfig]) -> list[ProbeConfig]:
-        if len(v) != len(set(v)):
+        if has_duplicates(v):
             # Using a custom validator instead of Field(unique_items=True) to avoid Pydantic bug:
             # https://github.com/pydantic/pydantic/issues/3765
             # Because of the bug, our gen_schema_reference.py fails to determine the type of

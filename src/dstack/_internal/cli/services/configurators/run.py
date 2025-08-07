@@ -341,6 +341,14 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
                     username=interpolator.interpolate_or_error(conf.registry_auth.username),
                     password=interpolator.interpolate_or_error(conf.registry_auth.password),
                 )
+            if isinstance(conf, ServiceConfiguration):
+                for probe in conf.probes:
+                    for header in probe.headers:
+                        header.value = interpolator.interpolate_or_error(header.value)
+                    if probe.url:
+                        probe.url = interpolator.interpolate_or_error(probe.url)
+                    if probe.body:
+                        probe.body = interpolator.interpolate_or_error(probe.body)
         except InterpolatorError as e:
             raise ConfigurationError(e.args[0])
 
