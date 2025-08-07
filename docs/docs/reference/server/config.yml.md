@@ -15,7 +15,7 @@ to configure [backends](../../concepts/backends.md) and other [sever-level setti
     overrides:
         show_root_heading: false
         backends:
-            type: 'Union[AWSBackendConfigWithCreds, AzureBackendConfigWithCreds, GCPBackendConfigWithCreds, LambdaBackendConfigWithCreds, NebiusBackendConfigWithCreds, RunpodBackendConfigWithCreds, VastAIBackendConfigWithCreds, KubernetesConfig]'
+            type: 'Union[AWSBackendConfigWithCreds, AzureBackendConfigWithCreds, GCPBackendConfigWithCreds, HotAisleBackendConfigWithCreds, LambdaBackendConfigWithCreds, NebiusBackendConfigWithCreds, RunpodBackendConfigWithCreds, VastAIBackendConfigWithCreds, KubernetesConfig]'
 
 #### `projects[n].backends` { #backends data-toc-label="backends" }
 
@@ -125,6 +125,23 @@ to configure [backends](../../concepts/backends.md) and other [sever-level setti
             show_root_heading: false
             type:
                 required: true
+
+##### `projects[n].backends[type=hotaisle]` { #hotaisle data-toc-label="hotaisle" }
+
+#SCHEMA# dstack._internal.core.backends.hotaisle.models.HotAisleBackendConfigWithCreds
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+        item_id_prefix: hotaisle-
+
+###### `projects[n].backends[type=hotaisle].creds` { #hotaisle-creds data-toc-label="creds" }
+
+#SCHEMA# dstack._internal.core.backends.hotaisle.models.HotAisleAPIKeyCreds
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
 
 ##### `projects[n].backends[type=lambda]` { #lambda data-toc-label="lambda" }
 

@@ -83,6 +83,7 @@ class TestListBackendTypes:
             "cudo",
             "datacrunch",
             "gcp",
+            "hotaisle",
             "kubernetes",
             "lambda",
             *(["nebius"] if sys.version_info >= (3, 10) else []),

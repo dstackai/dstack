@@ -579,6 +579,34 @@ gcloud projects list --format="json(projectId)"
     Using private subnets assumes that both the `dstack` server and users can access the configured VPC's private subnets.
     Additionally, [Cloud NAT](https://cloud.google.com/nat/docs/overview) must be configured to provide access to external resources for provisioned instances.
 
+## Hot Aisle
+
+Log in to the SSH TUI as described in the [Hot Aisle Quick Start :material-arrow-top-right-thin:{ .external }](https://hotaisle.xyz/quick-start/).
+Create a new team and generate an API key for the member in the team.
+
+Then, go ahead and configure the backend:
+
+<div editor-title="~/.dstack/server/config.yml">
+
+```yaml
+projects:
+- name: main
+  backends:
+    - type: hotaisle
+      team_handle: hotaisle-team-handle
+      creds:
+        type: api_key
+        api_key: 9c27a4bb7a8e472fae12ab34.3f2e3c1db75b9a0187fd2196c6b3e56d2b912e1c439ba08d89e7b6fcd4ef1d3f
+```
+
+</div>
+
+??? info "Required permissions"
+    The API key must have the following roles assigned:
+
+    * **Owner role for the user** - Required for creating and managing SSH keys
+    * **Operator role for the team** - Required for managing virtual machines within the team
+
 ## Lambda
 
 Log into your [Lambda Cloud :material-arrow-top-right-thin:{ .external }](https://lambdalabs.com/service/gpu-cloud) account, click API keys in the sidebar, and then click the `Generate API key`
