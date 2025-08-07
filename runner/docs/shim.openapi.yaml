@@ -2,7 +2,7 @@ openapi: 3.1.1
 
 info:
   title: dstack-shim API
-  version: v2/0.18.34
+  version: v2/0.19.22
   x-logo:
     url: https://avatars.githubusercontent.com/u/54146142?s=260
   description: >
@@ -50,10 +50,25 @@ paths:
               schema:
                 $ref: "#/components/schemas/HealthcheckResponse"
 
+  /instance/health:
+    get:
+      summary: Get instance health
+
+      description: (since [0.19.22](https://github.com/dstackai/dstack/releases/tag/0.19.22)) Returns an object of optional passive system checks
+      tags: [Instance]
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InstanceHealthResponse"
+
   /tasks:
     get:
       summary: Get task list
       description: Returns a list of all tasks known to shim, including terminated ones
+      tags: [Tasks]
       responses:
         "200":
           description: ""
@@ -63,6 +78,7 @@ paths:
                 $ref: "#/components/schemas/TaskListResponse"
     post:
       summary: Submit and run new task
+      tags: [Tasks]
       requestBody:
         required: true
         content:
@@ -86,6 +102,7 @@ paths:
   /tasks/{id}:
     get:
       summary: Get task info
+      tags: [Tasks]
       parameters:
         - $ref: "#/parameters/taskId"
       responses:
@@ -102,6 +119,7 @@ paths:
         Stops the task, that is, cancels image pulling if in progress,
         stops the container if running, and sets the status to `terminated`.
         No-op if the task is already terminated
+      tags: [Tasks]
       parameters:
         - in: path
           name: id
@@ -131,6 +149,7 @@ paths:
       description: >
         Removes the task from in-memory storage and destroys its associated
         resources: a container, logs, etc.
+      tags: [Tasks]
       parameters:
         - $ref: "#/parameters/taskId"
       responses:
@@ -270,7 +289,7 @@ components:
           type: string
           default: ""
           description: Mount point inside container
-    
+
     GPUDevice:
       title: shim.GPUDevice
       type: object
@@ -283,6 +302,72 @@ components:
           type: string
           default: ""
           description: Path inside container
+
+    DCGMHealth:
+      title: shim.dcgm.Health
+      type: object
+      properties:
+        overall_health:
+          type: integer
+          description: >
+            [dcgmHealthWatchResult_enum](https://docs.nvidia.com/datacenter/dcgm/latest/dcgm-api/dcgm-api-data-structs.html#_CPPv426dcgmHealthWatchResult_enum)
+          examples:
+            - 10
+        incidents:
+          type: array
+          items:
+            $ref: "#/components/schemas/DCGMHealthIncident"
+      required:
+        - overall_health
+        - incidents
+      additionalProperties: false
+
+    DCGMHealthIncident:
+      title: shim.dcgm.HealthIncident
+      type: object
+      properties:
+        system:
+          type: integer
+          description: >
+            [dcgmHealthSystems_enum](https://docs.nvidia.com/datacenter/dcgm/latest/dcgm-api/dcgm-api-data-structs.html#_CPPv422dcgmHealthSystems_enum)
+          examples:
+            - 1
+        health:
+          type: integer
+          description: >
+            [dcgmHealthWatchResult_enum](https://docs.nvidia.com/datacenter/dcgm/latest/dcgm-api/dcgm-api-data-structs.html#_CPPv426dcgmHealthWatchResult_enum)
+          examples:
+            - 10
+        error_message:
+          type: string
+          examples:
+            - >
+              Detected more than 16 PCIe replays per minute for GPU 0 : 99 Reconnect PCIe card.
+              Run system side PCIE diagnostic utilities to verify hops off the GPU board. If issue is on the board, run the field diagnostic.
+        error_code:
+          type: integer
+          description: >
+            [dcgmError_enum](https://github.com/NVIDIA/DCGM/blob/master/dcgmlib/dcgm_errors.h)
+          examples:
+            - 3
+        entity_group_id:
+          type: integer
+          description: >
+            [dcgm_field_entity_group_t](https://docs.nvidia.com/datacenter/dcgm/latest/dcgm-api/dcgm-api-field-entity.html#_CPPv425dcgm_field_entity_group_t)
+          examples:
+            - 1
+        entity_id:
+          type: integer
+          examples:
+            - 0
+      required:
+        - system
+        - health
+        - error_message
+        - error_code
+        - entity_group_id
+        - entity_id
+      additionalProperties: false
 
     HealthcheckResponse:
       title: shim.api.HealthcheckResponse
@@ -297,6 +382,14 @@ components:
       required:
         - service
         - version
+      additionalProperties: false
+
+    InstanceHealthResponse:
+      title: shim.api.InstanceHealthResponse
+      type: object
+      properties:
+        dcgm:
+          $ref: "#/components/schemas/DCGMHealth"
       additionalProperties: false
 
     TaskListResponse:

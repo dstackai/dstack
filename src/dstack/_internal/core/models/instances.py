@@ -9,6 +9,7 @@ from pydantic import root_validator
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.envs import Env
+from dstack._internal.core.models.health import HealthStatus
 from dstack._internal.core.models.volumes import Volume
 from dstack._internal.utils.common import pretty_resources
 
@@ -225,6 +226,7 @@ class Instance(CoreModel):
     hostname: Optional[str] = None
     status: InstanceStatus
     unreachable: bool = False
+    health_status: HealthStatus = HealthStatus.HEALTHY
     termination_reason: Optional[str] = None
     created: datetime.datetime
     region: Optional[str] = None

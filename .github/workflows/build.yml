@@ -126,7 +126,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest]
     steps:
       - uses: actions/checkout@v4
       - name: Set up Go
@@ -167,9 +167,9 @@ jobs:
     strategy:
       matrix:
         include:
-          - { goos: "linux", goarch: "amd64" }
-          - { goos: "linux", goarch: "arm64" }
-    runs-on: ubuntu-latest
+          - { runs-on: "ubuntu-24.04", goos: "linux", goarch: "amd64" }
+          - { runs-on: "ubuntu-24.04-arm", goos: "linux", goarch: "arm64" }
+    runs-on: ${{ matrix.runs-on }}
     steps:
       - uses: actions/checkout@v4
       - name: Set up Go
@@ -181,11 +181,10 @@ jobs:
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
-          CGO_ENABLED: 0
         run: |
           VERSION=$((${{ github.run_number }} + ${{ env.BUILD_INCREMENT }}))
-          go build -ldflags "-X 'main.Version=$VERSION' -extldflags '-static'" -o dstack-runner-$GOOS-$GOARCH $REPO_NAME/runner/cmd/runner
-          go build -ldflags "-X 'main.Version=$VERSION' -extldflags '-static'" -o dstack-shim-$GOOS-$GOARCH $REPO_NAME/runner/cmd/shim
+          CGO_ENABLED=0 go build -ldflags "-X 'main.Version=$VERSION' -extldflags '-static'" -o dstack-runner-$GOOS-$GOARCH $REPO_NAME/runner/cmd/runner
+          CGO_ENABLED=1 go build -ldflags "-X 'main.Version=$VERSION'" -o dstack-shim-$GOOS-$GOARCH $REPO_NAME/runner/cmd/shim
           echo $VERSION
       - uses: actions/upload-artifact@v4
         with:
