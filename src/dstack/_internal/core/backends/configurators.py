@@ -56,10 +56,10 @@ except ImportError:
 
 try:
     from dstack._internal.core.backends.hotaisle.configurator import (
-        HotaisleConfigurator,
+        HotAisleConfigurator,
     )
 
-    _CONFIGURATOR_CLASSES.append(HotaisleConfigurator)
+    _CONFIGURATOR_CLASSES.append(HotAisleConfigurator)
 except ImportError:
     pass
 

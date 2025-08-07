@@ -14,9 +14,10 @@ from dstack._internal.core.backends.base.compute import (
     get_shim_commands,
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
-from dstack._internal.core.backends.hotaisle.api_client import HotaisleAPIClient
-from dstack._internal.core.backends.hotaisle.models import HotaisleConfig
+from dstack._internal.core.backends.hotaisle.api_client import HotAisleAPIClient
+from dstack._internal.core.backends.hotaisle.models import HotAisleConfig
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceConfiguration,
@@ -31,14 +32,28 @@ logger = get_logger(__name__)
 MAX_INSTANCE_NAME_LEN = 60
 
 
-class HotaisleCompute(
+INSTANCE_TYPE_SPECS = {
+    "1x MI300X 8x Xeon Platinum 8462Y+": {
+        "cpu_model": "Xeon Platinum 8462Y+",
+        "cpu_frequency": 2800000000,
+        "cpu_manufacturer": "Intel",
+    },
+    "1x MI300X 13x Xeon Platinum 8470": {
+        "cpu_model": "Xeon Platinum 8470",
+        "cpu_frequency": 2000000000,
+        "cpu_manufacturer": "Intel",
+    },
+}
+
+
+class HotAisleCompute(
     ComputeWithCreateInstanceSupport,
     Compute,
 ):
-    def __init__(self, config: HotaisleConfig):
+    def __init__(self, config: HotAisleConfig):
         super().__init__()
         self.config = config
-        self.api_client = HotaisleAPIClient(config.creds.api_key, config.team_handle)
+        self.api_client = HotAisleAPIClient(config.creds.api_key, config.team_handle)
         self.catalog = gpuhunt.Catalog(balance_resources=False, auto_reload=False)
         self.catalog.add_provider(
             HotAisleProvider(api_key=config.creds.api_key, team_handle=config.team_handle)
@@ -53,41 +68,43 @@ class HotaisleCompute(
             requirements=requirements,
             catalog=self.catalog,
         )
-        offers = [
-            InstanceOfferWithAvailability(
-                **offer.dict(), availability=InstanceAvailability.AVAILABLE
-            )
-            for offer in offers
-        ]
-        return offers
+
+        supported_offers = []
+        for offer in offers:
+            if offer.instance.name in INSTANCE_TYPE_SPECS:
+                supported_offers.append(
+                    InstanceOfferWithAvailability(
+                        **offer.dict(), availability=InstanceAvailability.AVAILABLE
+                    )
+                )
+            else:
+                logger.warning(
+                    f"Skipping unsupported Hot Aisle instance type: {offer.instance.name}"
+                )
+
+        return supported_offers
 
     def get_payload_from_offer(self, instance_type) -> dict:
-        # Only two instance types are available in Hotaisle with CPUs: 8-core and 13-core. Other fields are
-        # not configurable.
+        instance_type_name = instance_type.name
+        cpu_specs = INSTANCE_TYPE_SPECS[instance_type_name]
         cpu_cores = instance_type.resources.cpus
-        if cpu_cores == 8:
-            cpu_model = "Xeon Platinum 8462Y+"
-            frequency = 2800000000
-        else:  # cpu_cores == 13
-            cpu_model = "Xeon Platinum 8470"
-            frequency = 2000000000
 
         return {
             "cpu_cores": cpu_cores,
             "cpus": {
                 "count": 1,
-                "manufacturer": "Intel",
-                "model": cpu_model,
+                "manufacturer": cpu_specs["cpu_manufacturer"],
+                "model": cpu_specs["cpu_model"],
                 "cores": cpu_cores,
-                "frequency": frequency,
+                "frequency": cpu_specs["cpu_frequency"],
             },
-            "disk_capacity": 13194139533312,
-            "ram_capacity": 240518168576,
+            "disk_capacity": instance_type.resources.disk.size_mib * 1024**2,
+            "ram_capacity": instance_type.resources.memory_mib * 1024**2,
             "gpus": [
                 {
                     "count": len(instance_type.resources.gpus),
-                    "manufacturer": "AMD",
-                    "model": "MI300X",
+                    "manufacturer": instance_type.resources.gpus[0].vendor,
+                    "model": instance_type.resources.gpus[0].name,
                 }
             ],
         }
@@ -117,7 +134,9 @@ class HotaisleCompute(
             ssh_port=22,
             dockerized=True,
             ssh_proxy=None,
-            backend_data=vm_data["ip_address"],
+            backend_data=HotAisleInstanceBackendData(
+                ip_address=vm_data["ip_address"], vm_id=vm_data["name"]
+            ).json(),
         )
 
     def update_provisioning_data(
@@ -129,7 +148,8 @@ class HotaisleCompute(
         vm_state = self.api_client.get_vm_state(provisioning_data.instance_id)
         if vm_state == "running":
             if provisioning_data.hostname is None and provisioning_data.backend_data:
-                provisioning_data.hostname = provisioning_data.backend_data
+                backend_data = HotAisleInstanceBackendData.load(provisioning_data.backend_data)
+                provisioning_data.hostname = backend_data.ip_address
             commands = get_shim_commands(
                 authorized_keys=[project_ssh_public_key],
                 arch=provisioning_data.instance_type.resources.cpu_arch,
@@ -211,3 +231,13 @@ def _run_ssh_command(hostname: str, ssh_private_key: str, command: str):
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
+
+
+class HotAisleInstanceBackendData(CoreModel):
+    ip_address: str
+    vm_id: Optional[str] = None
+
+    @classmethod
+    def load(cls, raw: Optional[str]) -> "HotAisleInstanceBackendData":
+        assert raw is not None
+        return cls.__response__.parse_raw(raw)

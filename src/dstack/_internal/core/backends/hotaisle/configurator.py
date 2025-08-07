@@ -3,60 +3,58 @@ import json
 from dstack._internal.core.backends.base.configurator import (
     BackendRecord,
     Configurator,
-    raise_invalid_credentials_error,
 )
-from dstack._internal.core.backends.hotaisle.api_client import HotaisleAPIClient
-from dstack._internal.core.backends.hotaisle.backend import HotaisleBackend
+from dstack._internal.core.backends.hotaisle.api_client import HotAisleAPIClient
+from dstack._internal.core.backends.hotaisle.backend import HotAisleBackend
 from dstack._internal.core.backends.hotaisle.models import (
-    AnyHotaisleBackendConfig,
-    AnyHotaisleCreds,
-    HotaisleBackendConfig,
-    HotaisleBackendConfigWithCreds,
-    HotaisleConfig,
-    HotaisleCreds,
-    HotaisleStoredConfig,
+    AnyHotAisleBackendConfig,
+    AnyHotAisleCreds,
+    HotAisleBackendConfig,
+    HotAisleBackendConfigWithCreds,
+    HotAisleConfig,
+    HotAisleCreds,
+    HotAisleStoredConfig,
 )
 from dstack._internal.core.models.backends.base import (
     BackendType,
 )
 
 
-class HotaisleConfigurator(Configurator):
+class HotAisleConfigurator(Configurator):
     TYPE = BackendType.HOTAISLE
-    BACKEND_CLASS = HotaisleBackend
+    BACKEND_CLASS = HotAisleBackend
 
-    def validate_config(self, config: HotaisleBackendConfigWithCreds, default_creds_enabled: bool):
+    def validate_config(self, config: HotAisleBackendConfigWithCreds, default_creds_enabled: bool):
         self._validate_creds(config.creds, config.team_handle)
 
     def create_backend(
-        self, project_name: str, config: HotaisleBackendConfigWithCreds
+        self, project_name: str, config: HotAisleBackendConfigWithCreds
     ) -> BackendRecord:
         return BackendRecord(
-            config=HotaisleStoredConfig(
-                **HotaisleBackendConfig.__response__.parse_obj(config).dict()
+            config=HotAisleStoredConfig(
+                **HotAisleBackendConfig.__response__.parse_obj(config).dict()
             ).json(),
-            auth=HotaisleCreds.parse_obj(config.creds).json(),
+            auth=HotAisleCreds.parse_obj(config.creds).json(),
         )
 
     def get_backend_config(
         self, record: BackendRecord, include_creds: bool
-    ) -> AnyHotaisleBackendConfig:
+    ) -> AnyHotAisleBackendConfig:
         config = self._get_config(record)
         if include_creds:
-            return HotaisleBackendConfigWithCreds.__response__.parse_obj(config)
-        return HotaisleBackendConfig.__response__.parse_obj(config)
+            return HotAisleBackendConfigWithCreds.__response__.parse_obj(config)
+        return HotAisleBackendConfig.__response__.parse_obj(config)
 
-    def get_backend(self, record: BackendRecord) -> HotaisleBackend:
+    def get_backend(self, record: BackendRecord) -> HotAisleBackend:
         config = self._get_config(record)
-        return HotaisleBackend(config=config)
+        return HotAisleBackend(config=config)
 
-    def _get_config(self, record: BackendRecord) -> HotaisleConfig:
-        return HotaisleConfig.__response__(
+    def _get_config(self, record: BackendRecord) -> HotAisleConfig:
+        return HotAisleConfig.__response__(
             **json.loads(record.config),
-            creds=HotaisleCreds.parse_raw(record.auth),
+            creds=HotAisleCreds.parse_raw(record.auth),
         )
 
-    def _validate_creds(self, creds: AnyHotaisleCreds, team_handle: str):
-        api_client = HotaisleAPIClient(creds.api_key, team_handle)
-        if not api_client.validate_api_key():
-            raise_invalid_credentials_error(fields=[["creds", "api_key"]])
+    def _validate_creds(self, creds: AnyHotAisleCreds, team_handle: str):
+        api_client = HotAisleAPIClient(creds.api_key, team_handle)
+        api_client.validate_api_key()

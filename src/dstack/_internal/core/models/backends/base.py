@@ -11,7 +11,7 @@ class BackendType(str, enum.Enum):
         DSTACK (BackendType): dstack Sky
         GCP (BackendType): Google Cloud Platform
         DATACRUNCH (BackendType): DataCrunch
-        HOTAISLE (BackendType): Hotaisle
+        HOTAISLE (BackendType): Hot Aisle
         KUBERNETES (BackendType): Kubernetes
         LAMBDA (BackendType): Lambda Cloud
         NEBIUS (BackendType): Nebius AI Cloud

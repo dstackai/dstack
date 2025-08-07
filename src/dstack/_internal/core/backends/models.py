@@ -30,9 +30,9 @@ from dstack._internal.core.backends.gcp.models import (
     GCPBackendFileConfigWithCreds,
 )
 from dstack._internal.core.backends.hotaisle.models import (
-    HotaisleBackendConfig,
-    HotaisleBackendConfigWithCreds,
-    HotaisleBackendFileConfigWithCreds,
+    HotAisleBackendConfig,
+    HotAisleBackendConfigWithCreds,
+    HotAisleBackendFileConfigWithCreds,
 )
 from dstack._internal.core.backends.kubernetes.models import (
     KubernetesBackendConfig,
@@ -78,7 +78,7 @@ AnyBackendConfigWithoutCreds = Union[
     CudoBackendConfig,
     DataCrunchBackendConfig,
     GCPBackendConfig,
-    HotaisleBackendConfig,
+    HotAisleBackendConfig,
     KubernetesBackendConfig,
     LambdaBackendConfig,
     NebiusBackendConfig,
@@ -101,7 +101,7 @@ AnyBackendConfigWithCreds = Union[
     CudoBackendConfigWithCreds,
     DataCrunchBackendConfigWithCreds,
     GCPBackendConfigWithCreds,
-    HotaisleBackendConfigWithCreds,
+    HotAisleBackendConfigWithCreds,
     KubernetesBackendConfigWithCreds,
     LambdaBackendConfigWithCreds,
     OCIBackendConfigWithCreds,
@@ -123,7 +123,7 @@ AnyBackendFileConfigWithCreds = Union[
     CudoBackendConfigWithCreds,
     DataCrunchBackendConfigWithCreds,
     GCPBackendFileConfigWithCreds,
-    HotaisleBackendFileConfigWithCreds,
+    HotAisleBackendFileConfigWithCreds,
     KubernetesBackendFileConfigWithCreds,
     LambdaBackendConfigWithCreds,
     OCIBackendConfigWithCreds,
