@@ -800,7 +800,9 @@ async def _check_instance(session: AsyncSession, instance: InstanceModel) -> Non
         health_status = instance.health
 
     loglevel = logging.DEBUG
-    if not instance_check.reachable or (check_instance_health and not health_status.is_healthy()):
+    if not instance_check.reachable and instance.status.is_available():
+        loglevel = logging.WARNING
+    elif check_instance_health and not health_status.is_healthy():
         loglevel = logging.WARNING
     logger.log(
         loglevel,
@@ -945,7 +947,7 @@ def _check_instance_inner(
     except requests.RequestException as e:
         template = "shim.%s(): request error: %s"
         args = (method.__func__.__name__, e)
-        logger.warning(template, *args)
+        logger.debug(template, *args)
         return InstanceCheck(reachable=False, message=template % args)
     except Exception as e:
         template = "shim.%s(): unexpected exception %s: %s"
