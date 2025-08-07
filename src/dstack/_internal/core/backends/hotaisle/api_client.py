@@ -68,9 +68,7 @@ class HotAisleAPIClient:
         response.raise_for_status()
         return True
 
-    def create_virtual_machine(
-        self, vm_payload: Dict[str, Any], instance_name: str
-    ) -> Dict[str, Any]:
+    def create_virtual_machine(self, vm_payload: Dict[str, Any]) -> Dict[str, Any]:
         url = f"{API_URL}/teams/{self.team_handle}/virtual_machines/"
         response = self._make_request("POST", url, json=vm_payload)
         response.raise_for_status()
@@ -87,6 +85,9 @@ class HotAisleAPIClient:
     def terminate_virtual_machine(self, vm_name: str) -> None:
         url = f"{API_URL}/teams/{self.team_handle}/virtual_machines/{vm_name}/"
         response = self._make_request("DELETE", url)
+        if response.status_code == 404:
+            logger.debug("Hot Aisle virtual machine %s not found", vm_name)
+            return
         response.raise_for_status()
 
     def _make_request(

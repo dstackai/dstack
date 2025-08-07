@@ -10,7 +10,6 @@ from gpuhunt.providers.hotaisle import HotAisleProvider
 from dstack._internal.core.backends.base.compute import (
     Compute,
     ComputeWithCreateInstanceSupport,
-    generate_unique_instance_name,
     get_shim_commands,
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
@@ -115,13 +114,10 @@ class HotAisleCompute(
         instance_config: InstanceConfiguration,
         placement_group: Optional[PlacementGroup],
     ) -> JobProvisioningData:
-        instance_name = generate_unique_instance_name(
-            instance_config, max_length=MAX_INSTANCE_NAME_LEN
-        )
         project_ssh_key = instance_config.ssh_keys[0]
         self.api_client.upload_ssh_key(project_ssh_key.public)
         vm_payload = self.get_payload_from_offer(instance_offer.instance)
-        vm_data = self.api_client.create_virtual_machine(vm_payload, instance_name)
+        vm_data = self.api_client.create_virtual_machine(vm_payload)
         return JobProvisioningData(
             backend=instance_offer.backend,
             instance_type=instance_offer.instance,
@@ -178,24 +174,10 @@ def _start_runner(
     project_ssh_private_key: str,
     launch_command: str,
 ):
-    _setup_instance(
-        hostname=hostname,
-        ssh_private_key=project_ssh_private_key,
-    )
     _launch_runner(
         hostname=hostname,
         ssh_private_key=project_ssh_private_key,
         launch_command=launch_command,
-    )
-
-
-def _setup_instance(
-    hostname: str,
-    ssh_private_key: str,
-):
-    setup_commands = ("sudo apt-get update",)
-    _run_ssh_command(
-        hostname=hostname, ssh_private_key=ssh_private_key, command=" && ".join(setup_commands)
     )
 
 
