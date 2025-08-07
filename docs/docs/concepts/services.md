@@ -230,7 +230,34 @@ $ dstack ps --verbose
 
     If multiple probes are configured for the service, their statuses are displayed in the order in which the probes appear in the configuration.
 
-Probes are executed for each service replica while the replica is `running`. Probe statuses do not affect how `dstack` handles replicas, except during [rolling deployments](#rolling-deployment).
+Probes are executed for each service replica while the replica is `running`. A probe execution is considered successful if the replica responds with a `2xx` status code. Probe statuses do not affect how `dstack` handles replicas, except during [rolling deployments](#rolling-deployment).
+
+??? info "HTTP request configuration"
+    You can configure the HTTP request method, headers, and other properties. To include secret values in probe requests, use environment variable interpolation, which is enabled for the `url`, `headers[i].value`, and `body` properties.
+
+    <div editor-title="service.dstack.yml">
+
+    ```yaml
+    type: service
+    name: my-service
+    port: 80
+    image: my-app:latest
+    env:
+    - PROBES_API_KEY
+    probes:
+    - type: http
+      method: post
+      url: /check-health
+      headers:
+      - name: X-API-Key
+        value: ${{ env.PROBES_API_KEY }}
+      - name: Content-Type
+        value: application/json
+      body: '{"level": 2}'
+      timeout: 20s
+    ```
+
+    </div>
 
 See the [reference](../reference/dstack.yml/service.md#probes) for more probe configuration options.
 
