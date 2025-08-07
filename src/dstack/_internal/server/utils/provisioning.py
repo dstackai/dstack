@@ -20,7 +20,6 @@ from dstack._internal.core.models.instances import (
     Resources,
     SSHConnectionParams,
 )
-from dstack._internal.server.schemas.runner import HealthcheckResponse
 from dstack._internal.utils.gpu import (
     convert_amd_gpu_name,
     convert_intel_accelerator_name,
@@ -221,7 +220,7 @@ def get_host_info(client: paramiko.SSHClient, working_dir: str) -> Dict[str, Any
         raise ProvisioningError("Cannot get host_info")
 
 
-def get_shim_healthcheck(client: paramiko.SSHClient) -> HealthcheckResponse:
+def get_shim_healthcheck(client: paramiko.SSHClient) -> str:
     retries = 20
     iter_delay = 3
     for _ in range(retries):
@@ -233,7 +232,7 @@ def get_shim_healthcheck(client: paramiko.SSHClient) -> HealthcheckResponse:
     raise ProvisioningError("Cannot get HealthcheckResponse")
 
 
-def _get_shim_healthcheck(client: paramiko.SSHClient) -> Optional[HealthcheckResponse]:
+def _get_shim_healthcheck(client: paramiko.SSHClient) -> Optional[str]:
     try:
         _, stdout, stderr = client.exec_command(
             f"curl -s http://localhost:{DSTACK_SHIM_HTTP_PORT}/api/healthcheck", timeout=15
@@ -246,10 +245,7 @@ def _get_shim_healthcheck(client: paramiko.SSHClient) -> Optional[HealthcheckRes
         raise ProvisioningError(f"get_shim_healthcheck didn't work. stdout: {out}, stderr: {err}")
     if not out:
         return None
-    try:
-        return HealthcheckResponse.__response__.parse_raw(out)
-    except ValueError as e:
-        raise ProvisioningError(f"Cannot parse HealthcheckResponse: {e}") from e
+    return out
 
 
 def host_info_to_instance_type(host_info: Dict[str, Any], cpu_arch: GoArchType) -> InstanceType:

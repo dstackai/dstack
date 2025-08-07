@@ -28,18 +28,6 @@ from dstack._internal.core.backends.features import (
     BACKENDS_WITH_CREATE_INSTANCE_SUPPORT,
     BACKENDS_WITH_PLACEMENT_GROUPS_SUPPORT,
 )
-from dstack._internal.core.backends.remote.provisioning import (
-    detect_cpu_arch,
-    get_host_info,
-    get_paramiko_connection,
-    get_shim_healthcheck,
-    host_info_to_instance_type,
-    remove_dstack_runner_if_exists,
-    remove_host_info_if_exists,
-    run_pre_start_commands,
-    run_shim_as_systemd_service,
-    upload_envs,
-)
 from dstack._internal.core.consts import DSTACK_SHIM_HTTP_PORT
 
 # FIXME: ProvisioningError is a subclass of ComputeError and should not be used outside of Compute
@@ -85,7 +73,7 @@ from dstack._internal.server.models import (
     ProjectModel,
 )
 from dstack._internal.server.schemas.instances import InstanceCheck
-from dstack._internal.server.schemas.runner import InstanceHealthResponse
+from dstack._internal.server.schemas.runner import HealthcheckResponse, InstanceHealthResponse
 from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services.fleets import (
     fleet_model_to_fleet,
@@ -108,6 +96,18 @@ from dstack._internal.server.services.placement import (
 from dstack._internal.server.services.runner import client as runner_client
 from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
 from dstack._internal.server.utils import sentry_utils
+from dstack._internal.server.utils.provisioning import (
+    detect_cpu_arch,
+    get_host_info,
+    get_paramiko_connection,
+    get_shim_healthcheck,
+    host_info_to_instance_type,
+    remove_dstack_runner_if_exists,
+    remove_host_info_if_exists,
+    run_pre_start_commands,
+    run_shim_as_systemd_service,
+    upload_envs,
+)
 from dstack._internal.utils.common import (
     get_current_datetime,
     get_or_error,
@@ -479,7 +479,11 @@ def _deploy_instance(
         host_info = get_host_info(client, dstack_working_dir)
         logger.debug("Received a host_info %s", host_info)
 
-        healthcheck = get_shim_healthcheck(client)
+        healthcheck_out = get_shim_healthcheck(client)
+        try:
+            healthcheck = HealthcheckResponse.__response__.parse_raw(healthcheck_out)
+        except ValueError as e:
+            raise ProvisioningError(f"Cannot parse HealthcheckResponse: {e}") from e
         instance_check = runner_client.healthcheck_response_to_instance_check(healthcheck)
 
         return instance_check, host_info, arch
