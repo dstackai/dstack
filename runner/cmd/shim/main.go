@@ -204,7 +204,7 @@ func start(ctx context.Context, args shim.CLIArgs, serviceMode bool) (err error)
 	}
 
 	var dcgmExporter *dcgm.DCGMExporter
-	var dcgmWrapper *dcgm.DCGMWrapper
+	var dcgmWrapper dcgm.DCGMWrapperInterface
 
 	if common.GetGpuVendor() == common.GpuVendorNvidia {
 		dcgmExporterPath, err := dcgm.GetDCGMExporterExecPath(ctx)

@@ -29,14 +29,14 @@ type ShimServer struct {
 	runner TaskRunner
 
 	dcgmExporter *dcgm.DCGMExporter
-	dcgmWrapper  *dcgm.DCGMWrapper
+	dcgmWrapper  dcgm.DCGMWrapperInterface
 
 	version string
 }
 
 func NewShimServer(
 	ctx context.Context, address string, version string,
-	runner TaskRunner, dcgmExporter *dcgm.DCGMExporter, dcgmWrapper *dcgm.DCGMWrapper,
+	runner TaskRunner, dcgmExporter *dcgm.DCGMExporter, dcgmWrapper dcgm.DCGMWrapperInterface,
 ) *ShimServer {
 	r := api.NewRouter()
 	s := &ShimServer{
