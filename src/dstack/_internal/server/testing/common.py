@@ -330,6 +330,7 @@ async def create_run(
 async def create_job(
     session: AsyncSession,
     run: RunModel,
+    fleet: Optional[FleetModel] = None,
     submission_num: int = 0,
     status: JobStatus = JobStatus.SUBMITTED,
     submitted_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
@@ -353,6 +354,7 @@ async def create_job(
     job_spec.job_num = job_num
     job = JobModel(
         project_id=run.project_id,
+        fleet=fleet,
         run_id=run.id,
         run_name=run.run_name,
         job_num=job_num,
@@ -733,6 +735,7 @@ def get_instance_offer_with_availability(
     availability_zones: Optional[List[str]] = None,
     price: float = 1.0,
     instance_type: str = "instance",
+    availability: InstanceAvailability = InstanceAvailability.AVAILABLE,
 ):
     gpus = [
         Gpu(
@@ -756,7 +759,7 @@ def get_instance_offer_with_availability(
         ),
         region=region,
         price=price,
-        availability=InstanceAvailability.AVAILABLE,
+        availability=availability,
         availability_zones=availability_zones,
         blocks=blocks,
         total_blocks=total_blocks,

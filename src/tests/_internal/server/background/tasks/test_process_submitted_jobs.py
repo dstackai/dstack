@@ -11,14 +11,11 @@ from dstack._internal.core.models.configurations import TaskConfiguration
 from dstack._internal.core.models.health import HealthStatus
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
-    InstanceOfferWithAvailability,
     InstanceStatus,
-    InstanceType,
-    Resources,
 )
 from dstack._internal.core.models.profiles import Profile
+from dstack._internal.core.models.resources import Range
 from dstack._internal.core.models.runs import (
-    JobProvisioningData,
     JobStatus,
     JobTerminationReason,
 )
@@ -40,7 +37,9 @@ from dstack._internal.server.testing.common import (
     create_run,
     create_user,
     create_volume,
+    get_fleet_spec,
     get_instance_offer_with_availability,
+    get_job_provisioning_data,
     get_run_spec,
     get_volume_provisioning_data,
 )
@@ -113,14 +112,8 @@ class TestProcessSubmittedJobs:
             run=run,
             instance_assigned=True,
         )
-        offer = InstanceOfferWithAvailability(
+        offer = get_instance_offer_with_availability(
             backend=backend,
-            instance=InstanceType(
-                name="instance",
-                resources=Resources(cpus=1, memory_mib=512, spot=False, gpus=[]),
-            ),
-            region="us",
-            price=1.0,
             availability=InstanceAvailability.AVAILABLE,
         )
         with patch("dstack._internal.server.services.backends.get_project_backends") as m:
@@ -128,20 +121,7 @@ class TestProcessSubmittedJobs:
             m.return_value = [backend_mock]
             backend_mock.TYPE = backend
             backend_mock.compute.return_value.get_offers_cached.return_value = [offer]
-            backend_mock.compute.return_value.run_job.return_value = JobProvisioningData(
-                backend=offer.backend,
-                instance_type=offer.instance,
-                instance_id="instance_id",
-                hostname="1.1.1.1",
-                internal_ip=None,
-                region=offer.region,
-                price=offer.price,
-                username="ubuntu",
-                ssh_port=22,
-                ssh_proxy=None,
-                dockerized=True,
-                backend_data=None,
-            )
+            backend_mock.compute.return_value.run_job.return_value = get_job_provisioning_data()
             await process_submitted_jobs()
             m.assert_called_once()
             backend_mock.compute.return_value.get_offers_cached.assert_called_once()
@@ -179,14 +159,8 @@ class TestProcessSubmittedJobs:
             run=run,
             instance_assigned=True,
         )
-        offer = InstanceOfferWithAvailability(
+        offer = get_instance_offer_with_availability(
             backend=BackendType.RUNPOD,
-            instance=InstanceType(
-                name="instance",
-                resources=Resources(cpus=1, memory_mib=512, spot=False, gpus=[]),
-            ),
-            region="us",
-            price=1.0,
             availability=InstanceAvailability.AVAILABLE,
         )
         with patch("dstack._internal.server.services.backends.get_project_backends") as m:
@@ -194,20 +168,7 @@ class TestProcessSubmittedJobs:
             m.return_value = [backend_mock]
             backend_mock.TYPE = BackendType.RUNPOD
             backend_mock.compute.return_value.get_offers_cached.return_value = [offer]
-            backend_mock.compute.return_value.run_job.return_value = JobProvisioningData(
-                backend=offer.backend,
-                instance_type=offer.instance,
-                instance_id="instance_id",
-                hostname="1.1.1.1",
-                internal_ip=None,
-                region=offer.region,
-                price=offer.price,
-                username="ubuntu",
-                ssh_port=22,
-                ssh_proxy=None,
-                dockerized=True,
-                backend_data=None,
-            )
+            backend_mock.compute.return_value.run_job.return_value = get_job_provisioning_data()
             with patch("dstack._internal.utils.common.get_current_datetime") as datetime_mock:
                 datetime_mock.return_value = datetime(2023, 1, 2, 3, 30, 0, tzinfo=timezone.utc)
                 await process_submitted_jobs()
@@ -248,14 +209,8 @@ class TestProcessSubmittedJobs:
             run=run,
             instance_assigned=True,
         )
-        offer = InstanceOfferWithAvailability(
+        offer = get_instance_offer_with_availability(
             backend=BackendType.RUNPOD,
-            instance=InstanceType(
-                name="instance",
-                resources=Resources(cpus=1, memory_mib=512, spot=False, gpus=[]),
-            ),
-            region="us",
-            price=1.0,
             availability=InstanceAvailability.AVAILABLE,
         )
         with patch("dstack._internal.server.services.backends.get_project_backends") as m:
@@ -263,20 +218,7 @@ class TestProcessSubmittedJobs:
             m.return_value = [backend_mock]
             backend_mock.TYPE = BackendType.RUNPOD
             backend_mock.compute.return_value.get_offers_cached.return_value = [offer]
-            backend_mock.compute.return_value.run_job.return_value = JobProvisioningData(
-                backend=offer.backend,
-                instance_type=offer.instance,
-                instance_id="instance_id",
-                hostname="1.1.1.1",
-                internal_ip=None,
-                region=offer.region,
-                price=offer.price,
-                username="ubuntu",
-                ssh_port=22,
-                ssh_proxy=None,
-                dockerized=True,
-                backend_data=None,
-            )
+            backend_mock.compute.return_value.run_job.return_value = get_job_provisioning_data()
             with patch("dstack._internal.utils.common.get_current_datetime") as datetime_mock:
                 datetime_mock.return_value = datetime(2023, 1, 2, 3, 30, 0, tzinfo=timezone.utc)
                 await process_submitted_jobs()
@@ -319,14 +261,8 @@ class TestProcessSubmittedJobs:
             run=run,
             instance_assigned=True,
         )
-        offer = InstanceOfferWithAvailability(
+        offer = get_instance_offer_with_availability(
             backend=BackendType.RUNPOD,
-            instance=InstanceType(
-                name="instance",
-                resources=Resources(cpus=1, memory_mib=512, spot=False, gpus=[]),
-            ),
-            region="us",
-            price=1.0,
             availability=InstanceAvailability.AVAILABLE,
         )
         with patch("dstack._internal.server.services.backends.get_project_backends") as m:
@@ -334,20 +270,7 @@ class TestProcessSubmittedJobs:
             m.return_value = [backend_mock]
             backend_mock.TYPE = BackendType.RUNPOD
             backend_mock.compute.return_value.get_offers_cached.return_value = [offer]
-            backend_mock.compute.return_value.run_job.return_value = JobProvisioningData(
-                backend=offer.backend,
-                instance_type=offer.instance,
-                instance_id="instance_id",
-                hostname="1.1.1.1",
-                internal_ip=None,
-                region=offer.region,
-                price=offer.price,
-                username="ubuntu",
-                ssh_port=22,
-                ssh_proxy=None,
-                dockerized=False,
-                backend_data=None,
-            )
+            backend_mock.compute.return_value.run_job.return_value = get_job_provisioning_data()
             await process_submitted_jobs()
 
         await session.refresh(job)
@@ -401,9 +324,11 @@ class TestProcessSubmittedJobs:
             session=session,
             project_id=project.id,
         )
+        fleet = await create_fleet(session=session, project=project)
         instance = await create_instance(
             session=session,
             project=project,
+            fleet=fleet,
             status=InstanceStatus.IDLE,
         )
         run = await create_run(
@@ -435,16 +360,19 @@ class TestProcessSubmittedJobs:
             session=session,
             project_id=project.id,
         )
+        fleet = await create_fleet(session=session, project=project)
         # busy
         await create_instance(
             session=session,
             project=project,
+            fleet=fleet,
             status=InstanceStatus.BUSY,
         )
         # unreachable
         await create_instance(
             session=session,
             project=project,
+            fleet=fleet,
             status=InstanceStatus.IDLE,
             unreachable=True,
         )
@@ -452,6 +380,7 @@ class TestProcessSubmittedJobs:
         await create_instance(
             session=session,
             project=project,
+            fleet=fleet,
             status=InstanceStatus.IDLE,
             health_status=HealthStatus.FAILURE,
         )
@@ -494,9 +423,11 @@ class TestProcessSubmittedJobs:
             backend=BackendType.AWS,
             region="us-east-1",
         )
+        fleet = await create_fleet(session=session, project=project)
         instance = await create_instance(
             session=session,
             project=project,
+            fleet=fleet,
             status=InstanceStatus.IDLE,
             backend=BackendType.AWS,
             region="us-east-1",
@@ -557,9 +488,11 @@ class TestProcessSubmittedJobs:
             project_id=project.id,
         )
         offer = get_instance_offer_with_availability(gpu_count=8, cpu_count=64, memory_gib=128)
+        fleet = await create_fleet(session=session, project=project)
         instance = await create_instance(
             session=session,
             project=project,
+            fleet=fleet,
             status=InstanceStatus.IDLE,
             offer=offer,
             total_blocks=4,
@@ -598,9 +531,11 @@ class TestProcessSubmittedJobs:
             project_id=project.id,
         )
         offer = get_instance_offer_with_availability(gpu_count=8, cpu_count=64, memory_gib=128)
+        fleet = await create_fleet(session=session, project=project)
         instance = await create_instance(
             session=session,
             project=project,
+            fleet=fleet,
             status=InstanceStatus.IDLE,
             backend=BackendType.AWS,
             offer=offer,
@@ -646,9 +581,11 @@ class TestProcessSubmittedJobs:
             project_id=project.id,
         )
         offer = get_instance_offer_with_availability(gpu_count=8, cpu_count=64, memory_gib=128)
+        fleet = await create_fleet(session=session, project=project)
         instance = await create_instance(
             session=session,
             project=project,
+            fleet=fleet,
             status=InstanceStatus.IDLE,
             backend=BackendType.AWS,
             offer=offer,
@@ -712,14 +649,19 @@ class TestProcessSubmittedJobs:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_creates_new_instance_in_existing_fleet(self, test_db, session: AsyncSession):
+    async def test_creates_new_instance_in_existing_non_empty_fleet(
+        self, test_db, session: AsyncSession
+    ):
         project = await create_project(session)
         user = await create_user(session)
         repo = await create_repo(session=session, project_id=project.id)
-        fleet = await create_fleet(session=session, project=project)
+        fleet_spec = get_fleet_spec()
+        fleet_spec.configuration.nodes = Range(min=1, max=2)
+        fleet = await create_fleet(session=session, project=project, spec=fleet_spec)
         instance = await create_instance(
             session=session,
             project=project,
+            fleet=fleet,
             instance_num=0,
             status=InstanceStatus.BUSY,
         )
@@ -738,14 +680,8 @@ class TestProcessSubmittedJobs:
         )
         await session.commit()
 
-        offer = InstanceOfferWithAvailability(
+        offer = get_instance_offer_with_availability(
             backend=BackendType.AWS,
-            instance=InstanceType(
-                name="instance",
-                resources=Resources(cpus=4, memory_mib=8192, spot=False, gpus=[]),
-            ),
-            region="us",
-            price=1.0,
             availability=InstanceAvailability.AVAILABLE,
         )
         with patch("dstack._internal.server.services.backends.get_project_backends") as m:
@@ -753,20 +689,7 @@ class TestProcessSubmittedJobs:
             m.return_value = [backend_mock]
             backend_mock.TYPE = BackendType.AWS
             backend_mock.compute.return_value.get_offers_cached.return_value = [offer]
-            backend_mock.compute.return_value.run_job.return_value = JobProvisioningData(
-                backend=offer.backend,
-                instance_type=offer.instance,
-                instance_id="instance_id",
-                hostname="1.1.1.1",
-                internal_ip=None,
-                region=offer.region,
-                price=offer.price,
-                username="ubuntu",
-                ssh_port=22,
-                ssh_proxy=None,
-                dockerized=True,
-                backend_data=None,
-            )
+            backend_mock.compute.return_value.run_job.return_value = get_job_provisioning_data()
             await process_submitted_jobs()
             m.assert_called_once()
             backend_mock.compute.return_value.get_offers_cached.assert_called_once()
@@ -782,6 +705,88 @@ class TestProcessSubmittedJobs:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_assigns_job_to_elastic_empty_fleet(self, test_db, session: AsyncSession):
+        project = await create_project(session)
+        user = await create_user(session)
+        repo = await create_repo(session=session, project_id=project.id)
+        fleet_spec = get_fleet_spec()
+        fleet_spec.configuration.nodes = Range(min=0, max=1)
+        await create_fleet(session=session, project=project, spec=fleet_spec)
+        # Need a second non-empty fleet to have two-stage processing
+        fleet2 = await create_fleet(session=session, project=project, spec=fleet_spec)
+        await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet2,
+            instance_num=0,
+            status=InstanceStatus.BUSY,
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            instance_assigned=False,
+        )
+        await process_submitted_jobs()
+        await session.refresh(job)
+        res = await session.execute(select(JobModel))
+        job = res.unique().scalar_one()
+        assert job.status == JobStatus.SUBMITTED
+        assert job.instance_assigned
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_creates_new_instance_in_existing_empty_fleet(
+        self, test_db, session: AsyncSession
+    ):
+        project = await create_project(session)
+        user = await create_user(session)
+        repo = await create_repo(session=session, project_id=project.id)
+        fleet_spec = get_fleet_spec()
+        fleet_spec.configuration.nodes = Range(min=0, max=1)
+        fleet = await create_fleet(session=session, project=project, spec=fleet_spec)
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            fleet=fleet,
+            instance_assigned=True,
+        )
+        offer = get_instance_offer_with_availability(
+            backend=BackendType.AWS,
+            availability=InstanceAvailability.AVAILABLE,
+        )
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            backend_mock = Mock()
+            m.return_value = [backend_mock]
+            backend_mock.TYPE = BackendType.AWS
+            backend_mock.compute.return_value.get_offers_cached.return_value = [offer]
+            backend_mock.compute.return_value.run_job.return_value = get_job_provisioning_data()
+            await process_submitted_jobs()
+            m.assert_called_once()
+            backend_mock.compute.return_value.get_offers_cached.assert_called_once()
+            backend_mock.compute.return_value.run_job.assert_called_once()
+
+        await session.refresh(job)
+        res = await session.execute(select(JobModel).options(joinedload(JobModel.instance)))
+        job = res.unique().scalar_one()
+        assert job.status == JobStatus.PROVISIONING
+        assert job.instance is not None
+        assert job.instance.instance_num == 0
+        assert job.instance.fleet_id == fleet.id
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_picks_high_priority_jobs_first(self, test_db, session: AsyncSession):
         project = await create_project(session)
         user = await create_user(session)
@@ -789,9 +794,11 @@ class TestProcessSubmittedJobs:
             session=session,
             project_id=project.id,
         )
+        fleet = await create_fleet(session=session, project=project)
         instance = await create_instance(
             session=session,
             project=project,
+            fleet=fleet,
             status=InstanceStatus.IDLE,
         )
         run1 = await create_run(
