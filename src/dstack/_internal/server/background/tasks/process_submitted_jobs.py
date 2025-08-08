@@ -12,6 +12,7 @@ from dstack._internal.core.backends.base.compute import ComputeWithVolumeSupport
 from dstack._internal.core.errors import BackendError, ServerClientError
 from dstack._internal.core.models.common import NetworkMode
 from dstack._internal.core.models.fleets import (
+    Fleet,
     FleetConfiguration,
     FleetSpec,
     FleetStatus,
@@ -463,6 +464,14 @@ async def _run_job_on_new_instance(
     fleet = None
     if fleet_model is not None:
         fleet = fleet_model_to_fleet(fleet_model)
+        # FIXME: Concurrent provisioning may violate nodes.max
+        # To fix, lock fleet and split instance model creation
+        # and instance provisioning into separate transactions.
+        if not _check_can_create_new_instance_in_fleet(fleet):
+            logger.debug(
+                "%s: cannot fit new instance into fleet %s", fmt(job_model), fleet_model.name
+            )
+            return None
     multinode = job.job_spec.jobs_per_replica > 1 or (
         fleet is not None and fleet.spec.configuration.placement == InstanceGroupPlacement.CLUSTER
     )
@@ -520,6 +529,18 @@ async def _run_job_on_new_instance(
             )
             continue
     return None
+
+
+def _check_can_create_new_instance_in_fleet(fleet: Fleet) -> bool:
+    if fleet.spec.configuration.ssh_config is not None:
+        return False
+    if (
+        fleet.spec.configuration.nodes is not None
+        and fleet.spec.configuration.nodes.max is not None
+        and fleet.spec.configuration.nodes.max <= len(fleet.instances)
+    ):
+        return False
+    return True
 
 
 def _get_or_create_fleet_model_for_job(
