@@ -298,10 +298,7 @@ class NebiusCompute(
         placement_group: PlacementGroup,
         instance_offer: InstanceOffer,
     ) -> bool:
-        if not (
-            placement_group.configuration.backend == BackendType.NEBIUS
-            and placement_group.configuration.region == instance_offer.region
-        ):
+        if placement_group.configuration.region != instance_offer.region:
             return False
         assert placement_group.provisioning_data is not None
         backend_data = NebiusPlacementGroupBackendData.load(
