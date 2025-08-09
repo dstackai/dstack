@@ -455,8 +455,7 @@ async def _wait_for_instance_provisioning_data(job_model: JobModel):
 
     if job_model.instance.status == InstanceStatus.TERMINATED:
         job_model.status = JobStatus.TERMINATING
-        # TODO use WAITING_INSTANCE_LIMIT_EXCEEDED after 0.19.x
-        job_model.termination_reason = JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
+        job_model.termination_reason = JobTerminationReason.WAITING_INSTANCE_LIMIT_EXCEEDED
         return
 
     job_model.job_provisioning_data = job_model.instance.job_provisioning_data

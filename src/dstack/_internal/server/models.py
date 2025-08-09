@@ -7,7 +7,6 @@ from sqlalchemy import (
     BigInteger,
     Boolean,
     DateTime,
-    Enum,
     Float,
     ForeignKey,
     Index,
@@ -186,7 +185,7 @@ class UserModel(BaseModel):
     token: Mapped[DecryptedString] = mapped_column(EncryptedString(200), unique=True)
     # token_hash is needed for fast search by token when stored token is encrypted
     token_hash: Mapped[str] = mapped_column(String(2000), unique=True)
-    global_role: Mapped[GlobalRole] = mapped_column(Enum(GlobalRole))
+    global_role: Mapped[GlobalRole] = mapped_column(EnumAsString(GlobalRole, 100))
     # deactivated users cannot access API
     active: Mapped[bool] = mapped_column(Boolean, default=True)
 
@@ -247,7 +246,7 @@ class MemberModel(BaseModel):
     project: Mapped["ProjectModel"] = relationship()
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     user: Mapped[UserModel] = relationship(lazy="joined")
-    project_role: Mapped[ProjectRole] = mapped_column(Enum(ProjectRole))
+    project_role: Mapped[ProjectRole] = mapped_column(EnumAsString(ProjectRole, 100))
     # member_num defines members ordering
     member_num: Mapped[Optional[int]] = mapped_column(Integer)
 
@@ -279,7 +278,7 @@ class RepoModel(BaseModel):
     project: Mapped["ProjectModel"] = relationship()
     # RepoModel.name stores repo_id
     name: Mapped[str] = mapped_column(String(100))
-    type: Mapped[RepoType] = mapped_column(Enum(RepoType))
+    type: Mapped[RepoType] = mapped_column(EnumAsString(RepoType, 100))
 
     info: Mapped[str] = mapped_column(Text)
 
@@ -360,9 +359,9 @@ class RunModel(BaseModel):
     submitted_at: Mapped[datetime] = mapped_column(NaiveDateTime)
     last_processed_at: Mapped[datetime] = mapped_column(NaiveDateTime)
     next_triggered_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
-    status: Mapped[RunStatus] = mapped_column(Enum(RunStatus), index=True)
+    status: Mapped[RunStatus] = mapped_column(EnumAsString(RunStatus, 100), index=True)
     termination_reason: Mapped[Optional[RunTerminationReason]] = mapped_column(
-        Enum(RunTerminationReason)
+        EnumAsString(RunTerminationReason, 100)
     )
     # resubmission_attempt counts consecutive transitions to pending without provisioning.
     # Can be used to choose retry delay depending on the attempt number.
@@ -401,9 +400,9 @@ class JobModel(BaseModel):
     submission_num: Mapped[int] = mapped_column(Integer)
     submitted_at: Mapped[datetime] = mapped_column(NaiveDateTime)
     last_processed_at: Mapped[datetime] = mapped_column(NaiveDateTime)
-    status: Mapped[JobStatus] = mapped_column(Enum(JobStatus), index=True)
+    status: Mapped[JobStatus] = mapped_column(EnumAsString(JobStatus, 100), index=True)
     termination_reason: Mapped[Optional[JobTerminationReason]] = mapped_column(
-        Enum(JobTerminationReason)
+        EnumAsString(JobTerminationReason, 100)
     )
     termination_reason_message: Mapped[Optional[str]] = mapped_column(Text)
     # `disconnected_at` stores the first time of connectivity issues with the instance.
@@ -446,7 +445,7 @@ class GatewayModel(BaseModel):
     # Use `get_gateway_configuration` to construct `configuration` for old gateways.
     configuration: Mapped[Optional[str]] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
-    status: Mapped[GatewayStatus] = mapped_column(Enum(GatewayStatus))
+    status: Mapped[GatewayStatus] = mapped_column(EnumAsString(GatewayStatus, 100))
     status_message: Mapped[Optional[str]] = mapped_column(Text)
     last_processed_at: Mapped[datetime] = mapped_column(NaiveDateTime)
 
@@ -532,7 +531,7 @@ class FleetModel(BaseModel):
     deleted: Mapped[bool] = mapped_column(Boolean, default=False)
     deleted_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
 
-    status: Mapped[FleetStatus] = mapped_column(Enum(FleetStatus), index=True)
+    status: Mapped[FleetStatus] = mapped_column(EnumAsString(FleetStatus, 100), index=True)
     status_message: Mapped[Optional[str]] = mapped_column(Text)
 
     spec: Mapped[str] = mapped_column(Text)
@@ -571,7 +570,7 @@ class InstanceModel(BaseModel):
     fleet_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("fleets.id"))
     fleet: Mapped[Optional["FleetModel"]] = relationship(back_populates="instances")
 
-    status: Mapped[InstanceStatus] = mapped_column(Enum(InstanceStatus), index=True)
+    status: Mapped[InstanceStatus] = mapped_column(EnumAsString(InstanceStatus, 100), index=True)
     unreachable: Mapped[bool] = mapped_column(Boolean)
 
     # VM
@@ -672,7 +671,7 @@ class VolumeModel(BaseModel):
     deleted: Mapped[bool] = mapped_column(Boolean, default=False)
     deleted_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
 
-    status: Mapped[VolumeStatus] = mapped_column(Enum(VolumeStatus), index=True)
+    status: Mapped[VolumeStatus] = mapped_column(EnumAsString(VolumeStatus, 100), index=True)
     status_message: Mapped[Optional[str]] = mapped_column(Text)
 
     configuration: Mapped[str] = mapped_column(Text)
