@@ -787,6 +787,58 @@ class TestProcessSubmittedJobs:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_assigns_job_to_optimal_fleet(self, test_db, session: AsyncSession):
+        project = await create_project(session)
+        user = await create_user(session)
+        repo = await create_repo(session=session, project_id=project.id)
+        fleet1 = await create_fleet(session=session, project=project)
+        fleet2 = await create_fleet(session=session, project=project)
+        fleet3 = await create_fleet(session=session, project=project)
+        await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet1,
+            instance_num=0,
+            status=InstanceStatus.BUSY,
+            price=1,
+        )
+        await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet2,
+            instance_num=0,
+            status=InstanceStatus.IDLE,
+            price=2,
+        )
+        await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet3,
+            instance_num=0,
+            status=InstanceStatus.IDLE,
+            price=3,
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            instance_assigned=False,
+        )
+        await process_submitted_jobs()
+        await session.refresh(job)
+        res = await session.execute(select(JobModel))
+        job = res.unique().scalar_one()
+        assert job.status == JobStatus.SUBMITTED
+        assert job.instance_assigned
+        assert job.fleet_id == fleet2.id
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_picks_high_priority_jobs_first(self, test_db, session: AsyncSession):
         project = await create_project(session)
         user = await create_user(session)

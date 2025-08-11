@@ -53,7 +53,6 @@ from dstack._internal.server.models import (
 from dstack._internal.server.services.backends import get_project_backend_by_type_or_error
 from dstack._internal.server.services.fleets import (
     fleet_model_to_fleet,
-    get_fleet_spec,
 )
 from dstack._internal.server.services.instances import (
     filter_pool_instances,
@@ -298,47 +297,14 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
                 .execution_options(populate_existing=True)
             )
             fleet_models = list(res.unique().scalars().all())
-            fleet_instances_with_offers = []
-            for candidate_fleet_model in fleet_models:
-                fleet_instances_with_offers = await _get_fleet_instances_with_offers(
-                    fleet_model=candidate_fleet_model,
-                    run_spec=run_spec,
-                    job=job,
-                    master_job_provisioning_data=master_job_provisioning_data,
-                    volumes=volumes,
-                )
-                if run_model.fleet_id is not None:
-                    # Using the first fleet that was already chosen by the master job.
-                    fleet_model = candidate_fleet_model
-                    break
-                # Looking for an eligible fleet for the run.
-                # TODO: Pick optimal fleet instead of the first eligible one.
-                fleet_spec = get_fleet_spec(candidate_fleet_model)
-                fleet_capacity = len(
-                    [o for o in fleet_instances_with_offers if o[1].availability.is_available()]
-                )
-                if fleet_spec.configuration.nodes is not None:
-                    if fleet_spec.configuration.nodes.max is None:
-                        fleet_capacity = math.inf
-                    else:
-                        # FIXME: Multiple service jobs can be provisioned on one instance with blocks.
-                        # Current capacity calculation does not take future provisioned blocks into account.
-                        # It may be impossible to do since we cannot be sure which instance will be provisioned.
-                        fleet_capacity += fleet_spec.configuration.nodes.max - len(
-                            candidate_fleet_model.instances
-                        )
-                instances_required = 1
-                if run_spec.configuration.type == "task":
-                    instances_required = run_spec.configuration.nodes
-                elif (
-                    run_spec.configuration.type == "service"
-                    and run_spec.configuration.replicas.min is not None
-                ):
-                    instances_required = run_spec.configuration.replicas.min
-                if fleet_capacity >= instances_required:
-                    # TODO: Ensure we use the chosen fleet when there are no instance assigned.
-                    fleet_model = candidate_fleet_model
-                    break
+            fleet_model, fleet_instances_with_offers = _find_optimal_fleet_with_offers(
+                fleet_models=fleet_models,
+                run_model=run_model,
+                run_spec=run.run_spec,
+                job=job,
+                master_job_provisioning_data=master_job_provisioning_data,
+                volumes=volumes,
+            )
             instance = await _assign_job_to_fleet_instance(
                 session=session,
                 instances_with_offers=fleet_instances_with_offers,
@@ -453,7 +419,73 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         await session.commit()
 
 
-async def _get_fleet_instances_with_offers(
+def _find_optimal_fleet_with_offers(
+    fleet_models: list[FleetModel],
+    run_model: RunModel,
+    run_spec: RunSpec,
+    job: Job,
+    master_job_provisioning_data: Optional[JobProvisioningData],
+    volumes: Optional[list[list[Volume]]],
+) -> tuple[Optional[FleetModel], list[tuple[InstanceModel, InstanceOfferWithAvailability]]]:
+    if run_model.fleet is not None:
+        # Using the fleet that was already chosen by the master job
+        fleet_instances_with_offers = _get_fleet_instances_with_offers(
+            fleet_model=run_model.fleet,
+            run_spec=run_spec,
+            job=job,
+            master_job_provisioning_data=master_job_provisioning_data,
+            volumes=volumes,
+        )
+        return run_model.fleet, fleet_instances_with_offers
+
+    if len(fleet_models) == 0:
+        return None, []
+
+    nodes_required_num = _get_nodes_required_num_for_run(run_spec)
+
+    candidate_fleets_with_offers: list[
+        tuple[
+            Optional[FleetModel],
+            list[tuple[InstanceModel, InstanceOfferWithAvailability]],
+            tuple[int, float],
+        ]
+    ] = []
+    for candidate_fleet_model in fleet_models:
+        fleet_instances_with_offers = _get_fleet_instances_with_offers(
+            fleet_model=candidate_fleet_model,
+            run_spec=run_spec,
+            job=job,
+            master_job_provisioning_data=master_job_provisioning_data,
+            volumes=volumes,
+        )
+        fleet_available_offers = [
+            o for _, o in fleet_instances_with_offers if o.availability.is_available()
+        ]
+        fleet_has_available_capacity = nodes_required_num <= len(fleet_available_offers)
+        fleet_cheapest_offer = math.inf
+        if len(fleet_available_offers) > 0:
+            fleet_cheapest_offer = fleet_available_offers[0].price
+        fleet_priority = (not fleet_has_available_capacity, fleet_cheapest_offer)
+        candidate_fleets_with_offers.append(
+            (candidate_fleet_model, fleet_instances_with_offers, fleet_priority)
+        )
+    candidate_fleets_with_offers.sort(key=lambda t: t[-1])
+    return candidate_fleets_with_offers[0][:2]
+
+
+def _get_nodes_required_num_for_run(run_spec: RunSpec) -> int:
+    nodes_required_num = 1
+    if run_spec.configuration.type == "task":
+        nodes_required_num = run_spec.configuration.nodes
+    elif (
+        run_spec.configuration.type == "service"
+        and run_spec.configuration.replicas.min is not None
+    ):
+        nodes_required_num = run_spec.configuration.replicas.min
+    return nodes_required_num
+
+
+def _get_fleet_instances_with_offers(
     fleet_model: FleetModel,
     run_spec: RunSpec,
     job: Job,
