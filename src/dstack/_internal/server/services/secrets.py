@@ -18,7 +18,7 @@ logger = get_logger(__name__)
 
 
 _SECRET_NAME_REGEX = "^[A-Za-z0-9-_]{1,200}$"
-_SECRET_VALUE_MAX_LENGTH = 2000
+_SECRET_VALUE_MAX_LENGTH = 3000
 
 
 async def list_secrets(
