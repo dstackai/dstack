@@ -705,6 +705,42 @@ class TestProcessSubmittedJobs:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_assigns_no_fleet_when_all_fleets_occupied(self, test_db, session: AsyncSession):
+        project = await create_project(session)
+        user = await create_user(session)
+        repo = await create_repo(session=session, project_id=project.id)
+        fleet = await create_fleet(session=session, project=project)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            instance_num=0,
+            status=InstanceStatus.BUSY,
+        )
+        fleet.instances.append(instance)
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            instance_assigned=False,
+        )
+        await session.commit()
+        await process_submitted_jobs()
+        await session.refresh(job)
+        res = await session.execute(select(JobModel).options(joinedload(JobModel.instance)))
+        job = res.unique().scalar_one()
+        assert job.status == JobStatus.SUBMITTED
+        assert job.instance_assigned
+        assert job.instance is None
+        assert job.fleet is None
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_assigns_job_to_elastic_empty_fleet(self, test_db, session: AsyncSession):
         project = await create_project(session)
         user = await create_user(session)

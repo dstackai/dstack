@@ -492,11 +492,12 @@ def _find_optimal_fleet_with_offers(
     nodes_required_num = _get_nodes_required_num_for_run(run_spec)
     # The current strategy is to first consider fleets that can accommodate
     # the run without additional provisioning and choose the one with the cheapest offer.
-    # Fallback to fleet with the cheapest offer among all fleets.
+    # Fallback to fleet with the cheapest offer among all fleets with offers.
     candidate_fleets_with_offers: list[
         tuple[
             Optional[FleetModel],
             list[tuple[InstanceModel, InstanceOfferWithAvailability]],
+            int,
             tuple[int, float],
         ]
     ] = []
@@ -517,8 +518,16 @@ def _find_optimal_fleet_with_offers(
             fleet_cheapest_offer = fleet_available_offers[0].price
         fleet_priority = (not fleet_has_available_capacity, fleet_cheapest_offer)
         candidate_fleets_with_offers.append(
-            (candidate_fleet_model, fleet_instances_with_offers, fleet_priority)
+            (
+                candidate_fleet_model,
+                fleet_instances_with_offers,
+                len(fleet_available_offers),
+                fleet_priority,
+            )
         )
+    if all(t[2] == 0 for t in candidate_fleets_with_offers):
+        # If no fleets have available offers, create a new fleet.
+        return None, []
     candidate_fleets_with_offers.sort(key=lambda t: t[-1])
     return candidate_fleets_with_offers[0][:2]
 
