@@ -637,9 +637,6 @@ async def _run_job_on_new_instance(
     fleet = None
     if fleet_model is not None:
         fleet = fleet_model_to_fleet(fleet_model)
-        # FIXME: Concurrent provisioning may violate nodes.max
-        # To fix, lock fleet and split instance model creation
-        # and instance provisioning into separate transactions.
         if not _check_can_create_new_instance_in_fleet(fleet):
             logger.debug(
                 "%s: cannot fit new instance into fleet %s", fmt(job_model), fleet_model.name
@@ -707,12 +704,10 @@ async def _run_job_on_new_instance(
 def _check_can_create_new_instance_in_fleet(fleet: Fleet) -> bool:
     if fleet.spec.configuration.ssh_config is not None:
         return False
-    if (
-        fleet.spec.configuration.nodes is not None
-        and fleet.spec.configuration.nodes.max is not None
-        and fleet.spec.configuration.nodes.max <= len(fleet.instances)
-    ):
-        return False
+    # TODO: Respect nodes.max
+    # Ensure concurrent provisioning does not violate nodes.max
+    # E.g. lock fleet and split instance model creation
+    # and instance provisioning into separate transactions.
     return True
 
 
