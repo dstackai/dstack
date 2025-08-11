@@ -574,7 +574,7 @@ def _should_retry_job(run: Run, job: Job, job_model: JobModel) -> Optional[datet
 
     if (
         last_provisioned_submission.termination_reason is not None
-        and last_provisioned_submission.termination_reason.to_retry_event()
+        and JobTerminationReason(last_provisioned_submission.termination_reason).to_retry_event()
         in job.job_spec.retry.on_events
     ):
         return common.get_current_datetime() - last_provisioned_submission.last_processed_at
