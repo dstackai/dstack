@@ -442,7 +442,9 @@ def _find_optimal_fleet_with_offers(
         return None, []
 
     nodes_required_num = _get_nodes_required_num_for_run(run_spec)
-
+    # The current strategy is to first consider fleets that can accommodate
+    # the run without additional provisioning and choose the one with the cheapest offer.
+    # Fallback to fleet with the cheapest offer among all fleets.
     candidate_fleets_with_offers: list[
         tuple[
             Optional[FleetModel],
