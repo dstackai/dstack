@@ -1,10 +1,17 @@
 package api
 
-import "github.com/dstackai/dstack/runner/internal/shim"
+import (
+	"github.com/dstackai/dstack/runner/internal/shim"
+	"github.com/dstackai/dstack/runner/internal/shim/dcgm"
+)
 
 type HealthcheckResponse struct {
 	Service string `json:"service"`
 	Version string `json:"version"`
+}
+
+type InstanceHealthResponse struct {
+	DCGM *dcgm.Health `json:"dcgm"`
 }
 
 type TaskListResponse struct {

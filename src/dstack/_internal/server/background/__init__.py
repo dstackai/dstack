@@ -9,6 +9,7 @@ from dstack._internal.server.background.tasks.process_gateways import (
 )
 from dstack._internal.server.background.tasks.process_idle_volumes import process_idle_volumes
 from dstack._internal.server.background.tasks.process_instances import (
+    delete_instance_health_checks,
     process_instances,
 )
 from dstack._internal.server.background.tasks.process_metrics import (
@@ -86,6 +87,7 @@ def start_background_tasks() -> AsyncIOScheduler:
         IntervalTrigger(seconds=10, jitter=2),
         max_instances=1,
     )
+    _scheduler.add_job(delete_instance_health_checks, IntervalTrigger(minutes=5), max_instances=1)
     for replica in range(settings.SERVER_BACKGROUND_PROCESSING_FACTOR):
         # Add multiple copies of tasks if requested.
         # max_instances=1 for additional copies to avoid running too many tasks.

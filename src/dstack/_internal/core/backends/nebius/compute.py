@@ -74,6 +74,7 @@ SETUP_COMMANDS = [
 SUPPORTED_PLATFORMS = [
     "gpu-h100-sxm",
     "gpu-h200-sxm",
+    "gpu-b200-sxm",
     "gpu-l40s-a",
     "gpu-l40s-d",
     "cpu-d3",
@@ -150,12 +151,16 @@ class NebiusCompute(
             )
             if backend_data.cluster is not None:
                 cluster_id = backend_data.cluster.id
+
+        gpus = instance_offer.instance.resources.gpus
         create_disk_op = resources.create_disk(
             sdk=self._sdk,
             name=instance_name,
             project_id=self._region_to_project_id[instance_offer.region],
             size_mib=instance_offer.instance.resources.disk.size_mib,
-            image_family="ubuntu22.04-cuda12",
+            image_family="ubuntu24.04-cuda12"
+            if gpus and gpus[0].name == "B200"
+            else "ubuntu22.04-cuda12",
         )
         create_instance_op = None
         try:
@@ -180,6 +185,7 @@ class NebiusCompute(
                 cluster_id=cluster_id,
                 disk_id=create_disk_op.resource_id,
                 subnet_id=self._get_subnet_id(instance_offer.region),
+                preemptible=instance_offer.instance.resources.spot,
             )
             _wait_for_instance(self._sdk, create_instance_op)
         except BaseException:
@@ -367,4 +373,4 @@ def _wait_for_instance(sdk: SDK, op: SDKOperation[Operation]) -> None:
 
 def _supported_instances(offer: InstanceOffer) -> bool:
     platform, _ = offer.instance.name.split()
-    return platform in SUPPORTED_PLATFORMS and not offer.instance.resources.spot
+    return platform in SUPPORTED_PLATFORMS

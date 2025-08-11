@@ -224,23 +224,28 @@ def get_shim_healthcheck(client: paramiko.SSHClient) -> str:
     retries = 20
     iter_delay = 3
     for _ in range(retries):
-        try:
-            _, stdout, stderr = client.exec_command(
-                f"curl -s http://localhost:{DSTACK_SHIM_HTTP_PORT}/api/healthcheck", timeout=15
-            )
-            out = stdout.read().strip().decode()
-            err = stderr.read().strip().decode()
-            if err:
-                raise ProvisioningError(
-                    f"The command 'get_shim_healthcheck' didn't work. stdout: {out}, stderr: {err}"
-                )
-            if not out:
-                logger.debug("healthcheck is empty. retry")
-                time.sleep(iter_delay)
-                continue
-            return out
-        except (paramiko.SSHException, OSError) as e:
-            raise ProvisioningError(f"get_shim_healthcheck failed: {e}") from e
+        healthcheck = _get_shim_healthcheck(client)
+        if healthcheck is not None:
+            return healthcheck
+        logger.debug("healthcheck is empty. retry")
+        time.sleep(iter_delay)
+    raise ProvisioningError("Cannot get HealthcheckResponse")
+
+
+def _get_shim_healthcheck(client: paramiko.SSHClient) -> Optional[str]:
+    try:
+        _, stdout, stderr = client.exec_command(
+            f"curl -s http://localhost:{DSTACK_SHIM_HTTP_PORT}/api/healthcheck", timeout=15
+        )
+        out = stdout.read().strip().decode()
+        err = stderr.read().strip().decode()
+    except (paramiko.SSHException, OSError) as e:
+        raise ProvisioningError(f"get_shim_healthcheck failed: {e}") from e
+    if err:
+        raise ProvisioningError(f"get_shim_healthcheck didn't work. stdout: {out}, stderr: {err}")
+    if not out:
+        return None
+    return out
 
 
 def host_info_to_instance_type(host_info: Dict[str, Any], cpu_arch: GoArchType) -> InstanceType:

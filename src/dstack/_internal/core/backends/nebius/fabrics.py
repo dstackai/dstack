@@ -21,6 +21,7 @@ INFINIBAND_FABRICS = [
     InfinibandFabric("fabric-6", "gpu-h100-sxm", "eu-north1"),
     InfinibandFabric("fabric-7", "gpu-h200-sxm", "eu-north1"),
     InfinibandFabric("us-central1-a", "gpu-h200-sxm", "us-central1"),
+    InfinibandFabric("us-central1-b", "gpu-b200-sxm", "us-central1"),
 ]
 
 

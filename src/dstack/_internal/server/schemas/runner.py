@@ -16,6 +16,7 @@ from dstack._internal.core.models.runs import (
     RunSpec,
 )
 from dstack._internal.core.models.volumes import InstanceMountPoint, VolumeMountPoint
+from dstack._internal.server.schemas.health.dcgm import DCGMHealthResponse
 
 
 class JobStateEvent(CoreModel):
@@ -112,6 +113,10 @@ class SubmitBody(CoreModel):
 class HealthcheckResponse(CoreModel):
     service: str
     version: str
+
+
+class InstanceHealthResponse(CoreModel):
+    dcgm: Optional[DCGMHealthResponse] = None
 
 
 class GPUMetrics(CoreModel):

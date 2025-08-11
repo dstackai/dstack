@@ -2,7 +2,7 @@ import functools
 import socket
 import time
 from collections.abc import Iterable
-from typing import Callable, Dict, List, Optional, TypeVar, Union
+from typing import Callable, Dict, List, Literal, Optional, TypeVar, Union
 
 import requests
 from typing_extensions import Concatenate, ParamSpec
@@ -27,7 +27,7 @@ def runner_ssh_tunnel(
     [Callable[Concatenate[Dict[int, int], P], R]],
     Callable[
         Concatenate[PrivateKeyOrPair, JobProvisioningData, Optional[JobRuntimeData], P],
-        Union[bool, R],
+        Union[Literal[False], R],
     ],
 ]:
     """
@@ -42,7 +42,7 @@ def runner_ssh_tunnel(
         func: Callable[Concatenate[Dict[int, int], P], R],
     ) -> Callable[
         Concatenate[PrivateKeyOrPair, JobProvisioningData, Optional[JobRuntimeData], P],
-        Union[bool, R],
+        Union[Literal[False], R],
     ]:
         @functools.wraps(func)
         def wrapper(
@@ -51,7 +51,7 @@ def runner_ssh_tunnel(
             job_runtime_data: Optional[JobRuntimeData],
             *args: P.args,
             **kwargs: P.kwargs,
-        ) -> Union[bool, R]:
+        ) -> Union[Literal[False], R]:
             """
             Returns:
                 is successful

@@ -32,7 +32,7 @@ dependencies = [
     "python-multipart>=0.0.16",
     "filelock",
     "psutil",
-    "gpuhunt==0.1.6",
+    "gpuhunt==0.1.7",
     "argcomplete>=3.5.0",
     "ignore-python>=0.2.0",
     "orjson",
@@ -121,7 +121,7 @@ server = [
     "aiosqlite",
     "docker>=6.0.0",
     "python-dxf==12.1.0",
-    "sentry-sdk[fastapi]",
+    "sentry-sdk[fastapi]>=2.27.0",
     "alembic-postgresql-enum",
     "asyncpg",
     "python-json-logger>=3.1.0",
@@ -176,7 +176,7 @@ oci = [
     "dstack[server]",
 ]
 nebius = [
-    "nebius>=0.2.19,<0.3; python_version >= '3.10'",
+    "nebius>=0.2.40,<0.3; python_version >= '3.10'",
     "dstack[server]",
 ]
 all = [

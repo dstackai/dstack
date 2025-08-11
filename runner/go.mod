@@ -3,6 +3,7 @@ module github.com/dstackai/dstack/runner
 go 1.23.8
 
 require (
+	github.com/NVIDIA/go-dcgm v0.0.0-20250707210631-823394f2bd9b
 	github.com/alexellis/go-execute/v2 v2.2.1
 	github.com/bluekeyes/go-gitdiff v0.7.2
 	github.com/codeclysm/extract/v4 v4.0.0
@@ -29,6 +30,7 @@ require (
 	dario.cat/mergo v1.0.0 // indirect
 	github.com/Microsoft/go-winio v0.6.1 // indirect
 	github.com/ProtonMail/go-crypto v1.0.0 // indirect
+	github.com/bits-and-blooms/bitset v1.22.0 // indirect
 	github.com/cloudflare/circl v1.3.7 // indirect
 	github.com/containerd/log v0.1.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.4 // indirect

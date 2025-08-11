@@ -222,6 +222,21 @@ def remove_prefix(text: str, prefix: str) -> str:
     return text
 
 
+def has_duplicates(iterable: Iterable[Any]) -> bool:
+    """
+    Checks if there are any duplicate items in the given iterable.
+
+    O(n^2) implementation, but works with iterables with unhashable items.
+    For iterables with hashable items, prefer len(set(iterable)) != len(iterable).
+    """
+    seen = []
+    for item in iterable:
+        if item in seen:
+            return True
+        seen.append(item)
+    return False
+
+
 T = TypeVar("T")
 
 

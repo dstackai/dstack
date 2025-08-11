@@ -28,10 +28,12 @@ from nebius.api.nebius.compute.v1 import (
     GpuClusterSpec,
     Instance,
     InstanceGpuClusterSpec,
+    InstanceRecoveryPolicy,
     InstanceServiceClient,
     InstanceSpec,
     IPAddress,
     NetworkInterfaceSpec,
+    PreemptibleSpec,
     PublicIPAddress,
     ResourcesSpec,
     SourceImageFamily,
@@ -283,6 +285,7 @@ def create_instance(
     cluster_id: Optional[str],
     disk_id: str,
     subnet_id: str,
+    preemptible: bool,
 ) -> SDKOperation[Operation]:
     client = InstanceServiceClient(sdk)
     request = CreateInstanceRequest(
@@ -306,6 +309,12 @@ def create_instance(
                     public_ip_address=PublicIPAddress(static=True),
                 )
             ],
+            preemptible=PreemptibleSpec(
+                priority=1, on_preemption=PreemptibleSpec.PreemptionPolicy.STOP
+            )
+            if preemptible
+            else None,
+            recovery_policy=InstanceRecoveryPolicy.FAIL if preemptible else None,
         ),
     )
     with wrap_capacity_errors():

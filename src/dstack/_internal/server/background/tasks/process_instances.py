@@ -1,13 +1,14 @@
 import asyncio
 import datetime
+import logging
 from datetime import timedelta
-from typing import Any, Dict, List, Optional, Tuple, cast
+from typing import Any, Dict, List, Optional, cast
 
 import requests
 from paramiko.pkey import PKey
 from paramiko.ssh_exception import PasswordRequiredException
 from pydantic import ValidationError
-from sqlalchemy import select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
@@ -26,18 +27,6 @@ from dstack._internal.core.backends.base.compute import (
 from dstack._internal.core.backends.features import (
     BACKENDS_WITH_CREATE_INSTANCE_SUPPORT,
     BACKENDS_WITH_PLACEMENT_GROUPS_SUPPORT,
-)
-from dstack._internal.core.backends.remote.provisioning import (
-    detect_cpu_arch,
-    get_host_info,
-    get_paramiko_connection,
-    get_shim_healthcheck,
-    host_info_to_instance_type,
-    remove_dstack_runner_if_exists,
-    remove_host_info_if_exists,
-    run_pre_start_commands,
-    run_shim_as_systemd_service,
-    upload_envs,
 )
 from dstack._internal.core.consts import DSTACK_SHIM_HTTP_PORT
 
@@ -77,12 +66,14 @@ from dstack._internal.server.background.tasks.common import get_provisioning_tim
 from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import (
     FleetModel,
+    InstanceHealthCheckModel,
     InstanceModel,
     JobModel,
     PlacementGroupModel,
     ProjectModel,
 )
-from dstack._internal.server.schemas.runner import HealthcheckResponse
+from dstack._internal.server.schemas.instances import InstanceCheck
+from dstack._internal.server.schemas.runner import HealthcheckResponse, InstanceHealthResponse
 from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services.fleets import (
     fleet_model_to_fleet,
@@ -103,9 +94,20 @@ from dstack._internal.server.services.placement import (
     schedule_fleet_placement_groups_deletion,
 )
 from dstack._internal.server.services.runner import client as runner_client
-from dstack._internal.server.services.runner.client import HealthStatus
 from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
 from dstack._internal.server.utils import sentry_utils
+from dstack._internal.server.utils.provisioning import (
+    detect_cpu_arch,
+    get_host_info,
+    get_paramiko_connection,
+    get_shim_healthcheck,
+    host_info_to_instance_type,
+    remove_dstack_runner_if_exists,
+    remove_host_info_if_exists,
+    run_pre_start_commands,
+    run_shim_as_systemd_service,
+    upload_envs,
+)
 from dstack._internal.utils.common import (
     get_current_datetime,
     get_or_error,
@@ -135,6 +137,17 @@ async def process_instances(batch_size: int = 1):
     for _ in range(batch_size):
         tasks.append(_process_next_instance())
     await asyncio.gather(*tasks)
+
+
+@sentry_utils.instrument_background_task
+async def delete_instance_health_checks():
+    now = get_current_datetime()
+    cutoff = now - timedelta(seconds=server_settings.SERVER_INSTANCE_HEALTH_TTL_SECONDS)
+    async with get_session_ctx() as session:
+        await session.execute(
+            delete(InstanceHealthCheckModel).where(InstanceHealthCheckModel.collected_at < cutoff)
+        )
+        await session.commit()
 
 
 @sentry_utils.instrument_background_task
@@ -415,10 +428,10 @@ async def _add_remote(instance: InstanceModel) -> None:
 
 def _deploy_instance(
     remote_details: RemoteConnectionInfo,
-    pkeys: List[PKey],
+    pkeys: list[PKey],
     ssh_proxy_pkeys: Optional[list[PKey]],
-    authorized_keys: List[str],
-) -> Tuple[HealthStatus, Dict[str, Any], GoArchType]:
+    authorized_keys: list[str],
+) -> tuple[InstanceCheck, dict[str, Any], GoArchType]:
     with get_paramiko_connection(
         remote_details.ssh_user,
         remote_details.host,
@@ -466,14 +479,14 @@ def _deploy_instance(
         host_info = get_host_info(client, dstack_working_dir)
         logger.debug("Received a host_info %s", host_info)
 
-        raw_health = get_shim_healthcheck(client)
+        healthcheck_out = get_shim_healthcheck(client)
         try:
-            health_response = HealthcheckResponse.__response__.parse_raw(raw_health)
+            healthcheck = HealthcheckResponse.__response__.parse_raw(healthcheck_out)
         except ValueError as e:
-            raise ProvisioningError("Cannot read HealthcheckResponse") from e
-        health = runner_client.health_response_to_health_status(health_response)
+            raise ProvisioningError(f"Cannot parse HealthcheckResponse: {e}") from e
+        instance_check = runner_client.healthcheck_response_to_instance_check(healthcheck)
 
-        return health, host_info, arch
+        return instance_check, host_info, arch
 
 
 async def _create_instance(session: AsyncSession, instance: InstanceModel) -> None:
@@ -758,29 +771,65 @@ async def _check_instance(session: AsyncSession, instance: InstanceModel) -> Non
 
     ssh_private_keys = get_instance_ssh_private_keys(instance)
 
+    health_check_cutoff = get_current_datetime() - timedelta(
+        seconds=server_settings.SERVER_INSTANCE_HEALTH_MIN_COLLECT_INTERVAL_SECONDS
+    )
+    res = await session.execute(
+        select(func.count(1)).where(
+            InstanceHealthCheckModel.instance_id == instance.id,
+            InstanceHealthCheckModel.collected_at > health_check_cutoff,
+        )
+    )
+    check_instance_health = res.scalar_one() == 0
+
     # May return False if fails to establish ssh connection
-    health_status_response = await run_async(
-        _instance_healthcheck,
+    instance_check = await run_async(
+        _check_instance_inner,
         ssh_private_keys,
         job_provisioning_data,
         None,
+        check_instance_health=check_instance_health,
     )
-    if isinstance(health_status_response, bool) or health_status_response is None:
-        health_status = HealthStatus(healthy=False, reason="SSH or tunnel error")
+    if instance_check is False:
+        instance_check = InstanceCheck(reachable=False, message="SSH or tunnel error")
+
+    if instance_check.reachable and check_instance_health:
+        health_status = instance_check.get_health_status()
     else:
-        health_status = health_status_response
+        # Keep previous health status
+        health_status = instance.health
 
-    logger.debug(
-        "Check instance %s status. shim health: %s",
+    loglevel = logging.DEBUG
+    if not instance_check.reachable and instance.status.is_available():
+        loglevel = logging.WARNING
+    elif check_instance_health and not health_status.is_healthy():
+        loglevel = logging.WARNING
+    logger.log(
+        loglevel,
+        "Instance %s check: reachable=%s health_status=%s message=%r",
         instance.name,
-        health_status,
-        extra={"instance_name": instance.name, "shim_health": health_status},
+        instance_check.reachable,
+        health_status.name,
+        instance_check.message,
+        extra={"instance_name": instance.name, "health_status": health_status},
     )
 
-    if health_status.healthy:
+    if instance_check.has_health_checks():
+        # ensured by has_health_checks()
+        assert instance_check.health_response is not None
+        health_check_model = InstanceHealthCheckModel(
+            instance_id=instance.id,
+            collected_at=get_current_datetime(),
+            status=health_status,
+            response=instance_check.health_response.json(),
+        )
+        session.add(health_check_model)
+
+    instance.health = health_status
+    instance.unreachable = not instance_check.reachable
+
+    if instance_check.reachable:
         instance.termination_deadline = None
-        instance.health_status = None
-        instance.unreachable = False
 
         if instance.status == InstanceStatus.PROVISIONING:
             instance.status = InstanceStatus.IDLE if not instance.jobs else InstanceStatus.BUSY
@@ -798,9 +847,6 @@ async def _check_instance(session: AsyncSession, instance: InstanceModel) -> Non
     if instance.termination_deadline is None:
         instance.termination_deadline = get_current_datetime() + TERMINATION_DEADLINE_OFFSET
 
-    instance.health_status = health_status.reason
-    instance.unreachable = True
-
     if instance.status == InstanceStatus.PROVISIONING and instance.started_at is not None:
         provisioning_deadline = _get_provisioning_deadline(
             instance=instance,
@@ -816,12 +862,7 @@ async def _check_instance(session: AsyncSession, instance: InstanceModel) -> Non
                     "instance_status": InstanceStatus.TERMINATING.value,
                 },
             )
-    elif instance.status in (InstanceStatus.IDLE, InstanceStatus.BUSY):
-        logger.warning(
-            "Instance %s shim is not available",
-            instance.name,
-            extra={"instance_name": instance.name},
-        )
+    elif instance.status.is_available():
         deadline = instance.termination_deadline
         if get_current_datetime() > deadline:
             instance.status = InstanceStatus.TERMINATING
@@ -892,20 +933,30 @@ async def _wait_for_instance_provisioning_data(
 
 
 @runner_ssh_tunnel(ports=[DSTACK_SHIM_HTTP_PORT], retries=1)
-def _instance_healthcheck(ports: Dict[int, int]) -> HealthStatus:
+def _check_instance_inner(
+    ports: Dict[int, int], *, check_instance_health: bool = False
+) -> InstanceCheck:
+    instance_health_response: Optional[InstanceHealthResponse] = None
     shim_client = runner_client.ShimClient(port=ports[DSTACK_SHIM_HTTP_PORT])
+    method = shim_client.healthcheck
     try:
-        resp = shim_client.healthcheck(unmask_exeptions=True)
-        if resp is None:
-            return HealthStatus(healthy=False, reason="Unknown reason")
-        return runner_client.health_response_to_health_status(resp)
+        healthcheck_response = method(unmask_exceptions=True)
+        if check_instance_health:
+            method = shim_client.get_instance_health
+            instance_health_response = method()
     except requests.RequestException as e:
-        return HealthStatus(healthy=False, reason=f"Can't request shim: {e}")
+        template = "shim.%s(): request error: %s"
+        args = (method.__func__.__name__, e)
+        logger.debug(template, *args)
+        return InstanceCheck(reachable=False, message=template % args)
     except Exception as e:
-        logger.exception("Unknown exception from shim.healthcheck: %s", e)
-        return HealthStatus(
-            healthy=False, reason=f"Unknown exception ({e.__class__.__name__}): {e}"
-        )
+        template = "shim.%s(): unexpected exception %s: %s"
+        args = (method.__func__.__name__, e.__class__.__name__, e)
+        logger.exception(template, *args)
+        return InstanceCheck(reachable=False, message=template % args)
+    return runner_client.healthcheck_response_to_instance_check(
+        healthcheck_response, instance_health_response
+    )
 
 
 async def _terminate(instance: InstanceModel) -> None:
