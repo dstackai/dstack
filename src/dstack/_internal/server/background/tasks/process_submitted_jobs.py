@@ -235,6 +235,10 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
     # Then, the job runs on the assigned instance or a new instance is provisioned.
     # This is needed to avoid holding instances lock for a long time.
     if not job_model.instance_assigned:
+        # If another job freed the instance but is still trying to detach volumes,
+        # do not provision on it to prevent attaching volumes that are currently detaching.
+        detaching_instances_ids = await get_instances_ids_with_detaching_volumes(session)
+
         fleet_filters = [
             FleetModel.project_id == project.id,
             FleetModel.deleted == False,
@@ -243,60 +247,41 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
             fleet_filters.append(FleetModel.id == run_model.fleet_id)
         if run_spec.configuration.fleets is not None:
             fleet_filters.append(FleetModel.name.in_(run_spec.configuration.fleets))
-        res = await session.execute(
-            select(FleetModel)
-            .outerjoin(FleetModel.instances)
-            .where(*fleet_filters)
-            .where(
-                or_(
-                    InstanceModel.id.is_(None),
-                    and_(
-                        InstanceModel.deleted == False,
-                        InstanceModel.total_blocks > InstanceModel.busy_blocks,
-                    ),
-                )
-            )
-            .options(contains_eager(FleetModel.instances))
-            .order_by(InstanceModel.id)  # take locks in order
-            .with_for_update(key_share=True, of=InstanceModel)
+
+        instance_filters = [
+            InstanceModel.deleted == False,
+            InstanceModel.total_blocks > InstanceModel.busy_blocks,
+            InstanceModel.id.not_in(detaching_instances_ids),
+        ]
+
+        fleet_models_with_instances, fleet_models_without_instances = await _select_fleet_models(
+            session=session,
+            fleet_filters=fleet_filters,
+            instance_filters=instance_filters,
         )
-        fleet_models = list(res.unique().scalars().all())
-        fleets_ids = sorted([f.id for f in fleet_models])
         instances_ids = sorted(
-            itertools.chain.from_iterable([i.id for i in f.instances] for f in fleet_models)
+            itertools.chain.from_iterable(
+                [i.id for i in f.instances] for f in fleet_models_with_instances
+            )
         )
+        fleet_models = fleet_models_with_instances + fleet_models_without_instances
+        fleets_ids = [f.id for f in fleet_models]
+
         if get_db().dialect_name == "sqlite":
             # Start new transaction to see committed changes after lock
             await session.commit()
+
         async with get_locker(get_db().dialect_name).lock_ctx(
             InstanceModel.__tablename__, instances_ids
         ):
-            # If another job freed the instance but is still trying to detach volumes,
-            # do not provision on it to prevent attaching volumes that are currently detaching.
-            detaching_instances_ids = await get_instances_ids_with_detaching_volumes(session)
-            # Refetch after lock
-            res = await session.execute(
-                select(FleetModel)
-                .outerjoin(FleetModel.instances)
-                .where(
-                    FleetModel.id.in_(fleets_ids),
-                    *fleet_filters,
+            if get_db().dialect_name == "sqlite":
+                fleet_models = await _refetch_fleet_models(
+                    session=session,
+                    fleets_ids=fleets_ids,
+                    instances_ids=instances_ids,
+                    fleet_filters=fleet_filters,
+                    instance_filters=instance_filters,
                 )
-                .where(
-                    or_(
-                        InstanceModel.id.is_(None),
-                        and_(
-                            InstanceModel.id.not_in(detaching_instances_ids),
-                            InstanceModel.id.in_(instances_ids),
-                            InstanceModel.deleted == False,
-                            InstanceModel.total_blocks > InstanceModel.busy_blocks,
-                        ),
-                    )
-                )
-                .options(contains_eager(FleetModel.instances))
-                .execution_options(populate_existing=True)
-            )
-            fleet_models = list(res.unique().scalars().all())
             fleet_model, fleet_instances_with_offers = _find_optimal_fleet_with_offers(
                 fleet_models=fleet_models,
                 run_model=run_model,
@@ -417,6 +402,69 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
             )
         job_model.last_processed_at = common_utils.get_current_datetime()
         await session.commit()
+
+
+async def _select_fleet_models(
+    session: AsyncSession, fleet_filters: list, instance_filters: list
+) -> tuple[list[FleetModel], list[FleetModel]]:
+    # Selecting fleets in two queries since Postgres does not allow
+    # locking nullable side of an outer join. So, first lock instances with inner join.
+    # Then select left out fleets without instances.
+    res = await session.execute(
+        select(FleetModel)
+        .join(FleetModel.instances)
+        .where(*fleet_filters)
+        .where(*instance_filters)
+        .options(contains_eager(FleetModel.instances))
+        .order_by(InstanceModel.id)  # take locks in order
+        .with_for_update(key_share=True, of=InstanceModel)
+    )
+    fleet_models_with_instances = list(res.unique().scalars().all())
+    fleet_models_with_instances_ids = [f.id for f in fleet_models_with_instances]
+    res = await session.execute(
+        select(FleetModel)
+        .outerjoin(FleetModel.instances)
+        .where(
+            *fleet_filters,
+            FleetModel.id.not_in(fleet_models_with_instances_ids),
+        )
+        .where(InstanceModel.id.is_(None))
+        .options(contains_eager(FleetModel.instances))  # loading empty relation
+    )
+    fleet_models_without_instances = list(res.unique().scalars().all())
+    return fleet_models_with_instances, fleet_models_without_instances
+
+
+async def _refetch_fleet_models(
+    session: AsyncSession,
+    fleets_ids: list[uuid.UUID],
+    instances_ids: list[uuid.UUID],
+    fleet_filters: list,
+    instance_filters: list,
+) -> list[FleetModel]:
+    res = await session.execute(
+        select(FleetModel)
+        .outerjoin(FleetModel.instances)
+        .where(
+            FleetModel.id.in_(fleets_ids),
+            *fleet_filters,
+        )
+        .where(
+            and_(
+                InstanceModel.id.in_(instances_ids),
+                or_(
+                    InstanceModel.id.is_(None),
+                    and_(
+                        *instance_filters,
+                    ),
+                ),
+            )
+        )
+        .options(contains_eager(FleetModel.instances))
+        .execution_options(populate_existing=True)
+    )
+    fleet_models = list(res.unique().scalars().all())
+    return fleet_models
 
 
 def _find_optimal_fleet_with_offers(
