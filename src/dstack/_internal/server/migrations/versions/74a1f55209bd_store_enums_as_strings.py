@@ -1,7 +1,7 @@
 """Store enums as strings
 
 Revision ID: 74a1f55209bd
-Revises: 25479f540245
+Revises: 728b1488b1b4
 Create Date: 2025-08-06 13:49:28.785378
 
 """
@@ -12,7 +12,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = "74a1f55209bd"
-down_revision = "25479f540245"
+down_revision = "728b1488b1b4"
 branch_labels = None
 depends_on = None
 
