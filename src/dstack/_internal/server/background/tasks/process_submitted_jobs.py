@@ -26,7 +26,7 @@ from dstack._internal.core.models.profiles import (
     CreationPolicy,
     TerminationPolicy,
 )
-from dstack._internal.core.models.resources import Memory
+from dstack._internal.core.models.resources import Memory, Range
 from dstack._internal.core.models.runs import (
     Job,
     JobProvisioningData,
@@ -723,6 +723,7 @@ def _create_fleet_model_for_job(
             name=run.run_spec.run_name,
             placement=placement,
             reservation=run.run_spec.configuration.reservation,
+            nodes=Range(min=_get_nodes_required_num_for_run(run.run_spec), max=None),
         ),
         profile=run.run_spec.merged_profile,
         autocreated=True,
