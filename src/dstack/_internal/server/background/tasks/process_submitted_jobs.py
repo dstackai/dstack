@@ -290,6 +290,16 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
                 master_job_provisioning_data=master_job_provisioning_data,
                 volumes=volumes,
             )
+            if fleet_model is None and run_spec.configuration.fleets is not None:
+                # Run cannot create new fleets when fleets are specified
+                logger.debug("%s: failed to use specified fleets", fmt(job_model))
+                job_model.status = JobStatus.TERMINATING
+                job_model.termination_reason = (
+                    JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
+                )
+                job_model.last_processed_at = common_utils.get_current_datetime()
+                await session.commit()
+                return
             instance = await _assign_job_to_fleet_instance(
                 session=session,
                 instances_with_offers=fleet_instances_with_offers,

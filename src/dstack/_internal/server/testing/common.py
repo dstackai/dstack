@@ -258,8 +258,8 @@ async def create_file_archive(
 
 
 def get_run_spec(
-    run_name: str,
     repo_id: str,
+    run_name: str = "test-run",
     configuration_path: str = "dstack.yaml",
     profile: Union[Profile, Callable[[], Profile], None] = lambda: Profile(name="default"),
     configuration: Optional[AnyRunConfiguration] = None,
