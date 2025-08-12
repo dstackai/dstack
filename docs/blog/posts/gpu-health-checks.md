@@ -22,7 +22,7 @@ In large-scale training, a single bad GPU can derail progress. Sometimes the fai
 
 Multi-GPU and multi-node workloads are only as strong as their weakest component. GPU cloud providers increasingly rely on automated health checks to prevent degraded hardware from reaching customers. Problems can stem from ECC memory errors, faulty PCIe links, overheating, or other hardware-level issues. Some are fatal, others allow the GPU to run but at reduced performance or with higher failure risk.
 
-Passive checks like these run in the background. They collect telemetry, run lightweight internal tests, and compare results to NVIDIA’s known failure patterns — without pausing workloads.
+Passive checks like these run in the background. They continuously monitor hardware telemetry and system events, evaluating them against NVIDIA’s known failure patterns — all without pausing workloads.
 
 ## How it works in dstack
 
