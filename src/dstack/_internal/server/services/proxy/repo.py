@@ -54,6 +54,7 @@ class ServerProxyRepo(BaseProxyRepo):
                 RunModel.gateway_id.is_(None),
                 JobModel.run_name == run_name,
                 JobModel.status == JobStatus.RUNNING,
+                JobModel.registered == True,
                 JobModel.job_num == 0,
             )
             .options(
