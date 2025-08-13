@@ -1,4 +1,4 @@
-from typing import Callable, Optional, TypeVar, Union
+from typing import Callable, Optional, TypeVar
 
 from pydantic import BaseModel
 
@@ -12,6 +12,7 @@ from dstack._internal.core.models.resources import (
     ResourcesSpec,
 )
 from dstack._internal.core.models.runs import Requirements
+from dstack._internal.utils.typing import SupportsRichComparison
 
 
 class CombineError(ValueError):
@@ -65,15 +66,14 @@ def combine_fleet_and_run_requirements(
         return None
 
 
-T = TypeVar("T")
-ModelT = TypeVar("ModelT", bound=BaseModel)
-CompT = TypeVar("CompT", bound=Union[float, int])
-StrT = TypeVar("StrT", bound=str)
+_T = TypeVar("_T")
+_ModelT = TypeVar("_ModelT", bound=BaseModel)
+_CompT = TypeVar("_CompT", bound=SupportsRichComparison)
 
 
 def _intersect_lists_optional(
-    list1: Optional[list[T]], list2: Optional[list[T]]
-) -> Optional[list[T]]:
+    list1: Optional[list[_T]], list2: Optional[list[_T]]
+) -> Optional[list[_T]]:
     if list1 is None:
         if list2 is None:
             return None
@@ -83,21 +83,21 @@ def _intersect_lists_optional(
     return [x for x in list1 if x in list2]
 
 
-def _get_min(value1: CompT, value2: CompT) -> CompT:
+def _get_min(value1: _CompT, value2: _CompT) -> _CompT:
     return min(value1, value2)
 
 
-def _get_min_optional(value1: Optional[CompT], value2: Optional[CompT]) -> Optional[CompT]:
+def _get_min_optional(value1: Optional[_CompT], value2: Optional[_CompT]) -> Optional[_CompT]:
     return _combine_optional(value1, value2, _get_min)
 
 
-def _get_single_value(value1: T, value2: T) -> T:
+def _get_single_value(value1: _T, value2: _T) -> _T:
     if value1 == value2:
         return value1
     raise CombineError(f"Values {value1} and {value2} cannot be combined")
 
 
-def _get_single_value_optional(value1: Optional[T], value2: Optional[T]) -> Optional[T]:
+def _get_single_value_optional(value1: Optional[_T], value2: Optional[_T]) -> Optional[_T]:
     return _combine_optional(value1, value2, _get_single_value)
 
 
@@ -161,10 +161,7 @@ def _combine_gpu(value1: GPUSpec, value2: GPUSpec) -> GPUSpec:
         count=_combine_range(value1.count, value2.count),
         memory=_combine_range_optional(value1.memory, value2.memory),
         total_memory=_combine_range_optional(value1.total_memory, value2.total_memory),
-        # TODO: min compute_capability
-        compute_capability=_get_single_value_optional(
-            value1.compute_capability, value2.compute_capability
-        ),
+        compute_capability=_get_min_optional(value1.compute_capability, value2.compute_capability),
     )
 
 
@@ -206,8 +203,8 @@ def _combine_range_optional(value1: Optional[Range], value2: Optional[Range]) ->
 
 
 def _combine_optional(
-    value1: Optional[T], value2: Optional[T], combiner: Callable[[T, T], T]
-) -> Optional[T]:
+    value1: Optional[_T], value2: Optional[_T], combiner: Callable[[_T, _T], _T]
+) -> Optional[_T]:
     if value1 is None:
         return value2
     if value2 is None:
@@ -216,10 +213,10 @@ def _combine_optional(
 
 
 def _combine_models_optional(
-    value1: Optional[ModelT],
-    value2: Optional[ModelT],
-    combiner: Callable[[ModelT, ModelT], ModelT],
-) -> Optional[ModelT]:
+    value1: Optional[_ModelT],
+    value2: Optional[_ModelT],
+    combiner: Callable[[_ModelT, _ModelT], _ModelT],
+) -> Optional[_ModelT]:
     if value1 is None:
         if value2 is not None:
             return value2.copy(deep=True)

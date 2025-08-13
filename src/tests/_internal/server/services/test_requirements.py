@@ -378,7 +378,7 @@ class TestCombineGpu:
             name=["V100", "T4"],
             count=Range(min=2, max=3),
             memory=Range(min=Memory(16), max=Memory(24)),
-            compute_capability=ComputeCapability((7, 0)),
+            compute_capability=ComputeCapability((7, 8)),
         )
         assert _combine_gpu_optional(gpu1, gpu2) == GPUSpec(
             vendor=gpuhunt.AcceleratorVendor.NVIDIA,
