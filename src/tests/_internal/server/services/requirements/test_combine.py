@@ -15,7 +15,7 @@ from dstack._internal.core.models.resources import (
     ResourcesSpec,
 )
 from dstack._internal.core.models.runs import Requirements
-from dstack._internal.server.services.requirements import (
+from dstack._internal.server.services.requirements.combine import (
     CombineError,
     Profile,
     _combine_cpu,
