@@ -19,11 +19,11 @@ from dstack._internal.server.services.requirements import (
     CombineError,
     Profile,
     _combine_cpu,
-    _combine_gpu,
-    _combine_idle_duration,
+    _combine_gpu_optional,
+    _combine_idle_duration_optional,
     _combine_resources,
-    _combine_spot_policy,
-    _intersect_lists,
+    _combine_spot_policy_optional,
+    _intersect_lists_optional,
     combine_fleet_and_run_profiles,
     combine_fleet_and_run_requirements,
 )
@@ -154,116 +154,123 @@ class TestCombineFleetAndRunRequirements:
 
 class TestIntersectLists:
     def test_both_none_returns_none(self):
-        assert _intersect_lists(None, None) is None
+        assert _intersect_lists_optional(None, None) is None
 
     def test_first_none_returns_copy_of_second(self):
         list2 = ["a", "b", "c"]
-        result = _intersect_lists(None, list2)
+        result = _intersect_lists_optional(None, list2)
         assert result == list2
         assert result is not list2  # Should be a copy
 
     def test_second_none_returns_copy_of_first(self):
         list1 = ["x", "y", "z"]
-        result = _intersect_lists(list1, None)
+        result = _intersect_lists_optional(list1, None)
         assert result == list1
         assert result is not list1  # Should be a copy
 
     def test_intersection_of_overlapping_lists(self):
         list1 = ["a", "b", "c", "d"]
         list2 = ["b", "c", "e", "f"]
-        result = _intersect_lists(list1, list2)
+        result = _intersect_lists_optional(list1, list2)
         assert result == ["b", "c"]
 
     def test_intersection_of_non_overlapping_lists(self):
         list1 = ["a", "b"]
         list2 = ["c", "d"]
-        result = _intersect_lists(list1, list2)
+        result = _intersect_lists_optional(list1, list2)
         assert result == []
 
     def test_intersection_preserves_order_from_first_list(self):
         list1 = ["c", "a", "b"]
         list2 = ["a", "b", "c"]
-        result = _intersect_lists(list1, list2)
+        result = _intersect_lists_optional(list1, list2)
         assert result == ["c", "a", "b"]
 
     def test_intersection_with_duplicates(self):
         list1 = ["a", "b", "a", "c"]
         list2 = ["a", "c", "d"]
-        result = _intersect_lists(list1, list2)
+        result = _intersect_lists_optional(list1, list2)
         assert result == ["a", "a", "c"]
 
 
 class TestCombineIdleDuration:
     def test_both_none_returns_none(self):
-        assert _combine_idle_duration(None, None) is None
+        assert _combine_idle_duration_optional(None, None) is None
 
     def test_first_none_returns_second(self):
-        assert _combine_idle_duration(None, 3600) == 3600
+        assert _combine_idle_duration_optional(None, 3600) == 3600
 
     def test_second_none_returns_first(self):
-        assert _combine_idle_duration(7200, None) == 7200
+        assert _combine_idle_duration_optional(7200, None) == 7200
 
     def test_both_positive_returns_minimum(self):
-        assert _combine_idle_duration(3600, 7200) == 3600
-        assert _combine_idle_duration(7200, 3600) == 3600
+        assert _combine_idle_duration_optional(3600, 7200) == 3600
+        assert _combine_idle_duration_optional(7200, 3600) == 3600
 
     def test_both_negative_returns_minimum(self):
-        assert _combine_idle_duration(-1, -2) == -2
-        assert _combine_idle_duration(-2, -1) == -2
+        assert _combine_idle_duration_optional(-1, -2) == -2
+        assert _combine_idle_duration_optional(-2, -1) == -2
 
     def test_both_zero_returns_zero(self):
-        assert _combine_idle_duration(0, 0) == 0
+        assert _combine_idle_duration_optional(0, 0) == 0
 
     def test_positive_and_negative_raises_error(self):
         with pytest.raises(
             CombineError, match="idle_duration values 3600 and -1 cannot be combined"
         ):
-            _combine_idle_duration(3600, -1)
+            _combine_idle_duration_optional(3600, -1)
 
     def test_negative_and_positive_raises_error(self):
         with pytest.raises(
             CombineError, match="idle_duration values -1 and 3600 cannot be combined"
         ):
-            _combine_idle_duration(-1, 3600)
+            _combine_idle_duration_optional(-1, 3600)
 
     def test_zero_and_positive_returns_zero(self):
-        assert _combine_idle_duration(0, 3600) == 0
-        assert _combine_idle_duration(3600, 0) == 0
+        assert _combine_idle_duration_optional(0, 3600) == 0
+        assert _combine_idle_duration_optional(3600, 0) == 0
 
     def test_zero_and_negative_raises_error(self):
         with pytest.raises(CombineError, match="idle_duration values 0 and -1 cannot be combined"):
-            _combine_idle_duration(0, -1)
+            _combine_idle_duration_optional(0, -1)
         with pytest.raises(CombineError, match="idle_duration values -1 and 0 cannot be combined"):
-            _combine_idle_duration(-1, 0)
+            _combine_idle_duration_optional(-1, 0)
 
 
 class TestCombineSpotPolicy:
     def test_both_none_returns_none(self):
-        assert _combine_spot_policy(None, None) is None
+        assert _combine_spot_policy_optional(None, None) is None
 
     def test_first_none_returns_second(self):
-        assert _combine_spot_policy(None, SpotPolicy.SPOT) == SpotPolicy.SPOT
-        assert _combine_spot_policy(None, SpotPolicy.ONDEMAND) == SpotPolicy.ONDEMAND
-        assert _combine_spot_policy(None, SpotPolicy.AUTO) == SpotPolicy.AUTO
+        assert _combine_spot_policy_optional(None, SpotPolicy.SPOT) == SpotPolicy.SPOT
+        assert _combine_spot_policy_optional(None, SpotPolicy.ONDEMAND) == SpotPolicy.ONDEMAND
+        assert _combine_spot_policy_optional(None, SpotPolicy.AUTO) == SpotPolicy.AUTO
 
     def test_second_none_returns_first(self):
-        assert _combine_spot_policy(SpotPolicy.SPOT, None) == SpotPolicy.SPOT
-        assert _combine_spot_policy(SpotPolicy.ONDEMAND, None) == SpotPolicy.ONDEMAND
-        assert _combine_spot_policy(SpotPolicy.AUTO, None) == SpotPolicy.AUTO
+        assert _combine_spot_policy_optional(SpotPolicy.SPOT, None) == SpotPolicy.SPOT
+        assert _combine_spot_policy_optional(SpotPolicy.ONDEMAND, None) == SpotPolicy.ONDEMAND
+        assert _combine_spot_policy_optional(SpotPolicy.AUTO, None) == SpotPolicy.AUTO
 
     def test_auto_with_other_returns_other(self):
-        assert _combine_spot_policy(SpotPolicy.AUTO, SpotPolicy.SPOT) == SpotPolicy.SPOT
-        assert _combine_spot_policy(SpotPolicy.AUTO, SpotPolicy.ONDEMAND) == SpotPolicy.ONDEMAND
-        assert _combine_spot_policy(SpotPolicy.SPOT, SpotPolicy.AUTO) == SpotPolicy.SPOT
-        assert _combine_spot_policy(SpotPolicy.ONDEMAND, SpotPolicy.AUTO) == SpotPolicy.ONDEMAND
+        assert _combine_spot_policy_optional(SpotPolicy.AUTO, SpotPolicy.SPOT) == SpotPolicy.SPOT
+        assert (
+            _combine_spot_policy_optional(SpotPolicy.AUTO, SpotPolicy.ONDEMAND)
+            == SpotPolicy.ONDEMAND
+        )
+        assert _combine_spot_policy_optional(SpotPolicy.SPOT, SpotPolicy.AUTO) == SpotPolicy.SPOT
+        assert (
+            _combine_spot_policy_optional(SpotPolicy.ONDEMAND, SpotPolicy.AUTO)
+            == SpotPolicy.ONDEMAND
+        )
 
     def test_auto_with_auto_returns_auto(self):
-        assert _combine_spot_policy(SpotPolicy.AUTO, SpotPolicy.AUTO) == SpotPolicy.AUTO
+        assert _combine_spot_policy_optional(SpotPolicy.AUTO, SpotPolicy.AUTO) == SpotPolicy.AUTO
 
     def test_same_non_auto_values_return_same(self):
-        assert _combine_spot_policy(SpotPolicy.SPOT, SpotPolicy.SPOT) == SpotPolicy.SPOT
+        assert _combine_spot_policy_optional(SpotPolicy.SPOT, SpotPolicy.SPOT) == SpotPolicy.SPOT
         assert (
-            _combine_spot_policy(SpotPolicy.ONDEMAND, SpotPolicy.ONDEMAND) == SpotPolicy.ONDEMAND
+            _combine_spot_policy_optional(SpotPolicy.ONDEMAND, SpotPolicy.ONDEMAND)
+            == SpotPolicy.ONDEMAND
         )
 
     def test_different_non_auto_values_raise_error(self):
@@ -271,13 +278,13 @@ class TestCombineSpotPolicy:
             CombineError,
             match="spot_policy values SpotPolicy.SPOT and SpotPolicy.ONDEMAND cannot be combined",
         ):
-            _combine_spot_policy(SpotPolicy.SPOT, SpotPolicy.ONDEMAND)
+            _combine_spot_policy_optional(SpotPolicy.SPOT, SpotPolicy.ONDEMAND)
 
         with pytest.raises(
             CombineError,
             match="spot_policy values SpotPolicy.ONDEMAND and SpotPolicy.SPOT cannot be combined",
         ):
-            _combine_spot_policy(SpotPolicy.ONDEMAND, SpotPolicy.SPOT)
+            _combine_spot_policy_optional(SpotPolicy.ONDEMAND, SpotPolicy.SPOT)
 
 
 class TestCombineResources:
@@ -344,17 +351,17 @@ class TestCombineCpu:
 
 class TestCombineGpu:
     def test_both_none_returns_none(self):
-        assert _combine_gpu(None, None) is None
+        assert _combine_gpu_optional(None, None) is None
 
     def test_first_none_returns_copy_of_second(self):
         gpu2 = GPUSpec(count=Range(min=1, max=2))
-        result = _combine_gpu(None, gpu2)
+        result = _combine_gpu_optional(None, gpu2)
         assert result == gpu2
         assert result is not gpu2  # Should be a copy
 
     def test_second_none_returns_copy_of_first(self):
         gpu1 = GPUSpec(count=Range(min=2, max=4))
-        result = _combine_gpu(gpu1, None)
+        result = _combine_gpu_optional(gpu1, None)
         assert result == gpu1
         assert result is not gpu1  # Should be a copy
 
@@ -373,7 +380,7 @@ class TestCombineGpu:
             memory=Range(min=Memory(16), max=Memory(24)),
             compute_capability=ComputeCapability((7, 0)),
         )
-        assert _combine_gpu(gpu1, gpu2) == GPUSpec(
+        assert _combine_gpu_optional(gpu1, gpu2) == GPUSpec(
             vendor=gpuhunt.AcceleratorVendor.NVIDIA,
             name=["V100"],
             count=Range(min=2, max=3),
@@ -385,16 +392,16 @@ class TestCombineGpu:
         gpu1 = GPUSpec(vendor=gpuhunt.AcceleratorVendor.NVIDIA, count=Range(min=1, max=2))
         gpu2 = GPUSpec(vendor=gpuhunt.AcceleratorVendor.AMD, count=Range(min=1, max=2))
         with pytest.raises(CombineError):
-            _combine_gpu(gpu1, gpu2)
+            _combine_gpu_optional(gpu1, gpu2)
 
     def test_non_overlapping_count_ranges_raises_error(self):
         gpu1 = GPUSpec(count=Range(min=1, max=2))
         gpu2 = GPUSpec(count=Range(min=4, max=6))
         with pytest.raises(CombineError):
-            _combine_gpu(gpu1, gpu2)
+            _combine_gpu_optional(gpu1, gpu2)
 
     def test_non_overlapping_memory_ranges_raises_error(self):
         gpu1 = GPUSpec(count=Range(min=1, max=2), memory=Range(min=Memory(8), max=Memory(16)))
         gpu2 = GPUSpec(count=Range(min=1, max=2), memory=Range(min=Memory(32), max=Memory(64)))
         with pytest.raises(CombineError):
-            _combine_gpu(gpu1, gpu2)
+            _combine_gpu_optional(gpu1, gpu2)

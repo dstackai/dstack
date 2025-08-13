@@ -1,4 +1,6 @@
-from typing import Optional, TypeVar, Union
+from typing import Callable, Optional, TypeVar, Union
+
+from pydantic import BaseModel
 
 from dstack._internal.core.models.profiles import Profile, SpotPolicy
 from dstack._internal.core.models.resources import (
@@ -24,20 +26,22 @@ def combine_fleet_and_run_profiles(
     """
     try:
         return Profile(
-            backends=_intersect_lists(fleet_profile.backends, run_profile.backends),
-            regions=_intersect_lists(fleet_profile.regions, run_profile.regions),
-            availability_zones=_intersect_lists(
+            backends=_intersect_lists_optional(fleet_profile.backends, run_profile.backends),
+            regions=_intersect_lists_optional(fleet_profile.regions, run_profile.regions),
+            availability_zones=_intersect_lists_optional(
                 fleet_profile.availability_zones, run_profile.availability_zones
             ),
-            instance_types=_intersect_lists(
+            instance_types=_intersect_lists_optional(
                 fleet_profile.instance_types, run_profile.instance_types
             ),
-            reservation=_get_optional_single_value(
+            reservation=_get_single_value_optional(
                 fleet_profile.reservation, run_profile.reservation
             ),
-            spot_policy=_combine_spot_policy(fleet_profile.spot_policy, run_profile.spot_policy),
-            max_price=_get_optional_min(fleet_profile.max_price, run_profile.max_price),
-            idle_duration=_combine_idle_duration(
+            spot_policy=_combine_spot_policy_optional(
+                fleet_profile.spot_policy, run_profile.spot_policy
+            ),
+            max_price=_get_min_optional(fleet_profile.max_price, run_profile.max_price),
+            idle_duration=_combine_idle_duration_optional(
                 fleet_profile.idle_duration, run_profile.idle_duration
             ),  # converted by validator
         )
@@ -51,9 +55,9 @@ def combine_fleet_and_run_requirements(
     try:
         return Requirements(
             resources=_combine_resources(fleet_requirements.resources, run_requirements.resources),
-            max_price=_get_optional_min(fleet_requirements.max_price, run_requirements.max_price),
-            spot=_combine_spot(fleet_requirements.spot, run_requirements.spot),
-            reservation=_get_optional_single_value(
+            max_price=_get_min_optional(fleet_requirements.max_price, run_requirements.max_price),
+            spot=_combine_spot_optional(fleet_requirements.spot, run_requirements.spot),
+            reservation=_get_single_value_optional(
                 fleet_requirements.reservation, run_requirements.reservation
             ),
         )
@@ -62,11 +66,14 @@ def combine_fleet_and_run_requirements(
 
 
 T = TypeVar("T")
+ModelT = TypeVar("ModelT", bound=BaseModel)
 CompT = TypeVar("CompT", bound=Union[float, int])
 StrT = TypeVar("StrT", bound=str)
 
 
-def _intersect_lists(list1: Optional[list[T]], list2: Optional[list[T]]) -> Optional[list[T]]:
+def _intersect_lists_optional(
+    list1: Optional[list[T]], list2: Optional[list[T]]
+) -> Optional[list[T]]:
     if list1 is None:
         if list2 is None:
             return None
@@ -76,37 +83,25 @@ def _intersect_lists(list1: Optional[list[T]], list2: Optional[list[T]]) -> Opti
     return [x for x in list1 if x in list2]
 
 
-def _get_optional_min(value1: Optional[CompT], value2: Optional[CompT]) -> Optional[CompT]:
-    if value1 is None:
-        if value2 is None:
-            return None
-        return value2
-    if value2 is None:
-        return value1
+def _get_min(value1: CompT, value2: CompT) -> CompT:
     return min(value1, value2)
 
 
-def _get_optional_single_value(value1: Optional[T], value2: Optional[T]) -> Optional[T]:
-    if value1 is None:
-        if value2 is None:
-            return None
-        return value2
-    if value2 is None:
-        return value1
+def _get_min_optional(value1: Optional[CompT], value2: Optional[CompT]) -> Optional[CompT]:
+    return _combine_optional(value1, value2, _get_min)
+
+
+def _get_single_value(value1: T, value2: T) -> T:
     if value1 == value2:
         return value1
     raise CombineError(f"Values {value1} and {value2} cannot be combined")
 
 
-def _combine_spot_policy(
-    value1: Optional[SpotPolicy], value2: Optional[SpotPolicy]
-) -> Optional[SpotPolicy]:
-    if value1 is None:
-        if value2 is None:
-            return None
-        return value2
-    if value2 is None:
-        return value1
+def _get_single_value_optional(value1: Optional[T], value2: Optional[T]) -> Optional[T]:
+    return _combine_optional(value1, value2, _get_single_value)
+
+
+def _combine_spot_policy(value1: SpotPolicy, value2: SpotPolicy) -> SpotPolicy:
     if value1 == SpotPolicy.AUTO:
         return value2
     if value2 == SpotPolicy.AUTO:
@@ -116,31 +111,35 @@ def _combine_spot_policy(
     raise CombineError(f"spot_policy values {value1} and {value2} cannot be combined")
 
 
-def _combine_idle_duration(value1: Optional[int], value2: Optional[int]) -> Optional[int]:
-    if value1 is None:
-        if value2 is None:
-            return None
-        return value2
-    if value2 is None:
-        return value1
+def _combine_spot_policy_optional(
+    value1: Optional[SpotPolicy], value2: Optional[SpotPolicy]
+) -> Optional[SpotPolicy]:
+    return _combine_optional(value1, value2, _combine_spot_policy)
+
+
+def _combine_idle_duration(value1: int, value2: int) -> int:
     if value1 < 0 and value2 >= 0 or value2 < 0 and value1 >= 0:
         raise CombineError(f"idle_duration values {value1} and {value2} cannot be combined")
     return min(value1, value2)
+
+
+def _combine_idle_duration_optional(value1: Optional[int], value2: Optional[int]) -> Optional[int]:
+    return _combine_optional(value1, value2, _combine_idle_duration)
 
 
 def _combine_resources(value1: ResourcesSpec, value2: ResourcesSpec) -> ResourcesSpec:
     return ResourcesSpec(
         cpu=_combine_cpu(value1.cpu, value2.cpu),  # converted by validator
         memory=_combine_memory(value1.memory, value2.memory),
-        shm_size=_combine_shm_size(value1.shm_size, value2.shm_size),
-        gpu=_combine_gpu(value1.gpu, value2.gpu),
-        disk=_combine_disk(value1.disk, value2.disk),
+        shm_size=_combine_shm_size_optional(value1.shm_size, value2.shm_size),
+        gpu=_combine_gpu_optional(value1.gpu, value2.gpu),
+        disk=_combine_disk_optional(value1.disk, value2.disk),
     )
 
 
 def _combine_cpu(value1: CPUSpec, value2: CPUSpec) -> CPUSpec:
     return CPUSpec(
-        arch=_get_optional_single_value(value1.arch, value2.arch),
+        arch=_get_single_value_optional(value1.arch, value2.arch),
         count=_combine_range(value1.count, value2.count),
     )
 
@@ -149,52 +148,50 @@ def _combine_memory(value1: Range[Memory], value2: Range[Memory]) -> Range[Memor
     return _combine_range(value1, value2)
 
 
-def _combine_shm_size(value1: Optional[Memory], value2: Optional[Memory]) -> Optional[Memory]:
-    return _get_optional_min(value1, value2)
+def _combine_shm_size_optional(
+    value1: Optional[Memory], value2: Optional[Memory]
+) -> Optional[Memory]:
+    return _get_min_optional(value1, value2)
 
 
-def _combine_gpu(value1: Optional[GPUSpec], value2: Optional[GPUSpec]) -> Optional[GPUSpec]:
-    if value1 is None:
-        if value2 is None:
-            return None
-        return value2.copy(deep=True)
-    if value2 is None:
-        return value1.copy(deep=True)
+def _combine_gpu(value1: GPUSpec, value2: GPUSpec) -> GPUSpec:
     return GPUSpec(
-        vendor=_get_optional_single_value(value1.vendor, value2.vendor),
-        name=_intersect_lists(value1.name, value2.name),
+        vendor=_get_single_value_optional(value1.vendor, value2.vendor),
+        name=_intersect_lists_optional(value1.name, value2.name),
         count=_combine_range(value1.count, value2.count),
         memory=_combine_range_optional(value1.memory, value2.memory),
         total_memory=_combine_range_optional(value1.total_memory, value2.total_memory),
         # TODO: min compute_capability
-        compute_capability=_get_optional_single_value(
+        compute_capability=_get_single_value_optional(
             value1.compute_capability, value2.compute_capability
         ),
     )
 
 
-def _combine_disk(value1: Optional[DiskSpec], value2: Optional[DiskSpec]) -> Optional[DiskSpec]:
-    if value1 is None:
-        if value2 is None:
-            return None
-        return value2.copy(deep=True)
-    if value2 is None:
-        return value1.copy(deep=True)
-    return DiskSpec(
-        size=_combine_range(value1.size, value2.size),
-    )
+def _combine_gpu_optional(
+    value1: Optional[GPUSpec], value2: Optional[GPUSpec]
+) -> Optional[GPUSpec]:
+    return _combine_models_optional(value1, value2, _combine_gpu)
 
 
-def _combine_spot(value1: Optional[bool], value2: Optional[bool]) -> Optional[bool]:
-    if value1 is None:
-        if value2 is None:
-            return None
-        return value2
-    if value2 is None:
-        return value1
+def _combine_disk(value1: DiskSpec, value2: DiskSpec) -> DiskSpec:
+    return DiskSpec(size=_combine_range(value1.size, value2.size))
+
+
+def _combine_disk_optional(
+    value1: Optional[DiskSpec], value2: Optional[DiskSpec]
+) -> Optional[DiskSpec]:
+    return _combine_models_optional(value1, value2, _combine_disk)
+
+
+def _combine_spot(value1: bool, value2: bool) -> bool:
     if value1 != value2:
         raise CombineError(f"spot values {value1} and {value2} cannot be combined")
     return value1
+
+
+def _combine_spot_optional(value1: Optional[bool], value2: Optional[bool]) -> Optional[bool]:
+    return _combine_optional(value1, value2, _combine_spot)
 
 
 def _combine_range(value1: Range, value2: Range) -> Range:
@@ -205,10 +202,28 @@ def _combine_range(value1: Range, value2: Range) -> Range:
 
 
 def _combine_range_optional(value1: Optional[Range], value2: Optional[Range]) -> Optional[Range]:
+    return _combine_models_optional(value1, value2, _combine_range)
+
+
+def _combine_optional(
+    value1: Optional[T], value2: Optional[T], combiner: Callable[[T, T], T]
+) -> Optional[T]:
     if value1 is None:
-        if value2 is None:
-            return None
-        return value2.copy(deep=True)
+        return value2
+    if value2 is None:
+        return value1
+    return combiner(value1, value2)
+
+
+def _combine_models_optional(
+    value1: Optional[ModelT],
+    value2: Optional[ModelT],
+    combiner: Callable[[ModelT, ModelT], ModelT],
+) -> Optional[ModelT]:
+    if value1 is None:
+        if value2 is not None:
+            return value2.copy(deep=True)
+        return None
     if value2 is None:
         return value1.copy(deep=True)
-    return _combine_range(value1, value2)
+    return combiner(value1, value2)
