@@ -569,7 +569,7 @@ def get_fleet_spec(conf: Optional[FleetConfiguration] = None) -> FleetSpec:
     return FleetSpec(
         configuration=conf,
         configuration_path="fleet.dstack.yml",
-        profile=Profile(name=""),
+        profile=Profile(),
     )
 
 

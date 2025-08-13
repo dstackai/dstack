@@ -77,7 +77,7 @@ def parse_off_duration(v: Optional[Union[int, str, bool]]) -> Optional[Union[str
     return parse_duration(v)
 
 
-def parse_idle_duration(v: Optional[Union[int, str]]) -> Optional[Union[str, int]]:
+def parse_idle_duration(v: Optional[Union[int, str]]) -> Optional[int]:
     if v == "off" or v == -1:
         return -1
     return parse_duration(v)
@@ -366,7 +366,7 @@ class ProfileProps(CoreModel):
         Field(
             description="The name of the profile that can be passed as `--profile` to `dstack apply`"
         ),
-    ]
+    ] = ""
     default: Annotated[
         bool, Field(description="If set to true, `dstack apply` will use this profile by default.")
     ] = False
