@@ -1,6 +1,6 @@
 from typing import Optional, TypeVar, Union
 
-from dstack._internal.core.models.profiles import Profile
+from dstack._internal.core.models.profiles import Profile, SpotPolicy
 from dstack._internal.core.models.resources import (
     CPUSpec,
     DiskSpec,
@@ -35,6 +35,7 @@ def combine_fleet_and_run_profiles(
             reservation=_get_optional_single_value(
                 fleet_profile.reservation, run_profile.reservation
             ),
+            spot_policy=_combine_spot_policy(fleet_profile.spot_policy, run_profile.spot_policy),
             max_price=_get_optional_min(fleet_profile.max_price, run_profile.max_price),
             idle_duration=_combine_idle_duration(
                 fleet_profile.idle_duration, run_profile.idle_duration
@@ -95,6 +96,24 @@ def _get_optional_single_value(value1: Optional[T], value2: Optional[T]) -> Opti
     if value1 == value2:
         return value1
     raise CombineError(f"Values {value1} and {value2} cannot be combined")
+
+
+def _combine_spot_policy(
+    value1: Optional[SpotPolicy], value2: Optional[SpotPolicy]
+) -> Optional[SpotPolicy]:
+    if value1 is None:
+        if value2 is None:
+            return None
+        return value2
+    if value2 is None:
+        return value1
+    if value1 == SpotPolicy.AUTO:
+        return value2
+    if value2 == SpotPolicy.AUTO:
+        return value1
+    if value1 == value2:
+        return value1
+    raise CombineError(f"spot_policy values {value1} and {value2} cannot be combined")
 
 
 def _combine_idle_duration(value1: Optional[int], value2: Optional[int]) -> Optional[int]:

@@ -282,7 +282,7 @@ class ProfileParams(CoreModel):
         ),
     ] = None
     idle_duration: Annotated[
-        Optional[Union[Literal["off"], str, int]],
+        Optional[Union[Literal["off"], int, str]],
         Field(
             description=(
                 "Time to wait before terminating idle instances."
