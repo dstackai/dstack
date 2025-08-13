@@ -165,7 +165,7 @@ def _combine_gpu(value1: Optional[GPUSpec], value2: Optional[GPUSpec]) -> Option
         name=_intersect_lists(value1.name, value2.name),
         count=_combine_range(value1.count, value2.count),
         memory=_combine_range_optional(value1.memory, value2.memory),
-        total_memory=_combine_range_optional(value1.memory, value2.memory),
+        total_memory=_combine_range_optional(value1.total_memory, value2.total_memory),
         # TODO: min compute_capability
         compute_capability=_get_optional_single_value(
             value1.compute_capability, value2.compute_capability
