@@ -23,7 +23,6 @@ from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import (
     InstanceModel,
     JobModel,
-    ProbeModel,
     ProjectModel,
     RunModel,
     UserModel,
@@ -37,7 +36,7 @@ from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.prometheus.client_metrics import run_metrics
 from dstack._internal.server.services.runs import (
     fmt,
-    is_replica_ready,
+    is_replica_registered,
     process_terminating_run,
     retry_run_replica_jobs,
     run_model_to_run,
@@ -150,11 +149,6 @@ async def _process_run(session: AsyncSession, run_model: RunModel):
             selectinload(RunModel.jobs)
             .joinedload(JobModel.instance)
             .load_only(InstanceModel.fleet_id)
-        )
-        .options(
-            selectinload(RunModel.jobs)
-            .joinedload(JobModel.probes)
-            .load_only(ProbeModel.success_streak)
         )
         .execution_options(populate_existing=True)
     )
@@ -465,6 +459,9 @@ async def _handle_run_replicas(
         run_spec=run_spec,
     )
     if _has_out_of_date_replicas(run_model):
+        assert run_spec.configuration.type == "service", (
+            "Rolling deployment is only supported for services"
+        )
         non_terminated_replica_count = len(
             {j.replica_num for j in run_model.jobs if not j.status.is_finished()}
         )
@@ -479,22 +476,24 @@ async def _handle_run_replicas(
             )
 
         replicas_to_stop_count = 0
-        # stop any out-of-date replicas that are not ready
+        # stop any out-of-date replicas that are not registered
         replicas_to_stop_count += sum(
             any(j.deployment_num < run_model.deployment_num for j in jobs)
             and any(
                 j.status not in [JobStatus.TERMINATING] + JobStatus.finished_statuses()
                 for j in jobs
             )
-            and not is_replica_ready(jobs)
+            and not is_replica_registered(jobs)
             for _, jobs in group_jobs_by_replica_latest(run_model.jobs)
         )
-        ready_replica_count = sum(
-            is_replica_ready(jobs) for _, jobs in group_jobs_by_replica_latest(run_model.jobs)
+        # stop excessive registered out-of-date replicas, except those that are already `terminating`
+        non_terminating_registered_replicas_count = sum(
+            is_replica_registered(jobs) and all(j.status != JobStatus.TERMINATING for j in jobs)
+            for _, jobs in group_jobs_by_replica_latest(run_model.jobs)
         )
-        if ready_replica_count > run_model.desired_replica_count:
-            # stop excessive ready out-of-date replicas
-            replicas_to_stop_count += ready_replica_count - run_model.desired_replica_count
+        replicas_to_stop_count += max(
+            0, non_terminating_registered_replicas_count - run_model.desired_replica_count
+        )
         if replicas_to_stop_count:
             await scale_run_replicas(
                 session,

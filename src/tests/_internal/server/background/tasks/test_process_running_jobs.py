@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
@@ -57,6 +58,7 @@ from dstack._internal.server.testing.common import (
     create_instance,
     create_job,
     create_job_metrics_point,
+    create_probe,
     create_project,
     create_repo,
     create_run,
@@ -100,6 +102,12 @@ def runner_client_mock(monkeypatch: pytest.MonkeyPatch) -> Mock:
         "dstack._internal.server.services.runner.client.RunnerClient", Mock(return_value=mock)
     )
     return mock
+
+
+@dataclass
+class _ProbeSetup:
+    success_streak: int
+    ready_after: int
 
 
 class TestProcessRunningJobs:
@@ -900,8 +908,8 @@ class TestProcessRunningJobs:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    @pytest.mark.parametrize("probe_count", [0, 1, 2])
-    async def test_creates_probe_models(
+    @pytest.mark.parametrize("probe_count", [1, 2])
+    async def test_creates_probe_models_and_not_registers_service_replica(
         self,
         test_db,
         probe_count: int,
@@ -956,6 +964,143 @@ class TestProcessRunningJobs:
         ).scalar_one()
         assert job.status == JobStatus.RUNNING
         assert [p.probe_num for p in job.probes] == list(range(probe_count))
+        assert not job.registered  # do not register, probes haven't passed yet
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_registers_service_replica_immediately_if_no_probes(
+        self,
+        test_db,
+        session: AsyncSession,
+        ssh_tunnel_mock: Mock,
+        shim_client_mock: Mock,
+        runner_client_mock: Mock,
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_spec=get_run_spec(
+                run_name="test",
+                repo_id=repo.name,
+                configuration=ServiceConfiguration(port=80, image="ubuntu"),
+            ),
+        )
+        instance = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.BUSY,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.PULLING,
+            job_provisioning_data=get_job_provisioning_data(dockerized=True),
+            instance=instance,
+            instance_assigned=True,
+        )
+        shim_client_mock.get_task.return_value.status = TaskStatus.RUNNING
+
+        await process_running_jobs()
+
+        await session.refresh(job)
+        assert job.status == JobStatus.RUNNING
+        assert job.registered
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.parametrize(
+        ("probes", "expect_to_register"),
+        [
+            (
+                [
+                    _ProbeSetup(success_streak=0, ready_after=1),
+                ],
+                False,
+            ),
+            (
+                [
+                    _ProbeSetup(success_streak=1, ready_after=1),
+                ],
+                True,
+            ),
+            (
+                [
+                    _ProbeSetup(success_streak=1, ready_after=1),
+                    _ProbeSetup(success_streak=1, ready_after=2),
+                ],
+                False,
+            ),
+            (
+                [
+                    _ProbeSetup(success_streak=1, ready_after=1),
+                    _ProbeSetup(success_streak=3, ready_after=2),
+                ],
+                True,
+            ),
+        ],
+    )
+    async def test_registers_service_replica_only_after_probes_pass(
+        self,
+        test_db,
+        session: AsyncSession,
+        ssh_tunnel_mock: Mock,
+        shim_client_mock: Mock,
+        runner_client_mock: Mock,
+        probes: list[_ProbeSetup],
+        expect_to_register: bool,
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_spec=get_run_spec(
+                run_name="test",
+                repo_id=repo.name,
+                configuration=ServiceConfiguration(
+                    port=80,
+                    image="ubuntu",
+                    probes=[
+                        ProbeConfig(type="http", url=f"/{i}", ready_after=p.ready_after)
+                        for i, p in enumerate(probes)
+                    ],
+                ),
+            ),
+        )
+        instance = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.BUSY,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            job_provisioning_data=get_job_provisioning_data(dockerized=True),
+            instance=instance,
+            instance_assigned=True,
+            registered=False,
+        )
+        for i, probe in enumerate(probes):
+            await create_probe(
+                session=session, job=job, probe_num=i, success_streak=probe.success_streak
+            )
+        runner_client_mock.pull.return_value = PullResponse(
+            job_states=[], job_logs=[], runner_logs=[], last_updated=0
+        )
+
+        await process_running_jobs()
+
+        await session.refresh(job)
+        assert job.registered == expect_to_register
 
 
 class TestPatchBaseImageForAwsEfa:
