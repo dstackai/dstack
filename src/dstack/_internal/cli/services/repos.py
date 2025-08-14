@@ -1,12 +1,12 @@
+import argparse
 from pathlib import Path
 from typing import Optional
 
 from dstack._internal.cli.services.configurators.base import ArgsParser
 from dstack._internal.core.errors import CLIError
-from dstack._internal.core.models.repos.base import Repo, RepoType
+from dstack._internal.core.models.repos.base import Repo
 from dstack._internal.core.models.repos.remote import GitRepoURL, RemoteRepo, RepoError
 from dstack._internal.core.models.repos.virtual import VirtualRepo
-from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.core.services.repos import get_default_branch
 from dstack._internal.utils.path import PathLike
 from dstack.api._public import Client
@@ -28,49 +28,31 @@ def register_init_repo_args(parser: ArgsParser):
         type=str,
         dest="git_identity_file",
     )
-    parser.add_argument(
-        "--ssh-identity",
-        metavar="SSH_PRIVATE_KEY",
-        help="The private SSH key path for SSH tunneling",
-        type=Path,
-        dest="ssh_identity_file",
-    )
+    # Deprecated since 0.19.25
     parser.add_argument(
         "--local",
         action="store_true",
-        help="Do not use Git",
+        help=argparse.SUPPRESS,
     )
 
 
 def init_repo(
     api: Client,
-    repo_path: Optional[PathLike],
+    repo_path: PathLike,
     repo_branch: Optional[str],
     repo_hash: Optional[str],
     local: bool,
     git_identity_file: Optional[PathLike],
     oauth_token: Optional[str],
-    ssh_identity_file: Optional[PathLike],
 ) -> Repo:
-    init = True
-    if repo_path is None:
-        init = False
-        repo_path = Path.cwd()
     if Path(repo_path).exists():
         repo = api.repos.load(
             repo_dir=repo_path,
             local=local,
-            init=init,
+            init=True,
             git_identity_file=git_identity_file,
             oauth_token=oauth_token,
         )
-        if ssh_identity_file:
-            ConfigManager().save_repo_config(
-                repo_path=repo.get_repo_dir_or_error(),
-                repo_id=repo.repo_id,
-                repo_type=RepoType(repo.run_repo_data.repo_type),
-                ssh_key_path=ssh_identity_file,
-            )
     elif isinstance(repo_path, str):
         try:
             GitRepoURL.parse(repo_path)

@@ -103,3 +103,10 @@ def add_row_from_dict(table: Table, data: Dict[Union[str, int], Any], **kwargs):
         else:
             row.append("")
     table.add_row(*row, **kwargs)
+
+
+def warn(message: str):
+    if not message.endswith("\n"):
+        # Additional blank line for better visibility if there are more than one warning
+        message = f"{message}\n"
+    console.print(f"[warning][bold]{message}[/]")
