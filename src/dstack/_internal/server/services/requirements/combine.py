@@ -1,4 +1,4 @@
-from typing import Callable, Optional, TypeVar
+from typing import Callable, Optional, Protocol, Self, TypeVar
 
 from pydantic import BaseModel
 
@@ -45,6 +45,7 @@ def combine_fleet_and_run_profiles(
             idle_duration=_combine_idle_duration_optional(
                 fleet_profile.idle_duration, run_profile.idle_duration
             ),  # converted by validator
+            tags=_combine_tags_optional(fleet_profile.tags, run_profile.tags),
         )
     except CombineError:
         return None
@@ -69,6 +70,13 @@ def combine_fleet_and_run_requirements(
 _T = TypeVar("_T")
 _ModelT = TypeVar("_ModelT", bound=BaseModel)
 _CompT = TypeVar("_CompT", bound=SupportsRichComparison)
+
+
+class _SupportsCopy(Protocol):
+    def copy(self) -> Self: ...
+
+
+_CopyT = TypeVar("_CopyT", bound=_SupportsCopy)
 
 
 def _intersect_lists_optional(
@@ -125,6 +133,16 @@ def _combine_idle_duration(value1: int, value2: int) -> int:
 
 def _combine_idle_duration_optional(value1: Optional[int], value2: Optional[int]) -> Optional[int]:
     return _combine_optional(value1, value2, _combine_idle_duration)
+
+
+def _combine_tags_optional(
+    value1: Optional[dict[str, str]], value2: Optional[dict[str, str]]
+) -> Optional[dict[str, str]]:
+    return _combine_copy_optional(value1, value2, _combine_tags)
+
+
+def _combine_tags(value1: dict[str, str], value2: dict[str, str]) -> dict[str, str]:
+    return value1 | value2
 
 
 def _combine_resources(value1: ResourcesSpec, value2: ResourcesSpec) -> ResourcesSpec:
@@ -223,4 +241,18 @@ def _combine_models_optional(
         return None
     if value2 is None:
         return value1.copy(deep=True)
+    return combiner(value1, value2)
+
+
+def _combine_copy_optional(
+    value1: Optional[_CopyT],
+    value2: Optional[_CopyT],
+    combiner: Callable[[_CopyT, _CopyT], _CopyT],
+) -> Optional[_CopyT]:
+    if value1 is None:
+        if value2 is not None:
+            return value2.copy()
+        return None
+    if value2 is None:
+        return value1.copy()
     return combiner(value1, value2)

@@ -39,6 +39,7 @@ class TestCombineFleetAndRunProfiles:
             reservation="r-12345",
             spot_policy=SpotPolicy.AUTO,
             idle_duration=3600,
+            tags={"tag": "value"},
         )
         assert combine_fleet_and_run_profiles(profile, profile) == profile
 
@@ -59,6 +60,7 @@ class TestCombineFleetAndRunProfiles:
                     reservation="r-1",
                     spot_policy=SpotPolicy.AUTO,
                     idle_duration=3600,
+                    tags={"tag1": "value1"},
                 ),
                 Profile(
                     backends=[BackendType.GCP, BackendType.RUNPOD],
@@ -67,6 +69,7 @@ class TestCombineFleetAndRunProfiles:
                     reservation="r-1",
                     spot_policy=SpotPolicy.SPOT,
                     idle_duration=7200,
+                    tags={"tag2": "value2"},
                 ),
                 Profile(
                     backends=[BackendType.GCP],
@@ -75,6 +78,7 @@ class TestCombineFleetAndRunProfiles:
                     reservation="r-1",
                     spot_policy=SpotPolicy.SPOT,
                     idle_duration=3600,
+                    tags={"tag1": "value1", "tag2": "value2"},
                 ),
                 id="compatible_profiles",
             ),
