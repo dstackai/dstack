@@ -19,7 +19,7 @@ $ dstack apply --help
 
 ## User SSH key
 
-By default, `dstack` uses its own SSH key to access runs (`~/.dstack/ssh/id_rsa`).
+By default, `dstack` uses its own SSH key to attach to runs (`~/.dstack/ssh/id_rsa`).
 It is possible to override this key via the `--ssh-identity` argument.
 
 [//]: # (TODO: Provide examples)
