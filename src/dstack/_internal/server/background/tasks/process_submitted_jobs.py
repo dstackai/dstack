@@ -460,13 +460,11 @@ async def _refetch_fleet_models(
             *fleet_filters,
         )
         .where(
-            and_(
-                InstanceModel.id.in_(instances_ids),
-                or_(
-                    InstanceModel.id.is_(None),
-                    and_(
-                        *instance_filters,
-                    ),
+            or_(
+                InstanceModel.id.is_(None),
+                and_(
+                    InstanceModel.id.in_(instances_ids),
+                    *instance_filters,
                 ),
             )
         )
@@ -535,8 +533,12 @@ def _find_optimal_fleet_with_offers(
                 fleet_priority,
             )
         )
-    if all(t[2] == 0 for t in candidate_fleets_with_offers):
-        # If no fleets have available offers, create a new fleet.
+    if run_spec.configuration.fleets is None and all(
+        t[2] == 0 for t in candidate_fleets_with_offers
+    ):
+        # If fleets are not specified and no fleets have available offers, create a new fleet.
+        # This is for compatibility with non-fleet-first UX when runs created new fleets
+        # if there are no instances to reuse.
         return None, []
     candidate_fleets_with_offers.sort(key=lambda t: t[-1])
     return candidate_fleets_with_offers[0][:2]

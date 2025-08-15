@@ -776,15 +776,19 @@ class TestProcessSubmittedJobs:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_assigns_job_to_elastic_empty_fleet(self, test_db, session: AsyncSession):
+    async def test_does_not_assign_job_to_elastic_empty_fleet_if_fleets_unspecified(
+        self, test_db, session: AsyncSession
+    ):
         project = await create_project(session)
         user = await create_user(session)
         repo = await create_repo(session=session, project_id=project.id)
         fleet_spec = get_fleet_spec()
         fleet_spec.configuration.nodes = Range(min=0, max=1)
-        await create_fleet(session=session, project=project, spec=fleet_spec)
+        await create_fleet(session=session, project=project, spec=fleet_spec, name="fleet")
         # Need a second non-empty fleet to have two-stage processing
-        fleet2 = await create_fleet(session=session, project=project, spec=fleet_spec)
+        fleet2 = await create_fleet(
+            session=session, project=project, spec=fleet_spec, name="fleet2"
+        )
         await create_instance(
             session=session,
             project=project,
@@ -807,6 +811,51 @@ class TestProcessSubmittedJobs:
         await session.refresh(job)
         assert job.status == JobStatus.SUBMITTED
         assert job.instance_assigned
+        assert job.instance_id is None
+        assert job.fleet_id is None
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_assigns_job_to_elastic_empty_fleet_if_fleets_specified(
+        self, test_db, session: AsyncSession
+    ):
+        project = await create_project(session)
+        user = await create_user(session)
+        repo = await create_repo(session=session, project_id=project.id)
+        fleet_spec = get_fleet_spec()
+        fleet_spec.configuration.nodes = Range(min=0, max=1)
+        fleet = await create_fleet(session=session, project=project, spec=fleet_spec, name="fleet")
+        # Need a second non-empty fleet to have two-stage processing
+        fleet2 = await create_fleet(
+            session=session, project=project, spec=fleet_spec, name="fleet2"
+        )
+        await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet2,
+            instance_num=0,
+            status=InstanceStatus.BUSY,
+        )
+        run_spec = get_run_spec(repo_id=repo.name)
+        run_spec.configuration.fleets = [fleet.name, fleet2.name]
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_spec=run_spec,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            instance_assigned=False,
+        )
+        await process_submitted_jobs()
+        await session.refresh(job)
+        assert job.status == JobStatus.SUBMITTED
+        assert job.instance_assigned
+        assert job.instance_id is None
+        assert job.fleet_id == fleet.id
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
@@ -852,7 +901,6 @@ class TestProcessSubmittedJobs:
         assert job.status == JobStatus.PROVISIONING
         assert job.instance is not None
         assert job.instance.instance_num == 0
-        assert job.instance.fleet_id == fleet.id
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
