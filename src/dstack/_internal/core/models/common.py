@@ -102,7 +102,7 @@ class RegistryAuth(CoreModel):
         password (str): The password or access token
     """
 
-    class Config:
+    class Config(CoreModel.Config):
         frozen = True
 
     username: Annotated[str, Field(description="The username")]

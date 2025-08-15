@@ -396,6 +396,8 @@ async def _process_active_run(session: AsyncSession, run_model: RunModel):
 
         if new_status == RunStatus.PENDING:
             run_metrics.increment_pending_runs(run_model.project.name, run_spec.configuration.type)
+            # Unassign run from fleet so that the new fleet can be chosen when retrying
+            run_model.fleet = None
 
         run_model.status = new_status
         run_model.termination_reason = termination_reason

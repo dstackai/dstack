@@ -130,7 +130,7 @@ DEFAULT_GPU_COUNT = Range[int](min=1)
 
 
 class CPUSpec(CoreModel):
-    class Config:
+    class Config(CoreModel.Config):
         @staticmethod
         def schema_extra(schema: Dict[str, Any]):
             add_extra_schema_types(
@@ -191,7 +191,7 @@ class CPUSpec(CoreModel):
 
 
 class GPUSpec(CoreModel):
-    class Config:
+    class Config(CoreModel.Config):
         @staticmethod
         def schema_extra(schema: Dict[str, Any]):
             add_extra_schema_types(
@@ -314,7 +314,7 @@ class GPUSpec(CoreModel):
 
 
 class DiskSpec(CoreModel):
-    class Config:
+    class Config(CoreModel.Config):
         @staticmethod
         def schema_extra(schema: Dict[str, Any]):
             add_extra_schema_types(
@@ -340,7 +340,7 @@ DEFAULT_DISK = DiskSpec(size=Range[Memory](min=Memory.parse("100GB"), max=None))
 
 
 class ResourcesSpec(CoreModel):
-    class Config:
+    class Config(CoreModel.Config):
         @staticmethod
         def schema_extra(schema: Dict[str, Any]):
             add_extra_schema_types(

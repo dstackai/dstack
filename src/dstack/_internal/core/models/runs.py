@@ -444,7 +444,7 @@ class RunSpec(CoreModel):
     # TODO: make merged_profile a computed field after migrating to pydanticV2
     merged_profile: Annotated[Profile, Field(exclude=True)] = None
 
-    class Config:
+    class Config(CoreModel.Config):
         @staticmethod
         def schema_extra(schema: Dict[str, Any], model: Type) -> None:
             prop = schema.get("properties", {})

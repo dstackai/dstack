@@ -15,6 +15,7 @@ from dstack._internal.server.models import (
     RunModel,
 )
 from dstack._internal.server.services.fleets import (
+    get_fleet_spec,
     is_fleet_empty,
     is_fleet_in_use,
 )
@@ -92,9 +93,16 @@ async def _process_fleets(session: AsyncSession, fleet_models: List[FleetModel])
 
 
 def _autodelete_fleet(fleet_model: FleetModel) -> bool:
-    # Currently all empty fleets are autodeleted.
-    # TODO: If fleets with `nodes: 0..` are supported, their deletion should be skipped.
     if is_fleet_in_use(fleet_model) or not is_fleet_empty(fleet_model):
+        return False
+
+    fleet_spec = get_fleet_spec(fleet_model)
+    if (
+        fleet_model.status != FleetStatus.TERMINATING
+        and fleet_spec.configuration.nodes is not None
+        and (fleet_spec.configuration.nodes.min is None or fleet_spec.configuration.nodes.min == 0)
+    ):
+        # Empty fleets that allow 0 nodes should not be auto-deleted
         return False
 
     logger.info("Automatic cleanup of an empty fleet %s", fleet_model.name)

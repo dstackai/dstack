@@ -84,7 +84,7 @@ class DecryptedString(CoreModel):
     decrypted: bool = True
     exc: Optional[Exception] = None
 
-    class Config:
+    class Config(CoreModel.Config):
         arbitrary_types_allowed = True
 
     def get_plaintext_or_error(self) -> str:
@@ -390,10 +390,18 @@ class JobModel(BaseModel):
     id: Mapped[uuid.UUID] = mapped_column(
         UUIDType(binary=False), primary_key=True, default=uuid.uuid4
     )
+
     project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
     project: Mapped["ProjectModel"] = relationship()
+
     run_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("runs.id", ondelete="CASCADE"))
     run: Mapped["RunModel"] = relationship()
+
+    # Jobs need to reference fleets because we may choose an optimal fleet for a master job
+    # but not yet create an instance for it.
+    fleet_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("fleets.id"))
+    fleet: Mapped[Optional["FleetModel"]] = relationship(back_populates="jobs")
+
     run_name: Mapped[str] = mapped_column(String(100))
     job_num: Mapped[int] = mapped_column(Integer)
     job_name: Mapped[str] = mapped_column(String(100))
@@ -540,6 +548,7 @@ class FleetModel(BaseModel):
     spec: Mapped[str] = mapped_column(Text)
 
     runs: Mapped[List["RunModel"]] = relationship(back_populates="fleet")
+    jobs: Mapped[List["JobModel"]] = relationship(back_populates="fleet")
     instances: Mapped[List["InstanceModel"]] = relationship(back_populates="fleet")
 
 

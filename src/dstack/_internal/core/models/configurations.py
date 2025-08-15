@@ -20,6 +20,7 @@ from dstack._internal.core.models.services import AnyModel, OpenAIChatModel
 from dstack._internal.core.models.unix import UnixUser
 from dstack._internal.core.models.volumes import MountPoint, VolumeConfiguration, parse_mount_point
 from dstack._internal.utils.common import has_duplicates
+from dstack._internal.utils.json_schema import add_extra_schema_types
 from dstack._internal.utils.json_utils import (
     pydantic_orjson_dumps_with_indent,
 )
@@ -561,7 +562,7 @@ class ServiceConfigurationParams(CoreModel):
     )
     auth: Annotated[bool, Field(description="Enable the authorization")] = True
     replicas: Annotated[
-        Union[conint(ge=1), constr(regex=r"^[0-9]+..[1-9][0-9]*$"), Range[int]],
+        Range[int],
         Field(
             description="The number of replicas. Can be a number (e.g. `2`) or a range (`0..4` or `1..8`). "
             "If it's a range, the `scaling` property is required"
@@ -592,20 +593,13 @@ class ServiceConfigurationParams(CoreModel):
         return v
 
     @validator("replicas")
-    def convert_replicas(cls, v: Any) -> Range[int]:
-        if isinstance(v, str) and ".." in v:
-            min, max = v.replace(" ", "").split("..")
-            v = Range(min=min or 0, max=max or None)
-        elif isinstance(v, (int, float)):
-            v = Range(min=v, max=v)
+    def convert_replicas(cls, v: Range[int]) -> Range[int]:
         if v.max is None:
             raise ValueError("The maximum number of replicas is required")
+        if v.min is None:
+            v.min = 0
         if v.min < 0:
             raise ValueError("The minimum number of replicas must be greater than or equal to 0")
-        if v.max < v.min:
-            raise ValueError(
-                "The maximum number of replicas must be greater than or equal to the minimum number of replicas"
-            )
         return v
 
     @validator("gateway")
@@ -622,9 +616,9 @@ class ServiceConfigurationParams(CoreModel):
     def validate_scaling(cls, values):
         scaling = values.get("scaling")
         replicas = values.get("replicas")
-        if replicas.min != replicas.max and not scaling:
+        if replicas and replicas.min != replicas.max and not scaling:
             raise ValueError("When you set `replicas` to a range, ensure to specify `scaling`.")
-        if replicas.min == replicas.max and scaling:
+        if replicas and replicas.min == replicas.max and scaling:
             raise ValueError("To use `scaling`, `replicas` must be set to a range.")
         return values
 
@@ -654,6 +648,14 @@ class ServiceConfiguration(
     ProfileParams, BaseRunConfigurationWithCommands, ServiceConfigurationParams
 ):
     type: Literal["service"] = "service"
+
+    class Config(CoreModel.Config):
+        @staticmethod
+        def schema_extra(schema: Dict[str, Any]):
+            add_extra_schema_types(
+                schema["properties"]["replicas"],
+                extra_types=[{"type": "integer"}, {"type": "string"}],
+            )
 
 
 AnyRunConfiguration = Union[DevEnvironmentConfiguration, TaskConfiguration, ServiceConfiguration]
@@ -715,7 +717,7 @@ class DstackConfiguration(CoreModel):
         Field(discriminator="type"),
     ]
 
-    class Config:
+    class Config(CoreModel.Config):
         json_loads = orjson.loads
         json_dumps = pydantic_orjson_dumps_with_indent
 
