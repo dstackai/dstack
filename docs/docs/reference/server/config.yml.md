@@ -1,7 +1,7 @@
 # ~/.dstack/server/config.yml
 
 The `~/.dstack/server/config.yml` file is used
-to configure [backends](../../concepts/backends.md) and other [sever-level settings](../../guides/server-deployment.md).
+to configure [backends](../../concepts/backends.md) and other [server-level settings](../../guides/server-deployment.md).
 
 ## Root reference
 
