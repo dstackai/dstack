@@ -1,8 +1,8 @@
 """Add JobModel.fleet
 
-Revision ID: 474af8479c09
-Revises: 74a1f55209bd
-Create Date: 2025-08-11 11:32:39.847360
+Revision ID: e2d08cd1b8d9
+Revises: 3d7f6c2ec000
+Create Date: 2025-08-15 11:26:05.670591
 
 """
 
@@ -11,8 +11,8 @@ import sqlalchemy_utils
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision = "474af8479c09"
-down_revision = "74a1f55209bd"
+revision = "e2d08cd1b8d9"
+down_revision = "3d7f6c2ec000"
 branch_labels = None
 depends_on = None
 
