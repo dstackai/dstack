@@ -153,12 +153,6 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                             logo: { src: logo, alt: 'Dstack logo' },
                         }}
                         utilities={[
-                            process.env.UI_VERSION === 'sky' && {
-                                type: 'button',
-                                iconName: 'suggestions',
-                                title: t('common.tutorial_other'),
-                                onClick: toggleTutorialPanel,
-                            },
                             {
                                 type: 'button',
                                 text: t('common.docs'),
@@ -183,6 +177,12 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                                 text: t('common.ask_ai'),
                                 title: t('common.ask_ai'),
                                 onClick: askAi,
+                            },
+                            process.env.UI_VERSION === 'sky' && {
+                                type: 'button',
+                                iconName: 'suggestions',
+                                title: t('common.tutorial_other'),
+                                onClick: toggleTutorialPanel,
                             },
                             {
                                 'data-class': 'user-menu',
