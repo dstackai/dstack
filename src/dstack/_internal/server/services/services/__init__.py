@@ -173,24 +173,43 @@ async def register_replica(
     ssh_head_proxy: Optional[SSHConnectionParams],
     ssh_head_proxy_private_key: Optional[str],
 ):
-    if gateway_id is None:  # in-server proxy
-        return
-    conn = await get_or_add_gateway_connection(session, gateway_id)
-    job_submission = jobs_services.job_model_to_job_submission(job_model)
-    try:
-        logger.debug("%s: registering replica for service %s", fmt(job_model), run.id.hex)
-        async with conn.client() as client:
-            await client.register_replica(
-                run=run,
-                job_spec=JobSpec.__response__.parse_raw(job_model.job_spec_data),
-                job_submission=job_submission,
-                ssh_head_proxy=ssh_head_proxy,
-                ssh_head_proxy_private_key=ssh_head_proxy_private_key,
-            )
-        logger.info("%s: replica is registered for service %s", fmt(job_model), run.id.hex)
-    except (httpx.RequestError, SSHError) as e:
-        logger.debug("Gateway request failed", exc_info=True)
-        raise GatewayError(repr(e))
+    if gateway_id is not None:
+        conn = await get_or_add_gateway_connection(session, gateway_id)
+        job_submission = jobs_services.job_model_to_job_submission(job_model)
+        try:
+            logger.debug("%s: registering replica for service %s", fmt(job_model), run.id.hex)
+            async with conn.client() as client:
+                await client.register_replica(
+                    run=run,
+                    job_spec=JobSpec.__response__.parse_raw(job_model.job_spec_data),
+                    job_submission=job_submission,
+                    ssh_head_proxy=ssh_head_proxy,
+                    ssh_head_proxy_private_key=ssh_head_proxy_private_key,
+                )
+        except (httpx.RequestError, SSHError) as e:
+            logger.debug("Gateway request failed", exc_info=True)
+            raise GatewayError(repr(e))
+        except GatewayError as e:
+            if "already exists in service" in e.msg:
+                # Pre-0.19.25 servers never mark the job as `registered`, so 0.19.25+ servers may
+                # attempt to register a replica that is already registered on the gateway.
+                logger.warning(
+                    (
+                        "%s: could not register replica in gateway: %s."
+                        " NOTE: if you just updated dstack from pre-0.19.25 to 0.19.25+,"
+                        " expect to see this warning once for every running service replica"
+                    ),
+                    fmt(job_model),
+                    e.msg,
+                )
+            else:
+                raise
+    job_model.registered = True
+    logger.info(
+        "%s: service replica registered to receive requests, gateway=%s",
+        fmt(job_model),
+        gateway_id is not None,
+    )
 
 
 async def unregister_service(session: AsyncSession, run_model: RunModel):
@@ -224,30 +243,30 @@ async def unregister_replica(session: AsyncSession, job_model: JobModel):
         .options(joinedload(RunModel.project).joinedload(ProjectModel.backends))
     )
     run_model = res.unique().scalar_one()
-    if run_model.gateway_id is None:
-        # not a service or served by in-server proxy
-        return
-
-    conn = await get_or_add_gateway_connection(session, run_model.gateway_id)
-    try:
-        logger.debug(
-            "%s: unregistering replica from service %s", fmt(job_model), job_model.run_id.hex
-        )
-        async with conn.client() as client:
-            await client.unregister_replica(
-                project=run_model.project.name,
-                run_name=run_model.run_name,
-                job_id=job_model.id,
+    if run_model.gateway_id is not None:
+        conn = await get_or_add_gateway_connection(session, run_model.gateway_id)
+        try:
+            logger.debug(
+                "%s: unregistering replica from service %s", fmt(job_model), job_model.run_id.hex
             )
-        logger.info(
-            "%s: replica is unregistered from service %s", fmt(job_model), job_model.run_id.hex
-        )
-    except GatewayError as e:
-        # ignore if replica is not registered
-        logger.warning("%s: unregistering replica from service: %s", fmt(job_model), e)
-    except (httpx.RequestError, SSHError) as e:
-        logger.debug("Gateway request failed", exc_info=True)
-        raise GatewayError(repr(e))
+            async with conn.client() as client:
+                await client.unregister_replica(
+                    project=run_model.project.name,
+                    run_name=run_model.run_name,
+                    job_id=job_model.id,
+                )
+        except GatewayError as e:
+            # ignore if replica is not registered
+            logger.warning("%s: unregistering replica from service: %s", fmt(job_model), e)
+        except (httpx.RequestError, SSHError) as e:
+            logger.debug("Gateway request failed", exc_info=True)
+            raise GatewayError(repr(e))
+    job_model.registered = False
+    logger.info(
+        "%s: service replica unregistered from receiving requests, gateway=%s",
+        fmt(job_model),
+        run_model.gateway_id is not None,
+    )
 
 
 def _get_service_https(run_spec: RunSpec, configuration: GatewayConfiguration) -> bool:

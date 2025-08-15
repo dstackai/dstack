@@ -438,6 +438,9 @@ class JobModel(BaseModel):
     probes: Mapped[list["ProbeModel"]] = relationship(
         back_populates="job", order_by="ProbeModel.probe_num"
     )
+    # Whether the replica is registered to receive service requests.
+    # Always `False` for non-service runs.
+    registered: Mapped[bool] = mapped_column(Boolean, server_default=false())
 
 
 class GatewayModel(BaseModel):

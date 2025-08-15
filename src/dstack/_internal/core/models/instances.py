@@ -165,6 +165,9 @@ class InstanceAvailability(Enum):
     AVAILABLE = "available"
     NOT_AVAILABLE = "not_available"
     NO_QUOTA = "no_quota"
+    NO_BALANCE = (
+        "no_balance"  # Introduced in 0.19.24, may be used after a short compatibility period
+    )
     IDLE = "idle"
     BUSY = "busy"
 

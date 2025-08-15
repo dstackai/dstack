@@ -9,7 +9,6 @@ WORKDIR /dstack-server
 
 RUN apt-get update && apt-get install -y \
     curl \
-    software-properties-common \
     git \
     sqlite3 \
     && rm -rf /var/lib/apt/lists/*

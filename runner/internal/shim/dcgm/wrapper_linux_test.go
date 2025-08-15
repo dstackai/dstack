@@ -1,3 +1,5 @@
+//go:build linux
+
 package dcgm
 
 import (
@@ -73,7 +75,7 @@ func getGpuID(t *testing.T) uint {
 	return gpuIDs[0]
 }
 
-func injectError(t *testing.T, gpuID uint, fieldID godcgm.Short, fieldType uint, value interface{}) {
+func injectError(t *testing.T, gpuID uint, fieldID godcgm.Short, fieldType uint, value any) {
 	t.Helper()
 	err := godcgm.InjectFieldValue(gpuID, fieldID, fieldType, 0, time.Now().UnixMicro(), value)
 	require.NoError(t, err)

@@ -344,6 +344,7 @@ async def create_job(
     deployment_num: Optional[int] = None,
     instance_assigned: bool = False,
     disconnected_at: Optional[datetime] = None,
+    registered: bool = False,
 ) -> JobModel:
     if deployment_num is None:
         deployment_num = run.deployment_num
@@ -374,6 +375,7 @@ async def create_job(
         used_instance_id=instance.id if instance is not None else None,
         disconnected_at=disconnected_at,
         probes=[],
+        registered=registered,
     )
     session.add(job)
     await session.commit()

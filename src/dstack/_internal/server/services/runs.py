@@ -41,6 +41,7 @@ from dstack._internal.core.models.runs import (
     JobStatus,
     JobSubmission,
     JobTerminationReason,
+    ProbeSpec,
     Run,
     RunPlan,
     RunSpec,
@@ -58,6 +59,7 @@ from dstack._internal.server import settings
 from dstack._internal.server.db import get_db
 from dstack._internal.server.models import (
     JobModel,
+    ProbeModel,
     ProjectModel,
     RepoModel,
     RunModel,
@@ -86,6 +88,7 @@ from dstack._internal.server.services.locking import get_locker, string_to_lock_
 from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.offers import get_offers_by_requirements
 from dstack._internal.server.services.plugins import apply_plugin_policies
+from dstack._internal.server.services.probes import is_probe_ready
 from dstack._internal.server.services.projects import list_user_project_models
 from dstack._internal.server.services.resources import set_resources_defaults
 from dstack._internal.server.services.secrets import get_project_secrets_mapping
@@ -1185,8 +1188,8 @@ async def scale_run_replicas(session: AsyncSession, run_model: RunModel, replica
         elif {JobStatus.PROVISIONING, JobStatus.PULLING} & statuses:
             # if there are any provisioning or pulling jobs, the replica is active and has the importance of 1
             active_replicas.append((1, is_out_of_date, replica_num, replica_jobs))
-        elif not is_replica_ready(replica_jobs):
-            # all jobs are running, but probes are failing, the replica is active and has the importance of 2
+        elif not is_replica_registered(replica_jobs):
+            # all jobs are running, but not receiving traffic, the replica is active and has the importance of 2
             active_replicas.append((2, is_out_of_date, replica_num, replica_jobs))
         else:
             # all jobs are running and ready, the replica is active and has the importance of 3
@@ -1273,15 +1276,13 @@ async def retry_run_replica_jobs(
         session.add(new_job_model)
 
 
-def is_replica_ready(jobs: Iterable[JobModel]) -> bool:
-    if not all(job.status == JobStatus.RUNNING for job in jobs):
-        return False
-    for job in jobs:
-        job_spec: JobSpec = JobSpec.__response__.parse_raw(job.job_spec_data)
-        for probe_spec, probe in zip(job_spec.probes, job.probes):
-            if probe.success_streak < probe_spec.ready_after:
-                return False
-    return True
+def is_job_ready(probes: Iterable[ProbeModel], probe_specs: Iterable[ProbeSpec]) -> bool:
+    return all(is_probe_ready(probe, probe_spec) for probe, probe_spec in zip(probes, probe_specs))
+
+
+def is_replica_registered(jobs: list[JobModel]) -> bool:
+    # Only job_num=0 is supposed to receive service requests
+    return jobs[0].registered
 
 
 def _remove_job_spec_sensitive_info(spec: JobSpec):

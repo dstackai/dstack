@@ -15,9 +15,11 @@ from dstack._internal.cli.services.configurators.base import (
     BaseApplyConfigurator,
 )
 from dstack._internal.cli.services.profile import apply_profile_args, register_profile_args
+from dstack._internal.cli.services.repos import init_default_virtual_repo
 from dstack._internal.cli.utils.common import (
     confirm_ask,
     console,
+    warn,
 )
 from dstack._internal.cli.utils.rich import MultiItemStatus
 from dstack._internal.cli.utils.run import get_runs_table, print_run_plan
@@ -40,6 +42,7 @@ from dstack._internal.core.models.configurations import (
     TaskConfiguration,
 )
 from dstack._internal.core.models.repos.base import Repo
+from dstack._internal.core.models.repos.local import LocalRepo
 from dstack._internal.core.models.resources import CPUSpec
 from dstack._internal.core.models.runs import JobStatus, JobSubmission, RunSpec, RunStatus
 from dstack._internal.core.services.configs import ConfigManager
@@ -76,17 +79,42 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
         self.apply_args(conf, configurator_args, unknown_args)
         self.validate_gpu_vendor_and_image(conf)
         self.validate_cpu_arch_and_image(conf)
-        if repo is None:
-            repo = self.api.repos.load(Path.cwd())
         config_manager = ConfigManager()
-        if repo.repo_dir is not None:
-            repo_config = config_manager.get_repo_config_or_error(repo.repo_dir)
-            self.api.ssh_identity_file = repo_config.ssh_key_path
-        else:
-            self.api.ssh_identity_file = get_ssh_keypair(
-                command_args.ssh_identity_file,
-                config_manager.dstack_key_path,
-            )
+        if repo is None:
+            repo_path = Path.cwd()
+            repo_config = config_manager.get_repo_config(repo_path)
+            if repo_config is None:
+                warn(
+                    "The repo is not initialized. Starting from 0.19.25, repos are optional\n"
+                    "There are three options:\n"
+                    "  - Run `dstack init` to initialize the current directory as a repo\n"
+                    "  - Specify `--repo`\n"
+                    "  - Specify `--no-repo` to not use any repo and supress this warning"
+                    " (this will be the default in the future versions)"
+                )
+                if not command_args.yes and not confirm_ask("Continue without the repo?"):
+                    console.print("\nExiting...")
+                    return
+                repo = init_default_virtual_repo(self.api)
+            else:
+                # Unlikely, but may raise ConfigurationError if the repo does not exist
+                # on the server side (stale entry in `config.yml`)
+                repo = self.api.repos.load(repo_path)
+                if isinstance(repo, LocalRepo):
+                    warn(
+                        f"{repo.repo_dir} is a local repo.\n"
+                        "Local repos are deprecated since 0.19.25"
+                        " and will be removed soon\n"
+                        "There are two options:\n"
+                        "  - Migrate to `files`: https://dstack.ai/docs/concepts/tasks/#files\n"
+                        "  - Specify `--no-repo` if you don't need the repo at all\n"
+                        "In either case, you can run `dstack init --remove` to remove the repo"
+                        " (only the record about the repo, not its files) and this warning"
+                    )
+        self.api.ssh_identity_file = get_ssh_keypair(
+            command_args.ssh_identity_file,
+            config_manager.dstack_key_path,
+        )
         profile = load_profile(Path.cwd(), configurator_args.profile)
         with console.status("Getting apply plan..."):
             run_plan = self.api.runs.get_run_plan(

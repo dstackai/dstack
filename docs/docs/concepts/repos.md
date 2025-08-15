@@ -7,13 +7,13 @@ This allows accessing the directory files from within the run.
 ## Initialize a repo
 
 To use a directory with `dstack apply`, it must first be initialized as a repo by running [`dstack init`](../reference/cli/dstack/init.md).
-The directory can be either a regular local directory or a cloned Git repo.
+The directory must be a cloned Git repo.
 
 [`dstack init`](../reference/cli/dstack/init.md) is not required if you pass `-P` (or `--repo`) to [`dstack apply`](../reference/cli/dstack/apply.md) (see below).
 
 ### Git credentials
 
-If the directory is a cloned Git repo, [`dstack init`](../reference/cli/dstack/init.md) grants the `dstack` server access by uploading the current user's default
+[`dstack init`](../reference/cli/dstack/init.md) grants the `dstack` server access by uploading the current user's default
 Git credentials, ensuring that dstack can clone the Git repo when running the container.
 
 To use custom credentials, pass them directly with `--token` (GitHub token) or `--git-identity` (path to a private SSH
@@ -24,21 +24,19 @@ key).
 
 ### .gitignore and folder size
 
-If the directory is cloned Git repo, [`dstack apply`](../reference/cli/dstack/apply.md) uploads to the `dstack` server only local changes.
-If the directory is not a cloned Git repo, it uploads the entire directory.
+[`dstack apply`](../reference/cli/dstack/apply.md) uploads to the `dstack` server only local changes.
 
 Uploads are limited to 2MB. Use `.gitignore` to exclude unnecessary files from being uploaded.
 You can set the `DSTACK_SERVER_CODE_UPLOAD_LIMIT` environment variable to increase the default server limit.
 Increasing the limit is recommended only if you [configure an object storage](../guides/server-deployment.md).
 
-### Initialize as a local directory
+### Use a local directory instead of a Git repo
 
-If the directory is a cloned Git repo but you want to initialize it as a regular local directory,
-use `--local` with [`dstack init`](../reference/cli/dstack/init.md).
+If the directory is not a cloned Git repo, use [`files`](../reference/dstack.yml/task.md#_files).
 
 ## Specify the repo
 
-By default, `dstack apply` uses the current directory as a repo and requires `dstack init`.
+By default, `dstack apply` uses the current directory as a repo if it is already initialized.
 You can change this by explicitly specifying the repo to use for `dstack apply`.
 
 ### Pass the repo path
@@ -47,8 +45,8 @@ To use a specific directory as the repo, specify its path using `-P` (or `--repo
 
 <div class="termy">
 
-```shell    
-$ dstack apply -f .dstack.yml -P ../parent_dir 
+```shell
+$ dstack apply -f .dstack.yml -P ../parent_dir
 ```
 
 </div>
@@ -73,7 +71,7 @@ If you use a private Git repo, you can pass Git credentials to `dstack apply` us
 
 ### Do not use a repo
 
-To run a configuration without a repo (the `/workflow` directory inside the container will be empty), use `--no-repo`:
+To run a configuration without a repo (the `/workflow` directory inside the container will be empty) if it is already initialized, use `--no-repo`:
 
 <div class="termy">
 
