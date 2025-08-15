@@ -84,7 +84,7 @@ class DecryptedString(CoreModel):
     decrypted: bool = True
     exc: Optional[Exception] = None
 
-    class Config:
+    class Config(CoreModel.Config):
         arbitrary_types_allowed = True
 
     def get_plaintext_or_error(self) -> str:

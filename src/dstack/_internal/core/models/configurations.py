@@ -649,7 +649,7 @@ class ServiceConfiguration(
 ):
     type: Literal["service"] = "service"
 
-    class Config:
+    class Config(CoreModel.Config):
         @staticmethod
         def schema_extra(schema: Dict[str, Any]):
             add_extra_schema_types(
@@ -717,7 +717,7 @@ class DstackConfiguration(CoreModel):
         Field(discriminator="type"),
     ]
 
-    class Config:
+    class Config(CoreModel.Config):
         json_loads = orjson.loads
         json_dumps = pydantic_orjson_dumps_with_indent
 

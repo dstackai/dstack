@@ -339,7 +339,7 @@ class ProfileParams(CoreModel):
     termination_policy: Annotated[Optional[TerminationPolicy], Field(exclude=True)] = None
     termination_idle_time: Annotated[Optional[Union[str, int]], Field(exclude=True)] = None
 
-    class Config:
+    class Config(CoreModel.Config):
         @staticmethod
         def schema_extra(schema: Dict[str, Any]) -> None:
             del schema["properties"]["pool_name"]
@@ -379,7 +379,7 @@ class Profile(ProfileProps, ProfileParams):
 class ProfilesConfig(CoreModel):
     profiles: List[Profile]
 
-    class Config:
+    class Config(CoreModel.Config):
         json_loads = orjson.loads
         json_dumps = pydantic_orjson_dumps_with_indent
 

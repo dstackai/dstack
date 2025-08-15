@@ -32,7 +32,7 @@ class DXFAuthAdapter:
 
 
 class DockerImage(CoreModel):
-    class Config:
+    class Config(CoreModel.Config):
         frozen = True
 
     image: str
