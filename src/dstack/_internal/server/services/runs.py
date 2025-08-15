@@ -1366,7 +1366,11 @@ def _process_offers_into_backend_gpus(
                 gpu_types_in_offer[gpu_type_key] = 0
             gpu_types_in_offer[gpu_type_key] += 1
 
-        for (gpu_name, gpu_memory_mib, gpu_vendor), gpu_count_in_offer in gpu_types_in_offer.items():
+        for (
+            gpu_name,
+            gpu_memory_mib,
+            gpu_vendor,
+        ), gpu_count_in_offer in gpu_types_in_offer.items():
             instance_config_key = (
                 gpu_name,
                 gpu_memory_mib,
@@ -1542,7 +1546,7 @@ async def get_run_gpus_grouped(
     backend_gpus = _process_offers_into_backend_gpus(offers)
 
     group_by_set = set(group_by) if group_by else set()
-    
+
     if "backend" in group_by_set and "region" in group_by_set:
         gpus = _get_gpus_grouped_by_backend_and_region(backend_gpus)
     elif "backend" in group_by_set:
