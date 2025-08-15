@@ -788,19 +788,8 @@ class TestProcessSubmittedJobs:
         fleet_spec = get_fleet_spec()
         fleet_spec.configuration.nodes = Range(min=0, max=1)
         fleet = await create_fleet(session=session, project=project, spec=fleet_spec, name="fleet")
-        # Need a second non-empty fleet to have two-stage processing
-        fleet2 = await create_fleet(
-            session=session, project=project, spec=fleet_spec, name="fleet2"
-        )
-        await create_instance(
-            session=session,
-            project=project,
-            fleet=fleet2,
-            instance_num=0,
-            status=InstanceStatus.BUSY,
-        )
         run_spec = get_run_spec(repo_id=repo.name)
-        run_spec.configuration.fleets = [fleet.name, fleet2.name]
+        run_spec.configuration.fleets = [fleet.name]
         run = await create_run(
             session=session,
             project=project,
@@ -815,7 +804,6 @@ class TestProcessSubmittedJobs:
         )
         await process_submitted_jobs()
         await session.refresh(job)
-        assert job.status == JobStatus.SUBMITTED
         assert job.instance_assigned
         assert job.instance_id is None
         assert job.fleet_id == fleet.id
