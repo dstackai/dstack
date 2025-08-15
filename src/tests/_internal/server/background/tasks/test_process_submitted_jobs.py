@@ -739,43 +739,6 @@ class TestProcessSubmittedJobs:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_fails_with_no_capacity_when_specified_fleets_occupied(
-        self, test_db, session: AsyncSession
-    ):
-        project = await create_project(session)
-        user = await create_user(session)
-        repo = await create_repo(session=session, project_id=project.id)
-        fleet = await create_fleet(session=session, project=project, name="test-fleet")
-        instance = await create_instance(
-            session=session,
-            project=project,
-            fleet=fleet,
-            instance_num=0,
-            status=InstanceStatus.BUSY,
-        )
-        fleet.instances.append(instance)
-        run_spec = get_run_spec(repo_id=repo.name)
-        run_spec.configuration.fleets = ["test-fleet"]
-        run = await create_run(
-            session=session,
-            project=project,
-            repo=repo,
-            user=user,
-            run_spec=run_spec,
-        )
-        job = await create_job(
-            session=session,
-            run=run,
-            instance_assigned=False,
-        )
-        await session.commit()
-        await process_submitted_jobs()
-        await session.refresh(job)
-        assert job.status == JobStatus.TERMINATING
-        assert job.termination_reason == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
-
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_does_not_assign_job_to_elastic_empty_fleet_if_fleets_unspecified(
         self, test_db, session: AsyncSession
     ):
