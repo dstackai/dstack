@@ -177,14 +177,14 @@ export const RunDetailsPage: React.FC = () => {
                                     href: ROUTES.PROJECT.DETAILS.RUNS.DETAILS.FORMAT(paramProjectName, paramRunId),
                                 },
                                 {
-                                    label: 'Metrics',
-                                    id: CodeTab.Metrics,
-                                    href: ROUTES.PROJECT.DETAILS.RUNS.DETAILS.METRICS.FORMAT(paramProjectName, paramRunId),
-                                },
-                                {
                                     label: 'Logs',
                                     id: CodeTab.Logs,
                                     href: ROUTES.PROJECT.DETAILS.RUNS.DETAILS.LOGS.FORMAT(paramProjectName, paramRunId),
+                                },
+                                {
+                                    label: 'Metrics',
+                                    id: CodeTab.Metrics,
+                                    href: ROUTES.PROJECT.DETAILS.RUNS.DETAILS.METRICS.FORMAT(paramProjectName, paramRunId),
                                 },
                             ]}
                         />

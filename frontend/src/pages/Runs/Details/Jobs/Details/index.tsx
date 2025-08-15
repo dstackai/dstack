@@ -80,18 +80,18 @@ export const JobDetailsPage: React.FC = () => {
                             ),
                         },
                         {
-                            label: 'Metrics',
-                            id: CodeTab.Metrics,
-                            href: ROUTES.PROJECT.DETAILS.RUNS.DETAILS.JOBS.DETAILS.METRICS.FORMAT(
+                            label: 'Logs',
+                            id: CodeTab.Logs,
+                            href: ROUTES.PROJECT.DETAILS.RUNS.DETAILS.JOBS.DETAILS.LOGS.FORMAT(
                                 paramProjectName,
                                 paramRunId,
                                 paramJobName,
                             ),
                         },
                         {
-                            label: 'Logs',
-                            id: CodeTab.Logs,
-                            href: ROUTES.PROJECT.DETAILS.RUNS.DETAILS.JOBS.DETAILS.LOGS.FORMAT(
+                            label: 'Metrics',
+                            id: CodeTab.Metrics,
+                            href: ROUTES.PROJECT.DETAILS.RUNS.DETAILS.JOBS.DETAILS.METRICS.FORMAT(
                                 paramProjectName,
                                 paramRunId,
                                 paramJobName,
