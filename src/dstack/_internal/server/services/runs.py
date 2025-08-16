@@ -1425,8 +1425,9 @@ def _update_gpu_group(row: GpuGroup, gpu: BackendGpu, backend_type: str):
 
     row.count.min = min(row.count.min, gpu.count)
     row.count.max = max(row.count.max, gpu.count)
-    row.price.min = min(row.price.min, gpu.price)
-    row.price.max = max(row.price.max, gpu.price)
+    per_gpu_price = gpu.price / gpu.count
+    row.price.min = min(row.price.min, per_gpu_price)
+    row.price.max = max(row.price.max, per_gpu_price)
 
 
 def _get_gpus_with_no_grouping(backend_gpus: List[BackendGpus]) -> List[GpuGroup]:
@@ -1436,7 +1437,8 @@ def _get_gpus_with_no_grouping(backend_gpus: List[BackendGpus]) -> List[GpuGroup
         for gpu in backend.gpus:
             key = (gpu.name, gpu.memory_mib, gpu.vendor)
             if key not in gpu_rows:
-                price_range = Range[float](min=gpu.price, max=gpu.price)
+                per_gpu_price = gpu.price / gpu.count
+                price_range = Range[float](min=per_gpu_price, max=per_gpu_price)
 
                 gpu_rows[key] = GpuGroup(
                     name=gpu.name,
@@ -1472,6 +1474,7 @@ def _get_gpus_grouped_by_backend(backend_gpus: List[BackendGpus]) -> List[GpuGro
         for gpu in backend.gpus:
             key = (gpu.name, gpu.memory_mib, gpu.vendor, backend.backend_type)
             if key not in gpu_rows:
+                per_gpu_price = gpu.price / gpu.count
                 gpu_rows[key] = GpuGroup(
                     name=gpu.name,
                     memory_mib=gpu.memory_mib,
@@ -1479,7 +1482,7 @@ def _get_gpus_grouped_by_backend(backend_gpus: List[BackendGpus]) -> List[GpuGro
                     availability=[gpu.availability],
                     spot=["spot" if gpu.spot else "on-demand"],
                     count=Range[int](min=gpu.count, max=gpu.count),
-                    price=Range[float](min=gpu.price, max=gpu.price),
+                    price=Range[float](min=per_gpu_price, max=per_gpu_price),
                     backend=backend.backend_type,
                     regions=backend.regions.copy(),
                 )
@@ -1507,6 +1510,7 @@ def _get_gpus_grouped_by_backend_and_region(backend_gpus: List[BackendGpus]) -> 
             for gpu in backend.gpus:
                 key = (gpu.name, gpu.memory_mib, gpu.vendor, backend.backend_type, region)
                 if key not in gpu_rows:
+                    per_gpu_price = gpu.price / gpu.count
                     gpu_rows[key] = GpuGroup(
                         name=gpu.name,
                         memory_mib=gpu.memory_mib,
@@ -1514,7 +1518,7 @@ def _get_gpus_grouped_by_backend_and_region(backend_gpus: List[BackendGpus]) -> 
                         availability=[gpu.availability],
                         spot=["spot" if gpu.spot else "on-demand"],
                         count=Range[int](min=gpu.count, max=gpu.count),
-                        price=Range[float](min=gpu.price, max=gpu.price),
+                        price=Range[float](min=per_gpu_price, max=per_gpu_price),
                         backend=backend.backend_type,
                         region=region,
                     )
@@ -1542,6 +1546,7 @@ def _get_gpus_grouped_by_count(backend_gpus: List[BackendGpus]) -> List[GpuGroup
         for gpu in backend.gpus:
             key = (gpu.name, gpu.memory_mib, gpu.vendor, gpu.count)
             if key not in gpu_rows:
+                per_gpu_price = gpu.price / gpu.count
                 gpu_rows[key] = GpuGroup(
                     name=gpu.name,
                     memory_mib=gpu.memory_mib,
@@ -1549,7 +1554,7 @@ def _get_gpus_grouped_by_count(backend_gpus: List[BackendGpus]) -> List[GpuGroup
                     availability=[gpu.availability],
                     spot=["spot" if gpu.spot else "on-demand"],
                     count=Range[int](min=gpu.count, max=gpu.count),
-                    price=Range[float](min=gpu.price, max=gpu.price),
+                    price=Range[float](min=per_gpu_price, max=per_gpu_price),
                     backends=[backend.backend_type],
                 )
             else:
@@ -1575,6 +1580,7 @@ def _get_gpus_grouped_by_backend_and_count(backend_gpus: List[BackendGpus]) -> L
         for gpu in backend.gpus:
             key = (gpu.name, gpu.memory_mib, gpu.vendor, backend.backend_type, gpu.count)
             if key not in gpu_rows:
+                per_gpu_price = gpu.price / gpu.count
                 gpu_rows[key] = GpuGroup(
                     name=gpu.name,
                     memory_mib=gpu.memory_mib,
@@ -1582,7 +1588,7 @@ def _get_gpus_grouped_by_backend_and_count(backend_gpus: List[BackendGpus]) -> L
                     availability=[gpu.availability],
                     spot=["spot" if gpu.spot else "on-demand"],
                     count=Range[int](min=gpu.count, max=gpu.count),
-                    price=Range[float](min=gpu.price, max=gpu.price),
+                    price=Range[float](min=per_gpu_price, max=per_gpu_price),
                     backend=backend.backend_type,
                     regions=backend.regions.copy(),
                 )
@@ -1620,6 +1626,7 @@ def _get_gpus_grouped_by_backend_region_and_count(
                     gpu.count,
                 )
                 if key not in gpu_rows:
+                    per_gpu_price = gpu.price / gpu.count
                     gpu_rows[key] = GpuGroup(
                         name=gpu.name,
                         memory_mib=gpu.memory_mib,
@@ -1627,7 +1634,7 @@ def _get_gpus_grouped_by_backend_region_and_count(
                         availability=[gpu.availability],
                         spot=["spot" if gpu.spot else "on-demand"],
                         count=Range[int](min=gpu.count, max=gpu.count),
-                        price=Range[float](min=gpu.price, max=gpu.price),
+                        price=Range[float](min=per_gpu_price, max=per_gpu_price),
                         backend=backend.backend_type,
                         region=region,
                     )

@@ -156,7 +156,7 @@ class ListGpuCommand(APIBaseCommand):
         table.add_column("#")
         table.add_column("GPU", no_wrap=True, ratio=2)
         table.add_column("SPOT", style="grey58", ratio=1)
-        table.add_column("PRICE", style="grey58", ratio=1)
+        table.add_column("$/GPU", style="grey58", ratio=1)
         table.add_column(backend_column, style="grey58", ratio=2)
         if region_column:
             table.add_column(region_column, style="grey58", ratio=2)
