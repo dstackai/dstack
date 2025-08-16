@@ -18,9 +18,11 @@ from dstack._internal.core.models.runs import (
 from dstack._internal.server.schemas.runs import (
     ApplyRunPlanRequest,
     DeleteRunsRequest,
+    GetRunGpusRequest,
     GetRunPlanRequest,
     GetRunRequest,
     ListRunsRequest,
+    RunGpusResponse,
     StopRunsRequest,
 )
 from dstack.api.server._group import APIClientGroup
@@ -94,3 +96,16 @@ class RunsAPIClient(APIClientGroup):
     def delete(self, project_name: str, runs_names: List[str]):
         body = DeleteRunsRequest(runs_names=runs_names)
         self._request(f"/api/project/{project_name}/runs/delete", body=body.json())
+
+    def get_gpus(
+        self,
+        project_name: str,
+        run_spec: RunSpec,
+        group_by: Optional[List[str]] = None,
+    ) -> RunGpusResponse:
+        body = GetRunGpusRequest(run_spec=run_spec, group_by=group_by)
+        resp = self._request(
+            f"/api/project/{project_name}/runs/gpus",
+            body=body.json(),
+        )
+        return parse_obj_as(RunGpusResponse, resp.json())

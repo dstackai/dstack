@@ -12,6 +12,7 @@ from dstack._internal.cli.commands.delete import DeleteCommand
 from dstack._internal.cli.commands.fleet import FleetCommand
 from dstack._internal.cli.commands.gateway import GatewayCommand
 from dstack._internal.cli.commands.init import InitCommand
+from dstack._internal.cli.commands.list import ListCommand
 from dstack._internal.cli.commands.logs import LogsCommand
 from dstack._internal.cli.commands.metrics import MetricsCommand
 from dstack._internal.cli.commands.offer import OfferCommand
@@ -68,6 +69,7 @@ def main():
     FleetCommand.register(subparsers)
     GatewayCommand.register(subparsers)
     InitCommand.register(subparsers)
+    ListCommand.register(subparsers)
     OfferCommand.register(subparsers)
     LogsCommand.register(subparsers)
     MetricsCommand.register(subparsers)
