@@ -48,7 +48,8 @@
     "danger_zone": "Danger Zone",
     "control_plane": "Control plane",
     "refresh": "Refresh",
-    "quickstart": "Quickstart"
+    "quickstart": "Quickstart",
+    "ask_ai": "Ask AI"
   },
 
   "auth": {
