@@ -1,14 +1,16 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useParams } from 'react-router-dom';
 import classNames from 'classnames';
 
 import { Box, Button, Code, Container, Header, ListEmptyMessage, Loader, TextContent } from 'components';
 
 import { useLocalStorageState } from 'hooks/useLocalStorageState';
 import { useLazyGetProjectLogsQuery } from 'services/project';
+import { useGetRunQuery } from 'services/run';
 
 import { LogRow } from './components/LogRow';
-import { decodeLogs } from './helpers';
+import { decodeLogs, getJobSubmissionId } from './helpers';
 
 import { IProps } from './types';
 
@@ -220,5 +222,45 @@ export const Logs: React.FC<IProps> = ({ className, projectName, runName, jobSub
                 </TextContent>
             </Container>
         </div>
+    );
+};
+
+const getJobSubmissionIdFromJobData = (job?: IJob): string | undefined => {
+    if (!job) return;
+
+    return job.job_submissions[job.job_submissions.length - 1]?.id;
+};
+
+export const JobLogs = () => {
+    const params = useParams();
+    const paramProjectName = params.projectName ?? '';
+    const paramRunId = params.runId ?? '';
+    const paramJobName = params.jobName ?? '';
+
+    const { data: runData, isLoading: isLoadingRun } = useGetRunQuery({
+        project_name: paramProjectName,
+        id: paramRunId,
+    });
+
+    const jobData = useMemo<IJob | null>(() => {
+        if (!runData) return null;
+
+        return runData.jobs.find((job) => job.job_spec.job_name === paramJobName) ?? null;
+    }, [runData]);
+
+    if (isLoadingRun)
+        return (
+            <Container>
+                <Loader />
+            </Container>
+        );
+
+    return (
+        <Logs
+            projectName={paramProjectName}
+            runName={runData?.run_spec?.run_name ?? ''}
+            jobSubmissionId={jobData ? getJobSubmissionIdFromJobData(jobData) : getJobSubmissionId(runData)}
+            className={styles.logsPage}
+        />
     );
 };

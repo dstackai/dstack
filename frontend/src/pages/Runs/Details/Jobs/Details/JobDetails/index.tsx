@@ -7,7 +7,6 @@ import { Box, ColumnLayout, Container, Header, Loader, StatusIndicator } from 'c
 import { getStatusIconType } from 'libs/run';
 import { useGetRunQuery } from 'services/run';
 
-import { Logs } from '../../../Logs';
 import {
     getJobError,
     getJobListItemBackend,
@@ -23,12 +22,6 @@ import {
 } from '../../List/helpers';
 
 import styles from './styles.module.scss';
-
-const getJobSubmissionId = (job?: IJob): string | undefined => {
-    if (!job) return;
-
-    return job.job_submissions[job.job_submissions.length - 1]?.id;
-};
 
 export const JobDetails = () => {
     const { t } = useTranslation();
@@ -111,13 +104,6 @@ export const JobDetails = () => {
                     </div>
                 </ColumnLayout>
             </Container>
-
-            <Logs
-                projectName={paramProjectName}
-                runName={runData?.run_spec?.run_name ?? ''}
-                jobSubmissionId={getJobSubmissionId(jobData)}
-                className={styles.logs}
-            />
         </div>
     );
 };

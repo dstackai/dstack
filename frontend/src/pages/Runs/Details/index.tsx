@@ -21,6 +21,7 @@ import styles from './styles.module.scss';
 enum CodeTab {
     Details = 'details',
     Metrics = 'metrics',
+    Logs = 'logs',
 }
 
 export const RunDetailsPage: React.FC = () => {
@@ -174,6 +175,11 @@ export const RunDetailsPage: React.FC = () => {
                                     label: 'Details',
                                     id: CodeTab.Details,
                                     href: ROUTES.PROJECT.DETAILS.RUNS.DETAILS.FORMAT(paramProjectName, paramRunId),
+                                },
+                                {
+                                    label: 'Logs',
+                                    id: CodeTab.Logs,
+                                    href: ROUTES.PROJECT.DETAILS.RUNS.DETAILS.LOGS.FORMAT(paramProjectName, paramRunId),
                                 },
                                 {
                                     label: 'Metrics',
