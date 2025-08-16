@@ -30,8 +30,8 @@ class ListGpuConfigurator(BaseRunConfigurator):
         parser.add_argument(
             "--group-by",
             action="append",
-            choices=["backend", "region"],
-            help="Group GPUs by backend and/or region. Can be specified multiple times.",
+            choices=["backend", "region", "count"],
+            help="Group GPUs by backend, region, and/or count. Can be specified multiple times.",
         )
 
 
@@ -198,6 +198,8 @@ class ListGpuCommand(APIBaseCommand):
                 count_range = str(gpu_group.count.min)
             else:
                 count_range = f"{gpu_group.count.min}..{gpu_group.count.max}"
+
+            # Always include count in GPU spec format: <gpu name>:<memory>:<count>
             gpu_spec = f"{gpu_group.name}:{memory_gb}:{count_range}"
 
             spot_types = []

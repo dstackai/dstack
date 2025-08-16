@@ -1535,11 +1535,125 @@ def _get_gpus_grouped_by_backend_and_region(backend_gpus: List[BackendGpus]) -> 
     )
 
 
+def _get_gpus_grouped_by_count(backend_gpus: List[BackendGpus]) -> List[GpuGroup]:
+    """Aggregates GPU specs, grouping them by GPU count."""
+    gpu_rows: Dict[Tuple, GpuGroup] = {}
+    for backend in backend_gpus:
+        for gpu in backend.gpus:
+            key = (gpu.name, gpu.memory_mib, gpu.vendor, gpu.count)
+            if key not in gpu_rows:
+                gpu_rows[key] = GpuGroup(
+                    name=gpu.name,
+                    memory_mib=gpu.memory_mib,
+                    vendor=gpu.vendor,
+                    availability=[gpu.availability],
+                    spot=["spot" if gpu.spot else "on-demand"],
+                    count=Range[int](min=gpu.count, max=gpu.count),
+                    price=Range[float](min=gpu.price, max=gpu.price),
+                    backends=[backend.backend_type],
+                )
+            else:
+                _update_gpu_group(gpu_rows[key], gpu, backend.backend_type)
+
+    return sorted(
+        list(gpu_rows.values()),
+        key=lambda g: (
+            not any(av.is_available() for av in g.availability),
+            g.price.min,
+            g.price.max,
+            g.count.min,
+            g.name,
+            g.memory_mib,
+        ),
+    )
+
+
+def _get_gpus_grouped_by_backend_and_count(backend_gpus: List[BackendGpus]) -> List[GpuGroup]:
+    """Aggregates GPU specs, grouping them by backend and GPU count."""
+    gpu_rows: Dict[Tuple, GpuGroup] = {}
+    for backend in backend_gpus:
+        for gpu in backend.gpus:
+            key = (gpu.name, gpu.memory_mib, gpu.vendor, backend.backend_type, gpu.count)
+            if key not in gpu_rows:
+                gpu_rows[key] = GpuGroup(
+                    name=gpu.name,
+                    memory_mib=gpu.memory_mib,
+                    vendor=gpu.vendor,
+                    availability=[gpu.availability],
+                    spot=["spot" if gpu.spot else "on-demand"],
+                    count=Range[int](min=gpu.count, max=gpu.count),
+                    price=Range[float](min=gpu.price, max=gpu.price),
+                    backend=backend.backend_type,
+                    regions=backend.regions.copy(),
+                )
+            else:
+                _update_gpu_group(gpu_rows[key], gpu, backend.backend_type)
+
+    return sorted(
+        list(gpu_rows.values()),
+        key=lambda g: (
+            not any(av.is_available() for av in g.availability),
+            g.price.min,
+            g.price.max,
+            g.backend.value,
+            g.count.min,
+            g.name,
+            g.memory_mib,
+        ),
+    )
+
+
+def _get_gpus_grouped_by_backend_region_and_count(
+    backend_gpus: List[BackendGpus],
+) -> List[GpuGroup]:
+    """Aggregates GPU specs, grouping them by backend, region, and GPU count."""
+    gpu_rows: Dict[Tuple, GpuGroup] = {}
+    for backend in backend_gpus:
+        for region in backend.regions:
+            for gpu in backend.gpus:
+                key = (
+                    gpu.name,
+                    gpu.memory_mib,
+                    gpu.vendor,
+                    backend.backend_type,
+                    region,
+                    gpu.count,
+                )
+                if key not in gpu_rows:
+                    gpu_rows[key] = GpuGroup(
+                        name=gpu.name,
+                        memory_mib=gpu.memory_mib,
+                        vendor=gpu.vendor,
+                        availability=[gpu.availability],
+                        spot=["spot" if gpu.spot else "on-demand"],
+                        count=Range[int](min=gpu.count, max=gpu.count),
+                        price=Range[float](min=gpu.price, max=gpu.price),
+                        backend=backend.backend_type,
+                        region=region,
+                    )
+                else:
+                    _update_gpu_group(gpu_rows[key], gpu, backend.backend_type)
+
+    return sorted(
+        list(gpu_rows.values()),
+        key=lambda g: (
+            not any(av.is_available() for av in g.availability),
+            g.price.min,
+            g.price.max,
+            g.backend.value,
+            g.region,
+            g.count.min,
+            g.name,
+            g.memory_mib,
+        ),
+    )
+
+
 async def get_run_gpus_grouped(
     session: AsyncSession,
     project: ProjectModel,
     run_spec: RunSpec,
-    group_by: Optional[List[Literal["backend", "region"]]] = None,
+    group_by: Optional[List[Literal["backend", "region", "count"]]] = None,
 ) -> RunGpusResponse:
     """Retrieves available GPU specifications based on a run spec, with optional grouping."""
     offers = await _get_gpu_offers(session, project, run_spec)
@@ -1547,10 +1661,20 @@ async def get_run_gpus_grouped(
 
     group_by_set = set(group_by) if group_by else set()
 
-    if "backend" in group_by_set and "region" in group_by_set:
+    # Determine grouping strategy based on combination
+    has_backend = "backend" in group_by_set
+    has_region = "region" in group_by_set
+    has_count = "count" in group_by_set
+    if has_backend and has_region and has_count:
+        gpus = _get_gpus_grouped_by_backend_region_and_count(backend_gpus)
+    elif has_backend and has_count:
+        gpus = _get_gpus_grouped_by_backend_and_count(backend_gpus)
+    elif has_backend and has_region:
         gpus = _get_gpus_grouped_by_backend_and_region(backend_gpus)
-    elif "backend" in group_by_set:
+    elif has_backend:
         gpus = _get_gpus_grouped_by_backend(backend_gpus)
+    elif has_count:
+        gpus = _get_gpus_grouped_by_count(backend_gpus)
     else:
         gpus = _get_gpus_with_no_grouping(backend_gpus)
 

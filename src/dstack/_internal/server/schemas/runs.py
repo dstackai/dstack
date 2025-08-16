@@ -94,8 +94,9 @@ class GetRunGpusRequest(CoreModel):
     """Request for getting run GPUs with optional grouping."""
 
     run_spec: RunSpec
-    group_by: Optional[List[Literal["backend", "region"]]] = Field(
-        default=None, description="List of fields to group by. Valid values: 'backend', 'region'"
+    group_by: Optional[List[Literal["backend", "region", "count"]]] = Field(
+        default=None,
+        description="List of fields to group by. Valid values: 'backend', 'region', 'count'",
     )
 
 
