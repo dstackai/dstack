@@ -28,8 +28,6 @@ from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
-MAX_INSTANCE_NAME_LEN = 60
-
 
 INSTANCE_TYPE_SPECS = {
     "1x MI300X 8x Xeon Platinum 8462Y+": {
@@ -130,9 +128,7 @@ class HotAisleCompute(
             ssh_port=22,
             dockerized=True,
             ssh_proxy=None,
-            backend_data=HotAisleInstanceBackendData(
-                ip_address=vm_data["ip_address"], vm_id=vm_data["name"]
-            ).json(),
+            backend_data=HotAisleInstanceBackendData(ip_address=vm_data["ip_address"]).json(),
         )
 
     def update_provisioning_data(
@@ -217,7 +213,6 @@ def _run_ssh_command(hostname: str, ssh_private_key: str, command: str):
 
 class HotAisleInstanceBackendData(CoreModel):
     ip_address: str
-    vm_id: Optional[str] = None
 
     @classmethod
     def load(cls, raw: Optional[str]) -> "HotAisleInstanceBackendData":
