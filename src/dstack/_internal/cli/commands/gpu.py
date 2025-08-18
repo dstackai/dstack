@@ -59,6 +59,14 @@ class GpuCommand(APIBaseCommand):
 
     def _command(self, args: argparse.Namespace):
         super()._command(args)
+
+        # Validate that no unknown arguments were passed
+        if hasattr(args, "unknown") and args.unknown:
+            from dstack._internal.core.errors import CLIError
+
+            unknown_args_str = " ".join(args.unknown)
+            raise CLIError(f"Unrecognized arguments: {unknown_args_str}")
+
         conf = TaskConfiguration(commands=[":"])
 
         configurator = GpuConfigurator(api_client=self.api)
