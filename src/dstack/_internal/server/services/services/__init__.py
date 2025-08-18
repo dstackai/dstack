@@ -73,6 +73,8 @@ async def register_service(session: AsyncSession, run_model: RunModel, run_spec:
 async def _register_service_in_gateway(
     session: AsyncSession, run_model: RunModel, run_spec: RunSpec, gateway: GatewayModel
 ) -> ServiceSpec:
+    assert run_spec.configuration.type == "service"
+
     if gateway.gateway_compute is None:
         raise ServerClientError("Gateway has no instance associated with it")
 
@@ -127,6 +129,7 @@ async def _register_service_in_gateway(
 
 
 def _register_service_in_server(run_model: RunModel, run_spec: RunSpec) -> ServiceSpec:
+    assert run_spec.configuration.type == "service"
     if run_spec.configuration.https != SERVICE_HTTPS_DEFAULT:
         # Note: if the user sets `https: <default-value>`, it will be ignored silently
         # TODO: in 0.19, make `https` Optional to be able to tell if it was set or omitted
@@ -270,6 +273,7 @@ async def unregister_replica(session: AsyncSession, job_model: JobModel):
 
 
 def _get_service_https(run_spec: RunSpec, configuration: GatewayConfiguration) -> bool:
+    assert run_spec.configuration.type == "service"
     if not run_spec.configuration.https:
         return False
     if configuration.certificate is not None and configuration.certificate.type == "acm":
