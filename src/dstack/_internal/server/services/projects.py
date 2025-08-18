@@ -313,7 +313,6 @@ async def add_project_members(
                 member_num=None,
                 commit=False,
             )
-            member_by_user_id[user_to_add.id] = None
 
     await session.commit()
 
