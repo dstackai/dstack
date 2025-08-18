@@ -74,6 +74,8 @@ class ServerProxyRepo(BaseProxyRepo):
             jpd: JobProvisioningData = JobProvisioningData.__response__.parse_raw(
                 job.job_provisioning_data
             )
+            assert jpd.hostname is not None
+            assert jpd.ssh_port is not None
             if not jpd.dockerized:
                 ssh_destination = f"{jpd.username}@{jpd.hostname}"
                 ssh_port = jpd.ssh_port
