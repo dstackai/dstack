@@ -1285,7 +1285,7 @@ def is_replica_registered(jobs: list[JobModel]) -> bool:
     return jobs[0].registered
 
 
-def _remove_job_spec_sensitive_info(spec: JobSpec) -> None:
+def _remove_job_spec_sensitive_info(spec: JobSpec):
     spec.ssh_key = None
 
 
