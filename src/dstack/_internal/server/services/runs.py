@@ -109,9 +109,6 @@ from dstack._internal.utils.random_names import generate_name
 
 logger = get_logger(__name__)
 
-# Cache for run specs with 5-minute TTL
-# Key: (project_id, backend_config_hash), Value: (RunGpusResponse, timestamp)
-
 
 JOB_TERMINATION_REASONS_TO_RETRY = {
     JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY,
