@@ -18,7 +18,7 @@ from dstack._internal.core.models.runs import Requirements, RunSpec, get_policy_
 from dstack.api.utils import load_profile
 
 
-class ListGpuConfigurator(BaseRunConfigurator):
+class GpuConfigurator(BaseRunConfigurator):
     TYPE = ApplyConfigurationType.TASK
 
     @classmethod
@@ -35,7 +35,7 @@ class ListGpuConfigurator(BaseRunConfigurator):
         )
 
 
-class ListGpuCommand(APIBaseCommand):
+class GpuCommand(APIBaseCommand):
     NAME = "gpu"
     DESCRIPTION = "List available GPUs"
 
@@ -54,13 +54,13 @@ class ListGpuCommand(APIBaseCommand):
             dest="format",
             help="Output in JSON format (equivalent to --format json)",
         )
-        ListGpuConfigurator.register_args(self._parser)
+        GpuConfigurator.register_args(self._parser)
 
     def _command(self, args: argparse.Namespace):
         super()._command(args)
         conf = TaskConfiguration(commands=[":"])
 
-        configurator = ListGpuConfigurator(api_client=self.api)
+        configurator = GpuConfigurator(api_client=self.api)
         configurator.apply_args(conf, args, [])
         profile = load_profile(Path.cwd(), profile_name=args.profile)
 
@@ -278,21 +278,3 @@ class ListGpuCommand(APIBaseCommand):
 
         console.print(props)
         console.print()
-
-
-class ListCommand(APIBaseCommand):
-    NAME = "list"
-    DESCRIPTION = "List various resources"
-
-    def _register(self):
-        super()._register()
-        subparsers = self._parser.add_subparsers(dest="subcommand", help="Available subcommands")
-
-        gpu_parser = subparsers.add_parser("gpu", help="List available GPUs")
-        gpu_cmd = ListGpuCommand(gpu_parser)
-        gpu_cmd._register()
-        gpu_parser.set_defaults(func=gpu_cmd._command)
-
-    def _command(self, args: argparse.Namespace):
-        if not hasattr(args, "subcommand") or args.subcommand is None:
-            self._parser.print_help()
