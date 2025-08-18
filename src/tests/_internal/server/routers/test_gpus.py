@@ -200,6 +200,19 @@ class TestListGpus:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_region_without_backend_rejected(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user, project, repo, run_spec = await gpu_test_setup(session)
+
+        response = await call_gpus_api(
+            client, project.name, user.token, run_spec, group_by=["region"]
+        )
+
+        assert response.status_code == 400
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_exact_aggregation_values(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -422,28 +435,79 @@ class TestListGpus:
             assert t4_runpod["price"] == {"min": 0.25, "max": 0.25}
             assert rtx_runpod["price"] == {"min": 0.65, "max": 0.75}
 
-            # Test region grouping to validate multi-region, multi-backend setup
             response_region = await client.post(
                 f"/api/project/{project.name}/gpus/list",
                 headers=get_auth_headers(user.token),
-                json={"run_spec": run_spec.dict(), "group_by": ["region"]},
+                json={"run_spec": run_spec.dict(), "group_by": ["backend", "region"]},
             )
             assert response_region.status_code == 200
             region_data = response_region.json()
 
-            assert len(region_data["gpus"]) == 2
+            assert len(region_data["gpus"]) == 5
 
-            t4_region_group = next(
-                (gpu for gpu in region_data["gpus"] if gpu["name"] == "T4"), None
+            t4_aws_uswest2 = next(
+                (
+                    gpu
+                    for gpu in region_data["gpus"]
+                    if gpu["name"] == "T4"
+                    and gpu.get("backend") == "aws"
+                    and gpu.get("region") == "us-west-2"
+                ),
+                None,
             )
-            rtx_region_group = next(
-                (gpu for gpu in region_data["gpus"] if gpu["name"] == "RTX4090"), None
+            t4_runpod_useast1 = next(
+                (
+                    gpu
+                    for gpu in region_data["gpus"]
+                    if gpu["name"] == "T4"
+                    and gpu.get("backend") == "runpod"
+                    and gpu.get("region") == "us-east-1"
+                ),
+                None,
             )
 
-            assert t4_region_group is not None
-            assert rtx_region_group is not None
+            rtx_runpod_useast1 = next(
+                (
+                    gpu
+                    for gpu in region_data["gpus"]
+                    if gpu["name"] == "RTX4090"
+                    and gpu.get("backend") == "runpod"
+                    and gpu.get("region") == "us-east-1"
+                ),
+                None,
+            )
+            rtx_runpod_euwest1 = next(
+                (
+                    gpu
+                    for gpu in region_data["gpus"]
+                    if gpu["name"] == "RTX4090"
+                    and gpu.get("backend") == "runpod"
+                    and gpu.get("region") == "eu-west-1"
+                ),
+                None,
+            )
 
-            assert set(t4_region_group["backends"]) == {"aws", "runpod"}
-            assert set(rtx_region_group["backends"]) == {"runpod"}
-            assert t4_region_group["price"] == {"min": 0.25, "max": 0.60}
-            assert rtx_region_group["price"] == {"min": 0.65, "max": 0.75}
+            assert t4_aws_uswest2 is not None
+            assert t4_runpod_useast1 is not None
+            assert rtx_runpod_useast1 is not None
+            assert rtx_runpod_euwest1 is not None
+
+            assert t4_aws_uswest2["backend"] == "aws"
+            assert t4_aws_uswest2["region"] == "us-west-2"
+            assert t4_aws_uswest2["price"]["min"] == 0.30
+            assert t4_aws_uswest2["price"]["max"] == 0.60
+
+            assert t4_runpod_useast1["backend"] == "runpod"
+            assert t4_runpod_useast1["region"] == "us-east-1"
+            assert t4_runpod_useast1["price"]["min"] == 0.25
+            assert t4_runpod_useast1["price"]["max"] == 0.25
+
+            assert rtx_runpod_useast1["backend"] == "runpod"
+            assert rtx_runpod_useast1["region"] == "us-east-1"
+            assert rtx_runpod_useast1["price"]["min"] == 0.75
+            assert rtx_runpod_useast1["price"]["max"] == 0.75
+
+            assert rtx_runpod_euwest1["backend"] == "runpod"
+            assert rtx_runpod_euwest1["region"] == "eu-west-1"
+            assert rtx_runpod_euwest1["price"]["min"] == 0.65
+            assert rtx_runpod_euwest1["price"]["max"] == 0.65

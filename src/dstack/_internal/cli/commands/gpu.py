@@ -31,7 +31,8 @@ class GpuConfigurator(BaseRunConfigurator):
             "--group-by",
             action="append",
             choices=["backend", "region", "count"],
-            help="Group GPUs by backend, region, and/or count. Can be specified multiple times.",
+            help="Group GPUs by backend, region, and/or count. Can be specified multiple times. "
+            "Note: 'region' can only be used together with 'backend'.",
         )
 
 

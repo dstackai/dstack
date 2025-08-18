@@ -20,6 +20,7 @@ class BackendGpu(CoreModel):
     spot: bool
     count: int
     price: float
+    region: str
 
 
 class BackendGpus(CoreModel):
@@ -36,7 +37,8 @@ class ListGpusRequest(CoreModel):
     run_spec: RunSpec
     group_by: Optional[List[Literal["backend", "region", "count"]]] = Field(
         default=None,
-        description="List of fields to group by. Valid values: 'backend', 'region', 'count'",
+        description="List of fields to group by. Valid values: 'backend', 'region', 'count'. "
+        "Note: 'region' can only be used together with 'backend'.",
     )
 
 
