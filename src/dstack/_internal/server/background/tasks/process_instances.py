@@ -181,8 +181,8 @@ async def _process_next_instance():
             if instance is None:
                 return
             lockset.add(instance.id)
+        instance_model_id = instance.id
         try:
-            instance_model_id = instance.id
             await _process_instance(session=session, instance=instance)
         finally:
             lockset.difference_update([instance_model_id])

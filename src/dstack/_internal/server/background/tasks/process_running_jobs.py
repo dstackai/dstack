@@ -128,9 +128,8 @@ async def _process_next_running_job():
             if job_model is None:
                 return
             lockset.add(job_model.id)
-
+        job_model_id = job_model.id
         try:
-            job_model_id = job_model.id
             await _process_running_job(session=session, job_model=job_model)
         finally:
             lockset.difference_update([job_model_id])

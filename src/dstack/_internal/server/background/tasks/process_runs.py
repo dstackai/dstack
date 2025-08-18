@@ -129,8 +129,8 @@ async def _process_next_run():
             job_ids = [j.id for j in run_model.jobs]
             run_lockset.add(run_model.id)
             job_lockset.update(job_ids)
+        run_model_id = run_model.id
         try:
-            run_model_id = run_model.id
             await _process_run(session=session, run_model=run_model)
         finally:
             run_lockset.difference_update([run_model_id])

@@ -49,8 +49,8 @@ async def process_gateways():
             if gateway_model is None:
                 return
             lockset.add(gateway_model.id)
+        gateway_model_id = gateway_model.id
         try:
-            gateway_model_id = gateway_model.id
             initial_status = gateway_model.status
             if initial_status == GatewayStatus.SUBMITTED:
                 await _process_submitted_gateway(session=session, gateway_model=gateway_model)
