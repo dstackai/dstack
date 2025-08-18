@@ -76,7 +76,7 @@ class GpuCommand(APIBaseCommand):
             status = contextlib.nullcontext()
 
         with status:
-            gpu_response = self.api.client.gpus.get_gpus(
+            gpu_response = self.api.client.gpus.list_gpus(
                 self.api.project,
                 run_spec,
                 group_by=args.group_by,

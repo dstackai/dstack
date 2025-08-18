@@ -30,8 +30,8 @@ class BackendGpus(CoreModel):
     regions: List[str]
 
 
-class GetRunGpusRequest(CoreModel):
-    """Request for getting run GPUs with optional grouping."""
+class ListGpusRequest(CoreModel):
+    """Request for listing GPUs with optional grouping."""
 
     run_spec: RunSpec
     group_by: Optional[List[Literal["backend", "region", "count"]]] = Field(
@@ -56,7 +56,7 @@ class GpuGroup(CoreModel):
     region: Optional[str] = None
 
 
-class RunGpusResponse(CoreModel):
+class ListGpusResponse(CoreModel):
     """Response containing GPU specifications."""
 
     gpus: List[GpuGroup] = Field(

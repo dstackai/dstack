@@ -109,7 +109,7 @@ async def call_gpus_api(
     )
 
 
-class TestGetRunGpus:
+class TestListGpus:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_403_if_not_project_member(

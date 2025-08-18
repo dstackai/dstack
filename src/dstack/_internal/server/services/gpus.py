@@ -12,7 +12,7 @@ from dstack._internal.server.schemas.gpus import (
     BackendGpu,
     BackendGpus,
     GpuGroup,
-    RunGpusResponse,
+    ListGpusResponse,
 )
 from dstack._internal.server.services.offers import get_offers_by_requirements
 
@@ -354,12 +354,12 @@ def _get_gpus_grouped_by_backend_region_and_count(
     )
 
 
-async def get_run_gpus_grouped(
+async def list_gpus_grouped(
     session: AsyncSession,
     project: ProjectModel,
     run_spec: RunSpec,
     group_by: Optional[List[Literal["backend", "region", "count"]]] = None,
-) -> RunGpusResponse:
+) -> ListGpusResponse:
     """Retrieves available GPU specifications based on a run spec, with optional grouping."""
     offers = await _get_gpu_offers(session, project, run_spec)
     backend_gpus = _process_offers_into_backend_gpus(offers)
@@ -383,4 +383,4 @@ async def get_run_gpus_grouped(
     else:
         gpus = _get_gpus_with_no_grouping(backend_gpus)
 
-    return RunGpusResponse(gpus=gpus)
+    return ListGpusResponse(gpus=gpus)
