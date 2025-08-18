@@ -17,6 +17,7 @@ from dstack.api.server._backends import BackendsAPIClient
 from dstack.api.server._files import FilesAPIClient
 from dstack.api.server._fleets import FleetsAPIClient
 from dstack.api.server._gateways import GatewaysAPIClient
+from dstack.api.server._gpus import GpusAPIClient
 from dstack.api.server._logs import LogsAPIClient
 from dstack.api.server._metrics import MetricsAPIClient
 from dstack.api.server._projects import ProjectsAPIClient
@@ -44,6 +45,7 @@ class APIClient:
         backends: operations with backends
         fleets: operations with fleets
         runs: operations with runs
+        gpus: operations with GPUs
         metrics: operations with metrics
         logs: operations with logs
         gateways: operations with gateways
@@ -92,6 +94,10 @@ class APIClient:
     @property
     def runs(self) -> RunsAPIClient:
         return RunsAPIClient(self._request)
+
+    @property
+    def gpus(self) -> GpusAPIClient:
+        return GpusAPIClient(self._request)
 
     @property
     def metrics(self) -> MetricsAPIClient:

@@ -10,11 +10,9 @@ from dstack._internal.server.models import ProjectModel, UserModel
 from dstack._internal.server.schemas.runs import (
     ApplyRunPlanRequest,
     DeleteRunsRequest,
-    GetRunGpusRequest,
     GetRunPlanRequest,
     GetRunRequest,
     ListRunsRequest,
-    RunGpusResponse,
     StopRunsRequest,
     SubmitRunRequest,
 )
@@ -179,18 +177,6 @@ async def delete_runs(
     """
     _, project = user_project
     await runs.delete_runs(session=session, project=project, runs_names=body.runs_names)
-
-
-@project_router.post("/gpus", response_model=RunGpusResponse, response_model_exclude_none=True)
-async def get_run_gpus(
-    body: GetRunGpusRequest,
-    session: AsyncSession = Depends(get_session),
-    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
-) -> RunGpusResponse:
-    _, project = user_project
-    return await runs.get_run_gpus_grouped(
-        session=session, project=project, run_spec=body.run_spec, group_by=body.group_by
-    )
 
 
 # apply_plan replaces submit_run since it can create new runs.
