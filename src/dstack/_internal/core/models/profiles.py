@@ -9,6 +9,7 @@ from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import CoreModel, Duration
 from dstack._internal.utils.common import list_enum_values_for_annotation
 from dstack._internal.utils.cron import validate_cron
+from dstack._internal.utils.json_schema import add_extra_schema_types
 from dstack._internal.utils.json_utils import pydantic_orjson_dumps_with_indent
 from dstack._internal.utils.tags import tags_validator
 
@@ -151,7 +152,7 @@ class UtilizationPolicy(CoreModel):
         ),
     ]
     time_window: Annotated[
-        Union[int, str],
+        int,
         Field(
             description=(
                 "The time window of metric samples taking into account to measure utilization"
@@ -159,6 +160,14 @@ class UtilizationPolicy(CoreModel):
             )
         ),
     ]
+
+    class Config(CoreModel.Config):
+        @staticmethod
+        def schema_extra(schema: Dict[str, Any]):
+            add_extra_schema_types(
+                schema["properties"]["time_window"],
+                extra_types=[{"type": "string"}],
+            )
 
     @validator("time_window", pre=True)
     def validate_time_window(cls, v: Union[int, str]) -> int:
@@ -382,7 +391,6 @@ class ProfilesConfig(CoreModel):
     class Config(CoreModel.Config):
         json_loads = orjson.loads
         json_dumps = pydantic_orjson_dumps_with_indent
-
         schema_extra = {"$schema": "http://json-schema.org/draft-07/schema#"}
 
     def default(self) -> Optional[Profile]:
