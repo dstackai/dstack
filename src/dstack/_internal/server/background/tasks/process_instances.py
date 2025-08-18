@@ -393,6 +393,7 @@ async def _add_remote(instance: InstanceModel) -> None:
         return
 
     region = instance.region
+    assert region is not None  # always set for ssh instances
     jpd = JobProvisioningData(
         backend=BackendType.REMOTE,
         instance_type=instance_type,
