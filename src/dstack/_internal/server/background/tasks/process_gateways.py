@@ -165,6 +165,9 @@ async def _process_provisioning_gateway(
     )
     gateway_model = res.unique().scalar_one()
 
+    # Provisioning gateways must have compute.
+    assert gateway_model.gateway_compute is not None
+
     # FIXME: problems caused by blocking on connect_to_gateway_with_retry and configure_gateway:
     # - cannot delete the gateway before it is provisioned because the DB model is locked
     # - connection retry counter is reset on server restart
