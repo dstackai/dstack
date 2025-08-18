@@ -18,6 +18,8 @@ class DevEnvironmentJobConfigurator(JobConfigurator):
     TYPE: RunConfigurationType = RunConfigurationType.DEV_ENVIRONMENT
 
     def __init__(self, run_spec: RunSpec, secrets: Dict[str, str]):
+        assert run_spec.configuration.type == "dev-environment"
+
         if run_spec.configuration.ide == "vscode":
             __class = VSCodeDesktop
         elif run_spec.configuration.ide == "cursor":
@@ -32,6 +34,8 @@ class DevEnvironmentJobConfigurator(JobConfigurator):
         super().__init__(run_spec=run_spec, secrets=secrets)
 
     def _shell_commands(self) -> List[str]:
+        assert self.run_spec.configuration.type == "dev-environment"
+
         commands = self.ide.get_install_commands()
         commands.append(INSTALL_IPYKERNEL)
         commands += self.run_spec.configuration.setup
@@ -56,4 +60,5 @@ class DevEnvironmentJobConfigurator(JobConfigurator):
         return self.run_spec.merged_profile.spot_policy or SpotPolicy.ONDEMAND
 
     def _ports(self) -> List[PortMapping]:
+        assert self.run_spec.configuration.type == "dev-environment"
         return self.run_spec.configuration.ports
