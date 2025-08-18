@@ -169,6 +169,11 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
 
     job = find_job(run.jobs, job_model.replica_num, job_model.job_num)
 
+    volumes = []
+    secrets = {}
+    cluster_info = None
+    repo_creds = None
+
     initial_status = job_model.status
     if initial_status in [JobStatus.PROVISIONING, JobStatus.PULLING]:
         # Wait until all other jobs in the replica are provisioned
@@ -256,6 +261,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
                 user_ssh_key,
             )
         else:
+            assert cluster_info is not None
             logger.debug(
                 "%s: process provisioning job without shim, age=%s",
                 fmt(job_model),
@@ -274,7 +280,6 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
                 repo=repo_model,
                 code_hash=_get_repo_code_hash(run, job),
             )
-
             success = await common_utils.run_async(
                 _submit_job_to_runner,
                 server_ssh_private_keys,
@@ -308,6 +313,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
 
     else:  # fails are not acceptable
         if initial_status == JobStatus.PULLING:
+            assert cluster_info is not None
             logger.debug(
                 "%s: process pulling job with shim, age=%s", fmt(job_model), job_submission.age
             )
