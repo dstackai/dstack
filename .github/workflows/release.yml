@@ -8,256 +8,77 @@ on:
       - "[0-9]+.[0-9]+.[0-9]+"
       - "[0-9]+.[0-9]+.[0-9]+.post[0-9]+"
 
-env:
-  BUILD_INCREMENT: 150
-  PIP_DISABLE_PIP_VERSION_CHECK: on
-  PIP_DEFAULT_TIMEOUT: 10
-  PIP_PROGRESS_BAR: off
-
 jobs:
-  code-lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up uv
-        uses: astral-sh/setup-uv@v5
-        with:
-          python-version: 3.11
-      - run: uv tool install pre-commit
-      - run: pre-commit run -a --show-diff-on-failure
-
-  frontend-build:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: frontend
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 18
-      - name: Install packages
-        run: npm ci
-      - name: Build dist
-        run: npm run build
-      - name: Upload dist
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-build
-          path: frontend/build
-
-  python-test:
-    needs: [code-lint, frontend-build]
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [macos-latest, ubuntu-latest, windows-latest]
-        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: astral-sh/setup-uv@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Install dependencies
-        run: uv sync --all-extras
-      - name: Download frontend build
-        uses: actions/download-artifact@v4
-        with:
-          name: frontend-build
-          path: src/dstack/_internal/server/statics
-      - name: Run pytest on POSIX
-        if: matrix.os != 'windows-latest'
-        # Skip Postgres tests on macos since macos runner doesn't have Docker.
-        run: |
-          RUNPOSTGRES=""
-          if [ "${{ matrix.os }}" != "macos-latest" ]; then
-            RUNPOSTGRES="--runpostgres"
-          fi
-          uv run pytest -n auto src/tests --runui $RUNPOSTGRES
-      - name: Run pytest on Windows
-        if: matrix.os == 'windows-latest'
-        run: |
-          uv run pytest -n auto src/tests --runui --runpostgres
-
-  runner-test:
-    defaults:
-      run:
-        working-directory: runner
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: runner/go.mod
-          cache-dependency-path: runner/go.sum
-      - name: Check if go.mod and go.sum are up-to-date
-        run: go mod tidy -diff
-      - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v6
-        with:
-          version: v1.62.0
-          args: --timeout=20m
-          working-directory: runner
-      - name: Test
-        run: |
-          go version
-          go fmt $(go list ./... | grep -v /vendor/)
-          go vet $(go list ./... | grep -v /vendor/)
-          go test -race $(go list ./... | grep -v /vendor/)
-
-  runner-compile:
-    needs: [runner-test]
-    defaults:
-      run:
-        working-directory: runner
-    env:
-      REPO_NAME: github.com/dstackai/dstack
-    strategy:
-      matrix:
-        include:
-          - { runs-on: "ubuntu-24.04", goos: "linux", goarch: "amd64" }
-          - { runs-on: "ubuntu-24.04-arm", goos: "linux", goarch: "arm64" }
-    runs-on: ${{ matrix.runs-on }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: runner/go.mod
-          cache-dependency-path: runner/go.sum
-      - name: build
-        env:
-          GOOS: ${{ matrix.goos }}
-          GOARCH: ${{ matrix.goarch }}
-        run: |
-          VERSION=${GITHUB_REF#refs/tags/}
-          CGO_ENABLED=0 go build -ldflags "-X 'main.Version=$VERSION' -extldflags '-static'" -o dstack-runner-$GOOS-$GOARCH $REPO_NAME/runner/cmd/runner
-          CGO_ENABLED=1 go build -ldflags "-X 'main.Version=$VERSION'" -o dstack-shim-$GOOS-$GOARCH $REPO_NAME/runner/cmd/shim
-      - uses: actions/upload-artifact@v4
-        with:
-          name: dstack-runner-${{ matrix.goos }}-${{ matrix.goarch }}
-          path: |
-            runner/dstack-runner-${{ matrix.goos }}-${{ matrix.goarch }}
-            runner/dstack-shim-${{ matrix.goos }}-${{ matrix.goarch }}
-
-  gateway-build:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: gateway
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up uv
-        uses: astral-sh/setup-uv@v5
-        with:
-          python-version: 3.11
-      - name: Install AWS
-        run: uv tool install awscli
-      - name: Store version
-        run: echo VERSION=${GITHUB_REF#refs/tags/} > $GITHUB_ENV
-      - name: Build package
-        run: |
-          echo "__version__ = \"${{ env.VERSION }}\"" > src/dstack/gateway/version.py
-          sed \
-            -i.old \
-            "s|@ git+https://github.com/dstackai/dstack.git@master|== ${{ env.VERSION }}|" \
-            pyproject.toml
-          diff pyproject.toml pyproject.toml.old > /dev/null && echo "Could not set version" && exit 1
-          uv build
-      - name: Upload to S3
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        run: |
-          WHEEL=dstack_gateway-${{ env.VERSION }}-py3-none-any.whl
-          aws s3 cp dist/$WHEEL "s3://dstack-gateway-downloads/release/$WHEEL"
-          echo "${{ env.VERSION }}" | aws s3 cp - "s3://dstack-gateway-downloads/release/latest-version"
-
-  runner-upload:
-    needs: [runner-compile, gateway-build, python-test]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Set up uv
-        uses: astral-sh/setup-uv@v5
-        with:
-          python-version: 3.11
-      - name: Install AWS
-        run: uv tool install awscli
-      - name: Download Runner
-        uses: actions/download-artifact@v4
-        with:
-          pattern: dstack-runner-*
-          merge-multiple: true
-          path: runner
-      - name: Upload to S3
-        working-directory: runner
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        run: |
-          VERSION=${GITHUB_REF#refs/tags/}
-          aws s3 cp . "s3://dstack-runner-downloads/$VERSION/binaries/" --recursive --exclude "*" --include "dstack-*" --acl public-read
-          aws s3 cp . "s3://dstack-runner-downloads/latest/binaries/" --recursive --exclude "*" --include "dstack-*" --acl public-read
-
-  pypi-upload:
-    needs: [python-test, runner-upload]
+  compute-version:
     runs-on: ubuntu-latest
     outputs:
-      LATEST: ${{ steps.set_latest.outputs.LATEST }}
-      name: Set latest variable
+      version: ${{ steps.set-version.outputs.version }}
+      latest: ${{ steps.set-latest.outputs.latest }}
     steps:
-      - uses: actions/checkout@v4
-      - name: Set up uv
+      - name: Set up Python
         uses: astral-sh/setup-uv@v5
         with:
           python-version: 3.11
-      - name: Download frontend build
-        uses: actions/download-artifact@v4
-        with:
-          name: frontend-build
-          path: src/dstack/_internal/server/statics
-      - name: Set output
-        id: set_latest
+          # settings to prevent warnings when running uv without a repo checkout
+          enable-cache: false
+          ignore-empty-workdir: true
+      - id: set-version
+        run: |
+          echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+      - id: set-latest
         run: |
           uv pip install packaging
-          VERSION=${GITHUB_REF#refs/tags/}
+          VERSION=${{ steps.set-version.outputs.version }}
           LATEST=$(python -c "from packaging import version as pkg_version; print('' if pkg_version.parse('$VERSION').is_prerelease else '1', end='')")
-          echo "LATEST=$LATEST" >> "$GITHUB_OUTPUT"
-      - name: Upload pip package
-        run: |
-          VERSION=${GITHUB_REF#refs/tags/}
-          BASE_IMAGE=$(cat src/dstack/version.py | grep "base_image = ")
-          BASE_IMAGE_UBUNTU_VERSION=$(cat src/dstack/version.py | grep "base_image_ubuntu_version = ")
-          echo "__version__ = \"$VERSION\"" > src/dstack/version.py
-          echo "__is_release__ = True" >> src/dstack/version.py
-          echo $BASE_IMAGE >> src/dstack/version.py
-          echo $BASE_IMAGE_UBUNTU_VERSION >> src/dstack/version.py
-          cp README.md src
-          uv build
-          uv publish --username ${{ secrets.PYPI_USERNAME }} --password ${{ secrets.PYPI_PASSWORD }}   
+          echo "latest=$LATEST" >> "$GITHUB_OUTPUT"
 
-  update-get-dstack-tag:
-    needs: [pypi-upload]
+  build-artifacts:
+    needs: [compute-version]
+    uses: ./.github/workflows/build-artifacts.yml
+    with:
+      version: ${{ needs.compute-version.outputs.version }}
+      staging: true
+      go-integration-tests: true
+
+  upload-pre-pypi-artifacts:
+    needs: [compute-version, build-artifacts]
+    uses: ./.github/workflows/upload-pre-pypi-artifacts.yml
+    with:
+      version: ${{ needs.compute-version.outputs.version }}
+      staging: false
+    secrets: inherit
+
+  pypi-upload:
+    needs: [compute-version, upload-pre-pypi-artifacts]
     runs-on: ubuntu-latest
-    env:
-      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
     steps:
       - name: Set up uv
         uses: astral-sh/setup-uv@v5
         with:
           python-version: 3.11
-      - name: Install AWS
-        run: uv tool install awscli
-      - run: |
-          VERSION=${GITHUB_REF#refs/tags/}
-          echo $VERSION | aws s3 cp - s3://get-dstack/cli/latest-version --acl public-read
+          # settings to prevent warnings when running uv without a repo checkout
+          enable-cache: false
+          ignore-empty-workdir: true
+      - name: Download Python package
+        uses: actions/download-artifact@v4
+        with:
+          name: python-build
+          path: dist
+      - name: Upload Python package to PyPI
+        run: |
+          uv publish --username ${{ secrets.PYPI_USERNAME }} --password ${{ secrets.PYPI_PASSWORD }}   
+
+  upload-post-pypi-artifacts:
+    needs: [compute-version, pypi-upload]
+    uses: ./.github/workflows/upload-post-pypi-artifacts.yml
+    with:
+      version: ${{ needs.compute-version.outputs.version }}
+      is-latest-version: ${{ needs.compute-version.outputs.latest == '1' }}
+      staging: false
+    secrets: inherit
 
   server-docker-upload:
-    needs: [pypi-upload]
+    needs: [compute-version, pypi-upload]
     defaults:
       run:
         working-directory: docker/server
@@ -276,12 +97,12 @@ jobs:
         uses: docker/setup-qemu-action@v3
       - name: Build and upload to DockerHub
         run: |
-          VERSION=${GITHUB_REF#refs/tags/}
+          VERSION=${{ needs.compute-version.outputs.version }}
           docker buildx build --platform linux/arm64/v8 --build-arg VERSION=$VERSION --push --provenance=false --tag dstackai/dstack:$VERSION-arm64 -f release/Dockerfile .
           docker buildx build --platform linux/amd64 --build-arg VERSION=$VERSION --push --provenance=false --tag dstackai/dstack:$VERSION-amd64 -f release/Dockerfile .
           docker manifest create dstackai/dstack:$VERSION --amend dstackai/dstack:$VERSION-arm64 --amend dstackai/dstack:$VERSION-amd64
           docker manifest push dstackai/dstack:$VERSION
-          if [ -n "${{ needs.pypi-upload.outputs.LATEST }}" ]; then
+          if [ -n "${{ needs.compute-version.outputs.latest }}" ]; then
             docker manifest create dstackai/dstack:latest --amend dstackai/dstack:$VERSION-arm64 --amend dstackai/dstack:$VERSION-amd64
             docker manifest push dstackai/dstack:latest
           fi
@@ -292,32 +113,3 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
           repository: dstackai/dstack
           readme-filepath: ./docker/server/README.md
-
-  generate-json-schema:
-    needs: [pypi-upload]
-    env:
-      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
-        with:
-          python-version: 3.11
-      - name: Install AWS
-        run: uv tool install awscli
-      - name: Install dstack
-        run: uv sync
-      - name: Generate json schema
-        run: |
-          uv run python -c "from dstack._internal.core.models.configurations import DstackConfiguration; print(DstackConfiguration.schema_json())" > configuration.json
-          uv run python -c "from dstack._internal.core.models.profiles import ProfilesConfig; print(ProfilesConfig.schema_json())" > profiles.json
-      - name: Upload json schema to S3
-        run: |
-          VERSION=${GITHUB_REF#refs/tags/}
-          aws s3 cp configuration.json "s3://dstack-runner-downloads/$VERSION/schemas/configuration.json" --acl public-read
-          aws s3 cp profiles.json "s3://dstack-runner-downloads/$VERSION/schemas/profiles.json" --acl public-read      
-          if [ -n "${{ needs.pypi-upload.outputs.LATEST }}" ]; then
-            aws s3 cp configuration.json "s3://dstack-runner-downloads/latest/schemas/configuration.json" --acl public-read
-            aws s3 cp profiles.json "s3://dstack-runner-downloads/latest/schemas/profiles.json" --acl public-read
-          fi
