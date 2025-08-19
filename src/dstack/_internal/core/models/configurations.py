@@ -221,7 +221,7 @@ class ProbeConfig(CoreModel):
         ),
     ] = None
     timeout: Annotated[
-        Optional[Union[int, str]],
+        Optional[int],
         Field(
             description=(
                 f"Maximum amount of time the HTTP request is allowed to take. Defaults to `{DEFAULT_PROBE_TIMEOUT}s`"
@@ -229,7 +229,7 @@ class ProbeConfig(CoreModel):
         ),
     ] = None
     interval: Annotated[
-        Optional[Union[int, str]],
+        Optional[int],
         Field(
             description=(
                 "Minimum amount of time between the end of one probe execution"
@@ -249,7 +249,19 @@ class ProbeConfig(CoreModel):
         ),
     ] = None
 
-    @validator("timeout")
+    class Config(CoreModel.Config):
+        @staticmethod
+        def schema_extra(schema: Dict[str, Any]):
+            add_extra_schema_types(
+                schema["properties"]["timeout"],
+                extra_types=[{"type": "string"}],
+            )
+            add_extra_schema_types(
+                schema["properties"]["interval"],
+                extra_types=[{"type": "string"}],
+            )
+
+    @validator("timeout", pre=True)
     def parse_timeout(cls, v: Optional[Union[int, str]]) -> Optional[int]:
         if v is None:
             return v
@@ -258,7 +270,7 @@ class ProbeConfig(CoreModel):
             raise ValueError(f"Probe timeout cannot be shorter than {MIN_PROBE_TIMEOUT}s")
         return parsed
 
-    @validator("interval")
+    @validator("interval", pre=True)
     def parse_interval(cls, v: Optional[Union[int, str]]) -> Optional[int]:
         if v is None:
             return v
