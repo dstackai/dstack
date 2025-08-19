@@ -62,15 +62,17 @@ def parse_duration(v: Optional[Union[int, str]]) -> Optional[int]:
     return Duration.parse(v)
 
 
-def parse_max_duration(v: Optional[Union[int, str, bool]]) -> Optional[Union[str, int]]:
+def parse_max_duration(v: Optional[Union[int, str, bool]]) -> Optional[Union[Literal["off"], int]]:
     return parse_off_duration(v)
 
 
-def parse_stop_duration(v: Optional[Union[int, str, bool]]) -> Optional[Union[str, int]]:
+def parse_stop_duration(
+    v: Optional[Union[int, str, bool]],
+) -> Optional[Union[Literal["off"], int]]:
     return parse_off_duration(v)
 
 
-def parse_off_duration(v: Optional[Union[int, str, bool]]) -> Optional[Union[str, int]]:
+def parse_off_duration(v: Optional[Union[int, str, bool]]) -> Optional[Union[Literal["off"], int]]:
     if v == "off" or v is False:
         return "off"
     if v is True:
@@ -78,7 +80,7 @@ def parse_off_duration(v: Optional[Union[int, str, bool]]) -> Optional[Union[str
     return parse_duration(v)
 
 
-def parse_idle_duration(v: Optional[Union[int, str]]) -> Optional[Union[str, int]]:
+def parse_idle_duration(v: Optional[Union[int, str]]) -> Optional[int]:
     if v == "off" or v == -1:
         return -1
     return parse_duration(v)
@@ -256,7 +258,7 @@ class ProfileParams(CoreModel):
         Field(description="The policy for resubmitting the run. Defaults to `false`"),
     ] = None
     max_duration: Annotated[
-        Optional[Union[Literal["off"], str, int, bool]],
+        Optional[Union[Literal["off"], int]],
         Field(
             description=(
                 "The maximum duration of a run (e.g., `2h`, `1d`, etc)."
@@ -266,7 +268,7 @@ class ProfileParams(CoreModel):
         ),
     ] = None
     stop_duration: Annotated[
-        Optional[Union[Literal["off"], str, int, bool]],
+        Optional[Union[Literal["off"], int]],
         Field(
             description=(
                 "The maximum duration of a run graceful stopping."
@@ -356,6 +358,14 @@ class ProfileParams(CoreModel):
             del schema["properties"]["retry_policy"]
             del schema["properties"]["termination_policy"]
             del schema["properties"]["termination_idle_time"]
+            add_extra_schema_types(
+                schema["properties"]["max_duration"],
+                extra_types=[{"type": "boolean"}, {"type": "string"}],
+            )
+            add_extra_schema_types(
+                schema["properties"]["stop_duration"],
+                extra_types=[{"type": "boolean"}, {"type": "string"}],
+            )
 
     _validate_max_duration = validator("max_duration", pre=True, allow_reuse=True)(
         parse_max_duration

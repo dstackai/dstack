@@ -436,7 +436,7 @@ class RunCollection:
     ) -> RunPlan:
         """
         Get a run plan.
-        Use this method to see the run plan before applying the cofiguration.
+        Use this method to see the run plan before applying the configuration.
 
         Args:
             configuration (Union[Task, Service, DevEnvironment]): The run configuration.
@@ -691,8 +691,8 @@ class RunCollection:
             spot_policy=spot_policy,
             retry=None,
             utilization_policy=utilization_policy,
-            max_duration=max_duration,
-            stop_duration=stop_duration,
+            max_duration=max_duration,  # type: ignore[assignment]
+            stop_duration=stop_duration,  # type: ignore[assignment]
             max_price=max_price,
             creation_policy=creation_policy,
             idle_duration=idle_duration,

@@ -519,6 +519,11 @@ class DevEnvironmentConfiguration(
 ):
     type: Literal["dev-environment"] = "dev-environment"
 
+    class Config(ProfileParams.Config):
+        @staticmethod
+        def schema_extra(schema: Dict[str, Any]):
+            ProfileParams.Config.schema_extra(schema)
+
 
 class TaskConfigurationParams(CoreModel):
     nodes: Annotated[int, Field(description="Number of nodes", ge=1)] = 1
@@ -531,6 +536,11 @@ class TaskConfiguration(
     TaskConfigurationParams,
 ):
     type: Literal["task"] = "task"
+
+    class Config(ProfileParams.Config):
+        @staticmethod
+        def schema_extra(schema: Dict[str, Any]):
+            ProfileParams.Config.schema_extra(schema)
 
 
 class ServiceConfigurationParams(CoreModel):
@@ -593,6 +603,10 @@ class ServiceConfigurationParams(CoreModel):
     class Config(CoreModel.Config):
         @staticmethod
         def schema_extra(schema: Dict[str, Any]):
+            add_extra_schema_types(
+                schema["properties"]["replicas"],
+                extra_types=[{"type": "integer"}, {"type": "string"}],
+            )
             add_extra_schema_types(
                 schema["properties"]["model"],
                 extra_types=[{"type": "string"}],
@@ -669,13 +683,11 @@ class ServiceConfiguration(
 ):
     type: Literal["service"] = "service"
 
-    class Config(CoreModel.Config):
+    class Config(ProfileParams.Config, ServiceConfigurationParams.Config):
         @staticmethod
         def schema_extra(schema: Dict[str, Any]):
-            add_extra_schema_types(
-                schema["properties"]["replicas"],
-                extra_types=[{"type": "integer"}, {"type": "string"}],
-            )
+            ProfileParams.Config.schema_extra(schema)
+            ServiceConfigurationParams.Config.schema_extra(schema)
 
 
 AnyRunConfiguration = Union[DevEnvironmentConfiguration, TaskConfiguration, ServiceConfiguration]

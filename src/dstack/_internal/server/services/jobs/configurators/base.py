@@ -258,19 +258,17 @@ class JobConfigurator(ABC):
         return self.run_spec.configuration.single_branch
 
     def _max_duration(self) -> Optional[int]:
-        if self.run_spec.merged_profile.max_duration in [None, True]:
+        if self.run_spec.merged_profile.max_duration is None:
             return self._default_max_duration()
-        if self.run_spec.merged_profile.max_duration in ["off", False]:
+        if self.run_spec.merged_profile.max_duration == "off":
             return None
-        # pydantic validator ensures this is int
         return self.run_spec.merged_profile.max_duration
 
     def _stop_duration(self) -> Optional[int]:
-        if self.run_spec.merged_profile.stop_duration in [None, True]:
+        if self.run_spec.merged_profile.stop_duration is None:
             return DEFAULT_STOP_DURATION
-        if self.run_spec.merged_profile.stop_duration in ["off", False]:
+        if self.run_spec.merged_profile.stop_duration == "off":
             return None
-        # pydantic validator ensures this is int
         return self.run_spec.merged_profile.stop_duration
 
     def _utilization_policy(self) -> Optional[UtilizationPolicy]:
