@@ -17,8 +17,8 @@ from dstack._internal.core.backends.configurators import (
 )
 from dstack._internal.core.backends.local.backend import LocalBackend
 from dstack._internal.core.backends.models import (
-    AnyBackendConfig,
     AnyBackendConfigWithCreds,
+    AnyBackendConfigWithoutCreds,
 )
 from dstack._internal.core.errors import (
     BackendError,
@@ -126,19 +126,25 @@ async def get_backend_config(
             )
             continue
         if backend_model.type == backend_type:
-            return get_backend_config_from_backend_model(
-                configurator, backend_model, include_creds=True
-            )
+            return get_backend_config_with_creds_from_backend_model(configurator, backend_model)
     return None
 
 
-def get_backend_config_from_backend_model(
+def get_backend_config_with_creds_from_backend_model(
     configurator: Configurator,
     backend_model: BackendModel,
-    include_creds: bool,
-) -> AnyBackendConfig:
+) -> AnyBackendConfigWithCreds:
     backend_record = get_stored_backend_record(backend_model)
-    backend_config = configurator.get_backend_config(backend_record, include_creds=include_creds)
+    backend_config = configurator.get_backend_config(backend_record, include_creds=True)
+    return backend_config
+
+
+def get_backend_config_without_creds_from_backend_model(
+    configurator: Configurator,
+    backend_model: BackendModel,
+) -> AnyBackendConfigWithoutCreds:
+    backend_record = get_stored_backend_record(backend_model)
+    backend_config = configurator.get_backend_config(backend_record, include_creds=False)
     return backend_config
 
 
