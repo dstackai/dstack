@@ -124,9 +124,17 @@ class ProfileRetry(CoreModel):
         ),
     ] = None
     duration: Annotated[
-        Optional[Union[int, str]],
+        Optional[int],
         Field(description="The maximum period of retrying the run, e.g., `4h` or `1d`"),
     ] = None
+
+    class Config(CoreModel.Config):
+        @staticmethod
+        def schema_extra(schema: Dict[str, Any]):
+            add_extra_schema_types(
+                schema["properties"]["duration"],
+                extra_types=[{"type": "string"}],
+            )
 
     _validate_duration = validator("duration", pre=True, allow_reuse=True)(parse_duration)
 
