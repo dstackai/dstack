@@ -33,6 +33,11 @@ export const ROUTES = {
                         FORMAT: (projectName: string, runId: string) =>
                             buildRoute(ROUTES.PROJECT.DETAILS.RUNS.DETAILS.METRICS.TEMPLATE, { projectName, runId }),
                     },
+                    LOGS: {
+                        TEMPLATE: `/projects/:projectName/runs/:runId/logs`,
+                        FORMAT: (projectName: string, runId: string) =>
+                            buildRoute(ROUTES.PROJECT.DETAILS.RUNS.DETAILS.LOGS.TEMPLATE, { projectName, runId }),
+                    },
                     JOBS: {
                         DETAILS: {
                             TEMPLATE: `/projects/:projectName/runs/:runId/jobs/:jobName`,
@@ -46,6 +51,15 @@ export const ROUTES = {
                                 TEMPLATE: `/projects/:projectName/runs/:runId/jobs/:jobName/metrics`,
                                 FORMAT: (projectName: string, runId: string, jobName: string) =>
                                     buildRoute(ROUTES.PROJECT.DETAILS.RUNS.DETAILS.JOBS.DETAILS.METRICS.TEMPLATE, {
+                                        projectName,
+                                        runId,
+                                        jobName,
+                                    }),
+                            },
+                            LOGS: {
+                                TEMPLATE: `/projects/:projectName/runs/:runId/jobs/:jobName/logs`,
+                                FORMAT: (projectName: string, runId: string, jobName: string) =>
+                                    buildRoute(ROUTES.PROJECT.DETAILS.RUNS.DETAILS.JOBS.DETAILS.LOGS.TEMPLATE, {
                                         projectName,
                                         runId,
                                         jobName,
