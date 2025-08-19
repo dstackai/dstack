@@ -293,7 +293,7 @@ class ProfileParams(CoreModel):
         ),
     ] = None
     idle_duration: Annotated[
-        Optional[Union[Literal["off"], str, int]],
+        Optional[int],
         Field(
             description=(
                 "Time to wait before terminating idle instances."
@@ -365,6 +365,10 @@ class ProfileParams(CoreModel):
             add_extra_schema_types(
                 schema["properties"]["stop_duration"],
                 extra_types=[{"type": "boolean"}, {"type": "string"}],
+            )
+            add_extra_schema_types(
+                schema["properties"]["idle_duration"],
+                extra_types=[{"type": "string"}],
             )
 
     _validate_max_duration = validator("max_duration", pre=True, allow_reuse=True)(

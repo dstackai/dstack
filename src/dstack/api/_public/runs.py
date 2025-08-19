@@ -695,7 +695,7 @@ class RunCollection:
             stop_duration=stop_duration,  # type: ignore[assignment]
             max_price=max_price,
             creation_policy=creation_policy,
-            idle_duration=idle_duration,
+            idle_duration=idle_duration,  # type: ignore[assignment]
         )
         run_spec = RunSpec(
             run_name=run_name,

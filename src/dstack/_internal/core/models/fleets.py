@@ -224,7 +224,7 @@ class InstanceGroupParams(CoreModel):
         Field(description="The maximum instance price per hour, in dollars", gt=0.0),
     ] = None
     idle_duration: Annotated[
-        Optional[Union[Literal["off"], str, int]],
+        Optional[int],
         Field(
             description="Time to wait before terminating idle instances. Defaults to `5m` for runs and `3d` for fleets. Use `off` for unlimited duration"
         ),
@@ -242,6 +242,10 @@ class InstanceGroupParams(CoreModel):
             add_extra_schema_types(
                 schema["properties"]["nodes"],
                 extra_types=[{"type": "integer"}, {"type": "string"}],
+            )
+            add_extra_schema_types(
+                schema["properties"]["idle_duration"],
+                extra_types=[{"type": "string"}],
             )
 
     _validate_idle_duration = validator("idle_duration", pre=True, allow_reuse=True)(
