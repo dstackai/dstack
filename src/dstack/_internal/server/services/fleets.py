@@ -504,6 +504,7 @@ async def create_fleet_ssh_instance_model(
         raise ServerClientError("ssh key or user not specified")
 
     if proxy_jump is not None:
+        assert proxy_jump.ssh_key is not None
         ssh_proxy = SSHConnectionParams(
             hostname=proxy_jump.hostname,
             port=proxy_jump.port or 22,
