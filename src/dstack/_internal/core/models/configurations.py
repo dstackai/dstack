@@ -547,7 +547,7 @@ class ServiceConfigurationParams(CoreModel):
         ),
     ] = STRIP_PREFIX_DEFAULT
     model: Annotated[
-        Optional[Union[AnyModel, str]],
+        Optional[AnyModel],
         Field(
             description=(
                 "Mapping of the model for the OpenAI-compatible endpoint provided by `dstack`."
@@ -578,6 +578,14 @@ class ServiceConfigurationParams(CoreModel):
         Field(description="List of probes used to determine job health"),
     ] = []
 
+    class Config(CoreModel.Config):
+        @staticmethod
+        def schema_extra(schema: Dict[str, Any]):
+            add_extra_schema_types(
+                schema["properties"]["model"],
+                extra_types=[{"type": "string"}],
+            )
+
     @validator("port")
     def convert_port(cls, v) -> PortMapping:
         if isinstance(v, int):
@@ -586,7 +594,7 @@ class ServiceConfigurationParams(CoreModel):
             return PortMapping.parse(v)
         return v
 
-    @validator("model")
+    @validator("model", pre=True)
     def convert_model(cls, v: Optional[Union[AnyModel, str]]) -> Optional[AnyModel]:
         if isinstance(v, str):
             return OpenAIChatModel(type="chat", name=v, format="openai")
