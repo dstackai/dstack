@@ -812,7 +812,6 @@ class RunCollection:
         if configuration_path is not None:
             base_dir = Path(configuration_path).expanduser().resolve().parent
         for file_mapping in configuration.files:
-            assert isinstance(file_mapping, FilePathMapping)
             path = Path(file_mapping.local_path).expanduser()
             if not path.is_absolute():
                 if base_dir is None:

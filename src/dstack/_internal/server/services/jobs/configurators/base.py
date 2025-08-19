@@ -3,7 +3,7 @@ import sys
 import threading
 from abc import ABC, abstractmethod
 from pathlib import PurePosixPath
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional
 
 from cachetools import TTLCache, cached
 
@@ -326,7 +326,7 @@ class JobConfigurator(ABC):
 
 
 def interpolate_job_volumes(
-    run_volumes: List[Union[MountPoint, str]],
+    run_volumes: List[MountPoint],
     job_num: int,
 ) -> List[MountPoint]:
     if len(run_volumes) == 0:
@@ -341,9 +341,6 @@ def interpolate_job_volumes(
     )
     job_volumes = []
     for mount_point in run_volumes:
-        if isinstance(mount_point, str):
-            # pydantic validator ensures strings are converted to MountPoint
-            continue
         if not isinstance(mount_point, VolumeMountPoint):
             job_volumes.append(mount_point.copy())
             continue
