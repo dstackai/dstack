@@ -198,7 +198,7 @@ def print_filter_info(run_spec: RunSpec, group_by: List[str], project: str):
         return f"[bold]{s}[/bold]"
 
     props.add_row(th("Project"), project)
-    props.add_row(th("User"), "admin")  # TODO: Get actual user name
+    # TODO: Show user name
     props.add_row(th("Resources"), pretty_req)
     props.add_row(th("Spot policy"), spot_policy)
     props.add_row(th("Max price"), max_price)
