@@ -529,7 +529,7 @@ async def submit_run(
             initial_status = RunStatus.PENDING
             initial_replicas = 0
         elif run_spec.configuration.type == "service":
-            initial_replicas = run_spec.configuration.replicas.min
+            initial_replicas = run_spec.configuration.replicas.min or 0
 
         run_model = RunModel(
             id=uuid.uuid4(),

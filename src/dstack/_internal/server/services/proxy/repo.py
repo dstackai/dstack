@@ -177,6 +177,8 @@ def _model_options_to_format_spec(model: AnyModel) -> AnyModelFormat:
         if model.format == "openai":
             return OpenAIChatModelFormat(prefix=model.prefix)
         elif model.format == "tgi":
+            assert model.chat_template is not None
+            assert model.eos_token is not None
             return TGIChatModelFormat(
                 chat_template=model.chat_template,
                 eos_token=model.eos_token,
