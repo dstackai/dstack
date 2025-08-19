@@ -5,7 +5,6 @@ Application logic related to `type: service` runs.
 import uuid
 from datetime import datetime
 from typing import Optional
-from urllib.parse import urlparse
 
 import httpx
 from sqlalchemy import select
@@ -102,6 +101,9 @@ async def _register_service_in_gateway(
         model_url=f"{gateway_protocol}://gateway.{wildcard_domain}",
     )
 
+    domain = service_spec.get_domain()
+    assert domain is not None
+
     conn = await get_or_add_gateway_connection(session, gateway.id)
     try:
         logger.debug("%s: registering service as %s", fmt(run_model), service_spec.url)
@@ -109,7 +111,7 @@ async def _register_service_in_gateway(
             await client.register_service(
                 project=run_model.project.name,
                 run_name=run_model.run_name,
-                domain=urlparse(service_spec.url).hostname,
+                domain=domain,
                 service_https=service_https,
                 gateway_https=gateway_https,
                 auth=run_spec.configuration.auth,
