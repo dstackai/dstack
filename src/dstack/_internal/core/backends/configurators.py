@@ -48,6 +48,15 @@ except ImportError:
     pass
 
 try:
+    from dstack._internal.core.backends.digitalocean.configurator import (
+        DigitalOceanConfigurator,
+    )
+
+    _CONFIGURATOR_CLASSES.append(DigitalOceanConfigurator)
+except ImportError:
+    pass
+
+try:
     from dstack._internal.core.backends.gcp.configurator import GCPConfigurator
 
     _CONFIGURATOR_CLASSES.append(GCPConfigurator)

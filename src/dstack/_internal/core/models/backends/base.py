@@ -8,9 +8,10 @@ class BackendType(str, enum.Enum):
         AZURE (BackendType): Microsoft Azure
         CLOUDRIFT (BackendType): CloudRift
         CUDO (BackendType): Cudo
+        DATACRUNCH (BackendType): DataCrunch
+        DIGITALOCEAN (BackendType): DigitalOcean
         DSTACK (BackendType): dstack Sky
         GCP (BackendType): Google Cloud Platform
-        DATACRUNCH (BackendType): DataCrunch
         HOTAISLE (BackendType): Hot Aisle
         KUBERNETES (BackendType): Kubernetes
         LAMBDA (BackendType): Lambda Cloud
@@ -27,6 +28,7 @@ class BackendType(str, enum.Enum):
     CLOUDRIFT = "cloudrift"
     CUDO = "cudo"
     DATACRUNCH = "datacrunch"
+    DIGITALOCEAN = "digitalocean"
     DSTACK = "dstack"
     GCP = "gcp"
     HOTAISLE = "hotaisle"
