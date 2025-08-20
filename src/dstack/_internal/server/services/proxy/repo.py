@@ -142,7 +142,7 @@ class ServerProxyRepo(BaseProxyRepo):
             model_options_obj = service_spec.options.get("openai", {}).get("model")
             if model_spec is None or model_options_obj is None:
                 continue
-            model_options = pydantic.parse_obj_as(AnyModel, model_options_obj)
+            model_options = pydantic.parse_obj_as(AnyModel, model_options_obj)  # type: ignore[arg-type]
             model = ChatModel(
                 project_name=project_name,
                 name=model_spec.name,

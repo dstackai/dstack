@@ -637,6 +637,7 @@ def _process_pulling_with_shim(
         is successful
     """
     shim_client = client.ShimClient(port=ports[DSTACK_SHIM_HTTP_PORT])
+    job_runtime_data = None
     if shim_client.is_api_v2_supported():  # raises error if shim is down, causes retry
         task = shim_client.get_task(job_model.id)
 
