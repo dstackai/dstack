@@ -1,6 +1,6 @@
 import sys
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple, Type
+from typing import Dict, Optional, Tuple, Type
 
 import yaml
 
@@ -24,7 +24,9 @@ from dstack._internal.core.models.configurations import (
 APPLY_STDIN_NAME = "-"
 
 
-apply_configurators_mapping: Dict[ApplyConfigurationType, Type[BaseApplyConfigurator[Any]]] = {
+apply_configurators_mapping: Dict[
+    ApplyConfigurationType, Type[BaseApplyConfigurator[AnyApplyConfiguration]]
+] = {
     cls.TYPE: cls
     for cls in [
         DevEnvironmentConfigurator,
@@ -47,7 +49,9 @@ run_configurators_mapping: Dict[ApplyConfigurationType, Type[BaseRunConfigurator
 }
 
 
-def get_apply_configurator_class(configurator_type: str) -> Type[BaseApplyConfigurator[Any]]:
+def get_apply_configurator_class(
+    configurator_type: str,
+) -> Type[BaseApplyConfigurator[AnyApplyConfiguration]]:
     return apply_configurators_mapping[ApplyConfigurationType(configurator_type)]
 
 
