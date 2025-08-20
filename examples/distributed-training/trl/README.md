@@ -2,18 +2,6 @@
 
 This example walks you through how to run distributed fine-tune using [TRL :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/trl){:target="_blank"}, [Accelerate :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/accelerate){:target="_blank"} and [Deepspeed :material-arrow-top-right-thin:{ .external }](https://github.com/deepspeedai/DeepSpeed){:target="_blank"}.
 
-??? info "Prerequisites"
-    Once `dstack` is [installed](https://dstack.ai/docs/installation), go ahead clone the repo, and run `dstack init`.
-
-    <div class="termy">
- 
-    ```shell
-    $ git clone https://github.com/dstackai/dstack
-    $ cd dstack
-    $ dstack init
-    ```
-    </div>
-
 ## Create fleet
 
 Before submitting distributed training runs, make sure to create a fleet with a `placement` set to `cluster`.
@@ -41,7 +29,7 @@ Once the fleet is created, define a distributed task configuration. Here's an ex
       - WANDB_API_KEY
       - MODEL_ID=meta-llama/Llama-3.1-8B
       - HUB_MODEL_ID
-    
+
     commands:
       - pip install transformers bitsandbytes peft wandb
       - git clone https://github.com/huggingface/trl
@@ -98,7 +86,7 @@ Once the fleet is created, define a distributed task configuration. Here's an ex
       - HUB_MODEL_ID
       - MODEL_ID=meta-llama/Llama-3.1-8B
       - ACCELERATE_LOG_LEVEL=info
-    
+
     commands:
       - pip install transformers bitsandbytes peft wandb deepspeed
       - git clone https://github.com/huggingface/trl
@@ -153,10 +141,10 @@ $ WANDB_API_KEY=...
 $ HUB_MODEL_ID=...
 $ dstack apply -f examples/distributed-training/trl/fsdp.dstack.yml
 
- #  BACKEND       RESOURCES                       INSTANCE TYPE  PRICE       
- 1  ssh (remote)  cpu=208 mem=1772GB H100:80GB:8  instance       $0     idle 
- 2  ssh (remote)  cpu=208 mem=1772GB H100:80GB:8  instance       $0     idle  
-    
+ #  BACKEND       RESOURCES                       INSTANCE TYPE  PRICE
+ 1  ssh (remote)  cpu=208 mem=1772GB H100:80GB:8  instance       $0     idle
+ 2  ssh (remote)  cpu=208 mem=1772GB H100:80GB:8  instance       $0     idle
+
 Submit the run trl-train-fsdp-distrib? [y/n]: y
 
 Provisioning...
@@ -166,11 +154,10 @@ Provisioning...
 
 ## Source code
 
-The source-code of this example can be found in 
+The source-code of this example can be found in
 [`examples/distributed-training/trl` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/distributed-training/trl){:target="_blank"}.
 
 !!! info "What's next?"
     1. Read the [clusters](https://dstack.ai/docs/guides/clusters) guide
-    2. Check [dev environments](https://dstack.ai/docs/concepts/dev-environments), [tasks](https://dstack.ai/docs/concepts/tasks), 
+    2. Check [dev environments](https://dstack.ai/docs/concepts/dev-environments), [tasks](https://dstack.ai/docs/concepts/tasks),
        [services](https://dstack.ai/docs/concepts/services), and [fleets](https://dstack.ai/docs/concepts/fleets)
-    

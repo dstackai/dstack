@@ -29,7 +29,6 @@ def pipeline(...):
         return (
             f"source {DSTACK_VENV_PATH}/bin/activate"
             f" && cd {DSTACK_REPO_PATH}"
-            " && dstack init"
             " && dstack apply -y -f task.dstack.yml"
         )
 ```
@@ -78,5 +77,5 @@ def pipeline(...):
 
 ## Source code
 
-The source code for this example can be found in 
+The source code for this example can be found in
 [`examples/misc/airflow` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/misc/airflow).

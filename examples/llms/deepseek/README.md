@@ -2,21 +2,9 @@
 
 This example walks you through how to deploy and
 train [Deepseek :material-arrow-top-right-thin:{ .external }](https://huggingface.co/deepseek-ai){:target="_blank"}
-models with `dstack`. 
+models with `dstack`.
 
 > We used Deepseek-R1 distilled models and Deepseek-V2-Lite, a 16B model with the same architecture as Deepseek-R1 (671B). Deepseek-V2-Lite retains MLA and DeepSeekMoE but requires less memory, making it ideal for testing and fine-tuning on smaller GPUs.
-
-??? info "Prerequisites"
-    Once `dstack` is [installed](https://dstack.ai/docs/installation), go ahead clone the repo, and run `dstack init`.
-
-    <div class="termy">
- 
-    ```shell
-    $ git clone https://github.com/dstackai/dstack
-    $ cd dstack
-    $ dstack init
-    ```
-    </div>
 
 ## Deployment
 
@@ -52,13 +40,13 @@ Here's an example of a service that deploys `Deepseek-R1-Distill-Llama-70B` usin
     </div>
 
 === "vLLM"
-    
+
     <div editor-title="examples/llms/deepseek/sglang/amd/.dstack.yml">
 
     ```yaml
     type: service
     name: deepseek-r1-amd
-    
+
     image: rocm/vllm:rocm6.2_mi300_ubuntu20.04_py3.9_vllm_0.6.4
     env:
       - MODEL_ID=deepseek-ai/DeepSeek-R1-Distill-Llama-70B
@@ -68,7 +56,7 @@ Here's an example of a service that deploys `Deepseek-R1-Distill-Llama-70B` usin
         --max-model-len $MAX_MODEL_LEN
         --trust-remote-code
     port: 8000
-    
+
     model: deepseek-ai/DeepSeek-R1-Distill-Llama-70B
 
     resources:
@@ -83,7 +71,7 @@ Note, when using `Deepseek-R1-Distill-Llama-70B` with `vLLM` with a 192GB GPU, w
 
 Here's an example of a service that deploys `Deepseek-R1-Distill-Llama-70B`
 using [TGI on Gaudi :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/tgi-gaudi){:target="_blank"}
-and [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/HabanaAI/vllm-fork){:target="_blank"} (Gaudi fork) with Intel Gaudi 2. 
+and [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/HabanaAI/vllm-fork){:target="_blank"} (Gaudi fork) with Intel Gaudi 2.
 
 > Both [TGI on Gaudi :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/tgi-gaudi){:target="_blank"}
 > and [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/HabanaAI/vllm-fork){:target="_blank"} do not support `Deepseek-V2-Lite`.
@@ -151,7 +139,7 @@ and [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/Haban
     env:
       - MODEL_ID=deepseek-ai/DeepSeek-R1-Distill-Llama-70B
       - HABANA_VISIBLE_DEVICES=all
-      - OMPI_MCA_btl_vader_single_copy_mechanism=none  
+      - OMPI_MCA_btl_vader_single_copy_mechanism=none
 
     commands:
       - git clone https://github.com/HabanaAI/vllm-fork.git
@@ -166,13 +154,13 @@ and [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/Haban
 
     port: 8000
     ```
-    </div>  
+    </div>
 
 ### NVIDIA
 
 Here's an example of a service that deploys `Deepseek-R1-Distill-Llama-8B`
 using [SGLang :material-arrow-top-right-thin:{ .external }](https://github.com/sgl-project/sglang){:target="_blank"}
-and [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/vllm-project/vllm){:target="_blank"} with NVIDIA GPUs. 
+and [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/vllm-project/vllm){:target="_blank"} with NVIDIA GPUs.
 Both SGLang and vLLM also support `Deepseek-V2-Lite`.
 
 === "SGLang"
@@ -181,7 +169,7 @@ Both SGLang and vLLM also support `Deepseek-V2-Lite`.
     ```yaml
     type: service
     name: deepseek-r1-nvidia
-    
+
     image: lmsysorg/sglang:latest
     env:
       - MODEL_ID=deepseek-ai/DeepSeek-R1-Distill-Llama-8B
@@ -190,10 +178,10 @@ Both SGLang and vLLM also support `Deepseek-V2-Lite`.
           --model-path $MODEL_ID
           --port 8000
           --trust-remote-code
-    
+
     port: 8000
     model: deepseek-ai/DeepSeek-R1-Distill-Llama-8B
-    
+
     resources:
       gpu: 24GB
     ```
@@ -205,17 +193,17 @@ Both SGLang and vLLM also support `Deepseek-V2-Lite`.
     ```yaml
     type: service
     name: deepseek-r1-nvidia
-    
+
     image: vllm/vllm-openai:latest
     env:
       - MODEL_ID=deepseek-ai/DeepSeek-R1-Distill-Llama-8B
       - MAX_MODEL_LEN=4096
     commands:
       - vllm serve $MODEL_ID
-        --max-model-len $MAX_MODEL_LEN 
-    port: 8000 
+        --max-model-len $MAX_MODEL_LEN
+    port: 8000
     model: deepseek-ai/DeepSeek-R1-Distill-Llama-8B
-    
+
     resources:
       gpu: 24GB
     ```
@@ -253,9 +241,9 @@ To run a configuration, use the [`dstack apply`](https://dstack.ai/docs/referenc
 ```shell
 $ dstack apply -f examples/llms/deepseek/sglang/amd/.dstack.yml
 
- #  BACKEND  REGION     RESOURCES                         SPOT  PRICE   
- 1  runpod   EU-RO-1   24xCPU, 283GB, 1xMI300X (192GB)    no    $2.49  
-    
+ #  BACKEND  REGION     RESOURCES                         SPOT  PRICE
+ 1  runpod   EU-RO-1   24xCPU, 283GB, 1xMI300X (192GB)    no    $2.49
+
 Submit the run deepseek-r1-amd? [y/n]: y
 
 Provisioning...
@@ -291,7 +279,7 @@ curl http://127.0.0.1:3000/proxy/models/main/chat/completions \
 ```
 </div>
 
-When a [gateway](https://dstack.ai/docs/concepts/gateways/) is configured, the OpenAI-compatible endpoint 
+When a [gateway](https://dstack.ai/docs/concepts/gateways/) is configured, the OpenAI-compatible endpoint
 is available at `https://gateway.<gateway domain>/`.
 
 ## Fine-tuning
@@ -371,19 +359,21 @@ Here are the examples of LoRA fine-tuning of `Deepseek-V2-Lite` and GRPO fine-tu
     type: task
     name: trl-train-grpo
 
-    image: rocm/pytorch:rocm6.2.3_ubuntu22.04_py3.10_pytorch_release_2.3.0 
+    image: rocm/pytorch:rocm6.2.3_ubuntu22.04_py3.10_pytorch_release_2.3.0
 
     env:
       - WANDB_API_KEY
       - WANDB_PROJECT
       - MODEL_ID=deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B
+    files:
+      - grpo_train.py
     commands:
       - pip install trl
       - pip install datasets
       # numPy version less than 2 is required for the scipy installation with AMD.
       - pip install "numpy<2"
       - mkdir -p grpo_example
-      - cp examples/llms/deepseek/trl/amd/grpo_train.py grpo_example/grpo_train.py
+      - cp grpo_train.py grpo_example/grpo_train.py
       - cd grpo_example
       - python grpo_train.py
         --model_name_or_path $MODEL_ID
@@ -529,43 +519,43 @@ on NVIDIA GPU using HuggingFace's [TRL :material-arrow-top-right-thin:{ .externa
       - pip install bitsandbytes
       - cd peft/examples/sft
       - python train.py
-        --seed 100 
-        --model_name_or_path "deepseek-ai/DeepSeek-V2-Lite" 
-        --dataset_name "smangrul/ultrachat-10k-chatml" 
-        --chat_template_format "chatml" 
-        --add_special_tokens False 
-        --append_concat_token False 
-        --splits "train,test" 
-        --max_seq_len 512 
-        --num_train_epochs 1 
-        --logging_steps 5 
-        --log_level "info" 
-        --logging_strategy "steps" 
-        --eval_strategy "epoch" 
-        --save_strategy "epoch" 
-        --hub_private_repo True 
-        --hub_strategy "every_save" 
-        --bf16 True 
-        --packing True 
-        --learning_rate 1e-4 
-        --lr_scheduler_type "cosine" 
-        --weight_decay 1e-4 
-        --warmup_ratio 0.0 
-        --max_grad_norm 1.0 
-        --output_dir "mistral-sft-lora" 
-        --per_device_train_batch_size 8 
-        --per_device_eval_batch_size 8 
-        --gradient_accumulation_steps 4 
-        --gradient_checkpointing True 
-        --use_reentrant True 
-        --dataset_text_field "content" 
-        --use_peft_lora True 
-        --lora_r 16 
-        --lora_alpha 16 
-        --lora_dropout 0.05 
-        --lora_target_modules "all-linear" 
-        --use_4bit_quantization True 
-        --use_nested_quant True 
+        --seed 100
+        --model_name_or_path "deepseek-ai/DeepSeek-V2-Lite"
+        --dataset_name "smangrul/ultrachat-10k-chatml"
+        --chat_template_format "chatml"
+        --add_special_tokens False
+        --append_concat_token False
+        --splits "train,test"
+        --max_seq_len 512
+        --num_train_epochs 1
+        --logging_steps 5
+        --log_level "info"
+        --logging_strategy "steps"
+        --eval_strategy "epoch"
+        --save_strategy "epoch"
+        --hub_private_repo True
+        --hub_strategy "every_save"
+        --bf16 True
+        --packing True
+        --learning_rate 1e-4
+        --lr_scheduler_type "cosine"
+        --weight_decay 1e-4
+        --warmup_ratio 0.0
+        --max_grad_norm 1.0
+        --output_dir "mistral-sft-lora"
+        --per_device_train_batch_size 8
+        --per_device_eval_batch_size 8
+        --gradient_accumulation_steps 4
+        --gradient_checkpointing True
+        --use_reentrant True
+        --dataset_text_field "content"
+        --use_peft_lora True
+        --lora_r 16
+        --lora_alpha 16
+        --lora_dropout 0.05
+        --lora_target_modules "all-linear"
+        --use_4bit_quantization True
+        --use_nested_quant True
         --bnb_4bit_compute_dtype "bfloat16"
 
     resources:
@@ -598,10 +588,9 @@ needs 7–10GB due to intermediate hidden states.
 
 ## Source code
 
-The source-code of this example can be found in 
+The source-code of this example can be found in
 [`examples/llms/deepseek` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/llms/deepseek).
 
 !!! info "What's next?"
-    1. Check [dev environments](https://dstack.ai/docs/dev-environments), [tasks](https://dstack.ai/docs/tasks), 
+    1. Check [dev environments](https://dstack.ai/docs/dev-environments), [tasks](https://dstack.ai/docs/tasks),
        [services](https://dstack.ai/docs/services), and [protips](https://dstack.ai/docs/protips).
-   

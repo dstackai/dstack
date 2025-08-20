@@ -9,6 +9,9 @@ env:
   - WANDB_API_KEY
   - WANDB_PROJECT
   - MODEL_ID=deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B
+# Copy train script into the workind directory inside the container.
+files:
+  - grpo_train.py
 # Commands of the task
 commands:
   - pip install trl
@@ -16,7 +19,7 @@ commands:
   # numpy version less than 2 is required for the scipy installation with AMD.
   - pip install "numpy<2"
   - mkdir -p grpo_example
-  - cp examples/llms/deepseek/trl/amd/grpo_train.py grpo_example/grpo_train.py
+  - cp grpo_train.py grpo_example/grpo_train.py
   - cd grpo_example
   - python grpo_train.py
     --model_name_or_path $MODEL_ID
