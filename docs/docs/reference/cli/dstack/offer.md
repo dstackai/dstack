@@ -1,8 +1,8 @@
 # dstack offer
 
-Displays available offers (hardware configurations) with the configured backends (or offers that match already provisioned fleets).
+Displays available offers (hardware configurations) from configured backends or from fleets you’ve already provisioned. Supports filtering and grouping.
 
-The output includes backend, region, instance type, resources, spot availability, and pricing details.
+The output shows backend, region, instance type, resources, spot availability, and pricing.
 
 ## Usage
 
@@ -19,7 +19,7 @@ $ dstack offer --help
 
 ## Examples
 
-### List GPU offers
+### Filtering offers
 
 The `--gpu` flag accepts the same specification format as the `gpu` property in [`dev environment`](../../../concepts/dev-environments.md), [`task`](../../../concepts/tasks.md), 
 [`service`](../../../concepts/services.md), and [`fleet`](../../../concepts/fleets.md) configurations.
@@ -70,6 +70,34 @@ Getting offers...
 ```
 
 </div>
+
+### Grouping offers
+
+Use `--group-by` to aggregate offers. Accepted values: `gpu`, `backend`, `region`, and `count`.
+
+<div class="termy">
+
+```shell
+dstack offer --gpu b200 --group-by gpu,backend,region
+ Project      main
+ User         admin
+ Resources    cpu=2.. mem=8GB.. disk=100GB.. b200:1..
+ Spot policy  auto
+ Max price    -
+ Reservation  -
+ Group by     gpu, backend, region
+
+ #   GPU              SPOT             $/GPU       BACKEND  REGION
+ 1   B200:180GB:1..8  spot, on-demand  3.59..5.99  runpod   EU-RO-1
+ 2   B200:180GB:1..8  spot, on-demand  3.59..5.99  runpod   US-CA-2
+ 3   B200:180GB:8     on-demand        4.99        lambda   us-east-1
+ 4   B200:180GB:8     on-demand        5.5         nebius   us-central1
+```
+
+</div>
+
+When using `--group-by`, `gpu` must always be `included`.
+The `region` value can only be used together with `backend`.
 
 ### JSON format
     
