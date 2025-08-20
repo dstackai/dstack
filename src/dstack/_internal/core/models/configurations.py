@@ -535,6 +535,12 @@ class DevEnvironmentConfiguration(
             ProfileParams.Config.schema_extra(schema)
             BaseRunConfigurationWithPorts.Config.schema_extra(schema)
 
+    @validator("entrypoint")
+    def validate_entrypoint(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None:
+            raise ValueError("entrypoint is not supported for dev-environment")
+        return v
+
 
 class TaskConfigurationParams(CoreModel):
     nodes: Annotated[int, Field(description="Number of nodes", ge=1)] = 1

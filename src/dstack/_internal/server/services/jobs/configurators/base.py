@@ -179,6 +179,7 @@ class JobConfigurator(ABC):
 
     async def _commands(self) -> List[str]:
         if self.run_spec.configuration.entrypoint is not None:  # docker-like format
+            assert self.run_spec.configuration.type != "dev-environment"
             entrypoint = shlex.split(self.run_spec.configuration.entrypoint)
             commands = self.run_spec.configuration.commands
         elif shell_commands := self._shell_commands():
