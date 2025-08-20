@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 
 from dstack._internal.core.models.configurations import DEFAULT_REPO_DIR
 
@@ -7,7 +7,7 @@ class CursorDesktop:
     def __init__(
         self,
         run_name: str,
-        version: str,
+        version: Optional[str],
         extensions: List[str],
     ):
         self.run_name = run_name

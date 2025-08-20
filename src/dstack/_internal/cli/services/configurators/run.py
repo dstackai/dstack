@@ -552,7 +552,7 @@ def _unique_ports_constraint(ports: List[int]):
         used_ports.add(i)
 
 
-def _detect_vscode_version(exe: str = "code") -> Optional[str]:
+def _detect_vscode_version(exe: str = "code1") -> Optional[str]:
     try:
         run = subprocess.run([exe, "--version"], capture_output=True)
     except FileNotFoundError:
