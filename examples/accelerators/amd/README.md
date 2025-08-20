@@ -126,8 +126,7 @@ To request multiple GPUs, specify the quantity after the GPU name, separated by 
     # Required environment variables
     env:
       - HF_TOKEN
-    # Copy train.py script located next to the dstack configuration
-    # to the working directory inside the run container
+    # Mount files
     files:
       - train.py
     # Commands of the task

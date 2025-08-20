@@ -8,7 +8,7 @@ python: "3.11"
 env:
   - HF_TOKEN
 
-# Copy local files to the working directory inside the run container
+# Mount files
 files:
   - train.py
   - config.yaml

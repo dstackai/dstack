@@ -6,6 +6,17 @@ models with `dstack`.
 
 > We used Deepseek-R1 distilled models and Deepseek-V2-Lite, a 16B model with the same architecture as Deepseek-R1 (671B). Deepseek-V2-Lite retains MLA and DeepSeekMoE but requires less memory, making it ideal for testing and fine-tuning on smaller GPUs.
 
+??? info "Prerequisites"
+    Once `dstack` is [installed](https://dstack.ai/docs/installation), clone the repo with examples.
+
+    <div class="termy">
+ 
+    ```shell
+    $ git clone https://github.com/dstackai/dstack
+    $ cd dstack
+    ```
+    </div>
+
 ## Deployment
 
 ### AMD

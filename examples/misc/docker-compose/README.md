@@ -7,6 +7,18 @@ with [TGI :material-arrow-top-right-thin:{ .external }](https://huggingface.co/d
 serving [Llama-3.2-3B-Instruct :material-arrow-top-right-thin:{ .external }](https://huggingface.co/meta-llama/Llama-3.2-3B-Instruct){:target="_blank"}
 using [Docker Compose :material-arrow-top-right-thin:{ .external }](https://docs.docker.com/compose/){:target="_blank"}.
 
+??? info "Prerequisites"
+    Once `dstack` is [installed](https://dstack.ai/docs/installation), clone the repo with examples.
+
+    <div class="termy">
+ 
+    ```shell
+    $ git clone https://github.com/dstackai/dstack
+    $ cd dstack
+    ```
+ 
+    </div>
+
 ## Deployment
 
 ### Running as a task

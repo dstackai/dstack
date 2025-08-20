@@ -2,6 +2,17 @@
 
 This example walks you through how to run distributed fine-tune using [Axolotl :material-arrow-top-right-thin:{ .external }](https://github.com/axolotl-ai-cloud/axolotl){:target="_blank"} with `dstack`.
 
+??? info "Prerequisites"
+    Once `dstack` is [installed](https://dstack.ai/docs/installation), clone the repo with examples.
+
+    <div class="termy">
+ 
+    ```shell
+    $ git clone https://github.com/dstackai/dstack
+    $ cd dstack
+    ```
+    </div>
+
 ## Create a fleet
 
 Before submitting distributed training runs, make sure to create a fleet with a `placement` set to `cluster`.

@@ -2,6 +2,18 @@
 
 This example walks you through how to deploy and fine-tuning Llama 3.1 with `dstack`.
 
+??? info "Prerequisites"
+    Once `dstack` is [installed](https://dstack.ai/docs/installation), clone the repo with examples.
+
+    <div class="termy">
+ 
+    ```shell
+    $ git clone https://github.com/dstackai/dstack
+    $ cd dstack
+    ```
+ 
+    </div>
+
 ## Deployment
 
 You can use any serving frameworks.

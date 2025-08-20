@@ -2,6 +2,18 @@
 
 This example shows how to deploy DeepSeek-R1-Distill-Llama 8B and 70B using [SGLang :material-arrow-top-right-thin:{ .external }](https://github.com/sgl-project/sglang){:target="_blank"} and `dstack`.
 
+??? info "Prerequisites"
+    Once `dstack` is [installed](https://dstack.ai/docs/installation), clone the repo with examples.
+
+    <div class="termy">
+ 
+    ```shell
+    $ git clone https://github.com/dstackai/dstack
+    $ cd dstack
+    ```
+ 
+    </div>
+
 ## Deployment
 Here's an example of a service that deploys DeepSeek-R1-Distill-Llama 8B and 70B using SgLang.
 

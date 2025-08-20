@@ -29,7 +29,7 @@ def pipeline(...):
         return (
             f"source {DSTACK_VENV_PATH}/bin/activate"
             f" && cd {DSTACK_REPO_PATH}"
-            " && dstack apply -y -f task.dstack.yml"
+            " && dstack apply -y -f task.dstack.yml --repo ."
         )
 ```
 

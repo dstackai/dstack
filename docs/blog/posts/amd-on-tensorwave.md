@@ -31,7 +31,18 @@ TensorWave dashboard.
 
 ## Creating a fleet
 
-Define an SSH fleet configuration by listing the IP addresses of each node in the cluster,
+??? info "Prerequisites"
+    Once `dstack` is [installed](https://dstack.ai/docs/installation), create a project folder.
+    
+    <div class="termy">
+    
+    ```shell
+    $ mkdir tensorwave-demo && cd tensorwave-demo
+    ```
+    
+    </div>
+
+Now, define an SSH fleet configuration by listing the IP addresses of each node in the cluster, 
 along with the SSH user and SSH key configured for each host.
 
 <div editor-title="fleet.dstack.yml">

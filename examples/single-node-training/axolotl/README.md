@@ -2,6 +2,18 @@
 
 This example shows how to use [Axolotl :material-arrow-top-right-thin:{ .external }](https://github.com/OpenAccess-AI-Collective/axolotl){:target="_blank"} with `dstack` to fine-tune 4-bit Quantized `Llama-4-Scout-17B-16E` using SFT with FSDP and QLoRA.
 
+??? info "Prerequisites"
+    Once `dstack` is [installed](https://dstack.ai/docs/installation), clone the repo with examples.
+
+    <div class="termy">
+ 
+    ```shell
+    $ git clone https://github.com/dstackai/dstack
+    $ cd dstack
+    ```
+ 
+    </div>
+
 ## Define a configuration
 
 Axolotl reads the model, QLoRA, and dataset arguments, as well as trainer configuration from a [`scout-qlora-flexattn-fsdp2.yaml` :material-arrow-top-right-thin:{ .external }](https://github.com/axolotl-ai-cloud/axolotl/blob/main/examples/llama-4/scout-qlora-flexattn-fsdp2.yaml){:target="_blank"} file. The configuration uses 4-bit axolotl quantized version of `meta-llama/Llama-4-Scout-17B-16E`, requiring only ~43GB VRAM/GPU with 4K context length.
@@ -56,10 +68,10 @@ cloud resources and run the configuration.
 <div class="termy">
 
 ```shell
-$ export HF_TOKEN=...
-$ export WANDB_API_KEY=...
-$ export WANDB_PROJECT=...
-$ export HUB_MODEL_ID=...
+$ HF_TOKEN=...
+$ WANDB_API_KEY=...
+$ WANDB_PROJECT=...
+$ HUB_MODEL_ID=...
 $ dstack apply -f examples/single-node-training/axolotl/.dstack.yml
 
  #  BACKEND              RESOURCES                     INSTANCE TYPE  PRICE

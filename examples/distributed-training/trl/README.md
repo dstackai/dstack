@@ -2,6 +2,17 @@
 
 This example walks you through how to run distributed fine-tune using [TRL :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/trl){:target="_blank"}, [Accelerate :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/accelerate){:target="_blank"} and [Deepspeed :material-arrow-top-right-thin:{ .external }](https://github.com/deepspeedai/DeepSpeed){:target="_blank"}.
 
+??? info "Prerequisites"
+    Once `dstack` is [installed](https://dstack.ai/docs/installation), clone the repo with examples.
+
+    <div class="termy">
+ 
+    ```shell
+    $ git clone https://github.com/dstackai/dstack
+    $ cd dstack
+    ```
+    </div>
+
 ## Create fleet
 
 Before submitting distributed training runs, make sure to create a fleet with a `placement` set to `cluster`.

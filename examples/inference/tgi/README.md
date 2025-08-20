@@ -7,6 +7,18 @@ description: "This example shows how to deploy Llama 4 Scout to any cloud or on-
 
 This example shows how to deploy Llama 4 Scout with `dstack` using [HuggingFace TGI :material-arrow-top-right-thin:{ .external }](https://huggingface.co/docs/text-generation-inference/en/index){:target="_blank"}.
 
+??? info "Prerequisites"
+    Once `dstack` is [installed](https://dstack.ai/docs/installation), clone the repo with examples.
+
+    <div class="termy">
+ 
+    ```shell
+    $ git clone https://github.com/dstackai/dstack
+    $ cd dstack
+    ```
+ 
+    </div>
+
 ## Deployment
 
 Here's an example of a service that deploys [`Llama-4-Scout-17B-16E-Instruct` :material-arrow-top-right-thin:{ .external }](https://huggingface.co/meta-llama/Llama-4-Scout-17B-16E-Instruct){:target="_blank"} using TGI.
