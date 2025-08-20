@@ -60,7 +60,7 @@ def load_plugins(enabled_plugins: list[str]):
     _PLUGINS.clear()
     entrypoints: dict[str, PluginEntrypoint] = {}
     plugins_to_load = enabled_plugins.copy()
-    for entrypoint in entry_points(group="dstack.plugins"):
+    for entrypoint in entry_points(group="dstack.plugins"):  # type: ignore[call-arg]
         if entrypoint.name not in enabled_plugins:
             logger.info(
                 ("Found not enabled plugin %s. Plugin will not be loaded."),
