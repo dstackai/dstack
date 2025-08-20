@@ -85,12 +85,9 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
             repo_config = config_manager.get_repo_config(repo_path)
             if repo_config is None:
                 warn(
-                    "The repo is not initialized. Starting from 0.19.25, repos are optional\n"
-                    "There are three options:\n"
-                    "  - Run `dstack init` to initialize the current directory as a repo\n"
-                    "  - Specify `--repo`\n"
-                    "  - Specify `--no-repo` to not use any repo and supress this warning"
-                    " (this will be the default in the future versions)"
+                    "Repo is not initialized. "
+                    "Use [code]--repo <dir>[/code] or [code]--no-repo[/code] to initialize it.\n"
+                    "Starting from 0.19.25, repos will be configured via YAML and this message won't appear."
                 )
                 if not command_args.yes and not confirm_ask("Continue without the repo?"):
                     console.print("\nExiting...")
