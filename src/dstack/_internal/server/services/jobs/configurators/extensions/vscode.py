@@ -6,7 +6,7 @@ from dstack._internal.core.models.configurations import DEFAULT_REPO_DIR
 class VSCodeDesktop:
     def __init__(
         self,
-        run_name: str,
+        run_name: Optional[str],
         version: Optional[str],
         extensions: List[str],
     ):

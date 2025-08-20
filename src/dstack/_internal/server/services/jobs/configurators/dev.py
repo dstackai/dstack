@@ -19,7 +19,6 @@ class DevEnvironmentJobConfigurator(JobConfigurator):
 
     def __init__(self, run_spec: RunSpec, secrets: Dict[str, str]):
         assert run_spec.configuration.type == "dev-environment"
-        assert run_spec.run_name is not None
 
         if run_spec.configuration.ide == "vscode":
             __class = VSCodeDesktop
