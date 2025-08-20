@@ -20,6 +20,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: site
+          path: site
       - name: Deploy
         uses: JamesIves/github-pages-deploy-action@v4.6.4
         with:
