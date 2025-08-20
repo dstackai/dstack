@@ -8,14 +8,13 @@ description: "This example shows how to deploy Llama 4 Scout to any cloud or on-
 This example shows how to deploy Llama 4 Scout with `dstack` using [HuggingFace TGI :material-arrow-top-right-thin:{ .external }](https://huggingface.co/docs/text-generation-inference/en/index){:target="_blank"}.
 
 ??? info "Prerequisites"
-    Once `dstack` is [installed](https://dstack.ai/docs/installation), go ahead clone the repo, and run `dstack init`.
+    Once `dstack` is [installed](https://dstack.ai/docs/installation), clone the repo with examples.
 
     <div class="termy">
  
     ```shell
     $ git clone https://github.com/dstackai/dstack
     $ cd dstack
-    $ dstack init
     ```
  
     </div>
@@ -40,7 +39,7 @@ env:
   # max_batch_prefill_tokens must be >= max_input_tokens
   - MAX_BATCH_PREFILL_TOKENS=8192
 commands:
-   # Activate the virtual environment at /usr/src/.venv/ 
+   # Activate the virtual environment at /usr/src/.venv/
    # as required by TGI's latest image.
    - . /usr/src/.venv/bin/activate
    - NUM_SHARD=$DSTACK_GPUS_NUM text-generation-launcher
@@ -64,7 +63,7 @@ resources:
 
 ### Running a configuration
 
-To run a configuration, use the [`dstack apply`](https://dstack.ai/docs/reference/cli/dstack/apply.md) command. 
+To run a configuration, use the [`dstack apply`](https://dstack.ai/docs/reference/cli/dstack/apply.md) command.
 
 <div class="termy">
 
@@ -72,9 +71,9 @@ To run a configuration, use the [`dstack apply`](https://dstack.ai/docs/referenc
 $ HF_TOKEN=...
 $ dstack apply -f examples/inference/tgi/.dstack.yml
 
- #  BACKEND  REGION     RESOURCES                      SPOT PRICE   
- 1  vastai   is-iceland 48xCPU, 128GB, 2xH200 (140GB)  no   $7.87   
- 2  runpod   EU-SE-1    40xCPU, 128GB, 2xH200 (140GB)  no   $7.98 
+ #  BACKEND  REGION     RESOURCES                      SPOT PRICE
+ 1  vastai   is-iceland 48xCPU, 128GB, 2xH200 (140GB)  no   $7.87
+ 2  runpod   EU-SE-1    40xCPU, 128GB, 2xH200 (140GB)  no   $7.98
 
 Submit the run llama4-scout? [y/n]: y
 
@@ -83,7 +82,7 @@ Provisioning...
 ```
 </div>
 
-If no gateway is created, the model will be available via the OpenAI-compatible endpoint 
+If no gateway is created, the model will be available via the OpenAI-compatible endpoint
 at `<dstack server URL>/proxy/models/<project name>/`.
 
 <div class="termy">
@@ -111,12 +110,12 @@ $ curl http://127.0.0.1:3000/proxy/models/main/chat/completions \
 
 </div>
 
-When a [gateway](https://dstack.ai/docs/concepts/gateways/) is configured, the OpenAI-compatible endpoint 
+When a [gateway](https://dstack.ai/docs/concepts/gateways/) is configured, the OpenAI-compatible endpoint
 is available at `https://gateway.<gateway domain>/`.
 
 ## Source code
 
-The source-code of this example can be found in 
+The source-code of this example can be found in
 [`examples/inference/tgi` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/inference/tgi).
 
 ## What's next?

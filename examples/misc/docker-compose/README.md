@@ -8,14 +8,13 @@ serving [Llama-3.2-3B-Instruct :material-arrow-top-right-thin:{ .external }](htt
 using [Docker Compose :material-arrow-top-right-thin:{ .external }](https://docs.docker.com/compose/){:target="_blank"}.
 
 ??? info "Prerequisites"
-    Once `dstack` is [installed](https://dstack.ai/docs/installation), go ahead clone the repo, and run `dstack init`.
+    Once `dstack` is [installed](https://dstack.ai/docs/installation), clone the repo with examples.
 
     <div class="termy">
  
     ```shell
     $ git clone https://github.com/dstackai/dstack
     $ cd dstack
-    $ dstack init
     ```
  
     </div>
@@ -26,31 +25,32 @@ using [Docker Compose :material-arrow-top-right-thin:{ .external }](https://docs
 
 === "`task.dstack.yml`"
 
-    <div editor-title="examples/misc/docker-compose/task.dstack.yml"> 
-    
+    <div editor-title="examples/misc/docker-compose/task.dstack.yml">
+
     ```yaml
     type: task
     name: chat-ui-task
-    
+
     docker: true
     env:
       - MODEL_ID=meta-llama/Llama-3.2-3B-Instruct
       - HF_TOKEN
-    working_dir: examples/misc/docker-compose
+    files:
+      - compose.yaml
     commands:
       - docker compose up
     ports:
       - 9000
-    
+
     resources:
       gpu: "nvidia:24GB"
     ```
-    
+
     </div>
 
 === "`compose.yaml`"
 
-    <div editor-title="examples/misc/docker-compose/compose.yaml"> 
+    <div editor-title="examples/misc/docker-compose/compose.yaml">
 
     ```yaml
     services:
@@ -71,7 +71,7 @@ using [Docker Compose :material-arrow-top-right-thin:{ .external }](https://docs
         depends_on:
           - tgi
           - db
-    
+
       tgi:
         image: ghcr.io/huggingface/text-generation-inference:sha-704a58c
         volumes:
@@ -87,12 +87,12 @@ using [Docker Compose :material-arrow-top-right-thin:{ .external }](https://docs
                 - driver: nvidia
                   count: all
                   capabilities: [gpu]
-    
+
       db:
         image: mongo:latest
         volumes:
           - db_data:/data/db
-    
+
     volumes:
       tgi_data:
       db_data:
@@ -119,7 +119,7 @@ $ dstack apply -f examples/examples/misc/docker-compose/task.dstack.yml
  1  runpod   CA-MTL-1  18xCPU, 100GB, A5000:24GB    yes   $0.12
  2  runpod   EU-SE-1   18xCPU, 100GB, A5000:24GB    yes   $0.12
  3  gcp      us-west4  27xCPU, 150GB, A5000:24GB:2  yes   $0.23
- 
+
 Submit the run chat-ui-task? [y/n]: y
 
 Provisioning...
@@ -133,7 +133,7 @@ Provisioning...
 To persist data between runs, create a [volume](https://dstack.ai/docs/concepts/volumes/) and attach it to the run
 configuration.
 
-<div editor-title="examples/misc/docker-compose/task.dstack.yml"> 
+<div editor-title="examples/misc/docker-compose/task.dstack.yml">
 
 ```yaml
 type: task
@@ -144,7 +144,8 @@ image: dstackai/dind
 env:
   - MODEL_ID=meta-llama/Llama-3.2-3B-Instruct
   - HF_TOKEN
-working_dir: examples/misc/docker-compose
+files:
+  - compose.yaml
 commands:
   - start-dockerd
   - docker compose up
@@ -170,10 +171,10 @@ be persisted.
 
 ## Source code
 
-The source-code of this example can be found in 
+The source-code of this example can be found in
 [`examples/misc/docker-compose` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/misc/docker-compose).
 
 ## What's next?
 
-1. Check [dev environments](https://dstack.ai/docs/dev-environments), [tasks](https://dstack.ai/docs/tasks), 
+1. Check [dev environments](https://dstack.ai/docs/dev-environments), [tasks](https://dstack.ai/docs/tasks),
    [services](https://dstack.ai/docs/services), and [protips](https://dstack.ai/docs/protips).
