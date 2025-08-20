@@ -78,6 +78,14 @@ pattern = '<picture>\s*|<source[^>]*>\s*|\s*</picture>|<video[^>]*>\s*|</video>\
 replacement = ''
 ignore-case = true
 
+[tool.pyright]
+include = [
+    "src/dstack/_internal/server",
+]
+ignore = [
+    "src/dstack/_internal/server/migrations/versions",
+]
+
 [dependency-groups]
 dev = [
     "httpx>=0.28.1",
