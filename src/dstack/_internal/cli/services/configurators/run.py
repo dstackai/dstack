@@ -87,7 +87,7 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
                 warn(
                     "Repo is not initialized. "
                     "Use [code]--repo <dir>[/code] or [code]--no-repo[/code] to initialize it.\n"
-                    "Starting from 0.19.25, repos will be configured via YAML and this message won't appear."
+                    "Starting from 0.19.26, repos will be configured via YAML and this message won't appear."
                 )
                 if not command_args.yes and not confirm_ask("Continue without the repo?"):
                     console.print("\nExiting...")
