@@ -46,7 +46,7 @@ from dstack.api.utils import load_profile
 logger = get_logger(__name__)
 
 
-class FleetConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
+class FleetConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator[FleetConfiguration]):
     TYPE: ApplyConfigurationType = ApplyConfigurationType.FLEET
 
     def apply_configuration(

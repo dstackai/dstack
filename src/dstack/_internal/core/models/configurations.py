@@ -466,7 +466,7 @@ class BaseRunConfiguration(CoreModel):
         raise ValueError("The value must be `sh`, `bash`, or an absolute path")
 
 
-class BaseRunConfigurationWithPorts(BaseRunConfiguration):
+class ConfigurationWithPortsParams(CoreModel):
     ports: Annotated[
         List[Union[ValidPort, constr(regex=r"^(?:[0-9]+|\*):[0-9]+$"), PortMapping]],
         Field(description="Port numbers/mapping to expose"),
@@ -481,7 +481,7 @@ class BaseRunConfigurationWithPorts(BaseRunConfiguration):
         return v
 
 
-class BaseRunConfigurationWithCommands(BaseRunConfiguration):
+class ConfigurationWithCommandsParams(CoreModel):
     commands: Annotated[CommandsList, Field(description="The shell commands to run")] = []
 
     @root_validator
@@ -525,15 +525,18 @@ class DevEnvironmentConfigurationParams(CoreModel):
 
 
 class DevEnvironmentConfiguration(
-    ProfileParams, BaseRunConfigurationWithPorts, DevEnvironmentConfigurationParams
+    ProfileParams,
+    BaseRunConfiguration,
+    ConfigurationWithPortsParams,
+    DevEnvironmentConfigurationParams,
 ):
     type: Literal["dev-environment"] = "dev-environment"
 
-    class Config(ProfileParams.Config, BaseRunConfigurationWithPorts.Config):
+    class Config(ProfileParams.Config, BaseRunConfiguration.Config):
         @staticmethod
         def schema_extra(schema: Dict[str, Any]):
             ProfileParams.Config.schema_extra(schema)
-            BaseRunConfigurationWithPorts.Config.schema_extra(schema)
+            BaseRunConfiguration.Config.schema_extra(schema)
 
     @validator("entrypoint")
     def validate_entrypoint(cls, v: Optional[str]) -> Optional[str]:
@@ -548,8 +551,9 @@ class TaskConfigurationParams(CoreModel):
 
 class TaskConfiguration(
     ProfileParams,
-    BaseRunConfigurationWithCommands,
-    BaseRunConfigurationWithPorts,
+    BaseRunConfiguration,
+    ConfigurationWithCommandsParams,
+    ConfigurationWithPortsParams,
     TaskConfigurationParams,
 ):
     type: Literal["task"] = "task"
@@ -697,19 +701,22 @@ class ServiceConfigurationParams(CoreModel):
 
 
 class ServiceConfiguration(
-    ProfileParams, BaseRunConfigurationWithCommands, ServiceConfigurationParams
+    ProfileParams,
+    BaseRunConfiguration,
+    ConfigurationWithCommandsParams,
+    ServiceConfigurationParams,
 ):
     type: Literal["service"] = "service"
 
     class Config(
         ProfileParams.Config,
-        BaseRunConfigurationWithCommands.Config,
+        BaseRunConfiguration.Config,
         ServiceConfigurationParams.Config,
     ):
         @staticmethod
         def schema_extra(schema: Dict[str, Any]):
             ProfileParams.Config.schema_extra(schema)
-            BaseRunConfigurationWithCommands.Config.schema_extra(schema)
+            BaseRunConfiguration.Config.schema_extra(schema)
             ServiceConfigurationParams.Config.schema_extra(schema)
 
 

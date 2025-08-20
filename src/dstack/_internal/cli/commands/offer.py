@@ -4,9 +4,11 @@ import json
 from pathlib import Path
 
 from dstack._internal.cli.commands import APIBaseCommand
+from dstack._internal.cli.services.args import cpu_spec, disk_spec, gpu_spec
 from dstack._internal.cli.services.configurators.run import (
     BaseRunConfigurator,
 )
+from dstack._internal.cli.services.profile import register_profile_args
 from dstack._internal.cli.utils.common import console
 from dstack._internal.cli.utils.run import print_run_plan
 from dstack._internal.core.models.configurations import (
@@ -27,11 +29,45 @@ class OfferConfigurator(BaseRunConfigurator):
     TYPE = ApplyConfigurationType.TASK
 
     @classmethod
-    def register_args(
-        cls,
-        parser: argparse.ArgumentParser,
-    ):
-        super().register_args(parser, default_max_offers=50)
+    def register_args(cls, parser: argparse.ArgumentParser):
+        configuration_group = parser.add_argument_group(f"{cls.TYPE.value} Options")
+        configuration_group.add_argument(
+            "-n",
+            "--name",
+            dest="run_name",
+            help="The name of the run. If not specified, a random name is assigned",
+        )
+        configuration_group.add_argument(
+            "--max-offers",
+            help="Number of offers to show in the run plan",
+            type=int,
+            default=50,
+        )
+        cls.register_env_args(configuration_group)
+        configuration_group.add_argument(
+            "--cpu",
+            type=cpu_spec,
+            help="Request CPU for the run. "
+            "The format is [code]ARCH[/]:[code]COUNT[/] (all parts are optional)",
+            dest="cpu_spec",
+            metavar="SPEC",
+        )
+        configuration_group.add_argument(
+            "--gpu",
+            type=gpu_spec,
+            help="Request GPU for the run. "
+            "The format is [code]NAME[/]:[code]COUNT[/]:[code]MEMORY[/] (all parts are optional)",
+            dest="gpu_spec",
+            metavar="SPEC",
+        )
+        configuration_group.add_argument(
+            "--disk",
+            type=disk_spec,
+            help="Request the size range of disk for the run. Example [code]--disk 100GB..[/].",
+            metavar="RANGE",
+            dest="disk_spec",
+        )
+        register_profile_args(parser)
 
 
 # TODO: Support aggregated offers
