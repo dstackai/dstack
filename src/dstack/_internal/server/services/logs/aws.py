@@ -117,8 +117,9 @@ else:
         ) -> Tuple[List[_CloudWatchLogEvent], Optional[str]]:
             current_request = request
             previous_next_token = request.next_token
+            next_token = None
 
-            for attempt in range(self.MAX_RETRIES):
+            for _ in range(self.MAX_RETRIES):
                 cw_events, next_token = self._get_log_events(stream, current_request)
 
                 if cw_events:
