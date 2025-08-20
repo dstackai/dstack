@@ -80,6 +80,7 @@ ignore-case = true
 
 [tool.pyright]
 include = [
+    "src/dstack/plugins",
     "src/dstack/_internal/server",
     "src/dstack/_internal/cli/services/configurators",
 ]
