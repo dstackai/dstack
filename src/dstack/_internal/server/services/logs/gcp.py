@@ -90,7 +90,7 @@ else:
                     page_size=request.limit,
                     page_token=request.next_token,
                 )
-                response = self.client._logging_api._gapic_api.list_log_entries(
+                response = self.client._logging_api._gapic_api.list_log_entries(  # type: ignore[attr-defined]
                     request=request_obj
                 )
 
