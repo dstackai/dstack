@@ -346,7 +346,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
                 server_ssh_private_keys,
                 job_provisioning_data,
             )
-        elif initial_status == JobStatus.RUNNING:
+        else:
             logger.debug("%s: process running job, age=%s", fmt(job_model), job_submission.age)
             success = await common_utils.run_async(
                 _process_running,
