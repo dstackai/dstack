@@ -1,0 +1,55 @@
+name: Upload Post-PyPI Artifacts
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        type: string
+        required: true
+      is-latest-version:
+        type: boolean
+        required: true
+      staging:
+        type: boolean
+        required: true
+
+jobs:
+  upload-post-pypi-artifacts:
+    runs-on: ubuntu-latest
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+    steps:
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: 3.11
+          # settings to prevent warnings when running uv without a repo checkout
+          enable-cache: false
+          ignore-empty-workdir: true
+      - name: Install AWS
+        run: uv tool install awscli
+      - name: Download JSON schemas
+        uses: actions/download-artifact@v4
+        with:
+          name: json-schemas
+          path: json-schemas
+      - name: Upload JSON schemas to S3
+        working-directory: json-schemas
+        run: |
+          BUCKET=dstack-runner-downloads
+          if [ "${{ inputs.staging }}" = "true" ]; then
+            BUCKET=dstack-runner-downloads-stgn
+          fi
+          aws s3 cp configuration.json "s3://$BUCKET/${{ inputs.version }}/schemas/configuration.json" --acl public-read
+          aws s3 cp profiles.json "s3://$BUCKET/${{ inputs.version }}/schemas/profiles.json" --acl public-read
+          if [ "${{ inputs.is-latest-version }}" = "true" ]; then
+            aws s3 cp configuration.json "s3://$BUCKET/latest/schemas/configuration.json" --acl public-read
+            aws s3 cp profiles.json "s3://$BUCKET/latest/schemas/profiles.json" --acl public-read
+          fi
+      - name: Set latest version in S3
+        run: |
+          CHANNEL=cli
+          if [ "${{ inputs.staging }}" = "true" ]; then
+            CHANNEL=stgn-cli
+          fi
+          echo ${{ inputs.version }} | aws s3 cp - s3://get-dstack/$CHANNEL/latest-version --acl public-read
