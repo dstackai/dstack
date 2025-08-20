@@ -3,7 +3,7 @@ name: Build Docs
 on:
   workflow_call:
     inputs:
-      release_tag:
+      release-tag:
         type: string
         required: false
 
@@ -18,8 +18,8 @@ jobs:
       - name: Install dstack
         run: |
           uv pip install examples/plugins/example_plugin_server
-          if [ -n "${{ inputs.release_tag }}" ]; then
-            uv pip install "dstack[server]==${{ inputs.release_tag }}"
+          if [ -n "${{ inputs.release-tag }}" ]; then
+            uv pip install "dstack[server]==${{ inputs.release-tag }}"
           else
             uv pip install -e '.[server]'
           fi
