@@ -120,7 +120,7 @@ async def _execute_probe(probe: ProbeModel, probe_spec: ProbeSpec) -> bool:
                 method=probe_spec.method,
                 url="http://dstack" + probe_spec.url,
                 headers=[(h.name, h.value) for h in probe_spec.headers],
-                data=probe_spec.body,
+                content=probe_spec.body,
                 timeout=probe_spec.timeout,
                 follow_redirects=False,
             )
