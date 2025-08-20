@@ -34,6 +34,9 @@ jobs:
           python-version: 3.11
       - run: uv tool install pre-commit
       - run: pre-commit run -a --show-diff-on-failure
+      - uses: jakebailey/pyright-action@v2
+        with:
+          pylance-version: latest-release
 
   frontend-build:
     runs-on: ubuntu-latest
