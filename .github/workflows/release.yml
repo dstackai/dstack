@@ -37,7 +37,7 @@ jobs:
     uses: ./.github/workflows/build-artifacts.yml
     with:
       version: ${{ needs.compute-version.outputs.version }}
-      staging: true
+      staging: false
       go-integration-tests: true
 
   upload-pre-pypi-artifacts:
