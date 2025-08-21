@@ -23,7 +23,12 @@ from dstack._internal.core.models.backends.base import (
 REGIONS = []
 
 
-class VultrConfigurator(Configurator):
+class VultrConfigurator(
+    Configurator[
+        VultrBackendConfig,
+        VultrBackendConfigWithCreds,
+    ]
+):
     TYPE = BackendType.VULTR
     BACKEND_CLASS = VultrBackend
 
@@ -42,10 +47,12 @@ class VultrConfigurator(Configurator):
             auth=VultrCreds.parse_obj(config.creds).json(),
         )
 
-    def get_backend_config(self, record: BackendRecord, include_creds: bool) -> VultrBackendConfig:
+    def get_backend_config_with_creds(self, record: BackendRecord) -> VultrBackendConfigWithCreds:
         config = self._get_config(record)
-        if include_creds:
-            return VultrBackendConfigWithCreds.__response__.parse_obj(config)
+        return VultrBackendConfigWithCreds.__response__.parse_obj(config)
+
+    def get_backend_config_without_creds(self, record: BackendRecord) -> VultrBackendConfig:
+        config = self._get_config(record)
         return VultrBackendConfig.__response__.parse_obj(config)
 
     def get_backend(self, record: BackendRecord) -> VultrBackend:

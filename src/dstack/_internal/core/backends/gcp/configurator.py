@@ -11,7 +11,6 @@ from dstack._internal.core.backends.base.configurator import (
 from dstack._internal.core.backends.gcp import auth, resources
 from dstack._internal.core.backends.gcp.backend import GCPBackend
 from dstack._internal.core.backends.gcp.models import (
-    AnyGCPBackendConfig,
     GCPBackendConfig,
     GCPBackendConfigWithCreds,
     GCPConfig,
@@ -109,7 +108,12 @@ DEFAULT_REGIONS = REGIONS
 MAIN_REGION = "us-east1"
 
 
-class GCPConfigurator(Configurator):
+class GCPConfigurator(
+    Configurator[
+        GCPBackendConfig,
+        GCPBackendConfigWithCreds,
+    ]
+):
     TYPE = BackendType.GCP
     BACKEND_CLASS = GCPBackend
 
@@ -147,12 +151,12 @@ class GCPConfigurator(Configurator):
             auth=GCPCreds.parse_obj(config.creds).json(),
         )
 
-    def get_backend_config(
-        self, record: BackendRecord, include_creds: bool
-    ) -> AnyGCPBackendConfig:
+    def get_backend_config_with_creds(self, record: BackendRecord) -> GCPBackendConfigWithCreds:
         config = self._get_config(record)
-        if include_creds:
-            return GCPBackendConfigWithCreds.__response__.parse_obj(config)
+        return GCPBackendConfigWithCreds.__response__.parse_obj(config)
+
+    def get_backend_config_without_creds(self, record: BackendRecord) -> GCPBackendConfig:
+        config = self._get_config(record)
         return GCPBackendConfig.__response__.parse_obj(config)
 
     def get_backend(self, record: BackendRecord) -> GCPBackend:
