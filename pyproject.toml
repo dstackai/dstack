@@ -83,6 +83,7 @@ include = [
     "src/dstack/plugins",
     "src/dstack/_internal/server",
     "src/dstack/_internal/core/services",
+    "src/dstack/_internal/cli/commands",
     "src/dstack/_internal/cli/services/configurators",
 ]
 ignore = [

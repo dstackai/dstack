@@ -26,7 +26,7 @@ class MetricsCommand(APIBaseCommand):
 
     def _register(self):
         super()._register()
-        self._parser.add_argument("run_name").completer = RunNameCompleter()
+        self._parser.add_argument("run_name").completer = RunNameCompleter()  # type: ignore[attr-defined]
         self._parser.add_argument(
             "-w",
             "--watch",

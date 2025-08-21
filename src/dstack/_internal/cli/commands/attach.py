@@ -61,7 +61,7 @@ class AttachCommand(APIBaseCommand):
             type=int,
             default=0,
         )
-        self._parser.add_argument("run_name").completer = RunNameCompleter()
+        self._parser.add_argument("run_name").completer = RunNameCompleter()  # type: ignore[attr-defined]
 
     def _command(self, args: argparse.Namespace):
         super()._command(args)

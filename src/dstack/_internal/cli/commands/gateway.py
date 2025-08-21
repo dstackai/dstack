@@ -68,7 +68,7 @@ class GatewayCommand(APIBaseCommand):
         delete_parser.set_defaults(subfunc=self._delete)
         delete_parser.add_argument(
             "name", help="The name of the gateway"
-        ).completer = GatewayNameCompleter()
+        ).completer = GatewayNameCompleter()  # type: ignore[attr-defined]
         delete_parser.add_argument(
             "-y", "--yes", action="store_true", help="Don't ask for confirmation"
         )
@@ -79,7 +79,7 @@ class GatewayCommand(APIBaseCommand):
         update_parser.set_defaults(subfunc=self._update)
         update_parser.add_argument(
             "name", help="The name of the gateway"
-        ).completer = GatewayNameCompleter()
+        ).completer = GatewayNameCompleter()  # type: ignore[attr-defined]
         update_parser.add_argument(
             "--set-default", action="store_true", help="Set it the default gateway for the project"
         )

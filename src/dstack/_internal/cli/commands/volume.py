@@ -48,7 +48,7 @@ class VolumeCommand(APIBaseCommand):
         delete_parser.add_argument(
             "name",
             help="The name of the volume",
-        ).completer = VolumeNameCompleter()
+        ).completer = VolumeNameCompleter()  # type: ignore[attr-defined]
         delete_parser.add_argument(
             "-y", "--yes", help="Don't ask for confirmation", action="store_true"
         )
