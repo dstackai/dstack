@@ -124,8 +124,8 @@ class ProjectCommand(BaseCommand):
         table.add_column("USER", style="grey58")
         table.add_column("DEFAULT", justify="center")
 
-        for project_name in config_manager.list_projects():
-            project_config = config_manager.get_project_config(project_name)
+        for project_config in config_manager.list_project_configs():
+            project_name = project_config.name
             is_default = project_name == default_project.name if default_project else False
 
             # Get username from API

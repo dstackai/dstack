@@ -1,7 +1,7 @@
 import argparse
 from pathlib import Path
 
-from argcomplete import FilesCompleter
+from argcomplete import FilesCompleter  # type: ignore[attr-defined]
 
 from dstack._internal.cli.commands import APIBaseCommand
 from dstack._internal.cli.services.configurators import (
@@ -48,7 +48,7 @@ class ApplyCommand(APIBaseCommand):
                 " Defaults to [code]$PWD/.dstack.yml[/]"
             ),
             dest="configuration_file",
-        ).completer = FilesCompleter(allowednames=["*.yml", "*.yaml"])
+        ).completer = FilesCompleter(allowednames=["*.yml", "*.yaml"])  # type: ignore[attr-defined]
         self._parser.add_argument(
             "-y",
             "--yes",
