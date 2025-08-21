@@ -8,7 +8,6 @@ from dstack._internal.core.backends.base.configurator import (
 from dstack._internal.core.backends.cudo import api_client
 from dstack._internal.core.backends.cudo.backend import CudoBackend
 from dstack._internal.core.backends.cudo.models import (
-    AnyCudoBackendConfig,
     CudoBackendConfig,
     CudoBackendConfigWithCreds,
     CudoConfig,
@@ -18,7 +17,12 @@ from dstack._internal.core.backends.cudo.models import (
 from dstack._internal.core.models.backends.base import BackendType
 
 
-class CudoConfigurator(Configurator):
+class CudoConfigurator(
+    Configurator[
+        CudoBackendConfig,
+        CudoBackendConfigWithCreds,
+    ]
+):
     TYPE = BackendType.CUDO
     BACKEND_CLASS = CudoBackend
 
@@ -35,12 +39,12 @@ class CudoConfigurator(Configurator):
             auth=CudoCreds.parse_obj(config.creds).json(),
         )
 
-    def get_backend_config(
-        self, record: BackendRecord, include_creds: bool
-    ) -> AnyCudoBackendConfig:
+    def get_backend_config_with_creds(self, record: BackendRecord) -> CudoBackendConfigWithCreds:
         config = self._get_config(record)
-        if include_creds:
-            return CudoBackendConfigWithCreds.__response__.parse_obj(config)
+        return CudoBackendConfigWithCreds.__response__.parse_obj(config)
+
+    def get_backend_config_without_creds(self, record: BackendRecord) -> CudoBackendConfig:
+        config = self._get_config(record)
         return CudoBackendConfig.__response__.parse_obj(config)
 
     def get_backend(self, record: BackendRecord) -> CudoBackend:

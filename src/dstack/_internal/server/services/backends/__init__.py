@@ -135,7 +135,7 @@ def get_backend_config_with_creds_from_backend_model(
     backend_model: BackendModel,
 ) -> AnyBackendConfigWithCreds:
     backend_record = get_stored_backend_record(backend_model)
-    backend_config = configurator.get_backend_config(backend_record, include_creds=True)
+    backend_config = configurator.get_backend_config_with_creds(backend_record)
     return backend_config
 
 
@@ -144,7 +144,7 @@ def get_backend_config_without_creds_from_backend_model(
     backend_model: BackendModel,
 ) -> AnyBackendConfigWithoutCreds:
     backend_record = get_stored_backend_record(backend_model)
-    backend_config = configurator.get_backend_config(backend_record, include_creds=False)
+    backend_config = configurator.get_backend_config_without_creds(backend_record)
     return backend_config
 
 

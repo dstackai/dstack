@@ -8,7 +8,6 @@ from dstack._internal.core.backends.base.configurator import (
 from dstack._internal.core.backends.lambdalabs import api_client
 from dstack._internal.core.backends.lambdalabs.backend import LambdaBackend
 from dstack._internal.core.backends.lambdalabs.models import (
-    AnyLambdaBackendConfig,
     LambdaBackendConfig,
     LambdaBackendConfigWithCreds,
     LambdaConfig,
@@ -20,7 +19,12 @@ from dstack._internal.core.models.backends.base import (
 )
 
 
-class LambdaConfigurator(Configurator):
+class LambdaConfigurator(
+    Configurator[
+        LambdaBackendConfig,
+        LambdaBackendConfigWithCreds,
+    ]
+):
     TYPE = BackendType.LAMBDA
     BACKEND_CLASS = LambdaBackend
 
@@ -37,12 +41,12 @@ class LambdaConfigurator(Configurator):
             auth=LambdaCreds.parse_obj(config.creds).json(),
         )
 
-    def get_backend_config(
-        self, record: BackendRecord, include_creds: bool
-    ) -> AnyLambdaBackendConfig:
+    def get_backend_config_with_creds(self, record: BackendRecord) -> LambdaBackendConfigWithCreds:
         config = self._get_config(record)
-        if include_creds:
-            return LambdaBackendConfigWithCreds.__response__.parse_obj(config)
+        return LambdaBackendConfigWithCreds.__response__.parse_obj(config)
+
+    def get_backend_config_without_creds(self, record: BackendRecord) -> LambdaBackendConfig:
+        config = self._get_config(record)
         return LambdaBackendConfig.__response__.parse_obj(config)
 
     def get_backend(self, record: BackendRecord) -> LambdaBackend:
