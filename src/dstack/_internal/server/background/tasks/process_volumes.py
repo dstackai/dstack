@@ -42,8 +42,8 @@ async def process_submitted_volumes():
             if volume_model is None:
                 return
             lockset.add(volume_model.id)
+        volume_model_id = volume_model.id
         try:
-            volume_model_id = volume_model.id
             await _process_submitted_volume(session=session, volume_model=volume_model)
         finally:
             lockset.difference_update([volume_model_id])

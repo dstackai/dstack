@@ -110,9 +110,11 @@ async def lifespan(app: FastAPI):
     _print_dstack_logo()
     if not check_required_ssh_version():
         logger.warning("OpenSSH 8.4+ is required. The dstack server may not work properly")
+    server_config_manager = None
+    server_config_loaded = False
     if settings.SERVER_CONFIG_ENABLED:
         server_config_manager = ServerConfigManager()
-        config_loaded = server_config_manager.load_config()
+        server_config_loaded = server_config_manager.load_config()
         # Encryption has to be configured before working with users and projects
         await server_config_manager.apply_encryption()
     async with get_session_ctx() as session:
@@ -126,11 +128,9 @@ async def lifespan(app: FastAPI):
                 session=session,
                 user=admin,
             )
-            if settings.SERVER_CONFIG_ENABLED:
-                server_config_dir = str(SERVER_CONFIG_FILE_PATH).replace(
-                    os.path.expanduser("~"), "~", 1
-                )
-                if not config_loaded:
+            if server_config_manager is not None:
+                server_config_dir = _get_server_config_dir()
+                if not server_config_loaded:
                     logger.info("Initializing the default configuration...", {"show_path": False})
                     await server_config_manager.init_config(session=session)
                     logger.info(
@@ -153,6 +153,7 @@ async def lifespan(app: FastAPI):
     )
     if settings.SERVER_S3_BUCKET is not None or settings.SERVER_GCS_BUCKET is not None:
         init_default_storage()
+    scheduler = None
     if settings.SERVER_BACKGROUND_PROCESSING_ENABLED:
         scheduler = start_background_tasks()
     else:
@@ -167,7 +168,7 @@ async def lifespan(app: FastAPI):
     for func in _ON_STARTUP_HOOKS:
         await func(app)
     yield
-    if settings.SERVER_BACKGROUND_PROCESSING_ENABLED:
+    if scheduler is not None:
         scheduler.shutdown()
     PROBES_SCHEDULER.shutdown(wait=False)
     await gateway_connections_pool.remove_all()
@@ -371,6 +372,18 @@ def _is_prometheus_request(request: Request) -> bool:
     return request.url.path.startswith("/metrics")
 
 
+def _sentry_traces_sampler(sampling_context: SamplingContext) -> float:
+    parent_sampling_decision = sampling_context["parent_sampled"]
+    if parent_sampling_decision is not None:
+        return float(parent_sampling_decision)
+    transaction_context = sampling_context["transaction_context"]
+    name = transaction_context.get("name")
+    if name is not None:
+        if name.startswith("background."):
+            return settings.SENTRY_TRACES_BACKGROUND_SAMPLE_RATE
+    return settings.SENTRY_TRACES_SAMPLE_RATE
+
+
 def _print_dstack_logo():
     console.print(
         """[purple]╱╱╭╮╱╱╭╮╱╱╱╱╱╱╭╮
@@ -387,13 +400,5 @@ def _print_dstack_logo():
     )
 
 
-def _sentry_traces_sampler(sampling_context: SamplingContext) -> float:
-    parent_sampling_decision = sampling_context["parent_sampled"]
-    if parent_sampling_decision is not None:
-        return float(parent_sampling_decision)
-    transaction_context = sampling_context["transaction_context"]
-    name = transaction_context.get("name")
-    if name is not None:
-        if name.startswith("background."):
-            return settings.SENTRY_TRACES_BACKGROUND_SAMPLE_RATE
-    return settings.SENTRY_TRACES_SAMPLE_RATE
+def _get_server_config_dir() -> str:
+    return str(SERVER_CONFIG_FILE_PATH).replace(os.path.expanduser("~"), "~", 1)

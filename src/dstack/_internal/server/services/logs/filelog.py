@@ -48,7 +48,7 @@ class FileLogStorage(LogStorage):
     ) -> JobSubmissionLogs:
         start_line = 0
         if request.next_token:
-            start_line = self._next_token(request)
+            start_line = self._parse_next_token(request.next_token)
 
         logs = []
         next_token = None
@@ -97,7 +97,9 @@ class FileLogStorage(LogStorage):
     def _poll_logs_descending(
         self, log_file_path: Path, request: PollLogsRequest
     ) -> JobSubmissionLogs:
-        start_offset = self._next_token(request)
+        start_offset = None
+        if request.next_token is not None:
+            start_offset = self._parse_next_token(request.next_token)
 
         candidate_logs = []
 
@@ -123,12 +125,12 @@ class FileLogStorage(LogStorage):
         except FileNotFoundError:
             return JobSubmissionLogs(logs=[], next_token=None)
 
-        logs = [log for log, offset in candidate_logs[: request.limit]]
+        logs = [log for log, _ in candidate_logs[: request.limit]]
         next_token = None
         if len(candidate_logs) > request.limit:
             # We fetched one more than the limit, so there are more pages.
             # The next token should point to the start of the last log we are returning.
-            _last_log_event, last_log_offset = candidate_logs[request.limit - 1]
+            _, last_log_offset = candidate_logs[request.limit - 1]
             next_token = str(last_log_offset)
 
         return JobSubmissionLogs(logs=logs, next_token=next_token)
@@ -245,8 +247,7 @@ class FileLogStorage(LogStorage):
             message=runner_log_event.message.decode(errors="replace"),
         )
 
-    def _next_token(self, request: PollLogsRequest) -> Optional[int]:
-        next_token = request.next_token
+    def _parse_next_token(self, next_token: str) -> int:
         if next_token is None:
             return None
         try:

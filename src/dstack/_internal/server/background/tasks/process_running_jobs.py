@@ -128,9 +128,8 @@ async def _process_next_running_job():
             if job_model is None:
                 return
             lockset.add(job_model.id)
-
+        job_model_id = job_model.id
         try:
-            job_model_id = job_model.id
             await _process_running_job(session=session, job_model=job_model)
         finally:
             lockset.difference_update([job_model_id])
@@ -169,6 +168,11 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
         return
 
     job = find_job(run.jobs, job_model.replica_num, job_model.job_num)
+
+    volumes = []
+    secrets = {}
+    cluster_info = None
+    repo_creds = None
 
     initial_status = job_model.status
     if initial_status in [JobStatus.PROVISIONING, JobStatus.PULLING]:
@@ -257,6 +261,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
                 user_ssh_key,
             )
         else:
+            assert cluster_info is not None
             logger.debug(
                 "%s: process provisioning job without shim, age=%s",
                 fmt(job_model),
@@ -275,7 +280,6 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
                 repo=repo_model,
                 code_hash=_get_repo_code_hash(run, job),
             )
-
             success = await common_utils.run_async(
                 _submit_job_to_runner,
                 server_ssh_private_keys,
@@ -309,6 +313,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
 
     else:  # fails are not acceptable
         if initial_status == JobStatus.PULLING:
+            assert cluster_info is not None
             logger.debug(
                 "%s: process pulling job with shim, age=%s", fmt(job_model), job_submission.age
             )
@@ -341,7 +346,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
                 server_ssh_private_keys,
                 job_provisioning_data,
             )
-        elif initial_status == JobStatus.RUNNING:
+        else:
             logger.debug("%s: process running job, age=%s", fmt(job_model), job_submission.age)
             success = await common_utils.run_async(
                 _process_running,
@@ -632,6 +637,7 @@ def _process_pulling_with_shim(
         is successful
     """
     shim_client = client.ShimClient(port=ports[DSTACK_SHIM_HTTP_PORT])
+    job_runtime_data = None
     if shim_client.is_api_v2_supported():  # raises error if shim is down, causes retry
         task = shim_client.get_task(job_model.id)
 

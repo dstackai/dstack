@@ -1,8 +1,8 @@
 from typing import Dict, List, Literal, Optional, Tuple
 
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from dstack._internal.core.backends.base.backend import Backend
+from dstack._internal.core.errors import ServerClientError
+from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import InstanceOfferWithAvailability
 from dstack._internal.core.models.profiles import SpotPolicy
 from dstack._internal.core.models.resources import Range
@@ -15,10 +15,43 @@ from dstack._internal.server.schemas.gpus import (
     ListGpusResponse,
 )
 from dstack._internal.server.services.offers import get_offers_by_requirements
+from dstack._internal.utils.common import get_or_error
+
+
+async def list_gpus_grouped(
+    project: ProjectModel,
+    run_spec: RunSpec,
+    group_by: Optional[List[Literal["backend", "region", "count"]]] = None,
+) -> ListGpusResponse:
+    """Retrieves available GPU specifications based on a run spec, with optional grouping."""
+    offers = await _get_gpu_offers(project=project, run_spec=run_spec)
+    backend_gpus = _process_offers_into_backend_gpus(offers)
+    group_by_set = set(group_by) if group_by else set()
+    if "region" in group_by_set and "backend" not in group_by_set:
+        raise ServerClientError("Cannot group by 'region' without also grouping by 'backend'")
+
+    # Determine grouping strategy based on combination
+    has_backend = "backend" in group_by_set
+    has_region = "region" in group_by_set
+    has_count = "count" in group_by_set
+    if has_backend and has_region and has_count:
+        gpus = _get_gpus_grouped_by_backend_region_and_count(backend_gpus)
+    elif has_backend and has_count:
+        gpus = _get_gpus_grouped_by_backend_and_count(backend_gpus)
+    elif has_backend and has_region:
+        gpus = _get_gpus_grouped_by_backend_and_region(backend_gpus)
+    elif has_backend:
+        gpus = _get_gpus_grouped_by_backend(backend_gpus)
+    elif has_count:
+        gpus = _get_gpus_grouped_by_count(backend_gpus)
+    else:
+        gpus = _get_gpus_with_no_grouping(backend_gpus)
+
+    return ListGpusResponse(gpus=gpus)
 
 
 async def _get_gpu_offers(
-    session: AsyncSession, project: ProjectModel, run_spec: RunSpec
+    project: ProjectModel, run_spec: RunSpec
 ) -> List[Tuple[Backend, InstanceOfferWithAvailability]]:
     """Fetches all available instance offers that match the run spec's GPU requirements."""
     profile = run_spec.merged_profile
@@ -28,7 +61,6 @@ async def _get_gpu_offers(
         spot=get_policy_map(profile.spot_policy, default=SpotPolicy.AUTO),
         reservation=profile.reservation,
     )
-
     return await get_offers_by_requirements(
         project=project,
         profile=profile,
@@ -45,7 +77,7 @@ def _process_offers_into_backend_gpus(
     offers: List[Tuple[Backend, InstanceOfferWithAvailability]],
 ) -> List[BackendGpus]:
     """Transforms raw offers into a structured list of BackendGpus, aggregating GPU info."""
-    backend_data: Dict[str, Dict] = {}
+    backend_data: Dict[BackendType, Dict] = {}
 
     for backend, offer in offers:
         backend_type = backend.TYPE
@@ -111,7 +143,7 @@ def _process_offers_into_backend_gpus(
     return backend_gpus_list
 
 
-def _update_gpu_group(row: GpuGroup, gpu: BackendGpu, backend_type: str):
+def _update_gpu_group(row: GpuGroup, gpu: BackendGpu, backend_type: BackendType):
     """Updates an existing GpuGroup with new data from another GPU offer."""
     spot_type: Literal["spot", "on-demand"] = "spot" if gpu.spot else "on-demand"
 
@@ -121,6 +153,12 @@ def _update_gpu_group(row: GpuGroup, gpu: BackendGpu, backend_type: str):
         row.spot.append(spot_type)
     if row.backends and backend_type not in row.backends:
         row.backends.append(backend_type)
+
+    # FIXME: Consider using non-optional range
+    assert row.count.min is not None
+    assert row.count.max is not None
+    assert row.price.min is not None
+    assert row.price.max is not None
 
     row.count.min = min(row.count.min, gpu.count)
     row.count.max = max(row.count.max, gpu.count)
@@ -194,7 +232,7 @@ def _get_gpus_grouped_by_backend(backend_gpus: List[BackendGpus]) -> List[GpuGro
             not any(av.is_available() for av in g.availability),
             g.price.min,
             g.price.max,
-            g.backend.value,
+            get_or_error(g.backend).value,
             g.name,
             g.memory_mib,
         ),
@@ -229,7 +267,7 @@ def _get_gpus_grouped_by_backend_and_region(backend_gpus: List[BackendGpus]) -> 
             not any(av.is_available() for av in g.availability),
             g.price.min,
             g.price.max,
-            g.backend.value,
+            get_or_error(g.backend).value,
             g.region,
             g.name,
             g.memory_mib,
@@ -299,7 +337,7 @@ def _get_gpus_grouped_by_backend_and_count(backend_gpus: List[BackendGpus]) -> L
             not any(av.is_available() for av in g.availability),
             g.price.min,
             g.price.max,
-            g.backend.value,
+            get_or_error(g.backend).value,
             g.count.min,
             g.name,
             g.memory_mib,
@@ -344,47 +382,10 @@ def _get_gpus_grouped_by_backend_region_and_count(
             not any(av.is_available() for av in g.availability),
             g.price.min,
             g.price.max,
-            g.backend.value,
+            get_or_error(g.backend).value,
             g.region,
             g.count.min,
             g.name,
             g.memory_mib,
         ),
     )
-
-
-async def list_gpus_grouped(
-    session: AsyncSession,
-    project: ProjectModel,
-    run_spec: RunSpec,
-    group_by: Optional[List[Literal["backend", "region", "count"]]] = None,
-) -> ListGpusResponse:
-    """Retrieves available GPU specifications based on a run spec, with optional grouping."""
-    offers = await _get_gpu_offers(session, project, run_spec)
-    backend_gpus = _process_offers_into_backend_gpus(offers)
-
-    group_by_set = set(group_by) if group_by else set()
-
-    if "region" in group_by_set and "backend" not in group_by_set:
-        from dstack._internal.core.errors import ServerClientError
-
-        raise ServerClientError("Cannot group by 'region' without also grouping by 'backend'")
-
-    # Determine grouping strategy based on combination
-    has_backend = "backend" in group_by_set
-    has_region = "region" in group_by_set
-    has_count = "count" in group_by_set
-    if has_backend and has_region and has_count:
-        gpus = _get_gpus_grouped_by_backend_region_and_count(backend_gpus)
-    elif has_backend and has_count:
-        gpus = _get_gpus_grouped_by_backend_and_count(backend_gpus)
-    elif has_backend and has_region:
-        gpus = _get_gpus_grouped_by_backend_and_region(backend_gpus)
-    elif has_backend:
-        gpus = _get_gpus_grouped_by_backend(backend_gpus)
-    elif has_count:
-        gpus = _get_gpus_grouped_by_count(backend_gpus)
-    else:
-        gpus = _get_gpus_with_no_grouping(backend_gpus)
-
-    return ListGpusResponse(gpus=gpus)

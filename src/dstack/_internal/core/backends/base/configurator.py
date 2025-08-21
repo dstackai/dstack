@@ -1,11 +1,12 @@
 from abc import ABC, abstractmethod
-from typing import Any, ClassVar, List, Optional
+from typing import Any, ClassVar, List, Literal, Optional, overload
 from uuid import UUID
 
 from dstack._internal.core.backends.base.backend import Backend
 from dstack._internal.core.backends.models import (
     AnyBackendConfig,
     AnyBackendConfigWithCreds,
+    AnyBackendConfigWithoutCreds,
 )
 from dstack._internal.core.errors import BackendInvalidCredentialsError
 from dstack._internal.core.models.backends.base import BackendType
@@ -75,6 +76,18 @@ class Configurator(ABC):
         It may perform additional validation not possible in `validate_config()`
         and raise `ServerClientError` or its subclass if config is invalid.
         """
+        pass
+
+    @overload
+    def get_backend_config(
+        self, record: StoredBackendRecord, include_creds: Literal[False]
+    ) -> AnyBackendConfigWithoutCreds:
+        pass
+
+    @overload
+    def get_backend_config(
+        self, record: StoredBackendRecord, include_creds: Literal[True]
+    ) -> AnyBackendConfigWithCreds:
         pass
 
     @abstractmethod

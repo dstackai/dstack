@@ -181,8 +181,8 @@ async def _process_next_instance():
             if instance is None:
                 return
             lockset.add(instance.id)
+        instance_model_id = instance.id
         try:
-            instance_model_id = instance.id
             await _process_instance(session=session, instance=instance)
         finally:
             lockset.difference_update([instance_model_id])
@@ -393,6 +393,7 @@ async def _add_remote(instance: InstanceModel) -> None:
         return
 
     region = instance.region
+    assert region is not None  # always set for ssh instances
     jpd = JobProvisioningData(
         backend=BackendType.REMOTE,
         instance_type=instance_type,

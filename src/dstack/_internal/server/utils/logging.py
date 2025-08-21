@@ -31,15 +31,15 @@ def configure_logging():
             rename_fields={"name": "logger", "asctime": "timestamp", "levelname": "level"},
         ),
     }
-    handlers = {
+    handlers: dict[str, logging.Handler] = {
         "rich": DstackRichHandler(console=console),
         "standard": logging.StreamHandler(stream=sys.stdout),
         "json": logging.StreamHandler(stream=sys.stdout),
     }
     if settings.LOG_FORMAT not in formatters:
         raise ValueError(f"Invalid settings.LOG_FORMAT: {settings.LOG_FORMAT}")
-    formatter = formatters.get(settings.LOG_FORMAT)
-    handler = handlers.get(settings.LOG_FORMAT)
+    formatter = formatters[settings.LOG_FORMAT]
+    handler = handlers[settings.LOG_FORMAT]
     handler.setFormatter(formatter)
     handler.addFilter(AsyncioCancelledErrorFilter())
     root_logger = logging.getLogger(None)

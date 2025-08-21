@@ -86,6 +86,7 @@ class CustomApplyPolicy(ApplyPolicy):
         spec: ApplySpec,
         excludes: Optional[Dict] = None,
     ) -> ApplySpec:
+        spec_json = None
         try:
             spec_request = request_cls(user=user, project=project, spec=spec)
             spec_json = self._call_plugin_service(spec_request, endpoint, excludes)

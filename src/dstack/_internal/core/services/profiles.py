@@ -37,10 +37,10 @@ def get_termination(
 ) -> Tuple[TerminationPolicy, int]:
     termination_policy = TerminationPolicy.DESTROY_AFTER_IDLE
     termination_idle_time = default_termination_idle_time
-    if profile.idle_duration is not None and int(profile.idle_duration) < 0:
+    if profile.idle_duration is not None and profile.idle_duration < 0:
         termination_policy = TerminationPolicy.DONT_DESTROY
     elif profile.idle_duration is not None:
         termination_idle_time = profile.idle_duration
     if termination_policy == TerminationPolicy.DONT_DESTROY:
         termination_idle_time = -1
-    return termination_policy, int(termination_idle_time)
+    return termination_policy, termination_idle_time

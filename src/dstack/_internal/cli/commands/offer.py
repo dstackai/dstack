@@ -3,7 +3,11 @@ from pathlib import Path
 from typing import List
 
 from dstack._internal.cli.commands import APIBaseCommand
-from dstack._internal.cli.services.configurators.run import BaseRunConfigurator
+from dstack._internal.cli.services.args import cpu_spec, disk_spec, gpu_spec
+from dstack._internal.cli.services.configurators.run import (
+    BaseRunConfigurator,
+)
+from dstack._internal.cli.services.profile import register_profile_args
 from dstack._internal.cli.utils.common import console
 from dstack._internal.cli.utils.gpu import print_gpu_json, print_gpu_table
 from dstack._internal.cli.utils.run import print_offers_json, print_run_plan
@@ -18,11 +22,8 @@ class OfferConfigurator(BaseRunConfigurator):
     TYPE = ApplyConfigurationType.TASK
 
     @classmethod
-    def register_args(
-        cls,
-        parser: argparse.ArgumentParser,
-    ):
-        super().register_args(parser, default_max_offers=50)
+    def register_args(cls, parser: argparse.ArgumentParser):
+        configuration_group = parser.add_argument_group(f"{cls.TYPE.value} Options")
         parser.add_argument(
             "--group-by",
             action="append",
@@ -33,6 +34,43 @@ class OfferConfigurator(BaseRunConfigurator):
                 "Can be repeated or comma-separated (e.g. [code]--group-by gpu,backend[/code])."
             ),
         )
+        configuration_group.add_argument(
+            "-n",
+            "--name",
+            dest="run_name",
+            help="The name of the run. If not specified, a random name is assigned",
+        )
+        configuration_group.add_argument(
+            "--max-offers",
+            help="Number of offers to show in the run plan",
+            type=int,
+            default=50,
+        )
+        cls.register_env_args(configuration_group)
+        configuration_group.add_argument(
+            "--cpu",
+            type=cpu_spec,
+            help="Request CPU for the run. "
+            "The format is [code]ARCH[/]:[code]COUNT[/] (all parts are optional)",
+            dest="cpu_spec",
+            metavar="SPEC",
+        )
+        configuration_group.add_argument(
+            "--gpu",
+            type=gpu_spec,
+            help="Request GPU for the run. "
+            "The format is [code]NAME[/]:[code]COUNT[/]:[code]MEMORY[/] (all parts are optional)",
+            dest="gpu_spec",
+            metavar="SPEC",
+        )
+        configuration_group.add_argument(
+            "--disk",
+            type=disk_spec,
+            help="Request the size range of disk for the run. Example [code]--disk 100GB..[/].",
+            metavar="RANGE",
+            dest="disk_spec",
+        )
+        register_profile_args(parser)
 
 
 class OfferCommand(APIBaseCommand):
@@ -117,7 +155,7 @@ class OfferCommand(APIBaseCommand):
 
         return processed
 
-    def _list_gpus(self, args: List[str], run_spec: RunSpec) -> List[GpuGroup]:
+    def _list_gpus(self, args: argparse.Namespace, run_spec: RunSpec) -> List[GpuGroup]:
         group_by = [g for g in args.group_by if g != "gpu"] or None
         return self.api.client.gpus.list_gpus(
             self.api.project,
