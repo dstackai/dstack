@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"reflect"
 
 	"github.com/dstackai/dstack/runner/internal/api"
 	"github.com/dstackai/dstack/runner/internal/log"
@@ -25,7 +24,7 @@ func (s *ShimServer) HealthcheckHandler(w http.ResponseWriter, r *http.Request) 
 func (s *ShimServer) InstanceHealthHandler(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	ctx := r.Context()
 	response := InstanceHealthResponse{}
-	if !reflect.ValueOf(s.dcgmWrapper).IsNil() {
+	if s.dcgmWrapper != nil {
 		if dcgmHealth, err := s.dcgmWrapper.GetHealth(); err != nil {
 			log.Error(ctx, "failed to get health from DCGM", "err", err)
 		} else {

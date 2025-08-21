@@ -35,6 +35,12 @@
     transform: translateY(-24px);
 }
 
+.logsPage {
+    flex-grow: 1;
+    min-height: 0;
+    max-height: calc(100vh - 258px);
+}
+
 .logs {
     display: flex;
     flex-direction: column;

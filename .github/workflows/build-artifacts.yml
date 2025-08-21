@@ -1,0 +1,260 @@
+name: Build Artifacts
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        type: string
+        required: true
+      staging:
+        type: boolean
+        required: true
+      go-integration-tests:
+        type: boolean
+        required: true
+
+jobs:
+  code-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: 3.11
+      - run: uv tool install pre-commit
+      - run: pre-commit run -a --show-diff-on-failure
+
+  frontend-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore cached build
+        id: cache-build
+        uses: actions/cache@v4
+        with:
+          path: frontend/build
+          key: frontend-build-${{ hashFiles('frontend/**') }}
+          restore-keys: |
+            frontend-build-
+      - name: Set up Node
+        if: steps.cache-build.outputs.cache-hit != 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+      - name: Install packages
+        if: steps.cache-build.outputs.cache-hit != 'true'
+        run: npm ci
+      - name: Build dist
+        if: steps.cache-build.outputs.cache-hit != 'true'
+        run: npm run build
+      - name: Upload dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: frontend/build
+          retention-days: 1
+
+  python-test:
+    needs: [code-lint, frontend-build]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install dependencies
+        run: uv sync --all-extras
+      - name: Run pyright
+        uses: jakebailey/pyright-action@v2
+        with:
+          pylance-version: latest-release
+      - name: Download frontend build
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-build
+          path: src/dstack/_internal/server/statics
+      - name: Run pytest on POSIX
+        if: matrix.os != 'windows-latest'
+        # Skip Postgres tests on macos since macos runner doesn't have Docker.
+        run: |
+          RUNPOSTGRES=""
+          if [ "${{ matrix.os }}" != "macos-latest" ]; then
+            RUNPOSTGRES="--runpostgres"
+          fi
+          uv run pytest -n auto src/tests --runui $RUNPOSTGRES
+      - name: Run pytest on Windows
+        if: matrix.os == 'windows-latest'
+        run: |
+          uv run pytest -n auto src/tests --runui --runpostgres
+
+  runner-test:
+    defaults:
+      run:
+        working-directory: runner
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: runner/go.mod
+          cache-dependency-path: runner/go.sum
+      - name: Check if go.mod and go.sum are up-to-date
+        run: go mod tidy -diff
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: v1.62.0  # Should match .pre-commit-config.yaml
+          args: --timeout=20m
+          working-directory: runner
+      - name: Test
+        # Only run slow tests if requested by workflow call inputs.
+        run: |
+          SHORT="-short"
+          if [[ "${{ inputs.go-integration-tests }}" == "true" ]]; then
+            SHORT=""
+          fi
+          # Skip failing integration tests on macOS for release builds.
+          # TODO: https://github.com/dstackai/dstack/issues/3005
+          if [[ "${{ inputs.staging }}" == "false" && "${{ startsWith(matrix.os, 'macos') }}" == "true" ]]; then
+            SHORT="-short"
+          fi
+          go version
+          go fmt $(go list ./... | grep -v /vendor/)
+          go vet $(go list ./... | grep -v /vendor/)
+          go test $SHORT -race $(go list ./... | grep -v /vendor/)
+
+  runner-compile:
+    needs: [runner-test]
+    defaults:
+      run:
+        working-directory: runner
+    env:
+      REPO_NAME: github.com/dstackai/dstack
+    strategy:
+      matrix:
+        include:
+          - { runs-on: "ubuntu-24.04", goos: "linux", goarch: "amd64" }
+          - { runs-on: "ubuntu-24.04-arm", goos: "linux", goarch: "arm64" }
+    runs-on: ${{ matrix.runs-on }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: runner/go.mod
+          cache-dependency-path: runner/go.sum
+      - name: build
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          CGO_ENABLED=0 go build -ldflags "-X 'main.Version=${{ inputs.version }}' -extldflags '-static'" -o dstack-runner-$GOOS-$GOARCH $REPO_NAME/runner/cmd/runner
+          CGO_ENABLED=1 go build -ldflags "-X 'main.Version=${{ inputs.version }}'" -o dstack-shim-$GOOS-$GOARCH $REPO_NAME/runner/cmd/shim
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dstack-runner-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: |
+            runner/dstack-runner-${{ matrix.goos }}-${{ matrix.goarch }}
+            runner/dstack-shim-${{ matrix.goos }}-${{ matrix.goarch }}
+          retention-days: 1
+
+  gateway-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: 3.11
+      - name: Build package
+        working-directory: gateway
+        run: |
+          echo "__version__ = \"${{ inputs.version }}\"" > src/dstack/gateway/version.py
+          # TODO: depend on a specific dstackai/dstack commit for staging builds?
+          if [[ "${{ inputs.staging }}" == "false" ]]; then
+            sed \
+              -i.old \
+              "s|@ git+https://github.com/dstackai/dstack.git@master|== ${{ inputs.version }}|" \
+              pyproject.toml
+            diff pyproject.toml pyproject.toml.old > /dev/null && echo "Could not set version" && exit 1
+          fi
+          uv build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dstack-gateway
+          path: gateway/dist/dstack_gateway-${{ inputs.version }}-py3-none-any.whl
+          retention-days: 1
+
+  python-build:
+    needs: [code-lint, frontend-build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: 3.11
+      - name: Download frontend build
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-build
+          path: src/dstack/_internal/server/statics
+      - name: Build dstack Python package
+        # TODO: set __version__ to inputs.version regardless of inputs.staging,
+        # so that staging builds are also tied to a specific runner and gateway version.
+        # May require changing how dstack handles __version__.
+        run: |
+          if [[ "${{ inputs.staging }}" == "true" ]]; then
+            VERSION=0.0.0
+            IS_RELEASE=False
+          else
+            VERSION=${{ inputs.version }}
+            IS_RELEASE=True
+          fi
+          BASE_IMAGE=$(cat src/dstack/version.py | grep "base_image = ")
+          BASE_IMAGE_UBUNTU_VERSION=$(cat src/dstack/version.py | grep "base_image_ubuntu_version = ")
+          echo "__version__ = \"$VERSION\"" > src/dstack/version.py
+          echo "__is_release__ = $IS_RELEASE" >> src/dstack/version.py
+          echo $BASE_IMAGE >> src/dstack/version.py
+          echo $BASE_IMAGE_UBUNTU_VERSION >> src/dstack/version.py
+          cp README.md src
+          uv build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: python-build
+          path: dist
+          retention-days: 1
+
+  generate-json-schema:
+    needs: [code-lint]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: 3.11
+      - name: Install dstack
+        run: uv sync
+      - name: Generate json schema
+        run: |
+          mkdir /tmp/json-schemas
+          uv run python -c "from dstack._internal.core.models.configurations import DstackConfiguration; print(DstackConfiguration.schema_json())" > /tmp/json-schemas/configuration.json
+          uv run python -c "from dstack._internal.core.models.profiles import ProfilesConfig; print(ProfilesConfig.schema_json())" > /tmp/json-schemas/profiles.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: json-schemas
+          path: /tmp/json-schemas
+          retention-days: 1

@@ -1,0 +1,57 @@
+name: Upload Pre-PyPI Artifacts
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        type: string
+        required: true
+      staging:
+        type: boolean
+        required: true
+
+jobs:
+  upload-pre-pypi-artifacts:
+    runs-on: ubuntu-latest
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+    steps:
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: 3.11
+          # settings to prevent warnings when running uv without a repo checkout
+          enable-cache: false
+          ignore-empty-workdir: true
+      - name: Install AWS
+        run: uv tool install awscli
+      - name: Download dstack-gateway
+        uses: actions/download-artifact@v4
+        with:
+          name: dstack-gateway
+          path: gateway
+      - name: Upload dstack-gateway to S3
+        working-directory: gateway
+        run: |
+          CHANNEL=release
+          if [ "${{ inputs.staging }}" = "true" ]; then
+            CHANNEL=stgn
+          fi
+          WHEEL=dstack_gateway-${{ inputs.version }}-py3-none-any.whl
+          aws s3 cp $WHEEL "s3://dstack-gateway-downloads/$CHANNEL/$WHEEL"
+          echo "${{ inputs.version }}" | aws s3 cp - "s3://dstack-gateway-downloads/$CHANNEL/latest-version"
+      - name: Download dstack-runner
+        uses: actions/download-artifact@v4
+        with:
+          pattern: dstack-runner-*
+          merge-multiple: true
+          path: runner
+      - name: Upload dstack-runner to S3
+        working-directory: runner
+        run: |
+          BUCKET=dstack-runner-downloads
+          if [ "${{ inputs.staging }}" = "true" ]; then
+            BUCKET=dstack-runner-downloads-stgn
+          fi
+          aws s3 cp . "s3://$BUCKET/${{ inputs.version }}/binaries/" --recursive --exclude "*" --include "dstack-*" --acl public-read
+          aws s3 cp . "s3://$BUCKET/latest/binaries/" --recursive --exclude "*" --include "dstack-*" --acl public-read
