@@ -7,7 +7,6 @@ from dstack._internal.core.backends.base.configurator import (
 from dstack._internal.core.backends.hotaisle.api_client import HotAisleAPIClient
 from dstack._internal.core.backends.hotaisle.backend import HotAisleBackend
 from dstack._internal.core.backends.hotaisle.models import (
-    AnyHotAisleBackendConfig,
     AnyHotAisleCreds,
     HotAisleBackendConfig,
     HotAisleBackendConfigWithCreds,
@@ -20,7 +19,12 @@ from dstack._internal.core.models.backends.base import (
 )
 
 
-class HotAisleConfigurator(Configurator):
+class HotAisleConfigurator(
+    Configurator[
+        HotAisleBackendConfig,
+        HotAisleBackendConfigWithCreds,
+    ]
+):
     TYPE = BackendType.HOTAISLE
     BACKEND_CLASS = HotAisleBackend
 
@@ -37,12 +41,14 @@ class HotAisleConfigurator(Configurator):
             auth=HotAisleCreds.parse_obj(config.creds).json(),
         )
 
-    def get_backend_config(
-        self, record: BackendRecord, include_creds: bool
-    ) -> AnyHotAisleBackendConfig:
+    def get_backend_config_with_creds(
+        self, record: BackendRecord
+    ) -> HotAisleBackendConfigWithCreds:
         config = self._get_config(record)
-        if include_creds:
-            return HotAisleBackendConfigWithCreds.__response__.parse_obj(config)
+        return HotAisleBackendConfigWithCreds.__response__.parse_obj(config)
+
+    def get_backend_config_without_creds(self, record: BackendRecord) -> HotAisleBackendConfig:
+        config = self._get_config(record)
         return HotAisleBackendConfig.__response__.parse_obj(config)
 
     def get_backend(self, record: BackendRecord) -> HotAisleBackend:

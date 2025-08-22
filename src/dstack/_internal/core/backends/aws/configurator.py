@@ -7,7 +7,6 @@ from boto3.session import Session
 from dstack._internal.core.backends.aws import auth, compute, resources
 from dstack._internal.core.backends.aws.backend import AWSBackend
 from dstack._internal.core.backends.aws.models import (
-    AnyAWSBackendConfig,
     AWSAccessKeyCreds,
     AWSBackendConfig,
     AWSBackendConfigWithCreds,
@@ -52,7 +51,12 @@ DEFAULT_REGIONS = REGION_VALUES
 MAIN_REGION = "us-east-1"
 
 
-class AWSConfigurator(Configurator):
+class AWSConfigurator(
+    Configurator[
+        AWSBackendConfig,
+        AWSBackendConfigWithCreds,
+    ]
+):
     TYPE = BackendType.AWS
     BACKEND_CLASS = AWSBackend
 
@@ -87,12 +91,12 @@ class AWSConfigurator(Configurator):
             auth=AWSCreds.parse_obj(config.creds).json(),
         )
 
-    def get_backend_config(
-        self, record: BackendRecord, include_creds: bool
-    ) -> AnyAWSBackendConfig:
+    def get_backend_config_with_creds(self, record: BackendRecord) -> AWSBackendConfigWithCreds:
         config = self._get_config(record)
-        if include_creds:
-            return AWSBackendConfigWithCreds.__response__.parse_obj(config)
+        return AWSBackendConfigWithCreds.__response__.parse_obj(config)
+
+    def get_backend_config_without_creds(self, record: BackendRecord) -> AWSBackendConfig:
+        config = self._get_config(record)
         return AWSBackendConfig.__response__.parse_obj(config)
 
     def get_backend(self, record: BackendRecord) -> AWSBackend:

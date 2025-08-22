@@ -26,7 +26,7 @@ from dstack._internal.utils.common import local_time
 from dstack.api._public import Client
 
 
-class VolumeConfigurator(BaseApplyConfigurator):
+class VolumeConfigurator(BaseApplyConfigurator[VolumeConfiguration]):
     TYPE: ApplyConfigurationType = ApplyConfigurationType.VOLUME
 
     def apply_configuration(

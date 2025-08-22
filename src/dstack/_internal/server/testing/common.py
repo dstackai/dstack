@@ -258,8 +258,8 @@ async def create_file_archive(
 
 
 def get_run_spec(
-    run_name: str,
     repo_id: str,
+    run_name: str = "test-run",
     configuration_path: str = "dstack.yaml",
     profile: Union[Profile, Callable[[], Profile], None] = lambda: Profile(name="default"),
     configuration: Optional[AnyRunConfiguration] = None,
@@ -330,6 +330,7 @@ async def create_run(
 async def create_job(
     session: AsyncSession,
     run: RunModel,
+    fleet: Optional[FleetModel] = None,
     submission_num: int = 0,
     status: JobStatus = JobStatus.SUBMITTED,
     submitted_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
@@ -343,6 +344,7 @@ async def create_job(
     deployment_num: Optional[int] = None,
     instance_assigned: bool = False,
     disconnected_at: Optional[datetime] = None,
+    registered: bool = False,
 ) -> JobModel:
     if deployment_num is None:
         deployment_num = run.deployment_num
@@ -353,6 +355,7 @@ async def create_job(
     job_spec.job_num = job_num
     job = JobModel(
         project_id=run.project_id,
+        fleet=fleet,
         run_id=run.id,
         run_name=run.run_name,
         job_num=job_num,
@@ -372,6 +375,7 @@ async def create_job(
         used_instance_id=instance.id if instance is not None else None,
         disconnected_at=disconnected_at,
         probes=[],
+        registered=registered,
     )
     session.add(job)
     await session.commit()
@@ -733,6 +737,7 @@ def get_instance_offer_with_availability(
     availability_zones: Optional[List[str]] = None,
     price: float = 1.0,
     instance_type: str = "instance",
+    availability: InstanceAvailability = InstanceAvailability.AVAILABLE,
 ):
     gpus = [
         Gpu(
@@ -756,7 +761,7 @@ def get_instance_offer_with_availability(
         ),
         region=region,
         price=price,
-        availability=InstanceAvailability.AVAILABLE,
+        availability=availability,
         availability_zones=availability_zones,
         blocks=blocks,
         total_blocks=total_blocks,

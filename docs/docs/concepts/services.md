@@ -63,8 +63,7 @@ Model meta-llama/Meta-Llama-3.1-8B-Instruct is published at:
 
 </div>
 
-`dstack apply` automatically provisions instances, uploads the contents of the repo (incl. your local uncommitted changes),
-and runs the service.
+`dstack apply` automatically provisions instances and runs the service.
 
 If a [gateway](gateways.md) is not configured, the service’s endpoint will be accessible at
 `<dstack server URL>/proxy/services/<project name>/<run name>/`.
@@ -591,8 +590,10 @@ resources:
 
 By default, `dstack` automatically mounts the [repo](repos.md) directory where you ran `dstack init` to any run configuration. 
 
-However, in some cases, you may not want to mount the entire directory (e.g., if it’s too large),
-or you might want to mount files outside of it. In such cases, you can use the [`files`](../reference/dstack.yml/dev-environment.md#files) property.
+If you configured a [repo](repos.md), `dstack` automatically mounts its content (incl. your local changes) inside the container.
+
+In some cases, you don’t need to mount an entire repo and can mount only specific directories. This can be done using
+[`files`](../reference/dstack.yml/task.md#_files) instead of repos.
 
 <!-- TODO: Add a more relevant example -->
 
@@ -670,7 +671,7 @@ $ dstack apply -f examples/.dstack.yml --no-repo
 </div>
 
 ??? info ".gitignore and .dstackignore"
-    `dstack` automatically excludes files and folders listed in `.gitignore` and `.dstackignore`.
+    If you configured a [repo](repos.md) or [files](#files), `dstack` excludes files and folders listed in `.gitignore` and `.dstackignore`.
     
     Uploads are limited to 2MB. To avoid exceeding this limit, make sure to exclude unnecessary files.
     You can increase the default server limit by setting the `DSTACK_SERVER_CODE_UPLOAD_LIMIT` environment variable.

@@ -27,7 +27,7 @@ from dstack._internal.utils.common import local_time
 from dstack.api._public import Client
 
 
-class GatewayConfigurator(BaseApplyConfigurator):
+class GatewayConfigurator(BaseApplyConfigurator[GatewayConfiguration]):
     TYPE: ApplyConfigurationType = ApplyConfigurationType.GATEWAY
 
     def apply_configuration(

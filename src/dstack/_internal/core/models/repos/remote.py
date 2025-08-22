@@ -32,7 +32,7 @@ class RemoteRepoCreds(CoreModel):
     # TODO: remove in 0.20. Left for compatibility with CLI <=0.18.44
     protocol: Annotated[Optional[str], Field(exclude=True)] = None
 
-    class Config:
+    class Config(CoreModel.Config):
         @staticmethod
         def schema_extra(schema: Dict[str, Any]) -> None:
             del schema["properties"]["protocol"]
@@ -47,7 +47,7 @@ class RemoteRepoInfo(BaseRepoInfo):
     repo_port: Annotated[Optional[int], Field(exclude=True)] = None
     repo_user_name: Annotated[Optional[str], Field(exclude=True)] = None
 
-    class Config:
+    class Config(BaseRepoInfo.Config):
         @staticmethod
         def schema_extra(schema: Dict[str, Any]) -> None:
             del schema["properties"]["repo_host_name"]

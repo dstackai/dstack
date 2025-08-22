@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import { Button, ButtonWithConfirmation, Header, ListEmptyMessage, Modal, Pagination, SpaceBetween, Table } from 'components';
 
-import { useCollection, useNotifications, usePermissionGuard } from 'hooks';
+import { useAppSelector, useCollection, useNotifications, usePermissionGuard } from 'hooks';
 import { getServerError } from 'libs';
 import {
     useDeleteSecretsMutation,
@@ -13,6 +13,9 @@ import {
 } from 'services/secrets';
 import { GlobalUserRole, ProjectUserRole } from 'types';
 
+import { selectUserData } from 'App/slice';
+
+import { getProjectRoleByUserName } from '../utils';
 import { SecretForm } from './Form';
 
 import { IProps, TFormValues } from './types';
@@ -21,6 +24,8 @@ import styles from './styles.module.scss';
 
 export const ProjectSecrets: React.FC<IProps> = ({ project, loading }) => {
     const { t } = useTranslation();
+    const userData = useAppSelector(selectUserData);
+    const userName = userData?.username ?? '';
     const [initialFormValues, setInitialFormValues] = useState<TFormValues | undefined>();
     const projectName = project?.project_name ?? '';
     const [pushNotification] = useNotifications();
@@ -28,6 +33,7 @@ export const ProjectSecrets: React.FC<IProps> = ({ project, loading }) => {
     const [hasPermissionForSecretsManaging] = usePermissionGuard({
         allowedProjectRoles: [ProjectUserRole.ADMIN],
         allowedGlobalRoles: [GlobalUserRole.ADMIN],
+        projectRole: project ? (getProjectRoleByUserName(project, userName) ?? undefined) : undefined,
     });
 
     const { data, isLoading, isFetching } = useGetAllSecretsQuery(

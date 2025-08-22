@@ -74,7 +74,7 @@ class ServerCommand(BaseCommand):
         uvicorn_log_level = os.getenv("DSTACK_SERVER_UVICORN_LOG_LEVEL", "ERROR").lower()
         reload_disabled = os.getenv("DSTACK_SERVER_RELOAD_DISABLED") is not None
 
-        uvicorn.run(
+        uvicorn.run(  # type: ignore[unbound-variable]
             "dstack._internal.server.main:app",
             host=args.host,
             port=args.port,

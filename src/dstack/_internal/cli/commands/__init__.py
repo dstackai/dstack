@@ -54,7 +54,7 @@ class BaseCommand(ABC):
 
 
 class APIBaseCommand(BaseCommand):
-    api: Client = None
+    api: Client
 
     def _register(self):
         self._parser.add_argument(
@@ -62,7 +62,7 @@ class APIBaseCommand(BaseCommand):
             help="The name of the project. Defaults to [code]$DSTACK_PROJECT[/]",
             metavar="NAME",
             default=os.getenv("DSTACK_PROJECT"),
-        ).completer = ProjectNameCompleter()
+        ).completer = ProjectNameCompleter()  # type: ignore[attr-defined]
 
     def _command(self, args: argparse.Namespace):
         configure_logging()

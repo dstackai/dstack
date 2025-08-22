@@ -93,6 +93,8 @@ async def create_gateway_compute(
     backend_id: Optional[uuid.UUID] = None,
 ) -> GatewayComputeModel:
     assert isinstance(backend_compute, ComputeWithGatewaySupport)
+    assert configuration.name is not None
+
     private_bytes, public_bytes = generate_rsa_key_pair_bytes()
     gateway_ssh_private_key = private_bytes.decode()
     gateway_ssh_public_key = public_bytes.decode()

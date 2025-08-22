@@ -84,7 +84,7 @@ class DecryptedString(CoreModel):
     decrypted: bool = True
     exc: Optional[Exception] = None
 
-    class Config:
+    class Config(CoreModel.Config):
         arbitrary_types_allowed = True
 
     def get_plaintext_or_error(self) -> str:
@@ -390,10 +390,18 @@ class JobModel(BaseModel):
     id: Mapped[uuid.UUID] = mapped_column(
         UUIDType(binary=False), primary_key=True, default=uuid.uuid4
     )
+
     project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
     project: Mapped["ProjectModel"] = relationship()
+
     run_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("runs.id", ondelete="CASCADE"))
     run: Mapped["RunModel"] = relationship()
+
+    # Jobs need to reference fleets because we may choose an optimal fleet for a master job
+    # but not yet create an instance for it.
+    fleet_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("fleets.id"))
+    fleet: Mapped[Optional["FleetModel"]] = relationship(back_populates="jobs")
+
     run_name: Mapped[str] = mapped_column(String(100))
     job_num: Mapped[int] = mapped_column(Integer)
     job_name: Mapped[str] = mapped_column(String(100))
@@ -430,6 +438,9 @@ class JobModel(BaseModel):
     probes: Mapped[list["ProbeModel"]] = relationship(
         back_populates="job", order_by="ProbeModel.probe_num"
     )
+    # Whether the replica is registered to receive service requests.
+    # Always `False` for non-service runs.
+    registered: Mapped[bool] = mapped_column(Boolean, server_default=false())
 
 
 class GatewayModel(BaseModel):
@@ -537,6 +548,7 @@ class FleetModel(BaseModel):
     spec: Mapped[str] = mapped_column(Text)
 
     runs: Mapped[List["RunModel"]] = relationship(back_populates="fleet")
+    jobs: Mapped[List["JobModel"]] = relationship(back_populates="fleet")
     instances: Mapped[List["InstanceModel"]] = relationship(back_populates="fleet")
 
 
@@ -610,6 +622,7 @@ class InstanceModel(BaseModel):
     backend: Mapped[Optional[BackendType]] = mapped_column(EnumAsString(BackendType, 100))
     backend_data: Mapped[Optional[str]] = mapped_column(Text)
 
+    # Not set for cloud fleets that haven't been provisioning
     offer: Mapped[Optional[str]] = mapped_column(Text)
     region: Mapped[Optional[str]] = mapped_column(String(2000))
     price: Mapped[Optional[float]] = mapped_column(Float)

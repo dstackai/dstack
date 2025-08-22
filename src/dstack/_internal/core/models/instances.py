@@ -122,7 +122,7 @@ class SSHConnectionParams(CoreModel):
     username: str
     port: int
 
-    class Config:
+    class Config(CoreModel.Config):
         frozen = True
 
 

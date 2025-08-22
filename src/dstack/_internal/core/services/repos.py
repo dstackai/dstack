@@ -84,7 +84,7 @@ def get_local_repo_credentials(
 
 def check_remote_repo_credentials_https(url: GitRepoURL, oauth_token: str) -> RemoteRepoCreds:
     try:
-        git.cmd.Git().ls_remote(url.as_https(oauth_token), env=dict(GIT_TERMINAL_PROMPT="0"))
+        git.cmd.Git().ls_remote(url.as_https(oauth_token), env=dict(GIT_TERMINAL_PROMPT="0"))  # type: ignore[attr-defined]
     except GitCommandError:
         masked = len(oauth_token[:-4]) * "*" + oauth_token[-4:]
         raise InvalidRepoCredentialsError(
@@ -111,7 +111,7 @@ def check_remote_repo_credentials_ssh(url: GitRepoURL, identity_file: PathLike) 
         private_key = f.read()
 
     try:
-        git.cmd.Git().ls_remote(
+        git.cmd.Git().ls_remote(  # type: ignore[attr-defined]
             url.as_ssh(), env=dict(GIT_SSH_COMMAND=make_ssh_command_for_git(identity_file))
         )
     except GitCommandError:
@@ -131,7 +131,7 @@ def get_default_branch(remote_url: str) -> Optional[str]:
     Get the default branch of a remote Git repository.
     """
     try:
-        output = git.cmd.Git().ls_remote("--symref", remote_url, "HEAD")
+        output = git.cmd.Git().ls_remote("--symref", remote_url, "HEAD")  # type: ignore[attr-defined]
         for line in output.splitlines():
             if line.startswith("ref:"):
                 return line.split()[1].split("/")[-1]

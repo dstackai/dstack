@@ -130,19 +130,19 @@ DEFAULT_GPU_COUNT = Range[int](min=1)
 
 
 class CPUSpec(CoreModel):
-    class Config:
+    arch: Annotated[
+        Optional[gpuhunt.CPUArchitecture],
+        Field(description="The CPU architecture, one of: `x86`, `arm`"),
+    ] = None
+    count: Annotated[Range[int], Field(description="The number of CPU cores")] = DEFAULT_CPU_COUNT
+
+    class Config(CoreModel.Config):
         @staticmethod
         def schema_extra(schema: Dict[str, Any]):
             add_extra_schema_types(
                 schema["properties"]["count"],
                 extra_types=[{"type": "integer"}, {"type": "string"}],
             )
-
-    arch: Annotated[
-        Optional[gpuhunt.CPUArchitecture],
-        Field(description="The CPU architecture, one of: `x86`, `arm`"),
-    ] = None
-    count: Annotated[Range[int], Field(description="The number of CPU cores")] = DEFAULT_CPU_COUNT
 
     @classmethod
     def __get_validators__(cls):
@@ -191,22 +191,6 @@ class CPUSpec(CoreModel):
 
 
 class GPUSpec(CoreModel):
-    class Config:
-        @staticmethod
-        def schema_extra(schema: Dict[str, Any]):
-            add_extra_schema_types(
-                schema["properties"]["count"],
-                extra_types=[{"type": "integer"}, {"type": "string"}],
-            )
-            add_extra_schema_types(
-                schema["properties"]["memory"],
-                extra_types=[{"type": "integer"}, {"type": "string"}],
-            )
-            add_extra_schema_types(
-                schema["properties"]["total_memory"],
-                extra_types=[{"type": "integer"}, {"type": "string"}],
-            )
-
     vendor: Annotated[
         Optional[gpuhunt.AcceleratorVendor],
         Field(
@@ -233,6 +217,22 @@ class GPUSpec(CoreModel):
         Optional[ComputeCapability],
         Field(description="The minimum compute capability of the GPU (e.g., `7.5`)"),
     ] = None
+
+    class Config(CoreModel.Config):
+        @staticmethod
+        def schema_extra(schema: Dict[str, Any]):
+            add_extra_schema_types(
+                schema["properties"]["count"],
+                extra_types=[{"type": "integer"}, {"type": "string"}],
+            )
+            add_extra_schema_types(
+                schema["properties"]["memory"],
+                extra_types=[{"type": "integer"}, {"type": "string"}],
+            )
+            add_extra_schema_types(
+                schema["properties"]["total_memory"],
+                extra_types=[{"type": "integer"}, {"type": "string"}],
+            )
 
     @classmethod
     def __get_validators__(cls):
@@ -314,15 +314,15 @@ class GPUSpec(CoreModel):
 
 
 class DiskSpec(CoreModel):
-    class Config:
+    size: Annotated[Range[Memory], Field(description="Disk size")]
+
+    class Config(CoreModel.Config):
         @staticmethod
         def schema_extra(schema: Dict[str, Any]):
             add_extra_schema_types(
                 schema["properties"]["size"],
                 extra_types=[{"type": "integer"}, {"type": "string"}],
             )
-
-    size: Annotated[Range[Memory], Field(description="Disk size")]
 
     @classmethod
     def __get_validators__(cls):
@@ -340,7 +340,25 @@ DEFAULT_DISK = DiskSpec(size=Range[Memory](min=Memory.parse("100GB"), max=None))
 
 
 class ResourcesSpec(CoreModel):
-    class Config:
+    # TODO: Remove Range[int] in 0.20. Range[int] for backward compatibility only.
+    cpu: Annotated[Union[CPUSpec, Range[int]], Field(description="The CPU requirements")] = (
+        CPUSpec()
+    )
+    memory: Annotated[Range[Memory], Field(description="The RAM size (e.g., `8GB`)")] = (
+        DEFAULT_MEMORY_SIZE
+    )
+    shm_size: Annotated[
+        Optional[Memory],
+        Field(
+            description="The size of shared memory (e.g., `8GB`). "
+            "If you are using parallel communicating processes (e.g., dataloaders in PyTorch), "
+            "you may need to configure this"
+        ),
+    ] = None
+    gpu: Annotated[Optional[GPUSpec], Field(description="The GPU requirements")] = None
+    disk: Annotated[Optional[DiskSpec], Field(description="The disk resources")] = DEFAULT_DISK
+
+    class Config(CoreModel.Config):
         @staticmethod
         def schema_extra(schema: Dict[str, Any]):
             add_extra_schema_types(
@@ -363,24 +381,6 @@ class ResourcesSpec(CoreModel):
                 schema["properties"]["disk"],
                 extra_types=[{"type": "integer"}, {"type": "string"}],
             )
-
-    # TODO: Remove Range[int] in 0.20. Range[int] for backward compatibility only.
-    cpu: Annotated[Union[CPUSpec, Range[int]], Field(description="The CPU requirements")] = (
-        CPUSpec()
-    )
-    memory: Annotated[Range[Memory], Field(description="The RAM size (e.g., `8GB`)")] = (
-        DEFAULT_MEMORY_SIZE
-    )
-    shm_size: Annotated[
-        Optional[Memory],
-        Field(
-            description="The size of shared memory (e.g., `8GB`). "
-            "If you are using parallel communicating processes (e.g., dataloaders in PyTorch), "
-            "you may need to configure this"
-        ),
-    ] = None
-    gpu: Annotated[Optional[GPUSpec], Field(description="The GPU requirements")] = None
-    disk: Annotated[Optional[DiskSpec], Field(description="The disk resources")] = DEFAULT_DISK
 
     def pretty_format(self) -> str:
         # TODO: Remove in 0.20. Use self.cpu directly

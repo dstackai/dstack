@@ -55,7 +55,11 @@ async def _check_active_instances(
     )
     for fleet_model in fleet_models:
         for instance in fleet_model.instances:
-            if instance.status.is_active() and instance.backend in backends_types:
+            if (
+                instance.status.is_active()
+                and instance.backend is not None
+                and instance.backend in backends_types
+            ):
                 if error:
                     msg = (
                         f"Backend {instance.backend.value} has active instances."
@@ -83,6 +87,7 @@ async def _check_active_volumes(
         if (
             volume_model.status.is_active()
             and volume_model.provisioning_data is not None
+            and volume_model.provisioning_data.backend is not None
             and volume_model.provisioning_data.backend in backends_types
         ):
             if error:

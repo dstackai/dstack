@@ -30,7 +30,7 @@ class LogsCommand(APIBaseCommand):
             type=int,
             default=0,
         )
-        self._parser.add_argument("run_name").completer = RunNameCompleter(all=True)
+        self._parser.add_argument("run_name").completer = RunNameCompleter(all=True)  # type: ignore[attr-defined]
 
     def _command(self, args: argparse.Namespace):
         super()._command(args)

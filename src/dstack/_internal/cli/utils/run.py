@@ -28,6 +28,39 @@ from dstack._internal.utils.common import (
 from dstack.api import Run
 
 
+def print_offers_json(run_plan: RunPlan, run_spec):
+    """Print offers information in JSON format."""
+    job_plan = run_plan.job_plans[0]
+
+    output = {
+        "project": run_plan.project_name,
+        "user": run_plan.user,
+        "resources": job_plan.job_spec.requirements.resources.dict(),
+        "max_price": (job_plan.job_spec.requirements.max_price),
+        "spot": run_spec.configuration.spot_policy,
+        "reservation": run_plan.run_spec.configuration.reservation,
+        "offers": [],
+        "total_offers": job_plan.total_offers,
+    }
+
+    for offer in job_plan.offers:
+        output["offers"].append(
+            {
+                "backend": ("ssh" if offer.backend.value == "remote" else offer.backend.value),
+                "region": offer.region,
+                "instance_type": offer.instance.name,
+                "resources": offer.instance.resources.dict(),
+                "spot": offer.instance.resources.spot,
+                "price": float(offer.price),
+                "availability": offer.availability.value,
+            }
+        )
+
+    import json
+
+    print(json.dumps(output, indent=2))
+
+
 def print_run_plan(
     run_plan: RunPlan, max_offers: Optional[int] = None, include_run_properties: bool = True
 ):

@@ -4,6 +4,7 @@ import (
 	"context"
 	"net"
 	"net/http"
+	"reflect"
 	"sync"
 
 	"github.com/dstackai/dstack/runner/internal/api"
@@ -29,7 +30,7 @@ type ShimServer struct {
 	runner TaskRunner
 
 	dcgmExporter *dcgm.DCGMExporter
-	dcgmWrapper  dcgm.DCGMWrapperInterface
+	dcgmWrapper  dcgm.DCGMWrapperInterface // interface with nil value normalized to plain nil
 
 	version string
 }
@@ -38,6 +39,9 @@ func NewShimServer(
 	ctx context.Context, address string, version string,
 	runner TaskRunner, dcgmExporter *dcgm.DCGMExporter, dcgmWrapper dcgm.DCGMWrapperInterface,
 ) *ShimServer {
+	if dcgmWrapper != nil && reflect.ValueOf(dcgmWrapper).IsNil() {
+		dcgmWrapper = nil
+	}
 	r := api.NewRouter()
 	s := &ShimServer{
 		HttpServer: &http.Server{

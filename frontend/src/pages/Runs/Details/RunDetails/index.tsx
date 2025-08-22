@@ -23,10 +23,6 @@ import {
     getRunListItemSpot,
 } from '../../List/helpers';
 import { JobList } from '../Jobs/List';
-import { Logs } from '../Logs';
-import { getJobSubmissionId } from '../Logs/helpers';
-
-import styles from './styles.module.scss';
 
 export const RunDetails = () => {
     const { t } = useTranslation();
@@ -171,15 +167,6 @@ export const RunDetails = () => {
                     </ColumnLayout>
                 )}
             </Container>
-
-            {runData.jobs.length === 1 && (
-                <Logs
-                    projectName={paramProjectName}
-                    runName={runData?.run_spec?.run_name ?? ''}
-                    jobSubmissionId={getJobSubmissionId(runData)}
-                    className={styles.logs}
-                />
-            )}
 
             {runData.jobs.length > 1 && (
                 <JobList

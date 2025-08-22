@@ -8,7 +8,6 @@ from dstack._internal.core.backends.base.configurator import (
 from dstack._internal.core.backends.tensordock import api_client
 from dstack._internal.core.backends.tensordock.backend import TensorDockBackend
 from dstack._internal.core.backends.tensordock.models import (
-    AnyTensorDockBackendConfig,
     TensorDockBackendConfig,
     TensorDockBackendConfigWithCreds,
     TensorDockConfig,
@@ -23,7 +22,12 @@ from dstack._internal.core.models.backends.base import (
 REGIONS = []
 
 
-class TensorDockConfigurator(Configurator):
+class TensorDockConfigurator(
+    Configurator[
+        TensorDockBackendConfig,
+        TensorDockBackendConfigWithCreds,
+    ]
+):
     TYPE = BackendType.TENSORDOCK
     BACKEND_CLASS = TensorDockBackend
 
@@ -44,12 +48,14 @@ class TensorDockConfigurator(Configurator):
             auth=TensorDockCreds.parse_obj(config.creds).json(),
         )
 
-    def get_backend_config(
-        self, record: BackendRecord, include_creds: bool
-    ) -> AnyTensorDockBackendConfig:
+    def get_backend_config_with_creds(
+        self, record: BackendRecord
+    ) -> TensorDockBackendConfigWithCreds:
         config = self._get_config(record)
-        if include_creds:
-            return TensorDockBackendConfigWithCreds.__response__.parse_obj(config)
+        return TensorDockBackendConfigWithCreds.__response__.parse_obj(config)
+
+    def get_backend_config_without_creds(self, record: BackendRecord) -> TensorDockBackendConfig:
+        config = self._get_config(record)
         return TensorDockBackendConfig.__response__.parse_obj(config)
 
     def get_backend(self, record: BackendRecord) -> TensorDockBackend:

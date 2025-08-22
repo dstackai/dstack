@@ -263,10 +263,6 @@ class ComputeWithPlacementGroupSupport(ABC):
         Checks if the instance offer can be provisioned in the placement group.
 
         Should return immediately, without performing API calls.
-
-        Can be called with an offer originating from a different backend, because some backends
-        (BackendType.DSTACK) produce offers on behalf of other backends. Should return `False`
-        in that case.
         """
         pass
 

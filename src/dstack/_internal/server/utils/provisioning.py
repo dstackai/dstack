@@ -312,10 +312,10 @@ def get_paramiko_connection(
     with proxy_ctx as proxy_client, paramiko.SSHClient() as client:
         proxy_channel: Optional[paramiko.Channel] = None
         if proxy_client is not None:
+            transport = proxy_client.get_transport()
+            assert transport is not None
             try:
-                proxy_channel = proxy_client.get_transport().open_channel(
-                    "direct-tcpip", (host, port), ("", 0)
-                )
+                proxy_channel = transport.open_channel("direct-tcpip", (host, port), ("", 0))
             except (paramiko.SSHException, OSError) as e:
                 raise ProvisioningError(f"Proxy channel failed: {e}") from e
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())

@@ -1,7 +1,7 @@
 import argparse
 import os
 from abc import ABC, abstractmethod
-from typing import List, Optional, Union, cast
+from typing import Generic, List, Optional, TypeVar, Union, cast
 
 from dstack._internal.cli.services.args import env_var
 from dstack._internal.core.errors import ConfigurationError
@@ -15,8 +15,10 @@ from dstack.api._public import Client
 
 ArgsParser = Union[argparse._ArgumentGroup, argparse.ArgumentParser]
 
+ApplyConfigurationT = TypeVar("ApplyConfigurationT", bound=AnyApplyConfiguration)
 
-class BaseApplyConfigurator(ABC):
+
+class BaseApplyConfigurator(ABC, Generic[ApplyConfigurationT]):
     TYPE: ApplyConfigurationType
 
     def __init__(self, api_client: Client):
@@ -25,7 +27,7 @@ class BaseApplyConfigurator(ABC):
     @abstractmethod
     def apply_configuration(
         self,
-        conf: AnyApplyConfiguration,
+        conf: ApplyConfigurationT,
         configuration_path: str,
         command_args: argparse.Namespace,
         configurator_args: argparse.Namespace,
@@ -48,7 +50,7 @@ class BaseApplyConfigurator(ABC):
     @abstractmethod
     def delete_configuration(
         self,
-        conf: AnyApplyConfiguration,
+        conf: ApplyConfigurationT,
         configuration_path: str,
         command_args: argparse.Namespace,
     ):

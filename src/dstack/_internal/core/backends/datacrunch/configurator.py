@@ -10,7 +10,6 @@ from dstack._internal.core.backends.base.configurator import (
 )
 from dstack._internal.core.backends.datacrunch.backend import DataCrunchBackend
 from dstack._internal.core.backends.datacrunch.models import (
-    AnyDataCrunchBackendConfig,
     DataCrunchBackendConfig,
     DataCrunchBackendConfigWithCreds,
     DataCrunchConfig,
@@ -22,7 +21,12 @@ from dstack._internal.core.models.backends.base import (
 )
 
 
-class DataCrunchConfigurator(Configurator):
+class DataCrunchConfigurator(
+    Configurator[
+        DataCrunchBackendConfig,
+        DataCrunchBackendConfigWithCreds,
+    ]
+):
     TYPE = BackendType.DATACRUNCH
     BACKEND_CLASS = DataCrunchBackend
 
@@ -41,12 +45,14 @@ class DataCrunchConfigurator(Configurator):
             auth=DataCrunchCreds.parse_obj(config.creds).json(),
         )
 
-    def get_backend_config(
-        self, record: BackendRecord, include_creds: bool
-    ) -> AnyDataCrunchBackendConfig:
+    def get_backend_config_with_creds(
+        self, record: BackendRecord
+    ) -> DataCrunchBackendConfigWithCreds:
         config = self._get_config(record)
-        if include_creds:
-            return DataCrunchBackendConfigWithCreds.__response__.parse_obj(config)
+        return DataCrunchBackendConfigWithCreds.__response__.parse_obj(config)
+
+    def get_backend_config_without_creds(self, record: BackendRecord) -> DataCrunchBackendConfig:
+        config = self._get_config(record)
         return DataCrunchBackendConfig.__response__.parse_obj(config)
 
     def get_backend(self, record: BackendRecord) -> DataCrunchBackend:

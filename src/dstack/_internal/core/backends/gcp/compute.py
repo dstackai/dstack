@@ -448,10 +448,7 @@ class GCPCompute(
         placement_group: PlacementGroup,
         instance_offer: InstanceOffer,
     ) -> bool:
-        return (
-            placement_group.configuration.backend == BackendType.GCP
-            and placement_group.configuration.region == instance_offer.region
-        )
+        return placement_group.configuration.region == instance_offer.region
 
     def create_gateway(
         self,

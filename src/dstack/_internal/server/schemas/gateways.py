@@ -14,7 +14,7 @@ class CreateGatewayRequest(CoreModel):
     backend_type: Annotated[Optional[BackendType], Field(exclude=True)] = None
     region: Annotated[Optional[str], Field(exclude=True)] = None
 
-    class Config:
+    class Config(CoreModel.Config):
         @staticmethod
         def schema_extra(schema: Dict[str, Any]) -> None:
             del schema["properties"]["name"]

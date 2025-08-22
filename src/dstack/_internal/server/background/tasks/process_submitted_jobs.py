@@ -1,17 +1,20 @@
 import asyncio
+import itertools
+import math
 import uuid
 from datetime import datetime, timedelta
 from typing import List, Optional, Tuple
 
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, load_only, selectinload
+from sqlalchemy.orm import contains_eager, joinedload, load_only, selectinload
 
 from dstack._internal.core.backends.base.backend import Backend
 from dstack._internal.core.backends.base.compute import ComputeWithVolumeSupport
 from dstack._internal.core.errors import BackendError, ServerClientError
 from dstack._internal.core.models.common import NetworkMode
 from dstack._internal.core.models.fleets import (
+    Fleet,
     FleetConfiguration,
     FleetSpec,
     FleetStatus,
@@ -23,7 +26,7 @@ from dstack._internal.core.models.profiles import (
     CreationPolicy,
     TerminationPolicy,
 )
-from dstack._internal.core.models.resources import Memory
+from dstack._internal.core.models.resources import Memory, Range
 from dstack._internal.core.models.runs import (
     Job,
     JobProvisioningData,
@@ -145,8 +148,8 @@ async def _process_next_submitted_job():
             if job_model is None:
                 return
             lockset.add(job_model.id)
+        job_model_id = job_model.id
         try:
-            job_model_id = job_model.id
             await _process_submitted_job(session=session, job_model=job_model)
         finally:
             lockset.difference_update([job_model_id])
@@ -157,7 +160,10 @@ async def _process_next_submitted_job():
 async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
     # Refetch to load related attributes.
     res = await session.execute(
-        select(JobModel).where(JobModel.id == job_model.id).options(joinedload(JobModel.instance))
+        select(JobModel)
+        .where(JobModel.id == job_model.id)
+        .options(joinedload(JobModel.instance))
+        .options(joinedload(JobModel.fleet).joinedload(FleetModel.instances))
     )
     job_model = res.unique().scalar_one()
     res = await session.execute(
@@ -175,6 +181,12 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
     run_spec = run.run_spec
     profile = run_spec.merged_profile
     job = find_job(run.jobs, job_model.replica_num, job_model.job_num)
+
+    # Master job chooses fleet for the run.
+    # Due to two-step processing, it's saved to job_model.fleet.
+    # Other jobs just inherit fleet from run_model.fleet.
+    # If master job chooses no fleet, the new fleet will be created.
+    fleet_model = run_model.fleet or job_model.fleet
 
     master_job = find_job(run.jobs, job_model.replica_num, 0)
     master_job_provisioning_data = None
@@ -223,54 +235,80 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
     # Then, the job runs on the assigned instance or a new instance is provisioned.
     # This is needed to avoid holding instances lock for a long time.
     if not job_model.instance_assigned:
-        # Try assigning an existing instance
-        res = await session.execute(
-            select(InstanceModel)
-            .where(
-                InstanceModel.project_id == project.id,
-                InstanceModel.deleted == False,
-                InstanceModel.total_blocks > InstanceModel.busy_blocks,
-            )
-            .order_by(InstanceModel.id)  # take locks in order
-            .with_for_update(key_share=True)
+        # If another job freed the instance but is still trying to detach volumes,
+        # do not provision on it to prevent attaching volumes that are currently detaching.
+        detaching_instances_ids = await get_instances_ids_with_detaching_volumes(session)
+
+        fleet_filters = [
+            FleetModel.project_id == project.id,
+            FleetModel.deleted == False,
+        ]
+        if run_model.fleet is not None:
+            fleet_filters.append(FleetModel.id == run_model.fleet_id)
+        if run_spec.configuration.fleets is not None:
+            fleet_filters.append(FleetModel.name.in_(run_spec.configuration.fleets))
+
+        instance_filters = [
+            InstanceModel.deleted == False,
+            InstanceModel.total_blocks > InstanceModel.busy_blocks,
+            InstanceModel.id.not_in(detaching_instances_ids),
+        ]
+
+        fleet_models_with_instances, fleet_models_without_instances = await _select_fleet_models(
+            session=session,
+            fleet_filters=fleet_filters,
+            instance_filters=instance_filters,
         )
-        pool_instances = list(res.unique().scalars().all())
-        instances_ids = sorted([i.id for i in pool_instances])
+        instances_ids = sorted(
+            itertools.chain.from_iterable(
+                [i.id for i in f.instances] for f in fleet_models_with_instances
+            )
+        )
+        fleet_models = fleet_models_with_instances + fleet_models_without_instances
+        fleets_ids = [f.id for f in fleet_models]
+
         if get_db().dialect_name == "sqlite":
             # Start new transaction to see committed changes after lock
             await session.commit()
+
         async with get_locker(get_db().dialect_name).lock_ctx(
             InstanceModel.__tablename__, instances_ids
         ):
-            # If another job freed the instance but is still trying to detach volumes,
-            # do not provision on it to prevent attaching volumes that are currently detaching.
-            detaching_instances_ids = await get_instances_ids_with_detaching_volumes(session)
-            # Refetch after lock
-            res = await session.execute(
-                select(InstanceModel)
-                .where(
-                    InstanceModel.id.not_in(detaching_instances_ids),
-                    InstanceModel.id.in_(instances_ids),
-                    InstanceModel.deleted == False,
-                    InstanceModel.total_blocks > InstanceModel.busy_blocks,
+            if get_db().dialect_name == "sqlite":
+                fleet_models = await _refetch_fleet_models(
+                    session=session,
+                    fleets_ids=fleets_ids,
+                    instances_ids=instances_ids,
+                    fleet_filters=fleet_filters,
+                    instance_filters=instance_filters,
                 )
-                .options(joinedload(InstanceModel.fleet))
-                .execution_options(populate_existing=True)
-            )
-            pool_instances = list(res.unique().scalars().all())
-            instance = await _assign_job_to_pool_instance(
-                session=session,
-                pool_instances=pool_instances,
-                run_spec=run_spec,
-                job_model=job_model,
+            fleet_model, fleet_instances_with_offers = _find_optimal_fleet_with_offers(
+                fleet_models=fleet_models,
+                run_model=run_model,
+                run_spec=run.run_spec,
                 job=job,
-                fleet_model=run_model.fleet,
                 master_job_provisioning_data=master_job_provisioning_data,
                 volumes=volumes,
             )
+            if fleet_model is None and run_spec.configuration.fleets is not None:
+                # Run cannot create new fleets when fleets are specified
+                logger.debug("%s: failed to use specified fleets", fmt(job_model))
+                job_model.status = JobStatus.TERMINATING
+                job_model.termination_reason = (
+                    JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
+                )
+                job_model.last_processed_at = common_utils.get_current_datetime()
+                await session.commit()
+                return
+            instance = await _assign_job_to_fleet_instance(
+                session=session,
+                instances_with_offers=fleet_instances_with_offers,
+                job_model=job_model,
+            )
+            job_model.fleet = fleet_model
             job_model.instance_assigned = True
             job_model.last_processed_at = common_utils.get_current_datetime()
-            if len(pool_instances) > 0:
+            if len(instances_ids) > 0:
                 await session.commit()
                 return
             # If no instances were locked, we can proceed in the same transaction.
@@ -297,7 +335,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         # Create a new cloud instance
         run_job_result = await _run_job_on_new_instance(
             project=project,
-            fleet_model=run_model.fleet,
+            fleet_model=fleet_model,
             job_model=job_model,
             run=run,
             job=job,
@@ -318,11 +356,11 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         job_provisioning_data, offer = run_job_result
         job_model.job_provisioning_data = job_provisioning_data.json()
         job_model.status = JobStatus.PROVISIONING
-        fleet_model = _get_or_create_fleet_model_for_job(
-            project=project,
-            run_model=run_model,
-            run=run,
-        )
+        if fleet_model is None:
+            fleet_model = _create_fleet_model_for_job(
+                project=project,
+                run=run,
+            )
         instance_num = await _get_next_instance_num(
             session=session,
             fleet_model=fleet_model,
@@ -376,16 +414,156 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         await session.commit()
 
 
-async def _assign_job_to_pool_instance(
+async def _select_fleet_models(
+    session: AsyncSession, fleet_filters: list, instance_filters: list
+) -> tuple[list[FleetModel], list[FleetModel]]:
+    # Selecting fleets in two queries since Postgres does not allow
+    # locking nullable side of an outer join. So, first lock instances with inner join.
+    # Then select left out fleets without instances.
+    res = await session.execute(
+        select(FleetModel)
+        .join(FleetModel.instances)
+        .where(*fleet_filters)
+        .where(*instance_filters)
+        .options(contains_eager(FleetModel.instances))
+        .order_by(InstanceModel.id)  # take locks in order
+        .with_for_update(key_share=True, of=InstanceModel)
+    )
+    fleet_models_with_instances = list(res.unique().scalars().all())
+    fleet_models_with_instances_ids = [f.id for f in fleet_models_with_instances]
+    res = await session.execute(
+        select(FleetModel)
+        .outerjoin(FleetModel.instances)
+        .where(
+            *fleet_filters,
+            FleetModel.id.not_in(fleet_models_with_instances_ids),
+        )
+        .where(InstanceModel.id.is_(None))
+        .options(contains_eager(FleetModel.instances))  # loading empty relation
+    )
+    fleet_models_without_instances = list(res.unique().scalars().all())
+    return fleet_models_with_instances, fleet_models_without_instances
+
+
+async def _refetch_fleet_models(
     session: AsyncSession,
-    pool_instances: List[InstanceModel],
+    fleets_ids: list[uuid.UUID],
+    instances_ids: list[uuid.UUID],
+    fleet_filters: list,
+    instance_filters: list,
+) -> list[FleetModel]:
+    res = await session.execute(
+        select(FleetModel)
+        .outerjoin(FleetModel.instances)
+        .where(
+            FleetModel.id.in_(fleets_ids),
+            *fleet_filters,
+        )
+        .where(
+            or_(
+                InstanceModel.id.is_(None),
+                and_(
+                    InstanceModel.id.in_(instances_ids),
+                    *instance_filters,
+                ),
+            )
+        )
+        .options(contains_eager(FleetModel.instances))
+        .execution_options(populate_existing=True)
+    )
+    fleet_models = list(res.unique().scalars().all())
+    return fleet_models
+
+
+def _find_optimal_fleet_with_offers(
+    fleet_models: list[FleetModel],
+    run_model: RunModel,
     run_spec: RunSpec,
-    job_model: JobModel,
     job: Job,
-    fleet_model: Optional[FleetModel],
+    master_job_provisioning_data: Optional[JobProvisioningData],
+    volumes: Optional[list[list[Volume]]],
+) -> tuple[Optional[FleetModel], list[tuple[InstanceModel, InstanceOfferWithAvailability]]]:
+    if run_model.fleet is not None:
+        # Using the fleet that was already chosen by the master job
+        fleet_instances_with_offers = _get_fleet_instances_with_offers(
+            fleet_model=run_model.fleet,
+            run_spec=run_spec,
+            job=job,
+            master_job_provisioning_data=master_job_provisioning_data,
+            volumes=volumes,
+        )
+        return run_model.fleet, fleet_instances_with_offers
+
+    if len(fleet_models) == 0:
+        return None, []
+
+    nodes_required_num = _get_nodes_required_num_for_run(run_spec)
+    # The current strategy is to first consider fleets that can accommodate
+    # the run without additional provisioning and choose the one with the cheapest offer.
+    # Fallback to fleet with the cheapest offer among all fleets with offers.
+    candidate_fleets_with_offers: list[
+        tuple[
+            Optional[FleetModel],
+            list[tuple[InstanceModel, InstanceOfferWithAvailability]],
+            int,
+            tuple[int, float],
+        ]
+    ] = []
+    for candidate_fleet_model in fleet_models:
+        fleet_instances_with_offers = _get_fleet_instances_with_offers(
+            fleet_model=candidate_fleet_model,
+            run_spec=run_spec,
+            job=job,
+            master_job_provisioning_data=master_job_provisioning_data,
+            volumes=volumes,
+        )
+        fleet_available_offers = [
+            o for _, o in fleet_instances_with_offers if o.availability.is_available()
+        ]
+        fleet_has_available_capacity = nodes_required_num <= len(fleet_available_offers)
+        fleet_cheapest_offer = math.inf
+        if len(fleet_available_offers) > 0:
+            fleet_cheapest_offer = fleet_available_offers[0].price
+        fleet_priority = (not fleet_has_available_capacity, fleet_cheapest_offer)
+        candidate_fleets_with_offers.append(
+            (
+                candidate_fleet_model,
+                fleet_instances_with_offers,
+                len(fleet_available_offers),
+                fleet_priority,
+            )
+        )
+    if run_spec.configuration.fleets is None and all(
+        t[2] == 0 for t in candidate_fleets_with_offers
+    ):
+        # If fleets are not specified and no fleets have available offers, create a new fleet.
+        # This is for compatibility with non-fleet-first UX when runs created new fleets
+        # if there are no instances to reuse.
+        return None, []
+    candidate_fleets_with_offers.sort(key=lambda t: t[-1])
+    return candidate_fleets_with_offers[0][:2]
+
+
+def _get_nodes_required_num_for_run(run_spec: RunSpec) -> int:
+    nodes_required_num = 1
+    if run_spec.configuration.type == "task":
+        nodes_required_num = run_spec.configuration.nodes
+    elif (
+        run_spec.configuration.type == "service"
+        and run_spec.configuration.replicas.min is not None
+    ):
+        nodes_required_num = run_spec.configuration.replicas.min
+    return nodes_required_num
+
+
+def _get_fleet_instances_with_offers(
+    fleet_model: FleetModel,
+    run_spec: RunSpec,
+    job: Job,
     master_job_provisioning_data: Optional[JobProvisioningData] = None,
     volumes: Optional[List[List[Volume]]] = None,
-) -> Optional[InstanceModel]:
+) -> list[tuple[InstanceModel, InstanceOfferWithAvailability]]:
+    pool_instances = fleet_model.instances
     instances_with_offers: list[tuple[InstanceModel, InstanceOfferWithAvailability]]
     profile = run_spec.merged_profile
     multinode = job.job_spec.jobs_per_replica > 1
@@ -414,7 +592,15 @@ async def _assign_job_to_pool_instance(
         volumes=volumes,
     )
     instances_with_offers.extend(shared_instances_with_offers)
+    instances_with_offers.sort(key=lambda instance_with_offer: instance_with_offer[0].price or 0)
+    return instances_with_offers
 
+
+async def _assign_job_to_fleet_instance(
+    session: AsyncSession,
+    instances_with_offers: list[tuple[InstanceModel, InstanceOfferWithAvailability]],
+    job_model: JobModel,
+) -> Optional[InstanceModel]:
     if len(instances_with_offers) == 0:
         return None
 
@@ -463,6 +649,11 @@ async def _run_job_on_new_instance(
     fleet = None
     if fleet_model is not None:
         fleet = fleet_model_to_fleet(fleet_model)
+        if not _check_can_create_new_instance_in_fleet(fleet):
+            logger.debug(
+                "%s: cannot fit new instance into fleet %s", fmt(job_model), fleet_model.name
+            )
+            return None
     multinode = job.job_spec.jobs_per_replica > 1 or (
         fleet is not None and fleet.spec.configuration.placement == InstanceGroupPlacement.CLUSTER
     )
@@ -522,13 +713,20 @@ async def _run_job_on_new_instance(
     return None
 
 
-def _get_or_create_fleet_model_for_job(
+def _check_can_create_new_instance_in_fleet(fleet: Fleet) -> bool:
+    if fleet.spec.configuration.ssh_config is not None:
+        return False
+    # TODO: Respect nodes.max
+    # Ensure concurrent provisioning does not violate nodes.max
+    # E.g. lock fleet and split instance model creation
+    # and instance provisioning into separate transactions.
+    return True
+
+
+def _create_fleet_model_for_job(
     project: ProjectModel,
-    run_model: RunModel,
     run: Run,
 ) -> FleetModel:
-    if run_model.fleet is not None:
-        return run_model.fleet
     placement = InstanceGroupPlacement.ANY
     if run.run_spec.configuration.type == "task" and run.run_spec.configuration.nodes > 1:
         placement = InstanceGroupPlacement.CLUSTER
@@ -537,6 +735,7 @@ def _get_or_create_fleet_model_for_job(
             name=run.run_spec.run_name,
             placement=placement,
             reservation=run.run_spec.configuration.reservation,
+            nodes=Range(min=_get_nodes_required_num_for_run(run.run_spec), max=None),
         ),
         profile=run.run_spec.merged_profile,
         autocreated=True,

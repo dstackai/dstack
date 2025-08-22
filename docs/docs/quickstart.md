@@ -1,27 +1,33 @@
 # Quickstart
 
 > Before using `dstack`, ensure you've [installed](installation/index.md) the server, or signed up for [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"}.
-    
-## Initialize a repo
 
-Before using `dstack`'s CLI in a directory, initialize the directory as a repo with [`dstack init`](reference/cli/dstack/init.md).
+## Set up a directory
+    
+Set up a directory where you'll store you project files and `dstack` configurations.
 
 <div class="termy">
 
 ```shell
 $ mkdir quickstart && cd quickstart
-$ dstack init
 ```
 
 </div>
 
-## Apply a configuration
+> If the directory is a remote Git repo that you want to mount with workloads, run `dstack init`.
+> Starting with 0.19.26, repos will be [configurable :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/2851){:target="_blank"} in the run configuration.
+
+## Run your first workload
+
+`dstack` supports three types of workloads.
 
 === "Dev environment"
 
     A dev environment lets you provision an instance and access it with your desktop IDE.
 
-    Create the following configuration file inside the repo:
+    <h3>Define a configuration</h3>
+
+    Create the following run configuration inside your project folder:
 
     <div editor-title=".dstack.yml"> 
 
@@ -41,6 +47,8 @@ $ dstack init
     ```
 
     </div>
+
+    <h3>Apply the configuration</h3>
 
     Apply the configuration via [`dstack apply`](reference/cli/dstack/apply.md):
 
@@ -73,7 +81,9 @@ $ dstack init
 
     A task allows you to schedule a job or run a web app. Tasks can be distributed and can forward ports.
 
-    Create the following configuration file inside the repo:
+    <h3>Define a configuration</h3>
+
+    Create the following run configuration inside your project folder:
 
     <div editor-title="task.dstack.yml"> 
 
@@ -102,6 +112,8 @@ $ dstack init
 
     By default, tasks run on a single instance. To run a distributed task, specify 
     [`nodes`](concepts/tasks.md#distributed-tasks), and `dstack` will run it on a cluster.
+
+    <h3>Apply the configuration</h3>
 
     Run the configuration via [`dstack apply`](reference/cli/dstack/apply.md):
 
@@ -133,7 +145,9 @@ $ dstack init
 
     A service allows you to deploy a model or any web app as an endpoint.
 
-    Create the following configuration file inside the repo:
+    <h3>Define a configuration</h3>
+
+    Create the following run configuration inside your project folder:
 
     <div editor-title="service.dstack.yml"> 
 
@@ -163,6 +177,8 @@ $ dstack init
     ```
 
     </div>
+
+    <h3>Apply the configuration</h3>
 
     Run the configuration via [`dstack apply`](reference/cli/dstack/apply.md):
 
@@ -198,14 +214,25 @@ $ dstack init
         If you're using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"},
         a gateway is pre-configured for you.
 
-> `dstack apply` automatically provisions instances, uploads the contents of the repo (incl. your local uncommitted changes),
-and runs the configuration.
+`dstack apply` automatically provisions instances and runs the workload according to the configuration.
+
+??? info "Repo is not initialized"
+
+    If you don't run `dstack init`, you may see the following warning:
+
+    ```
+    Repo is not initialized. Use --repo <dir> or --no-repo to initialize it.
+    Starting from 0.19.26, repos will be configured via YAML and this message won't appear.
+    ```
+
+    From 0.19.26 onward, this message will no longer be shown since repos can be 
+    [configured :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/2851){:target="_blank"} in the run configuration.
 
 ## Troubleshooting
 
 Something not working? See the [troubleshooting](guides/troubleshooting.md) guide.
 
 !!! info "What's next?"
-    1. Read about [backends](concepts/backends.md),  [dev environments](concepts/dev-environments.md), [tasks](concepts/tasks.md), and [services](concepts/services.md)
+    1. Read about [backends](concepts/backends.md),  [dev environments](concepts/dev-environments.md), [tasks](concepts/tasks.md), [services](concepts/services.md), and [fleets](concepts/services.md)
     2. Browse [examples](../examples.md)
     3. Join [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd)

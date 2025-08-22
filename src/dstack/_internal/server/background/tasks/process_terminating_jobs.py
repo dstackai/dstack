@@ -75,9 +75,9 @@ async def _process_next_terminating_job():
                     return
                 instance_lockset.add(instance_model.id)
             job_lockset.add(job_model.id)
+        job_model_id = job_model.id
+        instance_model_id = job_model.used_instance_id
         try:
-            job_model_id = job_model.id
-            instance_model_id = job_model.used_instance_id
             await _process_job(
                 session=session,
                 job_model=job_model,

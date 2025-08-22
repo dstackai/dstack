@@ -17,4 +17,4 @@ class CompletionCommand(BaseCommand):
 
     def _command(self, args):
         super()._command(args)
-        print(argcomplete.shellcode(["dstack"], shell=args.shell))
+        print(argcomplete.shellcode(["dstack"], shell=args.shell))  # type: ignore[attr-defined]

@@ -8,7 +8,6 @@ from dstack._internal.core.backends.base.configurator import (
 from dstack._internal.core.backends.cloudrift.api_client import RiftClient
 from dstack._internal.core.backends.cloudrift.backend import CloudRiftBackend
 from dstack._internal.core.backends.cloudrift.models import (
-    AnyCloudRiftBackendConfig,
     AnyCloudRiftCreds,
     CloudRiftBackendConfig,
     CloudRiftBackendConfigWithCreds,
@@ -21,7 +20,12 @@ from dstack._internal.core.models.backends.base import (
 )
 
 
-class CloudRiftConfigurator(Configurator):
+class CloudRiftConfigurator(
+    Configurator[
+        CloudRiftBackendConfig,
+        CloudRiftBackendConfigWithCreds,
+    ]
+):
     TYPE = BackendType.CLOUDRIFT
     BACKEND_CLASS = CloudRiftBackend
 
@@ -40,12 +44,14 @@ class CloudRiftConfigurator(Configurator):
             auth=CloudRiftCreds.parse_obj(config.creds).json(),
         )
 
-    def get_backend_config(
-        self, record: BackendRecord, include_creds: bool
-    ) -> AnyCloudRiftBackendConfig:
+    def get_backend_config_with_creds(
+        self, record: BackendRecord
+    ) -> CloudRiftBackendConfigWithCreds:
         config = self._get_config(record)
-        if include_creds:
-            return CloudRiftBackendConfigWithCreds.__response__.parse_obj(config)
+        return CloudRiftBackendConfigWithCreds.__response__.parse_obj(config)
+
+    def get_backend_config_without_creds(self, record: BackendRecord) -> CloudRiftBackendConfig:
+        config = self._get_config(record)
         return CloudRiftBackendConfig.__response__.parse_obj(config)
 
     def get_backend(self, record: BackendRecord) -> CloudRiftBackend:

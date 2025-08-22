@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from enum import Enum
 from typing import Any, Dict, List, Literal, Optional, Type
+from urllib.parse import urlparse
 
 from pydantic import UUID4, Field, root_validator
 from typing_extensions import Annotated
@@ -444,7 +445,7 @@ class RunSpec(CoreModel):
     # TODO: make merged_profile a computed field after migrating to pydanticV2
     merged_profile: Annotated[Profile, Field(exclude=True)] = None
 
-    class Config:
+    class Config(CoreModel.Config):
         @staticmethod
         def schema_extra(schema: Dict[str, Any], model: Type) -> None:
             prop = schema.get("properties", {})
@@ -482,6 +483,9 @@ class ServiceSpec(CoreModel):
     url: Annotated[str, Field(description="Full URL or path relative to dstack-server's base URL")]
     model: Optional[ServiceModelSpec] = None
     options: Dict[str, Any] = {}
+
+    def get_domain(self) -> Optional[str]:
+        return urlparse(self.url).hostname
 
 
 class RunStatus(str, Enum):

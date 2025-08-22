@@ -87,5 +87,5 @@ class ProjectNameCompleter(BaseCompleter):
 
     def __call__(self, prefix: str, parsed_args: argparse.Namespace, **kwargs) -> List[str]:
         argcomplete.debug(f"{self.__class__.__name__}: Listing projects from ConfigManager")
-        projects = ConfigManager().list_projects()
-        return [p for p in projects if p.startswith(prefix)]
+        projects = ConfigManager().list_project_configs()
+        return [p.name for p in projects if p.name.startswith(prefix)]

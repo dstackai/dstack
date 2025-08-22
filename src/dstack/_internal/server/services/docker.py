@@ -32,14 +32,14 @@ class DXFAuthAdapter:
 
 
 class DockerImage(CoreModel):
-    class Config:
-        frozen = True
-
     image: str
     registry: Optional[str]
     repo: str
     tag: str
     digest: Optional[str]
+
+    class Config(CoreModel.Config):
+        frozen = True
 
 
 class ImageConfig(CoreModel):
@@ -77,7 +77,7 @@ def get_image_config(image_name: str, registry_auth: Optional[RegistryAuth]) -> 
     registry_client = PatchedDXF(
         host=image.registry or DEFAULT_REGISTRY,
         repo=image.repo,
-        auth=DXFAuthAdapter(registry_auth),
+        auth=DXFAuthAdapter(registry_auth),  # type: ignore[assignment]
         timeout=REGISTRY_REQUEST_TIMEOUT,
     )
 
@@ -88,7 +88,7 @@ def get_image_config(image_name: str, registry_auth: Optional[RegistryAuth]) -> 
             )
             manifest = ImageManifest.__response__.parse_raw(manifest_resp)
             config_stream = registry_client.pull_blob(manifest.config.digest)
-            config_resp = join_byte_stream_checked(config_stream, MAX_CONFIG_OBJECT_SIZE)
+            config_resp = join_byte_stream_checked(config_stream, MAX_CONFIG_OBJECT_SIZE)  # type: ignore[arg-type]
             if config_resp is None:
                 raise DockerRegistryError(
                     f"Image config object exceeds the size limit of {MAX_CONFIG_OBJECT_SIZE} bytes"

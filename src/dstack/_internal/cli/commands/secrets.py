@@ -29,7 +29,7 @@ class SecretCommand(APIBaseCommand):
         get_parser.add_argument(
             "name",
             help="The name of the secret",
-        ).completer = SecretNameCompleter()
+        ).completer = SecretNameCompleter()  # type: ignore[attr-defined]
         get_parser.set_defaults(subfunc=self._get)
 
         set_parser = subparsers.add_parser(
@@ -53,7 +53,7 @@ class SecretCommand(APIBaseCommand):
         delete_parser.add_argument(
             "name",
             help="The name of the secret",
-        ).completer = SecretNameCompleter()
+        ).completer = SecretNameCompleter()  # type: ignore[attr-defined]
         delete_parser.add_argument(
             "-y", "--yes", help="Don't ask for confirmation", action="store_true"
         )

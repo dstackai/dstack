@@ -67,7 +67,7 @@ class GatewayConnection:
             # reverse_forwarded_sockets are added later in .open()
         )
         self.tunnel_id = uuid.uuid4()
-        self._client = GatewayClient(uds=self.gateway_socket_path)
+        self._client = GatewayClient(uds=str(self.gateway_socket_path))
 
     @staticmethod
     def _init_symlink_dir(connection_dir: Path) -> Tuple[TemporaryDirectory, Path]:

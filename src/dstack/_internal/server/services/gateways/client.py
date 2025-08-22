@@ -7,7 +7,7 @@ from pydantic import parse_obj_as
 
 from dstack._internal.core.consts import DSTACK_RUNNER_SSH_PORT
 from dstack._internal.core.errors import GatewayError
-from dstack._internal.core.models.configurations import RateLimit, ServiceConfiguration
+from dstack._internal.core.models.configurations import RateLimit
 from dstack._internal.core.models.instances import SSHConnectionParams
 from dstack._internal.core.models.runs import JobSpec, JobSubmission, Run, get_service_port
 from dstack._internal.proxy.gateway.schemas.stats import ServiceStats
@@ -85,7 +85,7 @@ class GatewayClient:
         ssh_head_proxy: Optional[SSHConnectionParams],
         ssh_head_proxy_private_key: Optional[str],
     ):
-        assert isinstance(run.run_spec.configuration, ServiceConfiguration)
+        assert run.run_spec.configuration.type == "service"
         payload = {
             "job_id": job_submission.id.hex,
             "app_port": get_service_port(job_spec, run.run_spec.configuration),
@@ -93,6 +93,9 @@ class GatewayClient:
             "ssh_head_proxy_private_key": ssh_head_proxy_private_key,
         }
         jpd = job_submission.job_provisioning_data
+        assert jpd is not None
+        assert jpd.hostname is not None
+        assert jpd.ssh_port is not None
         if not jpd.dockerized:
             payload.update(
                 {

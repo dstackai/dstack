@@ -427,6 +427,36 @@ Getting offers...
 
 </div>
 
+??? info "Grouping offers"
+    Use `--group-by` to aggregate offers. Accepted values: `gpu`, `backend`, `region`, and `count`.
+
+    <div class="termy">
+
+    ```shell
+    dstack offer --gpu b200 --group-by gpu,backend,region
+    Project      main
+    User         admin
+    Resources    cpu=2.. mem=8GB.. disk=100GB.. b200:1..
+    Spot policy  auto
+    Max price    -
+    Reservation  -
+    Group by     gpu, backend, region
+
+    #   GPU              SPOT             $/GPU       BACKEND  REGION
+    1   B200:180GB:1..8  spot, on-demand  3.59..5.99  runpod   EU-RO-1
+    2   B200:180GB:1..8  spot, on-demand  3.59..5.99  runpod   US-CA-2
+    3   B200:180GB:8     on-demand        4.99        lambda   us-east-1
+    4   B200:180GB:8     on-demand        5.5         nebius   us-central1
+    ```
+
+    </div>
+
+    When using `--group-by`, `gpu` must always be `included`.
+    The `region` value can only be used together with `backend`.
+
+The `offer` command allows you to filter and group offers with various [advanced options](../reference/cli/dstack/offer.md#usage).
+
+
 ## Metrics
 
 `dstack` tracks essential metrics accessible via the CLI and UI. To access advanced metrics like DCGM, configure the server to export metrics to Prometheus. See [Metrics](metrics.md) for details.

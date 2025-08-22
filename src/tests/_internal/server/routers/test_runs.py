@@ -1176,13 +1176,13 @@ class TestGetRunPlan:
                 ServiceConfiguration(
                     commands=["one", "two"],
                     port=80,
-                    replicas=1,
+                    replicas=Range(min=1, max=1),
                     scaling=None,
                 ),
                 ServiceConfiguration(
                     commands=["one", "two"],
                     port=80,
-                    replicas="2..4",
+                    replicas=Range(min=2, max=4),
                     scaling=ScalingSpec(metric="rps", target=5),
                 ),
                 "update",
@@ -1193,14 +1193,14 @@ class TestGetRunPlan:
                     commands=["one", "two"],
                     port=80,
                     gateway=None,
-                    replicas=1,
+                    replicas=Range(min=1, max=1),
                     scaling=None,
                 ),
                 ServiceConfiguration(
                     commands=["one", "two"],
                     port=8080,
                     gateway="test-gateway",  # not updatable
-                    replicas="2..4",
+                    replicas=Range(min=2, max=4),
                     scaling=ScalingSpec(metric="rps", target=5),
                 ),
                 "create",
@@ -1345,7 +1345,7 @@ class TestApplyPlan:
                 type="service",
                 commands=["one", "two"],
                 port=80,
-                replicas=1,
+                replicas=Range(min=1, max=1),
             ),
         )
         run_model = await create_run(
@@ -1357,7 +1357,7 @@ class TestApplyPlan:
             run_spec=run_spec,
         )
         run = run_model_to_run(run_model)
-        run_spec.configuration.replicas = 2
+        run_spec.configuration.replicas = Range(min=2, max=2)
         response = await client.post(
             f"/api/project/{project.name}/runs/apply",
             headers=get_auth_headers(user.token),

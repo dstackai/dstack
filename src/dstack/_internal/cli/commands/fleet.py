@@ -48,7 +48,7 @@ class FleetCommand(APIBaseCommand):
         delete_parser.add_argument(
             "name",
             help="The name of the fleet",
-        ).completer = FleetNameCompleter()
+        ).completer = FleetNameCompleter()  # type: ignore[attr-defined]
         delete_parser.add_argument(
             "-i",
             "--instance",

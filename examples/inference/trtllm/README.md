@@ -9,14 +9,13 @@ This example shows how to deploy both DeepSeek R1 and its distilled version
 using [TensorRT-LLM :material-arrow-top-right-thin:{ .external }](https://github.com/NVIDIA/TensorRT-LLM){:target="_blank"} and `dstack`.
 
 ??? info "Prerequisites"
-    Once `dstack` is [installed](https://dstack.ai/docs/installation), go ahead clone the repo, and run `dstack init`.
+    Once `dstack` is [installed](https://dstack.ai/docs/installation), clone the repo with examples.
 
     <div class="termy">
  
     ```shell
     $ git clone https://github.com/dstackai/dstack
     $ cd dstack
-    $ dstack init
     ```
  
     </div>
@@ -72,8 +71,8 @@ To run it, pass the task configuration to `dstack apply`.
 ```shell
 $ dstack apply -f examples/inference/trtllm/build-image.dstack.yml
 
- #  BACKEND  REGION             RESOURCES               SPOT  PRICE       
- 1  cudo     ca-montreal-2      8xCPU, 25GB, (500.0GB)  yes   $0.1073   
+ #  BACKEND  REGION             RESOURCES               SPOT  PRICE
+ 1  cudo     ca-montreal-2      8xCPU, 25GB, (500.0GB)  yes   $0.1073
 
 Submit the run build-image? [y/n]: y
 
@@ -93,7 +92,7 @@ Below is the service configuration that deploys DeepSeek R1 using the built Tens
     name: serve-r1
 
     # Specify the image built with `examples/inference/trtllm/build-image.dstack.yml`
-    image: dstackai/tensorrt_llm:9b931c0f6305aefa3660e6fb84a76a42c0eef167 
+    image: dstackai/tensorrt_llm:9b931c0f6305aefa3660e6fb84a76a42c0eef167
     env:
       - MAX_BATCH_SIZE=256
       - MAX_NUM_TOKENS=16384
@@ -125,15 +124,15 @@ Below is the service configuration that deploys DeepSeek R1 using the built Tens
     </div>
 
 
-To run it, pass the configuration to `dstack apply`. 
+To run it, pass the configuration to `dstack apply`.
 
 <div class="termy">
 
 ```shell
 $ dstack apply -f examples/inference/trtllm/serve-r1.dstack.yml
 
- #  BACKEND  REGION             RESOURCES                        SPOT  PRICE       
- 1  vastai   is-iceland         192xCPU, 2063GB, 8xH200 (141GB)  yes   $25.62   
+ #  BACKEND  REGION             RESOURCES                        SPOT  PRICE
+ 1  vastai   is-iceland         192xCPU, 2063GB, 8xH200 (141GB)  yes   $25.62
 
 Submit the run serve-r1? [y/n]: y
 
@@ -149,7 +148,7 @@ To deploy DeepSeek R1 Distill Llama 8B, follow the steps below.
 
 #### Convert and upload checkpoints
 
-Here’s the task config that converts a Hugging Face model to a TensorRT-LLM checkpoint format 
+Here’s the task config that converts a Hugging Face model to a TensorRT-LLM checkpoint format
 and uploads it to S3 using the provided AWS credentials.
 
 <div editor-title="examples/inference/trtllm/convert-model.dstack.yml">
@@ -168,7 +167,7 @@ and uploads it to S3 using the provided AWS credentials.
       - AWS_DEFAULT_REGION
     commands:
       # nvcr.io/nvidia/tritonserver:25.01-trtllm-python-py3 container uses TensorRT-LLM version 0.17.0,
-      # therefore we are using branch v0.17.0 
+      # therefore we are using branch v0.17.0
       - git clone --branch v0.17.0 --depth 1 https://github.com/triton-inference-server/tensorrtllm_backend.git
       - git clone --branch v0.17.0 --single-branch https://github.com/NVIDIA/TensorRT-LLM.git
       - git clone https://github.com/triton-inference-server/server.git
@@ -192,15 +191,15 @@ and uploads it to S3 using the provided AWS credentials.
     </div>
 
 
-To run it, pass the configuration to `dstack apply`. 
+To run it, pass the configuration to `dstack apply`.
 
 <div class="termy">
 
 ```shell
 $ dstack apply -f examples/inference/trtllm/convert-model.dstack.yml
 
- #  BACKEND  REGION       RESOURCES                    SPOT  PRICE       
- 1  vastai   us-iowa      12xCPU, 85GB, 1xA100 (40GB)  yes   $0.66904  
+ #  BACKEND  REGION       RESOURCES                    SPOT  PRICE
+ 1  vastai   us-iowa      12xCPU, 85GB, 1xA100 (40GB)  yes   $0.66904
 
 Submit the run convert-model? [y/n]: y
 
@@ -228,7 +227,7 @@ Here’s the task config that builds a TensorRT-LLM model and uploads it to S3 w
         - AWS_SECRET_ACCESS_KEY
         - AWS_DEFAULT_REGION
         - MAX_SEQ_LEN=8192 # Sum of Max Input Length & Max Output Length
-        - MAX_INPUT_LEN=4096 
+        - MAX_INPUT_LEN=4096
         - MAX_BATCH_SIZE=256
         - TRITON_MAX_BATCH_SIZE=1
         - INSTANCE_COUNT=1
@@ -260,15 +259,15 @@ Here’s the task config that builds a TensorRT-LLM model and uploads it to S3 w
     ```
     </div>
 
-To run it, pass the configuration to `dstack apply`. 
+To run it, pass the configuration to `dstack apply`.
 
 <div class="termy">
 
 ```shell
 $ dstack apply -f examples/inference/trtllm/build-model.dstack.yml
 
- #  BACKEND  REGION       RESOURCES                    SPOT  PRICE       
- 1  vastai   us-iowa      12xCPU, 85GB, 1xA100 (40GB)  yes   $0.66904  
+ #  BACKEND  REGION       RESOURCES                    SPOT  PRICE
+ 1  vastai   us-iowa      12xCPU, 85GB, 1xA100 (40GB)  yes   $0.66904
 
 Submit the run build-model? [y/n]: y
 
@@ -302,25 +301,25 @@ Below is the service configuration that deploys DeepSeek R1 Distill Llama 8B.
       - ./aws/install
       - aws s3 sync s3://${S3_BUCKET_NAME}/tllm_engine_1gpu_bf16 ./tllm_engine_1gpu_bf16
       - git clone https://github.com/triton-inference-server/server.git
-      - python3 server/python/openai/openai_frontend/main.py --model-repository s3://${S3_BUCKET_NAME}/triton_model_repo  --tokenizer tokenizer_dir --openai-port 8000  
+      - python3 server/python/openai/openai_frontend/main.py --model-repository s3://${S3_BUCKET_NAME}/triton_model_repo  --tokenizer tokenizer_dir --openai-port 8000
     port: 8000
     model: ensemble
 
     resources:
       gpu: A100:40GB
- 
+
 ```
 </div>
 
-To run it, pass the configuration to `dstack apply`. 
+To run it, pass the configuration to `dstack apply`.
 
 <div class="termy">
 
 ```shell
 $ dstack apply -f examples/inference/trtllm/serve-distill.dstack.yml
 
- #  BACKEND  REGION       RESOURCES                    SPOT  PRICE       
- 1  vastai   us-iowa      12xCPU, 85GB, 1xA100 (40GB)  yes   $0.66904  
+ #  BACKEND  REGION       RESOURCES                    SPOT  PRICE
+ 1  vastai   us-iowa      12xCPU, 85GB, 1xA100 (40GB)  yes   $0.66904
 
 Submit the run serve-distill? [y/n]: y
 
@@ -331,7 +330,7 @@ Provisioning...
 
 ## Access the endpoint
 
-If no gateway is created, the model will be available via the OpenAI-compatible endpoint 
+If no gateway is created, the model will be available via the OpenAI-compatible endpoint
 at `<dstack server URL>/proxy/models/<project name>/`.
 
 <div class="termy">
@@ -360,12 +359,12 @@ $ curl http://127.0.0.1:3000/proxy/models/main/chat/completions \
 
 </div>
 
-When a [gateway](https://dstack.ai/docs/concepts/gateways/) is configured, the OpenAI-compatible endpoint 
+When a [gateway](https://dstack.ai/docs/concepts/gateways/) is configured, the OpenAI-compatible endpoint
 is available at `https://gateway.<gateway domain>/`.
 
 ## Source code
 
-The source-code of this example can be found in 
+The source-code of this example can be found in
 [`examples/inference/trtllm` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/inference/trtllm){:target="_blank"}.
 
 ## What's next?

@@ -54,6 +54,7 @@ class ServerProxyRepo(BaseProxyRepo):
                 RunModel.gateway_id.is_(None),
                 JobModel.run_name == run_name,
                 JobModel.status == JobStatus.RUNNING,
+                JobModel.registered == True,
                 JobModel.job_num == 0,
             )
             .options(
@@ -73,6 +74,8 @@ class ServerProxyRepo(BaseProxyRepo):
             jpd: JobProvisioningData = JobProvisioningData.__response__.parse_raw(
                 job.job_provisioning_data
             )
+            assert jpd.hostname is not None
+            assert jpd.ssh_port is not None
             if not jpd.dockerized:
                 ssh_destination = f"{jpd.username}@{jpd.hostname}"
                 ssh_port = jpd.ssh_port
@@ -139,7 +142,7 @@ class ServerProxyRepo(BaseProxyRepo):
             model_options_obj = service_spec.options.get("openai", {}).get("model")
             if model_spec is None or model_options_obj is None:
                 continue
-            model_options = pydantic.parse_obj_as(AnyModel, model_options_obj)
+            model_options = pydantic.parse_obj_as(AnyModel, model_options_obj)  # type: ignore[arg-type]
             model = ChatModel(
                 project_name=project_name,
                 name=model_spec.name,
@@ -174,6 +177,8 @@ def _model_options_to_format_spec(model: AnyModel) -> AnyModelFormat:
         if model.format == "openai":
             return OpenAIChatModelFormat(prefix=model.prefix)
         elif model.format == "tgi":
+            assert model.chat_template is not None
+            assert model.eos_token is not None
             return TGIChatModelFormat(
                 chat_template=model.chat_template,
                 eos_token=model.eos_token,

@@ -25,12 +25,26 @@ uv sync --all-extras
 
 Alternatively, if you want to manage virtual environments by yourself, you can install `dstack` into the activated virtual environment with `uv sync --all-extras --active`.
 
-## 4. (Recommended) Install pre-commits:
+## 4. (Recommended) Install pre-commit hooks:
+
+Code formatting and linting can be done automatically on each commit with `pre-commit` hooks:
 
 ```shell
 uv run pre-commit install
 ```
 
-## 5. Frontend
+## 5. (Recommended) Use pyright:
+
+The CI runs `pyright` for type checking `dstack` Python code.
+So we recommend you configure your IDE to use `pyright`/`pylance` with `standard` type checking mode.
+
+You can also install `pyright` and run it from the CLI:
+
+```shell
+uv tool install pyright
+pyright -p .
+```
+
+## 6. Frontend
 
 See [FRONTEND.md](FRONTEND.md) for the details on how to build and develop the frontend.

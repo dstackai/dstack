@@ -383,10 +383,7 @@ class AWSCompute(
     ) -> bool:
         if not _offer_supports_placement_group(instance_offer, placement_group):
             return False
-        return (
-            placement_group.configuration.backend == BackendType.AWS
-            and placement_group.configuration.region == instance_offer.region
-        )
+        return placement_group.configuration.region == instance_offer.region
 
     def create_gateway(
         self,

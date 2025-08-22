@@ -3,7 +3,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional, Set, TypeVar
 
 import gpuhunt
 from pydantic import parse_obj_as
@@ -15,9 +15,11 @@ from dstack._internal.cli.services.configurators.base import (
     BaseApplyConfigurator,
 )
 from dstack._internal.cli.services.profile import apply_profile_args, register_profile_args
+from dstack._internal.cli.services.repos import init_default_virtual_repo
 from dstack._internal.cli.utils.common import (
     confirm_ask,
     console,
+    warn,
 )
 from dstack._internal.cli.utils.rich import MultiItemStatus
 from dstack._internal.cli.utils.run import get_runs_table, print_run_plan
@@ -31,8 +33,7 @@ from dstack._internal.core.models.common import ApplyAction, RegistryAuth
 from dstack._internal.core.models.configurations import (
     AnyRunConfiguration,
     ApplyConfigurationType,
-    BaseRunConfiguration,
-    BaseRunConfigurationWithPorts,
+    ConfigurationWithPortsParams,
     DevEnvironmentConfiguration,
     PortMapping,
     RunConfigurationType,
@@ -40,6 +41,7 @@ from dstack._internal.core.models.configurations import (
     TaskConfiguration,
 )
 from dstack._internal.core.models.repos.base import Repo
+from dstack._internal.core.models.repos.local import LocalRepo
 from dstack._internal.core.models.resources import CPUSpec
 from dstack._internal.core.models.runs import JobStatus, JobSubmission, RunSpec, RunStatus
 from dstack._internal.core.services.configs import ConfigManager
@@ -60,13 +62,18 @@ _BIND_ADDRESS_ARG = "bind_address"
 
 logger = get_logger(__name__)
 
+RunConfigurationT = TypeVar("RunConfigurationT", bound=AnyRunConfiguration)
 
-class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
+
+class BaseRunConfigurator(
+    ApplyEnvVarsConfiguratorMixin,
+    BaseApplyConfigurator[RunConfigurationT],
+):
     TYPE: ApplyConfigurationType
 
     def apply_configuration(
         self,
-        conf: BaseRunConfiguration,
+        conf: RunConfigurationT,
         configuration_path: str,
         command_args: argparse.Namespace,
         configurator_args: argparse.Namespace,
@@ -76,17 +83,39 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
         self.apply_args(conf, configurator_args, unknown_args)
         self.validate_gpu_vendor_and_image(conf)
         self.validate_cpu_arch_and_image(conf)
-        if repo is None:
-            repo = self.api.repos.load(Path.cwd())
         config_manager = ConfigManager()
-        if repo.repo_dir is not None:
-            repo_config = config_manager.get_repo_config_or_error(repo.repo_dir)
-            self.api.ssh_identity_file = repo_config.ssh_key_path
-        else:
-            self.api.ssh_identity_file = get_ssh_keypair(
-                command_args.ssh_identity_file,
-                config_manager.dstack_key_path,
-            )
+        if repo is None:
+            repo_path = Path.cwd()
+            repo_config = config_manager.get_repo_config(repo_path)
+            if repo_config is None:
+                warn(
+                    "Repo is not initialized. "
+                    "Use [code]--repo <dir>[/code] or [code]--no-repo[/code] to initialize it.\n"
+                    "Starting from 0.19.26, repos will be configured via YAML and this message won't appear."
+                )
+                if not command_args.yes and not confirm_ask("Continue without the repo?"):
+                    console.print("\nExiting...")
+                    return
+                repo = init_default_virtual_repo(self.api)
+            else:
+                # Unlikely, but may raise ConfigurationError if the repo does not exist
+                # on the server side (stale entry in `config.yml`)
+                repo = self.api.repos.load(repo_path)
+                if isinstance(repo, LocalRepo):
+                    warn(
+                        f"{repo.repo_dir} is a local repo.\n"
+                        "Local repos are deprecated since 0.19.25"
+                        " and will be removed soon\n"
+                        "There are two options:\n"
+                        "  - Migrate to `files`: https://dstack.ai/docs/concepts/tasks/#files\n"
+                        "  - Specify `--no-repo` if you don't need the repo at all\n"
+                        "In either case, you can run `dstack init --remove` to remove the repo"
+                        " (only the record about the repo, not its files) and this warning"
+                    )
+        self.api.ssh_identity_file = get_ssh_keypair(
+            command_args.ssh_identity_file,
+            config_manager.dstack_key_path,
+        )
         profile = load_profile(Path.cwd(), configurator_args.profile)
         with console.status("Getting apply plan..."):
             run_plan = self.api.runs.get_run_plan(
@@ -242,7 +271,7 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
 
     def delete_configuration(
         self,
-        conf: AnyRunConfiguration,
+        conf: RunConfigurationT,
         configuration_path: str,
         command_args: argparse.Namespace,
     ):
@@ -268,7 +297,7 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
         console.print(f"Run [code]{conf.name}[/] deleted")
 
     @classmethod
-    def register_args(cls, parser: argparse.ArgumentParser, default_max_offers: int = 3):
+    def register_args(cls, parser: argparse.ArgumentParser):
         configuration_group = parser.add_argument_group(f"{cls.TYPE.value} Options")
         configuration_group.add_argument(
             "-n",
@@ -280,7 +309,7 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
             "--max-offers",
             help="Number of offers to show in the run plan",
             type=int,
-            default=default_max_offers,
+            default=3,
         )
         cls.register_env_args(configuration_group)
         configuration_group.add_argument(
@@ -308,7 +337,7 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
         )
         register_profile_args(parser)
 
-    def apply_args(self, conf: BaseRunConfiguration, args: argparse.Namespace, unknown: List[str]):
+    def apply_args(self, conf: RunConfigurationT, args: argparse.Namespace, unknown: List[str]):
         apply_profile_args(args, conf)
         if args.run_name:
             conf.name = args.run_name
@@ -332,7 +361,7 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
         except InterpolatorError as e:
             raise ConfigurationError(e.args[0])
 
-    def interpolate_env(self, conf: BaseRunConfiguration):
+    def interpolate_env(self, conf: RunConfigurationT):
         env_dict = conf.env.as_dict()
         interpolator = VariablesInterpolator({"env": env_dict}, skip=["secrets"])
         try:
@@ -352,7 +381,7 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
         except InterpolatorError as e:
             raise ConfigurationError(e.args[0])
 
-    def validate_gpu_vendor_and_image(self, conf: BaseRunConfiguration) -> None:
+    def validate_gpu_vendor_and_image(self, conf: RunConfigurationT) -> None:
         """
         Infers and sets `resources.gpu.vendor` if not set, requires `image` if the vendor is AMD.
         """
@@ -413,7 +442,7 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
                 "`image` is required if `resources.gpu.vendor` is `tenstorrent`"
             )
 
-    def validate_cpu_arch_and_image(self, conf: BaseRunConfiguration) -> None:
+    def validate_cpu_arch_and_image(self, conf: RunConfigurationT) -> None:
         """
         Infers `resources.cpu.arch` if not set, requires `image` if the architecture is ARM.
         """
@@ -437,10 +466,9 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
             raise ConfigurationError("`image` is required if `resources.cpu.arch` is `arm`")
 
 
-class RunWithPortsConfigurator(BaseRunConfigurator):
+class RunWithPortsConfiguratorMixin:
     @classmethod
-    def register_args(cls, parser: argparse.ArgumentParser):
-        super().register_args(parser)
+    def register_ports_args(cls, parser: argparse.ArgumentParser):
         parser.add_argument(
             "-p",
             "--port",
@@ -457,29 +485,42 @@ class RunWithPortsConfigurator(BaseRunConfigurator):
             metavar="HOST",
         )
 
-    def apply_args(
-        self, conf: BaseRunConfigurationWithPorts, args: argparse.Namespace, unknown: List[str]
+    def apply_ports_args(
+        self,
+        conf: ConfigurationWithPortsParams,
+        args: argparse.Namespace,
     ):
-        super().apply_args(conf, args, unknown)
         if args.ports:
             conf.ports = list(_merge_ports(conf.ports, args.ports).values())
 
 
-class TaskConfigurator(RunWithPortsConfigurator):
+class TaskConfigurator(RunWithPortsConfiguratorMixin, BaseRunConfigurator):
     TYPE = ApplyConfigurationType.TASK
+
+    @classmethod
+    def register_args(cls, parser: argparse.ArgumentParser):
+        super().register_args(parser)
+        cls.register_ports_args(parser)
 
     def apply_args(self, conf: TaskConfiguration, args: argparse.Namespace, unknown: List[str]):
         super().apply_args(conf, args, unknown)
+        self.apply_ports_args(conf, args)
         self.interpolate_run_args(conf.commands, unknown)
 
 
-class DevEnvironmentConfigurator(RunWithPortsConfigurator):
+class DevEnvironmentConfigurator(RunWithPortsConfiguratorMixin, BaseRunConfigurator):
     TYPE = ApplyConfigurationType.DEV_ENVIRONMENT
+
+    @classmethod
+    def register_args(cls, parser: argparse.ArgumentParser):
+        super().register_args(parser)
+        cls.register_ports_args(parser)
 
     def apply_args(
         self, conf: DevEnvironmentConfiguration, args: argparse.Namespace, unknown: List[str]
     ):
         super().apply_args(conf, args, unknown)
+        self.apply_ports_args(conf, args)
         if conf.ide == "vscode" and conf.version is None:
             conf.version = _detect_vscode_version()
             if conf.version is None:
@@ -649,6 +690,8 @@ def render_run_spec_diff(old_spec: RunSpec, new_spec: RunSpec) -> Optional[str]:
             if type(old_spec.profile) is not type(new_spec.profile):
                 item = NestedListItem("Profile")
             else:
+                assert old_spec.profile is not None
+                assert new_spec.profile is not None
                 item = NestedListItem(
                     "Profile properties:",
                     children=[

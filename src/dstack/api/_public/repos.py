@@ -112,27 +112,28 @@ class RepoCollection:
                     " Run `dstack init` to initialize the current directory as a repo or specify `--repo`."
                 )
             repo = load_repo(repo_config)
-            try:
-                self._api_client.repos.get(self._project, repo.repo_id, include_creds=False)
-            except ResourceNotExistsError:
+            if not self.is_initialized(repo):
                 raise ConfigurationError(
                     "The repo is not initialized."
                     " Run `dstack init` to initialize the current directory as a repo or specify `--repo`."
                 )
         else:
             logger.debug("Initializing repo")
-            repo = LocalRepo(repo_dir=repo_dir)  # default
-            if not local:
+            if local:
+                repo = LocalRepo(repo_dir=repo_dir)
+            else:
                 try:
                     repo = RemoteRepo.from_dir(repo_dir)
                 except InvalidGitRepositoryError:
-                    pass  # use default
+                    raise ConfigurationError(
+                        f"Git repo not found: {repo_dir}. Use `files` to mount an arbitrary"
+                        " directory: https://dstack.ai/docs/concepts/tasks/#files"
+                    )
             self.init(repo, git_identity_file, oauth_token)
             config.save_repo_config(
                 repo.get_repo_dir_or_error(),
                 repo.repo_id,
                 RepoType(repo.run_repo_data.repo_type),
-                get_ssh_keypair(None, config.dstack_key_path),
             )
         return repo
 

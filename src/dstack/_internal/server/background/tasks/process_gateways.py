@@ -49,8 +49,8 @@ async def process_gateways():
             if gateway_model is None:
                 return
             lockset.add(gateway_model.id)
+        gateway_model_id = gateway_model.id
         try:
-            gateway_model_id = gateway_model.id
             initial_status = gateway_model.status
             if initial_status == GatewayStatus.SUBMITTED:
                 await _process_submitted_gateway(session=session, gateway_model=gateway_model)
@@ -164,6 +164,9 @@ async def _process_provisioning_gateway(
         .execution_options(populate_existing=True)
     )
     gateway_model = res.unique().scalar_one()
+
+    # Provisioning gateways must have compute.
+    assert gateway_model.gateway_compute is not None
 
     # FIXME: problems caused by blocking on connect_to_gateway_with_retry and configure_gateway:
     # - cannot delete the gateway before it is provisioned because the DB model is locked

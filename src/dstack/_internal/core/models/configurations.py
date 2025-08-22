@@ -20,6 +20,7 @@ from dstack._internal.core.models.services import AnyModel, OpenAIChatModel
 from dstack._internal.core.models.unix import UnixUser
 from dstack._internal.core.models.volumes import MountPoint, VolumeConfiguration, parse_mount_point
 from dstack._internal.utils.common import has_duplicates
+from dstack._internal.utils.json_schema import add_extra_schema_types
 from dstack._internal.utils.json_utils import (
     pydantic_orjson_dumps_with_indent,
 )
@@ -220,7 +221,7 @@ class ProbeConfig(CoreModel):
         ),
     ] = None
     timeout: Annotated[
-        Optional[Union[int, str]],
+        Optional[int],
         Field(
             description=(
                 f"Maximum amount of time the HTTP request is allowed to take. Defaults to `{DEFAULT_PROBE_TIMEOUT}s`"
@@ -228,7 +229,7 @@ class ProbeConfig(CoreModel):
         ),
     ] = None
     interval: Annotated[
-        Optional[Union[int, str]],
+        Optional[int],
         Field(
             description=(
                 "Minimum amount of time between the end of one probe execution"
@@ -248,7 +249,19 @@ class ProbeConfig(CoreModel):
         ),
     ] = None
 
-    @validator("timeout")
+    class Config(CoreModel.Config):
+        @staticmethod
+        def schema_extra(schema: Dict[str, Any]):
+            add_extra_schema_types(
+                schema["properties"]["timeout"],
+                extra_types=[{"type": "string"}],
+            )
+            add_extra_schema_types(
+                schema["properties"]["interval"],
+                extra_types=[{"type": "string"}],
+            )
+
+    @validator("timeout", pre=True)
     def parse_timeout(cls, v: Optional[Union[int, str]]) -> Optional[int]:
         if v is None:
             return v
@@ -257,7 +270,7 @@ class ProbeConfig(CoreModel):
             raise ValueError(f"Probe timeout cannot be shorter than {MIN_PROBE_TIMEOUT}s")
         return parsed
 
-    @validator("interval")
+    @validator("interval", pre=True)
     def parse_interval(cls, v: Optional[Union[int, str]]) -> Optional[int]:
         if v is None:
             return v
@@ -372,9 +385,7 @@ class BaseRunConfiguration(CoreModel):
             ),
         ),
     ] = None
-    volumes: Annotated[
-        List[Union[MountPoint, str]], Field(description="The volumes mount points")
-    ] = []
+    volumes: Annotated[List[MountPoint], Field(description="The volumes mount points")] = []
     docker: Annotated[
         Optional[bool],
         Field(
@@ -382,11 +393,23 @@ class BaseRunConfiguration(CoreModel):
         ),
     ] = None
     files: Annotated[
-        list[Union[FilePathMapping, str]],
+        list[FilePathMapping],
         Field(description="The local to container file path mappings"),
     ] = []
     # deprecated since 0.18.31; task, service -- no effect; dev-environment -- executed right before `init`
     setup: CommandsList = []
+
+    class Config(CoreModel.Config):
+        @staticmethod
+        def schema_extra(schema: Dict[str, Any]):
+            add_extra_schema_types(
+                schema["properties"]["volumes"]["items"],
+                extra_types=[{"type": "string"}],
+            )
+            add_extra_schema_types(
+                schema["properties"]["files"]["items"],
+                extra_types=[{"type": "string"}],
+            )
 
     @validator("python", pre=True, always=True)
     def convert_python(cls, v, values) -> Optional[PythonVersion]:
@@ -412,14 +435,14 @@ class BaseRunConfiguration(CoreModel):
         #   but it's not possible to do so without breaking backwards compatibility.
         return v
 
-    @validator("volumes", each_item=True)
-    def convert_volumes(cls, v) -> MountPoint:
+    @validator("volumes", each_item=True, pre=True)
+    def convert_volumes(cls, v: Union[MountPoint, str]) -> MountPoint:
         if isinstance(v, str):
             return parse_mount_point(v)
         return v
 
-    @validator("files", each_item=True)
-    def convert_files(cls, v) -> FilePathMapping:
+    @validator("files", each_item=True, pre=True)
+    def convert_files(cls, v: Union[FilePathMapping, str]) -> FilePathMapping:
         if isinstance(v, str):
             return FilePathMapping.parse(v)
         return v
@@ -443,7 +466,7 @@ class BaseRunConfiguration(CoreModel):
         raise ValueError("The value must be `sh`, `bash`, or an absolute path")
 
 
-class BaseRunConfigurationWithPorts(BaseRunConfiguration):
+class ConfigurationWithPortsParams(CoreModel):
     ports: Annotated[
         List[Union[ValidPort, constr(regex=r"^(?:[0-9]+|\*):[0-9]+$"), PortMapping]],
         Field(description="Port numbers/mapping to expose"),
@@ -458,7 +481,7 @@ class BaseRunConfigurationWithPorts(BaseRunConfiguration):
         return v
 
 
-class BaseRunConfigurationWithCommands(BaseRunConfiguration):
+class ConfigurationWithCommandsParams(CoreModel):
     commands: Annotated[CommandsList, Field(description="The shell commands to run")] = []
 
     @root_validator
@@ -502,9 +525,24 @@ class DevEnvironmentConfigurationParams(CoreModel):
 
 
 class DevEnvironmentConfiguration(
-    ProfileParams, BaseRunConfigurationWithPorts, DevEnvironmentConfigurationParams
+    ProfileParams,
+    BaseRunConfiguration,
+    ConfigurationWithPortsParams,
+    DevEnvironmentConfigurationParams,
 ):
     type: Literal["dev-environment"] = "dev-environment"
+
+    class Config(ProfileParams.Config, BaseRunConfiguration.Config):
+        @staticmethod
+        def schema_extra(schema: Dict[str, Any]):
+            ProfileParams.Config.schema_extra(schema)
+            BaseRunConfiguration.Config.schema_extra(schema)
+
+    @validator("entrypoint")
+    def validate_entrypoint(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None:
+            raise ValueError("entrypoint is not supported for dev-environment")
+        return v
 
 
 class TaskConfigurationParams(CoreModel):
@@ -513,11 +551,18 @@ class TaskConfigurationParams(CoreModel):
 
 class TaskConfiguration(
     ProfileParams,
-    BaseRunConfigurationWithCommands,
-    BaseRunConfigurationWithPorts,
+    BaseRunConfiguration,
+    ConfigurationWithCommandsParams,
+    ConfigurationWithPortsParams,
     TaskConfigurationParams,
 ):
     type: Literal["task"] = "task"
+
+    class Config(ProfileParams.Config, BaseRunConfiguration.Config):
+        @staticmethod
+        def schema_extra(schema: Dict[str, Any]):
+            ProfileParams.Config.schema_extra(schema)
+            BaseRunConfiguration.Config.schema_extra(schema)
 
 
 class ServiceConfigurationParams(CoreModel):
@@ -546,7 +591,7 @@ class ServiceConfigurationParams(CoreModel):
         ),
     ] = STRIP_PREFIX_DEFAULT
     model: Annotated[
-        Optional[Union[AnyModel, str]],
+        Optional[AnyModel],
         Field(
             description=(
                 "Mapping of the model for the OpenAI-compatible endpoint provided by `dstack`."
@@ -561,7 +606,7 @@ class ServiceConfigurationParams(CoreModel):
     )
     auth: Annotated[bool, Field(description="Enable the authorization")] = True
     replicas: Annotated[
-        Union[conint(ge=1), constr(regex=r"^[0-9]+..[1-9][0-9]*$"), Range[int]],
+        Range[int],
         Field(
             description="The number of replicas. Can be a number (e.g. `2`) or a range (`0..4` or `1..8`). "
             "If it's a range, the `scaling` property is required"
@@ -577,6 +622,18 @@ class ServiceConfigurationParams(CoreModel):
         Field(description="List of probes used to determine job health"),
     ] = []
 
+    class Config(CoreModel.Config):
+        @staticmethod
+        def schema_extra(schema: Dict[str, Any]):
+            add_extra_schema_types(
+                schema["properties"]["replicas"],
+                extra_types=[{"type": "integer"}, {"type": "string"}],
+            )
+            add_extra_schema_types(
+                schema["properties"]["model"],
+                extra_types=[{"type": "string"}],
+            )
+
     @validator("port")
     def convert_port(cls, v) -> PortMapping:
         if isinstance(v, int):
@@ -585,27 +642,20 @@ class ServiceConfigurationParams(CoreModel):
             return PortMapping.parse(v)
         return v
 
-    @validator("model")
+    @validator("model", pre=True)
     def convert_model(cls, v: Optional[Union[AnyModel, str]]) -> Optional[AnyModel]:
         if isinstance(v, str):
             return OpenAIChatModel(type="chat", name=v, format="openai")
         return v
 
     @validator("replicas")
-    def convert_replicas(cls, v: Any) -> Range[int]:
-        if isinstance(v, str) and ".." in v:
-            min, max = v.replace(" ", "").split("..")
-            v = Range(min=min or 0, max=max or None)
-        elif isinstance(v, (int, float)):
-            v = Range(min=v, max=v)
+    def convert_replicas(cls, v: Range[int]) -> Range[int]:
         if v.max is None:
             raise ValueError("The maximum number of replicas is required")
+        if v.min is None:
+            v.min = 0
         if v.min < 0:
             raise ValueError("The minimum number of replicas must be greater than or equal to 0")
-        if v.max < v.min:
-            raise ValueError(
-                "The maximum number of replicas must be greater than or equal to the minimum number of replicas"
-            )
         return v
 
     @validator("gateway")
@@ -622,9 +672,9 @@ class ServiceConfigurationParams(CoreModel):
     def validate_scaling(cls, values):
         scaling = values.get("scaling")
         replicas = values.get("replicas")
-        if replicas.min != replicas.max and not scaling:
+        if replicas and replicas.min != replicas.max and not scaling:
             raise ValueError("When you set `replicas` to a range, ensure to specify `scaling`.")
-        if replicas.min == replicas.max and scaling:
+        if replicas and replicas.min == replicas.max and scaling:
             raise ValueError("To use `scaling`, `replicas` must be set to a range.")
         return values
 
@@ -651,9 +701,23 @@ class ServiceConfigurationParams(CoreModel):
 
 
 class ServiceConfiguration(
-    ProfileParams, BaseRunConfigurationWithCommands, ServiceConfigurationParams
+    ProfileParams,
+    BaseRunConfiguration,
+    ConfigurationWithCommandsParams,
+    ServiceConfigurationParams,
 ):
     type: Literal["service"] = "service"
+
+    class Config(
+        ProfileParams.Config,
+        BaseRunConfiguration.Config,
+        ServiceConfigurationParams.Config,
+    ):
+        @staticmethod
+        def schema_extra(schema: Dict[str, Any]):
+            ProfileParams.Config.schema_extra(schema)
+            BaseRunConfiguration.Config.schema_extra(schema)
+            ServiceConfigurationParams.Config.schema_extra(schema)
 
 
 AnyRunConfiguration = Union[DevEnvironmentConfiguration, TaskConfiguration, ServiceConfiguration]
@@ -715,7 +779,7 @@ class DstackConfiguration(CoreModel):
         Field(discriminator="type"),
     ]
 
-    class Config:
+    class Config(CoreModel.Config):
         json_loads = orjson.loads
         json_dumps = pydantic_orjson_dumps_with_indent
 

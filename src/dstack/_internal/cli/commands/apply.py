@@ -1,6 +1,7 @@
 import argparse
+from pathlib import Path
 
-from argcomplete import FilesCompleter
+from argcomplete import FilesCompleter  # type: ignore[attr-defined]
 
 from dstack._internal.cli.commands import APIBaseCommand
 from dstack._internal.cli.services.configurators import (
@@ -13,7 +14,7 @@ from dstack._internal.cli.services.repos import (
     init_repo,
     register_init_repo_args,
 )
-from dstack._internal.cli.utils.common import console
+from dstack._internal.cli.utils.common import console, warn
 from dstack._internal.core.errors import CLIError
 from dstack._internal.core.models.configurations import ApplyConfigurationType
 
@@ -47,7 +48,7 @@ class ApplyCommand(APIBaseCommand):
                 " Defaults to [code]$PWD/.dstack.yml[/]"
             ),
             dest="configuration_file",
-        ).completer = FilesCompleter(allowednames=["*.yml", "*.yaml"])
+        ).completer = FilesCompleter(allowednames=["*.yml", "*.yaml"])  # type: ignore[attr-defined]
         self._parser.add_argument(
             "-y",
             "--yes",
@@ -64,6 +65,13 @@ class ApplyCommand(APIBaseCommand):
             "--detach",
             help="Exit immediately after submitting configuration",
             action="store_true",
+        )
+        self._parser.add_argument(
+            "--ssh-identity",
+            metavar="SSH_PRIVATE_KEY",
+            help="The private SSH key path for SSH tunneling",
+            type=Path,
+            dest="ssh_identity_file",
         )
         repo_group = self._parser.add_argument_group("Repo Options")
         repo_group.add_argument(
@@ -111,6 +119,11 @@ class ApplyCommand(APIBaseCommand):
                 raise CLIError("Cannot read configuration from stdin if -y/--yes is not specified")
             if args.repo and args.no_repo:
                 raise CLIError("Either --repo or --no-repo can be specified")
+            if args.local:
+                warn(
+                    "Local repos are deprecated since 0.19.25 and will be removed soon."
+                    " Consider using `files` instead: https://dstack.ai/docs/concepts/tasks/#files"
+                )
             repo = None
             if args.repo:
                 repo = init_repo(
@@ -121,7 +134,6 @@ class ApplyCommand(APIBaseCommand):
                     local=args.local,
                     git_identity_file=args.git_identity_file,
                     oauth_token=args.gh_token,
-                    ssh_identity_file=args.ssh_identity_file,
                 )
             elif args.no_repo:
                 repo = init_default_virtual_repo(api=self.api)

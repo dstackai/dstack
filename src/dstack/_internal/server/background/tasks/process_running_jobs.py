@@ -32,6 +32,7 @@ from dstack._internal.core.models.runs import (
     JobSpec,
     JobStatus,
     JobTerminationReason,
+    ProbeSpec,
     Run,
     RunSpec,
     RunStatus,
@@ -70,6 +71,7 @@ from dstack._internal.server.services.repos import (
 from dstack._internal.server.services.runner import client
 from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
 from dstack._internal.server.services.runs import (
+    is_job_ready,
     run_model_to_run,
 )
 from dstack._internal.server.services.secrets import get_project_secrets_mapping
@@ -126,9 +128,8 @@ async def _process_next_running_job():
             if job_model is None:
                 return
             lockset.add(job_model.id)
-
+        job_model_id = job_model.id
         try:
-            job_model_id = job_model.id
             await _process_running_job(session=session, job_model=job_model)
         finally:
             lockset.difference_update([job_model_id])
@@ -140,6 +141,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
         select(JobModel)
         .where(JobModel.id == job_model.id)
         .options(joinedload(JobModel.instance).joinedload(InstanceModel.project))
+        .options(joinedload(JobModel.probes).load_only(ProbeModel.success_streak))
         .execution_options(populate_existing=True)
     )
     job_model = res.unique().scalar_one()
@@ -166,6 +168,11 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
         return
 
     job = find_job(run.jobs, job_model.replica_num, job_model.job_num)
+
+    volumes = []
+    secrets = {}
+    cluster_info = None
+    repo_creds = None
 
     initial_status = job_model.status
     if initial_status in [JobStatus.PROVISIONING, JobStatus.PULLING]:
@@ -254,6 +261,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
                 user_ssh_key,
             )
         else:
+            assert cluster_info is not None
             logger.debug(
                 "%s: process provisioning job without shim, age=%s",
                 fmt(job_model),
@@ -272,7 +280,6 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
                 repo=repo_model,
                 code_hash=_get_repo_code_hash(run, job),
             )
-
             success = await common_utils.run_async(
                 _submit_job_to_runner,
                 server_ssh_private_keys,
@@ -306,6 +313,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
 
     else:  # fails are not acceptable
         if initial_status == JobStatus.PULLING:
+            assert cluster_info is not None
             logger.debug(
                 "%s: process pulling job with shim, age=%s", fmt(job_model), job_submission.age
             )
@@ -338,7 +346,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
                 server_ssh_private_keys,
                 job_provisioning_data,
             )
-        elif initial_status == JobStatus.RUNNING:
+        else:
             logger.debug("%s: process running job, age=%s", fmt(job_model), job_submission.age)
             success = await common_utils.run_async(
                 _process_running,
@@ -382,52 +390,21 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
                         job_submission.age,
                     )
 
-    if (
-        initial_status != job_model.status
-        and job_model.status == JobStatus.RUNNING
-        and job_model.job_num == 0  # gateway connects only to the first node
-        and run.run_spec.configuration.type == "service"
-    ):
-        ssh_head_proxy: Optional[SSHConnectionParams] = None
-        ssh_head_proxy_private_key: Optional[str] = None
-        instance = common_utils.get_or_error(job_model.instance)
-        if instance.remote_connection_info is not None:
-            rci = RemoteConnectionInfo.__response__.parse_raw(instance.remote_connection_info)
-            if rci.ssh_proxy is not None:
-                ssh_head_proxy = rci.ssh_proxy
-                ssh_head_proxy_keys = common_utils.get_or_error(rci.ssh_proxy_keys)
-                ssh_head_proxy_private_key = ssh_head_proxy_keys[0].private
-        try:
-            await services.register_replica(
-                session,
-                run_model.gateway_id,
-                run,
-                job_model,
-                ssh_head_proxy,
-                ssh_head_proxy_private_key,
-            )
-        except GatewayError as e:
-            logger.warning(
-                "%s: failed to register service replica: %s, age=%s",
-                fmt(job_model),
-                e,
-                job_submission.age,
-            )
-            job_model.status = JobStatus.TERMINATING
-            job_model.termination_reason = JobTerminationReason.GATEWAY_ERROR
-        else:
-            for probe_num in range(len(job.job_spec.probes)):
-                session.add(
-                    ProbeModel(
-                        name=f"{job_model.job_name}-{probe_num}",
-                        job=job_model,
-                        probe_num=probe_num,
-                        due=common_utils.get_current_datetime(),
-                        success_streak=0,
-                        active=True,
-                    )
+    if initial_status != job_model.status and job_model.status == JobStatus.RUNNING:
+        job_model.probes = []
+        for probe_num in range(len(job.job_spec.probes)):
+            job_model.probes.append(
+                ProbeModel(
+                    name=f"{job_model.job_name}-{probe_num}",
+                    probe_num=probe_num,
+                    due=common_utils.get_current_datetime(),
+                    success_streak=0,
+                    active=True,
                 )
+            )
 
+    if job_model.status == JobStatus.RUNNING:
+        await _maybe_register_replica(session, run_model, run, job_model, job.job_spec.probes)
     if job_model.status == JobStatus.RUNNING:
         await _check_gpu_utilization(session, job_model, job)
 
@@ -660,6 +637,7 @@ def _process_pulling_with_shim(
         is successful
     """
     shim_client = client.ShimClient(port=ports[DSTACK_SHIM_HTTP_PORT])
+    job_runtime_data = None
     if shim_client.is_api_v2_supported():  # raises error if shim is down, causes retry
         task = shim_client.get_task(job_model.id)
 
@@ -820,6 +798,55 @@ def _should_terminate_job_due_to_disconnect(job_model: JobModel) -> bool:
         common_utils.get_current_datetime()
         > job_model.disconnected_at + JOB_DISCONNECTED_RETRY_TIMEOUT
     )
+
+
+async def _maybe_register_replica(
+    session: AsyncSession,
+    run_model: RunModel,
+    run: Run,
+    job_model: JobModel,
+    probe_specs: Iterable[ProbeSpec],
+) -> None:
+    """
+    Register the replica represented by this job to receive service requests if it is ready.
+    """
+
+    if (
+        run.run_spec.configuration.type != "service"
+        or job_model.registered
+        or job_model.job_num != 0  # only the first job in the replica receives service requests
+        or not is_job_ready(job_model.probes, probe_specs)
+    ):
+        return
+
+    ssh_head_proxy: Optional[SSHConnectionParams] = None
+    ssh_head_proxy_private_key: Optional[str] = None
+    instance = common_utils.get_or_error(job_model.instance)
+    if instance.remote_connection_info is not None:
+        rci: RemoteConnectionInfo = RemoteConnectionInfo.__response__.parse_raw(
+            instance.remote_connection_info
+        )
+        if rci.ssh_proxy is not None:
+            ssh_head_proxy = rci.ssh_proxy
+            ssh_head_proxy_keys = common_utils.get_or_error(rci.ssh_proxy_keys)
+            ssh_head_proxy_private_key = ssh_head_proxy_keys[0].private
+    try:
+        await services.register_replica(
+            session,
+            run_model.gateway_id,
+            run,
+            job_model,
+            ssh_head_proxy,
+            ssh_head_proxy_private_key,
+        )
+    except GatewayError as e:
+        logger.warning(
+            "%s: failed to register service replica: %s",
+            fmt(job_model),
+            e,
+        )
+        job_model.status = JobStatus.TERMINATING
+        job_model.termination_reason = JobTerminationReason.GATEWAY_ERROR
 
 
 async def _check_gpu_utilization(session: AsyncSession, job_model: JobModel, job: Job) -> None:

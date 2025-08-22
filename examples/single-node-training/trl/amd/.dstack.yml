@@ -9,6 +9,9 @@ image: runpod/pytorch:2.1.2-py3.10-rocm6.1-ubuntu22.04
 env:
   - HF_TOKEN
 
+files:
+  - train.py
+
 commands:
   - export PATH=/opt/conda/envs/py_3.10/bin:$PATH
   - git clone https://github.com/ROCm/bitsandbytes
@@ -22,7 +25,7 @@ commands:
   - pip install peft
   - pip install transformers datasets huggingface-hub scipy
   - cd ..
-  - python examples/single-node-training/trl/amd/train.py
+  - python train.py
 
 # Uncomment to leverage spot instances
 #spot_policy: auto

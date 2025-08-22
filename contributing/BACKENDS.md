@@ -4,8 +4,8 @@ The guide below explains the steps required to extend `dstack` with support for 
 
 ## Overview of the process
 
-1. Add the cloud provider to [gpuhunt](https://https://github.com/dstackai/gpuhunt)
-2. Integrate the cloud provider into [dstack](https://https://github.com/dstackai/dstack)
+1. Add the cloud provider to [gpuhunt](https://github.com/dstackai/gpuhunt)
+2. Integrate the cloud provider into [dstack](https://github.com/dstackai/dstack)
 
 ## 1. Add a cloud provider to dstackai/gpuhunt
 
