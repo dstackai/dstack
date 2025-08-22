@@ -1,6 +1,7 @@
-from typing import Callable, Optional, Protocol, Self, TypeVar
+from typing import Callable, Optional, Protocol, TypeVar
 
 from pydantic import BaseModel
+from typing_extensions import Self
 
 from dstack._internal.core.models.profiles import Profile, SpotPolicy
 from dstack._internal.core.models.resources import (
@@ -44,7 +45,7 @@ def combine_fleet_and_run_profiles(
             max_price=_get_min_optional(fleet_profile.max_price, run_profile.max_price),
             idle_duration=_combine_idle_duration_optional(
                 fleet_profile.idle_duration, run_profile.idle_duration
-            ),  # converted by validator
+            ),
             tags=_combine_tags_optional(fleet_profile.tags, run_profile.tags),
         )
     except CombineError:
@@ -147,7 +148,7 @@ def _combine_tags(value1: dict[str, str], value2: dict[str, str]) -> dict[str, s
 
 def _combine_resources(value1: ResourcesSpec, value2: ResourcesSpec) -> ResourcesSpec:
     return ResourcesSpec(
-        cpu=_combine_cpu(value1.cpu, value2.cpu),  # converted by validator
+        cpu=_combine_cpu(value1.cpu, value2.cpu),  # type: ignore[attr-defined]
         memory=_combine_memory(value1.memory, value2.memory),
         shm_size=_combine_shm_size_optional(value1.shm_size, value2.shm_size),
         gpu=_combine_gpu_optional(value1.gpu, value2.gpu),

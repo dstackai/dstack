@@ -1,4 +1,4 @@
-from typing import Any, Protocol, TypeAlias, TypeVar
+from typing import Any, Protocol, TypeVar, Union
 
 _T_contra = TypeVar("_T_contra", contravariant=True)
 
@@ -11,4 +11,4 @@ class SupportsDunderGT(Protocol[_T_contra]):
     def __gt__(self, other: _T_contra, /) -> bool: ...
 
 
-SupportsRichComparison: TypeAlias = SupportsDunderLT[Any] | SupportsDunderGT[Any]
+SupportsRichComparison = Union[SupportsDunderLT[Any], SupportsDunderGT[Any]]
