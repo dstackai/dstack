@@ -53,6 +53,7 @@ from dstack._internal.server.models import (
 from dstack._internal.server.services.backends import get_project_backend_by_type_or_error
 from dstack._internal.server.services.fleets import (
     fleet_model_to_fleet,
+    get_fleet_requirements,
 )
 from dstack._internal.server.services.instances import (
     filter_pool_instances,
@@ -71,6 +72,10 @@ from dstack._internal.server.services.jobs import (
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.offers import get_offers_by_requirements
+from dstack._internal.server.services.requirements.combine import (
+    combine_fleet_and_run_profiles,
+    combine_fleet_and_run_requirements,
+)
 from dstack._internal.server.services.runs import (
     check_run_spec_requires_instance_mounts,
     run_model_to_run,
@@ -646,6 +651,8 @@ async def _run_job_on_new_instance(
 ) -> Optional[Tuple[JobProvisioningData, InstanceOfferWithAvailability]]:
     if volumes is None:
         volumes = []
+    profile = run.run_spec.merged_profile
+    requirements = job.job_spec.requirements
     fleet = None
     if fleet_model is not None:
         fleet = fleet_model_to_fleet(fleet_model)
@@ -654,13 +661,26 @@ async def _run_job_on_new_instance(
                 "%s: cannot fit new instance into fleet %s", fmt(job_model), fleet_model.name
             )
             return None
+        profile = combine_fleet_and_run_profiles(fleet.spec.merged_profile, profile)
+        if profile is None:
+            logger.debug("%s: cannot combine fleet %s profile", fmt(job_model), fleet_model.name)
+            return None
+        fleet_requirements = get_fleet_requirements(fleet.spec)
+        requirements = combine_fleet_and_run_requirements(fleet_requirements, requirements)
+        if requirements is None:
+            logger.debug(
+                "%s: cannot combine fleet %s requirements", fmt(job_model), fleet_model.name
+            )
+            return None
+        # TODO: Respect fleet provisioning properties such as tags
+
     multinode = job.job_spec.jobs_per_replica > 1 or (
         fleet is not None and fleet.spec.configuration.placement == InstanceGroupPlacement.CLUSTER
     )
     offers = await get_offers_by_requirements(
         project=project,
-        profile=run.run_spec.merged_profile,
-        requirements=job.job_spec.requirements,
+        profile=profile,
+        requirements=requirements,
         exclude_not_available=True,
         multinode=multinode,
         master_job_provisioning_data=master_job_provisioning_data,
