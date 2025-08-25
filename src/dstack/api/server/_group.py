@@ -1,3 +1,4 @@
+from logging import Logger
 from typing import Optional
 
 import requests
@@ -12,10 +13,10 @@ class APIRequest(Protocol):
         raise_for_status: bool = True,
         method: str = "POST",
         **kwargs,
-    ) -> requests.Response:
-        pass
+    ) -> requests.Response: ...
 
 
 class APIClientGroup:
-    def __init__(self, _request: APIRequest):
+    def __init__(self, _request: APIRequest, _logger: Logger):
         self._request = _request
+        self._logger = _logger

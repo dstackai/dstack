@@ -1,7 +1,7 @@
 import argparse
 import os
 from abc import ABC, abstractmethod
-from typing import Generic, List, Optional, TypeVar, Union, cast
+from typing import Generic, List, TypeVar, Union, cast
 
 from dstack._internal.cli.services.args import env_var
 from dstack._internal.core.errors import ConfigurationError
@@ -10,7 +10,6 @@ from dstack._internal.core.models.configurations import (
     ApplyConfigurationType,
 )
 from dstack._internal.core.models.envs import Env, EnvSentinel, EnvVarTuple
-from dstack._internal.core.models.repos.base import Repo
 from dstack.api._public import Client
 
 ArgsParser = Union[argparse._ArgumentGroup, argparse.ArgumentParser]
@@ -32,7 +31,6 @@ class BaseApplyConfigurator(ABC, Generic[ApplyConfigurationT]):
         command_args: argparse.Namespace,
         configurator_args: argparse.Namespace,
         unknown_args: List[str],
-        repo: Optional[Repo] = None,
     ):
         """
         Implements `dstack apply` for a given configuration type.
@@ -43,7 +41,6 @@ class BaseApplyConfigurator(ABC, Generic[ApplyConfigurationT]):
             command_args: The args parsed by `dstack apply`.
             configurator_args: The known args parsed by `cls.get_parser()`.
             unknown_args: The unknown args after parsing by `cls.get_parser()`.
-            repo: The repo to use with apply.
         """
         pass
 

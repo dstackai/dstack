@@ -1,5 +1,4 @@
 import argparse
-from pathlib import Path
 
 from argcomplete import FilesCompleter  # type: ignore[attr-defined]
 
@@ -9,12 +8,7 @@ from dstack._internal.cli.services.configurators import (
     get_apply_configurator_class,
     load_apply_configuration,
 )
-from dstack._internal.cli.services.repos import (
-    init_default_virtual_repo,
-    init_repo,
-    register_init_repo_args,
-)
-from dstack._internal.cli.utils.common import console, warn
+from dstack._internal.cli.utils.common import console
 from dstack._internal.core.errors import CLIError
 from dstack._internal.core.models.configurations import ApplyConfigurationType
 
@@ -66,37 +60,6 @@ class ApplyCommand(APIBaseCommand):
             help="Exit immediately after submitting configuration",
             action="store_true",
         )
-        self._parser.add_argument(
-            "--ssh-identity",
-            metavar="SSH_PRIVATE_KEY",
-            help="The private SSH key path for SSH tunneling",
-            type=Path,
-            dest="ssh_identity_file",
-        )
-        repo_group = self._parser.add_argument_group("Repo Options")
-        repo_group.add_argument(
-            "-P",
-            "--repo",
-            help=("The repo to use for the run. Can be a local path or a Git repo URL."),
-            dest="repo",
-        )
-        repo_group.add_argument(
-            "--repo-branch",
-            help="The repo branch to use for the run",
-            dest="repo_branch",
-        )
-        repo_group.add_argument(
-            "--repo-hash",
-            help="The hash of the repo commit to use for the run",
-            dest="repo_hash",
-        )
-        repo_group.add_argument(
-            "--no-repo",
-            help="Do not use any repo for the run",
-            dest="no_repo",
-            action="store_true",
-        )
-        register_init_repo_args(repo_group)
 
     def _command(self, args: argparse.Namespace):
         try:
@@ -117,26 +80,6 @@ class ApplyCommand(APIBaseCommand):
             super()._command(args)
             if not args.yes and args.configuration_file == APPLY_STDIN_NAME:
                 raise CLIError("Cannot read configuration from stdin if -y/--yes is not specified")
-            if args.repo and args.no_repo:
-                raise CLIError("Either --repo or --no-repo can be specified")
-            if args.local:
-                warn(
-                    "Local repos are deprecated since 0.19.25 and will be removed soon."
-                    " Consider using `files` instead: https://dstack.ai/docs/concepts/tasks/#files"
-                )
-            repo = None
-            if args.repo:
-                repo = init_repo(
-                    api=self.api,
-                    repo_path=args.repo,
-                    repo_branch=args.repo_branch,
-                    repo_hash=args.repo_hash,
-                    local=args.local,
-                    git_identity_file=args.git_identity_file,
-                    oauth_token=args.gh_token,
-                )
-            elif args.no_repo:
-                repo = init_default_virtual_repo(api=self.api)
             configuration_path, configuration = load_apply_configuration(args.configuration_file)
             configurator_class = get_apply_configurator_class(configuration.type)
             configurator = configurator_class(api_client=self.api)
@@ -148,7 +91,6 @@ class ApplyCommand(APIBaseCommand):
                 command_args=args,
                 configurator_args=known,
                 unknown_args=unknown,
-                repo=repo,
             )
         except KeyboardInterrupt:
             console.print("\nOperation interrupted by user. Exiting...")

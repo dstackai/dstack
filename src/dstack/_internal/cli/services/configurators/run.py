@@ -15,12 +15,14 @@ from dstack._internal.cli.services.configurators.base import (
     BaseApplyConfigurator,
 )
 from dstack._internal.cli.services.profile import apply_profile_args, register_profile_args
-from dstack._internal.cli.services.repos import init_default_virtual_repo
-from dstack._internal.cli.utils.common import (
-    confirm_ask,
-    console,
-    warn,
+from dstack._internal.cli.services.repos import (
+    get_repo_from_dir,
+    get_repo_from_url,
+    init_default_virtual_repo,
+    is_git_repo_url,
+    register_init_repo_args,
 )
+from dstack._internal.cli.utils.common import confirm_ask, console, warn
 from dstack._internal.cli.utils.rich import MultiItemStatus
 from dstack._internal.cli.utils.run import get_runs_table, print_run_plan
 from dstack._internal.core.errors import (
@@ -46,6 +48,7 @@ from dstack._internal.core.models.resources import CPUSpec
 from dstack._internal.core.models.runs import JobStatus, JobSubmission, RunSpec, RunStatus
 from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.core.services.diff import diff_models
+from dstack._internal.core.services.repos import load_repo
 from dstack._internal.utils.common import local_time
 from dstack._internal.utils.interpolator import InterpolatorError, VariablesInterpolator
 from dstack._internal.utils.logging import get_logger
@@ -78,42 +81,18 @@ class BaseRunConfigurator(
         command_args: argparse.Namespace,
         configurator_args: argparse.Namespace,
         unknown_args: List[str],
-        repo: Optional[Repo] = None,
     ):
+        if configurator_args.repo and configurator_args.no_repo:
+            raise CLIError("Either --repo or --no-repo can be specified")
+
         self.apply_args(conf, configurator_args, unknown_args)
         self.validate_gpu_vendor_and_image(conf)
         self.validate_cpu_arch_and_image(conf)
+
         config_manager = ConfigManager()
-        if repo is None:
-            repo_path = Path.cwd()
-            repo_config = config_manager.get_repo_config(repo_path)
-            if repo_config is None:
-                warn(
-                    "Repo is not initialized. "
-                    "Use [code]--repo <dir>[/code] or [code]--no-repo[/code] to initialize it.\n"
-                    "Starting from 0.19.26, repos will be configured via YAML and this message won't appear."
-                )
-                if not command_args.yes and not confirm_ask("Continue without the repo?"):
-                    console.print("\nExiting...")
-                    return
-                repo = init_default_virtual_repo(self.api)
-            else:
-                # Unlikely, but may raise ConfigurationError if the repo does not exist
-                # on the server side (stale entry in `config.yml`)
-                repo = self.api.repos.load(repo_path)
-                if isinstance(repo, LocalRepo):
-                    warn(
-                        f"{repo.repo_dir} is a local repo.\n"
-                        "Local repos are deprecated since 0.19.25"
-                        " and will be removed soon\n"
-                        "There are two options:\n"
-                        "  - Migrate to `files`: https://dstack.ai/docs/concepts/tasks/#files\n"
-                        "  - Specify `--no-repo` if you don't need the repo at all\n"
-                        "In either case, you can run `dstack init --remove` to remove the repo"
-                        " (only the record about the repo, not its files) and this warning"
-                    )
+        repo = self.get_repo(conf, configuration_path, configurator_args, config_manager)
         self.api.ssh_identity_file = get_ssh_keypair(
-            command_args.ssh_identity_file,
+            configurator_args.ssh_identity_file,
             config_manager.dstack_key_path,
         )
         profile = load_profile(Path.cwd(), configurator_args.profile)
@@ -298,6 +277,13 @@ class BaseRunConfigurator(
 
     @classmethod
     def register_args(cls, parser: argparse.ArgumentParser):
+        parser.add_argument(
+            "--ssh-identity",
+            metavar="SSH_PRIVATE_KEY",
+            help="The private SSH key path for SSH tunneling",
+            type=Path,
+            dest="ssh_identity_file",
+        )
         configuration_group = parser.add_argument_group(f"{cls.TYPE.value} Options")
         configuration_group.add_argument(
             "-n",
@@ -336,6 +322,30 @@ class BaseRunConfigurator(
             dest="disk_spec",
         )
         register_profile_args(parser)
+        repo_group = parser.add_argument_group("Repo Options")
+        repo_group.add_argument(
+            "-P",
+            "--repo",
+            help=("The repo to use for the run. Can be a local path or a Git repo URL."),
+            dest="repo",
+        )
+        repo_group.add_argument(
+            "--repo-branch",
+            help="The repo branch to use for the run",
+            dest="repo_branch",
+        )
+        repo_group.add_argument(
+            "--repo-hash",
+            help="The hash of the repo commit to use for the run",
+            dest="repo_hash",
+        )
+        repo_group.add_argument(
+            "--no-repo",
+            help="Do not use any repo for the run",
+            dest="no_repo",
+            action="store_true",
+        )
+        register_init_repo_args(repo_group)
 
     def apply_args(self, conf: RunConfigurationT, args: argparse.Namespace, unknown: List[str]):
         apply_profile_args(args, conf)
@@ -464,6 +474,118 @@ class BaseRunConfigurator(
         # Servers with ARM support set the arch using the same logic.
         if arch == gpuhunt.CPUArchitecture.ARM and conf.image is None:
             raise ConfigurationError("`image` is required if `resources.cpu.arch` is `arm`")
+
+    def get_repo(
+        self,
+        conf: RunConfigurationT,
+        configuration_path: str,
+        configurator_args: argparse.Namespace,
+        config_manager: ConfigManager,
+    ) -> Repo:
+        if configurator_args.no_repo:
+            return init_default_virtual_repo(api=self.api)
+
+        repo: Optional[Repo] = None
+        repo_branch: Optional[str] = configurator_args.repo_branch
+        repo_hash: Optional[str] = configurator_args.repo_hash
+        # Should we (re)initialize the repo?
+        # If any Git credentials provided, we reinitialize the repo, as the user may have provided
+        # updated credentials.
+        init = (
+            configurator_args.git_identity_file is not None
+            or configurator_args.gh_token is not None
+        )
+
+        url: Optional[str] = None
+        local_path: Optional[Path] = None
+        # dummy value, safe to join with any path
+        root_dir = Path(".")
+        # True if no repo specified, but we found one in `config.yml`
+        legacy_local_path = False
+        if repo_arg := configurator_args.repo:
+            if is_git_repo_url(repo_arg):
+                url = repo_arg
+            else:
+                local_path = Path(repo_arg)
+                # rel paths in `--repo` are resolved relative to the current working dir
+                root_dir = Path.cwd()
+        elif conf.repos:
+            repo_spec = conf.repos[0]
+            if repo_spec.url:
+                url = repo_spec.url
+            elif repo_spec.local_path:
+                local_path = Path(repo_spec.local_path)
+                # rel paths in the conf are resolved relative to the conf's parent dir
+                root_dir = Path(configuration_path).resolve().parent
+            else:
+                assert False, f"should not reach here: {repo_spec}"
+            if repo_branch is None:
+                repo_branch = repo_spec.branch
+            if repo_hash is None:
+                repo_hash = repo_spec.hash
+        else:
+            local_path = Path.cwd()
+            legacy_local_path = True
+        if url:
+            repo = get_repo_from_url(repo_url=url, repo_branch=repo_branch, repo_hash=repo_hash)
+            if not self.api.repos.is_initialized(repo, by_user=True):
+                init = True
+        elif local_path:
+            if legacy_local_path:
+                if repo_config := config_manager.get_repo_config(local_path):
+                    repo = load_repo(repo_config)
+                    # allow users with legacy configurations use shared repo creds
+                    if self.api.repos.is_initialized(repo, by_user=False):
+                        warn(
+                            "The repo is not specified but found and will be used in the run\n"
+                            "Future versions will not load repos automatically\n"
+                            "To prepare for future versions and get rid of this warning:\n"
+                            "- If you need the repo in the run, either specify [code]repos[/code]"
+                            " in the configuration or use [code]--repo .[/code]\n"
+                            "- If you don't need the repo in the run, either run"
+                            " [code]dstack init --remove[/code] once (it removes only the record"
+                            " about the repo, the repo files will remain intact)"
+                            " or use [code]--no-repo[/code]"
+                        )
+                    else:
+                        # ignore stale entries in `config.yml`
+                        repo = None
+                        init = False
+            else:
+                original_local_path = local_path
+                local_path = local_path.expanduser()
+                if not local_path.is_absolute():
+                    local_path = (root_dir / local_path).resolve()
+                if not local_path.exists():
+                    raise ConfigurationError(
+                        f"Invalid repo path: {original_local_path} -> {local_path}"
+                    )
+                local: bool = configurator_args.local
+                repo = get_repo_from_dir(local_path, local=local)
+                if not self.api.repos.is_initialized(repo, by_user=True):
+                    init = True
+        else:
+            assert False, "should not reach here"
+
+        if repo is None:
+            return init_default_virtual_repo(api=self.api)
+
+        if init:
+            self.api.repos.init(
+                repo=repo,
+                git_identity_file=configurator_args.git_identity_file,
+                oauth_token=configurator_args.gh_token,
+            )
+        if isinstance(repo, LocalRepo):
+            warn(
+                f"{repo.repo_dir} is a local repo\n"
+                "Local repos are deprecated since 0.19.25 and will be removed soon\n"
+                "There are two options:\n"
+                "- Migrate to [code]files[/code]: https://dstack.ai/docs/concepts/tasks/#files\n"
+                "- Specify [code]--no-repo[/code] if you don't need the repo at all"
+            )
+
+        return repo
 
 
 class RunWithPortsConfiguratorMixin:
