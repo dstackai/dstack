@@ -224,7 +224,7 @@ To store logs using GCP Logging, set the `DSTACK_SERVER_GCP_LOGGING_PROJECT` env
 
 ## File storage
 
-When using [repos](../concepts/repos.md), the `dstack` CLI uploads uncommitted local files and diffs to the server so that you can have access to them within runs. By default, the files are stored in the DB and each upload is limited to 2MB. You can configure an object storage to be used for uploads and increase the default limit by setting the `DSTACK_SERVER_CODE_UPLOAD_LIMIT` environment variable
+When using  [files](../concepts/dev-environments.md#files) or [repos](../concepts/dev-environments.md#repos), `dstack` uploads local files and diffs to the server so that you can have access to them within runs. By default, the files are stored in the DB and each upload is limited to 2MB. You can configure an object storage to be used for uploads and increase the default limit by setting the `DSTACK_SERVER_CODE_UPLOAD_LIMIT` environment variable
 
 ### S3
 

@@ -14,9 +14,6 @@ $ mkdir quickstart && cd quickstart
 
 </div>
 
-> If the directory is a remote Git repo that you want to mount with workloads, run `dstack init`.
-> Starting with 0.19.26, repos will be [configurable :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/2851){:target="_blank"} in the run configuration.
-
 ## Run your first workload
 
 `dstack` supports three types of workloads.
@@ -215,18 +212,6 @@ $ mkdir quickstart && cd quickstart
         a gateway is pre-configured for you.
 
 `dstack apply` automatically provisions instances and runs the workload according to the configuration.
-
-??? info "Repo is not initialized"
-
-    If you don't run `dstack init`, you may see the following warning:
-
-    ```
-    Repo is not initialized. Use --repo <dir> or --no-repo to initialize it.
-    Starting from 0.19.26, repos will be configured via YAML and this message won't appear.
-    ```
-
-    From 0.19.26 onward, this message will no longer be shown since repos can be 
-    [configured :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/2851){:target="_blank"} in the run configuration.
 
 ## Troubleshooting
 
