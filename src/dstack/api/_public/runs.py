@@ -23,7 +23,7 @@ from dstack._internal.core.models.configurations import (
     PortMapping,
     ServiceConfiguration,
 )
-from dstack._internal.core.models.files import FileArchiveMapping, FilePathMapping
+from dstack._internal.core.models.files import FileArchiveMapping
 from dstack._internal.core.models.profiles import (
     CreationPolicy,
     Profile,
@@ -499,7 +499,6 @@ class RunCollection:
 
         self._validate_configuration_files(configuration, run_spec.configuration_path)
         for file_mapping in configuration.files:
-            assert isinstance(file_mapping, FilePathMapping)
             with tempfile.TemporaryFile("w+b") as fp:
                 try:
                     archive_hash = create_file_archive(file_mapping.local_path, fp)

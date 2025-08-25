@@ -35,7 +35,6 @@ from dstack._internal.core.models.fleets import (
     InstanceGroupPlacement,
 )
 from dstack._internal.core.models.instances import InstanceAvailability, InstanceStatus, SSHKey
-from dstack._internal.core.models.repos.base import Repo
 from dstack._internal.core.services.diff import diff_models
 from dstack._internal.utils.common import local_time
 from dstack._internal.utils.logging import get_logger
@@ -56,7 +55,6 @@ class FleetConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator[Fle
         command_args: argparse.Namespace,
         configurator_args: argparse.Namespace,
         unknown_args: List[str],
-        repo: Optional[Repo] = None,
     ):
         self.apply_args(conf, configurator_args, unknown_args)
         profile = load_profile(Path.cwd(), None)

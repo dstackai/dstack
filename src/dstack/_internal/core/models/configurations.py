@@ -1,12 +1,12 @@
 import re
+import string
 from collections import Counter
 from enum import Enum
 from pathlib import PurePosixPath
-from typing import Any, Dict, List, Optional, Union
+from typing import Annotated, Any, Dict, List, Literal, Optional, Self, Union
 
 import orjson
 from pydantic import Field, ValidationError, conint, constr, root_validator, validator
-from typing_extensions import Annotated, Literal
 
 from dstack._internal.core.errors import ConfigurationError
 from dstack._internal.core.models.common import CoreModel, Duration, RegistryAuth
@@ -81,6 +81,72 @@ class PortMapping(CoreModel):
         else:
             local_port = int(local_port)
         return PortMapping(local_port=local_port, container_port=int(container_port))
+
+
+class RepoSpec(CoreModel):
+    local_path: Annotated[
+        Optional[str],
+        Field(
+            description=(
+                "The path to the Git repo on the user's machine. Relative paths are resolved"
+                " relative to the parent directory of the the configuration file."
+                " Mutually exclusive with `url`"
+            )
+        ),
+    ] = None
+    url: Annotated[
+        Optional[str],
+        Field(description="The Git repo URL. Mutually exclusive with `local_path`"),
+    ] = None
+    branch: Annotated[
+        Optional[str],
+        Field(
+            description=(
+                "The repo branch. Defaults to the active branch for local paths"
+                " and the default branch for URLs"
+            )
+        ),
+    ] = None
+    hash: Annotated[
+        Optional[str],
+        Field(description="The commit hash"),
+    ] = None
+    # Not implemented, has no effect, hidden in the docs
+    path: str = DEFAULT_REPO_DIR
+
+    @classmethod
+    def parse(cls, v: str) -> Self:
+        is_url = False
+        parts = v.split(":")
+        if len(parts) > 1:
+            # Git repo, git@github.com:dstackai/dstack.git or https://github.com/dstackai/dstack
+            if "@" in parts[0] or parts[1].startswith("//"):
+                parts = [f"{parts[0]}:{parts[1]}", *parts[2:]]
+                is_url = True
+            # Windows path, e.g., `C:\path\to`, 'c:/path/to'
+            elif (
+                len(parts[0]) == 1
+                and parts[0] in string.ascii_letters
+                and parts[1][:1] in ["\\", "/"]
+            ):
+                parts = [f"{parts[0]}:{parts[1]}", *parts[2:]]
+        if len(parts) == 1:
+            if is_url:
+                return cls(url=parts[0])
+            return cls(local_path=parts[0])
+        if len(parts) == 2:
+            if is_url:
+                return cls(url=parts[0], path=parts[1])
+            return cls(local_path=parts[0], path=parts[1])
+        raise ValueError(f"Invalid repo: {v}")
+
+    @root_validator
+    def validate_local_path_or_url(cls, values):
+        if values["local_path"] and values["url"]:
+            raise ValueError("`local_path` and `url` are mutually exclusive")
+        if not values["local_path"] and not values["url"]:
+            raise ValueError("Either `local_path` or `url` must be specified")
+        return values
 
 
 class ScalingSpec(CoreModel):
@@ -392,6 +458,10 @@ class BaseRunConfiguration(CoreModel):
             description="Use Docker inside the container. Mutually exclusive with `image`, `python`, and `nvcc`. Overrides `privileged`"
         ),
     ] = None
+    repos: Annotated[
+        list[RepoSpec],
+        Field(description="The list of Git repos"),
+    ] = []
     files: Annotated[
         list[FilePathMapping],
         Field(description="The local to container file path mappings"),
@@ -445,6 +515,18 @@ class BaseRunConfiguration(CoreModel):
     def convert_files(cls, v: Union[FilePathMapping, str]) -> FilePathMapping:
         if isinstance(v, str):
             return FilePathMapping.parse(v)
+        return v
+
+    @validator("repos", pre=True, each_item=True)
+    def convert_repos(cls, v: Union[RepoSpec, str]) -> RepoSpec:
+        if isinstance(v, str):
+            return RepoSpec.parse(v)
+        return v
+
+    @validator("repos")
+    def validate_repos(cls, v) -> RepoSpec:
+        if len(v) > 1:
+            raise ValueError("A maximum of one repo is currently supported")
         return v
 
     @validator("user")

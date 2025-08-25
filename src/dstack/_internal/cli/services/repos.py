@@ -1,10 +1,11 @@
 import argparse
-from pathlib import Path
-from typing import Optional
+from typing import Literal, Optional, Union, overload
+
+import git
 
 from dstack._internal.cli.services.configurators.base import ArgsParser
 from dstack._internal.core.errors import CLIError
-from dstack._internal.core.models.repos.base import Repo
+from dstack._internal.core.models.repos.local import LocalRepo
 from dstack._internal.core.models.repos.remote import GitRepoURL, RemoteRepo, RepoError
 from dstack._internal.core.models.repos.virtual import VirtualRepo
 from dstack._internal.core.services.repos import get_default_branch
@@ -36,51 +37,54 @@ def register_init_repo_args(parser: ArgsParser):
     )
 
 
-def init_repo(
-    api: Client,
-    repo_path: PathLike,
-    repo_branch: Optional[str],
-    repo_hash: Optional[str],
-    local: bool,
-    git_identity_file: Optional[PathLike],
-    oauth_token: Optional[str],
-) -> Repo:
-    if Path(repo_path).exists():
-        repo = api.repos.load(
-            repo_dir=repo_path,
-            local=local,
-            init=True,
-            git_identity_file=git_identity_file,
-            oauth_token=oauth_token,
-        )
-    elif isinstance(repo_path, str):
-        try:
-            GitRepoURL.parse(repo_path)
-        except RepoError as e:
-            raise CLIError("Invalid repo path") from e
-        if repo_branch is None and repo_hash is None:
-            repo_branch = get_default_branch(repo_path)
-            if repo_branch is None:
-                raise CLIError(
-                    "Failed to automatically detect remote repo branch."
-                    " Specify --repo-branch or --repo-hash."
-                )
-        repo = RemoteRepo.from_url(
-            repo_url=repo_path,
-            repo_branch=repo_branch,
-            repo_hash=repo_hash,
-        )
-        api.repos.init(
-            repo=repo,
-            git_identity_file=git_identity_file,
-            oauth_token=oauth_token,
-        )
-    else:
-        raise CLIError("Invalid repo path")
-    return repo
-
-
 def init_default_virtual_repo(api: Client) -> VirtualRepo:
     repo = VirtualRepo()
     api.repos.init(repo)
     return repo
+
+
+def get_repo_from_url(
+    repo_url: str, repo_branch: Optional[str] = None, repo_hash: Optional[str] = None
+) -> RemoteRepo:
+    if repo_branch is None and repo_hash is None:
+        repo_branch = get_default_branch(repo_url)
+        if repo_branch is None:
+            raise CLIError(
+                "Failed to automatically detect remote repo branch. Specify branch or hash."
+            )
+    return RemoteRepo.from_url(
+        repo_url=repo_url,
+        repo_branch=repo_branch,
+        repo_hash=repo_hash,
+    )
+
+
+@overload
+def get_repo_from_dir(repo_dir: PathLike, local: Literal[False] = False) -> RemoteRepo: ...
+
+
+@overload
+def get_repo_from_dir(repo_dir: PathLike, local: Literal[True]) -> LocalRepo: ...
+
+
+def get_repo_from_dir(repo_dir: PathLike, local: bool = False) -> Union[RemoteRepo, LocalRepo]:
+    if local:
+        return LocalRepo.from_dir(repo_dir)
+    try:
+        return RemoteRepo.from_dir(repo_dir)
+    except git.InvalidGitRepositoryError:
+        raise CLIError(
+            f"Git repo not found: {repo_dir}\n"
+            "Use `files` to mount an arbitrary directory:"
+            " https://dstack.ai/docs/concepts/tasks/#files"
+        )
+    except RepoError as e:
+        raise CLIError(str(e)) from e
+
+
+def is_git_repo_url(value: str) -> bool:
+    try:
+        GitRepoURL.parse(value)
+    except RepoError:
+        return False
+    return True

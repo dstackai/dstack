@@ -2,7 +2,12 @@ from typing import BinaryIO, List, Optional
 
 from pydantic import parse_obj_as
 
-from dstack._internal.core.models.repos import AnyRepoInfo, RemoteRepoCreds, RepoHead
+from dstack._internal.core.models.repos import (
+    AnyRepoInfo,
+    RemoteRepoCreds,
+    RepoHead,
+    RepoHeadWithCreds,
+)
 from dstack._internal.server.schemas.repos import (
     DeleteReposRequest,
     GetRepoRequest,
@@ -16,10 +21,22 @@ class ReposAPIClient(APIClientGroup):
         resp = self._request(f"/api/project/{project_name}/repos/list")
         return parse_obj_as(List[RepoHead.__response__], resp.json())
 
-    def get(self, project_name: str, repo_id: str, include_creds: bool) -> RepoHead:
-        body = GetRepoRequest(repo_id=repo_id, include_creds=include_creds)
+    def get(
+        self, project_name: str, repo_id: str, include_creds: Optional[bool] = None
+    ) -> RepoHead:
+        if include_creds is not None:
+            self._logger.warning(
+                "`include_creds` argument is deprecated and has no effect, `get()` always returns"
+                " the repo without creds. Use `get_with_creds()` to get the repo with creds"
+            )
+        body = GetRepoRequest(repo_id=repo_id, include_creds=False)
         resp = self._request(f"/api/project/{project_name}/repos/get", body=body.json())
         return parse_obj_as(RepoHead.__response__, resp.json())
+
+    def get_with_creds(self, project_name: str, repo_id: str) -> RepoHeadWithCreds:
+        body = GetRepoRequest(repo_id=repo_id, include_creds=True)
+        resp = self._request(f"/api/project/{project_name}/repos/get", body=body.json())
+        return parse_obj_as(RepoHeadWithCreds.__response__, resp.json())
 
     def init(
         self,
