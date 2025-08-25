@@ -1,13 +1,10 @@
 # dstack init
 
-This command initializes the current directory as a `dstack` [repo](../../../concepts/repos.md).
-The directory must be a cloned Git repository.
+If you’re using private Git repos in your runs via [`repos`](../../../concepts/dev-environments.md#repos),
+`dstack` will automatically try to use your default Git credentials (from
+`~/.ssh/config` or `~/.config/gh/hosts.yml`). 
 
-**Git credentials**
-
-`dstack init` ensures that `dstack` can access a remote Git repository.
-By default, the command uses the user's default Git credentials. These can be overridden with
-`--git-identity` (private SSH key) or `--token` (OAuth token).
+To provide custom Git credentials, run `dstack init`. 
 
 <div class="termy">
 
@@ -17,3 +14,7 @@ $ dstack init --help
 ```
 
 </div>
+
+You can set credentials with  `--git-identity` (private SSH key) or `--token` (OAuth token).
+
+Run `dstack init` in the repo’s directory, or pass the repo path or URL with `--repo` (or `-P`).
