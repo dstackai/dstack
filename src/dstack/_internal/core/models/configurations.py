@@ -3,10 +3,11 @@ import string
 from collections import Counter
 from enum import Enum
 from pathlib import PurePosixPath
-from typing import Annotated, Any, Dict, List, Literal, Optional, Self, Union
+from typing import Annotated, Any, Dict, List, Literal, Optional, Union
 
 import orjson
 from pydantic import Field, ValidationError, conint, constr, root_validator, validator
+from typing_extensions import Self
 
 from dstack._internal.core.errors import ConfigurationError
 from dstack._internal.core.models.common import CoreModel, Duration, RegistryAuth
