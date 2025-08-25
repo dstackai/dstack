@@ -810,6 +810,46 @@ class TestProcessSubmittedJobs:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_assigns_job_to_elastic_non_empty_busy_fleet_if_fleets_specified(
+        self, test_db, session: AsyncSession
+    ):
+        project = await create_project(session)
+        user = await create_user(session)
+        repo = await create_repo(session=session, project_id=project.id)
+        fleet_spec = get_fleet_spec()
+        fleet_spec.configuration.nodes = Range(min=1, max=2)
+        fleet = await create_fleet(session=session, project=project, spec=fleet_spec, name="fleet")
+        await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            instance_num=0,
+            status=InstanceStatus.BUSY,
+            total_blocks=1,
+            busy_blocks=1,
+        )
+        run_spec = get_run_spec(repo_id=repo.name)
+        run_spec.configuration.fleets = [fleet.name]
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_spec=run_spec,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            instance_assigned=False,
+        )
+        await process_submitted_jobs()
+        await session.refresh(job)
+        assert job.instance_assigned
+        assert job.instance_id is None
+        assert job.fleet_id == fleet.id
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_creates_new_instance_in_existing_empty_fleet(
         self, test_db, session: AsyncSession
     ):
