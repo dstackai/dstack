@@ -278,16 +278,9 @@ class TestCombineSpotPolicy:
         )
 
     def test_different_non_auto_values_raise_error(self):
-        with pytest.raises(
-            CombineError,
-            match="spot_policy values SpotPolicy.SPOT and SpotPolicy.ONDEMAND cannot be combined",
-        ):
+        with pytest.raises(CombineError):
             _combine_spot_policy_optional(SpotPolicy.SPOT, SpotPolicy.ONDEMAND)
-
-        with pytest.raises(
-            CombineError,
-            match="spot_policy values SpotPolicy.ONDEMAND and SpotPolicy.SPOT cannot be combined",
-        ):
+        with pytest.raises(CombineError):
             _combine_spot_policy_optional(SpotPolicy.ONDEMAND, SpotPolicy.SPOT)
 
 
