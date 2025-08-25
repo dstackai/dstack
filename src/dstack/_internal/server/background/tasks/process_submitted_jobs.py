@@ -250,8 +250,8 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         ]
         if run_model.fleet is not None:
             fleet_filters.append(FleetModel.id == run_model.fleet_id)
-        if run_spec.configuration.fleets is not None:
-            fleet_filters.append(FleetModel.name.in_(run_spec.configuration.fleets))
+        if run_spec.merged_profile.fleets is not None:
+            fleet_filters.append(FleetModel.name.in_(run_spec.merged_profile.fleets))
 
         instance_filters = [
             InstanceModel.deleted == False,
@@ -295,7 +295,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
                 master_job_provisioning_data=master_job_provisioning_data,
                 volumes=volumes,
             )
-            if fleet_model is None and run_spec.configuration.fleets is not None:
+            if fleet_model is None and run_spec.merged_profile.fleets is not None:
                 # Run cannot create new fleets when fleets are specified
                 logger.debug("%s: failed to use specified fleets", fmt(job_model))
                 job_model.status = JobStatus.TERMINATING
@@ -538,7 +538,7 @@ def _find_optimal_fleet_with_offers(
                 fleet_priority,
             )
         )
-    if run_spec.configuration.fleets is None and all(
+    if run_spec.merged_profile.fleets is None and all(
         t[2] == 0 for t in candidate_fleets_with_offers
     ):
         # If fleets are not specified and no fleets have available offers, create a new fleet.
