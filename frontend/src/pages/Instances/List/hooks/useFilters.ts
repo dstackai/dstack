@@ -20,8 +20,6 @@ export const useFilters = (localStorePrefix = 'instances-list-page') => {
     const { projectOptions } = useProjectFilter({ localStorePrefix });
 
     const [propertyFilterQuery, setPropertyFilterQuery] = useState<PropertyFilterProps.Query>(() => {
-        console.log(requestParamsToTokens<RequestParamsKeys>({ searchParams, filterKeys }));
-
         return requestParamsToTokens<RequestParamsKeys>({ searchParams, filterKeys });
     });
 

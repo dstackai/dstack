@@ -78,7 +78,8 @@
     "billing": "Billing",
     "resources": "Resources",
     "volumes": "Volumes",
-    "instances": "Instances"
+    "instances": "Instances",
+    "offers": "Offers"
   },
 
   "backend": {
@@ -445,6 +446,20 @@
       "type": "Type",
       "size": "Size"
     }
+  },
+  "offer": {
+    "title": "Offers",
+    "project_name_label": "Project name",
+    "filter_property_placeholder": "Filter offers by properties",
+    "backend": "Backend",
+    "region": "Region",
+    "count": "Count",
+    "price": "Price",
+    "memory_mib": "Memmory",
+    "empty_message_title": "No offers",
+    "empty_message_text": "No offers to display.",
+    "nomatch_message_title": "No matches",
+    "nomatch_message_text": "We can't find a match."
   },
 
   "models": {

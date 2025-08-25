@@ -1,0 +1,22 @@
+.selectFilters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 20px;
+
+  .filterField {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .selectFilter {
+    flex-shrink: 0;
+    width: 240px;
+  }
+
+  .propertyFilter {
+    max-width: 640px;
+    flex-grow: 1;
+    min-width: 0;
+  }
+}
