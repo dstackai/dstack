@@ -397,7 +397,7 @@ class ProfileProps(CoreModel):
         Field(
             description="The name of the profile that can be passed as `--profile` to `dstack apply`"
         ),
-    ]
+    ] = ""
     default: Annotated[
         bool, Field(description="If set to true, `dstack apply` will use this profile by default.")
     ] = False
