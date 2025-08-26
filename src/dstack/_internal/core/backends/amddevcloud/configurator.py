@@ -1,26 +1,23 @@
-from dstack._internal.core.backends.base.configurator import BackendRecord
-from dstack._internal.core.backends.digitalocean.backend import DigitalOceanBackend
+from dstack._internal.core.backends.amddevcloud.backend import AMDDevCloudBackend
 from dstack._internal.core.backends.digitalocean_base.api_client import DigitalOceanAPIClient
 from dstack._internal.core.backends.digitalocean_base.backend import BaseDigitalOceanBackend
 from dstack._internal.core.backends.digitalocean_base.configurator import (
     BaseDigitalOceanConfigurator,
 )
-from dstack._internal.core.backends.digitalocean_base.models import (
-    AnyBaseDigitalOceanCreds,
-)
+from dstack._internal.core.backends.digitalocean_base.models import AnyBaseDigitalOceanCreds
 from dstack._internal.core.models.backends.base import (
     BackendType,
 )
 
 
-class DigitalOceanConfigurator(BaseDigitalOceanConfigurator):
-    TYPE = BackendType.DIGITALOCEAN
-    BACKEND_CLASS = DigitalOceanBackend
-    API_URL = "https://api.digitalocean.com"
+class AMDDevCloudConfigurator(BaseDigitalOceanConfigurator):
+    TYPE = BackendType.AMDDEVCLOUD
+    BACKEND_CLASS = AMDDevCloudBackend
+    API_URL = "https://api-amd.digitalocean.com"
 
-    def get_backend(self, record: BackendRecord) -> BaseDigitalOceanBackend:
+    def get_backend(self, record) -> BaseDigitalOceanBackend:
         config = self._get_config(record)
-        return DigitalOceanBackend(config=config, api_url=self.API_URL)
+        return AMDDevCloudBackend(config=config, api_url=self.API_URL)
 
     def _validate_creds(self, creds: AnyBaseDigitalOceanCreds):
         api_client = DigitalOceanAPIClient(creds.api_key, self.API_URL)

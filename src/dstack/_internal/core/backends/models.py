@@ -20,10 +20,10 @@ from dstack._internal.core.backends.datacrunch.models import (
     DataCrunchBackendConfig,
     DataCrunchBackendConfigWithCreds,
 )
-from dstack._internal.core.backends.digitalocean.models import (
-    DigitalOceanBackendConfig,
-    DigitalOceanBackendConfigWithCreds,
-    DigitalOceanBackendFileConfigWithCreds,
+from dstack._internal.core.backends.digitalocean_base.models import (
+    BaseDigitalOceanBackendConfig,
+    BaseDigitalOceanBackendConfigWithCreds,
+    BaseDigitalOceanBackendFileConfigWithCreds,
 )
 from dstack._internal.core.backends.dstack.models import (
     DstackBackendConfig,
@@ -82,7 +82,7 @@ AnyBackendConfigWithoutCreds = Union[
     CloudRiftBackendConfig,
     CudoBackendConfig,
     DataCrunchBackendConfig,
-    DigitalOceanBackendConfig,
+    BaseDigitalOceanBackendConfig,
     GCPBackendConfig,
     HotAisleBackendConfig,
     KubernetesBackendConfig,
@@ -106,7 +106,7 @@ AnyBackendConfigWithCreds = Union[
     CloudRiftBackendConfigWithCreds,
     CudoBackendConfigWithCreds,
     DataCrunchBackendConfigWithCreds,
-    DigitalOceanBackendConfigWithCreds,
+    BaseDigitalOceanBackendConfigWithCreds,
     GCPBackendConfigWithCreds,
     HotAisleBackendConfigWithCreds,
     KubernetesBackendConfigWithCreds,
@@ -129,7 +129,7 @@ AnyBackendFileConfigWithCreds = Union[
     CloudRiftBackendConfigWithCreds,
     CudoBackendConfigWithCreds,
     DataCrunchBackendConfigWithCreds,
-    DigitalOceanBackendFileConfigWithCreds,
+    BaseDigitalOceanBackendFileConfigWithCreds,
     GCPBackendFileConfigWithCreds,
     HotAisleBackendFileConfigWithCreds,
     KubernetesBackendFileConfigWithCreds,

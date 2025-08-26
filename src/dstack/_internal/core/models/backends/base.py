@@ -4,6 +4,7 @@ import enum
 class BackendType(str, enum.Enum):
     """
     Attributes:
+        AMDDEVCLOUD (BackendType): AMD Developer Cloud
         AWS (BackendType): Amazon Web Services
         AZURE (BackendType): Microsoft Azure
         CLOUDRIFT (BackendType): CloudRift
@@ -23,6 +24,7 @@ class BackendType(str, enum.Enum):
         VULTR (BackendType): Vultr
     """
 
+    AMDDEVCLOUD = "amddevcloud"
     AWS = "aws"
     AZURE = "azure"
     CLOUDRIFT = "cloudrift"

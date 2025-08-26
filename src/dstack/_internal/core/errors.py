@@ -90,10 +90,6 @@ class BackendAuthError(BackendError):
     pass
 
 
-class BackendRateLimitExceededError(BackendError):
-    pass
-
-
 class ComputeError(BackendError):
     pass
 
