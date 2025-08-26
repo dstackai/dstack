@@ -243,6 +243,7 @@ def _deploy_instance(
             hostname=hostname,
             description=description,
             startup_script_id=startup_script_id,
+            pricing="FIXED_PRICE",
             is_spot=is_spot,
             location=location,
             os_volume={"name": "OS volume", "size": disk_size},
