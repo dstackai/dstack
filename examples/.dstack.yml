@@ -4,9 +4,9 @@ name: cursor
 python: 3.12
 ide: cursor
 
-files: 
-  - .:examples
-  - ~/.ssh/id_rsa:/root/.ssh/id_rsa
+# Mount the repo directory to `/workflow` (the default working directory)
+repos:
+  - ..
 
 resources:
-  gpu: 1
+ gpu: 1

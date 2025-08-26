@@ -342,7 +342,7 @@ ide: vscode
 
 Sometimes, you may want to mount an entire Git repo inside the container.
 
-Imagine you have a cloned Git repo containing an `examples` directory with a `.dstack.yml` file:
+Imagine you have a cloned Git repo containing an `examples` subdirectory with a `.dstack.yml` file:
 
 <div editor-title="examples/.dstack.yml"> 
 
@@ -351,9 +351,9 @@ type: dev-environment
 name: vscode    
 
 repos:
-  # Maps the parent directory of `examples` (if it's a Git repo) 
-  # to `/workflow` (the default working directory)
-  - ../..
+  # Mounts the parent directory of `examples` (must be a Git repo)
+  #   to `/workflow` (the default working directory)
+  - ..
 
 ide: vscode
 ```
