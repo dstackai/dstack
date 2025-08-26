@@ -110,11 +110,11 @@ def make_sdk(creds: NebiusServiceAccountCreds) -> SDK:
 
 def wait_for_operation(
     op: SDKOperation[Operation],
-    per_retry_timeout: float,
+    timeout: float,
     interval: float = 1,
 ) -> None:
     # Re-implementation of SDKOperation.wait() to avoid https://github.com/nebius/pysdk/issues/74
-    deadline = time.monotonic() + per_retry_timeout
+    deadline = time.monotonic() + timeout
     while not op.done():
         if time.monotonic() + interval > deadline:
             raise TimeoutError(f"Operation {op.id} wait timeout")

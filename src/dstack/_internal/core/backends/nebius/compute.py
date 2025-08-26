@@ -165,7 +165,7 @@ class NebiusCompute(
         create_instance_op = None
         try:
             logger.debug("Blocking until disk %s is created", create_disk_op.resource_id)
-            resources.wait_for_operation(create_disk_op, per_retry_timeout=WAIT_FOR_DISK_TIMEOUT)
+            resources.wait_for_operation(create_disk_op, timeout=WAIT_FOR_DISK_TIMEOUT)
             if not create_disk_op.successful():
                 raw_op = create_disk_op.raw()
                 raise ProvisioningError(
@@ -196,7 +196,7 @@ class NebiusCompute(
                             self._sdk, create_instance_op.resource_id
                         )
                     resources.wait_for_operation(
-                        delete_instance_op, per_retry_timeout=DELETE_INSTANCE_TIMEOUT
+                        delete_instance_op, timeout=DELETE_INSTANCE_TIMEOUT
                     )
                 except Exception as e:
                     logger.exception(
