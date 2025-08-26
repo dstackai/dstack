@@ -1,0 +1,17 @@
+type: dev-environment
+name: wan22
+ide: vscode
+nvcc: true
+repos:
+  - https://github.com/Wan-Video/Wan2.2.git
+init:
+  - |
+    pip install torch
+    pip install -r requirements.txt
+    pip install "huggingface_hub[cli]"
+    huggingface-cli download Wan-AI/Wan2.2-T2V-A14B --local-dir ./Wan2.2-T2V-A14B
+resources: 
+  gpu:
+    name: H100
+    count: 8 # Set to 1.. if 8 GPUs not available trading inferece speed
+  disk: 200GB
