@@ -96,7 +96,7 @@ class BaseDigitalOceanCompute(
         else:
             backend_specific_commands = SETUP_COMMANDS
 
-        # Prepare droplet configuration
+        project_id = self.api_client.get_project_id(self.config.project_name)
         droplet_config = {
             "name": instance_name,
             "region": instance_offer.region,
@@ -111,6 +111,7 @@ class BaseDigitalOceanCompute(
                 authorized_keys=instance_config.get_public_keys(),
                 backend_specific_commands=backend_specific_commands,
             ),
+            **({"project_id": project_id} if project_id is not None else {}),
         }
 
         droplet = self.api_client.create_droplet(droplet_config)

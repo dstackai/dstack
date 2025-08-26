@@ -32,6 +32,18 @@ class DigitalOceanAPIClient:
         response.raise_for_status()
         return response.json()["ssh_keys"]
 
+    def list_projects(self) -> List[Dict[str, Any]]:
+        response = self._make_request("GET", "/v2/projects")
+        response.raise_for_status()
+        return response.json()["projects"]
+
+    def get_project_id(self, project_name: str) -> Optional[str]:
+        projects = self.list_projects()
+        for project in projects:
+            if project["name"] == project_name:
+                return project["id"]
+        return None
+
     def create_ssh_key(self, name: str, public_key: str) -> Dict[str, Any]:
         payload = {"name": name, "public_key": public_key}
         response = self._make_request("POST", "/v2/account/keys", json=payload)
