@@ -148,14 +148,15 @@ type TaskStorage struct {
 	mu    sync.RWMutex
 }
 
-func (ts *TaskStorage) IDs() []string {
+// Get a _copy_ of all tasks. To "commit" changes, use Update()
+func (ts *TaskStorage) List() []Task {
 	ts.mu.RLock()
 	defer ts.mu.RUnlock()
-	ids := make([]string, 0, len(ts.tasks))
-	for id := range ts.tasks {
-		ids = append(ids, id)
+	tasks := make([]Task, 0, len(ts.tasks))
+	for _, task := range ts.tasks {
+		tasks = append(tasks, task)
 	}
-	return ids
+	return tasks
 }
 
 // Get a _copy_ of the task. To "commit" changes, use Update()

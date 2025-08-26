@@ -15,7 +15,7 @@ type InstanceHealthResponse struct {
 }
 
 type TaskListResponse struct {
-	IDs []string `json:"ids"`
+	Tasks []*shim.TaskListItem `json:"tasks"`
 }
 
 type TaskInfoResponse struct {

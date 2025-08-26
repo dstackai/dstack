@@ -396,13 +396,22 @@ components:
       title: shim.api.TaskListResponse
       type: object
       properties:
-        ids:
+        tasks:
           type: array
           items:
-            $ref: "#/components/schemas/TaskID"
-          description: A list of all task IDs tracked by shim
+            type: object
+            properties:
+              id:
+                $ref: "#/components/schemas/TaskID"
+              status:
+                allOf:
+                  - $ref: "#/components/schemas/TaskStatus"
+            required:
+              - id
+              - status
+          description: A list of all tasks tracked by shim, each with its ID and status
       required:
-        - ids
+        - tasks
       additionalProperties: false
 
     TaskInfoResponse:

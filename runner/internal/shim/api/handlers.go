@@ -36,7 +36,8 @@ func (s *ShimServer) InstanceHealthHandler(w http.ResponseWriter, r *http.Reques
 }
 
 func (s *ShimServer) TaskListHandler(w http.ResponseWriter, r *http.Request) (interface{}, error) {
-	return &TaskListResponse{IDs: s.runner.TaskIDs()}, nil
+	tasks := s.runner.TaskList()
+	return &TaskListResponse{tasks}, nil
 }
 
 func (s *ShimServer) TaskInfoHandler(w http.ResponseWriter, r *http.Request) (interface{}, error) {

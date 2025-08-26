@@ -159,6 +159,16 @@ class GPUDevice(CoreModel):
     path_in_container: str
 
 
+class TaskListItem(CoreModel):
+    id: str
+    status: TaskStatus
+
+
+class TaskListResponse(CoreModel):
+    ids: Optional[list[str]] = None  # returned by pre-TODO shim
+    tasks: Optional[list[TaskListItem]] = None  # returned by TODO+ shim
+
+
 class TaskInfoResponse(CoreModel):
     id: str
     status: TaskStatus
