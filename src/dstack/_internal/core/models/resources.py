@@ -226,6 +226,10 @@ class GPUSpec(CoreModel):
                 extra_types=[{"type": "integer"}, {"type": "string"}],
             )
             add_extra_schema_types(
+                schema["properties"]["name"],
+                extra_types=[{"type": "string"}],
+            )
+            add_extra_schema_types(
                 schema["properties"]["memory"],
                 extra_types=[{"type": "integer"}, {"type": "string"}],
             )
