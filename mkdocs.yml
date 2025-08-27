@@ -292,6 +292,8 @@ nav:
         - TPU: examples/accelerators/tpu/index.md
         - Intel Gaudi: examples/accelerators/intel/index.md
         - Tenstorrent: examples/accelerators/tenstorrent/index.md
+    - Models:
+        - Wan2.2: examples/models/wan22/index.md
   - Changelog: blog/changelog.md
   - Case studies: blog/case-studies.md
   - Benchmarks: blog/benchmarks.md
