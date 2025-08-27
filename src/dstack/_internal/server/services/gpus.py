@@ -79,8 +79,8 @@ def _process_offers_into_backend_gpus(
     """Transforms raw offers into a structured list of BackendGpus, aggregating GPU info."""
     backend_data: Dict[BackendType, Dict] = {}
 
-    for backend, offer in offers:
-        backend_type = backend.TYPE
+    for _, offer in offers:
+        backend_type = offer.backend
         if backend_type not in backend_data:
             backend_data[backend_type] = {"gpus": {}, "regions": set()}
 
