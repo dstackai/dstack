@@ -588,12 +588,7 @@ resources:
 
 ### Files
 
-By default, `dstack` automatically mounts the [repo](repos.md) directory where you ran `dstack init` to any run configuration. 
-
-If you configured a [repo](repos.md), `dstack` automatically mounts its content (incl. your local changes) inside the container.
-
-In some cases, you don’t need to mount an entire repo and can mount only specific directories. This can be done using
-[`files`](../reference/dstack.yml/task.md#_files) instead of repos.
+Sometimes, when you run a service, you may want to mount local files. This is possible via the [`files`](../reference/dstack.yml/task.md#_files) property. Each entry maps a local directory or file to a path inside the container.
 
 <!-- TODO: Add a more relevant example -->
 
@@ -625,13 +620,11 @@ resources:
 
 Each entry maps a local directory or file to a path inside the container. Both local and container paths can be relative or absolute.
 
-- If the local path is relative, it’s resolved relative to the configuration file.
-- If the container path is relative, it’s resolved relative to `/workflow`.
+If the local path is relative, it’s resolved relative to the configuration file. If the container path is relative, it’s resolved relative to `/workflow`.
 
 The container path is optional. If not specified, it will be automatically calculated.
 
 <!-- TODO: Add a more relevant example -->
-
 
 <div editor-title="examples/.dstack.yml"> 
 
@@ -659,27 +652,99 @@ resources:
 
 </div>
 
-Note: If you want to use `files` without mounting the entire repo directory,
-make sure to pass `--no-repo` when running `dstack apply`:
+??? info "Upload limit and excludes"
+    Whether its a file or folder, each entry is limited to 2MB. To avoid exceeding this limit, make sure to exclude unnecessary files
+    by listing it via `.gitignore` or `.dstackignore`.
+    The 2MB upload limit can be increased by setting the `DSTACK_SERVER_CODE_UPLOAD_LIMIT` environment variable.
 
-<div class="termy">
+### Repos
 
-```shell
-$ dstack apply -f examples/.dstack.yml --no-repo
+Sometimes, you may want to mount an entire Git repo inside the container.
+
+Imagine you have a cloned Git repo containing an `examples` subdirectory with a `.dstack.yml` file:
+
+<!-- TODO: Add a more relevant example -->
+
+<div editor-title="examples/.dstack.yml"> 
+
+```yaml
+type: service
+name: llama-2-7b-service
+
+repos:
+  # Mounts the parent directory of `examples` (must be a Git repo)
+  #   to `/workflow` (the default working directory)
+  - ..
+
+python: 3.12
+
+env:
+  - HF_TOKEN
+  - MODEL=NousResearch/Llama-2-7b-chat-hf
+commands:
+  - uv pip install vllm
+  - python -m vllm.entrypoints.openai.api_server --model $MODEL --port 8000
+port: 8000
+
+resources:
+  gpu: 24GB
 ```
 
 </div>
 
-??? info ".gitignore and .dstackignore"
-    If you configured a [repo](repos.md) or [files](#files), `dstack` excludes files and folders listed in `.gitignore` and `.dstackignore`.
-    
-    Uploads are limited to 2MB. To avoid exceeding this limit, make sure to exclude unnecessary files.
-    You can increase the default server limit by setting the `DSTACK_SERVER_CODE_UPLOAD_LIMIT` environment variable.
+When you run it, `dstack` fetches the repo on the instance, applies your local changes, and mounts it—so the container matches your local repo.
 
+The local path can be either relative to the configuration file or absolute.
 
-!!! warning "Experimental"
-    The `files` feature is experimental. Feedback is highly appreciated.
-    
+??? info "Path"
+    Currently, `dstack` always mounts the repo to `/workflow` inside the container. It's the default working directory. 
+    Starting with the next release, it will be possible to specify a custom container path.
+
+??? info "Local diff limit and excludes"
+    The local diff size is limited to 2MB. To avoid exceeding this limit, exclude unnecessary files
+    via `.gitignore` or `.dstackignore`.
+    The 2MB local diff limit can be increased by setting the `DSTACK_SERVER_CODE_UPLOAD_LIMIT` environment variable.
+
+??? info "Repo URL"
+
+    Sometimes you may want to mount a Git repo without cloning it locally. In this case, simply provide a URL in `repos`:
+
+    <!-- TODO: Add a more relevant example -->
+
+    <div editor-title="examples/.dstack.yml"> 
+
+    ```yaml
+    type: service
+    name: llama-2-7b-service
+
+    repos:
+      # Clone the specified repo to `/workflow` (the default working directory)
+      - https://github.com/dstackai/dstack
+
+    python: 3.12
+
+    env:
+      - HF_TOKEN
+      - MODEL=NousResearch/Llama-2-7b-chat-hf
+    commands:
+      - uv pip install vllm
+      - python -m vllm.entrypoints.openai.api_server --model $MODEL --port 8000
+    port: 8000
+
+    resources:
+      gpu: 24GB
+    ```
+
+    </div>
+
+??? info "Private repos"
+    If a Git repo is private, `dstack` will automatically try to use your default Git credentials (from
+    `~/.ssh/config` or `~/.config/gh/hosts.yml`).
+
+    If you want to use custom credentials, you can provide them with [`dstack init`](../reference/cli/dstack/init.md).
+
+> Currently, you can configure up to one repo per run configuration.
+
 ### Retry policy
 
 By default, if `dstack` can't find capacity, or the service exits with an error, or the instance is interrupted, the run will fail.
@@ -858,7 +923,7 @@ The rolling deployment stops when all replicas are updated or when a new deploym
 ??? info "Supported properties"
     <!-- NOTE: should be in sync with constants in server/services/runs.py -->
 
-    Rolling deployment supports changes to the following properties: `port`, `probes`, `resources`, `volumes`, `docker`, `files`, `image`, `user`, `privileged`, `entrypoint`, `working_dir`, `python`, `nvcc`, `single_branch`, `env`, `shell`, `commands`, as well as changes to [repo](repos.md) or [file](#files) contents.
+    Rolling deployment supports changes to the following properties: `port`, `probes`, `resources`, `volumes`, `docker`, `files`, `image`, `user`, `privileged`, `entrypoint`, `working_dir`, `python`, `nvcc`, `single_branch`, `env`, `shell`, `commands`, as well as changes to [repo](#repos) or [file](#files) contents.
 
     Changes to `replicas` and `scaling` can be applied without redeploying replicas.
 
@@ -870,7 +935,7 @@ The rolling deployment stops when all replicas are updated or when a new deploym
 --8<-- "docs/concepts/snippets/manage-runs.ext"
 
 !!! info "What's next?"
-    1. Read about [dev environments](dev-environments.md), [tasks](tasks.md), and [repos](repos.md)
+    1. Read about [dev environments](dev-environments.md) and [tasks](tasks.md)
     2. Learn how to manage [fleets](fleets.md)
     3. See how to set up [gateways](gateways.md)
     4. Check the [TGI :material-arrow-top-right-thin:{ .external }](../../examples/inference/tgi/index.md){:target="_blank"},

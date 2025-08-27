@@ -296,10 +296,7 @@ If you don't assign a value to an environment variable (see `HF_TOKEN` above),
 
 ### Files
 
-If you configured a [repo](repos.md), `dstack` automatically mounts its content (incl. your local changes) inside the container.
-
-In some cases, you don’t need to mount an entire repo and can mount only specific directories. This can be done using
-[`files`](../reference/dstack.yml/task.md#_files) instead of repos.
+Sometimes, when you run a dev environment, you may want to mount local files. This is possible via the [`files`](../reference/dstack.yml/task.md#_files) property. Each entry maps a local directory or file to a path inside the container.
 
 <div editor-title="examples/.dstack.yml"> 
 
@@ -316,12 +313,10 @@ ide: vscode
 
 </div>
 
-Each entry maps a local directory or file to a path inside the container. Both local and container paths can be relative or absolute.
+If the local path is relative, it’s resolved relative to the configuration file.
+If the container path is relative, it’s resolved relative to `/workflow`.
 
-- If the local path is relative, it’s resolved relative to the configuration file.
-- If the container path is relative, it’s resolved relative to `/workflow`.
-
-The container path is optional. If not specified, it will be automatically calculated.
+The container path is optional. If not specified, it will be automatically calculated:
 
 <div editor-title="examples/.dstack.yml"> 
 
@@ -338,25 +333,71 @@ ide: vscode
 
 </div>
 
-Note: If you want to use `files` without mounting the entire repo directory,
-make sure to pass `--no-repo` when running `dstack apply`:
+??? info "Upload limit and excludes"
+    Whether its a file or folder, each entry is limited to 2MB. To avoid exceeding this limit, make sure to exclude unnecessary files
+    by listing it via `.gitignore` or `.dstackignore`.
+    The 2MB upload limit can be increased by setting the `DSTACK_SERVER_CODE_UPLOAD_LIMIT` environment variable.
 
-<div class="termy">
+### Repos
 
-```shell
-$ dstack apply -f examples/.dstack.yml --no-repo
+Sometimes, you may want to mount an entire Git repo inside the container.
+
+Imagine you have a cloned Git repo containing an `examples` subdirectory with a `.dstack.yml` file:
+
+<div editor-title="examples/.dstack.yml"> 
+
+```yaml
+type: dev-environment
+name: vscode    
+
+repos:
+  # Mounts the parent directory of `examples` (must be a Git repo)
+  #   to `/workflow` (the default working directory)
+  - ..
+
+ide: vscode
 ```
 
 </div>
 
-??? info ".gitignore and .dstackignore"
-    If you configured a [repo](repos.md) or [files](#files), `dstack` excludes files and folders listed in `.gitignore` and `.dstackignore`.
-    
-    Uploads are limited to 2MB. To avoid exceeding this limit, make sure to exclude unnecessary files.
-    You can increase the default server limit by setting the `DSTACK_SERVER_CODE_UPLOAD_LIMIT` environment variable.
+When you run it, `dstack` fetches the repo on the instance, applies your local changes, and mounts it—so the container matches your local repo.
 
-!!! warning "Experimental"
-    The `files` feature is experimental. Feedback is highly appreciated.
+The local path can be either relative to the configuration file or absolute.
+
+??? info "Path"
+    Currently, `dstack` always mounts the repo to `/workflow` inside the container. It's the default working directory. 
+    Starting with the next release, it will be possible to specify a custom container path.
+
+??? info "Local diff limit and excludes"
+    The local diff size is limited to 2MB. To avoid exceeding this limit, exclude unnecessary files
+    via `.gitignore` or `.dstackignore`.
+    The 2MB local diff limit can be increased by setting the `DSTACK_SERVER_CODE_UPLOAD_LIMIT` environment variable.
+
+??? info "Repo URL"
+    Sometimes you may want to mount a Git repo without cloning it locally. In this case, simply provide a URL in `repos`:
+
+    <div editor-title="examples/.dstack.yml"> 
+
+    ```yaml
+    type: dev-environment
+    name: vscode    
+
+    repos:
+      # Clone the specified repo to `/workflow` (the default working directory)
+      - https://github.com/dstackai/dstack
+
+    ide: vscode
+    ```
+
+    </div>
+
+??? info "Private repos"
+    If a Git repo is private, `dstack` will automatically try to use your default Git credentials (from
+    `~/.ssh/config` or `~/.config/gh/hosts.yml`).
+
+    If you want to use custom credentials, you can provide them with [`dstack init`](../reference/cli/dstack/init.md).
+
+> Currently, you can configure up to one repo per run configuration.
 
 ### Retry policy
 
@@ -534,5 +575,5 @@ via the [`spot_policy`](../reference/dstack.yml/dev-environment.md#spot_policy) 
 --8<-- "docs/concepts/snippets/manage-runs.ext"
 
 !!! info "What's next?"
-    1. Read about [tasks](tasks.md), [services](services.md), and [repos](repos.md)
+    1. Read about [tasks](tasks.md) and [services](services.md)
     2. Learn how to manage [fleets](fleets.md)
