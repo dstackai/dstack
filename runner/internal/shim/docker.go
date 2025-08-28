@@ -216,8 +216,13 @@ func (d *DockerRunner) Resources(ctx context.Context) Resources {
 	}
 }
 
-func (d *DockerRunner) TaskIDs() []string {
-	return d.tasks.IDs()
+func (d *DockerRunner) TaskList() []*TaskListItem {
+	tasks := d.tasks.List()
+	result := make([]*TaskListItem, 0, len(tasks))
+	for _, task := range tasks {
+		result = append(result, &TaskListItem{ID: task.ID, Status: task.Status})
+	}
+	return result
 }
 
 func (d *DockerRunner) TaskInfo(taskID string) TaskInfo {

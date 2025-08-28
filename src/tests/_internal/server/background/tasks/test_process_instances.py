@@ -1,8 +1,9 @@
 import datetime as dt
 from collections import defaultdict
+from collections.abc import Generator
 from contextlib import contextmanager
 from typing import Optional
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, call, patch
 
 import gpuhunt
 import pytest
@@ -41,7 +42,12 @@ from dstack._internal.server.background.tasks.process_instances import (
 from dstack._internal.server.models import InstanceHealthCheckModel, PlacementGroupModel
 from dstack._internal.server.schemas.health.dcgm import DCGMHealthResponse, DCGMHealthResult
 from dstack._internal.server.schemas.instances import InstanceCheck
-from dstack._internal.server.schemas.runner import InstanceHealthResponse
+from dstack._internal.server.schemas.runner import (
+    InstanceHealthResponse,
+    TaskListItem,
+    TaskListResponse,
+    TaskStatus,
+)
 from dstack._internal.server.testing.common import (
     ComputeMockSpec,
     create_fleet,
@@ -375,6 +381,116 @@ class TestCheckShim:
         health_check = res.scalars().one()
         assert health_check.status == HealthStatus.WARNING
         assert health_check.response == health_response.json()
+
+
+class TestRemoveDanglingTasks:
+    @pytest.fixture
+    def ssh_tunnel_mock(self) -> Generator[Mock, None, None]:
+        with patch("dstack._internal.server.services.runner.ssh.SSHTunnel") as SSHTunnelMock:
+            yield SSHTunnelMock
+
+    @pytest.fixture
+    def shim_client_mock(self) -> Generator[Mock, None, None]:
+        with patch("dstack._internal.server.services.runner.client.ShimClient") as ShimClientMock:
+            yield ShimClientMock.return_value
+
+    @pytest.mark.asyncio
+    async def test_terminates_and_removes_dangling_tasks(
+        self, test_db, session: AsyncSession, ssh_tunnel_mock, shim_client_mock: Mock
+    ):
+        user = await create_user(session=session)
+        project = await create_project(session=session)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.BUSY,
+        )
+        repo = await create_repo(
+            session=session,
+            project_id=project.id,
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            instance=instance,
+        )
+        dangling_task_id_1 = "fe138b77-d0b1-49d3-8c9f-2dfe78ece727"
+        dangling_task_id_2 = "8b016a75-41de-44f1-91ff-c9b63d2caa1d"
+        shim_client_mock.list_tasks.return_value = TaskListResponse(
+            tasks=[
+                TaskListItem(id=str(job.id), status=TaskStatus.RUNNING),
+                TaskListItem(id=dangling_task_id_1, status=TaskStatus.RUNNING),
+                TaskListItem(id=dangling_task_id_2, status=TaskStatus.TERMINATED),
+            ]
+        )
+        await process_instances()
+
+        await session.refresh(instance)
+        assert instance.status == InstanceStatus.BUSY
+
+        shim_client_mock.terminate_task.assert_called_once_with(
+            task_id=dangling_task_id_1, reason=None, message=None, timeout=0
+        )
+        assert shim_client_mock.remove_task.call_count == 2
+        shim_client_mock.remove_task.assert_has_calls(
+            [call(task_id=dangling_task_id_1), call(task_id=dangling_task_id_2)]
+        )
+
+    @pytest.mark.asyncio
+    async def test_terminates_and_removes_dangling_tasks_legacy_shim(
+        self, test_db, session: AsyncSession, ssh_tunnel_mock, shim_client_mock: Mock
+    ):
+        user = await create_user(session=session)
+        project = await create_project(session=session)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.BUSY,
+        )
+        repo = await create_repo(
+            session=session,
+            project_id=project.id,
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            instance=instance,
+        )
+        dangling_task_id_1 = "fe138b77-d0b1-49d3-8c9f-2dfe78ece727"
+        dangling_task_id_2 = "8b016a75-41de-44f1-91ff-c9b63d2caa1d"
+        shim_client_mock.list_tasks.return_value = TaskListResponse(
+            ids=[str(job.id), dangling_task_id_1, dangling_task_id_2]
+        )
+        await process_instances()
+
+        await session.refresh(instance)
+        assert instance.status == InstanceStatus.BUSY
+
+        assert shim_client_mock.terminate_task.call_count == 2
+        shim_client_mock.terminate_task.assert_has_calls(
+            [
+                call(task_id=dangling_task_id_1, reason=None, message=None, timeout=0),
+                call(task_id=dangling_task_id_2, reason=None, message=None, timeout=0),
+            ]
+        )
+        assert shim_client_mock.remove_task.call_count == 2
+        shim_client_mock.remove_task.assert_has_calls(
+            [call(task_id=dangling_task_id_1), call(task_id=dangling_task_id_2)]
+        )
 
 
 class TestTerminateIdleTime:

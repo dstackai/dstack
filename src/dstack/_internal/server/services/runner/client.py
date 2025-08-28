@@ -26,6 +26,7 @@ from dstack._internal.server.schemas.runner import (
     ShimVolumeInfo,
     SubmitBody,
     TaskInfoResponse,
+    TaskListResponse,
     TaskSubmitRequest,
     TaskTerminateRequest,
 )
@@ -244,6 +245,12 @@ class ShimClient:
             return None
         self._raise_for_status(resp)
         return self._response(InstanceHealthResponse, resp)
+
+    def list_tasks(self) -> TaskListResponse:
+        if not self.is_api_v2_supported():
+            raise ShimAPIVersionError()
+        resp = self._request("GET", "/api/tasks", raise_for_status=True)
+        return self._response(TaskListResponse, resp)
 
     def get_task(self, task_id: "_TaskID") -> TaskInfoResponse:
         if not self.is_api_v2_supported():

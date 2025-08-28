@@ -19,7 +19,7 @@ type TaskRunner interface {
 	Remove(ctx context.Context, taskID string) error
 
 	Resources(context.Context) shim.Resources
-	TaskIDs() []string
+	TaskList() []*shim.TaskListItem
 	TaskInfo(taskID string) shim.TaskInfo
 }
 
