@@ -88,8 +88,6 @@ volumes:
 
 </div>
 
-You can customize the 
-
 ## Run the configuration
 
 Once the configuration is ready, run `dstack apply -f <configuration file>`, and `dstack` will automatically provision the
