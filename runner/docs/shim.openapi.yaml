@@ -404,8 +404,7 @@ components:
               id:
                 $ref: "#/components/schemas/TaskID"
               status:
-                allOf:
-                  - $ref: "#/components/schemas/TaskStatus"
+                $ref: "#/components/schemas/TaskStatus"
             required:
               - id
               - status
