@@ -647,7 +647,7 @@ def remove_dangling_tasks_from_instance(shim_client: ShimClient, instance: Insta
     if task_list_response.tasks is not None:
         tasks = [(t.id, t.status) for t in task_list_response.tasks]
     elif task_list_response.ids is not None:
-        # compatibility with pre-TODO shim
+        # compatibility with pre-0.19.26 shim
         tasks = [(t_id, None) for t_id in task_list_response.ids]
     else:
         raise ValueError("Unexpected task list response, neither `tasks` nor `ids` is set")

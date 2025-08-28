@@ -165,8 +165,8 @@ class TaskListItem(CoreModel):
 
 
 class TaskListResponse(CoreModel):
-    ids: Optional[list[str]] = None  # returned by pre-TODO shim
-    tasks: Optional[list[TaskListItem]] = None  # returned by TODO+ shim
+    ids: Optional[list[str]] = None  # returned by pre-0.19.26 shim
+    tasks: Optional[list[TaskListItem]] = None  # returned by 0.19.26+ shim
 
 
 class TaskInfoResponse(CoreModel):
