@@ -41,8 +41,8 @@ def main():
 
     parser = argparse.ArgumentParser(
         description=(
-            "Not sure where to start? Call [code]dstack init[/].\n"
-            "Define a [code].dstack.yml[/] configuration file and run it via [code]dstack apply[/]\n"
+            "Not sure where to start?"
+            " Define a [code].dstack.yml[/] configuration file and run it via [code]dstack apply[/]\n"
         ),
         formatter_class=RichHelpFormatter,
         epilog=(
