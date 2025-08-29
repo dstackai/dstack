@@ -449,25 +449,24 @@ async def create_fleet(
     return await _create_fleet(session=session, project=project, user=user, spec=spec)
 
 
-async def create_fleet_instance_model(
+def create_fleet_instance_model(
     session: AsyncSession,
     project: ProjectModel,
-    user: UserModel,
+    username: str,
     spec: FleetSpec,
-    reservation: Optional[str],
     instance_num: int,
 ) -> InstanceModel:
     profile = spec.merged_profile
     requirements = get_fleet_requirements(spec)
-    instance_model = await instances_services.create_instance_model(
+    instance_model = instances_services.create_instance_model(
         session=session,
         project=project,
-        user=user,
+        username=username,
         profile=profile,
         requirements=requirements,
         instance_name=f"{spec.configuration.name}-{instance_num}",
         instance_num=instance_num,
-        reservation=reservation,
+        reservation=spec.merged_profile.reservation,
         blocks=spec.configuration.blocks,
         tags=spec.configuration.tags,
     )
@@ -705,12 +704,11 @@ async def _create_fleet(
                 fleet_model.instances.append(instances_model)
         else:
             for i in range(_get_fleet_nodes_to_provision(spec)):
-                instance_model = await create_fleet_instance_model(
+                instance_model = create_fleet_instance_model(
                     session=session,
                     project=project,
-                    user=user,
+                    username=user.name,
                     spec=spec,
-                    reservation=spec.configuration.reservation,
                     instance_num=i,
                 )
                 fleet_model.instances.append(instance_model)
