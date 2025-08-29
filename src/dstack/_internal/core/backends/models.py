@@ -23,7 +23,6 @@ from dstack._internal.core.backends.datacrunch.models import (
 from dstack._internal.core.backends.digitalocean_base.models import (
     BaseDigitalOceanBackendConfig,
     BaseDigitalOceanBackendConfigWithCreds,
-    BaseDigitalOceanBackendFileConfigWithCreds,
 )
 from dstack._internal.core.backends.dstack.models import (
     DstackBackendConfig,
@@ -129,7 +128,7 @@ AnyBackendFileConfigWithCreds = Union[
     CloudRiftBackendConfigWithCreds,
     CudoBackendConfigWithCreds,
     DataCrunchBackendConfigWithCreds,
-    BaseDigitalOceanBackendFileConfigWithCreds,
+    BaseDigitalOceanBackendConfigWithCreds,
     GCPBackendFileConfigWithCreds,
     HotAisleBackendFileConfigWithCreds,
     KubernetesBackendFileConfigWithCreds,

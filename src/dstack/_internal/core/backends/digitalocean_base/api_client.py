@@ -27,6 +27,14 @@ class DigitalOceanAPIClient:
                 )
             raise e
 
+    def validate_project_name(self, project_name: str) -> bool:
+        if self.get_project_id(project_name) is None:
+            raise_invalid_credentials_error(
+                fields=[["config", "project_name"]],
+                details=f"Project with name '{project_name}' does not exist",
+            )
+        return True
+
     def list_ssh_keys(self) -> List[Dict[str, Any]]:
         response = self._make_request("GET", "/v2/account/keys")
         response.raise_for_status()
@@ -83,7 +91,6 @@ class DigitalOceanAPIClient:
     ) -> requests.Response:
         url = f"{self.base_url}{endpoint}"
         headers = {
-            "Content-Type": "application/json",
             "Authorization": f"Bearer {self.api_key}",
         }
 

@@ -19,10 +19,10 @@ class BaseDigitalOceanBackendConfig(CoreModel):
         Literal["amddevcloud", "digitalocean"],
         Field(description="The type of backend"),
     ] = "digitalocean"
-    project_name: Annotated[str, Field(description="The name of the DigitalOcean project")] = None
+    project_name: Annotated[Optional[str], Field(description="The name of the project")] = None
     regions: Annotated[
         Optional[List[str]],
-        Field(description="The list of DigitalOcean regions. Omit to use all regions"),
+        Field(description="The list of regions. Omit to use all regions"),
     ] = None
 
 

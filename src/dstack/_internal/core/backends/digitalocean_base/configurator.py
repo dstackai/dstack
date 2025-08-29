@@ -1,4 +1,5 @@
 import json
+from typing import Optional
 
 from dstack._internal.core.backends.base.configurator import (
     BackendRecord,
@@ -20,7 +21,7 @@ class BaseDigitalOceanConfigurator(Configurator):
     def validate_config(
         self, config: BaseDigitalOceanBackendConfigWithCreds, default_creds_enabled: bool
     ):
-        self._validate_creds(config.creds)
+        self._validate_creds(config.creds, config.project_name)
 
     def create_backend(
         self, project_name: str, config: BaseDigitalOceanBackendConfigWithCreds
@@ -49,5 +50,5 @@ class BaseDigitalOceanConfigurator(Configurator):
             creds=BaseDigitalOceanCreds.parse_raw(record.auth),
         )
 
-    def _validate_creds(self, creds: AnyBaseDigitalOceanCreds):
+    def _validate_creds(self, creds: AnyBaseDigitalOceanCreds, project_name: Optional[str] = None):
         pass

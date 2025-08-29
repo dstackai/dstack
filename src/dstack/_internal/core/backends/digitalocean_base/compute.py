@@ -88,7 +88,6 @@ class BaseDigitalOceanCompute(
             name=f"dstack-{instance_config.project_name}",
             public_key=project_ssh_key.public,
         )
-
         size_slug = instance_offer.instance.name
 
         if not instance_offer.instance.resources.gpus:
@@ -96,7 +95,11 @@ class BaseDigitalOceanCompute(
         else:
             backend_specific_commands = SETUP_COMMANDS
 
-        project_id = self.api_client.get_project_id(self.config.project_name)
+        project_id = (
+            self.api_client.get_project_id(self.config.project_name)
+            if self.config.project_name
+            else None
+        )
         droplet_config = {
             "name": instance_name,
             "region": instance_offer.region,
@@ -155,9 +158,9 @@ class BaseDigitalOceanCompute(
             return "ubuntu-24-04-x64"
 
         gpu_count = len(instance_offer.instance.resources.gpus)
-        gpu_name = instance_offer.instance.resources.gpus[0].name
+        gpu_vendor = instance_offer.instance.resources.gpus[0].vendor
 
-        if gpu_name == "MI300X":
+        if gpu_vendor == "amd":
             # AMD GPU
             return "digitaloceanai-rocmjupyter"
         else:
