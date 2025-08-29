@@ -34,6 +34,8 @@ def get_catalog_offers(
     provider = backend.value
     if backend == BackendType.LAMBDA:
         provider = "lambdalabs"
+    if backend == BackendType.AMDDEVCLOUD:
+        provider = "digitalocean"
     q = requirements_to_query_filter(requirements)
     q.provider = [provider]
     offers = []

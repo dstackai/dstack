@@ -5,6 +5,12 @@ from dstack._internal.core.models.backends.base import BackendType
 
 _CONFIGURATOR_CLASSES: List[Type[Configurator]] = []
 
+try:
+    from dstack._internal.core.backends.amddevcloud.configurator import AMDDevCloudConfigurator
+
+    _CONFIGURATOR_CLASSES.append(AMDDevCloudConfigurator)
+except ImportError:
+    pass
 
 try:
     from dstack._internal.core.backends.aws.configurator import AWSConfigurator
@@ -44,6 +50,15 @@ try:
     )
 
     _CONFIGURATOR_CLASSES.append(DataCrunchConfigurator)
+except ImportError:
+    pass
+
+try:
+    from dstack._internal.core.backends.digitalocean.configurator import (
+        DigitalOceanConfigurator,
+    )
+
+    _CONFIGURATOR_CLASSES.append(DigitalOceanConfigurator)
 except ImportError:
     pass
 

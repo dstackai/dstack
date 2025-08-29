@@ -4,13 +4,15 @@ import enum
 class BackendType(str, enum.Enum):
     """
     Attributes:
+        AMDDEVCLOUD (BackendType): AMD Developer Cloud
         AWS (BackendType): Amazon Web Services
         AZURE (BackendType): Microsoft Azure
         CLOUDRIFT (BackendType): CloudRift
         CUDO (BackendType): Cudo
+        DATACRUNCH (BackendType): DataCrunch
+        DIGITALOCEAN (BackendType): DigitalOcean
         DSTACK (BackendType): dstack Sky
         GCP (BackendType): Google Cloud Platform
-        DATACRUNCH (BackendType): DataCrunch
         HOTAISLE (BackendType): Hot Aisle
         KUBERNETES (BackendType): Kubernetes
         LAMBDA (BackendType): Lambda Cloud
@@ -22,11 +24,13 @@ class BackendType(str, enum.Enum):
         VULTR (BackendType): Vultr
     """
 
+    AMDDEVCLOUD = "amddevcloud"
     AWS = "aws"
     AZURE = "azure"
     CLOUDRIFT = "cloudrift"
     CUDO = "cudo"
     DATACRUNCH = "datacrunch"
+    DIGITALOCEAN = "digitalocean"
     DSTACK = "dstack"
     GCP = "gcp"
     HOTAISLE = "hotaisle"

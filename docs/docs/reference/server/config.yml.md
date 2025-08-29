@@ -126,22 +126,6 @@ to configure [backends](../../concepts/backends.md) and other [server-level sett
             type:
                 required: true
 
-##### `projects[n].backends[type=hotaisle]` { #hotaisle data-toc-label="hotaisle" }
-
-#SCHEMA# dstack._internal.core.backends.hotaisle.models.HotAisleBackendConfigWithCreds
-    overrides:
-        show_root_heading: false
-        type:
-            required: true
-        item_id_prefix: hotaisle-
-
-###### `projects[n].backends[type=hotaisle].creds` { #hotaisle-creds data-toc-label="creds" }
-
-#SCHEMA# dstack._internal.core.backends.hotaisle.models.HotAisleAPIKeyCreds
-    overrides:
-        show_root_heading: false
-        type:
-            required: true
 
 ##### `projects[n].backends[type=lambda]` { #lambda data-toc-label="lambda" }
 
@@ -327,6 +311,57 @@ to configure [backends](../../concepts/backends.md) and other [server-level sett
 ###### `projects[n].backends[type=vultr].creds` { #vultr-creds data-toc-label="creds" }
 
 #SCHEMA# dstack._internal.core.backends.vultr.models.VultrAPIKeyCreds
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+
+##### `projects[n].backends[type=amddevcloud]` { #amddevcloud data-toc-label="amddevcloud" }
+
+#SCHEMA# dstack._internal.core.backends.digitalocean_base.models.BaseDigitalOceanBackendConfigWithCreds
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+        item_id_prefix: amddevcloud-
+
+###### `projects[n].backends[type=amddevcloud].creds` { #amddevcloud-creds data-toc-label="creds" }
+
+#SCHEMA# dstack._internal.core.backends.digitalocean_base.models.BaseDigitalOceanAPIKeyCreds
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+
+##### `projects[n].backends[type=digitalocean]` { #digitalocean data-toc-label="digitalocean" }
+
+#SCHEMA# dstack._internal.core.backends.digitalocean_base.models.BaseDigitalOceanBackendConfigWithCreds
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+        item_id_prefix: digitalocean-
+
+###### `projects[n].backends[type=digitalocean].creds` { #digitalocean-creds data-toc-label="creds" }
+
+#SCHEMA# dstack._internal.core.backends.digitalocean_base.models.BaseDigitalOceanAPIKeyCreds
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+
+##### `projects[n].backends[type=hotaisle]` { #hotaisle data-toc-label="hotaisle" }
+
+#SCHEMA# dstack._internal.core.backends.hotaisle.models.HotAisleBackendConfigWithCreds
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+        item_id_prefix: hotaisle-
+
+###### `projects[n].backends[type=hotaisle].creds` { #hotaisle-creds data-toc-label="creds" }
+
+#SCHEMA# dstack._internal.core.backends.hotaisle.models.HotAisleAPIKeyCreds
     overrides:
         show_root_heading: false
         type:
