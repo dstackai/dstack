@@ -16,7 +16,7 @@ from dstack._internal.core.models.configurations import (
     DEFAULT_PROBE_READY_AFTER,
     DEFAULT_PROBE_TIMEOUT,
     DEFAULT_PROBE_URL,
-    DEFAULT_REPO_DIR,
+    LEGACY_REPO_DIR,
     PortMapping,
     ProbeConfig,
     PythonVersion,
@@ -45,6 +45,14 @@ from dstack._internal.server.services.docker import ImageConfig, get_image_confi
 from dstack._internal.utils import crypto
 from dstack._internal.utils.common import run_async
 from dstack._internal.utils.interpolator import InterpolatorError, VariablesInterpolator
+from dstack._internal.utils.logging import get_logger
+from dstack._internal.utils.path import is_absolute_posix_path
+
+logger = get_logger(__name__)
+
+
+DSTACK_DIR = "/dstack"
+DSTACK_PROFILE_PATH = f"{DSTACK_DIR}/profile"
 
 
 def get_default_python_verison() -> str:
@@ -160,6 +168,7 @@ class JobConfigurator(ABC):
             ssh_key=self._ssh_key(jobs_per_replica),
             repo_data=self.run_spec.repo_data,
             repo_code_hash=self.run_spec.repo_code_hash,
+            repo_dir=self._repo_dir(),
             file_archives=self.run_spec.file_archives,
             service_port=self._service_port(),
             probes=self._probes(),
@@ -209,9 +218,9 @@ class JobConfigurator(ABC):
         ):
             return []
         return [
-            f"uv venv --python {self._python()} --prompt workflow --seed {DEFAULT_REPO_DIR}/.venv > /dev/null 2>&1",
-            f"echo 'source {DEFAULT_REPO_DIR}/.venv/bin/activate' >> ~/.bashrc",
-            f"source {DEFAULT_REPO_DIR}/.venv/bin/activate",
+            f"uv venv -q --prompt $DSTACK_RUN_NAME --seed -p {self._python()} {DSTACK_DIR}/venv",
+            f"echo '. {DSTACK_DIR}/venv/bin/activate' >> {DSTACK_PROFILE_PATH}",
+            f". {DSTACK_DIR}/venv/bin/activate",
         ]
 
     def _app_specs(self) -> List[AppSpec]:
@@ -290,11 +299,25 @@ class JobConfigurator(ABC):
     def _retry(self) -> Optional[Retry]:
         return get_retry(self.run_spec.merged_profile)
 
+    def _repo_dir(self) -> str:
+        """
+        Returns absolute or relative path
+        """
+        repo_dir = self.run_spec.repo_dir
+        if repo_dir is None:
+            return LEGACY_REPO_DIR
+        return repo_dir
+
     def _working_dir(self) -> Optional[str]:
         """
-        None means default working directory
+        Returns absolute path or None
+        None means the default working directory taken from the image
         """
-        return self.run_spec.working_dir
+        working_dir = self.run_spec.configuration.working_dir
+        if working_dir is None or is_absolute_posix_path(working_dir):
+            return working_dir
+        # Legacy configuration; relative working_dir is deprecated
+        return str(PurePosixPath(LEGACY_REPO_DIR) / working_dir)
 
     def _python(self) -> str:
         if self.run_spec.configuration.python is not None:

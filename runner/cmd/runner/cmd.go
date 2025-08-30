@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/dstackai/dstack/runner/consts"
 	"github.com/urfave/cli/v2"
 )
 
@@ -11,7 +12,8 @@ import (
 var Version string
 
 func App() {
-	var paths struct{ tempDir, homeDir, workingDir string }
+	var tempDir string
+	var homeDir string
 	var httpPort int
 	var sshPort int
 	var logLevel int
@@ -37,36 +39,36 @@ func App() {
 					&cli.PathFlag{
 						Name:        "temp-dir",
 						Usage:       "Temporary directory for logs and other files",
-						Required:    true,
-						Destination: &paths.tempDir,
+						Value:       consts.RunnerTempDir,
+						Destination: &tempDir,
 					},
 					&cli.PathFlag{
 						Name:        "home-dir",
 						Usage:       "HomeDir directory for credentials and $HOME",
-						Required:    true,
-						Destination: &paths.homeDir,
+						Value:       consts.RunnerHomeDir,
+						Destination: &homeDir,
 					},
+					// TODO: Not used, left for compatibility with old servers. Remove eventually.
 					&cli.PathFlag{
 						Name:        "working-dir",
-						Usage:       "Base path for the job",
-						Required:    true,
-						Destination: &paths.workingDir,
+						Hidden:      true,
+						Destination: nil,
 					},
 					&cli.IntFlag{
 						Name:        "http-port",
 						Usage:       "Set a http port",
-						Value:       10999,
+						Value:       consts.RunnerHTTPPort,
 						Destination: &httpPort,
 					},
 					&cli.IntFlag{
 						Name:        "ssh-port",
 						Usage:       "Set the ssh port",
-						Required:    true,
+						Value:       consts.RunnerSSHPort,
 						Destination: &sshPort,
 					},
 				},
 				Action: func(c *cli.Context) error {
-					err := start(paths.tempDir, paths.homeDir, paths.workingDir, httpPort, sshPort, logLevel, Version)
+					err := start(tempDir, homeDir, httpPort, sshPort, logLevel, Version)
 					if err != nil {
 						return cli.Exit(err, 1)
 					}

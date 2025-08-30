@@ -28,7 +28,7 @@ class FilePathMapping(CoreModel):
         Field(
             description=(
                 "The path in the container. Relative paths are resolved relative to"
-                " the repo directory"
+                " the working directory"
             )
         ),
     ]

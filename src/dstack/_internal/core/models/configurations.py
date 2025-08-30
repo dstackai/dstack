@@ -34,7 +34,7 @@ STRIP_PREFIX_DEFAULT = True
 RUN_PRIOTIRY_MIN = 0
 RUN_PRIOTIRY_MAX = 100
 RUN_PRIORITY_DEFAULT = 0
-DEFAULT_REPO_DIR = "/workflow"
+LEGACY_REPO_DIR = "/workflow"
 MIN_PROBE_TIMEOUT = 1
 MIN_PROBE_INTERVAL = 1
 DEFAULT_PROBE_URL = "/"
@@ -112,8 +112,15 @@ class RepoSpec(CoreModel):
         Optional[str],
         Field(description="The commit hash"),
     ] = None
-    # Not implemented, has no effect, hidden in the docs
-    path: str = DEFAULT_REPO_DIR
+    path: Annotated[
+        Optional[str],
+        Field(
+            description=(
+                "The repo path inside the run container. Relative paths are resolved"
+                f" relative to the working directory. Defaults to `{LEGACY_REPO_DIR}`"
+            )
+        ),
+    ] = None
 
     @classmethod
     def parse(cls, v: str) -> Self:
@@ -148,6 +155,14 @@ class RepoSpec(CoreModel):
         if not values["local_path"] and not values["url"]:
             raise ValueError("Either `local_path` or `url` must be specified")
         return values
+
+    @validator("path")
+    def validate_path(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        if v.startswith("~") and PurePosixPath(v).parts[0] != "~":
+            raise ValueError("`~username` syntax is not supported")
+        return v
 
 
 class ScalingSpec(CoreModel):
@@ -380,7 +395,7 @@ class BaseRunConfiguration(CoreModel):
         Field(
             description=(
                 "The user inside the container, `user_name_or_id[:group_name_or_id]`"
-                " (e.g., `ubuntu`, `1000:1000`). Defaults to the default `image` user"
+                " (e.g., `ubuntu`, `1000:1000`). Defaults to the default user from the `image`"
             )
         ),
     ] = None
@@ -390,9 +405,8 @@ class BaseRunConfiguration(CoreModel):
         Optional[str],
         Field(
             description=(
-                "The path to the working directory inside the container."
-                f" It's specified relative to the repository directory (`{DEFAULT_REPO_DIR}`) and should be inside it."
-                ' Defaults to `"."` '
+                "The absolute path to the working directory inside the container."
+                f" Defaults to `{LEGACY_REPO_DIR}`"
             )
         ),
     ] = None

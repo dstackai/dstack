@@ -2,16 +2,14 @@ package executor
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path"
 	"regexp"
-	"slices"
-	"strings"
 
 	"github.com/codeclysm/extract/v4"
+	"github.com/dstackai/dstack/runner/internal/common"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"github.com/dstackai/dstack/runner/internal/log"
 )
@@ -35,24 +33,11 @@ func (ex *RunExecutor) AddFileArchive(id string, src io.Reader) error {
 }
 
 // setupFiles must be called from Run
+// ex.jobWorkingDir must be already created
 func (ex *RunExecutor) setupFiles(ctx context.Context) error {
-	homeDir := ex.workingDir
-	uid := -1
-	gid := -1
-	// User must be already set
-	if ex.jobSpec.User.HomeDir != "" {
-		homeDir = ex.jobSpec.User.HomeDir
-	}
-	if ex.jobSpec.User.Uid != nil {
-		uid = int(*ex.jobSpec.User.Uid)
-	}
-	if ex.jobSpec.User.Gid != nil {
-		gid = int(*ex.jobSpec.User.Gid)
-	}
-
 	for _, fa := range ex.jobSpec.FileArchives {
 		archivePath := path.Join(ex.archiveDir, fa.Id)
-		if err := extractFileArchive(ctx, archivePath, fa.Path, ex.workingDir, uid, gid, homeDir); err != nil {
+		if err := extractFileArchive(ctx, archivePath, fa.Path, ex.jobWorkingDir, ex.jobUid, ex.jobGid, ex.jobHomeDir); err != nil {
 			return gerrors.Wrap(err)
 		}
 	}
@@ -64,24 +49,19 @@ func (ex *RunExecutor) setupFiles(ctx context.Context) error {
 	return nil
 }
 
-func extractFileArchive(ctx context.Context, archivePath string, targetPath string, targetRoot string, uid int, gid int, homeDir string) error {
-	log.Trace(ctx, "Extracting file archive", "archive", archivePath, "target", targetPath)
+func extractFileArchive(ctx context.Context, archivePath string, destPath string, baseDir string, uid int, gid int, homeDir string) error {
+	log.Trace(ctx, "Extracting file archive", "archive", archivePath, "dest", destPath, "base", baseDir, "home", homeDir)
 
-	targetPath = path.Clean(targetPath)
-	// `~username[/path/to]` is not supported
-	if targetPath == "~" {
-		targetPath = homeDir
-	} else if rest, found := strings.CutPrefix(targetPath, "~/"); found {
-		targetPath = path.Join(homeDir, rest)
-	} else if !path.IsAbs(targetPath) {
-		targetPath = path.Join(targetRoot, targetPath)
-	}
-	dir, root := path.Split(targetPath)
-	if err := mkdirAll(ctx, dir, uid, gid); err != nil {
+	destPath, err := common.ExpandPath(destPath, baseDir, homeDir)
+	if err != nil {
 		return gerrors.Wrap(err)
 	}
-	if err := os.RemoveAll(targetPath); err != nil {
-		log.Warning(ctx, "Failed to remove", "path", targetPath, "err", err)
+	destBase, destName := path.Split(destPath)
+	if err := common.MkdirAll(ctx, destBase, uid, gid); err != nil {
+		return gerrors.Wrap(err)
+	}
+	if err := os.RemoveAll(destPath); err != nil {
+		log.Warning(ctx, "Failed to remove", "path", destPath, "err", err)
 	}
 
 	archive, err := os.Open(archivePath)
@@ -91,47 +71,24 @@ func extractFileArchive(ctx context.Context, archivePath string, targetPath stri
 	defer archive.Close()
 
 	var paths []string
-	repl := fmt.Sprintf("%s$2", root)
+	repl := fmt.Sprintf("%s$2", destName)
 	renameAndRemember := func(s string) string {
 		s = renameRegex.ReplaceAllString(s, repl)
 		paths = append(paths, s)
 		return s
 	}
-	if err := extract.Tar(ctx, archive, dir, renameAndRemember); err != nil {
+	if err := extract.Tar(ctx, archive, destBase, renameAndRemember); err != nil {
 		return gerrors.Wrap(err)
 	}
 
 	if uid != -1 || gid != -1 {
 		for _, p := range paths {
-			if err := os.Chown(path.Join(dir, p), uid, gid); err != nil {
+			log.Warning(ctx, "path", "path", p)
+			if err := os.Chown(path.Join(destBase, p), uid, gid); err != nil {
 				log.Warning(ctx, "Failed to chown", "path", p, "err", err)
 			}
 		}
 	}
 
-	return nil
-}
-
-func mkdirAll(ctx context.Context, p string, uid int, gid int) error {
-	var paths []string
-	for {
-		p = path.Dir(p)
-		if p == "/" {
-			break
-		}
-		paths = append(paths, p)
-	}
-	for _, p := range slices.Backward(paths) {
-		if _, err := os.Stat(p); errors.Is(err, os.ErrNotExist) {
-			if err := os.Mkdir(p, 0o755); err != nil {
-				return err
-			}
-			if err := os.Chown(p, uid, gid); err != nil {
-				log.Warning(ctx, "Failed to chown", "path", p, "err", err)
-			}
-		} else if err != nil {
-			return err
-		}
-	}
 	return nil
 }

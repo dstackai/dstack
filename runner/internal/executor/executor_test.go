@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -18,28 +19,41 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestExecutor_WorkingDir_Current(t *testing.T) {
+func TestExecutor_WorkingDir_Set(t *testing.T) {
 	var b bytes.Buffer
 	ex := makeTestExecutor(t)
-	workingDir := "."
+	baseDir, err := filepath.EvalSymlinks(t.TempDir())
+	require.NoError(t, err)
+	workingDir := path.Join(baseDir, "path/to/wd")
+
 	ex.jobSpec.WorkingDir = &workingDir
 	ex.jobSpec.Commands = append(ex.jobSpec.Commands, "pwd")
+	err = ex.setJobWorkingDir(context.TODO())
+	require.NoError(t, err)
+	require.Equal(t, workingDir, ex.jobWorkingDir)
+	err = os.MkdirAll(workingDir, 0o755)
+	require.NoError(t, err)
 
-	err := ex.execJob(context.TODO(), io.Writer(&b))
+	err = ex.execJob(context.TODO(), io.Writer(&b))
 	assert.NoError(t, err)
 	// Normalize line endings for cross-platform compatibility.
-	assert.Equal(t, ex.workingDir+"\n", strings.ReplaceAll(b.String(), "\r\n", "\n"))
+	assert.Equal(t, workingDir+"\n", strings.ReplaceAll(b.String(), "\r\n", "\n"))
 }
 
-func TestExecutor_WorkingDir_Nil(t *testing.T) {
+func TestExecutor_WorkingDir_NotSet(t *testing.T) {
 	var b bytes.Buffer
 	ex := makeTestExecutor(t)
+	cwd, err := os.Getwd()
+	require.NoError(t, err)
 	ex.jobSpec.WorkingDir = nil
 	ex.jobSpec.Commands = append(ex.jobSpec.Commands, "pwd")
+	err = ex.setJobWorkingDir(context.TODO())
+	require.NoError(t, err)
+	require.Equal(t, cwd, ex.jobWorkingDir)
 
-	err := ex.execJob(context.TODO(), io.Writer(&b))
+	err = ex.execJob(context.TODO(), io.Writer(&b))
 	assert.NoError(t, err)
-	assert.Equal(t, ex.workingDir+"\n", strings.ReplaceAll(b.String(), "\r\n", "\n"))
+	assert.Equal(t, cwd+"\n", strings.ReplaceAll(b.String(), "\r\n", "\n"))
 }
 
 func TestExecutor_HomeDir(t *testing.T) {
@@ -88,7 +102,8 @@ func TestExecutor_SSHCredentials(t *testing.T) {
 func TestExecutor_LocalRepo(t *testing.T) {
 	var b bytes.Buffer
 	ex := makeTestExecutor(t)
-	ex.jobSpec.Commands = append(ex.jobSpec.Commands, "cat foo")
+	cmd := fmt.Sprintf("cat %s/foo", *ex.jobSpec.RepoDir)
+	ex.jobSpec.Commands = append(ex.jobSpec.Commands, cmd)
 	makeCodeTar(t, ex.codePath)
 
 	err := ex.setupRepo(context.TODO())
@@ -143,6 +158,8 @@ func TestExecutor_RemoteRepo(t *testing.T) {
 	err := os.WriteFile(ex.codePath, []byte{}, 0o600) // empty diff
 	require.NoError(t, err)
 
+	err = ex.setJobWorkingDir(context.TODO())
+	require.NoError(t, err)
 	err = ex.setupRepo(context.TODO())
 	require.NoError(t, err)
 
@@ -157,9 +174,9 @@ func TestExecutor_RemoteRepo(t *testing.T) {
 func makeTestExecutor(t *testing.T) *RunExecutor {
 	t.Helper()
 	baseDir, err := filepath.EvalSymlinks(t.TempDir())
-	workingDir := "."
 	require.NoError(t, err)
 
+	repo := filepath.Join(baseDir, "repo")
 	body := schemas.SubmitBody{
 		Run: schemas.Run{
 			Id: "12346",
@@ -177,7 +194,8 @@ func makeTestExecutor(t *testing.T) *RunExecutor {
 			Commands:    []string{"/bin/bash", "-c"},
 			Env:         make(map[string]string),
 			MaxDuration: 0, // no timeout
-			WorkingDir:  &workingDir,
+			WorkingDir:  &repo,
+			RepoDir:     &repo,
 			RepoData:    &schemas.RepoData{RepoType: "local"},
 		},
 		Secrets: make(map[string]string),
@@ -190,9 +208,7 @@ func makeTestExecutor(t *testing.T) *RunExecutor {
 	_ = os.Mkdir(temp, 0o700)
 	home := filepath.Join(baseDir, "home")
 	_ = os.Mkdir(home, 0o700)
-	repo := filepath.Join(baseDir, "repo")
-	_ = os.Mkdir(repo, 0o700)
-	ex, _ := NewRunExecutor(temp, home, repo, 10022)
+	ex, _ := NewRunExecutor(temp, home, 10022)
 	ex.SetJob(body)
 	ex.SetCodePath(filepath.Join(baseDir, "code")) // note: create file before run
 	return ex

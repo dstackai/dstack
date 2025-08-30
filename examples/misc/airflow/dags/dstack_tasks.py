@@ -47,7 +47,7 @@ def dstack_tasks():
         dstack is installed into a separate virtual environment available to Airflow.
         """
         return (
-            f"source {DSTACK_VENV_PATH}/bin/activate"
+            f". {DSTACK_VENV_PATH}/bin/activate"
             f" && cd {DSTACK_REPO_PATH}"
             " && dstack apply -y -f task.dstack.yml --repo ."
         )

@@ -33,9 +33,9 @@ type Server struct {
 	version string
 }
 
-func NewServer(tempDir string, homeDir string, workingDir string, address string, sshPort int, version string) (*Server, error) {
+func NewServer(tempDir string, homeDir string, address string, sshPort int, version string) (*Server, error) {
 	r := api.NewRouter()
-	ex, err := executor.NewRunExecutor(tempDir, homeDir, workingDir, sshPort)
+	ex, err := executor.NewRunExecutor(tempDir, homeDir, sshPort)
 	if err != nil {
 		return nil, err
 	}

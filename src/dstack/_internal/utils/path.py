@@ -1,6 +1,6 @@
 import os
 from dataclasses import dataclass
-from pathlib import Path, PurePath
+from pathlib import Path, PurePath, PurePosixPath
 from typing import Union
 
 PathLike = Union[str, os.PathLike]
@@ -48,3 +48,10 @@ def resolve_relative_path(path: PathLike) -> PurePath:
         return normalize_path(path)
     except ValueError:
         raise ValueError("Path is outside of the repo")
+
+
+def is_absolute_posix_path(path: PathLike) -> bool:
+    # Passing Windows path leads to undefined behavior
+    if str(path).startswith("~"):
+        return True
+    return PurePosixPath(path).is_absolute()

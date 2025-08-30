@@ -34,7 +34,6 @@ func (c *CLIArgs) getRunnerArgs() []string {
 		"--ssh-port", strconv.Itoa(c.Runner.SSHPort),
 		"--temp-dir", consts.RunnerTempDir,
 		"--home-dir", consts.RunnerHomeDir,
-		"--working-dir", consts.RunnerWorkingDir,
 	}
 }
 
