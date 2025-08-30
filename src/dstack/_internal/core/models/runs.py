@@ -10,7 +10,7 @@ from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import ApplyAction, CoreModel, NetworkMode, RegistryAuth
 from dstack._internal.core.models.configurations import (
     DEFAULT_PROBE_METHOD,
-    DEFAULT_REPO_DIR,
+    LEGACY_REPO_DIR,
     AnyRunConfiguration,
     HTTPHeaderSpec,
     HTTPMethod,
@@ -259,6 +259,7 @@ class JobSpec(CoreModel):
     retry: Optional[Retry]
     volumes: Optional[List[MountPoint]] = None
     ssh_key: Optional[JobSSHKey] = None
+    # `working_dir` is always absolute (if not None) since 0.19.27
     working_dir: Optional[str]
     # `repo_data` is optional for client compatibility with pre-0.19.17 servers and for compatibility
     # with jobs submitted before 0.19.17. All new jobs are expected to have non-None `repo_data`.
@@ -268,6 +269,8 @@ class JobSpec(CoreModel):
     # submitted before 0.19.17. See `_get_repo_code_hash` on how to get the correct `repo_code_hash`
     # TODO: drop this comment when supporting jobs submitted before 0.19.17 is no longer relevant.
     repo_code_hash: Optional[str] = None
+    # `repo_dir` was added in 0.19.27. Default value is set for backward compatibility
+    repo_dir: str = LEGACY_REPO_DIR
     file_archives: list[FileArchiveMapping] = []
     # None for non-services and pre-0.19.19 services. See `get_service_port`
     service_port: Optional[int] = None
@@ -409,17 +412,27 @@ class RunSpec(CoreModel):
         Optional[str],
         Field(description="The hash of the repo diff. Can be omitted if there is no repo diff."),
     ] = None
+    repo_dir: Annotated[
+        Optional[str],
+        Field(
+            description=(
+                "The repo path inside the container. Relative paths are resolved"
+                f" relative to the working directory. Defaults to `{LEGACY_REPO_DIR}`."
+            )
+        ),
+    ] = None
     file_archives: Annotated[
         list[FileArchiveMapping],
-        Field(description="The list of file archive ID to container path mappings"),
+        Field(description="The list of file archive ID to container path mappings."),
     ] = []
+    # Server uses configuration.working_dir instead of this field since 0.19.27, but
+    # the field still exists for compatibility with older servers
     working_dir: Annotated[
         Optional[str],
         Field(
             description=(
-                "The path to the working directory inside the container."
-                f" It's specified relative to the repository directory (`{DEFAULT_REPO_DIR}`) and should be inside it."
-                ' Defaults to `"."`.'
+                "The absolute path to the working directory inside the container."
+                " Defaults to the default working directory from the `image`."
             )
         ),
     ] = None

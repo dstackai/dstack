@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	osuser "os/user"
+	"path"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -21,6 +22,7 @@ import (
 	"github.com/creack/pty"
 	"github.com/dstackai/ansistrip"
 	"github.com/dstackai/dstack/runner/consts"
+	"github.com/dstackai/dstack/runner/internal/common"
 	"github.com/dstackai/dstack/runner/internal/connections"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"github.com/dstackai/dstack/runner/internal/log"
@@ -50,7 +52,6 @@ type ConnectionTracker interface {
 type RunExecutor struct {
 	tempDir    string
 	homeDir    string
-	workingDir string
 	archiveDir string
 	sshPort    int
 	currentUid uint32
@@ -61,7 +62,12 @@ type RunExecutor struct {
 	clusterInfo     schemas.ClusterInfo
 	secrets         map[string]string
 	repoCredentials *schemas.RepoCredentials
+	repoDir         string
 	codePath        string
+	jobUid          int
+	jobGid          int
+	jobHomeDir      string
+	jobWorkingDir   string
 
 	mu              *sync.RWMutex
 	state           string
@@ -82,7 +88,7 @@ func (s *stubConnectionTracker) GetNoConnectionsSecs() int64   { return 0 }
 func (s *stubConnectionTracker) Track(ticker <-chan time.Time) {}
 func (s *stubConnectionTracker) Stop()                         {}
 
-func NewRunExecutor(tempDir string, homeDir string, workingDir string, sshPort int) (*RunExecutor, error) {
+func NewRunExecutor(tempDir string, homeDir string, sshPort int) (*RunExecutor, error) {
 	mu := &sync.RWMutex{}
 	timestamp := NewMonotonicTimestamp()
 	user, err := osuser.Current()
@@ -115,10 +121,11 @@ func NewRunExecutor(tempDir string, homeDir string, workingDir string, sshPort i
 	return &RunExecutor{
 		tempDir:    tempDir,
 		homeDir:    homeDir,
-		workingDir: workingDir,
 		archiveDir: filepath.Join(tempDir, "file_archives"),
 		sshPort:    sshPort,
 		currentUid: uid,
+		jobUid:     -1,
+		jobGid:     -1,
 
 		mu:              mu,
 		state:           WaitSubmit,
@@ -187,12 +194,14 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 		return gerrors.Wrap(err)
 	}
 
-	if err := ex.setupFiles(ctx); err != nil {
+	ex.setJobCredentials(ctx)
+
+	if err := ex.setJobWorkingDir(ctx); err != nil {
 		ex.SetJobStateWithTerminationReason(
 			ctx,
 			types.JobStateFailed,
 			types.TerminationReasonExecutorError,
-			fmt.Sprintf("Failed to set up files (%s)", err),
+			fmt.Sprintf("Failed to set the working dir (%s)", err),
 		)
 		return gerrors.Wrap(err)
 	}
@@ -203,6 +212,16 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 			types.JobStateFailed,
 			types.TerminationReasonContainerExitedWithError,
 			fmt.Sprintf("Failed to set up the repo (%s)", err),
+		)
+		return gerrors.Wrap(err)
+	}
+
+	if err := ex.setupFiles(ctx); err != nil {
+		ex.SetJobStateWithTerminationReason(
+			ctx,
+			types.JobStateFailed,
+			types.TerminationReasonExecutorError,
+			fmt.Sprintf("Failed to set up files (%s)", err),
 		)
 		return gerrors.Wrap(err)
 	}
@@ -318,6 +337,41 @@ func (ex *RunExecutor) SetRunnerState(state string) {
 	ex.state = state
 }
 
+func (ex *RunExecutor) setJobCredentials(ctx context.Context) {
+	if ex.jobSpec.User.Uid != nil {
+		ex.jobUid = int(*ex.jobSpec.User.Uid)
+	}
+	if ex.jobSpec.User.Gid != nil {
+		ex.jobGid = int(*ex.jobSpec.User.Gid)
+	}
+	if ex.jobSpec.User.HomeDir != "" {
+		ex.jobHomeDir = ex.jobSpec.User.HomeDir
+	} else {
+		ex.jobHomeDir = "/"
+	}
+	log.Trace(ctx, "Job credentials", "uid", ex.jobUid, "gid", ex.jobGid, "home", ex.jobHomeDir)
+}
+
+func (ex *RunExecutor) setJobWorkingDir(ctx context.Context) error {
+	var err error
+	if ex.jobSpec.WorkingDir == nil {
+		ex.jobWorkingDir, err = os.Getwd()
+		if err != nil {
+			return gerrors.Wrap(err)
+		}
+	} else {
+		ex.jobWorkingDir, err = common.ExpandPath(*ex.jobSpec.WorkingDir, "", ex.jobHomeDir)
+		if err != nil {
+			return gerrors.Wrap(err)
+		}
+		if !path.IsAbs(ex.jobWorkingDir) {
+			return fmt.Errorf("working_dir must be absolute: %s", ex.jobWorkingDir)
+		}
+	}
+	log.Trace(ctx, "Job working dir", "path", ex.jobWorkingDir)
+	return nil
+}
+
 func (ex *RunExecutor) getRepoData() schemas.RepoData {
 	if ex.jobSpec.RepoData == nil {
 		// jobs submitted before 0.19.17 do not have jobSpec.RepoData
@@ -339,6 +393,7 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 		"DSTACK_JOB_ID":         ex.jobSubmission.Id,
 		"DSTACK_RUN_NAME":       ex.run.RunSpec.RunName,
 		"DSTACK_REPO_ID":        ex.run.RunSpec.RepoId,
+		"DSTACK_REPO_DIR":       ex.repoDir,
 		"DSTACK_NODES_IPS":      strings.Join(ex.clusterInfo.JobIPs, "\n"),
 		"DSTACK_MASTER_NODE_IP": ex.clusterInfo.MasterJobIP,
 		"DSTACK_NODE_RANK":      strconv.Itoa(node_rank),
@@ -364,14 +419,7 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 	}
 	cmd.WaitDelay = ex.killDelay // kills the process if it doesn't exit in time
 
-	cmd.Dir = ex.workingDir
-	if ex.jobSpec.WorkingDir != nil {
-		workingDir, err := joinRelPath(ex.workingDir, *ex.jobSpec.WorkingDir)
-		if err != nil {
-			return gerrors.Wrap(err)
-		}
-		cmd.Dir = workingDir
-	}
+	cmd.Dir = ex.jobWorkingDir
 
 	// User must be already set
 	user := ex.jobSpec.User
@@ -402,7 +450,7 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 	envMap.Update(ex.jobSpec.Env, false)
 
 	const profilePath = "/etc/profile"
-	const dstackProfilePath = "/tmp/dstack_profile"
+	const dstackProfilePath = "/dstack/profile"
 	if err := writeDstackProfile(envMap, dstackProfilePath); err != nil {
 		log.Warning(ctx, "failed to write dstack_profile", "path", dstackProfilePath, "err", err)
 	} else if err := includeDstackProfile(profilePath, dstackProfilePath); err != nil {
@@ -797,8 +845,11 @@ func writeMpiHostfile(ctx context.Context, ips []string, gpus_per_node int, path
 	return nil
 }
 
-func writeDstackProfile(env map[string]string, path string) error {
-	file, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
+func writeDstackProfile(env map[string]string, pth string) error {
+	if err := os.MkdirAll(path.Dir(pth), 0o755); err != nil {
+		return err
+	}
+	file, err := os.OpenFile(pth, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
 	if err != nil {
 		return err
 	}
@@ -813,7 +864,7 @@ func writeDstackProfile(env map[string]string, path string) error {
 			return err
 		}
 	}
-	if err = os.Chmod(path, 0o644); err != nil {
+	if err = os.Chmod(pth, 0o644); err != nil {
 		return err
 	}
 	return nil

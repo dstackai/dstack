@@ -87,18 +87,21 @@ def get_dev_env_run_plan_dict(
             "/bin/bash",
             "-i",
             "-c",
-            "start-dockerd && (echo pip install ipykernel... && "
-            "pip install -q --no-cache-dir "
-            'ipykernel 2> /dev/null) || echo "no '
-            'pip, ipykernel was not installed" '
-            "&& echo '' && echo To open in VS "
-            "Code Desktop, use link below: && "
-            "echo '' && echo '  "
-            "vscode://vscode-remote/ssh-remote+dry-run/workflow' "
-            "&& echo '' && echo 'To connect via "
-            "SSH, use: `ssh dry-run`' && echo '' "
-            "&& echo -n 'To exit, press Ctrl+C.' "
-            "&& tail -f /dev/null",
+            (
+                "start-dockerd"
+                " && (echo 'pip install ipykernel...'"
+                " && pip install -q --no-cache-dir ipykernel 2> /dev/null)"
+                " || echo 'no pip, ipykernel was not installed'"
+                " && echo"
+                " && echo 'To open in VS Code Desktop, use link below:'"
+                " && echo"
+                ' && echo "  vscode://vscode-remote/ssh-remote+dry-run$DSTACK_REPO_DIR"'
+                " && echo"
+                " && echo 'To connect via SSH, use: `ssh dry-run`'"
+                " && echo"
+                " && echo -n 'To exit, press Ctrl+C.'"
+                " && tail -f /dev/null"
+            ),
         ]
         image_name = "dstackai/dind"
     else:
@@ -106,21 +109,23 @@ def get_dev_env_run_plan_dict(
             "/bin/bash",
             "-i",
             "-c",
-            "uv venv --python 3.13 --prompt workflow --seed /workflow/.venv > /dev/null 2>&1"
-            " && echo 'source /workflow/.venv/bin/activate' >> ~/.bashrc"
-            " && source /workflow/.venv/bin/activate"
-            " && (echo pip install ipykernel... && "
-            "pip install -q --no-cache-dir "
-            'ipykernel 2> /dev/null) || echo "no '
-            'pip, ipykernel was not installed" '
-            "&& echo '' && echo To open in VS "
-            "Code Desktop, use link below: && "
-            "echo '' && echo '  "
-            "vscode://vscode-remote/ssh-remote+dry-run/workflow' "
-            "&& echo '' && echo 'To connect via "
-            "SSH, use: `ssh dry-run`' && echo '' "
-            "&& echo -n 'To exit, press Ctrl+C.' "
-            "&& tail -f /dev/null",
+            (
+                "uv venv -q --prompt $DSTACK_RUN_NAME --seed -p 3.13 /dstack/venv"
+                " && echo '. /dstack/venv/bin/activate' >> /dstack/profile"
+                " && . /dstack/venv/bin/activate"
+                " && (echo 'pip install ipykernel...'"
+                " && pip install -q --no-cache-dir ipykernel 2> /dev/null)"
+                " || echo 'no pip, ipykernel was not installed'"
+                " && echo"
+                " && echo 'To open in VS Code Desktop, use link below:'"
+                " && echo"
+                ' && echo "  vscode://vscode-remote/ssh-remote+dry-run$DSTACK_REPO_DIR"'
+                " && echo"
+                " && echo 'To connect via SSH, use: `ssh dry-run`'"
+                " && echo"
+                " && echo -n 'To exit, press Ctrl+C.'"
+                " && tail -f /dev/null"
+            ),
         ]
         image_name = "dstackai/base:0.10-base-ubuntu22.04"
 
@@ -204,9 +209,10 @@ def get_dev_env_run_plan_dict(
         "repo_code_hash": None,
         "repo_data": {"repo_dir": "/repo", "repo_type": "local"},
         "repo_id": repo_id,
+        "repo_dir": "~/repo",
         "run_name": run_name,
         "ssh_key_pub": "ssh_key",
-        "working_dir": ".",
+        "working_dir": None,
     }
     return {
         "project_name": project_name,
@@ -247,9 +253,10 @@ def get_dev_env_run_plan_dict(
                     "retry": None,
                     "volumes": volumes,
                     "ssh_key": None,
-                    "working_dir": ".",
+                    "working_dir": None,
                     "repo_code_hash": None,
                     "repo_data": {"repo_dir": "/repo", "repo_type": "local"},
+                    "repo_dir": "~/repo",
                     "file_archives": [],
                     "service_port": None,
                     "probes": [],
@@ -284,18 +291,21 @@ def get_dev_env_run_dict(
             "/bin/bash",
             "-i",
             "-c",
-            "start-dockerd && (echo pip install ipykernel... && "
-            "pip install -q --no-cache-dir "
-            'ipykernel 2> /dev/null) || echo "no '
-            'pip, ipykernel was not installed" '
-            "&& echo '' && echo To open in VS "
-            "Code Desktop, use link below: && "
-            "echo '' && echo '  "
-            "vscode://vscode-remote/ssh-remote+test-run/workflow' "
-            "&& echo '' && echo 'To connect via "
-            "SSH, use: `ssh test-run`' && echo '' "
-            "&& echo -n 'To exit, press Ctrl+C.' "
-            "&& tail -f /dev/null",
+            (
+                "start-dockerd"
+                " && (echo 'pip install ipykernel...'"
+                " && pip install -q --no-cache-dir ipykernel 2> /dev/null)"
+                " || echo 'no pip, ipykernel was not installed'"
+                " && echo"
+                " && echo 'To open in VS Code Desktop, use link below:'"
+                " && echo"
+                ' && echo "  vscode://vscode-remote/ssh-remote+test-run$DSTACK_REPO_DIR"'
+                " && echo"
+                " && echo 'To connect via SSH, use: `ssh test-run`'"
+                " && echo"
+                " && echo -n 'To exit, press Ctrl+C.'"
+                " && tail -f /dev/null"
+            ),
         ]
         image_name = "dstackai/dind"
     else:
@@ -303,21 +313,23 @@ def get_dev_env_run_dict(
             "/bin/bash",
             "-i",
             "-c",
-            "uv venv --python 3.13 --prompt workflow --seed /workflow/.venv > /dev/null 2>&1"
-            " && echo 'source /workflow/.venv/bin/activate' >> ~/.bashrc"
-            " && source /workflow/.venv/bin/activate"
-            " && (echo pip install ipykernel... && "
-            "pip install -q --no-cache-dir "
-            'ipykernel 2> /dev/null) || echo "no '
-            'pip, ipykernel was not installed" '
-            "&& echo '' && echo To open in VS "
-            "Code Desktop, use link below: && "
-            "echo '' && echo '  "
-            "vscode://vscode-remote/ssh-remote+test-run/workflow' "
-            "&& echo '' && echo 'To connect via "
-            "SSH, use: `ssh test-run`' && echo '' "
-            "&& echo -n 'To exit, press Ctrl+C.' "
-            "&& tail -f /dev/null",
+            (
+                "uv venv -q --prompt $DSTACK_RUN_NAME --seed -p 3.13 /dstack/venv"
+                " && echo '. /dstack/venv/bin/activate' >> /dstack/profile"
+                " && . /dstack/venv/bin/activate"
+                " && (echo 'pip install ipykernel...'"
+                " && pip install -q --no-cache-dir ipykernel 2> /dev/null)"
+                " || echo 'no pip, ipykernel was not installed'"
+                " && echo"
+                " && echo 'To open in VS Code Desktop, use link below:'"
+                " && echo"
+                ' && echo "  vscode://vscode-remote/ssh-remote+test-run$DSTACK_REPO_DIR"'
+                " && echo"
+                " && echo 'To connect via SSH, use: `ssh test-run`'"
+                " && echo"
+                " && echo -n 'To exit, press Ctrl+C.'"
+                " && tail -f /dev/null"
+            ),
         ]
         image_name = "dstackai/base:0.10-base-ubuntu22.04"
 
@@ -409,9 +421,10 @@ def get_dev_env_run_dict(
             "repo_code_hash": None,
             "repo_data": {"repo_dir": "/repo", "repo_type": "local"},
             "repo_id": repo_id,
+            "repo_dir": "~/repo",
             "run_name": run_name,
             "ssh_key_pub": "ssh_key",
-            "working_dir": ".",
+            "working_dir": None,
         },
         "jobs": [
             {
@@ -447,9 +460,10 @@ def get_dev_env_run_dict(
                     "retry": None,
                     "volumes": [],
                     "ssh_key": None,
-                    "working_dir": ".",
+                    "working_dir": None,
                     "repo_code_hash": None,
                     "repo_data": {"repo_dir": "/repo", "repo_type": "local"},
+                    "repo_dir": "~/repo",
                     "file_archives": [],
                     "service_port": None,
                     "probes": [],
@@ -526,7 +540,7 @@ def get_service_run_spec(
         "repo_id": repo_id,
         "run_name": run_name,
         "ssh_key_pub": "ssh_key",
-        "working_dir": ".",
+        "working_dir": None,
     }
 
 

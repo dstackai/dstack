@@ -2,19 +2,33 @@ package executor
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 
 	"github.com/codeclysm/extract/v4"
+	"github.com/dstackai/dstack/runner/internal/common"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/dstackai/dstack/runner/internal/repo"
 )
 
 // setupRepo must be called from Run
+// TODO: change ownership to uid:gid
 func (ex *RunExecutor) setupRepo(ctx context.Context) error {
+	if ex.jobSpec.RepoDir == nil {
+		return errors.New("repo_dir is not set")
+	}
+
+	var err error
+	ex.repoDir, err = common.ExpandPath(*ex.jobSpec.RepoDir, ex.jobWorkingDir, ex.jobHomeDir)
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+	log.Trace(ctx, "Job repo dir", "path", ex.repoDir)
+
 	shouldCheckout, err := ex.shouldCheckout(ctx)
 	if err != nil {
 		return gerrors.Wrap(err)
@@ -64,7 +78,7 @@ func (ex *RunExecutor) prepareGit(ctx context.Context) error {
 		ex.getRepoData().RepoBranch,
 		ex.getRepoData().RepoHash,
 		ex.jobSpec.SingleBranch,
-	).WithLocalPath(ex.workingDir)
+	).WithLocalPath(ex.repoDir)
 	if ex.repoCredentials != nil {
 		log.Trace(ctx, "Credentials is not empty")
 		switch ex.repoCredentials.GetProtocol() {
@@ -102,7 +116,7 @@ func (ex *RunExecutor) prepareGit(ctx context.Context) error {
 		return gerrors.Wrap(err)
 	}
 	if len(repoDiff) > 0 {
-		if err := repo.ApplyDiff(ctx, ex.workingDir, string(repoDiff)); err != nil {
+		if err := repo.ApplyDiff(ctx, ex.repoDir, string(repoDiff)); err != nil {
 			return gerrors.Wrap(err)
 		}
 	}
@@ -115,8 +129,8 @@ func (ex *RunExecutor) prepareArchive(ctx context.Context) error {
 		return gerrors.Wrap(err)
 	}
 	defer func() { _ = file.Close() }()
-	log.Trace(ctx, "Extracting code archive", "src", ex.codePath, "dst", ex.workingDir)
-	if err := extract.Tar(ctx, file, ex.workingDir, nil); err != nil {
+	log.Trace(ctx, "Extracting code archive", "src", ex.codePath, "dst", ex.repoDir)
+	if err := extract.Tar(ctx, file, ex.repoDir, nil); err != nil {
 		return gerrors.Wrap(err)
 	}
 	return nil
@@ -124,10 +138,10 @@ func (ex *RunExecutor) prepareArchive(ctx context.Context) error {
 
 func (ex *RunExecutor) shouldCheckout(ctx context.Context) (bool, error) {
 	log.Trace(ctx, "checking if repo checkout is needed")
-	info, err := os.Stat(ex.workingDir)
+	info, err := os.Stat(ex.repoDir)
 	if err != nil {
 		if os.IsNotExist(err) {
-			if err = os.MkdirAll(ex.workingDir, 0o777); err != nil {
+			if err = common.MkdirAll(ctx, ex.repoDir, ex.jobUid, ex.jobGid); err != nil {
 				return false, gerrors.Wrap(err)
 			}
 			// No repo dir - created a new one
@@ -136,9 +150,9 @@ func (ex *RunExecutor) shouldCheckout(ctx context.Context) (bool, error) {
 		return false, gerrors.Wrap(err)
 	}
 	if !info.IsDir() {
-		return false, fmt.Errorf("failed to set up repo dir: %s is not a dir", ex.workingDir)
+		return false, fmt.Errorf("failed to set up repo dir: %s is not a dir", ex.repoDir)
 	}
-	entries, err := os.ReadDir(ex.workingDir)
+	entries, err := os.ReadDir(ex.repoDir)
 	if err != nil {
 		return false, gerrors.Wrap(err)
 	}
@@ -158,14 +172,14 @@ func (ex *RunExecutor) shouldCheckout(ctx context.Context) (bool, error) {
 }
 
 func (ex *RunExecutor) moveRepoDir(tmpDir string) error {
-	if err := moveDir(ex.workingDir, tmpDir); err != nil {
+	if err := moveDir(ex.repoDir, tmpDir); err != nil {
 		return gerrors.Wrap(err)
 	}
 	return nil
 }
 
 func (ex *RunExecutor) restoreRepoDir(tmpDir string) error {
-	if err := moveDir(tmpDir, ex.workingDir); err != nil {
+	if err := moveDir(tmpDir, ex.repoDir); err != nil {
 		return gerrors.Wrap(err)
 	}
 	return nil

@@ -9,8 +9,8 @@ from dstack._internal.server.services.jobs.configurators.extensions.cursor impor
 from dstack._internal.server.services.jobs.configurators.extensions.vscode import VSCodeDesktop
 
 INSTALL_IPYKERNEL = (
-    "(echo pip install ipykernel... && pip install -q --no-cache-dir ipykernel 2> /dev/null) || "
-    'echo "no pip, ipykernel was not installed"'
+    "(echo 'pip install ipykernel...' && pip install -q --no-cache-dir ipykernel 2> /dev/null) || "
+    "echo 'no pip, ipykernel was not installed'"
 )
 
 
@@ -39,12 +39,12 @@ class DevEnvironmentJobConfigurator(JobConfigurator):
         commands = self.ide.get_install_commands()
         commands.append(INSTALL_IPYKERNEL)
         commands += self.run_spec.configuration.setup
-        commands.append("echo ''")
+        commands.append("echo")
         commands += self.run_spec.configuration.init
         commands += self.ide.get_print_readme_commands()
         commands += [
             f"echo 'To connect via SSH, use: `ssh {self.run_spec.run_name}`'",
-            "echo ''",
+            "echo",
             "echo -n 'To exit, press Ctrl+C.'",
         ]
         commands += ["tail -f /dev/null"]  # idle

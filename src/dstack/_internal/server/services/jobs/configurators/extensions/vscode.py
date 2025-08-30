@@ -1,7 +1,5 @@
 from typing import List, Optional
 
-from dstack._internal.core.models.configurations import DEFAULT_REPO_DIR
-
 
 class VSCodeDesktop:
     def __init__(
@@ -37,8 +35,8 @@ class VSCodeDesktop:
 
     def get_print_readme_commands(self) -> List[str]:
         return [
-            "echo To open in VS Code Desktop, use link below:",
-            "echo ''",
-            f"echo '  vscode://vscode-remote/ssh-remote+{self.run_name}{DEFAULT_REPO_DIR}'",  # TODO use $REPO_DIR
-            "echo ''",
+            "echo 'To open in VS Code Desktop, use link below:'",
+            "echo",
+            f'echo "  vscode://vscode-remote/ssh-remote+{self.run_name}$DSTACK_REPO_DIR"',
+            "echo",
         ]
