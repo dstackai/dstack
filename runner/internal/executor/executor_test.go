@@ -22,10 +22,13 @@ import (
 func TestExecutor_WorkingDir_Set(t *testing.T) {
 	var b bytes.Buffer
 	ex := makeTestExecutor(t)
-	workingDir := path.Join(t.TempDir(), "path/to/wd")
+	baseDir, err := filepath.EvalSymlinks(t.TempDir())
+	require.NoError(t, err)
+	workingDir := path.Join(baseDir, "path/to/wd")
+
 	ex.jobSpec.WorkingDir = &workingDir
 	ex.jobSpec.Commands = append(ex.jobSpec.Commands, "pwd")
-	err := ex.setJobWorkingDir(context.TODO())
+	err = ex.setJobWorkingDir(context.TODO())
 	require.NoError(t, err)
 	require.Equal(t, workingDir, ex.jobWorkingDir)
 	err = os.MkdirAll(workingDir, 0o755)
