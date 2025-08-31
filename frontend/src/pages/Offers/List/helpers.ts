@@ -1,4 +1,12 @@
+import { RequestParam } from '../../../libs/filters';
+
 const rangeSeparator = '..';
+
+export function convertMiBToGB(mib: number) {
+    const bytes = mib * Math.pow(2, 20); // Convert MiB to bytes
+    // Convert bytes to GB
+    return bytes / Math.pow(10, 9);
+}
 
 export const getPropertyFilterOptions = (gpus: IGpu[]) => {
     const names = new Set<string>();
@@ -30,7 +38,7 @@ export const getPropertyFilterOptions = (gpus: IGpu[]) => {
     };
 };
 
-const round = (number: number) => Math.round(number * 100) / 100;
+export const round = (number: number) => Math.round(number * 100) / 100;
 
 export const renderRange = (range: { min?: number; max?: number }) => {
     if (typeof range.min === 'number' && typeof range.max === 'number' && range.max != range.min) {
@@ -40,23 +48,29 @@ export const renderRange = (range: { min?: number; max?: number }) => {
     return range.min?.toString() ?? range.max?.toString();
 };
 
-export const stringRangeToObject = (rangeString: string): { min?: number; max?: number } | undefined => {
-    if (!rangeString) return;
+export const rangeToObject = (range: RequestParam): { min?: number; max?: number } | undefined => {
+    if (!range) return;
 
-    const [minString, maxString] = rangeString.split(rangeSeparator);
+    if (typeof range === 'string') {
+        const [minString, maxString] = range.split(rangeSeparator);
 
-    const min = Number(minString);
-    const max = Number(maxString);
+        const min = Number(minString);
+        const max = Number(maxString);
 
-    if (!isNaN(min) && !isNaN(max)) {
-        return { min, max };
+        if (!isNaN(min) && !isNaN(max)) {
+            return { min, max };
+        }
+
+        if (!isNaN(min)) {
+            return { min, max: min };
+        }
+
+        if (!isNaN(max)) {
+            return { min: max, max };
+        }
     }
 
-    if (!isNaN(min)) {
-        return { min, max: min };
-    }
-
-    if (!isNaN(max)) {
-        return { min: max, max };
-    }
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-expect-error
+    return range;
 };

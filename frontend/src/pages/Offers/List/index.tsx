@@ -1,36 +1,39 @@
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useSearchParams } from 'react-router-dom';
 
-import type { SelectCSDProps } from 'components';
-import { Box, Cards, Header, PropertyFilter, SelectCSD } from 'components';
+import { Cards, Header, PropertyFilter, SelectCSD, StatusIndicator } from 'components';
 
 import { useCollection } from 'hooks';
-import { useProjectFilter } from 'hooks/useProjectFilter';
 import { useGetGpusListQuery } from 'services/gpu';
 
 import { useEmptyMessages } from './hooks/useEmptyMessages';
 import { useFilters } from './hooks/useFilters';
-import { bytesFormatter } from '../../Runs/Details/Jobs/Metrics/helpers';
-import { renderRange, stringRangeToObject } from './helpers';
+import { convertMiBToGB, rangeToObject, renderRange, round } from './helpers';
 
 import styles from './styles.module.scss';
 
+const gpusFilterOption = { label: 'GPUs', value: 'gpu' };
+
 const getRequestParams = ({
+    project_name,
     gpu_name,
     backend,
     gpu_count,
     gpu_memory,
+    spot_policy,
 }: {
+    project_name: string;
     gpu_name?: string[];
     backend?: string[];
     gpu_count?: string;
     gpu_memory?: string;
-}): Omit<TGpusListQueryParams, 'project_name'> => {
-    const gpuCountMinMax = stringRangeToObject(gpu_count ?? '');
-    const gpuMemoryMinMax = stringRangeToObject(gpu_memory ?? '');
+    spot_policy?: TSpot;
+}): TGpusListQueryParams => {
+    const gpuCountMinMax = rangeToObject(gpu_count ?? '');
+    const gpuMemoryMinMax = rangeToObject(gpu_memory ?? '');
 
     return {
+        project_name: project_name,
         run_spec: {
             configuration: {
                 nodes: 1,
@@ -41,15 +44,16 @@ const getRequestParams = ({
                 home_dir: '/root',
                 env: {},
                 resources: {
-                    cpu: { min: 2 },
-                    memory: { min: 8.0 },
-                    disk: { size: { min: 100.0 } },
+                    // cpu: { min: 2 },
+                    // memory: { min: 8.0 },
+                    // disk: { size: { min: 100.0 } },
                     gpu: {
                         ...(gpu_name?.length ? { name: gpu_name } : {}),
                         ...(gpuCountMinMax ? { count: gpuCountMinMax } : {}),
                         ...(gpuMemoryMinMax ? { memory: gpuMemoryMinMax } : {}),
                     },
                 },
+                spot_policy,
                 volumes: [],
                 files: [],
                 setup: [],
@@ -63,23 +67,14 @@ const getRequestParams = ({
 
 export const OfferList = () => {
     const { t } = useTranslation();
-    const [requestParams, setRequestParams] = useState<Omit<TGpusListQueryParams, 'project_name'> | undefined>();
-    const [searchParams, setSearchParams] = useSearchParams();
+    const [requestParams, setRequestParams] = useState<TGpusListQueryParams | undefined>();
 
-    const { projectOptions, selectedProject, setSelectedProject } = useProjectFilter({
-        localStorePrefix: 'offers-list-projects',
-    });
-
-    console.log({ requestParams });
     const { data, isLoading, isFetching } = useGetGpusListQuery(
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-expect-error
+        requestParams,
         {
-            project_name: selectedProject?.value ?? '',
-            ...requestParams,
-        },
-        {
-            skip: !selectedProject || !requestParams,
+            skip: !requestParams || !requestParams['project_name'],
         },
     );
 
@@ -92,30 +87,18 @@ export const OfferList = () => {
         filteringProperties,
     } = useFilters({ gpus: data?.gpus ?? [] });
 
-    console.log({ filteringRequestParams });
-
     useEffect(() => {
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-expect-error
         setRequestParams(getRequestParams(filteringRequestParams));
     }, [JSON.stringify(filteringRequestParams)]);
 
-    const onChangeProjectName = (project: SelectCSDProps.Option) => {
-        setSelectedProject(project);
-        setSearchParams({ project_name: project.value ?? '' });
-    };
+    const { renderEmptyMessage, renderNoMatchMessage } = useEmptyMessages({
+        clearFilter,
+        projectNameSelected: Boolean(requestParams?.['project_name']),
+    });
 
-    useEffect(() => {
-        if (!selectedProject && projectOptions?.length) {
-            const searchParamProjectName = searchParams.get('project_name');
-
-            onChangeProjectName(projectOptions.find((p) => p.value === searchParamProjectName) ?? projectOptions[0]);
-        }
-    }, [projectOptions]);
-
-    const { renderEmptyMessage, renderNoMatchMessage } = useEmptyMessages({ clearFilter });
-
-    const { items, collectionProps } = useCollection(data?.gpus ?? [], {
+    const { items, collectionProps } = useCollection(requestParams?.['project_name'] ? (data?.gpus ?? []) : [], {
         filtering: {
             empty: renderEmptyMessage(),
             noMatch: renderNoMatchMessage(),
@@ -131,17 +114,17 @@ export const OfferList = () => {
                 header: (gpu) => gpu.name,
                 sections: [
                     {
-                        id: 'backend',
-                        header: t('offer.backend'),
-                        content: (gpu) => gpu.backend ?? gpu.backends?.join(', ') ?? '-',
+                        id: 'backends',
+                        header: t('offer.backend_plural'),
+                        content: (gpu) => gpu.backends?.join(', ') ?? '-',
                         width: 50,
                     },
-                    {
-                        id: 'region',
-                        header: t('offer.region'),
-                        content: (gpu) => gpu.region ?? gpu.regions?.join(', ') ?? '-',
-                        width: 50,
-                    },
+                    // {
+                    //     id: 'region',
+                    //     header: t('offer.region'),
+                    //     content: (gpu) => gpu.region ?? gpu.regions?.join(', ') ?? '-',
+                    //     width: 50,
+                    // },
                     {
                         id: 'count',
                         header: t('offer.count'),
@@ -157,7 +140,22 @@ export const OfferList = () => {
                     {
                         id: 'memory_mib',
                         header: t('offer.memory_mib'),
-                        content: (gpu) => bytesFormatter(gpu.memory_mib),
+                        content: (gpu) => `${round(convertMiBToGB(gpu.memory_mib))}GB`,
+                        width: 50,
+                    },
+                    {
+                        id: 'spot',
+                        header: t('offer.spot'),
+                        content: (gpu) => gpu.spot.join(', ') ?? '-',
+                        width: 50,
+                    },
+                    {
+                        id: 'availability',
+                        content: (gpu) => {
+                            if (gpu.availability === 'not_available') {
+                                return <StatusIndicator type="error">Not Available</StatusIndicator>;
+                            }
+                        },
                         width: 50,
                     },
                 ],
@@ -168,18 +166,6 @@ export const OfferList = () => {
             header={<Header variant="awsui-h1-sticky">{t('offer.title')}</Header>}
             filter={
                 <div className={styles.selectFilters}>
-                    <div className={styles.filterField}>
-                        <Box>{t('offer.project_name_label')}:</Box>
-                        <div className={styles.selectFilter}>
-                            <SelectCSD
-                                disabled={isLoading || isFetching}
-                                options={projectOptions}
-                                selectedOption={selectedProject}
-                                onChange={({ detail: { selectedOption } }) => onChangeProjectName(selectedOption)}
-                            />
-                        </div>
-                    </div>
-
                     <div className={styles.propertyFilter}>
                         <PropertyFilter
                             disabled={isLoading || isFetching}
@@ -195,6 +181,16 @@ export const OfferList = () => {
                             }}
                             filteringOptions={filteringOptions}
                             filteringProperties={filteringProperties}
+                        />
+                    </div>
+
+                    <div className={styles.filterField}>
+                        <SelectCSD
+                            inlineLabelText={t('offer.groupBy')}
+                            options={[gpusFilterOption]}
+                            selectedOption={gpusFilterOption}
+                            expandToViewport={true}
+                            disabled
                         />
                     </div>
                 </div>
