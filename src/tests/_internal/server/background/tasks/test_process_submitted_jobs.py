@@ -8,13 +8,13 @@ from sqlalchemy.orm import joinedload
 
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import TaskConfiguration
+from dstack._internal.core.models.fleets import FleetNodesSpec
 from dstack._internal.core.models.health import HealthStatus
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceStatus,
 )
 from dstack._internal.core.models.profiles import Profile
-from dstack._internal.core.models.resources import Range
 from dstack._internal.core.models.runs import (
     JobStatus,
     JobTerminationReason,
@@ -656,7 +656,7 @@ class TestProcessSubmittedJobs:
         user = await create_user(session)
         repo = await create_repo(session=session, project_id=project.id)
         fleet_spec = get_fleet_spec()
-        fleet_spec.configuration.nodes = Range(min=1, max=2)
+        fleet_spec.configuration.nodes = FleetNodesSpec(min=1, target=1, max=2)
         fleet = await create_fleet(session=session, project=project, spec=fleet_spec)
         instance = await create_instance(
             session=session,
@@ -746,7 +746,7 @@ class TestProcessSubmittedJobs:
         user = await create_user(session)
         repo = await create_repo(session=session, project_id=project.id)
         fleet_spec = get_fleet_spec()
-        fleet_spec.configuration.nodes = Range(min=0, max=1)
+        fleet_spec.configuration.nodes = FleetNodesSpec(min=0, target=0, max=1)
         await create_fleet(session=session, project=project, spec=fleet_spec, name="fleet")
         # Need a second non-empty fleet to have two-stage processing
         fleet2 = await create_fleet(
@@ -786,7 +786,7 @@ class TestProcessSubmittedJobs:
         user = await create_user(session)
         repo = await create_repo(session=session, project_id=project.id)
         fleet_spec = get_fleet_spec()
-        fleet_spec.configuration.nodes = Range(min=0, max=1)
+        fleet_spec.configuration.nodes = FleetNodesSpec(min=0, target=0, max=1)
         fleet = await create_fleet(session=session, project=project, spec=fleet_spec, name="fleet")
         run_spec = get_run_spec(repo_id=repo.name)
         run_spec.configuration.fleets = [fleet.name]
@@ -817,7 +817,7 @@ class TestProcessSubmittedJobs:
         user = await create_user(session)
         repo = await create_repo(session=session, project_id=project.id)
         fleet_spec = get_fleet_spec()
-        fleet_spec.configuration.nodes = Range(min=1, max=2)
+        fleet_spec.configuration.nodes = FleetNodesSpec(min=1, target=1, max=2)
         fleet = await create_fleet(session=session, project=project, spec=fleet_spec, name="fleet")
         await create_instance(
             session=session,
@@ -857,7 +857,7 @@ class TestProcessSubmittedJobs:
         user = await create_user(session)
         repo = await create_repo(session=session, project_id=project.id)
         fleet_spec = get_fleet_spec()
-        fleet_spec.configuration.nodes = Range(min=0, max=1)
+        fleet_spec.configuration.nodes = FleetNodesSpec(min=0, target=0, max=1)
         fleet = await create_fleet(session=session, project=project, spec=fleet_spec)
         run = await create_run(
             session=session,

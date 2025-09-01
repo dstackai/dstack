@@ -147,7 +147,6 @@ def _maintain_fleet_nodes_min(
     Returns `True` if retried or added new instances and `False` otherwise.
     """
     assert fleet_spec.configuration.nodes is not None
-    nodes_min = fleet_spec.configuration.nodes.min or 0
     for instance in fleet_model.instances:
         # Delete terminated but not deleted instances since
         # they are going to be replaced with new pending instances.
@@ -158,9 +157,9 @@ def _maintain_fleet_nodes_min(
             instance.deleted_at = get_current_datetime()
     active_instances = [i for i in fleet_model.instances if not i.deleted]
     active_instances_num = len(active_instances)
-    if active_instances_num >= nodes_min:
+    if active_instances_num >= fleet_spec.configuration.nodes.min:
         return False
-    nodes_missing = nodes_min - active_instances_num
+    nodes_missing = fleet_spec.configuration.nodes.min - active_instances_num
     for i in range(nodes_missing):
         instance_model = create_fleet_instance_model(
             session=session,
@@ -183,7 +182,7 @@ def _autodelete_fleet(fleet_model: FleetModel) -> bool:
     if (
         fleet_model.status != FleetStatus.TERMINATING
         and fleet_spec.configuration.nodes is not None
-        and (fleet_spec.configuration.nodes.min is None or fleet_spec.configuration.nodes.min == 0)
+        and fleet_spec.configuration.nodes.min == 0
     ):
         # Empty fleets that allow 0 nodes should not be auto-deleted
         return False

@@ -16,6 +16,7 @@ from dstack._internal.core.models.common import NetworkMode
 from dstack._internal.core.models.fleets import (
     Fleet,
     FleetConfiguration,
+    FleetNodesSpec,
     FleetSpec,
     FleetStatus,
     InstanceGroupPlacement,
@@ -26,7 +27,7 @@ from dstack._internal.core.models.profiles import (
     CreationPolicy,
     TerminationPolicy,
 )
-from dstack._internal.core.models.resources import Memory, Range
+from dstack._internal.core.models.resources import Memory
 from dstack._internal.core.models.runs import (
     Job,
     JobProvisioningData,
@@ -755,12 +756,17 @@ def _create_fleet_model_for_job(
     placement = InstanceGroupPlacement.ANY
     if run.run_spec.configuration.type == "task" and run.run_spec.configuration.nodes > 1:
         placement = InstanceGroupPlacement.CLUSTER
+    nodes = _get_nodes_required_num_for_run(run.run_spec)
     spec = FleetSpec(
         configuration=FleetConfiguration(
             name=run.run_spec.run_name,
             placement=placement,
             reservation=run.run_spec.configuration.reservation,
-            nodes=Range(min=_get_nodes_required_num_for_run(run.run_spec), max=None),
+            nodes=FleetNodesSpec(
+                min=nodes,
+                target=nodes,
+                max=None,
+            ),
         ),
         profile=run.run_spec.merged_profile,
         autocreated=True,

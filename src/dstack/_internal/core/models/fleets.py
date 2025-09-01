@@ -19,7 +19,7 @@ from dstack._internal.core.models.profiles import (
     TerminationPolicy,
     parse_idle_duration,
 )
-from dstack._internal.core.models.resources import Range, ResourcesSpec
+from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.utils.common import list_enum_values_for_annotation
 from dstack._internal.utils.json_schema import add_extra_schema_types
 from dstack._internal.utils.tags import tags_validator
@@ -141,6 +141,53 @@ class SSHParams(CoreModel):
         return value
 
 
+class FleetNodesSpec(CoreModel):
+    min: Annotated[
+        int, Field(description=("The minimum number of instances to maintain in the fleet."))
+    ]
+    # TODO: Exclude target if equal to min for backward compatibility
+    target: Annotated[
+        int,
+        Field(
+            description=(
+                "The number of instances to provision on fleet apply. `min` <= `target` <= `max`"
+            )
+        ),
+    ]
+    max: Annotated[
+        Optional[int], Field(description=("The maximum number of instances allowed in the fleet."))
+    ] = None
+
+    @root_validator(pre=True)
+    def set_min_and_target_defaults(cls, values):
+        min_ = values.get("min")
+        target = values.get("target")
+        if min_ is None:
+            values["min"] = 0
+        if target is None:
+            values["target"] = values["min"]
+        return values
+
+    @validator("min")
+    def validate_min(cls, v: int):
+        if v < 0:
+            raise ValueError("min cannot be negative")
+        return v
+
+    @root_validator(skip_on_failure=True)
+    def _post_validate_ranges(cls, values):
+        min_ = values["min"]
+        target = values["target"]
+        max_ = values.get("max")
+        if target < min_:
+            raise ValueError("target must not be be less than min")
+        if max_ is not None and max_ < min_:
+            raise ValueError("max must not be less than min")
+        if max_ is not None and max_ < target:
+            raise ValueError("max must not be less than target")
+        return values
+
+
 class InstanceGroupParams(CoreModel):
     env: Annotated[
         Env,
@@ -151,7 +198,9 @@ class InstanceGroupParams(CoreModel):
         Field(description="The parameters for adding instances via SSH"),
     ] = None
 
-    nodes: Annotated[Optional[Range[int]], Field(description="The number of instances")] = None
+    nodes: Annotated[
+        Optional[FleetNodesSpec], Field(description="The number of instances in cloud fleet")
+    ] = None
     placement: Annotated[
         Optional[InstanceGroupPlacement],
         Field(description="The placement of instances: `any` or `cluster`"),
@@ -247,6 +296,16 @@ class InstanceGroupParams(CoreModel):
                 schema["properties"]["idle_duration"],
                 extra_types=[{"type": "string"}],
             )
+
+    @validator("nodes", pre=True)
+    def parse_nodes(cls, v: Optional[Union[dict, str]]) -> Optional[dict]:
+        if isinstance(v, str) and ".." in v:
+            v = v.replace(" ", "")
+            min, max = v.split("..")
+            return dict(min=min or None, max=max or None)
+        elif isinstance(v, str) or isinstance(v, int):
+            return dict(min=v, max=v)
+        return v
 
     _validate_idle_duration = validator("idle_duration", pre=True, allow_reuse=True)(
         parse_idle_duration

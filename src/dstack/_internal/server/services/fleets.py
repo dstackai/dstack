@@ -992,7 +992,7 @@ def _validate_internal_ips(ssh_config: SSHParams):
 
 
 def _get_fleet_nodes_to_provision(spec: FleetSpec) -> int:
-    if spec.configuration.nodes is None or spec.configuration.nodes.min is None:
+    if spec.configuration.nodes is None:
         return 0
     return spec.configuration.nodes.min
 
