@@ -122,7 +122,7 @@ class BaseRunConfigurator(
             warn(
                 "[code]repos[0].path[/code] is not set,"
                 f" using legacy repo path [code]{LEGACY_REPO_DIR}[/code]\n\n"
-                "In future versions [code]path[/code] will be mandatory."
+                "In a future version the default value will be changed."
                 f" To keep using [code]{LEGACY_REPO_DIR}[/code], explicitly set"
                 f" [code]repos[0].path[/code] to [code]{LEGACY_REPO_DIR}[/code]\n"
             )
