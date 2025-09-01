@@ -3,9 +3,7 @@ import { RequestParam } from '../../../libs/filters';
 const rangeSeparator = '..';
 
 export function convertMiBToGB(mib: number) {
-    const bytes = mib * Math.pow(2, 20); // Convert MiB to bytes
-    // Convert bytes to GB
-    return bytes / Math.pow(10, 9);
+    return mib / 1024;
 }
 
 export const getPropertyFilterOptions = (gpus: IGpu[]) => {

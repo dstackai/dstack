@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Cards, Header, PropertyFilter, SelectCSD, StatusIndicator } from 'components';
+import { Cards, Header, Link, PropertyFilter, SelectCSD, StatusIndicator } from 'components';
 
 import { useCollection } from 'hooks';
 import { useGetGpusListQuery } from 'services/gpu';
@@ -12,7 +12,7 @@ import { convertMiBToGB, rangeToObject, renderRange, round } from './helpers';
 
 import styles from './styles.module.scss';
 
-const gpusFilterOption = { label: 'GPUs', value: 'gpu' };
+const gpusFilterOption = { label: 'GPU', value: 'gpu' };
 
 const getRequestParams = ({
     project_name,
@@ -111,8 +111,26 @@ export const OfferList = () => {
             {...collectionProps}
             items={items}
             cardDefinition={{
-                header: (gpu) => gpu.name,
+                header: (gpu) => <Link>{gpu.name}</Link>,
                 sections: [
+                    {
+                        id: 'memory_mib',
+                        header: t('offer.memory_mib'),
+                        content: (gpu) => `${round(convertMiBToGB(gpu.memory_mib))}GB`,
+                        width: 50,
+                    },
+                    {
+                        id: 'price',
+                        header: t('offer.price'),
+                        content: (gpu) => <span className={styles.greenText}>{renderRange(gpu.price) ?? '-'}</span>,
+                        width: 50,
+                    },
+                    {
+                        id: 'count',
+                        header: t('offer.count'),
+                        content: (gpu) => renderRange(gpu.count) ?? '-',
+                        width: 50,
+                    },
                     {
                         id: 'backends',
                         header: t('offer.backend_plural'),
@@ -126,24 +144,6 @@ export const OfferList = () => {
                     //     width: 50,
                     // },
                     {
-                        id: 'count',
-                        header: t('offer.count'),
-                        content: (gpu) => renderRange(gpu.count) ?? '-',
-                        width: 50,
-                    },
-                    {
-                        id: 'price',
-                        header: t('offer.price'),
-                        content: (gpu) => renderRange(gpu.price) ?? '-',
-                        width: 50,
-                    },
-                    {
-                        id: 'memory_mib',
-                        header: t('offer.memory_mib'),
-                        content: (gpu) => `${round(convertMiBToGB(gpu.memory_mib))}GB`,
-                        width: 50,
-                    },
-                    {
                         id: 'spot',
                         header: t('offer.spot'),
                         content: (gpu) => gpu.spot.join(', ') ?? '-',
@@ -152,8 +152,10 @@ export const OfferList = () => {
                     {
                         id: 'availability',
                         content: (gpu) => {
+                            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                            // @ts-expect-error
                             if (gpu.availability === 'not_available') {
-                                return <StatusIndicator type="error">Not Available</StatusIndicator>;
+                                return <StatusIndicator type="warning">Not Available</StatusIndicator>;
                             }
                         },
                         width: 50,
@@ -164,6 +166,7 @@ export const OfferList = () => {
             loadingText={t('common.loading')}
             stickyHeader={true}
             header={<Header variant="awsui-h1-sticky">{t('offer.title')}</Header>}
+            variant="full-page"
             filter={
                 <div className={styles.selectFilters}>
                     <div className={styles.propertyFilter}>

@@ -93,7 +93,7 @@ export const useFilters = ({ gpus }: Args) => {
         {
             key: filterKeys.GPU_NAME,
             operators: ['='],
-            propertyLabel: 'GPU names',
+            propertyLabel: 'GPU name',
         },
         {
             key: filterKeys.GPU_COUNT,
@@ -103,17 +103,17 @@ export const useFilters = ({ gpus }: Args) => {
         {
             key: filterKeys.GPU_MEMORY,
             operators: ['<=', '>='],
-            propertyLabel: 'GPU Memory',
+            propertyLabel: 'GPU memory',
         },
         {
             key: filterKeys.BACKEND,
             operators: ['='],
-            propertyLabel: 'Backends',
+            propertyLabel: 'Backend',
         },
         {
             key: filterKeys.SPOT_POLICY,
             operators: ['='],
-            propertyLabel: 'Spot',
+            propertyLabel: 'Spot policy',
         },
     ];
 
