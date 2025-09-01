@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.common import NetworkMode
 from dstack._internal.core.models.configurations import TaskConfiguration
 from dstack._internal.core.models.health import HealthStatus
 from dstack._internal.core.models.instances import (
@@ -25,8 +26,12 @@ from dstack._internal.core.models.volumes import (
     VolumeMountPoint,
     VolumeStatus,
 )
-from dstack._internal.server.background.tasks.process_submitted_jobs import process_submitted_jobs
+from dstack._internal.server.background.tasks.process_submitted_jobs import (
+    _prepare_job_runtime_data,
+    process_submitted_jobs,
+)
 from dstack._internal.server.models import InstanceModel, JobModel, VolumeAttachmentModel
+from dstack._internal.server.settings import JobNetworkMode
 from dstack._internal.server.testing.common import (
     ComputeMockSpec,
     create_fleet,
@@ -1004,3 +1009,102 @@ class TestProcessSubmittedJobs:
         await process_submitted_jobs()
         await session.refresh(job2)
         assert job2.status == JobStatus.PROVISIONING
+
+
+@pytest.mark.parametrize(
+    ["job_network_mode", "blocks", "multinode", "network_mode", "constraints_are_set"],
+    [
+        pytest.param(
+            JobNetworkMode.HOST_FOR_MULTINODE_ONLY,
+            2,
+            False,
+            NetworkMode.BRIDGE,
+            True,
+            id="host-for-multinode-only--half-of-instance",
+        ),
+        pytest.param(
+            JobNetworkMode.HOST_FOR_MULTINODE_ONLY,
+            4,
+            False,
+            NetworkMode.BRIDGE,
+            False,
+            id="host-for-multinode-only--entire-instance",
+        ),
+        pytest.param(
+            JobNetworkMode.HOST_FOR_MULTINODE_ONLY,
+            4,
+            True,
+            NetworkMode.HOST,
+            False,
+            id="host-for-multinode-only--entire-instance--multinode",
+        ),
+        pytest.param(
+            JobNetworkMode.HOST_WHEN_POSSIBLE,
+            2,
+            False,
+            NetworkMode.BRIDGE,
+            True,
+            id="host-when-possible--half-of-instance",
+        ),
+        pytest.param(
+            JobNetworkMode.HOST_WHEN_POSSIBLE,
+            4,
+            False,
+            NetworkMode.HOST,
+            False,
+            id="host-when-possible--entire-instance",
+        ),
+        pytest.param(
+            JobNetworkMode.HOST_WHEN_POSSIBLE,
+            4,
+            True,
+            NetworkMode.HOST,
+            False,
+            id="host-when-possible--entire-instance--multinode",
+        ),
+        pytest.param(
+            JobNetworkMode.FORCED_BRIDGE,
+            2,
+            False,
+            NetworkMode.BRIDGE,
+            True,
+            id="forced-bridge--half-of-instance",
+        ),
+        pytest.param(
+            JobNetworkMode.FORCED_BRIDGE,
+            4,
+            False,
+            NetworkMode.BRIDGE,
+            False,
+            id="forced-bridge--entire-instance",
+        ),
+        pytest.param(
+            JobNetworkMode.FORCED_BRIDGE,
+            4,
+            True,
+            NetworkMode.BRIDGE,
+            False,
+            id="forced-bridge--entire-instance--multinode",
+        ),
+    ],
+)
+def test_prepare_job_runtime_data(
+    monkeypatch: pytest.MonkeyPatch,
+    job_network_mode: JobNetworkMode,
+    blocks: int,
+    multinode: bool,
+    network_mode: NetworkMode,
+    constraints_are_set: bool,
+):
+    monkeypatch.setattr("dstack._internal.server.settings.JOB_NETWORK_MODE", job_network_mode)
+    offer = get_instance_offer_with_availability(blocks=blocks, total_blocks=4)
+    jrd = _prepare_job_runtime_data(offer=offer, multinode=multinode)
+    assert jrd.network_mode == network_mode
+    if constraints_are_set:
+        assert jrd.gpu is not None
+        assert jrd.cpu is not None
+        assert jrd.memory is not None
+    else:
+        assert jrd.gpu is None
+        assert jrd.cpu is None
+        assert jrd.memory is None

@@ -85,7 +85,6 @@ from dstack._internal.server.services.volumes import (
 )
 from dstack._internal.server.utils import sentry_utils
 from dstack._internal.utils import common as common_utils
-from dstack._internal.utils import env as env_utils
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -186,6 +185,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
     run_spec = run.run_spec
     profile = run_spec.merged_profile
     job = find_job(run.jobs, job_model.replica_num, job_model.job_num)
+    multinode = job.job_spec.jobs_per_replica > 1
 
     # Master job chooses fleet for the run.
     # Due to two-step processing, it's saved to job_model.fleet.
@@ -308,6 +308,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
                 session=session,
                 instances_with_offers=fleet_instances_with_offers,
                 job_model=job_model,
+                multinode=multinode,
             )
             job_model.fleet = fleet_model
             job_model.instance_assigned = True
@@ -383,7 +384,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
             offer=offer,
             instance_num=instance_num,
         )
-        job_model.job_runtime_data = _prepare_job_runtime_data(offer).json()
+        job_model.job_runtime_data = _prepare_job_runtime_data(offer, multinode).json()
         instance.fleet_id = fleet_model.id
         logger.info(
             "The job %s created the new instance %s",
@@ -610,6 +611,7 @@ async def _assign_job_to_fleet_instance(
     session: AsyncSession,
     instances_with_offers: list[tuple[InstanceModel, InstanceOfferWithAvailability]],
     job_model: JobModel,
+    multinode: bool,
 ) -> Optional[InstanceModel]:
     if len(instances_with_offers) == 0:
         return None
@@ -639,7 +641,7 @@ async def _assign_job_to_fleet_instance(
     job_model.instance = instance
     job_model.used_instance_id = instance.id
     job_model.job_provisioning_data = instance.job_provisioning_data
-    job_model.job_runtime_data = _prepare_job_runtime_data(offer).json()
+    job_model.job_runtime_data = _prepare_job_runtime_data(offer, multinode).json()
     return instance
 
 
@@ -827,12 +829,17 @@ def _create_instance_model_for_job(
     return instance
 
 
-def _prepare_job_runtime_data(offer: InstanceOfferWithAvailability) -> JobRuntimeData:
+def _prepare_job_runtime_data(
+    offer: InstanceOfferWithAvailability, multinode: bool
+) -> JobRuntimeData:
     if offer.blocks == offer.total_blocks:
-        if env_utils.get_bool("DSTACK_FORCE_BRIDGE_NETWORK"):
+        if settings.JOB_NETWORK_MODE == settings.JobNetworkMode.FORCED_BRIDGE:
             network_mode = NetworkMode.BRIDGE
-        else:
+        elif settings.JOB_NETWORK_MODE == settings.JobNetworkMode.HOST_WHEN_POSSIBLE:
             network_mode = NetworkMode.HOST
+        else:
+            assert settings.JOB_NETWORK_MODE == settings.JobNetworkMode.HOST_FOR_MULTINODE_ONLY
+            network_mode = NetworkMode.HOST if multinode else NetworkMode.BRIDGE
         return JobRuntimeData(
             network_mode=network_mode,
             offer=offer,
