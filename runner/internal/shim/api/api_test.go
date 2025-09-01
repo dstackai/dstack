@@ -34,8 +34,8 @@ func (ds *DummyRunner) Remove(context.Context, string) error {
 	return nil
 }
 
-func (ds *DummyRunner) TaskIDs() []string {
-	return []string{}
+func (ds *DummyRunner) TaskList() []*shim.TaskListItem {
+	return []*shim.TaskListItem{}
 }
 
 func (ds *DummyRunner) TaskInfo(taskID string) shim.TaskInfo {

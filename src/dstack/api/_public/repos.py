@@ -68,6 +68,7 @@ class RepoCollection:
         """
         creds = None
         if isinstance(repo, RemoteRepo):
+            assert repo.repo_url is not None
             try:
                 creds = get_local_repo_credentials(
                     repo_url=repo.repo_url,
@@ -140,21 +141,39 @@ class RepoCollection:
     def is_initialized(
         self,
         repo: Repo,
+        by_user: bool = False,
     ) -> bool:
         """
-        Checks if the remote repo is initialized in the project
+        Checks if the repo is initialized in the project
 
         Args:
             repo: The repo to check.
+            by_user: Require the remote repo to be initialized by the user, that is, to have
+                the user's credentials. Ignored for other repo types.
 
         Returns:
             Whether the repo is initialized or not.
         """
+        if isinstance(repo, RemoteRepo) and by_user:
+            return self._is_initialized_by_user(repo)
         try:
-            self._api_client.repos.get(self._project, repo.repo_id, include_creds=False)
+            self._api_client.repos.get(self._project, repo.repo_id)
             return True
         except ResourceNotExistsError:
             return False
+
+    def _is_initialized_by_user(self, repo: RemoteRepo) -> bool:
+        try:
+            repo_head = self._api_client.repos.get_with_creds(self._project, repo.repo_id)
+        except ResourceNotExistsError:
+            return False
+        # This works because:
+        # - RepoCollection.init() always submits RemoteRepoCreds for remote repos, even if
+        #   the repo is public
+        # - Server returns creds only if there is RepoCredsModel for the user (or legacy
+        #   shared creds in RepoModel)
+        # TODO: add an API method with the same logic returning a bool value?
+        return repo_head.repo_creds is not None
 
 
 def get_ssh_keypair(key_path: Optional[PathLike], dstack_key_path: Path) -> str:

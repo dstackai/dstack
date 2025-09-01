@@ -279,7 +279,7 @@ async def get_plan(
         offers_with_backends = await get_create_instance_offers(
             project=project,
             profile=effective_spec.merged_profile,
-            requirements=_get_fleet_requirements(effective_spec),
+            requirements=get_fleet_requirements(effective_spec),
             fleet_spec=effective_spec,
             blocks=effective_spec.configuration.blocks,
         )
@@ -458,7 +458,7 @@ async def create_fleet_instance_model(
     instance_num: int,
 ) -> InstanceModel:
     profile = spec.merged_profile
-    requirements = _get_fleet_requirements(spec)
+    requirements = get_fleet_requirements(spec)
     instance_model = await instances_services.create_instance_model(
         session=session,
         project=project,
@@ -504,6 +504,7 @@ async def create_fleet_ssh_instance_model(
         raise ServerClientError("ssh key or user not specified")
 
     if proxy_jump is not None:
+        assert proxy_jump.ssh_key is not None
         ssh_proxy = SSHConnectionParams(
             hostname=proxy_jump.hostname,
             port=proxy_jump.port or 22,
@@ -641,6 +642,17 @@ def is_fleet_in_use(fleet_model: FleetModel, instance_nums: Optional[List[int]] 
 def is_fleet_empty(fleet_model: FleetModel) -> bool:
     active_instances = [i for i in fleet_model.instances if not i.deleted]
     return len(active_instances) == 0
+
+
+def get_fleet_requirements(fleet_spec: FleetSpec) -> Requirements:
+    profile = fleet_spec.merged_profile
+    requirements = Requirements(
+        resources=fleet_spec.configuration.resources or ResourcesSpec(),
+        max_price=profile.max_price,
+        spot=get_policy_map(profile.spot_policy, default=SpotPolicy.ONDEMAND),
+        reservation=fleet_spec.configuration.reservation,
+    )
+    return requirements
 
 
 async def _create_fleet(
@@ -1001,17 +1013,6 @@ def _terminate_fleet_instances(fleet_model: FleetModel, instance_nums: Optional[
             instance.deleted = True
         else:
             instance.status = InstanceStatus.TERMINATING
-
-
-def _get_fleet_requirements(fleet_spec: FleetSpec) -> Requirements:
-    profile = fleet_spec.merged_profile
-    requirements = Requirements(
-        resources=fleet_spec.configuration.resources or ResourcesSpec(),
-        max_price=profile.max_price,
-        spot=get_policy_map(profile.spot_policy, default=SpotPolicy.ONDEMAND),
-        reservation=fleet_spec.configuration.reservation,
-    )
-    return requirements
 
 
 def _get_next_instance_num(instance_nums: set[int]) -> int:

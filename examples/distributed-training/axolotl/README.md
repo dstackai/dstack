@@ -3,14 +3,13 @@
 This example walks you through how to run distributed fine-tune using [Axolotl :material-arrow-top-right-thin:{ .external }](https://github.com/axolotl-ai-cloud/axolotl){:target="_blank"} with `dstack`.
 
 ??? info "Prerequisites"
-    Once `dstack` is [installed](https://dstack.ai/docs/installation), go ahead clone the repo, and run `dstack init`.
+    Once `dstack` is [installed](https://dstack.ai/docs/installation), clone the repo with examples.
 
     <div class="termy">
  
     ```shell
     $ git clone https://github.com/dstackai/dstack
     $ cd dstack
-    $ dstack init
     ```
     </div>
 
@@ -67,7 +66,7 @@ commands:
       --machine_rank=$DSTACK_NODE_RANK \
       --num_processes=$DSTACK_GPUS_NUM \
       --num_machines=$DSTACK_NODES_NUM
-  
+
 resources:
   gpu: 80GB:8
   shm_size: 128GB
@@ -93,10 +92,10 @@ $ WANDB_PROJECT=...
 $ HUB_MODEL_ID=...
 $ dstack apply -f examples/distributed-training/trl/fsdp.dstack.yml
 
- #  BACKEND       RESOURCES                       INSTANCE TYPE  PRICE       
- 1  ssh (remote)  cpu=208 mem=1772GB H100:80GB:8  instance       $0     idle 
- 2  ssh (remote)  cpu=208 mem=1772GB H100:80GB:8  instance       $0     idle  
-    
+ #  BACKEND       RESOURCES                       INSTANCE TYPE  PRICE
+ 1  ssh (remote)  cpu=208 mem=1772GB H100:80GB:8  instance       $0     idle
+ 2  ssh (remote)  cpu=208 mem=1772GB H100:80GB:8  instance       $0     idle
+
 Submit the run trl-train-fsdp-distrib? [y/n]: y
 
 Provisioning...
@@ -106,10 +105,10 @@ Provisioning...
 
 ## Source code
 
-The source-code of this example can be found in 
+The source-code of this example can be found in
 [`examples/distributed-training/axolotl` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/distributed-training/axolotl).
 
 !!! info "What's next?"
     1. Read the [clusters](https://dstack.ai/docs/guides/clusters) guide
-    2. Check [dev environments](https://dstack.ai/docs/dev-environments), [tasks](https://dstack.ai/docs/concepts/tasks), 
+    2. Check [dev environments](https://dstack.ai/docs/dev-environments), [tasks](https://dstack.ai/docs/concepts/tasks),
        [services](https://dstack.ai/docs/concepts/services), and [fleets](https://dstack.ai/docs/concepts/fleets)

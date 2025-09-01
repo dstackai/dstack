@@ -21,12 +21,16 @@ class ProxyDependencyInjector(ABC):
     def __init__(self) -> None:
         self._service_conn_pool = ServiceConnectionPool()
 
+    # Abstract AsyncGenerator does not need async def since
+    # type checkers infer a different type without yield in body.
+    # https://mypy.readthedocs.io/en/stable/more_types.html#asynchronous-iterators
+
     @abstractmethod
-    async def get_repo(self) -> AsyncGenerator[BaseProxyRepo, None]:
+    def get_repo(self) -> AsyncGenerator[BaseProxyRepo, None]:
         pass
 
     @abstractmethod
-    async def get_auth_provider(self) -> AsyncGenerator[BaseProxyAuthProvider, None]:
+    def get_auth_provider(self) -> AsyncGenerator[BaseProxyAuthProvider, None]:
         pass
 
     async def get_service_connection_pool(self) -> ServiceConnectionPool:

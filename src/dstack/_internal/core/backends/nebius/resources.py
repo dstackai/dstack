@@ -119,7 +119,7 @@ def wait_for_operation(
         if time.monotonic() + interval > deadline:
             raise TimeoutError(f"Operation {op.id} wait timeout")
         time.sleep(interval)
-        LOOP.await_(op.update(timeout=REQUEST_TIMEOUT, metadata=REQUEST_MD))
+        LOOP.await_(op.update(per_retry_timeout=REQUEST_TIMEOUT, metadata=REQUEST_MD))
 
 
 def get_region_to_project_id_map(
@@ -155,7 +155,7 @@ def validate_regions(configured: set[str], available: set[str]) -> None:
 def list_tenant_projects(sdk: SDK) -> Sequence[Container]:
     tenants = LOOP.await_(
         TenantServiceClient(sdk).list(
-            ListTenantsRequest(), timeout=REQUEST_TIMEOUT, metadata=REQUEST_MD
+            ListTenantsRequest(), per_retry_timeout=REQUEST_TIMEOUT, metadata=REQUEST_MD
         )
     )
     if len(tenants.items) != 1:
@@ -164,7 +164,7 @@ def list_tenant_projects(sdk: SDK) -> Sequence[Container]:
     projects = LOOP.await_(
         ProjectServiceClient(sdk).list(
             ListProjectsRequest(parent_id=tenant_id, page_size=999),
-            timeout=REQUEST_TIMEOUT,
+            per_retry_timeout=REQUEST_TIMEOUT,
             metadata=REQUEST_MD,
         )
     )
@@ -238,7 +238,7 @@ def get_default_subnet(sdk: SDK, project_id: str) -> Subnet:
     subnets = LOOP.await_(
         SubnetServiceClient(sdk).list(
             ListSubnetsRequest(parent_id=project_id, page_size=999),
-            timeout=REQUEST_TIMEOUT,
+            per_retry_timeout=REQUEST_TIMEOUT,
             metadata=REQUEST_MD,
         )
     )
@@ -264,13 +264,15 @@ def create_disk(
         ),
     )
     with wrap_capacity_errors():
-        return LOOP.await_(client.create(request, timeout=REQUEST_TIMEOUT, metadata=REQUEST_MD))
+        return LOOP.await_(
+            client.create(request, per_retry_timeout=REQUEST_TIMEOUT, metadata=REQUEST_MD)
+        )
 
 
 def delete_disk(sdk: SDK, disk_id: str) -> None:
     LOOP.await_(
         DiskServiceClient(sdk).delete(
-            DeleteDiskRequest(id=disk_id), timeout=REQUEST_TIMEOUT, metadata=REQUEST_MD
+            DeleteDiskRequest(id=disk_id), per_retry_timeout=REQUEST_TIMEOUT, metadata=REQUEST_MD
         )
     )
 
@@ -318,13 +320,17 @@ def create_instance(
         ),
     )
     with wrap_capacity_errors():
-        return LOOP.await_(client.create(request, timeout=REQUEST_TIMEOUT, metadata=REQUEST_MD))
+        return LOOP.await_(
+            client.create(request, per_retry_timeout=REQUEST_TIMEOUT, metadata=REQUEST_MD)
+        )
 
 
 def get_instance(sdk: SDK, instance_id: str) -> Instance:
     return LOOP.await_(
         InstanceServiceClient(sdk).get(
-            GetInstanceRequest(id=instance_id), timeout=REQUEST_TIMEOUT, metadata=REQUEST_MD
+            GetInstanceRequest(id=instance_id),
+            per_retry_timeout=REQUEST_TIMEOUT,
+            metadata=REQUEST_MD,
         )
     )
 
@@ -332,7 +338,9 @@ def get_instance(sdk: SDK, instance_id: str) -> Instance:
 def delete_instance(sdk: SDK, instance_id: str) -> SDKOperation[Operation]:
     return LOOP.await_(
         InstanceServiceClient(sdk).delete(
-            DeleteInstanceRequest(id=instance_id), timeout=REQUEST_TIMEOUT, metadata=REQUEST_MD
+            DeleteInstanceRequest(id=instance_id),
+            per_retry_timeout=REQUEST_TIMEOUT,
+            metadata=REQUEST_MD,
         )
     )
 
@@ -345,7 +353,7 @@ def create_cluster(sdk: SDK, name: str, project_id: str, fabric: str) -> SDKOper
                     metadata=ResourceMetadata(name=name, parent_id=project_id),
                     spec=GpuClusterSpec(infiniband_fabric=fabric),
                 ),
-                timeout=REQUEST_TIMEOUT,
+                per_retry_timeout=REQUEST_TIMEOUT,
                 metadata=REQUEST_MD,
             )
         )
@@ -354,6 +362,8 @@ def create_cluster(sdk: SDK, name: str, project_id: str, fabric: str) -> SDKOper
 def delete_cluster(sdk: SDK, cluster_id: str) -> None:
     return LOOP.await_(
         GpuClusterServiceClient(sdk).delete(
-            DeleteGpuClusterRequest(id=cluster_id), timeout=REQUEST_TIMEOUT, metadata=REQUEST_MD
+            DeleteGpuClusterRequest(id=cluster_id),
+            per_retry_timeout=REQUEST_TIMEOUT,
+            metadata=REQUEST_MD,
         )
     )

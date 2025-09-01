@@ -1,12 +1,13 @@
 import re
+import string
 from collections import Counter
 from enum import Enum
 from pathlib import PurePosixPath
-from typing import Any, Dict, List, Optional, Union
+from typing import Annotated, Any, Dict, List, Literal, Optional, Union
 
 import orjson
 from pydantic import Field, ValidationError, conint, constr, root_validator, validator
-from typing_extensions import Annotated, Literal
+from typing_extensions import Self
 
 from dstack._internal.core.errors import ConfigurationError
 from dstack._internal.core.models.common import CoreModel, Duration, RegistryAuth
@@ -81,6 +82,72 @@ class PortMapping(CoreModel):
         else:
             local_port = int(local_port)
         return PortMapping(local_port=local_port, container_port=int(container_port))
+
+
+class RepoSpec(CoreModel):
+    local_path: Annotated[
+        Optional[str],
+        Field(
+            description=(
+                "The path to the Git repo on the user's machine. Relative paths are resolved"
+                " relative to the parent directory of the the configuration file."
+                " Mutually exclusive with `url`"
+            )
+        ),
+    ] = None
+    url: Annotated[
+        Optional[str],
+        Field(description="The Git repo URL. Mutually exclusive with `local_path`"),
+    ] = None
+    branch: Annotated[
+        Optional[str],
+        Field(
+            description=(
+                "The repo branch. Defaults to the active branch for local paths"
+                " and the default branch for URLs"
+            )
+        ),
+    ] = None
+    hash: Annotated[
+        Optional[str],
+        Field(description="The commit hash"),
+    ] = None
+    # Not implemented, has no effect, hidden in the docs
+    path: str = DEFAULT_REPO_DIR
+
+    @classmethod
+    def parse(cls, v: str) -> Self:
+        is_url = False
+        parts = v.split(":")
+        if len(parts) > 1:
+            # Git repo, git@github.com:dstackai/dstack.git or https://github.com/dstackai/dstack
+            if "@" in parts[0] or parts[1].startswith("//"):
+                parts = [f"{parts[0]}:{parts[1]}", *parts[2:]]
+                is_url = True
+            # Windows path, e.g., `C:\path\to`, 'c:/path/to'
+            elif (
+                len(parts[0]) == 1
+                and parts[0] in string.ascii_letters
+                and parts[1][:1] in ["\\", "/"]
+            ):
+                parts = [f"{parts[0]}:{parts[1]}", *parts[2:]]
+        if len(parts) == 1:
+            if is_url:
+                return cls(url=parts[0])
+            return cls(local_path=parts[0])
+        if len(parts) == 2:
+            if is_url:
+                return cls(url=parts[0], path=parts[1])
+            return cls(local_path=parts[0], path=parts[1])
+        raise ValueError(f"Invalid repo: {v}")
+
+    @root_validator
+    def validate_local_path_or_url(cls, values):
+        if values["local_path"] and values["url"]:
+            raise ValueError("`local_path` and `url` are mutually exclusive")
+        if not values["local_path"] and not values["url"]:
+            raise ValueError("Either `local_path` or `url` must be specified")
+        return values
 
 
 class ScalingSpec(CoreModel):
@@ -221,7 +288,7 @@ class ProbeConfig(CoreModel):
         ),
     ] = None
     timeout: Annotated[
-        Optional[Union[int, str]],
+        Optional[int],
         Field(
             description=(
                 f"Maximum amount of time the HTTP request is allowed to take. Defaults to `{DEFAULT_PROBE_TIMEOUT}s`"
@@ -229,7 +296,7 @@ class ProbeConfig(CoreModel):
         ),
     ] = None
     interval: Annotated[
-        Optional[Union[int, str]],
+        Optional[int],
         Field(
             description=(
                 "Minimum amount of time between the end of one probe execution"
@@ -249,7 +316,19 @@ class ProbeConfig(CoreModel):
         ),
     ] = None
 
-    @validator("timeout")
+    class Config(CoreModel.Config):
+        @staticmethod
+        def schema_extra(schema: Dict[str, Any]):
+            add_extra_schema_types(
+                schema["properties"]["timeout"],
+                extra_types=[{"type": "string"}],
+            )
+            add_extra_schema_types(
+                schema["properties"]["interval"],
+                extra_types=[{"type": "string"}],
+            )
+
+    @validator("timeout", pre=True)
     def parse_timeout(cls, v: Optional[Union[int, str]]) -> Optional[int]:
         if v is None:
             return v
@@ -258,7 +337,7 @@ class ProbeConfig(CoreModel):
             raise ValueError(f"Probe timeout cannot be shorter than {MIN_PROBE_TIMEOUT}s")
         return parsed
 
-    @validator("interval")
+    @validator("interval", pre=True)
     def parse_interval(cls, v: Optional[Union[int, str]]) -> Optional[int]:
         if v is None:
             return v
@@ -373,21 +452,35 @@ class BaseRunConfiguration(CoreModel):
             ),
         ),
     ] = None
-    volumes: Annotated[
-        List[Union[MountPoint, str]], Field(description="The volumes mount points")
-    ] = []
+    volumes: Annotated[List[MountPoint], Field(description="The volumes mount points")] = []
     docker: Annotated[
         Optional[bool],
         Field(
             description="Use Docker inside the container. Mutually exclusive with `image`, `python`, and `nvcc`. Overrides `privileged`"
         ),
     ] = None
+    repos: Annotated[
+        list[RepoSpec],
+        Field(description="The list of Git repos"),
+    ] = []
     files: Annotated[
-        list[Union[FilePathMapping, str]],
+        list[FilePathMapping],
         Field(description="The local to container file path mappings"),
     ] = []
     # deprecated since 0.18.31; task, service -- no effect; dev-environment -- executed right before `init`
     setup: CommandsList = []
+
+    class Config(CoreModel.Config):
+        @staticmethod
+        def schema_extra(schema: Dict[str, Any]):
+            add_extra_schema_types(
+                schema["properties"]["volumes"]["items"],
+                extra_types=[{"type": "string"}],
+            )
+            add_extra_schema_types(
+                schema["properties"]["files"]["items"],
+                extra_types=[{"type": "string"}],
+            )
 
     @validator("python", pre=True, always=True)
     def convert_python(cls, v, values) -> Optional[PythonVersion]:
@@ -413,16 +506,28 @@ class BaseRunConfiguration(CoreModel):
         #   but it's not possible to do so without breaking backwards compatibility.
         return v
 
-    @validator("volumes", each_item=True)
-    def convert_volumes(cls, v) -> MountPoint:
+    @validator("volumes", each_item=True, pre=True)
+    def convert_volumes(cls, v: Union[MountPoint, str]) -> MountPoint:
         if isinstance(v, str):
             return parse_mount_point(v)
         return v
 
-    @validator("files", each_item=True)
-    def convert_files(cls, v) -> FilePathMapping:
+    @validator("files", each_item=True, pre=True)
+    def convert_files(cls, v: Union[FilePathMapping, str]) -> FilePathMapping:
         if isinstance(v, str):
             return FilePathMapping.parse(v)
+        return v
+
+    @validator("repos", pre=True, each_item=True)
+    def convert_repos(cls, v: Union[RepoSpec, str]) -> RepoSpec:
+        if isinstance(v, str):
+            return RepoSpec.parse(v)
+        return v
+
+    @validator("repos")
+    def validate_repos(cls, v) -> RepoSpec:
+        if len(v) > 1:
+            raise ValueError("A maximum of one repo is currently supported")
         return v
 
     @validator("user")
@@ -444,7 +549,7 @@ class BaseRunConfiguration(CoreModel):
         raise ValueError("The value must be `sh`, `bash`, or an absolute path")
 
 
-class BaseRunConfigurationWithPorts(BaseRunConfiguration):
+class ConfigurationWithPortsParams(CoreModel):
     ports: Annotated[
         List[Union[ValidPort, constr(regex=r"^(?:[0-9]+|\*):[0-9]+$"), PortMapping]],
         Field(description="Port numbers/mapping to expose"),
@@ -459,7 +564,7 @@ class BaseRunConfigurationWithPorts(BaseRunConfiguration):
         return v
 
 
-class BaseRunConfigurationWithCommands(BaseRunConfiguration):
+class ConfigurationWithCommandsParams(CoreModel):
     commands: Annotated[CommandsList, Field(description="The shell commands to run")] = []
 
     @root_validator
@@ -503,9 +608,24 @@ class DevEnvironmentConfigurationParams(CoreModel):
 
 
 class DevEnvironmentConfiguration(
-    ProfileParams, BaseRunConfigurationWithPorts, DevEnvironmentConfigurationParams
+    ProfileParams,
+    BaseRunConfiguration,
+    ConfigurationWithPortsParams,
+    DevEnvironmentConfigurationParams,
 ):
     type: Literal["dev-environment"] = "dev-environment"
+
+    class Config(ProfileParams.Config, BaseRunConfiguration.Config):
+        @staticmethod
+        def schema_extra(schema: Dict[str, Any]):
+            ProfileParams.Config.schema_extra(schema)
+            BaseRunConfiguration.Config.schema_extra(schema)
+
+    @validator("entrypoint")
+    def validate_entrypoint(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None:
+            raise ValueError("entrypoint is not supported for dev-environment")
+        return v
 
 
 class TaskConfigurationParams(CoreModel):
@@ -514,11 +634,18 @@ class TaskConfigurationParams(CoreModel):
 
 class TaskConfiguration(
     ProfileParams,
-    BaseRunConfigurationWithCommands,
-    BaseRunConfigurationWithPorts,
+    BaseRunConfiguration,
+    ConfigurationWithCommandsParams,
+    ConfigurationWithPortsParams,
     TaskConfigurationParams,
 ):
     type: Literal["task"] = "task"
+
+    class Config(ProfileParams.Config, BaseRunConfiguration.Config):
+        @staticmethod
+        def schema_extra(schema: Dict[str, Any]):
+            ProfileParams.Config.schema_extra(schema)
+            BaseRunConfiguration.Config.schema_extra(schema)
 
 
 class ServiceConfigurationParams(CoreModel):
@@ -547,7 +674,7 @@ class ServiceConfigurationParams(CoreModel):
         ),
     ] = STRIP_PREFIX_DEFAULT
     model: Annotated[
-        Optional[Union[AnyModel, str]],
+        Optional[AnyModel],
         Field(
             description=(
                 "Mapping of the model for the OpenAI-compatible endpoint provided by `dstack`."
@@ -578,6 +705,18 @@ class ServiceConfigurationParams(CoreModel):
         Field(description="List of probes used to determine job health"),
     ] = []
 
+    class Config(CoreModel.Config):
+        @staticmethod
+        def schema_extra(schema: Dict[str, Any]):
+            add_extra_schema_types(
+                schema["properties"]["replicas"],
+                extra_types=[{"type": "integer"}, {"type": "string"}],
+            )
+            add_extra_schema_types(
+                schema["properties"]["model"],
+                extra_types=[{"type": "string"}],
+            )
+
     @validator("port")
     def convert_port(cls, v) -> PortMapping:
         if isinstance(v, int):
@@ -586,7 +725,7 @@ class ServiceConfigurationParams(CoreModel):
             return PortMapping.parse(v)
         return v
 
-    @validator("model")
+    @validator("model", pre=True)
     def convert_model(cls, v: Optional[Union[AnyModel, str]]) -> Optional[AnyModel]:
         if isinstance(v, str):
             return OpenAIChatModel(type="chat", name=v, format="openai")
@@ -645,17 +784,23 @@ class ServiceConfigurationParams(CoreModel):
 
 
 class ServiceConfiguration(
-    ProfileParams, BaseRunConfigurationWithCommands, ServiceConfigurationParams
+    ProfileParams,
+    BaseRunConfiguration,
+    ConfigurationWithCommandsParams,
+    ServiceConfigurationParams,
 ):
     type: Literal["service"] = "service"
 
-    class Config(CoreModel.Config):
+    class Config(
+        ProfileParams.Config,
+        BaseRunConfiguration.Config,
+        ServiceConfigurationParams.Config,
+    ):
         @staticmethod
         def schema_extra(schema: Dict[str, Any]):
-            add_extra_schema_types(
-                schema["properties"]["replicas"],
-                extra_types=[{"type": "integer"}, {"type": "string"}],
-            )
+            ProfileParams.Config.schema_extra(schema)
+            BaseRunConfiguration.Config.schema_extra(schema)
+            ServiceConfigurationParams.Config.schema_extra(schema)
 
 
 AnyRunConfiguration = Union[DevEnvironmentConfiguration, TaskConfiguration, ServiceConfiguration]

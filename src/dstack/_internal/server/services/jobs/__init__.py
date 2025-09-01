@@ -256,7 +256,16 @@ async def process_terminating_job(
     if jpd is not None:
         logger.debug("%s: stopping container", fmt(job_model))
         ssh_private_keys = get_instance_ssh_private_keys(instance_model)
-        await stop_container(job_model, jpd, ssh_private_keys)
+        if not await stop_container(job_model, jpd, ssh_private_keys):
+            # The dangling container can be removed later during instance processing
+            logger.warning(
+                (
+                    "%s: could not stop container, possibly due to a communication error."
+                    " See debug logs for details."
+                    " Ignoring, can attempt to remove the container later"
+                ),
+                fmt(job_model),
+            )
         if jrd is not None and jrd.volume_names is not None:
             volume_names = jrd.volume_names
         else:
@@ -378,21 +387,22 @@ async def stop_container(
     job_model: JobModel,
     job_provisioning_data: JobProvisioningData,
     ssh_private_keys: tuple[str, Optional[str]],
-):
+) -> bool:
     if job_provisioning_data.dockerized:
         # send a request to the shim to terminate the docker container
         # SSHError and RequestException are caught in the `runner_ssh_tunner` decorator
-        await run_async(
+        return await run_async(
             _shim_submit_stop,
             ssh_private_keys,
             job_provisioning_data,
             None,
             job_model,
         )
+    return True
 
 
 @runner_ssh_tunnel(ports=[DSTACK_SHIM_HTTP_PORT])
-def _shim_submit_stop(ports: Dict[int, int], job_model: JobModel):
+def _shim_submit_stop(ports: Dict[int, int], job_model: JobModel) -> bool:
     shim_client = client.ShimClient(port=ports[DSTACK_SHIM_HTTP_PORT])
 
     resp = shim_client.healthcheck()
@@ -418,6 +428,7 @@ def _shim_submit_stop(ports: Dict[int, int], job_model: JobModel):
             shim_client.remove_task(task_id=job_model.id)
     else:
         shim_client.stop(force=True)
+    return True
 
 
 def group_jobs_by_replica_latest(jobs: List[JobModel]) -> Iterable[Tuple[int, List[JobModel]]]:

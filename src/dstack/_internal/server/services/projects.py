@@ -19,7 +19,7 @@ from dstack._internal.server.models import MemberModel, ProjectModel, UserModel
 from dstack._internal.server.schemas.projects import MemberSetting
 from dstack._internal.server.services import users
 from dstack._internal.server.services.backends import (
-    get_backend_config_from_backend_model,
+    get_backend_config_without_creds_from_backend_model,
 )
 from dstack._internal.server.services.permissions import get_default_permissions
 from dstack._internal.server.settings import DEFAULT_PROJECT_NAME
@@ -313,7 +313,6 @@ async def add_project_members(
                 member_num=None,
                 commit=False,
             )
-            member_by_user_id[user_to_add.id] = None
 
     await session.commit()
 
@@ -544,9 +543,7 @@ def project_model_to_project(
                     b.type.value,
                 )
                 continue
-            backend_config = get_backend_config_from_backend_model(
-                configurator, b, include_creds=False
-            )
+            backend_config = get_backend_config_without_creds_from_backend_model(configurator, b)
             if isinstance(backend_config, DstackBackendConfig):
                 for backend_type in backend_config.base_backends:
                     backends.append(

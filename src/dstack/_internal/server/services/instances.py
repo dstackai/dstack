@@ -39,6 +39,7 @@ from dstack._internal.core.models.profiles import (
 from dstack._internal.core.models.runs import JobProvisioningData, Requirements
 from dstack._internal.core.models.volumes import Volume
 from dstack._internal.core.services.profiles import get_termination
+from dstack._internal.server import settings as server_settings
 from dstack._internal.server.models import (
     FleetModel,
     InstanceHealthCheckModel,
@@ -47,9 +48,11 @@ from dstack._internal.server.models import (
     UserModel,
 )
 from dstack._internal.server.schemas.health.dcgm import DCGMHealthResponse
-from dstack._internal.server.schemas.runner import InstanceHealthResponse
+from dstack._internal.server.schemas.runner import InstanceHealthResponse, TaskStatus
+from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.offers import generate_shared_offer
 from dstack._internal.server.services.projects import list_user_project_models
+from dstack._internal.server.services.runner.client import ShimClient
 from dstack._internal.utils import common as common_utils
 from dstack._internal.utils.logging import get_logger
 
@@ -633,3 +636,40 @@ async def create_ssh_instance_model(
         busy_blocks=0,
     )
     return im
+
+
+def remove_dangling_tasks_from_instance(shim_client: ShimClient, instance: InstanceModel) -> None:
+    if not shim_client.is_api_v2_supported():
+        return
+    assigned_to_instance_job_ids = {str(j.id) for j in instance.jobs}
+    task_list_response = shim_client.list_tasks()
+    tasks: list[tuple[str, Optional[TaskStatus]]]
+    if task_list_response.tasks is not None:
+        tasks = [(t.id, t.status) for t in task_list_response.tasks]
+    elif task_list_response.ids is not None:
+        # compatibility with pre-0.19.26 shim
+        tasks = [(t_id, None) for t_id in task_list_response.ids]
+    else:
+        raise ValueError("Unexpected task list response, neither `tasks` nor `ids` is set")
+    for task_id, task_status in tasks:
+        if task_id in assigned_to_instance_job_ids:
+            continue
+        should_terminate = task_status != TaskStatus.TERMINATED
+        should_remove = not server_settings.SERVER_KEEP_SHIM_TASKS
+        if not (should_terminate or should_remove):
+            continue
+        logger.warning(
+            "%s: dangling task found, id=%s, status=%s. Terminating and/or removing",
+            fmt(instance),
+            task_id,
+            task_status or "<unknown>",
+        )
+        if should_terminate:
+            shim_client.terminate_task(
+                task_id=task_id,
+                reason=None,
+                message=None,
+                timeout=0,
+            )
+        if should_remove:
+            shim_client.remove_task(task_id=task_id)

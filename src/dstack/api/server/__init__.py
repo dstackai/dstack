@@ -17,6 +17,7 @@ from dstack.api.server._backends import BackendsAPIClient
 from dstack.api.server._files import FilesAPIClient
 from dstack.api.server._fleets import FleetsAPIClient
 from dstack.api.server._gateways import GatewaysAPIClient
+from dstack.api.server._gpus import GpusAPIClient
 from dstack.api.server._logs import LogsAPIClient
 from dstack.api.server._metrics import MetricsAPIClient
 from dstack.api.server._projects import ProjectsAPIClient
@@ -25,9 +26,6 @@ from dstack.api.server._runs import RunsAPIClient
 from dstack.api.server._secrets import SecretsAPIClient
 from dstack.api.server._users import UsersAPIClient
 from dstack.api.server._volumes import VolumesAPIClient
-
-logger = get_logger(__name__)
-
 
 _MAX_RETRIES = 3
 _RETRY_INTERVAL = 1
@@ -44,6 +42,7 @@ class APIClient:
         backends: operations with backends
         fleets: operations with fleets
         runs: operations with runs
+        gpus: operations with GPUs
         metrics: operations with metrics
         logs: operations with logs
         gateways: operations with gateways
@@ -64,6 +63,7 @@ class APIClient:
         client_api_version = os.getenv("DSTACK_CLIENT_API_VERSION", version.__version__)
         if client_api_version is not None:
             self._s.headers.update({"X-API-VERSION": client_api_version})
+        self._logger = get_logger(__name__)
 
     @property
     def base_url(self) -> str:
@@ -71,51 +71,55 @@ class APIClient:
 
     @property
     def users(self) -> UsersAPIClient:
-        return UsersAPIClient(self._request)
+        return UsersAPIClient(self._request, self._logger)
 
     @property
     def projects(self) -> ProjectsAPIClient:
-        return ProjectsAPIClient(self._request)
+        return ProjectsAPIClient(self._request, self._logger)
 
     @property
     def backends(self) -> BackendsAPIClient:
-        return BackendsAPIClient(self._request)
+        return BackendsAPIClient(self._request, self._logger)
 
     @property
     def fleets(self) -> FleetsAPIClient:
-        return FleetsAPIClient(self._request)
+        return FleetsAPIClient(self._request, self._logger)
 
     @property
     def repos(self) -> ReposAPIClient:
-        return ReposAPIClient(self._request)
+        return ReposAPIClient(self._request, self._logger)
 
     @property
     def runs(self) -> RunsAPIClient:
-        return RunsAPIClient(self._request)
+        return RunsAPIClient(self._request, self._logger)
+
+    @property
+    def gpus(self) -> GpusAPIClient:
+        return GpusAPIClient(self._request, self._logger)
 
     @property
     def metrics(self) -> MetricsAPIClient:
-        return MetricsAPIClient(self._request)
+        return MetricsAPIClient(self._request, self._logger)
 
     @property
     def logs(self) -> LogsAPIClient:
-        return LogsAPIClient(self._request)
+        return LogsAPIClient(self._request, self._logger)
 
     @property
     def secrets(self) -> SecretsAPIClient:
-        return SecretsAPIClient(self._request)
+        return SecretsAPIClient(self._request, self._logger)
 
     @property
     def gateways(self) -> GatewaysAPIClient:
-        return GatewaysAPIClient(self._request)
+        return GatewaysAPIClient(self._request, self._logger)
 
     @property
     def volumes(self) -> VolumesAPIClient:
-        return VolumesAPIClient(self._request)
+        return VolumesAPIClient(self._request, self._logger)
 
     @property
     def files(self) -> FilesAPIClient:
-        return FilesAPIClient(self._request)
+        return FilesAPIClient(self._request, self._logger)
 
     def _request(
         self,
@@ -130,20 +134,20 @@ class APIClient:
             kwargs.setdefault("headers", {})["Content-Type"] = "application/json"
             kwargs["data"] = body
 
-        logger.debug("POST /%s", path)
+        self._logger.debug("POST /%s", path)
         for _ in range(_MAX_RETRIES):
             try:
                 # TODO: set adequate timeout here or everywhere the method is used
                 resp = self._s.request(method, f"{self._base_url}/{path}", **kwargs)
                 break
             except requests.exceptions.ConnectionError as e:
-                logger.debug("Could not connect to server: %s", e)
+                self._logger.debug("Could not connect to server: %s", e)
                 time.sleep(_RETRY_INTERVAL)
         else:
             raise ClientError(f"Failed to connect to dstack server {self._base_url}")
 
         if 400 <= resp.status_code < 600:
-            logger.debug(
+            self._logger.debug(
                 "Error requesting %s. Status: %s. Headers: %s. Body: %s",
                 resp.request.url,
                 resp.status_code,

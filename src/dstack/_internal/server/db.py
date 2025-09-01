@@ -4,8 +4,12 @@ from typing import Optional
 from alembic import command, config
 from sqlalchemy import AsyncAdaptedQueuePool, event
 from sqlalchemy.engine.interfaces import DBAPIConnection
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 from sqlalchemy.pool import ConnectionPoolEntry
 
 from dstack._internal.server import settings
@@ -26,8 +30,8 @@ class Database:
                 pool_size=settings.DB_POOL_SIZE,
                 max_overflow=settings.DB_MAX_OVERFLOW,
             )
-        self.session_maker = sessionmaker(
-            bind=self.engine,
+        self.session_maker = async_sessionmaker(
+            bind=self.engine,  # type: ignore[assignment]
             expire_on_commit=False,
             class_=AsyncSession,
         )

@@ -11,7 +11,6 @@ from dstack._internal.core.backends.nebius import resources
 from dstack._internal.core.backends.nebius.backend import NebiusBackend
 from dstack._internal.core.backends.nebius.fabrics import get_all_infiniband_fabrics
 from dstack._internal.core.backends.nebius.models import (
-    AnyNebiusBackendConfig,
     NebiusBackendConfig,
     NebiusBackendConfigWithCreds,
     NebiusConfig,
@@ -22,7 +21,12 @@ from dstack._internal.core.backends.nebius.models import (
 from dstack._internal.core.models.backends.base import BackendType
 
 
-class NebiusConfigurator(Configurator):
+class NebiusConfigurator(
+    Configurator[
+        NebiusBackendConfig,
+        NebiusBackendConfigWithCreds,
+    ]
+):
     TYPE = BackendType.NEBIUS
     BACKEND_CLASS = NebiusBackend
 
@@ -60,12 +64,12 @@ class NebiusConfigurator(Configurator):
             auth=NebiusCreds.parse_obj(config.creds).json(),
         )
 
-    def get_backend_config(
-        self, record: BackendRecord, include_creds: bool
-    ) -> AnyNebiusBackendConfig:
+    def get_backend_config_with_creds(self, record: BackendRecord) -> NebiusBackendConfigWithCreds:
         config = self._get_config(record)
-        if include_creds:
-            return NebiusBackendConfigWithCreds.__response__.parse_obj(config)
+        return NebiusBackendConfigWithCreds.__response__.parse_obj(config)
+
+    def get_backend_config_without_creds(self, record: BackendRecord) -> NebiusBackendConfig:
+        config = self._get_config(record)
         return NebiusBackendConfig.__response__.parse_obj(config)
 
     def get_backend(self, record: BackendRecord) -> NebiusBackend:

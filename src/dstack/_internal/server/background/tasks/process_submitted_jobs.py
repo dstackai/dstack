@@ -5,9 +5,9 @@ import uuid
 from datetime import datetime, timedelta
 from typing import List, Optional, Tuple
 
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, func, not_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import contains_eager, joinedload, load_only, selectinload
+from sqlalchemy.orm import contains_eager, joinedload, load_only, noload, selectinload
 
 from dstack._internal.core.backends.base.backend import Backend
 from dstack._internal.core.backends.base.compute import ComputeWithVolumeSupport
@@ -53,6 +53,7 @@ from dstack._internal.server.models import (
 from dstack._internal.server.services.backends import get_project_backend_by_type_or_error
 from dstack._internal.server.services.fleets import (
     fleet_model_to_fleet,
+    get_fleet_requirements,
 )
 from dstack._internal.server.services.instances import (
     filter_pool_instances,
@@ -71,6 +72,10 @@ from dstack._internal.server.services.jobs import (
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.offers import get_offers_by_requirements
+from dstack._internal.server.services.requirements.combine import (
+    combine_fleet_and_run_profiles,
+    combine_fleet_and_run_requirements,
+)
 from dstack._internal.server.services.runs import (
     check_run_spec_requires_instance_mounts,
     run_model_to_run,
@@ -148,8 +153,8 @@ async def _process_next_submitted_job():
             if job_model is None:
                 return
             lockset.add(job_model.id)
+        job_model_id = job_model.id
         try:
-            job_model_id = job_model.id
             await _process_submitted_job(session=session, job_model=job_model)
         finally:
             lockset.difference_update([job_model_id])
@@ -245,8 +250,8 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         ]
         if run_model.fleet is not None:
             fleet_filters.append(FleetModel.id == run_model.fleet_id)
-        if run_spec.configuration.fleets is not None:
-            fleet_filters.append(FleetModel.name.in_(run_spec.configuration.fleets))
+        if run_spec.merged_profile.fleets is not None:
+            fleet_filters.append(FleetModel.name.in_(run_spec.merged_profile.fleets))
 
         instance_filters = [
             InstanceModel.deleted == False,
@@ -264,9 +269,6 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
                 [i.id for i in f.instances] for f in fleet_models_with_instances
             )
         )
-        fleet_models = fleet_models_with_instances + fleet_models_without_instances
-        fleets_ids = [f.id for f in fleet_models]
-
         if get_db().dialect_name == "sqlite":
             # Start new transaction to see committed changes after lock
             await session.commit()
@@ -275,13 +277,15 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
             InstanceModel.__tablename__, instances_ids
         ):
             if get_db().dialect_name == "sqlite":
-                fleet_models = await _refetch_fleet_models(
+                fleets_with_instances_ids = [f.id for f in fleet_models_with_instances]
+                fleet_models_with_instances = await _refetch_fleet_models_with_instances(
                     session=session,
-                    fleets_ids=fleets_ids,
+                    fleets_ids=fleets_with_instances_ids,
                     instances_ids=instances_ids,
                     fleet_filters=fleet_filters,
                     instance_filters=instance_filters,
                 )
+            fleet_models = fleet_models_with_instances + fleet_models_without_instances
             fleet_model, fleet_instances_with_offers = _find_optimal_fleet_with_offers(
                 fleet_models=fleet_models,
                 run_model=run_model,
@@ -290,7 +294,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
                 master_job_provisioning_data=master_job_provisioning_data,
                 volumes=volumes,
             )
-            if fleet_model is None and run_spec.configuration.fleets is not None:
+            if fleet_model is None and run_spec.merged_profile.fleets is not None:
                 # Run cannot create new fleets when fleets are specified
                 logger.debug("%s: failed to use specified fleets", fmt(job_model))
                 job_model.status = JobStatus.TERMINATING
@@ -361,6 +365,10 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
                 project=project,
                 run=run,
             )
+        # FIXME: Fleet is not locked which may lead to duplicate instance_num.
+        # This is currently hard to fix without locking the fleet for entire provisioning duration.
+        # Processing should be done in multiple steps so that
+        # InstanceModel is created before provisioning.
         instance_num = await _get_next_instance_num(
             session=session,
             fleet_model=fleet_model,
@@ -438,14 +446,21 @@ async def _select_fleet_models(
             *fleet_filters,
             FleetModel.id.not_in(fleet_models_with_instances_ids),
         )
-        .where(InstanceModel.id.is_(None))
-        .options(contains_eager(FleetModel.instances))  # loading empty relation
+        .where(
+            or_(
+                InstanceModel.id.is_(None),
+                not_(and_(*instance_filters)),
+            )
+        )
+        # Load empty list of instances so that downstream code
+        # knows this fleet has no instances eligible for offers.
+        .options(noload(FleetModel.instances))
     )
     fleet_models_without_instances = list(res.unique().scalars().all())
     return fleet_models_with_instances, fleet_models_without_instances
 
 
-async def _refetch_fleet_models(
+async def _refetch_fleet_models_with_instances(
     session: AsyncSession,
     fleets_ids: list[uuid.UUID],
     instances_ids: list[uuid.UUID],
@@ -460,13 +475,8 @@ async def _refetch_fleet_models(
             *fleet_filters,
         )
         .where(
-            or_(
-                InstanceModel.id.is_(None),
-                and_(
-                    InstanceModel.id.in_(instances_ids),
-                    *instance_filters,
-                ),
-            )
+            InstanceModel.id.in_(instances_ids),
+            *instance_filters,
         )
         .options(contains_eager(FleetModel.instances))
         .execution_options(populate_existing=True)
@@ -533,7 +543,7 @@ def _find_optimal_fleet_with_offers(
                 fleet_priority,
             )
         )
-    if run_spec.configuration.fleets is None and all(
+    if run_spec.merged_profile.fleets is None and all(
         t[2] == 0 for t in candidate_fleets_with_offers
     ):
         # If fleets are not specified and no fleets have available offers, create a new fleet.
@@ -646,6 +656,8 @@ async def _run_job_on_new_instance(
 ) -> Optional[Tuple[JobProvisioningData, InstanceOfferWithAvailability]]:
     if volumes is None:
         volumes = []
+    profile = run.run_spec.merged_profile
+    requirements = job.job_spec.requirements
     fleet = None
     if fleet_model is not None:
         fleet = fleet_model_to_fleet(fleet_model)
@@ -654,13 +666,26 @@ async def _run_job_on_new_instance(
                 "%s: cannot fit new instance into fleet %s", fmt(job_model), fleet_model.name
             )
             return None
+        profile = combine_fleet_and_run_profiles(fleet.spec.merged_profile, profile)
+        if profile is None:
+            logger.debug("%s: cannot combine fleet %s profile", fmt(job_model), fleet_model.name)
+            return None
+        fleet_requirements = get_fleet_requirements(fleet.spec)
+        requirements = combine_fleet_and_run_requirements(fleet_requirements, requirements)
+        if requirements is None:
+            logger.debug(
+                "%s: cannot combine fleet %s requirements", fmt(job_model), fleet_model.name
+            )
+            return None
+        # TODO: Respect fleet provisioning properties such as tags
+
     multinode = job.job_spec.jobs_per_replica > 1 or (
         fleet is not None and fleet.spec.configuration.placement == InstanceGroupPlacement.CLUSTER
     )
     offers = await get_offers_by_requirements(
         project=project,
-        profile=run.run_spec.merged_profile,
-        requirements=job.job_spec.requirements,
+        profile=profile,
+        requirements=requirements,
         exclude_not_available=True,
         multinode=multinode,
         master_job_provisioning_data=master_job_provisioning_data,
@@ -752,25 +777,11 @@ def _create_fleet_model_for_job(
 
 
 async def _get_next_instance_num(session: AsyncSession, fleet_model: FleetModel) -> int:
-    if len(fleet_model.instances) == 0:
-        # No instances means the fleet is not in the db yet, so don't lock.
-        return 0
-    async with get_locker(get_db().dialect_name).lock_ctx(
-        FleetModel.__tablename__, [fleet_model.id]
-    ):
-        fleet_model = (
-            (
-                await session.execute(
-                    select(FleetModel)
-                    .where(FleetModel.id == fleet_model.id)
-                    .options(joinedload(FleetModel.instances))
-                    .execution_options(populate_existing=True)
-                )
-            )
-            .unique()
-            .scalar_one()
-        )
-        return len(fleet_model.instances)
+    res = await session.execute(
+        select(func.count(InstanceModel.id)).where(InstanceModel.fleet_id == fleet_model.id)
+    )
+    instance_count = res.scalar_one()
+    return instance_count
 
 
 def _create_instance_model_for_job(

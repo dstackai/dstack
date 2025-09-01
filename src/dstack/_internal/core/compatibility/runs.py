@@ -136,6 +136,7 @@ def get_run_spec_excludes(run_spec: RunSpec) -> IncludeExcludeDictType:
         configuration_excludes["schedule"] = True
     if profile is not None and profile.schedule is None:
         profile_excludes.add("schedule")
+    configuration_excludes["repos"] = True
 
     if configuration_excludes:
         spec_excludes["configuration"] = configuration_excludes

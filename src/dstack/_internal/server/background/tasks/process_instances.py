@@ -85,8 +85,10 @@ from dstack._internal.server.services.instances import (
     get_instance_provisioning_data,
     get_instance_requirements,
     get_instance_ssh_private_keys,
+    remove_dangling_tasks_from_instance,
 )
 from dstack._internal.server.services.locking import get_locker
+from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.offers import is_divisible_into_blocks
 from dstack._internal.server.services.placement import (
     get_fleet_placement_group_models,
@@ -181,8 +183,8 @@ async def _process_next_instance():
             if instance is None:
                 return
             lockset.add(instance.id)
+        instance_model_id = instance.id
         try:
-            instance_model_id = instance.id
             await _process_instance(session=session, instance=instance)
         finally:
             lockset.difference_update([instance_model_id])
@@ -393,6 +395,7 @@ async def _add_remote(instance: InstanceModel) -> None:
         return
 
     region = instance.region
+    assert region is not None  # always set for ssh instances
     jpd = JobProvisioningData(
         backend=BackendType.REMOTE,
         instance_type=instance_type,
@@ -788,6 +791,7 @@ async def _check_instance(session: AsyncSession, instance: InstanceModel) -> Non
         ssh_private_keys,
         job_provisioning_data,
         None,
+        instance=instance,
         check_instance_health=check_instance_health,
     )
     if instance_check is False:
@@ -934,7 +938,7 @@ async def _wait_for_instance_provisioning_data(
 
 @runner_ssh_tunnel(ports=[DSTACK_SHIM_HTTP_PORT], retries=1)
 def _check_instance_inner(
-    ports: Dict[int, int], *, check_instance_health: bool = False
+    ports: Dict[int, int], *, instance: InstanceModel, check_instance_health: bool = False
 ) -> InstanceCheck:
     instance_health_response: Optional[InstanceHealthResponse] = None
     shim_client = runner_client.ShimClient(port=ports[DSTACK_SHIM_HTTP_PORT])
@@ -954,6 +958,10 @@ def _check_instance_inner(
         args = (method.__func__.__name__, e.__class__.__name__, e)
         logger.exception(template, *args)
         return InstanceCheck(reachable=False, message=template % args)
+    try:
+        remove_dangling_tasks_from_instance(shim_client, instance)
+    except Exception as e:
+        logger.exception("%s: error removing dangling tasks: %s", fmt(instance), e)
     return runner_client.healthcheck_response_to_instance_check(
         healthcheck_response, instance_health_response
     )

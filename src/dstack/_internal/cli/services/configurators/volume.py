@@ -1,6 +1,6 @@
 import argparse
 import time
-from typing import List, Optional
+from typing import List
 
 from rich.table import Table
 
@@ -14,7 +14,6 @@ from dstack._internal.cli.utils.rich import MultiItemStatus
 from dstack._internal.cli.utils.volume import get_volumes_table
 from dstack._internal.core.errors import ResourceNotExistsError
 from dstack._internal.core.models.configurations import ApplyConfigurationType
-from dstack._internal.core.models.repos.base import Repo
 from dstack._internal.core.models.volumes import (
     Volume,
     VolumeConfiguration,
@@ -26,7 +25,7 @@ from dstack._internal.utils.common import local_time
 from dstack.api._public import Client
 
 
-class VolumeConfigurator(BaseApplyConfigurator):
+class VolumeConfigurator(BaseApplyConfigurator[VolumeConfiguration]):
     TYPE: ApplyConfigurationType = ApplyConfigurationType.VOLUME
 
     def apply_configuration(
@@ -36,7 +35,6 @@ class VolumeConfigurator(BaseApplyConfigurator):
         command_args: argparse.Namespace,
         configurator_args: argparse.Namespace,
         unknown_args: List[str],
-        repo: Optional[Repo] = None,
     ):
         self.apply_args(conf, configurator_args, unknown_args)
         spec = VolumeSpec(

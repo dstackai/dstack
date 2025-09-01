@@ -65,8 +65,7 @@ Launching `axolotl-train`...
 
 </div>
 
-`dstack apply` automatically provisions instances, uploads the contents of the repo (incl. your local uncommitted changes),
-and runs the commands.
+`dstack apply` automatically provisions instances and runs the task.
 
 ## Configuration options
 
@@ -463,10 +462,7 @@ If you don't assign a value to an environment variable (see `HF_TOKEN` above),
 
 ### Files
 
-By default, `dstack` automatically mounts the [repo](repos.md) directory where you ran `dstack init` to any run configuration. 
-
-However, in some cases, you may not want to mount the entire directory (e.g., if it’s too large),
-or you might want to mount files outside of it. In such cases, you can use the [`files`](../reference/dstack.yml/dev-environment.md#files) property.
+Sometimes, when you run a task, you may want to mount local files. This is possible via the [`files`](../reference/dstack.yml/task.md#_files) property. Each entry maps a local directory or file to a path inside the container.
 
 <div editor-title="examples/.dstack.yml"> 
 
@@ -501,8 +497,7 @@ resources:
 
 Each entry maps a local directory or file to a path inside the container. Both local and container paths can be relative or absolute.
 
-- If the local path is relative, it’s resolved relative to the configuration file.
-- If the container path is relative, it’s resolved relative to `/workflow`.
+If the local path is relative, it’s resolved relative to the configuration file. If the container path is relative, it’s resolved relative to `/workflow`.
 
 The container path is optional. If not specified, it will be automatically calculated.
 
@@ -539,26 +534,108 @@ resources:
 
 </div>
 
-Note: If you want to use `files` without mounting the entire repo directory,
-make sure to pass `--no-repo` when running `dstack apply`:
+??? info "Upload limit and excludes"
+    Whether its a file or folder, each entry is limited to 2MB. To avoid exceeding this limit, make sure to exclude unnecessary files
+    by listing it via `.gitignore` or `.dstackignore`.
+    The 2MB upload limit can be increased by setting the `DSTACK_SERVER_CODE_UPLOAD_LIMIT` environment variable.
 
-<div class="termy">
+### Repos
 
-```shell
-$ dstack apply -f examples/.dstack.yml --no-repo
+Sometimes, you may want to mount an entire Git repo inside the container.
+
+Imagine you have a cloned Git repo containing an `examples` subdirectory with a `.dstack.yml` file:
+
+<!-- TODO: Add a more elevant example -->
+
+<div editor-title="examples/.dstack.yml"> 
+
+```yaml
+type: task
+name: trl-sft    
+
+repos:
+  # Mounts the parent directory of `examples` (must be a Git repo)
+  #   to `/workflow` (the default working directory)
+  - ..
+
+python: 3.12
+
+env:
+  - HF_TOKEN
+  - HF_HUB_ENABLE_HF_TRANSFER=1
+  - MODEL=Qwen/Qwen2.5-0.5B
+  - DATASET=stanfordnlp/imdb
+
+commands:
+  - uv pip install trl
+  - | 
+    trl sft \
+      --model_name_or_path $MODEL --dataset_name $DATASET
+      --num_processes $DSTACK_GPUS_PER_NODE
+
+resources:
+  gpu: H100:1
 ```
 
 </div>
 
-??? info ".gitignore and .dstackignore"
-    `dstack` automatically excludes files and folders listed in `.gitignore` and `.dstackignore`.
-    
-    Uploads are limited to 2MB. To avoid exceeding this limit, make sure to exclude unnecessary files.
-    You can increase the default server limit by setting the `DSTACK_SERVER_CODE_UPLOAD_LIMIT` environment variable.
+When you run it, `dstack` fetches the repo on the instance, applies your local changes, and mounts it—so the container matches your local repo.
 
-!!! warning "Experimental"
-    The `files` feature is experimental. Feedback is highly appreciated.
-    
+The local path can be either relative to the configuration file or absolute.
+
+??? info "Path"
+    Currently, `dstack` always mounts the repo to `/workflow` inside the container. It's the default working directory. 
+    Starting with the next release, it will be possible to specify a custom container path.
+
+??? info "Local diff limit and excludes"
+    The local diff size is limited to 2MB. To avoid exceeding this limit, exclude unnecessary files
+    via `.gitignore` or `.dstackignore`.
+    The 2MB local diff limit can be increased by setting the `DSTACK_SERVER_CODE_UPLOAD_LIMIT` environment variable.
+
+??? info "Repo URL"
+    Sometimes you may want to mount a Git repo without cloning it locally. In this case, simply provide a URL in `repos`:
+
+    <!-- TODO: Add a more elevant example -->
+
+    <div editor-title="examples/.dstack.yml"> 
+
+    ```yaml
+    type: task
+    name: trl-sft    
+
+    repos:
+      # Clone the specified repo to `/workflow` (the default working directory)
+      - https://github.com/dstackai/dstack
+
+    python: 3.12
+
+    env:
+      - HF_TOKEN
+      - HF_HUB_ENABLE_HF_TRANSFER=1
+      - MODEL=Qwen/Qwen2.5-0.5B
+      - DATASET=stanfordnlp/imdb
+
+    commands:
+      - uv pip install trl
+      - | 
+        trl sft \
+          --model_name_or_path $MODEL --dataset_name $DATASET
+          --num_processes $DSTACK_GPUS_PER_NODE
+
+    resources:
+      gpu: H100:1
+    ```
+
+    </div>
+
+??? info "Private repos"
+    If a Git repo is private, `dstack` will automatically try to use your default Git credentials (from
+    `~/.ssh/config` or `~/.config/gh/hosts.yml`).
+
+    If you want to use custom credentials, you can provide them with [`dstack init`](../reference/cli/dstack/init.md).
+
+> Currently, you can configure up to one repo per run configuration.
+
 ### Retry policy
 
 By default, if `dstack` can't find capacity, or the task exits with an error, or the instance is interrupted, 
@@ -721,6 +798,6 @@ via the [`spot_policy`](../reference/dstack.yml/task.md#spot_policy) property. I
 --8<-- "docs/concepts/snippets/manage-runs.ext"
 
 !!! info "What's next?"
-    1. Read about [dev environments](dev-environments.md), [services](services.md), and [repos](repos.md)
+    1. Read about [dev environments](dev-environments.md) and [services](services.md)
     2. Learn how to manage [fleets](fleets.md)
     3. Check the [Axolotl](/examples/single-node-training/axolotl) example

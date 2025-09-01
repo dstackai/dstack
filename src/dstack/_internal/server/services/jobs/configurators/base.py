@@ -3,7 +3,7 @@ import sys
 import threading
 from abc import ABC, abstractmethod
 from pathlib import PurePosixPath
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional
 
 from cachetools import TTLCache, cached
 
@@ -179,6 +179,7 @@ class JobConfigurator(ABC):
 
     async def _commands(self) -> List[str]:
         if self.run_spec.configuration.entrypoint is not None:  # docker-like format
+            assert self.run_spec.configuration.type != "dev-environment"
             entrypoint = shlex.split(self.run_spec.configuration.entrypoint)
             commands = self.run_spec.configuration.commands
         elif shell_commands := self._shell_commands():
@@ -258,19 +259,17 @@ class JobConfigurator(ABC):
         return self.run_spec.configuration.single_branch
 
     def _max_duration(self) -> Optional[int]:
-        if self.run_spec.merged_profile.max_duration in [None, True]:
+        if self.run_spec.merged_profile.max_duration is None:
             return self._default_max_duration()
-        if self.run_spec.merged_profile.max_duration in ["off", False]:
+        if self.run_spec.merged_profile.max_duration == "off":
             return None
-        # pydantic validator ensures this is int
         return self.run_spec.merged_profile.max_duration
 
     def _stop_duration(self) -> Optional[int]:
-        if self.run_spec.merged_profile.stop_duration in [None, True]:
+        if self.run_spec.merged_profile.stop_duration is None:
             return DEFAULT_STOP_DURATION
-        if self.run_spec.merged_profile.stop_duration in ["off", False]:
+        if self.run_spec.merged_profile.stop_duration == "off":
             return None
-        # pydantic validator ensures this is int
         return self.run_spec.merged_profile.stop_duration
 
     def _utilization_policy(self) -> Optional[UtilizationPolicy]:
@@ -328,7 +327,7 @@ class JobConfigurator(ABC):
 
 
 def interpolate_job_volumes(
-    run_volumes: List[Union[MountPoint, str]],
+    run_volumes: List[MountPoint],
     job_num: int,
 ) -> List[MountPoint]:
     if len(run_volumes) == 0:
@@ -343,9 +342,6 @@ def interpolate_job_volumes(
     )
     job_volumes = []
     for mount_point in run_volumes:
-        if isinstance(mount_point, str):
-            # pydantic validator ensures strings are converted to MountPoint
-            continue
         if not isinstance(mount_point, VolumeMountPoint):
             job_volumes.append(mount_point.copy())
             continue

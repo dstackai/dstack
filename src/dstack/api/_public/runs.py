@@ -23,7 +23,7 @@ from dstack._internal.core.models.configurations import (
     PortMapping,
     ServiceConfiguration,
 )
-from dstack._internal.core.models.files import FileArchiveMapping, FilePathMapping
+from dstack._internal.core.models.files import FileArchiveMapping
 from dstack._internal.core.models.profiles import (
     CreationPolicy,
     Profile,
@@ -436,7 +436,7 @@ class RunCollection:
     ) -> RunPlan:
         """
         Get a run plan.
-        Use this method to see the run plan before applying the cofiguration.
+        Use this method to see the run plan before applying the configuration.
 
         Args:
             configuration (Union[Task, Service, DevEnvironment]): The run configuration.
@@ -499,7 +499,6 @@ class RunCollection:
 
         self._validate_configuration_files(configuration, run_spec.configuration_path)
         for file_mapping in configuration.files:
-            assert isinstance(file_mapping, FilePathMapping)
             with tempfile.TemporaryFile("w+b") as fp:
                 try:
                     archive_hash = create_file_archive(file_mapping.local_path, fp)
@@ -691,11 +690,11 @@ class RunCollection:
             spot_policy=spot_policy,
             retry=None,
             utilization_policy=utilization_policy,
-            max_duration=max_duration,
-            stop_duration=stop_duration,
+            max_duration=max_duration,  # type: ignore[assignment]
+            stop_duration=stop_duration,  # type: ignore[assignment]
             max_price=max_price,
             creation_policy=creation_policy,
-            idle_duration=idle_duration,
+            idle_duration=idle_duration,  # type: ignore[assignment]
         )
         run_spec = RunSpec(
             run_name=run_name,
@@ -812,7 +811,6 @@ class RunCollection:
         if configuration_path is not None:
             base_dir = Path(configuration_path).expanduser().resolve().parent
         for file_mapping in configuration.files:
-            assert isinstance(file_mapping, FilePathMapping)
             path = Path(file_mapping.local_path).expanduser()
             if not path.is_absolute():
                 if base_dir is None:

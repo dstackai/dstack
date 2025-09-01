@@ -120,6 +120,8 @@ class RPSAutoscaler(BaseServiceScaler):
 
 
 def get_service_scaler(conf: ServiceConfiguration) -> BaseServiceScaler:
+    assert conf.replicas.min is not None
+    assert conf.replicas.max is not None
     if conf.scaling is None:
         return ManualScaler(
             min_replicas=conf.replicas.min,

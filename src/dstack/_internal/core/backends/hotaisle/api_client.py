@@ -16,46 +16,38 @@ class HotAisleAPIClient:
         self.team_handle = team_handle
 
     def validate_api_key(self) -> bool:
-        try:
-            self._validate_user_and_team()
-            return True
-        except requests.HTTPError as e:
-            if e.response.status_code == 401:
-                raise_invalid_credentials_error(
-                    fields=[["creds", "api_key"]], details="Invalid API key"
-                )
-            elif e.response.status_code == 403:
-                raise_invalid_credentials_error(
-                    fields=[["creds", "api_key"]],
-                    details="Authenticated user does note have required permissions",
-                )
-            raise e
-        except ValueError as e:
-            error_message = str(e)
-            if "No Hot Aisle teams found" in error_message:
-                raise_invalid_credentials_error(
-                    fields=[["creds", "api_key"]],
-                    details="Valid API key but no teams found for this user",
-                )
-            elif "not found" in error_message:
-                raise_invalid_credentials_error(
-                    fields=[["team_handle"]], details=f"Team handle '{self.team_handle}' not found"
-                )
-            raise e
-
-    def _validate_user_and_team(self) -> None:
         url = f"{API_URL}/user/"
-        response = self._make_request("GET", url)
-        response.raise_for_status()
-        user_data = response.json()
+        try:
+            response = self._make_request("GET", url)
+            response.raise_for_status()
+        except requests.HTTPError as e:
+            if e.response is not None:
+                if e.response.status_code == 401:
+                    raise_invalid_credentials_error(
+                        fields=[["creds", "api_key"]], details="Invalid API key"
+                    )
+                if e.response.status_code == 403:
+                    raise_invalid_credentials_error(
+                        fields=[["creds", "api_key"]],
+                        details="Authenticated user does not have required permissions",
+                    )
+            raise
 
-        teams = user_data.get("teams", [])
+        user_data = response.json()
+        teams = user_data["teams"]
         if not teams:
-            raise ValueError("No Hot Aisle teams found for this user")
+            raise_invalid_credentials_error(
+                fields=[["creds", "api_key"]],
+                details="Valid API key but no teams found for this user",
+            )
 
         available_teams = [team["handle"] for team in teams]
         if self.team_handle not in available_teams:
-            raise ValueError(f"Hot Aisle team '{self.team_handle}' not found.")
+            raise_invalid_credentials_error(
+                fields=[["team_handle"]],
+                details=f"Team handle '{self.team_handle}' not found",
+            )
+        return True
 
     def upload_ssh_key(self, public_key: str) -> bool:
         url = f"{API_URL}/user/ssh_keys/"

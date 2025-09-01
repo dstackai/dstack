@@ -14,7 +14,7 @@ class StopCommand(APIBaseCommand):
         super()._register()
         self._parser.add_argument("-x", "--abort", action="store_true")
         self._parser.add_argument("-y", "--yes", action="store_true")
-        self._parser.add_argument("run_name").completer = RunNameCompleter()
+        self._parser.add_argument("run_name").completer = RunNameCompleter()  # type: ignore[attr-defined]
 
     def _command(self, args: argparse.Namespace):
         super()._command(args)

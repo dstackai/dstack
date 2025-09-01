@@ -161,7 +161,10 @@ class DataCrunchCompute(
         try:
             self.client.instances.action(id_list=[instance_id], action="delete")
         except APIException as e:
-            if e.message == "Invalid instance id":
+            if e.message in [
+                "Invalid instance id",
+                "Can't discontinue a discontinued instance",
+            ]:
                 logger.debug("Skipping instance %s termination. Instance not found.", instance_id)
                 return
             raise
@@ -243,6 +246,7 @@ def _deploy_instance(
             hostname=hostname,
             description=description,
             startup_script_id=startup_script_id,
+            pricing="FIXED_PRICE",
             is_spot=is_spot,
             location=location,
             os_volume={"name": "OS volume", "size": disk_size},

@@ -38,7 +38,10 @@ class ConfigManager:
             with open(self.config_filepath, "r") as f:
                 config = yaml.safe_load(f)
             self.config = GlobalConfig.parse_obj(config)
-        except (FileNotFoundError, ValidationError):
+        except FileNotFoundError:
+            self.config = GlobalConfig()
+        except ValidationError:
+            logger.error(f"Error in `{self.config_filepath}`", exc_info=True)
             self.config = GlobalConfig()
 
     def get_project_config(self, name: Optional[str] = None) -> Optional[ProjectConfig]:
@@ -65,8 +68,8 @@ class ConfigManager:
         if len(self.config.projects) == 1:
             self.config.projects[0].default = True
 
-    def list_projects(self):
-        return [project.name for project in self.config.projects]
+    def list_project_configs(self) -> list[ProjectConfig]:
+        return self.config.projects
 
     def delete_project(self, name: str):
         self.config.projects = [p for p in self.config.projects if p.name != name]

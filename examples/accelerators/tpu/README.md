@@ -7,8 +7,8 @@ or request TPUs by specifying `tpu` as `vendor` ([see examples](https://dstack.a
 Below are a few examples on using TPUs for deployment and fine-tuning.
 
 !!! info "Multi-host TPUs"
-    Currently, `dstack` supports only single-host TPUs, which means that 
-    the maximum supported number of cores is `8` (e.g. `v2-8`, `v3-8`, `v5litepod-8`, `v5p-8`, `v6e-8`). 
+    Currently, `dstack` supports only single-host TPUs, which means that
+    the maximum supported number of cores is `8` (e.g. `v2-8`, `v3-8`, `v5litepod-8`, `v5p-8`, `v6e-8`).
     Multi-host TPU support is on the roadmap.
 
 !!! info "TPU storage"
@@ -18,18 +18,18 @@ Below are a few examples on using TPUs for deployment and fine-tuning.
 ## Deployment
 
 Many serving frameworks including vLLM and TGI have TPU support.
-Here's an example of a [service](https://dstack.ai/docs/services) that deploys Llama 3.1 8B using 
+Here's an example of a [service](https://dstack.ai/docs/services) that deploys Llama 3.1 8B using
 [Optimum TPU :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/optimum-tpu){:target="_blank"}
 and [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/vllm-project/vllm){:target="_blank"}.
 
 === "Optimum TPU"
 
-    <div editor-title="examples/inference/tgi/tpu/.dstack.yml"> 
-    
+    <div editor-title="examples/inference/tgi/tpu/.dstack.yml">
+
     ```yaml
     type: service
     name: llama31-service-optimum-tpu
-    
+
     image: dstackai/optimum-tpu:llama31
     env:
       - HF_TOKEN
@@ -41,7 +41,7 @@ and [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/vllm-
     port: 8000
     # Register the model
     model: meta-llama/Meta-Llama-3.1-8B-Instruct
-    
+
     resources:
       gpu: v5litepod-4
     ```
@@ -50,14 +50,14 @@ and [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/vllm-
     Note that for Optimum TPU `MAX_INPUT_TOKEN` is set to 4095 by default. We must also set `MAX_BATCH_PREFILL_TOKENS` to 4095.
 
     ??? info "Docker image"
-        The official Docker image `huggingface/optimum-tpu:latest` doesn’t support Llama 3.1-8B. 
-        We’ve created a custom image with the fix: `dstackai/optimum-tpu:llama31`. 
-        Once the [pull request :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/optimum-tpu/pull/92){:target="_blank"} is merged, 
+        The official Docker image `huggingface/optimum-tpu:latest` doesn’t support Llama 3.1-8B.
+        We’ve created a custom image with the fix: `dstackai/optimum-tpu:llama31`.
+        Once the [pull request :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/optimum-tpu/pull/92){:target="_blank"} is merged,
         the official Docker image can be used.
 
 === "vLLM"
-    <div editor-title="examples/inference/vllm/tpu/.dstack.yml"> 
-    
+    <div editor-title="examples/inference/vllm/tpu/.dstack.yml">
+
     ```yaml
     type: service
     name: llama31-service-vllm-tpu
@@ -79,17 +79,17 @@ and [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/vllm-
       - pip install -r requirements-tpu.txt
       - apt-get install -y libopenblas-base libopenmpi-dev libomp-dev
       - python setup.py develop
-      - vllm serve $MODEL_ID 
-          --tensor-parallel-size 4 
+      - vllm serve $MODEL_ID
+          --tensor-parallel-size 4
           --max-model-len $MAX_MODEL_LEN
           --port 8000
     port: 8000
     # Register the model
     model: meta-llama/Meta-Llama-3.1-8B-Instruct
-    
+
     # Uncomment to leverage spot instances
     #spot_policy: auto
-    
+
     resources:
       gpu: v5litepod-4
     ```
@@ -123,11 +123,11 @@ cloud resources and run the configuration.
 
 ## Fine-tuning with Optimum TPU
 
-Below is an example of fine-tuning Llama 3.1 8B using [Optimum TPU :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/optimum-tpu){:target="_blank"} 
+Below is an example of fine-tuning Llama 3.1 8B using [Optimum TPU :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/optimum-tpu){:target="_blank"}
 and the [`Abirate/english_quotes` :material-arrow-top-right-thin:{ .external }](https://huggingface.co/datasets/Abirate/english_quotes){:target="_blank"}
 dataset.
 
-<div editor-title="examples/single-node-training/optimum-tpu/llama31/.dstack.yml"> 
+<div editor-title="examples/single-node-training/optimum-tpu/llama31/.dstack.yml">
 
 ```yaml
 type: task
@@ -136,11 +136,14 @@ name: optimum-tpu-llama-train
 python: "3.11"
 env:
   - HF_TOKEN
+files:
+  - train.py
+  - config.yaml
 commands:
   - git clone -b add_llama_31_support https://github.com/dstackai/optimum-tpu.git
   - mkdir -p optimum-tpu/examples/custom/
-  - cp examples/single-node-training/optimum-tpu/llama31/train.py optimum-tpu/examples/custom/train.py
-  - cp examples/single-node-training/optimum-tpu/llama31/config.yaml optimum-tpu/examples/custom/config.yaml
+  - cp train.py optimum-tpu/examples/custom/train.py
+  - cp config.yaml optimum-tpu/examples/custom/config.yaml
   - cd optimum-tpu
   - pip install -e . -f https://storage.googleapis.com/libtpu-releases/index.html
   - pip install datasets evaluate
@@ -178,7 +181,7 @@ Note, `v5litepod` is optimized for fine-tuning transformer-based models. Each co
 
 ## Source code
 
-The source-code of this example can be found in 
+The source-code of this example can be found in
 [`examples/inference/tgi/tpu` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/inference/tgi/tpu){:target="_blank"},
 [`examples/inference/vllm/tpu` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/inference/vllm/tpu){:target="_blank"},
 and [`examples/single-node-training/optimum-tpu` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/single-node-training/trl){:target="_blank"}.
@@ -188,5 +191,5 @@ and [`examples/single-node-training/optimum-tpu` :material-arrow-top-right-thin:
 1. Browse [Optimum TPU :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/optimum-tpu),
    [Optimum TPU TGI :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/optimum-tpu/tree/main/text-generation-inference) and
    [vLLM :material-arrow-top-right-thin:{ .external }](https://docs.vllm.ai/en/latest/getting_started/tpu-installation.html).
-2. Check [dev environments](https://dstack.ai/docs/dev-environments), [tasks](https://dstack.ai/docs/tasks), 
+2. Check [dev environments](https://dstack.ai/docs/dev-environments), [tasks](https://dstack.ai/docs/tasks),
    [services](https://dstack.ai/docs/services), and [fleets](https://dstack.ai/docs/concepts/fleets).

@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 from typing import Optional, Union
 
-import git
+import git.cmd
 import requests
 import yaml
 from git.exc import GitCommandError
@@ -23,6 +23,8 @@ logger = get_logger(__name__)
 
 gh_config_path = os.path.expanduser("~/.config/gh/hosts.yml")
 default_ssh_key = os.path.expanduser("~/.ssh/id_rsa")
+
+no_prompt_env = dict(GIT_TERMINAL_PROMPT="0")
 
 
 class InvalidRepoCredentialsError(DstackError):
@@ -84,7 +86,7 @@ def get_local_repo_credentials(
 
 def check_remote_repo_credentials_https(url: GitRepoURL, oauth_token: str) -> RemoteRepoCreds:
     try:
-        git.cmd.Git().ls_remote(url.as_https(oauth_token), env=dict(GIT_TERMINAL_PROMPT="0"))
+        git.cmd.Git().ls_remote(url.as_https(oauth_token), env=no_prompt_env)
     except GitCommandError:
         masked = len(oauth_token[:-4]) * "*" + oauth_token[-4:]
         raise InvalidRepoCredentialsError(
@@ -131,7 +133,7 @@ def get_default_branch(remote_url: str) -> Optional[str]:
     Get the default branch of a remote Git repository.
     """
     try:
-        output = git.cmd.Git().ls_remote("--symref", remote_url, "HEAD")
+        output = git.cmd.Git().ls_remote("--symref", remote_url, "HEAD", env=no_prompt_env)
         for line in output.splitlines():
             if line.startswith("ref:"):
                 return line.split()[1].split("/")[-1]
