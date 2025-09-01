@@ -37,6 +37,6 @@ class CursorDesktop:
         return [
             "echo To open in Cursor, use link below:",
             "echo",
-            f'echo "  vscode://vscode-remote/ssh-remote+{self.run_name}$DSTACK_REPO_DIR"',
+            f'echo "  cursor://vscode-remote/ssh-remote+{self.run_name}$DSTACK_REPO_DIR"',
             "echo",
         ]
