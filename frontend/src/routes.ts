@@ -98,6 +98,10 @@ export const ROUTES = {
         LIST: '/runs',
     },
 
+    OFFERS: {
+        LIST: '/offers',
+    },
+
     MODELS: {
         LIST: '/models',
         DETAILS: {

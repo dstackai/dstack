@@ -23,6 +23,7 @@ import { CreditsHistoryAdd, UserAdd, UserDetails, UserEdit, UserList } from 'pag
 import { UserBilling, UserProjects, UserSettings } from 'pages/User/Details';
 
 import { AuthErrorMessage } from './App/AuthErrorMessage';
+import { OfferList } from './pages/Offers';
 import { JobDetails } from './pages/Runs/Details/Jobs/Details/JobDetails';
 import { VolumeList } from './pages/Volumes';
 import { ROUTES } from './routes';
@@ -134,6 +135,12 @@ export const router = createBrowserRouter([
             {
                 path: ROUTES.RUNS.LIST,
                 element: <RunList />,
+            },
+
+            // Offers
+            {
+                path: ROUTES.OFFERS.LIST,
+                element: <OfferList />,
             },
 
             // Models

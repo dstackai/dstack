@@ -105,6 +105,8 @@ export const API = {
         SECRETS_UPDATE: (projectName: IProject['project_name']) =>
             `${API.BASE()}/project/${projectName}/secrets/create_or_update`,
         SECRETS_DELETE: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/secrets/delete`,
+        // GPUS
+        GPUS_LIST: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/gpus/list`,
     },
 
     BACKENDS: {

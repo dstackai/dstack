@@ -17,6 +17,8 @@ import { volumeApi } from 'services/volume';
 
 import appReducer from 'App/slice';
 
+import { gpuApi } from './services/gpu';
+
 export const store = configureStore({
     reducer: {
         app: appReducer,
@@ -32,6 +34,7 @@ export const store = configureStore({
         [serverApi.reducerPath]: serverApi.reducer,
         [volumeApi.reducerPath]: volumeApi.reducer,
         [secretApi.reducerPath]: secretApi.reducer,
+        [gpuApi.reducerPath]: gpuApi.reducer,
         [mainApi.reducerPath]: mainApi.reducer,
     },
 
@@ -50,6 +53,7 @@ export const store = configureStore({
             .concat(serverApi.middleware)
             .concat(volumeApi.middleware)
             .concat(secretApi.middleware)
+            .concat(gpuApi.middleware)
             .concat(mainApi.middleware),
 });
 
