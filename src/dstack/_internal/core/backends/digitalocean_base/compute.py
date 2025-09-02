@@ -160,7 +160,7 @@ class BaseDigitalOceanCompute(
         gpu_count = len(instance_offer.instance.resources.gpus)
         gpu_vendor = instance_offer.instance.resources.gpus[0].vendor
 
-        if gpu_vendor == "amd":
+        if gpu_vendor == gpuhunt.AcceleratorVendor.AMD:
             # AMD GPU
             return "digitaloceanai-rocmjupyter"
         else:
