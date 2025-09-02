@@ -30,7 +30,7 @@ class DigitalOceanAPIClient:
     def validate_project_name(self, project_name: str) -> bool:
         if self.get_project_id(project_name) is None:
             raise_invalid_credentials_error(
-                fields=[["config", "project_name"]],
+                fields=[["project_name"]],
                 details=f"Project with name '{project_name}' does not exist",
             )
         return True
