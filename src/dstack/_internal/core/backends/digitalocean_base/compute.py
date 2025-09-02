@@ -95,11 +95,11 @@ class BaseDigitalOceanCompute(
         else:
             backend_specific_commands = SETUP_COMMANDS
 
-        project_id = (
-            self.api_client.get_project_id(self.config.project_name)
-            if self.config.project_name
-            else None
-        )
+        project_id = None
+        if self.config.project_name:
+            project_id = self.api_client.get_project_id(self.config.project_name)
+            if project_id is None:
+                raise BackendError(f"Project {self.config.project_name} does not exist")
         droplet_config = {
             "name": instance_name,
             "region": instance_offer.region,
