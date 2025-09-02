@@ -79,14 +79,14 @@ func main() {
 			&cli.IntFlag{
 				Name:        "runner-http-port",
 				Usage:       "Set runner's http port",
-				Value:       10999,
+				Value:       consts.RunnerHTTPPort,
 				Destination: &args.Runner.HTTPPort,
 				EnvVars:     []string{"DSTACK_RUNNER_HTTP_PORT"},
 			},
 			&cli.IntFlag{
 				Name:        "runner-ssh-port",
 				Usage:       "Set runner's ssh port",
-				Value:       10022,
+				Value:       consts.RunnerSSHPort,
 				Destination: &args.Runner.SSHPort,
 				EnvVars:     []string{"DSTACK_RUNNER_SSH_PORT"},
 			},

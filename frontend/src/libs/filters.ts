@@ -19,6 +19,22 @@ export const tokensToSearchParams = <RequestParamsKeys extends string>(
     return params;
 };
 
+export type RequestParam = string | { min: number } | { max: number };
+
+const convertTokenValueToRequestParam = (token: PropertyFilterProps.Query['tokens'][number]): RequestParam => {
+    const { value, operator } = token;
+
+    if (operator === '>=') {
+        return { min: Number(value) };
+    }
+
+    if (operator === '<=') {
+        return { max: Number(value) };
+    }
+
+    return value;
+};
+
 export const tokensToRequestParams = <RequestParamsKeys extends string>({
     tokens,
     arrayFieldKeys,
@@ -26,7 +42,7 @@ export const tokensToRequestParams = <RequestParamsKeys extends string>({
     tokens: PropertyFilterProps.Query['tokens'];
     arrayFieldKeys?: RequestParamsKeys[];
 }) => {
-    return tokens.reduce<Record<RequestParamsKeys, string | string[]>>(
+    return tokens.reduce<Record<RequestParamsKeys, RequestParam | string[]>>(
         (acc, token) => {
             const propertyKey = token.propertyKey as RequestParamsKeys;
 
@@ -34,21 +50,23 @@ export const tokensToRequestParams = <RequestParamsKeys extends string>({
                 return acc;
             }
 
+            const convertedValue = convertTokenValueToRequestParam(token);
+
             if (arrayFieldKeys?.includes(propertyKey)) {
                 if (Array.isArray(acc[propertyKey])) {
-                    acc[propertyKey].push(token.value);
+                    acc[propertyKey].push(convertedValue as string);
                 } else {
-                    acc[propertyKey] = [token.value];
+                    acc[propertyKey] = [convertedValue as string];
                 }
 
                 return acc;
             }
 
-            acc[propertyKey] = token.value;
+            acc[propertyKey] = convertedValue;
 
             return acc;
         },
-        {} as Record<RequestParamsKeys, string>,
+        {} as Record<RequestParamsKeys, RequestParam>,
     );
 };
 

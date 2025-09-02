@@ -1,7 +1,7 @@
 from typing import Optional
 
 from dstack._internal.core.models.common import IncludeExcludeDictType, IncludeExcludeSetType
-from dstack._internal.core.models.configurations import ServiceConfiguration
+from dstack._internal.core.models.configurations import LEGACY_REPO_DIR, ServiceConfiguration
 from dstack._internal.core.models.runs import ApplyRunPlanInput, JobSpec, JobSubmission, RunSpec
 from dstack._internal.server.schemas.runs import GetRunPlanRequest, ListRunsRequest
 
@@ -102,6 +102,9 @@ def get_run_spec_excludes(run_spec: RunSpec) -> IncludeExcludeDictType:
     configuration = run_spec.configuration
     profile = run_spec.profile
 
+    if run_spec.repo_dir in [None, LEGACY_REPO_DIR]:
+        spec_excludes["repo_dir"] = True
+
     if configuration.fleets is None:
         configuration_excludes["fleets"] = True
     if profile is not None and profile.fleets is None:
@@ -163,6 +166,8 @@ def get_job_spec_excludes(job_specs: list[JobSpec]) -> IncludeExcludeDictType:
         spec_excludes["service_port"] = True
     if all(not s.probes for s in job_specs):
         spec_excludes["probes"] = True
+    if all(s.repo_dir in [None, LEGACY_REPO_DIR] for s in job_specs):
+        spec_excludes["repo_dir"] = True
 
     return spec_excludes
 

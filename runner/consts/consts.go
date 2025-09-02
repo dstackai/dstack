@@ -30,4 +30,9 @@ const (
 	RunnerWorkingDir = "/workflow"
 )
 
+const (
+	RunnerHTTPPort = 10999
+	RunnerSSHPort  = 10022
+)
+
 const ShimLogFileName = "shim.log"

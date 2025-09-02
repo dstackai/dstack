@@ -2,7 +2,7 @@ import argparse
 import subprocess
 import sys
 import time
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Dict, List, Optional, Set, TypeVar
 
 import gpuhunt
@@ -33,6 +33,7 @@ from dstack._internal.core.errors import (
 )
 from dstack._internal.core.models.common import ApplyAction, RegistryAuth
 from dstack._internal.core.models.configurations import (
+    LEGACY_REPO_DIR,
     AnyRunConfiguration,
     ApplyConfigurationType,
     ConfigurationWithPortsParams,
@@ -53,6 +54,7 @@ from dstack._internal.utils.common import local_time
 from dstack._internal.utils.interpolator import InterpolatorError, VariablesInterpolator
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.nested_list import NestedList, NestedListItem
+from dstack._internal.utils.path import is_absolute_posix_path
 from dstack.api._public.repos import get_ssh_keypair
 from dstack.api._public.runs import Run
 from dstack.api.utils import load_profile
@@ -88,6 +90,42 @@ class BaseRunConfigurator(
         self.apply_args(conf, configurator_args, unknown_args)
         self.validate_gpu_vendor_and_image(conf)
         self.validate_cpu_arch_and_image(conf)
+
+        working_dir = conf.working_dir
+        if working_dir is None:
+            # Use the default working dir for the image for tasks and services if `commands`
+            # is not set (emulate pre-0.19.27 JobConfigutor logic), otherwise fall back to
+            # `/workflow`.
+            if isinstance(conf, DevEnvironmentConfiguration) or conf.commands:
+                conf.working_dir = LEGACY_REPO_DIR
+                warn(
+                    "[code]working_dir[/code] is not set."
+                    f" Using legacy working directory [code]{LEGACY_REPO_DIR}[/code]\n\n"
+                    "In future versions the default value will be taken from the image\n"
+                    f"- To keep using legacy working directory, set"
+                    f" [code]working_dir[/code] to [code]{LEGACY_REPO_DIR}[/code]\n"
+                    f"- To prepare for the future default, set [code]working_dir[/code]"
+                    " to the image default working directory (only until the new default"
+                    " takes effect)"
+                )
+        elif not is_absolute_posix_path(working_dir):
+            legacy_working_dir = PurePosixPath(LEGACY_REPO_DIR) / working_dir
+            warn(
+                "[code]working_dir[/code] is relative."
+                f" Using legacy working directory [code]{legacy_working_dir}[/code]\n\n"
+                "Future versions will require absolute path\n"
+                f"To keep using legacy working directory, set"
+                f" [code]working_dir[/code] to [code]{legacy_working_dir}[/code]\n"
+            )
+
+        if conf.repos and conf.repos[0].path is None:
+            warn(
+                "[code]repos[0].path[/code] is not set,"
+                f" using legacy repo path [code]{LEGACY_REPO_DIR}[/code]\n\n"
+                "In a future version the default value will be changed."
+                f" To keep using [code]{LEGACY_REPO_DIR}[/code], explicitly set"
+                f" [code]repos[0].path[/code] to [code]{LEGACY_REPO_DIR}[/code]\n"
+            )
 
         config_manager = ConfigManager()
         repo = self.get_repo(conf, configuration_path, configurator_args, config_manager)

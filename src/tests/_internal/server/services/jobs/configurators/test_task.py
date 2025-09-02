@@ -98,9 +98,9 @@ class TestCommands:
             expected_shell,
             "-i",
             "-c",
-            "uv venv --python 3.12 --prompt workflow --seed /workflow/.venv > /dev/null 2>&1"
-            " && echo 'source /workflow/.venv/bin/activate' >> ~/.bashrc"
-            " && source /workflow/.venv/bin/activate"
+            "uv venv -q --prompt $DSTACK_RUN_NAME --seed -p 3.12 /dstack/venv"
+            " && echo '. /dstack/venv/bin/activate' >> /dstack/profile"
+            " && . /dstack/venv/bin/activate"
             " && sleep inf",
         ]
 

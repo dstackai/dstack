@@ -433,6 +433,7 @@ class RunCollection:
         repo: Optional[Repo] = None,
         profile: Optional[Profile] = None,
         configuration_path: Optional[str] = None,
+        repo_dir: Optional[str] = None,
     ) -> RunPlan:
         """
         Get a run plan.
@@ -443,11 +444,17 @@ class RunCollection:
             repo (Union[LocalRepo, RemoteRepo, VirtualRepo, None]):
                 The repo to use for the run. Pass `None` if repo is not needed.
             profile: The profile to use for the run.
-            configuration_path: The path to the configuration file. Omit if the configuration is not loaded from a file.
+            configuration_path: The path to the configuration file. Omit if the configuration
+                is not loaded from a file.
+            repo_dir: The path of the cloned repo inside the run container. If not set,
+                defaults first to the `repos[0].path` property of the configuration (for remote
+                repos only), then to `/workflow`.
 
         Returns:
             Run plan.
         """
+        # XXX: not using the LEGACY_REPO_DIR const in the docstring above, as the docs generator,
+        # apparently, doesn't support f-strings (f"""...""").
         if repo is None:
             repo = VirtualRepo()
             repo_code_hash = None
@@ -455,11 +462,17 @@ class RunCollection:
             with _prepare_code_file(repo) as (_, repo_code_hash):
                 pass
 
+        if repo_dir is None and configuration.repos:
+            repo_dir = configuration.repos[0].path
+
         run_spec = RunSpec(
             run_name=configuration.name,
             repo_id=repo.repo_id,
             repo_data=repo.run_repo_data,
             repo_code_hash=repo_code_hash,
+            repo_dir=repo_dir,
+            # Server doesn't use this field since 0.19.27, but we still send it for compatibility
+            # with older servers
             working_dir=configuration.working_dir,
             configuration_path=configuration_path,
             configuration=configuration,

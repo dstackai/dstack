@@ -78,7 +78,8 @@
     "billing": "Billing",
     "resources": "Resources",
     "volumes": "Volumes",
-    "instances": "Instances"
+    "instances": "Instances",
+    "offers": "Offers"
   },
 
   "backend": {
@@ -445,6 +446,25 @@
       "type": "Type",
       "size": "Size"
     }
+  },
+  "offer": {
+    "title": "Offers",
+    "filter_property_placeholder": "Filter offers by properties",
+    "backend": "Backend",
+    "backend_plural": "Backends",
+    "availability": "Availability",
+    "groupBy": "Group by",
+    "region": "Region",
+    "count": "Count",
+    "price": "$/GPU",
+    "memory_mib": "Memory",
+    "spot": "Spot policy",
+    "empty_message_title_select_project": "Select a project",
+    "empty_message_text_select_project": "Use the filter above to select a project",
+    "empty_message_title": "No offers",
+    "empty_message_text": "No offers to display.",
+    "nomatch_message_title": "No matches",
+    "nomatch_message_text": "We can't find a match."
   },
 
   "models": {
