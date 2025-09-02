@@ -143,7 +143,7 @@ class SSHParams(CoreModel):
 
 class FleetNodesSpec(CoreModel):
     min: Annotated[
-        int, Field(description=("The minimum number of instances to maintain in the fleet."))
+        int, Field(description=("The minimum number of instances to maintain in the fleet"))
     ]
     target: Annotated[
         int,
@@ -154,7 +154,7 @@ class FleetNodesSpec(CoreModel):
         ),
     ]
     max: Annotated[
-        Optional[int], Field(description=("The maximum number of instances allowed in the fleet."))
+        Optional[int], Field(description=("The maximum number of instances allowed in the fleet"))
     ] = None
 
     @root_validator(pre=True)
