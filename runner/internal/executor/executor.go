@@ -360,7 +360,10 @@ func (ex *RunExecutor) setJobWorkingDir(ctx context.Context) error {
 			return gerrors.Wrap(err)
 		}
 	} else {
-		ex.jobWorkingDir, err = common.ExpandPath(*ex.jobSpec.WorkingDir, "", ex.jobHomeDir)
+		// We still support relative paths, as 0.19.27 server uses relative paths when possible
+		// for compatibility with pre-0.19.27 runners.
+		// Replace consts.LegacyRepoDir with "" eventually.
+		ex.jobWorkingDir, err = common.ExpandPath(*ex.jobSpec.WorkingDir, consts.LegacyRepoDir, ex.jobHomeDir)
 		if err != nil {
 			return gerrors.Wrap(err)
 		}

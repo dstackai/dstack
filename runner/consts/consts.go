@@ -26,9 +26,9 @@ const (
 	// The current user's homedir (as of 2024-12-28, it's always root) should be used
 	// instead of the hardcoded value
 	RunnerHomeDir = "/root"
-	// A repo directory and a default working directory for the job
-	RunnerWorkingDir = "/workflow"
 )
+
+const LegacyRepoDir = "/workflow"
 
 const (
 	RunnerHTTPPort = 10999
