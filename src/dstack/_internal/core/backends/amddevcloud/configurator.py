@@ -1,6 +1,7 @@
 from typing import Optional
 
 from dstack._internal.core.backends.amddevcloud.backend import AMDDevCloudBackend
+from dstack._internal.core.backends.base.configurator import BackendRecord
 from dstack._internal.core.backends.digitalocean_base.api_client import DigitalOceanAPIClient
 from dstack._internal.core.backends.digitalocean_base.backend import BaseDigitalOceanBackend
 from dstack._internal.core.backends.digitalocean_base.configurator import (
@@ -17,7 +18,7 @@ class AMDDevCloudConfigurator(BaseDigitalOceanConfigurator):
     BACKEND_CLASS = AMDDevCloudBackend
     API_URL = "https://api-amd.digitalocean.com"
 
-    def get_backend(self, record) -> BaseDigitalOceanBackend:
+    def get_backend(self, record: BackendRecord) -> BaseDigitalOceanBackend:
         config = self._get_config(record)
         return AMDDevCloudBackend(config=config, api_url=self.API_URL)
 
