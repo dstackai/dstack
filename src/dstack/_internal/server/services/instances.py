@@ -513,10 +513,10 @@ async def list_active_remote_instances(
     return instance_models
 
 
-async def create_instance_model(
+def create_instance_model(
     session: AsyncSession,
     project: ProjectModel,
-    user: UserModel,
+    username: str,
     profile: Profile,
     requirements: Requirements,
     instance_name: str,
@@ -536,7 +536,7 @@ async def create_instance_model(
     instance_config = InstanceConfiguration(
         project_name=project.name,
         instance_name=instance_name,
-        user=user.name,
+        user=username,
         ssh_keys=[project_ssh_key],
         instance_id=str(instance_id),
         reservation=reservation,

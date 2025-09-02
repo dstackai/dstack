@@ -53,14 +53,12 @@ from dstack._internal.core.models.placement import (
     PlacementStrategy,
 )
 from dstack._internal.core.models.profiles import (
-    RetryEvent,
     TerminationPolicy,
 )
 from dstack._internal.core.models.runs import (
     JobProvisioningData,
     Retry,
 )
-from dstack._internal.core.services.profiles import get_retry
 from dstack._internal.server import settings as server_settings
 from dstack._internal.server.background.tasks.common import get_provisioning_timeout
 from dstack._internal.server.db import get_db, get_session_ctx
@@ -327,7 +325,6 @@ async def _add_remote(instance: InstanceModel) -> None:
             e,
         )
         instance.status = InstanceStatus.PENDING
-        instance.last_retry_at = get_current_datetime()
         return
 
     instance_type = host_info_to_instance_type(host_info, cpu_arch)
@@ -426,7 +423,6 @@ async def _add_remote(instance: InstanceModel) -> None:
     instance.offer = instance_offer.json()
     instance.job_provisioning_data = jpd.json()
     instance.started_at = get_current_datetime()
-    instance.last_retry_at = get_current_datetime()
 
 
 def _deploy_instance(
@@ -493,29 +489,6 @@ def _deploy_instance(
 
 
 async def _create_instance(session: AsyncSession, instance: InstanceModel) -> None:
-    if instance.last_retry_at is not None:
-        last_retry = instance.last_retry_at
-        if get_current_datetime() < last_retry + timedelta(minutes=1):
-            return
-
-    if (
-        instance.profile is None
-        or instance.requirements is None
-        or instance.instance_configuration is None
-    ):
-        instance.status = InstanceStatus.TERMINATED
-        instance.termination_reason = "Empty profile, requirements or instance_configuration"
-        instance.last_retry_at = get_current_datetime()
-        logger.warning(
-            "Empty profile, requirements or instance_configuration. Terminate instance: %s",
-            instance.name,
-            extra={
-                "instance_name": instance.name,
-                "instance_status": InstanceStatus.TERMINATED.value,
-            },
-        )
-        return
-
     if _need_to_wait_fleet_provisioning(instance):
         logger.debug("Waiting for the first instance in the fleet to be provisioned")
         return
@@ -529,7 +502,6 @@ async def _create_instance(session: AsyncSession, instance: InstanceModel) -> No
         instance.termination_reason = (
             f"Error to parse profile, requirements or instance_configuration: {e}"
         )
-        instance.last_retry_at = get_current_datetime()
         logger.warning(
             "Error to parse profile, requirements or instance_configuration. Terminate instance: %s",
             instance.name,
@@ -539,24 +511,6 @@ async def _create_instance(session: AsyncSession, instance: InstanceModel) -> No
             },
         )
         return
-
-    retry = get_retry(profile)
-    should_retry = retry is not None and RetryEvent.NO_CAPACITY in retry.on_events
-
-    if retry is not None:
-        retry_duration_deadline = _get_retry_duration_deadline(instance, retry)
-        if get_current_datetime() > retry_duration_deadline:
-            instance.status = InstanceStatus.TERMINATED
-            instance.termination_reason = "Retry duration expired"
-            logger.warning(
-                "Retry duration expired. Terminating instance %s",
-                instance.name,
-                extra={
-                    "instance_name": instance.name,
-                    "instance_status": InstanceStatus.TERMINATED.value,
-                },
-            )
-            return
 
     placement_group_models = []
     placement_group_model = None
@@ -594,15 +548,6 @@ async def _create_instance(session: AsyncSession, instance: InstanceModel) -> No
         blocks="auto" if instance.total_blocks is None else instance.total_blocks,
         exclude_not_available=True,
     )
-
-    if not offers and should_retry:
-        instance.last_retry_at = get_current_datetime()
-        logger.debug(
-            "No offers for instance %s. Next retry",
-            instance.name,
-            extra={"instance_name": instance.name},
-        )
-        return
 
     # Limit number of offers tried to prevent long-running processing
     # in case all offers fail.
@@ -681,7 +626,6 @@ async def _create_instance(session: AsyncSession, instance: InstanceModel) -> No
         instance.offer = instance_offer.json()
         instance.total_blocks = instance_offer.total_blocks
         instance.started_at = get_current_datetime()
-        instance.last_retry_at = get_current_datetime()
 
         logger.info(
             "Created instance %s",
@@ -702,21 +646,18 @@ async def _create_instance(session: AsyncSession, instance: InstanceModel) -> No
             )
         return
 
-    instance.last_retry_at = get_current_datetime()
-
-    if not should_retry:
-        _mark_terminated(instance, "All offers failed" if offers else "No offers found")
-        if (
-            instance.fleet
-            and _is_fleet_master_instance(instance)
-            and _is_cloud_cluster(instance.fleet)
-        ):
-            # Do not attempt to deploy other instances, as they won't determine the correct cluster
-            # backend, region, and placement group without a successfully deployed master instance
-            for sibling_instance in instance.fleet.instances:
-                if sibling_instance.id == instance.id:
-                    continue
-                _mark_terminated(sibling_instance, "Master instance failed to start")
+    _mark_terminated(instance, "All offers failed" if offers else "No offers found")
+    if (
+        instance.fleet
+        and _is_fleet_master_instance(instance)
+        and _is_cloud_cluster(instance.fleet)
+    ):
+        # Do not attempt to deploy other instances, as they won't determine the correct cluster
+        # backend, region, and placement group without a successfully deployed master instance
+        for sibling_instance in instance.fleet.instances:
+            if sibling_instance.id == instance.id:
+                continue
+            _mark_terminated(sibling_instance, "Master instance failed to start")
 
 
 def _mark_terminated(instance: InstanceModel, termination_reason: str) -> None:

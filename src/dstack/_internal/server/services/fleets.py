@@ -449,25 +449,24 @@ async def create_fleet(
     return await _create_fleet(session=session, project=project, user=user, spec=spec)
 
 
-async def create_fleet_instance_model(
+def create_fleet_instance_model(
     session: AsyncSession,
     project: ProjectModel,
-    user: UserModel,
+    username: str,
     spec: FleetSpec,
-    reservation: Optional[str],
     instance_num: int,
 ) -> InstanceModel:
     profile = spec.merged_profile
     requirements = get_fleet_requirements(spec)
-    instance_model = await instances_services.create_instance_model(
+    instance_model = instances_services.create_instance_model(
         session=session,
         project=project,
-        user=user,
+        username=username,
         profile=profile,
         requirements=requirements,
         instance_name=f"{spec.configuration.name}-{instance_num}",
         instance_num=instance_num,
-        reservation=reservation,
+        reservation=spec.merged_profile.reservation,
         blocks=spec.configuration.blocks,
         tags=spec.configuration.tags,
     )
@@ -655,6 +654,19 @@ def get_fleet_requirements(fleet_spec: FleetSpec) -> Requirements:
     return requirements
 
 
+def get_next_instance_num(taken_instance_nums: set[int]) -> int:
+    if not taken_instance_nums:
+        return 0
+    min_instance_num = min(taken_instance_nums)
+    if min_instance_num > 0:
+        return 0
+    instance_num = min_instance_num + 1
+    while True:
+        if instance_num not in taken_instance_nums:
+            return instance_num
+        instance_num += 1
+
+
 async def _create_fleet(
     session: AsyncSession,
     project: ProjectModel,
@@ -705,12 +717,11 @@ async def _create_fleet(
                 fleet_model.instances.append(instances_model)
         else:
             for i in range(_get_fleet_nodes_to_provision(spec)):
-                instance_model = await create_fleet_instance_model(
+                instance_model = create_fleet_instance_model(
                     session=session,
                     project=project,
-                    user=user,
+                    username=user.name,
                     spec=spec,
-                    reservation=spec.configuration.reservation,
                     instance_num=i,
                 )
                 fleet_model.instances.append(instance_model)
@@ -778,7 +789,7 @@ async def _update_fleet(
         if added_hosts:
             await _check_ssh_hosts_not_yet_added(session, spec, fleet.id)
             for host in added_hosts.values():
-                instance_num = _get_next_instance_num(active_instance_nums)
+                instance_num = get_next_instance_num(active_instance_nums)
                 instance_model = await create_fleet_ssh_instance_model(
                     project=project,
                     spec=spec,
@@ -994,9 +1005,9 @@ def _validate_internal_ips(ssh_config: SSHParams):
 
 
 def _get_fleet_nodes_to_provision(spec: FleetSpec) -> int:
-    if spec.configuration.nodes is None or spec.configuration.nodes.min is None:
+    if spec.configuration.nodes is None:
         return 0
-    return spec.configuration.nodes.min
+    return spec.configuration.nodes.target
 
 
 def _terminate_fleet_instances(fleet_model: FleetModel, instance_nums: Optional[List[int]]):
@@ -1013,16 +1024,3 @@ def _terminate_fleet_instances(fleet_model: FleetModel, instance_nums: Optional[
             instance.deleted = True
         else:
             instance.status = InstanceStatus.TERMINATING
-
-
-def _get_next_instance_num(instance_nums: set[int]) -> int:
-    if not instance_nums:
-        return 0
-    min_instance_num = min(instance_nums)
-    if min_instance_num > 0:
-        return 0
-    instance_num = min_instance_num + 1
-    while True:
-        if instance_num not in instance_nums:
-            return instance_num
-        instance_num += 1
