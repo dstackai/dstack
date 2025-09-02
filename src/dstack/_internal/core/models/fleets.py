@@ -168,7 +168,7 @@ class FleetNodesSpec(CoreModel):
         return values
 
     @validator("min")
-    def validate_min(cls, v: int):
+    def validate_min(cls, v: int) -> int:
         if v < 0:
             raise ValueError("min cannot be negative")
         return v

@@ -385,6 +385,8 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
             instance_num=instance_num,
         )
         job_model.job_runtime_data = _prepare_job_runtime_data(offer).json()
+        # Both this task and process_fleets can add instances to fleets.
+        # TODO: Ensure this does not violate nodes.max when it's enforced.
         instance.fleet_id = fleet_model.id
         logger.info(
             "The job %s created the new instance %s",

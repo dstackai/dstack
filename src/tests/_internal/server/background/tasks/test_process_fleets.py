@@ -1,11 +1,13 @@
 import pytest
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dstack._internal.core.models.fleets import FleetStatus
+from dstack._internal.core.models.fleets import FleetNodesSpec, FleetStatus
 from dstack._internal.core.models.instances import InstanceStatus
 from dstack._internal.core.models.runs import RunStatus
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.background.tasks.process_fleets import process_fleets
+from dstack._internal.server.models import InstanceModel
 from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.testing.common import (
     create_fleet,
@@ -101,3 +103,24 @@ class TestProcessEmptyFleets:
         await process_fleets()
         await session.refresh(fleet)
         assert not fleet.deleted
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_consolidation_creates_missing_instances(self, test_db, session: AsyncSession):
+        project = await create_project(session)
+        spec = get_fleet_spec()
+        spec.configuration.nodes = FleetNodesSpec(min=2, target=2, max=2)
+        fleet = await create_fleet(
+            session=session,
+            project=project,
+            spec=spec,
+        )
+        await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.IDLE,
+        )
+        await process_fleets()
+        instances = (await session.execute(select(InstanceModel))).scalars().all()
+        assert len(instances) == 2
