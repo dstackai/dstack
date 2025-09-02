@@ -12,6 +12,7 @@ from dstack._internal.core.backends.base.compute import (
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.digitalocean_base.api_client import DigitalOceanAPIClient
 from dstack._internal.core.backends.digitalocean_base.models import BaseDigitalOceanConfig
+from dstack._internal.core.errors import BackendError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
