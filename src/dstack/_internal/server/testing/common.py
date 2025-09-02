@@ -28,6 +28,7 @@ from dstack._internal.core.models.configurations import (
 from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.fleets import (
     FleetConfiguration,
+    FleetNodesSpec,
     FleetSpec,
     FleetStatus,
     InstanceGroupPlacement,
@@ -60,7 +61,7 @@ from dstack._internal.core.models.profiles import (
 )
 from dstack._internal.core.models.repos.base import RepoType
 from dstack._internal.core.models.repos.local import LocalRunRepoData
-from dstack._internal.core.models.resources import CPUSpec, Memory, Range, ResourcesSpec
+from dstack._internal.core.models.resources import CPUSpec, Memory, ResourcesSpec
 from dstack._internal.core.models.runs import (
     JobProvisioningData,
     JobRuntimeData,
@@ -579,7 +580,7 @@ def get_fleet_spec(conf: Optional[FleetConfiguration] = None) -> FleetSpec:
 
 def get_fleet_configuration(
     name: str = "test-fleet",
-    nodes: Range[int] = Range(min=1, max=1),
+    nodes: FleetNodesSpec = FleetNodesSpec(min=1, target=1, max=1),
     placement: Optional[InstanceGroupPlacement] = None,
 ) -> FleetConfiguration:
     return FleetConfiguration(

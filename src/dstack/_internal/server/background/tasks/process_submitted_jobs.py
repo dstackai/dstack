@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime, timedelta
 from typing import List, Optional, Tuple
 
-from sqlalchemy import and_, func, not_, or_, select
+from sqlalchemy import and_, not_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import contains_eager, joinedload, load_only, noload, selectinload
 
@@ -16,6 +16,7 @@ from dstack._internal.core.models.common import NetworkMode
 from dstack._internal.core.models.fleets import (
     Fleet,
     FleetConfiguration,
+    FleetNodesSpec,
     FleetSpec,
     FleetStatus,
     InstanceGroupPlacement,
@@ -26,7 +27,7 @@ from dstack._internal.core.models.profiles import (
     CreationPolicy,
     TerminationPolicy,
 )
-from dstack._internal.core.models.resources import Memory, Range
+from dstack._internal.core.models.resources import Memory
 from dstack._internal.core.models.runs import (
     Job,
     JobProvisioningData,
@@ -54,6 +55,7 @@ from dstack._internal.server.services.backends import get_project_backend_by_typ
 from dstack._internal.server.services.fleets import (
     fleet_model_to_fleet,
     get_fleet_requirements,
+    get_next_instance_num,
 )
 from dstack._internal.server.services.instances import (
     filter_pool_instances,
@@ -385,6 +387,8 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
             instance_num=instance_num,
         )
         job_model.job_runtime_data = _prepare_job_runtime_data(offer, multinode).json()
+        # Both this task and process_fleets can add instances to fleets.
+        # TODO: Ensure this does not violate nodes.max when it's enforced.
         instance.fleet_id = fleet_model.id
         logger.info(
             "The job %s created the new instance %s",
@@ -757,12 +761,17 @@ def _create_fleet_model_for_job(
     placement = InstanceGroupPlacement.ANY
     if run.run_spec.configuration.type == "task" and run.run_spec.configuration.nodes > 1:
         placement = InstanceGroupPlacement.CLUSTER
+    nodes = _get_nodes_required_num_for_run(run.run_spec)
     spec = FleetSpec(
         configuration=FleetConfiguration(
             name=run.run_spec.run_name,
             placement=placement,
             reservation=run.run_spec.configuration.reservation,
-            nodes=Range(min=_get_nodes_required_num_for_run(run.run_spec), max=None),
+            nodes=FleetNodesSpec(
+                min=nodes,
+                target=nodes,
+                max=None,
+            ),
         ),
         profile=run.run_spec.merged_profile,
         autocreated=True,
@@ -780,10 +789,13 @@ def _create_fleet_model_for_job(
 
 async def _get_next_instance_num(session: AsyncSession, fleet_model: FleetModel) -> int:
     res = await session.execute(
-        select(func.count(InstanceModel.id)).where(InstanceModel.fleet_id == fleet_model.id)
+        select(InstanceModel.instance_num).where(
+            InstanceModel.fleet_id == fleet_model.id,
+            InstanceModel.deleted.is_(False),
+        )
     )
-    instance_count = res.scalar_one()
-    return instance_count
+    taken_instance_nums = set(res.scalars().all())
+    return get_next_instance_num(taken_instance_nums)
 
 
 def _create_instance_model_for_job(

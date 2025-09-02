@@ -551,6 +551,9 @@ class FleetModel(BaseModel):
     jobs: Mapped[List["JobModel"]] = relationship(back_populates="fleet")
     instances: Mapped[List["InstanceModel"]] = relationship(back_populates="fleet")
 
+    consolidation_attempt: Mapped[int] = mapped_column(Integer, server_default="0")
+    last_consolidated_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
+
 
 class InstanceModel(BaseModel):
     __tablename__ = "instances"
@@ -605,8 +608,8 @@ class InstanceModel(BaseModel):
         Integer, default=DEFAULT_FLEET_TERMINATION_IDLE_TIME
     )
 
-    # retry policy
-    last_retry_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
+    # Deprecated
+    last_retry_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime, deferred=True)
 
     # instance termination handling
     termination_deadline: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
