@@ -994,7 +994,7 @@ def _validate_internal_ips(ssh_config: SSHParams):
 def _get_fleet_nodes_to_provision(spec: FleetSpec) -> int:
     if spec.configuration.nodes is None:
         return 0
-    return spec.configuration.nodes.min
+    return spec.configuration.nodes.target
 
 
 def _terminate_fleet_instances(fleet_model: FleetModel, instance_nums: Optional[List[int]]):

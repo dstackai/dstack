@@ -145,7 +145,6 @@ class FleetNodesSpec(CoreModel):
     min: Annotated[
         int, Field(description=("The minimum number of instances to maintain in the fleet."))
     ]
-    # TODO: Exclude target if equal to min for backward compatibility
     target: Annotated[
         int,
         Field(
