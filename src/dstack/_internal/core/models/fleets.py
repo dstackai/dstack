@@ -150,11 +150,17 @@ class FleetNodesSpec(CoreModel):
         Field(
             description=(
                 "The number of instances to provision on fleet apply. `min` <= `target` <= `max`"
+                " Defaults to `min`"
             )
         ),
     ]
     max: Annotated[
-        Optional[int], Field(description=("The maximum number of instances allowed in the fleet"))
+        Optional[int],
+        Field(
+            description=(
+                "The maximum number of instances allowed in the fleet. Unlimited if not specified"
+            )
+        ),
     ] = None
 
     @root_validator(pre=True)

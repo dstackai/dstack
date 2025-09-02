@@ -59,6 +59,27 @@ Once the status of instances changes to `idle`, they can be used by dev environm
 
 ### Configuration options
 
+#### Nodes { #nodes }
+
+The `nodes` property controls how many instances to provision and maintain in the fleet:
+
+<div editor-title=".dstack.yml"> 
+
+```yaml
+type: fleet
+
+name: my-fleet
+
+nodes:
+  min: 1 # Always maintain at least 1 instance
+  target: 2 # Provision 2 instances initially
+  max: 3 # Do not allow more than 3 instances
+```
+
+</div>
+
+`dstack` ensures the fleet always has at least `nodes.min` instances, creating new instances in the background if necessary. If you don't need to keep instances in the fleet forever, you can set `nodes.min` to `0`. By default, `dstack apply` also provisions `nodes.min` instances. The `nodes.target` property allows provisioning more instances initially than needs to be maintained.
+
 #### Placement { #cloud-placement }
 
 To ensure instances are interconnected (e.g., for
