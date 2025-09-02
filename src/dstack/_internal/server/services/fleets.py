@@ -654,6 +654,19 @@ def get_fleet_requirements(fleet_spec: FleetSpec) -> Requirements:
     return requirements
 
 
+def get_next_instance_num(taken_instance_nums: set[int]) -> int:
+    if not taken_instance_nums:
+        return 0
+    min_instance_num = min(taken_instance_nums)
+    if min_instance_num > 0:
+        return 0
+    instance_num = min_instance_num + 1
+    while True:
+        if instance_num not in taken_instance_nums:
+            return instance_num
+        instance_num += 1
+
+
 async def _create_fleet(
     session: AsyncSession,
     project: ProjectModel,
@@ -776,7 +789,7 @@ async def _update_fleet(
         if added_hosts:
             await _check_ssh_hosts_not_yet_added(session, spec, fleet.id)
             for host in added_hosts.values():
-                instance_num = _get_next_instance_num(active_instance_nums)
+                instance_num = get_next_instance_num(active_instance_nums)
                 instance_model = await create_fleet_ssh_instance_model(
                     project=project,
                     spec=spec,
@@ -1011,16 +1024,3 @@ def _terminate_fleet_instances(fleet_model: FleetModel, instance_nums: Optional[
             instance.deleted = True
         else:
             instance.status = InstanceStatus.TERMINATING
-
-
-def _get_next_instance_num(instance_nums: set[int]) -> int:
-    if not instance_nums:
-        return 0
-    min_instance_num = min(instance_nums)
-    if min_instance_num > 0:
-        return 0
-    instance_num = min_instance_num + 1
-    while True:
-        if instance_num not in instance_nums:
-            return instance_num
-        instance_num += 1

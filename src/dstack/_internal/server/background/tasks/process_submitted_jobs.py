@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime, timedelta
 from typing import List, Optional, Tuple
 
-from sqlalchemy import and_, func, not_, or_, select
+from sqlalchemy import and_, not_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import contains_eager, joinedload, load_only, noload, selectinload
 
@@ -55,6 +55,7 @@ from dstack._internal.server.services.backends import get_project_backend_by_typ
 from dstack._internal.server.services.fleets import (
     fleet_model_to_fleet,
     get_fleet_requirements,
+    get_next_instance_num,
 )
 from dstack._internal.server.services.instances import (
     filter_pool_instances,
@@ -786,10 +787,13 @@ def _create_fleet_model_for_job(
 
 async def _get_next_instance_num(session: AsyncSession, fleet_model: FleetModel) -> int:
     res = await session.execute(
-        select(func.count(InstanceModel.id)).where(InstanceModel.fleet_id == fleet_model.id)
+        select(InstanceModel.instance_num).where(
+            InstanceModel.fleet_id == fleet_model.id,
+            InstanceModel.deleted.is_(False),
+        )
     )
-    instance_count = res.scalar_one()
-    return instance_count
+    taken_instance_nums = set(res.scalars().all())
+    return get_next_instance_num(taken_instance_nums)
 
 
 def _create_instance_model_for_job(

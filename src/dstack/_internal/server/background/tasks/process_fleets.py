@@ -19,6 +19,7 @@ from dstack._internal.server.models import (
 from dstack._internal.server.services.fleets import (
     create_fleet_instance_model,
     get_fleet_spec,
+    get_next_instance_num,
     is_fleet_empty,
     is_fleet_in_use,
 )
@@ -167,8 +168,9 @@ def _maintain_fleet_nodes_min(
             # TODO: Store fleet.user and pass it instead of the project owner.
             username=fleet_model.project.owner.name,
             spec=fleet_spec,
-            instance_num=active_instances_num + i,
+            instance_num=get_next_instance_num({i.instance_num for i in active_instances}),
         )
+        active_instances.append(instance_model)
         fleet_model.instances.append(instance_model)
     logger.info("Added %s instances to fleet %s", nodes_missing, fleet_model.name)
     return True

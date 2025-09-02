@@ -120,7 +120,9 @@ class TestProcessEmptyFleets:
             project=project,
             fleet=fleet,
             status=InstanceStatus.IDLE,
+            instance_num=1,
         )
         await process_fleets()
         instances = (await session.execute(select(InstanceModel))).scalars().all()
         assert len(instances) == 2
+        assert {i.instance_num for i in instances} == {0, 1}  # uses 0 for next instance num
