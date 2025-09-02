@@ -7,7 +7,6 @@ from dstack._internal.core.backends.base.configurator import (
 )
 from dstack._internal.core.backends.digitalocean_base.backend import BaseDigitalOceanBackend
 from dstack._internal.core.backends.digitalocean_base.models import (
-    AnyBaseDigitalOceanBackendConfig,
     AnyBaseDigitalOceanCreds,
     BaseDigitalOceanBackendConfig,
     BaseDigitalOceanBackendConfigWithCreds,
@@ -33,16 +32,20 @@ class BaseDigitalOceanConfigurator(Configurator):
             auth=BaseDigitalOceanCreds.parse_obj(config.creds).json(),
         )
 
-    def get_backend_config(
-        self, record: BackendRecord, include_creds: bool
-    ) -> AnyBaseDigitalOceanBackendConfig:
+    def get_backend_config_with_creds(
+        self, record: BackendRecord
+    ) -> BaseDigitalOceanBackendConfigWithCreds:
         config = self._get_config(record)
-        if include_creds:
-            return BaseDigitalOceanBackendConfigWithCreds.__response__.parse_obj(config)
+        return BaseDigitalOceanBackendConfigWithCreds.__response__.parse_obj(config)
+
+    def get_backend_config_without_creds(
+        self, record: BackendRecord
+    ) -> BaseDigitalOceanBackendConfig:
+        config = self._get_config(record)
         return BaseDigitalOceanBackendConfig.__response__.parse_obj(config)
 
     def get_backend(self, record: BackendRecord) -> BaseDigitalOceanBackend:
-        pass
+        raise NotImplementedError("Subclasses must implement get_backend")
 
     def _get_config(self, record: BackendRecord) -> BaseDigitalOceanConfig:
         return BaseDigitalOceanConfig.__response__(
