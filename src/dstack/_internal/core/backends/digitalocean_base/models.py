@@ -35,10 +35,6 @@ AnyBaseDigitalOceanBackendConfig = Union[
 ]
 
 
-class BaseDigitalOceanBackendFileConfigWithCreds(BaseDigitalOceanBackendConfig):
-    creds: Annotated[AnyBaseDigitalOceanCreds, Field(description="The credentials")]
-
-
 class BaseDigitalOceanStoredConfig(BaseDigitalOceanBackendConfig):
     pass
 
