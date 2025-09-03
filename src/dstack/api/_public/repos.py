@@ -1,15 +1,21 @@
 from pathlib import Path
-from typing import Optional, Union
+from typing import Literal, Optional, Union, overload
 
 from git import InvalidGitRepositoryError
 
 from dstack._internal.core.errors import ConfigurationError, ResourceNotExistsError
-from dstack._internal.core.models.repos import LocalRepo, RemoteRepo
+from dstack._internal.core.models.repos import (
+    LocalRepo,
+    RemoteRepo,
+    RemoteRepoCreds,
+    RepoHead,
+    RepoHeadWithCreds,
+)
 from dstack._internal.core.models.repos.base import Repo, RepoType
 from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.core.services.repos import (
     InvalidRepoCredentialsError,
-    get_local_repo_credentials,
+    get_repo_creds_and_default_branch,
     load_repo,
 )
 from dstack._internal.utils.crypto import generate_rsa_key_pair
@@ -34,6 +40,7 @@ class RepoCollection:
         repo: Repo,
         git_identity_file: Optional[PathLike] = None,
         oauth_token: Optional[str] = None,
+        creds: Optional[RemoteRepoCreds] = None,
     ):
         """
         Initializes the repo and configures its credentials in the project.
@@ -65,12 +72,13 @@ class RepoCollection:
             repo: The repo to initialize.
             git_identity_file: The private SSH key path for accessing the remote repo.
             oauth_token: The GitHub OAuth token to access the remote repo.
+            creds: Optional prepared repo credentials. If specified, both `git_identity_file`
+                and `oauth_token` are ignored.
         """
-        creds = None
-        if isinstance(repo, RemoteRepo):
+        if creds is None and isinstance(repo, RemoteRepo):
             assert repo.repo_url is not None
             try:
-                creds = get_local_repo_credentials(
+                creds, _ = get_repo_creds_and_default_branch(
                     repo_url=repo.repo_url,
                     identity_file=git_identity_file,
                     oauth_token=oauth_token,
@@ -174,6 +182,33 @@ class RepoCollection:
         #   shared creds in RepoModel)
         # TODO: add an API method with the same logic returning a bool value?
         return repo_head.repo_creds is not None
+
+    @overload
+    def get(self, repo_id: str, *, with_creds: Literal[False] = False) -> Optional[RepoHead]: ...
+
+    @overload
+    def get(self, repo_id: str, *, with_creds: Literal[True]) -> Optional[RepoHeadWithCreds]: ...
+
+    def get(
+        self, repo_id: str, *, with_creds: bool = False
+    ) -> Optional[Union[RepoHead, RepoHeadWithCreds]]:
+        """
+        Returns the repo by `repo_id`
+
+        Args:
+            repo_id: The repo ID.
+            with_creds: include repo credentials in the response.
+
+        Returns:
+            The repo or `None` if the repo is not found.
+        """
+        method = self._api_client.repos.get
+        if with_creds:
+            method = self._api_client.repos.get_with_creds
+        try:
+            return method(self._project, repo_id)
+        except ResourceNotExistsError:
+            return None
 
 
 def get_ssh_keypair(key_path: Optional[PathLike], dstack_key_path: Path) -> str:

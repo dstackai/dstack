@@ -1,5 +1,5 @@
 import argparse
-from typing import Literal, Optional, Union, overload
+from typing import Literal, Union, overload
 
 import git
 
@@ -8,7 +8,6 @@ from dstack._internal.core.errors import CLIError
 from dstack._internal.core.models.repos.local import LocalRepo
 from dstack._internal.core.models.repos.remote import GitRepoURL, RemoteRepo, RepoError
 from dstack._internal.core.models.repos.virtual import VirtualRepo
-from dstack._internal.core.services.repos import get_default_branch
 from dstack._internal.utils.path import PathLike
 from dstack.api._public import Client
 
@@ -41,22 +40,6 @@ def init_default_virtual_repo(api: Client) -> VirtualRepo:
     repo = VirtualRepo()
     api.repos.init(repo)
     return repo
-
-
-def get_repo_from_url(
-    repo_url: str, repo_branch: Optional[str] = None, repo_hash: Optional[str] = None
-) -> RemoteRepo:
-    if repo_branch is None and repo_hash is None:
-        repo_branch = get_default_branch(repo_url)
-        if repo_branch is None:
-            raise CLIError(
-                "Failed to automatically detect remote repo branch. Specify branch or hash."
-            )
-    return RemoteRepo.from_url(
-        repo_url=repo_url,
-        repo_branch=repo_branch,
-        repo_hash=repo_hash,
-    )
 
 
 @overload

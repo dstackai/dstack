@@ -17,7 +17,6 @@ from dstack._internal.cli.services.configurators.base import (
 from dstack._internal.cli.services.profile import apply_profile_args, register_profile_args
 from dstack._internal.cli.services.repos import (
     get_repo_from_dir,
-    get_repo_from_url,
     init_default_virtual_repo,
     is_git_repo_url,
     register_init_repo_args,
@@ -43,13 +42,19 @@ from dstack._internal.core.models.configurations import (
     ServiceConfiguration,
     TaskConfiguration,
 )
+from dstack._internal.core.models.repos import RepoHeadWithCreds
 from dstack._internal.core.models.repos.base import Repo
 from dstack._internal.core.models.repos.local import LocalRepo
+from dstack._internal.core.models.repos.remote import RemoteRepo, RemoteRepoCreds
 from dstack._internal.core.models.resources import CPUSpec
 from dstack._internal.core.models.runs import JobStatus, JobSubmission, RunSpec, RunStatus
 from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.core.services.diff import diff_models
-from dstack._internal.core.services.repos import load_repo
+from dstack._internal.core.services.repos import (
+    InvalidRepoCredentialsError,
+    get_repo_creds_and_default_branch,
+    load_repo,
+)
 from dstack._internal.utils.common import local_time
 from dstack._internal.utils.interpolator import InterpolatorError, VariablesInterpolator
 from dstack._internal.utils.logging import get_logger
@@ -524,15 +529,17 @@ class BaseRunConfigurator(
             return init_default_virtual_repo(api=self.api)
 
         repo: Optional[Repo] = None
+        repo_head: Optional[RepoHeadWithCreds] = None
         repo_branch: Optional[str] = configurator_args.repo_branch
         repo_hash: Optional[str] = configurator_args.repo_hash
+        repo_creds: Optional[RemoteRepoCreds] = None
+        git_identity_file: Optional[str] = configurator_args.git_identity_file
+        git_private_key: Optional[str] = None
+        oauth_token: Optional[str] = configurator_args.gh_token
         # Should we (re)initialize the repo?
         # If any Git credentials provided, we reinitialize the repo, as the user may have provided
         # updated credentials.
-        init = (
-            configurator_args.git_identity_file is not None
-            or configurator_args.gh_token is not None
-        )
+        init = git_identity_file is not None or oauth_token is not None
 
         url: Optional[str] = None
         local_path: Optional[Path] = None
@@ -565,15 +572,15 @@ class BaseRunConfigurator(
             local_path = Path.cwd()
             legacy_local_path = True
         if url:
-            repo = get_repo_from_url(repo_url=url, repo_branch=repo_branch, repo_hash=repo_hash)
-            if not self.api.repos.is_initialized(repo, by_user=True):
-                init = True
+            # "master" is a dummy value, we'll fetch the actual default branch later
+            repo = RemoteRepo.from_url(repo_url=url, repo_branch="master")
+            repo_head = self.api.repos.get(repo_id=repo.repo_id, with_creds=True)
         elif local_path:
             if legacy_local_path:
                 if repo_config := config_manager.get_repo_config(local_path):
                     repo = load_repo(repo_config)
-                    # allow users with legacy configurations use shared repo creds
-                    if self.api.repos.is_initialized(repo, by_user=False):
+                    repo_head = self.api.repos.get(repo_id=repo.repo_id, with_creds=True)
+                    if repo_head is not None:
                         warn(
                             "The repo is not specified but found and will be used in the run\n"
                             "Future versions will not load repos automatically\n"
@@ -600,20 +607,55 @@ class BaseRunConfigurator(
                     )
                 local: bool = configurator_args.local
                 repo = get_repo_from_dir(local_path, local=local)
-                if not self.api.repos.is_initialized(repo, by_user=True):
-                    init = True
+                repo_head = self.api.repos.get(repo_id=repo.repo_id, with_creds=True)
+            if isinstance(repo, RemoteRepo):
+                repo_branch = repo.run_repo_data.repo_branch
+                repo_hash = repo.run_repo_data.repo_hash
         else:
             assert False, "should not reach here"
 
         if repo is None:
             return init_default_virtual_repo(api=self.api)
 
+        if isinstance(repo, RemoteRepo):
+            assert repo.repo_url is not None
+
+            if repo_head is not None and repo_head.repo_creds is not None:
+                if git_identity_file is None and oauth_token is None:
+                    git_private_key = repo_head.repo_creds.private_key
+                    oauth_token = repo_head.repo_creds.oauth_token
+            else:
+                init = True
+
+            try:
+                repo_creds, default_repo_branch = get_repo_creds_and_default_branch(
+                    repo_url=repo.repo_url,
+                    identity_file=git_identity_file,
+                    private_key=git_private_key,
+                    oauth_token=oauth_token,
+                )
+            except InvalidRepoCredentialsError as e:
+                raise CLIError(*e.args) from e
+
+            if repo_branch is None and repo_hash is None:
+                repo_branch = default_repo_branch
+                if repo_branch is None:
+                    raise CLIError(
+                        "Failed to automatically detect remote repo branch."
+                        " Specify branch or hash."
+                    )
+            repo = RemoteRepo.from_url(
+                repo_url=repo.repo_url, repo_branch=repo_branch, repo_hash=repo_hash
+            )
+
         if init:
             self.api.repos.init(
                 repo=repo,
-                git_identity_file=configurator_args.git_identity_file,
-                oauth_token=configurator_args.gh_token,
+                git_identity_file=git_identity_file,
+                oauth_token=oauth_token,
+                creds=repo_creds,
             )
+
         if isinstance(repo, LocalRepo):
             warn(
                 f"{repo.repo_dir} is a local repo\n"
