@@ -57,6 +57,7 @@ from dstack._internal.utils.nested_list import NestedList, NestedListItem
 from dstack._internal.utils.path import is_absolute_posix_path
 from dstack.api._public.repos import get_ssh_keypair
 from dstack.api._public.runs import Run
+from dstack.api.server import APIClient
 from dstack.api.utils import load_profile
 
 _KNOWN_AMD_GPUS = {gpu.name.lower() for gpu in gpuhunt.KNOWN_AMD_GPUS}
@@ -222,6 +223,9 @@ class BaseRunConfigurator(
                         format_date=local_time,
                     )
                 )
+
+                _warn_fleet_autocreated(self.api.client, run)
+
                 console.print(
                     f"\n[code]{run.name}[/] provisioning completed [secondary]({run.status.value})[/]"
                 )
@@ -865,3 +869,17 @@ def render_run_spec_diff(old_spec: RunSpec, new_spec: RunSpec) -> Optional[str]:
             item = NestedListItem(spec_field.replace("_", " ").capitalize())
         nested_list.children.append(item)
     return nested_list.render()
+
+
+def _warn_fleet_autocreated(api: APIClient, run: Run):
+    if run._run.fleet is None:
+        return
+    fleet = api.fleets.get(project_name=run._project, name=run._run.fleet.name)
+    if not fleet.spec.autocreated:
+        return
+    warn(
+        f"\nThe run is using automatically created fleet [code]{fleet.name}[/code].\n"
+        "Future [code]dstack[/code] versions will stop creating fleets automatically.\n"
+        "Create the fleet explicitly to remove this warning and prepare for upcoming changes.\n"
+        "Learn more about fleets: https://dstack.ai/docs/concepts/fleets/"
+    )
