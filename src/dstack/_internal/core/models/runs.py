@@ -519,10 +519,16 @@ class RunStatus(str, Enum):
         return self in self.finished_statuses()
 
 
+class RunFleet(CoreModel):
+    id: UUID4
+    name: str
+
+
 class Run(CoreModel):
     id: UUID4
     project_name: str
     user: str
+    fleet: Optional[RunFleet] = None
     submitted_at: datetime
     last_processed_at: datetime
     status: RunStatus

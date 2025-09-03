@@ -49,6 +49,7 @@ from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.services.runs import run_model_to_run
 from dstack._internal.server.testing.common import (
     create_backend,
+    create_fleet,
     create_gateway,
     create_gateway_compute,
     create_instance,
@@ -337,6 +338,7 @@ def get_dev_env_run_dict(
         "id": run_id,
         "project_name": project_name,
         "user": username,
+        "fleet": None,
         "submitted_at": submitted_at,
         "last_processed_at": last_processed_at,
         "status": "submitted",
@@ -558,6 +560,7 @@ class TestListRuns:
     async def test_lists_runs(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
+        fleet = await create_fleet(session=session, project=project)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
@@ -571,6 +574,7 @@ class TestListRuns:
             project=project,
             repo=repo,
             user=user,
+            fleet=fleet,
             submitted_at=run1_submitted_at,
         )
         run1_spec = RunSpec.parse_raw(run1.run_spec)
@@ -587,6 +591,7 @@ class TestListRuns:
             project=project,
             repo=repo,
             user=user,
+            fleet=fleet,
             submitted_at=run2_submitted_at,
         )
         run2_spec = RunSpec.parse_raw(run2.run_spec)
@@ -601,6 +606,10 @@ class TestListRuns:
                 "id": str(run1.id),
                 "project_name": project.name,
                 "user": user.name,
+                "fleet": {
+                    "id": str(fleet.id),
+                    "name": fleet.name,
+                },
                 "submitted_at": run1_submitted_at.isoformat(),
                 "last_processed_at": run1_submitted_at.isoformat(),
                 "status": "submitted",
@@ -660,6 +669,10 @@ class TestListRuns:
                 "id": str(run2.id),
                 "project_name": project.name,
                 "user": user.name,
+                "fleet": {
+                    "id": str(fleet.id),
+                    "name": fleet.name,
+                },
                 "submitted_at": run2_submitted_at.isoformat(),
                 "last_processed_at": run2_submitted_at.isoformat(),
                 "status": "submitted",
@@ -784,6 +797,7 @@ class TestListRuns:
                 "id": str(run.id),
                 "project_name": project.name,
                 "user": user.name,
+                "fleet": None,
                 "submitted_at": run_submitted_at.isoformat(),
                 "last_processed_at": run_submitted_at.isoformat(),
                 "status": "submitted",

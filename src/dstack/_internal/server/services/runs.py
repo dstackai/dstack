@@ -43,6 +43,7 @@ from dstack._internal.core.models.runs import (
     JobTerminationReason,
     ProbeSpec,
     Run,
+    RunFleet,
     RunPlan,
     RunSpec,
     RunStatus,
@@ -58,6 +59,7 @@ from dstack._internal.core.services.diff import diff_models
 from dstack._internal.server import settings
 from dstack._internal.server.db import get_db
 from dstack._internal.server.models import (
+    FleetModel,
     JobModel,
     ProbeModel,
     ProjectModel,
@@ -227,6 +229,7 @@ async def list_projects_run_models(
         select(RunModel)
         .where(*filters)
         .options(joinedload(RunModel.user).load_only(UserModel.name))
+        .options(joinedload(RunModel.fleet).load_only(FleetModel.id, FleetModel.name))
         .options(selectinload(RunModel.jobs).joinedload(JobModel.probes))
         .order_by(*order_by)
         .limit(limit)
@@ -269,6 +272,7 @@ async def get_run_by_name(
             RunModel.deleted == False,
         )
         .options(joinedload(RunModel.user))
+        .options(joinedload(RunModel.fleet).load_only(FleetModel.id, FleetModel.name))
         .options(selectinload(RunModel.jobs).joinedload(JobModel.probes))
     )
     run_model = res.scalar()
@@ -289,6 +293,7 @@ async def get_run_by_id(
             RunModel.id == run_id,
         )
         .options(joinedload(RunModel.user))
+        .options(joinedload(RunModel.fleet).load_only(FleetModel.id, FleetModel.name))
         .options(selectinload(RunModel.jobs).joinedload(JobModel.probes))
     )
     run_model = res.scalar()
@@ -709,10 +714,12 @@ def run_model_to_run(
 
     status_message = _get_run_status_message(run_model)
     error = _get_run_error(run_model)
+    fleet = _get_run_fleet(run_model)
     run = Run(
         id=run_model.id,
         project_name=run_model.project.name,
         user=run_model.user.name,
+        fleet=fleet,
         submitted_at=run_model.submitted_at,
         last_processed_at=run_model.last_processed_at,
         status=run_model.status,
@@ -819,6 +826,15 @@ def _get_run_error(run_model: RunModel) -> Optional[str]:
     if run_model.termination_reason is None:
         return None
     return run_model.termination_reason.to_error()
+
+
+def _get_run_fleet(run_model: RunModel) -> Optional[RunFleet]:
+    if run_model.fleet is None:
+        return None
+    return RunFleet(
+        id=run_model.fleet.id,
+        name=run_model.fleet.name,
+    )
 
 
 async def _get_pool_offers(
