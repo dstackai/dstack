@@ -30,7 +30,6 @@ MAX_INSTANCE_NAME_LEN = 60
 # Setup commands for DigitalOcean instances
 SETUP_COMMANDS = [
     "sudo ufw delete limit ssh",
-    "sudo ufw allow ssh",
 ]
 
 DOCKER_INSTALL_COMMANDS = [

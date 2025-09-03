@@ -4,6 +4,7 @@ import re
 import string
 import threading
 from abc import ABC, abstractmethod
+from collections.abc import Iterable
 from functools import lru_cache
 from pathlib import Path
 from typing import Dict, List, Literal, Optional
@@ -45,6 +46,7 @@ logger = get_logger(__name__)
 
 DSTACK_SHIM_BINARY_NAME = "dstack-shim"
 DSTACK_RUNNER_BINARY_NAME = "dstack-runner"
+DEFAULT_PRIVATE_SUBNETS = ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16")
 
 GoArchType = Literal["amd64", "arm64"]
 
@@ -507,12 +509,16 @@ def get_user_data(
     base_path: Optional[PathLike] = None,
     bin_path: Optional[PathLike] = None,
     backend_shim_env: Optional[Dict[str, str]] = None,
+    skip_firewall_setup: bool = False,
+    firewall_allow_from_subnets: Iterable[str] = DEFAULT_PRIVATE_SUBNETS,
 ) -> str:
     shim_commands = get_shim_commands(
         authorized_keys=authorized_keys,
         base_path=base_path,
         bin_path=bin_path,
         backend_shim_env=backend_shim_env,
+        skip_firewall_setup=skip_firewall_setup,
+        firewall_allow_from_subnets=firewall_allow_from_subnets,
     )
     commands = (backend_specific_commands or []) + shim_commands
     return get_cloud_config(
@@ -554,8 +560,13 @@ def get_shim_commands(
     bin_path: Optional[PathLike] = None,
     backend_shim_env: Optional[Dict[str, str]] = None,
     arch: Optional[str] = None,
+    skip_firewall_setup: bool = False,
+    firewall_allow_from_subnets: Iterable[str] = DEFAULT_PRIVATE_SUBNETS,
 ) -> List[str]:
-    commands = get_setup_cloud_instance_commands()
+    commands = get_setup_cloud_instance_commands(
+        skip_firewall_setup=skip_firewall_setup,
+        firewall_allow_from_subnets=firewall_allow_from_subnets,
+    )
     commands += get_shim_pre_start_commands(
         base_path=base_path,
         bin_path=bin_path,
@@ -638,8 +649,11 @@ def get_dstack_shim_download_url(arch: Optional[str] = None) -> str:
     return url_template.format(version=version, arch=arch)
 
 
-def get_setup_cloud_instance_commands() -> list[str]:
-    return [
+def get_setup_cloud_instance_commands(
+    skip_firewall_setup: bool,
+    firewall_allow_from_subnets: Iterable[str],
+) -> list[str]:
+    commands = [
         # Workaround for https://github.com/NVIDIA/nvidia-container-toolkit/issues/48
         # Attempts to patch /etc/docker/daemon.json while keeping any custom settings it may have.
         (
@@ -653,6 +667,16 @@ def get_setup_cloud_instance_commands() -> list[str]:
             "'"
         ),
     ]
+    if not skip_firewall_setup:
+        for subnet in firewall_allow_from_subnets:
+            commands.append(f"ufw allow from {subnet}")
+        commands += [
+            "ufw allow ssh",
+            "ufw default deny incoming",
+            "ufw default allow outgoing",
+            "ufw --force enable",
+        ]
+    return commands
 
 
 def get_shim_pre_start_commands(

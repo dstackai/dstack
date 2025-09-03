@@ -2,6 +2,7 @@ import concurrent.futures
 import json
 import threading
 from collections import defaultdict
+from dataclasses import dataclass
 from typing import Callable, Dict, List, Literal, Optional, Tuple
 
 import google.api_core.exceptions
@@ -285,16 +286,18 @@ class GCPCompute(
                 )
             raise NoCapacityError()
 
+        image = _get_image(
+            instance_type_name=instance_offer.instance.name,
+            cuda=len(instance_offer.instance.resources.gpus) > 0,
+        )
+
         for zone in zones:
             request = compute_v1.InsertInstanceRequest()
             request.zone = zone
             request.project = self.config.project_id
             request.instance_resource = gcp_resources.create_instance_struct(
                 disk_size=disk_size,
-                image_id=_get_image_id(
-                    instance_type_name=instance_offer.instance.name,
-                    cuda=len(instance_offer.instance.resources.gpus) > 0,
-                ),
+                image_id=image.id,
                 machine_type=instance_offer.instance.name,
                 accelerators=gcp_resources.get_accelerators(
                     project_id=self.config.project_id,
@@ -305,6 +308,7 @@ class GCPCompute(
                 user_data=_get_user_data(
                     authorized_keys=authorized_keys,
                     instance_type_name=instance_offer.instance.name,
+                    is_ufw_installed=image.is_ufw_installed,
                 ),
                 authorized_keys=authorized_keys,
                 labels=labels,
@@ -889,24 +893,41 @@ def _get_vpc_subnet(
     )
 
 
-def _get_image_id(instance_type_name: str, cuda: bool) -> str:
+@dataclass
+class GCPImage:
+    id: str
+    is_ufw_installed: bool
+
+
+def _get_image(instance_type_name: str, cuda: bool) -> GCPImage:
     if instance_type_name == "a3-megagpu-8g":
         image_name = "dstack-a3mega-5"
+        is_ufw_installed = False
     elif instance_type_name in ["a3-edgegpu-8g", "a3-highgpu-8g"]:
-        return "projects/cos-cloud/global/images/cos-105-17412-535-78"
+        return GCPImage(
+            id="projects/cos-cloud/global/images/cos-105-17412-535-78",
+            is_ufw_installed=False,
+        )
     elif cuda:
         image_name = f"dstack-cuda-{version.base_image}"
+        is_ufw_installed = True
     else:
         image_name = f"dstack-{version.base_image}"
+        is_ufw_installed = True
     image_name = image_name.replace(".", "-")
-    return f"projects/dstack/global/images/{image_name}"
+    return GCPImage(
+        id=f"projects/dstack/global/images/{image_name}",
+        is_ufw_installed=is_ufw_installed,
+    )
 
 
 def _get_gateway_image_id() -> str:
     return "projects/ubuntu-os-cloud/global/images/ubuntu-2204-jammy-v20230714"
 
 
-def _get_user_data(authorized_keys: List[str], instance_type_name: str) -> str:
+def _get_user_data(
+    authorized_keys: List[str], instance_type_name: str, is_ufw_installed: bool
+) -> str:
     base_path = None
     bin_path = None
     backend_shim_env = None
@@ -929,6 +950,9 @@ def _get_user_data(authorized_keys: List[str], instance_type_name: str) -> str:
         base_path=base_path,
         bin_path=bin_path,
         backend_shim_env=backend_shim_env,
+        # Instance-level firewall is optional on GCP. The main protection comes from GCP firewalls.
+        # So only set up instance-level firewall if ufw is available.
+        skip_firewall_setup=not is_ufw_installed,
     )
 
 
