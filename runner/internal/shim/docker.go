@@ -982,7 +982,7 @@ func bindPorts(ports []int) nat.PortMap {
 	for _, port := range ports {
 		portMap[nat.Port(fmt.Sprintf("%d/tcp", port))] = []nat.PortBinding{
 			{
-				HostIP:   "0.0.0.0",
+				HostIP:   "127.0.0.1",
 				HostPort: "", // use ephemeral port from ip_local_port_range
 			},
 		}

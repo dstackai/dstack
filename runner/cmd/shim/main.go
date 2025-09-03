@@ -240,7 +240,7 @@ func start(ctx context.Context, args shim.CLIArgs, serviceMode bool) (err error)
 		}
 	}
 
-	address := fmt.Sprintf(":%d", args.Shim.HTTPPort)
+	address := fmt.Sprintf("localhost:%d", args.Shim.HTTPPort)
 	shimServer := api.NewShimServer(ctx, address, Version, dockerRunner, dcgmExporter, dcgmWrapper)
 
 	defer func() {
