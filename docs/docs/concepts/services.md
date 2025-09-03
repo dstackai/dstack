@@ -115,6 +115,9 @@ If [authorization](#authorization) is not disabled, the service endpoint require
 
 ## Configuration options
 
+!!! info "No commands"
+    If `commands` are not specified, `dstack` runs `image`’s entrypoint (or fails if none is set).
+
 ### Replicas and scaling
 
 By default, `dstack` runs a single replica of the service.
@@ -578,13 +581,28 @@ resources:
 ??? info "System environment variables"
     The following environment variables are available in any run by default:
     
-    | Name                    | Description                             |
-    |-------------------------|-----------------------------------------|
-    | `DSTACK_RUN_NAME`       | The name of the run                     |
-    | `DSTACK_REPO_ID`        | The ID of the repo                      |
-    | `DSTACK_GPUS_NUM`       | The total number of GPUs in the run     |
+    | Name                    | Description                                      |
+    |-------------------------|--------------------------------------------------|
+    | `DSTACK_RUN_NAME`       | The name of the run                              |
+    | `DSTACK_REPO_ID`        | The ID of the repo                               |
+    | `DSTACK_GPUS_NUM`       | The total number of GPUs in the run              |
+    | `DSTACK_WORKING_DIR`    | The working directory of the run                 |
+    | `DSTACK_REPO_DIR`       | The directory where the repo is mounted (if any) |
 
 <!-- TODO: Ellaborate on using environment variables in `registry_auth` -->
+
+### Working directory
+
+If `working_dir` is not specified, it defaults to `/workflow`.
+
+!!! info "No commands"
+    If you’re using a custom `image` without `commands`, then `working_dir` is taken from `image`.
+
+The `working_dir` must be an absolute path. The tilde (`~`) is supported (e.g., `~/my-working-dir`).
+
+<!-- TODO: In a future version, the default working directory will be taken from `image`. -->
+
+<!-- TODO: Elaborate on `entrypoint` -->
 
 ### Files
 
@@ -652,7 +670,7 @@ resources:
 
 </div>
 
-??? info "Upload limit and excludes"
+??? info "File size"
     Whether its a file or folder, each entry is limited to 2MB. To avoid exceeding this limit, make sure to exclude unnecessary files
     by listing it via `.gitignore` or `.dstackignore`.
     The 2MB upload limit can be increased by setting the `DSTACK_SERVER_CODE_UPLOAD_LIMIT` environment variable.
@@ -696,14 +714,46 @@ When you run it, `dstack` fetches the repo on the instance, applies your local c
 
 The local path can be either relative to the configuration file or absolute.
 
-??? info "Path"
-    Currently, `dstack` always mounts the repo to `/workflow` inside the container. It's the default working directory. 
-    Starting with the next release, it will be possible to specify a custom container path.
+??? info "Repo directory"
+    By default, `dstack` mounts the repo to `/workflow` (the default working directory).
 
-??? info "Local diff limit and excludes"
-    The local diff size is limited to 2MB. To avoid exceeding this limit, exclude unnecessary files
-    via `.gitignore` or `.dstackignore`.
-    The 2MB local diff limit can be increased by setting the `DSTACK_SERVER_CODE_UPLOAD_LIMIT` environment variable.
+    <!-- TODO: In a future version, the default working directory will come from the image, so this should be revisited. -->
+    
+    You can override the repo directory using either a relative or an absolute path:
+
+    <div editor-title="examples/.dstack.yml"> 
+
+    ```yaml
+    type: service
+    name: llama-2-7b-service
+
+    repos:
+      # Mounts the parent directory of `examples` (must be a Git repo)
+      #   to `/my-repo`
+      - ..:/my-repo
+
+    python: 3.12
+
+    env:
+      - HF_TOKEN
+      - MODEL=NousResearch/Llama-2-7b-chat-hf
+    commands:
+      - uv pip install vllm
+      - python -m vllm.entrypoints.openai.api_server --model $MODEL --port 8000
+    port: 8000
+
+    resources:
+      gpu: 24GB
+    ```
+
+    </div>
+
+    If the path is relative, it is resolved against `working_dir`.
+
+??? info "Repo size"
+    The repo size is not limited. However, local changes are limited to 2MB. 
+    To avoid exceeding this limit, exclude unnecessary files using `.gitignore` or `.dstackignore`.
+    You can increase the 2MB limit by setting the `DSTACK_SERVER_CODE_UPLOAD_LIMIT` environment variable.
 
 ??? info "Repo URL"
 
