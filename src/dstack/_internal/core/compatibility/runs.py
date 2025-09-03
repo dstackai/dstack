@@ -104,6 +104,8 @@ def get_run_spec_excludes(run_spec: RunSpec) -> IncludeExcludeDictType:
 
     if run_spec.repo_dir in [None, LEGACY_REPO_DIR]:
         spec_excludes["repo_dir"] = True
+    elif run_spec.repo_dir == "." and configuration.working_dir in [None, LEGACY_REPO_DIR, "."]:
+        spec_excludes["repo_dir"] = True
 
     if configuration.fleets is None:
         configuration_excludes["fleets"] = True

@@ -97,7 +97,8 @@ class BaseRunConfigurator(
             # is not set (emulate pre-0.19.27 JobConfigutor logic), otherwise fall back to
             # `/workflow`.
             if isinstance(conf, DevEnvironmentConfiguration) or conf.commands:
-                conf.working_dir = LEGACY_REPO_DIR
+                # relative path for compatibility with pre-0.19.27 servers
+                conf.working_dir = "."
                 warn(
                     "[code]working_dir[/code] is not set."
                     f" Using legacy working directory [code]{LEGACY_REPO_DIR}[/code]\n\n"
@@ -117,6 +118,12 @@ class BaseRunConfigurator(
                 f"To keep using legacy working directory, set"
                 f" [code]working_dir[/code] to [code]{legacy_working_dir}[/code]\n"
             )
+        else:
+            # relative path for compatibility with pre-0.19.27 servers
+            try:
+                conf.working_dir = str(PurePosixPath(working_dir).relative_to(LEGACY_REPO_DIR))
+            except ValueError:
+                pass
 
         if conf.repos and conf.repos[0].path is None:
             warn(
