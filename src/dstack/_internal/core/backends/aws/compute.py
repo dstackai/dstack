@@ -292,7 +292,12 @@ class AWSCompute(
                         image_id=image_id,
                         instance_type=instance_offer.instance.name,
                         iam_instance_profile=self.config.iam_instance_profile,
-                        user_data=get_user_data(authorized_keys=instance_config.get_public_keys()),
+                        user_data=get_user_data(
+                            authorized_keys=instance_config.get_public_keys(),
+                            # Custom OS images may lack ufw, so don't attempt to set up the firewall.
+                            # Rely on security groups and the image's built-in firewall rules instead.
+                            skip_firewall_setup=self.config.os_images is not None,
+                        ),
                         tags=aws_resources.make_tags(tags),
                         security_group_id=security_group_id,
                         spot=instance_offer.instance.resources.spot,
