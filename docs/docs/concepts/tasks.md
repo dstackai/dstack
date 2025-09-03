@@ -69,6 +69,9 @@ Launching `axolotl-train`...
 
 ## Configuration options
 
+!!! info "No commands"
+    If `commands` are not specified, `dstack` runs `image`’s entrypoint (or fails if none is set).
+
 ### Ports
 
 A task can configure ports. In this case, if the task is running an application on a port, `dstack apply` 
@@ -456,9 +459,24 @@ If you don't assign a value to an environment variable (see `HF_TOKEN` above),
     | `DSTACK_NODES_NUM`      | The number of nodes in the run                                   |
     | `DSTACK_GPUS_PER_NODE`  | The number of GPUs per node                                      |
     | `DSTACK_NODE_RANK`      | The rank of the node                                             |
-    | `DSTACK_MASTER_NODE_IP` | The internal IP address of the master node                          |
+    | `DSTACK_MASTER_NODE_IP` | The internal IP address of the master node                       |
     | `DSTACK_NODES_IPS`      | The list of internal IP addresses of all nodes delimited by "\n" |
     | `DSTACK_MPI_HOSTFILE`   | The path to a pre-populated MPI hostfile                         |
+    | `DSTACK_WORKING_DIR`    | The working directory of the run                                 |
+    | `DSTACK_REPO_DIR`       | The directory where the repo is mounted (if any)                 |
+
+### Working directory
+
+If `working_dir` is not specified, it defaults to `/workflow`.
+
+!!! info "No commands"
+    If you’re using a custom `image` without `commands`, then `working_dir` is taken from `image`.
+
+The `working_dir` must be an absolute path. The tilde (`~`) is supported (e.g., `~/my-working-dir`).
+
+<!-- TODO: In a future version, the default working directory will be taken from `image`. -->
+
+<!-- TODO: Elaborate on `entrypoint` -->
 
 ### Files
 
@@ -534,7 +552,7 @@ resources:
 
 </div>
 
-??? info "Upload limit and excludes"
+??? info "File size"
     Whether its a file or folder, each entry is limited to 2MB. To avoid exceeding this limit, make sure to exclude unnecessary files
     by listing it via `.gitignore` or `.dstackignore`.
     The 2MB upload limit can be increased by setting the `DSTACK_SERVER_CODE_UPLOAD_LIMIT` environment variable.
@@ -583,14 +601,51 @@ When you run it, `dstack` fetches the repo on the instance, applies your local c
 
 The local path can be either relative to the configuration file or absolute.
 
-??? info "Path"
-    Currently, `dstack` always mounts the repo to `/workflow` inside the container. It's the default working directory. 
-    Starting with the next release, it will be possible to specify a custom container path.
+??? info "Repo directory"
+    By default, `dstack` mounts the repo to `/workflow` (the default working directory).
 
-??? info "Local diff limit and excludes"
-    The local diff size is limited to 2MB. To avoid exceeding this limit, exclude unnecessary files
-    via `.gitignore` or `.dstackignore`.
-    The 2MB local diff limit can be increased by setting the `DSTACK_SERVER_CODE_UPLOAD_LIMIT` environment variable.
+    <!-- TODO: In a future version, the default working directory will come from the image, so this should be revisited. -->
+    
+    You can override the repo directory using either a relative or an absolute path:
+
+    <div editor-title="examples/.dstack.yml"> 
+
+    ```yaml
+    type: task
+    name: trl-sft    
+
+    repos:
+      # Mounts the parent directory of `examples` (must be a Git repo)
+      #   to `/my-repo`
+      - ..:/my-repo
+
+    python: 3.12
+
+    env:
+      - HF_TOKEN
+      - HF_HUB_ENABLE_HF_TRANSFER=1
+      - MODEL=Qwen/Qwen2.5-0.5B
+      - DATASET=stanfordnlp/imdb
+
+    commands:
+      - uv pip install trl
+      - | 
+        trl sft \
+          --model_name_or_path $MODEL --dataset_name $DATASET
+          --num_processes $DSTACK_GPUS_PER_NODE
+
+    resources:
+      gpu: H100:1
+    ```
+
+    </div>
+
+    If the path is relative, it is resolved against [working directory](#working-directory).
+
+??? info "Repo size"
+    The repo size is not limited. However, local changes are limited to 2MB. 
+    To avoid exceeding this limit, exclude unnecessary files using `.gitignore` or `.dstackignore`.
+    You can increase the 2MB limit by setting the `DSTACK_SERVER_CODE_UPLOAD_LIMIT` environment variable.
 
 ??? info "Repo URL"
     Sometimes you may want to mount a Git repo without cloning it locally. In this case, simply provide a URL in `repos`:
