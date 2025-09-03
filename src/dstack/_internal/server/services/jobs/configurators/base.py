@@ -218,7 +218,15 @@ class JobConfigurator(ABC):
         ):
             return []
         return [
-            f"uv venv -q --prompt $DSTACK_RUN_NAME --seed -p {self._python()} {DSTACK_DIR}/venv",
+            # `uv` may emit:
+            # > warning: `VIRTUAL_ENV=/dstack/venv` does not match the project environment path
+            # > `.venv` and will be ignored; use `--active` to target the active environment
+            # > instead
+            # Safe to ignore, reusing dstack's venv for `uv` is discouraged (it should only be
+            # used for legacy `pip`-based configurations). `--no-active` suppresses the warning.
+            # Alternatively, the user can call `deactivate` once before using `uv`.
+            # If the user really wants to reuse dstack's venv, they must spefify `--active`.
+            f"uv venv -q --prompt dstack -p {self._python()} --seed {DSTACK_DIR}/venv",
             f"echo '. {DSTACK_DIR}/venv/bin/activate' >> {DSTACK_PROFILE_PATH}",
             f". {DSTACK_DIR}/venv/bin/activate",
         ]

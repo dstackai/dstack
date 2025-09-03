@@ -110,7 +110,7 @@ def get_dev_env_run_plan_dict(
             "-i",
             "-c",
             (
-                "uv venv -q --prompt $DSTACK_RUN_NAME --seed -p 3.13 /dstack/venv"
+                "uv venv -q --prompt dstack -p 3.13 --seed /dstack/venv"
                 " && echo '. /dstack/venv/bin/activate' >> /dstack/profile"
                 " && . /dstack/venv/bin/activate"
                 " && (echo 'pip install ipykernel...'"
@@ -314,7 +314,7 @@ def get_dev_env_run_dict(
             "-i",
             "-c",
             (
-                "uv venv -q --prompt $DSTACK_RUN_NAME --seed -p 3.13 /dstack/venv"
+                "uv venv -q --prompt dstack -p 3.13 --seed /dstack/venv"
                 " && echo '. /dstack/venv/bin/activate' >> /dstack/profile"
                 " && . /dstack/venv/bin/activate"
                 " && (echo 'pip install ipykernel...'"

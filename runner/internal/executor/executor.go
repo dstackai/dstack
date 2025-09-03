@@ -394,6 +394,7 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 		"DSTACK_RUN_NAME":       ex.run.RunSpec.RunName,
 		"DSTACK_REPO_ID":        ex.run.RunSpec.RepoId,
 		"DSTACK_REPO_DIR":       ex.repoDir,
+		"DSTACK_WORKING_DIR":    ex.jobWorkingDir,
 		"DSTACK_NODES_IPS":      strings.Join(ex.clusterInfo.JobIPs, "\n"),
 		"DSTACK_MASTER_NODE_IP": ex.clusterInfo.MasterJobIP,
 		"DSTACK_NODE_RANK":      strconv.Itoa(node_rank),
@@ -863,6 +864,9 @@ func writeDstackProfile(env map[string]string, pth string) error {
 		if _, err = file.WriteString(line); err != nil {
 			return err
 		}
+	}
+	if _, err = file.WriteString("cd \"$DSTACK_WORKING_DIR\"\n"); err != nil {
+		return err
 	}
 	if err = os.Chmod(pth, 0o644); err != nil {
 		return err
