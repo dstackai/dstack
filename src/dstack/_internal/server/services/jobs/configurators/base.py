@@ -318,14 +318,23 @@ class JobConfigurator(ABC):
 
     def _working_dir(self) -> Optional[str]:
         """
-        Returns absolute path or None
+        Returns path or None
+
         None means the default working directory taken from the image
+
+        Currently, for compatibility with pre-0.19.27 runners, the path may be relative.
+        Future versions should return only absolute paths
         """
         working_dir = self.run_spec.configuration.working_dir
-        if working_dir is None or is_absolute_posix_path(working_dir):
+        if working_dir is None:
             return working_dir
-        # Legacy configuration; relative working_dir is deprecated
-        return str(PurePosixPath(LEGACY_REPO_DIR) / working_dir)
+        # Return a relative path if possible
+        if is_absolute_posix_path(working_dir):
+            try:
+                return str(PurePosixPath(working_dir).relative_to(LEGACY_REPO_DIR))
+            except ValueError:
+                pass
+        return working_dir
 
     def _python(self) -> str:
         if self.run_spec.configuration.python is not None:
