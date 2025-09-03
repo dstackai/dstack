@@ -196,12 +196,12 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 
 	ex.setJobCredentials(ctx)
 
-	if err := ex.setJobWorkingDir(ctx); err != nil {
+	if err := ex.prepareJobWorkingDir(ctx); err != nil {
 		ex.SetJobStateWithTerminationReason(
 			ctx,
 			types.JobStateFailed,
 			types.TerminationReasonExecutorError,
-			fmt.Sprintf("Failed to set the working dir (%s)", err),
+			fmt.Sprintf("Failed to set up the working dir (%s)", err),
 		)
 		return gerrors.Wrap(err)
 	}
@@ -352,7 +352,7 @@ func (ex *RunExecutor) setJobCredentials(ctx context.Context) {
 	log.Trace(ctx, "Job credentials", "uid", ex.jobUid, "gid", ex.jobGid, "home", ex.jobHomeDir)
 }
 
-func (ex *RunExecutor) setJobWorkingDir(ctx context.Context) error {
+func (ex *RunExecutor) prepareJobWorkingDir(ctx context.Context) error {
 	var err error
 	if ex.jobSpec.WorkingDir == nil {
 		ex.jobWorkingDir, err = os.Getwd()
@@ -369,6 +369,9 @@ func (ex *RunExecutor) setJobWorkingDir(ctx context.Context) error {
 		}
 	}
 	log.Trace(ctx, "Job working dir", "path", ex.jobWorkingDir)
+	if err := common.MkdirAll(ctx, ex.jobWorkingDir, ex.jobUid, ex.jobGid); err != nil {
+		return gerrors.Wrap(err)
+	}
 	return nil
 }
 
