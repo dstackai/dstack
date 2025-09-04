@@ -6,12 +6,12 @@ from typing import Optional
 from dstack._internal.cli.commands import BaseCommand
 from dstack._internal.cli.services.repos import (
     get_repo_from_dir,
-    get_repo_from_url,
     is_git_repo_url,
     register_init_repo_args,
 )
 from dstack._internal.cli.utils.common import configure_logging, confirm_ask, console, warn
 from dstack._internal.core.errors import ConfigurationError
+from dstack._internal.core.models.repos.remote import RemoteRepo
 from dstack._internal.core.services.configs import ConfigManager
 from dstack.api import Client
 
@@ -101,7 +101,7 @@ class InitCommand(BaseCommand):
         if repo_url is not None:
             # Dummy repo branch to avoid autodetection that fails on private repos.
             # We don't need branch/hash for repo_id anyway.
-            repo = get_repo_from_url(repo_url, repo_branch="master")
+            repo = RemoteRepo.from_url(repo_url, repo_branch="master")
         elif repo_path is not None:
             repo = get_repo_from_dir(repo_path, local=local)
         else:

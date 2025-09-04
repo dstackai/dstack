@@ -50,6 +50,13 @@ def make_ssh_command_for_git(identity_file: PathLike) -> str:
     )
 
 
+def make_git_env(*, identity_file: Optional[PathLike] = None) -> dict[str, str]:
+    env: dict[str, str] = {"GIT_TERMINAL_PROMPT": "0"}
+    if identity_file is not None:
+        env["GIT_SSH_COMMAND"] = make_ssh_command_for_git(identity_file)
+    return env
+
+
 def try_ssh_key_passphrase(identity_file: PathLike, passphrase: str = "") -> bool:
     ssh_keygen = find_ssh_util("ssh-keygen")
     if ssh_keygen is None:
