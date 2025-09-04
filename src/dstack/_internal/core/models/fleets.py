@@ -163,6 +163,15 @@ class FleetNodesSpec(CoreModel):
         ),
     ] = None
 
+    def dict(self, *args, **kwargs) -> Dict:
+        # super() does not work with pydantic-duality
+        res = CoreModel.dict(self, *args, **kwargs)
+        # For backward compatibility with old clients
+        # that do not ignore extra fields due to https://github.com/dstackai/dstack/issues/3066
+        if hasattr(res, "target") and res["target"] == res["min"]:
+            del res["target"]
+        return res
+
     @root_validator(pre=True)
     def set_min_and_target_defaults(cls, values):
         min_ = values.get("min")
