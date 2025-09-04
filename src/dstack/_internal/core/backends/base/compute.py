@@ -668,12 +668,15 @@ def get_setup_cloud_instance_commands(
         ),
     ]
     if not skip_firewall_setup:
+        commands += [
+            "ufw --force reset",  # Some OS images have default rules like `allow 80`. Delete them
+            "ufw default deny incoming",
+            "ufw default allow outgoing",
+            "ufw allow ssh",
+        ]
         for subnet in firewall_allow_from_subnets:
             commands.append(f"ufw allow from {subnet}")
         commands += [
-            "ufw allow ssh",
-            "ufw default deny incoming",
-            "ufw default allow outgoing",
             "ufw --force enable",
         ]
     return commands

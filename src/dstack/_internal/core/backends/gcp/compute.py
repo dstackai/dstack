@@ -951,7 +951,7 @@ def _get_user_data(
         bin_path=bin_path,
         backend_shim_env=backend_shim_env,
         # Instance-level firewall is optional on GCP. The main protection comes from GCP firewalls.
-        # So only set up instance-level firewall if ufw is available.
+        # So only set up instance-level firewall as an additional measure if ufw is available.
         skip_firewall_setup=not is_ufw_installed,
     )
 
