@@ -41,6 +41,7 @@ from dstack._internal.core.models.volumes import InstanceMountPoint, Volume, Vol
 from dstack._internal.server.background.tasks.common import get_provisioning_timeout
 from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import (
+    FleetModel,
     InstanceModel,
     JobModel,
     ProbeModel,
@@ -151,6 +152,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
         .options(joinedload(RunModel.project))
         .options(joinedload(RunModel.user))
         .options(joinedload(RunModel.repo))
+        .options(joinedload(RunModel.fleet).load_only(FleetModel.id, FleetModel.name))
         .options(joinedload(RunModel.jobs))
     )
     run_model = res.unique().scalar_one()
