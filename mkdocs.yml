@@ -294,11 +294,10 @@ nav:
         - Tenstorrent: examples/accelerators/tenstorrent/index.md
     - Models:
         - Wan2.2: examples/models/wan22/index.md
-  - Changelog: blog/changelog.md
-  - Case studies: blog/case-studies.md
-  - Benchmarks: blog/benchmarks.md
   - Blog: 
     - blog/index.md
+  - Case studies: blog/case-studies.md
+  - Benchmarks: blog/benchmarks.md
 #  - Discord: https://discord.gg/u8SmfwPpMd" target="_blank
 #  - Changelog: https://github.com/dstackai/dstack/releases" target="_blank
 #  - GitHub: https://github.com/dstackai/dstack" target="_blank
