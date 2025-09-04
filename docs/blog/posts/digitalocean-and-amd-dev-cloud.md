@@ -29,7 +29,7 @@ AMD Developer Cloud is a new cloud platform designed to make AMD GPUs easily acc
 
 ## Why dstack
 
-Unlike Kubernetes, dstack provides a high-level, AI-engineer-friendly interface where GPUs work out of the box—no custom operators or low-level setup required. Unlike Slurm, it’s use-case agnostic, equally suited for training, inference, benchmarking, and dev environments.
+`dstack` provides a high-level, AI-engineer-friendly interface where GPUs work out of the box—no K8S custom operators or low-level setup required. It’s use-case agnostic, equally suited for training, inference, benchmarking, and dev environments.
 
 With the new DigitalOcean and AMD Developer Cloud backends, you can now provision NVIDIA or AMD GPU VMs and run workloads with a single CLI command.
 
