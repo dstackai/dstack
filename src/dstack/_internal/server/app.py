@@ -160,6 +160,11 @@ async def lifespan(app: FastAPI):
         logger.info("Background processing is disabled")
     PROBES_SCHEDULER.start()
     dstack_version = DSTACK_VERSION if DSTACK_VERSION else "(no version)"
+    logger.info(
+        "Job network mode: %s (%d)",
+        settings.JOB_NETWORK_MODE.name,
+        settings.JOB_NETWORK_MODE.value,
+    )
     logger.info(f"The admin token is {admin.token.get_plaintext_or_error()}", {"show_path": False})
     logger.info(
         f"The dstack server {dstack_version} is running at {SERVER_URL}",
