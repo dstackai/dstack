@@ -99,7 +99,7 @@ class OfferCommand(APIBaseCommand):
         conf = TaskConfiguration(commands=[":"])
 
         configurator = OfferConfigurator(api_client=self.api)
-        configurator.apply_args(conf, args, [])
+        configurator.apply_args(conf, args)
         profile = load_profile(Path.cwd(), profile_name=args.profile)
 
         run_spec = RunSpec(

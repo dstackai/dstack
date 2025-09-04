@@ -9,7 +9,7 @@ from dstack._internal.cli.services.repos import (
     is_git_repo_url,
     register_init_repo_args,
 )
-from dstack._internal.cli.utils.common import configure_logging, confirm_ask, console, warn
+from dstack._internal.cli.utils.common import confirm_ask, console, warn
 from dstack._internal.core.errors import ConfigurationError
 from dstack._internal.core.models.repos.remote import RemoteRepo
 from dstack._internal.core.services.configs import ConfigManager
@@ -52,7 +52,7 @@ class InitCommand(BaseCommand):
         )
 
     def _command(self, args: argparse.Namespace):
-        configure_logging()
+        super()._command(args)
 
         repo_path: Optional[Path] = None
         repo_url: Optional[str] = None
