@@ -925,24 +925,23 @@ projects:
       project_name: my-amd-project
       creds:
         type: api_key
-        api_key: <api_key_amd_dev_cloud>
+        api_key: ...
 ```
 
 </div>
 
-??? info "Project Name"
-    **project_name** configuration is optional. If it is not provided, the default project is used.
+??? info "Project"
+    If `project_name` is not set, the default project will be used.
 
 ??? info "Required permissions"
     The API key must have the following scopes assigned:
 
-    * **account** - read
-    * **droplet** - create,read,update,delete,admin
-    * **project** - create,read,update,delete
-    * **regions** - read
-    * **sizes**   - read
-    * **ssh_key**  - create,read,update,delete
-
+    * `account` - read
+    * `droplet` - create, read, update, delete, admin
+    * `project` - create, read, update, delete
+    * `regions` - read
+    * `sizes` - read
+    * `ssh_key` - create, read, update, delete
 
 
 ## Digital Ocean
@@ -960,24 +959,23 @@ projects:
       project_name: my-digital-ocean-project
       creds:
         type: api_key
-        api_key: <api_key_digitalocean>
+        api_key: ...
 ```
 
 </div>
 
-??? info "Project Name"
-    **project_name** configuration is optional. If it is not provided, the default project is used.
+??? info "Project"
+    If `project_name` is not set, the default project will be used.
 
 ??? info "Required permissions"
     The API key must have the following scopes assigned:
 
-    * **account** - read
-    * **droplet** - create,read,update,delete,admin
-    * **project** - create,read,update,delete
-    * **regions** - read
-    * **sizes**   - read
-    * **ssh_key**  - create,read,update,delete
-
+    * `account` - read
+    * `droplet` - create, read, update, delete, admin
+    * `project` - create, read, update, delete
+    * `regions` - read
+    * `sizes` - read
+    * `ssh_key` - create, read, update,delete
 
 ## Hot Aisle
 
