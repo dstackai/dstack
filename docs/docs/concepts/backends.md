@@ -925,7 +925,7 @@ projects:
       project_name: my-amd-project
       creds:
         type: api_key
-        api_key: dop_v1_71ea79a0c4bf2ffa70ac9d2a7b2689d2b41768567b22ebabe58a80066dcc5e92
+        api_key: <api_key_amd_dev_cloud>
 ```
 
 </div>
@@ -960,7 +960,7 @@ projects:
       project_name: my-digital-ocean-project
       creds:
         type: api_key
-        api_key: dop_v1_71ea79a0c4bf2ffa70ac9d2a7b2689d2b41768567b22ebabe58a80066dcc5e92
+        api_key: <api_key_digitalocean>
 ```
 
 </div>
