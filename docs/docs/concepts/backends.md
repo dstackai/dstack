@@ -243,6 +243,7 @@ There are two ways to configure AWS: using an access key or using the default cr
         * `user` with passwordless sudo access
         * Docker is installed
         * (For NVIDIA instances) NVIDIA/CUDA drivers and NVIDIA Container Toolkit are installed
+        * The firewall (`iptables`, `ufw`, etc.) must allow external traffic to port 22 and all traffic within the private subnet, and should forbid any other incoming external traffic.
 
 ## Azure
 

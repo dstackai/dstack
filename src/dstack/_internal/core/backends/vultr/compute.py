@@ -75,17 +75,13 @@ class VultrCompute(
         subnet = vpc["v4_subnet"]
         subnet_mask = vpc["v4_subnet_mask"]
 
-        setup_commands = [
-            f"sudo ufw allow from {subnet}/{subnet_mask}",
-            "sudo ufw reload",
-        ]
         instance_id = self.api_client.launch_instance(
             region=instance_offer.region,
             label=instance_name,
             plan=instance_offer.instance.name,
             user_data=get_user_data(
                 authorized_keys=instance_config.get_public_keys(),
-                backend_specific_commands=setup_commands,
+                firewall_allow_from_subnets=[f"{subnet}/{subnet_mask}"],
             ),
             vpc_id=vpc["id"],
         )

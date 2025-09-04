@@ -59,13 +59,6 @@ DOCKER_DAEMON_CONFIG = {
     "exec-opts": ["native.cgroupdriver=cgroupfs"],
 }
 SETUP_COMMANDS = [
-    "ufw allow ssh",
-    "ufw allow from 10.0.0.0/8",
-    "ufw allow from 172.16.0.0/12",
-    "ufw allow from 192.168.0.0/16",
-    "ufw default deny incoming",
-    "ufw default allow outgoing",
-    "ufw enable",
     'sed -i "s/.*AllowTcpForwarding.*/AllowTcpForwarding yes/g" /etc/ssh/sshd_config',
     "service ssh restart",
     f"echo {shlex.quote(json.dumps(DOCKER_DAEMON_CONFIG))} > /etc/docker/daemon.json",

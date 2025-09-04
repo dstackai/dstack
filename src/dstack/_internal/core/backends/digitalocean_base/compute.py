@@ -26,13 +26,6 @@ from dstack._internal.utils.logging import get_logger
 logger = get_logger(__name__)
 
 MAX_INSTANCE_NAME_LEN = 60
-
-# Setup commands for DigitalOcean instances
-SETUP_COMMANDS = [
-    "sudo ufw delete limit ssh",
-    "sudo ufw allow ssh",
-]
-
 DOCKER_INSTALL_COMMANDS = [
     "export DEBIAN_FRONTEND=noninteractive",
     "mkdir -p /etc/apt/keyrings",
@@ -92,9 +85,9 @@ class BaseDigitalOceanCompute(
         size_slug = instance_offer.instance.name
 
         if not instance_offer.instance.resources.gpus:
-            backend_specific_commands = SETUP_COMMANDS + DOCKER_INSTALL_COMMANDS
+            backend_specific_commands = DOCKER_INSTALL_COMMANDS
         else:
-            backend_specific_commands = SETUP_COMMANDS
+            backend_specific_commands = None
 
         project_id = None
         if self.config.project_name:

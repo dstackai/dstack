@@ -135,11 +135,10 @@ class OCICompute(
             security_group.id, region.virtual_network_client
         )
 
-        setup_commands = [
-            f"sudo iptables -I INPUT -s {resources.VCN_CIDR} -j ACCEPT",
-            "sudo netfilter-persistent save",
-        ]
-        cloud_init_user_data = get_user_data(instance_config.get_public_keys(), setup_commands)
+        cloud_init_user_data = get_user_data(
+            authorized_keys=instance_config.get_public_keys(),
+            firewall_allow_from_subnets=[resources.VCN_CIDR],
+        )
 
         display_name = generate_unique_instance_name(instance_config)
         try:
