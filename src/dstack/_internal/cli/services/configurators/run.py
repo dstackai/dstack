@@ -106,14 +106,8 @@ class BaseRunConfigurator(
                 # relative path for compatibility with pre-0.19.27 servers
                 conf.working_dir = "."
                 warn(
-                    "[code]working_dir[/code] is not set."
-                    f" Using legacy working directory [code]{LEGACY_REPO_DIR}[/code]\n\n"
-                    "In future versions the default value will be taken from the image\n"
-                    f"- To keep using legacy working directory, set"
-                    f" [code]working_dir[/code] to [code]{LEGACY_REPO_DIR}[/code]\n"
-                    f"- To prepare for the future default, set [code]working_dir[/code]"
-                    " to the image default working directory (only until the new default"
-                    " takes effect)"
+                    f'The [code]working_dir[/code] is not set — using legacy default [code]"{LEGACY_REPO_DIR}"[/code].'
+                    " Future versions will default to the [code]image[/code]'s working directory."
                 )
         elif not is_absolute_posix_path(working_dir):
             legacy_working_dir = PurePosixPath(LEGACY_REPO_DIR) / working_dir
