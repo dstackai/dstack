@@ -197,6 +197,8 @@ def _autodelete_fleet(fleet_model: FleetModel) -> bool:
 
 
 async def _update_deleted_fleets_placement_groups(session: AsyncSession, fleets_ids: list[UUID]):
+    if len(fleets_ids) == 0:
+        return
     await session.execute(
         update(PlacementGroupModel)
         .where(
