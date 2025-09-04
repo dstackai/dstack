@@ -168,7 +168,7 @@ class FleetNodesSpec(CoreModel):
         res = CoreModel.dict(self, *args, **kwargs)
         # For backward compatibility with old clients
         # that do not ignore extra fields due to https://github.com/dstackai/dstack/issues/3066
-        if hasattr(res, "target") and res["target"] == res["min"]:
+        if "target" in res and res["target"] == res["min"]:
             del res["target"]
         return res
 

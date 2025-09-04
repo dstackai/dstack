@@ -336,7 +336,7 @@ class TestApplyFleetPlan:
             "spec": {
                 "configuration_path": spec.configuration_path,
                 "configuration": {
-                    "nodes": {"min": 1, "target": 1, "max": 1},
+                    "nodes": {"min": 1, "max": 1},
                     "placement": None,
                     "env": {},
                     "ssh_config": None,
