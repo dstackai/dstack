@@ -878,8 +878,7 @@ def _warn_fleet_autocreated(api: APIClient, run: Run):
     if not fleet.spec.autocreated:
         return
     warn(
-        f"\nThe run is using automatically created fleet [code]{fleet.name}[/code].\n"
-        "Future [code]dstack[/code] versions will stop creating fleets automatically.\n"
-        "Create the fleet explicitly to remove this warning and prepare for upcoming changes.\n"
-        "Learn more about fleets: https://dstack.ai/docs/concepts/fleets/"
+        f"\nNo existing fleet matched, so the run created a new fleet [code]{fleet.name}[/code].\n"
+        "Future dstack versions won't create fleets automatically.\n"
+        "Create a fleet explicitly: https://dstack.ai/docs/concepts/fleets/"
     )
