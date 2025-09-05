@@ -92,7 +92,15 @@ Examples of good release notes:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Generate release notes from draft release")
+    # TODO: When the script is sufficiently polished, we may automate draft release generation and its update,
+    # and integrate the script into the CI.
+    parser = argparse.ArgumentParser(
+        description=(
+            "Generate expanded `dstack` release notes from a release draft using LLM."
+            " The script accepts a release tag for which you must generate automatic release notes beforehand."
+            " The script does not publish or change anything on GitHub and only outputs the generated release notes."
+        )
+    )
     parser.add_argument("tag", help="Release tag (e.g., 0.19.25)")
     args = parser.parse_args()
 
