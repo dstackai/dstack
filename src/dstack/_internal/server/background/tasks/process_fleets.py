@@ -177,6 +177,14 @@ def _maintain_fleet_nodes_min(
 
 
 def _autodelete_fleet(fleet_model: FleetModel) -> bool:
+    if fleet_model.project.deleted:
+        # It used to be possible to delete project with active resources:
+        # https://github.com/dstackai/dstack/issues/3077
+        fleet_model.status = FleetStatus.TERMINATED
+        fleet_model.deleted = True
+        logger.info("Fleet %s deleted due to deleted project", fleet_model.name)
+        return True
+
     if is_fleet_in_use(fleet_model) or not is_fleet_empty(fleet_model):
         return False
 
