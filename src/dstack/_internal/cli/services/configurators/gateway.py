@@ -1,6 +1,5 @@
 import argparse
 import time
-from typing import List
 
 from rich.table import Table
 
@@ -27,7 +26,7 @@ from dstack.api._public import Client
 
 
 class GatewayConfigurator(BaseApplyConfigurator[GatewayConfiguration]):
-    TYPE: ApplyConfigurationType = ApplyConfigurationType.GATEWAY
+    TYPE = ApplyConfigurationType.GATEWAY
 
     def apply_configuration(
         self,
@@ -35,9 +34,8 @@ class GatewayConfigurator(BaseApplyConfigurator[GatewayConfiguration]):
         configuration_path: str,
         command_args: argparse.Namespace,
         configurator_args: argparse.Namespace,
-        unknown_args: List[str],
     ):
-        self.apply_args(conf, configurator_args, unknown_args)
+        self.apply_args(conf, configurator_args)
         spec = GatewaySpec(
             configuration=conf,
             configuration_path=configuration_path,
@@ -179,7 +177,7 @@ class GatewayConfigurator(BaseApplyConfigurator[GatewayConfiguration]):
             help="The gateway name",
         )
 
-    def apply_args(self, conf: GatewayConfiguration, args: argparse.Namespace, unknown: List[str]):
+    def apply_args(self, conf: GatewayConfiguration, args: argparse.Namespace):
         if args.name:
             conf.name = args.name
 

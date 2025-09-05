@@ -1,7 +1,7 @@
 import argparse
 import os
 from abc import ABC, abstractmethod
-from typing import Generic, List, TypeVar, Union, cast
+from typing import ClassVar, Generic, List, TypeVar, Union, cast
 
 from dstack._internal.cli.services.args import env_var
 from dstack._internal.core.errors import ConfigurationError
@@ -18,7 +18,7 @@ ApplyConfigurationT = TypeVar("ApplyConfigurationT", bound=AnyApplyConfiguration
 
 
 class BaseApplyConfigurator(ABC, Generic[ApplyConfigurationT]):
-    TYPE: ApplyConfigurationType
+    TYPE: ClassVar[ApplyConfigurationType]
 
     def __init__(self, api_client: Client):
         self.api = api_client
@@ -30,7 +30,6 @@ class BaseApplyConfigurator(ABC, Generic[ApplyConfigurationT]):
         configuration_path: str,
         command_args: argparse.Namespace,
         configurator_args: argparse.Namespace,
-        unknown_args: List[str],
     ):
         """
         Implements `dstack apply` for a given configuration type.
@@ -40,7 +39,6 @@ class BaseApplyConfigurator(ABC, Generic[ApplyConfigurationT]):
             configuration_path: The path to the configuration file.
             command_args: The args parsed by `dstack apply`.
             configurator_args: The known args parsed by `cls.get_parser()`.
-            unknown_args: The unknown args after parsing by `cls.get_parser()`.
         """
         pass
 

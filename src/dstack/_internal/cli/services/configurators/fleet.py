@@ -1,7 +1,7 @@
 import argparse
 import time
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 
 from rich.table import Table
 
@@ -46,7 +46,7 @@ logger = get_logger(__name__)
 
 
 class FleetConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator[FleetConfiguration]):
-    TYPE: ApplyConfigurationType = ApplyConfigurationType.FLEET
+    TYPE = ApplyConfigurationType.FLEET
 
     def apply_configuration(
         self,
@@ -54,9 +54,8 @@ class FleetConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator[Fle
         configuration_path: str,
         command_args: argparse.Namespace,
         configurator_args: argparse.Namespace,
-        unknown_args: List[str],
     ):
-        self.apply_args(conf, configurator_args, unknown_args)
+        self.apply_args(conf, configurator_args)
         profile = load_profile(Path.cwd(), None)
         spec = FleetSpec(
             configuration=conf,
@@ -309,7 +308,7 @@ class FleetConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator[Fle
         )
         cls.register_env_args(configuration_group)
 
-    def apply_args(self, conf: FleetConfiguration, args: argparse.Namespace, unknown: List[str]):
+    def apply_args(self, conf: FleetConfiguration, args: argparse.Namespace):
         if args.name:
             conf.name = args.name
         self.apply_env_vars(conf.env, args)

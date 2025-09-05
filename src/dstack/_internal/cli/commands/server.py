@@ -1,5 +1,5 @@
+import argparse
 import os
-from argparse import Namespace
 
 from dstack._internal import settings
 from dstack._internal.cli.commands import BaseCommand
@@ -53,7 +53,7 @@ class ServerCommand(BaseCommand):
         )
         self._parser.add_argument("--token", type=str, help="The admin user token")
 
-    def _command(self, args: Namespace):
+    def _command(self, args: argparse.Namespace):
         super()._command(args)
 
         if not UVICORN_INSTALLED:

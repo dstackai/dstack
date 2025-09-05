@@ -34,9 +34,9 @@ class TestApplyArgs:
         configurator = configurator_class(Mock())
         configurator.register_args(parser)
         conf = conf.copy(deep=True)  # to avoid modifying the original configuration
-        known, unknown = parser.parse_known_args(args)
-        configurator.apply_args(conf, known, unknown)
-        return conf, known
+        parsed_args = parser.parse_args(args)
+        configurator.apply_args(conf, parsed_args)
+        return conf, parsed_args
 
     def test_env(self):
         conf = TaskConfiguration(commands=["whoami"])

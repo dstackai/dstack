@@ -40,6 +40,7 @@ class ConfigCommand(BaseCommand):
         )
 
     def _command(self, args: argparse.Namespace):
+        super()._command(args)
         config_manager = ConfigManager()
         if args.remove:
             config_manager.delete_project(args.project)

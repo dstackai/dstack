@@ -1,4 +1,5 @@
 import argparse
+import shlex
 
 from argcomplete import FilesCompleter  # type: ignore[attr-defined]
 
@@ -19,6 +20,7 @@ class ApplyCommand(APIBaseCommand):
     NAME = "apply"
     DESCRIPTION = "Apply a configuration"
     DEFAULT_HELP = False
+    ACCEPT_EXTRA_ARGS = True
 
     def _register(self):
         super()._register()
@@ -84,13 +86,14 @@ class ApplyCommand(APIBaseCommand):
             configurator_class = get_apply_configurator_class(configuration.type)
             configurator = configurator_class(api_client=self.api)
             configurator_parser = configurator.get_parser()
-            known, unknown = configurator_parser.parse_known_args(args.unknown)
+            configurator_args, unknown_args = configurator_parser.parse_known_args(args.extra_args)
+            if unknown_args:
+                raise CLIError(f"Unrecognized arguments: {shlex.join(unknown_args)}")
             configurator.apply_configuration(
                 conf=configuration,
                 configuration_path=configuration_path,
                 command_args=args,
-                configurator_args=known,
-                unknown_args=unknown,
+                configurator_args=configurator_args,
             )
         except KeyboardInterrupt:
             console.print("\nOperation interrupted by user. Exiting...")
