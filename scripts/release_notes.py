@@ -6,6 +6,7 @@
 # ]
 # ///
 
+import argparse
 import os
 import re
 from pathlib import Path
@@ -91,9 +92,13 @@ Examples of good release notes:
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Generate release notes from draft release")
+    parser.add_argument("tag", help="Release tag (e.g., 0.19.25)")
+    args = parser.parse_args()
+
     with open(Path(__file__).parent / "release_notes_examples.md") as f:
         examples = f.read()
-    draft_release = get_draft_release_by_tag("0.19.25rc1")
+    draft_release = get_draft_release_by_tag(args.tag)
     draft_body = draft_release["body"]
     prs = get_prs_from_draft(draft_body)
     notes = generate_release_notes(draft_body, prs, examples)
