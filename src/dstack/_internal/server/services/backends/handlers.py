@@ -20,6 +20,8 @@ async def delete_backends_safe(
     error: bool = True,
 ):
     try:
+        # FIXME: The checks are not under lock,
+        # so there can be dangling active resources due to race conditions.
         await _check_active_instances(
             session=session,
             project=project,

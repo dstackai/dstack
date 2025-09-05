@@ -8,14 +8,20 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from dstack._internal.core.models.fleets import FleetStatus
+from dstack._internal.core.models.runs import RunStatus
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.models import MemberModel, ProjectModel
 from dstack._internal.server.services.permissions import DefaultPermissions
 from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.testing.common import (
     create_backend,
+    create_fleet,
     create_project,
+    create_repo,
+    create_run,
     create_user,
+    create_volume,
     default_permissions_context,
     get_auth_headers,
 )
@@ -486,6 +492,19 @@ class TestDeleteProject:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_400_if_project_does_not_exist(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.ADMIN)
+        response = await client.post(
+            "/api/projects/delete",
+            headers=get_auth_headers(user.token),
+            json={"projects_names": ["random_project"]},
+        )
+        assert response.status_code == 400
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_403_if_not_project_admin(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -505,7 +524,7 @@ class TestDeleteProject:
             json={"projects_names": [project1.name, project2.name]},
         )
         assert response.status_code == 403
-        res = await session.execute(select(ProjectModel))
+        res = await session.execute(select(ProjectModel).where(ProjectModel.deleted.is_(False)))
         assert len(res.all()) == 2
 
     @pytest.mark.asyncio
@@ -521,8 +540,105 @@ class TestDeleteProject:
             json={"projects_names": [project.name]},
         )
         assert response.status_code == 403
-        res = await session.execute(select(ProjectModel))
+        res = await session.execute(select(ProjectModel).where(ProjectModel.deleted.is_(False)))
         assert len(res.all()) == 1
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_errors_if_project_has_active_runs(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.ADMIN)
+        project = await create_project(session=session, name="project")
+        repo = await create_repo(session=session, project_id=project.id)
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            status=RunStatus.SUBMITTED,
+        )
+        response = await client.post(
+            "/api/projects/delete",
+            headers=get_auth_headers(user.token),
+            json={"projects_names": [project.name]},
+        )
+        assert response.status_code == 400
+        res = await session.execute(select(ProjectModel).where(ProjectModel.deleted.is_(False)))
+        assert len(res.all()) == 1
+        run.status = RunStatus.TERMINATED
+        await session.commit()
+        response = await client.post(
+            "/api/projects/delete",
+            headers=get_auth_headers(user.token),
+            json={"projects_names": [project.name]},
+        )
+        assert response.status_code == 200
+        res = await session.execute(select(ProjectModel).where(ProjectModel.deleted.is_(False)))
+        assert len(res.all()) == 0
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_errors_if_project_has_active_fleets(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.ADMIN)
+        project = await create_project(session=session, name="project")
+        fleet = await create_fleet(
+            session=session,
+            project=project,
+            deleted=False,
+        )
+        response = await client.post(
+            "/api/projects/delete",
+            headers=get_auth_headers(user.token),
+            json={"projects_names": [project.name]},
+        )
+        assert response.status_code == 400
+        res = await session.execute(select(ProjectModel).where(ProjectModel.deleted.is_(False)))
+        assert len(res.all()) == 1
+        fleet.status = FleetStatus.TERMINATED
+        fleet.deleted = True
+        await session.commit()
+        response = await client.post(
+            "/api/projects/delete",
+            headers=get_auth_headers(user.token),
+            json={"projects_names": [project.name]},
+        )
+        assert response.status_code == 200
+        res = await session.execute(select(ProjectModel).where(ProjectModel.deleted.is_(False)))
+        assert len(res.all()) == 0
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_errors_if_project_has_active_volumes(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.ADMIN)
+        project = await create_project(session=session, name="project")
+        volume = await create_volume(
+            session=session,
+            project=project,
+            user=user,
+        )
+        response = await client.post(
+            "/api/projects/delete",
+            headers=get_auth_headers(user.token),
+            json={"projects_names": [project.name]},
+        )
+        assert response.status_code == 400
+        res = await session.execute(select(ProjectModel).where(ProjectModel.deleted.is_(False)))
+        assert len(res.all()) == 1
+        volume.deleted = True
+        await session.commit()
+        response = await client.post(
+            "/api/projects/delete",
+            headers=get_auth_headers(user.token),
+            json={"projects_names": [project.name]},
+        )
+        assert response.status_code == 200
+        res = await session.execute(select(ProjectModel).where(ProjectModel.deleted.is_(False)))
+        assert len(res.all()) == 0
 
 
 class TestGetProject:
