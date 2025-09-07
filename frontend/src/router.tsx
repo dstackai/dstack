@@ -14,7 +14,7 @@ import { FleetDetails, FleetList } from 'pages/Fleets';
 import { InstanceList } from 'pages/Instances';
 import { ModelsList } from 'pages/Models';
 import { ModelDetails } from 'pages/Models/Details';
-import { ProjectAdd, ProjectDetails, ProjectList, ProjectSettings } from 'pages/Project';
+import { CreateProjectWizard, ProjectAdd, ProjectDetails, ProjectList, ProjectSettings } from 'pages/Project';
 import { BackendAdd, BackendEdit } from 'pages/Project/Backends';
 import { AddGateway, EditGateway } from 'pages/Project/Gateways';
 import { JobLogs, JobMetrics, RunDetails, RunDetailsPage, RunList } from 'pages/Runs';
@@ -126,10 +126,17 @@ export const router = createBrowserRouter([
                     },
                 ],
             },
-            {
-                path: ROUTES.PROJECT.ADD,
-                element: <ProjectAdd />,
-            },
+
+            ...([
+                process.env.UI_VERSION !== 'sky' && {
+                    path: ROUTES.PROJECT.ADD,
+                    element: <ProjectAdd />,
+                },
+                process.env.UI_VERSION === 'sky' && {
+                    path: ROUTES.PROJECT.ADD,
+                    element: <CreateProjectWizard />,
+                },
+            ].filter(Boolean) as RouteObject[]),
 
             // Runs
             {
