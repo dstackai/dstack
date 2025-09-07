@@ -56,6 +56,9 @@ export { default as PropertyFilter } from '@cloudscape-design/components/propert
 export type { PropertyFilterProps } from '@cloudscape-design/components/property-filter';
 export type { LineChartProps } from '@cloudscape-design/components/line-chart/interfaces';
 export type { ModalProps } from '@cloudscape-design/components/modal';
+export { default as AnchorNavigation } from '@cloudscape-design/components/anchor-navigation';
+export { default as ExpandableSection } from '@cloudscape-design/components/expandable-section';
+export { I18nProvider } from '@cloudscape-design/components/i18n';
 
 // custom components
 export { NavigateLink } from './NavigateLink';

@@ -1,24 +1,28 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import { Container } from '@cloudscape-design/components';
-import AnchorNavigation from '@cloudscape-design/components/anchor-navigation';
-import Box from '@cloudscape-design/components/box';
-import BreadcrumbGroup from '@cloudscape-design/components/breadcrumb-group';
-import Button from '@cloudscape-design/components/button';
-import ContentLayout from '@cloudscape-design/components/content-layout';
-import ExpandableSection from '@cloudscape-design/components/expandable-section';
-import Grid from '@cloudscape-design/components/grid';
-import Header from '@cloudscape-design/components/header';
-import { I18nProvider } from '@cloudscape-design/components/i18n';
 import enMessages from '@cloudscape-design/components/i18n/messages/all.en.json';
-import Icon from '@cloudscape-design/components/icon';
-import Link from '@cloudscape-design/components/link';
-import Popover from '@cloudscape-design/components/popover';
-import SpaceBetween from '@cloudscape-design/components/space-between';
-import TextContent from '@cloudscape-design/components/text-content';
-import TopNavigation from '@cloudscape-design/components/top-navigation';
 import { Mode } from '@cloudscape-design/global-styles';
+
+import {
+    AnchorNavigation,
+    Box,
+    BreadcrumbGroup,
+    Button,
+    Container,
+    ContentLayout,
+    ExpandableSection,
+    Grid,
+    Header,
+    I18nProvider,
+    Icon,
+    Link,
+    Popover,
+    SpaceBetween,
+    TextContent,
+    TopNavigation,
+} from 'components';
+import { DarkThemeIcon, LightThemeIcon } from 'layouts/AppLayout/themeIcons';
 
 import { DISCORD_URL } from 'consts';
 import { useAppDispatch, useAppSelector } from 'hooks';
@@ -28,10 +32,8 @@ import { useGithubAuthorizeMutation } from 'services/auth';
 
 import { selectSystemMode, setSystemMode } from 'App/slice';
 
-import { DarkThemeIcon, LightThemeIcon } from '../../../layouts/AppLayout/themeIcons';
-
-import logo from '../../../assets/images/logo.svg';
-import './styles.scss';
+import logo from 'assets/images/logo.svg';
+import styles from './styles.module.scss';
 
 type PortalProps = {
     children: React.ReactNode;
@@ -106,7 +108,7 @@ function OnThisPageNavigation({ variant }: { variant: 'mobile' | 'side' }) {
     );
 
     return variant === 'side' ? (
-        <div className="on-this-page--side" data-testid="on-this-page">
+        <div className={styles.onThisPageSide} data-testid="on-this-page">
             <Box variant="h2" margin={{ bottom: 'xxs' }}>
                 <span id="navigation-header">On this page</span>
             </Box>
@@ -190,7 +192,7 @@ function HeroHeader() {
 
 function ProductOverview() {
     return (
-        <section className="page-section" aria-label="Product overview">
+        <section className={styles.pageSection} aria-label="Product overview">
             <Header variant="h2">
                 <span id="overview">Overview</span>
             </Header>
@@ -212,7 +214,7 @@ function ProductOverview() {
                         <span id="features">Features</span>
                     </Box>
                     <Box>
-                        <dl className="product-details" aria-label="Product details">
+                        <dl className={styles.productDetails} aria-label="Product details">
                             <dt></dt>
                             <dt>
                                 <Link
@@ -328,12 +330,12 @@ function ProductOverview() {
 
 function OtherVersions() {
     return (
-        <section className="other-versions">
+        <section className={styles.otherVersions}>
             <Box variant="h2" margin={{ bottom: 'm' }}>
                 <span id="other-versions">Other versions</span>
             </Box>
-            <ul className="product-cards-list">
-                <li className="product-cards-list-item" aria-label="Open-source">
+            <ul className={styles.ProductCardsList}>
+                <li className={styles.productCardsListItem} aria-label="Open-source">
                     <Container>
                         <SpaceBetween direction="vertical" size="s">
                             <SpaceBetween direction="vertical" size="xxs">
@@ -347,7 +349,7 @@ function OtherVersions() {
                         </SpaceBetween>
                     </Container>
                 </li>
-                <li className="product-cards-list-item" aria-label="dstack Enterprise">
+                <li className={styles.productCardsListItem} aria-label="dstack Enterprise">
                     <Container>
                         <SpaceBetween direction="vertical" size="s">
                             <SpaceBetween direction="vertical" size="xxs">
@@ -423,6 +425,7 @@ export const LoginByGithub: React.FC = () => {
                     />
                 </div>
             </HeaderPortal>
+
             <I18nProvider locale="en" messages={[enMessages]}>
                 <ContentLayout
                     breadcrumbs={
@@ -441,23 +444,22 @@ export const LoginByGithub: React.FC = () => {
                     maxContentWidth={1040}
                     disableOverlap={true}
                 >
-                    <div className="product-page-content-grid">
-                        <div className="on-this-page--mobile">
+                    <div className={styles.productPageContentGrid}>
+                        <div className={styles.onThisPageMobile}>
                             <OnThisPageNavigation variant="mobile" />
                         </div>
 
-                        <aside aria-label="Side bar" className="product-page-aside">
-                            <div className="product-page-aside-sticky">
+                        <aside aria-label="Side bar" className={styles.productPageAside}>
+                            <div className={styles.productPageAsideSticky}>
                                 <SpaceBetween size="xl">
-                                    <div className="on-this-page--side">
+                                    <div className={styles.onThisPageMobile}>
                                         <OnThisPageNavigation variant="side" />
                                     </div>
-                                    {/* <hr /> */}
                                 </SpaceBetween>
                             </div>
                         </aside>
 
-                        <main className="product-page-content">
+                        <main className={styles.productPageContent}>
                             <ProductOverview />
                             <OtherVersions />
                         </main>
