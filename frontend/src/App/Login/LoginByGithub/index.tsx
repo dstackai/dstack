@@ -193,10 +193,10 @@ function HeroHeader() {
 function ProductOverview() {
     return (
         <section className={styles.pageSection} aria-label="Product overview">
-            <Header variant="h2">
-                <span id="overview">Overview</span>
-            </Header>
             <SpaceBetween size="m">
+                <Header variant="h2">
+                    <span id="overview">Overview</span>
+                </Header>
                 <div>
                     <Box variant="p">
                         <strong>dstack</strong> is an open-source container orchestrator that lets ML teams easily manage
@@ -316,7 +316,7 @@ function ProductOverview() {
                     </Header>
                     <SpaceBetween size="m">
                         <Box variant="p">
-                            Want to learn more about dstack? Check out the{' '}
+                            Want to learn more about <strong>dstack</strong>? Check out the{' '}
                             <Link href="https://dstack.ai/docs/" variant="primary" external={true}>
                                 documentation
                             </Link>
