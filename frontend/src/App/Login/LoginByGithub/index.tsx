@@ -334,7 +334,7 @@ function OtherVersions() {
             <Box variant="h2" margin={{ bottom: 'm' }}>
                 <span id="other-versions">Other versions</span>
             </Box>
-            <ul className={styles.ProductCardsList}>
+            <ul className={styles.productCardsList}>
                 <li className={styles.productCardsListItem} aria-label="Open-source">
                     <Container>
                         <SpaceBetween direction="vertical" size="s">
