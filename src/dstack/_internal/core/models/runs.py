@@ -7,7 +7,14 @@ from pydantic import UUID4, Field, root_validator
 from typing_extensions import Annotated
 
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.common import ApplyAction, CoreModel, NetworkMode, RegistryAuth
+from dstack._internal.core.models.common import (
+    ApplyAction,
+    CoreConfig,
+    CoreModel,
+    NetworkMode,
+    RegistryAuth,
+    generate_dual_core_model,
+)
 from dstack._internal.core.models.configurations import (
     DEFAULT_PROBE_METHOD,
     LEGACY_REPO_DIR,
@@ -385,7 +392,14 @@ class Job(CoreModel):
     job_submissions: List[JobSubmission]
 
 
-class RunSpec(CoreModel):
+class RunSpecConfig(CoreConfig):
+    @staticmethod
+    def schema_extra(schema: Dict[str, Any], model: Type) -> None:
+        prop = schema.get("properties", {})
+        prop.pop("merged_profile", None)
+
+
+class RunSpec(generate_dual_core_model(RunSpecConfig)):
     # TODO: run_name, working_dir are redundant here since they already passed in configuration
     run_name: Annotated[
         Optional[str],
@@ -457,12 +471,6 @@ class RunSpec(CoreModel):
     # Read profile parameters from merged_profile instead of profile directly.
     # TODO: make merged_profile a computed field after migrating to pydanticV2
     merged_profile: Annotated[Profile, Field(exclude=True)] = None
-
-    class Config(CoreModel.Config):
-        @staticmethod
-        def schema_extra(schema: Dict[str, Any], model: Type) -> None:
-            prop = schema.get("properties", {})
-            prop.pop("merged_profile", None)
 
     @root_validator
     def _merged_profile(cls, values) -> Dict:

@@ -7,7 +7,7 @@ from pydantic import Field, parse_obj_as, root_validator, validator
 from pydantic.generics import GenericModel
 from typing_extensions import Annotated
 
-from dstack._internal.core.models.common import CoreModel
+from dstack._internal.core.models.common import CoreConfig, CoreModel, generate_dual_core_model
 from dstack._internal.utils.common import pretty_resources
 from dstack._internal.utils.json_schema import add_extra_schema_types
 from dstack._internal.utils.logging import get_logger
@@ -129,20 +129,21 @@ DEFAULT_MEMORY_SIZE = Range[Memory](min=Memory.parse("8GB"))
 DEFAULT_GPU_COUNT = Range[int](min=1)
 
 
-class CPUSpec(CoreModel):
+class CPUSpecConfig(CoreConfig):
+    @staticmethod
+    def schema_extra(schema: Dict[str, Any]):
+        add_extra_schema_types(
+            schema["properties"]["count"],
+            extra_types=[{"type": "integer"}, {"type": "string"}],
+        )
+
+
+class CPUSpec(generate_dual_core_model(CPUSpecConfig)):
     arch: Annotated[
         Optional[gpuhunt.CPUArchitecture],
         Field(description="The CPU architecture, one of: `x86`, `arm`"),
     ] = None
     count: Annotated[Range[int], Field(description="The number of CPU cores")] = DEFAULT_CPU_COUNT
-
-    class Config(CoreModel.Config):
-        @staticmethod
-        def schema_extra(schema: Dict[str, Any]):
-            add_extra_schema_types(
-                schema["properties"]["count"],
-                extra_types=[{"type": "integer"}, {"type": "string"}],
-            )
 
     @classmethod
     def __get_validators__(cls):
@@ -190,7 +191,28 @@ class CPUSpec(CoreModel):
         return v
 
 
-class GPUSpec(CoreModel):
+class GPUSpecConfig(CoreConfig):
+    @staticmethod
+    def schema_extra(schema: Dict[str, Any]):
+        add_extra_schema_types(
+            schema["properties"]["count"],
+            extra_types=[{"type": "integer"}, {"type": "string"}],
+        )
+        add_extra_schema_types(
+            schema["properties"]["name"],
+            extra_types=[{"type": "string"}],
+        )
+        add_extra_schema_types(
+            schema["properties"]["memory"],
+            extra_types=[{"type": "integer"}, {"type": "string"}],
+        )
+        add_extra_schema_types(
+            schema["properties"]["total_memory"],
+            extra_types=[{"type": "integer"}, {"type": "string"}],
+        )
+
+
+class GPUSpec(generate_dual_core_model(GPUSpecConfig)):
     vendor: Annotated[
         Optional[gpuhunt.AcceleratorVendor],
         Field(
@@ -217,26 +239,6 @@ class GPUSpec(CoreModel):
         Optional[ComputeCapability],
         Field(description="The minimum compute capability of the GPU (e.g., `7.5`)"),
     ] = None
-
-    class Config(CoreModel.Config):
-        @staticmethod
-        def schema_extra(schema: Dict[str, Any]):
-            add_extra_schema_types(
-                schema["properties"]["count"],
-                extra_types=[{"type": "integer"}, {"type": "string"}],
-            )
-            add_extra_schema_types(
-                schema["properties"]["name"],
-                extra_types=[{"type": "string"}],
-            )
-            add_extra_schema_types(
-                schema["properties"]["memory"],
-                extra_types=[{"type": "integer"}, {"type": "string"}],
-            )
-            add_extra_schema_types(
-                schema["properties"]["total_memory"],
-                extra_types=[{"type": "integer"}, {"type": "string"}],
-            )
 
     @classmethod
     def __get_validators__(cls):
@@ -317,16 +319,17 @@ class GPUSpec(CoreModel):
         return gpuhunt.AcceleratorVendor.cast(v)
 
 
-class DiskSpec(CoreModel):
-    size: Annotated[Range[Memory], Field(description="Disk size")]
+class DiskSpecConfig(CoreConfig):
+    @staticmethod
+    def schema_extra(schema: Dict[str, Any]):
+        add_extra_schema_types(
+            schema["properties"]["size"],
+            extra_types=[{"type": "integer"}, {"type": "string"}],
+        )
 
-    class Config(CoreModel.Config):
-        @staticmethod
-        def schema_extra(schema: Dict[str, Any]):
-            add_extra_schema_types(
-                schema["properties"]["size"],
-                extra_types=[{"type": "integer"}, {"type": "string"}],
-            )
+
+class DiskSpec(generate_dual_core_model(DiskSpecConfig)):
+    size: Annotated[Range[Memory], Field(description="Disk size")]
 
     @classmethod
     def __get_validators__(cls):
@@ -343,7 +346,32 @@ class DiskSpec(CoreModel):
 DEFAULT_DISK = DiskSpec(size=Range[Memory](min=Memory.parse("100GB"), max=None))
 
 
-class ResourcesSpec(CoreModel):
+class ResourcesSpecConfig(CoreConfig):
+    @staticmethod
+    def schema_extra(schema: Dict[str, Any]):
+        add_extra_schema_types(
+            schema["properties"]["cpu"],
+            extra_types=[{"type": "integer"}, {"type": "string"}],
+        )
+        add_extra_schema_types(
+            schema["properties"]["memory"],
+            extra_types=[{"type": "integer"}, {"type": "string"}],
+        )
+        add_extra_schema_types(
+            schema["properties"]["shm_size"],
+            extra_types=[{"type": "integer"}, {"type": "string"}],
+        )
+        add_extra_schema_types(
+            schema["properties"]["gpu"],
+            extra_types=[{"type": "integer"}, {"type": "string"}],
+        )
+        add_extra_schema_types(
+            schema["properties"]["disk"],
+            extra_types=[{"type": "integer"}, {"type": "string"}],
+        )
+
+
+class ResourcesSpec(generate_dual_core_model(ResourcesSpecConfig)):
     # TODO: Remove Range[int] in 0.20. Range[int] for backward compatibility only.
     cpu: Annotated[Union[CPUSpec, Range[int]], Field(description="The CPU requirements")] = (
         CPUSpec()
@@ -361,30 +389,6 @@ class ResourcesSpec(CoreModel):
     ] = None
     gpu: Annotated[Optional[GPUSpec], Field(description="The GPU requirements")] = None
     disk: Annotated[Optional[DiskSpec], Field(description="The disk resources")] = DEFAULT_DISK
-
-    class Config(CoreModel.Config):
-        @staticmethod
-        def schema_extra(schema: Dict[str, Any]):
-            add_extra_schema_types(
-                schema["properties"]["cpu"],
-                extra_types=[{"type": "integer"}, {"type": "string"}],
-            )
-            add_extra_schema_types(
-                schema["properties"]["memory"],
-                extra_types=[{"type": "integer"}, {"type": "string"}],
-            )
-            add_extra_schema_types(
-                schema["properties"]["shm_size"],
-                extra_types=[{"type": "integer"}, {"type": "string"}],
-            )
-            add_extra_schema_types(
-                schema["properties"]["gpu"],
-                extra_types=[{"type": "integer"}, {"type": "string"}],
-            )
-            add_extra_schema_types(
-                schema["properties"]["disk"],
-                extra_types=[{"type": "integer"}, {"type": "string"}],
-            )
 
     def pretty_format(self) -> str:
         # TODO: Remove in 0.20. Use self.cpu directly

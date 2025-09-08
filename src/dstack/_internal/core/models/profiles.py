@@ -6,7 +6,12 @@ from pydantic import Field, root_validator, validator
 from typing_extensions import Annotated, Literal
 
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.common import CoreModel, Duration
+from dstack._internal.core.models.common import (
+    CoreConfig,
+    CoreModel,
+    Duration,
+    generate_dual_core_model,
+)
 from dstack._internal.utils.common import list_enum_values_for_annotation
 from dstack._internal.utils.cron import validate_cron
 from dstack._internal.utils.json_schema import add_extra_schema_types
@@ -112,7 +117,16 @@ class RetryEvent(str, Enum):
     ERROR = "error"
 
 
-class ProfileRetry(CoreModel):
+class ProfileRetryConfig(CoreConfig):
+    @staticmethod
+    def schema_extra(schema: Dict[str, Any]):
+        add_extra_schema_types(
+            schema["properties"]["duration"],
+            extra_types=[{"type": "string"}],
+        )
+
+
+class ProfileRetry(generate_dual_core_model(ProfileRetryConfig)):
     on_events: Annotated[
         Optional[List[RetryEvent]],
         Field(
@@ -128,14 +142,6 @@ class ProfileRetry(CoreModel):
         Field(description="The maximum period of retrying the run, e.g., `4h` or `1d`"),
     ] = None
 
-    class Config(CoreModel.Config):
-        @staticmethod
-        def schema_extra(schema: Dict[str, Any]):
-            add_extra_schema_types(
-                schema["properties"]["duration"],
-                extra_types=[{"type": "string"}],
-            )
-
     _validate_duration = validator("duration", pre=True, allow_reuse=True)(parse_duration)
 
     @root_validator
@@ -146,7 +152,16 @@ class ProfileRetry(CoreModel):
         return values
 
 
-class UtilizationPolicy(CoreModel):
+class UtilizationPolicyConfig(CoreConfig):
+    @staticmethod
+    def schema_extra(schema: Dict[str, Any]):
+        add_extra_schema_types(
+            schema["properties"]["time_window"],
+            extra_types=[{"type": "string"}],
+        )
+
+
+class UtilizationPolicy(generate_dual_core_model(UtilizationPolicyConfig)):
     _min_time_window = "5m"
 
     min_gpu_utilization: Annotated[
@@ -170,14 +185,6 @@ class UtilizationPolicy(CoreModel):
             )
         ),
     ]
-
-    class Config(CoreModel.Config):
-        @staticmethod
-        def schema_extra(schema: Dict[str, Any]):
-            add_extra_schema_types(
-                schema["properties"]["time_window"],
-                extra_types=[{"type": "string"}],
-            )
 
     @validator("time_window", pre=True)
     def validate_time_window(cls, v: Union[int, str]) -> int:
@@ -217,6 +224,28 @@ class Schedule(CoreModel):
         if isinstance(self.cron, str):
             return [self.cron]
         return self.cron
+
+
+class ProfileParamsConfig(CoreConfig):
+    @staticmethod
+    def schema_extra(schema: Dict[str, Any]) -> None:
+        del schema["properties"]["pool_name"]
+        del schema["properties"]["instance_name"]
+        del schema["properties"]["retry_policy"]
+        del schema["properties"]["termination_policy"]
+        del schema["properties"]["termination_idle_time"]
+        add_extra_schema_types(
+            schema["properties"]["max_duration"],
+            extra_types=[{"type": "boolean"}, {"type": "string"}],
+        )
+        add_extra_schema_types(
+            schema["properties"]["stop_duration"],
+            extra_types=[{"type": "boolean"}, {"type": "string"}],
+        )
+        add_extra_schema_types(
+            schema["properties"]["idle_duration"],
+            extra_types=[{"type": "string"}],
+        )
 
 
 class ProfileParams(CoreModel):
@@ -358,27 +387,6 @@ class ProfileParams(CoreModel):
     termination_policy: Annotated[Optional[TerminationPolicy], Field(exclude=True)] = None
     termination_idle_time: Annotated[Optional[Union[str, int]], Field(exclude=True)] = None
 
-    class Config(CoreModel.Config):
-        @staticmethod
-        def schema_extra(schema: Dict[str, Any]) -> None:
-            del schema["properties"]["pool_name"]
-            del schema["properties"]["instance_name"]
-            del schema["properties"]["retry_policy"]
-            del schema["properties"]["termination_policy"]
-            del schema["properties"]["termination_idle_time"]
-            add_extra_schema_types(
-                schema["properties"]["max_duration"],
-                extra_types=[{"type": "boolean"}, {"type": "string"}],
-            )
-            add_extra_schema_types(
-                schema["properties"]["stop_duration"],
-                extra_types=[{"type": "boolean"}, {"type": "string"}],
-            )
-            add_extra_schema_types(
-                schema["properties"]["idle_duration"],
-                extra_types=[{"type": "string"}],
-            )
-
     _validate_max_duration = validator("max_duration", pre=True, allow_reuse=True)(
         parse_max_duration
     )
@@ -403,17 +411,28 @@ class ProfileProps(CoreModel):
     ] = False
 
 
-class Profile(ProfileProps, ProfileParams):
+class ProfileConfig(ProfileParamsConfig):
+    @staticmethod
+    def schema_extra(schema: Dict[str, Any]) -> None:
+        ProfileParamsConfig.schema_extra(schema)
+
+
+class Profile(
+    ProfileProps,
+    ProfileParams,
+    generate_dual_core_model(ProfileConfig),
+):
     pass
 
 
-class ProfilesConfig(CoreModel):
-    profiles: List[Profile]
+class ProfilesConfigConfig(CoreConfig):
+    json_loads = orjson.loads
+    json_dumps = pydantic_orjson_dumps_with_indent
+    schema_extra = {"$schema": "http://json-schema.org/draft-07/schema#"}
 
-    class Config(CoreModel.Config):
-        json_loads = orjson.loads
-        json_dumps = pydantic_orjson_dumps_with_indent
-        schema_extra = {"$schema": "http://json-schema.org/draft-07/schema#"}
+
+class ProfilesConfig(generate_dual_core_model(ProfilesConfigConfig)):
+    profiles: List[Profile]
 
     def default(self) -> Optional[Profile]:
         for p in self.profiles:
