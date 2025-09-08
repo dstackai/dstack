@@ -30,7 +30,9 @@ class CoreConfig:
 # for permissive parsing of the server responses.
 #
 # We define a func to generate CoreModel dynamically that can be used
-# to define custom config for both __request__ and __response__ models.
+# to define custom Config for both __request__ and __response__ models.
+# Note: Defining config in the model class directly overrides
+# pydantic-duality's base config, breaking __response__.
 def generate_dual_core_model(
     custom_config: Union[type, Mapping],
 ) -> "type[CoreModel]":
