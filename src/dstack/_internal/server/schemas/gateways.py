@@ -9,7 +9,7 @@ from dstack._internal.core.models.gateways import GatewayConfiguration
 
 class CreateGatewayRequestConfig(CoreConfig):
     @staticmethod
-    def schema_extra(schema: Dict[str, Any]) -> None:
+    def schema_extra(schema: Dict[str, Any]):
         del schema["properties"]["name"]
         del schema["properties"]["backend_type"]
         del schema["properties"]["region"]

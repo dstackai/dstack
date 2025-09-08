@@ -228,7 +228,7 @@ class Schedule(CoreModel):
 
 class ProfileParamsConfig(CoreConfig):
     @staticmethod
-    def schema_extra(schema: Dict[str, Any]) -> None:
+    def schema_extra(schema: Dict[str, Any]):
         del schema["properties"]["pool_name"]
         del schema["properties"]["instance_name"]
         del schema["properties"]["retry_policy"]
@@ -413,7 +413,7 @@ class ProfileProps(CoreModel):
 
 class ProfileConfig(ProfileParamsConfig):
     @staticmethod
-    def schema_extra(schema: Dict[str, Any]) -> None:
+    def schema_extra(schema: Dict[str, Any]):
         ProfileParamsConfig.schema_extra(schema)
 
 

@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any, Dict, List, Literal, Optional, Type
+from typing import Any, Dict, List, Literal, Optional
 from urllib.parse import urlparse
 
 from pydantic import UUID4, Field, root_validator
@@ -394,7 +394,7 @@ class Job(CoreModel):
 
 class RunSpecConfig(CoreConfig):
     @staticmethod
-    def schema_extra(schema: Dict[str, Any], model: Type) -> None:
+    def schema_extra(schema: Dict[str, Any]):
         prop = schema.get("properties", {})
         prop.pop("merged_profile", None)
 

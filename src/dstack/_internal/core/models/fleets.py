@@ -2,7 +2,7 @@ import ipaddress
 import uuid
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Type, Union
+from typing import Any, Dict, List, Optional, Union
 
 from pydantic import Field, root_validator, validator
 from typing_extensions import Annotated, Literal
@@ -364,7 +364,7 @@ class FleetConfiguration(
 
 class FleetSpecConfig(CoreConfig):
     @staticmethod
-    def schema_extra(schema: Dict[str, Any], model: Type) -> None:
+    def schema_extra(schema: Dict[str, Any]):
         prop = schema.get("properties", {})
         prop.pop("merged_profile", None)
 

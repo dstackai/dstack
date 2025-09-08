@@ -26,7 +26,7 @@ class RepoError(DstackError):
 
 class RemoteRepoCredsConfig(CoreConfig):
     @staticmethod
-    def schema_extra(schema: Dict[str, Any]) -> None:
+    def schema_extra(schema: Dict[str, Any]):
         del schema["properties"]["protocol"]
 
 
@@ -41,7 +41,7 @@ class RemoteRepoCreds(generate_dual_core_model(RemoteRepoCredsConfig)):
 
 class RemoteRepoInfoConfig(CoreConfig):
     @staticmethod
-    def schema_extra(schema: Dict[str, Any]) -> None:
+    def schema_extra(schema: Dict[str, Any]):
         del schema["properties"]["repo_host_name"]
         del schema["properties"]["repo_port"]
         del schema["properties"]["repo_user_name"]
