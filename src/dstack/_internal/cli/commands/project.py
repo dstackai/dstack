@@ -67,6 +67,7 @@ class ProjectCommand(BaseCommand):
         set_default_parser.set_defaults(subfunc=self._set_default)
 
     def _command(self, args: argparse.Namespace):
+        super()._command(args)
         if not hasattr(args, "subfunc"):
             args.subfunc = self._list
         args.subfunc(args)

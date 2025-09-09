@@ -50,6 +50,6 @@ def apply_args(
     configurator = FleetConfigurator(Mock())
     configurator.register_args(parser)
     conf = conf.copy(deep=True)
-    configurator_args, unknown_args = parser.parse_known_args(args)
-    configurator.apply_args(conf, configurator_args, unknown_args)
+    configurator_args = parser.parse_args(args)
+    configurator.apply_args(conf, configurator_args)
     return conf, configurator_args

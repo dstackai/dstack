@@ -1,4 +1,5 @@
 import argparse
+import shlex
 import subprocess
 import sys
 import time
@@ -35,6 +36,7 @@ from dstack._internal.core.models.configurations import (
     LEGACY_REPO_DIR,
     AnyRunConfiguration,
     ApplyConfigurationType,
+    ConfigurationWithCommandsParams,
     ConfigurationWithPortsParams,
     DevEnvironmentConfiguration,
     PortMapping,
@@ -80,20 +82,17 @@ class BaseRunConfigurator(
     ApplyEnvVarsConfiguratorMixin,
     BaseApplyConfigurator[RunConfigurationT],
 ):
-    TYPE: ApplyConfigurationType
-
     def apply_configuration(
         self,
         conf: RunConfigurationT,
         configuration_path: str,
         command_args: argparse.Namespace,
         configurator_args: argparse.Namespace,
-        unknown_args: List[str],
     ):
         if configurator_args.repo and configurator_args.no_repo:
             raise CLIError("Either --repo or --no-repo can be specified")
 
-        self.apply_args(conf, configurator_args, unknown_args)
+        self.apply_args(conf, configurator_args)
         self.validate_gpu_vendor_and_image(conf)
         self.validate_cpu_arch_and_image(conf)
 
@@ -395,7 +394,7 @@ class BaseRunConfigurator(
         )
         register_init_repo_args(repo_group)
 
-    def apply_args(self, conf: RunConfigurationT, args: argparse.Namespace, unknown: List[str]):
+    def apply_args(self, conf: RunConfigurationT, args: argparse.Namespace):
         apply_profile_args(args, conf)
         if args.run_name:
             conf.name = args.run_name
@@ -408,16 +407,6 @@ class BaseRunConfigurator(
 
         self.apply_env_vars(conf.env, args)
         self.interpolate_env(conf)
-        self.interpolate_run_args(conf.setup, unknown)
-
-    def interpolate_run_args(self, value: List[str], unknown):
-        run_args = " ".join(unknown)
-        interpolator = VariablesInterpolator({"run": {"args": run_args}}, skip=["secrets"])
-        try:
-            for i in range(len(value)):
-                value[i] = interpolator.interpolate_or_error(value[i])
-        except InterpolatorError as e:
-            raise ConfigurationError(e.args[0])
 
     def interpolate_env(self, conf: RunConfigurationT):
         env_dict = conf.env.as_dict()
@@ -701,18 +690,50 @@ class RunWithPortsConfiguratorMixin:
             conf.ports = list(_merge_ports(conf.ports, args.ports).values())
 
 
-class TaskConfigurator(RunWithPortsConfiguratorMixin, BaseRunConfigurator):
+class RunWithCommandsConfiguratorMixin:
+    @classmethod
+    def register_commands_args(cls, parser: argparse.ArgumentParser):
+        parser.add_argument(
+            "run_args",
+            help=(
+                "Run arguments. Available in the configuration [code]commands[/code] as"
+                " [code]${{ run.args }}[/code]."
+                " Use [code]--[/code] to separate run options from [code]dstack[/code] options"
+            ),
+            nargs="*",
+            metavar="RUN_ARGS",
+        )
+
+    def apply_commands_args(
+        self,
+        conf: ConfigurationWithCommandsParams,
+        args: argparse.Namespace,
+    ):
+        commands = conf.commands
+        run_args = shlex.join(args.run_args)
+        interpolator = VariablesInterpolator({"run": {"args": run_args}}, skip=["secrets"])
+        try:
+            for i, command in enumerate(commands):
+                commands[i] = interpolator.interpolate_or_error(command)
+        except InterpolatorError as e:
+            raise ConfigurationError(e.args[0])
+
+
+class TaskConfigurator(
+    RunWithPortsConfiguratorMixin, RunWithCommandsConfiguratorMixin, BaseRunConfigurator
+):
     TYPE = ApplyConfigurationType.TASK
 
     @classmethod
     def register_args(cls, parser: argparse.ArgumentParser):
         super().register_args(parser)
         cls.register_ports_args(parser)
+        cls.register_commands_args(parser)
 
-    def apply_args(self, conf: TaskConfiguration, args: argparse.Namespace, unknown: List[str]):
-        super().apply_args(conf, args, unknown)
+    def apply_args(self, conf: TaskConfiguration, args: argparse.Namespace):
+        super().apply_args(conf, args)
         self.apply_ports_args(conf, args)
-        self.interpolate_run_args(conf.commands, unknown)
+        self.apply_commands_args(conf, args)
 
 
 class DevEnvironmentConfigurator(RunWithPortsConfiguratorMixin, BaseRunConfigurator):
@@ -723,10 +744,8 @@ class DevEnvironmentConfigurator(RunWithPortsConfiguratorMixin, BaseRunConfigura
         super().register_args(parser)
         cls.register_ports_args(parser)
 
-    def apply_args(
-        self, conf: DevEnvironmentConfiguration, args: argparse.Namespace, unknown: List[str]
-    ):
-        super().apply_args(conf, args, unknown)
+    def apply_args(self, conf: DevEnvironmentConfiguration, args: argparse.Namespace):
+        super().apply_args(conf, args)
         self.apply_ports_args(conf, args)
         if conf.ide == "vscode" and conf.version is None:
             conf.version = _detect_vscode_version()
@@ -746,12 +765,17 @@ class DevEnvironmentConfigurator(RunWithPortsConfiguratorMixin, BaseRunConfigura
                 )
 
 
-class ServiceConfigurator(BaseRunConfigurator):
+class ServiceConfigurator(RunWithCommandsConfiguratorMixin, BaseRunConfigurator):
     TYPE = ApplyConfigurationType.SERVICE
 
-    def apply_args(self, conf: ServiceConfiguration, args: argparse.Namespace, unknown: List[str]):
-        super().apply_args(conf, args, unknown)
-        self.interpolate_run_args(conf.commands, unknown)
+    @classmethod
+    def register_args(cls, parser: argparse.ArgumentParser):
+        super().register_args(parser)
+        cls.register_commands_args(parser)
+
+    def apply_args(self, conf: TaskConfiguration, args: argparse.Namespace):
+        super().apply_args(conf, args)
+        self.apply_commands_args(conf, args)
 
 
 def _merge_ports(conf: List[PortMapping], args: List[PortMapping]) -> Dict[int, PortMapping]:
