@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime, timedelta
 from typing import List, Optional, Tuple
 
-from sqlalchemy import and_, not_, or_, select
+from sqlalchemy import and_, func, not_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import contains_eager, joinedload, load_only, noload, selectinload
 
@@ -54,6 +54,7 @@ from dstack._internal.server.models import (
 from dstack._internal.server.services.backends import get_project_backend_by_type_or_error
 from dstack._internal.server.services.fleets import (
     fleet_model_to_fleet,
+    generate_fleet_name,
     get_fleet_requirements,
     get_next_instance_num,
 )
@@ -71,7 +72,7 @@ from dstack._internal.server.services.jobs import (
     get_job_configured_volumes,
     get_job_runtime_data,
 )
-from dstack._internal.server.services.locking import get_locker
+from dstack._internal.server.services.locking import get_locker, string_to_lock_id
 from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.offers import get_offers_by_requirements
 from dstack._internal.server.services.requirements.combine import (
@@ -363,7 +364,8 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         job_model.job_provisioning_data = job_provisioning_data.json()
         job_model.status = JobStatus.PROVISIONING
         if fleet_model is None:
-            fleet_model = _create_fleet_model_for_job(
+            fleet_model = await _create_fleet_model_for_job(
+                session=session,
                 project=project,
                 run=run,
             )
@@ -752,7 +754,8 @@ def _check_can_create_new_instance_in_fleet(fleet: Fleet) -> bool:
     return True
 
 
-def _create_fleet_model_for_job(
+async def _create_fleet_model_for_job(
+    session: AsyncSession,
     project: ProjectModel,
     run: Run,
 ) -> FleetModel:
@@ -760,9 +763,19 @@ def _create_fleet_model_for_job(
     if run.run_spec.configuration.type == "task" and run.run_spec.configuration.nodes > 1:
         placement = InstanceGroupPlacement.CLUSTER
     nodes = _get_nodes_required_num_for_run(run.run_spec)
+
+    lock_namespace = f"fleet_names_{project.name}"
+    # TODO: Lock fleet names on SQLite.
+    # Needs some refactoring so that the lock is released after commit.
+    if get_db().dialect_name == "postgresql":
+        await session.execute(
+            select(func.pg_advisory_xact_lock(string_to_lock_id(lock_namespace)))
+        )
+    fleet_name = await generate_fleet_name(session=session, project=project)
+
     spec = FleetSpec(
         configuration=FleetConfiguration(
-            name=run.run_spec.run_name,
+            name=fleet_name,
             placement=placement,
             reservation=run.run_spec.configuration.reservation,
             nodes=FleetNodesSpec(
@@ -776,7 +789,7 @@ def _create_fleet_model_for_job(
     )
     fleet_model = FleetModel(
         id=uuid.uuid4(),
-        name=run.run_spec.run_name,
+        name=fleet_name,
         project=project,
         status=FleetStatus.ACTIVE,
         spec=spec.json(),
