@@ -9,7 +9,11 @@ from pydantic import Field, ValidationError, validator
 from typing_extensions import Annotated
 
 from dstack._internal.core.errors import DockerRegistryError
-from dstack._internal.core.models.common import CoreModel, RegistryAuth
+from dstack._internal.core.models.common import (
+    CoreModel,
+    FrozenCoreModel,
+    RegistryAuth,
+)
 from dstack._internal.server.utils.common import join_byte_stream_checked
 from dstack._internal.utils.dxf import PatchedDXF
 
@@ -31,15 +35,12 @@ class DXFAuthAdapter:
         )
 
 
-class DockerImage(CoreModel):
+class DockerImage(FrozenCoreModel):
     image: str
-    registry: Optional[str]
+    registry: Optional[str] = None
     repo: str
     tag: str
-    digest: Optional[str]
-
-    class Config(CoreModel.Config):
-        frozen = True
+    digest: Optional[str] = None
 
 
 class ImageConfig(CoreModel):

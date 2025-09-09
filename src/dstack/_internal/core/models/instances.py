@@ -7,7 +7,10 @@ import gpuhunt
 from pydantic import root_validator
 
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.common import CoreModel
+from dstack._internal.core.models.common import (
+    CoreModel,
+    FrozenCoreModel,
+)
 from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.health import HealthStatus
 from dstack._internal.core.models.volumes import Volume
@@ -117,13 +120,10 @@ class InstanceType(CoreModel):
     resources: Resources
 
 
-class SSHConnectionParams(CoreModel):
+class SSHConnectionParams(FrozenCoreModel):
     hostname: str
     username: str
     port: int
-
-    class Config(CoreModel.Config):
-        frozen = True
 
 
 class SSHKey(CoreModel):
