@@ -4,7 +4,13 @@ Environment variables read by the dstack server. Documented in reference/environ
 
 import os
 import warnings
+from enum import Enum
 from pathlib import Path
+
+from dstack._internal.utils.env import environ
+from dstack._internal.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 DSTACK_DIR_PATH = Path("~/.dstack/").expanduser()
 
@@ -136,3 +142,43 @@ UPDATE_DEFAULT_PROJECT = os.getenv("DSTACK_UPDATE_DEFAULT_PROJECT") is not None
 DO_NOT_UPDATE_DEFAULT_PROJECT = os.getenv("DSTACK_DO_NOT_UPDATE_DEFAULT_PROJECT") is not None
 SKIP_GATEWAY_UPDATE = os.getenv("DSTACK_SKIP_GATEWAY_UPDATE") is not None
 ENABLE_PROMETHEUS_METRICS = os.getenv("DSTACK_ENABLE_PROMETHEUS_METRICS") is not None
+
+
+class JobNetworkMode(Enum):
+    # "host" for multinode runs only, "bridge" otherwise. Opt-in new defaut
+    HOST_FOR_MULTINODE_ONLY = 1
+    # "bridge" if the job occupies only a part of the instance, "host" otherswise. Current default
+    HOST_WHEN_POSSIBLE = 2
+    # Always "bridge", even for multinode runs. Same as legacy DSTACK_FORCE_BRIDGE_NETWORK=true
+    FORCED_BRIDGE = 3
+
+
+def _get_job_network_mode() -> JobNetworkMode:
+    # Current default
+    mode = JobNetworkMode.HOST_WHEN_POSSIBLE
+    bridge_var = "DSTACK_FORCE_BRIDGE_NETWORK"
+    force_bridge = environ.get_bool(bridge_var)
+    mode_var = "DSTACK_SERVER_JOB_NETWORK_MODE"
+    mode_from_env = environ.get_enum(mode_var, JobNetworkMode, value_type=int)
+    if mode_from_env is not None:
+        if force_bridge is not None:
+            logger.warning(
+                f"{bridge_var} is deprecated since 0.19.27 and ignored when {mode_var} is set"
+            )
+        return mode_from_env
+    if force_bridge is not None:
+        if force_bridge:
+            mode = JobNetworkMode.FORCED_BRIDGE
+            logger.warning(
+                (
+                    f"{bridge_var} is deprecated since 0.19.27."
+                    f" Set {mode_var} to {mode.value} and remove {bridge_var}"
+                )
+            )
+        else:
+            logger.warning(f"{bridge_var} is deprecated since 0.19.27. Remove {bridge_var}")
+    return mode
+
+
+JOB_NETWORK_MODE = _get_job_network_mode()
+del _get_job_network_mode
