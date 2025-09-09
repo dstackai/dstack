@@ -31,6 +31,8 @@ def get_apply_plan_excludes(plan: ApplyRunPlanInput) -> Optional[IncludeExcludeD
         current_resource_excludes["status_message"] = True
         if current_resource.deployment_num == 0:
             current_resource_excludes["deployment_num"] = True
+        if current_resource.fleet is None:
+            current_resource_excludes["fleet"] = True
         apply_plan_excludes["current_resource"] = current_resource_excludes
         current_resource_excludes["run_spec"] = get_run_spec_excludes(current_resource.run_spec)
         job_submissions_excludes: IncludeExcludeDictType = {}
