@@ -4,8 +4,8 @@ date: 2025-09-10
 description: "TBA"
 slug: state-of-cloud-gpu-2025
 image: https://dstack.ai/static-assets/static-assets/images/cloud-gpu-providers.png
-categories:
-  - Benchmarks
+# categories:
+#   - Benchmarks
 ---
 
 # The state of cloud GPUs in 2025: costs, performance, playbooks
@@ -135,4 +135,12 @@ This turns capacity from individual silos into one fungible pool.
     - **Next steps.** We plan to publish price normalization, hardware/network microbenchmarks, and a scheduler capability matrix; preliminary harnesses are linked in the appendix. Contributors welcome.
 
 
-> If you need a lighter, simpler orchestration and control-plane alternative to Kubernetes or Slurm, consider [dstack :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/){:target="_blank"}. If you want unified access to low-cost on-demand and spot GPUs across multiple clouds, look at [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai/){:target="_blank"}.
+> If you need a lighter, simpler orchestration and control-plane alternative to Kubernetes or Slurm, consider [dstack :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/){:target="_blank"}. 
+It’s open-source and self-hosted.
+
+??? info "dstack Sky"
+    If you want unified access to low-cost on-demand and spot GPUs across multiple clouds, try [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai/){:target="_blank"}.
+
+    <img src="https://dstack.ai/static-assets/static-assets/images/dstack-sky-offers.png" width="750"/>
+
+    You can use it with your own cloud accounts or through the cloud marketplace.
