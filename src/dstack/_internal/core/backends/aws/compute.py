@@ -157,7 +157,7 @@ class AWSCompute(
             )
         return availability_offers
 
-    def get_offers(self, requirements: Requirements) -> List[InstanceOfferWithAvailability]:
+    def get_requirements_filter(self, requirements: Requirements) -> Optional[Callable[[InstanceOfferWithAvailability], bool]]:
         # Handle reservations specially since they require different filtering
         if requirements and requirements.reservation:
             region_to_reservation = {}
@@ -170,10 +170,7 @@ class AWSCompute(
                 if reservation is not None:
                     region_to_reservation[region] = reservation
 
-            def _supported_instances_with_reservation(offer: InstanceOffer) -> bool:
-                # Filter: only instance types supported by dstack
-                if not _supported_instances(offer):
-                    return False
+            def reservation_filter(offer: InstanceOfferWithAvailability) -> bool:
                 # Filter: Spot instances can't be used with reservations
                 if offer.instance.resources.spot:
                     return False
@@ -184,35 +181,9 @@ class AWSCompute(
                     return False
                 return True
 
-            offers = get_catalog_offers(
-                backend=BackendType.AWS,
-                locations=self.config.regions,
-                requirements=requirements,
-                configurable_disk_size=CONFIGURABLE_DISK_SIZE,
-                extra_filter=_supported_instances_with_reservation,
-            )
-            regions = list(set(i.region for i in offers))
-            with self._get_regions_to_quotas_execution_lock:
-                regions_to_quotas = self._get_regions_to_quotas(self.session, regions)
-            regions_to_zones = self._get_regions_to_zones(self.session, regions)
-
-            availability_offers = []
-            for offer in offers:
-                availability = InstanceAvailability.UNKNOWN
-                quota = _has_quota(regions_to_quotas[offer.region], offer.instance.name)
-                if quota is not None and not quota:
-                    availability = InstanceAvailability.NO_QUOTA
-                availability_offers.append(
-                    InstanceOfferWithAvailability(
-                        **offer.dict(),
-                        availability=availability,
-                        availability_zones=regions_to_zones[offer.region],
-                    )
-                )
-            return availability_offers
+            return reservation_filter
         
-        # For non-reservation requests, use the cached approach
-        return super().get_offers(requirements)
+        return None
 
     def terminate_instance(
         self, instance_id: str, region: str, backend_data: Optional[str] = None

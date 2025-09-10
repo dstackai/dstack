@@ -152,10 +152,32 @@ class ComputeWithAllOffersCached(ABC):
         """
         pass
 
+    @abstractmethod
+    def get_requirements_filter(self, requirements: Requirements) -> Optional[Callable[[InstanceOfferWithAvailability], bool]]:
+        """
+        Returns a filter function to apply to offers based on requirements.
+        This allows backends to implement custom filtering logic for specific requirements.
+        """
+        pass
+
     def get_offers(self, requirements: Requirements) -> List[InstanceOfferWithAvailability]:
         offers_with_availability = self._get_all_offers_with_availability_cached()
+        
+        # Apply requirements-specific filter first
+        requirements_filter = self.get_requirements_filter(requirements)
+        if requirements_filter is not None:
+            offers_with_availability = [
+                offer for offer in offers_with_availability 
+                if requirements_filter(offer)
+            ]
+        
+        # Then apply standard requirements filtering
         filtered_offers = filter_offers_by_requirements(offers_with_availability, requirements)
         return filtered_offers
+
+    def get_requirements_filter(self, requirements: Requirements) -> Optional[Callable[[InstanceOfferWithAvailability], bool]]:
+        # GCP doesn't need special requirements-based filtering
+        return None
 
     @cachedmethod(
         cache=lambda self: self._offers_with_availability_cache,
