@@ -6,6 +6,7 @@ from datacrunch.instances.instances import Instance
 
 from dstack._internal.core.backends.base.backend import Compute
 from dstack._internal.core.backends.base.compute import (
+    ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
     generate_unique_instance_name,
     get_shim_commands,
@@ -37,7 +38,7 @@ CONFIGURABLE_DISK_SIZE = Range[Memory](min=IMAGE_SIZE, max=None)
 
 class DataCrunchCompute(
     ComputeWithCreateInstanceSupport,
-    Compute,
+    ComputeWithAllOffersCached,
 ):
     def __init__(self, config: DataCrunchConfig):
         super().__init__()
@@ -47,13 +48,11 @@ class DataCrunchCompute(
             client_secret=self.config.creds.client_secret,
         )
 
-    def get_offers(
-        self, requirements: Requirements
-    ) -> List[InstanceOfferWithAvailability]:
+    def get_all_offers_with_availability(self) -> List[InstanceOfferWithAvailability]:
         offers = get_catalog_offers(
             backend=BackendType.DATACRUNCH,
             locations=self.config.regions,
-            requirements=requirements,
+            requirements=None,
             configurable_disk_size=CONFIGURABLE_DISK_SIZE,
         )
         offers_with_availability = self._get_offers_with_availability(offers)
