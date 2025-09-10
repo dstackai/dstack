@@ -18,6 +18,7 @@ from dstack._internal.core.backends.aws.models import (
 )
 from dstack._internal.core.backends.base.compute import (
     Compute,
+    ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
     ComputeWithGatewaySupport,
     ComputeWithMultinodeSupport,
@@ -87,6 +88,7 @@ def _ec2client_cache_methodkey(self, ec2_client, *args, **kwargs):
 
 
 class AWSCompute(
+    ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
     ComputeWithMultinodeSupport,
     ComputeWithReservationSupport,
@@ -125,10 +127,38 @@ class AWSCompute(
         self._get_image_id_and_username_cache_lock = threading.Lock()
         self._get_image_id_and_username_cache = TTLCache(maxsize=100, ttl=600)
 
-    def get_offers(
-        self, requirements: Requirements
-    ) -> List[InstanceOfferWithAvailability]:
-        filter = _supported_instances
+    def get_all_offers_with_availability(self) -> List[InstanceOfferWithAvailability]:
+        offers = get_catalog_offers(
+            backend=BackendType.AWS,
+            locations=self.config.regions,
+            requirements=None,
+            configurable_disk_size=CONFIGURABLE_DISK_SIZE,
+            extra_filter=_supported_instances,
+        )
+        regions = list(set(i.region for i in offers))
+        with self._get_regions_to_quotas_execution_lock:
+            # Cache lock does not prevent concurrent execution.
+            # We use a separate lock to avoid requesting quotas in parallel and hitting rate limits.
+            regions_to_quotas = self._get_regions_to_quotas(self.session, regions)
+        regions_to_zones = self._get_regions_to_zones(self.session, regions)
+
+        availability_offers = []
+        for offer in offers:
+            availability = InstanceAvailability.UNKNOWN
+            quota = _has_quota(regions_to_quotas[offer.region], offer.instance.name)
+            if quota is not None and not quota:
+                availability = InstanceAvailability.NO_QUOTA
+            availability_offers.append(
+                InstanceOfferWithAvailability(
+                    **offer.dict(),
+                    availability=availability,
+                    availability_zones=regions_to_zones[offer.region],
+                )
+            )
+        return availability_offers
+
+    def get_offers(self, requirements: Requirements) -> List[InstanceOfferWithAvailability]:
+        # Handle reservations specially since they require different filtering
         if requirements and requirements.reservation:
             region_to_reservation = {}
             for region in self.config.regions:
@@ -154,36 +184,35 @@ class AWSCompute(
                     return False
                 return True
 
-            filter = _supported_instances_with_reservation
-
-        offers = get_catalog_offers(
-            backend=BackendType.AWS,
-            locations=self.config.regions,
-            requirements=requirements,
-            configurable_disk_size=CONFIGURABLE_DISK_SIZE,
-            extra_filter=filter,
-        )
-        regions = list(set(i.region for i in offers))
-        with self._get_regions_to_quotas_execution_lock:
-            # Cache lock does not prevent concurrent execution.
-            # We use a separate lock to avoid requesting quotas in parallel and hitting rate limits.
-            regions_to_quotas = self._get_regions_to_quotas(self.session, regions)
-        regions_to_zones = self._get_regions_to_zones(self.session, regions)
-
-        availability_offers = []
-        for offer in offers:
-            availability = InstanceAvailability.UNKNOWN
-            quota = _has_quota(regions_to_quotas[offer.region], offer.instance.name)
-            if quota is not None and not quota:
-                availability = InstanceAvailability.NO_QUOTA
-            availability_offers.append(
-                InstanceOfferWithAvailability(
-                    **offer.dict(),
-                    availability=availability,
-                    availability_zones=regions_to_zones[offer.region],
-                )
+            offers = get_catalog_offers(
+                backend=BackendType.AWS,
+                locations=self.config.regions,
+                requirements=requirements,
+                configurable_disk_size=CONFIGURABLE_DISK_SIZE,
+                extra_filter=_supported_instances_with_reservation,
             )
-        return availability_offers
+            regions = list(set(i.region for i in offers))
+            with self._get_regions_to_quotas_execution_lock:
+                regions_to_quotas = self._get_regions_to_quotas(self.session, regions)
+            regions_to_zones = self._get_regions_to_zones(self.session, regions)
+
+            availability_offers = []
+            for offer in offers:
+                availability = InstanceAvailability.UNKNOWN
+                quota = _has_quota(regions_to_quotas[offer.region], offer.instance.name)
+                if quota is not None and not quota:
+                    availability = InstanceAvailability.NO_QUOTA
+                availability_offers.append(
+                    InstanceOfferWithAvailability(
+                        **offer.dict(),
+                        availability=availability,
+                        availability_zones=regions_to_zones[offer.region],
+                    )
+                )
+            return availability_offers
+        
+        # For non-reservation requests, use the cached approach
+        return super().get_offers(requirements)
 
     def terminate_instance(
         self, instance_id: str, region: str, backend_data: Optional[str] = None
