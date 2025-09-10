@@ -113,7 +113,7 @@ class GCPCompute(
         self._offers_with_availability_cache = TTLCache(maxsize=1, ttl=180)
 
     def get_offers(
-        self, requirements: Optional[Requirements] = None
+        self, requirements: Requirements
     ) -> List[InstanceOfferWithAvailability]:
         offers_with_availability = self._get_all_offers_with_availability()
         filtered_offers = filter_offers_by_requirements(offers_with_availability, requirements)

@@ -71,7 +71,7 @@ class KubernetesCompute(
         self.api = get_api_from_config_data(config.kubeconfig.data)
 
     def get_offers(
-        self, requirements: Optional[Requirements] = None
+        self, requirements: Requirements
     ) -> List[InstanceOfferWithAvailability]:
         nodes = self.api.list_node()
         instance_offers = []

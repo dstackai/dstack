@@ -126,7 +126,7 @@ class AWSCompute(
         self._get_image_id_and_username_cache = TTLCache(maxsize=100, ttl=600)
 
     def get_offers(
-        self, requirements: Optional[Requirements] = None
+        self, requirements: Requirements
     ) -> List[InstanceOfferWithAvailability]:
         filter = _supported_instances
         if requirements and requirements.reservation:

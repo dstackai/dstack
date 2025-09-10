@@ -57,7 +57,7 @@ class HotAisleCompute(
         )
 
     def get_offers(
-        self, requirements: Optional[Requirements] = None
+        self, requirements: Requirements
     ) -> List[InstanceOfferWithAvailability]:
         offers = get_catalog_offers(
             backend=BackendType.HOTAISLE,

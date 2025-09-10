@@ -63,7 +63,7 @@ class Compute(ABC):
 
     @abstractmethod
     def get_offers(
-        self, requirements: Optional[Requirements] = None
+        self, requirements: Requirements
     ) -> List[InstanceOfferWithAvailability]:
         """
         Returns offers with availability matching `requirements`.
@@ -121,10 +121,8 @@ class Compute(ABC):
         """
         pass
 
-    def _get_offers_cached_key(self, requirements: Optional[Requirements] = None) -> int:
+    def _get_offers_cached_key(self, requirements: Requirements) -> int:
         # Requirements is not hashable, so we use a hack to get arguments hash
-        if requirements is None:
-            return hash(None)
         return hash(requirements.json())
 
     @cachedmethod(
@@ -133,7 +131,7 @@ class Compute(ABC):
         lock=lambda self: self._offers_cache_lock,
     )
     def get_offers_cached(
-        self, requirements: Optional[Requirements] = None
+        self, requirements: Requirements
     ) -> List[InstanceOfferWithAvailability]:
         return self.get_offers(requirements)
 

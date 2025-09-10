@@ -29,7 +29,7 @@ class LocalCompute(
     Compute,
 ):
     def get_offers(
-        self, requirements: Optional[Requirements] = None
+        self, requirements: Requirements
     ) -> List[InstanceOfferWithAvailability]:
         return [
             InstanceOfferWithAvailability(
