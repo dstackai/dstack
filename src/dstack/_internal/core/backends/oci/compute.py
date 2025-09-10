@@ -115,7 +115,11 @@ class OCICompute(
         availability_domain = instance_offer.availability_zones[0]
 
         listing, package = resources.get_marketplace_listing_and_package(
-            cuda=len(instance_offer.instance.resources.gpus) > 0,
+            gpu_name=(
+                instance_offer.instance.resources.gpus[0].name
+                if len(instance_offer.instance.resources.gpus) > 0
+                else None
+            ),
             client=region.marketplace_client,
         )
         resources.accept_marketplace_listing_agreements(

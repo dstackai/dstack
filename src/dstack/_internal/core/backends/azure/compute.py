@@ -47,8 +47,10 @@ from dstack._internal.core.backends.base.compute import (
     get_gateway_user_data,
     get_user_data,
     merge_tags,
+    requires_nvidia_proprietary_kernel_modules,
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
+from dstack._internal.core.consts import DSTACK_OS_IMAGE_WITH_PROPRIETARY_NVIDIA_KERNEL_MODULES
 from dstack._internal.core.errors import ComputeError, NoCapacityError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.gateways import (
@@ -369,6 +371,7 @@ def _parse_config_vpc_id(vpc_id: str) -> Tuple[str, str]:
 class VMImageVariant(enum.Enum):
     GRID = enum.auto()
     CUDA = enum.auto()
+    CUDA_WITH_PROPRIETARY_KERNEL_MODULES = enum.auto()
     STANDARD = enum.auto()
 
     @classmethod
@@ -376,18 +379,24 @@ class VMImageVariant(enum.Enum):
         if "_A10_v5" in instance.name:
             return cls.GRID
         elif len(instance.resources.gpus) > 0:
-            return cls.CUDA
+            if not requires_nvidia_proprietary_kernel_modules(instance.resources.gpus[0].name):
+                return cls.CUDA
+            else:
+                return cls.CUDA_WITH_PROPRIETARY_KERNEL_MODULES
         else:
             return cls.STANDARD
 
     def get_image_name(self) -> str:
-        name = "dstack-"
         if self is self.GRID:
-            name += "grid-"
+            return f"dstack-grid-{version.base_image}"
         elif self is self.CUDA:
-            name += "cuda-"
-        name += version.base_image
-        return name
+            return f"dstack-cuda-{version.base_image}"
+        elif self is self.CUDA_WITH_PROPRIETARY_KERNEL_MODULES:
+            return f"dstack-cuda-{DSTACK_OS_IMAGE_WITH_PROPRIETARY_NVIDIA_KERNEL_MODULES}"
+        elif self is self.STANDARD:
+            return f"dstack-{version.base_image}"
+        else:
+            raise ValueError(f"Unexpected image variant {self!r}")
 
 
 _SUPPORTED_VM_SERIES_PATTERNS = [

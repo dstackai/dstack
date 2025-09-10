@@ -47,6 +47,22 @@ logger = get_logger(__name__)
 DSTACK_SHIM_BINARY_NAME = "dstack-shim"
 DSTACK_RUNNER_BINARY_NAME = "dstack-runner"
 DEFAULT_PRIVATE_SUBNETS = ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16")
+NVIDIA_GPUS_REQUIRING_PROPRIETARY_KERNEL_MODULES = frozenset(
+    # All NVIDIA architectures prior to Turing do not support Open Kernel Modules and require
+    # proprietary modules. This list is incomplete, update when necessary.
+    [
+        "v100",
+        "p100",
+        "p40",
+        "p4",
+        "m60",
+        "m40",
+        "m4",
+        "k80",
+        "k40",
+        "k20",
+    ]
+)
 
 GoArchType = Literal["amd64", "arm64"]
 
@@ -887,3 +903,12 @@ def merge_tags(
         for k, v in resource_tags.items():
             res.setdefault(k, v)
     return res
+
+
+def requires_nvidia_proprietary_kernel_modules(gpu_name: str) -> bool:
+    """
+    Returns:
+        Whether this NVIDIA GPU requires NVIDIA proprietary kernel modules
+        instead of open kernel modules.
+    """
+    return gpu_name.lower() in NVIDIA_GPUS_REQUIRING_PROPRIETARY_KERNEL_MODULES
