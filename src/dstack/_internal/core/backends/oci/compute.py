@@ -6,6 +6,7 @@ import oci
 
 from dstack._internal.core.backends.base.compute import (
     Compute,
+    ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
     ComputeWithMultinodeSupport,
     generate_unique_instance_name,
@@ -47,6 +48,7 @@ CONFIGURABLE_DISK_SIZE = Range[Memory](min=Memory.parse("50GB"), max=Memory.pars
 
 
 class OCICompute(
+    ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
     ComputeWithMultinodeSupport,
     Compute,
@@ -60,13 +62,11 @@ class OCICompute(
     def shapes_quota(self) -> resources.ShapesQuota:
         return resources.ShapesQuota.load(self.regions, self.config.compartment_id)
 
-    def get_offers(
-        self, requirements: Requirements
-    ) -> List[InstanceOfferWithAvailability]:
+    def get_all_offers_with_availability(self) -> List[InstanceOfferWithAvailability]:
         offers = get_catalog_offers(
             backend=BackendType.OCI,
             locations=self.config.regions,
-            requirements=requirements,
+            requirements=None,
             configurable_disk_size=CONFIGURABLE_DISK_SIZE,
             extra_filter=_supported_instances,
         )
