@@ -23,7 +23,7 @@ from dstack._internal.core.models.instances import (
 )
 from dstack._internal.core.models.placement import PlacementGroup
 from dstack._internal.core.models.resources import Memory, Range
-from dstack._internal.core.models.runs import JobProvisioningData, Requirements
+from dstack._internal.core.models.runs import JobProvisioningData
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.ssh import get_public_key_fingerprint
 
@@ -37,8 +37,9 @@ CONFIGURABLE_DISK_SIZE = Range[Memory](min=IMAGE_SIZE, max=None)
 
 
 class DataCrunchCompute(
-    ComputeWithCreateInstanceSupport,
     ComputeWithAllOffersCached,
+    ComputeWithCreateInstanceSupport,
+    Compute,
 ):
     def __init__(self, config: DataCrunchConfig):
         super().__init__()

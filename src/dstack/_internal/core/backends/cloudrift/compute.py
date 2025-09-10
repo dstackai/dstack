@@ -1,6 +1,7 @@
 from typing import Dict, List, Optional
 
 from dstack._internal.core.backends.base.compute import (
+    Compute,
     ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
     get_shim_commands,
@@ -26,6 +27,7 @@ logger = get_logger(__name__)
 class CloudRiftCompute(
     ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
+    Compute,
 ):
     def __init__(self, config: CloudRiftConfig):
         super().__init__()
