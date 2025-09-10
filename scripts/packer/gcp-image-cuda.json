@@ -10,7 +10,7 @@
     {
       "type": "googlecompute",
       "project_id": "dstack",
-      "source_image": "ubuntu-2204-jammy-v20230714",
+      "source_image": "ubuntu-2404-noble-amd64-v20250828",
       "image_name": "{{user `build_prefix`}}dstack-cuda-{{user `image_version` | clean_resource_name}}",
       "instance_name": "{{user `build_prefix`}}dstack-cuda-{{user `image_version` | clean_resource_name}}",
       "ssh_username": "ubuntu",
