@@ -65,7 +65,7 @@ from dstack._internal.core.models.instances import (
 )
 from dstack._internal.core.models.placement import PlacementGroup
 from dstack._internal.core.models.resources import Memory, Range
-from dstack._internal.core.models.runs import JobProvisioningData, Requirements
+from dstack._internal.core.models.runs import JobProvisioningData
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -105,12 +105,6 @@ class AzureCompute(
             offers=offers,
         )
         return offers_with_availability
-
-    def get_offers_post_filter(
-        self, requirements: Requirements
-    ) -> Optional[Callable[[InstanceOfferWithAvailability], bool]]:
-        # Azure doesn't need special requirements-based filtering
-        return None
 
     def create_instance(
         self,
