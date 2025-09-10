@@ -1,6 +1,6 @@
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import boto3
 import botocore.client
@@ -157,11 +157,12 @@ class AWSCompute(
             )
         return availability_offers
 
-    def get_requirements_filter(self, requirements: Requirements) -> Optional[Callable[[InstanceOfferWithAvailability], bool]]:
-        # Handle reservations specially since they require different filtering
-        if requirements and requirements.reservation:
+    def get_offers_post_filter(
+        self, requirements: Requirements
+    ) -> Optional[Callable[[InstanceOfferWithAvailability], bool]]:
+        if requirements.reservation:
             region_to_reservation = {}
-            for region in self.config.regions:
+            for region in get_or_error(self.config.regions):
                 reservation = aws_resources.get_reservation(
                     ec2_client=self.session.client("ec2", region_name=region),
                     reservation_id=requirements.reservation,
@@ -182,7 +183,7 @@ class AWSCompute(
                 return True
 
             return reservation_filter
-        
+
         return None
 
     def terminate_instance(
