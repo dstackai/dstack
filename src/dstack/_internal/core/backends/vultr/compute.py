@@ -6,6 +6,7 @@ import requests
 
 from dstack._internal.core.backends.base.backend import Compute
 from dstack._internal.core.backends.base.compute import (
+    ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
     ComputeWithMultinodeSupport,
     generate_unique_instance_name,
@@ -23,7 +24,7 @@ from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
 )
 from dstack._internal.core.models.placement import PlacementGroup
-from dstack._internal.core.models.runs import JobProvisioningData, Requirements
+from dstack._internal.core.models.runs import JobProvisioningData
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -32,6 +33,7 @@ MAX_INSTANCE_NAME_LEN = 64
 
 
 class VultrCompute(
+    ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
     ComputeWithMultinodeSupport,
     Compute,
@@ -41,12 +43,10 @@ class VultrCompute(
         self.config = config
         self.api_client = VultrApiClient(config.creds.api_key)
 
-    def get_offers(
-        self, requirements: Requirements
-    ) -> List[InstanceOfferWithAvailability]:
+    def get_all_offers_with_availability(self) -> List[InstanceOfferWithAvailability]:
         offers = get_catalog_offers(
             backend=BackendType.VULTR,
-            requirements=requirements,
+            requirements=None,
             locations=self.config.regions or None,
             extra_filter=_supported_instances,
         )

@@ -5,6 +5,7 @@ from typing import List, Optional
 
 from dstack._internal.core.backends.base.backend import Compute
 from dstack._internal.core.backends.base.compute import (
+    ComputeWithAllOffersCached,
     ComputeWithVolumeSupport,
     generate_unique_instance_name,
     generate_unique_volume_name,
@@ -27,7 +28,7 @@ from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
     SSHKey,
 )
-from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
+from dstack._internal.core.models.runs import Job, JobProvisioningData, Run
 from dstack._internal.core.models.volumes import Volume, VolumeProvisioningData
 from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.logging import get_logger
@@ -41,6 +42,7 @@ CONTAINER_REGISTRY_AUTH_CLEANUP_INTERVAL = 60 * 60 * 24  # 24 hour
 
 
 class RunpodCompute(
+    ComputeWithAllOffersCached,
     ComputeWithVolumeSupport,
     Compute,
 ):
@@ -51,13 +53,11 @@ class RunpodCompute(
         self.config = config
         self.api_client = RunpodApiClient(config.creds.api_key)
 
-    def get_offers(
-        self, requirements: Requirements
-    ) -> List[InstanceOfferWithAvailability]:
+    def get_all_offers_with_availability(self) -> List[InstanceOfferWithAvailability]:
         offers = get_catalog_offers(
             backend=BackendType.RUNPOD,
             locations=self.config.regions or None,
-            requirements=requirements,
+            requirements=None,
             extra_filter=lambda o: _is_secure_cloud(o.region) or self.config.allow_community_cloud,
         )
         offers = [

@@ -12,6 +12,7 @@ from nebius.sdk import SDK
 
 from dstack._internal.core.backends.base.backend import Compute
 from dstack._internal.core.backends.base.compute import (
+    ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
     ComputeWithMultinodeSupport,
     ComputeWithPlacementGroupSupport,
@@ -41,7 +42,7 @@ from dstack._internal.core.models.placement import (
     PlacementStrategy,
 )
 from dstack._internal.core.models.resources import Memory, Range
-from dstack._internal.core.models.runs import JobProvisioningData, Requirements
+from dstack._internal.core.models.runs import JobProvisioningData
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -76,6 +77,7 @@ SUPPORTED_PLATFORMS = [
 
 
 class NebiusCompute(
+    ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
     ComputeWithMultinodeSupport,
     ComputeWithPlacementGroupSupport,
@@ -106,13 +108,11 @@ class NebiusCompute(
             ).metadata.id
         return self._subnet_id_cache[region]
 
-    def get_offers(
-        self, requirements: Requirements
-    ) -> List[InstanceOfferWithAvailability]:
+    def get_all_offers_with_availability(self) -> List[InstanceOfferWithAvailability]:
         offers = get_catalog_offers(
             backend=BackendType.NEBIUS,
             locations=list(self._region_to_project_id),
-            requirements=requirements,
+            requirements=None,
             extra_filter=_supported_instances,
             configurable_disk_size=CONFIGURABLE_DISK_SIZE,
         )
