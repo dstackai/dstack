@@ -39,6 +39,7 @@ from dstack._internal.core.backends.azure import utils as azure_utils
 from dstack._internal.core.backends.azure.models import AzureConfig
 from dstack._internal.core.backends.base.compute import (
     Compute,
+    ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
     ComputeWithGatewaySupport,
     ComputeWithMultinodeSupport,
@@ -73,6 +74,7 @@ CONFIGURABLE_DISK_SIZE = Range[Memory](min=Memory.parse("30GB"), max=Memory.pars
 
 
 class AzureCompute(
+    ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
     ComputeWithMultinodeSupport,
     ComputeWithGatewaySupport,
@@ -89,13 +91,11 @@ class AzureCompute(
             credential=credential, subscription_id=config.subscription_id
         )
 
-    def get_offers(
-        self, requirements: Requirements
-    ) -> List[InstanceOfferWithAvailability]:
+    def get_all_offers_with_availability(self) -> List[InstanceOfferWithAvailability]:
         offers = get_catalog_offers(
             backend=BackendType.AZURE,
             locations=self.config.regions,
-            requirements=requirements,
+            requirements=None,
             configurable_disk_size=CONFIGURABLE_DISK_SIZE,
             extra_filter=_supported_instances,
         )
@@ -105,6 +105,12 @@ class AzureCompute(
             offers=offers,
         )
         return offers_with_availability
+
+    def get_offers_post_filter(
+        self, requirements: Requirements
+    ) -> Optional[Callable[[InstanceOfferWithAvailability], bool]]:
+        # Azure doesn't need special requirements-based filtering
+        return None
 
     def create_instance(
         self,
