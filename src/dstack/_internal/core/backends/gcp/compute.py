@@ -17,6 +17,7 @@ import dstack._internal.core.backends.gcp.resources as gcp_resources
 from dstack import version
 from dstack._internal.core.backends.base.compute import (
     Compute,
+    ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
     ComputeWithGatewaySupport,
     ComputeWithMultinodeSupport,
@@ -32,7 +33,6 @@ from dstack._internal.core.backends.base.compute import (
     merge_tags,
 )
 from dstack._internal.core.backends.base.offers import (
-    filter_offers_by_requirements,
     get_catalog_offers,
 )
 from dstack._internal.core.backends.gcp.features import tcpx as tcpx_features
@@ -60,7 +60,7 @@ from dstack._internal.core.models.instances import (
 )
 from dstack._internal.core.models.placement import PlacementGroup, PlacementGroupProvisioningData
 from dstack._internal.core.models.resources import Memory, Range
-from dstack._internal.core.models.runs import JobProvisioningData, Requirements
+from dstack._internal.core.models.runs import JobProvisioningData
 from dstack._internal.core.models.volumes import (
     Volume,
     VolumeAttachmentData,
@@ -85,6 +85,7 @@ class GCPVolumeDiskBackendData(CoreModel):
 
 
 class GCPCompute(
+    ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
     ComputeWithMultinodeSupport,
     ComputeWithPlacementGroupSupport,
@@ -109,21 +110,8 @@ class GCPCompute(
         )
         self._extra_subnets_cache_lock = threading.Lock()
         self._extra_subnets_cache = TTLCache(maxsize=30, ttl=60)
-        self._offers_with_availability_cache_lock = threading.Lock()
-        self._offers_with_availability_cache = TTLCache(maxsize=1, ttl=180)
 
-    def get_offers(
-        self, requirements: Requirements
-    ) -> List[InstanceOfferWithAvailability]:
-        offers_with_availability = self._get_all_offers_with_availability()
-        filtered_offers = filter_offers_by_requirements(offers_with_availability, requirements)
-        return filtered_offers
-
-    @cachedmethod(
-        cache=lambda self: self._offers_with_availability_cache,
-        lock=lambda self: self._offers_with_availability_cache_lock,
-    )
-    def _get_all_offers_with_availability(self) -> List[InstanceOfferWithAvailability]:
+    def get_all_offers_with_availability(self) -> List[InstanceOfferWithAvailability]:
         regions = get_or_error(self.config.regions)
         offers = get_catalog_offers(
             backend=BackendType.GCP,

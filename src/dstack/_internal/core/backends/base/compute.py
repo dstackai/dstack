@@ -15,6 +15,7 @@ import yaml
 from cachetools import TTLCache, cachedmethod
 
 from dstack._internal import settings
+from dstack._internal.core.backends.base.offers import filter_offers_by_requirements
 from dstack._internal.core.consts import (
     DSTACK_RUNNER_HTTP_PORT,
     DSTACK_RUNNER_SSH_PORT,
@@ -62,9 +63,7 @@ class Compute(ABC):
         self._offers_cache = TTLCache(maxsize=10, ttl=180)
 
     @abstractmethod
-    def get_offers(
-        self, requirements: Requirements
-    ) -> List[InstanceOfferWithAvailability]:
+    def get_offers(self, requirements: Requirements) -> List[InstanceOfferWithAvailability]:
         """
         Returns offers with availability matching `requirements`.
         If the provider is added to gpuhunt, typically gets offers using `base.offers.get_catalog_offers()`
@@ -130,10 +129,40 @@ class Compute(ABC):
         key=_get_offers_cached_key,
         lock=lambda self: self._offers_cache_lock,
     )
-    def get_offers_cached(
-        self, requirements: Requirements
-    ) -> List[InstanceOfferWithAvailability]:
+    def get_offers_cached(self, requirements: Requirements) -> List[InstanceOfferWithAvailability]:
         return self.get_offers(requirements)
+
+
+class ComputeWithAllOffersCached(ABC):
+    """
+    Provides common `get_offers()` implementation for backends
+    whose offers do not depend on requirements.
+    It caches all offers with availability and post-filters by requirements.
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._offers_with_availability_cache_lock = threading.Lock()
+        self._offers_with_availability_cache = TTLCache(maxsize=1, ttl=180)
+
+    @abstractmethod
+    def get_all_offers_with_availability(self) -> List[InstanceOfferWithAvailability]:
+        """
+        Returns all backend offers with availability.
+        """
+        pass
+
+    def get_offers(self, requirements: Requirements) -> List[InstanceOfferWithAvailability]:
+        offers_with_availability = self._get_all_offers_with_availability_cached()
+        filtered_offers = filter_offers_by_requirements(offers_with_availability, requirements)
+        return filtered_offers
+
+    @cachedmethod(
+        cache=lambda self: self._offers_with_availability_cache,
+        lock=lambda self: self._offers_with_availability_cache_lock,
+    )
+    def _get_all_offers_with_availability_cached(self) -> List[InstanceOfferWithAvailability]:
+        return self.get_all_offers_with_availability()
 
 
 class ComputeWithCreateInstanceSupport(ABC):
