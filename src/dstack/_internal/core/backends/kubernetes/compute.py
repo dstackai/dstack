@@ -15,7 +15,7 @@ from dstack._internal.core.backends.base.compute import (
     get_docker_commands,
     get_dstack_gateway_commands,
 )
-from dstack._internal.core.backends.base.offers import match_requirements
+from dstack._internal.core.backends.base.offers import filter_offers_by_requirements
 from dstack._internal.core.backends.kubernetes.models import (
     KubernetesConfig,
     KubernetesNetworkingConfig,
@@ -99,7 +99,7 @@ class KubernetesCompute(
                 availability=InstanceAvailability.AVAILABLE,
                 instance_runtime=InstanceRuntime.RUNNER,
             )
-            instance_offers.extend(match_requirements([instance_offer], requirements))
+            instance_offers.extend(filter_offers_by_requirements([instance_offer], requirements))
         return instance_offers
 
     def run_job(

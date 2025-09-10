@@ -1,5 +1,5 @@
 from dataclasses import asdict
-from typing import Callable, List, Optional
+from typing import Callable, List, Optional, TypeVar
 
 import gpuhunt
 from pydantic import parse_obj_as
@@ -9,6 +9,7 @@ from dstack._internal.core.models.instances import (
     Disk,
     Gpu,
     InstanceOffer,
+    InstanceOfferWithAvailability,
     InstanceType,
     Resources,
 )
@@ -163,9 +164,13 @@ def requirements_to_query_filter(req: Optional[Requirements]) -> gpuhunt.QueryFi
     return q
 
 
-def match_requirements(
-    offers: List[InstanceOffer], requirements: Optional[Requirements]
-) -> List[InstanceOffer]:
+InstanceOfferT = TypeVar("InstanceOfferT", InstanceOffer, InstanceOfferWithAvailability)
+
+
+def filter_offers_by_requirements(
+    offers: List[InstanceOfferT],
+    requirements: Optional[Requirements],
+) -> List[InstanceOfferT]:
     query_filter = requirements_to_query_filter(requirements)
     filtered_offers = []
     for offer in offers:
