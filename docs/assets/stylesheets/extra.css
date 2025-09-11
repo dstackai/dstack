@@ -804,7 +804,7 @@ body {
         display: inline-block;
         font-size: 17px;
         font-weight: 600;
-        line-height: 1.4rem;
+        /* line-height: 1.4rem; */
         /*letter-spacing: -0.5px;*/
         position: relative;
         left: -11px;
@@ -866,7 +866,7 @@ body {
 }
 
 .md-sidebar--primary .md-nav__link, .md-sidebar--post .md-nav__link {
-    padding: 5px 15px 4px;
+    padding: 4px 15px 4px;
     margin-top: 0;
 }
 
@@ -988,6 +988,10 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
 @media screen and (min-width: 76.25em) {
     .md-nav--integrated>.md-nav__list>.md-nav__item--active .md-nav--secondary {
         margin-bottom: 0;
+    }
+
+    .md-nav--primary .md-nav__list {
+        padding-bottom: .2rem;
     }
 }
 
