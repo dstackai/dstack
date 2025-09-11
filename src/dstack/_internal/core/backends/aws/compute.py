@@ -111,6 +111,8 @@ class AWSCompute(
         # Caches to avoid redundant API calls when provisioning many instances
         # get_offers is already cached but we still cache its sub-functions
         # with more aggressive/longer caches.
+        self._offers_post_filter_cache_lock = threading.Lock()
+        self._offers_post_filter_cache = TTLCache(maxsize=10, ttl=180)
         self._get_regions_to_quotas_cache_lock = threading.Lock()
         self._get_regions_to_quotas_execution_lock = threading.Lock()
         self._get_regions_to_quotas_cache = TTLCache(maxsize=10, ttl=300)
@@ -160,6 +162,15 @@ class AWSCompute(
     ) -> Callable[[InstanceOfferWithAvailability], Optional[InstanceOfferWithAvailability]]:
         return get_offers_disk_modifier(CONFIGURABLE_DISK_SIZE, requirements)
 
+    def _get_offers_cached_key(self, requirements: Requirements) -> int:
+        # Requirements is not hashable, so we use a hack to get arguments hash
+        return hash(requirements.json())
+
+    @cachedmethod(
+        cache=lambda self: self._offers_post_filter_cache,
+        key=_get_offers_cached_key,
+        lock=lambda self: self._offers_post_filter_cache_lock,
+    )
     def get_offers_post_filter(
         self, requirements: Requirements
     ) -> Optional[Callable[[InstanceOfferWithAvailability], bool]]:
