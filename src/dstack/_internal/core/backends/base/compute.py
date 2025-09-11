@@ -58,10 +58,6 @@ class Compute(ABC):
     If a compute supports additional features, it must also subclass `ComputeWith*` classes.
     """
 
-    def __init__(self):
-        self._offers_cache_lock = threading.Lock()
-        self._offers_cache = TTLCache(maxsize=10, ttl=180)
-
     @abstractmethod
     def get_offers(self, requirements: Requirements) -> List[InstanceOfferWithAvailability]:
         """
@@ -120,18 +116,6 @@ class Compute(ABC):
         """
         pass
 
-    def _get_offers_cached_key(self, requirements: Requirements) -> int:
-        # Requirements is not hashable, so we use a hack to get arguments hash
-        return hash(requirements.json())
-
-    @cachedmethod(
-        cache=lambda self: self._offers_cache,
-        key=_get_offers_cached_key,
-        lock=lambda self: self._offers_cache_lock,
-    )
-    def get_offers_cached(self, requirements: Requirements) -> List[InstanceOfferWithAvailability]:
-        return self.get_offers(requirements)
-
 
 class ComputeWithAllOffersCached(ABC):
     """
@@ -142,8 +126,8 @@ class ComputeWithAllOffersCached(ABC):
 
     def __init__(self) -> None:
         super().__init__()
-        self._offers_with_availability_cache_lock = threading.Lock()
-        self._offers_with_availability_cache = TTLCache(maxsize=1, ttl=180)
+        self._offers_cache_lock = threading.Lock()
+        self._offers_cache = TTLCache(maxsize=1, ttl=180)
 
     @abstractmethod
     def get_all_offers_with_availability(self) -> List[InstanceOfferWithAvailability]:
@@ -170,11 +154,50 @@ class ComputeWithAllOffersCached(ABC):
         return filtered_offers
 
     @cachedmethod(
-        cache=lambda self: self._offers_with_availability_cache,
-        lock=lambda self: self._offers_with_availability_cache_lock,
+        cache=lambda self: self._offers_cache,
+        lock=lambda self: self._offers_cache_lock,
     )
     def _get_all_offers_with_availability_cached(self) -> List[InstanceOfferWithAvailability]:
         return self.get_all_offers_with_availability()
+
+
+class ComputeWithFilteredOffersCached(ABC):
+    """
+    Provides common `get_offers()` implementation for backends
+    whose offers depend on requirements.
+    It caches offers using requirements as key.
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._offers_cache_lock = threading.Lock()
+        self._offers_cache = TTLCache(maxsize=10, ttl=180)
+
+    @abstractmethod
+    def get_offers_by_requirements(
+        self, requirements: Requirements
+    ) -> List[InstanceOfferWithAvailability]:
+        """
+        Returns backend offers with availability matching requirements.
+        """
+        pass
+
+    def get_offers(self, requirements: Requirements) -> List[InstanceOfferWithAvailability]:
+        return self._get_offers_cached(requirements)
+
+    def _get_offers_cached_key(self, requirements: Requirements) -> int:
+        # Requirements is not hashable, so we use a hack to get arguments hash
+        return hash(requirements.json())
+
+    @cachedmethod(
+        cache=lambda self: self._offers_cache,
+        key=_get_offers_cached_key,
+        lock=lambda self: self._offers_cache_lock,
+    )
+    def _get_offers_cached(
+        self, requirements: Requirements
+    ) -> List[InstanceOfferWithAvailability]:
+        return self.get_offers_by_requirements(requirements)
 
 
 class ComputeWithCreateInstanceSupport(ABC):
