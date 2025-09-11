@@ -131,8 +131,6 @@ class AWSCompute(
         offers = get_catalog_offers(
             backend=BackendType.AWS,
             locations=self.config.regions,
-            requirements=None,
-            configurable_disk_size=CONFIGURABLE_DISK_SIZE,
             extra_filter=_supported_instances,
         )
         regions = list(set(i.region for i in offers))

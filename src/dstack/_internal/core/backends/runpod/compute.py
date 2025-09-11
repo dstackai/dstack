@@ -1,7 +1,7 @@
 import json
 import uuid
 from datetime import timedelta
-from typing import List, Optional
+from typing import Callable, List, Optional
 
 from dstack._internal.core.backends.base.backend import Compute
 from dstack._internal.core.backends.base.compute import (
@@ -12,7 +12,7 @@ from dstack._internal.core.backends.base.compute import (
     get_docker_commands,
     get_job_instance_name,
 )
-from dstack._internal.core.backends.base.offers import get_catalog_offers
+from dstack._internal.core.backends.base.offers import get_catalog_offers, get_offers_disk_modifier
 from dstack._internal.core.backends.runpod.api_client import RunpodApiClient
 from dstack._internal.core.backends.runpod.models import RunpodConfig
 from dstack._internal.core.consts import DSTACK_RUNNER_SSH_PORT
@@ -28,7 +28,8 @@ from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
     SSHKey,
 )
-from dstack._internal.core.models.runs import Job, JobProvisioningData, Run
+from dstack._internal.core.models.resources import Memory, Range
+from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
 from dstack._internal.core.models.volumes import Volume, VolumeProvisioningData
 from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.logging import get_logger
@@ -39,6 +40,9 @@ logger = get_logger(__name__)
 MAX_RESOURCE_NAME_LEN = 60
 
 CONTAINER_REGISTRY_AUTH_CLEANUP_INTERVAL = 60 * 60 * 24  # 24 hour
+
+# RunPod does not seem to have any limits on the disk size.
+CONFIGURABLE_DISK_SIZE = Range[Memory](min=Memory.parse("1GB"), max=None)
 
 
 class RunpodCompute(
@@ -67,6 +71,11 @@ class RunpodCompute(
             for offer in offers
         ]
         return offers
+
+    def get_offers_modifier(
+        self, requirements: Requirements
+    ) -> Callable[[InstanceOfferWithAvailability], Optional[InstanceOfferWithAvailability]]:
+        return get_offers_disk_modifier(CONFIGURABLE_DISK_SIZE, requirements)
 
     def run_job(
         self,

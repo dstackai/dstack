@@ -38,7 +38,6 @@ class CloudRiftCompute(
         offers = get_catalog_offers(
             backend=BackendType.CLOUDRIFT,
             locations=self.config.regions or None,
-            requirements=None,
         )
         offers_with_availabilities = self._get_offers_with_availability(offers)
         return offers_with_availabilities

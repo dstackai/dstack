@@ -116,7 +116,6 @@ class GCPCompute(
         regions = get_or_error(self.config.regions)
         offers = get_catalog_offers(
             backend=BackendType.GCP,
-            configurable_disk_size=CONFIGURABLE_DISK_SIZE,
             extra_filter=_supported_instances_and_zones(regions),
         )
         quotas: Dict[str, Dict[str, float]] = defaultdict(dict)

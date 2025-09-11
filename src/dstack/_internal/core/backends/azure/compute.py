@@ -95,8 +95,6 @@ class AzureCompute(
         offers = get_catalog_offers(
             backend=BackendType.AZURE,
             locations=self.config.regions,
-            requirements=None,
-            configurable_disk_size=CONFIGURABLE_DISK_SIZE,
             extra_filter=_supported_instances,
         )
         offers_with_availability = _get_offers_with_availability(

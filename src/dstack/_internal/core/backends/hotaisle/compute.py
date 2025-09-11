@@ -62,7 +62,6 @@ class HotAisleCompute(
         offers = get_catalog_offers(
             backend=BackendType.HOTAISLE,
             locations=self.config.regions or None,
-            requirements=None,
             catalog=self.catalog,
         )
         supported_offers = []

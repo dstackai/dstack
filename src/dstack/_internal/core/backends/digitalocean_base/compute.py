@@ -56,7 +56,6 @@ class BaseDigitalOceanCompute(
         offers = get_catalog_offers(
             backend=self.BACKEND_TYPE,
             locations=self.config.regions,
-            requirements=None,
             catalog=self.catalog,
         )
         return [

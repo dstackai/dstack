@@ -53,8 +53,6 @@ class DataCrunchCompute(
         offers = get_catalog_offers(
             backend=BackendType.DATACRUNCH,
             locations=self.config.regions,
-            requirements=None,
-            configurable_disk_size=CONFIGURABLE_DISK_SIZE,
         )
         offers_with_availability = self._get_offers_with_availability(offers)
         return offers_with_availability
