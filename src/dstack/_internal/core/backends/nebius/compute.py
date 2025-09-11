@@ -3,7 +3,7 @@ import random
 import shlex
 import time
 from functools import cached_property
-from typing import List, Optional
+from typing import Callable, List, Optional
 
 from nebius.aio.operation import Operation as SDKOperation
 from nebius.aio.service_error import RequestError, StatusCode
@@ -19,7 +19,7 @@ from dstack._internal.core.backends.base.compute import (
     generate_unique_instance_name,
     get_user_data,
 )
-from dstack._internal.core.backends.base.offers import get_catalog_offers
+from dstack._internal.core.backends.base.offers import get_catalog_offers, get_offers_disk_modifier
 from dstack._internal.core.backends.nebius import resources
 from dstack._internal.core.backends.nebius.fabrics import get_suitable_infiniband_fabrics
 from dstack._internal.core.backends.nebius.models import NebiusConfig, NebiusServiceAccountCreds
@@ -42,7 +42,7 @@ from dstack._internal.core.models.placement import (
     PlacementStrategy,
 )
 from dstack._internal.core.models.resources import Memory, Range
-from dstack._internal.core.models.runs import JobProvisioningData
+from dstack._internal.core.models.runs import JobProvisioningData, Requirements
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -123,6 +123,11 @@ class NebiusCompute(
             )
             for offer in offers
         ]
+
+    def get_offers_modifier(
+        self, requirements: Requirements
+    ) -> Callable[[InstanceOfferWithAvailability], Optional[InstanceOfferWithAvailability]]:
+        return get_offers_disk_modifier(CONFIGURABLE_DISK_SIZE, requirements)
 
     def create_instance(
         self,

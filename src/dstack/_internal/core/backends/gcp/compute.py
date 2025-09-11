@@ -34,6 +34,7 @@ from dstack._internal.core.backends.base.compute import (
 )
 from dstack._internal.core.backends.base.offers import (
     get_catalog_offers,
+    get_offers_disk_modifier,
 )
 from dstack._internal.core.backends.gcp.features import tcpx as tcpx_features
 from dstack._internal.core.backends.gcp.models import GCPConfig
@@ -60,7 +61,7 @@ from dstack._internal.core.models.instances import (
 )
 from dstack._internal.core.models.placement import PlacementGroup, PlacementGroupProvisioningData
 from dstack._internal.core.models.resources import Memory, Range
-from dstack._internal.core.models.runs import JobProvisioningData
+from dstack._internal.core.models.runs import JobProvisioningData, Requirements
 from dstack._internal.core.models.volumes import (
     Volume,
     VolumeAttachmentData,
@@ -144,6 +145,11 @@ class GCPCompute(
             offers_with_availability.append(offer_with_availability)
             offers_with_availability[-1].region = region
         return offers_with_availability
+
+    def get_offers_modifier(
+        self, requirements: Requirements
+    ) -> Callable[[InstanceOfferWithAvailability], Optional[InstanceOfferWithAvailability]]:
+        return get_offers_disk_modifier(CONFIGURABLE_DISK_SIZE, requirements)
 
     def terminate_instance(
         self, instance_id: str, region: str, backend_data: Optional[str] = None

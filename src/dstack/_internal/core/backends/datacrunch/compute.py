@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional
+from typing import Callable, Dict, List, Optional
 
 from datacrunch import DataCrunchClient
 from datacrunch.exceptions import APIException
@@ -11,7 +11,7 @@ from dstack._internal.core.backends.base.compute import (
     generate_unique_instance_name,
     get_shim_commands,
 )
-from dstack._internal.core.backends.base.offers import get_catalog_offers
+from dstack._internal.core.backends.base.offers import get_catalog_offers, get_offers_disk_modifier
 from dstack._internal.core.backends.datacrunch.models import DataCrunchConfig
 from dstack._internal.core.errors import NoCapacityError
 from dstack._internal.core.models.backends.base import BackendType
@@ -23,7 +23,7 @@ from dstack._internal.core.models.instances import (
 )
 from dstack._internal.core.models.placement import PlacementGroup
 from dstack._internal.core.models.resources import Memory, Range
-from dstack._internal.core.models.runs import JobProvisioningData
+from dstack._internal.core.models.runs import JobProvisioningData, Requirements
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.ssh import get_public_key_fingerprint
 
@@ -58,6 +58,11 @@ class DataCrunchCompute(
         )
         offers_with_availability = self._get_offers_with_availability(offers)
         return offers_with_availability
+
+    def get_offers_modifier(
+        self, requirements: Requirements
+    ) -> Callable[[InstanceOfferWithAvailability], Optional[InstanceOfferWithAvailability]]:
+        return get_offers_disk_modifier(CONFIGURABLE_DISK_SIZE, requirements)
 
     def _get_offers_with_availability(
         self, offers: List[InstanceOffer]

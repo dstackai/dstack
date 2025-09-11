@@ -2,7 +2,7 @@ import base64
 import enum
 import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
 
 from azure.core.credentials import TokenCredential
 from azure.core.exceptions import ResourceExistsError, ResourceNotFoundError
@@ -49,7 +49,7 @@ from dstack._internal.core.backends.base.compute import (
     get_user_data,
     merge_tags,
 )
-from dstack._internal.core.backends.base.offers import get_catalog_offers
+from dstack._internal.core.backends.base.offers import get_catalog_offers, get_offers_disk_modifier
 from dstack._internal.core.errors import ComputeError, NoCapacityError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.gateways import (
@@ -65,7 +65,7 @@ from dstack._internal.core.models.instances import (
 )
 from dstack._internal.core.models.placement import PlacementGroup
 from dstack._internal.core.models.resources import Memory, Range
-from dstack._internal.core.models.runs import JobProvisioningData
+from dstack._internal.core.models.runs import JobProvisioningData, Requirements
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -105,6 +105,11 @@ class AzureCompute(
             offers=offers,
         )
         return offers_with_availability
+
+    def get_offers_modifier(
+        self, requirements: Requirements
+    ) -> Callable[[InstanceOfferWithAvailability], Optional[InstanceOfferWithAvailability]]:
+        return get_offers_disk_modifier(CONFIGURABLE_DISK_SIZE, requirements)
 
     def create_instance(
         self,
