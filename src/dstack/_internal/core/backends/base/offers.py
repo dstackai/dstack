@@ -201,6 +201,11 @@ def choose_disk_size_mib(
 def get_offers_disk_modifier(
     configurable_disk_size: Range[Memory], requirements: Requirements
 ) -> Callable[[InstanceOfferWithAvailability], Optional[InstanceOfferWithAvailability]]:
+    """
+    Returns a func that modifies offers disk by setting min value that satisfies both
+    `configurable_disk_size` and `requirements`.
+    """
+
     def modifier(offer: InstanceOfferWithAvailability) -> Optional[InstanceOfferWithAvailability]:
         requirements_disk_range = DEFAULT_DISK.size
         if requirements.resources.disk is not None:

@@ -9,6 +9,7 @@ from kubernetes import client
 
 from dstack._internal.core.backends.base.compute import (
     Compute,
+    ComputeWithFilteredOffersCached,
     ComputeWithGatewaySupport,
     generate_unique_gateway_instance_name,
     generate_unique_instance_name_for_job,
@@ -58,6 +59,7 @@ NVIDIA_GPU_NAMES = NVIDIA_GPU_NAME_TO_GPU_INFO.keys()
 
 
 class KubernetesCompute(
+    ComputeWithFilteredOffersCached,
     ComputeWithGatewaySupport,
     Compute,
 ):
@@ -70,7 +72,7 @@ class KubernetesCompute(
         self.networking_config = networking_config
         self.api = get_api_from_config_data(config.kubeconfig.data)
 
-    def get_offers(
+    def get_offers_by_requirements(
         self, requirements: Requirements
     ) -> List[InstanceOfferWithAvailability]:
         nodes = self.api.list_node()
