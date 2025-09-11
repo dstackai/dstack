@@ -112,9 +112,7 @@ class NebiusCompute(
         offers = get_catalog_offers(
             backend=BackendType.NEBIUS,
             locations=list(self._region_to_project_id),
-            requirements=None,
             extra_filter=_supported_instances,
-            configurable_disk_size=CONFIGURABLE_DISK_SIZE,
         )
         return [
             InstanceOfferWithAvailability(
