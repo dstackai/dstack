@@ -66,8 +66,6 @@ class OCICompute(
         offers = get_catalog_offers(
             backend=BackendType.OCI,
             locations=self.config.regions,
-            requirements=None,
-            configurable_disk_size=CONFIGURABLE_DISK_SIZE,
             extra_filter=_supported_instances,
         )
 
