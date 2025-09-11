@@ -28,9 +28,7 @@ class LocalCompute(
     ComputeWithVolumeSupport,
     Compute,
 ):
-    def get_offers(
-        self, requirements: Optional[Requirements] = None
-    ) -> List[InstanceOfferWithAvailability]:
+    def get_offers(self, requirements: Requirements) -> List[InstanceOfferWithAvailability]:
         return [
             InstanceOfferWithAvailability(
                 backend=BackendType.LOCAL,

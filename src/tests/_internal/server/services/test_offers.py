@@ -23,13 +23,11 @@ class TestGetOffersByRequirements:
             aws_backend_mock = Mock()
             aws_backend_mock.TYPE = BackendType.AWS
             aws_offer = get_instance_offer_with_availability(backend=BackendType.AWS)
-            aws_backend_mock.compute.return_value.get_offers_cached.return_value = [aws_offer]
+            aws_backend_mock.compute.return_value.get_offers.return_value = [aws_offer]
             runpod_backend_mock = Mock()
             runpod_backend_mock.TYPE = BackendType.RUNPOD
             runpod_offer = get_instance_offer_with_availability(backend=BackendType.RUNPOD)
-            runpod_backend_mock.compute.return_value.get_offers_cached.return_value = [
-                runpod_offer
-            ]
+            runpod_backend_mock.compute.return_value.get_offers.return_value = [runpod_offer]
             m.return_value = [aws_backend_mock, runpod_backend_mock]
             res = await get_offers_by_requirements(
                 project=Mock(),
@@ -47,13 +45,11 @@ class TestGetOffersByRequirements:
             aws_backend_mock = Mock()
             aws_backend_mock.TYPE = BackendType.AWS
             aws_offer = get_instance_offer_with_availability(backend=BackendType.AWS)
-            aws_backend_mock.compute.return_value.get_offers_cached.return_value = [aws_offer]
+            aws_backend_mock.compute.return_value.get_offers.return_value = [aws_offer]
             runpod_backend_mock = Mock()
             runpod_backend_mock.TYPE = BackendType.RUNPOD
             runpod_offer = get_instance_offer_with_availability(backend=BackendType.RUNPOD)
-            runpod_backend_mock.compute.return_value.get_offers_cached.return_value = [
-                runpod_offer
-            ]
+            runpod_backend_mock.compute.return_value.get_offers.return_value = [runpod_offer]
             m.return_value = [aws_backend_mock, runpod_backend_mock]
             res = await get_offers_by_requirements(
                 project=Mock(),
@@ -72,7 +68,7 @@ class TestGetOffersByRequirements:
             aws_backend_mock = Mock()
             aws_backend_mock.TYPE = BackendType.AWS
             aws_offer = get_instance_offer_with_availability(backend=BackendType.AWS)
-            aws_backend_mock.compute.return_value.get_offers_cached.return_value = [aws_offer]
+            aws_backend_mock.compute.return_value.get_offers.return_value = [aws_offer]
             runpod_backend_mock = Mock()
             runpod_backend_mock.TYPE = BackendType.RUNPOD
             runpod_offer1 = get_instance_offer_with_availability(
@@ -81,7 +77,7 @@ class TestGetOffersByRequirements:
             runpod_offer2 = get_instance_offer_with_availability(
                 backend=BackendType.RUNPOD, region="us"
             )
-            runpod_backend_mock.compute.return_value.get_offers_cached.return_value = [
+            runpod_backend_mock.compute.return_value.get_offers.return_value = [
                 runpod_offer1,
                 runpod_offer2,
             ]
@@ -124,7 +120,7 @@ class TestGetOffersByRequirements:
             aws_offer4 = get_instance_offer_with_availability(
                 backend=BackendType.AWS, availability_zones=None
             )
-            aws_backend_mock.compute.return_value.get_offers_cached.return_value = [
+            aws_backend_mock.compute.return_value.get_offers.return_value = [
                 aws_offer1,
                 aws_offer2,
                 aws_offer3,
@@ -148,13 +144,11 @@ class TestGetOffersByRequirements:
             aws_backend_mock = Mock()
             aws_backend_mock.TYPE = BackendType.AWS
             aws_offer = get_instance_offer_with_availability(backend=BackendType.AWS)
-            aws_backend_mock.compute.return_value.get_offers_cached.return_value = [aws_offer]
+            aws_backend_mock.compute.return_value.get_offers.return_value = [aws_offer]
             runpod_backend_mock = Mock()
             runpod_backend_mock.TYPE = BackendType.RUNPOD
             runpod_offer = get_instance_offer_with_availability(backend=BackendType.RUNPOD)
-            runpod_backend_mock.compute.return_value.get_offers_cached.return_value = [
-                runpod_offer
-            ]
+            runpod_backend_mock.compute.return_value.get_offers.return_value = [runpod_offer]
             m.return_value = [aws_backend_mock, runpod_backend_mock]
             res = await get_offers_by_requirements(
                 project=Mock(),

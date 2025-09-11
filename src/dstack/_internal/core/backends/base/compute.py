@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterable
 from functools import lru_cache
 from pathlib import Path
-from typing import Dict, List, Literal, Optional
+from typing import Callable, Dict, List, Literal, Optional
 
 import git
 import requests
@@ -15,6 +15,7 @@ import yaml
 from cachetools import TTLCache, cachedmethod
 
 from dstack._internal import settings
+from dstack._internal.core.backends.base.offers import filter_offers_by_requirements
 from dstack._internal.core.consts import (
     DSTACK_RUNNER_HTTP_PORT,
     DSTACK_RUNNER_SSH_PORT,
@@ -57,14 +58,8 @@ class Compute(ABC):
     If a compute supports additional features, it must also subclass `ComputeWith*` classes.
     """
 
-    def __init__(self):
-        self._offers_cache_lock = threading.Lock()
-        self._offers_cache = TTLCache(maxsize=10, ttl=180)
-
     @abstractmethod
-    def get_offers(
-        self, requirements: Optional[Requirements] = None
-    ) -> List[InstanceOfferWithAvailability]:
+    def get_offers(self, requirements: Requirements) -> List[InstanceOfferWithAvailability]:
         """
         Returns offers with availability matching `requirements`.
         If the provider is added to gpuhunt, typically gets offers using `base.offers.get_catalog_offers()`
@@ -121,10 +116,97 @@ class Compute(ABC):
         """
         pass
 
-    def _get_offers_cached_key(self, requirements: Optional[Requirements] = None) -> int:
+
+class ComputeWithAllOffersCached(ABC):
+    """
+    Provides common `get_offers()` implementation for backends
+    whose offers do not depend on requirements.
+    It caches all offers with availability and post-filters by requirements.
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._offers_cache_lock = threading.Lock()
+        self._offers_cache = TTLCache(maxsize=1, ttl=180)
+
+    @abstractmethod
+    def get_all_offers_with_availability(self) -> List[InstanceOfferWithAvailability]:
+        """
+        Returns all backend offers with availability.
+        """
+        pass
+
+    def get_offers_modifier(
+        self, requirements: Requirements
+    ) -> Optional[
+        Callable[[InstanceOfferWithAvailability], Optional[InstanceOfferWithAvailability]]
+    ]:
+        """
+        Returns a modifier function that modifies offers before they are filtered by requirements.
+        Can return `None` to exclude the offer.
+        E.g. can be used to set appropriate disk size based on requirements.
+        """
+        return None
+
+    def get_offers_post_filter(
+        self, requirements: Requirements
+    ) -> Optional[Callable[[InstanceOfferWithAvailability], bool]]:
+        """
+        Returns a filter function to apply to offers based on requirements.
+        This allows backends to implement custom post-filtering logic for specific requirements.
+        """
+        return None
+
+    def get_offers(self, requirements: Requirements) -> List[InstanceOfferWithAvailability]:
+        offers = self._get_all_offers_with_availability_cached()
+        modifier = self.get_offers_modifier(requirements)
+        if modifier is not None:
+            modified_offers = []
+            for o in offers:
+                modified_offer = modifier(o)
+                if modified_offer is not None:
+                    modified_offers.append(modified_offer)
+            offers = modified_offers
+        offers = filter_offers_by_requirements(offers, requirements)
+        post_filter = self.get_offers_post_filter(requirements)
+        if post_filter is not None:
+            offers = [o for o in offers if post_filter(o)]
+        return offers
+
+    @cachedmethod(
+        cache=lambda self: self._offers_cache,
+        lock=lambda self: self._offers_cache_lock,
+    )
+    def _get_all_offers_with_availability_cached(self) -> List[InstanceOfferWithAvailability]:
+        return self.get_all_offers_with_availability()
+
+
+class ComputeWithFilteredOffersCached(ABC):
+    """
+    Provides common `get_offers()` implementation for backends
+    whose offers depend on requirements.
+    It caches offers using requirements as key.
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._offers_cache_lock = threading.Lock()
+        self._offers_cache = TTLCache(maxsize=10, ttl=180)
+
+    @abstractmethod
+    def get_offers_by_requirements(
+        self, requirements: Requirements
+    ) -> List[InstanceOfferWithAvailability]:
+        """
+        Returns backend offers with availability matching requirements.
+        """
+        pass
+
+    def get_offers(self, requirements: Requirements) -> List[InstanceOfferWithAvailability]:
+        return self._get_offers_cached(requirements)
+
+    def _get_offers_cached_key(self, requirements: Requirements) -> int:
         # Requirements is not hashable, so we use a hack to get arguments hash
-        if requirements is None:
-            return hash(None)
         return hash(requirements.json())
 
     @cachedmethod(
@@ -132,10 +214,10 @@ class Compute(ABC):
         key=_get_offers_cached_key,
         lock=lambda self: self._offers_cache_lock,
     )
-    def get_offers_cached(
-        self, requirements: Optional[Requirements] = None
+    def _get_offers_cached(
+        self, requirements: Requirements
     ) -> List[InstanceOfferWithAvailability]:
-        return self.get_offers(requirements)
+        return self.get_offers_by_requirements(requirements)
 
 
 class ComputeWithCreateInstanceSupport(ABC):

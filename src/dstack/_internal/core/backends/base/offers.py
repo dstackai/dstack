@@ -1,5 +1,5 @@
 from dataclasses import asdict
-from typing import Callable, List, Optional
+from typing import Callable, List, Optional, TypeVar
 
 import gpuhunt
 from pydantic import parse_obj_as
@@ -9,11 +9,13 @@ from dstack._internal.core.models.instances import (
     Disk,
     Gpu,
     InstanceOffer,
+    InstanceOfferWithAvailability,
     InstanceType,
     Resources,
 )
 from dstack._internal.core.models.resources import DEFAULT_DISK, CPUSpec, Memory, Range
 from dstack._internal.core.models.runs import Requirements
+from dstack._internal.utils.common import get_or_error
 
 # Offers not supported by all dstack versions are hidden behind one or more flags.
 # This list enables the flags that are currently supported.
@@ -163,9 +165,13 @@ def requirements_to_query_filter(req: Optional[Requirements]) -> gpuhunt.QueryFi
     return q
 
 
-def match_requirements(
-    offers: List[InstanceOffer], requirements: Optional[Requirements]
-) -> List[InstanceOffer]:
+InstanceOfferT = TypeVar("InstanceOfferT", InstanceOffer, InstanceOfferWithAvailability)
+
+
+def filter_offers_by_requirements(
+    offers: List[InstanceOfferT],
+    requirements: Optional[Requirements],
+) -> List[InstanceOfferT]:
     query_filter = requirements_to_query_filter(requirements)
     filtered_offers = []
     for offer in offers:
@@ -190,3 +196,27 @@ def choose_disk_size_mib(
         disk_size_gib = disk_size_range.min
 
     return round(disk_size_gib * 1024)
+
+
+def get_offers_disk_modifier(
+    configurable_disk_size: Range[Memory], requirements: Requirements
+) -> Callable[[InstanceOfferWithAvailability], Optional[InstanceOfferWithAvailability]]:
+    """
+    Returns a func that modifies offers disk by setting min value that satisfies both
+    `configurable_disk_size` and `requirements`.
+    """
+
+    def modifier(offer: InstanceOfferWithAvailability) -> Optional[InstanceOfferWithAvailability]:
+        requirements_disk_range = DEFAULT_DISK.size
+        if requirements.resources.disk is not None:
+            requirements_disk_range = requirements.resources.disk.size
+        disk_size_range = requirements_disk_range.intersect(configurable_disk_size)
+        if disk_size_range is None:
+            return None
+        offer_copy = offer.copy(deep=True)
+        offer_copy.instance.resources.disk = Disk(
+            size_mib=get_or_error(disk_size_range.min) * 1024
+        )
+        return offer_copy
+
+    return modifier
