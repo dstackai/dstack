@@ -33,7 +33,7 @@ from dstack._internal.core.backends.base.compute import (
     get_user_data,
     merge_tags,
 )
-from dstack._internal.core.backends.base.offers import get_catalog_offers
+from dstack._internal.core.backends.base.offers import get_catalog_offers, get_offers_disk_modifier
 from dstack._internal.core.errors import (
     ComputeError,
     NoCapacityError,
@@ -156,6 +156,11 @@ class AWSCompute(
                 )
             )
         return availability_offers
+
+    def get_offers_modifier(
+        self, requirements: Requirements
+    ) -> Callable[[InstanceOfferWithAvailability], Optional[InstanceOfferWithAvailability]]:
+        return get_offers_disk_modifier(CONFIGURABLE_DISK_SIZE, requirements)
 
     def get_offers_post_filter(
         self, requirements: Requirements

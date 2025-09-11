@@ -15,6 +15,7 @@ from dstack._internal.core.models.instances import (
 )
 from dstack._internal.core.models.resources import DEFAULT_DISK, CPUSpec, Memory, Range
 from dstack._internal.core.models.runs import Requirements
+from dstack._internal.utils.common import get_or_error
 
 # Offers not supported by all dstack versions are hidden behind one or more flags.
 # This list enables the flags that are currently supported.
@@ -195,3 +196,22 @@ def choose_disk_size_mib(
         disk_size_gib = disk_size_range.min
 
     return round(disk_size_gib * 1024)
+
+
+def get_offers_disk_modifier(
+    configurable_disk_size: Range[Memory], requirements: Requirements
+) -> Callable[[InstanceOfferWithAvailability], Optional[InstanceOfferWithAvailability]]:
+    def modifier(offer: InstanceOfferWithAvailability) -> Optional[InstanceOfferWithAvailability]:
+        requirements_disk_range = DEFAULT_DISK.size
+        if requirements.resources.disk is not None:
+            requirements_disk_range = requirements.resources.disk.size
+        disk_size_range = requirements_disk_range.intersect(configurable_disk_size)
+        if disk_size_range is None:
+            return None
+        offer_copy = offer.copy(deep=True)
+        offer_copy.instance.resources.disk = Disk(
+            size_mib=get_or_error(disk_size_range.min) * 1024
+        )
+        return offer_copy
+
+    return modifier

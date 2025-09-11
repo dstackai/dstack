@@ -136,6 +136,18 @@ class ComputeWithAllOffersCached(ABC):
         """
         pass
 
+    def get_offers_modifier(
+        self, requirements: Requirements
+    ) -> Optional[
+        Callable[[InstanceOfferWithAvailability], Optional[InstanceOfferWithAvailability]]
+    ]:
+        """
+        Returns a modifier function that modifies offers before they are filtered by requirements.
+        Can return `None` to exclude the offer.
+        E.g. can be used to set appropriate disk size based on requirements.
+        """
+        return None
+
     def get_offers_post_filter(
         self, requirements: Requirements
     ) -> Optional[Callable[[InstanceOfferWithAvailability], bool]]:
@@ -146,12 +158,20 @@ class ComputeWithAllOffersCached(ABC):
         return None
 
     def get_offers(self, requirements: Requirements) -> List[InstanceOfferWithAvailability]:
-        offers_with_availability = self._get_all_offers_with_availability_cached()
-        filtered_offers = filter_offers_by_requirements(offers_with_availability, requirements)
+        offers = self._get_all_offers_with_availability_cached()
+        modifier = self.get_offers_modifier(requirements)
+        if modifier is not None:
+            modified_offers = []
+            for o in offers:
+                modified_offer = modifier(o)
+                if modified_offer is not None:
+                    modified_offers.append(modified_offer)
+            offers = modified_offers
+        offers = filter_offers_by_requirements(offers, requirements)
         post_filter = self.get_offers_post_filter(requirements)
         if post_filter is not None:
-            filtered_offers = [o for o in filtered_offers if post_filter(o)]
-        return filtered_offers
+            offers = [o for o in offers if post_filter(o)]
+        return offers
 
     @cachedmethod(
         cache=lambda self: self._offers_cache,
