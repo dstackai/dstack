@@ -84,7 +84,7 @@ def create_mock_backends_with_offers(
     for backend_type, offers in offers_by_backend.items():
         backend_mock = Mock()
         backend_mock.TYPE = backend_type
-        backend_mock.compute.return_value.get_offers_cached.return_value = offers
+        backend_mock.compute.return_value.get_offers.return_value = offers
         mocked_backends.append(backend_mock)
 
     return mocked_backends
@@ -161,7 +161,7 @@ class TestListGpus:
         with patch("dstack._internal.server.services.backends.get_project_backends") as m:
             backend_mock_aws = Mock()
             backend_mock_aws.TYPE = BackendType.AWS
-            backend_mock_aws.compute.return_value.get_offers_cached.return_value = []
+            backend_mock_aws.compute.return_value.get_offers.return_value = []
             m.return_value = [backend_mock_aws]
 
             response = await client.post(
@@ -310,7 +310,7 @@ class TestListGpus:
         with patch("dstack._internal.server.services.backends.get_project_backends") as m:
             backend_mock_aws = Mock()
             backend_mock_aws.TYPE = BackendType.AWS
-            backend_mock_aws.compute.return_value.get_offers_cached.return_value = [
+            backend_mock_aws.compute.return_value.get_offers.return_value = [
                 offer_t4_spot,
                 offer_t4_ondemand,
                 offer_t4_quota,
@@ -319,7 +319,7 @@ class TestListGpus:
 
             backend_mock_runpod = Mock()
             backend_mock_runpod.TYPE = BackendType.RUNPOD
-            backend_mock_runpod.compute.return_value.get_offers_cached.return_value = [
+            backend_mock_runpod.compute.return_value.get_offers.return_value = [
                 offer_runpod_rtx_east,
                 offer_runpod_rtx_eu,
                 offer_runpod_t4_east,

@@ -729,7 +729,7 @@ class TestCreateInstance:
                 availability=InstanceAvailability.AVAILABLE,
             )
             backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
-            backend_mock.compute.return_value.get_offers_cached.return_value = [offer]
+            backend_mock.compute.return_value.get_offers.return_value = [offer]
             backend_mock.compute.return_value.create_instance.return_value = JobProvisioningData(
                 backend=offer.backend,
                 instance_type=offer.instance,
@@ -762,13 +762,13 @@ class TestCreateInstance:
         aws_mock.TYPE = BackendType.AWS
         offer = get_instance_offer_with_availability(backend=BackendType.AWS, price=1.0)
         aws_mock.compute.return_value = Mock(spec=ComputeMockSpec)
-        aws_mock.compute.return_value.get_offers_cached.return_value = [offer]
+        aws_mock.compute.return_value.get_offers.return_value = [offer]
         aws_mock.compute.return_value.create_instance.side_effect = err
         gcp_mock = Mock()
         gcp_mock.TYPE = BackendType.GCP
         offer = get_instance_offer_with_availability(backend=BackendType.GCP, price=2.0)
         gcp_mock.compute.return_value = Mock(spec=ComputeMockSpec)
-        gcp_mock.compute.return_value.get_offers_cached.return_value = [offer]
+        gcp_mock.compute.return_value.get_offers.return_value = [offer]
         gcp_mock.compute.return_value.create_instance.return_value = get_job_provisioning_data(
             backend=offer.backend, region=offer.region, price=offer.price
         )
@@ -791,7 +791,7 @@ class TestCreateInstance:
         aws_mock.TYPE = BackendType.AWS
         offer = get_instance_offer_with_availability(backend=BackendType.AWS, price=1.0)
         aws_mock.compute.return_value = Mock(spec=ComputeMockSpec)
-        aws_mock.compute.return_value.get_offers_cached.return_value = [offer]
+        aws_mock.compute.return_value.get_offers.return_value = [offer]
         aws_mock.compute.return_value.create_instance.side_effect = err
         with patch("dstack._internal.server.services.backends.get_project_backends") as m:
             m.return_value = [aws_mock]
@@ -903,7 +903,7 @@ class TestPlacementGroups:
         backend_mock = Mock()
         backend_mock.TYPE = BackendType.AWS
         backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
-        backend_mock.compute.return_value.get_offers_cached.return_value = [
+        backend_mock.compute.return_value.get_offers.return_value = [
             get_instance_offer_with_availability()
         ]
         backend_mock.compute.return_value.create_instance.return_value = (
@@ -951,7 +951,7 @@ class TestPlacementGroups:
         backend_mock = Mock()
         backend_mock.TYPE = BackendType.AWS
         backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
-        backend_mock.compute.return_value.get_offers_cached.return_value = [
+        backend_mock.compute.return_value.get_offers.return_value = [
             get_instance_offer_with_availability(instance_type="bad-offer-1"),
             get_instance_offer_with_availability(instance_type="bad-offer-2"),
             get_instance_offer_with_availability(instance_type="good-offer"),
@@ -1010,7 +1010,7 @@ class TestPlacementGroups:
         backend_mock = Mock()
         backend_mock.TYPE = BackendType.AWS
         backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
-        backend_mock.compute.return_value.get_offers_cached.return_value = [
+        backend_mock.compute.return_value.get_offers.return_value = [
             get_instance_offer_with_availability(instance_type="bad-offer"),
             get_instance_offer_with_availability(instance_type="good-offer"),
         ]
