@@ -13,6 +13,7 @@ from dstack._internal.core.backends.dstack.models import (
 )
 from dstack._internal.core.backends.models import BackendInfo
 from dstack._internal.core.errors import ForbiddenError, ResourceExistsError, ServerClientError
+from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.projects import Member, MemberPermissions, Project
 from dstack._internal.core.models.runs import RunStatus
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
@@ -115,11 +116,20 @@ async def get_project_by_name(
     return project_model_to_project(project_model)
 
 
+class ProjectConfig(CoreModel):
+    """
+    This class can be inherited to extend the project creation configuration passed to the hooks.
+    """
+
+    pass
+
+
 async def create_project(
     session: AsyncSession,
     user: UserModel,
     project_name: str,
     is_public: bool = False,
+    config: Optional[ProjectConfig] = None,
 ) -> Project:
     user_permissions = users.get_user_permissions(user)
     if not user_permissions.can_create_projects:
@@ -147,7 +157,7 @@ async def create_project(
         session=session, project_name=project_name
     )
     for hook in _CREATE_PROJECT_HOOKS:
-        await hook(session, project_model)
+        await hook(session, project_model, config)
     # a hook may change project
     session.expire(project_model)
     project_model = await get_project_model_by_name_or_error(
@@ -609,7 +619,9 @@ def get_member_permissions(member_model: MemberModel) -> MemberPermissions:
 _CREATE_PROJECT_HOOKS = []
 
 
-def register_create_project_hook(func: Callable[[AsyncSession, ProjectModel], Awaitable[None]]):
+def register_create_project_hook(
+    func: Callable[[AsyncSession, ProjectModel, Optional[ProjectConfig]], Awaitable[None]],
+):
     _CREATE_PROJECT_HOOKS.append(func)
 
 
