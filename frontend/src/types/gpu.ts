@@ -1,6 +1,7 @@
 declare type TAvailability = 'unknown' | 'available' | 'not_available' | 'no_quota' | 'no_balance' | 'idle' | 'busy';
 
 declare type TSpot = 'spot' | 'on-demand' | 'auto';
+declare type TGpuGroupBy = 'gpu' | 'backend' | 'region' | 'count';
 
 declare type TRange = {
     min: number;
@@ -73,6 +74,7 @@ declare interface IGpu {
 
 declare type TGpusListQueryParams = {
     project_name: string;
+    group_by?: TGpuGroupBy[];
     run_spec: {
         group_gy?: string;
         spot?: string | boolean;

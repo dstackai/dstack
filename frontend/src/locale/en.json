@@ -461,6 +461,8 @@
     "spot": "Spot policy",
     "empty_message_title_select_project": "Select a project",
     "empty_message_text_select_project": "Use the filter above to select a project",
+    "empty_message_title_select_groupBy": "Select a group by",
+    "empty_message_text_select_groupBy": "Use the field above to select a group by",
     "empty_message_title": "No offers",
     "empty_message_text": "No offers to display.",
     "nomatch_message_title": "No matches",

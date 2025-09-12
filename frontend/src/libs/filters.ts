@@ -101,3 +101,23 @@ export const requestParamsToTokens = <RequestParamsKeys extends string>({
         tokens,
     };
 };
+
+export const requestParamsToArray = <Key extends string>({
+    searchParams,
+    paramName,
+}: {
+    searchParams: URLSearchParams;
+    paramName: Key;
+}) => {
+    const paramValues: string[] = [];
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
+
+    for (const [paramKey, paramValue] of searchParams.entries()) {
+        if (paramKey === paramName) {
+            paramValues.push(paramValue);
+        }
+    }
+
+    return paramValues;
+};
