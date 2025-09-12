@@ -14,6 +14,10 @@ export const gpuApi = createApi({
     endpoints: (builder) => ({
         getGpusList: builder.query<TGpusListQueryResponse, TGpusListQueryParams>({
             query: ({ project_name, ...body }) => {
+                if (body?.group_by?.length) {
+                    body.group_by = body.group_by.filter((g) => g !== 'gpu');
+                }
+
                 return {
                     url: API.PROJECTS.GPUS_LIST(project_name),
                     method: 'POST',
