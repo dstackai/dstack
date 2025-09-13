@@ -6,6 +6,8 @@ import botocore.exceptions
 
 import dstack.version as version
 from dstack._internal.core.backends.aws.models import AWSOSImageConfig
+from dstack._internal.core.backends.base.compute import requires_nvidia_proprietary_kernel_modules
+from dstack._internal.core.consts import DSTACK_OS_IMAGE_WITH_PROPRIETARY_NVIDIA_KERNEL_MODULES
 from dstack._internal.core.errors import BackendError, ComputeError, ComputeResourceNotFoundError
 from dstack._internal.utils.logging import get_logger
 
@@ -17,14 +19,14 @@ DLAMI_OWNER_ACCOUNT_ID = "898082745236"
 
 def get_image_id_and_username(
     ec2_client: botocore.client.BaseClient,
-    cuda: bool,
+    gpu_name: Optional[str],
     instance_type: str,
     image_config: Optional[AWSOSImageConfig] = None,
 ) -> tuple[str, str]:
     if image_config is not None:
-        image = image_config.nvidia if cuda else image_config.cpu
+        image = image_config.nvidia if gpu_name else image_config.cpu
         if image is None:
-            logger.warning("%s image not configured", "nvidia" if cuda else "cpu")
+            logger.warning("%s image not configured", "nvidia" if gpu_name else "cpu")
             raise ComputeResourceNotFoundError()
         image_name = image.name
         image_owner = image.owner
@@ -35,9 +37,12 @@ def get_image_id_and_username(
         image_owner = DLAMI_OWNER_ACCOUNT_ID
         username = "ubuntu"
     else:
-        image_name = (
-            f"dstack-{version.base_image}" if not cuda else f"dstack-cuda-{version.base_image}"
-        )
+        if gpu_name is None:
+            image_name = f"dstack-{version.base_image}"
+        elif not requires_nvidia_proprietary_kernel_modules(gpu_name):
+            image_name = f"dstack-cuda-{version.base_image}"
+        else:
+            image_name = f"dstack-cuda-{DSTACK_OS_IMAGE_WITH_PROPRIETARY_NVIDIA_KERNEL_MODULES}"
         image_owner = DSTACK_ACCOUNT_ID
         username = "ubuntu"
     response = ec2_client.describe_images(

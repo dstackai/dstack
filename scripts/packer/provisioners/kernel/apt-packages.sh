@@ -19,6 +19,7 @@ DEPS="
   tree
   jq
   gdb
+  ufw
   python3-pip
   python3-boto
   python3-boto3

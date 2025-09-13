@@ -118,7 +118,7 @@ class TestGetImageIdAndUsername:
         }
         image_id, username = get_image_id_and_username(
             ec2_client_mock,
-            cuda=False,
+            gpu_name=None,
             instance_type="some",
         )
         assert image_id == "ami-00000000000000003"
@@ -144,7 +144,7 @@ class TestGetImageIdAndUsername:
         with pytest.raises(ComputeResourceNotFoundError):
             get_image_id_and_username(
                 ec2_client_mock,
-                cuda=False,
+                gpu_name=None,
                 instance_type="some",
             )
         assert "image 'dstack-0.0' not found" in caplog.text
@@ -162,7 +162,7 @@ class TestGetImageIdAndUsername:
         monkeypatch.setattr("dstack.version.base_image", "0.0")
         _, username = get_image_id_and_username(
             ec2_client_mock,
-            cuda=cuda,
+            gpu_name="A10G" if cuda else None,
             instance_type="some",
         )
         assert username == "ubuntu"
@@ -198,7 +198,7 @@ class TestGetImageIdAndUsername:
         )
         _, username = get_image_id_and_username(
             ec2_client_mock,
-            cuda=cuda,
+            gpu_name="A10G" if cuda else None,
             instance_type="some",
             image_config=image_config,
         )
@@ -221,7 +221,7 @@ class TestGetImageIdAndUsername:
         with pytest.raises(ComputeResourceNotFoundError):
             get_image_id_and_username(
                 ec2_client_mock,
-                cuda=False,
+                gpu_name=None,
                 instance_type="some",
                 image_config=image_config,
             )

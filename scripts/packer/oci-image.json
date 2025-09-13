@@ -15,7 +15,7 @@
       "compartment_ocid": "{{user `oci_compartment_ocid`}}",
       "subnet_ocid": "{{user `oci_subnet_ocid`}}",
       "shape": "VM.Standard2.1",
-      "base_image_ocid": "ocid1.image.oc1.eu-frankfurt-1.aaaaaaaaxroekfbow3kdrdjlwao6tsxxfcb23xmqrdjtjcay2ow52eijvzqa",
+      "base_image_ocid": "ocid1.image.oc1.eu-frankfurt-1.aaaaaaaahelib4o7g4fsjgck2lhxjmzonvbniwcmjjn2im4cxlksjgyzw5gq",
       "image_name": "{{user `build_prefix`}}dstack-{{user `image_version`}}",
       "instance_name": "packer-{{user `build_prefix`}}dstack-{{user `image_version`}}",
       "ssh_username": "ubuntu"
@@ -25,10 +25,6 @@
     {
       "type": "shell",
       "inline": ["cloud-init status --long --wait"]
-    },
-    {
-      "type": "shell",
-      "script": "provisioners/wait-for-dpkg-lock.sh"
     },
     {
       "type": "shell",
