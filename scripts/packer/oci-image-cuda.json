@@ -29,10 +29,6 @@
     },
     {
       "type": "shell",
-      "script": "provisioners/wait-for-dpkg-lock.sh"
-    },
-    {
-      "type": "shell",
       "scripts": [
         "provisioners/kernel/apt-upgrade.sh",
         "provisioners/kernel/apt-daily.sh",
