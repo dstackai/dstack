@@ -20,6 +20,7 @@ from dstack._internal.core.models.runs import Requirements
 SUPPORTED_GPUHUNT_FLAGS = [
     "oci-spot",
     "lambda-arm",
+    "gcp-a4",
 ]
 
 
