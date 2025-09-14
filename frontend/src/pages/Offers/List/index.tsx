@@ -220,7 +220,7 @@ export const OfferList = () => {
 
                     <div className={styles.filterField}>
                         <MultiselectCSD
-                            inlineLabelText={t('offer.groupBy')}
+                            placeholder={t('offer.groupBy')}
                             onChange={onChangeGroupBy}
                             options={groupByOptions}
                             selectedOptions={groupBy}
