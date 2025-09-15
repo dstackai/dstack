@@ -183,7 +183,7 @@ export const CreateProjectWizard: React.FC = () => {
         return {
             project_name,
             config: {
-                base_backends: project_type === 'gpu_marketplace' ? backends : [],
+                base_backends: project_type === 'gpu_marketplace' ? (backends ?? []) : [],
             },
         };
     };
