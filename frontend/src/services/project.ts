@@ -180,6 +180,7 @@ export const projectApi = createApi({
 
 export const {
     useGetProjectsQuery,
+    useLazyGetProjectsQuery,
     useGetProjectQuery,
     useCreateProjectMutation,
     useCreateWizardProjectMutation,

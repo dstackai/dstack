@@ -44,6 +44,7 @@ export enum HotspotIds {
     ADD_TOP_UP_BALANCE = 'billing-top-up-balance',
     PAYMENT_CONTINUE_BUTTON = 'billing-payment-continue-button',
     CONFIGURE_CLI_COMMAND = 'configure-cli-command',
+    CREATE_FIRST_PROJECT = 'create-first-project',
 }
 
 export const BILLING_TUTORIAL: TutorialPanelProps.Tutorial = {
@@ -95,6 +96,31 @@ export const CONFIGURE_CLI_TUTORIAL: TutorialPanelProps.Tutorial = {
                     title: 'Run the dstack project add command',
                     content: 'Run this command on your local machine to configure the dstack CLI.',
                     hotspotId: HotspotIds.CONFIGURE_CLI_COMMAND,
+                },
+            ],
+        },
+    ],
+};
+
+export const CREATE_FIRST_PROJECT: TutorialPanelProps.Tutorial = {
+    completed: false,
+    title: 'Create the first project',
+    description: (
+        <>
+            <Box variant="p" color="text-body-secondary" padding={{ top: 'n' }}>
+                Configure the first your project
+            </Box>
+        </>
+    ),
+    completedScreenDescription: 'TBA',
+    tasks: [
+        {
+            title: 'Create the first project',
+            steps: [
+                {
+                    title: 'Create the first project',
+                    content: 'Create the first project',
+                    hotspotId: HotspotIds.CREATE_FIRST_PROJECT,
                 },
             ],
         },

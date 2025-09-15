@@ -168,7 +168,7 @@ export const CreateProjectWizard: React.FC = () => {
     const resolver = useYupValidationResolver(projectValidationSchema);
     const formMethods = useForm<IProjectWizardForm>({
         resolver,
-        defaultValues: { enable_fleet: true, fleet_min_instances: 0 },
+        defaultValues: { project_type: 'gpu_marketplace', enable_fleet: true, fleet_min_instances: 0 },
     });
     const { handleSubmit, control, watch, trigger, formState, getValues, setValue, setError } = formMethods;
     const formValues = watch();
@@ -209,10 +209,9 @@ export const CreateProjectWizard: React.FC = () => {
                     return false;
                 });
 
-            console.log({ serverValidationResult });
-
             return yupValidationResult && serverValidationResult;
         } catch (e) {
+            console.log(e);
             return false;
         }
     };
@@ -468,10 +467,10 @@ export const CreateProjectWizard: React.FC = () => {
                                         },
                                         {
                                             label: t('projects.edit.backends'),
-                                            value: (formValues['project_type'] === 'gpu_marketplace'
-                                                ? (formValues['backends'] ?? [])
-                                                : backendOptions.map((b: { value: string }) => b.value)
-                                            ).join(', '),
+                                            value:
+                                                formValues['project_type'] === 'gpu_marketplace'
+                                                    ? (formValues['backends'] ?? []).join(', ')
+                                                    : 'The backends can be configured with your own cloud credentials in the project settings after the project is created.',
                                         },
                                     ]}
                                 />
