@@ -11,7 +11,7 @@ from pydantic import Field
 from typing_extensions import Literal
 
 from dstack._internal.core.errors import DstackError
-from dstack._internal.core.models.common import CoreModel
+from dstack._internal.core.models.common import CoreConfig, generate_dual_core_model
 from dstack._internal.core.models.repos.base import BaseRepoInfo, Repo
 from dstack._internal.utils.hash import get_sha256, slugify
 from dstack._internal.utils.path import PathLike
@@ -24,21 +24,33 @@ class RepoError(DstackError):
     pass
 
 
-class RemoteRepoCreds(CoreModel):
+class RemoteRepoCredsConfig(CoreConfig):
+    @staticmethod
+    def schema_extra(schema: Dict[str, Any]):
+        del schema["properties"]["protocol"]
+
+
+class RemoteRepoCreds(generate_dual_core_model(RemoteRepoCredsConfig)):
     clone_url: str
-    private_key: Optional[str]
-    oauth_token: Optional[str]
+    private_key: Optional[str] = None
+    oauth_token: Optional[str] = None
 
     # TODO: remove in 0.20. Left for compatibility with CLI <=0.18.44
     protocol: Annotated[Optional[str], Field(exclude=True)] = None
 
-    class Config(CoreModel.Config):
-        @staticmethod
-        def schema_extra(schema: Dict[str, Any]) -> None:
-            del schema["properties"]["protocol"]
+
+class RemoteRepoInfoConfig(CoreConfig):
+    @staticmethod
+    def schema_extra(schema: Dict[str, Any]):
+        del schema["properties"]["repo_host_name"]
+        del schema["properties"]["repo_port"]
+        del schema["properties"]["repo_user_name"]
 
 
-class RemoteRepoInfo(BaseRepoInfo):
+class RemoteRepoInfo(
+    BaseRepoInfo,
+    generate_dual_core_model(RemoteRepoInfoConfig),
+):
     repo_type: Literal["remote"] = "remote"
     repo_name: str
 
@@ -46,13 +58,6 @@ class RemoteRepoInfo(BaseRepoInfo):
     repo_host_name: Annotated[Optional[str], Field(exclude=True)] = None
     repo_port: Annotated[Optional[int], Field(exclude=True)] = None
     repo_user_name: Annotated[Optional[str], Field(exclude=True)] = None
-
-    class Config(BaseRepoInfo.Config):
-        @staticmethod
-        def schema_extra(schema: Dict[str, Any]) -> None:
-            del schema["properties"]["repo_host_name"]
-            del schema["properties"]["repo_port"]
-            del schema["properties"]["repo_user_name"]
 
 
 class RemoteRunRepoData(RemoteRepoInfo):

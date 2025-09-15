@@ -13,9 +13,22 @@ from dstack._internal.core.backends.dstack.models import (
 )
 from dstack._internal.core.backends.models import BackendInfo
 from dstack._internal.core.errors import ForbiddenError, ResourceExistsError, ServerClientError
-from dstack._internal.core.models.projects import Member, MemberPermissions, Project
+from dstack._internal.core.models.projects import (
+    Member,
+    MemberPermissions,
+    Project,
+    ProjectHookConfig,
+)
+from dstack._internal.core.models.runs import RunStatus
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
-from dstack._internal.server.models import MemberModel, ProjectModel, UserModel
+from dstack._internal.server.models import (
+    FleetModel,
+    MemberModel,
+    ProjectModel,
+    RunModel,
+    UserModel,
+    VolumeModel,
+)
 from dstack._internal.server.schemas.projects import MemberSetting
 from dstack._internal.server.services import users
 from dstack._internal.server.services.backends import (
@@ -112,6 +125,7 @@ async def create_project(
     user: UserModel,
     project_name: str,
     is_public: bool = False,
+    config: Optional[ProjectHookConfig] = None,
 ) -> Project:
     user_permissions = users.get_user_permissions(user)
     if not user_permissions.can_create_projects:
@@ -139,7 +153,7 @@ async def create_project(
         session=session, project_name=project_name
     )
     for hook in _CREATE_PROJECT_HOOKS:
-        await hook(session, project_model)
+        await hook(session, project_model, config)
     # a hook may change project
     session.expire(project_model)
     project_model = await get_project_model_by_name_or_error(
@@ -178,6 +192,19 @@ async def delete_projects(
                 raise ForbiddenError()
         if all(name in projects_names for name in user_project_names):
             raise ServerClientError("Cannot delete the only project")
+
+    res = await session.execute(
+        select(ProjectModel.id).where(ProjectModel.name.in_(projects_names))
+    )
+    project_ids = res.scalars().all()
+    if len(project_ids) != len(projects_names):
+        raise ServerClientError("Failed to delete non-existent projects")
+
+    for project_id in project_ids:
+        # FIXME: The checks are not under lock,
+        # so there can be dangling active resources due to race conditions.
+        await _check_project_has_active_resources(session=session, project_id=project_id)
+
     timestamp = str(int(get_current_datetime().timestamp()))
     new_project_name = "_deleted_" + timestamp + ProjectModel.name
     await session.execute(
@@ -588,7 +615,9 @@ def get_member_permissions(member_model: MemberModel) -> MemberPermissions:
 _CREATE_PROJECT_HOOKS = []
 
 
-def register_create_project_hook(func: Callable[[AsyncSession, ProjectModel], Awaitable[None]]):
+def register_create_project_hook(
+    func: Callable[[AsyncSession, ProjectModel, Optional[ProjectHookConfig]], Awaitable[None]],
+):
     _CREATE_PROJECT_HOOKS.append(func)
 
 
@@ -612,6 +641,36 @@ def _is_project_admin(
             if m.project_role == ProjectRole.ADMIN:
                 return True
     return False
+
+
+async def _check_project_has_active_resources(session: AsyncSession, project_id: uuid.UUID):
+    res = await session.execute(
+        select(RunModel.run_name).where(
+            RunModel.project_id == project_id,
+            RunModel.status.not_in(RunStatus.finished_statuses()),
+        )
+    )
+    run_names = list(res.scalars().all())
+    if len(run_names) > 0:
+        raise ServerClientError(f"Failed to delete project with active runs: {run_names}")
+    res = await session.execute(
+        select(FleetModel.name).where(
+            FleetModel.project_id == project_id,
+            FleetModel.deleted.is_(False),
+        )
+    )
+    fleet_names = list(res.scalars().all())
+    if len(fleet_names) > 0:
+        raise ServerClientError(f"Failed to delete project with active fleets: {fleet_names}")
+    res = await session.execute(
+        select(VolumeModel.name).where(
+            VolumeModel.project_id == project_id,
+            VolumeModel.deleted.is_(False),
+        )
+    )
+    volume_names = list(res.scalars().all())
+    if len(volume_names) > 0:
+        raise ServerClientError(f"Failed to delete project with active volumes: {volume_names}")
 
 
 async def remove_project_members(

@@ -5,6 +5,7 @@ import requests
 from dstack._internal.core.backends.base.backend import Compute
 from dstack._internal.core.backends.base.compute import (
     ComputeWithCreateInstanceSupport,
+    ComputeWithFilteredOffersCached,
     generate_unique_instance_name,
     get_shim_commands,
 )
@@ -29,6 +30,7 @@ MAX_RESOURCE_NAME_LEN = 30
 
 
 class CudoCompute(
+    ComputeWithFilteredOffersCached,
     ComputeWithCreateInstanceSupport,
     Compute,
 ):
@@ -37,8 +39,8 @@ class CudoCompute(
         self.config = config
         self.api_client = CudoApiClient(config.creds.api_key)
 
-    def get_offers(
-        self, requirements: Optional[Requirements] = None
+    def get_offers_by_requirements(
+        self, requirements: Requirements
     ) -> List[InstanceOfferWithAvailability]:
         offers = get_catalog_offers(
             backend=BackendType.CUDO,

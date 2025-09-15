@@ -83,7 +83,7 @@ def main():
     argcomplete.autocomplete(parser, always_complete_options=False)
 
     args, unknown_args = parser.parse_known_args()
-    args.unknown = unknown_args
+    args.extra_args = unknown_args
 
     try:
         check_for_updates()

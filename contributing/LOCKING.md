@@ -50,7 +50,7 @@ await session.commit()
 select ...
 ```
 
-> SQLite exhibits "snapshot isolation". When a read transaction starts, that reader continues to see an unchanging "snapshot" of the database file as it existed at the moment in time when the read transaction started. Any write transactions that commit while the read transaction is active are still invisible to the read transaction, because the reader is seeing a snapshot of database file from a prior moment in time. Source: https://www.sqlite.org/isolation.html
+> SQLite exhibits Snapshot Isolation. When a read transaction starts, that reader continues to see an unchanging "snapshot" of the database file as it existed at the moment in time when the read transaction started. Any write transactions that commit while the read transaction is active are still invisible to the read transaction, because the reader is seeing a snapshot of database file from a prior moment in time. Source: https://www.sqlite.org/isolation.html
 
 Thus, if a new transaction is not started, you won't see changes that concurrent transactions made before you acquired the lock.
 
@@ -82,3 +82,29 @@ In fact, using `joinedload` and `.with_for_update()` will trigger an error becau
 **Always use `.with_for_update(key_share=True)` unless you plan to delete rows or update a primary key column**
 
 If you `SELECT FOR UPDATE` from a table that is referenced in a child table via a foreign key, it can lead to deadlocks if the child table is updated because Postgres will issue a `FOR KEY SHARE` lock on the parent table rows to ensure valid foreign keys. For this reason, you should always do `SELECT FOR NO KEY UPDATE` (.`with_for_update(key_share=True)`) if primary key columns are not modified. `SELECT FOR NO KEY UPDATE` is not blocked by a `FOR KEY SHARE` lock, so no deadlock.
+
+
+**Lock unique names**
+
+The following pattern can be used to lock a unique name of some resource type:
+
+```python
+lock_namespace = f"fleet_names_{project.name}"
+if get_db().dialect_name == "sqlite":
+    # Start new transaction to see committed changes after lock
+    await session.commit()
+elif get_db().dialect_name == "postgresql":
+    await session.execute(
+        select(func.pg_advisory_xact_lock(string_to_lock_id(lock_namespace)))
+    )
+
+lock, _ = get_locker(get_db().dialect_name).get_lockset(lock_namespace)
+async with lock:
+    # ... select taken names, use a unique name
+    await session.commit()
+```
+
+Note that:
+
+* This pattern works assuming that Postgres is using default isolation level Read Committed. By the time a transaction acquires the advisory lock, all other transactions that can take the name have committed, so their changes can be seen and a unique name is taken.
+* SQLite needs a commit before selecting taken names due to Snapshot Isolation as noted above.

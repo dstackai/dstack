@@ -1,6 +1,5 @@
 import argparse
 import time
-from typing import List
 
 from rich.table import Table
 
@@ -26,7 +25,7 @@ from dstack.api._public import Client
 
 
 class VolumeConfigurator(BaseApplyConfigurator[VolumeConfiguration]):
-    TYPE: ApplyConfigurationType = ApplyConfigurationType.VOLUME
+    TYPE = ApplyConfigurationType.VOLUME
 
     def apply_configuration(
         self,
@@ -34,9 +33,8 @@ class VolumeConfigurator(BaseApplyConfigurator[VolumeConfiguration]):
         configuration_path: str,
         command_args: argparse.Namespace,
         configurator_args: argparse.Namespace,
-        unknown_args: List[str],
     ):
-        self.apply_args(conf, configurator_args, unknown_args)
+        self.apply_args(conf, configurator_args)
         spec = VolumeSpec(
             configuration=conf,
             configuration_path=configuration_path,
@@ -167,7 +165,7 @@ class VolumeConfigurator(BaseApplyConfigurator[VolumeConfiguration]):
             help="The volume name",
         )
 
-    def apply_args(self, conf: VolumeConfiguration, args: argparse.Namespace, unknown: List[str]):
+    def apply_args(self, conf: VolumeConfiguration, args: argparse.Namespace):
         if args.name:
             conf.name = args.name
 

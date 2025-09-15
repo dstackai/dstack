@@ -13,6 +13,7 @@ export { default as SpaceBetween } from '@cloudscape-design/components/space-bet
 export { default as Container } from '@cloudscape-design/components/container';
 export { default as Spinner } from '@cloudscape-design/components/spinner';
 export { default as Cards } from '@cloudscape-design/components/cards';
+export type { CardsProps } from '@cloudscape-design/components/cards';
 export { default as Header } from '@cloudscape-design/components/header';
 export { default as Link } from '@cloudscape-design/components/link';
 export type { LinkProps } from '@cloudscape-design/components/link';
@@ -32,6 +33,8 @@ export { default as CheckboxCSD } from '@cloudscape-design/components/checkbox';
 export { default as InputCSD } from '@cloudscape-design/components/input';
 export { default as SelectCSD } from '@cloudscape-design/components/select';
 export type { SelectProps as SelectCSDProps } from '@cloudscape-design/components/select';
+export { default as MultiselectCSD } from '@cloudscape-design/components/multiselect';
+export type { MultiselectProps } from '@cloudscape-design/components/multiselect';
 export { default as StatusIndicator } from '@cloudscape-design/components/status-indicator';
 export type { StatusIndicatorProps } from '@cloudscape-design/components/status-indicator';
 export { default as Popover } from '@cloudscape-design/components/popover';
@@ -56,6 +59,9 @@ export { default as PropertyFilter } from '@cloudscape-design/components/propert
 export type { PropertyFilterProps } from '@cloudscape-design/components/property-filter';
 export type { LineChartProps } from '@cloudscape-design/components/line-chart/interfaces';
 export type { ModalProps } from '@cloudscape-design/components/modal';
+export { default as AnchorNavigation } from '@cloudscape-design/components/anchor-navigation';
+export { default as ExpandableSection } from '@cloudscape-design/components/expandable-section';
+export { I18nProvider } from '@cloudscape-design/components/i18n';
 export { default as Wizard } from '@cloudscape-design/components/wizard';
 
 // custom components

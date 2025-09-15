@@ -10,12 +10,23 @@ from pydantic import Field, ValidationError, conint, constr, root_validator, val
 from typing_extensions import Self
 
 from dstack._internal.core.errors import ConfigurationError
-from dstack._internal.core.models.common import CoreModel, Duration, RegistryAuth
+from dstack._internal.core.models.common import (
+    CoreConfig,
+    CoreModel,
+    Duration,
+    RegistryAuth,
+    generate_dual_core_model,
+)
 from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.files import FilePathMapping
 from dstack._internal.core.models.fleets import FleetConfiguration
 from dstack._internal.core.models.gateways import GatewayConfiguration
-from dstack._internal.core.models.profiles import ProfileParams, parse_duration, parse_off_duration
+from dstack._internal.core.models.profiles import (
+    ProfileParams,
+    ProfileParamsConfig,
+    parse_duration,
+    parse_off_duration,
+)
 from dstack._internal.core.models.resources import Range, ResourcesSpec
 from dstack._internal.core.models.services import AnyModel, OpenAIChatModel
 from dstack._internal.core.models.unix import UnixUser
@@ -276,7 +287,20 @@ class HTTPHeaderSpec(CoreModel):
     ]
 
 
-class ProbeConfig(CoreModel):
+class ProbeConfigConfig(CoreConfig):
+    @staticmethod
+    def schema_extra(schema: Dict[str, Any]):
+        add_extra_schema_types(
+            schema["properties"]["timeout"],
+            extra_types=[{"type": "string"}],
+        )
+        add_extra_schema_types(
+            schema["properties"]["interval"],
+            extra_types=[{"type": "string"}],
+        )
+
+
+class ProbeConfig(generate_dual_core_model(ProbeConfigConfig)):
     type: Literal["http"]  # expect other probe types in the future, namely `exec`
     url: Annotated[
         Optional[str], Field(description=f"The URL to request. Defaults to `{DEFAULT_PROBE_URL}`")
@@ -331,18 +355,6 @@ class ProbeConfig(CoreModel):
         ),
     ] = None
 
-    class Config(CoreModel.Config):
-        @staticmethod
-        def schema_extra(schema: Dict[str, Any]):
-            add_extra_schema_types(
-                schema["properties"]["timeout"],
-                extra_types=[{"type": "string"}],
-            )
-            add_extra_schema_types(
-                schema["properties"]["interval"],
-                extra_types=[{"type": "string"}],
-            )
-
     @validator("timeout", pre=True)
     def parse_timeout(cls, v: Optional[Union[int, str]]) -> Optional[int]:
         if v is None:
@@ -379,6 +391,19 @@ class ProbeConfig(CoreModel):
         if values["body"] is not None and method in ["get", "head"]:
             raise ValueError(f"Cannot set request body for the `{method}` method")
         return values
+
+
+class BaseRunConfigurationConfig(CoreConfig):
+    @staticmethod
+    def schema_extra(schema: Dict[str, Any]):
+        add_extra_schema_types(
+            schema["properties"]["volumes"]["items"],
+            extra_types=[{"type": "string"}],
+        )
+        add_extra_schema_types(
+            schema["properties"]["files"]["items"],
+            extra_types=[{"type": "string"}],
+        )
 
 
 class BaseRunConfiguration(CoreModel):
@@ -483,18 +508,6 @@ class BaseRunConfiguration(CoreModel):
     ] = []
     # deprecated since 0.18.31; task, service -- no effect; dev-environment -- executed right before `init`
     setup: CommandsList = []
-
-    class Config(CoreModel.Config):
-        @staticmethod
-        def schema_extra(schema: Dict[str, Any]):
-            add_extra_schema_types(
-                schema["properties"]["volumes"]["items"],
-                extra_types=[{"type": "string"}],
-            )
-            add_extra_schema_types(
-                schema["properties"]["files"]["items"],
-                extra_types=[{"type": "string"}],
-            )
 
     @validator("python", pre=True, always=True)
     def convert_python(cls, v, values) -> Optional[PythonVersion]:
@@ -621,19 +634,24 @@ class DevEnvironmentConfigurationParams(CoreModel):
         return None
 
 
+class DevEnvironmentConfigurationConfig(
+    ProfileParamsConfig,
+    BaseRunConfigurationConfig,
+):
+    @staticmethod
+    def schema_extra(schema: Dict[str, Any]):
+        ProfileParamsConfig.schema_extra(schema)
+        BaseRunConfigurationConfig.schema_extra(schema)
+
+
 class DevEnvironmentConfiguration(
     ProfileParams,
     BaseRunConfiguration,
     ConfigurationWithPortsParams,
     DevEnvironmentConfigurationParams,
+    generate_dual_core_model(DevEnvironmentConfigurationConfig),
 ):
     type: Literal["dev-environment"] = "dev-environment"
-
-    class Config(ProfileParams.Config, BaseRunConfiguration.Config):
-        @staticmethod
-        def schema_extra(schema: Dict[str, Any]):
-            ProfileParams.Config.schema_extra(schema)
-            BaseRunConfiguration.Config.schema_extra(schema)
 
     @validator("entrypoint")
     def validate_entrypoint(cls, v: Optional[str]) -> Optional[str]:
@@ -646,20 +664,38 @@ class TaskConfigurationParams(CoreModel):
     nodes: Annotated[int, Field(description="Number of nodes", ge=1)] = 1
 
 
+class TaskConfigurationConfig(
+    ProfileParamsConfig,
+    BaseRunConfigurationConfig,
+):
+    @staticmethod
+    def schema_extra(schema: Dict[str, Any]):
+        ProfileParamsConfig.schema_extra(schema)
+        BaseRunConfigurationConfig.schema_extra(schema)
+
+
 class TaskConfiguration(
     ProfileParams,
     BaseRunConfiguration,
     ConfigurationWithCommandsParams,
     ConfigurationWithPortsParams,
     TaskConfigurationParams,
+    generate_dual_core_model(TaskConfigurationConfig),
 ):
     type: Literal["task"] = "task"
 
-    class Config(ProfileParams.Config, BaseRunConfiguration.Config):
-        @staticmethod
-        def schema_extra(schema: Dict[str, Any]):
-            ProfileParams.Config.schema_extra(schema)
-            BaseRunConfiguration.Config.schema_extra(schema)
+
+class ServiceConfigurationParamsConfig(CoreConfig):
+    @staticmethod
+    def schema_extra(schema: Dict[str, Any]):
+        add_extra_schema_types(
+            schema["properties"]["replicas"],
+            extra_types=[{"type": "integer"}, {"type": "string"}],
+        )
+        add_extra_schema_types(
+            schema["properties"]["model"],
+            extra_types=[{"type": "string"}],
+        )
 
 
 class ServiceConfigurationParams(CoreModel):
@@ -718,18 +754,6 @@ class ServiceConfigurationParams(CoreModel):
         list[ProbeConfig],
         Field(description="List of probes used to determine job health"),
     ] = []
-
-    class Config(CoreModel.Config):
-        @staticmethod
-        def schema_extra(schema: Dict[str, Any]):
-            add_extra_schema_types(
-                schema["properties"]["replicas"],
-                extra_types=[{"type": "integer"}, {"type": "string"}],
-            )
-            add_extra_schema_types(
-                schema["properties"]["model"],
-                extra_types=[{"type": "string"}],
-            )
 
     @validator("port")
     def convert_port(cls, v) -> PortMapping:
@@ -797,24 +821,26 @@ class ServiceConfigurationParams(CoreModel):
         return v
 
 
+class ServiceConfigurationConfig(
+    ProfileParamsConfig,
+    BaseRunConfigurationConfig,
+    ServiceConfigurationParamsConfig,
+):
+    @staticmethod
+    def schema_extra(schema: Dict[str, Any]):
+        ProfileParamsConfig.schema_extra(schema)
+        BaseRunConfigurationConfig.schema_extra(schema)
+        ServiceConfigurationParamsConfig.schema_extra(schema)
+
+
 class ServiceConfiguration(
     ProfileParams,
     BaseRunConfiguration,
     ConfigurationWithCommandsParams,
     ServiceConfigurationParams,
+    generate_dual_core_model(ServiceConfigurationConfig),
 ):
     type: Literal["service"] = "service"
-
-    class Config(
-        ProfileParams.Config,
-        BaseRunConfiguration.Config,
-        ServiceConfigurationParams.Config,
-    ):
-        @staticmethod
-        def schema_extra(schema: Dict[str, Any]):
-            ProfileParams.Config.schema_extra(schema)
-            BaseRunConfiguration.Config.schema_extra(schema)
-            ServiceConfigurationParams.Config.schema_extra(schema)
 
 
 AnyRunConfiguration = Union[DevEnvironmentConfiguration, TaskConfiguration, ServiceConfiguration]
@@ -876,7 +902,7 @@ class DstackConfiguration(CoreModel):
         Field(discriminator="type"),
     ]
 
-    class Config(CoreModel.Config):
+    class Config(CoreConfig):
         json_loads = orjson.loads
         json_dumps = pydantic_orjson_dumps_with_indent
 

@@ -3,7 +3,7 @@ import random
 import shlex
 import time
 from functools import cached_property
-from typing import List, Optional
+from typing import Callable, List, Optional
 
 from nebius.aio.operation import Operation as SDKOperation
 from nebius.aio.service_error import RequestError, StatusCode
@@ -12,13 +12,14 @@ from nebius.sdk import SDK
 
 from dstack._internal.core.backends.base.backend import Compute
 from dstack._internal.core.backends.base.compute import (
+    ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
     ComputeWithMultinodeSupport,
     ComputeWithPlacementGroupSupport,
     generate_unique_instance_name,
     get_user_data,
 )
-from dstack._internal.core.backends.base.offers import get_catalog_offers
+from dstack._internal.core.backends.base.offers import get_catalog_offers, get_offers_disk_modifier
 from dstack._internal.core.backends.nebius import resources
 from dstack._internal.core.backends.nebius.fabrics import get_suitable_infiniband_fabrics
 from dstack._internal.core.backends.nebius.models import NebiusConfig, NebiusServiceAccountCreds
@@ -76,6 +77,7 @@ SUPPORTED_PLATFORMS = [
 
 
 class NebiusCompute(
+    ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
     ComputeWithMultinodeSupport,
     ComputeWithPlacementGroupSupport,
@@ -106,15 +108,11 @@ class NebiusCompute(
             ).metadata.id
         return self._subnet_id_cache[region]
 
-    def get_offers(
-        self, requirements: Optional[Requirements] = None
-    ) -> List[InstanceOfferWithAvailability]:
+    def get_all_offers_with_availability(self) -> List[InstanceOfferWithAvailability]:
         offers = get_catalog_offers(
             backend=BackendType.NEBIUS,
             locations=list(self._region_to_project_id),
-            requirements=requirements,
             extra_filter=_supported_instances,
-            configurable_disk_size=CONFIGURABLE_DISK_SIZE,
         )
         return [
             InstanceOfferWithAvailability(
@@ -123,6 +121,11 @@ class NebiusCompute(
             )
             for offer in offers
         ]
+
+    def get_offers_modifier(
+        self, requirements: Requirements
+    ) -> Callable[[InstanceOfferWithAvailability], Optional[InstanceOfferWithAvailability]]:
+        return get_offers_disk_modifier(CONFIGURABLE_DISK_SIZE, requirements)
 
     def create_instance(
         self,

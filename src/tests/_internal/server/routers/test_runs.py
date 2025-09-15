@@ -997,12 +997,10 @@ class TestGetRunPlan:
         with patch("dstack._internal.server.services.backends.get_project_backends") as m:
             backend_mock_aws = Mock()
             backend_mock_aws.TYPE = BackendType.AWS
-            backend_mock_aws.compute.return_value.get_offers_cached.return_value = [offer_aws]
+            backend_mock_aws.compute.return_value.get_offers.return_value = [offer_aws]
             backend_mock_runpod = Mock()
             backend_mock_runpod.TYPE = BackendType.RUNPOD
-            backend_mock_runpod.compute.return_value.get_offers_cached.return_value = [
-                offer_runpod
-            ]
+            backend_mock_runpod.compute.return_value.get_offers.return_value = [offer_runpod]
             m.return_value = [backend_mock_aws, backend_mock_runpod]
             response = await client.post(
                 f"/api/project/{project.name}/runs/get_plan",
@@ -1059,12 +1057,10 @@ class TestGetRunPlan:
         with patch("dstack._internal.server.services.backends.get_project_backends") as m:
             backend_mock_aws = Mock()
             backend_mock_aws.TYPE = BackendType.AWS
-            backend_mock_aws.compute.return_value.get_offers_cached.return_value = [offer_aws]
+            backend_mock_aws.compute.return_value.get_offers.return_value = [offer_aws]
             backend_mock_runpod = Mock()
             backend_mock_runpod.TYPE = BackendType.RUNPOD
-            backend_mock_runpod.compute.return_value.get_offers_cached.return_value = [
-                offer_runpod
-            ]
+            backend_mock_runpod.compute.return_value.get_offers.return_value = [offer_runpod]
             m.return_value = [backend_mock_aws, backend_mock_runpod]
             response = await client.post(
                 f"/api/project/{project.name}/runs/get_plan",
@@ -1121,12 +1117,10 @@ class TestGetRunPlan:
         with patch("dstack._internal.server.services.backends.get_project_backends") as m:
             backend_mock_aws = Mock()
             backend_mock_aws.TYPE = BackendType.AWS
-            backend_mock_aws.compute.return_value.get_offers_cached.return_value = [offer_aws]
+            backend_mock_aws.compute.return_value.get_offers.return_value = [offer_aws]
             backend_mock_runpod = Mock()
             backend_mock_runpod.TYPE = BackendType.RUNPOD
-            backend_mock_runpod.compute.return_value.get_offers_cached.return_value = [
-                offer_runpod
-            ]
+            backend_mock_runpod.compute.return_value.get_offers.return_value = [offer_runpod]
             m.return_value = [backend_mock_aws, backend_mock_runpod]
             response = await client.post(
                 f"/api/project/{project.name}/runs/get_plan",
@@ -1183,12 +1177,10 @@ class TestGetRunPlan:
         with patch("dstack._internal.server.services.backends.get_project_backends") as m:
             backend_mock_aws = Mock()
             backend_mock_aws.TYPE = BackendType.AWS
-            backend_mock_aws.compute.return_value.get_offers_cached.return_value = [offer_aws]
+            backend_mock_aws.compute.return_value.get_offers.return_value = [offer_aws]
             backend_mock_runpod = Mock()
             backend_mock_runpod.TYPE = BackendType.RUNPOD
-            backend_mock_runpod.compute.return_value.get_offers_cached.return_value = [
-                offer_runpod
-            ]
+            backend_mock_runpod.compute.return_value.get_offers.return_value = [offer_runpod]
             m.return_value = [backend_mock_aws, backend_mock_runpod]
             response = await client.post(
                 f"/api/project/{project.name}/runs/get_plan",

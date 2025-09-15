@@ -96,11 +96,12 @@
     "webpack-nano": "^1.1.1"
   },
   "dependencies": {
-    "@cloudscape-design/chat-components": "^1.0.19",
-    "@cloudscape-design/collection-hooks": "^1.0.56",
-    "@cloudscape-design/components": "^3.0.856",
-    "@cloudscape-design/design-tokens": "^3.0.51",
-    "@cloudscape-design/global-styles": "^1.0.33",
+    "@cloudscape-design/chat-components": "^1.0.62",
+    "@cloudscape-design/collection-hooks": "^1.0.74",
+    "@cloudscape-design/component-toolkit": "^1.0.0-beta.120",
+    "@cloudscape-design/components": "^3.0.1091",
+    "@cloudscape-design/design-tokens": "^3.0.60",
+    "@cloudscape-design/global-styles": "^1.0.45",
     "@hookform/resolvers": "^2.9.10",
     "@reduxjs/toolkit": "^1.9.1",
     "@types/yup": "^0.29.14",

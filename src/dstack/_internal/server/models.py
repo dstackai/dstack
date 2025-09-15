@@ -24,7 +24,7 @@ from sqlalchemy_utils import UUIDType
 
 from dstack._internal.core.errors import DstackError
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.common import CoreModel
+from dstack._internal.core.models.common import CoreConfig, generate_dual_core_model
 from dstack._internal.core.models.fleets import FleetStatus
 from dstack._internal.core.models.gateways import GatewayStatus
 from dstack._internal.core.models.health import HealthStatus
@@ -71,7 +71,11 @@ class NaiveDateTime(TypeDecorator):
         return value.replace(tzinfo=timezone.utc)
 
 
-class DecryptedString(CoreModel):
+class DecryptedStringConfig(CoreConfig):
+    arbitrary_types_allowed = True
+
+
+class DecryptedString(generate_dual_core_model(DecryptedStringConfig)):
     """
     A type for representing plaintext strings encrypted with `EncryptedString`.
     Besides the string, stores information if the decryption was successful.
@@ -83,9 +87,6 @@ class DecryptedString(CoreModel):
     plaintext: Optional[str]
     decrypted: bool = True
     exc: Optional[Exception] = None
-
-    class Config(CoreModel.Config):
-        arbitrary_types_allowed = True
 
     def get_plaintext_or_error(self) -> str:
         if self.decrypted and self.plaintext is not None:

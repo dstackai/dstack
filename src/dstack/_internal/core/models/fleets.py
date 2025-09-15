@@ -2,13 +2,18 @@ import ipaddress
 import uuid
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Type, Union
+from typing import Any, Dict, List, Optional, Union
 
 from pydantic import Field, root_validator, validator
 from typing_extensions import Annotated, Literal
 
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.common import ApplyAction, CoreModel
+from dstack._internal.core.models.common import (
+    ApplyAction,
+    CoreConfig,
+    CoreModel,
+    generate_dual_core_model,
+)
 from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.instances import Instance, InstanceOfferWithAvailability, SSHKey
 from dstack._internal.core.models.profiles import (
@@ -202,6 +207,21 @@ class FleetNodesSpec(CoreModel):
         return values
 
 
+class InstanceGroupParamsConfig(CoreConfig):
+    @staticmethod
+    def schema_extra(schema: Dict[str, Any]):
+        del schema["properties"]["termination_policy"]
+        del schema["properties"]["termination_idle_time"]
+        add_extra_schema_types(
+            schema["properties"]["nodes"],
+            extra_types=[{"type": "integer"}, {"type": "string"}],
+        )
+        add_extra_schema_types(
+            schema["properties"]["idle_duration"],
+            extra_types=[{"type": "string"}],
+        )
+
+
 class InstanceGroupParams(CoreModel):
     env: Annotated[
         Env,
@@ -297,20 +317,6 @@ class InstanceGroupParams(CoreModel):
     termination_policy: Annotated[Optional[TerminationPolicy], Field(exclude=True)] = None
     termination_idle_time: Annotated[Optional[Union[str, int]], Field(exclude=True)] = None
 
-    class Config(CoreModel.Config):
-        @staticmethod
-        def schema_extra(schema: Dict[str, Any], model: Type):
-            del schema["properties"]["termination_policy"]
-            del schema["properties"]["termination_idle_time"]
-            add_extra_schema_types(
-                schema["properties"]["nodes"],
-                extra_types=[{"type": "integer"}, {"type": "string"}],
-            )
-            add_extra_schema_types(
-                schema["properties"]["idle_duration"],
-                extra_types=[{"type": "string"}],
-            )
-
     @validator("nodes", pre=True)
     def parse_nodes(cls, v: Optional[Union[dict, str]]) -> Optional[dict]:
         if isinstance(v, str) and ".." in v:
@@ -331,7 +337,17 @@ class FleetProps(CoreModel):
     name: Annotated[Optional[str], Field(description="The fleet name")] = None
 
 
-class FleetConfiguration(InstanceGroupParams, FleetProps):
+class FleetConfigurationConfig(InstanceGroupParamsConfig):
+    @staticmethod
+    def schema_extra(schema: Dict[str, Any]):
+        InstanceGroupParamsConfig.schema_extra(schema)
+
+
+class FleetConfiguration(
+    InstanceGroupParams,
+    FleetProps,
+    generate_dual_core_model(FleetConfigurationConfig),
+):
     tags: Annotated[
         Optional[Dict[str, str]],
         Field(
@@ -346,7 +362,14 @@ class FleetConfiguration(InstanceGroupParams, FleetProps):
     _validate_tags = validator("tags", pre=True, allow_reuse=True)(tags_validator)
 
 
-class FleetSpec(CoreModel):
+class FleetSpecConfig(CoreConfig):
+    @staticmethod
+    def schema_extra(schema: Dict[str, Any]):
+        prop = schema.get("properties", {})
+        prop.pop("merged_profile", None)
+
+
+class FleetSpec(generate_dual_core_model(FleetSpecConfig)):
     configuration: FleetConfiguration
     configuration_path: Optional[str] = None
     profile: Profile
@@ -355,12 +378,6 @@ class FleetSpec(CoreModel):
     # Read profile parameters from merged_profile instead of profile directly.
     # TODO: make merged_profile a computed field after migrating to pydanticV2
     merged_profile: Annotated[Profile, Field(exclude=True)] = None
-
-    class Config(CoreModel.Config):
-        @staticmethod
-        def schema_extra(schema: Dict[str, Any], model: Type) -> None:
-            prop = schema.get("properties", {})
-            prop.pop("merged_profile", None)
 
     @root_validator
     def _merged_profile(cls, values) -> Dict:
