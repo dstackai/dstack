@@ -1,17 +1,18 @@
 from concurrent.futures import ThreadPoolExecutor
 from functools import cached_property
-from typing import List, Optional
+from typing import Callable, List, Optional
 
 import oci
 
 from dstack._internal.core.backends.base.compute import (
     Compute,
+    ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
     ComputeWithMultinodeSupport,
     generate_unique_instance_name,
     get_user_data,
 )
-from dstack._internal.core.backends.base.offers import get_catalog_offers
+from dstack._internal.core.backends.base.offers import get_catalog_offers, get_offers_disk_modifier
 from dstack._internal.core.backends.oci import resources
 from dstack._internal.core.backends.oci.models import OCIConfig
 from dstack._internal.core.backends.oci.region import make_region_clients_map
@@ -47,6 +48,7 @@ CONFIGURABLE_DISK_SIZE = Range[Memory](min=Memory.parse("50GB"), max=Memory.pars
 
 
 class OCICompute(
+    ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
     ComputeWithMultinodeSupport,
     Compute,
@@ -60,14 +62,10 @@ class OCICompute(
     def shapes_quota(self) -> resources.ShapesQuota:
         return resources.ShapesQuota.load(self.regions, self.config.compartment_id)
 
-    def get_offers(
-        self, requirements: Optional[Requirements] = None
-    ) -> List[InstanceOfferWithAvailability]:
+    def get_all_offers_with_availability(self) -> List[InstanceOfferWithAvailability]:
         offers = get_catalog_offers(
             backend=BackendType.OCI,
             locations=self.config.regions,
-            requirements=requirements,
-            configurable_disk_size=CONFIGURABLE_DISK_SIZE,
             extra_filter=_supported_instances,
         )
 
@@ -95,6 +93,11 @@ class OCICompute(
             )
 
         return offers_with_availability
+
+    def get_offers_modifier(
+        self, requirements: Requirements
+    ) -> Callable[[InstanceOfferWithAvailability], Optional[InstanceOfferWithAvailability]]:
+        return get_offers_disk_modifier(CONFIGURABLE_DISK_SIZE, requirements)
 
     def terminate_instance(
         self, instance_id: str, region: str, backend_data: Optional[str] = None

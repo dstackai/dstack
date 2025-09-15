@@ -7,6 +7,7 @@ from typing import Dict, List, Optional
 
 from dstack._internal.core.backends.base.compute import (
     Compute,
+    ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
     generate_unique_instance_name,
     get_shim_commands,
@@ -22,12 +23,13 @@ from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
 )
 from dstack._internal.core.models.placement import PlacementGroup
-from dstack._internal.core.models.runs import JobProvisioningData, Requirements
+from dstack._internal.core.models.runs import JobProvisioningData
 
 MAX_INSTANCE_NAME_LEN = 60
 
 
 class LambdaCompute(
+    ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
     Compute,
 ):
@@ -36,13 +38,10 @@ class LambdaCompute(
         self.config = config
         self.api_client = LambdaAPIClient(config.creds.api_key)
 
-    def get_offers(
-        self, requirements: Optional[Requirements] = None
-    ) -> List[InstanceOfferWithAvailability]:
+    def get_all_offers_with_availability(self) -> List[InstanceOfferWithAvailability]:
         offers = get_catalog_offers(
             backend=BackendType.LAMBDA,
             locations=self.config.regions or None,
-            requirements=requirements,
         )
         offers_with_availability = self._get_offers_with_availability(offers)
         return offers_with_availability

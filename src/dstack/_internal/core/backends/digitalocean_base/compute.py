@@ -5,6 +5,7 @@ from gpuhunt.providers.digitalocean import DigitalOceanProvider
 
 from dstack._internal.core.backends.base.backend import Compute
 from dstack._internal.core.backends.base.compute import (
+    ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
     generate_unique_instance_name,
     get_user_data,
@@ -20,7 +21,7 @@ from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
 )
 from dstack._internal.core.models.placement import PlacementGroup
-from dstack._internal.core.models.runs import JobProvisioningData, Requirements
+from dstack._internal.core.models.runs import JobProvisioningData
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -37,6 +38,7 @@ DOCKER_INSTALL_COMMANDS = [
 
 
 class BaseDigitalOceanCompute(
+    ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
     Compute,
 ):
@@ -50,13 +52,10 @@ class BaseDigitalOceanCompute(
             DigitalOceanProvider(api_key=config.creds.api_key, api_url=api_url)
         )
 
-    def get_offers(
-        self, requirements: Optional[Requirements] = None
-    ) -> List[InstanceOfferWithAvailability]:
+    def get_all_offers_with_availability(self) -> List[InstanceOfferWithAvailability]:
         offers = get_catalog_offers(
             backend=self.BACKEND_TYPE,
             locations=self.config.regions,
-            requirements=requirements,
             catalog=self.catalog,
         )
         return [

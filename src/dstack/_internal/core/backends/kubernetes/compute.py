@@ -9,13 +9,14 @@ from kubernetes import client
 
 from dstack._internal.core.backends.base.compute import (
     Compute,
+    ComputeWithFilteredOffersCached,
     ComputeWithGatewaySupport,
     generate_unique_gateway_instance_name,
     generate_unique_instance_name_for_job,
     get_docker_commands,
     get_dstack_gateway_commands,
 )
-from dstack._internal.core.backends.base.offers import match_requirements
+from dstack._internal.core.backends.base.offers import filter_offers_by_requirements
 from dstack._internal.core.backends.kubernetes.models import (
     KubernetesConfig,
     KubernetesNetworkingConfig,
@@ -58,6 +59,7 @@ NVIDIA_GPU_NAMES = NVIDIA_GPU_NAME_TO_GPU_INFO.keys()
 
 
 class KubernetesCompute(
+    ComputeWithFilteredOffersCached,
     ComputeWithGatewaySupport,
     Compute,
 ):
@@ -70,8 +72,8 @@ class KubernetesCompute(
         self.networking_config = networking_config
         self.api = get_api_from_config_data(config.kubeconfig.data)
 
-    def get_offers(
-        self, requirements: Optional[Requirements] = None
+    def get_offers_by_requirements(
+        self, requirements: Requirements
     ) -> List[InstanceOfferWithAvailability]:
         nodes = self.api.list_node()
         instance_offers = []
@@ -99,7 +101,7 @@ class KubernetesCompute(
                 availability=InstanceAvailability.AVAILABLE,
                 instance_runtime=InstanceRuntime.RUNNER,
             )
-            instance_offers.extend(match_requirements([instance_offer], requirements))
+            instance_offers.extend(filter_offers_by_requirements([instance_offer], requirements))
         return instance_offers
 
     def run_job(
