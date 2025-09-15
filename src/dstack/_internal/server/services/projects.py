@@ -13,8 +13,12 @@ from dstack._internal.core.backends.dstack.models import (
 )
 from dstack._internal.core.backends.models import BackendInfo
 from dstack._internal.core.errors import ForbiddenError, ResourceExistsError, ServerClientError
-from dstack._internal.core.models.common import CoreModel
-from dstack._internal.core.models.projects import Member, MemberPermissions, Project
+from dstack._internal.core.models.projects import (
+    Member,
+    MemberPermissions,
+    Project,
+    ProjectHookConfig,
+)
 from dstack._internal.core.models.runs import RunStatus
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.models import (
@@ -114,14 +118,6 @@ async def get_project_by_name(
     if project_model is None:
         return None
     return project_model_to_project(project_model)
-
-
-class ProjectHookConfig(CoreModel):
-    """
-    This class can be inherited to extend the project creation configuration passed to the hooks.
-    """
-
-    pass
 
 
 async def create_project(
