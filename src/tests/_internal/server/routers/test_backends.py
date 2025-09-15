@@ -91,7 +91,6 @@ class TestListBackendTypes:
             *(["nebius"] if sys.version_info >= (3, 10) else []),
             "oci",
             "runpod",
-            "tensordock",
             "vastai",
             "vultr",
         ]

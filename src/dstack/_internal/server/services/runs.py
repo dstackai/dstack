@@ -1164,6 +1164,8 @@ async def process_terminating_run(session: AsyncSession, run_model: RunModel):
         ):
             run_model.next_triggered_at = _get_next_triggered_at(run.run_spec)
             run_model.status = RunStatus.PENDING
+            # Unassign run from fleet so that the new fleet can be chosen on the next submission
+            run_model.fleet = None
         else:
             run_model.status = run_model.termination_reason.to_status()
 
