@@ -203,7 +203,7 @@ export const CreateProjectWizard: React.FC = () => {
                     const projectExist = errorDetail.some(({ code }) => code === 'resource_exists');
 
                     if (projectExist) {
-                        setError('project_name', { type: 'custom', message: 'Project is already exist' });
+                        setError('project_name', { type: 'custom', message: 'Project with this name already exists' });
                     }
 
                     return false;
@@ -314,7 +314,7 @@ export const CreateProjectWizard: React.FC = () => {
                 submitButtonText={t('projects.wizard.submit')}
                 steps={[
                     {
-                        title: 'Project name and type',
+                        title: 'Name and type',
                         content: (
                             <Container>
                                 <SpaceBetween direction="vertical" size="l">
@@ -352,8 +352,8 @@ export const CreateProjectWizard: React.FC = () => {
                                     label={t('projects.edit.backends')}
                                     description={
                                         formValues['project_type'] === 'gpu_marketplace'
-                                            ? t('projects.edit.backends_description')
-                                            : 'Own_cloud_backends_placeholder'
+                                            ? t('projects.edit.base_backends_description')
+                                            : t('projects.edit.backends_description')
                                     }
                                     errorText={formState.errors.backends?.message}
                                 />
