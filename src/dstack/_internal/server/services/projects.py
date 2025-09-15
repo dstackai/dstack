@@ -116,7 +116,7 @@ async def get_project_by_name(
     return project_model_to_project(project_model)
 
 
-class ProjectConfig(CoreModel):
+class ProjectHookConfig(CoreModel):
     """
     This class can be inherited to extend the project creation configuration passed to the hooks.
     """
@@ -129,7 +129,7 @@ async def create_project(
     user: UserModel,
     project_name: str,
     is_public: bool = False,
-    config: Optional[ProjectConfig] = None,
+    config: Optional[ProjectHookConfig] = None,
 ) -> Project:
     user_permissions = users.get_user_permissions(user)
     if not user_permissions.can_create_projects:
@@ -620,7 +620,7 @@ _CREATE_PROJECT_HOOKS = []
 
 
 def register_create_project_hook(
-    func: Callable[[AsyncSession, ProjectModel, Optional[ProjectConfig]], Awaitable[None]],
+    func: Callable[[AsyncSession, ProjectModel, Optional[ProjectHookConfig]], Awaitable[None]],
 ):
     _CREATE_PROJECT_HOOKS.append(func)
 
