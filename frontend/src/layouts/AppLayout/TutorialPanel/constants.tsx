@@ -53,7 +53,7 @@ export const BILLING_TUTORIAL: TutorialPanelProps.Tutorial = {
     description: (
         <>
             <Box variant="p" color="text-body-secondary" padding={{ top: 'n' }}>
-                Top up your balance via a credit card to use GPU by dstack Sky.
+                If you plan to use the GPU marketplace, top up your balance with a credit card.
             </Box>
         </>
     ),
@@ -104,11 +104,11 @@ export const CONFIGURE_CLI_TUTORIAL: TutorialPanelProps.Tutorial = {
 
 export const CREATE_FIRST_PROJECT: TutorialPanelProps.Tutorial = {
     completed: false,
-    title: 'Create the first project',
+    title: 'Create a project',
     description: (
         <>
             <Box variant="p" color="text-body-secondary" padding={{ top: 'n' }}>
-                Configure the first your project
+                Create your first project. Choose to use the GPU marketplace or configure your own cloud credentials.
             </Box>
         </>
     ),
