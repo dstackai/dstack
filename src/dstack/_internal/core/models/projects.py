@@ -26,3 +26,11 @@ class Project(CoreModel):
     backends: List[BackendInfo]
     members: List[Member]
     is_public: bool = False
+
+
+class ProjectHookConfig(CoreModel):
+    """
+    This class can be inherited to extend the project creation configuration passed to the hooks.
+    """
+
+    pass
