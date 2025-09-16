@@ -185,10 +185,9 @@ class DataCrunchCompute(
 
 def _get_vm_image_id(instance_offer: InstanceOfferWithAvailability) -> str:
     # https://api.datacrunch.io/v1/images
-    if (
-        len(instance_offer.instance.resources.gpus) > 0
-        and instance_offer.instance.resources.gpus[0].name == "V100"
-    ):
+    if len(instance_offer.instance.resources.gpus) > 0 and instance_offer.instance.resources.gpus[
+        0
+    ].name in ["V100", "A6000"]:
         # Ubuntu 22.04 + CUDA 12.0 + Docker
         return "2088da25-bb0d-41cc-a191-dccae45d96fd"
     # Ubuntu 24.04 + CUDA 12.8 Open + Docker
