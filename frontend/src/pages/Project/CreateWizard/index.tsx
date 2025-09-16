@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
@@ -250,8 +250,8 @@ export const CreateProjectWizard: React.FC = () => {
         onNavigate({ requestedStepIndex, reason });
     };
 
-    const onChangeProjectType: TilesProps['onChange'] = ({ detail: { value } }) => {
-        if (value === 'gpu_marketplace') {
+    const onChangeProjectType = (backendType: string) => {
+        if (backendType === 'gpu_marketplace') {
             setValue(
                 'backends',
                 backendBaseOptions.map((b: { value: string }) => b.value),
@@ -260,6 +260,16 @@ export const CreateProjectWizard: React.FC = () => {
             trigger(['backends']).catch(console.log);
         }
     };
+
+    const onChangeProjectTypeHandler: TilesProps['onChange'] = ({ detail: { value } }) => {
+        onChangeProjectType(value);
+    };
+
+    useEffect(() => {
+        if (backendBaseOptions?.length) {
+            onChangeProjectType(formValues.project_type);
+        }
+    }, [backendBaseOptions]);
 
     const onSubmitWizard = async () => {
         const isValid = await trigger();
@@ -335,7 +345,7 @@ export const CreateProjectWizard: React.FC = () => {
                                                 control={control}
                                                 name="project_type"
                                                 items={projectTypeOptions}
-                                                onChange={onChangeProjectType}
+                                                onChange={onChangeProjectTypeHandler}
                                             />
                                         </FormField>
                                     </div>
