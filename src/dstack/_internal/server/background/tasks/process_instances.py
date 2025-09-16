@@ -578,7 +578,6 @@ async def _create_instance(session: AsyncSession, instance: InstanceModel) -> No
                 if placement_group_model is None:  # error occurred
                     continue
                 session.add(placement_group_model)
-                await session.flush()
                 placement_group_models.append(placement_group_model)
         logger.debug(
             "Trying %s in %s/%s for $%0.4f per hour",
@@ -636,7 +635,9 @@ async def _create_instance(session: AsyncSession, instance: InstanceModel) -> No
             },
         )
         if instance.fleet_id and _is_fleet_master_instance(instance):
-            # Clean up placement groups that did not end up being used
+            # Clean up placement groups that did not end up being used.
+            # Flush to update still uncommitted placement groups.
+            await session.flush()
             await schedule_fleet_placement_groups_deletion(
                 session=session,
                 fleet_id=instance.fleet_id,
