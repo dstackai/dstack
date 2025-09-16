@@ -61,7 +61,9 @@ export type { LineChartProps } from '@cloudscape-design/components/line-chart/in
 export type { ModalProps } from '@cloudscape-design/components/modal';
 export { default as AnchorNavigation } from '@cloudscape-design/components/anchor-navigation';
 export { default as ExpandableSection } from '@cloudscape-design/components/expandable-section';
+export { default as KeyValuePairs } from '@cloudscape-design/components/key-value-pairs';
 export { I18nProvider } from '@cloudscape-design/components/i18n';
+export { default as Wizard } from '@cloudscape-design/components/wizard';
 
 // custom components
 export { NavigateLink } from './NavigateLink';
@@ -80,6 +82,8 @@ export type { FormMultiselectOptions, FormMultiselectProps } from './form/Multis
 export { FormS3BucketSelector } from './form/S3BucketSelector';
 export type { FormTilesProps } from './form/Tiles/types';
 export { FormTiles } from './form/Tiles';
+export type { FormCardsProps } from './form/Cards/types';
+export { FormCards } from './form/Cards';
 export { Notifications } from './Notifications';
 export { ConfirmationDialog } from './ConfirmationDialog';
 export { FileUploader } from './FileUploader';

@@ -58,6 +58,7 @@ export const API = {
         BASE: () => `${API.BASE()}/projects`,
         LIST: () => `${API.PROJECTS.BASE()}/list`,
         CREATE: () => `${API.PROJECTS.BASE()}/create`,
+        CREATE_WIZARD: () => `${API.PROJECTS.BASE()}/create_wizard`,
         DELETE: () => `${API.PROJECTS.BASE()}/delete`,
         DETAILS: (name: IProject['project_name']) => `${API.PROJECTS.BASE()}/${name}`,
         DETAILS_INFO: (name: IProject['project_name']) => `${API.PROJECTS.DETAILS(name)}/get`,
@@ -112,6 +113,7 @@ export const API = {
     BACKENDS: {
         BASE: () => `${API.BASE()}/backends`,
         LIST_TYPES: () => `${API.BACKENDS.BASE()}/list_types`,
+        LIST_BASE_TYPES: () => `${API.BACKENDS.BASE()}/list_base_types`,
         CONFIG_VALUES: () => `${API.BACKENDS.BASE()}/config_values`,
     },
 

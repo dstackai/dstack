@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 import {
     DISCORD_URL,
@@ -8,6 +8,8 @@ import {
 } from 'consts';
 import { useAppDispatch, useAppSelector } from 'hooks';
 import { goToUrl } from 'libs';
+import { ROUTES } from 'routes';
+import { useGetProjectsQuery } from 'services/project';
 import { useGetRunsQuery } from 'services/run';
 import { useGetUserBillingInfoQuery } from 'services/user';
 
@@ -17,6 +19,7 @@ import { useSideNavigation } from '../hooks';
 import {
     BILLING_TUTORIAL,
     CONFIGURE_CLI_TUTORIAL,
+    CREATE_FIRST_PROJECT,
     // CREDITS_TUTORIAL,
     JOIN_DISCORD_TUTORIAL,
     QUICKSTART_TUTORIAL,
@@ -26,13 +29,22 @@ import { ITutorialItem } from 'App/types';
 
 export const useTutorials = () => {
     const navigate = useNavigate();
+    const location = useLocation();
     const dispatch = useAppDispatch();
     const { billingUrl } = useSideNavigation();
     const useName = useAppSelector(selectUserName);
-    const { billingCompleted, configureCLICompleted, discordCompleted, tallyCompleted, quickStartCompleted, hideStartUp } =
-        useAppSelector(selectTutorialPanel);
+    const {
+        billingCompleted,
+        createProjectCompleted,
+        configureCLICompleted,
+        discordCompleted,
+        tallyCompleted,
+        quickStartCompleted,
+        hideStartUp,
+    } = useAppSelector(selectTutorialPanel);
 
     const { data: userBillingData } = useGetUserBillingInfoQuery({ username: useName ?? '' }, { skip: !useName });
+    const { data: projectData } = useGetProjectsQuery();
     const { data: runsData } = useGetRunsQuery({
         limit: 1,
     });
@@ -40,18 +52,32 @@ export const useTutorials = () => {
     const completeIsChecked = useRef<boolean>(false);
 
     useEffect(() => {
-        if (userBillingData && runsData && !completeIsChecked.current) {
+        if (
+            userBillingData &&
+            projectData &&
+            runsData &&
+            !completeIsChecked.current &&
+            location.pathname !== ROUTES.PROJECT.ADD
+        ) {
             const billingCompleted = userBillingData.balance > 0;
             const configureCLICompleted = runsData.length > 0;
+            const createProjectCompleted = projectData.length > 0;
 
             let tempHideStartUp = hideStartUp;
 
             if (hideStartUp === null) {
-                tempHideStartUp = billingCompleted && configureCLICompleted;
+                tempHideStartUp = billingCompleted && configureCLICompleted && createProjectCompleted;
             }
 
             // Set hideStartUp without updating localstorage
-            dispatch(updateTutorialPanelState({ billingCompleted, configureCLICompleted, hideStartUp: tempHideStartUp }));
+            dispatch(
+                updateTutorialPanelState({
+                    billingCompleted,
+                    configureCLICompleted,
+                    createProjectCompleted,
+                    hideStartUp: tempHideStartUp,
+                }),
+            );
 
             if (!tempHideStartUp && process.env.UI_VERSION === 'sky') {
                 dispatch(openTutorialPanel());
@@ -59,7 +85,17 @@ export const useTutorials = () => {
 
             completeIsChecked.current = true;
         }
-    }, [userBillingData, runsData]);
+    }, [userBillingData, runsData, projectData, location.pathname]);
+
+    useEffect(() => {
+        if (projectData && projectData.length > 0 && !createProjectCompleted) {
+            dispatch(
+                updateTutorialPanelState({
+                    createProjectCompleted: true,
+                }),
+            );
+        }
+    }, [projectData]);
 
     const startBillingTutorial = useCallback(() => {
         navigate(billingUrl);
@@ -67,6 +103,14 @@ export const useTutorials = () => {
 
     const finishBillingTutorial = useCallback(() => {
         dispatch(updateTutorialPanelState({ billingCompleted: true }));
+    }, []);
+
+    const startFirstProjectTutorial = useCallback(() => {
+        navigate(ROUTES.PROJECT.ADD);
+    }, []);
+
+    const finishFirstProjectTutorial = useCallback(() => {
+        dispatch(updateTutorialPanelState({ createProjectCompleted: true }));
     }, []);
 
     const startConfigCliTutorial = useCallback(() => {}, [billingUrl]);
@@ -103,8 +147,16 @@ export const useTutorials = () => {
             // },
 
             {
-                ...CONFIGURE_CLI_TUTORIAL,
+                ...CREATE_FIRST_PROJECT,
                 id: 2,
+                completed: createProjectCompleted,
+                startCallback: startFirstProjectTutorial,
+                finishCallback: finishFirstProjectTutorial,
+            },
+
+            {
+                ...CONFIGURE_CLI_TUTORIAL,
+                id: 3,
                 completed: configureCLICompleted,
                 startCallback: startConfigCliTutorial,
                 finishCallback: finishConfigCliTutorial,
@@ -112,7 +164,7 @@ export const useTutorials = () => {
 
             {
                 ...BILLING_TUTORIAL,
-                id: 3,
+                id: 4,
                 completed: billingCompleted,
                 startCallback: startBillingTutorial,
                 finishCallback: finishBillingTutorial,
@@ -120,7 +172,7 @@ export const useTutorials = () => {
 
             {
                 ...QUICKSTART_TUTORIAL,
-                id: 4,
+                id: 5,
                 startWithoutActivation: true,
                 completed: quickStartCompleted,
                 startCallback: startQuickStartTutorial,
@@ -128,7 +180,7 @@ export const useTutorials = () => {
 
             {
                 ...JOIN_DISCORD_TUTORIAL,
-                id: 5,
+                id: 6,
                 startWithoutActivation: true,
                 completed: discordCompleted,
                 startCallback: startDiscordTutorial,
@@ -136,11 +188,13 @@ export const useTutorials = () => {
         ];
     }, [
         billingUrl,
+        createProjectCompleted,
         quickStartCompleted,
         discordCompleted,
         tallyCompleted,
         billingCompleted,
         configureCLICompleted,
+        finishFirstProjectTutorial,
         finishBillingTutorial,
         finishConfigCliTutorial,
     ]);

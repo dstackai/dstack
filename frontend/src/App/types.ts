@@ -32,6 +32,7 @@ export interface IAppState {
     };
 
     tutorialPanel: {
+        createProjectCompleted: boolean;
         billingCompleted: boolean;
         configureCLICompleted: boolean;
         discordCompleted: boolean;

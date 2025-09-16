@@ -10,7 +10,7 @@ const decoder = new TextDecoder('utf-8');
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const transformProjectResponse = (project: any): IProject => ({
     ...project,
-    isPublic: project.is_public,
+    isPublic: project?.is_public,
 });
 
 export const projectApi = createApi({
@@ -56,6 +56,18 @@ export const projectApi = createApi({
         createProject: builder.mutation<IProject, IProject>({
             query: (project) => ({
                 url: API.PROJECTS.CREATE(),
+                method: 'POST',
+                body: project,
+            }),
+
+            transformResponse: transformProjectResponse,
+
+            invalidatesTags: () => ['Projects'],
+        }),
+
+        createWizardProject: builder.mutation<IProject, TCreateWizardProjectParams>({
+            query: (project) => ({
+                url: API.PROJECTS.CREATE_WIZARD(),
                 method: 'POST',
                 body: project,
             }),
@@ -168,8 +180,10 @@ export const projectApi = createApi({
 
 export const {
     useGetProjectsQuery,
+    useLazyGetProjectsQuery,
     useGetProjectQuery,
     useCreateProjectMutation,
+    useCreateWizardProjectMutation,
     useUpdateProjectMembersMutation,
     useAddProjectMemberMutation,
     useRemoveProjectMemberMutation,
