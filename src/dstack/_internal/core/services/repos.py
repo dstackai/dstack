@@ -122,7 +122,8 @@ def _get_repo_creds_and_default_branch_https(
 
 def _get_repo_default_branch(url: str, env: dict[str, str]) -> Optional[str]:
     # output example: "ref: refs/heads/dev\tHEAD\n545344f77c0df78367085952a97fc3a058eb4c65\tHEAD"
-    output: str = git.cmd.Git().ls_remote("--symref", url, "HEAD", env=env)
+    # Disable credential helpers to exclude any default credentials from being used
+    output: str = git.cmd.Git()(c="credential.helper=").ls_remote("--symref", url, "HEAD", env=env)
     for line in output.splitlines():
         # line format: `<oid> TAB <ref> LF`
         oid, _, ref = line.partition("\t")
