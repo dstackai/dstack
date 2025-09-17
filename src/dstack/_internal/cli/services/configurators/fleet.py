@@ -159,12 +159,19 @@ class FleetConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator[Fle
         console.print(
             get_fleets_table(
                 [fleet],
-                verbose=_failed_provisioning(fleet),
+                verbose=_fleet_has_failed_instances(fleet),
                 format_date=local_time,
             )
         )
-        if _failed_provisioning(fleet):
-            console.print("\n[error]Some instances failed. Check the table above for errors.[/]")
+        if _fleet_has_failed_instances(fleet):
+            if _fleet_retrying(fleet):
+                console.print(
+                    "\n[error]Some instances failed. Provisioning will be retried in the background.[/]"
+                )
+            else:
+                console.print(
+                    "\n[error]Some instances failed. Check the table above for errors.[/]"
+                )
             exit(1)
 
     def _apply_plan_on_old_server(self, plan: FleetPlan, command_args: argparse.Namespace):
@@ -253,11 +260,11 @@ class FleetConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator[Fle
         console.print(
             get_fleets_table(
                 [fleet],
-                verbose=_failed_provisioning(fleet),
+                verbose=_fleet_has_failed_instances(fleet),
                 format_date=local_time,
             )
         )
-        if _failed_provisioning(fleet):
+        if _fleet_has_failed_instances(fleet):
             console.print("\n[error]Some instances failed. Check the table above for errors.[/]")
             exit(1)
 
@@ -462,11 +469,18 @@ def _finished_provisioning(fleet: Fleet) -> bool:
     return True
 
 
-def _failed_provisioning(fleet: Fleet) -> bool:
+def _fleet_has_failed_instances(fleet: Fleet) -> bool:
     for instance in fleet.instances:
         if instance.status == InstanceStatus.TERMINATED:
             return True
     return False
+
+
+def _fleet_retrying(fleet: Fleet) -> bool:
+    if fleet.spec.configuration.nodes is None:
+        return False
+    active_instances = [i for i in fleet.instances if i.status.is_active()]
+    return len(active_instances) < fleet.spec.configuration.nodes.min
 
 
 def _apply_plan(api: Client, plan: FleetPlan) -> Fleet:
