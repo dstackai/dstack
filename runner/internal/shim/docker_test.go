@@ -21,7 +21,7 @@ import (
 
 // TestDocker_SSHServer pulls ubuntu image (without sshd), installs openssh-server and exits
 func TestDocker_SSHServer(t *testing.T) {
-	if testing.Short() {
+	if testing.Short() || (os.Getenv("CI") == "true" && runtime.GOOS == "darwin") {
 		t.Skip()
 	}
 	t.Parallel()
