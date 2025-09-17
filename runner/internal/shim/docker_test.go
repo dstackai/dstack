@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"os"
 	"os/exec"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -35,7 +36,9 @@ func TestDocker_SSHServer(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 	defer cancel()
 
-	dockerRunner, _ := NewDockerRunner(ctx, params)
+	dockerRunner, err := NewDockerRunner(ctx, params)
+	require.NoError(t, err)
+
 	taskConfig := createTaskConfig(t)
 	defer dockerRunner.Remove(context.Background(), taskConfig.ID)
 
@@ -45,7 +48,7 @@ func TestDocker_SSHServer(t *testing.T) {
 
 // TestDocker_SSHServerConnect pulls ubuntu image (without sshd), installs openssh-server and tries to connect via SSH
 func TestDocker_SSHServerConnect(t *testing.T) {
-	if testing.Short() {
+	if testing.Short() || (os.Getenv("CI") == "true" && runtime.GOOS == "darwin") {
 		t.Skip()
 	}
 	t.Parallel()
@@ -66,7 +69,8 @@ func TestDocker_SSHServerConnect(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 	defer cancel()
 
-	dockerRunner, _ := NewDockerRunner(ctx, params)
+	dockerRunner, err := NewDockerRunner(ctx, params)
+	require.NoError(t, err)
 
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -99,7 +103,7 @@ func TestDocker_SSHServerConnect(t *testing.T) {
 }
 
 func TestDocker_ShmNoexecByDefault(t *testing.T) {
-	if testing.Short() {
+	if testing.Short() || (os.Getenv("CI") == "true" && runtime.GOOS == "darwin") {
 		t.Skip()
 	}
 	t.Parallel()
@@ -113,7 +117,9 @@ func TestDocker_ShmNoexecByDefault(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 	defer cancel()
 
-	dockerRunner, _ := NewDockerRunner(ctx, params)
+	dockerRunner, err := NewDockerRunner(ctx, params)
+	require.NoError(t, err)
+
 	taskConfig := createTaskConfig(t)
 	defer dockerRunner.Remove(context.Background(), taskConfig.ID)
 
@@ -122,7 +128,7 @@ func TestDocker_ShmNoexecByDefault(t *testing.T) {
 }
 
 func TestDocker_ShmExecIfSizeSpecified(t *testing.T) {
-	if testing.Short() {
+	if testing.Short() || (os.Getenv("CI") == "true" && runtime.GOOS == "darwin") {
 		t.Skip()
 	}
 	t.Parallel()
@@ -136,7 +142,9 @@ func TestDocker_ShmExecIfSizeSpecified(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 	defer cancel()
 
-	dockerRunner, _ := NewDockerRunner(ctx, params)
+	dockerRunner, err := NewDockerRunner(ctx, params)
+	require.NoError(t, err)
+
 	taskConfig := createTaskConfig(t)
 	taskConfig.ShmSize = 1024 * 1024
 	defer dockerRunner.Remove(context.Background(), taskConfig.ID)
