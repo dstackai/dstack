@@ -50,8 +50,24 @@ def make_ssh_command_for_git(identity_file: PathLike) -> str:
     )
 
 
-def make_git_env(*, identity_file: Optional[PathLike] = None) -> dict[str, str]:
-    env: dict[str, str] = {"GIT_TERMINAL_PROMPT": "0"}
+def make_git_env(
+    *,
+    disable_prompt: bool = True,
+    disable_config: bool = False,
+    identity_file: Optional[PathLike] = None,
+) -> dict[str, str]:
+    env: dict[str, str] = {}
+    if disable_prompt:
+        # Fail with error instead of prompting on the terminal (e.g., when asking for
+        # HTTP authentication)
+        env["GIT_TERMINAL_PROMPT"] = "0"
+    if disable_config:
+        # Disable system-wide config (usually /etc/gitconfig)
+        env["GIT_CONFIG_SYSTEM"] = os.devnull
+        # Disable user (aka "global") config ($XDG_CONFIG_HOME/git/config or ~/.git/config)
+        env["GIT_CONFIG_GLOBAL"] = os.devnull
+        # Disable repo (aka "local") config (./.git/config)
+        env["GIT_DIR"] = os.devnull
     if identity_file is not None:
         env["GIT_SSH_COMMAND"] = make_ssh_command_for_git(identity_file)
     return env

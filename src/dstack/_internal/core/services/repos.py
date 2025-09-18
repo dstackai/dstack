@@ -87,8 +87,9 @@ def _get_repo_creds_and_default_branch_ssh(
     url: GitRepoURL, identity_file: PathLike, private_key: str
 ) -> tuple[RemoteRepoCreds, Optional[str]]:
     _url = url.as_ssh()
+    env = make_git_env(disable_config=True, identity_file=identity_file)
     try:
-        default_branch = _get_repo_default_branch(_url, make_git_env(identity_file=identity_file))
+        default_branch = _get_repo_default_branch(_url, env)
     except GitCommandError as e:
         message = f"Cannot access `{_url}` using the `{identity_file}` private SSH key"
         raise InvalidRepoCredentialsError(message) from e
@@ -104,8 +105,9 @@ def _get_repo_creds_and_default_branch_https(
     url: GitRepoURL, oauth_token: Optional[str] = None
 ) -> tuple[RemoteRepoCreds, Optional[str]]:
     _url = url.as_https()
+    env = make_git_env(disable_config=True)
     try:
-        default_branch = _get_repo_default_branch(url.as_https(oauth_token), make_git_env())
+        default_branch = _get_repo_default_branch(url.as_https(oauth_token), env)
     except GitCommandError as e:
         message = f"Cannot access `{_url}`"
         if oauth_token is not None:
@@ -122,8 +124,7 @@ def _get_repo_creds_and_default_branch_https(
 
 def _get_repo_default_branch(url: str, env: dict[str, str]) -> Optional[str]:
     # output example: "ref: refs/heads/dev\tHEAD\n545344f77c0df78367085952a97fc3a058eb4c65\tHEAD"
-    # Disable credential helpers to exclude any default credentials from being used
-    output: str = git.cmd.Git()(c="credential.helper=").ls_remote("--symref", url, "HEAD", env=env)
+    output: str = git.cmd.Git().ls_remote("--symref", url, "HEAD", env=env)
     for line in output.splitlines():
         # line format: `<oid> TAB <ref> LF`
         oid, _, ref = line.partition("\t")
