@@ -22,6 +22,7 @@ from dstack._internal.utils.common import get_or_error
 SUPPORTED_GPUHUNT_FLAGS = [
     "oci-spot",
     "lambda-arm",
+    "gcp-a4",
 ]
 
 

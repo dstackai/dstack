@@ -19,6 +19,7 @@ DSTACK_INSTANCE_TAG = "dstack-runner-instance"
 DSTACK_GATEWAY_TAG = "dstack-gateway-instance"
 
 supported_accelerators = [
+    {"accelerator_name": "nvidia-b200", "gpu_name": "B200", "memory_mb": 1024 * 180},
     {"accelerator_name": "nvidia-a100-80gb", "gpu_name": "A100", "memory_mb": 1024 * 80},
     {"accelerator_name": "nvidia-tesla-a100", "gpu_name": "A100", "memory_mb": 1024 * 40},
     {"accelerator_name": "nvidia-l4", "gpu_name": "L4", "memory_mb": 1024 * 24},
@@ -476,5 +477,6 @@ def instance_type_supports_persistent_disk(instance_type_name: str) -> bool:
             "n4-",
             "h3-",
             "v6e",
+            "a4-",
         ]
     )
