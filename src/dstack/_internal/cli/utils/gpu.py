@@ -9,7 +9,7 @@ from dstack._internal.core.models.runs import Requirements, RunSpec, get_policy_
 from dstack._internal.server.schemas.gpus import GpuGroup
 
 
-def print_gpu_json(gpu_response, run_spec, group_by_cli, api_project):
+def print_gpu_json(gpus, run_spec, group_by_cli, api_project):
     """Print GPU information in JSON format."""
     req = Requirements(
         resources=run_spec.configuration.resources,
@@ -36,7 +36,7 @@ def print_gpu_json(gpu_response, run_spec, group_by_cli, api_project):
         "gpus": [],
     }
 
-    for gpu_group in gpu_response.gpus:
+    for gpu_group in gpus:
         gpu_data = {
             "name": gpu_group.name,
             "memory_mib": gpu_group.memory_mib,
