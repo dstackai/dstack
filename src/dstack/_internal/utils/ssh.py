@@ -53,6 +53,7 @@ def make_ssh_command_for_git(identity_file: PathLike) -> str:
 def make_git_env(
     *,
     disable_prompt: bool = True,
+    disable_askpass: bool = False,
     disable_config: bool = False,
     identity_file: Optional[PathLike] = None,
 ) -> dict[str, str]:
@@ -61,6 +62,9 @@ def make_git_env(
         # Fail with error instead of prompting on the terminal (e.g., when asking for
         # HTTP authentication)
         env["GIT_TERMINAL_PROMPT"] = "0"
+    if disable_askpass:
+        env["GIT_ASKPASS"] = ""
+        env["SSH_ASKPASS"] = ""
     if disable_config:
         # Disable system-wide config (usually /etc/gitconfig)
         env["GIT_CONFIG_SYSTEM"] = os.devnull

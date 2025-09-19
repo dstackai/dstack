@@ -153,7 +153,7 @@ def _get_repo_creds_and_default_branch_ssh(
     url: GitRepoURL, identity_file: PathLike, private_key: str
 ) -> tuple[RemoteRepoCreds, Optional[str]]:
     _url = url.as_ssh()
-    env = make_git_env(disable_config=True, identity_file=identity_file)
+    env = _make_git_env_for_creds_check(identity_file=identity_file)
     try:
         default_branch = _get_repo_default_branch(_url, env)
     except GitCommandError as e:
@@ -171,7 +171,7 @@ def _get_repo_creds_and_default_branch_https(
     url: GitRepoURL, oauth_token: Optional[str] = None
 ) -> tuple[RemoteRepoCreds, Optional[str]]:
     _url = url.as_https()
-    env = make_git_env(disable_config=True)
+    env = _make_git_env_for_creds_check()
     try:
         default_branch = _get_repo_default_branch(url.as_https(oauth_token), env)
     except GitCommandError as e:
@@ -186,6 +186,17 @@ def _get_repo_creds_and_default_branch_https(
         oauth_token=oauth_token,
     )
     return creds, default_branch
+
+
+def _make_git_env_for_creds_check(identity_file: Optional[PathLike] = None) -> dict[str, str]:
+    # Our goal is to check if _provided_ creds (if any) are correct, so we need to be sure that
+    # only the provided creds are used, without falling back to any additional mechanisms.
+    # To do this, we:
+    # 1. Disable all configs to ignore any stored creds
+    # 2. Disable askpass to avoid asking for creds interactively or fetching stored creds from
+    # a non-interactive askpass helper (for example, VS Code sets GIT_ASKPASS to its own helper,
+    # which silently provides creds to Git).
+    return make_git_env(disable_config=True, disable_askpass=True, identity_file=identity_file)
 
 
 def _get_repo_default_branch(url: str, env: dict[str, str]) -> Optional[str]:
