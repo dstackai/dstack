@@ -123,8 +123,20 @@ def _get_repo_creds_and_default_branch_https(
 
 
 def _get_repo_default_branch(url: str, env: dict[str, str]) -> Optional[str]:
+    # Git shipped by Apple with XCode is patched to support an additional config scope
+    # above "system" called "xcode". There is no option in `git config list` to show this config,
+    # but you can list the merged config (`git config list` without options) and then exclude
+    # all settings listed in `git config list --{system,global,local,worktree}`.
+    # As of time of writing, there are only two settings in the "xcode" config, one of which breaks
+    # our "is repo public?" check, namely "credential.helper=osxkeychain".
+    # As there is no way to disable "xcode" config (no env variable, no CLI option, etc.),
+    # the only way to disable credential helper is to override this specific setting with an empty
+    # string via command line argument: `git -c credential.helper= COMMAND [ARGS ...]`.
+    # See: https://github.com/git/git/commit/3d4355712b9fe77a96ad4ad877d92dc7ff6e0874
+    # See: https://gist.github.com/ChrisTollefson/ab9c0a5d1dd4dd615217345c6936a307
+    _git = git.cmd.Git()(c="credential.helper=")
     # output example: "ref: refs/heads/dev\tHEAD\n545344f77c0df78367085952a97fc3a058eb4c65\tHEAD"
-    output: str = git.cmd.Git().ls_remote("--symref", url, "HEAD", env=env)
+    output: str = _git.ls_remote("--symref", url, "HEAD", env=env)
     for line in output.splitlines():
         # line format: `<oid> TAB <ref> LF`
         oid, _, ref = line.partition("\t")
