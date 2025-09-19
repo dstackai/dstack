@@ -1,4 +1,5 @@
 import atexit
+import dataclasses
 import re
 import time
 from pathlib import Path
@@ -6,8 +7,10 @@ from typing import Optional, Union
 
 import psutil
 
-from dstack._internal.core.errors import SSHError
+from dstack._internal.core.errors import ConfigurationError, SSHError
+from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import SSHConnectionParams
+from dstack._internal.core.models.runs import JobProvisioningData
 from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.core.services.ssh.client import get_ssh_client_info
 from dstack._internal.core.services.ssh.ports import PortsLock
@@ -23,6 +26,82 @@ from dstack._internal.utils.ssh import (
 
 # ssh -L option format: [bind_address:]port:host:hostport
 _SSH_TUNNEL_REGEX = re.compile(r"(?:[\w.-]+:)?(?P<local_port>\d+):localhost:(?P<remote_port>\d+)")
+
+
+HostConfigType = dict[str, Union[str, int, FilePath]]
+
+
+class SSHProxyConfig:
+    """Do nothing"""
+
+    def update_host(self, host: HostConfigType):
+        pass
+
+    def apply_provisioning_data(self, provisioning_data: JobProvisioningData):
+        pass
+
+
+@dataclasses.dataclass
+class SSHProxyJumpConfig(SSHProxyConfig):
+    """Add ProxyJump to the given host configuration"""
+
+    jump_host: str
+
+    def update_host(self, host: HostConfigType):
+        host["ProxyJump"] = self.jump_host
+
+
+@dataclasses.dataclass
+class SSHProxyCommandConfig(SSHProxyConfig):
+    """Add ProxyCommand to the given host configuration"""
+
+    command: str
+
+    def update_host(self, host: HostConfigType):
+        host["ProxyCommand"] = self.command
+
+
+@dataclasses.dataclass(kw_only=True)
+class SSHProxyAwsSSMConfig(SSHProxyConfig):
+    """Add ProxyCommand to use AWS SSM"""
+
+    profile: Optional[str] = None
+    region: Optional[str] = None
+    document_name: Optional[str] = None
+    instance_id: Optional[str] = None
+    instance_region: Optional[str] = None
+
+    def update_host(self, host: HostConfigType):
+        if self.instance_id:
+            host["HostName"] = self.instance_id
+        region = self.region if self.region else self.instance_region
+        document = self.document_name if self.document_name else "AWS-StartSSHSession"
+        args = [
+            "aws",
+            "ssm",
+            "start-session",
+            "--target",
+            "%h",
+            "--document-name",
+            document,
+            "--parameters",
+            "portNumber=%p",
+        ]
+        if region:
+            args.extend(["--region", region])
+        if self.profile:
+            args.extend(["--profile", self.profile])
+        command = f"sh -c '{' '.join(map(str, args))}'"
+        host["ProxyCommand"] = command
+
+    def apply_provisioning_data(self, provisioning_data: JobProvisioningData):
+        backend = provisioning_data.get_base_backend()
+        if backend != BackendType.AWS:
+            raise ConfigurationError(
+                "attach.proxy.type=aws-ssm is supported only for the AWS backend"
+            )
+        self.instance_id = provisioning_data.instance_id
+        self.instance_region = provisioning_data.region
 
 
 class SSHAttach:
@@ -67,6 +146,7 @@ class SSHAttach:
         service_port: Optional[int] = None,
         local_backend: bool = False,
         bind_address: Optional[str] = None,
+        proxy_config: Optional[SSHProxyConfig] = None,
     ):
         self._ports_lock = ports_lock
         self.ports = ports_lock.dict()
@@ -198,6 +278,18 @@ class SSHAttach:
                     "ControlPath": self.control_sock_path,
                 }
             )
+
+        if proxy_config:
+            # Apply proxy configuration for the first hop connection
+            first_hop_key: Optional[str] = None
+            if f"{run_name}-jump-host" in hosts:
+                first_hop_key = f"{run_name}-jump-host"
+            elif f"{run_name}-host" in hosts:
+                first_hop_key = f"{run_name}-host"
+            else:
+                first_hop_key = run_name
+
+            proxy_config.update_host(hosts[first_hop_key])
 
     def attach(self):
         include_ssh_config(self.ssh_config_path)
