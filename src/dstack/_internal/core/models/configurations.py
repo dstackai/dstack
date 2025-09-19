@@ -644,11 +644,83 @@ class DevEnvironmentConfigurationConfig(
         BaseRunConfigurationConfig.schema_extra(schema)
 
 
+AttachProxyType = Literal["none", "jump", "command", "aws-ssm"]
+
+
+class AttachProxyNone(CoreModel):
+    type: Annotated[
+        Literal["none"], Field(description="No client-side proxy for the first SSH hop")
+    ] = "none"
+
+
+class AttachProxyJump(CoreModel):
+    type: Annotated[
+        Literal["jump"],
+        Field(description="Use ProxyJump on the client-side for the first SSH hop"),
+    ] = "jump"
+    proxy_jump: Annotated[
+        str,
+        Field(description="Host alias from ~/.ssh/config for using in ProxyJump"),
+    ]
+
+
+class AttachProxyCommand(CoreModel):
+    type: Annotated[
+        Literal["command"],
+        Field(description="Use ProxyCommand on the client-side for the first SSH hop"),
+    ] = "command"
+    proxy_command: Annotated[
+        str,
+        Field(
+            description=(
+                "ProxyCommand string to execute for the first hop."
+                " The value is passed as-is to ssh_config."
+                " If you need stream forwarding through SSH, include '-W %h:%p' yourself."
+            )
+        ),
+    ]
+
+
+class AttachProxyAwsSSM(CoreModel):
+    type: Annotated[
+        Literal["aws-ssm"], Field(description="Use AWS SSM as a proxy for the first SSH hop")
+    ] = "aws-ssm"
+    profile: Annotated[Optional[str], Field(description="AWS profile name to use")] = None
+    region: Annotated[Optional[str], Field(description="AWS region for SSM")] = None
+    document_name: Annotated[
+        str,
+        Field(description="SSM document name for SSH session"),
+    ] = "AWS-StartSSHSession"
+
+
+class RunAttachParams(CoreModel):
+    proxy: Annotated[
+        Union[
+            AttachProxyNone,
+            AttachProxyJump,
+            AttachProxyCommand,
+            AttachProxyAwsSSM,
+        ],
+        Field(
+            discriminator="type",
+            description="Client-side SSH transport overrides for attach",
+        ),
+    ] = AttachProxyNone()
+
+
+class RunAttachConfiguration(CoreModel):
+    attach: Annotated[
+        RunAttachParams,
+        Field(description="Attach transport settings (client-side only)", exclude=True),
+    ] = RunAttachParams()
+
+
 class DevEnvironmentConfiguration(
     ProfileParams,
     BaseRunConfiguration,
     ConfigurationWithPortsParams,
     DevEnvironmentConfigurationParams,
+    RunAttachConfiguration,
     generate_dual_core_model(DevEnvironmentConfigurationConfig),
 ):
     type: Literal["dev-environment"] = "dev-environment"
@@ -680,6 +752,7 @@ class TaskConfiguration(
     ConfigurationWithCommandsParams,
     ConfigurationWithPortsParams,
     TaskConfigurationParams,
+    RunAttachConfiguration,
     generate_dual_core_model(TaskConfigurationConfig),
 ):
     type: Literal["task"] = "task"
@@ -838,6 +911,7 @@ class ServiceConfiguration(
     BaseRunConfiguration,
     ConfigurationWithCommandsParams,
     ServiceConfigurationParams,
+    RunAttachConfiguration,
     generate_dual_core_model(ServiceConfigurationConfig),
 ):
     type: Literal["service"] = "service"

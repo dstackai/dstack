@@ -40,6 +40,8 @@ from dstack._internal.core.models.configurations import (
     ConfigurationWithPortsParams,
     DevEnvironmentConfiguration,
     PortMapping,
+    RunAttachConfiguration,
+    RunAttachParams,
     RunConfigurationType,
     ServiceConfiguration,
     TaskConfiguration,
@@ -56,6 +58,12 @@ from dstack._internal.core.services.repos import (
     InvalidRepoCredentialsError,
     get_repo_creds_and_default_branch,
     load_repo,
+)
+from dstack._internal.core.services.ssh.attach import (
+    SSHProxyAwsSSMConfig,
+    SSHProxyCommandConfig,
+    SSHProxyConfig,
+    SSHProxyJumpConfig,
 )
 from dstack._internal.utils.common import local_time
 from dstack._internal.utils.interpolator import InterpolatorError, VariablesInterpolator
@@ -241,8 +249,28 @@ class BaseRunConfigurator(
                     bind_address: Optional[str] = getattr(
                         configurator_args, _BIND_ADDRESS_ARG, None
                     )
+                    # Map the attach.proxy settings to the original configuration
+                    attach_proxy_config = SSHProxyConfig()
+                    if isinstance(conf, RunAttachConfiguration) and conf.attach is not None:
+                        attach: RunAttachParams = conf.attach
+                        if attach.proxy.type == "jump":
+                            attach_proxy_config = SSHProxyJumpConfig(attach.proxy.proxy_jump)
+                        elif attach.proxy.type == "command":
+                            attach_proxy_config = SSHProxyCommandConfig(attach.proxy.proxy_command)
+                        elif attach.proxy.type == "aws-ssm":
+                            attach_proxy_config = SSHProxyAwsSSMConfig(
+                                profile=attach.proxy.profile,
+                                region=attach.proxy.region,
+                                document_name=attach.proxy.document_name,
+                            )
+                        if attach.proxy.type != "none":
+                            console.print(
+                                f"Using client-side attach proxy: [code]{attach.proxy.type}[/]"
+                            )
                     try:
-                        if run.attach(bind_address=bind_address):
+                        if run.attach(
+                            bind_address=bind_address, attach_proxy_config=attach_proxy_config
+                        ):
                             for entry in run.logs():
                                 sys.stdout.buffer.write(entry)
                                 sys.stdout.buffer.flush()
