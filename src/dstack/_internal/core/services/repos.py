@@ -36,24 +36,59 @@ def get_repo_creds_and_default_branch(
 
     # no auth
     with suppress(InvalidRepoCredentialsError):
-        return _get_repo_creds_and_default_branch_https(url)
+        creds, default_branch = _get_repo_creds_and_default_branch_https(url)
+        logger.debug(
+            "Git repo %s is public. Using no auth. Default branch: %s", repo_url, default_branch
+        )
+        return creds, default_branch
 
     # ssh key provided by the user or pulled from the server
     if identity_file is not None or private_key is not None:
         if identity_file is not None:
             private_key = _read_private_key(identity_file)
-            return _get_repo_creds_and_default_branch_ssh(url, identity_file, private_key)
+            creds, default_branch = _get_repo_creds_and_default_branch_ssh(
+                url, identity_file, private_key
+            )
+            logger.debug(
+                "Git repo %s is private. Using identity file: %s. Default branch: %s",
+                repo_url,
+                identity_file,
+                default_branch,
+            )
+            return creds, default_branch
         elif private_key is not None:
             with NamedTemporaryFile("w+", 0o600) as f:
                 f.write(private_key)
                 f.flush()
-                return _get_repo_creds_and_default_branch_ssh(url, f.name, private_key)
+                creds, default_branch = _get_repo_creds_and_default_branch_ssh(
+                    url, f.name, private_key
+                )
+                masked_key = "***" + private_key[-10:] if len(private_key) > 10 else "***MASKED***"
+                logger.debug(
+                    "Git repo %s is private. Using private key: %s. Default branch: %s",
+                    repo_url,
+                    masked_key,
+                    default_branch,
+                )
+                return creds, default_branch
         else:
             assert False, "should not reach here"
 
     # oauth token provided by the user or pulled from the server
     if oauth_token is not None:
-        return _get_repo_creds_and_default_branch_https(url, oauth_token)
+        creds, default_branch = _get_repo_creds_and_default_branch_https(url, oauth_token)
+        masked_token = (
+            len(oauth_token[:-4]) * "*" + oauth_token[-4:]
+            if len(oauth_token) > 4
+            else "***MASKED***"
+        )
+        logger.debug(
+            "Git repo %s is private. Using provided OAuth token: %s. Default branch: %s",
+            repo_url,
+            masked_token,
+            default_branch,
+        )
+        return creds, default_branch
 
     # key from ssh config
     identities = get_host_config(url.original_host).get("identityfile")
@@ -61,7 +96,16 @@ def get_repo_creds_and_default_branch(
         _identity_file = identities[0]
         with suppress(InvalidRepoCredentialsError):
             _private_key = _read_private_key(_identity_file)
-            return _get_repo_creds_and_default_branch_ssh(url, _identity_file, _private_key)
+            creds, default_branch = _get_repo_creds_and_default_branch_ssh(
+                url, _identity_file, _private_key
+            )
+            logger.debug(
+                "Git repo %s is private. Using SSH config identity file: %s. Default branch: %s",
+                repo_url,
+                _identity_file,
+                default_branch,
+            )
+            return creds, default_branch
 
     # token from gh config
     if os.path.exists(gh_config_path):
@@ -70,13 +114,35 @@ def get_repo_creds_and_default_branch(
         _oauth_token = gh_hosts.get(url.host, {}).get("oauth_token")
         if _oauth_token is not None:
             with suppress(InvalidRepoCredentialsError):
-                return _get_repo_creds_and_default_branch_https(url, _oauth_token)
+                creds, default_branch = _get_repo_creds_and_default_branch_https(url, _oauth_token)
+                masked_token = (
+                    len(_oauth_token[:-4]) * "*" + _oauth_token[-4:]
+                    if len(_oauth_token) > 4
+                    else "***MASKED***"
+                )
+                logger.debug(
+                    "Git repo %s is private. Using GitHub config token: %s from %s. Default branch: %s",
+                    repo_url,
+                    masked_token,
+                    gh_config_path,
+                    default_branch,
+                )
+                return creds, default_branch
 
     # default user key
     if os.path.exists(default_ssh_key):
         with suppress(InvalidRepoCredentialsError):
             _private_key = _read_private_key(default_ssh_key)
-            return _get_repo_creds_and_default_branch_ssh(url, default_ssh_key, _private_key)
+            creds, default_branch = _get_repo_creds_and_default_branch_ssh(
+                url, default_ssh_key, _private_key
+            )
+            logger.debug(
+                "Git repo %s is private. Using default identity file: %s. Default branch: %s",
+                repo_url,
+                default_ssh_key,
+                default_branch,
+            )
+            return creds, default_branch
 
     raise InvalidRepoCredentialsError(
         "No valid default Git credentials found. Pass valid `--token` or `--git-identity`."
