@@ -61,7 +61,7 @@ class SSHProxyCommandConfig(SSHProxyConfig):
         host["ProxyCommand"] = self.command
 
 
-@dataclasses.dataclass(kw_only=True)
+@dataclasses.dataclass
 class SSHProxyAwsSSMConfig(SSHProxyConfig):
     """Add ProxyCommand to use AWS SSM"""
 

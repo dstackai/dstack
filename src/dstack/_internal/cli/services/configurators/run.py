@@ -251,8 +251,10 @@ class BaseRunConfigurator(
                     )
                     # Map the attach.proxy settings to the original configuration
                     attach_proxy_config = SSHProxyConfig()
-                    if isinstance(conf, RunAttachConfiguration) and conf.attach is not None:
-                        attach: RunAttachParams = conf.attach
+                    if isinstance(conf, RunAttachConfiguration) and isinstance(
+                        conf.attach, RunAttachParams
+                    ):
+                        attach = conf.attach
                         if attach.proxy.type == "jump":
                             attach_proxy_config = SSHProxyJumpConfig(attach.proxy.proxy_jump)
                         elif attach.proxy.type == "command":
