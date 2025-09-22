@@ -7,10 +7,12 @@ export const useEmptyMessages = ({
     clearFilter,
     isDisabledClearFilter,
     projectNameSelected,
+    groupBySelected,
 }: {
     clearFilter?: () => void;
     isDisabledClearFilter?: boolean;
     projectNameSelected?: boolean;
+    groupBySelected?: boolean;
 }) => {
     const { t } = useTranslation();
 
@@ -20,6 +22,15 @@ export const useEmptyMessages = ({
                 <ListEmptyMessage
                     title={t('offer.empty_message_title_select_project')}
                     message={t('offer.empty_message_text_select_project')}
+                ></ListEmptyMessage>
+            );
+        }
+
+        if (!groupBySelected) {
+            return (
+                <ListEmptyMessage
+                    title={t('offer.empty_message_title_select_groupBy')}
+                    message={t('offer.empty_message_text_select_groupBy')}
                 ></ListEmptyMessage>
             );
         }

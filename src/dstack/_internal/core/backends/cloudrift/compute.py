@@ -1,7 +1,8 @@
 from typing import Dict, List, Optional
 
-from dstack._internal.core.backends.base.backend import Compute
 from dstack._internal.core.backends.base.compute import (
+    Compute,
+    ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
     get_shim_commands,
 )
@@ -17,13 +18,14 @@ from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
 )
 from dstack._internal.core.models.placement import PlacementGroup
-from dstack._internal.core.models.runs import JobProvisioningData, Requirements
+from dstack._internal.core.models.runs import JobProvisioningData
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
 
 class CloudRiftCompute(
+    ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
     Compute,
 ):
@@ -32,15 +34,11 @@ class CloudRiftCompute(
         self.config = config
         self.client = RiftClient(self.config.creds.api_key)
 
-    def get_offers(
-        self, requirements: Optional[Requirements] = None
-    ) -> List[InstanceOfferWithAvailability]:
+    def get_all_offers_with_availability(self) -> List[InstanceOfferWithAvailability]:
         offers = get_catalog_offers(
             backend=BackendType.CLOUDRIFT,
             locations=self.config.regions or None,
-            requirements=requirements,
         )
-
         offers_with_availabilities = self._get_offers_with_availability(offers)
         return offers_with_availabilities
 

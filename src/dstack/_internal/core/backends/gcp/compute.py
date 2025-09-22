@@ -17,6 +17,7 @@ import dstack._internal.core.backends.gcp.resources as gcp_resources
 from dstack import version
 from dstack._internal.core.backends.base.compute import (
     Compute,
+    ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
     ComputeWithGatewaySupport,
     ComputeWithMultinodeSupport,
@@ -32,7 +33,10 @@ from dstack._internal.core.backends.base.compute import (
     merge_tags,
     requires_nvidia_proprietary_kernel_modules,
 )
-from dstack._internal.core.backends.base.offers import get_catalog_offers
+from dstack._internal.core.backends.base.offers import (
+    get_catalog_offers,
+    get_offers_disk_modifier,
+)
 from dstack._internal.core.backends.gcp.features import tcpx as tcpx_features
 from dstack._internal.core.backends.gcp.models import GCPConfig
 from dstack._internal.core.consts import DSTACK_OS_IMAGE_WITH_PROPRIETARY_NVIDIA_KERNEL_MODULES
@@ -84,6 +88,7 @@ class GCPVolumeDiskBackendData(CoreModel):
 
 
 class GCPCompute(
+    ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
     ComputeWithMultinodeSupport,
     ComputeWithPlacementGroupSupport,
@@ -109,14 +114,10 @@ class GCPCompute(
         self._extra_subnets_cache_lock = threading.Lock()
         self._extra_subnets_cache = TTLCache(maxsize=30, ttl=60)
 
-    def get_offers(
-        self, requirements: Optional[Requirements] = None
-    ) -> List[InstanceOfferWithAvailability]:
+    def get_all_offers_with_availability(self) -> List[InstanceOfferWithAvailability]:
         regions = get_or_error(self.config.regions)
         offers = get_catalog_offers(
             backend=BackendType.GCP,
-            requirements=requirements,
-            configurable_disk_size=CONFIGURABLE_DISK_SIZE,
             extra_filter=_supported_instances_and_zones(regions),
         )
         quotas: Dict[str, Dict[str, float]] = defaultdict(dict)
@@ -144,8 +145,12 @@ class GCPCompute(
             offer_keys_to_offers[key] = offer_with_availability
             offers_with_availability.append(offer_with_availability)
             offers_with_availability[-1].region = region
-
         return offers_with_availability
+
+    def get_offers_modifier(
+        self, requirements: Requirements
+    ) -> Callable[[InstanceOfferWithAvailability], Optional[InstanceOfferWithAvailability]]:
+        return get_offers_disk_modifier(CONFIGURABLE_DISK_SIZE, requirements)
 
     def terminate_instance(
         self, instance_id: str, region: str, backend_data: Optional[str] = None

@@ -1,3 +1,12 @@
+declare type TCreateWizardProjectParams = {
+    project_name: string;
+    dry?: boolean;
+    is_public?: boolean;
+    config: {
+        base_backends: string[];
+    };
+};
+
 declare type TProjectBackend = {
     name: string;
     config: IBackendAWS | IBackendAzure | IBackendGCP | IBackendLambda | IBackendLocal | IBackendDstack;

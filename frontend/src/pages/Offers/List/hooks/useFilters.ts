@@ -1,18 +1,24 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
-import type { PropertyFilterProps } from 'components';
+import type { MultiselectProps, PropertyFilterProps } from 'components';
 
-import { EMPTY_QUERY, requestParamsToTokens, tokensToRequestParams, tokensToSearchParams } from 'libs/filters';
+import { useProjectFilter } from 'hooks/useProjectFilter';
+import {
+    EMPTY_QUERY,
+    requestParamsToArray,
+    requestParamsToTokens,
+    tokensToRequestParams,
+    tokensToSearchParams,
+} from 'libs/filters';
 
-import { useProjectFilter } from '../../../../hooks/useProjectFilter';
 import { getPropertyFilterOptions } from '../helpers';
 
 type Args = {
     gpus: IGpu[];
 };
 
-type RequestParamsKeys = 'project_name' | 'gpu_name' | 'gpu_count' | 'gpu_memory' | 'backend' | 'spot_policy';
+type RequestParamsKeys = 'project_name' | 'gpu_name' | 'gpu_count' | 'gpu_memory' | 'backend' | 'spot_policy' | 'group_by';
 
 export const filterKeys: Record<string, RequestParamsKeys> = {
     PROJECT_NAME: 'project_name',
@@ -40,6 +46,12 @@ const spotPolicyOptions = [
     },
 ];
 
+const gpuFilterOption = { label: 'GPU', value: 'gpu' };
+
+const defaultGroupByOptions = [{ ...gpuFilterOption }, { label: 'Backend', value: 'backend' }];
+
+const groupByRequestParamName: RequestParamsKeys = 'group_by';
+
 export const useFilters = ({ gpus }: Args) => {
     const [searchParams, setSearchParams] = useSearchParams();
     const { projectOptions } = useProjectFilter({ localStorePrefix: 'offers-list-projects' });
@@ -49,9 +61,23 @@ export const useFilters = ({ gpus }: Args) => {
         requestParamsToTokens<RequestParamsKeys>({ searchParams, filterKeys }),
     );
 
+    const [groupBy, setGroupBy] = useState<MultiselectProps.Options>(() => {
+        const selectedGroupBy = requestParamsToArray<RequestParamsKeys>({
+            searchParams,
+            paramName: groupByRequestParamName,
+        });
+
+        if (selectedGroupBy.length) {
+            return defaultGroupByOptions.filter(({ value }) => selectedGroupBy.includes(value));
+        }
+
+        return [gpuFilterOption];
+    });
+
     const clearFilter = () => {
         setSearchParams({});
         setPropertyFilterQuery(EMPTY_QUERY);
+        setGroupBy([]);
     };
 
     const filteringOptions = useMemo(() => {
@@ -83,6 +109,40 @@ export const useFilters = ({ gpus }: Args) => {
 
         return options;
     }, [gpus]);
+
+    const groupByOptions: MultiselectProps.Options = useMemo(() => {
+        return defaultGroupByOptions.map((option) => {
+            if (option.value === 'gpu' && groupBy.some(({ value }) => value === 'backend')) {
+                return {
+                    ...option,
+                    disabled: true,
+                };
+            }
+
+            if (option.value === 'backend' && !groupBy.some(({ value }) => value === 'gpu')) {
+                return {
+                    ...option,
+                    disabled: true,
+                };
+            }
+
+            return option;
+        });
+    }, [groupBy]);
+
+    const setSearchParamsHandle = ({
+        tokens,
+        groupBy,
+    }: {
+        tokens: PropertyFilterProps.Query['tokens'];
+        groupBy: MultiselectProps.Options;
+    }) => {
+        const searchParams = tokensToSearchParams<RequestParamsKeys>(tokens);
+
+        groupBy.forEach(({ value }) => searchParams.append(groupByRequestParamName, value as string));
+
+        setSearchParams(searchParams);
+    };
 
     const filteringProperties = [
         {
@@ -125,7 +185,10 @@ export const useFilters = ({ gpus }: Args) => {
             );
         });
 
-        setSearchParams(tokensToSearchParams<RequestParamsKeys>(filteredTokens));
+        setSearchParamsHandle({
+            tokens: filteredTokens,
+            groupBy: [...groupBy],
+        });
 
         setPropertyFilterQuery({
             operation,
@@ -137,9 +200,24 @@ export const useFilters = ({ gpus }: Args) => {
         onChangePropertyFilterHandle(detail);
     };
 
-    const filteringRequestParams = useMemo(() => {
-        console.log({ tokens: propertyFilterQuery.tokens });
+    const onChangeGroupBy: MultiselectProps['onChange'] = ({ detail }) => {
+        const selectedGpu = detail.selectedOptions.some(({ value }) => value === 'gpu');
 
+        let tempSelectedOptions: MultiselectProps.Options = detail.selectedOptions;
+
+        if (!selectedGpu) {
+            tempSelectedOptions = detail.selectedOptions.filter(({ value }) => value !== 'backend');
+        }
+
+        setSearchParamsHandle({
+            tokens: propertyFilterQuery.tokens,
+            groupBy: tempSelectedOptions,
+        });
+
+        setGroupBy(tempSelectedOptions);
+    };
+
+    const filteringRequestParams = useMemo(() => {
         const params = tokensToRequestParams<RequestParamsKeys>({
             tokens: propertyFilterQuery.tokens,
             arrayFieldKeys: multipleChoiseKeys,
@@ -177,5 +255,8 @@ export const useFilters = ({ gpus }: Args) => {
         onChangePropertyFilter,
         filteringOptions,
         filteringProperties,
+        groupBy,
+        groupByOptions,
+        onChangeGroupBy,
     } as const;
 };

@@ -61,6 +61,7 @@ const getInitialState = (): IAppState => {
         },
 
         tutorialPanel: {
+            createProjectCompleted: false,
             billingCompleted: false,
             configureCLICompleted: false,
             discordCompleted: false,

@@ -9,6 +9,7 @@ from gpuhunt.providers.hotaisle import HotAisleProvider
 
 from dstack._internal.core.backends.base.compute import (
     Compute,
+    ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
     get_shim_commands,
 )
@@ -23,7 +24,7 @@ from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
 )
 from dstack._internal.core.models.placement import PlacementGroup
-from dstack._internal.core.models.runs import JobProvisioningData, Requirements
+from dstack._internal.core.models.runs import JobProvisioningData
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -44,6 +45,7 @@ INSTANCE_TYPE_SPECS = {
 
 
 class HotAisleCompute(
+    ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
     Compute,
 ):
@@ -56,16 +58,12 @@ class HotAisleCompute(
             HotAisleProvider(api_key=config.creds.api_key, team_handle=config.team_handle)
         )
 
-    def get_offers(
-        self, requirements: Optional[Requirements] = None
-    ) -> List[InstanceOfferWithAvailability]:
+    def get_all_offers_with_availability(self) -> List[InstanceOfferWithAvailability]:
         offers = get_catalog_offers(
             backend=BackendType.HOTAISLE,
             locations=self.config.regions or None,
-            requirements=requirements,
             catalog=self.catalog,
         )
-
         supported_offers = []
         for offer in offers:
             if offer.instance.name in INSTANCE_TYPE_SPECS:
@@ -78,7 +76,6 @@ class HotAisleCompute(
                 logger.warning(
                     f"Skipping unsupported Hot Aisle instance type: {offer.instance.name}"
                 )
-
         return supported_offers
 
     def get_payload_from_offer(self, instance_type) -> dict:

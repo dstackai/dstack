@@ -1139,7 +1139,7 @@ def _patch_base_image_for_aws_efa(
     efa_enabled_patterns = [
         # TODO: p6-b200 isn't supported yet in gpuhunt
         r"^p6-b200\.(48xlarge)$",
-        r"^p5\.(48xlarge)$",
+        r"^p5\.(4xlarge|48xlarge)$",
         r"^p5e\.(48xlarge)$",
         r"^p5en\.(48xlarge)$",
         r"^p4d\.(24xlarge)$",

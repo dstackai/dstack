@@ -1,6 +1,6 @@
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import boto3
 import botocore.client
@@ -18,6 +18,7 @@ from dstack._internal.core.backends.aws.models import (
 )
 from dstack._internal.core.backends.base.compute import (
     Compute,
+    ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
     ComputeWithGatewaySupport,
     ComputeWithMultinodeSupport,
@@ -32,7 +33,7 @@ from dstack._internal.core.backends.base.compute import (
     get_user_data,
     merge_tags,
 )
-from dstack._internal.core.backends.base.offers import get_catalog_offers
+from dstack._internal.core.backends.base.offers import get_catalog_offers, get_offers_disk_modifier
 from dstack._internal.core.errors import (
     ComputeError,
     NoCapacityError,
@@ -87,6 +88,7 @@ def _ec2client_cache_methodkey(self, ec2_client, *args, **kwargs):
 
 
 class AWSCompute(
+    ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
     ComputeWithMultinodeSupport,
     ComputeWithReservationSupport,
@@ -109,6 +111,8 @@ class AWSCompute(
         # Caches to avoid redundant API calls when provisioning many instances
         # get_offers is already cached but we still cache its sub-functions
         # with more aggressive/longer caches.
+        self._offers_post_filter_cache_lock = threading.Lock()
+        self._offers_post_filter_cache = TTLCache(maxsize=10, ttl=180)
         self._get_regions_to_quotas_cache_lock = threading.Lock()
         self._get_regions_to_quotas_execution_lock = threading.Lock()
         self._get_regions_to_quotas_cache = TTLCache(maxsize=10, ttl=300)
@@ -125,43 +129,11 @@ class AWSCompute(
         self._get_image_id_and_username_cache_lock = threading.Lock()
         self._get_image_id_and_username_cache = TTLCache(maxsize=100, ttl=600)
 
-    def get_offers(
-        self, requirements: Optional[Requirements] = None
-    ) -> List[InstanceOfferWithAvailability]:
-        filter = _supported_instances
-        if requirements and requirements.reservation:
-            region_to_reservation = {}
-            for region in self.config.regions:
-                reservation = aws_resources.get_reservation(
-                    ec2_client=self.session.client("ec2", region_name=region),
-                    reservation_id=requirements.reservation,
-                    instance_count=1,
-                )
-                if reservation is not None:
-                    region_to_reservation[region] = reservation
-
-            def _supported_instances_with_reservation(offer: InstanceOffer) -> bool:
-                # Filter: only instance types supported by dstack
-                if not _supported_instances(offer):
-                    return False
-                # Filter: Spot instances can't be used with reservations
-                if offer.instance.resources.spot:
-                    return False
-                region = offer.region
-                reservation = region_to_reservation.get(region)
-                # Filter: only instance types matching the capacity reservation
-                if not bool(reservation and offer.instance.name == reservation["InstanceType"]):
-                    return False
-                return True
-
-            filter = _supported_instances_with_reservation
-
+    def get_all_offers_with_availability(self) -> List[InstanceOfferWithAvailability]:
         offers = get_catalog_offers(
             backend=BackendType.AWS,
             locations=self.config.regions,
-            requirements=requirements,
-            configurable_disk_size=CONFIGURABLE_DISK_SIZE,
-            extra_filter=filter,
+            extra_filter=_supported_instances,
         )
         regions = list(set(i.region for i in offers))
         with self._get_regions_to_quotas_execution_lock:
@@ -184,6 +156,49 @@ class AWSCompute(
                 )
             )
         return availability_offers
+
+    def get_offers_modifier(
+        self, requirements: Requirements
+    ) -> Callable[[InstanceOfferWithAvailability], Optional[InstanceOfferWithAvailability]]:
+        return get_offers_disk_modifier(CONFIGURABLE_DISK_SIZE, requirements)
+
+    def _get_offers_cached_key(self, requirements: Requirements) -> int:
+        # Requirements is not hashable, so we use a hack to get arguments hash
+        return hash(requirements.json())
+
+    @cachedmethod(
+        cache=lambda self: self._offers_post_filter_cache,
+        key=_get_offers_cached_key,
+        lock=lambda self: self._offers_post_filter_cache_lock,
+    )
+    def get_offers_post_filter(
+        self, requirements: Requirements
+    ) -> Optional[Callable[[InstanceOfferWithAvailability], bool]]:
+        if requirements.reservation:
+            region_to_reservation = {}
+            for region in get_or_error(self.config.regions):
+                reservation = aws_resources.get_reservation(
+                    ec2_client=self.session.client("ec2", region_name=region),
+                    reservation_id=requirements.reservation,
+                    instance_count=1,
+                )
+                if reservation is not None:
+                    region_to_reservation[region] = reservation
+
+            def reservation_filter(offer: InstanceOfferWithAvailability) -> bool:
+                # Filter: Spot instances can't be used with reservations
+                if offer.instance.resources.spot:
+                    return False
+                region = offer.region
+                reservation = region_to_reservation.get(region)
+                # Filter: only instance types matching the capacity reservation
+                if not bool(reservation and offer.instance.name == reservation["InstanceType"]):
+                    return False
+                return True
+
+            return reservation_filter
+
+        return None
 
     def terminate_instance(
         self, instance_id: str, region: str, backend_data: Optional[str] = None

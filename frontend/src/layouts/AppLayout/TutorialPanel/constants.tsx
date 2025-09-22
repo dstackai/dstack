@@ -44,6 +44,7 @@ export enum HotspotIds {
     ADD_TOP_UP_BALANCE = 'billing-top-up-balance',
     PAYMENT_CONTINUE_BUTTON = 'billing-payment-continue-button',
     CONFIGURE_CLI_COMMAND = 'configure-cli-command',
+    CREATE_FIRST_PROJECT = 'create-first-project',
 }
 
 export const BILLING_TUTORIAL: TutorialPanelProps.Tutorial = {
@@ -52,7 +53,7 @@ export const BILLING_TUTORIAL: TutorialPanelProps.Tutorial = {
     description: (
         <>
             <Box variant="p" color="text-body-secondary" padding={{ top: 'n' }}>
-                Top up your balance via a credit card to use GPU by dstack Sky.
+                If you plan to use the GPU marketplace, top up your balance with a credit card.
             </Box>
         </>
     ),
@@ -95,6 +96,31 @@ export const CONFIGURE_CLI_TUTORIAL: TutorialPanelProps.Tutorial = {
                     title: 'Run the dstack project add command',
                     content: 'Run this command on your local machine to configure the dstack CLI.',
                     hotspotId: HotspotIds.CONFIGURE_CLI_COMMAND,
+                },
+            ],
+        },
+    ],
+};
+
+export const CREATE_FIRST_PROJECT: TutorialPanelProps.Tutorial = {
+    completed: false,
+    title: 'Create a project',
+    description: (
+        <>
+            <Box variant="p" color="text-body-secondary" padding={{ top: 'n' }}>
+                Create your first project. Choose to use the GPU marketplace or configure your own cloud credentials.
+            </Box>
+        </>
+    ),
+    completedScreenDescription: 'TBA',
+    tasks: [
+        {
+            title: 'Create the first project',
+            steps: [
+                {
+                    title: 'Create the first project',
+                    content: 'Create the first project',
+                    hotspotId: HotspotIds.CREATE_FIRST_PROJECT,
                 },
             ],
         },

@@ -16,6 +16,7 @@ from dstack._internal.core.models.instances import (
     InstanceStatus,
 )
 from dstack._internal.core.models.profiles import Profile
+from dstack._internal.core.models.resources import Range, ResourcesSpec
 from dstack._internal.core.models.runs import (
     JobStatus,
     JobTerminationReason,
@@ -125,11 +126,11 @@ class TestProcessSubmittedJobs:
             backend_mock = Mock()
             m.return_value = [backend_mock]
             backend_mock.TYPE = backend
-            backend_mock.compute.return_value.get_offers_cached.return_value = [offer]
+            backend_mock.compute.return_value.get_offers.return_value = [offer]
             backend_mock.compute.return_value.run_job.return_value = get_job_provisioning_data()
             await process_submitted_jobs()
             m.assert_called_once()
-            backend_mock.compute.return_value.get_offers_cached.assert_called_once()
+            backend_mock.compute.return_value.get_offers.assert_called_once()
             backend_mock.compute.return_value.run_job.assert_called_once()
 
         await session.refresh(job)
@@ -172,13 +173,13 @@ class TestProcessSubmittedJobs:
             backend_mock = Mock()
             m.return_value = [backend_mock]
             backend_mock.TYPE = BackendType.RUNPOD
-            backend_mock.compute.return_value.get_offers_cached.return_value = [offer]
+            backend_mock.compute.return_value.get_offers.return_value = [offer]
             backend_mock.compute.return_value.run_job.return_value = get_job_provisioning_data()
             with patch("dstack._internal.utils.common.get_current_datetime") as datetime_mock:
                 datetime_mock.return_value = datetime(2023, 1, 2, 3, 30, 0, tzinfo=timezone.utc)
                 await process_submitted_jobs()
             m.assert_called_once()
-            backend_mock.compute.return_value.get_offers_cached.assert_not_called()
+            backend_mock.compute.return_value.get_offers.assert_not_called()
             backend_mock.compute.return_value.run_job.assert_not_called()
 
         await session.refresh(job)
@@ -222,13 +223,13 @@ class TestProcessSubmittedJobs:
             backend_mock = Mock()
             m.return_value = [backend_mock]
             backend_mock.TYPE = BackendType.RUNPOD
-            backend_mock.compute.return_value.get_offers_cached.return_value = [offer]
+            backend_mock.compute.return_value.get_offers.return_value = [offer]
             backend_mock.compute.return_value.run_job.return_value = get_job_provisioning_data()
             with patch("dstack._internal.utils.common.get_current_datetime") as datetime_mock:
                 datetime_mock.return_value = datetime(2023, 1, 2, 3, 30, 0, tzinfo=timezone.utc)
                 await process_submitted_jobs()
             m.assert_called_once()
-            backend_mock.compute.return_value.get_offers_cached.assert_not_called()
+            backend_mock.compute.return_value.get_offers.assert_not_called()
             backend_mock.compute.return_value.run_job.assert_not_called()
 
         await session.refresh(job)
@@ -274,7 +275,7 @@ class TestProcessSubmittedJobs:
             backend_mock = Mock()
             m.return_value = [backend_mock]
             backend_mock.TYPE = BackendType.RUNPOD
-            backend_mock.compute.return_value.get_offers_cached.return_value = [offer]
+            backend_mock.compute.return_value.get_offers.return_value = [offer]
             backend_mock.compute.return_value.run_job.return_value = get_job_provisioning_data()
             await process_submitted_jobs()
 
@@ -693,11 +694,11 @@ class TestProcessSubmittedJobs:
             backend_mock = Mock()
             m.return_value = [backend_mock]
             backend_mock.TYPE = BackendType.AWS
-            backend_mock.compute.return_value.get_offers_cached.return_value = [offer]
+            backend_mock.compute.return_value.get_offers.return_value = [offer]
             backend_mock.compute.return_value.run_job.return_value = get_job_provisioning_data()
             await process_submitted_jobs()
             m.assert_called_once()
-            backend_mock.compute.return_value.get_offers_cached.assert_called_once()
+            backend_mock.compute.return_value.get_offers.assert_called_once()
             backend_mock.compute.return_value.run_job.assert_called_once()
 
         await session.refresh(job)
@@ -744,7 +745,7 @@ class TestProcessSubmittedJobs:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_does_not_assign_job_to_elastic_empty_fleet_if_fleets_unspecified(
+    async def test_does_not_assign_job_to_elastic_empty_fleet_without_backend_offers_if_fleets_unspecified(
         self, test_db, session: AsyncSession
     ):
         project = await create_project(session)
@@ -781,6 +782,58 @@ class TestProcessSubmittedJobs:
         assert job.instance_assigned
         assert job.instance_id is None
         assert job.fleet_id is None
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_assigns_job_to_elastic_empty_fleet_with_backend_offers_if_fleets_unspecified(
+        self, test_db, session: AsyncSession
+    ):
+        project = await create_project(session)
+        user = await create_user(session)
+        repo = await create_repo(session=session, project_id=project.id)
+        fleet_spec1 = get_fleet_spec()
+        fleet_spec1.configuration.nodes = FleetNodesSpec(min=0, target=0, max=1)
+        fleet1 = await create_fleet(
+            session=session, project=project, spec=fleet_spec1, name="fleet"
+        )
+        # Need a second non-empty fleet to have two-stage processing
+        fleet_spec2 = get_fleet_spec()
+        # Empty resources intersection to return no backend offers
+        fleet_spec2.configuration.resources = ResourcesSpec(cpu=Range(min=0, max=0))
+        fleet2 = await create_fleet(
+            session=session, project=project, spec=fleet_spec2, name="fleet2"
+        )
+        await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet2,
+            instance_num=0,
+            status=InstanceStatus.BUSY,
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            instance_assigned=False,
+        )
+        aws_mock = Mock()
+        aws_mock.TYPE = BackendType.AWS
+        offer = get_instance_offer_with_availability(backend=BackendType.AWS, price=1.0)
+        aws_mock.compute.return_value = Mock(spec=ComputeMockSpec)
+        aws_mock.compute.return_value.get_offers.return_value = [offer]
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            m.return_value = [aws_mock]
+            await process_submitted_jobs()
+        await session.refresh(job)
+        assert job.status == JobStatus.SUBMITTED
+        assert job.instance_assigned
+        assert job.instance_id is None
+        assert job.fleet_id == fleet1.id
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
@@ -884,11 +937,11 @@ class TestProcessSubmittedJobs:
             backend_mock = Mock()
             m.return_value = [backend_mock]
             backend_mock.TYPE = BackendType.AWS
-            backend_mock.compute.return_value.get_offers_cached.return_value = [offer]
+            backend_mock.compute.return_value.get_offers.return_value = [offer]
             backend_mock.compute.return_value.run_job.return_value = get_job_provisioning_data()
             await process_submitted_jobs()
             m.assert_called_once()
-            backend_mock.compute.return_value.get_offers_cached.assert_called_once()
+            backend_mock.compute.return_value.get_offers.assert_called_once()
             backend_mock.compute.return_value.run_job.assert_called_once()
 
         await session.refresh(job)
