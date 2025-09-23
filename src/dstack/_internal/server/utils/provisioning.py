@@ -6,7 +6,7 @@ from textwrap import dedent
 from typing import Any, Dict, Generator, List, Optional
 
 import paramiko
-from gpuhunt import AcceleratorVendor, CPUArchitecture, correct_gpu_memory_gib
+from gpuhunt import AcceleratorVendor, correct_gpu_memory_gib
 
 from dstack._internal.core.backends.base.compute import GoArchType, normalize_arch
 from dstack._internal.core.consts import DSTACK_SHIM_HTTP_PORT
@@ -248,14 +248,7 @@ def _get_shim_healthcheck(client: paramiko.SSHClient) -> Optional[str]:
     return out
 
 
-def host_info_to_instance_type(host_info: Dict[str, Any], cpu_arch: GoArchType) -> InstanceType:
-    _cpu_arch: CPUArchitecture
-    if cpu_arch == "amd64":
-        _cpu_arch = CPUArchitecture.X86
-    elif cpu_arch == "arm64":
-        _cpu_arch = CPUArchitecture.ARM
-    else:
-        raise ValueError(f"Unexpected cpu_arch: {cpu_arch}")
+def host_info_to_instance_type(host_info: Dict[str, Any], arch: GoArchType) -> InstanceType:
     gpu_count = host_info.get("gpu_count", 0)
     if gpu_count > 0:
         gpu_vendor = AcceleratorVendor.cast(host_info.get("gpu_vendor", "nvidia"))
@@ -280,7 +273,7 @@ def host_info_to_instance_type(host_info: Dict[str, Any], cpu_arch: GoArchType) 
     instance_type = InstanceType(
         name="instance",
         resources=Resources(
-            cpu_arch=_cpu_arch,
+            cpu_arch=arch.to_cpu_architecture(),
             cpus=host_info["cpus"],
             memory_mib=host_info["memory"] / 1024 / 1024,
             spot=False,

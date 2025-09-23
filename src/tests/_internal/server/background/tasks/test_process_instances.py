@@ -11,6 +11,7 @@ from freezegun import freeze_time
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from dstack._internal.core.backends.base.compute import GoArchType
 from dstack._internal.core.errors import (
     BackendError,
     NoCapacityError,
@@ -1057,7 +1058,7 @@ class TestAddSSHInstance:
 
     @pytest.fixture
     def deploy_instance_mock(self, monkeypatch: pytest.MonkeyPatch, host_info: dict):
-        mock = Mock(return_value=(InstanceCheck(reachable=True), host_info, "amd64"))
+        mock = Mock(return_value=(InstanceCheck(reachable=True), host_info, GoArchType.AMD64))
         monkeypatch.setattr(
             "dstack._internal.server.background.tasks.process_instances._deploy_instance", mock
         )

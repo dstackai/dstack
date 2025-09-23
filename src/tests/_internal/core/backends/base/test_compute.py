@@ -4,6 +4,7 @@ from typing import Optional
 import pytest
 
 from dstack._internal.core.backends.base.compute import (
+    GoArchType,
     generate_unique_backend_name,
     generate_unique_gateway_instance_name,
     generate_unique_instance_name,
@@ -63,11 +64,11 @@ class TestGenerateUniqueBackendName:
 class TestNormalizeArch:
     @pytest.mark.parametrize("arch", [None, "", "X86", "x86_64", "AMD64"])
     def test_amd64(self, arch: Optional[str]):
-        assert normalize_arch(arch) == "amd64"
+        assert normalize_arch(arch) is GoArchType.AMD64
 
     @pytest.mark.parametrize("arch", ["arm", "ARM64", "AArch64"])
     def test_arm64(self, arch: str):
-        assert normalize_arch(arch) == "arm64"
+        assert normalize_arch(arch) is GoArchType.ARM64
 
     @pytest.mark.parametrize("arch", ["IA32", "i686", "ARM32", "aarch32"])
     def test_32bit_not_supported(self, arch: str):

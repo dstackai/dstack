@@ -307,7 +307,7 @@ async def _add_remote(instance: InstanceModel) -> None:
             )
             deploy_timeout = 20 * 60  # 20 minutes
             result = await asyncio.wait_for(future, timeout=deploy_timeout)
-            health, host_info, cpu_arch = result
+            health, host_info, arch = result
         except (asyncio.TimeoutError, TimeoutError) as e:
             raise ProvisioningError(f"Deploy timeout: {e}") from e
         except Exception as e:
@@ -327,7 +327,7 @@ async def _add_remote(instance: InstanceModel) -> None:
         instance.status = InstanceStatus.PENDING
         return
 
-    instance_type = host_info_to_instance_type(host_info, cpu_arch)
+    instance_type = host_info_to_instance_type(host_info, arch)
     instance_network = None
     internal_ip = None
     try:
