@@ -31,6 +31,7 @@ from dstack._internal.core.backends.base.compute import (
     get_shim_commands,
     get_user_data,
     merge_tags,
+    requires_nvidia_proprietary_kernel_modules,
 )
 from dstack._internal.core.backends.base.offers import (
     get_catalog_offers,
@@ -38,6 +39,7 @@ from dstack._internal.core.backends.base.offers import (
 )
 from dstack._internal.core.backends.gcp.features import tcpx as tcpx_features
 from dstack._internal.core.backends.gcp.models import GCPConfig
+from dstack._internal.core.consts import DSTACK_OS_IMAGE_WITH_PROPRIETARY_NVIDIA_KERNEL_MODULES
 from dstack._internal.core.errors import (
     ComputeError,
     ComputeResourceNotFoundError,
@@ -293,7 +295,11 @@ class GCPCompute(
 
         image = _get_image(
             instance_type_name=instance_offer.instance.name,
-            cuda=len(instance_offer.instance.resources.gpus) > 0,
+            gpu_name=(
+                instance_offer.instance.resources.gpus[0].name
+                if len(instance_offer.instance.resources.gpus) > 0
+                else None
+            ),
         )
 
         for zone in zones:
@@ -904,7 +910,7 @@ class GCPImage:
     is_ufw_installed: bool
 
 
-def _get_image(instance_type_name: str, cuda: bool) -> GCPImage:
+def _get_image(instance_type_name: str, gpu_name: Optional[str]) -> GCPImage:
     if instance_type_name == "a3-megagpu-8g":
         image_name = "dstack-a3mega-5"
         is_ufw_installed = False
@@ -913,8 +919,11 @@ def _get_image(instance_type_name: str, cuda: bool) -> GCPImage:
             id="projects/cos-cloud/global/images/cos-105-17412-535-78",
             is_ufw_installed=False,
         )
-    elif cuda:
-        image_name = f"dstack-cuda-{version.base_image}"
+    elif gpu_name is not None:
+        if not requires_nvidia_proprietary_kernel_modules(gpu_name):
+            image_name = f"dstack-cuda-{version.base_image}"
+        else:
+            image_name = f"dstack-cuda-{DSTACK_OS_IMAGE_WITH_PROPRIETARY_NVIDIA_KERNEL_MODULES}"
         is_ufw_installed = True
     else:
         image_name = f"dstack-{version.base_image}"

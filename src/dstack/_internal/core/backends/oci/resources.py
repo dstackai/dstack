@@ -23,7 +23,9 @@ import oci
 from oci.object_storage.models import CreatePreauthenticatedRequestDetails
 
 from dstack import version
+from dstack._internal.core.backends.base.compute import requires_nvidia_proprietary_kernel_modules
 from dstack._internal.core.backends.oci.region import OCIRegionClient
+from dstack._internal.core.consts import DSTACK_OS_IMAGE_WITH_PROPRIETARY_NVIDIA_KERNEL_MODULES
 from dstack._internal.core.errors import BackendError
 from dstack._internal.core.models.instances import InstanceOffer
 from dstack._internal.utils.common import batched
@@ -352,11 +354,14 @@ def terminate_instance_if_exists(client: oci.core.ComputeClient, instance_id: st
 
 
 def get_marketplace_listing_and_package(
-    cuda: bool, client: oci.marketplace.MarketplaceClient
+    gpu_name: Optional[str], client: oci.marketplace.MarketplaceClient
 ) -> Tuple[oci.marketplace.models.Listing, oci.marketplace.models.ImageListingPackage]:
     listing_name = f"dstack-{version.base_image}"
-    if cuda:
-        listing_name = f"dstack-cuda-{version.base_image}"
+    if gpu_name is not None:
+        if not requires_nvidia_proprietary_kernel_modules(gpu_name):
+            listing_name = f"dstack-cuda-{version.base_image}"
+        else:
+            listing_name = f"dstack-cuda-{DSTACK_OS_IMAGE_WITH_PROPRIETARY_NVIDIA_KERNEL_MODULES}"
 
     listing_summaries = list_marketplace_listings(listing_name, client)
     if len(listing_summaries) != 1:

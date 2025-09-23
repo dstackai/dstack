@@ -356,7 +356,7 @@ class TestProcessRunningJobs:
             name="test-run-0-0",
             registry_username="",
             registry_password="",
-            image_name="dstackai/base:0.10-base-ubuntu22.04",
+            image_name=f"dstackai/base:{settings.DSTACK_BASE_IMAGE_VERSION}-base-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}",
             container_user="root",
             privileged=privileged,
             gpu=None,

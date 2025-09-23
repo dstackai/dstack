@@ -62,6 +62,7 @@ from dstack._internal.server.testing.common import (
     get_job_provisioning_data,
     get_run_spec,
 )
+from tests._internal.server.background.tasks.test_process_running_jobs import settings
 
 pytestmark = pytest.mark.usefixtures("image_config_mock")
 
@@ -128,7 +129,7 @@ def get_dev_env_run_plan_dict(
                 " && tail -f /dev/null"
             ),
         ]
-        image_name = "dstackai/base:0.10-base-ubuntu22.04"
+        image_name = f"dstackai/base:{settings.DSTACK_BASE_IMAGE_VERSION}-base-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"
 
     run_spec = {
         "configuration": {
@@ -332,7 +333,7 @@ def get_dev_env_run_dict(
                 " && tail -f /dev/null"
             ),
         ]
-        image_name = "dstackai/base:0.10-base-ubuntu22.04"
+        image_name = "dstackai/base:0.11rc2-base-ubuntu22.04"
 
     return {
         "id": run_id,

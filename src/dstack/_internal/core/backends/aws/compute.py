@@ -291,7 +291,11 @@ class AWSCompute(
                 image_id, username = self._get_image_id_and_username(
                     ec2_client=ec2_client,
                     region=instance_offer.region,
-                    cuda=len(instance_offer.instance.resources.gpus) > 0,
+                    gpu_name=(
+                        instance_offer.instance.resources.gpus[0].name
+                        if len(instance_offer.instance.resources.gpus) > 0
+                        else None
+                    ),
                     instance_type=instance_offer.instance.name,
                     image_config=self.config.os_images,
                 )
@@ -897,11 +901,13 @@ class AWSCompute(
         self,
         ec2_client: botocore.client.BaseClient,
         region: str,
-        cuda: bool,
+        gpu_name: Optional[str],
         instance_type: str,
         image_config: Optional[AWSOSImageConfig] = None,
     ) -> tuple:
-        return hashkey(region, cuda, instance_type, image_config.json() if image_config else None)
+        return hashkey(
+            region, gpu_name, instance_type, image_config.json() if image_config else None
+        )
 
     @cachedmethod(
         cache=lambda self: self._get_image_id_and_username_cache,
@@ -912,13 +918,13 @@ class AWSCompute(
         self,
         ec2_client: botocore.client.BaseClient,
         region: str,
-        cuda: bool,
+        gpu_name: Optional[str],
         instance_type: str,
         image_config: Optional[AWSOSImageConfig] = None,
     ) -> tuple[str, str]:
         return aws_resources.get_image_id_and_username(
             ec2_client=ec2_client,
-            cuda=cuda,
+            gpu_name=gpu_name,
             instance_type=instance_type,
             image_config=image_config,
         )
