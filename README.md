@@ -14,26 +14,28 @@
 
 </div>
 
-`dstack` is an open-source container orchestrator that simplifies workload orchestration and drives GPU utilization for ML teams. It works with any GPU cloud, on-prem cluster, or accelerated hardware.
+`dstack` provides a unified control plane for running development, training, and inference on GPUs — across cloud VMs, Kubernetes, or on-prem clusters. It helps your team avoid vendor lock-in and reduce GPU costs.
 
 #### Accelerators
 
 `dstack` supports `NVIDIA`, `AMD`, `Google TPU`, `Intel Gaudi`, and `Tenstorrent` accelerators out of the box.
 
 ## Latest news ✨
+- [2025/09] [dstack 0.19.27: Offers UI, Digital Ocean and AMD Developer Cloud](https://github.com/dstackai/dstack/releases/tag/0.19.27)
+- [2025/08] [dstack 0.19.26: Repos – explicit repo configuration via YAML](https://github.com/dstackai/dstack/releases/tag/0.19.26)
+- [2025/08] [dstack 0.19.25: `dstack offer` CLI command](https://github.com/dstackai/dstack/releases/tag/0.19.25)
+- [2025/08] [dstack 0.19.22: Service probes, GPU health-checks, Tenstorrent Galaxy, Secrets UI](https://github.com/dstackai/dstack/releases/tag/0.19.22)
+- [2025/07] [dstack 0.19.21: Scheduled tasks](https://github.com/dstackai/dstack/releases/tag/0.19.21)
 - [2025/07] [dstack 0.19.17: Secrets, Files, Rolling deployment](https://github.com/dstackai/dstack/releases/tag/0.19.17)
 - [2025/06] [dstack 0.19.16: Docker in Docker, CloudRift](https://github.com/dstackai/dstack/releases/tag/0.19.16)
 - [2025/06] [dstack 0.19.13: InfiniBand support in default images](https://github.com/dstackai/dstack/releases/tag/0.19.13)
 - [2025/06] [dstack 0.19.12: Simplified use of MPI](https://github.com/dstackai/dstack/releases/tag/0.19.12)
-- [2025/05] [dstack 0.19.10: Priorities](https://github.com/dstackai/dstack/releases/tag/0.19.10)
-- [2025/05] [dstack 0.19.8: Nebius clusters, GH200 on Lambda](https://github.com/dstackai/dstack/releases/tag/0.19.8)
-- [2025/04] [dstack 0.19.6: Tenstorrent, Plugins](https://github.com/dstackai/dstack/releases/tag/0.19.6)
 
 ## How does it work?
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://dstack.ai/static-assets/static-assets/images/dstack-architecture-diagram-v10-dark.svg"/>
-  <img src="https://dstack.ai/static-assets/static-assets/images/dstack-architecture-diagram-v10.svg" width="750" />
+  <source media="(prefers-color-scheme: dark)" srcset="https://dstack.ai/static-assets/static-assets/images/dstack-architecture-diagram-v11-dark.svg"/>
+  <img src="https://dstack.ai/static-assets/static-assets/images/dstack-architecture-diagram-v11.svg" width="750" />
 </picture>
 
 ### Installation
