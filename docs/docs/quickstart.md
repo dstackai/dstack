@@ -14,9 +14,9 @@ $ mkdir quickstart && cd quickstart
 
 </div>
 
-## Run your first workload
+## Submit your first run
 
-`dstack` supports three types of workloads.
+`dstack` supports three types of run configurations.
 
 === "Dev environment"
 
