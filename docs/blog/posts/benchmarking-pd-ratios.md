@@ -1,5 +1,5 @@
 ---
-title: "Benchmarking Prefill–Decode: fixed 1:3 as a strong default"
+title: "Benchmarking Prefill–Decode ratios: fixed vs dynamic"
 date: 2025-09-25
 description: "TBA"  
 slug: benchmarking-pd-ratios
@@ -8,11 +8,10 @@ categories:
   - Benchmarks
 ---
 
-# Benchmarking Prefill–Decode: fixed 1:3 as a strong default
+# Benchmarking Prefill–Decode ratios: fixed vs dynamic
 
-As demand for low-latency LLM inference grows, squeezing more useful work out of every GPU minute is critical.
-This benchmark evaluates how the Prefill–Decode worker disaggregatioh ratio affects performance across workload profiles and concurrency levels,
-and assess if dynamic ratio adjustment adds value.
+This benchmark investigates whether the Prefill–Decode worker ratio needs to be managed dynamically at runtime, or if a fixed split can deliver the same performance with simpler orchestration.  
+We evaluate different ratios across workload profiles and concurrency levels to measure their impact on TTFT, ITL, and throughput, and to see whether fixing the ratio in advance is a practical alternative to dynamic adjustment.
 
 <img src="https://dstack.ai/static-assets/static-assets/images/benchmarking-pd-ratios.png" width="630" />
 
@@ -22,27 +21,41 @@ and assess if dynamic ratio adjustment adds value.
 
 ### What is Prefill–Decode disaggregation?
 
-DistServe ([Zhong et al., 2024 :material-arrow-top-right-thin:{ .external }](https://arxiv.org/pdf/2401.09670){:target="_blank"}) proposes prefill–decode disaggregation, separating the two phases of inference across dedicated workers.
-Prefill can be heavily batched—prompt tokens are processed in parallel—so it is compute-intensive. Decode is intrinsically sequential—one token per iteration with full KV-cache access—so it is memory- and bandwidth-intensive. Disaggregating these phases reduces cross-phase interference, allowing hardware to be provisioned for the dominant bottleneck and improving end-to-end service performance.
+LLM inference has two distinct phases: prefill and decode. Prefill processes all prompt tokens in parallel and is compute-intensive. Decode generates tokens one by one, repeatedly accessing the KV-cache, making it memory- and bandwidth-intensive. DistServe ([Zhong et al., 2024 :material-arrow-top-right-thin:{ .external }](https://arxiv.org/pdf/2401.09670){:target="_blank"}) introduced prefill–decode disaggregation to separate these phases across dedicated workers, reducing interference and enabling hardware to be allocated more efficiently.
 
-### What is the Prefill–Decode ratio?
+### What is the prefill–decode ratio?
 
-The optimal split between prefill and decode workers depends on service-level objectives (SLOs) and workload shape. DistServe shows that for input sequence length (ISL) = 512 and output sequence length (OSL) = 64, "2 prefill to 1 decode" meets both TTFT and TPOT targets. Beyond this illustrative case, however, DistServe does not systematically explore other Prefill–Decode ratios.
+The ratio of prefill to decode workers determines how much capacity is dedicated to each phase. DistServe showed that for a workload with ISL=512 and OSL=64, a 2:1 ratio met both TTFT and TPOT targets. But this example does not answer how the ratio should be chosen more generally, or whether it needs to change at runtime.
 
 !!! info "Reasoning model example"
-    In the DeepSeek deployment ([LMSYS, 2025 :material-arrow-top-right-thin:{ .external }](https://lmsys.org/blog/2025-05-05-large-scale-ep){:target="_blank"}), 3 nodes were allocated to prefill and 9 to decode. The decode-heavy split reflects reasoning workloads, where chains of thought push output lengths high. Allocating more capacity to decode reduces inter-token latency and keeps long responses streaming smoothly.
+    In the DeepSeek deployment ([LMSYS, 2025 :material-arrow-top-right-thin:{ .external }](https://lmsys.org/blog/2025-05-05-large-scale-ep){:target="_blank"}), the ratio was 1:3. This decode-leaning split reflects reasoning workloads, where long outputs dominate. Allocating more workers to decode reduces inter-token latency and keeps responses streaming smoothly.
 
-### Dynamic ratio adjustment
+### Dynamic ratio
 
-Dynamic allocation adjusts the split between prefill and decode workers at runtime. NVIDIA’s [SLA-based planner :material-arrow-top-right-thin:{ .external }](https://docs.nvidia.com/dynamo/latest/architecture/sla_planner.html){:target="_blank"}
-estimates the workers needed to meet TTFT and ITL targets, while the [Load-based planner :material-arrow-top-right-thin:{ .external }](https://docs.nvidia.com/dynamo/latest/architecture/load_planner.html){:target="_blank"}
-reallocates workers using KV-cache and queue signals. These planners describe how to move capacity between phases, but they do not prescribe a specific Prefill–Decode ratio.
+Dynamic approaches, such as NVIDIA’s [SLA-based :material-arrow-top-right-thin:{ .external }](https://docs.nvidia.com/dynamo/latest/architecture/sla_planner.html){:target="_blank"} 
+and [Load-based :material-arrow-top-right-thin:{ .external }](https://docs.nvidia.com/dynamo/latest/architecture/load_planner.html){:target="_blank"} planners, adjust the ratio at runtime according to SLO targets or load. However, they do this in conjunction with auto-scaling, which increases orchestration complexity. This raises the question: does the prefill–decode ratio really need to be dynamic, or can a fixed ratio be chosen ahead of time and still provide robust performance?
 
 ## Benchmark purpose
 
-Prior art points to different “best” ratios depending on workload: DistServe’s 2:1 for short outputs, the SGLang DeepSeek example’s 1:3 for long outputs, and dynamic planners that adapt the split in real time. Building on these insights, this benchmark evaluates how the Prefill–Decode worker ratio affects performance across workload profiles and concurrency levels. 
+The aim of this benchmark is to test whether the prefill–decode ratio must be adjusted dynamically at runtime, or if a fixed split can perform just as well.  
 
-We measure TTFT, ITL, and throughput to understand how allocation choices influence both latency and efficiency—and to assess when dynamic ratio adjustment adds value versus when a fixed ratio suffices for a known workload.
+If a fixed ratio works across workload profiles and concurrency levels, it would mean the ratio can be chosen ahead of time, simplifying orchestration by removing the need for runtime ratio management.  
+
+We evaluate different ratios across workload types (prefill-heavy, decode-heavy, balanced) and concurrency levels to see how each affects TTFT, ITL, and throughput.
+
+## Methodology
+
+To test this, we benchmarked different fixed prefill–decode ratios under varying workload profiles and concurrency levels. The experiments were run on a single node with 8xH200 GPUs, using SGLang to serve the model.  
+
+We compared three ratios—3:1, 2:2, and 1:3—at both low and high concurrency across three workload types:
+
+* **Prefill-heavy** (ISL > OSL) — e.g., summarization: long inputs, short outputs.
+* **Decode-heavy** (ISL < OSL) — e.g., reasoning: short inputs, long chains of thought.
+* **Balanced** (ISL ≈ OSL) — e.g., translation, paraphrasing.
+
+Lower concurrency highlights intrinsic trade-offs (prefill-leaning improves TTFT; decode-leaning improves ITL and throughput). Higher concurrency reveals the true bottleneck. In real deployments, success means meeting TTFT/ITL SLOs and sustaining throughput for cost efficiency, so we evaluate both.
+
+To evaluate performance, we measured TTFT, ITL, and throughput to capture both latency and efficiency.
 
 ??? info "Why these metrics matter"
 
@@ -50,17 +63,7 @@ We measure TTFT, ITL, and throughput to understand how allocation choices influe
     * **ITL** (inter-token latency) captures streaming smoothness—critical for long, reasoning-style outputs.
     * **Throughput** (tokens/sec) reflects cost efficiency. Prefill-heavy tasks (e.g., summarization of long docs) stress prefill; reasoning tasks stress decode. Maintaining high throughput ensures the under-stressed phase doesn’t leave GPUs idle.
 
-## Methodology
-
-We ran a single-node study on 8xH200 GPUs, varying the number of prefill and decode workers to examine how the split shapes performance. We compared three prefill-decode ratios—3:1, 2:2, 1:3 both lower and higher request concurrency for three workload profiles:
-
-* **Prefill-heavy** (ISL > OSL) — e.g., summarization: long inputs, short outputs.
-* **Decode-heavy** (ISL < OSL) — e.g., reasoning: short inputs, long chains of thought.
-* **Balanced** (ISL ≈ OSL) — e.g., translation, paraphrasing.
-
-Lower concurrency highlights intrinsic trade-offs (prefill-leaning improves TTFT; decode-leaning improves ITL and throughput). Higher concurrency reveals the true bottleneck. In real deployments, success is meeting TTFT/ITL SLOs and sustaining throughput for cost efficiency, so we evaluate both.
-
-> A single-node design isolates the question at hand—does adjusting the prefill/decode split improve performance? If a benefit doesn’t manifest on one node, scaling out will typically amplify the same dynamics rather than change them.
+If a fixed ratio consistently performs well across these metrics, it would indicate that the ratio can be chosen ahead of time, without requiring runtime adjustment.
 
 ## Benchmark setup
 
@@ -79,11 +82,11 @@ At higher concurrency, 1:3 wins across all metrics. Because TTFT = prefill time 
 
 In practice, summarization rarely has tight TTFT SLOs—users expect some delay after uploading long documents. Throughput and ITL dominate cost and experience, making 1:3 the recommended split for prefill-heavy workloads at both low and high concurrency.
 
-*TBA: Fig-1: ISL 2048, OSL 128, concurrency 32*
+<img src="https://dstack.ai/static-assets/static-assets/images/benchmarking-pd-ratios-fig-1.png" width="750" />
 
 > Metrics are normalized per chart: the best value for each metric is 100%; others are percentages of that maximum. Lower is better for ITL/TTFT; higher is better for Throughput.
 
-*TBA: Fig-2: ISL 2048, OSL 128, concurrency 128*
+<img src="https://dstack.ai/static-assets/static-assets/images/benchmarking-pd-ratios-fig-2.png" width="750" />
 
 ## Finding 2: Decode-heavy workloads
 
@@ -93,11 +96,11 @@ At higher concurrency, 1:3 again leads across all metrics.
 
 For reasoning tasks, ITL is usually the tightest SLO—smooth, uninterrupted token streaming drives user experience. We recommend 1:3 for decode-heavy workloads at both low and high concurrency.
 
-*TBA: Fig-3: ISL 128, OSL 2048, concurrency 32*
+<img src="https://dstack.ai/static-assets/static-assets/images/benchmarking-pd-ratios-fig-3.png" width="750" />
 
 > Metrics normalized as above. Lower is better for ITL/TTFT; higher is better for Throughput.
 
-*TBA: Fig-4: ISL 128, OSL 2048, concurrency 128*
+<img src="https://dstack.ai/static-assets/static-assets/images/benchmarking-pd-ratios-fig-4.png" width="750" />
 
 ## Finding 3: Balanced workloads
 
@@ -107,25 +110,27 @@ At higher concurrency, 1:3 regains the lead across metrics, while 1:1 sees TTFT 
 
 Since 1:1 becomes limiting under load, 1:3 is the safer default for balanced workloads—1:1 can offer slightly lower TTFT at light load, but 1:3 scales better and sustains higher throughput.
 
-*TBA: Fig-5: ISL 2048, OSL 2048, concurrency 32*
+<img src="https://dstack.ai/static-assets/static-assets/images/benchmarking-pd-ratios-fig-5.png" width="750" />
 
 > Metrics normalized as above. Lower is better for ITL/TTFT; higher is better for Throughput.
 
-*TBA: Fig-6: ISL 2048, OSL 2048, concurrency 128*
+<img src="https://dstack.ai/static-assets/static-assets/images/benchmarking-pd-ratios-fig-6.png" width="750" />
 
 ## Conclusion
 
-This study examined how the prefill/decode split shapes performance across workload profiles and load levels, and when dynamic adjustment is beneficial.
+Across all workload profiles and concurrency levels, a fixed ratio delivered robust performance.  
+This suggests that while dynamic planners (e.g., SLA- and load-based) provide a flexible framework for worker allocation, in many cases a fixed ratio combined with standard autoscaling can achieve similar outcomes with simpler orchestration.  
 
-1. A decode-leaning default performs robustly. Across profiles and loads, 1:3 consistently offered the strongest ITL and throughput, while keeping TTFT competitive when concurrency rises. For many known workload mixes, this reduces the need for dynamic rebalancing.
-2. Resilience under surges. The 1:3 split scales gracefully with concurrency, absorbing bursts without resorting to complex runtime adjustments.
-3. TTFT in context. 1:3 can show higher TTFT at low concurrency, but real-world expectations matter. Summarization users anticipate a delay after long uploads; reasoning users value smooth streaming most. For interactive chat with tight TTFT SLOs, techniques such as prefix caching and cache-aware routing can reduce prefill work and lower TTFT—often without changing the prefill/decode split.
-
-> Taken together, these results suggest that while dynamic planners (e.g., SLA- and load-based) provide a powerful framework to adapt capacity, in many production scenarios a simple, decode-leaning 1:3 baseline plus conventional autoscaling delivers excellent outcomes with less operational complexity.
+A fixed ratio therefore serves as a practical baseline for Prefill–Decode disaggregation. Dynamic adjustment remains valuable when workloads are highly unpredictable, but when profiles are understood, setting the ratio in advance can reduce operational complexity without sacrificing performance.
 
 ## Limitations
 
-This evaluation uses SGLang’s implementation of Prefill–Decode disaggregation. To strengthen generality, repeating the study with vLLM’s implementation would be valuable.
+1. This benchmark does not provide a method for determining the fixed ratio.
+2. The benchmark evaluated only a limited set of ratios: 3:1, 2:2, and 1:3.
+3. The benchmark does not directly validate whether dynamic ratio adjustment (e.g., NVIDIA’s planners) delivers better or worse performance compared with a fixed-ratio approach.
+4. The benchmark only considers tensor parallelism and not data parallelism, e.g. to assess how other forms of model parallelism interact with PD and affect latency/throughput trade-offs.
+
+Overall, more study on how the optimal ratio is found and what factors it depends on is required to ensure there is a simple and robust framework, ideally without overcomplicating orchestration.
 
 ## References
 
@@ -134,8 +139,3 @@ This evaluation uses SGLang’s implementation of Prefill–Decode disaggregatio
 * [Dynamo disaggregated serving :material-arrow-top-right-thin:{ .external }](https://docs.nvidia.com/dynamo/latest/architecture/disagg_serving.html#){:target="_blank"}
 * [SGLang PD disaggregation :material-arrow-top-right-thin:{ .external }](https://docs.sglang.ai/advanced_features/pd_disaggregation.html){:target="_blank"}
 * [vLLM disaggregated prefilling :material-arrow-top-right-thin:{ .external }](https://docs.vllm.ai/en/v0.9.2/features/disagg_prefill.html){:target="_blank"}
-
-!!! info "What's next?"
-
-    * **KV-cache–aware routing & prefix caching with PD**: Quantify how cache-aware routing and prefix caching, combined with PD, reduce redundant prefill compute and improve TTFT.
-    * **PD with model parallelism**: Extend beyond tensor parallelism to assess how additional forms of model parallelism interact with PD and affect latency/throughput trade-offs.
