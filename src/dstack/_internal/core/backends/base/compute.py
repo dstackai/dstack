@@ -5,14 +5,16 @@ import string
 import threading
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
+from enum import Enum
 from functools import lru_cache
 from pathlib import Path
-from typing import Callable, Dict, List, Literal, Optional
+from typing import Callable, Dict, List, Optional
 
 import git
 import requests
 import yaml
 from cachetools import TTLCache, cachedmethod
+from gpuhunt import CPUArchitecture
 
 from dstack._internal import settings
 from dstack._internal.core.backends.base.offers import filter_offers_by_requirements
@@ -65,7 +67,21 @@ NVIDIA_GPUS_REQUIRING_PROPRIETARY_KERNEL_MODULES = frozenset(
     ]
 )
 
-GoArchType = Literal["amd64", "arm64"]
+
+class GoArchType(str, Enum):
+    """
+    A subset of GOARCH values
+    """
+
+    AMD64 = "amd64"
+    ARM64 = "arm64"
+
+    def to_cpu_architecture(self) -> CPUArchitecture:
+        if self == self.AMD64:
+            return CPUArchitecture.X86
+        if self == self.ARM64:
+            return CPUArchitecture.ARM
+        assert False, self
 
 
 class Compute(ABC):
@@ -704,14 +720,14 @@ def normalize_arch(arch: Optional[str] = None) -> GoArchType:
     If the arch is not specified, falls back to `amd64`.
     """
     if not arch:
-        return "amd64"
+        return GoArchType.AMD64
     arch_lower = arch.lower()
     if "32" in arch_lower or arch_lower in ["i386", "i686"]:
         raise ValueError(f"32-bit architectures are not supported: {arch}")
     if arch_lower.startswith("x86") or arch_lower.startswith("amd"):
-        return "amd64"
+        return GoArchType.AMD64
     if arch_lower.startswith("arm") or arch_lower.startswith("aarch"):
-        return "arm64"
+        return GoArchType.ARM64
     raise ValueError(f"Unsupported architecture: {arch}")
 
 
@@ -727,8 +743,7 @@ def get_dstack_runner_download_url(arch: Optional[str] = None) -> str:
             "/{version}/binaries/dstack-runner-linux-{arch}"
         )
     version = get_dstack_runner_version()
-    arch = normalize_arch(arch)
-    return url_template.format(version=version, arch=arch)
+    return url_template.format(version=version, arch=normalize_arch(arch).value)
 
 
 def get_dstack_shim_download_url(arch: Optional[str] = None) -> str:
@@ -743,8 +758,7 @@ def get_dstack_shim_download_url(arch: Optional[str] = None) -> str:
             "/{version}/binaries/dstack-shim-linux-{arch}"
         )
     version = get_dstack_runner_version()
-    arch = normalize_arch(arch)
-    return url_template.format(version=version, arch=arch)
+    return url_template.format(version=version, arch=normalize_arch(arch).value)
 
 
 def get_setup_cloud_instance_commands(
