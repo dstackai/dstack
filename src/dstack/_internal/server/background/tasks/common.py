@@ -19,4 +19,6 @@ def get_provisioning_timeout(backend_type: BackendType, instance_type_name: str)
         return timedelta(minutes=20)
     if backend_type == BackendType.VULTR and instance_type_name.startswith("vbm"):
         return timedelta(minutes=55)
+    if backend_type == BackendType.GCP and instance_type_name == "a4-highgpu-8g":
+        return timedelta(minutes=16)
     return timedelta(minutes=10)
