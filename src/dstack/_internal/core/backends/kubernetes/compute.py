@@ -47,7 +47,7 @@ from dstack._internal.core.models.instances import (
     Resources,
     SSHConnectionParams,
 )
-from dstack._internal.core.models.resources import CPUSpec
+from dstack._internal.core.models.resources import CPUSpec, Memory
 from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
 from dstack._internal.core.models.volumes import Volume
 from dstack._internal.utils.common import parse_memory
@@ -171,11 +171,15 @@ class KubernetesCompute(
                     "jump_pod_port": jump_pod_port,
                 },
             ).start()
-        resources_spec = job.job_spec.requirements.resources
-        assert isinstance(resources_spec.cpu, CPUSpec)
+
         resources_requests: dict[str, str] = {}
         resources_limits: dict[str, str] = {}
         node_affinity: Optional[client.V1NodeAffinity] = None
+        volumes_: list[client.V1Volume] = []
+        volume_mounts: list[client.V1VolumeMount] = []
+
+        resources_spec = job.job_spec.requirements.resources
+        assert isinstance(resources_spec.cpu, CPUSpec)
         if (cpu_min := resources_spec.cpu.count.min) is not None:
             resources_requests["cpu"] = str(cpu_min)
         if (gpu_spec := resources_spec.gpu) is not None:
@@ -231,13 +235,32 @@ class KubernetesCompute(
                         ),
                     ],
                 )
+
         if (memory_min := resources_spec.memory.min) is not None:
-            resources_requests["memory"] = f"{float(memory_min)}Gi"
+            resources_requests["memory"] = _render_memory(memory_min)
         if (
             resources_spec.disk is not None
             and (disk_min := resources_spec.disk.size.min) is not None
         ):
-            resources_requests["ephemeral-storage"] = f"{float(disk_min)}Gi"
+            resources_requests["ephemeral-storage"] = _render_memory(disk_min)
+        if (shm_size := resources_spec.shm_size) is not None:
+            shm_volume_name = "dev-shm"
+            volumes_.append(
+                client.V1Volume(
+                    name=shm_volume_name,
+                    empty_dir=client.V1EmptyDirVolumeSource(
+                        medium="Memory",
+                        size_limit=_render_memory(shm_size),
+                    ),
+                )
+            )
+            volume_mounts.append(
+                client.V1VolumeMount(
+                    name=shm_volume_name,
+                    mount_path="/dev/shm",
+                )
+            )
+
         pod = client.V1Pod(
             metadata=client.V1ObjectMeta(
                 name=instance_name,
@@ -264,9 +287,11 @@ class KubernetesCompute(
                             requests=resources_requests,
                             limits=resources_limits,
                         ),
+                        volume_mounts=volume_mounts,
                     )
                 ],
                 affinity=node_affinity,
+                volumes=volumes_,
             ),
         )
         call_api_method(
@@ -450,6 +475,10 @@ def _parse_memory(memory: str) -> int:
         # no suffix means that the value is in bytes
         return int(memory) // 2**20
     return int(parse_memory(memory, as_untis="M"))
+
+
+def _render_memory(memory: Memory) -> str:
+    return f"{float(memory)}Gi"
 
 
 def _get_gpus_from_node_labels(labels: dict[str, str]) -> tuple[list[Gpu], Optional[str]]:
