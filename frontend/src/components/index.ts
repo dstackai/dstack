@@ -1,6 +1,7 @@
 export { default as Alert } from '@cloudscape-design/components/alert';
 export type { AlertProps } from '@cloudscape-design/components/alert';
 export { default as Icon } from '@cloudscape-design/components/icon';
+export { default as ButtonDropdown } from '@cloudscape-design/components/button-dropdown';
 export type { ButtonDropdownProps } from '@cloudscape-design/components/button-dropdown';
 export { default as AppLayout } from '@cloudscape-design/components/app-layout';
 export type { AppLayoutProps } from '@cloudscape-design/components/app-layout';

@@ -16,6 +16,7 @@ import { getPropertyFilterOptions } from '../helpers';
 
 type Args = {
     gpus: IGpu[];
+    withSearchParams?: boolean;
 };
 
 type RequestParamsKeys = 'project_name' | 'gpu_name' | 'gpu_count' | 'gpu_memory' | 'backend' | 'spot_policy' | 'group_by';
@@ -52,7 +53,7 @@ const defaultGroupByOptions = [{ ...gpuFilterOption }, { label: 'Backend', value
 
 const groupByRequestParamName: RequestParamsKeys = 'group_by';
 
-export const useFilters = ({ gpus }: Args) => {
+export const useFilters = ({ gpus, withSearchParams = true }: Args) => {
     const [searchParams, setSearchParams] = useSearchParams();
     const { projectOptions } = useProjectFilter({ localStorePrefix: 'offers-list-projects' });
     const projectNameIsChecked = useRef(false);
@@ -75,7 +76,9 @@ export const useFilters = ({ gpus }: Args) => {
     });
 
     const clearFilter = () => {
-        setSearchParams({});
+        if (withSearchParams) {
+            setSearchParams({});
+        }
         setPropertyFilterQuery(EMPTY_QUERY);
         setGroupBy([]);
     };
@@ -137,6 +140,10 @@ export const useFilters = ({ gpus }: Args) => {
         tokens: PropertyFilterProps.Query['tokens'];
         groupBy: MultiselectProps.Options;
     }) => {
+        if (!withSearchParams) {
+            return;
+        }
+
         const searchParams = tokensToSearchParams<RequestParamsKeys>(tokens);
 
         groupBy.forEach(({ value }) => searchParams.append(groupByRequestParamName, value as string));

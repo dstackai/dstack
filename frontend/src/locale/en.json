@@ -51,7 +51,8 @@
     "control_plane": "Control plane",
     "refresh": "Refresh",
     "quickstart": "Quickstart",
-    "ask_ai": "Ask AI"
+    "ask_ai": "Ask AI",
+    "new": "New"
   },
 
   "auth": {
@@ -463,6 +464,20 @@
       "name": "Name",
       "type": "Type",
       "size": "Size"
+    }
+  },
+  "runs": {
+    "dev_env": {
+      "wizard": {
+        "title": "Create dev environment",
+        "submit": "Apply",
+        "offer": "Offer",
+        "offer_description": "Select offer for run",
+        "name": "Run name",
+        "name_description": "Enter run name",
+        "config": "Config YAML",
+        "config_description": "Enter config YAML"
+      }
     }
   },
   "offer": {

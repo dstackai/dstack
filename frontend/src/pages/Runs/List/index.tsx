@@ -1,7 +1,9 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
+import { ButtonDropdownProps } from '@cloudscape-design/components';
 
-import { Button, Header, Loader, PropertyFilter, SpaceBetween, Table, Toggle } from 'components';
+import { Button, ButtonDropdown, Header, Loader, PropertyFilter, SpaceBetween, Table, Toggle } from 'components';
 
 import { DEFAULT_TABLE_PAGE_SIZE } from 'consts';
 import { useBreadcrumbs, useCollection, useInfiniteScroll } from 'hooks';
@@ -25,6 +27,7 @@ import styles from './styles.module.scss';
 export const RunList: React.FC = () => {
     const { t } = useTranslation();
     const [preferences] = useRunListPreferences();
+    const navigate = useNavigate();
 
     useBreadcrumbs([
         {
@@ -106,6 +109,14 @@ export const RunList: React.FC = () => {
     //     deleteRuns([...selectedItems]).catch(console.log);
     // };
 
+    const onFollowButtonDropdownLink: ButtonDropdownProps['onItemFollow'] = (event) => {
+        event.preventDefault();
+
+        if (event.detail.href) {
+            navigate(event.detail.href);
+        }
+    };
+
     return (
         <Table
             {...collectionProps}
@@ -123,6 +134,13 @@ export const RunList: React.FC = () => {
                     variant="awsui-h1-sticky"
                     actions={
                         <SpaceBetween size="xs" direction="horizontal">
+                            <ButtonDropdown
+                                items={[{ text: 'New dev environment', id: 'dev_env', href: ROUTES.RUNS.CREATE_DEV_ENV }]}
+                                onItemFollow={onFollowButtonDropdownLink}
+                            >
+                                {t('common.new')}
+                            </ButtonDropdown>
+
                             <Button formAction="none" onClick={abortClickHandle} disabled={isDisabledAbortButton}>
                                 {t('common.abort')}
                             </Button>
