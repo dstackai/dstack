@@ -9,7 +9,7 @@ and drives GPU utilization for ML teams. It works with any GPU cloud, on-prem cl
 
 ## How does it work?
 
-<img src="https://dstack.ai/static-assets/static-assets/images/dstack-architecture-diagram-v8.svg" />
+<img src="https://dstack.ai/static-assets/static-assets/images/dstack-architecture-diagram-v11.svg" />
 
 #### 1. Set up the server
 

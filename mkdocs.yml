@@ -244,6 +244,7 @@ nav:
             - gateway: docs/reference/dstack.yml/gateway.md
             - volume: docs/reference/dstack.yml/volume.md
         - server/config.yml: docs/reference/server/config.yml.md
+        - .dstack/profiles.yml: docs/reference/profiles.yml.md
         - CLI:
             - dstack server: docs/reference/cli/dstack/server.md
             - dstack init: docs/reference/cli/dstack/init.md
