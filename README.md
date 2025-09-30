@@ -14,9 +14,11 @@
 
 </div>
 
-`dstack` provides a unified control plane for running development, training, and inference on GPUs — across cloud VMs, Kubernetes, or on-prem clusters. It helps your team avoid vendor lock-in and reduce GPU costs.
+`dstack` is a unified control plane for GPU provisioning and orchestration that works with any GPU cloud, Kubernetes, or on-prem clusters. 
 
-#### Accelerators
+It streamlines development, training, and inference, and is compatible with any hardware, open-source tools, and frameworks.
+
+#### Hardware
 
 `dstack` supports `NVIDIA`, `AMD`, `Google TPU`, `Intel Gaudi`, and `Tenstorrent` accelerators out of the box.
 
@@ -44,15 +46,15 @@
 
 #### Set up the server
 
-##### (Optional) Configure backends
+##### Configure backends
 
-To use `dstack` with cloud providers, configure backends
-via the `~/.dstack/server/config.yml` file.
+To orchestrate compute across cloud providers or existing Kubernetes clusters, you need to configure backends.
 
-For more details on how to configure backends, check [Backends](https://dstack.ai/docs/concepts/backends).
+Backends can be set up in `~/.dstack/server/config.yml` or through the [project settings page](../concepts/projects.md#backends) in the UI.
 
-> For using `dstack` with on-prem servers, create [SSH fleets](https://dstack.ai/docs/concepts/fleets#ssh) 
-> once the server is up.
+For more details, see [Backends](../concepts/backends.md).
+
+> When using `dstack` with on-prem servers, backend configuration isn’t required. Simply create [SSH fleets](../concepts/fleets.md#ssh) once the server is up.
 
 ##### Start the server
 

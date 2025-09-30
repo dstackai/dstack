@@ -1080,9 +1080,9 @@ However, often [SSH fleets](../concepts/fleets.md#ssh) are a simpler and lighter
 ### SSH fleets
 
 SSH fleets require no backend configuration. 
-All you need to do is [provide hostnames and SSH credentials](../concepts/fleets.md#ss), and `dstack` sets up a fleet that can orchestrate container-based runs on your servers.
+All you need to do is [provide hostnames and SSH credentials](../concepts/fleets.md#ssh), and `dstack` sets up a fleet that can orchestrate container-based runs on your servers.
 
-> SSH fleets support the same features as [VM-based](#vm-based) backends.
+SSH fleets support the same features as [VM-based](#vm-based) backends.
 
 !!! info "What's next"
     1. See the [`~/.dstack/server/config.yml`](../reference/server/config.yml.md) reference
