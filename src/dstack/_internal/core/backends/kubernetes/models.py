@@ -8,11 +8,11 @@ from dstack._internal.core.models.common import CoreModel
 DEFAULT_NAMESPACE = "default"
 
 
-class KubernetesNetworkingConfig(CoreModel):
-    ssh_host: Annotated[
-        Optional[str], Field(description="The external IP address of any node")
+class KubernetesProxyJumpConfig(CoreModel):
+    hostname: Annotated[
+        Optional[str], Field(description="The external IP address or hostname of any node")
     ] = None
-    ssh_port: Annotated[
+    port: Annotated[
         Optional[int], Field(description="Any port accessible outside of the cluster")
     ] = None
 
@@ -24,8 +24,8 @@ class KubeconfigConfig(CoreModel):
 
 class KubernetesBackendConfig(CoreModel):
     type: Annotated[Literal["kubernetes"], Field(description="The type of backend")] = "kubernetes"
-    networking: Annotated[
-        Optional[KubernetesNetworkingConfig], Field(description="The networking configuration")
+    proxy_jump: Annotated[
+        Optional[KubernetesProxyJumpConfig], Field(description="The SSH proxy jump configuration")
     ] = None
     namespace: Annotated[
         str, Field(description="The namespace for resources managed by `dstack`")

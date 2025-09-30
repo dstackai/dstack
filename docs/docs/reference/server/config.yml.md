@@ -293,9 +293,9 @@ to configure [backends](../../concepts/backends.md) and other [server-level sett
     cat my-service-account-file.json | jq -c | jq -R
     ```
 
-###### `projects[n].backends[type=kubernetes].networking` { #kubernetes-networking data-toc-label="networking" }
+###### `projects[n].backends[type=kubernetes].proxy_jump` { #kubernetes-proxy_jump data-toc-label="proxy_jump" }
 
-#SCHEMA# dstack._internal.core.backends.kubernetes.models.KubernetesNetworkingConfig
+#SCHEMA# dstack._internal.core.backends.kubernetes.models.KubernetesProxyJumpConfig
     overrides:
         show_root_heading: false
 
