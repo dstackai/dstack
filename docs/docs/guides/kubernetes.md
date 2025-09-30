@@ -1,7 +1,7 @@
 # Kubernetes
 
-While `dstack` can run natively without Kubernetes on both cloud (via cloud [backends](../concepts/backends.md)) and on-prem 
-(via [SSH fleets](../concepts/fleets.md#ssh)), it also supports running dev environments, tasks, and services directly on Kubernetes clusters through its native integration — the `kubernetes` backend.
+While `dstack` can orchestrate container-based runs natively on both cloud and on-prem without Kubernetes (see [backends](../concepts/backends.md)), it also supports running container-based workloads directly on Kubernetes clusters.  
+For that, you need to configure the `kubernetes` backend.
 
 ## Setting up the backend
 
@@ -101,11 +101,11 @@ For more details on clusters, see the [corresponding guide](clusters.md).
     Managed Kubernetes is supported. However, the `kubernetes` backend can only run on pre-provisioned nodes.  
     Support for auto-scalable Kubernetes clusters is coming soon—you can track progress in the corresponding [issue :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/3126){:target="_blank"}.
 
-    If on-demand provisioning is important, we recommend using [cloud backends](../concepts/backends.md) instead of the `kubernetes` backend, as cloud backends already support auto-scaling.
+    If on-demand provisioning is important, we recommend using [VM-based](../concepts/backends.md#vm-based) backends as they already support auto-scaling.
     
 ??? info "When should I use the Kubernetes backend?"
     Choose the `kubernetes` backend if your GPUs already run on Kubernetes and your team depends on its ecosystem and tooling. 
 
-    If your priority is orchestrating cloud GPUs and Kubernetes isn’t a must, [cloud backends](../concepts/backends.md) are a better fit thanks to their native cloud integration.
+    If your priority is orchestrating cloud GPUs and Kubernetes isn’t a must, [VM-based](../concepts/backends.md#vm-based) backends are a better fit thanks to their native cloud integration.
 
     For on-prem GPUs where Kubernetes is optional, [SSH fleets](../concepts/fleets.md#ssh) provide a simpler and more lightweight alternative.
