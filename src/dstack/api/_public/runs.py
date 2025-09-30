@@ -46,7 +46,7 @@ from dstack._internal.core.models.runs import (
 )
 from dstack._internal.core.models.runs import Run as RunModel
 from dstack._internal.core.services.logs import URLReplacer
-from dstack._internal.core.services.ssh.attach import SSHAttach
+from dstack._internal.core.services.ssh.attach import SSHAttach, SSHProxyConfig
 from dstack._internal.core.services.ssh.ports import PortsLock
 from dstack._internal.server.schemas.logs import PollLogsRequest
 from dstack._internal.utils.common import get_or_error, make_proxy_url
@@ -259,6 +259,7 @@ class Run(ABC):
         ports_overrides: Optional[List[PortMapping]] = None,
         replica_num: Optional[int] = None,
         job_num: int = 0,
+        attach_proxy_config: Optional[SSHProxyConfig] = None,
     ) -> bool:
         """
         Establish an SSH tunnel to the instance and update SSH config
@@ -347,6 +348,9 @@ class Run(ABC):
             if isinstance(self._run.run_spec.configuration, ServiceConfiguration):
                 service_port = get_service_port(job.job_spec, self._run.run_spec.configuration)
 
+            if attach_proxy_config:
+                attach_proxy_config.apply_provisioning_data(provisioning_data)
+
             self._ssh_attach = SSHAttach(
                 hostname=provisioning_data.hostname,
                 ssh_port=provisioning_data.ssh_port,
@@ -361,6 +365,7 @@ class Run(ABC):
                 service_port=service_port,
                 local_backend=provisioning_data.backend == BackendType.LOCAL,
                 bind_address=bind_address,
+                proxy_config=attach_proxy_config,
             )
             if not ports_lock:
                 self._ssh_attach.attach()
