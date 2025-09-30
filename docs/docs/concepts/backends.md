@@ -1049,18 +1049,18 @@ In case of a self-managed cluster, also specify the IP address of any node in th
         - type: kubernetes
           kubeconfig:
             filename: ~/.kube/config
-          networking:
-            ssh_host: localhost # The external IP address of any node
-            ssh_port: 32000 # Any port accessible outside of the cluster
+          proxy_jump:
+            hostname: localhost # The external IP address of any node
+            port: 32000 # Any port accessible outside of the cluster
     ```
 
     </div>
 
-    The port specified to `ssh_port` must be accessible outside of the cluster.
+    The port specified to `port` must be accessible outside of the cluster.
 
     ??? info "Kind"
         If you are using [Kind](https://kind.sigs.k8s.io/), make sure to make 
-        to set up `ssh_port` via `extraPortMappings` for proxying SSH traffic:
+        to set up `port` via `extraPortMappings` for proxying SSH traffic:
     
         ```yaml
         kind: Cluster
@@ -1068,8 +1068,8 @@ In case of a self-managed cluster, also specify the IP address of any node in th
         nodes:
           - role: control-plane
             extraPortMappings:
-              - containerPort: 32000 # Must be same as `ssh_port`
-                hostPort: 32000 # Must be same as `ssh_port`
+              - containerPort: 32000 # Must be same as `port`
+                hostPort: 32000 # Must be same as `port`
         ```
     
         Go ahead and create the cluster like this: 
@@ -1092,13 +1092,13 @@ In case of a self-managed cluster, also specify the IP address of any node in th
           - type: kubernetes
             kubeconfig:
               filename: ~/.kube/config
-            networking:
-              ssh_port: 32000 # Any port accessible outside of the cluster
+            proxy_jump:
+              port: 32000 # Any port accessible outside of the cluster
     ```
 
     </div>
 
-    The port specified to `ssh_port` must be accessible outside of the cluster.
+    The port specified to `port` must be accessible outside of the cluster.
 
     ??? info "EKS"
         For example, if you are using EKS, make sure to add it via an ingress rule
