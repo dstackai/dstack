@@ -8,7 +8,7 @@ from dstack._internal.core.backends.kubernetes.configurator import (
 from dstack._internal.core.backends.kubernetes.models import (
     KubeconfigConfig,
     KubernetesBackendConfigWithCreds,
-    KubernetesNetworkingConfig,
+    KubernetesProxyJumpConfig,
 )
 from dstack._internal.core.errors import BackendInvalidCredentialsError
 
@@ -17,7 +17,7 @@ class TestKubernetesConfigurator:
     def test_validate_config_valid(self):
         config = KubernetesBackendConfigWithCreds(
             kubeconfig=KubeconfigConfig(data="valid", filename="-"),
-            networking=KubernetesNetworkingConfig(ssh_host=None, ssh_port=None),
+            proxy_jump=KubernetesProxyJumpConfig(hostname=None, port=None),
         )
         with patch(
             "dstack._internal.core.backends.kubernetes.utils.get_api_from_config_data"
@@ -30,7 +30,7 @@ class TestKubernetesConfigurator:
     def test_validate_config_invalid_config(self):
         config = KubernetesBackendConfigWithCreds(
             kubeconfig=KubeconfigConfig(data="invalid", filename="-"),
-            networking=KubernetesNetworkingConfig(ssh_host=None, ssh_port=None),
+            proxy_jump=KubernetesProxyJumpConfig(hostname=None, port=None),
         )
         with (
             patch(

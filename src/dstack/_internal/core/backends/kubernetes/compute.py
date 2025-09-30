@@ -20,7 +20,7 @@ from dstack._internal.core.backends.base.compute import (
 from dstack._internal.core.backends.base.offers import filter_offers_by_requirements
 from dstack._internal.core.backends.kubernetes.models import (
     KubernetesConfig,
-    KubernetesNetworkingConfig,
+    KubernetesProxyJumpConfig,
 )
 from dstack._internal.core.backends.kubernetes.utils import (
     call_api_method,
@@ -69,10 +69,10 @@ class KubernetesCompute(
     def __init__(self, config: KubernetesConfig):
         super().__init__()
         self.config = config.copy()
-        networking_config = self.config.networking
-        if networking_config is None:
-            networking_config = KubernetesNetworkingConfig()
-        self.networking_config = networking_config
+        proxy_jump = self.config.proxy_jump
+        if proxy_jump is None:
+            proxy_jump = KubernetesProxyJumpConfig()
+        self.proxy_jump = proxy_jump
         self.api = get_api_from_config_data(config.kubeconfig.data)
 
     def get_offers_by_requirements(
@@ -143,7 +143,7 @@ class KubernetesCompute(
         # as an ssh proxy jump to connect to all other services in Kubernetes.
         # Setup jump pod in a separate thread to avoid long-running run_job.
         # In case the thread fails, the job will be failed and resubmitted.
-        jump_pod_hostname = self.networking_config.ssh_host
+        jump_pod_hostname = self.proxy_jump.hostname
         if jump_pod_hostname is None:
             jump_pod_hostname = get_cluster_public_ip(self.api)
             if jump_pod_hostname is None:
@@ -156,7 +156,7 @@ class KubernetesCompute(
             namespace=self.config.namespace,
             project_name=run.project_name,
             ssh_public_keys=[project_ssh_public_key.strip(), run.run_spec.ssh_key_pub.strip()],
-            jump_pod_port=self.networking_config.ssh_port,
+            jump_pod_port=self.proxy_jump.port,
         )
         if not created:
             threading.Thread(
@@ -820,11 +820,11 @@ def _run_ssh_command(hostname: str, port: int, ssh_private_key: str, command: st
 
 
 def _get_jump_pod_name(project_name: str) -> str:
-    return f"{project_name}-ssh-jump-pod"
+    return f"dstack-{project_name}-ssh-jump-pod"
 
 
 def _get_jump_pod_service_name(project_name: str) -> str:
-    return f"{project_name}-ssh-jump-pod-service"
+    return f"dstack-{project_name}-ssh-jump-pod-service"
 
 
 def _get_pod_service_name(pod_name: str) -> str:

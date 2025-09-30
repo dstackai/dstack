@@ -295,7 +295,7 @@ to configure [backends](../../concepts/backends.md) and other [server-level sett
 
 ###### `projects[n].backends[type=kubernetes].networking` { #kubernetes-networking data-toc-label="networking" }
 
-#SCHEMA# dstack._internal.core.backends.kubernetes.models.KubernetesNetworkingConfig
+#SCHEMA# dstack._internal.core.backends.kubernetes.models.KubernetesProxyJumpConfig
     overrides:
         show_root_heading: false
 
