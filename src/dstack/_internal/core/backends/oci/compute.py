@@ -9,6 +9,7 @@ from dstack._internal.core.backends.base.compute import (
     ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
     ComputeWithMultinodeSupport,
+    ComputeWithPrivilegedSupport,
     generate_unique_instance_name,
     get_user_data,
 )
@@ -50,6 +51,7 @@ CONFIGURABLE_DISK_SIZE = Range[Memory](min=Memory.parse("50GB"), max=Memory.pars
 class OCICompute(
     ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
+    ComputeWithPrivilegedSupport,
     ComputeWithMultinodeSupport,
     Compute,
 ):

@@ -23,6 +23,7 @@ from dstack._internal.core.backends.base.compute import (
     ComputeWithMultinodeSupport,
     ComputeWithPlacementGroupSupport,
     ComputeWithPrivateGatewaySupport,
+    ComputeWithPrivilegedSupport,
     ComputeWithVolumeSupport,
     generate_unique_gateway_instance_name,
     generate_unique_instance_name,
@@ -90,6 +91,7 @@ class GCPVolumeDiskBackendData(CoreModel):
 class GCPCompute(
     ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
+    ComputeWithPrivilegedSupport,
     ComputeWithMultinodeSupport,
     ComputeWithPlacementGroupSupport,
     ComputeWithGatewaySupport,

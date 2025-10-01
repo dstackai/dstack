@@ -24,6 +24,7 @@ from dstack._internal.core.backends.base.compute import (
     ComputeWithMultinodeSupport,
     ComputeWithPlacementGroupSupport,
     ComputeWithPrivateGatewaySupport,
+    ComputeWithPrivilegedSupport,
     ComputeWithReservationSupport,
     ComputeWithVolumeSupport,
     generate_unique_gateway_instance_name,
@@ -90,6 +91,7 @@ def _ec2client_cache_methodkey(self, ec2_client, *args, **kwargs):
 class AWSCompute(
     ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
+    ComputeWithPrivilegedSupport,
     ComputeWithMultinodeSupport,
     ComputeWithReservationSupport,
     ComputeWithPlacementGroupSupport,

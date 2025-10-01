@@ -9,6 +9,7 @@ from dstack._internal.core.backends.base.compute import (
     Compute,
     ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
+    ComputeWithPrivilegedSupport,
     generate_unique_instance_name,
     get_shim_commands,
 )
@@ -31,6 +32,7 @@ MAX_INSTANCE_NAME_LEN = 60
 class LambdaCompute(
     ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
+    ComputeWithPrivilegedSupport,
     Compute,
 ):
     def __init__(self, config: LambdaConfig):

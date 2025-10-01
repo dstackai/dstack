@@ -11,6 +11,8 @@ from dstack._internal.core.backends.base.compute import (
     Compute,
     ComputeWithFilteredOffersCached,
     ComputeWithGatewaySupport,
+    ComputeWithMultinodeSupport,
+    ComputeWithPrivilegedSupport,
     generate_unique_gateway_instance_name,
     generate_unique_instance_name_for_job,
     get_docker_commands,
@@ -60,10 +62,14 @@ JUMP_POD_SSH_PORT = 22
 NVIDIA_GPU_NAME_TO_GPU_INFO = {gpu.name: gpu for gpu in KNOWN_NVIDIA_GPUS}
 NVIDIA_GPU_NAMES = NVIDIA_GPU_NAME_TO_GPU_INFO.keys()
 
+DUMMY_REGION = "-"
+
 
 class KubernetesCompute(
     ComputeWithFilteredOffersCached,
+    ComputeWithPrivilegedSupport,
     ComputeWithGatewaySupport,
+    ComputeWithMultinodeSupport,
     Compute,
 ):
     def __init__(self, config: KubernetesConfig):
@@ -118,7 +124,7 @@ class KubernetesCompute(
                     ),
                 ),
                 price=0,
-                region="-",
+                region=DUMMY_REGION,
                 availability=InstanceAvailability.AVAILABLE,
                 instance_runtime=InstanceRuntime.RUNNER,
             )
@@ -282,6 +288,13 @@ class KubernetesCompute(
                             # TODO(#1535): support non-root images properly
                             run_as_user=0,
                             run_as_group=0,
+                            privileged=job.job_spec.privileged,
+                            capabilities=client.V1Capabilities(
+                                add=[
+                                    # Allow to increase hard resource limits, see getrlimit(2)
+                                    "SYS_RESOURCE",
+                                ],
+                            ),
                         ),
                         resources=client.V1ResourceRequirements(
                             requests=resources_requests,
@@ -300,7 +313,7 @@ class KubernetesCompute(
             namespace=self.config.namespace,
             body=pod,
         )
-        service = call_api_method(
+        call_api_method(
             self.api.create_namespaced_service,
             client.V1Service,
             namespace=self.config.namespace,
@@ -313,14 +326,16 @@ class KubernetesCompute(
                 ),
             ),
         )
-        service_ip = get_value(service, ".spec.cluster_ip", str, required=True)
         return JobProvisioningData(
             backend=instance_offer.backend,
             instance_type=instance_offer.instance,
             instance_id=instance_name,
-            hostname=service_ip,
+            # Although we can already get Service's ClusterIP from the `V1Service` object returned
+            # by the `create_namespaced_service` method, we still need PodIP for multinode runs.
+            # We'll update both hostname and internal_ip once the pod is assigned to the node.
+            hostname=None,
             internal_ip=None,
-            region="local",
+            region=instance_offer.region,
             price=instance_offer.price,
             username="root",
             ssh_port=DSTACK_RUNNER_SSH_PORT,
@@ -332,6 +347,30 @@ class KubernetesCompute(
             ),
             backend_data=None,
         )
+
+    def update_provisioning_data(
+        self,
+        provisioning_data: JobProvisioningData,
+        project_ssh_public_key: str,
+        project_ssh_private_key: str,
+    ):
+        pod = call_api_method(
+            self.api.read_namespaced_pod,
+            client.V1Pod,
+            name=provisioning_data.instance_id,
+            namespace=self.config.namespace,
+        )
+        pod_id = get_value(pod, ".status.pod_ip", str)
+        if not pod_id:
+            return
+        provisioning_data.internal_ip = pod_id
+        service = call_api_method(
+            self.api.read_namespaced_service,
+            client.V1Service,
+            name=_get_pod_service_name(provisioning_data.instance_id),
+            namespace=self.config.namespace,
+        )
+        provisioning_data.hostname = get_value(service, ".spec.cluster_ip", str, required=True)
 
     def terminate_instance(
         self, instance_id: str, region: str, backend_data: Optional[str] = None
@@ -438,8 +477,9 @@ class KubernetesCompute(
             namespace=self.config.namespace,
             service_name=_get_pod_service_name(instance_name),
         )
+        region = DUMMY_REGION
         if hostname is None:
-            self.terminate_instance(instance_name, region="-")
+            self.terminate_instance(instance_name, region=region)
             raise ComputeError(
                 "Failed to get gateway hostname. "
                 "Ensure the Kubernetes cluster supports Load Balancer services."
@@ -447,7 +487,7 @@ class KubernetesCompute(
         return GatewayProvisioningData(
             instance_id=instance_name,
             ip_address=hostname,
-            region="-",
+            region=region,
         )
 
     def terminate_gateway(

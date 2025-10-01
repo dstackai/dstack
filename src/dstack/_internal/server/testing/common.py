@@ -16,6 +16,7 @@ from dstack._internal.core.backends.base.compute import (
     ComputeWithMultinodeSupport,
     ComputeWithPlacementGroupSupport,
     ComputeWithPrivateGatewaySupport,
+    ComputeWithPrivilegedSupport,
     ComputeWithReservationSupport,
     ComputeWithVolumeSupport,
 )
@@ -1131,6 +1132,7 @@ class AsyncContextManager:
 class ComputeMockSpec(
     Compute,
     ComputeWithCreateInstanceSupport,
+    ComputeWithPrivilegedSupport,
     ComputeWithMultinodeSupport,
     ComputeWithReservationSupport,
     ComputeWithPlacementGroupSupport,

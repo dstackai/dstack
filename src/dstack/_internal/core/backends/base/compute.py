@@ -320,6 +320,14 @@ class ComputeWithCreateInstanceSupport(ABC):
             ]
 
 
+class ComputeWithPrivilegedSupport:
+    """
+    Must be subclassed to support runs with `privileged: true`.
+    """
+
+    pass
+
+
 class ComputeWithMultinodeSupport:
     """
     Must be subclassed to support multinode tasks and cluster fleets.

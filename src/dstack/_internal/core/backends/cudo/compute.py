@@ -6,6 +6,7 @@ from dstack._internal.core.backends.base.backend import Compute
 from dstack._internal.core.backends.base.compute import (
     ComputeWithCreateInstanceSupport,
     ComputeWithFilteredOffersCached,
+    ComputeWithPrivilegedSupport,
     generate_unique_instance_name,
     get_shim_commands,
 )
@@ -32,6 +33,7 @@ MAX_RESOURCE_NAME_LEN = 30
 class CudoCompute(
     ComputeWithFilteredOffersCached,
     ComputeWithCreateInstanceSupport,
+    ComputeWithPrivilegedSupport,
     Compute,
 ):
     def __init__(self, config: CudoConfig):

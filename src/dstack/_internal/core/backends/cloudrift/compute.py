@@ -4,6 +4,7 @@ from dstack._internal.core.backends.base.compute import (
     Compute,
     ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
+    ComputeWithPrivilegedSupport,
     get_shim_commands,
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
@@ -27,6 +28,7 @@ logger = get_logger(__name__)
 class CloudRiftCompute(
     ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
+    ComputeWithPrivilegedSupport,
     Compute,
 ):
     def __init__(self, config: CloudRiftConfig):
