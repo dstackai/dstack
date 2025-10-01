@@ -59,8 +59,6 @@ def check_vpc(
         )
         for region in regions:
             get_vpc_subnet_or_error(
-                subnetworks_client=subnetworks_client,
-                vpc_project_id=vpc_project_id,
                 vpc_name=vpc_name,
                 region=region,
                 usable_subnets=usable_subnets,
@@ -122,6 +120,7 @@ def create_instance_struct(
     network: str = "global/networks/default",
     subnetwork: Optional[str] = None,
     extra_subnetworks: Optional[List[Tuple[str, str]]] = None,
+    roce_subnetworks: Optional[List[Tuple[str, str]]] = None,
     allocate_public_ip: bool = True,
     placement_policy: Optional[str] = None,
 ) -> compute_v1.Instance:
@@ -133,6 +132,7 @@ def create_instance_struct(
         subnetwork=subnetwork,
         allocate_public_ip=allocate_public_ip,
         extra_subnetworks=extra_subnetworks,
+        roce_subnetworks=roce_subnetworks,
     )
 
     disk = compute_v1.AttachedDisk()
@@ -195,6 +195,7 @@ def _get_network_interfaces(
     subnetwork: Optional[str],
     allocate_public_ip: bool,
     extra_subnetworks: Optional[List[Tuple[str, str]]],
+    roce_subnetworks: Optional[List[Tuple[str, str]]],
 ) -> List[compute_v1.NetworkInterface]:
     network_interface = compute_v1.NetworkInterface()
     network_interface.network = network
@@ -222,6 +223,14 @@ def _get_network_interfaces(
                 nic_type=compute_v1.NetworkInterface.NicType.GVNIC.name,
             )
         )
+    for network, subnetwork in roce_subnetworks or []:
+        network_interfaces.append(
+            compute_v1.NetworkInterface(
+                network=network,
+                subnetwork=subnetwork,
+                nic_type=compute_v1.NetworkInterface.NicType.MRDMA.name,
+            )
+        )
     return network_interfaces
 
 
@@ -234,29 +243,41 @@ def list_project_usable_subnets(
 
 
 def get_vpc_subnet_or_error(
-    subnetworks_client: compute_v1.SubnetworksClient,
-    vpc_project_id: str,
     vpc_name: str,
     region: str,
-    usable_subnets: Optional[List[compute_v1.UsableSubnetwork]] = None,
+    usable_subnets: list[compute_v1.UsableSubnetwork],
 ) -> str:
     """
     Returns resource name of any usable subnet in a given VPC
     (e.g. "projects/example-project/regions/europe-west4/subnetworks/example-subnet")
     """
-    if usable_subnets is None:
-        usable_subnets = list_project_usable_subnets(subnetworks_client, vpc_project_id)
+    vpc_subnets = get_vpc_subnets(vpc_name, region, usable_subnets)
+    if vpc_subnets:
+        return vpc_subnets[0]
+    raise ComputeError(
+        f"No usable subnetwork found in region {region} for VPC {vpc_name}."
+        f" Ensure that VPC {vpc_name} exists and has usable subnetworks."
+    )
+
+
+def get_vpc_subnets(
+    vpc_name: str,
+    region: str,
+    usable_subnets: list[compute_v1.UsableSubnetwork],
+) -> list[str]:
+    """
+    Returns resource names of all usable subnets in a given VPC
+    (e.g. ["projects/example-project/regions/europe-west4/subnetworks/example-subnet"])
+    """
+    result = []
     for subnet in usable_subnets:
         network_name = subnet.network.split("/")[-1]
         subnet_url = subnet.subnetwork
         subnet_resource_name = remove_prefix(subnet_url, "https://www.googleapis.com/compute/v1/")
         subnet_region = subnet_resource_name.split("/")[3]
         if network_name == vpc_name and subnet_region == region:
-            return subnet_resource_name
-    raise ComputeError(
-        f"No usable subnetwork found in region {region} for VPC {vpc_name} in project {vpc_project_id}."
-        f" Ensure that VPC {vpc_name} exists and has usable subnetworks."
-    )
+            result.append(subnet_resource_name)
+    return result
 
 
 def create_runner_firewall_rules(
