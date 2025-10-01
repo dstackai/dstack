@@ -133,7 +133,7 @@ The `gpu` property lets you specify vendor, model, memory, and count — e.g., `
 
 If vendor is omitted, `dstack` infers it from the model or defaults to `nvidia`.
 
-??? info "Google Cloud TPU"
+<!-- ??? info "Google Cloud TPU"
     To use TPUs, specify its architecture via the `gpu` property.
 
     ```yaml
@@ -146,7 +146,7 @@ If vendor is omitted, `dstack` infers it from the model or defaults to `nvidia`.
       gpu: v2-8
     ```
 
-    Currently, only 8 TPU cores can be specified, supporting single TPU device workloads. Multi-TPU support is coming soon.
+    Currently, only 8 TPU cores can be specified, supporting single TPU device workloads. Multi-TPU support is coming soon. -->
 
 ??? info "Shared memory"
     If you are using parallel communicating processes (e.g., dataloaders in PyTorch), you may need to configure 
@@ -159,8 +159,8 @@ If vendor is omitted, `dstack` infers it from the model or defaults to `nvidia`.
 
 #### Default image
 
-If you don't specify `image`, `dstack` uses its base Docker image pre-configured with 
-`uv`, `python`, `pip`, essential CUDA drivers, and NCCL tests (under `/opt/nccl-tests/build`). 
+If you don't specify `image`, `dstack` uses its [base :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/tree/master/docker/base){:target="_blank"} Docker image pre-configured with 
+    `uv`, `python`, `pip`, essential CUDA drivers, `mpirun`, and NCCL tests (under `/opt/nccl-tests/build`). 
 
 Set the `python` property to pre-install a specific version of Python.
 
