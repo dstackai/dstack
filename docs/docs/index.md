@@ -1,9 +1,10 @@
 # What is dstack?
 
-`dstack` is an open-source container orchestrator that simplifies workload orchestration 
-and drives GPU utilization for ML teams. It works with any GPU cloud, on-prem cluster, or accelerated hardware.
+`dstack` is a unified control plane for GPU provisioning and orchestration that works with any GPU cloud, Kubernetes, or on-prem clusters. 
 
-#### Accelerators
+It streamlines development, training, and inference, and is compatible with any hardware, open-source tools, and frameworks.
+
+#### Hardware
 
 `dstack` supports `NVIDIA`, `AMD`, `TPU`, `Intel Gaudi`, and `Tenstorrent` accelerators out of the box.
 

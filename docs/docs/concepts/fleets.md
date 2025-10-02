@@ -1,19 +1,19 @@
 # Fleets
 
-Fleets are groups of instances used to run dev environments, tasks, and services.
-Depending on the fleet configuration, instances can be interconnected clusters or standalone instances.
+Fleets act both as pools of instances and as templates for how those instances are provisioned.
 
 `dstack` supports two kinds of fleets: 
 
-* [Cloud fleets](#cloud) – dynamically provisioned through configured backends
-* [SSH fleets](#ssh) – created using on-prem servers
+* [Standard fleets](#standard) – dynamically provisioned through configured backends; they are supported with any type of backends: [VM-based](backends.md#vm-based), [container-based](backends.md#container-based), and [Kubernetes](backends.md#kubernetes)
+* [SSH fleets](#ssh) – created using on-prem servers; do not require backends
 
-## Cloud fleets { #cloud }
+## Standard fleets { #standard }
 
-When you call `dstack apply` to run a dev environment, task, or service, `dstack` reuses `idle` instances 
-from an existing fleet. If none match the requirements, `dstack` creates a new cloud fleet.
+When you run `dstack apply` to start a dev environment, task, or service, `dstack` will reuse idle instances  
+from an existing fleet whenever available.
 
-For greater control over cloud fleet provisioning, create fleets explicitly using configuration files. 
+If no fleet meets the requirements or has idle capacity, `dstack` can create a new fleet on the fly.  
+However, it’s generally better to define fleets explicitly in configuration files for greater control.  
 
 ### Apply a configuration
 
@@ -27,7 +27,7 @@ Define a fleet configuration as a YAML file in your project directory. The file 
     # The name is optional, if not specified, generated randomly
     name: my-fleet
     
-    # Specify the number of instances
+    # Can be a range or a fixed number
     nodes: 2
     # Uncomment to ensure instances are inter-connected
     #placement: cluster
@@ -57,6 +57,30 @@ Provisioning...
 
 Once the status of instances changes to `idle`, they can be used by dev environments, tasks, and services.
 
+??? info "Container-based backends"
+    [Container-based](backends.md#container-based) backends don’t support pre-provisioning,
+    so `nodes` can only be set to a range starting with `0`.
+    
+    This means instances are created only when a run starts, and once it finishes, they’re terminated and released back to the provider (either a cloud service or Kubernetes).
+
+    <div editor-title=".dstack.yml">
+
+    ```yaml
+    type: fleet
+    # The name is optional, if not specified, generated randomly
+    name: my-fleet
+    
+    # Specify the number of instances
+    nodes: 0..2
+    # Uncomment to ensure instances are inter-connected
+    #placement: cluster
+    
+    resources:
+      gpu: 24GB
+    ```
+
+    </div>
+
 ### Configuration options
 
 #### Nodes { #nodes }
@@ -71,30 +95,30 @@ type: fleet
 name: my-fleet
 
 nodes:
-  min: 1 # Always maintain at least 1 instance
-  target: 2 # Provision 2 instances initially
-  max: 3 # Do not allow more than 3 instances
+  min: 1 # Always maintain at least 1 idle instance. Can be 0.
+  target: 2 # (Optional) Provision 2 instances initially
+  max: 3 # (Optional) Do not allow more than 3 instances
 ```
 
 </div>
 
 `dstack` ensures the fleet always has at least `nodes.min` instances, creating new instances in the background if necessary. If you don't need to keep instances in the fleet forever, you can set `nodes.min` to `0`. By default, `dstack apply` also provisions `nodes.min` instances. The `nodes.target` property allows provisioning more instances initially than needs to be maintained.
 
-#### Placement { #cloud-placement }
+#### Placement { #standard-placement }
 
 To ensure instances are interconnected (e.g., for
 [distributed tasks](tasks.md#distributed-tasks)), set `placement` to `cluster`. 
 This ensures all instances are provisioned with optimal inter-node connectivity.
 
 ??? info "AWS"
-    When you create a cloud fleet with AWS, [Elastic Fabric Adapter networking :material-arrow-top-right-thin:{ .external }](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/efa.html){:target="_blank"} is automatically configured if it’s supported for the corresponding instance type.
+    When you create a fleet with AWS, [Elastic Fabric Adapter networking :material-arrow-top-right-thin:{ .external }](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/efa.html){:target="_blank"} is automatically configured if it’s supported for the corresponding instance type.
     Note, EFA requires the `public_ips` to be set to `false` in the `aws` backend configuration.
     Otherwise, instances are only connected by the default VPC subnet.
 
     Refer to the [EFA](../../examples/clusters/efa/index.md) example for more details.
 
 ??? info "GCP"
-    When you create a cloud fleet with GCP, for the A3 Mega and A3 High instance types, [GPUDirect-TCPXO and GPUDirect-TCPX :material-arrow-top-right-thin:{ .external }](https://cloud.google.com/kubernetes-engine/docs/how-to/gpu-bandwidth-gpudirect-tcpx-autopilot){:target="_blank"} networking is automatically configured.
+    When you create a fleet with GCP, for the A3 Mega and A3 High instance types, [GPUDirect-TCPXO and GPUDirect-TCPX :material-arrow-top-right-thin:{ .external }](https://cloud.google.com/kubernetes-engine/docs/how-to/gpu-bandwidth-gpudirect-tcpx-autopilot){:target="_blank"} networking is automatically configured.
 
     !!! info "Backend configuration"    
         Note, GPUDirect-TCPXO and GPUDirect-TCPX require `extra_vpcs` to be configured  in the `gcp` backend configuration.
@@ -102,7 +126,7 @@ This ensures all instances are provisioned with optimal inter-node connectivity.
         [A3 High](../../examples/clusters/a3high/index.md) examples for more details.
 
 ??? info "Nebius"
-    When you create a cloud fleet with Nebius, [InfiniBand networking :material-arrow-top-right-thin:{ .external }](https://docs.nebius.com/compute/clusters/gpu){:target="_blank"} is automatically configured if it’s supported for the corresponding instance type.
+    When you create a fleet with Nebius, [InfiniBand networking :material-arrow-top-right-thin:{ .external }](https://docs.nebius.com/compute/clusters/gpu){:target="_blank"} is automatically configured if it’s supported for the corresponding instance type.
     Otherwise, instances are only connected by the default VPC subnet.
 
     An InfiniBand fabric for the cluster is selected automatically. If you prefer to use some specific fabrics, configure them in the
@@ -112,6 +136,8 @@ The `cluster` placement is supported for `aws`, `azure`, `gcp`, `nebius`, `oci`,
 backends.
 
 > For more details on optimal inter-node connectivity, read the [Clusters](../guides/clusters.md) guide.
+
+<!-- TODO: Give a link to the Kubernetes guide -->
 
 #### Resources
 
@@ -163,9 +189,9 @@ and their quantity. Examples: `nvidia` (one NVIDIA GPU), `A100` (one A100), `A10
 > If you’re unsure which offers (hardware configurations) are available from the configured backends, use the
 > [`dstack offer`](../reference/cli/dstack/offer.md#list-gpu-offers) command to list them.
 
-#### Blocks { #cloud-blocks }
+#### Blocks { #standard-blocks }
 
-For cloud fleets, `blocks` function the same way as in SSH fleets. 
+For standard fleets, `blocks` function the same way as in SSH fleets. 
 See the [`Blocks`](#ssh-blocks) section under SSH fleets for details on the blocks concept.
 
 <div editor-title=".dstack.yml">
@@ -244,10 +270,8 @@ retry:
 
 </div>
 
-> Cloud fleets are supported by all backends except `kubernetes`, `vastai`, and `runpod`.
-
 !!! info "Reference"
-    Cloud fleets support many more configuration options,
+    Standard fleets support many more configuration options,
     incl. [`backends`](../reference/dstack.yml/fleet.md#backends), 
     [`regions`](../reference/dstack.yml/fleet.md#regions), 
     [`max_price`](../reference/dstack.yml/fleet.md#max_price), and

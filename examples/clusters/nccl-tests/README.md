@@ -33,6 +33,9 @@ commands:
       sleep infinity
     fi
 
+# Uncomment if the `kubernetes` backend requires it for `/dev/infiniband` access
+#privileged: true
+
 resources:
   gpu: nvidia:1..8
   shm_size: 16GB
@@ -40,14 +43,12 @@ resources:
 
 </div>
 
-<!-- TODO: Need to stop using our EFA image - either make our default image cluster-friendly, or recommend using NGC or other images -->
+!!! info "Default image"
+    If you don't specify `image`, `dstack` uses its [base :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/tree/master/docker/base){:target="_blank"} Docker image pre-configured with 
+    `uv`, `python`, `pip`, essential CUDA drivers, `mpirun`, and NCCL tests (under `/opt/nccl-tests/build`). 
 
-!!! info "Docker image"
-    The `dstackai/efa` image used in the example comes with MPI and NCCL tests pre-installed. While it is optimized for
-    [AWS EFA :material-arrow-top-right-thin:{ .external }](https://aws.amazon.com/hpc/efa/){:target="_blank"}, it can also
-    be used with regular TCP/IP network adapters and InfiniBand. 
-    
-    See the [source code :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/docker/efa) for the image.
+!!! info "Privileged"
+    In some cases, the backend (e.g., `kubernetes`) may require `privileged: true` to access the high-speed interconnect (e.g., InfiniBand).
 
 ### Apply a configuration
 

@@ -21,6 +21,9 @@ commands:
       sleep infinity
     fi
 
+# Uncomment if the `kubernetes` backend requires it for `/dev/infiniband` access
+#privileged: true
+
 resources:
   gpu: nvidia:1..8
   shm_size: 16GB

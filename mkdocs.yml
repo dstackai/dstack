@@ -229,12 +229,13 @@ nav:
           - Projects: docs/concepts/projects.md
           - Gateways: docs/concepts/gateways.md
       - Guides:
-          - Protips: docs/guides/protips.md
-          - Metrics: docs/guides/metrics.md
           - Clusters: docs/guides/clusters.md
+          - Kubernetes: docs/guides/kubernetes.md
           - Server deployment: docs/guides/server-deployment.md
-          - Plugins: docs/guides/plugins.md
           - Troubleshooting: docs/guides/troubleshooting.md
+          - Metrics: docs/guides/metrics.md
+          - Protips: docs/guides/protips.md
+          - Plugins: docs/guides/plugins.md
       - Reference:
         - .dstack.yml:
             - dev-environment: docs/reference/dstack.yml/dev-environment.md

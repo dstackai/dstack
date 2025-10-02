@@ -1,20 +1,21 @@
 # Installation
 
-> If you don't want to host the `dstack` server (or want to access GPU marketplace),
-> skip installation and proceed to [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"}.
+!!! info "dstack Sky"
+    If you don't want to host the `dstack` server (or want to access GPU marketplace),
+    skip installation and proceed to [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"}.
 
 ## Set up the server
 
-### (Optional) Configure backends
+### Configure backends
 
-Backends allow `dstack` to manage compute across various providers.
-They can be configured via `~/.dstack/server/config.yml` (or through the [project settings page](../concepts/projects.md#backends) in the UI).
+To orchestrate compute across cloud providers or existing Kubernetes clusters, you need to configure backends.
 
-For more details on how to configure backends, check [Backends](../concepts/backends.md).
+Backends can be set up in `~/.dstack/server/config.yml` or through the [project settings page](../concepts/projects.md#backends) in the UI.
+
+For more details, see [Backends](../concepts/backends.md).
 
 ??? info "SSH fleets"
-    For using `dstack` with on-prem servers, create [SSH fleets](../concepts/fleets.md#ssh) 
-    once the server is up.
+    When using `dstack` with on-prem servers, backend configuration isn’t required. Simply create [SSH fleets](../concepts/fleets.md#ssh) once the server is up.
 
 ### Start the server
 
