@@ -360,10 +360,10 @@ class KubernetesCompute(
             name=provisioning_data.instance_id,
             namespace=self.config.namespace,
         )
-        pod_id = get_value(pod, ".status.pod_ip", str)
-        if not pod_id:
+        pod_ip = get_value(pod, ".status.pod_ip", str)
+        if not pod_ip:
             return
-        provisioning_data.internal_ip = pod_id
+        provisioning_data.internal_ip = pod_ip
         service = call_api_method(
             self.api.read_namespaced_service,
             client.V1Service,
