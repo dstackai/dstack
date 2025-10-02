@@ -22,7 +22,7 @@ from dstack._internal.cli.commands.server import ServerCommand
 from dstack._internal.cli.commands.stats import StatsCommand
 from dstack._internal.cli.commands.stop import StopCommand
 from dstack._internal.cli.commands.volume import VolumeCommand
-from dstack._internal.cli.utils.common import _colors, configure_logging, console
+from dstack._internal.cli.utils.common import _colors, console
 from dstack._internal.cli.utils.updates import check_for_updates
 from dstack._internal.core.errors import ClientError, CLIError, ConfigurationError, SSHError
 from dstack._internal.core.services.ssh.client import get_ssh_client_info
@@ -38,8 +38,6 @@ def main():
     RichHelpFormatter.styles["argparse.args"] = _colors["code"]
     RichHelpFormatter.styles["argparse.groups"] = "bold grey74"
     RichHelpFormatter.styles["argparse.text"] = "grey74"
-
-    configure_logging()
 
     parser = argparse.ArgumentParser(
         description=(
