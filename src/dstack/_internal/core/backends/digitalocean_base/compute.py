@@ -7,6 +7,7 @@ from dstack._internal.core.backends.base.backend import Compute
 from dstack._internal.core.backends.base.compute import (
     ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
+    ComputeWithPrivilegedSupport,
     generate_unique_instance_name,
     get_user_data,
 )
@@ -40,6 +41,7 @@ DOCKER_INSTALL_COMMANDS = [
 class BaseDigitalOceanCompute(
     ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
+    ComputeWithPrivilegedSupport,
     Compute,
 ):
     def __init__(self, config: BaseDigitalOceanConfig, api_url: str, type: BackendType):

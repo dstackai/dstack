@@ -3,6 +3,7 @@ from typing import List, Optional
 from dstack._internal.core.backends.base.compute import (
     Compute,
     ComputeWithCreateInstanceSupport,
+    ComputeWithPrivilegedSupport,
     ComputeWithVolumeSupport,
 )
 from dstack._internal.core.consts import DSTACK_RUNNER_SSH_PORT
@@ -25,6 +26,7 @@ logger = get_logger(__name__)
 
 class LocalCompute(
     ComputeWithCreateInstanceSupport,
+    ComputeWithPrivilegedSupport,
     ComputeWithVolumeSupport,
     Compute,
 ):

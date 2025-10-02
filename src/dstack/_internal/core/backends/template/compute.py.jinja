@@ -8,6 +8,7 @@ from dstack._internal.core.backends.base.compute import (
     ComputeWithMultinodeSupport,
     ComputeWithPlacementGroupSupport,
     ComputeWithPrivateGatewaySupport,
+    ComputeWithPrivilegedSupport,
     ComputeWithReservationSupport,
     ComputeWithVolumeSupport,
 )
@@ -31,6 +32,7 @@ class {{ backend_name }}Compute(
     # TODO: Choose ComputeWith* classes to extend and implement
     # ComputeWithAllOffersCached,
     # ComputeWithCreateInstanceSupport,
+    # ComputeWithPrivilegedSupport,
     # ComputeWithMultinodeSupport,
     # ComputeWithReservationSupport,
     # ComputeWithPlacementGroupSupport,

@@ -43,6 +43,7 @@ from dstack._internal.core.backends.base.compute import (
     ComputeWithCreateInstanceSupport,
     ComputeWithGatewaySupport,
     ComputeWithMultinodeSupport,
+    ComputeWithPrivilegedSupport,
     generate_unique_gateway_instance_name,
     generate_unique_instance_name,
     get_gateway_user_data,
@@ -78,6 +79,7 @@ CONFIGURABLE_DISK_SIZE = Range[Memory](min=Memory.parse("30GB"), max=Memory.pars
 class AzureCompute(
     ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
+    ComputeWithPrivilegedSupport,
     ComputeWithMultinodeSupport,
     ComputeWithGatewaySupport,
     Compute,

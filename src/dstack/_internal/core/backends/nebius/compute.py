@@ -16,6 +16,7 @@ from dstack._internal.core.backends.base.compute import (
     ComputeWithCreateInstanceSupport,
     ComputeWithMultinodeSupport,
     ComputeWithPlacementGroupSupport,
+    ComputeWithPrivilegedSupport,
     generate_unique_instance_name,
     get_user_data,
 )
@@ -79,6 +80,7 @@ SUPPORTED_PLATFORMS = [
 class NebiusCompute(
     ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
+    ComputeWithPrivilegedSupport,
     ComputeWithMultinodeSupport,
     ComputeWithPlacementGroupSupport,
     Compute,

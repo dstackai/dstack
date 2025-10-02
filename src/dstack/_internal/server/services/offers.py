@@ -7,6 +7,7 @@ from dstack._internal.core.backends.base.compute import ComputeWithPlacementGrou
 from dstack._internal.core.backends.features import (
     BACKENDS_WITH_CREATE_INSTANCE_SUPPORT,
     BACKENDS_WITH_MULTINODE_SUPPORT,
+    BACKENDS_WITH_PRIVILEGED_SUPPORT,
     BACKENDS_WITH_RESERVATION_SUPPORT,
 )
 from dstack._internal.core.models.backends.base import BackendType
@@ -67,7 +68,12 @@ async def get_offers_by_requirements(
             backend_types = BACKENDS_WITH_MULTINODE_SUPPORT
         backend_types = [b for b in backend_types if b in BACKENDS_WITH_MULTINODE_SUPPORT]
 
-    if privileged or instance_mounts:
+    if privileged:
+        if backend_types is None:
+            backend_types = BACKENDS_WITH_PRIVILEGED_SUPPORT
+        backend_types = [b for b in backend_types if b in BACKENDS_WITH_PRIVILEGED_SUPPORT]
+
+    if instance_mounts:
         if backend_types is None:
             backend_types = BACKENDS_WITH_CREATE_INSTANCE_SUPPORT
         backend_types = [b for b in backend_types if b in BACKENDS_WITH_CREATE_INSTANCE_SUPPORT]

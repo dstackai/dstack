@@ -8,6 +8,7 @@ from dstack._internal.core.backends.base.backend import Compute
 from dstack._internal.core.backends.base.compute import (
     ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
+    ComputeWithPrivilegedSupport,
     generate_unique_instance_name,
     get_shim_commands,
 )
@@ -39,6 +40,7 @@ CONFIGURABLE_DISK_SIZE = Range[Memory](min=IMAGE_SIZE, max=None)
 class DataCrunchCompute(
     ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
+    ComputeWithPrivilegedSupport,
     Compute,
 ):
     def __init__(self, config: DataCrunchConfig):

@@ -29,6 +29,7 @@ import (
 	"github.com/dstackai/dstack/runner/internal/schemas"
 	"github.com/dstackai/dstack/runner/internal/types"
 	"github.com/prometheus/procfs"
+	"golang.org/x/sys/unix"
 )
 
 // TODO: Tune these parameters for optimal experience/performance
@@ -517,6 +518,21 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 	}
 
 	cmd.Env = envMap.Render()
+
+	// Configure process resource limits
+	// TODO: Make rlimits customizable in the run configuration. Currently, we only set max locked memory
+	// to unlimited to fix the issue with InfiniBand/RDMA: "Cannot allocate memory".
+	// See: https://github.com/ofiwg/libfabric/issues/6437
+	// See: https://github.com/openucx/ucx/issues/8229
+	// Note: we already set RLIMIT_MEMLOCK to unlimited in the shim if we've detected IB devices
+	// (see configureHpcNetworkingIfAvailable() function), but, as it's on the shim side, it only works
+	// with VM-based backends.
+	rlimitMemlock := unix.Rlimit{Cur: unix.RLIM_INFINITY, Max: unix.RLIM_INFINITY}
+	// TODO: Check if we have CAP_SYS_RESOURCE. In container environments, even root usually doesn't have
+	// this capability.
+	if err := unix.Setrlimit(unix.RLIMIT_MEMLOCK, &rlimitMemlock); err != nil {
+		log.Error(ctx, "Failed to set resource limits", "err", err)
+	}
 
 	log.Trace(ctx, "Starting exec", "cmd", cmd.String(), "working_dir", cmd.Dir, "env", cmd.Env)
 

@@ -320,6 +320,15 @@ class ComputeWithCreateInstanceSupport(ABC):
             ]
 
 
+class ComputeWithPrivilegedSupport:
+    """
+    Must be subclassed to support runs with `privileged: true`.
+    All VM-based Computes (that is, Computes that use the shim) should subclass this mixin.
+    """
+
+    pass
+
+
 class ComputeWithMultinodeSupport:
     """
     Must be subclassed to support multinode tasks and cluster fleets.

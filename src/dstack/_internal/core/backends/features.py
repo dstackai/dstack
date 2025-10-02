@@ -4,6 +4,7 @@ from dstack._internal.core.backends.base.compute import (
     ComputeWithMultinodeSupport,
     ComputeWithPlacementGroupSupport,
     ComputeWithPrivateGatewaySupport,
+    ComputeWithPrivilegedSupport,
     ComputeWithReservationSupport,
     ComputeWithVolumeSupport,
 )
@@ -37,6 +38,10 @@ def _get_backends_with_compute_feature(
 BACKENDS_WITH_CREATE_INSTANCE_SUPPORT = _get_backends_with_compute_feature(
     configurator_classes=_configurator_classes,
     compute_feature_class=ComputeWithCreateInstanceSupport,
+)
+BACKENDS_WITH_PRIVILEGED_SUPPORT = _get_backends_with_compute_feature(
+    configurator_classes=_configurator_classes,
+    compute_feature_class=ComputeWithPrivilegedSupport,
 )
 BACKENDS_WITH_MULTINODE_SUPPORT = [BackendType.REMOTE] + _get_backends_with_compute_feature(
     configurator_classes=_configurator_classes,

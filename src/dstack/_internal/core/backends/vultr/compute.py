@@ -9,6 +9,7 @@ from dstack._internal.core.backends.base.compute import (
     ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
     ComputeWithMultinodeSupport,
+    ComputeWithPrivilegedSupport,
     generate_unique_instance_name,
     get_user_data,
 )
@@ -35,6 +36,7 @@ MAX_INSTANCE_NAME_LEN = 64
 class VultrCompute(
     ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
+    ComputeWithPrivilegedSupport,
     ComputeWithMultinodeSupport,
     Compute,
 ):

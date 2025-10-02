@@ -6,6 +6,7 @@ import requests
 from dstack._internal.core.backends.base.backend import Compute
 from dstack._internal.core.backends.base.compute import (
     ComputeWithCreateInstanceSupport,
+    ComputeWithPrivilegedSupport,
     generate_unique_instance_name,
     get_shim_commands,
 )
@@ -32,6 +33,7 @@ MAX_INSTANCE_NAME_LEN = 60
 
 class TensorDockCompute(
     ComputeWithCreateInstanceSupport,
+    ComputeWithPrivilegedSupport,
     Compute,
 ):
     def __init__(self, config: TensorDockConfig):
