@@ -82,3 +82,8 @@ class ServerCommand(BaseCommand):
             log_level=uvicorn_log_level,
             workers=1,
         )
+
+    def _configure_logging(self) -> None:
+        # Server logging is configured in the FastAPI lifespan function.
+        # No need to configure CLI logging.
+        pass

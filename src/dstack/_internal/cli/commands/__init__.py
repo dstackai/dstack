@@ -7,6 +7,7 @@ from typing import ClassVar, Optional
 from rich_argparse import RichHelpFormatter
 
 from dstack._internal.cli.services.completion import ProjectNameCompleter
+from dstack._internal.cli.utils.common import configure_logging
 from dstack._internal.core.errors import CLIError
 from dstack.api import Client
 
@@ -52,8 +53,15 @@ class BaseCommand(ABC):
 
     @abstractmethod
     def _command(self, args: argparse.Namespace):
+        self._configure_logging()
         if not self.ACCEPT_EXTRA_ARGS and args.extra_args:
             raise CLIError(f"Unrecognized arguments: {shlex.join(args.extra_args)}")
+
+    def _configure_logging(self) -> None:
+        """
+        Override this method to configure command-specific logging
+        """
+        configure_logging()
 
 
 class APIBaseCommand(BaseCommand):
