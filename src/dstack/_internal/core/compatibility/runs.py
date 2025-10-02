@@ -53,6 +53,10 @@ def get_apply_plan_excludes(plan: ApplyRunPlanInput) -> Optional[IncludeExcludeD
             }
         if all(js.exit_status is None for js in job_submissions):
             job_submissions_excludes["exit_status"] = True
+        if all(js.status_message == "" for js in job_submissions):
+            job_submissions_excludes["status_message"] = True
+        if all(js.error is None for js in job_submissions):
+            job_submissions_excludes["error"] = True
         if all(js.deployment_num == 0 for js in job_submissions):
             job_submissions_excludes["deployment_num"] = True
         if all(not js.probes for js in job_submissions):
@@ -71,6 +75,10 @@ def get_apply_plan_excludes(plan: ApplyRunPlanInput) -> Optional[IncludeExcludeD
                 }
             if latest_job_submission.exit_status is None:
                 latest_job_submission_excludes["exit_status"] = True
+            if latest_job_submission.status_message == "":
+                latest_job_submission_excludes["status_message"] = True
+            if latest_job_submission.error is None:
+                latest_job_submission_excludes["error"] = True
             if latest_job_submission.deployment_num == 0:
                 latest_job_submission_excludes["deployment_num"] = True
             if not latest_job_submission.probes:
