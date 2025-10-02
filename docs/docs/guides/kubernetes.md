@@ -1,7 +1,10 @@
 # Kubernetes
 
-While `dstack` can orchestrate container-based runs natively on both cloud and on-prem without Kubernetes (see [backends](../concepts/backends.md)), it also supports running container-based workloads directly on Kubernetes clusters.  
-For that, you need to configure the `kubernetes` backend.
+The [kubernetes](../concepts/backends.md#kubernetes) backend enables `dstack` to run [dev environments](/docs/concepts/dev-environments), [tasks](/docs/concepts/tasks), and [services](/docs/concepts/services) directly on existing Kubernetes clusters.
+
+If your GPUs are already deployed on Kubernetes and your team relies on its ecosystem and tooling, use this backend to integrate `dstack` with your clusters.
+
+> If Kubernetes is not required, you can run `dstack` on clouds or on-prem clusters without Kubernetes by using [VM-based](../concepts/backends.md#vm-based), [container-based](../concepts/backends.md#container-based), or [on-prem](../concepts/backends.md#on-prem) backends.
 
 ## Setting up the backend
 

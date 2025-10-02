@@ -23,15 +23,13 @@ It streamlines development, training, and inference, and is compatible with any 
 `dstack` supports `NVIDIA`, `AMD`, `Google TPU`, `Intel Gaudi`, and `Tenstorrent` accelerators out of the box.
 
 ## Latest news ✨
-- [2025/09] [dstack 0.19.27: Offers UI, Digital Ocean and AMD Developer Cloud](https://github.com/dstackai/dstack/releases/tag/0.19.27)
-- [2025/08] [dstack 0.19.26: Repos – explicit repo configuration via YAML](https://github.com/dstackai/dstack/releases/tag/0.19.26)
-- [2025/08] [dstack 0.19.25: `dstack offer` CLI command](https://github.com/dstackai/dstack/releases/tag/0.19.25)
-- [2025/08] [dstack 0.19.22: Service probes, GPU health-checks, Tenstorrent Galaxy, Secrets UI](https://github.com/dstackai/dstack/releases/tag/0.19.22)
+- [2025/10] [dstack 0.19.31: Kubernetes, GCP A4 spot](https://github.com/dstackai/dstack/releases/tag/0.19.31)
+- [2025/08] [dstack 0.19.26: Repos](https://github.com/dstackai/dstack/releases/tag/0.19.26)
+- [2025/08] [dstack 0.19.22: Service probes, GPU health-checks, Tenstorrent Galaxy](https://github.com/dstackai/dstack/releases/tag/0.19.22)
 - [2025/07] [dstack 0.19.21: Scheduled tasks](https://github.com/dstackai/dstack/releases/tag/0.19.21)
 - [2025/07] [dstack 0.19.17: Secrets, Files, Rolling deployment](https://github.com/dstackai/dstack/releases/tag/0.19.17)
-- [2025/06] [dstack 0.19.16: Docker in Docker, CloudRift](https://github.com/dstackai/dstack/releases/tag/0.19.16)
-- [2025/06] [dstack 0.19.13: InfiniBand support in default images](https://github.com/dstackai/dstack/releases/tag/0.19.13)
-- [2025/06] [dstack 0.19.12: Simplified use of MPI](https://github.com/dstackai/dstack/releases/tag/0.19.12)
+- [2025/06] [dstack 0.19.16: Docker in Docker](https://github.com/dstackai/dstack/releases/tag/0.19.16)
+- [2025/06] [dstack 0.19.13: Default images with InfiniBand support](https://github.com/dstackai/dstack/releases/tag/0.19.13)
 
 ## How does it work?
 
