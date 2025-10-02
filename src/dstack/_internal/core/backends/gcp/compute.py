@@ -111,8 +111,8 @@ class GCPCompute(
         self.resource_policies_client = compute_v1.ResourcePoliciesClient(
             credentials=self.credentials
         )
-        self._extra_subnets_cache_lock = threading.Lock()
-        self._extra_subnets_cache = TTLCache(maxsize=30, ttl=60)
+        self._usable_subnets_cache_lock = threading.Lock()
+        self._usable_subnets_cache = TTLCache(maxsize=1, ttl=120)
 
     def get_all_offers_with_availability(self) -> List[InstanceOfferWithAvailability]:
         regions = get_or_error(self.config.regions)
@@ -203,12 +203,12 @@ class GCPCompute(
         disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
         # Choose any usable subnet in a VPC.
         # Configuring a specific subnet per region is not supported yet.
-        subnetwork = _get_vpc_subnet(
-            subnetworks_client=self.subnetworks_client,
-            config=self.config,
-            region=instance_offer.region,
-        )
+        subnetwork = self._get_vpc_subnet(instance_offer.region)
         extra_subnets = self._get_extra_subnets(
+            region=instance_offer.region,
+            instance_type_name=instance_offer.instance.name,
+        )
+        roce_subnets = self._get_roce_subnets(
             region=instance_offer.region,
             instance_type_name=instance_offer.instance.name,
         )
@@ -330,6 +330,7 @@ class GCPCompute(
                 network=self.config.vpc_resource_name,
                 subnetwork=subnetwork,
                 extra_subnetworks=extra_subnets,
+                roce_subnetworks=roce_subnets,
                 allocate_public_ip=allocate_public_ip,
                 placement_policy=placement_policy,
             )
@@ -339,6 +340,13 @@ class GCPCompute(
                 # If the request succeeds, we'll probably timeout and update_provisioning_data() will get hostname.
                 operation = self.instances_client.insert(request=request)
                 gcp_resources.wait_for_extended_operation(operation, timeout=30)
+            except google.api_core.exceptions.BadRequest as e:
+                if "Network profile only allows resource creation in location" in e.message:
+                    # A hack to find the correct RoCE VPC zone by trial and error.
+                    # Could be better to find it via the API.
+                    logger.debug("Got GCP error when provisioning a VM: %s", e)
+                    continue
+                raise
             except (
                 google.api_core.exceptions.ServiceUnavailable,
                 google.api_core.exceptions.NotFound,
@@ -487,11 +495,7 @@ class GCPCompute(
         )
         # Choose any usable subnet in a VPC.
         # Configuring a specific subnet per region is not supported yet.
-        subnetwork = _get_vpc_subnet(
-            subnetworks_client=self.subnetworks_client,
-            config=self.config,
-            region=configuration.region,
-        )
+        subnetwork = self._get_vpc_subnet(configuration.region)
 
         labels = {
             "owner": "dstack",
@@ -793,10 +797,6 @@ class GCPCompute(
             instance_id,
         )
 
-    @cachedmethod(
-        cache=lambda self: self._extra_subnets_cache,
-        lock=lambda self: self._extra_subnets_cache_lock,
-    )
     def _get_extra_subnets(
         self,
         region: str,
@@ -808,15 +808,16 @@ class GCPCompute(
             subnets_num = 8
         elif instance_type_name in ["a3-edgegpu-8g", "a3-highgpu-8g"]:
             subnets_num = 4
+        elif instance_type_name == "a4-highgpu-8g":
+            subnets_num = 1  # 1 main + 1 extra + 8 RoCE
         else:
             return []
         extra_subnets = []
         for vpc_name in self.config.extra_vpcs[:subnets_num]:
             subnet = gcp_resources.get_vpc_subnet_or_error(
-                subnetworks_client=self.subnetworks_client,
-                vpc_project_id=self.config.vpc_project_id or self.config.project_id,
                 vpc_name=vpc_name,
                 region=region,
+                usable_subnets=self._list_usable_subnets(),
             )
             vpc_resource_name = gcp_resources.vpc_name_to_vpc_resource_name(
                 project_id=self.config.vpc_project_id or self.config.project_id,
@@ -824,6 +825,58 @@ class GCPCompute(
             )
             extra_subnets.append((vpc_resource_name, subnet))
         return extra_subnets
+
+    def _get_roce_subnets(
+        self,
+        region: str,
+        instance_type_name: str,
+    ) -> List[Tuple[str, str]]:
+        if not self.config.roce_vpcs:
+            return []
+        if instance_type_name == "a4-highgpu-8g":
+            nics_num = 8
+        else:
+            return []
+        roce_vpc = self.config.roce_vpcs[0]  # roce_vpcs is validated to have at most 1 item
+        subnets = gcp_resources.get_vpc_subnets(
+            vpc_name=roce_vpc,
+            region=region,
+            usable_subnets=self._list_usable_subnets(),
+        )
+        if len(subnets) < nics_num:
+            raise ComputeError(
+                f"{instance_type_name} requires {nics_num} RoCE subnets,"
+                f" but only {len(subnets)} are available in VPC {roce_vpc}"
+            )
+        vpc_resource_name = gcp_resources.vpc_name_to_vpc_resource_name(
+            project_id=self.config.vpc_project_id or self.config.project_id,
+            vpc_name=roce_vpc,
+        )
+        nic_subnets = []
+        for subnet in subnets[:nics_num]:
+            nic_subnets.append((vpc_resource_name, subnet))
+        return nic_subnets
+
+    @cachedmethod(
+        cache=lambda self: self._usable_subnets_cache,
+        lock=lambda self: self._usable_subnets_cache_lock,
+    )
+    def _list_usable_subnets(self) -> list[compute_v1.UsableSubnetwork]:
+        # To avoid hitting the `ListUsable requests per minute` system limit, we fetch all subnets
+        # at once and cache them
+        return gcp_resources.list_project_usable_subnets(
+            subnetworks_client=self.subnetworks_client,
+            project_id=self.config.vpc_project_id or self.config.project_id,
+        )
+
+    def _get_vpc_subnet(self, region: str) -> Optional[str]:
+        if self.config.vpc_name is None:
+            return None
+        return gcp_resources.get_vpc_subnet_or_error(
+            vpc_name=self.config.vpc_name,
+            region=region,
+            usable_subnets=self._list_usable_subnets(),
+        )
 
 
 def _supported_instances_and_zones(
@@ -887,21 +940,6 @@ def _unique_instance_name(instance: InstanceType) -> str:
         return name
     gpu = instance.resources.gpus[0]
     return f"{name}-{gpu.name}-{gpu.memory_mib}"
-
-
-def _get_vpc_subnet(
-    subnetworks_client: compute_v1.SubnetworksClient,
-    config: GCPConfig,
-    region: str,
-) -> Optional[str]:
-    if config.vpc_name is None:
-        return None
-    return gcp_resources.get_vpc_subnet_or_error(
-        subnetworks_client=subnetworks_client,
-        vpc_project_id=config.vpc_project_id or config.project_id,
-        vpc_name=config.vpc_name,
-        region=region,
-    )
 
 
 @dataclass

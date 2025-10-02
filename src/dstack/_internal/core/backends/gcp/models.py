@@ -41,9 +41,22 @@ class GCPBackendConfig(CoreModel):
         Optional[List[str]],
         Field(
             description=(
-                "The names of additional VPCs used for GPUDirect. Specify eight VPCs to maximize bandwidth."
+                "The names of additional VPCs used for multi-NIC instances, such as those that support GPUDirect."
+                " Specify eight VPCs to maximize bandwidth in clusters with eight-GPU instances."
                 " Each VPC must have a subnet and a firewall rule allowing internal traffic across all subnets"
             )
+        ),
+    ] = None
+    roce_vpcs: Annotated[
+        Optional[List[str]],
+        Field(
+            description=(
+                "The names of additional VPCs with the RoCE network profile."
+                " Used for RDMA on GPU instances that support the MRDMA interface type."
+                " A VPC should have eight subnets to maximize the bandwidth in clusters"
+                " with eight-GPU instances."
+            ),
+            max_items=1,  # The currently supported instance types only need one VPC with eight subnets.
         ),
     ] = None
     vpc_project_id: Annotated[
