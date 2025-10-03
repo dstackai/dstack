@@ -48,11 +48,11 @@ It streamlines development, training, and inference, and is compatible with any 
 
 To orchestrate compute across cloud providers or existing Kubernetes clusters, you need to configure backends.
 
-Backends can be set up in `~/.dstack/server/config.yml` or through the [project settings page](../concepts/projects.md#backends) in the UI.
+Backends can be set up in `~/.dstack/server/config.yml` or through the [project settings page](https://dstack.ai/docs/concepts/projects#backends) in the UI.
 
-For more details, see [Backends](../concepts/backends.md).
+For more details, see [Backends](https://dstack.ai/docs/concepts/backends).
 
-> When using `dstack` with on-prem servers, backend configuration isn’t required. Simply create [SSH fleets](../concepts/fleets.md#ssh) once the server is up.
+> When using `dstack` with on-prem servers, backend configuration isn’t required. Simply create [SSH fleets](https://dstack.ai/docs/concepts/fleets#ssh) once the server is up.
 
 ##### Start the server
 
