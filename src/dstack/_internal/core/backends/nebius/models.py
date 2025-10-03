@@ -2,9 +2,6 @@ import json
 from pathlib import Path
 from typing import Annotated, Literal, Optional, Union
 
-from nebius.base.service_account.credentials_file import (
-    ServiceAccountCredentials,
-)
 from pydantic import Field, root_validator
 
 from dstack._internal.core.backends.base.models import fill_data
@@ -85,6 +82,10 @@ class NebiusServiceAccountFileCreds(CoreModel):
             try:
                 with open(Path(filename).expanduser()) as f:
                     data = json.load(f)
+                from nebius.base.service_account.credentials_file import (
+                    ServiceAccountCredentials,
+                )
+
                 credentials = ServiceAccountCredentials.from_json(data)
                 subject = credentials.subject_credentials
                 values["service_account_id"] = subject.sub
