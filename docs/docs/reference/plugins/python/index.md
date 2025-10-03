@@ -3,12 +3,11 @@
 The `dstack` plugin system allows extending `dstack` server functionality using external Python packages.
 
 !!! info "Experimental"
-    Plugins are currently an _experimental_ feature.
-    Backward compatibility is not guaranteed across releases.
+    Plugins are currently an experimental feature. Backward compatibility is not guaranteed across releases.
 
 ## Enable plugins
 
-To enable a plugin, list it under `plugins` in [`server/config.yml`](../reference/server/config.yml.md):
+To enable a plugin, list it under `plugins` in [`server/config.yml`](../../server/config.yml.md):
 
 <div editor-title="server/config.yml"> 
 
@@ -24,7 +23,7 @@ projects:
 
 On the next server restart, you should see a log message indicating that the plugin is loaded.
 
-## Create plugins
+## Create a plugin
 
 To create a plugin, create a Python package that implements a subclass of
 `dstack.plugins.Plugin` and exports this subclass as a "dstack.plugins" entry point.
@@ -61,7 +60,7 @@ To create a plugin, create a Python package that implements a subclass of
 
     </div>
 
-3. Specify a "dstack.plugins" entry point in `pyproject.toml`:
+3. Specify a `"dstack.plugins"` entry point in `pyproject.toml`:
 
     <div editor-title="pyproject.toml"> 
 
@@ -74,10 +73,9 @@ To create a plugin, create a Python package that implements a subclass of
 
 Then you can install the plugin package into your Python environment and enable it via `server/config.yml`.
 
-??? info "Plugins in Docker"
+??? info "Docker"
     If you deploy `dstack` using a Docker image you can add plugins either
-    by including them in your custom image built upon the `dstack` server image,
-    or by mounting installed plugins as volumes.
+    by including them in your custom image built upon the `dstack` [server image :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/tree/master/docker/server){:target="_blank"}, or by mounting installed plugins as volumes.
 
 ## Apply policies
 
@@ -113,9 +111,9 @@ class ExamplePolicy(ApplyPolicy):
 
 </div>
 
-## Built-in Plugins
+## Built-in plugins
 
-### REST Plugin
+### REST plugin
 
 `rest_plugin` is a builtin `dstack` plugin that allows writing your custom plugins as API servers, so you don't need to install plugins as Python packages.
 
@@ -125,4 +123,4 @@ Plugins implemented as API servers have advantages over plugins implemented as P
 * You can use any programming language.
 * If you run the `dstack` server via Docker, you don't need to extend the `dstack` server image with plugins or map them via volumes.
 
-To get started, check out the [plugin server example](https://github.com/dstackai/dstack/tree/master/examples/plugins/example_plugin_server). The `rest_plugin` server API is documented [here](../reference/plugins/rest_plugin/index.md).
+To get started, check out the [plugin server example :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/tree/master/examples/plugins/example_plugin_server){:target="_blank"}. The `rest_plugin` server API is documented [here](../../plugins/rest/index.md).
