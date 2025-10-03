@@ -235,7 +235,6 @@ nav:
           - Troubleshooting: docs/guides/troubleshooting.md
           - Metrics: docs/guides/metrics.md
           - Protips: docs/guides/protips.md
-          - Plugins: docs/guides/plugins.md
       - Reference:
         - .dstack.yml:
             - dev-environment: docs/reference/dstack.yml/dev-environment.md
@@ -245,7 +244,6 @@ nav:
             - gateway: docs/reference/dstack.yml/gateway.md
             - volume: docs/reference/dstack.yml/volume.md
         - server/config.yml: docs/reference/server/config.yml.md
-        - .dstack/profiles.yml: docs/reference/profiles.yml.md
         - CLI:
             - dstack server: docs/reference/cli/dstack/server.md
             - dstack init: docs/reference/cli/dstack/init.md
@@ -266,8 +264,10 @@ nav:
             - Python API: docs/reference/api/python/index.md
             - REST API: docs/reference/api/rest/index.md
         - Environment variables: docs/reference/environment-variables.md
+        - .dstack/profiles.yml: docs/reference/profiles.yml.md
         - Plugins:
-            - REST Plugin API: docs/reference/plugins/rest_plugin/index.md
+            - Python API: docs/reference/plugins/python/index.md
+            - REST API: docs/reference/plugins/rest/index.md
   - Examples:
     - examples.md
     - Single-node training:
