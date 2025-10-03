@@ -452,13 +452,42 @@ There are two ways to configure GCP: using a service account or using the defaul
     - name: main
       backends:
         - type: gcp
-          project_id: gcp-project-id
+          project_id: my-gcp-project
           creds:
             type: service_account
             filename: ~/.dstack/server/gcp-024ed630eab5.json
     ```
 
     </div>
+
+    ??? info "User interface"
+        If you are configuring the `gcp` backend on the [project settigns page](projects.md#backends), 
+        specify the contents of the JSON file in `data`:
+
+        <div editor-title="~/.dstack/server/config.yml">
+
+        ```yaml
+        type: gcp
+        project_id: my-gcp-project
+        creds:
+          type: service_account
+          data: |
+            {
+              "type": "service_account",
+              "project_id": "my-gcp-project",
+              "private_key_id": "abcd1234efgh5678ijkl9012mnop3456qrst7890",
+              "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEv...rest_of_key...IDAQAB\n-----END PRIVATE KEY-----\n",
+              "client_email": "my-service-account@my-gcp-project.iam.gserviceaccount.com",
+              "client_id": "123456789012345678901",
+              "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+              "token_uri": "https://oauth2.googleapis.com/token",
+              "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+              "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/my-service-account%40my-gcp-project.iam.gserviceaccount.com",
+              "universe_domain": "googleapis.com"
+            }
+        ```
+
+        </div>
 
 If you don't know your GCP project ID, use [Google Cloud CLI :material-arrow-top-right-thin:{ .external }](https://cloud.google.com/sdk/docs/install-sdk):
 
@@ -638,8 +667,33 @@ projects:
 
 </div>
 
-??? info "Configuring in the UI"
-    If you are configuring the backend in the `dstack` UI, specify the contents of the private key file in `private_key_content`.
+??? info "Credentials file"
+    It's also possible to configure the `nebius` backend using a credentials file [generated :material-arrow-top-right-thin:{ .external }](https://docs.nebius.com/iam/service-accounts/authorized-keys#create){:target="_blank"} by the `nebius` CLI:
+
+    <div class="termy">
+
+    ```shell
+    $ nebius iam auth-public-key generate \
+        --service-account-id <service account ID> \
+        --output ~/.nebius/sa-credentials.json
+    ```
+    
+    </div>
+
+  
+    ```yaml
+    projects:
+    - name: main
+      backends:
+      - type: nebius
+        creds:
+          type: service_account
+          filename: ~/.nebius/sa-credentials.json
+    ```
+
+??? info "User interface"
+    If you are configuring the `nebius` backend on the [project settigns page](projects.md#backends), 
+    specify the contents of the private key file in `private_key_content`:
 
     <div editor-title="~/.dstack/server/config.yml">
 
