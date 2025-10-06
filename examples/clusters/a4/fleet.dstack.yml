@@ -1,0 +1,13 @@
+type: fleet
+name: a4-cluster
+
+nodes: 2
+placement: cluster
+
+# Specify the zone where you have configured the RoCE VPC
+availability_zones: [us-west2-c]
+backends: [gcp]
+spot_policy: auto
+
+resources:
+  gpu: B200:8

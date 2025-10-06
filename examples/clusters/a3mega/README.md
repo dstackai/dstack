@@ -119,7 +119,7 @@ Fleet a3mega-cluster does not exist yet.
 Create the fleet? [y/n]: y
 
 Provisioning...
----> 100%                    
+---> 100%
 ```
 
 </div>

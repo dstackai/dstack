@@ -25,18 +25,19 @@ For cloud fleets, fast interconnect is currently supported only on the `aws`, `g
         Refer to the [EFA](../../examples/clusters/efa/index.md) example for more details.
 
 === "GCP"
-    When you create a cloud fleet with GCP, for the A3 Mega and A3 High instance types, [GPUDirect-TCPXO and GPUDirect-TCPX :material-arrow-top-right-thin:{ .external }](https://cloud.google.com/kubernetes-engine/docs/how-to/gpu-bandwidth-gpudirect-tcpx-autopilot){:target="_blank"} networking is automatically configured.
+    When you create a cloud fleet with GCP, `dstack` automatically configures [GPUDirect-TCPXO and GPUDirect-TCPX :material-arrow-top-right-thin:{ .external }](https://cloud.google.com/kubernetes-engine/docs/how-to/gpu-bandwidth-gpudirect-tcpx-autopilot){:target="_blank"} networking for the A3 Mega and A3 High instance types, as well as RoCE networking for the A4 instance type.
 
     !!! info "Backend configuration"    
-        Note, GPUDirect-TCPXO and GPUDirect-TCPX require `extra_vpcs` to be configured  in the `gcp` backend configuration.
-        Refer to the [A3 Mega](../../examples/clusters/a3mega/index.md) and 
+        You may need to configure `extra_vpcs` and `roce_vpcs` in the `gcp` backend configuration.
+        Refer to the [A4](../../examples/clusters/a4/index.md),
+        [A3 Mega](../../examples/clusters/a3mega/index.md), and 
         [A3 High](../../examples/clusters/a3high/index.md) examples for more details.
 
 === "Nebius"
     When you create a cloud fleet with Nebius, [InfiniBand :material-arrow-top-right-thin:{ .external }](https://docs.nebius.com/compute/clusters/gpu){:target="_blank"} networking is automatically configured if it’s supported for the corresponding instance type.
 
-> To request fast interconnect support for a other backends,
-file an [issue :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues){:target="_ blank"}. 
+> To request fast interconnect support for other backends,
+file an [issue :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues){:target="_ blank"}.
 
 ## Distributed tasks
 
