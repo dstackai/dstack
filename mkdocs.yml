@@ -280,6 +280,7 @@ nav:
     - Clusters:
         - NCCL tests: examples/clusters/nccl-tests/index.md
         - RCCL tests: examples/clusters/rccl-tests/index.md
+        - GCP A4: examples/clusters/a4/index.md
         - GCP A3 Mega: examples/clusters/a3mega/index.md
         - GCP A3 High: examples/clusters/a3high/index.md
         - AWS EFA: examples/clusters/efa/index.md

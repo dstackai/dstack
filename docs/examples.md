@@ -100,6 +100,16 @@ hide:
             Run multi-node RCCL tests with MPI
         </p>
     </a>
+    <a href="/examples/clusters/a4"
+       class="feature-cell sky">
+        <h3>
+            GCP A4
+        </h3>
+
+        <p>
+            Set up GCP A4 clusters with optimized networking
+        </p>
+    </a>
     <a href="/examples/clusters/a3mega"
        class="feature-cell sky">
         <h3>

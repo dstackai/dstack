@@ -64,7 +64,7 @@ Provisioning...
 
  FLEET         INSTANCE  BACKEND          INSTANCE TYPE  GPU          PRICE   STATUS  CREATED 
  my-efa-fleet  0         aws (us-west-2)  p4d.24xlarge   H100:8:80GB  $98.32  idle    3 mins ago      
-               1         aws (us-west-2)  p4d.24xlarge   $98.32  idle    3 mins ago    
+               1         aws (us-west-2)  p4d.24xlarge   H100:8:80GB  $98.32  idle    3 mins ago    
 ```
 
 </div>
