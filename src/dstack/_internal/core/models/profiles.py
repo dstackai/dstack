@@ -80,13 +80,16 @@ def parse_stop_duration(
 def parse_off_duration(v: Optional[Union[int, str, bool]]) -> Optional[Union[Literal["off"], int]]:
     if v == "off" or v is False:
         return "off"
-    if v is True:
+    if v is True or v is None:
         return None
-    return parse_duration(v)
+    duration = parse_duration(v)
+    if duration < 0:
+        raise ValueError("Duration cannot be negative")
+    return duration
 
 
 def parse_idle_duration(v: Optional[Union[int, str, bool]]) -> Optional[int]:
-    # Differs from `parse_off_duration`` to accept negative durations as `off`
+    # Differs from `parse_off_duration` to accept negative durations as `off`
     # for backward compatibility.
     if v == "off" or v is False or v == -1:
         return -1
