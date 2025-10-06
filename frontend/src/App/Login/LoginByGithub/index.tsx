@@ -342,7 +342,7 @@ function OtherVersions() {
                                 <Box variant="h3">Open-source</Box>
                                 <Box variant="small">Self-hosted</Box>
                             </SpaceBetween>
-                            <Box variant="p">Sigle sign-on, advanced governance controls, and dedicated support.</Box>
+                            <Box variant="p">Main capabilities for teams and individual engineers.</Box>
                             <Button external={true} href="https://dstack.ai/docs/installation">
                                 Installation
                             </Button>
@@ -356,7 +356,7 @@ function OtherVersions() {
                                 <Box variant="h3">dstack Enterprise</Box>
                                 <Box variant="small">Self-hosted</Box>
                             </SpaceBetween>
-                            <Box variant="p">Sigle sign-on, advanced governance controls, and dedicated support.</Box>
+                            <Box variant="p">Single sign-on, advanced governance controls, and dedicated support.</Box>
                             <Button variant="primary" external={true} href="https://calendly.com/dstackai/discovery-call">
                                 Book a demo
                             </Button>
