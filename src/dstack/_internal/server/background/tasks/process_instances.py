@@ -259,9 +259,7 @@ async def _add_remote(instance: InstanceModel) -> None:
     if instance.status == InstanceStatus.PENDING:
         instance.status = InstanceStatus.PROVISIONING
 
-    retry_duration_deadline = instance.created_at.replace(
-        tzinfo=datetime.timezone.utc
-    ) + timedelta(seconds=PROVISIONING_TIMEOUT_SECONDS)
+    retry_duration_deadline = instance.created_at + timedelta(seconds=PROVISIONING_TIMEOUT_SECONDS)
     if retry_duration_deadline < get_current_datetime():
         instance.status = InstanceStatus.TERMINATED
         instance.termination_reason = "Provisioning timeout expired"

@@ -256,8 +256,8 @@ async def _process_active_run(session: AsyncSession, run_model: RunModel):
     for replica_num, job_models in group_jobs_by_replica_latest(run_model.jobs):
         replica_statuses: Set[RunStatus] = set()
         replica_needs_retry = False
-
         replica_active = True
+        jobs_done_num = 0
         for job_model in job_models:
             job = find_job(run.jobs, job_model.replica_num, job_model.job_num)
             if (
@@ -272,8 +272,7 @@ async def _process_active_run(session: AsyncSession, run_model: RunModel):
             ):
                 # the job is done or going to be done
                 replica_statuses.add(RunStatus.DONE)
-                # for some reason the replica is done, it's not active
-                replica_active = False
+                jobs_done_num += 1
             elif job_model.termination_reason == JobTerminationReason.SCALED_DOWN:
                 # the job was scaled down
                 replica_active = False
@@ -313,26 +312,14 @@ async def _process_active_run(session: AsyncSession, run_model: RunModel):
             if not replica_needs_retry or retry_single_job:
                 run_statuses.update(replica_statuses)
 
-        if replica_active:
-            # submitted_at = replica created
-            replicas_info.append(
-                autoscalers.ReplicaInfo(
-                    active=True,
-                    timestamp=min(job.submitted_at for job in job_models).replace(
-                        tzinfo=datetime.timezone.utc
-                    ),
-                )
-            )
-        else:
-            # last_processed_at = replica scaled down
-            replicas_info.append(
-                autoscalers.ReplicaInfo(
-                    active=False,
-                    timestamp=max(job.last_processed_at for job in job_models).replace(
-                        tzinfo=datetime.timezone.utc
-                    ),
-                )
-            )
+        if jobs_done_num == len(job_models):
+            # Consider replica inactive if all its jobs are done for some reason.
+            # If only some jobs are done, replica is considered active to avoid
+            # provisioning new replicas for partially done multi-node tasks.
+            replica_active = False
+
+        replica_info = _get_replica_info(job_models, replica_active)
+        replicas_info.append(replica_info)
 
     termination_reason: Optional[RunTerminationReason] = None
     if RunStatus.FAILED in run_statuses:
@@ -408,6 +395,23 @@ async def _process_active_run(session: AsyncSession, run_model: RunModel):
             run_model.resubmission_attempt = 0
         elif new_status == RunStatus.PENDING:
             run_model.resubmission_attempt += 1
+
+
+def _get_replica_info(
+    replica_job_models: list[JobModel],
+    replica_active: bool,
+) -> autoscalers.ReplicaInfo:
+    if replica_active:
+        # submitted_at = replica created
+        return autoscalers.ReplicaInfo(
+            active=True,
+            timestamp=min(job.submitted_at for job in replica_job_models),
+        )
+    # last_processed_at = replica scaled down
+    return autoscalers.ReplicaInfo(
+        active=False,
+        timestamp=max(job.last_processed_at for job in replica_job_models),
+    )
 
 
 async def _handle_run_replicas(

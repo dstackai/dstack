@@ -373,7 +373,7 @@ class TestProcessRunsReplicas:
         session: AsyncSession,
         job_status: JobStatus,
         job_termination_reason: JobTerminationReason,
-    ) -> None:
+    ):
         run = await make_run(session, status=RunStatus.RUNNING, replicas=2)
         await create_job(
             session=session,
@@ -388,6 +388,55 @@ class TestProcessRunsReplicas:
         await session.refresh(run)
         assert run.status == RunStatus.TERMINATING
         assert run.termination_reason == RunTerminationReason.JOB_FAILED
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_considers_replicas_inactive_only_when_all_jobs_done(
+        self,
+        test_db,
+        session: AsyncSession,
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run_name = "test-run"
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            run_name=run_name,
+            configuration=TaskConfiguration(
+                commands=["echo hello"],
+                nodes=2,
+            ),
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_name=run_name,
+            run_spec=run_spec,
+            status=RunStatus.RUNNING,
+        )
+        await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.DONE,
+            termination_reason=JobTerminationReason.DONE_BY_RUNNER,
+            replica_num=0,
+            job_num=0,
+        )
+        await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            replica_num=0,
+            job_num=1,
+        )
+        await process_runs.process_runs()
+        await session.refresh(run)
+        assert run.status == RunStatus.RUNNING
+        # Should not create new replica with new jobs
+        assert len(run.jobs) == 2
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
