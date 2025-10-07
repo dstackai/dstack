@@ -126,3 +126,36 @@ class TestProcessEmptyFleets:
         instances = (await session.execute(select(InstanceModel))).scalars().all()
         assert len(instances) == 2
         assert {i.instance_num for i in instances} == {0, 1}  # uses 0 for next instance num
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_consolidation_terminates_redundant_instances(
+        self, test_db, session: AsyncSession
+    ):
+        project = await create_project(session)
+        spec = get_fleet_spec()
+        spec.configuration.nodes = FleetNodesSpec(min=1, target=1, max=1)
+        fleet = await create_fleet(
+            session=session,
+            project=project,
+            spec=spec,
+        )
+        instance1 = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.BUSY,
+            instance_num=0,
+        )
+        instance2 = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.IDLE,
+            instance_num=1,
+        )
+        await process_fleets()
+        await session.refresh(instance1)
+        await session.refresh(instance2)
+        assert instance1.status == InstanceStatus.BUSY
+        assert instance2.status == InstanceStatus.TERMINATING
