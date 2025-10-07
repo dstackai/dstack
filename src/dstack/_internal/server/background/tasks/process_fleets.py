@@ -55,7 +55,7 @@ async def process_fleets():
                     < get_current_datetime() - MIN_PROCESSING_INTERVAL,
                 )
                 .options(
-                    load_only(FleetModel.id),
+                    load_only(FleetModel.id, FleetModel.name),
                     joinedload(FleetModel.instances).load_only(InstanceModel.id),
                 )
                 .order_by(FleetModel.last_processed_at.asc())
@@ -187,8 +187,6 @@ def _maintain_fleet_nodes_in_min_max_range(
         # Delete terminated but not deleted instances since
         # they are going to be replaced with new pending instances.
         if instance.status == InstanceStatus.TERMINATED and not instance.deleted:
-            # It's safe to modify instances without instance lock since
-            # no other task modifies already terminated instances.
             instance.deleted = True
             instance.deleted_at = get_current_datetime()
     active_instances = [i for i in fleet_model.instances if not i.deleted]
