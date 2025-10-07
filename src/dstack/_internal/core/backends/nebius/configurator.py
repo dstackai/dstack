@@ -3,6 +3,7 @@ import json
 from nebius.aio.service_error import RequestError
 
 from dstack._internal.core.backends.base.configurator import (
+    TAGS_MAX_NUM,
     BackendRecord,
     Configurator,
     raise_invalid_credentials_error,
@@ -18,6 +19,7 @@ from dstack._internal.core.backends.nebius.models import (
     NebiusServiceAccountCreds,
     NebiusStoredConfig,
 )
+from dstack._internal.core.errors import BackendError, ServerClientError
 from dstack._internal.core.models.backends.base import BackendType
 
 
@@ -53,6 +55,19 @@ class NebiusConfigurator(
                     f" some of the valid options: {sorted(valid_fabrics)}"
                 ),
             )
+        self._check_config_tags(config)
+
+    def _check_config_tags(self, config: NebiusBackendConfigWithCreds):
+        if not config.tags:
+            return
+        if len(config.tags) > TAGS_MAX_NUM:
+            raise ServerClientError(
+                f"Maximum number of tags exceeded. Up to {TAGS_MAX_NUM} tags is allowed."
+            )
+        try:
+            resources.validate_labels(config.tags)
+        except BackendError as e:
+            raise ServerClientError(e.args[0])
 
     def create_backend(
         self, project_name: str, config: NebiusBackendConfigWithCreds

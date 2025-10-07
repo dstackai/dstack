@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from typing import Annotated, Literal, Optional, Union
+from typing import Annotated, Dict, Literal, Optional, Union
 
 from pydantic import Field, root_validator
 
@@ -139,6 +139,12 @@ class NebiusBackendConfig(CoreModel):
             description=(
                 "The list of allowed fabrics for InfiniBand clusters. Omit to allow all fabrics"
             )
+        ),
+    ] = None
+    tags: Annotated[
+        Optional[Dict[str, str]],
+        Field(
+            description="The tags (labels) that will be assigned to resources created by `dstack`"
         ),
     ] = None
 
