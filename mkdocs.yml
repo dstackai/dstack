@@ -264,6 +264,7 @@ nav:
             - Python API: docs/reference/api/python/index.md
             - REST API: docs/reference/api/rest/index.md
         - Environment variables: docs/reference/environment-variables.md
+        - .dstack/profiles.yml: docs/reference/profiles.yml.md
         - Plugins:
             - Python API: docs/reference/plugins/python/index.md
             - REST API: docs/reference/plugins/rest/index.md

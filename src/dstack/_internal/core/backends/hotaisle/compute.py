@@ -86,7 +86,6 @@ class HotAisleCompute(
             locations=self.config.regions or None,
             catalog=self.catalog,
         )
-        logger.info(f"Offers: {offers}")
         supported_offers = []
         for offer in offers:
             if offer.instance.name in INSTANCE_TYPE_SPECS:
