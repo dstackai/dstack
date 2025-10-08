@@ -5,7 +5,7 @@ from uuid import UUID
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, load_only
+from sqlalchemy.orm import joinedload, load_only, selectinload
 
 from dstack._internal.core.models.fleets import FleetSpec, FleetStatus
 from dstack._internal.core.models.instances import InstanceStatus
@@ -56,7 +56,7 @@ async def process_fleets():
                 )
                 .options(
                     load_only(FleetModel.id, FleetModel.name),
-                    joinedload(FleetModel.instances).load_only(InstanceModel.id),
+                    selectinload(FleetModel.instances).load_only(InstanceModel.id),
                 )
                 .order_by(FleetModel.last_processed_at.asc())
                 .limit(BATCH_SIZE)
