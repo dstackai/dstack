@@ -64,7 +64,7 @@ If you’d like to run [distributed tasks](../concepts/tasks.md#distributed-task
 
     placement: cluster
     
-    backends: [kuberenetes]
+    backends: [kubernetes]
     
     resources:
       # Specify requirements to filter nodes
