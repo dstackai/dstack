@@ -628,7 +628,6 @@ def _run_can_fit_into_fleet(run_spec: RunSpec, fleet: Fleet) -> bool:
     """
     # No check for cloud fleets with blocks > 1 since we don't know
     # how many jobs such fleets can accommodate.
-    # TODO: Check if cannot fit into SSH fleet.
     nodes_required_num = _get_nodes_required_num_for_run(run_spec)
     if (
         fleet.spec.configuration.nodes is not None
@@ -638,6 +637,15 @@ def _run_can_fit_into_fleet(run_spec: RunSpec, fleet: Fleet) -> bool:
         busy_instances = [i for i in fleet.instances if i.busy_blocks > 0]
         fleet_available_capacity = fleet.spec.configuration.nodes.max - len(busy_instances)
         if fleet_available_capacity < nodes_required_num:
+            return False
+    elif fleet.spec.configuration.ssh_config is not None:
+        # Currently assume that each idle block can run a job.
+        # TODO: Take resources / eligible offers into account.
+        total_idle_blocks = 0
+        for instance in fleet.instances:
+            total_blocks = instance.total_blocks or 1
+            total_idle_blocks += total_blocks - instance.busy_blocks
+        if total_idle_blocks < nodes_required_num:
             return False
     return True
 
