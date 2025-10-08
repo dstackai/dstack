@@ -92,10 +92,14 @@ async def process_fleets():
                     )
             for fleet_id in fleet_ids:
                 fleet_lockset.add(fleet_id)
+            instance_ids = [im.id for im in instance_models]
+            for instance_id in instance_ids:
+                instance_lockset.add(instance_id)
         try:
             await _process_fleets(session=session, fleet_models=fleet_models_to_process)
         finally:
             fleet_lockset.difference_update(fleet_ids)
+            instance_lockset.difference_update(instance_ids)
 
 
 async def _process_fleets(session: AsyncSession, fleet_models: List[FleetModel]):
