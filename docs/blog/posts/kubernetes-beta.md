@@ -148,7 +148,7 @@ Before running a distributed task, create a fleet with `placement` set to `clust
 
     placement: cluster
     
-    backends: [kuberenetes]
+    backends: [kubernetes]
     
     resources:
       # Specify requirements to filter nodes
