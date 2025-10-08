@@ -42,6 +42,26 @@ INSTANCE_TYPE_SPECS = {
         "cpu_frequency": 2000000000,
         "cpu_manufacturer": "Intel",
     },
+    "2x MI300X 26x Xeon Platinum 8470": {
+        "cpu_model": "Xeon Platinum 8470",
+        "cpu_frequency": 2000000000,
+        "cpu_manufacturer": "Intel",
+    },
+    "2x MI300X 26x Xeon Platinum 8462Y+": {
+        "cpu_model": "Xeon Platinum 8462Y+",
+        "cpu_frequency": 2800000000,
+        "cpu_manufacturer": "Intel",
+    },
+    "4x MI300X 52x Xeon Platinum 8462Y": {
+        "cpu_model": "Xeon Platinum 8470",
+        "cpu_frequency": 2000000000,
+        "cpu_manufacturer": "Intel",
+    },
+    "4x MI300X 52x Xeon Platinum 8462Y+": {
+        "cpu_model": "Xeon Platinum 8462Y+",
+        "cpu_frequency": 2800000000,
+        "cpu_manufacturer": "Intel",
+    },
 }
 
 
