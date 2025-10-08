@@ -1,6 +1,6 @@
 ARG UBUNTU_VERSION
 
-FROM nvidia/cuda:12.1.1-base-ubuntu${UBUNTU_VERSION}.04
+FROM nvidia/cuda:12.8.1-base-ubuntu${UBUNTU_VERSION}.04
 
 ARG _UV_HOME="/opt/uv"
 
