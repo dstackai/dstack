@@ -33,7 +33,7 @@ A major advantage of Kubernetes is its portability. Whether you’re using manag
 
 ### Nebius example
 
-If you're using **Nebius**, the process of creating a Kubernetes cluster is straightforward.
+If you're using [Nebius :material-arrow-top-right-thin:{ .external }](https://nebius.com/){:target="_blank"}, the process of creating a Kubernetes cluster is straightforward.
 
 Select the region of interest and click `Create cluster`.  
 Once the cluster is created, switch to `Applications` and install the `nvidia-device-plugin` application — this can be done in one click.
