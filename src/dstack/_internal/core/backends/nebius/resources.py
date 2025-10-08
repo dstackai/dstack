@@ -1,11 +1,12 @@
 import logging
+import re
 import time
 from collections import defaultdict
 from collections.abc import Container as ContainerT
 from collections.abc import Generator, Iterable, Sequence
 from contextlib import contextmanager
 from tempfile import NamedTemporaryFile
-from typing import Optional
+from typing import Dict, Optional
 
 from nebius.aio.authorization.options import options_to_metadata
 from nebius.aio.operation import Operation as SDKOperation
@@ -249,13 +250,14 @@ def get_default_subnet(sdk: SDK, project_id: str) -> Subnet:
 
 
 def create_disk(
-    sdk: SDK, name: str, project_id: str, size_mib: int, image_family: str
+    sdk: SDK, name: str, project_id: str, size_mib: int, image_family: str, labels: Dict[str, str]
 ) -> SDKOperation[Operation]:
     client = DiskServiceClient(sdk)
     request = CreateDiskRequest(
         metadata=ResourceMetadata(
             name=name,
             parent_id=project_id,
+            labels=labels,
         ),
         spec=DiskSpec(
             size_mebibytes=size_mib,
@@ -288,12 +290,14 @@ def create_instance(
     disk_id: str,
     subnet_id: str,
     preemptible: bool,
+    labels: Dict[str, str],
 ) -> SDKOperation[Operation]:
     client = InstanceServiceClient(sdk)
     request = CreateInstanceRequest(
         metadata=ResourceMetadata(
             name=name,
             parent_id=project_id,
+            labels=labels,
         ),
         spec=InstanceSpec(
             cloud_init_user_data=user_data,
@@ -367,3 +371,42 @@ def delete_cluster(sdk: SDK, cluster_id: str) -> None:
             metadata=REQUEST_MD,
         )
     )
+
+
+def filter_invalid_labels(labels: Dict[str, str]) -> Dict[str, str]:
+    filtered_labels = {}
+    for k, v in labels.items():
+        if not _is_valid_label(k, v):
+            logger.warning("Skipping invalid label '%s: %s'", k, v)
+            continue
+        filtered_labels[k] = v
+    return filtered_labels
+
+
+def validate_labels(labels: Dict[str, str]):
+    for k, v in labels.items():
+        if not _is_valid_label(k, v):
+            raise BackendError("Invalid resource labels")
+
+
+def _is_valid_label(key: str, value: str) -> bool:
+    # TODO: [Nebius] current validation logic reuses GCP's approach.
+    #   There is no public information on Nebius labels restrictions.
+    return is_valid_resource_name(key) and is_valid_label_value(value)
+
+
+MAX_RESOURCE_NAME_LEN = 63
+NAME_PATTERN = re.compile(r"^[a-z][_\-a-z0-9]{0,62}$")
+LABEL_VALUE_PATTERN = re.compile(r"^[_\-a-z0-9]{0,63}$")
+
+
+def is_valid_resource_name(name: str) -> bool:
+    if len(name) < 1 or len(name) > MAX_RESOURCE_NAME_LEN:
+        return False
+    match = re.match(NAME_PATTERN, name)
+    return match is not None
+
+
+def is_valid_label_value(value: str) -> bool:
+    match = re.match(LABEL_VALUE_PATTERN, value)
+    return match is not None

@@ -19,6 +19,7 @@ from dstack._internal.core.backends.base.compute import (
     ComputeWithPrivilegedSupport,
     generate_unique_instance_name,
     get_user_data,
+    merge_tags,
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers, get_offers_disk_modifier
 from dstack._internal.core.backends.nebius import resources
@@ -150,6 +151,18 @@ class NebiusCompute(
             if backend_data.cluster is not None:
                 cluster_id = backend_data.cluster.id
 
+        labels = {
+            "owner": "dstack",
+            "dstack_project": instance_config.project_name.lower(),
+            "dstack_name": instance_config.instance_name,
+            "dstack_user": instance_config.user.lower(),
+        }
+        labels = merge_tags(
+            base_tags=labels,
+            backend_tags=self.config.tags,
+            resource_tags=instance_config.tags,
+        )
+        labels = resources.filter_invalid_labels(labels)
         gpus = instance_offer.instance.resources.gpus
         create_disk_op = resources.create_disk(
             sdk=self._sdk,
@@ -159,6 +172,7 @@ class NebiusCompute(
             image_family="ubuntu24.04-cuda12"
             if gpus and gpus[0].name == "B200"
             else "ubuntu22.04-cuda12",
+            labels=labels,
         )
         create_instance_op = None
         try:
@@ -184,6 +198,7 @@ class NebiusCompute(
                 disk_id=create_disk_op.resource_id,
                 subnet_id=self._get_subnet_id(instance_offer.region),
                 preemptible=instance_offer.instance.resources.spot,
+                labels=labels,
             )
             _wait_for_instance(self._sdk, create_instance_op)
         except BaseException:
