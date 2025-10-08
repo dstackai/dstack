@@ -494,7 +494,9 @@ class TestProcessSubmittedJobs:
             project_id=project.id,
         )
         offer = get_instance_offer_with_availability(gpu_count=8, cpu_count=64, memory_gib=128)
-        fleet = await create_fleet(session=session, project=project)
+        fleet_spec = get_fleet_spec()
+        fleet_spec.configuration.blocks = 4
+        fleet = await create_fleet(session=session, project=project, spec=fleet_spec)
         instance = await create_instance(
             session=session,
             project=project,
@@ -537,7 +539,9 @@ class TestProcessSubmittedJobs:
             project_id=project.id,
         )
         offer = get_instance_offer_with_availability(gpu_count=8, cpu_count=64, memory_gib=128)
-        fleet = await create_fleet(session=session, project=project)
+        fleet_spec = get_fleet_spec()
+        fleet_spec.configuration.nodes = FleetNodesSpec(min=1, target=1, max=None)
+        fleet = await create_fleet(session=session, project=project, spec=fleet_spec)
         instance = await create_instance(
             session=session,
             project=project,
@@ -729,6 +733,55 @@ class TestProcessSubmittedJobs:
             project=project,
             repo=repo,
             user=user,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            instance_assigned=False,
+        )
+        await session.commit()
+        await process_submitted_jobs()
+        await session.refresh(job)
+        assert job.status == JobStatus.SUBMITTED
+        assert job.instance_assigned
+        assert job.instance_id is None
+        assert job.fleet_id is None
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_assigns_no_fleet_if_run_cannot_fit(self, test_db, session: AsyncSession):
+        project = await create_project(session)
+        user = await create_user(session)
+        repo = await create_repo(session=session, project_id=project.id)
+        fleet_spec = get_fleet_spec()
+        fleet_spec.configuration.nodes = FleetNodesSpec(min=1, target=1, max=3)
+        fleet = await create_fleet(session=session, project=project, spec=fleet_spec)
+        instance1 = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            instance_num=0,
+            status=InstanceStatus.BUSY,
+            busy_blocks=1,
+        )
+        instance2 = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            instance_num=1,
+            status=InstanceStatus.IDLE,
+            busy_blocks=0,
+        )
+        fleet.instances.append(instance1)
+        fleet.instances.append(instance2)
+        run_spec = get_run_spec(repo_id=repo.name)
+        run_spec.configuration = TaskConfiguration(nodes=3, commands=["echo"])
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_spec=run_spec,
         )
         job = await create_job(
             session=session,

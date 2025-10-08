@@ -260,7 +260,6 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
 
         instance_filters = [
             InstanceModel.deleted == False,
-            InstanceModel.total_blocks > InstanceModel.busy_blocks,
             InstanceModel.id.not_in(detaching_instances_ids),
         ]
 
@@ -514,9 +513,6 @@ async def _find_optimal_fleet_with_offers(
         )
         return run_model.fleet, fleet_instances_with_pool_offers
 
-    if len(fleet_models) == 0:
-        return None, []
-
     nodes_required_num = _get_nodes_required_num_for_run(run_spec)
     # The current strategy is first to consider fleets that can accommodate
     # the run without additional provisioning and choose the one with the cheapest pool offer.
@@ -534,6 +530,7 @@ async def _find_optimal_fleet_with_offers(
         ]
     ] = []
     for candidate_fleet_model in fleet_models:
+        candidate_fleet = fleet_model_to_fleet(candidate_fleet_model)
         fleet_instances_with_pool_offers = _get_fleet_instances_with_pool_offers(
             fleet_model=candidate_fleet_model,
             run_spec=run_spec,
@@ -541,24 +538,21 @@ async def _find_optimal_fleet_with_offers(
             master_job_provisioning_data=master_job_provisioning_data,
             volumes=volumes,
         )
-        fleet_has_available_capacity = nodes_required_num <= len(fleet_instances_with_pool_offers)
+        fleet_has_pool_capacity = nodes_required_num <= len(fleet_instances_with_pool_offers)
         fleet_cheapest_pool_offer = math.inf
         if len(fleet_instances_with_pool_offers) > 0:
             fleet_cheapest_pool_offer = fleet_instances_with_pool_offers[0][1].price
 
-        candidate_fleet = fleet_model_to_fleet(candidate_fleet_model)
-        profile = None
-        requirements = None
         try:
+            _check_can_create_new_instance_in_fleet(candidate_fleet)
             profile, requirements = _get_run_profile_and_requirements_in_fleet(
                 job=job,
                 run_spec=run_spec,
                 fleet=candidate_fleet,
             )
         except ValueError:
-            pass
-        fleet_backend_offers = []
-        if profile is not None and requirements is not None:
+            fleet_backend_offers = []
+        else:
             multinode = (
                 candidate_fleet.spec.configuration.placement == InstanceGroupPlacement.CLUSTER
                 or job.job_spec.jobs_per_replica > 1
@@ -579,8 +573,12 @@ async def _find_optimal_fleet_with_offers(
         if len(fleet_backend_offers) > 0:
             fleet_cheapest_backend_offer = fleet_backend_offers[0][1].price
 
+        if not _run_can_fit_into_fleet(run_spec, candidate_fleet):
+            logger.debug("Skipping fleet %s from consideration: run cannot fit into fleet")
+            continue
+
         fleet_priority = (
-            not fleet_has_available_capacity,
+            not fleet_has_pool_capacity,
             fleet_cheapest_pool_offer,
             fleet_cheapest_backend_offer,
         )
@@ -593,10 +591,13 @@ async def _find_optimal_fleet_with_offers(
                 fleet_priority,
             )
         )
+    if len(candidate_fleets_with_offers) == 0:
+        return None, []
     if run_spec.merged_profile.fleets is None and all(
         t[2] == 0 and t[3] == 0 for t in candidate_fleets_with_offers
     ):
-        # If fleets are not specified and no fleets have available pool or backend offers, create a new fleet.
+        # If fleets are not specified and no fleets have available pool
+        # or backend offers, create a new fleet.
         # This is for compatibility with non-fleet-first UX when runs created new fleets
         # if there are no instances to reuse.
         return None, []
@@ -614,6 +615,31 @@ def _get_nodes_required_num_for_run(run_spec: RunSpec) -> int:
     ):
         nodes_required_num = run_spec.configuration.replicas.min
     return nodes_required_num
+
+
+def _run_can_fit_into_fleet(run_spec: RunSpec, fleet: Fleet) -> bool:
+    """
+    Returns `False` if the run cannot fit into fleet for sure.
+    This is helpful heuristic to avoid even considering fleets too small for a run.
+    A run may not fit even if this function returns `True`.
+    This will lead to some jobs failing due to exceeding `nodes.max`
+    or more than `nodes.max` instances being provisioned
+    and eventually removed by the fleet consolidation logic.
+    """
+    # No check for cloud fleets with blocks > 1 since we don't know
+    # how many jobs such fleets can accommodate.
+    # TODO: Check if cannot fit into SSH fleet.
+    nodes_required_num = _get_nodes_required_num_for_run(run_spec)
+    if (
+        fleet.spec.configuration.nodes is not None
+        and fleet.spec.configuration.blocks == 1
+        and fleet.spec.configuration.nodes.max is not None
+    ):
+        busy_instances = [i for i in fleet.instances if i.busy_blocks > 0]
+        fleet_available_capacity = fleet.spec.configuration.nodes.max - len(busy_instances)
+        if fleet_available_capacity < nodes_required_num:
+            return False
+    return True
 
 
 def _get_fleet_instances_with_pool_offers(
@@ -713,6 +739,7 @@ async def _run_job_on_new_instance(
     if fleet_model is not None:
         fleet = fleet_model_to_fleet(fleet_model)
         try:
+            _check_can_create_new_instance_in_fleet(fleet)
             profile, requirements = _get_run_profile_and_requirements_in_fleet(
                 job=job,
                 run_spec=run.run_spec,
@@ -787,8 +814,6 @@ def _get_run_profile_and_requirements_in_fleet(
     run_spec: RunSpec,
     fleet: Fleet,
 ) -> tuple[Profile, Requirements]:
-    if not _check_can_create_new_instance_in_fleet(fleet):
-        raise ValueError("Cannot fit new instance into fleet")
     profile = combine_fleet_and_run_profiles(fleet.spec.merged_profile, run_spec.merged_profile)
     if profile is None:
         raise ValueError("Cannot combine fleet profile")
@@ -801,13 +826,23 @@ def _get_run_profile_and_requirements_in_fleet(
     return profile, requirements
 
 
-def _check_can_create_new_instance_in_fleet(fleet: Fleet) -> bool:
+def _check_can_create_new_instance_in_fleet(fleet: Fleet):
+    if not _can_create_new_instance_in_fleet(fleet):
+        raise ValueError("Cannot fit new instance into fleet")
+
+
+def _can_create_new_instance_in_fleet(fleet: Fleet) -> bool:
     if fleet.spec.configuration.ssh_config is not None:
         return False
-    # TODO: Respect nodes.max
-    # Ensure concurrent provisioning does not violate nodes.max
-    # E.g. lock fleet and split instance model creation
-    # and instance provisioning into separate transactions.
+    active_instances = [i for i in fleet.instances if i.status.is_active()]
+    # nodes.max is a soft limit that can be exceeded when provisioning concurrently.
+    # The fleet consolidation logic will remove redundant nodes eventually.
+    if (
+        fleet.spec.configuration.nodes is not None
+        and fleet.spec.configuration.nodes.max is not None
+        and len(active_instances) >= fleet.spec.configuration.nodes.max
+    ):
+        return False
     return True
 
 
