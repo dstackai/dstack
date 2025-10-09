@@ -3,7 +3,7 @@ from typing import Optional
 import dstack._internal.core.services.api_client as api_client_service
 from dstack._internal.core.errors import ConfigurationError
 from dstack._internal.utils.logging import get_logger
-from dstack._internal.utils.path import PathLike
+from dstack._internal.utils.path import PathLike as PathLike
 from dstack.api._public.backends import BackendCollection
 from dstack.api._public.repos import RepoCollection
 from dstack.api._public.runs import RunCollection

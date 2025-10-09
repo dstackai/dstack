@@ -139,10 +139,13 @@ class TestGetMyUser:
             "created_at": "2023-01-02T03:04:00+00:00",
             "global_role": user.global_role,
             "email": None,
+            "creds": {"token": user.token.get_plaintext_or_error()},
             "active": True,
             "permissions": {
                 "can_create_projects": True,
             },
+            "ssh_private_key": None,
+            "ssh_public_key": None,
         }
 
 
@@ -196,6 +199,8 @@ class TestGetUser:
             "permissions": {
                 "can_create_projects": True,
             },
+            "ssh_private_key": None,
+            "ssh_public_key": None,
         }
 
 
