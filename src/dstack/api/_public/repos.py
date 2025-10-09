@@ -1,4 +1,3 @@
-from pathlib import Path
 from typing import Literal, Optional, Union, overload
 
 from git import InvalidGitRepositoryError
@@ -18,7 +17,6 @@ from dstack._internal.core.services.repos import (
     get_repo_creds_and_default_branch,
     load_repo,
 )
-from dstack._internal.utils.crypto import generate_rsa_key_pair
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.path import PathLike
 from dstack.api.server import APIClient
@@ -209,22 +207,3 @@ class RepoCollection:
             return method(self._project, repo_id)
         except ResourceNotExistsError:
             return None
-
-
-def get_ssh_keypair(key_path: Optional[PathLike], dstack_key_path: Path) -> str:
-    """Returns a path to the private key"""
-    if key_path is not None:
-        key_path = Path(key_path).expanduser().resolve()
-        pub_key = (
-            key_path
-            if key_path.suffix == ".pub"
-            else key_path.with_suffix(key_path.suffix + ".pub")
-        )
-        private_key = pub_key.with_suffix("")
-        if pub_key.exists() and private_key.exists():
-            return str(private_key)
-        raise ConfigurationError(f"Make sure valid keypair exists: {private_key}(.pub)")
-
-    if not dstack_key_path.exists():
-        generate_rsa_key_pair(private_key_path=dstack_key_path)
-    return str(dstack_key_path)

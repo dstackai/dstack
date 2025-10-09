@@ -462,11 +462,12 @@ class RunSpec(generate_dual_core_model(RunSpecConfig)):
     configuration: Annotated[AnyRunConfiguration, Field(discriminator="type")]
     profile: Annotated[Optional[Profile], Field(description="The profile parameters")] = None
     ssh_key_pub: Annotated[
-        str,
+        Optional[str],
         Field(
             description="The contents of the SSH public key that will be used to connect to the run."
+            " Can be empty only before the run is submitted."
         ),
-    ]
+    ] = None
     # merged_profile stores profile parameters merged from profile and configuration.
     # Read profile parameters from merged_profile instead of profile directly.
     # TODO: make merged_profile a computed field after migrating to pydanticV2

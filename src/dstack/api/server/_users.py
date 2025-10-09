@@ -17,9 +17,9 @@ class UsersAPIClient(APIClientGroup):
         resp = self._request("/api/users/list")
         return parse_obj_as(List[User.__response__], resp.json())
 
-    def get_my_user(self) -> User:
+    def get_my_user(self) -> UserWithCreds:
         resp = self._request("/api/users/get_my_user")
-        return parse_obj_as(User.__response__, resp.json())
+        return parse_obj_as(UserWithCreds.__response__, resp.json())
 
     def get_user(self, username: str) -> User:
         body = GetUserRequest(username=username)

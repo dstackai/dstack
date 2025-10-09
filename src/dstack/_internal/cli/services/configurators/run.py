@@ -62,7 +62,6 @@ from dstack._internal.utils.interpolator import InterpolatorError, VariablesInte
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.nested_list import NestedList, NestedListItem
 from dstack._internal.utils.path import is_absolute_posix_path
-from dstack.api._public.repos import get_ssh_keypair
 from dstack.api._public.runs import Run
 from dstack.api.server import APIClient
 from dstack.api.utils import load_profile
@@ -135,10 +134,6 @@ class BaseRunConfigurator(
 
         config_manager = ConfigManager()
         repo = self.get_repo(conf, configuration_path, configurator_args, config_manager)
-        self.api.ssh_identity_file = get_ssh_keypair(
-            configurator_args.ssh_identity_file,
-            config_manager.dstack_key_path,
-        )
         profile = load_profile(Path.cwd(), configurator_args.profile)
         with console.status("Getting apply plan..."):
             run_plan = self.api.runs.get_run_plan(
@@ -146,6 +141,7 @@ class BaseRunConfigurator(
                 repo=repo,
                 configuration_path=configuration_path,
                 profile=profile,
+                ssh_identity_file=configurator_args.ssh_identity_file,
             )
 
         print_run_plan(run_plan, max_offers=configurator_args.max_offers)
