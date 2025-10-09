@@ -54,10 +54,10 @@ from dstack._internal.core.services.ssh.attach import SSHAttach
 from dstack._internal.core.services.ssh.ports import PortsLock
 from dstack._internal.server.schemas.logs import PollLogsRequest
 from dstack._internal.utils.common import get_or_error, make_proxy_url
+from dstack._internal.utils.crypto import generate_rsa_key_pair
 from dstack._internal.utils.files import create_file_archive
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.path import PathLike, path_in_dir
-from dstack.api._public.repos import generate_rsa_key_pair
 from dstack.api.server import APIClient
 
 logger = get_logger(__name__)
