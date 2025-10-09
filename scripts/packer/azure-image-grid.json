@@ -24,7 +24,6 @@
     "image_publisher": "canonical",
     "image_offer": "ubuntu-24_04-lts",
     "image_sku": "server",
-    "image_version": "24.04.202509170",
     "azure_tags": {
         "Name": "DSTACK-GRID"
     },
@@ -63,6 +62,15 @@
         "chmod +x install-docker.sh",
         "./install-docker.sh --version {{user `docker_version`}}"
       ]
+    },
+    {
+      "type": "shell",
+      "script": "provisioners/downgrade-azure-kernel.sh"
+    },
+    {
+      "type": "shell",
+      "inline": ["sudo reboot"],
+      "expect_disconnect": true
     },
     {
       "type": "shell",
