@@ -342,7 +342,7 @@ function OtherVersions() {
                                 <Box variant="h3">Open-source</Box>
                                 <Box variant="small">Self-hosted</Box>
                             </SpaceBetween>
-                            <Box variant="p">Main capabilities for teams and individual engineers.</Box>
+                            <Box variant="p">Fully customizable and self-hosted open-source version.</Box>
                             <Button external={true} href="https://dstack.ai/docs/installation">
                                 Installation
                             </Button>
