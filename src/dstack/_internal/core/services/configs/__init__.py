@@ -117,6 +117,7 @@ class ConfigManager:
 
     @property
     def dstack_key_path(self) -> Path:
+        # TODO: Remove since 0.19.35
         return self.dstack_ssh_dir / "id_rsa"
 
     @property

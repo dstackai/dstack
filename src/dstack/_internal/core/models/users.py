@@ -38,3 +38,5 @@ class UserTokenCreds(CoreModel):
 
 class UserWithCreds(User):
     creds: UserTokenCreds
+    ssh_public_key: Optional[str] = None
+    ssh_private_key: Optional[str] = None

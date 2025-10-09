@@ -17,7 +17,7 @@ from dstack._internal.server.schemas.runs import (
     SubmitRunRequest,
 )
 from dstack._internal.server.security.permissions import Authenticated, ProjectMember
-from dstack._internal.server.services import runs
+from dstack._internal.server.services import runs, users
 from dstack._internal.server.utils.routers import (
     CustomORJSONResponse,
     get_base_api_additional_responses,
@@ -111,6 +111,8 @@ async def get_plan(
     This is an optional step before calling `/apply`.
     """
     user, project = user_project
+    if not user.ssh_public_key and not body.run_spec.ssh_key_pub:
+        await users.refresh_ssh_key(session=session, user=user, username=user.name)
     run_plan = await runs.get_plan(
         session=session,
         project=project,
@@ -137,6 +139,8 @@ async def apply_plan(
     If the existing run is active and cannot be updated, it must be stopped first.
     """
     user, project = user_project
+    if not user.ssh_public_key and not body.plan.run_spec.ssh_key_pub:
+        await users.refresh_ssh_key(session=session, user=user, username=user.name)
     return CustomORJSONResponse(
         await runs.apply_plan(
             session=session,

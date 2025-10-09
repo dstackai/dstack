@@ -161,6 +161,7 @@ class KubernetesCompute(
         volumes: List[Volume],
     ) -> JobProvisioningData:
         instance_name = generate_unique_instance_name_for_job(run, job)
+        assert run.run_spec.ssh_key_pub is not None
         commands = get_docker_commands(
             [run.run_spec.ssh_key_pub.strip(), project_ssh_public_key.strip()]
         )

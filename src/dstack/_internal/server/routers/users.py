@@ -36,11 +36,11 @@ async def list_users(
     return CustomORJSONResponse(await users.list_users_for_user(session=session, user=user))
 
 
-@router.post("/get_my_user", response_model=User)
+@router.post("/get_my_user", response_model=UserWithCreds)
 async def get_my_user(
     user: UserModel = Depends(Authenticated()),
 ):
-    return CustomORJSONResponse(users.user_model_to_user(user))
+    return CustomORJSONResponse(users.user_model_to_user_with_creds(user))
 
 
 @router.post("/get_user", response_model=UserWithCreds)
@@ -89,6 +89,18 @@ async def update_user(
     if res is None:
         raise ResourceNotExistsError()
     return CustomORJSONResponse(users.user_model_to_user(res))
+
+
+@router.post("/refresh_ssh_key", response_model=UserWithCreds)
+async def refresh_ssh_key(
+    body: RefreshTokenRequest,
+    session: AsyncSession = Depends(get_session),
+    user: UserModel = Depends(Authenticated()),
+):
+    res = await users.refresh_ssh_key(session=session, user=user, username=body.username)
+    if res is None:
+        raise ResourceNotExistsError()
+    return CustomORJSONResponse(users.user_model_to_user_with_creds(res))
 
 
 @router.post("/refresh_token", response_model=UserWithCreds)

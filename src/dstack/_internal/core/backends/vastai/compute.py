@@ -85,6 +85,7 @@ class VastAICompute(
         instance_name = generate_unique_instance_name_for_job(
             run, job, max_length=MAX_INSTANCE_NAME_LEN
         )
+        assert run.run_spec.ssh_key_pub is not None
         commands = get_docker_commands(
             [run.run_spec.ssh_key_pub.strip(), project_ssh_public_key.strip()]
         )

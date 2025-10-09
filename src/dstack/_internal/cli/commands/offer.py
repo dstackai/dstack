@@ -104,7 +104,6 @@ class OfferCommand(APIBaseCommand):
 
         run_spec = RunSpec(
             configuration=conf,
-            ssh_key_pub="(dummy)",
             profile=profile,
         )
 

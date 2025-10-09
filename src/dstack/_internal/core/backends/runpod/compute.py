@@ -86,6 +86,7 @@ class RunpodCompute(
         project_ssh_private_key: str,
         volumes: List[Volume],
     ) -> JobProvisioningData:
+        assert run.run_spec.ssh_key_pub is not None
         instance_config = InstanceConfiguration(
             project_name=run.project_name,
             instance_name=get_job_instance_name(run, job),

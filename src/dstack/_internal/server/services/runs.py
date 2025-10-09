@@ -317,7 +317,7 @@ async def get_plan(
         spec=effective_run_spec,
     )
     effective_run_spec = RunSpec.parse_obj(effective_run_spec.dict())
-    _validate_run_spec_and_set_defaults(effective_run_spec)
+    _validate_run_spec_and_set_defaults(user, effective_run_spec)
 
     profile = effective_run_spec.merged_profile
     creation_policy = profile.creation_policy
@@ -422,7 +422,7 @@ async def apply_plan(
     )
     # Spec must be copied by parsing to calculate merged_profile
     run_spec = RunSpec.parse_obj(run_spec.dict())
-    _validate_run_spec_and_set_defaults(run_spec)
+    _validate_run_spec_and_set_defaults(user, run_spec)
     if run_spec.run_name is None:
         return await submit_run(
             session=session,
@@ -489,7 +489,7 @@ async def submit_run(
     project: ProjectModel,
     run_spec: RunSpec,
 ) -> Run:
-    _validate_run_spec_and_set_defaults(run_spec)
+    _validate_run_spec_and_set_defaults(user, run_spec)
     repo = await _get_run_repo_or_error(
         session=session,
         project=project,
@@ -981,7 +981,7 @@ def _get_job_submission_cost(job_submission: JobSubmission) -> float:
     return job_submission.job_provisioning_data.price * duration_hours
 
 
-def _validate_run_spec_and_set_defaults(run_spec: RunSpec):
+def _validate_run_spec_and_set_defaults(user: UserModel, run_spec: RunSpec):
     # This function may set defaults for null run_spec values,
     # although most defaults are resolved when building job_spec
     # so that we can keep both the original user-supplied value (null in run_spec)
@@ -1031,6 +1031,11 @@ def _validate_run_spec_and_set_defaults(run_spec: RunSpec):
     if run_spec.configuration.priority is None:
         run_spec.configuration.priority = RUN_PRIORITY_DEFAULT
     set_resources_defaults(run_spec.configuration.resources)
+    if run_spec.ssh_key_pub is None:
+        if user.ssh_public_key:
+            run_spec.ssh_key_pub = user.ssh_public_key
+        else:
+            raise ServerClientError("ssh_key_pub must be set if the user has no ssh_public_key")
 
 
 _UPDATABLE_SPEC_FIELDS = ["configuration_path", "configuration"]
