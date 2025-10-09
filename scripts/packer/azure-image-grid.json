@@ -24,6 +24,7 @@
     "image_publisher": "canonical",
     "image_offer": "ubuntu-24_04-lts",
     "image_sku": "server",
+    "image_version": "24.04.202509170",
     "azure_tags": {
         "Name": "DSTACK-GRID"
     },
