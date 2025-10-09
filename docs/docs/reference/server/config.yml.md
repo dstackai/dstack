@@ -287,10 +287,10 @@ to configure [backends](../../concepts/backends.md) and other [server-level sett
         show_root_heading: false
 
 ??? info "Specifying `data`"
-    To specify service account file contents as a string, use `jq`:
+    To specify kubeconfig contents directly via `data`, convert it to a string:
 
     ```shell
-    cat my-service-account-file.json | jq -c | jq -R
+    yq -o=json ~/.kube/config | jq -c | jq -R
     ```
 
 ###### `projects[n].backends[type=kubernetes].proxy_jump` { #kubernetes-proxy_jump data-toc-label="proxy_jump" }
