@@ -1,10 +1,11 @@
+from collections import defaultdict
 from datetime import timedelta
 from typing import List
 from uuid import UUID
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, load_only
+from sqlalchemy.orm import joinedload, load_only, selectinload
 
 from dstack._internal.core.models.fleets import FleetSpec, FleetStatus
 from dstack._internal.core.models.instances import InstanceStatus
@@ -37,30 +38,68 @@ MIN_PROCESSING_INTERVAL = timedelta(seconds=30)
 
 @sentry_utils.instrument_background_task
 async def process_fleets():
-    lock, lockset = get_locker(get_db().dialect_name).get_lockset(FleetModel.__tablename__)
+    fleet_lock, fleet_lockset = get_locker(get_db().dialect_name).get_lockset(
+        FleetModel.__tablename__
+    )
+    instance_lock, instance_lockset = get_locker(get_db().dialect_name).get_lockset(
+        InstanceModel.__tablename__
+    )
     async with get_session_ctx() as session:
-        async with lock:
+        async with fleet_lock, instance_lock:
             res = await session.execute(
                 select(FleetModel)
                 .where(
                     FleetModel.deleted == False,
-                    FleetModel.id.not_in(lockset),
+                    FleetModel.id.not_in(fleet_lockset),
                     FleetModel.last_processed_at
                     < get_current_datetime() - MIN_PROCESSING_INTERVAL,
                 )
-                .options(load_only(FleetModel.id))
+                .options(
+                    load_only(FleetModel.id, FleetModel.name),
+                    selectinload(FleetModel.instances).load_only(InstanceModel.id),
+                )
                 .order_by(FleetModel.last_processed_at.asc())
                 .limit(BATCH_SIZE)
                 .with_for_update(skip_locked=True, key_share=True)
             )
-            fleet_models = list(res.scalars().all())
+            fleet_models = list(res.scalars().unique().all())
             fleet_ids = [fm.id for fm in fleet_models]
+            res = await session.execute(
+                select(InstanceModel)
+                .where(
+                    InstanceModel.id.not_in(instance_lockset),
+                    InstanceModel.fleet_id.in_(fleet_ids),
+                )
+                .options(load_only(InstanceModel.id, InstanceModel.fleet_id))
+                .order_by(InstanceModel.id)
+                .with_for_update(skip_locked=True, key_share=True)
+            )
+            instance_models = list(res.scalars().all())
+            fleet_id_to_locked_instances = defaultdict(list)
+            for instance_model in instance_models:
+                fleet_id_to_locked_instances[instance_model.fleet_id].append(instance_model)
+            # Process only fleets with all instances locked.
+            # Other fleets won't be processed but will still be locked to avoid new transaction.
+            # This should not be problematic as long as process_fleets is quick.
+            fleet_models_to_process = []
+            for fleet_model in fleet_models:
+                if len(fleet_model.instances) == len(fleet_id_to_locked_instances[fleet_model.id]):
+                    fleet_models_to_process.append(fleet_model)
+                else:
+                    logger.debug(
+                        "Fleet %s processing will be skipped: some instance were not locked",
+                        fleet_model.name,
+                    )
             for fleet_id in fleet_ids:
-                lockset.add(fleet_id)
+                fleet_lockset.add(fleet_id)
+            instance_ids = [im.id for im in instance_models]
+            for instance_id in instance_ids:
+                instance_lockset.add(instance_id)
         try:
-            await _process_fleets(session=session, fleet_models=fleet_models)
+            await _process_fleets(session=session, fleet_models=fleet_models_to_process)
         finally:
-            lockset.difference_update(fleet_ids)
+            fleet_lockset.difference_update(fleet_ids)
+            instance_lockset.difference_update(instance_ids)
 
 
 async def _process_fleets(session: AsyncSession, fleet_models: List[FleetModel]):
@@ -99,8 +138,8 @@ def _consolidate_fleet_state_with_spec(session: AsyncSession, fleet_model: Fleet
         return
     if not _is_fleet_ready_for_consolidation(fleet_model):
         return
-    added_instances = _maintain_fleet_nodes_min(session, fleet_model, fleet_spec)
-    if added_instances:
+    changed_instances = _maintain_fleet_nodes_in_min_max_range(session, fleet_model, fleet_spec)
+    if changed_instances:
         fleet_model.consolidation_attempt += 1
     else:
         # The fleet is already consolidated or consolidation is in progress.
@@ -138,28 +177,47 @@ def _get_consolidation_retry_delay(consolidation_attempt: int) -> timedelta:
     return _CONSOLIDATION_RETRY_DELAYS[-1]
 
 
-def _maintain_fleet_nodes_min(
+def _maintain_fleet_nodes_in_min_max_range(
     session: AsyncSession,
     fleet_model: FleetModel,
     fleet_spec: FleetSpec,
 ) -> bool:
     """
-    Ensures the fleet has at least `nodes.min` instances.
-    Returns `True` if retried or added new instances and `False` otherwise.
+    Ensures the fleet has at least `nodes.min` and at most `nodes.max` instances.
+    Returns `True` if retried, added new instances, or terminated redundant instances and `False` otherwise.
     """
     assert fleet_spec.configuration.nodes is not None
     for instance in fleet_model.instances:
         # Delete terminated but not deleted instances since
         # they are going to be replaced with new pending instances.
         if instance.status == InstanceStatus.TERMINATED and not instance.deleted:
-            # It's safe to modify instances without instance lock since
-            # no other task modifies already terminated instances.
             instance.deleted = True
             instance.deleted_at = get_current_datetime()
     active_instances = [i for i in fleet_model.instances if not i.deleted]
     active_instances_num = len(active_instances)
     if active_instances_num >= fleet_spec.configuration.nodes.min:
-        return False
+        if (
+            fleet_spec.configuration.nodes.max is None
+            or active_instances_num <= fleet_spec.configuration.nodes.max
+        ):
+            return False
+        # Fleet has more instances than allowed by nodes.max.
+        # This is possible due to race conditions (e.g. provisioning jobs in a fleet concurrently)
+        # or if nodes.max is updated.
+        nodes_redundant = active_instances_num - fleet_spec.configuration.nodes.max
+        for instance in fleet_model.instances:
+            if nodes_redundant == 0:
+                break
+            if instance.status in [InstanceStatus.IDLE]:
+                instance.status = InstanceStatus.TERMINATING
+                instance.termination_reason = "Fleet has too many instances"
+                nodes_redundant -= 1
+                logger.info(
+                    "Terminating instance %s: %s",
+                    instance.name,
+                    instance.termination_reason,
+                )
+        return True
     nodes_missing = fleet_spec.configuration.nodes.min - active_instances_num
     for i in range(nodes_missing):
         instance_model = create_fleet_instance_model(
