@@ -12,6 +12,18 @@ install-frontend:
     cd {{source_directory()}}
     npm install
 
+run-frontend:
+    #!/usr/bin/env bash
+    set -e
+    cd {{source_directory()}}
+    npm run start
+
+run-frontend-sky:
+    #!/usr/bin/env bash
+    set -e
+    cd {{source_directory()}}
+    npm run start-sky
+
 build-frontend:
     #!/usr/bin/env bash
     set -e
