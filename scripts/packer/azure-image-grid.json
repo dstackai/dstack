@@ -65,6 +65,15 @@
     },
     {
       "type": "shell",
+      "script": "provisioners/downgrade-azure-kernel.sh"
+    },
+    {
+      "type": "shell",
+      "inline": ["sudo reboot"],
+      "expect_disconnect": true
+    },
+    {
+      "type": "shell",
       "script": "provisioners/install-nvidia-grid-driver-for-azure.sh"
     },
     {

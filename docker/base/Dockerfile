@@ -2,7 +2,7 @@
 ARG UBUNTU_VERSION
 
 # Build stage
-FROM nvidia/cuda:12.1.1-base-ubuntu${UBUNTU_VERSION}.04 AS builder
+FROM nvidia/cuda:12.8.1-base-ubuntu${UBUNTU_VERSION}.04 AS builder
 
 ENV NCCL_HOME=/opt/nccl
 ENV CUDA_HOME=/usr/local/cuda

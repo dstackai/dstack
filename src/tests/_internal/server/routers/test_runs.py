@@ -333,7 +333,7 @@ def get_dev_env_run_dict(
                 " && tail -f /dev/null"
             ),
         ]
-        image_name = "dstackai/base:0.11rc2-base-ubuntu22.04"
+        image_name = "dstackai/base:0.11-base-ubuntu22.04"
 
     return {
         "id": run_id,
