@@ -26,10 +26,10 @@ default:
     @just --list
 
 # Version of the runner and shim to upload
-export version := env_var("DSTACK_SHIM_UPLOAD_VERSION")
+export version := env("DSTACK_SHIM_UPLOAD_VERSION", "0.0.0")
 
 # S3 bucket to upload binaries to
-export s3_bucket := env_var("DSTACK_SHIM_UPLOAD_S3_BUCKET")
+export s3_bucket := env("DSTACK_SHIM_UPLOAD_S3_BUCKET", "dstack-runner-downloads-stgn")
 
 # Download URLs
 export runner_download_url := "s3://" + s3_bucket + "/" + version + "/binaries/dstack-runner-linux-amd64"
