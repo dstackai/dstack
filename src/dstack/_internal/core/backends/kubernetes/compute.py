@@ -27,7 +27,7 @@ from dstack._internal.core.backends.kubernetes.models import (
 )
 from dstack._internal.core.backends.kubernetes.utils import (
     call_api_method,
-    get_api_from_config_data,
+    get_api_from_config_dict,
     get_cluster_public_ip,
     get_value,
 )
@@ -99,7 +99,7 @@ class KubernetesCompute(
         if proxy_jump is None:
             proxy_jump = KubernetesProxyJumpConfig()
         self.proxy_jump = proxy_jump
-        self.api = get_api_from_config_data(config.kubeconfig.data)
+        self.api = get_api_from_config_dict(config.kubeconfig.data)
 
     def get_offers_by_requirements(
         self, requirements: Requirements

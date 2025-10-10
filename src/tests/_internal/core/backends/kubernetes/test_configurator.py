@@ -16,11 +16,11 @@ from dstack._internal.core.errors import BackendInvalidCredentialsError
 class TestKubernetesConfigurator:
     def test_validate_config_valid(self):
         config = KubernetesBackendConfigWithCreds(
-            kubeconfig=KubeconfigConfig(data="valid", filename="-"),
+            kubeconfig=KubeconfigConfig(data={"config": "valid"}, filename="-"),
             proxy_jump=KubernetesProxyJumpConfig(hostname=None, port=None),
         )
         with patch(
-            "dstack._internal.core.backends.kubernetes.utils.get_api_from_config_data"
+            "dstack._internal.core.backends.kubernetes.utils.get_api_from_config_dict"
         ) as get_api_mock:
             api_mock = Mock()
             api_mock.list_node.return_value = Mock()
@@ -29,12 +29,12 @@ class TestKubernetesConfigurator:
 
     def test_validate_config_invalid_config(self):
         config = KubernetesBackendConfigWithCreds(
-            kubeconfig=KubeconfigConfig(data="invalid", filename="-"),
+            kubeconfig=KubeconfigConfig(data={"config": "invalid"}, filename="-"),
             proxy_jump=KubernetesProxyJumpConfig(hostname=None, port=None),
         )
         with (
             patch(
-                "dstack._internal.core.backends.kubernetes.utils.get_api_from_config_data"
+                "dstack._internal.core.backends.kubernetes.utils.get_api_from_config_dict"
             ) as get_api_mock,
             pytest.raises(BackendInvalidCredentialsError) as exc_info,
         ):

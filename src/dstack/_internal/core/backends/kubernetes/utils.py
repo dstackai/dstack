@@ -1,18 +1,12 @@
 import ast
 from typing import Any, Callable, List, Literal, Optional, TypeVar, Union, get_origin, overload
 
-import yaml
 from kubernetes import client as kubernetes_client
 from kubernetes import config as kubernetes_config
 from typing_extensions import ParamSpec
 
 T = TypeVar("T")
 P = ParamSpec("P")
-
-
-def get_api_from_config_data(kubeconfig_data: str) -> kubernetes_client.CoreV1Api:
-    config_dict = yaml.load(kubeconfig_data, yaml.FullLoader)
-    return get_api_from_config_dict(config_dict)
 
 
 def get_api_from_config_dict(kubeconfig: dict) -> kubernetes_client.CoreV1Api:

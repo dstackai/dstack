@@ -30,7 +30,7 @@ class KubernetesConfigurator(
         self, config: KubernetesBackendConfigWithCreds, default_creds_enabled: bool
     ):
         try:
-            api = kubernetes_utils.get_api_from_config_data(config.kubeconfig.data)
+            api = kubernetes_utils.get_api_from_config_dict(config.kubeconfig.data)
             api.list_node()
         except Exception as e:
             logger.debug("Invalid kubeconfig: %s", str(e))

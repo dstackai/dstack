@@ -1,6 +1,7 @@
 from typing import Annotated, Literal, Optional, Union
 
-from pydantic import Field, root_validator
+import yaml
+from pydantic import Field, root_validator, validator
 
 from dstack._internal.core.backends.base.models import fill_data
 from dstack._internal.core.models.common import CoreModel
@@ -19,7 +20,13 @@ class KubernetesProxyJumpConfig(CoreModel):
 
 class KubeconfigConfig(CoreModel):
     filename: Annotated[str, Field(description="The path to the kubeconfig file")] = ""
-    data: Annotated[str, Field(description="The contents of the kubeconfig file")]
+    data: Annotated[dict, Field(description="The contents of the kubeconfig file")]
+
+    @validator("data", pre=True)
+    def convert_data(cls, v: Union[str, dict]) -> dict:
+        if isinstance(v, dict):
+            return v
+        return yaml.load(v, yaml.FullLoader)
 
 
 class KubernetesBackendConfig(CoreModel):
@@ -39,7 +46,8 @@ class KubernetesBackendConfigWithCreds(KubernetesBackendConfig):
 class KubeconfigFileConfig(CoreModel):
     filename: Annotated[str, Field(description="The path to the kubeconfig file")]
     data: Annotated[
-        Optional[str],
+        # str data converted to dict when parsed as KubeconfigConfig
+        Optional[Union[str, dict]],
         Field(
             description=(
                 "The contents of the kubeconfig file."
