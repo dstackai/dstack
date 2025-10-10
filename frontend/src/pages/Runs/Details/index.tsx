@@ -37,10 +37,13 @@ export const RunDetailsPage: React.FC = () => {
         error: runError,
         isLoading,
         refetch,
-    } = useGetRunQuery({
-        project_name: paramProjectName,
-        id: paramRunId,
-    });
+    } = useGetRunQuery(
+        {
+            project_name: paramProjectName,
+            id: paramRunId,
+        },
+        { pollingInterval: 10000 },
+    );
 
     useEffect(() => {
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment

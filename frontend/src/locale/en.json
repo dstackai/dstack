@@ -479,7 +479,8 @@
         "ide": "Run IDE",
         "ide_description": "Select a run ide",
         "config": "Config YAML",
-        "config_description": "Enter config YAML"
+        "config_description": "Enter config YAML",
+        "success_notification": "Run is created!"
       }
     }
   },

@@ -3,7 +3,6 @@ import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import cn from 'classnames';
-import jsYaml from 'js-yaml';
 import * as yup from 'yup';
 import { WizardProps } from '@cloudscape-design/components';
 import { CardsProps } from '@cloudscape-design/components/cards';
@@ -12,7 +11,7 @@ import { Container, FormCodeEditor, FormField, FormInput, FormSelect, SpaceBetwe
 
 import { useBreadcrumbs, useNotifications } from 'hooks';
 import { getServerError } from 'libs';
-import { getRunSpecConfigurationResources, getRunSpecFromYaml } from 'libs/run';
+import { getRunSpecFromYaml } from 'libs/run';
 import { ROUTES } from 'routes';
 import { useApplyRunMutation } from 'services/run';
 
@@ -191,7 +190,7 @@ export const CreateDevEnvironment: React.FC = () => {
             .then((data) => {
                 pushNotification({
                     type: 'success',
-                    content: t('projects.create.success_notification'),
+                    content: t('runs.dev_env.wizard.success_notification'),
                 });
 
                 navigate(ROUTES.PROJECT.DETAILS.RUNS.DETAILS.FORMAT(data.project_name, data.id));
