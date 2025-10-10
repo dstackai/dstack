@@ -287,10 +287,26 @@ to configure [backends](../../concepts/backends.md) and other [server-level sett
         show_root_heading: false
 
 ??? info "Specifying `data`"
-    To specify kubeconfig contents directly via `data`, convert it to a string:
+    To specify kubeconfig contents directly via `data`, you can convert it to a string:
 
     ```shell
     yq -o=json ~/.kube/config | jq -c | jq -R
+    ```
+
+    or copy kubeconfig contents under `data` as-is:
+
+    ```yaml
+    type: kubernetes
+    kubeconfig:
+      data:
+        apiVersion: v1
+        clusters:
+        - cluster:
+            # ...
+        contexts:
+        - context:
+            # ...
+        # ...
     ```
 
 ###### `projects[n].backends[type=kubernetes].proxy_jump` { #kubernetes-proxy_jump data-toc-label="proxy_jump" }
