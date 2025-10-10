@@ -135,7 +135,17 @@ export const RunList: React.FC = () => {
                     actions={
                         <SpaceBetween size="xs" direction="horizontal">
                             <ButtonDropdown
-                                items={[{ text: 'New dev environment', id: 'dev_env', href: ROUTES.RUNS.CREATE_DEV_ENV }]}
+                                items={[
+                                    {
+                                        text: 'New dev environment',
+                                        id: 'dev_env',
+                                        href: `${ROUTES.RUNS.CREATE_DEV_ENV}${
+                                            filteringRequestParams.project_name
+                                                ? `?project_name=${filteringRequestParams.project_name}`
+                                                : ''
+                                        }`,
+                                    },
+                                ]}
                                 onItemFollow={onFollowButtonDropdownLink}
                             >
                                 {t('common.new')}

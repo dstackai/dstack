@@ -1,29 +1,46 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import cn from 'classnames';
+import jsYaml from 'js-yaml';
 import * as yup from 'yup';
 import { WizardProps } from '@cloudscape-design/components';
 import { CardsProps } from '@cloudscape-design/components/cards';
 
-import { Code, Container, FormCodeEditor, FormField, FormInput, KeyValuePairs, SpaceBetween, Wizard } from 'components';
+import { Container, FormCodeEditor, FormField, FormInput, FormSelect, SpaceBetween, Wizard } from 'components';
 
 import { useBreadcrumbs, useNotifications } from 'hooks';
+import { getServerError } from 'libs';
+import { getRunSpecConfigurationResources, getRunSpecFromYaml } from 'libs/run';
 import { ROUTES } from 'routes';
+import { useApplyRunMutation } from 'services/run';
 
 import { OfferList } from 'pages/Offers/List';
+import { convertMiBToGB, renderRange, round } from 'pages/Offers/List/helpers';
 
 import { IRunEnvironmentFormValues } from './types';
+
+import styles from './styles.module.scss';
 
 const requiredFieldError = 'This is required field';
 const namesFieldError = 'Only latin characters, dashes, underscores, and digits';
 
+const ideOptions = [
+    {
+        label: 'cursor',
+        value: 'cursor',
+    },
+    {
+        label: 'vscode',
+        value: 'vscode',
+    },
+];
+
 const envValidationSchema = yup.object({
     offer: yup.object().required(requiredFieldError),
-    name: yup
-        .string()
-        .required(requiredFieldError)
-        .matches(/^[a-zA-Z0-9-_]+$/, namesFieldError),
+    name: yup.string().matches(/^[a-zA-Z0-9-_]+$/, namesFieldError),
+    ide: yup.string().required(requiredFieldError),
     config_yaml: yup.string().required(requiredFieldError),
 });
 
@@ -66,12 +83,18 @@ const useYupValidationResolver = (validationSchema) =>
 
 export const CreateDevEnvironment: React.FC = () => {
     const { t } = useTranslation();
+    const [searchParams] = useSearchParams();
     const navigate = useNavigate();
     const [pushNotification] = useNotifications();
     const [activeStepIndex, setActiveStepIndex] = useState(0);
     const [selectedOffers, setSelectedOffers] = useState<IGpu[]>([]);
+    const [selectedProject, setSelectedProject] = useState<IProject['project_name'] | null>(
+        () => searchParams.get('project_name') ?? null,
+    );
 
-    const loading = false;
+    const [applyRun, { isLoading: isApplying }] = useApplyRunMutation();
+
+    const loading = isApplying;
 
     useBreadcrumbs([
         {
@@ -87,9 +110,11 @@ export const CreateDevEnvironment: React.FC = () => {
     const resolver = useYupValidationResolver(envValidationSchema);
     const formMethods = useForm<IRunEnvironmentFormValues>({
         resolver,
-        defaultValues: {},
+        defaultValues: {
+            ide: 'cursor',
+        },
     });
-    const { handleSubmit, control, trigger, setValue, watch, formState } = formMethods;
+    const { handleSubmit, control, trigger, setValue, watch, formState, getValues } = formMethods;
     const formValues = watch();
 
     const onCancelHandler = () => {
@@ -101,7 +126,7 @@ export const CreateDevEnvironment: React.FC = () => {
     };
 
     const validateName = async () => {
-        return await trigger(['name']);
+        return await trigger(['name', 'ide']);
     };
 
     const validateConfig = async () => {
@@ -147,7 +172,36 @@ export const CreateDevEnvironment: React.FC = () => {
             return;
         }
 
-        // TODO send request
+        const { config_yaml } = getValues();
+
+        const requestParams: TRunApplyRequestParams = {
+            project_name: selectedProject ?? '',
+            plan: {
+                run_spec: {
+                    ...(await getRunSpecFromYaml(config_yaml)),
+                    ssh_key_pub: 'dummy',
+                },
+            },
+            force: false,
+        };
+
+        // TODO fix params
+        applyRun(requestParams)
+            .unwrap()
+            .then((data) => {
+                pushNotification({
+                    type: 'success',
+                    content: t('projects.create.success_notification'),
+                });
+
+                navigate(ROUTES.PROJECT.DETAILS.RUNS.DETAILS.FORMAT(data.project_name, data.id));
+            })
+            .catch((error) => {
+                pushNotification({
+                    type: 'error',
+                    content: t('common.server_error', { error: getServerError(error) }),
+                });
+            });
     };
 
     const onSubmit = () => {
@@ -158,8 +212,34 @@ export const CreateDevEnvironment: React.FC = () => {
         }
     };
 
+    useEffect(() => {
+        if (!formValues.offer || !formValues.ide) {
+            return;
+        }
+
+        setValue(
+            'config_yaml',
+            `type: dev-environment
+${`${
+    formValues.name
+        ? `name: ${formValues.name}
+
+`
+        : ''
+}`}ide: ${formValues.ide}
+
+resources:
+  gpu: ${formValues.offer.name}:${round(convertMiBToGB(formValues.offer.memory_mib))}GB:${renderRange(formValues.offer.count)}
+
+backends: [${formValues.offer.backends?.join(', ')}]
+
+spot_policy: auto
+        `,
+        );
+    }, [formValues.name, formValues.ide, formValues.offer]);
+
     return (
-        <form onSubmit={handleSubmit(onSubmit)}>
+        <form className={cn({ [styles.wizardForm]: activeStepIndex === 0 })} onSubmit={handleSubmit(onSubmit)}>
             <Wizard
                 activeStepIndex={activeStepIndex}
                 onNavigate={onNavigateHandler}
@@ -184,6 +264,7 @@ export const CreateDevEnvironment: React.FC = () => {
                                     description={t('runs.dev_env.wizard.offer_description')}
                                 />
                                 <OfferList
+                                    onChangeProjectName={(projectName) => setSelectedProject(projectName)}
                                     selectionType="single"
                                     withSearchParams={false}
                                     selectedItems={selectedOffers}
@@ -195,15 +276,24 @@ export const CreateDevEnvironment: React.FC = () => {
                     },
 
                     {
-                        title: 'Name',
+                        title: 'Name and IDE',
                         content: (
                             <Container>
                                 <SpaceBetween direction="vertical" size="l">
                                     <FormInput
                                         label={t('runs.dev_env.wizard.name')}
                                         description={t('runs.dev_env.wizard.name_description')}
+                                        placeholder={t('runs.dev_env.wizard.name_placeholder')}
                                         control={control}
                                         name="name"
+                                        disabled={loading}
+                                    />
+                                    <FormSelect
+                                        label={t('runs.dev_env.wizard.ide')}
+                                        description={t('runs.dev_env.wizard.ide_description')}
+                                        control={control}
+                                        name="ide"
+                                        options={ideOptions}
                                         disabled={loading}
                                     />
                                 </SpaceBetween>
@@ -223,30 +313,6 @@ export const CreateDevEnvironment: React.FC = () => {
                                     language="yaml"
                                     loading={loading}
                                     editorContentHeight={600}
-                                />
-                            </Container>
-                        ),
-                    },
-
-                    {
-                        title: 'Summary',
-                        content: (
-                            <Container>
-                                <KeyValuePairs
-                                    items={[
-                                        {
-                                            label: t('runs.dev_env.wizard.offer'),
-                                            value: formValues['offer']?.name,
-                                        },
-                                        {
-                                            label: t('runs.dev_env.wizard.name'),
-                                            value: formValues['name'],
-                                        },
-                                        {
-                                            label: t('runs.dev_env.wizard.config'),
-                                            value: <Code>{formValues['config_yaml']}</Code>,
-                                        },
-                                    ]}
                                 />
                             </Container>
                         ),

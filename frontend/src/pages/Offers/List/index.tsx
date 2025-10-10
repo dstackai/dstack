@@ -68,9 +68,10 @@ const getRequestParams = ({
 
 type OfferListProps = Pick<CardsProps, 'variant' | 'header' | 'onSelectionChange' | 'selectedItems' | 'selectionType'> & {
     withSearchParams?: boolean;
+    onChangeProjectName?: (value: string) => void;
 };
 
-export const OfferList: React.FC<OfferListProps> = ({ withSearchParams, ...props }) => {
+export const OfferList: React.FC<OfferListProps> = ({ withSearchParams, onChangeProjectName, ...props }) => {
     const { t } = useTranslation();
     const [requestParams, setRequestParams] = useState<TGpusListQueryParams | undefined>();
     const { data, isLoading, isFetching } = useGetGpusListQuery(
@@ -104,6 +105,10 @@ export const OfferList: React.FC<OfferListProps> = ({ withSearchParams, ...props
             }),
         );
     }, [JSON.stringify(filteringRequestParams), groupBy]);
+
+    useEffect(() => {
+        onChangeProjectName?.(filteringRequestParams.project_name ?? '');
+    }, [filteringRequestParams.project_name]);
 
     const { renderEmptyMessage, renderNoMatchMessage } = useEmptyMessages({
         clearFilter,

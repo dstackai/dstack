@@ -472,9 +472,12 @@
         "title": "Create dev environment",
         "submit": "Apply",
         "offer": "Offer",
-        "offer_description": "Select offer for run",
+        "offer_description": "Select a offer for run",
         "name": "Run name",
         "name_description": "Enter run name",
+        "name_placeholder": "Optional(generated automatically)",
+        "ide": "Run IDE",
+        "ide_description": "Select a run ide",
         "config": "Config YAML",
         "config_description": "Enter config YAML"
       }

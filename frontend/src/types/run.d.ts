@@ -10,6 +10,34 @@ declare type TRunsRequestParams = {
     job_submissions_limit?: number;
 };
 
+declare type TGPUResources = IGPUSpecRequest & {
+    name?: string | string[];
+};
+
+declare type TDevEnvironmentConfiguration = {
+    ide: string;
+    resources?: {
+        gpu?: TGPUResources | string | number;
+        cpu?: number | { min: number; max: number };
+        memory?: number | { min: number; max: number };
+    };
+    backends?: string[];
+    ssh_key_pub: string;
+};
+
+declare type TRunSpec = {
+    run_name: string;
+    configuration: TDevEnvironmentConfiguration;
+    ssh_key_pub: string;
+};
+declare type TRunApplyRequestParams = {
+    project_name: string;
+    plan: {
+        run_spec: TRunSpec;
+    };
+    force: boolean;
+};
+
 declare type TDeleteRunsRequestParams = {
     project_name: IProject['project_name'];
     runs_names: IRun['run_name'][];
@@ -129,18 +157,18 @@ declare interface IJob {
 
 declare interface IDevEnvironmentConfiguration {
     type: 'dev-environment';
-    priority?: number | null
+    priority?: number | null;
 }
 
 declare interface ITaskConfiguration {
     type: 'task';
-    priority?: number | null
+    priority?: number | null;
 }
 
 declare interface IServiceConfiguration {
     type: 'service';
     gateway: string | null;
-    priority?: number | null
+    priority?: number | null;
 }
 declare interface IRunSpec {
     configuration: IDevEnvironmentConfiguration | ITaskConfiguration | IServiceConfiguration;
