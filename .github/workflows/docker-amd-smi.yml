@@ -15,6 +15,10 @@ on:
         description: "Docker image revision"
         required: true
         default: 0
+      tag_latest:
+        description: "Update 'latest'"
+        type: boolean
+        default: false
 
 jobs:
   build-amd-smi:
@@ -48,4 +52,7 @@ jobs:
           VERSION=$(docker inspect --format '{{ index .Config.Labels "org.opencontainers.image.version" }}' ${IMAGE_NAME})
           docker tag ${IMAGE_NAME}:latest ${IMAGE_NAME}:${VERSION}
           docker push ${IMAGE_NAME}:${VERSION}
-          docker push ${IMAGE_NAME}:latest
+      - name: Tag and push latest
+        if: ${{ inputs.tag_latest }}
+        run: |
+          docker push ${{ inputs.image_name }}:latest
