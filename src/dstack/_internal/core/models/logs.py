@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import Enum
-from typing import List
+from typing import List, Optional
 
 from dstack._internal.core.models.common import CoreModel
 
@@ -23,3 +23,5 @@ class LogEvent(CoreModel):
 
 class JobSubmissionLogs(CoreModel):
     logs: List[LogEvent]
+    external_url: Optional[str] = None
+    next_token: Optional[str] = None

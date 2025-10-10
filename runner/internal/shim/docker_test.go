@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"os"
 	"os/exec"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -20,21 +21,24 @@ import (
 
 // TestDocker_SSHServer pulls ubuntu image (without sshd), installs openssh-server and exits
 func TestDocker_SSHServer(t *testing.T) {
-	if testing.Short() {
+	if testing.Short() || (os.Getenv("CI") == "true" && runtime.GOOS == "darwin") {
 		t.Skip()
 	}
 	t.Parallel()
 
 	params := &dockerParametersMock{
-		commands: []string{"echo 1"},
-		sshPort:  nextPort(),
+		commands:  []string{"echo 1"},
+		sshPort:   nextPort(),
+		runnerDir: t.TempDir(),
 	}
 
 	timeout := 180 // seconds
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 	defer cancel()
 
-	dockerRunner, _ := NewDockerRunner(ctx, params)
+	dockerRunner, err := NewDockerRunner(ctx, params)
+	require.NoError(t, err)
+
 	taskConfig := createTaskConfig(t)
 	defer dockerRunner.Remove(context.Background(), taskConfig.ID)
 
@@ -44,7 +48,7 @@ func TestDocker_SSHServer(t *testing.T) {
 
 // TestDocker_SSHServerConnect pulls ubuntu image (without sshd), installs openssh-server and tries to connect via SSH
 func TestDocker_SSHServerConnect(t *testing.T) {
-	if testing.Short() {
+	if testing.Short() || (os.Getenv("CI") == "true" && runtime.GOOS == "darwin") {
 		t.Skip()
 	}
 	t.Parallel()
@@ -58,13 +62,15 @@ func TestDocker_SSHServerConnect(t *testing.T) {
 		commands:     []string{"sleep 5"},
 		sshPort:      nextPort(),
 		publicSSHKey: string(publicBytes),
+		runnerDir:    t.TempDir(),
 	}
 
 	timeout := 180 // seconds
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 	defer cancel()
 
-	dockerRunner, _ := NewDockerRunner(ctx, params)
+	dockerRunner, err := NewDockerRunner(ctx, params)
+	require.NoError(t, err)
 
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -97,20 +103,23 @@ func TestDocker_SSHServerConnect(t *testing.T) {
 }
 
 func TestDocker_ShmNoexecByDefault(t *testing.T) {
-	if testing.Short() {
+	if testing.Short() || (os.Getenv("CI") == "true" && runtime.GOOS == "darwin") {
 		t.Skip()
 	}
 	t.Parallel()
 
 	params := &dockerParametersMock{
-		commands: []string{"mount | grep '/dev/shm .*size=65536k' | grep noexec"},
+		commands:  []string{"mount | grep '/dev/shm .*size=65536k' | grep noexec"},
+		runnerDir: t.TempDir(),
 	}
 
 	timeout := 180 // seconds
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 	defer cancel()
 
-	dockerRunner, _ := NewDockerRunner(ctx, params)
+	dockerRunner, err := NewDockerRunner(ctx, params)
+	require.NoError(t, err)
+
 	taskConfig := createTaskConfig(t)
 	defer dockerRunner.Remove(context.Background(), taskConfig.ID)
 
@@ -119,20 +128,23 @@ func TestDocker_ShmNoexecByDefault(t *testing.T) {
 }
 
 func TestDocker_ShmExecIfSizeSpecified(t *testing.T) {
-	if testing.Short() {
+	if testing.Short() || (os.Getenv("CI") == "true" && runtime.GOOS == "darwin") {
 		t.Skip()
 	}
 	t.Parallel()
 
 	params := &dockerParametersMock{
-		commands: []string{"mount | grep '/dev/shm .*size=1024k' | grep -v noexec"},
+		commands:  []string{"mount | grep '/dev/shm .*size=1024k' | grep -v noexec"},
+		runnerDir: t.TempDir(),
 	}
 
 	timeout := 180 // seconds
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 	defer cancel()
 
-	dockerRunner, _ := NewDockerRunner(ctx, params)
+	dockerRunner, err := NewDockerRunner(ctx, params)
+	require.NoError(t, err)
+
 	taskConfig := createTaskConfig(t)
 	taskConfig.ShmSize = 1024 * 1024
 	defer dockerRunner.Remove(context.Background(), taskConfig.ID)
@@ -148,6 +160,7 @@ type dockerParametersMock struct {
 	commands     []string
 	sshPort      int
 	publicSSHKey string
+	runnerDir    string
 }
 
 func (c *dockerParametersMock) DockerPrivileged() bool {
@@ -184,7 +197,7 @@ func (c *dockerParametersMock) DockerMounts(string) ([]mount.Mount, error) {
 }
 
 func (c *dockerParametersMock) MakeRunnerDir(string) (string, error) {
-	return "", nil
+	return c.runnerDir, nil
 }
 
 /* Utilities */

@@ -23,8 +23,8 @@
     "managed_image_name": "{{user `build_prefix`}}dstack-cuda-{{user `image_version` | clean_resource_name}}",
     "os_type": "Linux",
     "image_publisher": "canonical",
-    "image_offer": "0001-com-ubuntu-server-jammy",
-    "image_sku": "22_04-lts-gen2",
+    "image_offer": "ubuntu-24_04-lts",
+    "image_sku": "server",
     "azure_tags": {
         "Name": "DSTACK-CUDA"
     },
@@ -72,14 +72,6 @@
     {
       "type": "shell",
       "script": "provisioners/install-nvidia-container-toolkit.sh"
-    },
-    {
-      "type": "shell",
-      "environment_vars": [
-        "IMAGE_REPO={{user `image_repo`}}",
-        "IMAGE_VERSION={{user `image_version`}}"
-      ],
-      "script": "provisioners/pull-docker-images.sh"
     },
     {
       "type": "shell",

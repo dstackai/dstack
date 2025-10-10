@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional
+from typing import Callable, Dict, List, Optional
 
 from datacrunch import DataCrunchClient
 from datacrunch.exceptions import APIException
@@ -6,11 +6,13 @@ from datacrunch.instances.instances import Instance
 
 from dstack._internal.core.backends.base.backend import Compute
 from dstack._internal.core.backends.base.compute import (
+    ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
+    ComputeWithPrivilegedSupport,
     generate_unique_instance_name,
     get_shim_commands,
 )
-from dstack._internal.core.backends.base.offers import get_catalog_offers
+from dstack._internal.core.backends.base.offers import get_catalog_offers, get_offers_disk_modifier
 from dstack._internal.core.backends.datacrunch.models import DataCrunchConfig
 from dstack._internal.core.errors import NoCapacityError
 from dstack._internal.core.models.backends.base import BackendType
@@ -36,7 +38,9 @@ CONFIGURABLE_DISK_SIZE = Range[Memory](min=IMAGE_SIZE, max=None)
 
 
 class DataCrunchCompute(
+    ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
+    ComputeWithPrivilegedSupport,
     Compute,
 ):
     def __init__(self, config: DataCrunchConfig):
@@ -47,17 +51,18 @@ class DataCrunchCompute(
             client_secret=self.config.creds.client_secret,
         )
 
-    def get_offers(
-        self, requirements: Optional[Requirements] = None
-    ) -> List[InstanceOfferWithAvailability]:
+    def get_all_offers_with_availability(self) -> List[InstanceOfferWithAvailability]:
         offers = get_catalog_offers(
             backend=BackendType.DATACRUNCH,
             locations=self.config.regions,
-            requirements=requirements,
-            configurable_disk_size=CONFIGURABLE_DISK_SIZE,
         )
         offers_with_availability = self._get_offers_with_availability(offers)
         return offers_with_availability
+
+    def get_offers_modifier(
+        self, requirements: Requirements
+    ) -> Callable[[InstanceOfferWithAvailability], Optional[InstanceOfferWithAvailability]]:
+        return get_offers_disk_modifier(CONFIGURABLE_DISK_SIZE, requirements)
 
     def _get_offers_with_availability(
         self, offers: List[InstanceOffer]
@@ -161,7 +166,10 @@ class DataCrunchCompute(
         try:
             self.client.instances.action(id_list=[instance_id], action="delete")
         except APIException as e:
-            if e.message == "Invalid instance id":
+            if e.message in [
+                "Invalid instance id",
+                "Can't discontinue a discontinued instance",
+            ]:
                 logger.debug("Skipping instance %s termination. Instance not found.", instance_id)
                 return
             raise
@@ -179,10 +187,9 @@ class DataCrunchCompute(
 
 def _get_vm_image_id(instance_offer: InstanceOfferWithAvailability) -> str:
     # https://api.datacrunch.io/v1/images
-    if (
-        len(instance_offer.instance.resources.gpus) > 0
-        and instance_offer.instance.resources.gpus[0].name == "V100"
-    ):
+    if len(instance_offer.instance.resources.gpus) > 0 and instance_offer.instance.resources.gpus[
+        0
+    ].name in ["V100", "A6000"]:
         # Ubuntu 22.04 + CUDA 12.0 + Docker
         return "2088da25-bb0d-41cc-a191-dccae45d96fd"
     # Ubuntu 24.04 + CUDA 12.8 Open + Docker
@@ -243,6 +250,7 @@ def _deploy_instance(
             hostname=hostname,
             description=description,
             startup_script_id=startup_script_id,
+            pricing="FIXED_PRICE",
             is_spot=is_spot,
             location=location,
             os_volume={"name": "OS volume", "size": disk_size},

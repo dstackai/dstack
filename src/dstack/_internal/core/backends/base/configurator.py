@@ -1,11 +1,11 @@
 from abc import ABC, abstractmethod
-from typing import Any, ClassVar, List, Optional
+from typing import Any, ClassVar, Generic, List, Optional, TypeVar
 from uuid import UUID
 
 from dstack._internal.core.backends.base.backend import Backend
 from dstack._internal.core.backends.models import (
-    AnyBackendConfig,
     AnyBackendConfigWithCreds,
+    AnyBackendConfigWithoutCreds,
 )
 from dstack._internal.core.errors import BackendInvalidCredentialsError
 from dstack._internal.core.models.backends.base import BackendType
@@ -14,6 +14,11 @@ from dstack._internal.core.models.common import CoreModel
 # Most clouds allow ~ 40-60 tags/labels per resource.
 # We'll introduce our own base limit that can be customized per backend if required.
 TAGS_MAX_NUM = 25
+
+BackendConfigWithoutCredsT = TypeVar(
+    "BackendConfigWithoutCredsT", bound=AnyBackendConfigWithoutCreds
+)
+BackendConfigWithCredsT = TypeVar("BackendConfigWithCredsT", bound=AnyBackendConfigWithCreds)
 
 
 class BackendRecord(CoreModel):
@@ -39,7 +44,7 @@ class StoredBackendRecord(BackendRecord):
     backend_id: UUID
 
 
-class Configurator(ABC):
+class Configurator(ABC, Generic[BackendConfigWithoutCredsT, BackendConfigWithCredsT]):
     """
     `Configurator` is responsible for configuring backends
     and initializing `Backend` instances from backend configs.
@@ -52,7 +57,7 @@ class Configurator(ABC):
     BACKEND_CLASS: ClassVar[type[Backend]]
 
     @abstractmethod
-    def validate_config(self, config: AnyBackendConfigWithCreds, default_creds_enabled: bool):
+    def validate_config(self, config: BackendConfigWithCredsT, default_creds_enabled: bool):
         """
         Validates backend config including backend creds and other parameters.
         Raises `ServerClientError` or its subclass if config is invalid.
@@ -61,9 +66,7 @@ class Configurator(ABC):
         pass
 
     @abstractmethod
-    def create_backend(
-        self, project_name: str, config: AnyBackendConfigWithCreds
-    ) -> BackendRecord:
+    def create_backend(self, project_name: str, config: BackendConfigWithCredsT) -> BackendRecord:
         """
         Sets up backend given backend config and returns
         text-encoded config and creds to be stored in the DB.
@@ -78,13 +81,22 @@ class Configurator(ABC):
         pass
 
     @abstractmethod
-    def get_backend_config(
-        self, record: StoredBackendRecord, include_creds: bool
-    ) -> AnyBackendConfig:
+    def get_backend_config_with_creds(
+        self, record: StoredBackendRecord
+    ) -> BackendConfigWithCredsT:
         """
-        Constructs `BackendConfig` to be returned in API responses.
-        Project admins may need to see backend's creds. In this case `include_creds` will be `True`.
-        Otherwise, no sensitive information should be included.
+        Constructs `BackendConfig` with credentials included.
+        Used internally and when project admins need to see backend's creds.
+        """
+        pass
+
+    @abstractmethod
+    def get_backend_config_without_creds(
+        self, record: StoredBackendRecord
+    ) -> BackendConfigWithoutCredsT:
+        """
+        Constructs `BackendConfig` without sensitive information.
+        Used for API responses where creds should not be exposed.
         """
         pass
 

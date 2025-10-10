@@ -10,6 +10,12 @@ export const extendedProjectApi = projectApi.injectEndpoints({
                 method: 'POST',
             }),
         }),
+        getBackendBaseTypes: builder.query<TBackendType[], void>({
+            query: () => ({
+                url: API.BACKENDS.LIST_BASE_TYPES(),
+                method: 'POST',
+            }),
+        }),
 
         createBackend: builder.mutation<TBackendConfig, { projectName: IProject['project_name']; config: TBackendConfig }>({
             query: ({ projectName, config }) => ({
@@ -108,6 +114,7 @@ export const extendedProjectApi = projectApi.injectEndpoints({
 
 export const {
     useGetBackendTypesQuery,
+    useGetBackendBaseTypesQuery,
     useDeleteProjectBackendMutation,
     useCreateBackendMutation,
     useBackendValuesMutation,

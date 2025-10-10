@@ -5,8 +5,9 @@ from sqlalchemy.orm import joinedload
 from dstack._internal.core.backends.base.compute import ComputeWithVolumeSupport
 from dstack._internal.core.errors import BackendError, BackendNotAvailable
 from dstack._internal.core.models.volumes import VolumeStatus
-from dstack._internal.server.db import get_session_ctx
+from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import (
+    FleetModel,
     InstanceModel,
     ProjectModel,
     VolumeAttachmentModel,
@@ -15,14 +16,16 @@ from dstack._internal.server.models import (
 from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services import volumes as volumes_services
 from dstack._internal.server.services.locking import get_locker
+from dstack._internal.server.utils import sentry_utils
 from dstack._internal.utils.common import get_current_datetime, run_async
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
 
+@sentry_utils.instrument_background_task
 async def process_submitted_volumes():
-    lock, lockset = get_locker().get_lockset(VolumeModel.__tablename__)
+    lock, lockset = get_locker(get_db().dialect_name).get_lockset(VolumeModel.__tablename__)
     async with get_session_ctx() as session:
         async with lock:
             res = await session.execute(
@@ -33,14 +36,14 @@ async def process_submitted_volumes():
                 )
                 .order_by(VolumeModel.last_processed_at.asc())
                 .limit(1)
-                .with_for_update(skip_locked=True)
+                .with_for_update(skip_locked=True, key_share=True)
             )
             volume_model = res.scalar()
             if volume_model is None:
                 return
             lockset.add(volume_model.id)
+        volume_model_id = volume_model.id
         try:
-            volume_model_id = volume_model.id
             await _process_submitted_volume(session=session, volume_model=volume_model)
         finally:
             lockset.difference_update([volume_model_id])
@@ -49,7 +52,6 @@ async def process_submitted_volumes():
 async def _process_submitted_volume(session: AsyncSession, volume_model: VolumeModel):
     logger.info("Started submitted volume %s processing", volume_model.name)
     # Refetch to load related attributes.
-    # joinedload produces LEFT OUTER JOIN that can't be used with FOR UPDATE.
     res = await session.execute(
         select(VolumeModel)
         .where(VolumeModel.id == volume_model.id)
@@ -59,6 +61,7 @@ async def _process_submitted_volume(session: AsyncSession, volume_model: VolumeM
             joinedload(VolumeModel.attachments)
             .joinedload(VolumeAttachmentModel.instance)
             .joinedload(InstanceModel.fleet)
+            .load_only(FleetModel.name)
         )
         .execution_options(populate_existing=True)
     )

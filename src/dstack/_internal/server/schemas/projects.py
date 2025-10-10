@@ -11,6 +11,10 @@ class CreateProjectRequest(CoreModel):
     is_public: bool = False
 
 
+class UpdateProjectRequest(CoreModel):
+    is_public: bool
+
+
 class DeleteProjectsRequest(CoreModel):
     projects_names: List[str]
 
@@ -25,3 +29,11 @@ class MemberSetting(CoreModel):
 
 class SetProjectMembersRequest(CoreModel):
     members: List[MemberSetting]
+
+
+class AddProjectMemberRequest(CoreModel):
+    members: List[MemberSetting]
+
+
+class RemoveProjectMemberRequest(CoreModel):
+    usernames: List[str]

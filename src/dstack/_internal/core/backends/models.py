@@ -8,6 +8,10 @@ from dstack._internal.core.backends.azure.models import (
     AzureBackendConfig,
     AzureBackendConfigWithCreds,
 )
+from dstack._internal.core.backends.cloudrift.models import (
+    CloudRiftBackendConfig,
+    CloudRiftBackendConfigWithCreds,
+)
 from dstack._internal.core.backends.cudo.models import (
     CudoBackendConfig,
     CudoBackendConfigWithCreds,
@@ -15,6 +19,10 @@ from dstack._internal.core.backends.cudo.models import (
 from dstack._internal.core.backends.datacrunch.models import (
     DataCrunchBackendConfig,
     DataCrunchBackendConfigWithCreds,
+)
+from dstack._internal.core.backends.digitalocean_base.models import (
+    BaseDigitalOceanBackendConfig,
+    BaseDigitalOceanBackendConfigWithCreds,
 )
 from dstack._internal.core.backends.dstack.models import (
     DstackBackendConfig,
@@ -24,6 +32,11 @@ from dstack._internal.core.backends.gcp.models import (
     GCPBackendConfig,
     GCPBackendConfigWithCreds,
     GCPBackendFileConfigWithCreds,
+)
+from dstack._internal.core.backends.hotaisle.models import (
+    HotAisleBackendConfig,
+    HotAisleBackendConfigWithCreds,
+    HotAisleBackendFileConfigWithCreds,
 )
 from dstack._internal.core.backends.kubernetes.models import (
     KubernetesBackendConfig,
@@ -65,9 +78,12 @@ from dstack._internal.core.models.common import CoreModel
 AnyBackendConfigWithoutCreds = Union[
     AWSBackendConfig,
     AzureBackendConfig,
+    CloudRiftBackendConfig,
     CudoBackendConfig,
     DataCrunchBackendConfig,
+    BaseDigitalOceanBackendConfig,
     GCPBackendConfig,
+    HotAisleBackendConfig,
     KubernetesBackendConfig,
     LambdaBackendConfig,
     NebiusBackendConfig,
@@ -86,9 +102,12 @@ AnyBackendConfigWithoutCreds = Union[
 AnyBackendConfigWithCreds = Union[
     AWSBackendConfigWithCreds,
     AzureBackendConfigWithCreds,
+    CloudRiftBackendConfigWithCreds,
     CudoBackendConfigWithCreds,
     DataCrunchBackendConfigWithCreds,
+    BaseDigitalOceanBackendConfigWithCreds,
     GCPBackendConfigWithCreds,
+    HotAisleBackendConfigWithCreds,
     KubernetesBackendConfigWithCreds,
     LambdaBackendConfigWithCreds,
     OCIBackendConfigWithCreds,
@@ -106,9 +125,12 @@ AnyBackendConfigWithCreds = Union[
 AnyBackendFileConfigWithCreds = Union[
     AWSBackendConfigWithCreds,
     AzureBackendConfigWithCreds,
+    CloudRiftBackendConfigWithCreds,
     CudoBackendConfigWithCreds,
     DataCrunchBackendConfigWithCreds,
+    BaseDigitalOceanBackendConfigWithCreds,
     GCPBackendFileConfigWithCreds,
+    HotAisleBackendFileConfigWithCreds,
     KubernetesBackendFileConfigWithCreds,
     LambdaBackendConfigWithCreds,
     OCIBackendConfigWithCreds,

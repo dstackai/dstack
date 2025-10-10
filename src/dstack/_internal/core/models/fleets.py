@@ -2,13 +2,18 @@ import ipaddress
 import uuid
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Type, Union
+from typing import Any, Dict, List, Optional, Union
 
 from pydantic import Field, root_validator, validator
 from typing_extensions import Annotated, Literal
 
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.common import CoreModel
+from dstack._internal.core.models.common import (
+    ApplyAction,
+    CoreConfig,
+    CoreModel,
+    generate_dual_core_model,
+)
 from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.instances import Instance, InstanceOfferWithAvailability, SSHKey
 from dstack._internal.core.models.profiles import (
@@ -19,7 +24,7 @@ from dstack._internal.core.models.profiles import (
     TerminationPolicy,
     parse_idle_duration,
 )
-from dstack._internal.core.models.resources import Range, ResourcesSpec
+from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.utils.common import list_enum_values_for_annotation
 from dstack._internal.utils.json_schema import add_extra_schema_types
 from dstack._internal.utils.tags import tags_validator
@@ -141,6 +146,82 @@ class SSHParams(CoreModel):
         return value
 
 
+class FleetNodesSpec(CoreModel):
+    min: Annotated[
+        int, Field(description=("The minimum number of instances to maintain in the fleet"))
+    ]
+    target: Annotated[
+        int,
+        Field(
+            description=(
+                "The number of instances to provision on fleet apply. `min` <= `target` <= `max`"
+                " Defaults to `min`"
+            )
+        ),
+    ]
+    max: Annotated[
+        Optional[int],
+        Field(
+            description=(
+                "The maximum number of instances allowed in the fleet. Unlimited if not specified"
+            )
+        ),
+    ] = None
+
+    def dict(self, *args, **kwargs) -> Dict:
+        # super() does not work with pydantic-duality
+        res = CoreModel.dict(self, *args, **kwargs)
+        # For backward compatibility with old clients
+        # that do not ignore extra fields due to https://github.com/dstackai/dstack/issues/3066
+        if "target" in res and res["target"] == res["min"]:
+            del res["target"]
+        return res
+
+    @root_validator(pre=True)
+    def set_min_and_target_defaults(cls, values):
+        min_ = values.get("min")
+        target = values.get("target")
+        if min_ is None:
+            values["min"] = 0
+        if target is None:
+            values["target"] = values["min"]
+        return values
+
+    @validator("min")
+    def validate_min(cls, v: int) -> int:
+        if v < 0:
+            raise ValueError("min cannot be negative")
+        return v
+
+    @root_validator(skip_on_failure=True)
+    def _post_validate_ranges(cls, values):
+        min_ = values["min"]
+        target = values["target"]
+        max_ = values.get("max")
+        if target < min_:
+            raise ValueError("target must not be be less than min")
+        if max_ is not None and max_ < min_:
+            raise ValueError("max must not be less than min")
+        if max_ is not None and max_ < target:
+            raise ValueError("max must not be less than target")
+        return values
+
+
+class InstanceGroupParamsConfig(CoreConfig):
+    @staticmethod
+    def schema_extra(schema: Dict[str, Any]):
+        del schema["properties"]["termination_policy"]
+        del schema["properties"]["termination_idle_time"]
+        add_extra_schema_types(
+            schema["properties"]["nodes"],
+            extra_types=[{"type": "integer"}, {"type": "string"}],
+        )
+        add_extra_schema_types(
+            schema["properties"]["idle_duration"],
+            extra_types=[{"type": "string"}],
+        )
+
+
 class InstanceGroupParams(CoreModel):
     env: Annotated[
         Env,
@@ -151,7 +232,9 @@ class InstanceGroupParams(CoreModel):
         Field(description="The parameters for adding instances via SSH"),
     ] = None
 
-    nodes: Annotated[Optional[Range[int]], Field(description="The number of instances")] = None
+    nodes: Annotated[
+        Optional[FleetNodesSpec], Field(description="The number of instances in cloud fleet")
+    ] = None
     placement: Annotated[
         Optional[InstanceGroupPlacement],
         Field(description="The placement of instances: `any` or `cluster`"),
@@ -224,7 +307,7 @@ class InstanceGroupParams(CoreModel):
         Field(description="The maximum instance price per hour, in dollars", gt=0.0),
     ] = None
     idle_duration: Annotated[
-        Optional[Union[Literal["off"], str, int]],
+        Optional[int],
         Field(
             description="Time to wait before terminating idle instances. Defaults to `5m` for runs and `3d` for fleets. Use `off` for unlimited duration"
         ),
@@ -234,15 +317,15 @@ class InstanceGroupParams(CoreModel):
     termination_policy: Annotated[Optional[TerminationPolicy], Field(exclude=True)] = None
     termination_idle_time: Annotated[Optional[Union[str, int]], Field(exclude=True)] = None
 
-    class Config:
-        @staticmethod
-        def schema_extra(schema: Dict[str, Any], model: Type):
-            del schema["properties"]["termination_policy"]
-            del schema["properties"]["termination_idle_time"]
-            add_extra_schema_types(
-                schema["properties"]["nodes"],
-                extra_types=[{"type": "integer"}, {"type": "string"}],
-            )
+    @validator("nodes", pre=True)
+    def parse_nodes(cls, v: Optional[Union[dict, str]]) -> Optional[dict]:
+        if isinstance(v, str) and ".." in v:
+            v = v.replace(" ", "")
+            min, max = v.split("..")
+            return dict(min=min or None, max=max or None)
+        elif isinstance(v, str) or isinstance(v, int):
+            return dict(min=v, max=v)
+        return v
 
     _validate_idle_duration = validator("idle_duration", pre=True, allow_reuse=True)(
         parse_idle_duration
@@ -254,7 +337,17 @@ class FleetProps(CoreModel):
     name: Annotated[Optional[str], Field(description="The fleet name")] = None
 
 
-class FleetConfiguration(InstanceGroupParams, FleetProps):
+class FleetConfigurationConfig(InstanceGroupParamsConfig):
+    @staticmethod
+    def schema_extra(schema: Dict[str, Any]):
+        InstanceGroupParamsConfig.schema_extra(schema)
+
+
+class FleetConfiguration(
+    InstanceGroupParams,
+    FleetProps,
+    generate_dual_core_model(FleetConfigurationConfig),
+):
     tags: Annotated[
         Optional[Dict[str, str]],
         Field(
@@ -269,7 +362,14 @@ class FleetConfiguration(InstanceGroupParams, FleetProps):
     _validate_tags = validator("tags", pre=True, allow_reuse=True)(tags_validator)
 
 
-class FleetSpec(CoreModel):
+class FleetSpecConfig(CoreConfig):
+    @staticmethod
+    def schema_extra(schema: Dict[str, Any]):
+        prop = schema.get("properties", {})
+        prop.pop("merged_profile", None)
+
+
+class FleetSpec(generate_dual_core_model(FleetSpecConfig)):
     configuration: FleetConfiguration
     configuration_path: Optional[str] = None
     profile: Profile
@@ -278,12 +378,6 @@ class FleetSpec(CoreModel):
     # Read profile parameters from merged_profile instead of profile directly.
     # TODO: make merged_profile a computed field after migrating to pydanticV2
     merged_profile: Annotated[Profile, Field(exclude=True)] = None
-
-    class Config:
-        @staticmethod
-        def schema_extra(schema: Dict[str, Any], model: Type) -> None:
-            prop = schema.get("properties", {})
-            prop.pop("merged_profile", None)
 
     @root_validator
     def _merged_profile(cls, values) -> Dict:
@@ -324,6 +418,7 @@ class FleetPlan(CoreModel):
     offers: List[InstanceOfferWithAvailability]
     total_offers: int
     max_offer_price: Optional[float] = None
+    action: Optional[ApplyAction] = None  # default value for backward compatibility
 
     def get_effective_spec(self) -> FleetSpec:
         if self.effective_spec is not None:

@@ -5,7 +5,7 @@ description: "To simplify caching across runs and the use of NFS, we introduce a
 image: https://dstack.ai/static-assets/static-assets/images/dstack-instance-volumes.png
 slug: instance-volumes
 categories:
-  - Volumes 
+  - Changelog
 ---
 
 # Introducing instance volumes to persist data on instances

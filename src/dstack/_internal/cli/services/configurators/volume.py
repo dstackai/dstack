@@ -1,6 +1,5 @@
 import argparse
 import time
-from typing import List, Optional
 
 from rich.table import Table
 
@@ -14,7 +13,6 @@ from dstack._internal.cli.utils.rich import MultiItemStatus
 from dstack._internal.cli.utils.volume import get_volumes_table
 from dstack._internal.core.errors import ResourceNotExistsError
 from dstack._internal.core.models.configurations import ApplyConfigurationType
-from dstack._internal.core.models.repos.base import Repo
 from dstack._internal.core.models.volumes import (
     Volume,
     VolumeConfiguration,
@@ -26,8 +24,8 @@ from dstack._internal.utils.common import local_time
 from dstack.api._public import Client
 
 
-class VolumeConfigurator(BaseApplyConfigurator):
-    TYPE: ApplyConfigurationType = ApplyConfigurationType.VOLUME
+class VolumeConfigurator(BaseApplyConfigurator[VolumeConfiguration]):
+    TYPE = ApplyConfigurationType.VOLUME
 
     def apply_configuration(
         self,
@@ -35,10 +33,8 @@ class VolumeConfigurator(BaseApplyConfigurator):
         configuration_path: str,
         command_args: argparse.Namespace,
         configurator_args: argparse.Namespace,
-        unknown_args: List[str],
-        repo: Optional[Repo] = None,
     ):
-        self.apply_args(conf, configurator_args, unknown_args)
+        self.apply_args(conf, configurator_args)
         spec = VolumeSpec(
             configuration=conf,
             configuration_path=configuration_path,
@@ -110,7 +106,7 @@ class VolumeConfigurator(BaseApplyConfigurator):
                     time.sleep(LIVE_TABLE_PROVISION_INTERVAL_SECS)
                     volume = self.api.client.volumes.get(self.api.project, volume.name)
         except KeyboardInterrupt:
-            if confirm_ask("Delete the volume before exiting?"):
+            if not command_args.yes and confirm_ask("Delete the volume before exiting?"):
                 with console.status("Deleting volume..."):
                     self.api.client.volumes.delete(
                         project_name=self.api.project, names=[volume.name]
@@ -169,7 +165,7 @@ class VolumeConfigurator(BaseApplyConfigurator):
             help="The volume name",
         )
 
-    def apply_args(self, conf: VolumeConfiguration, args: argparse.Namespace, unknown: List[str]):
+    def apply_args(self, conf: VolumeConfiguration, args: argparse.Namespace):
         if args.name:
             conf.name = args.name
 

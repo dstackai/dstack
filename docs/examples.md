@@ -100,10 +100,20 @@ hide:
             Run multi-node RCCL tests with MPI
         </p>
     </a>
+    <a href="/examples/clusters/a4"
+       class="feature-cell sky">
+        <h3>
+            GCP A4
+        </h3>
+
+        <p>
+            Set up GCP A4 clusters with optimized networking
+        </p>
+    </a>
     <a href="/examples/clusters/a3mega"
        class="feature-cell sky">
         <h3>
-            A3 Mega
+            GCP A3 Mega
         </h3>
 
         <p>
@@ -113,11 +123,21 @@ hide:
     <a href="/examples/clusters/a3high"
        class="feature-cell sky">
         <h3>
-            A3 High
+            GCP A3 High
         </h3>
 
         <p>
             Set up GCP A3 High clusters with optimized networking
+        </p>
+    </a>
+        <a href="/examples/clusters/efa"
+       class="feature-cell sky">
+        <h3>
+            AWS EFA
+        </h3>
+
+        <p>
+            Set up AWS EFA clusters with optimized networking
         </p>
     </a>
 </div>
@@ -220,7 +240,23 @@ hide:
     </a>
 </div>
 
-## Misc
+## Models
+
+<div class="tx-landing__highlights_grid">
+    <a href="/examples/models/wan22"
+       class="feature-cell sky">
+        <h3>
+            Wan2.2
+        </h3>
+
+        <p>
+            Use Wan2.2 to generate videos from text
+        </p>
+    </a>
+</div>
+
+
+<!-- ## Misc
 
 <div class="tx-landing__highlights_grid">
     <a href="/examples/misc/docker-compose"
@@ -233,4 +269,4 @@ hide:
             Use Docker and Docker Compose inside runs
         </p>
     </a>
-</div>
+</div> -->

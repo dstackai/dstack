@@ -1,44 +1,102 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { ToggleProps } from '@cloudscape-design/components';
 
-import { useLocalStorageState } from 'hooks/useLocalStorageState';
+import type { PropertyFilterProps } from 'components';
+
 import { useProjectFilter } from 'hooks/useProjectFilter';
+import { EMPTY_QUERY, requestParamsToTokens, tokensToRequestParams, tokensToSearchParams } from 'libs/filters';
+
+type RequestParamsKeys = keyof Pick<TInstanceListRequestParams, 'only_active' | 'project_names' | 'fleet_ids'>;
+
+const filterKeys: Record<string, RequestParamsKeys> = {
+    PROJECT_NAMES: 'project_names',
+    FLEET_IDS: 'fleet_ids',
+};
 
 export const useFilters = (localStorePrefix = 'instances-list-page') => {
     const [searchParams, setSearchParams] = useSearchParams();
-    const [onlyActive, setOnlyActive] = useLocalStorageState<boolean>(`${localStorePrefix}-is-active`, false);
-    const { selectedProject, setSelectedProject, projectOptions } = useProjectFilter({ localStorePrefix });
+    const [onlyActive, setOnlyActive] = useState(() => searchParams.get('only_active') === 'true');
+    const { projectOptions } = useProjectFilter({ localStorePrefix });
 
-    const clearFilters = () => {
+    const [propertyFilterQuery, setPropertyFilterQuery] = useState<PropertyFilterProps.Query>(() => {
+        return requestParamsToTokens<RequestParamsKeys>({ searchParams, filterKeys });
+    });
+
+    const clearFilter = () => {
+        setSearchParams({});
         setOnlyActive(false);
-        setSelectedProject(null);
+        setPropertyFilterQuery(EMPTY_QUERY);
+    };
 
-        setSearchParams((prev) => {
-            prev.delete('fleetId');
-            return prev;
+    const filteringOptions = useMemo(() => {
+        const options: PropertyFilterProps.FilteringOption[] = [];
+
+        projectOptions.forEach(({ value }) => {
+            if (value)
+                options.push({
+                    propertyKey: filterKeys.PROJECT_NAMES,
+                    value,
+                });
+        });
+
+        return options;
+    }, [projectOptions]);
+
+    const filteringProperties = [
+        {
+            key: filterKeys.PROJECT_NAMES,
+            operators: ['='],
+            propertyLabel: 'Project',
+            groupValuesLabel: 'Project values',
+        },
+        {
+            key: filterKeys.FLEET_IDS,
+            operators: ['='],
+            propertyLabel: 'Fleet ID',
+        },
+    ];
+
+    const onChangePropertyFilter: PropertyFilterProps['onChange'] = ({ detail }) => {
+        const { tokens, operation } = detail;
+
+        setSearchParams(tokensToSearchParams<RequestParamsKeys>(tokens, onlyActive));
+
+        setPropertyFilterQuery({
+            operation,
+            tokens,
         });
     };
 
-    const selectedFleet = useMemo(() => {
-        const fleetName = searchParams.get('fleetId');
+    const onChangeOnlyActive: ToggleProps['onChange'] = ({ detail }) => {
+        setOnlyActive(detail.checked);
 
-        if (fleetName) {
-            return { label: fleetName, value: fleetName };
-        }
+        setSearchParams(tokensToSearchParams<RequestParamsKeys>(propertyFilterQuery.tokens, detail.checked));
+    };
 
-        return null;
-    }, [searchParams]);
+    const filteringRequestParams = useMemo(() => {
+        const params = tokensToRequestParams<RequestParamsKeys>({
+            tokens: propertyFilterQuery.tokens,
+            arrayFieldKeys: [filterKeys.PROJECT_NAMES, filterKeys.FLEET_IDS],
+        });
 
-    const isDisabledClearFilter = !selectedProject && !onlyActive && !selectedFleet;
+        return {
+            ...params,
+            only_active: onlyActive,
+        } as Partial<TInstanceListRequestParams>;
+    }, [propertyFilterQuery, onlyActive]);
+
+    const isDisabledClearFilter = !propertyFilterQuery.tokens.length && !onlyActive;
 
     return {
-        projectOptions,
-        selectedProject,
-        setSelectedProject,
-        selectedFleet,
+        filteringRequestParams,
+        clearFilter,
+        propertyFilterQuery,
+        onChangePropertyFilter,
+        filteringOptions,
+        filteringProperties,
         onlyActive,
-        setOnlyActive,
-        clearFilters,
+        onChangeOnlyActive,
         isDisabledClearFilter,
     } as const;
 };

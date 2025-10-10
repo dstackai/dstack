@@ -1,6 +1,16 @@
+"""
+Environment variables read by the dstack server. Documented in reference/environment-variables.md
+"""
+
 import os
 import warnings
+from enum import Enum
 from pathlib import Path
+
+from dstack._internal.utils.env import environ
+from dstack._internal.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 DSTACK_DIR_PATH = Path("~/.dstack/").expanduser()
 
@@ -27,12 +37,31 @@ LOG_FORMAT = os.getenv("DSTACK_SERVER_LOG_FORMAT", "rich").lower()
 ALEMBIC_MIGRATIONS_LOCATION = os.getenv(
     "DSTACK_ALEMBIC_MIGRATIONS_LOCATION", "dstack._internal.server:migrations"
 )
-# Users may want to increase pool size to support more concurrent resources
-# if their db supports many connections
-DB_POOL_SIZE = int(os.getenv("DSTACK_DB_POOL_SIZE", 10))
-DB_MAX_OVERFLOW = int(os.getenv("DSTACK_DB_MAX_OVERFLOW", 10))
+
+# Users may want to increase client pool size to support more concurrent resources
+# if their db supports many connections.
+DB_POOL_SIZE = int(os.getenv("DSTACK_DB_POOL_SIZE", 20))
+DB_MAX_OVERFLOW = int(os.getenv("DSTACK_DB_MAX_OVERFLOW", 20))
+
+# Scale the number of background processing tasks
+# allowing to process more resources on one server replica.
+# Not recommended to change on SQLite.
+# DSTACK_DB_POOL_SIZE and DSTACK_DB_MAX_OVERFLOW
+# must be increased proportionally.
+SERVER_BACKGROUND_PROCESSING_FACTOR = int(
+    os.getenv("DSTACK_SERVER_BACKGROUND_PROCESSING_FACTOR", 1)
+)
+
+SERVER_BACKGROUND_PROCESSING_DISABLED = (
+    os.getenv("DSTACK_SERVER_BACKGROUND_PROCESSING_DISABLED") is not None
+)
+SERVER_BACKGROUND_PROCESSING_ENABLED = not SERVER_BACKGROUND_PROCESSING_DISABLED
+
+SERVER_EXECUTOR_MAX_WORKERS = int(os.getenv("DSTACK_SERVER_EXECUTOR_MAX_WORKERS", 128))
 
 MAX_OFFERS_TRIED = int(os.getenv("DSTACK_SERVER_MAX_OFFERS_TRIED", 25))
+MAX_PROBES_PER_JOB = int(os.getenv("DSTACK_SERVER_MAX_PROBES_PER_JOB", 10))
+MAX_PROBE_TIMEOUT = int(os.getenv("DSTACK_SERVER_MAX_PROBE_TIMEOUT", 60 * 5))
 
 SERVER_CONFIG_DISABLED = os.getenv("DSTACK_SERVER_CONFIG_DISABLED") is not None
 SERVER_CONFIG_ENABLED = not SERVER_CONFIG_DISABLED
@@ -70,10 +99,22 @@ SERVER_METRICS_FINISHED_TTL_SECONDS = int(
     os.getenv("DSTACK_SERVER_METRICS_FINISHED_TTL_SECONDS", 7 * 24 * 3600)
 )
 
+SERVER_INSTANCE_HEALTH_TTL_SECONDS = int(
+    os.getenv("DSTACK_SERVER_INSTANCE_HEALTH_TTL_SECONDS", 7 * 24 * 3600)
+)
+SERVER_INSTANCE_HEALTH_MIN_COLLECT_INTERVAL_SECONDS = int(
+    os.getenv("DSTACK_SERVER_INSTANCE_HEALTH_MIN_COLLECT_INTERVAL_SECONDS", 60)
+)
+
+SERVER_KEEP_SHIM_TASKS = os.getenv("DSTACK_SERVER_KEEP_SHIM_TASKS") is not None
+
 DEFAULT_PROJECT_NAME = "main"
 
 SENTRY_DSN = os.getenv("DSTACK_SENTRY_DSN")
 SENTRY_TRACES_SAMPLE_RATE = float(os.getenv("DSTACK_SENTRY_TRACES_SAMPLE_RATE", 0.1))
+SENTRY_TRACES_BACKGROUND_SAMPLE_RATE = float(
+    os.getenv("DSTACK_SENTRY_TRACES_BACKGROUND_SAMPLE_RATE", 0.01)
+)
 SENTRY_PROFILES_SAMPLE_RATE = float(os.getenv("DSTACK_SENTRY_PROFILES_SAMPLE_RATE", 0))
 
 DEFAULT_CREDS_DISABLED = os.getenv("DSTACK_DEFAULT_CREDS_DISABLED") is not None
@@ -95,9 +136,49 @@ SERVER_CODE_UPLOAD_LIMIT = int(os.getenv("DSTACK_SERVER_CODE_UPLOAD_LIMIT", 2 * 
 
 SQL_ECHO_ENABLED = os.getenv("DSTACK_SQL_ECHO_ENABLED") is not None
 
-LOCAL_BACKEND_ENABLED = os.getenv("DSTACK_LOCAL_BACKEND_ENABLED") is not None
+SERVER_PROFILING_ENABLED = os.getenv("DSTACK_SERVER_PROFILING_ENABLED") is not None
 
 UPDATE_DEFAULT_PROJECT = os.getenv("DSTACK_UPDATE_DEFAULT_PROJECT") is not None
 DO_NOT_UPDATE_DEFAULT_PROJECT = os.getenv("DSTACK_DO_NOT_UPDATE_DEFAULT_PROJECT") is not None
-SKIP_GATEWAY_UPDATE = os.getenv("DSTACK_SKIP_GATEWAY_UPDATE", None) is not None
-ENABLE_PROMETHEUS_METRICS = os.getenv("DSTACK_ENABLE_PROMETHEUS_METRICS", None) is not None
+SKIP_GATEWAY_UPDATE = os.getenv("DSTACK_SKIP_GATEWAY_UPDATE") is not None
+ENABLE_PROMETHEUS_METRICS = os.getenv("DSTACK_ENABLE_PROMETHEUS_METRICS") is not None
+
+
+class JobNetworkMode(Enum):
+    # "host" for multinode runs only, "bridge" otherwise. Opt-in new defaut
+    HOST_FOR_MULTINODE_ONLY = 1
+    # "bridge" if the job occupies only a part of the instance, "host" otherswise. Current default
+    HOST_WHEN_POSSIBLE = 2
+    # Always "bridge", even for multinode runs. Same as legacy DSTACK_FORCE_BRIDGE_NETWORK=true
+    FORCED_BRIDGE = 3
+
+
+def _get_job_network_mode() -> JobNetworkMode:
+    # Current default
+    mode = JobNetworkMode.HOST_WHEN_POSSIBLE
+    bridge_var = "DSTACK_FORCE_BRIDGE_NETWORK"
+    force_bridge = environ.get_bool(bridge_var)
+    mode_var = "DSTACK_SERVER_JOB_NETWORK_MODE"
+    mode_from_env = environ.get_enum(mode_var, JobNetworkMode, value_type=int)
+    if mode_from_env is not None:
+        if force_bridge is not None:
+            logger.warning(
+                f"{bridge_var} is deprecated since 0.19.27 and ignored when {mode_var} is set"
+            )
+        return mode_from_env
+    if force_bridge is not None:
+        if force_bridge:
+            mode = JobNetworkMode.FORCED_BRIDGE
+            logger.warning(
+                (
+                    f"{bridge_var} is deprecated since 0.19.27."
+                    f" Set {mode_var} to {mode.value} and remove {bridge_var}"
+                )
+            )
+        else:
+            logger.warning(f"{bridge_var} is deprecated since 0.19.27. Remove {bridge_var}")
+    return mode
+
+
+JOB_NETWORK_MODE = _get_job_network_mode()
+del _get_job_network_mode

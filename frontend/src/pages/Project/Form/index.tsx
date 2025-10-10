@@ -2,7 +2,7 @@ import React from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 
-import { Button, Container, FormInput, FormUI, Header, SpaceBetween } from 'components';
+import { Button, Container, FormCheckbox, FormInput, FormUI, Header, SpaceBetween } from 'components';
 
 import { useNotifications } from 'hooks';
 import { isResponseServerError, isResponseServerFormFieldError } from 'libs';
@@ -16,6 +16,7 @@ export const ProjectForm: React.FC<IProps> = ({ initialValues, onCancel, loading
 
     const formMethods = useForm<IProject>({
         defaultValues: {
+            isPublic: false,
             ...initialValues,
         },
     });
@@ -25,7 +26,13 @@ export const ProjectForm: React.FC<IProps> = ({ initialValues, onCancel, loading
     const onSubmit = (data: IProject) => {
         clearErrors();
 
-        onSubmitProp(data).catch((errorResponse) => {
+        // Transform frontend camelCase to backend snake_case
+        const backendData = {
+            project_name: data.project_name,
+            is_public: data.isPublic,
+        };
+
+        onSubmitProp(backendData as unknown as IProject).catch((errorResponse) => {
             const errorRequestData = errorResponse?.data;
 
             if (isResponseServerError(errorRequestData)) {
@@ -80,6 +87,14 @@ export const ProjectForm: React.FC<IProps> = ({ initialValues, onCancel, loading
                                         message: t('projects.edit.validation.user_name_format'),
                                     },
                                 }}
+                            />
+
+                            <FormCheckbox
+                                label={t('projects.edit.is_public')}
+                                description={t('projects.edit.is_public_description')}
+                                control={control}
+                                name="isPublic"
+                                disabled={loading}
                             />
                         </SpaceBetween>
                     </Container>

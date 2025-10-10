@@ -8,6 +8,7 @@ import { UnauthorizedLayout } from 'layouts/UnauthorizedLayout';
 import { useAppDispatch } from 'hooks';
 import { ROUTES } from 'routes';
 import { useGithubCallbackMutation } from 'services/auth';
+import { useLazyGetProjectsQuery } from 'services/project';
 
 import { AuthErrorMessage } from 'App/AuthErrorMessage';
 import { Loading } from 'App/Loading';
@@ -22,13 +23,24 @@ export const LoginByGithubCallback: React.FC = () => {
     const dispatch = useAppDispatch();
 
     const [githubCallback] = useGithubCallbackMutation();
+    const [getProjects] = useLazyGetProjectsQuery();
 
     const checkCode = () => {
         if (code) {
             githubCallback({ code })
                 .unwrap()
-                .then(({ creds: { token } }) => {
+                .then(async ({ creds: { token } }) => {
                     dispatch(setAuthData({ token }));
+
+                    if (process.env.UI_VERSION === 'sky') {
+                        const result = await getProjects().unwrap();
+
+                        if (result?.length === 0) {
+                            navigate(ROUTES.PROJECT.ADD);
+                            return;
+                        }
+                    }
+
                     navigate('/');
                 })
                 .catch(() => {

@@ -4,24 +4,28 @@ import re
 import string
 import threading
 from abc import ABC, abstractmethod
+from collections.abc import Iterable
+from enum import Enum
 from functools import lru_cache
 from pathlib import Path
-from typing import Dict, List, Literal, Optional
+from typing import Callable, Dict, List, Optional
 
 import git
 import requests
 import yaml
 from cachetools import TTLCache, cachedmethod
+from gpuhunt import CPUArchitecture
 
 from dstack._internal import settings
 from dstack._internal.core.backends.base.models import JobConfiguration
+from dstack._internal.core.backends.base.offers import filter_offers_by_requirements
 from dstack._internal.core.consts import (
     DSTACK_RUNNER_HTTP_PORT,
     DSTACK_RUNNER_SSH_PORT,
     DSTACK_SHIM_HTTP_PORT,
 )
 from dstack._internal.core.models.compute_groups import ComputeGroup, ComputeGroupProvisioningData
-from dstack._internal.core.models.configurations import DEFAULT_REPO_DIR
+from dstack._internal.core.models.configurations import LEGACY_REPO_DIR
 from dstack._internal.core.models.gateways import (
     GatewayComputeConfiguration,
     GatewayProvisioningData,
@@ -47,8 +51,39 @@ logger = get_logger(__name__)
 
 DSTACK_SHIM_BINARY_NAME = "dstack-shim"
 DSTACK_RUNNER_BINARY_NAME = "dstack-runner"
+DEFAULT_PRIVATE_SUBNETS = ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16")
+NVIDIA_GPUS_REQUIRING_PROPRIETARY_KERNEL_MODULES = frozenset(
+    # All NVIDIA architectures prior to Turing do not support Open Kernel Modules and require
+    # proprietary modules. This list is incomplete, update when necessary.
+    [
+        "v100",
+        "p100",
+        "p40",
+        "p4",
+        "m60",
+        "m40",
+        "m4",
+        "k80",
+        "k40",
+        "k20",
+    ]
+)
 
-GoArchType = Literal["amd64", "arm64"]
+
+class GoArchType(str, Enum):
+    """
+    A subset of GOARCH values
+    """
+
+    AMD64 = "amd64"
+    ARM64 = "arm64"
+
+    def to_cpu_architecture(self) -> CPUArchitecture:
+        if self == self.AMD64:
+            return CPUArchitecture.X86
+        if self == self.ARM64:
+            return CPUArchitecture.ARM
+        assert False, self
 
 
 class Compute(ABC):
@@ -57,14 +92,8 @@ class Compute(ABC):
     If a compute supports additional features, it must also subclass `ComputeWith*` classes.
     """
 
-    def __init__(self):
-        self._offers_cache_lock = threading.Lock()
-        self._offers_cache = TTLCache(maxsize=5, ttl=30)
-
     @abstractmethod
-    def get_offers(
-        self, requirements: Optional[Requirements] = None
-    ) -> List[InstanceOfferWithAvailability]:
+    def get_offers(self, requirements: Requirements) -> List[InstanceOfferWithAvailability]:
         """
         Returns offers with availability matching `requirements`.
         If the provider is added to gpuhunt, typically gets offers using `base.offers.get_catalog_offers()`
@@ -121,10 +150,97 @@ class Compute(ABC):
         """
         pass
 
-    def _get_offers_cached_key(self, requirements: Optional[Requirements] = None) -> int:
+
+class ComputeWithAllOffersCached(ABC):
+    """
+    Provides common `get_offers()` implementation for backends
+    whose offers do not depend on requirements.
+    It caches all offers with availability and post-filters by requirements.
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._offers_cache_lock = threading.Lock()
+        self._offers_cache = TTLCache(maxsize=1, ttl=180)
+
+    @abstractmethod
+    def get_all_offers_with_availability(self) -> List[InstanceOfferWithAvailability]:
+        """
+        Returns all backend offers with availability.
+        """
+        pass
+
+    def get_offers_modifier(
+        self, requirements: Requirements
+    ) -> Optional[
+        Callable[[InstanceOfferWithAvailability], Optional[InstanceOfferWithAvailability]]
+    ]:
+        """
+        Returns a modifier function that modifies offers before they are filtered by requirements.
+        Can return `None` to exclude the offer.
+        E.g. can be used to set appropriate disk size based on requirements.
+        """
+        return None
+
+    def get_offers_post_filter(
+        self, requirements: Requirements
+    ) -> Optional[Callable[[InstanceOfferWithAvailability], bool]]:
+        """
+        Returns a filter function to apply to offers based on requirements.
+        This allows backends to implement custom post-filtering logic for specific requirements.
+        """
+        return None
+
+    def get_offers(self, requirements: Requirements) -> List[InstanceOfferWithAvailability]:
+        offers = self._get_all_offers_with_availability_cached()
+        modifier = self.get_offers_modifier(requirements)
+        if modifier is not None:
+            modified_offers = []
+            for o in offers:
+                modified_offer = modifier(o)
+                if modified_offer is not None:
+                    modified_offers.append(modified_offer)
+            offers = modified_offers
+        offers = filter_offers_by_requirements(offers, requirements)
+        post_filter = self.get_offers_post_filter(requirements)
+        if post_filter is not None:
+            offers = [o for o in offers if post_filter(o)]
+        return offers
+
+    @cachedmethod(
+        cache=lambda self: self._offers_cache,
+        lock=lambda self: self._offers_cache_lock,
+    )
+    def _get_all_offers_with_availability_cached(self) -> List[InstanceOfferWithAvailability]:
+        return self.get_all_offers_with_availability()
+
+
+class ComputeWithFilteredOffersCached(ABC):
+    """
+    Provides common `get_offers()` implementation for backends
+    whose offers depend on requirements.
+    It caches offers using requirements as key.
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._offers_cache_lock = threading.Lock()
+        self._offers_cache = TTLCache(maxsize=10, ttl=180)
+
+    @abstractmethod
+    def get_offers_by_requirements(
+        self, requirements: Requirements
+    ) -> List[InstanceOfferWithAvailability]:
+        """
+        Returns backend offers with availability matching requirements.
+        """
+        pass
+
+    def get_offers(self, requirements: Requirements) -> List[InstanceOfferWithAvailability]:
+        return self._get_offers_cached(requirements)
+
+    def _get_offers_cached_key(self, requirements: Requirements) -> int:
         # Requirements is not hashable, so we use a hack to get arguments hash
-        if requirements is None:
-            return hash(None)
         return hash(requirements.json())
 
     @cachedmethod(
@@ -132,10 +248,10 @@ class Compute(ABC):
         key=_get_offers_cached_key,
         lock=lambda self: self._offers_cache_lock,
     )
-    def get_offers_cached(
-        self, requirements: Optional[Requirements] = None
+    def _get_offers_cached(
+        self, requirements: Requirements
     ) -> List[InstanceOfferWithAvailability]:
-        return self.get_offers(requirements)
+        return self.get_offers_by_requirements(requirements)
 
 
 class ComputeWithCreateInstanceSupport(ABC):
@@ -223,6 +339,15 @@ class ComputeWithGroupProvisioningSupport(ABC):
         pass
 
 
+class ComputeWithPrivilegedSupport:
+    """
+    Must be subclassed to support runs with `privileged: true`.
+    All VM-based Computes (that is, Computes that use the shim) should subclass this mixin.
+    """
+
+    pass
+
+
 class ComputeWithMultinodeSupport:
     """
     Must be subclassed to support multinode tasks and cluster fleets.
@@ -282,10 +407,6 @@ class ComputeWithPlacementGroupSupport(ABC):
         Checks if the instance offer can be provisioned in the placement group.
 
         Should return immediately, without performing API calls.
-
-        Can be called with an offer originating from a different backend, because some backends
-        (BackendType.DSTACK) produce offers on behalf of other backends. Should return `False`
-        in that case.
         """
         pass
 
@@ -530,12 +651,16 @@ def get_user_data(
     base_path: Optional[PathLike] = None,
     bin_path: Optional[PathLike] = None,
     backend_shim_env: Optional[Dict[str, str]] = None,
+    skip_firewall_setup: bool = False,
+    firewall_allow_from_subnets: Iterable[str] = DEFAULT_PRIVATE_SUBNETS,
 ) -> str:
     shim_commands = get_shim_commands(
         authorized_keys=authorized_keys,
         base_path=base_path,
         bin_path=bin_path,
         backend_shim_env=backend_shim_env,
+        skip_firewall_setup=skip_firewall_setup,
+        firewall_allow_from_subnets=firewall_allow_from_subnets,
     )
     commands = (backend_specific_commands or []) + shim_commands
     return get_cloud_config(
@@ -577,8 +702,14 @@ def get_shim_commands(
     bin_path: Optional[PathLike] = None,
     backend_shim_env: Optional[Dict[str, str]] = None,
     arch: Optional[str] = None,
+    skip_firewall_setup: bool = False,
+    firewall_allow_from_subnets: Iterable[str] = DEFAULT_PRIVATE_SUBNETS,
 ) -> List[str]:
-    commands = get_shim_pre_start_commands(
+    commands = get_setup_cloud_instance_commands(
+        skip_firewall_setup=skip_firewall_setup,
+        firewall_allow_from_subnets=firewall_allow_from_subnets,
+    )
+    commands += get_shim_pre_start_commands(
         base_path=base_path,
         bin_path=bin_path,
         arch=arch,
@@ -617,14 +748,14 @@ def normalize_arch(arch: Optional[str] = None) -> GoArchType:
     If the arch is not specified, falls back to `amd64`.
     """
     if not arch:
-        return "amd64"
+        return GoArchType.AMD64
     arch_lower = arch.lower()
     if "32" in arch_lower or arch_lower in ["i386", "i686"]:
         raise ValueError(f"32-bit architectures are not supported: {arch}")
     if arch_lower.startswith("x86") or arch_lower.startswith("amd"):
-        return "amd64"
+        return GoArchType.AMD64
     if arch_lower.startswith("arm") or arch_lower.startswith("aarch"):
-        return "arm64"
+        return GoArchType.ARM64
     raise ValueError(f"Unsupported architecture: {arch}")
 
 
@@ -640,8 +771,7 @@ def get_dstack_runner_download_url(arch: Optional[str] = None) -> str:
             "/{version}/binaries/dstack-runner-linux-{arch}"
         )
     version = get_dstack_runner_version()
-    arch = normalize_arch(arch)
-    return url_template.format(version=version, arch=arch)
+    return url_template.format(version=version, arch=normalize_arch(arch).value)
 
 
 def get_dstack_shim_download_url(arch: Optional[str] = None) -> str:
@@ -656,8 +786,40 @@ def get_dstack_shim_download_url(arch: Optional[str] = None) -> str:
             "/{version}/binaries/dstack-shim-linux-{arch}"
         )
     version = get_dstack_runner_version()
-    arch = normalize_arch(arch)
-    return url_template.format(version=version, arch=arch)
+    return url_template.format(version=version, arch=normalize_arch(arch).value)
+
+
+def get_setup_cloud_instance_commands(
+    skip_firewall_setup: bool,
+    firewall_allow_from_subnets: Iterable[str],
+) -> list[str]:
+    commands = [
+        # Workaround for https://github.com/NVIDIA/nvidia-container-toolkit/issues/48
+        # Attempts to patch /etc/docker/daemon.json while keeping any custom settings it may have.
+        (
+            "/bin/sh -c '"  # wrap in /bin/sh to avoid interfering with other cloud init commands
+            " grep -q nvidia /etc/docker/daemon.json"
+            " && ! grep -q native.cgroupdriver /etc/docker/daemon.json"
+            " && jq '\\''.\"exec-opts\" = ((.\"exec-opts\" // []) + [\"native.cgroupdriver=cgroupfs\"])'\\'' /etc/docker/daemon.json > /tmp/daemon.json"
+            " && sudo mv /tmp/daemon.json /etc/docker/daemon.json"
+            " && sudo service docker restart"
+            " || true"
+            "'"
+        ),
+    ]
+    if not skip_firewall_setup:
+        commands += [
+            "ufw --force reset",  # Some OS images have default rules like `allow 80`. Delete them
+            "ufw default deny incoming",
+            "ufw default allow outgoing",
+            "ufw allow ssh",
+        ]
+        for subnet in firewall_allow_from_subnets:
+            commands.append(f"ufw allow from {subnet}")
+        commands += [
+            "ufw --force enable",
+        ]
+    return commands
 
 
 def get_shim_pre_start_commands(
@@ -778,7 +940,8 @@ def get_docker_commands(
             f" --ssh-port {DSTACK_RUNNER_SSH_PORT}"
             " --temp-dir /tmp/runner"
             " --home-dir /root"
-            f" --working-dir {DEFAULT_REPO_DIR}"
+            # TODO: Not used, left for compatibility with old runners. Remove eventually.
+            f" --working-dir {LEGACY_REPO_DIR}"
         ),
     ]
 
@@ -864,3 +1027,12 @@ def merge_tags(
         for k, v in resource_tags.items():
             res.setdefault(k, v)
     return res
+
+
+def requires_nvidia_proprietary_kernel_modules(gpu_name: str) -> bool:
+    """
+    Returns:
+        Whether this NVIDIA GPU requires NVIDIA proprietary kernel modules
+        instead of open kernel modules.
+    """
+    return gpu_name.lower() in NVIDIA_GPUS_REQUIRING_PROPRIETARY_KERNEL_MODULES

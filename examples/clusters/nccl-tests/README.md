@@ -13,14 +13,13 @@ type: task
 name: nccl-tests
 
 nodes: 2
+
 startup_order: workers-first
 stop_criteria: master-done
 
-image: dstackai/efa
 env:
   - NCCL_DEBUG=INFO
 commands:
-  - cd /root/nccl-tests/build
   - |
     if [ $DSTACK_NODE_RANK -eq 0 ]; then
       mpirun \
@@ -28,28 +27,28 @@ commands:
         --hostfile $DSTACK_MPI_HOSTFILE \
         -n $DSTACK_GPUS_NUM \
         -N $DSTACK_GPUS_PER_NODE \
-        --mca btl_tcp_if_exclude lo,docker0 \
         --bind-to none \
-        ./all_reduce_perf -b 8 -e 8G -f 2 -g 1
+        /opt/nccl-tests/build/all_reduce_perf -b 8 -e 8G -f 2 -g 1
     else
       sleep infinity
     fi
 
+# Uncomment if the `kubernetes` backend requires it for `/dev/infiniband` access
+#privileged: true
+
 resources:
-  gpu: nvidia:4:16GB
+  gpu: nvidia:1..8
   shm_size: 16GB
 ```
 
 </div>
 
-<!-- TODO: Need to stop using our EFA image - either make our default image cluster-friendly, or recommend using NGC or other images -->
+!!! info "Default image"
+    If you don't specify `image`, `dstack` uses its [base :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/tree/master/docker/base){:target="_blank"} Docker image pre-configured with 
+    `uv`, `python`, `pip`, essential CUDA drivers, `mpirun`, and NCCL tests (under `/opt/nccl-tests/build`). 
 
-!!! info "Docker image"
-    The `dstackai/efa` image used in the example comes with MPI and NCCL tests pre-installed. While it is optimized for
-    [AWS EFA :material-arrow-top-right-thin:{ .external }](https://aws.amazon.com/hpc/efa/){:target="_blank"}, it can also
-    be used with regular TCP/IP network adapters and InfiniBand. 
-    
-    See the [source code :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/docker/efa) for the image.
+!!! info "Privileged"
+    In some cases, the backend (e.g., `kubernetes`) may require `privileged: true` to access the high-speed interconnect (e.g., InfiniBand).
 
 ### Apply a configuration
 

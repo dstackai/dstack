@@ -1,11 +1,34 @@
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
-from fastapi import HTTPException, Request, status
-from fastapi.responses import JSONResponse
+import orjson
+from fastapi import HTTPException, Request, Response, status
 from packaging import version
 
 from dstack._internal.core.errors import ServerClientError, ServerClientErrorCode
 from dstack._internal.core.models.common import CoreModel
+from dstack._internal.utils.json_utils import get_orjson_default_options, orjson_default
+
+
+class CustomORJSONResponse(Response):
+    """
+    Custom JSONResponse that uses orjson for serialization.
+
+    It's recommended to return this class from routers directly instead of
+    returning pydantic models to avoid the FastAPI's jsonable_encoder overhead.
+    See https://fastapi.tiangolo.com/advanced/custom-response/#use-orjsonresponse.
+
+    Beware that FastAPI skips model validation when responses are returned directly.
+    If serialization needs to be modified, override `dict()` instead of adding validators.
+    """
+
+    media_type = "application/json"
+
+    def render(self, content: Any) -> bytes:
+        return orjson.dumps(
+            content,
+            option=get_orjson_default_options(),
+            default=orjson_default,
+        )
 
 
 class BadRequestDetailsModel(CoreModel):
@@ -30,7 +53,7 @@ def get_base_api_additional_responses() -> Dict:
     """
     Returns additional responses for the OpenAPI docs relevant to all API endpoints.
     The endpoints may override responses to make them as specific as possible.
-    E.g. an enpoint may specify which error codes it may return in `code`.
+    E.g. an endpoint may specify which error codes it may return in `code`.
     """
     return {
         400: get_bad_request_additional_response(),
@@ -102,7 +125,7 @@ def get_request_size(request: Request) -> int:
 def check_client_server_compatibility(
     client_version: Optional[str],
     server_version: Optional[str],
-) -> Optional[JSONResponse]:
+) -> Optional[CustomORJSONResponse]:
     """
     Returns `JSONResponse` with error if client/server versions are incompatible.
     Returns `None` otherwise.
@@ -116,7 +139,7 @@ def check_client_server_compatibility(
     try:
         parsed_client_version = version.parse(client_version)
     except version.InvalidVersion:
-        return JSONResponse(
+        return CustomORJSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
             content={
                 "detail": get_server_client_error_details(
@@ -138,11 +161,11 @@ def error_incompatible_versions(
     client_version: Optional[str],
     server_version: str,
     ask_cli_update: bool,
-) -> JSONResponse:
+) -> CustomORJSONResponse:
     msg = f"The client/CLI version ({client_version}) is incompatible with the server version ({server_version})."
     if ask_cli_update:
         msg += f" Update the dstack CLI: `pip install dstack=={server_version}`."
-    return JSONResponse(
+    return CustomORJSONResponse(
         status_code=status.HTTP_400_BAD_REQUEST,
         content={"detail": get_server_client_error_details(ServerClientError(msg=msg))},
     )

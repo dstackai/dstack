@@ -1,8 +1,9 @@
 import datetime as dt
 from collections import defaultdict
+from collections.abc import Generator
 from contextlib import contextmanager
 from typing import Optional
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, call, patch
 
 import gpuhunt
 import pytest
@@ -10,6 +11,7 @@ from freezegun import freeze_time
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from dstack._internal.core.backends.base.compute import GoArchType
 from dstack._internal.core.errors import (
     BackendError,
     NoCapacityError,
@@ -18,6 +20,7 @@ from dstack._internal.core.errors import (
 )
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.fleets import InstanceGroupPlacement
+from dstack._internal.core.models.health import HealthStatus
 from dstack._internal.core.models.instances import (
     Gpu,
     InstanceAvailability,
@@ -34,14 +37,23 @@ from dstack._internal.core.models.runs import (
     JobStatus,
 )
 from dstack._internal.server.background.tasks.process_instances import (
-    HealthStatus,
+    delete_instance_health_checks,
     process_instances,
 )
-from dstack._internal.server.models import PlacementGroupModel
+from dstack._internal.server.models import InstanceHealthCheckModel, PlacementGroupModel
+from dstack._internal.server.schemas.health.dcgm import DCGMHealthResponse, DCGMHealthResult
+from dstack._internal.server.schemas.instances import InstanceCheck
+from dstack._internal.server.schemas.runner import (
+    InstanceHealthResponse,
+    TaskListItem,
+    TaskListResponse,
+    TaskStatus,
+)
 from dstack._internal.server.testing.common import (
     ComputeMockSpec,
     create_fleet,
     create_instance,
+    create_instance_health_check,
     create_job,
     create_project,
     create_repo,
@@ -72,14 +84,13 @@ class TestCheckShim:
             status=InstanceStatus.PROVISIONING,
         )
         instance.termination_deadline = get_current_datetime() + dt.timedelta(days=1)
-        instance.health_status = "ssh connect problem"
 
         await session.commit()
 
         with patch(
-            "dstack._internal.server.background.tasks.process_instances._instance_healthcheck"
+            "dstack._internal.server.background.tasks.process_instances._check_instance_inner"
         ) as healthcheck:
-            healthcheck.return_value = HealthStatus(healthy=True, reason="OK")
+            healthcheck.return_value = InstanceCheck(reachable=True)
             await process_instances()
 
         await session.refresh(instance)
@@ -87,7 +98,6 @@ class TestCheckShim:
         assert instance is not None
         assert instance.status == InstanceStatus.IDLE
         assert instance.termination_deadline is None
-        assert instance.health_status is None
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
@@ -101,16 +111,15 @@ class TestCheckShim:
             status=InstanceStatus.PROVISIONING,
         )
         instance.started_at = get_current_datetime() + dt.timedelta(minutes=-20)
-        instance.health_status = "ssh connect problem"
 
         await session.commit()
 
         health_reason = "Shim problem"
 
         with patch(
-            "dstack._internal.server.background.tasks.process_instances._instance_healthcheck"
+            "dstack._internal.server.background.tasks.process_instances._check_instance_inner"
         ) as healthcheck:
-            healthcheck.return_value = HealthStatus(healthy=False, reason=health_reason)
+            healthcheck.return_value = InstanceCheck(reachable=False, message=health_reason)
             await process_instances()
 
         await session.refresh(instance)
@@ -118,7 +127,6 @@ class TestCheckShim:
         assert instance is not None
         assert instance.status == InstanceStatus.TERMINATING
         assert instance.termination_deadline is not None
-        assert instance.health_status == health_reason
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
@@ -145,7 +153,6 @@ class TestCheckShim:
         instance.termination_deadline = get_current_datetime().replace(
             tzinfo=dt.timezone.utc
         ) + dt.timedelta(days=1)
-        instance.health_status = "ssh connect problem"
 
         job = await create_job(
             session=session,
@@ -157,9 +164,9 @@ class TestCheckShim:
         await session.commit()
 
         with patch(
-            "dstack._internal.server.background.tasks.process_instances._instance_healthcheck"
+            "dstack._internal.server.background.tasks.process_instances._check_instance_inner"
         ) as healthcheck:
-            healthcheck.return_value = HealthStatus(healthy=True, reason="OK")
+            healthcheck.return_value = InstanceCheck(reachable=True)
             await process_instances()
 
         await session.refresh(instance)
@@ -168,7 +175,6 @@ class TestCheckShim:
         assert instance is not None
         assert instance.status == InstanceStatus.BUSY
         assert instance.termination_deadline is None
-        assert instance.health_status is None
         assert job.instance == instance
 
     @pytest.mark.asyncio
@@ -182,9 +188,9 @@ class TestCheckShim:
         )
         health_status = "SSH connection fail"
         with patch(
-            "dstack._internal.server.background.tasks.process_instances._instance_healthcheck"
+            "dstack._internal.server.background.tasks.process_instances._check_instance_inner"
         ) as healthcheck:
-            healthcheck.return_value = HealthStatus(healthy=False, reason=health_status)
+            healthcheck.return_value = InstanceCheck(reachable=False, message=health_status)
             await process_instances()
 
         await session.refresh(instance)
@@ -195,7 +201,6 @@ class TestCheckShim:
         assert instance.termination_deadline.replace(
             tzinfo=dt.timezone.utc
         ) > get_current_datetime() + dt.timedelta(minutes=19)
-        assert instance.health_status == health_status
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
@@ -210,9 +215,9 @@ class TestCheckShim:
         await session.commit()
 
         with patch(
-            "dstack._internal.server.background.tasks.process_instances._instance_healthcheck"
+            "dstack._internal.server.background.tasks.process_instances._check_instance_inner"
         ) as healthcheck:
-            healthcheck.return_value = HealthStatus(healthy=True, reason="OK")
+            healthcheck.return_value = InstanceCheck(reachable=True)
             await process_instances()
 
         await session.refresh(instance)
@@ -220,11 +225,10 @@ class TestCheckShim:
         assert instance is not None
         assert instance.status == InstanceStatus.IDLE
         assert instance.termination_deadline is None
-        assert instance.health_status is None
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_check_shim_terminate_instance_by_dedaline(self, test_db, session: AsyncSession):
+    async def test_check_shim_terminate_instance_by_deadline(self, test_db, session: AsyncSession):
         project = await create_project(session=session)
         instance = await create_instance(
             session=session,
@@ -237,21 +241,17 @@ class TestCheckShim:
 
         health_status = "Not ok"
         with patch(
-            "dstack._internal.server.background.tasks.process_instances._instance_healthcheck"
+            "dstack._internal.server.background.tasks.process_instances._check_instance_inner"
         ) as healthcheck:
-            healthcheck.return_value = HealthStatus(healthy=False, reason=health_status)
+            healthcheck.return_value = InstanceCheck(reachable=False, message=health_status)
             await process_instances()
 
         await session.refresh(instance)
 
         assert instance is not None
         assert instance.status == InstanceStatus.TERMINATING
-        assert (
-            instance.termination_deadline.replace(tzinfo=dt.timezone.utc)
-            == termination_deadline_time
-        )
+        assert instance.termination_deadline == termination_deadline_time
         assert instance.termination_reason == "Termination deadline"
-        assert instance.health_status == health_status
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
@@ -305,9 +305,70 @@ class TestCheckShim:
         await session.commit()
 
         with patch(
-            "dstack._internal.server.background.tasks.process_instances._instance_healthcheck"
+            "dstack._internal.server.background.tasks.process_instances._check_instance_inner"
         ) as healthcheck:
-            healthcheck.return_value = HealthStatus(healthy=True, reason="OK")
+            healthcheck.return_value = InstanceCheck(reachable=True)
+            await process_instances()
+            healthcheck.assert_called()
+
+        await session.refresh(instance)
+
+        assert instance is not None
+        assert instance.status == InstanceStatus.IDLE
+        assert not instance.unreachable
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("health_status", [HealthStatus.HEALTHY, HealthStatus.FAILURE])
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_check_shim_switch_to_unreachable_state(
+        self, test_db, session: AsyncSession, health_status: HealthStatus
+    ):
+        project = await create_project(session=session)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.IDLE,
+            unreachable=False,
+            health_status=health_status,
+        )
+
+        with patch(
+            "dstack._internal.server.background.tasks.process_instances._check_instance_inner"
+        ) as healthcheck:
+            healthcheck.return_value = InstanceCheck(reachable=False)
+            await process_instances()
+
+        await session.refresh(instance)
+
+        assert instance is not None
+        assert instance.status == InstanceStatus.IDLE
+        assert instance.unreachable
+        # Should keep the previous status
+        assert instance.health == health_status
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_check_shim_check_instance_health(self, test_db, session: AsyncSession):
+        project = await create_project(session=session)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.IDLE,
+            unreachable=False,
+            health_status=HealthStatus.HEALTHY,
+        )
+        health_response = InstanceHealthResponse(
+            dcgm=DCGMHealthResponse(
+                overall_health=DCGMHealthResult.DCGM_HEALTH_RESULT_WARN, incidents=[]
+            )
+        )
+
+        with patch(
+            "dstack._internal.server.background.tasks.process_instances._check_instance_inner"
+        ) as healthcheck:
+            healthcheck.return_value = InstanceCheck(
+                reachable=True, health_response=health_response
+            )
             await process_instances()
 
         await session.refresh(instance)
@@ -315,6 +376,122 @@ class TestCheckShim:
         assert instance is not None
         assert instance.status == InstanceStatus.IDLE
         assert not instance.unreachable
+        assert instance.health == HealthStatus.WARNING
+
+        res = await session.execute(select(InstanceHealthCheckModel))
+        health_check = res.scalars().one()
+        assert health_check.status == HealthStatus.WARNING
+        assert health_check.response == health_response.json()
+
+
+class TestRemoveDanglingTasks:
+    @pytest.fixture
+    def ssh_tunnel_mock(self) -> Generator[Mock, None, None]:
+        with patch("dstack._internal.server.services.runner.ssh.SSHTunnel") as SSHTunnelMock:
+            yield SSHTunnelMock
+
+    @pytest.fixture
+    def shim_client_mock(self) -> Generator[Mock, None, None]:
+        with patch("dstack._internal.server.services.runner.client.ShimClient") as ShimClientMock:
+            yield ShimClientMock.return_value
+
+    @pytest.mark.asyncio
+    async def test_terminates_and_removes_dangling_tasks(
+        self, test_db, session: AsyncSession, ssh_tunnel_mock, shim_client_mock: Mock
+    ):
+        user = await create_user(session=session)
+        project = await create_project(session=session)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.BUSY,
+        )
+        repo = await create_repo(
+            session=session,
+            project_id=project.id,
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            instance=instance,
+        )
+        dangling_task_id_1 = "fe138b77-d0b1-49d3-8c9f-2dfe78ece727"
+        dangling_task_id_2 = "8b016a75-41de-44f1-91ff-c9b63d2caa1d"
+        shim_client_mock.list_tasks.return_value = TaskListResponse(
+            tasks=[
+                TaskListItem(id=str(job.id), status=TaskStatus.RUNNING),
+                TaskListItem(id=dangling_task_id_1, status=TaskStatus.RUNNING),
+                TaskListItem(id=dangling_task_id_2, status=TaskStatus.TERMINATED),
+            ]
+        )
+        await process_instances()
+
+        await session.refresh(instance)
+        assert instance.status == InstanceStatus.BUSY
+
+        shim_client_mock.terminate_task.assert_called_once_with(
+            task_id=dangling_task_id_1, reason=None, message=None, timeout=0
+        )
+        assert shim_client_mock.remove_task.call_count == 2
+        shim_client_mock.remove_task.assert_has_calls(
+            [call(task_id=dangling_task_id_1), call(task_id=dangling_task_id_2)]
+        )
+
+    @pytest.mark.asyncio
+    async def test_terminates_and_removes_dangling_tasks_legacy_shim(
+        self, test_db, session: AsyncSession, ssh_tunnel_mock, shim_client_mock: Mock
+    ):
+        user = await create_user(session=session)
+        project = await create_project(session=session)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.BUSY,
+        )
+        repo = await create_repo(
+            session=session,
+            project_id=project.id,
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            instance=instance,
+        )
+        dangling_task_id_1 = "fe138b77-d0b1-49d3-8c9f-2dfe78ece727"
+        dangling_task_id_2 = "8b016a75-41de-44f1-91ff-c9b63d2caa1d"
+        shim_client_mock.list_tasks.return_value = TaskListResponse(
+            ids=[str(job.id), dangling_task_id_1, dangling_task_id_2]
+        )
+        await process_instances()
+
+        await session.refresh(instance)
+        assert instance.status == InstanceStatus.BUSY
+
+        assert shim_client_mock.terminate_task.call_count == 2
+        shim_client_mock.terminate_task.assert_has_calls(
+            [
+                call(task_id=dangling_task_id_1, reason=None, message=None, timeout=0),
+                call(task_id=dangling_task_id_2, reason=None, message=None, timeout=0),
+            ]
+        )
+        assert shim_client_mock.remove_task.call_count == 2
+        shim_client_mock.remove_task.assert_has_calls(
+            [call(task_id=dangling_task_id_1), call(task_id=dangling_task_id_2)]
+        )
 
 
 class TestTerminateIdleTime:
@@ -332,7 +509,7 @@ class TestTerminateIdleTime:
         await process_instances()
         await session.refresh(instance)
         assert instance is not None
-        assert instance.status == InstanceStatus.TERMINATED
+        assert instance.status == InstanceStatus.TERMINATING
         assert instance.termination_reason == "Idle timeout"
 
 
@@ -553,7 +730,7 @@ class TestCreateInstance:
                 availability=InstanceAvailability.AVAILABLE,
             )
             backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
-            backend_mock.compute.return_value.get_offers_cached.return_value = [offer]
+            backend_mock.compute.return_value.get_offers.return_value = [offer]
             backend_mock.compute.return_value.create_instance.return_value = JobProvisioningData(
                 backend=offer.backend,
                 instance_type=offer.instance,
@@ -586,13 +763,13 @@ class TestCreateInstance:
         aws_mock.TYPE = BackendType.AWS
         offer = get_instance_offer_with_availability(backend=BackendType.AWS, price=1.0)
         aws_mock.compute.return_value = Mock(spec=ComputeMockSpec)
-        aws_mock.compute.return_value.get_offers_cached.return_value = [offer]
+        aws_mock.compute.return_value.get_offers.return_value = [offer]
         aws_mock.compute.return_value.create_instance.side_effect = err
         gcp_mock = Mock()
         gcp_mock.TYPE = BackendType.GCP
         offer = get_instance_offer_with_availability(backend=BackendType.GCP, price=2.0)
         gcp_mock.compute.return_value = Mock(spec=ComputeMockSpec)
-        gcp_mock.compute.return_value.get_offers_cached.return_value = [offer]
+        gcp_mock.compute.return_value.get_offers.return_value = [offer]
         gcp_mock.compute.return_value.create_instance.return_value = get_job_provisioning_data(
             backend=offer.backend, region=offer.region, price=offer.price
         )
@@ -615,7 +792,7 @@ class TestCreateInstance:
         aws_mock.TYPE = BackendType.AWS
         offer = get_instance_offer_with_availability(backend=BackendType.AWS, price=1.0)
         aws_mock.compute.return_value = Mock(spec=ComputeMockSpec)
-        aws_mock.compute.return_value.get_offers_cached.return_value = [offer]
+        aws_mock.compute.return_value.get_offers.return_value = [offer]
         aws_mock.compute.return_value.create_instance.side_effect = err
         with patch("dstack._internal.server.services.backends.get_project_backends") as m:
             m.return_value = [aws_mock]
@@ -727,7 +904,7 @@ class TestPlacementGroups:
         backend_mock = Mock()
         backend_mock.TYPE = BackendType.AWS
         backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
-        backend_mock.compute.return_value.get_offers_cached.return_value = [
+        backend_mock.compute.return_value.get_offers.return_value = [
             get_instance_offer_with_availability()
         ]
         backend_mock.compute.return_value.create_instance.return_value = (
@@ -775,7 +952,7 @@ class TestPlacementGroups:
         backend_mock = Mock()
         backend_mock.TYPE = BackendType.AWS
         backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
-        backend_mock.compute.return_value.get_offers_cached.return_value = [
+        backend_mock.compute.return_value.get_offers.return_value = [
             get_instance_offer_with_availability(instance_type="bad-offer-1"),
             get_instance_offer_with_availability(instance_type="bad-offer-2"),
             get_instance_offer_with_availability(instance_type="good-offer"),
@@ -834,7 +1011,7 @@ class TestPlacementGroups:
         backend_mock = Mock()
         backend_mock.TYPE = BackendType.AWS
         backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
-        backend_mock.compute.return_value.get_offers_cached.return_value = [
+        backend_mock.compute.return_value.get_offers.return_value = [
             get_instance_offer_with_availability(instance_type="bad-offer"),
             get_instance_offer_with_availability(instance_type="good-offer"),
         ]
@@ -881,7 +1058,7 @@ class TestAddSSHInstance:
 
     @pytest.fixture
     def deploy_instance_mock(self, monkeypatch: pytest.MonkeyPatch, host_info: dict):
-        mock = Mock(return_value=(HealthStatus(healthy=True, reason="OK"), host_info, "amd64"))
+        mock = Mock(return_value=(InstanceCheck(reachable=True), host_info, GoArchType.AMD64))
         monkeypatch.setattr(
             "dstack._internal.server.background.tasks.process_instances._deploy_instance", mock
         )
@@ -935,3 +1112,36 @@ class TestAddSSHInstance:
         assert instance.status == InstanceStatus.IDLE
         assert instance.total_blocks == expected_blocks
         assert instance.busy_blocks == 0
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+@pytest.mark.usefixtures("test_db", "image_config_mock")
+class TestDeleteInstanceHealthChecks:
+    async def test_deletes_instance_health_checks(
+        self, monkeypatch: pytest.MonkeyPatch, session: AsyncSession
+    ):
+        project = await create_project(session=session)
+        instance = await create_instance(
+            session=session, project=project, status=InstanceStatus.IDLE
+        )
+        # 30 minutes
+        monkeypatch.setattr(
+            "dstack._internal.server.settings.SERVER_INSTANCE_HEALTH_TTL_SECONDS", 1800
+        )
+        now = get_current_datetime()
+        # old check
+        await create_instance_health_check(
+            session=session, instance=instance, collected_at=now - dt.timedelta(minutes=40)
+        )
+        # recent check
+        check = await create_instance_health_check(
+            session=session, instance=instance, collected_at=now - dt.timedelta(minutes=20)
+        )
+
+        await delete_instance_health_checks()
+
+        res = await session.execute(select(InstanceHealthCheckModel))
+        all_checks = res.scalars().all()
+        assert len(all_checks) == 1
+        assert all_checks[0] == check

@@ -77,17 +77,20 @@ class TestListBackendTypes:
         response = await client.post("/api/backends/list_types")
         assert response.status_code == 200, response.json()
         assert response.json() == [
+            "amddevcloud",
             "aws",
             "azure",
+            "cloudrift",
             "cudo",
             "datacrunch",
+            "digitalocean",
             "gcp",
+            "hotaisle",
             "kubernetes",
             "lambda",
             *(["nebius"] if sys.version_info >= (3, 10) else []),
             "oci",
             "runpod",
-            "tensordock",
             "vastai",
             "vultr",
         ]

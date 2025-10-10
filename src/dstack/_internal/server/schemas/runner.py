@@ -16,6 +16,7 @@ from dstack._internal.core.models.runs import (
     RunSpec,
 )
 from dstack._internal.core.models.volumes import InstanceMountPoint, VolumeMountPoint
+from dstack._internal.server.schemas.health.dcgm import DCGMHealthResponse
 
 
 class JobStateEvent(CoreModel):
@@ -77,6 +78,9 @@ class SubmitBody(CoreModel):
                 "max_duration",
                 "ssh_key",
                 "working_dir",
+                "repo_dir",
+                "repo_data",
+                "file_archives",
             }
         ),
     ]
@@ -110,6 +114,10 @@ class SubmitBody(CoreModel):
 class HealthcheckResponse(CoreModel):
     service: str
     version: str
+
+
+class InstanceHealthResponse(CoreModel):
+    dcgm: Optional[DCGMHealthResponse] = None
 
 
 class GPUMetrics(CoreModel):
@@ -150,6 +158,16 @@ class TaskStatus(str, Enum):
 class GPUDevice(CoreModel):
     path_on_host: str
     path_in_container: str
+
+
+class TaskListItem(CoreModel):
+    id: str
+    status: TaskStatus
+
+
+class TaskListResponse(CoreModel):
+    ids: Optional[list[str]] = None  # returned by pre-0.19.26 shim
+    tasks: Optional[list[TaskListItem]] = None  # returned by 0.19.26+ shim
 
 
 class TaskInfoResponse(CoreModel):

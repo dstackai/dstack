@@ -1,19 +1,89 @@
 import re
 from enum import Enum
-from typing import Union
+from typing import TYPE_CHECKING, Any, Callable, Mapping, Optional, Union
 
+import orjson
 from pydantic import Field
-from pydantic_duality import DualBaseModel
+from pydantic_duality import generate_dual_base_model
 from typing_extensions import Annotated
 
+from dstack._internal.utils.json_utils import pydantic_orjson_dumps
 
+IncludeExcludeFieldType = Union[int, str]
+IncludeExcludeSetType = set[IncludeExcludeFieldType]
+IncludeExcludeDictType = dict[
+    IncludeExcludeFieldType, Union[bool, IncludeExcludeSetType, "IncludeExcludeDictType"]
+]
+IncludeExcludeType = Union[IncludeExcludeSetType, IncludeExcludeDictType]
+
+
+class CoreConfig:
+    json_loads = orjson.loads
+    json_dumps = pydantic_orjson_dumps
+
+
+# All dstack models inherit from pydantic-duality's DualBaseModel.
 # DualBaseModel creates two classes for the model:
 # one with extra = "forbid" (CoreModel/CoreModel.__request__),
 # and another with extra = "ignore" (CoreModel.__response__).
-# This allows to use the same model both for a strict parsing of the user input and
-# for a permissive parsing of the server responses.
-class CoreModel(DualBaseModel):
-    pass
+# This allows to use the same model both for strict parsing of the user input and
+# for permissive parsing of the server responses.
+#
+# We define a func to generate CoreModel dynamically that can be used
+# to define custom Config for both __request__ and __response__ models.
+# Note: Defining config in the model class directly overrides
+# pydantic-duality's base config, breaking __response__.
+def generate_dual_core_model(
+    custom_config: Union[type, Mapping],
+) -> "type[CoreModel]":
+    class CoreModel(generate_dual_base_model(custom_config)):
+        def json(
+            self,
+            *,
+            include: Optional[IncludeExcludeType] = None,
+            exclude: Optional[IncludeExcludeType] = None,
+            by_alias: bool = False,
+            skip_defaults: Optional[bool] = None,  # ignore as it's deprecated
+            exclude_unset: bool = False,
+            exclude_defaults: bool = False,
+            exclude_none: bool = False,
+            encoder: Optional[Callable[[Any], Any]] = None,
+            models_as_dict: bool = True,  # does not seems to be needed by dstack or dependencies
+            **dumps_kwargs: Any,
+        ) -> str:
+            """
+            Override `json()` method so that it calls `dict()`.
+            Allows changing how models are serialized by overriding `dict()` only.
+            By default, `json()` won't call `dict()`, so changes applied in `dict()` won't take place.
+            """
+            data = self.dict(
+                by_alias=by_alias,
+                include=include,
+                exclude=exclude,
+                exclude_unset=exclude_unset,
+                exclude_defaults=exclude_defaults,
+                exclude_none=exclude_none,
+            )
+            if self.__custom_root_type__:
+                data = data["__root__"]
+            return self.__config__.json_dumps(data, default=encoder, **dumps_kwargs)
+
+    return CoreModel
+
+
+if TYPE_CHECKING:
+
+    class CoreModel(generate_dual_base_model(CoreConfig)):
+        pass
+else:
+    CoreModel = generate_dual_core_model(CoreConfig)
+
+
+class FrozenConfig(CoreConfig):
+    frozen = True
+
+
+FrozenCoreModel = generate_dual_core_model(FrozenConfig)
 
 
 class Duration(int):
@@ -50,7 +120,7 @@ class Duration(int):
         raise ValueError(f"Cannot parse the duration {v}")
 
 
-class RegistryAuth(CoreModel):
+class RegistryAuth(FrozenCoreModel):
     """
     Credentials for pulling a private Docker image.
 
@@ -58,9 +128,6 @@ class RegistryAuth(CoreModel):
         username (str): The username
         password (str): The password or access token
     """
-
-    class Config:
-        frozen = True
 
     username: Annotated[str, Field(description="The username")]
     password: Annotated[str, Field(description="The password or access token")]

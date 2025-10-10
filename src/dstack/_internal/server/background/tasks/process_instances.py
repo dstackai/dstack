@@ -1,21 +1,18 @@
 import asyncio
 import datetime
+import logging
 from datetime import timedelta
-from typing import Any, Dict, List, Optional, Tuple, cast
+from typing import Any, Dict, List, Optional, cast
 
 import requests
 from paramiko.pkey import PKey
 from paramiko.ssh_exception import PasswordRequiredException
 from pydantic import ValidationError
-from sqlalchemy import select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, lazyload
+from sqlalchemy.orm import joinedload
 
 from dstack._internal import settings
-from dstack._internal.core.backends import (
-    BACKENDS_WITH_CREATE_INSTANCE_SUPPORT,
-    BACKENDS_WITH_PLACEMENT_GROUPS_SUPPORT,
-)
 from dstack._internal.core.backends.base.compute import (
     ComputeWithCreateInstanceSupport,
     ComputeWithPlacementGroupSupport,
@@ -27,17 +24,9 @@ from dstack._internal.core.backends.base.compute import (
     get_shim_env,
     get_shim_pre_start_commands,
 )
-from dstack._internal.core.backends.remote.provisioning import (
-    detect_cpu_arch,
-    get_host_info,
-    get_paramiko_connection,
-    get_shim_healthcheck,
-    host_info_to_instance_type,
-    remove_dstack_runner_if_exists,
-    remove_host_info_if_exists,
-    run_pre_start_commands,
-    run_shim_as_systemd_service,
-    upload_envs,
+from dstack._internal.core.backends.features import (
+    BACKENDS_WITH_CREATE_INSTANCE_SUPPORT,
+    BACKENDS_WITH_PLACEMENT_GROUPS_SUPPORT,
 )
 from dstack._internal.core.consts import DSTACK_SHIM_HTTP_PORT
 
@@ -45,6 +34,7 @@ from dstack._internal.core.consts import DSTACK_SHIM_HTTP_PORT
 from dstack._internal.core.errors import (
     BackendError,
     NotYetTerminated,
+    PlacementGroupNotSupportedError,
     ProvisioningError,
 )
 from dstack._internal.core.models.backends.base import BackendType
@@ -63,24 +53,25 @@ from dstack._internal.core.models.placement import (
     PlacementStrategy,
 )
 from dstack._internal.core.models.profiles import (
-    RetryEvent,
     TerminationPolicy,
 )
 from dstack._internal.core.models.runs import (
     JobProvisioningData,
     Retry,
 )
-from dstack._internal.core.services.profiles import get_retry
 from dstack._internal.server import settings as server_settings
 from dstack._internal.server.background.tasks.common import get_provisioning_timeout
-from dstack._internal.server.db import get_session_ctx
+from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import (
     FleetModel,
+    InstanceHealthCheckModel,
     InstanceModel,
+    JobModel,
     PlacementGroupModel,
     ProjectModel,
 )
-from dstack._internal.server.schemas.runner import HealthcheckResponse
+from dstack._internal.server.schemas.instances import InstanceCheck
+from dstack._internal.server.schemas.runner import HealthcheckResponse, InstanceHealthResponse
 from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services.fleets import (
     fleet_model_to_fleet,
@@ -92,8 +83,10 @@ from dstack._internal.server.services.instances import (
     get_instance_provisioning_data,
     get_instance_requirements,
     get_instance_ssh_private_keys,
+    remove_dangling_tasks_from_instance,
 )
 from dstack._internal.server.services.locking import get_locker
+from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.offers import is_divisible_into_blocks
 from dstack._internal.server.services.placement import (
     get_fleet_placement_group_models,
@@ -101,14 +94,32 @@ from dstack._internal.server.services.placement import (
     schedule_fleet_placement_groups_deletion,
 )
 from dstack._internal.server.services.runner import client as runner_client
-from dstack._internal.server.services.runner.client import HealthStatus
 from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
-from dstack._internal.utils.common import get_current_datetime, run_async
+from dstack._internal.server.utils import sentry_utils
+from dstack._internal.server.utils.provisioning import (
+    detect_cpu_arch,
+    get_host_info,
+    get_paramiko_connection,
+    get_shim_healthcheck,
+    host_info_to_instance_type,
+    remove_dstack_runner_if_exists,
+    remove_host_info_if_exists,
+    run_pre_start_commands,
+    run_shim_as_systemd_service,
+    upload_envs,
+)
+from dstack._internal.utils.common import (
+    get_current_datetime,
+    get_or_error,
+    run_async,
+)
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.network import get_ip_from_network, is_ip_among_addresses
 from dstack._internal.utils.ssh import (
     pkey_from_str,
 )
+
+MIN_PROCESSING_INTERVAL = timedelta(seconds=10)
 
 PENDING_JOB_RETRY_INTERVAL = timedelta(seconds=60)
 
@@ -128,8 +139,20 @@ async def process_instances(batch_size: int = 1):
     await asyncio.gather(*tasks)
 
 
+@sentry_utils.instrument_background_task
+async def delete_instance_health_checks():
+    now = get_current_datetime()
+    cutoff = now - timedelta(seconds=server_settings.SERVER_INSTANCE_HEALTH_TTL_SECONDS)
+    async with get_session_ctx() as session:
+        await session.execute(
+            delete(InstanceHealthCheckModel).where(InstanceHealthCheckModel.collected_at < cutoff)
+        )
+        await session.commit()
+
+
+@sentry_utils.instrument_background_task
 async def _process_next_instance():
-    lock, lockset = get_locker().get_lockset(InstanceModel.__tablename__)
+    lock, lockset = get_locker(get_db().dialect_name).get_lockset(InstanceModel.__tablename__)
     async with get_session_ctx() as session:
         async with lock:
             res = await session.execute(
@@ -145,41 +168,43 @@ async def _process_next_instance():
                         ]
                     ),
                     InstanceModel.id.not_in(lockset),
+                    InstanceModel.last_processed_at
+                    < get_current_datetime() - MIN_PROCESSING_INTERVAL,
                 )
-                .options(lazyload(InstanceModel.jobs))
+                .options(joinedload(InstanceModel.jobs).load_only(JobModel.id, JobModel.status))
+                .options(joinedload(InstanceModel.project).load_only(ProjectModel.ssh_private_key))
                 .order_by(InstanceModel.last_processed_at.asc())
                 .limit(1)
-                .with_for_update(skip_locked=True)
+                .with_for_update(skip_locked=True, key_share=True, of=InstanceModel)
             )
             instance = res.scalar()
             if instance is None:
                 return
             lockset.add(instance.id)
+        instance_model_id = instance.id
         try:
-            instance_model_id = instance.id
             await _process_instance(session=session, instance=instance)
         finally:
             lockset.difference_update([instance_model_id])
 
 
 async def _process_instance(session: AsyncSession, instance: InstanceModel):
-    # Refetch to load related attributes.
-    # joinedload produces LEFT OUTER JOIN that can't be used with FOR UPDATE.
-    res = await session.execute(
-        select(InstanceModel)
-        .where(InstanceModel.id == instance.id)
-        .options(joinedload(InstanceModel.project).joinedload(ProjectModel.backends))
-        .options(joinedload(InstanceModel.jobs))
-        .options(joinedload(InstanceModel.fleet).joinedload(FleetModel.instances))
-        .execution_options(populate_existing=True)
-    )
-    instance = res.unique().scalar_one()
-    if (
-        instance.status == InstanceStatus.IDLE
-        and instance.termination_policy == TerminationPolicy.DESTROY_AFTER_IDLE
-        and not instance.jobs
+    if instance.status in (
+        InstanceStatus.PENDING,
+        InstanceStatus.TERMINATING,
     ):
-        await _mark_terminating_if_idle_duration_expired(instance)
+        # Refetch to load related attributes.
+        # Load related attributes only for statuses that always need them.
+        res = await session.execute(
+            select(InstanceModel)
+            .where(InstanceModel.id == instance.id)
+            .options(joinedload(InstanceModel.project).joinedload(ProjectModel.backends))
+            .options(joinedload(InstanceModel.jobs).load_only(JobModel.id, JobModel.status))
+            .options(joinedload(InstanceModel.fleet).joinedload(FleetModel.instances))
+            .execution_options(populate_existing=True)
+        )
+        instance = res.unique().scalar_one()
+
     if instance.status == InstanceStatus.PENDING:
         if instance.remote_connection_info is not None:
             await _add_remote(instance)
@@ -193,7 +218,9 @@ async def _process_instance(session: AsyncSession, instance: InstanceModel):
         InstanceStatus.IDLE,
         InstanceStatus.BUSY,
     ):
-        await _check_instance(instance)
+        idle_duration_expired = _check_and_mark_terminating_if_idle_duration_expired(instance)
+        if not idle_duration_expired:
+            await _check_instance(session, instance)
     elif instance.status == InstanceStatus.TERMINATING:
         await _terminate(instance)
 
@@ -201,7 +228,13 @@ async def _process_instance(session: AsyncSession, instance: InstanceModel):
     await session.commit()
 
 
-async def _mark_terminating_if_idle_duration_expired(instance: InstanceModel):
+def _check_and_mark_terminating_if_idle_duration_expired(instance: InstanceModel):
+    if not (
+        instance.status == InstanceStatus.IDLE
+        and instance.termination_policy == TerminationPolicy.DESTROY_AFTER_IDLE
+        and not instance.jobs
+    ):
+        return False
     idle_duration = _get_instance_idle_duration(instance)
     idle_seconds = instance.termination_idle_time
     delta = datetime.timedelta(seconds=idle_seconds)
@@ -217,6 +250,8 @@ async def _mark_terminating_if_idle_duration_expired(instance: InstanceModel):
                 "instance_status": instance.status.value,
             },
         )
+        return True
+    return False
 
 
 async def _add_remote(instance: InstanceModel) -> None:
@@ -224,9 +259,7 @@ async def _add_remote(instance: InstanceModel) -> None:
     if instance.status == InstanceStatus.PENDING:
         instance.status = InstanceStatus.PROVISIONING
 
-    retry_duration_deadline = instance.created_at.replace(
-        tzinfo=datetime.timezone.utc
-    ) + timedelta(seconds=PROVISIONING_TIMEOUT_SECONDS)
+    retry_duration_deadline = instance.created_at + timedelta(seconds=PROVISIONING_TIMEOUT_SECONDS)
     if retry_duration_deadline < get_current_datetime():
         instance.status = InstanceStatus.TERMINATED
         instance.termination_reason = "Provisioning timeout expired"
@@ -272,7 +305,7 @@ async def _add_remote(instance: InstanceModel) -> None:
             )
             deploy_timeout = 20 * 60  # 20 minutes
             result = await asyncio.wait_for(future, timeout=deploy_timeout)
-            health, host_info, cpu_arch = result
+            health, host_info, arch = result
         except (asyncio.TimeoutError, TimeoutError) as e:
             raise ProvisioningError(f"Deploy timeout: {e}") from e
         except Exception as e:
@@ -290,10 +323,9 @@ async def _add_remote(instance: InstanceModel) -> None:
             e,
         )
         instance.status = InstanceStatus.PENDING
-        instance.last_retry_at = get_current_datetime()
         return
 
-    instance_type = host_info_to_instance_type(host_info, cpu_arch)
+    instance_type = host_info_to_instance_type(host_info, arch)
     instance_network = None
     internal_ip = None
     try:
@@ -358,6 +390,7 @@ async def _add_remote(instance: InstanceModel) -> None:
         return
 
     region = instance.region
+    assert region is not None  # always set for ssh instances
     jpd = JobProvisioningData(
         backend=BackendType.REMOTE,
         instance_type=instance_type,
@@ -388,15 +421,14 @@ async def _add_remote(instance: InstanceModel) -> None:
     instance.offer = instance_offer.json()
     instance.job_provisioning_data = jpd.json()
     instance.started_at = get_current_datetime()
-    instance.last_retry_at = get_current_datetime()
 
 
 def _deploy_instance(
     remote_details: RemoteConnectionInfo,
-    pkeys: List[PKey],
+    pkeys: list[PKey],
     ssh_proxy_pkeys: Optional[list[PKey]],
-    authorized_keys: List[str],
-) -> Tuple[HealthStatus, Dict[str, Any], GoArchType]:
+    authorized_keys: list[str],
+) -> tuple[InstanceCheck, dict[str, Any], GoArchType]:
     with get_paramiko_connection(
         remote_details.ssh_user,
         remote_details.host,
@@ -444,40 +476,17 @@ def _deploy_instance(
         host_info = get_host_info(client, dstack_working_dir)
         logger.debug("Received a host_info %s", host_info)
 
-        raw_health = get_shim_healthcheck(client)
+        healthcheck_out = get_shim_healthcheck(client)
         try:
-            health_response = HealthcheckResponse.__response__.parse_raw(raw_health)
+            healthcheck = HealthcheckResponse.__response__.parse_raw(healthcheck_out)
         except ValueError as e:
-            raise ProvisioningError("Cannot read HealthcheckResponse") from e
-        health = runner_client.health_response_to_health_status(health_response)
+            raise ProvisioningError(f"Cannot parse HealthcheckResponse: {e}") from e
+        instance_check = runner_client.healthcheck_response_to_instance_check(healthcheck)
 
-        return health, host_info, arch
+        return instance_check, host_info, arch
 
 
 async def _create_instance(session: AsyncSession, instance: InstanceModel) -> None:
-    if instance.last_retry_at is not None:
-        last_retry = instance.last_retry_at.replace(tzinfo=datetime.timezone.utc)
-        if get_current_datetime() < last_retry + timedelta(minutes=1):
-            return
-
-    if (
-        instance.profile is None
-        or instance.requirements is None
-        or instance.instance_configuration is None
-    ):
-        instance.status = InstanceStatus.TERMINATED
-        instance.termination_reason = "Empty profile, requirements or instance_configuration"
-        instance.last_retry_at = get_current_datetime()
-        logger.warning(
-            "Empty profile, requirements or instance_configuration. Terminate instance: %s",
-            instance.name,
-            extra={
-                "instance_name": instance.name,
-                "instance_status": InstanceStatus.TERMINATED.value,
-            },
-        )
-        return
-
     if _need_to_wait_fleet_provisioning(instance):
         logger.debug("Waiting for the first instance in the fleet to be provisioned")
         return
@@ -491,7 +500,6 @@ async def _create_instance(session: AsyncSession, instance: InstanceModel) -> No
         instance.termination_reason = (
             f"Error to parse profile, requirements or instance_configuration: {e}"
         )
-        instance.last_retry_at = get_current_datetime()
         logger.warning(
             "Error to parse profile, requirements or instance_configuration. Terminate instance: %s",
             instance.name,
@@ -501,24 +509,6 @@ async def _create_instance(session: AsyncSession, instance: InstanceModel) -> No
             },
         )
         return
-
-    retry = get_retry(profile)
-    should_retry = retry is not None and RetryEvent.NO_CAPACITY in retry.on_events
-
-    if retry is not None:
-        retry_duration_deadline = _get_retry_duration_deadline(instance, retry)
-        if get_current_datetime() > retry_duration_deadline:
-            instance.status = InstanceStatus.TERMINATED
-            instance.termination_reason = "Retry duration expired"
-            logger.warning(
-                "Retry duration expired. Terminating instance %s",
-                instance.name,
-                extra={
-                    "instance_name": instance.name,
-                    "instance_status": InstanceStatus.TERMINATED.value,
-                },
-            )
-            return
 
     placement_group_models = []
     placement_group_model = None
@@ -557,15 +547,6 @@ async def _create_instance(session: AsyncSession, instance: InstanceModel) -> No
         exclude_not_available=True,
     )
 
-    if not offers and should_retry:
-        instance.last_retry_at = get_current_datetime()
-        logger.debug(
-            "No offers for instance %s. Next retry",
-            instance.name,
-            extra={"instance_name": instance.name},
-        )
-        return
-
     # Limit number of offers tried to prevent long-running processing
     # in case all offers fail.
     for backend, instance_offer in offers[: server_settings.MAX_OFFERS_TRIED]:
@@ -595,7 +576,6 @@ async def _create_instance(session: AsyncSession, instance: InstanceModel) -> No
                 if placement_group_model is None:  # error occurred
                     continue
                 session.add(placement_group_model)
-                await session.flush()
                 placement_group_models.append(placement_group_model)
         logger.debug(
             "Trying %s in %s/%s for $%0.4f per hour",
@@ -643,7 +623,6 @@ async def _create_instance(session: AsyncSession, instance: InstanceModel) -> No
         instance.offer = instance_offer.json()
         instance.total_blocks = instance_offer.total_blocks
         instance.started_at = get_current_datetime()
-        instance.last_retry_at = get_current_datetime()
 
         logger.info(
             "Created instance %s",
@@ -654,7 +633,9 @@ async def _create_instance(session: AsyncSession, instance: InstanceModel) -> No
             },
         )
         if instance.fleet_id and _is_fleet_master_instance(instance):
-            # Clean up placement groups that did not end up being used
+            # Clean up placement groups that did not end up being used.
+            # Flush to update still uncommitted placement groups.
+            await session.flush()
             await schedule_fleet_placement_groups_deletion(
                 session=session,
                 fleet_id=instance.fleet_id,
@@ -664,21 +645,18 @@ async def _create_instance(session: AsyncSession, instance: InstanceModel) -> No
             )
         return
 
-    instance.last_retry_at = get_current_datetime()
-
-    if not should_retry:
-        _mark_terminated(instance, "All offers failed" if offers else "No offers found")
-        if (
-            instance.fleet
-            and _is_fleet_master_instance(instance)
-            and _is_cloud_cluster(instance.fleet)
-        ):
-            # Do not attempt to deploy other instances, as they won't determine the correct cluster
-            # backend, region, and placement group without a successfully deployed master instance
-            for sibling_instance in instance.fleet.instances:
-                if sibling_instance.id == instance.id:
-                    continue
-                _mark_terminated(sibling_instance, "Master instance failed to start")
+    _mark_terminated(instance, "All offers failed" if offers else "No offers found")
+    if (
+        instance.fleet
+        and _is_fleet_master_instance(instance)
+        and _is_cloud_cluster(instance.fleet)
+    ):
+        # Do not attempt to deploy other instances, as they won't determine the correct cluster
+        # backend, region, and placement group without a successfully deployed master instance
+        for sibling_instance in instance.fleet.instances:
+            if sibling_instance.id == instance.id:
+                continue
+            _mark_terminated(sibling_instance, "Master instance failed to start")
 
 
 def _mark_terminated(instance: InstanceModel, termination_reason: str) -> None:
@@ -695,7 +673,7 @@ def _mark_terminated(instance: InstanceModel, termination_reason: str) -> None:
     )
 
 
-async def _check_instance(instance: InstanceModel) -> None:
+async def _check_instance(session: AsyncSession, instance: InstanceModel) -> None:
     if (
         instance.status == InstanceStatus.BUSY
         and instance.jobs
@@ -714,12 +692,16 @@ async def _check_instance(instance: InstanceModel) -> None:
         )
         return
 
-    job_provisioning_data = JobProvisioningData.__response__.parse_raw(
-        instance.job_provisioning_data
-    )
+    job_provisioning_data = get_or_error(get_instance_provisioning_data(instance))
     if job_provisioning_data.hostname is None:
+        res = await session.execute(
+            select(ProjectModel)
+            .where(ProjectModel.id == instance.project_id)
+            .options(joinedload(ProjectModel.backends))
+        )
+        project = res.unique().scalar_one()
         await _wait_for_instance_provisioning_data(
-            project=instance.project,
+            project=project,
             instance=instance,
             job_provisioning_data=job_provisioning_data,
         )
@@ -732,29 +714,66 @@ async def _check_instance(instance: InstanceModel) -> None:
 
     ssh_private_keys = get_instance_ssh_private_keys(instance)
 
+    health_check_cutoff = get_current_datetime() - timedelta(
+        seconds=server_settings.SERVER_INSTANCE_HEALTH_MIN_COLLECT_INTERVAL_SECONDS
+    )
+    res = await session.execute(
+        select(func.count(1)).where(
+            InstanceHealthCheckModel.instance_id == instance.id,
+            InstanceHealthCheckModel.collected_at > health_check_cutoff,
+        )
+    )
+    check_instance_health = res.scalar_one() == 0
+
     # May return False if fails to establish ssh connection
-    health_status_response = await run_async(
-        _instance_healthcheck,
+    instance_check = await run_async(
+        _check_instance_inner,
         ssh_private_keys,
         job_provisioning_data,
         None,
+        instance=instance,
+        check_instance_health=check_instance_health,
     )
-    if isinstance(health_status_response, bool) or health_status_response is None:
-        health_status = HealthStatus(healthy=False, reason="SSH or tunnel error")
+    if instance_check is False:
+        instance_check = InstanceCheck(reachable=False, message="SSH or tunnel error")
+
+    if instance_check.reachable and check_instance_health:
+        health_status = instance_check.get_health_status()
     else:
-        health_status = health_status_response
+        # Keep previous health status
+        health_status = instance.health
 
-    logger.debug(
-        "Check instance %s status. shim health: %s",
+    loglevel = logging.DEBUG
+    if not instance_check.reachable and instance.status.is_available():
+        loglevel = logging.WARNING
+    elif check_instance_health and not health_status.is_healthy():
+        loglevel = logging.WARNING
+    logger.log(
+        loglevel,
+        "Instance %s check: reachable=%s health_status=%s message=%r",
         instance.name,
-        health_status,
-        extra={"instance_name": instance.name, "shim_health": health_status},
+        instance_check.reachable,
+        health_status.name,
+        instance_check.message,
+        extra={"instance_name": instance.name, "health_status": health_status},
     )
 
-    if health_status.healthy:
+    if instance_check.has_health_checks():
+        # ensured by has_health_checks()
+        assert instance_check.health_response is not None
+        health_check_model = InstanceHealthCheckModel(
+            instance_id=instance.id,
+            collected_at=get_current_datetime(),
+            status=health_status,
+            response=instance_check.health_response.json(),
+        )
+        session.add(health_check_model)
+
+    instance.health = health_status
+    instance.unreachable = not instance_check.reachable
+
+    if instance_check.reachable:
         instance.termination_deadline = None
-        instance.health_status = None
-        instance.unreachable = False
 
         if instance.status == InstanceStatus.PROVISIONING:
             instance.status = InstanceStatus.IDLE if not instance.jobs else InstanceStatus.BUSY
@@ -772,9 +791,6 @@ async def _check_instance(instance: InstanceModel) -> None:
     if instance.termination_deadline is None:
         instance.termination_deadline = get_current_datetime() + TERMINATION_DEADLINE_OFFSET
 
-    instance.health_status = health_status.reason
-    instance.unreachable = True
-
     if instance.status == InstanceStatus.PROVISIONING and instance.started_at is not None:
         provisioning_deadline = _get_provisioning_deadline(
             instance=instance,
@@ -790,13 +806,8 @@ async def _check_instance(instance: InstanceModel) -> None:
                     "instance_status": InstanceStatus.TERMINATING.value,
                 },
             )
-    elif instance.status in (InstanceStatus.IDLE, InstanceStatus.BUSY):
-        logger.warning(
-            "Instance %s shim is not available",
-            instance.name,
-            extra={"instance_name": instance.name},
-        )
-        deadline = instance.termination_deadline.replace(tzinfo=datetime.timezone.utc)
+    elif instance.status.is_available():
+        deadline = instance.termination_deadline
         if get_current_datetime() > deadline:
             instance.status = InstanceStatus.TERMINATING
             instance.termination_reason = "Termination deadline"
@@ -866,20 +877,34 @@ async def _wait_for_instance_provisioning_data(
 
 
 @runner_ssh_tunnel(ports=[DSTACK_SHIM_HTTP_PORT], retries=1)
-def _instance_healthcheck(ports: Dict[int, int]) -> HealthStatus:
+def _check_instance_inner(
+    ports: Dict[int, int], *, instance: InstanceModel, check_instance_health: bool = False
+) -> InstanceCheck:
+    instance_health_response: Optional[InstanceHealthResponse] = None
     shim_client = runner_client.ShimClient(port=ports[DSTACK_SHIM_HTTP_PORT])
+    method = shim_client.healthcheck
     try:
-        resp = shim_client.healthcheck(unmask_exeptions=True)
-        if resp is None:
-            return HealthStatus(healthy=False, reason="Unknown reason")
-        return runner_client.health_response_to_health_status(resp)
+        healthcheck_response = method(unmask_exceptions=True)
+        if check_instance_health:
+            method = shim_client.get_instance_health
+            instance_health_response = method()
     except requests.RequestException as e:
-        return HealthStatus(healthy=False, reason=f"Can't request shim: {e}")
+        template = "shim.%s(): request error: %s"
+        args = (method.__func__.__name__, e)
+        logger.debug(template, *args)
+        return InstanceCheck(reachable=False, message=template % args)
     except Exception as e:
-        logger.exception("Unknown exception from shim.healthcheck: %s", e)
-        return HealthStatus(
-            healthy=False, reason=f"Unknown exception ({e.__class__.__name__}): {e}"
-        )
+        template = "shim.%s(): unexpected exception %s: %s"
+        args = (method.__func__.__name__, e.__class__.__name__, e)
+        logger.exception(template, *args)
+        return InstanceCheck(reachable=False, message=template % args)
+    try:
+        remove_dangling_tasks_from_instance(shim_client, instance)
+    except Exception as e:
+        logger.exception("%s: error removing dangling tasks: %s", fmt(instance), e)
+    return runner_client.healthcheck_response_to_instance_check(
+        healthcheck_response, instance_health_response
+    )
 
 
 async def _terminate(instance: InstanceModel) -> None:
@@ -951,18 +976,12 @@ async def _terminate(instance: InstanceModel) -> None:
 
 def _next_termination_retry_at(instance: InstanceModel) -> datetime.datetime:
     assert instance.last_termination_retry_at is not None
-    return (
-        instance.last_termination_retry_at.replace(tzinfo=datetime.timezone.utc)
-        + TERMINATION_RETRY_TIMEOUT
-    )
+    return instance.last_termination_retry_at + TERMINATION_RETRY_TIMEOUT
 
 
 def _get_termination_deadline(instance: InstanceModel) -> datetime.datetime:
     assert instance.first_termination_retry_at is not None
-    return (
-        instance.first_termination_retry_at.replace(tzinfo=datetime.timezone.utc)
-        + TERMINATION_RETRY_MAX_DURATION
-    )
+    return instance.first_termination_retry_at + TERMINATION_RETRY_MAX_DURATION
 
 
 def _need_to_wait_fleet_provisioning(instance: InstanceModel) -> bool:
@@ -1063,6 +1082,12 @@ async def _create_placement_group(
             placement_group_model_to_placement_group(placement_group_model),
             master_instance_offer,
         )
+    except PlacementGroupNotSupportedError:
+        logger.debug(
+            "Skipping offer %s because placement group not supported",
+            master_instance_offer.instance.name,
+        )
+        return None
     except BackendError as e:
         logger.warning(
             "Failed to create placement group %s in %s/%s: %r",
@@ -1091,27 +1116,26 @@ async def _create_placement_group(
 
 
 def _get_instance_idle_duration(instance: InstanceModel) -> datetime.timedelta:
-    last_time = instance.created_at.replace(tzinfo=datetime.timezone.utc)
+    last_time = instance.created_at
     if instance.last_job_processed_at is not None:
-        last_time = instance.last_job_processed_at.replace(tzinfo=datetime.timezone.utc)
+        last_time = instance.last_job_processed_at
     return get_current_datetime() - last_time
 
 
 def _get_retry_duration_deadline(instance: InstanceModel, retry: Retry) -> datetime.datetime:
-    return instance.created_at.replace(tzinfo=datetime.timezone.utc) + timedelta(
-        seconds=retry.duration
-    )
+    return instance.created_at + timedelta(seconds=retry.duration)
 
 
 def _get_provisioning_deadline(
     instance: InstanceModel,
     job_provisioning_data: JobProvisioningData,
 ) -> datetime.datetime:
+    assert instance.started_at is not None
     timeout_interval = get_provisioning_timeout(
         backend_type=job_provisioning_data.get_base_backend(),
         instance_type_name=job_provisioning_data.instance_type.name,
     )
-    return instance.started_at.replace(tzinfo=datetime.timezone.utc) + timeout_interval
+    return instance.started_at + timeout_interval
 
 
 def _ssh_keys_to_pkeys(ssh_keys: list[SSHKey]) -> list[PKey]:

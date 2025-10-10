@@ -1,7 +1,7 @@
 # ~/.dstack/server/config.yml
 
 The `~/.dstack/server/config.yml` file is used
-to configure [backends](../../concepts/backends.md) and other [sever-level settings](../../guides/server-deployment.md).
+to configure [backends](../../concepts/backends.md) and other [server-level settings](../../guides/server-deployment.md).
 
 ## Root reference
 
@@ -15,7 +15,7 @@ to configure [backends](../../concepts/backends.md) and other [sever-level setti
     overrides:
         show_root_heading: false
         backends:
-            type: 'Union[AWSBackendConfigWithCreds, AzureBackendConfigWithCreds, GCPBackendConfigWithCreds, LambdaBackendConfigWithCreds, NebiusBackendConfigWithCreds, RunpodBackendConfigWithCreds, VastAIBackendConfigWithCreds, KubernetesConfig]'
+            type: 'Union[AWSBackendConfigWithCreds, AzureBackendConfigWithCreds, GCPBackendConfigWithCreds, HotAisleBackendConfigWithCreds, LambdaBackendConfigWithCreds, NebiusBackendConfigWithCreds, RunpodBackendConfigWithCreds, VastAIBackendConfigWithCreds, KubernetesConfig]'
 
 #### `projects[n].backends` { #backends data-toc-label="backends" }
 
@@ -125,6 +125,7 @@ to configure [backends](../../concepts/backends.md) and other [sever-level setti
             show_root_heading: false
             type:
                 required: true
+
 
 ##### `projects[n].backends[type=lambda]` { #lambda data-toc-label="lambda" }
 
@@ -286,15 +287,15 @@ to configure [backends](../../concepts/backends.md) and other [sever-level setti
         show_root_heading: false
 
 ??? info "Specifying `data`"
-    To specify service account file contents as a string, use `jq`:
+    To specify kubeconfig contents directly via `data`, convert it to a string:
 
     ```shell
-    cat my-service-account-file.json | jq -c | jq -R
+    yq -o=json ~/.kube/config | jq -c | jq -R
     ```
 
-###### `projects[n].backends[type=kubernetes].networking` { #kubernetes-networking data-toc-label="networking" }
+###### `projects[n].backends[type=kubernetes].proxy_jump` { #kubernetes-proxy_jump data-toc-label="proxy_jump" }
 
-#SCHEMA# dstack._internal.core.backends.kubernetes.models.KubernetesNetworkingConfig
+#SCHEMA# dstack._internal.core.backends.kubernetes.models.KubernetesProxyJumpConfig
     overrides:
         show_root_heading: false
 
@@ -310,6 +311,74 @@ to configure [backends](../../concepts/backends.md) and other [sever-level setti
 ###### `projects[n].backends[type=vultr].creds` { #vultr-creds data-toc-label="creds" }
 
 #SCHEMA# dstack._internal.core.backends.vultr.models.VultrAPIKeyCreds
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+
+##### `projects[n].backends[type=amddevcloud]` { #amddevcloud data-toc-label="amddevcloud" }
+
+#SCHEMA# dstack._internal.core.backends.digitalocean_base.models.BaseDigitalOceanBackendConfigWithCreds
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+        item_id_prefix: amddevcloud-
+
+###### `projects[n].backends[type=amddevcloud].creds` { #amddevcloud-creds data-toc-label="creds" }
+
+#SCHEMA# dstack._internal.core.backends.digitalocean_base.models.BaseDigitalOceanAPIKeyCreds
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+
+##### `projects[n].backends[type=digitalocean]` { #digitalocean data-toc-label="digitalocean" }
+
+#SCHEMA# dstack._internal.core.backends.digitalocean_base.models.BaseDigitalOceanBackendConfigWithCreds
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+        item_id_prefix: digitalocean-
+
+###### `projects[n].backends[type=digitalocean].creds` { #digitalocean-creds data-toc-label="creds" }
+
+#SCHEMA# dstack._internal.core.backends.digitalocean_base.models.BaseDigitalOceanAPIKeyCreds
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+
+##### `projects[n].backends[type=hotaisle]` { #hotaisle data-toc-label="hotaisle" }
+
+#SCHEMA# dstack._internal.core.backends.hotaisle.models.HotAisleBackendConfigWithCreds
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+        item_id_prefix: hotaisle-
+
+###### `projects[n].backends[type=hotaisle].creds` { #hotaisle-creds data-toc-label="creds" }
+
+#SCHEMA# dstack._internal.core.backends.hotaisle.models.HotAisleAPIKeyCreds
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+
+##### `projects[n].backends[type=cloudrift]` { #cloudrift data-toc-label="cloudrift" }
+
+#SCHEMA# dstack._internal.core.backends.cloudrift.models.CloudRiftBackendConfigWithCreds
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+        item_id_prefix: cloudrift-
+
+###### `projects[n].backends[type=cloudrift].creds` { #cloudrift-creds data-toc-label="creds" }
+
+#SCHEMA# dstack._internal.core.backends.cloudrift.models.CloudRiftAPIKeyCreds
     overrides:
         show_root_heading: false
         type:

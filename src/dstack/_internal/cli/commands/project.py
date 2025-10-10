@@ -1,11 +1,12 @@
 import argparse
+from typing import Any, Union
 
 from requests import HTTPError
 from rich.table import Table
 
 import dstack.api.server
 from dstack._internal.cli.commands import BaseCommand
-from dstack._internal.cli.utils.common import confirm_ask, console
+from dstack._internal.cli.utils.common import add_row_from_dict, confirm_ask, console
 from dstack._internal.core.errors import ClientError, CLIError
 from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.utils.logging import get_logger
@@ -58,6 +59,10 @@ class ProjectCommand(BaseCommand):
         # List subcommand
         list_parser = subparsers.add_parser("list", help="List configured projects")
         list_parser.set_defaults(subfunc=self._list)
+        for parser in [self._parser, list_parser]:
+            parser.add_argument(
+                "-v", "--verbose", action="store_true", help="Show more information"
+            )
 
         # Set default subcommand
         set_default_parser = subparsers.add_parser("set-default", help="Set default project")
@@ -67,6 +72,7 @@ class ProjectCommand(BaseCommand):
         set_default_parser.set_defaults(subfunc=self._set_default)
 
     def _command(self, args: argparse.Namespace):
+        super()._command(args)
         if not hasattr(args, "subfunc"):
             args.subfunc = self._list
         args.subfunc(args)
@@ -121,30 +127,32 @@ class ProjectCommand(BaseCommand):
         table = Table(box=None)
         table.add_column("PROJECT", style="bold", no_wrap=True)
         table.add_column("URL", style="grey58")
-        table.add_column("USER", style="grey58")
+        if args.verbose:
+            table.add_column("USER", style="grey58")
         table.add_column("DEFAULT", justify="center")
 
-        for project_name in config_manager.list_projects():
-            project_config = config_manager.get_project_config(project_name)
+        for project_config in config_manager.list_project_configs():
+            project_name = project_config.name
             is_default = project_name == default_project.name if default_project else False
+            row: dict[Union[str, int], Any] = {
+                "PROJECT": project_name,
+                "URL": project_config.url,
+                "DEFAULT": "✓" if is_default else "",
+            }
 
-            # Get username from API
-            try:
-                api_client = dstack.api.server.APIClient(
-                    base_url=project_config.url, token=project_config.token
-                )
-                user_info = api_client.users.get_my_user()
-                username = user_info.username
-            except ClientError:
-                username = "(invalid token)"
+            if args.verbose:
+                # Get username from API
+                try:
+                    api_client = dstack.api.server.APIClient(
+                        base_url=project_config.url, token=project_config.token
+                    )
+                    user_info = api_client.users.get_my_user()
+                    username = user_info.username
+                except ClientError:
+                    username = "(invalid token)"
+                row["USER"] = username
 
-            table.add_row(
-                project_name,
-                project_config.url,
-                username,
-                "✓" if is_default else "",
-                style="bold" if is_default else None,
-            )
+            add_row_from_dict(table, row, style="bold" if is_default else None)
 
         console.print(table)
 

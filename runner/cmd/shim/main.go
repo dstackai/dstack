@@ -79,14 +79,14 @@ func main() {
 			&cli.IntFlag{
 				Name:        "runner-http-port",
 				Usage:       "Set runner's http port",
-				Value:       10999,
+				Value:       consts.RunnerHTTPPort,
 				Destination: &args.Runner.HTTPPort,
 				EnvVars:     []string{"DSTACK_RUNNER_HTTP_PORT"},
 			},
 			&cli.IntFlag{
 				Name:        "runner-ssh-port",
 				Usage:       "Set runner's ssh port",
-				Value:       10022,
+				Value:       consts.RunnerSSHPort,
 				Destination: &args.Runner.SSHPort,
 				EnvVars:     []string{"DSTACK_RUNNER_SSH_PORT"},
 			},
@@ -111,6 +111,14 @@ func main() {
 				Value:       5000,
 				Destination: &args.DCGMExporter.Interval,
 				EnvVars:     []string{"DSTACK_DCGM_EXPORTER_INTERVAL"},
+			},
+			/* DCGM Parameters */
+			&cli.StringFlag{
+				Name:        "dcgm-address",
+				Usage:       "nv-hostengine `hostname`, e.g., `localhost`",
+				DefaultText: "start libdcgm in embedded mode",
+				Destination: &args.DCGM.Address,
+				EnvVars:     []string{"DSTACK_DCGM_ADDRESS"},
 			},
 			/* Docker Parameters */
 			&cli.BoolFlag{
@@ -196,6 +204,7 @@ func start(ctx context.Context, args shim.CLIArgs, serviceMode bool) (err error)
 	}
 
 	var dcgmExporter *dcgm.DCGMExporter
+	var dcgmWrapper dcgm.DCGMWrapperInterface
 
 	if common.GetGpuVendor() == common.GpuVendorNvidia {
 		dcgmExporterPath, err := dcgm.GetDCGMExporterExecPath(ctx)
@@ -207,16 +216,32 @@ func start(ctx context.Context, args shim.CLIArgs, serviceMode bool) (err error)
 		if err == nil {
 			log.Info(ctx, "using DCGM Exporter")
 			defer func() {
-				_ = dcgmExporter.Stop(ctx)
+				if err := dcgmExporter.Stop(ctx); err != nil {
+					log.Error(ctx, "failed to stop DCGM Exporter", "err", err)
+				}
 			}()
 		} else {
 			log.Warning(ctx, "not using DCGM Exporter", "err", err)
-			dcgmExporter = nil
+		}
+
+		dcgmWrapper, err = dcgm.NewDCGMWrapper(args.DCGM.Address)
+		if err == nil {
+			log.Info(ctx, "using libdcgm")
+			defer func() {
+				if err := dcgmWrapper.Shutdown(); err != nil {
+					log.Error(ctx, "failed to shut down libdcgm", "err", err)
+				}
+			}()
+			if err := dcgmWrapper.EnableHealthChecks(); err != nil {
+				log.Error(ctx, "failed to enable libdcgm health checks", "err", err)
+			}
+		} else {
+			log.Warning(ctx, "not using libdcgm", "err", err)
 		}
 	}
 
-	address := fmt.Sprintf(":%d", args.Shim.HTTPPort)
-	shimServer := api.NewShimServer(ctx, address, dockerRunner, dcgmExporter, Version)
+	address := fmt.Sprintf("localhost:%d", args.Shim.HTTPPort)
+	shimServer := api.NewShimServer(ctx, address, Version, dockerRunner, dcgmExporter, dcgmWrapper)
 
 	defer func() {
 		shutdownCtx, cancelShutdown := context.WithTimeout(ctx, 5*time.Second)

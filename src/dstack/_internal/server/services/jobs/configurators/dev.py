@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from dstack._internal.core.errors import ServerClientError
 from dstack._internal.core.models.configurations import PortMapping, RunConfigurationType
@@ -9,15 +9,17 @@ from dstack._internal.server.services.jobs.configurators.extensions.cursor impor
 from dstack._internal.server.services.jobs.configurators.extensions.vscode import VSCodeDesktop
 
 INSTALL_IPYKERNEL = (
-    "(echo pip install ipykernel... && pip install -q --no-cache-dir ipykernel 2> /dev/null) || "
-    'echo "no pip, ipykernel was not installed"'
+    "(echo 'pip install ipykernel...' && pip install -q --no-cache-dir ipykernel 2> /dev/null) || "
+    "echo 'no pip, ipykernel was not installed'"
 )
 
 
 class DevEnvironmentJobConfigurator(JobConfigurator):
     TYPE: RunConfigurationType = RunConfigurationType.DEV_ENVIRONMENT
 
-    def __init__(self, run_spec: RunSpec):
+    def __init__(self, run_spec: RunSpec, secrets: Dict[str, str]):
+        assert run_spec.configuration.type == "dev-environment"
+
         if run_spec.configuration.ide == "vscode":
             __class = VSCodeDesktop
         elif run_spec.configuration.ide == "cursor":
@@ -29,18 +31,20 @@ class DevEnvironmentJobConfigurator(JobConfigurator):
             version=run_spec.configuration.version,
             extensions=["ms-python.python", "ms-toolsai.jupyter"],
         )
-        super().__init__(run_spec)
+        super().__init__(run_spec=run_spec, secrets=secrets)
 
     def _shell_commands(self) -> List[str]:
+        assert self.run_spec.configuration.type == "dev-environment"
+
         commands = self.ide.get_install_commands()
         commands.append(INSTALL_IPYKERNEL)
         commands += self.run_spec.configuration.setup
-        commands.append("echo ''")
+        commands.append("echo")
         commands += self.run_spec.configuration.init
         commands += self.ide.get_print_readme_commands()
         commands += [
             f"echo 'To connect via SSH, use: `ssh {self.run_spec.run_name}`'",
-            "echo ''",
+            "echo",
             "echo -n 'To exit, press Ctrl+C.'",
         ]
         commands += ["tail -f /dev/null"]  # idle
@@ -56,4 +60,5 @@ class DevEnvironmentJobConfigurator(JobConfigurator):
         return self.run_spec.merged_profile.spot_policy or SpotPolicy.ONDEMAND
 
     def _ports(self) -> List[PortMapping]:
+        assert self.run_spec.configuration.type == "dev-environment"
         return self.run_spec.configuration.ports

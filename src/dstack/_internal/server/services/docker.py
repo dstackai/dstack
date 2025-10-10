@@ -9,7 +9,11 @@ from pydantic import Field, ValidationError, validator
 from typing_extensions import Annotated
 
 from dstack._internal.core.errors import DockerRegistryError
-from dstack._internal.core.models.common import CoreModel, RegistryAuth
+from dstack._internal.core.models.common import (
+    CoreModel,
+    FrozenCoreModel,
+    RegistryAuth,
+)
 from dstack._internal.server.utils.common import join_byte_stream_checked
 from dstack._internal.utils.dxf import PatchedDXF
 
@@ -31,15 +35,12 @@ class DXFAuthAdapter:
         )
 
 
-class DockerImage(CoreModel):
-    class Config:
-        frozen = True
-
+class DockerImage(FrozenCoreModel):
     image: str
-    registry: Optional[str]
+    registry: Optional[str] = None
     repo: str
     tag: str
-    digest: Optional[str]
+    digest: Optional[str] = None
 
 
 class ImageConfig(CoreModel):
@@ -77,7 +78,7 @@ def get_image_config(image_name: str, registry_auth: Optional[RegistryAuth]) -> 
     registry_client = PatchedDXF(
         host=image.registry or DEFAULT_REGISTRY,
         repo=image.repo,
-        auth=DXFAuthAdapter(registry_auth),
+        auth=DXFAuthAdapter(registry_auth),  # type: ignore[assignment]
         timeout=REGISTRY_REQUEST_TIMEOUT,
     )
 
@@ -88,7 +89,7 @@ def get_image_config(image_name: str, registry_auth: Optional[RegistryAuth]) -> 
             )
             manifest = ImageManifest.__response__.parse_raw(manifest_resp)
             config_stream = registry_client.pull_blob(manifest.config.digest)
-            config_resp = join_byte_stream_checked(config_stream, MAX_CONFIG_OBJECT_SIZE)
+            config_resp = join_byte_stream_checked(config_stream, MAX_CONFIG_OBJECT_SIZE)  # type: ignore[arg-type]
             if config_resp is None:
                 raise DockerRegistryError(
                     f"Image config object exceeds the size limit of {MAX_CONFIG_OBJECT_SIZE} bytes"

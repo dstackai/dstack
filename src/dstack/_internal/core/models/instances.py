@@ -7,8 +7,12 @@ import gpuhunt
 from pydantic import root_validator
 
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.common import CoreModel
+from dstack._internal.core.models.common import (
+    CoreModel,
+    FrozenCoreModel,
+)
 from dstack._internal.core.models.envs import Env
+from dstack._internal.core.models.health import HealthStatus
 from dstack._internal.core.models.volumes import Volume
 from dstack._internal.utils.common import pretty_resources
 
@@ -116,13 +120,10 @@ class InstanceType(CoreModel):
     resources: Resources
 
 
-class SSHConnectionParams(CoreModel):
+class SSHConnectionParams(FrozenCoreModel):
     hostname: str
     username: str
     port: int
-
-    class Config:
-        frozen = True
 
 
 class SSHKey(CoreModel):
@@ -164,6 +165,9 @@ class InstanceAvailability(Enum):
     AVAILABLE = "available"
     NOT_AVAILABLE = "not_available"
     NO_QUOTA = "no_quota"
+    NO_BALANCE = (
+        "no_balance"  # Introduced in 0.19.24, may be used after a short compatibility period
+    )
     IDLE = "idle"
     BUSY = "busy"
 
@@ -225,6 +229,7 @@ class Instance(CoreModel):
     hostname: Optional[str] = None
     status: InstanceStatus
     unreachable: bool = False
+    health_status: HealthStatus = HealthStatus.HEALTHY
     termination_reason: Optional[str] = None
     created: datetime.datetime
     region: Optional[str] = None

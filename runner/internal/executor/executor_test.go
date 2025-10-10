@@ -8,7 +8,9 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -17,29 +19,41 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// todo test get history
-
-func TestExecutor_WorkingDir_Current(t *testing.T) {
+func TestExecutor_WorkingDir_Set(t *testing.T) {
 	var b bytes.Buffer
 	ex := makeTestExecutor(t)
-	workingDir := "."
+	baseDir, err := filepath.EvalSymlinks(t.TempDir())
+	require.NoError(t, err)
+	workingDir := path.Join(baseDir, "path/to/wd")
+
 	ex.jobSpec.WorkingDir = &workingDir
 	ex.jobSpec.Commands = append(ex.jobSpec.Commands, "pwd")
+	err = ex.prepareJobWorkingDir(context.TODO())
+	require.NoError(t, err)
+	require.Equal(t, workingDir, ex.jobWorkingDir)
+	err = os.MkdirAll(workingDir, 0o755)
+	require.NoError(t, err)
 
-	err := ex.execJob(context.TODO(), io.Writer(&b))
+	err = ex.execJob(context.TODO(), io.Writer(&b))
 	assert.NoError(t, err)
-	assert.Equal(t, ex.workingDir+"\r\n", b.String())
+	// Normalize line endings for cross-platform compatibility.
+	assert.Equal(t, workingDir+"\n", strings.ReplaceAll(b.String(), "\r\n", "\n"))
 }
 
-func TestExecutor_WorkingDir_Nil(t *testing.T) {
+func TestExecutor_WorkingDir_NotSet(t *testing.T) {
 	var b bytes.Buffer
 	ex := makeTestExecutor(t)
+	cwd, err := os.Getwd()
+	require.NoError(t, err)
 	ex.jobSpec.WorkingDir = nil
 	ex.jobSpec.Commands = append(ex.jobSpec.Commands, "pwd")
+	err = ex.prepareJobWorkingDir(context.TODO())
+	require.NoError(t, err)
+	require.Equal(t, cwd, ex.jobWorkingDir)
 
-	err := ex.execJob(context.TODO(), io.Writer(&b))
+	err = ex.execJob(context.TODO(), io.Writer(&b))
 	assert.NoError(t, err)
-	assert.Equal(t, ex.workingDir+"\r\n", b.String())
+	assert.Equal(t, cwd+"\n", strings.ReplaceAll(b.String(), "\r\n", "\n"))
 }
 
 func TestExecutor_HomeDir(t *testing.T) {
@@ -49,7 +63,7 @@ func TestExecutor_HomeDir(t *testing.T) {
 
 	err := ex.execJob(context.TODO(), io.Writer(&b))
 	assert.NoError(t, err)
-	assert.Equal(t, ex.homeDir+"\r\n", b.String())
+	assert.Equal(t, ex.homeDir+"\n", strings.ReplaceAll(b.String(), "\r\n", "\n"))
 }
 
 func TestExecutor_NonZeroExit(t *testing.T) {
@@ -61,7 +75,7 @@ func TestExecutor_NonZeroExit(t *testing.T) {
 	assert.Error(t, err)
 	assert.NotEmpty(t, ex.jobStateHistory)
 	exitStatus := ex.jobStateHistory[len(ex.jobStateHistory)-1].ExitStatus
-	assert.NotNil(t, exitStatus, ex.jobStateHistory)
+	assert.NotNil(t, exitStatus)
 	assert.Equal(t, 100, *exitStatus)
 }
 
@@ -88,7 +102,8 @@ func TestExecutor_SSHCredentials(t *testing.T) {
 func TestExecutor_LocalRepo(t *testing.T) {
 	var b bytes.Buffer
 	ex := makeTestExecutor(t)
-	ex.jobSpec.Commands = append(ex.jobSpec.Commands, "cat foo")
+	cmd := fmt.Sprintf("cat %s/foo", *ex.jobSpec.RepoDir)
+	ex.jobSpec.Commands = append(ex.jobSpec.Commands, cmd)
 	makeCodeTar(t, ex.codePath)
 
 	err := ex.setupRepo(context.TODO())
@@ -96,7 +111,7 @@ func TestExecutor_LocalRepo(t *testing.T) {
 
 	err = ex.execJob(context.TODO(), io.Writer(&b))
 	assert.NoError(t, err)
-	assert.Equal(t, "bar\r\n", b.String())
+	assert.Equal(t, "bar\n", strings.ReplaceAll(b.String(), "\r\n", "\n"))
 }
 
 func TestExecutor_Recover(t *testing.T) {
@@ -132,7 +147,7 @@ func TestExecutor_RemoteRepo(t *testing.T) {
 
 	var b bytes.Buffer
 	ex := makeTestExecutor(t)
-	ex.run.RunSpec.RepoData = schemas.RepoData{
+	ex.jobSpec.RepoData = &schemas.RepoData{
 		RepoType:        "remote",
 		RepoBranch:      "main",
 		RepoHash:        "2b83592e506ed6fe8e49f4eaa97c3866bc9402b1",
@@ -143,13 +158,15 @@ func TestExecutor_RemoteRepo(t *testing.T) {
 	err := os.WriteFile(ex.codePath, []byte{}, 0o600) // empty diff
 	require.NoError(t, err)
 
+	err = ex.prepareJobWorkingDir(context.TODO())
+	require.NoError(t, err)
 	err = ex.setupRepo(context.TODO())
 	require.NoError(t, err)
 
 	err = ex.execJob(context.TODO(), io.Writer(&b))
 	assert.NoError(t, err)
-	expected := fmt.Sprintf("%s\r\n%s\r\n%s\r\n", ex.run.RunSpec.RepoData.RepoHash, ex.run.RunSpec.RepoData.RepoConfigName, ex.run.RunSpec.RepoData.RepoConfigEmail)
-	assert.Equal(t, expected, b.String())
+	expected := fmt.Sprintf("%s\n%s\n%s\n", ex.getRepoData().RepoHash, ex.getRepoData().RepoConfigName, ex.getRepoData().RepoConfigEmail)
+	assert.Equal(t, expected, strings.ReplaceAll(b.String(), "\r\n", "\n"))
 }
 
 /* Helpers */
@@ -157,9 +174,9 @@ func TestExecutor_RemoteRepo(t *testing.T) {
 func makeTestExecutor(t *testing.T) *RunExecutor {
 	t.Helper()
 	baseDir, err := filepath.EvalSymlinks(t.TempDir())
-	workingDir := "."
 	require.NoError(t, err)
 
+	repo := filepath.Join(baseDir, "repo")
 	body := schemas.SubmitBody{
 		Run: schemas.Run{
 			Id: "12346",
@@ -177,7 +194,9 @@ func makeTestExecutor(t *testing.T) *RunExecutor {
 			Commands:    []string{"/bin/bash", "-c"},
 			Env:         make(map[string]string),
 			MaxDuration: 0, // no timeout
-			WorkingDir:  &workingDir,
+			WorkingDir:  &repo,
+			RepoDir:     &repo,
+			RepoData:    &schemas.RepoData{RepoType: "local"},
 		},
 		Secrets: make(map[string]string),
 		RepoCredentials: &schemas.RepoCredentials{
@@ -189,9 +208,7 @@ func makeTestExecutor(t *testing.T) *RunExecutor {
 	_ = os.Mkdir(temp, 0o700)
 	home := filepath.Join(baseDir, "home")
 	_ = os.Mkdir(home, 0o700)
-	repo := filepath.Join(baseDir, "repo")
-	_ = os.Mkdir(repo, 0o700)
-	ex, _ := NewRunExecutor(temp, home, repo, 10022)
+	ex, _ := NewRunExecutor(temp, home, 10022)
 	ex.SetJob(body)
 	ex.SetCodePath(filepath.Join(baseDir, "code")) // note: create file before run
 	return ex
@@ -234,4 +251,99 @@ func TestWriteDstackProfile(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, value, string(out))
 	}
+}
+
+func TestExecutor_Logs(t *testing.T) {
+	var b bytes.Buffer
+	ex := makeTestExecutor(t)
+	// Use printf to generate ANSI control codes.
+	// \033[31m = red text, \033[1;32m = bold green text, \033[0m = reset
+	ex.jobSpec.Commands = append(ex.jobSpec.Commands, "printf '\\033[31mRed Hello World\\033[0m\\n' && printf '\\033[1;32mBold Green Line 2\\033[0m\\n' && printf 'Line 3\\n'")
+
+	err := ex.execJob(context.TODO(), io.Writer(&b))
+	assert.NoError(t, err)
+
+	logHistory := ex.GetHistory(0).JobLogs
+	assert.NotEmpty(t, logHistory)
+
+	logString := combineLogMessages(logHistory)
+	normalizedLogString := strings.ReplaceAll(logString, "\r\n", "\n")
+
+	expectedOutput := "Red Hello World\nBold Green Line 2\nLine 3\n"
+	assert.Equal(t, expectedOutput, normalizedLogString, "Should strip ANSI codes from regular logs")
+
+	// Verify timestamps are in order
+	assert.Greater(t, len(logHistory), 0)
+	for i := 1; i < len(logHistory); i++ {
+		assert.GreaterOrEqual(t, logHistory[i].Timestamp, logHistory[i-1].Timestamp)
+	}
+}
+
+func TestExecutor_LogsWithErrors(t *testing.T) {
+	var b bytes.Buffer
+	ex := makeTestExecutor(t)
+	ex.jobSpec.Commands = append(ex.jobSpec.Commands, "echo 'Success message' && echo 'Error message' >&2 && exit 1")
+
+	err := ex.execJob(context.TODO(), io.Writer(&b))
+	assert.Error(t, err)
+
+	logHistory := ex.GetHistory(0).JobLogs
+	assert.NotEmpty(t, logHistory)
+
+	logString := combineLogMessages(logHistory)
+	normalizedLogString := strings.ReplaceAll(logString, "\r\n", "\n")
+
+	expectedOutput := "Success message\nError message\n"
+	assert.Equal(t, expectedOutput, normalizedLogString)
+}
+
+func TestExecutor_LogsAnsiCodeHandling(t *testing.T) {
+	var b bytes.Buffer
+	ex := makeTestExecutor(t)
+
+	// Test a variety of ANSI escape sequences on stdout and stderr.
+	cmd := "printf '\\033[31mRed\\033[0m \\033[32mGreen\\033[0m\\n' && " +
+		"printf '\\033[1mBold\\033[0m \\033[4mUnderline\\033[0m\\n' && " +
+		"printf '\\033[s\\033[uPlain text\\n' >&2"
+
+	ex.jobSpec.Commands = append(ex.jobSpec.Commands, cmd)
+
+	err := ex.execJob(context.TODO(), io.Writer(&b))
+	assert.NoError(t, err)
+
+	// 1. Check WebSocket logs, which should preserve ANSI codes.
+	wsLogHistory := ex.GetJobWsLogsHistory()
+	assert.NotEmpty(t, wsLogHistory)
+	wsLogString := combineLogMessages(wsLogHistory)
+	normalizedWsLogString := strings.ReplaceAll(wsLogString, "\r\n", "\n")
+
+	expectedWsOutput := "\033[31mRed\033[0m \033[32mGreen\033[0m\n" +
+		"\033[1mBold\033[0m \033[4mUnderline\033[0m\n" +
+		"\033[s\033[uPlain text\n"
+	assert.Equal(t, expectedWsOutput, normalizedWsLogString, "Websocket logs should preserve ANSI codes")
+
+	// 2. Check regular job logs, which should have ANSI codes stripped.
+	regularLogHistory := ex.GetHistory(0).JobLogs
+	assert.NotEmpty(t, regularLogHistory)
+	regularLogString := combineLogMessages(regularLogHistory)
+	normalizedRegularLogString := strings.ReplaceAll(regularLogString, "\r\n", "\n")
+
+	expectedRegularOutput := "Red Green\n" +
+		"Bold Underline\n" +
+		"Plain text\n"
+	assert.Equal(t, expectedRegularOutput, normalizedRegularLogString, "Regular logs should have ANSI codes stripped")
+
+	// Verify timestamps are ordered for both log types.
+	assert.Greater(t, len(wsLogHistory), 0)
+	for i := 1; i < len(wsLogHistory); i++ {
+		assert.GreaterOrEqual(t, wsLogHistory[i].Timestamp, wsLogHistory[i-1].Timestamp)
+	}
+}
+
+func combineLogMessages(logHistory []schemas.LogEvent) string {
+	var logOutput bytes.Buffer
+	for _, logEvent := range logHistory {
+		logOutput.Write(logEvent.Message)
+	}
+	return logOutput.String()
 }

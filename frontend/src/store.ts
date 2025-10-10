@@ -10,11 +10,14 @@ import { instanceApi } from 'services/instance';
 import { mainApi } from 'services/mainApi';
 import { projectApi } from 'services/project';
 import { runApi } from 'services/run';
+import { secretApi } from 'services/secrets';
 import { serverApi } from 'services/server';
 import { userApi } from 'services/user';
 import { volumeApi } from 'services/volume';
 
 import appReducer from 'App/slice';
+
+import { gpuApi } from './services/gpu';
 
 export const store = configureStore({
     reducer: {
@@ -30,6 +33,8 @@ export const store = configureStore({
         [authApi.reducerPath]: authApi.reducer,
         [serverApi.reducerPath]: serverApi.reducer,
         [volumeApi.reducerPath]: volumeApi.reducer,
+        [secretApi.reducerPath]: secretApi.reducer,
+        [gpuApi.reducerPath]: gpuApi.reducer,
         [mainApi.reducerPath]: mainApi.reducer,
     },
 
@@ -47,6 +52,8 @@ export const store = configureStore({
             .concat(authApi.middleware)
             .concat(serverApi.middleware)
             .concat(volumeApi.middleware)
+            .concat(secretApi.middleware)
+            .concat(gpuApi.middleware)
             .concat(mainApi.middleware),
 });
 

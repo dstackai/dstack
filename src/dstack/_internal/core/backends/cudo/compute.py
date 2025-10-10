@@ -5,6 +5,8 @@ import requests
 from dstack._internal.core.backends.base.backend import Compute
 from dstack._internal.core.backends.base.compute import (
     ComputeWithCreateInstanceSupport,
+    ComputeWithFilteredOffersCached,
+    ComputeWithPrivilegedSupport,
     generate_unique_instance_name,
     get_shim_commands,
 )
@@ -29,7 +31,9 @@ MAX_RESOURCE_NAME_LEN = 30
 
 
 class CudoCompute(
+    ComputeWithFilteredOffersCached,
     ComputeWithCreateInstanceSupport,
+    ComputeWithPrivilegedSupport,
     Compute,
 ):
     def __init__(self, config: CudoConfig):
@@ -37,8 +41,8 @@ class CudoCompute(
         self.config = config
         self.api_client = CudoApiClient(config.creds.api_key)
 
-    def get_offers(
-        self, requirements: Optional[Requirements] = None
+    def get_offers_by_requirements(
+        self, requirements: Requirements
     ) -> List[InstanceOfferWithAvailability]:
         offers = get_catalog_offers(
             backend=BackendType.CUDO,
@@ -65,12 +69,13 @@ class CudoCompute(
         public_keys = instance_config.get_public_keys()
         memory_size = round(instance_offer.instance.resources.memory_mib / 1024)
         disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
-        commands = get_shim_commands(authorized_keys=public_keys)
         gpus_no = len(instance_offer.instance.resources.gpus)
-        shim_commands = " ".join([" && ".join(commands)])
-        startup_script = (
-            shim_commands if gpus_no > 0 else f"{install_docker_script()} && {shim_commands}"
-        )
+        if gpus_no > 0:
+            # we'll need jq for patching /etc/docker/daemon.json, see get_shim_commands()
+            commands = install_jq_commands()
+        else:
+            commands = install_docker_commands()
+        commands += get_shim_commands(authorized_keys=public_keys)
 
         try:
             resp_data = self.api_client.create_virtual_machine(
@@ -85,7 +90,7 @@ class CudoCompute(
                 memory_gib=memory_size,
                 vcpus=instance_offer.instance.resources.cpus,
                 vm_id=vm_id,
-                start_script=startup_script,
+                start_script=" && ".join(commands),
                 password=None,
                 customSshKeys=public_keys,
             )
@@ -151,6 +156,19 @@ def _get_image_id(cuda: bool) -> str:
     return image_name
 
 
-def install_docker_script():
-    commands = 'export DEBIAN_FRONTEND="noninteractive" && mkdir -p /etc/apt/keyrings && curl --max-time 60 -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null && apt-get update && apt-get --assume-yes install docker-ce docker-ce-cli containerd.io docker-compose-plugin'
-    return commands
+def install_jq_commands():
+    return [
+        "export DEBIAN_FRONTEND=noninteractive",
+        "apt-get --assume-yes install jq",
+    ]
+
+
+def install_docker_commands():
+    return [
+        "export DEBIAN_FRONTEND=noninteractive",
+        "mkdir -p /etc/apt/keyrings",
+        "curl --max-time 60 -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg",
+        'echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null',
+        "apt-get update",
+        "apt-get --assume-yes install docker-ce docker-ce-cli containerd.io docker-compose-plugin",
+    ]

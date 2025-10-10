@@ -6,6 +6,7 @@ import { Navigate } from 'react-router-dom';
 import App from 'App';
 import { LoginByEntraIDCallback } from 'App/Login/EntraID/LoginByEntraIDCallback';
 import { LoginByGithubCallback } from 'App/Login/LoginByGithubCallback';
+import { LoginByGoogleCallback } from 'App/Login/LoginByGoogleCallback';
 import { LoginByOktaCallback } from 'App/Login/LoginByOktaCallback';
 import { TokenLogin } from 'App/Login/TokenLogin';
 import { Logout } from 'App/Logout';
@@ -13,15 +14,16 @@ import { FleetDetails, FleetList } from 'pages/Fleets';
 import { InstanceList } from 'pages/Instances';
 import { ModelsList } from 'pages/Models';
 import { ModelDetails } from 'pages/Models/Details';
-import { ProjectAdd, ProjectDetails, ProjectList, ProjectSettings } from 'pages/Project';
+import { CreateProjectWizard, ProjectAdd, ProjectDetails, ProjectList, ProjectSettings } from 'pages/Project';
 import { BackendAdd, BackendEdit } from 'pages/Project/Backends';
 import { AddGateway, EditGateway } from 'pages/Project/Gateways';
-import { JobMetrics, RunDetails, RunDetailsPage, RunList } from 'pages/Runs';
+import { JobLogs, JobMetrics, RunDetails, RunDetailsPage, RunList } from 'pages/Runs';
 import { JobDetailsPage } from 'pages/Runs/Details/Jobs/Details';
 import { CreditsHistoryAdd, UserAdd, UserDetails, UserEdit, UserList } from 'pages/User';
 import { UserBilling, UserProjects, UserSettings } from 'pages/User/Details';
 
 import { AuthErrorMessage } from './App/AuthErrorMessage';
+import { OfferList } from './pages/Offers';
 import { JobDetails } from './pages/Runs/Details/Jobs/Details/JobDetails';
 import { VolumeList } from './pages/Volumes';
 import { ROUTES } from './routes';
@@ -46,6 +48,10 @@ export const router = createBrowserRouter([
                 element: <LoginByEntraIDCallback />,
             },
             {
+                path: ROUTES.AUTH.GOOGLE_CALLBACK,
+                element: <LoginByGoogleCallback />,
+            },
+            {
                 path: ROUTES.AUTH.TOKEN,
                 element: <TokenLogin />,
             },
@@ -63,25 +69,21 @@ export const router = createBrowserRouter([
                 element: <ProjectDetails />,
                 children: [
                     {
-                        path: ROUTES.PROJECT.DETAILS.SETTINGS.TEMPLATE,
+                        index: true,
                         element: <ProjectSettings />,
                     },
-
                     {
                         path: ROUTES.PROJECT.BACKEND.ADD.TEMPLATE,
                         element: <BackendAdd />,
                     },
-
                     {
                         path: ROUTES.PROJECT.BACKEND.EDIT.TEMPLATE,
                         element: <BackendEdit />,
                     },
-
                     {
                         path: ROUTES.PROJECT.GATEWAY.ADD.TEMPLATE,
                         element: <AddGateway />,
                     },
-
                     {
                         path: ROUTES.PROJECT.GATEWAY.EDIT.TEMPLATE,
                         element: <EditGateway />,
@@ -100,6 +102,10 @@ export const router = createBrowserRouter([
                         path: ROUTES.PROJECT.DETAILS.RUNS.DETAILS.METRICS.TEMPLATE,
                         element: <JobMetrics />,
                     },
+                    {
+                        path: ROUTES.PROJECT.DETAILS.RUNS.DETAILS.LOGS.TEMPLATE,
+                        element: <JobLogs />,
+                    },
                 ],
             },
             {
@@ -114,17 +120,34 @@ export const router = createBrowserRouter([
                         path: ROUTES.PROJECT.DETAILS.RUNS.DETAILS.JOBS.DETAILS.METRICS.TEMPLATE,
                         element: <JobMetrics />,
                     },
+                    {
+                        path: ROUTES.PROJECT.DETAILS.RUNS.DETAILS.JOBS.DETAILS.LOGS.TEMPLATE,
+                        element: <JobLogs />,
+                    },
                 ],
             },
-            {
-                path: ROUTES.PROJECT.ADD,
-                element: <ProjectAdd />,
-            },
+
+            ...([
+                process.env.UI_VERSION !== 'sky' && {
+                    path: ROUTES.PROJECT.ADD,
+                    element: <ProjectAdd />,
+                },
+                process.env.UI_VERSION === 'sky' && {
+                    path: ROUTES.PROJECT.ADD,
+                    element: <CreateProjectWizard />,
+                },
+            ].filter(Boolean) as RouteObject[]),
 
             // Runs
             {
                 path: ROUTES.RUNS.LIST,
                 element: <RunList />,
+            },
+
+            // Offers
+            {
+                path: ROUTES.OFFERS.LIST,
+                element: <OfferList />,
             },
 
             // Models

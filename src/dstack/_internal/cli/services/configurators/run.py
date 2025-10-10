@@ -1,9 +1,10 @@
 import argparse
+import shlex
 import subprocess
 import sys
 import time
-from pathlib import Path
-from typing import Dict, List, Optional, Set
+from pathlib import Path, PurePosixPath
+from typing import Dict, List, Optional, Set, TypeVar
 
 import gpuhunt
 from pydantic import parse_obj_as
@@ -15,10 +16,13 @@ from dstack._internal.cli.services.configurators.base import (
     BaseApplyConfigurator,
 )
 from dstack._internal.cli.services.profile import apply_profile_args, register_profile_args
-from dstack._internal.cli.utils.common import (
-    confirm_ask,
-    console,
+from dstack._internal.cli.services.repos import (
+    get_repo_from_dir,
+    init_default_virtual_repo,
+    is_git_repo_url,
+    register_init_repo_args,
 )
+from dstack._internal.cli.utils.common import confirm_ask, console, warn
 from dstack._internal.cli.utils.rich import MultiItemStatus
 from dstack._internal.cli.utils.run import get_runs_table, print_run_plan
 from dstack._internal.core.errors import (
@@ -29,26 +33,38 @@ from dstack._internal.core.errors import (
 )
 from dstack._internal.core.models.common import ApplyAction, RegistryAuth
 from dstack._internal.core.models.configurations import (
+    LEGACY_REPO_DIR,
     AnyRunConfiguration,
     ApplyConfigurationType,
-    BaseRunConfiguration,
-    BaseRunConfigurationWithPorts,
+    ConfigurationWithCommandsParams,
+    ConfigurationWithPortsParams,
     DevEnvironmentConfiguration,
     PortMapping,
     RunConfigurationType,
     ServiceConfiguration,
     TaskConfiguration,
 )
+from dstack._internal.core.models.repos import RepoHeadWithCreds
 from dstack._internal.core.models.repos.base import Repo
+from dstack._internal.core.models.repos.local import LocalRepo
+from dstack._internal.core.models.repos.remote import RemoteRepo, RemoteRepoCreds
 from dstack._internal.core.models.resources import CPUSpec
-from dstack._internal.core.models.runs import JobStatus, JobSubmission, RunStatus
+from dstack._internal.core.models.runs import JobStatus, JobSubmission, RunSpec, RunStatus
 from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.core.services.diff import diff_models
+from dstack._internal.core.services.repos import (
+    InvalidRepoCredentialsError,
+    get_repo_creds_and_default_branch,
+    load_repo,
+)
 from dstack._internal.utils.common import local_time
 from dstack._internal.utils.interpolator import InterpolatorError, VariablesInterpolator
 from dstack._internal.utils.logging import get_logger
+from dstack._internal.utils.nested_list import NestedList, NestedListItem
+from dstack._internal.utils.path import is_absolute_posix_path
 from dstack.api._public.repos import get_ssh_keypair
 from dstack.api._public.runs import Run
+from dstack.api.server import APIClient
 from dstack.api.utils import load_profile
 
 _KNOWN_AMD_GPUS = {gpu.name.lower() for gpu in gpuhunt.KNOWN_AMD_GPUS}
@@ -59,33 +75,70 @@ _BIND_ADDRESS_ARG = "bind_address"
 
 logger = get_logger(__name__)
 
+RunConfigurationT = TypeVar("RunConfigurationT", bound=AnyRunConfiguration)
 
-class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
-    TYPE: ApplyConfigurationType
 
+class BaseRunConfigurator(
+    ApplyEnvVarsConfiguratorMixin,
+    BaseApplyConfigurator[RunConfigurationT],
+):
     def apply_configuration(
         self,
-        conf: BaseRunConfiguration,
+        conf: RunConfigurationT,
         configuration_path: str,
         command_args: argparse.Namespace,
         configurator_args: argparse.Namespace,
-        unknown_args: List[str],
-        repo: Optional[Repo] = None,
     ):
-        self.apply_args(conf, configurator_args, unknown_args)
+        if configurator_args.repo and configurator_args.no_repo:
+            raise CLIError("Either --repo or --no-repo can be specified")
+
+        self.apply_args(conf, configurator_args)
         self.validate_gpu_vendor_and_image(conf)
         self.validate_cpu_arch_and_image(conf)
-        if repo is None:
-            repo = self.api.repos.load(Path.cwd())
-        config_manager = ConfigManager()
-        if repo.repo_dir is not None:
-            repo_config = config_manager.get_repo_config_or_error(repo.repo_dir)
-            self.api.ssh_identity_file = repo_config.ssh_key_path
-        else:
-            self.api.ssh_identity_file = get_ssh_keypair(
-                command_args.ssh_identity_file,
-                config_manager.dstack_key_path,
+
+        working_dir = conf.working_dir
+        if working_dir is None:
+            # Use the default working dir for the image for tasks and services if `commands`
+            # is not set (emulate pre-0.19.27 JobConfigutor logic), otherwise fall back to
+            # `/workflow`.
+            if isinstance(conf, DevEnvironmentConfiguration) or conf.commands:
+                # relative path for compatibility with pre-0.19.27 servers
+                conf.working_dir = "."
+                warn(
+                    f'The [code]working_dir[/code] is not set — using legacy default [code]"{LEGACY_REPO_DIR}"[/code].'
+                    " Future versions will default to the [code]image[/code]'s working directory."
+                )
+        elif not is_absolute_posix_path(working_dir):
+            legacy_working_dir = PurePosixPath(LEGACY_REPO_DIR) / working_dir
+            warn(
+                "[code]working_dir[/code] is relative."
+                f" Using legacy working directory [code]{legacy_working_dir}[/code]\n\n"
+                "Future versions will require absolute path\n"
+                f"To keep using legacy working directory, set"
+                f" [code]working_dir[/code] to [code]{legacy_working_dir}[/code]\n"
             )
+        else:
+            # relative path for compatibility with pre-0.19.27 servers
+            try:
+                conf.working_dir = str(PurePosixPath(working_dir).relative_to(LEGACY_REPO_DIR))
+            except ValueError:
+                pass
+
+        if conf.repos and conf.repos[0].path is None:
+            warn(
+                "[code]repos[0].path[/code] is not set,"
+                f" using legacy repo path [code]{LEGACY_REPO_DIR}[/code]\n\n"
+                "In a future version the default value will be changed."
+                f" To keep using [code]{LEGACY_REPO_DIR}[/code], explicitly set"
+                f" [code]repos[0].path[/code] to [code]{LEGACY_REPO_DIR}[/code]\n"
+            )
+
+        config_manager = ConfigManager()
+        repo = self.get_repo(conf, configuration_path, configurator_args, config_manager)
+        self.api.ssh_identity_file = get_ssh_keypair(
+            configurator_args.ssh_identity_file,
+            config_manager.dstack_key_path,
+        )
         profile = load_profile(Path.cwd(), configurator_args.profile)
         with console.status("Getting apply plan..."):
             run_plan = self.api.runs.get_run_plan(
@@ -102,25 +155,20 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
             confirm_message = f"Submit the run [code]{conf.name}[/]?"
         stop_run_name = None
         if run_plan.current_resource is not None:
-            changed_fields = []
-            if run_plan.action == ApplyAction.UPDATE:
-                diff = diff_models(
-                    run_plan.get_effective_run_spec().configuration,
-                    run_plan.current_resource.run_spec.configuration,
-                )
-                changed_fields = list(diff.keys())
-            if run_plan.action == ApplyAction.UPDATE and len(changed_fields) > 0:
+            diff = render_run_spec_diff(
+                run_plan.get_effective_run_spec(),
+                run_plan.current_resource.run_spec,
+            )
+            if run_plan.action == ApplyAction.UPDATE and diff is not None:
                 console.print(
                     f"Active run [code]{conf.name}[/] already exists."
-                    " Detected configuration changes that can be updated in-place:"
-                    f" {changed_fields}"
+                    f" Detected changes that [code]can[/] be updated in-place:\n{diff}"
                 )
                 confirm_message = "Update the run?"
-            elif run_plan.action == ApplyAction.UPDATE and len(changed_fields) == 0:
+            elif run_plan.action == ApplyAction.UPDATE and diff is None:
                 stop_run_name = run_plan.current_resource.run_spec.run_name
                 console.print(
-                    f"Active run [code]{conf.name}[/] already exists."
-                    " Detected no configuration changes."
+                    f"Active run [code]{conf.name}[/] already exists. Detected no changes."
                 )
                 if command_args.yes and not command_args.force:
                     console.print("Use --force to apply anyway.")
@@ -129,7 +177,8 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
             elif not run_plan.current_resource.status.is_finished():
                 stop_run_name = run_plan.current_resource.run_spec.run_name
                 console.print(
-                    f"Active run [code]{conf.name}[/] already exists and cannot be updated in-place."
+                    f"Active run [code]{conf.name}[/] already exists."
+                    f" Detected changes that [error]cannot[/] be updated in-place:\n{diff}"
                 )
                 confirm_message = "Stop and override the run?"
 
@@ -179,6 +228,9 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
                         format_date=local_time,
                     )
                 )
+
+                _warn_fleet_autocreated(self.api.client, run)
+
                 console.print(
                     f"\n[code]{run.name}[/] provisioning completed [secondary]({run.status.value})[/]"
                 )
@@ -221,7 +273,9 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
                     exit(1)
         except KeyboardInterrupt:
             try:
-                if not confirm_ask(f"\nStop the run [code]{run.name}[/] before detaching?"):
+                if command_args.yes or not confirm_ask(
+                    f"\nStop the run [code]{run.name}[/] before detaching?"
+                ):
                     console.print("Detached")
                     abort_at_exit = False
                     return
@@ -243,7 +297,7 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
 
     def delete_configuration(
         self,
-        conf: AnyRunConfiguration,
+        conf: RunConfigurationT,
         configuration_path: str,
         command_args: argparse.Namespace,
     ):
@@ -269,7 +323,14 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
         console.print(f"Run [code]{conf.name}[/] deleted")
 
     @classmethod
-    def register_args(cls, parser: argparse.ArgumentParser, default_max_offers: int = 3):
+    def register_args(cls, parser: argparse.ArgumentParser):
+        parser.add_argument(
+            "--ssh-identity",
+            metavar="SSH_PRIVATE_KEY",
+            help="The private SSH key path for SSH tunneling",
+            type=Path,
+            dest="ssh_identity_file",
+        )
         configuration_group = parser.add_argument_group(f"{cls.TYPE.value} Options")
         configuration_group.add_argument(
             "-n",
@@ -281,7 +342,7 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
             "--max-offers",
             help="Number of offers to show in the run plan",
             type=int,
-            default=default_max_offers,
+            default=3,
         )
         cls.register_env_args(configuration_group)
         configuration_group.add_argument(
@@ -308,8 +369,32 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
             dest="disk_spec",
         )
         register_profile_args(parser)
+        repo_group = parser.add_argument_group("Repo Options")
+        repo_group.add_argument(
+            "-P",
+            "--repo",
+            help=("The repo to use for the run. Can be a local path or a Git repo URL."),
+            dest="repo",
+        )
+        repo_group.add_argument(
+            "--repo-branch",
+            help="The repo branch to use for the run",
+            dest="repo_branch",
+        )
+        repo_group.add_argument(
+            "--repo-hash",
+            help="The hash of the repo commit to use for the run",
+            dest="repo_hash",
+        )
+        repo_group.add_argument(
+            "--no-repo",
+            help="Do not use any repo for the run",
+            dest="no_repo",
+            action="store_true",
+        )
+        register_init_repo_args(repo_group)
 
-    def apply_args(self, conf: BaseRunConfiguration, args: argparse.Namespace, unknown: List[str]):
+    def apply_args(self, conf: RunConfigurationT, args: argparse.Namespace):
         apply_profile_args(args, conf)
         if args.run_name:
             conf.name = args.run_name
@@ -322,18 +407,8 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
 
         self.apply_env_vars(conf.env, args)
         self.interpolate_env(conf)
-        self.interpolate_run_args(conf.setup, unknown)
 
-    def interpolate_run_args(self, value: List[str], unknown):
-        run_args = " ".join(unknown)
-        interpolator = VariablesInterpolator({"run": {"args": run_args}}, skip=["secrets"])
-        try:
-            for i in range(len(value)):
-                value[i] = interpolator.interpolate_or_error(value[i])
-        except InterpolatorError as e:
-            raise ConfigurationError(e.args[0])
-
-    def interpolate_env(self, conf: BaseRunConfiguration):
+    def interpolate_env(self, conf: RunConfigurationT):
         env_dict = conf.env.as_dict()
         interpolator = VariablesInterpolator({"env": env_dict}, skip=["secrets"])
         try:
@@ -342,10 +417,18 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
                     username=interpolator.interpolate_or_error(conf.registry_auth.username),
                     password=interpolator.interpolate_or_error(conf.registry_auth.password),
                 )
+            if isinstance(conf, ServiceConfiguration):
+                for probe in conf.probes:
+                    for header in probe.headers:
+                        header.value = interpolator.interpolate_or_error(header.value)
+                    if probe.url:
+                        probe.url = interpolator.interpolate_or_error(probe.url)
+                    if probe.body:
+                        probe.body = interpolator.interpolate_or_error(probe.body)
         except InterpolatorError as e:
             raise ConfigurationError(e.args[0])
 
-    def validate_gpu_vendor_and_image(self, conf: BaseRunConfiguration) -> None:
+    def validate_gpu_vendor_and_image(self, conf: RunConfigurationT) -> None:
         """
         Infers and sets `resources.gpu.vendor` if not set, requires `image` if the vendor is AMD.
         """
@@ -398,14 +481,15 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
         else:
             has_amd_gpu = vendor == gpuhunt.AcceleratorVendor.AMD
             has_tt_gpu = vendor == gpuhunt.AcceleratorVendor.TENSTORRENT
-        if has_amd_gpu and conf.image is None:
+        # When docker=True, the system uses Docker-in-Docker image, so no custom image is required
+        if has_amd_gpu and conf.image is None and conf.docker is not True:
             raise ConfigurationError("`image` is required if `resources.gpu.vendor` is `amd`")
-        if has_tt_gpu and conf.image is None:
+        if has_tt_gpu and conf.image is None and conf.docker is not True:
             raise ConfigurationError(
                 "`image` is required if `resources.gpu.vendor` is `tenstorrent`"
             )
 
-    def validate_cpu_arch_and_image(self, conf: BaseRunConfiguration) -> None:
+    def validate_cpu_arch_and_image(self, conf: RunConfigurationT) -> None:
         """
         Infers `resources.cpu.arch` if not set, requires `image` if the architecture is ARM.
         """
@@ -428,11 +512,159 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
         if arch == gpuhunt.CPUArchitecture.ARM and conf.image is None:
             raise ConfigurationError("`image` is required if `resources.cpu.arch` is `arm`")
 
+    def get_repo(
+        self,
+        conf: RunConfigurationT,
+        configuration_path: str,
+        configurator_args: argparse.Namespace,
+        config_manager: ConfigManager,
+    ) -> Repo:
+        if configurator_args.no_repo:
+            return init_default_virtual_repo(api=self.api)
 
-class RunWithPortsConfigurator(BaseRunConfigurator):
+        repo: Optional[Repo] = None
+        repo_head: Optional[RepoHeadWithCreds] = None
+        repo_branch: Optional[str] = configurator_args.repo_branch
+        repo_hash: Optional[str] = configurator_args.repo_hash
+        repo_creds: Optional[RemoteRepoCreds] = None
+        git_identity_file: Optional[str] = configurator_args.git_identity_file
+        git_private_key: Optional[str] = None
+        oauth_token: Optional[str] = configurator_args.gh_token
+        # Should we (re)initialize the repo?
+        # If any Git credentials provided, we reinitialize the repo, as the user may have provided
+        # updated credentials.
+        init = git_identity_file is not None or oauth_token is not None
+
+        url: Optional[str] = None
+        local_path: Optional[Path] = None
+        # dummy value, safe to join with any path
+        root_dir = Path(".")
+        # True if no repo specified, but we found one in `config.yml`
+        legacy_local_path = False
+        if repo_arg := configurator_args.repo:
+            if is_git_repo_url(repo_arg):
+                url = repo_arg
+            else:
+                local_path = Path(repo_arg)
+                # rel paths in `--repo` are resolved relative to the current working dir
+                root_dir = Path.cwd()
+        elif conf.repos:
+            repo_spec = conf.repos[0]
+            if repo_spec.url:
+                url = repo_spec.url
+            elif repo_spec.local_path:
+                local_path = Path(repo_spec.local_path)
+                # rel paths in the conf are resolved relative to the conf's parent dir
+                root_dir = Path(configuration_path).resolve().parent
+            else:
+                assert False, f"should not reach here: {repo_spec}"
+            if repo_branch is None:
+                repo_branch = repo_spec.branch
+            if repo_hash is None:
+                repo_hash = repo_spec.hash
+        else:
+            local_path = Path.cwd()
+            legacy_local_path = True
+        if url:
+            # "master" is a dummy value, we'll fetch the actual default branch later
+            repo = RemoteRepo.from_url(repo_url=url, repo_branch="master")
+            repo_head = self.api.repos.get(repo_id=repo.repo_id, with_creds=True)
+        elif local_path:
+            if legacy_local_path:
+                if repo_config := config_manager.get_repo_config(local_path):
+                    repo = load_repo(repo_config)
+                    repo_head = self.api.repos.get(repo_id=repo.repo_id, with_creds=True)
+                    if repo_head is not None:
+                        warn(
+                            "The repo is not specified but found and will be used in the run\n"
+                            "Future versions will not load repos automatically\n"
+                            "To prepare for future versions and get rid of this warning:\n"
+                            "- If you need the repo in the run, either specify [code]repos[/code]"
+                            " in the configuration or use [code]--repo .[/code]\n"
+                            "- If you don't need the repo in the run, either run"
+                            " [code]dstack init --remove[/code] once (it removes only the record"
+                            " about the repo, the repo files will remain intact)"
+                            " or use [code]--no-repo[/code]"
+                        )
+                    else:
+                        # ignore stale entries in `config.yml`
+                        repo = None
+                        init = False
+            else:
+                original_local_path = local_path
+                local_path = local_path.expanduser()
+                if not local_path.is_absolute():
+                    local_path = (root_dir / local_path).resolve()
+                if not local_path.exists():
+                    raise ConfigurationError(
+                        f"Invalid repo path: {original_local_path} -> {local_path}"
+                    )
+                local: bool = configurator_args.local
+                repo = get_repo_from_dir(local_path, local=local)
+                repo_head = self.api.repos.get(repo_id=repo.repo_id, with_creds=True)
+            if isinstance(repo, RemoteRepo):
+                repo_branch = repo.run_repo_data.repo_branch
+                repo_hash = repo.run_repo_data.repo_hash
+        else:
+            assert False, "should not reach here"
+
+        if repo is None:
+            return init_default_virtual_repo(api=self.api)
+
+        if isinstance(repo, RemoteRepo):
+            assert repo.repo_url is not None
+
+            if repo_head is not None and repo_head.repo_creds is not None:
+                if git_identity_file is None and oauth_token is None:
+                    git_private_key = repo_head.repo_creds.private_key
+                    oauth_token = repo_head.repo_creds.oauth_token
+            else:
+                init = True
+
+            try:
+                repo_creds, default_repo_branch = get_repo_creds_and_default_branch(
+                    repo_url=repo.repo_url,
+                    identity_file=git_identity_file,
+                    private_key=git_private_key,
+                    oauth_token=oauth_token,
+                )
+            except InvalidRepoCredentialsError as e:
+                raise CLIError(*e.args) from e
+
+            if repo_branch is None and repo_hash is None:
+                repo_branch = default_repo_branch
+                if repo_branch is None:
+                    raise CLIError(
+                        "Failed to automatically detect remote repo branch."
+                        " Specify branch or hash."
+                    )
+            repo = RemoteRepo.from_url(
+                repo_url=repo.repo_url, repo_branch=repo_branch, repo_hash=repo_hash
+            )
+
+        if init:
+            self.api.repos.init(
+                repo=repo,
+                git_identity_file=git_identity_file,
+                oauth_token=oauth_token,
+                creds=repo_creds,
+            )
+
+        if isinstance(repo, LocalRepo):
+            warn(
+                f"{repo.repo_dir} is a local repo\n"
+                "Local repos are deprecated since 0.19.25 and will be removed soon\n"
+                "There are two options:\n"
+                "- Migrate to [code]files[/code]: https://dstack.ai/docs/concepts/tasks/#files\n"
+                "- Specify [code]--no-repo[/code] if you don't need the repo at all"
+            )
+
+        return repo
+
+
+class RunWithPortsConfiguratorMixin:
     @classmethod
-    def register_args(cls, parser: argparse.ArgumentParser):
-        super().register_args(parser)
+    def register_ports_args(cls, parser: argparse.ArgumentParser):
         parser.add_argument(
             "-p",
             "--port",
@@ -449,29 +681,72 @@ class RunWithPortsConfigurator(BaseRunConfigurator):
             metavar="HOST",
         )
 
-    def apply_args(
-        self, conf: BaseRunConfigurationWithPorts, args: argparse.Namespace, unknown: List[str]
+    def apply_ports_args(
+        self,
+        conf: ConfigurationWithPortsParams,
+        args: argparse.Namespace,
     ):
-        super().apply_args(conf, args, unknown)
         if args.ports:
             conf.ports = list(_merge_ports(conf.ports, args.ports).values())
 
 
-class TaskConfigurator(RunWithPortsConfigurator):
+class RunWithCommandsConfiguratorMixin:
+    @classmethod
+    def register_commands_args(cls, parser: argparse.ArgumentParser):
+        parser.add_argument(
+            "run_args",
+            help=(
+                "Run arguments. Available in the configuration [code]commands[/code] as"
+                " [code]${{ run.args }}[/code]."
+                " Use [code]--[/code] to separate run options from [code]dstack[/code] options"
+            ),
+            nargs="*",
+            metavar="RUN_ARGS",
+        )
+
+    def apply_commands_args(
+        self,
+        conf: ConfigurationWithCommandsParams,
+        args: argparse.Namespace,
+    ):
+        commands = conf.commands
+        run_args = shlex.join(args.run_args)
+        interpolator = VariablesInterpolator({"run": {"args": run_args}}, skip=["secrets"])
+        try:
+            for i, command in enumerate(commands):
+                commands[i] = interpolator.interpolate_or_error(command)
+        except InterpolatorError as e:
+            raise ConfigurationError(e.args[0])
+
+
+class TaskConfigurator(
+    RunWithPortsConfiguratorMixin, RunWithCommandsConfiguratorMixin, BaseRunConfigurator
+):
     TYPE = ApplyConfigurationType.TASK
 
-    def apply_args(self, conf: TaskConfiguration, args: argparse.Namespace, unknown: List[str]):
-        super().apply_args(conf, args, unknown)
-        self.interpolate_run_args(conf.commands, unknown)
+    @classmethod
+    def register_args(cls, parser: argparse.ArgumentParser):
+        super().register_args(parser)
+        cls.register_ports_args(parser)
+        cls.register_commands_args(parser)
+
+    def apply_args(self, conf: TaskConfiguration, args: argparse.Namespace):
+        super().apply_args(conf, args)
+        self.apply_ports_args(conf, args)
+        self.apply_commands_args(conf, args)
 
 
-class DevEnvironmentConfigurator(RunWithPortsConfigurator):
+class DevEnvironmentConfigurator(RunWithPortsConfiguratorMixin, BaseRunConfigurator):
     TYPE = ApplyConfigurationType.DEV_ENVIRONMENT
 
-    def apply_args(
-        self, conf: DevEnvironmentConfiguration, args: argparse.Namespace, unknown: List[str]
-    ):
-        super().apply_args(conf, args, unknown)
+    @classmethod
+    def register_args(cls, parser: argparse.ArgumentParser):
+        super().register_args(parser)
+        cls.register_ports_args(parser)
+
+    def apply_args(self, conf: DevEnvironmentConfiguration, args: argparse.Namespace):
+        super().apply_args(conf, args)
+        self.apply_ports_args(conf, args)
         if conf.ide == "vscode" and conf.version is None:
             conf.version = _detect_vscode_version()
             if conf.version is None:
@@ -490,12 +765,17 @@ class DevEnvironmentConfigurator(RunWithPortsConfigurator):
                 )
 
 
-class ServiceConfigurator(BaseRunConfigurator):
+class ServiceConfigurator(RunWithCommandsConfiguratorMixin, BaseRunConfigurator):
     TYPE = ApplyConfigurationType.SERVICE
 
-    def apply_args(self, conf: ServiceConfiguration, args: argparse.Namespace, unknown: List[str]):
-        super().apply_args(conf, args, unknown)
-        self.interpolate_run_args(conf.commands, unknown)
+    @classmethod
+    def register_args(cls, parser: argparse.ArgumentParser):
+        super().register_args(parser)
+        cls.register_commands_args(parser)
+
+    def apply_args(self, conf: TaskConfiguration, args: argparse.Namespace):
+        super().apply_args(conf, args)
+        self.apply_commands_args(conf, args)
 
 
 def _merge_ports(conf: List[PortMapping], args: List[PortMapping]) -> Dict[int, PortMapping]:
@@ -599,6 +879,7 @@ def _is_ready_to_attach(run: Run) -> bool:
         ]
         or run._run.jobs[0].job_submissions[-1].status
         in [JobStatus.SUBMITTED, JobStatus.PROVISIONING, JobStatus.PULLING]
+        or run._run.is_deployment_in_progress()
     )
 
 
@@ -608,4 +889,63 @@ def _run_resubmitted(run: Run, current_job_submission: Optional[JobSubmission]) 
     return run.status == RunStatus.PENDING or (
         not run.status.is_finished()
         and run._run.latest_job_submission.submitted_at > current_job_submission.submitted_at
+    )
+
+
+def render_run_spec_diff(old_spec: RunSpec, new_spec: RunSpec) -> Optional[str]:
+    changed_spec_fields = list(diff_models(old_spec, new_spec))
+    if not changed_spec_fields:
+        return None
+    friendly_spec_field_names = {
+        "repo_id": "Repo ID",
+        "repo_code_hash": "Repo files",
+        "repo_data": "Repo state (branch, commit, or other)",
+        "ssh_key_pub": "Public SSH key",
+    }
+    nested_list = NestedList()
+    for spec_field in changed_spec_fields:
+        if spec_field == "merged_profile":
+            continue
+        elif spec_field == "configuration":
+            if type(old_spec.configuration) is not type(new_spec.configuration):
+                item = NestedListItem("Configuration type")
+            else:
+                item = NestedListItem(
+                    "Configuration properties:",
+                    children=[
+                        NestedListItem(field)
+                        for field in diff_models(old_spec.configuration, new_spec.configuration)
+                    ],
+                )
+        elif spec_field == "profile":
+            if type(old_spec.profile) is not type(new_spec.profile):
+                item = NestedListItem("Profile")
+            else:
+                assert old_spec.profile is not None
+                assert new_spec.profile is not None
+                item = NestedListItem(
+                    "Profile properties:",
+                    children=[
+                        NestedListItem(field)
+                        for field in diff_models(old_spec.profile, new_spec.profile)
+                    ],
+                )
+        elif spec_field in friendly_spec_field_names:
+            item = NestedListItem(friendly_spec_field_names[spec_field])
+        else:
+            item = NestedListItem(spec_field.replace("_", " ").capitalize())
+        nested_list.children.append(item)
+    return nested_list.render()
+
+
+def _warn_fleet_autocreated(api: APIClient, run: Run):
+    if run._run.fleet is None:
+        return
+    fleet = api.fleets.get(project_name=run._project, name=run._run.fleet.name)
+    if not fleet.spec.autocreated:
+        return
+    warn(
+        f"\nNo existing fleet matched, so the run created a new fleet [code]{fleet.name}[/code].\n"
+        "Future dstack versions won't create fleets automatically.\n"
+        "Create a fleet explicitly: https://dstack.ai/docs/concepts/fleets/"
     )

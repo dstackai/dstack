@@ -12,16 +12,53 @@ from dstack._internal.core.models.profiles import (
     TerminationPolicy,
 )
 from dstack._internal.core.models.runs import (
+    JobStatus,
+    Probe,
+    ProbeSpec,
     RunPlan,
 )
 from dstack._internal.core.services.profiles import get_termination
 from dstack._internal.utils.common import (
     DateFormatter,
+    batched,
     format_duration_multiunit,
     format_pretty_duration,
     pretty_date,
 )
 from dstack.api import Run
+
+
+def print_offers_json(run_plan: RunPlan, run_spec):
+    """Print offers information in JSON format."""
+    job_plan = run_plan.job_plans[0]
+
+    output = {
+        "project": run_plan.project_name,
+        "user": run_plan.user,
+        "resources": job_plan.job_spec.requirements.resources.dict(),
+        "max_price": (job_plan.job_spec.requirements.max_price),
+        "spot": run_spec.configuration.spot_policy,
+        "reservation": run_plan.run_spec.configuration.reservation,
+        "offers": [],
+        "total_offers": job_plan.total_offers,
+    }
+
+    for offer in job_plan.offers:
+        output["offers"].append(
+            {
+                "backend": ("ssh" if offer.backend.value == "remote" else offer.backend.value),
+                "region": offer.region,
+                "instance_type": offer.instance.name,
+                "resources": offer.instance.resources.dict(),
+                "spot": offer.instance.resources.spot,
+                "price": float(offer.price),
+                "availability": offer.availability.value,
+            }
+        )
+
+    import json
+
+    print(json.dumps(output, indent=2))
 
 
 def print_run_plan(
@@ -156,15 +193,28 @@ def get_runs_table(
         table.add_column("INSTANCE TYPE", no_wrap=True, ratio=1)
     table.add_column("PRICE", style="grey58", ratio=1)
     table.add_column("STATUS", no_wrap=True, ratio=1)
+    if verbose or any(
+        run._run.is_deployment_in_progress()
+        and any(job.job_submissions[-1].probes for job in run._run.jobs)
+        for run in runs
+    ):
+        table.add_column("PROBES", ratio=1)
     table.add_column("SUBMITTED", style="grey58", no_wrap=True, ratio=1)
     if verbose:
         table.add_column("ERROR", no_wrap=True, ratio=2)
 
     for run in runs:
         run = run._run  # TODO(egor-s): make public attribute
+        show_deployment_num = (
+            verbose
+            and run.run_spec.configuration.type == "service"
+            or run.is_deployment_in_progress()
+        )
+        merge_job_rows = len(run.jobs) == 1 and not show_deployment_num
 
         run_row: Dict[Union[str, int], Any] = {
-            "NAME": run.run_spec.run_name,
+            "NAME": run.run_spec.run_name
+            + (f" [secondary]deployment={run.deployment_num}[/]" if show_deployment_num else ""),
             "SUBMITTED": format_date(run.submitted_at),
             "STATUS": (
                 run.latest_job_submission.status_message
@@ -174,7 +224,7 @@ def get_runs_table(
         }
         if run.error:
             run_row["ERROR"] = run.error
-        if len(run.jobs) != 1:
+        if not merge_job_rows:
             add_row_from_dict(table, run_row)
 
         for job in run.jobs:
@@ -184,8 +234,16 @@ def get_runs_table(
                 inactive_for = format_duration_multiunit(latest_job_submission.inactivity_secs)
                 status += f" (inactive for {inactive_for})"
             job_row: Dict[Union[str, int], Any] = {
-                "NAME": f"  replica={job.job_spec.replica_num} job={job.job_spec.job_num}",
+                "NAME": f"  replica={job.job_spec.replica_num} job={job.job_spec.job_num}"
+                + (
+                    f" deployment={latest_job_submission.deployment_num}"
+                    if show_deployment_num
+                    else ""
+                ),
                 "STATUS": latest_job_submission.status_message,
+                "PROBES": _format_job_probes(
+                    job.job_spec.probes, latest_job_submission.probes, latest_job_submission.status
+                ),
                 "SUBMITTED": format_date(latest_job_submission.submitted_at),
                 "ERROR": latest_job_submission.error,
             }
@@ -208,9 +266,28 @@ def get_runs_table(
                         "PRICE": f"${jpd.price:.4f}".rstrip("0").rstrip("."),
                     }
                 )
-            if len(run.jobs) == 1:
+            if merge_job_rows:
                 # merge rows
                 job_row.update(run_row)
             add_row_from_dict(table, job_row, style="secondary" if len(run.jobs) != 1 else None)
 
     return table
+
+
+def _format_job_probes(
+    probe_specs: list[ProbeSpec], probes: list[Probe], job_status: JobStatus
+) -> str:
+    if not probes or job_status != JobStatus.RUNNING:
+        return ""
+    statuses = []
+    for probe_spec, probe in zip(probe_specs, probes):
+        # NOTE: the symbols are documented in concepts/services.md, keep in sync.
+        if probe.success_streak >= probe_spec.ready_after:
+            status = "[code]✓[/]"
+        elif probe.success_streak > 0:
+            status = "[warning]~[/]"
+        else:
+            status = "[error]×[/]"
+        statuses.append(status)
+    # split into whitespace-delimited batches to allow column wrapping
+    return " ".join("".join(batch) for batch in batched(statuses, 5))

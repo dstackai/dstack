@@ -2,6 +2,7 @@ import asyncio
 import importlib.resources
 import os
 import time
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Awaitable, Callable, List
@@ -9,9 +10,10 @@ from typing import Awaitable, Callable, List
 import sentry_sdk
 from fastapi import FastAPI, Request, Response, status
 from fastapi.datastructures import URL
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from prometheus_client import Counter, Histogram
+from sentry_sdk.types import SamplingContext
 
 from dstack._internal.cli.utils.common import console
 from dstack._internal.core.errors import ForbiddenError, ServerClientError
@@ -20,11 +22,14 @@ from dstack._internal.proxy.lib.deps import get_injector_from_app
 from dstack._internal.proxy.lib.routers import model_proxy
 from dstack._internal.server import settings
 from dstack._internal.server.background import start_background_tasks
+from dstack._internal.server.background.tasks.process_probes import PROBES_SCHEDULER
 from dstack._internal.server.db import get_db, get_session_ctx, migrate
 from dstack._internal.server.routers import (
     backends,
+    files,
     fleets,
     gateways,
+    gpus,
     instances,
     logs,
     metrics,
@@ -54,6 +59,7 @@ from dstack._internal.server.settings import (
 )
 from dstack._internal.server.utils.logging import configure_logging
 from dstack._internal.server.utils.routers import (
+    CustomORJSONResponse,
     check_client_server_compatibility,
     error_detail,
     get_server_client_error_details,
@@ -78,17 +84,10 @@ REQUEST_DURATION = Histogram(
 
 
 def create_app() -> FastAPI:
-    if settings.SENTRY_DSN is not None:
-        sentry_sdk.init(
-            dsn=settings.SENTRY_DSN,
-            release=DSTACK_VERSION,
-            environment=settings.SERVER_ENVIRONMENT,
-            enable_tracing=True,
-            traces_sample_rate=settings.SENTRY_TRACES_SAMPLE_RATE,
-            profiles_sample_rate=settings.SENTRY_PROFILES_SAMPLE_RATE,
-        )
-
-    app = FastAPI(docs_url="/api/docs", lifespan=lifespan)
+    app = FastAPI(
+        docs_url="/api/docs",
+        lifespan=lifespan,
+    )
     app.state.proxy_dependency_injector = ServerProxyDependencyInjector()
     return app
 
@@ -96,13 +95,26 @@ def create_app() -> FastAPI:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     configure_logging()
+    if settings.SENTRY_DSN is not None:
+        sentry_sdk.init(
+            dsn=settings.SENTRY_DSN,
+            release=DSTACK_VERSION,
+            environment=settings.SERVER_ENVIRONMENT,
+            enable_tracing=True,
+            traces_sampler=_sentry_traces_sampler,
+            profiles_sample_rate=settings.SENTRY_PROFILES_SAMPLE_RATE,
+        )
+    server_executor = ThreadPoolExecutor(max_workers=settings.SERVER_EXECUTOR_MAX_WORKERS)
+    asyncio.get_running_loop().set_default_executor(server_executor)
     await migrate()
     _print_dstack_logo()
     if not check_required_ssh_version():
         logger.warning("OpenSSH 8.4+ is required. The dstack server may not work properly")
+    server_config_manager = None
+    server_config_loaded = False
     if settings.SERVER_CONFIG_ENABLED:
         server_config_manager = ServerConfigManager()
-        config_loaded = server_config_manager.load_config()
+        server_config_loaded = server_config_manager.load_config()
         # Encryption has to be configured before working with users and projects
         await server_config_manager.apply_encryption()
     async with get_session_ctx() as session:
@@ -116,11 +128,9 @@ async def lifespan(app: FastAPI):
                 session=session,
                 user=admin,
             )
-            if settings.SERVER_CONFIG_ENABLED:
-                server_config_dir = str(SERVER_CONFIG_FILE_PATH).replace(
-                    os.path.expanduser("~"), "~", 1
-                )
-                if not config_loaded:
+            if server_config_manager is not None:
+                server_config_dir = _get_server_config_dir()
+                if not server_config_loaded:
                     logger.info("Initializing the default configuration...", {"show_path": False})
                     await server_config_manager.init_config(session=session)
                     logger.info(
@@ -143,8 +153,18 @@ async def lifespan(app: FastAPI):
     )
     if settings.SERVER_S3_BUCKET is not None or settings.SERVER_GCS_BUCKET is not None:
         init_default_storage()
-    scheduler = start_background_tasks()
+    scheduler = None
+    if settings.SERVER_BACKGROUND_PROCESSING_ENABLED:
+        scheduler = start_background_tasks()
+    else:
+        logger.info("Background processing is disabled")
+    PROBES_SCHEDULER.start()
     dstack_version = DSTACK_VERSION if DSTACK_VERSION else "(no version)"
+    logger.info(
+        "Job network mode: %s (%d)",
+        settings.JOB_NETWORK_MODE.name,
+        settings.JOB_NETWORK_MODE.value,
+    )
     logger.info(f"The admin token is {admin.token.get_plaintext_or_error()}", {"show_path": False})
     logger.info(
         f"The dstack server {dstack_version} is running at {SERVER_URL}",
@@ -153,7 +173,9 @@ async def lifespan(app: FastAPI):
     for func in _ON_STARTUP_HOOKS:
         await func(app)
     yield
-    scheduler.shutdown()
+    if scheduler is not None:
+        scheduler.shutdown()
+    PROBES_SCHEDULER.shutdown(wait=False)
     await gateway_connections_pool.remove_all()
     service_conn_pool = await get_injector_from_app(app).get_service_connection_pool()
     await service_conn_pool.remove_all()
@@ -185,9 +207,11 @@ def register_routes(app: FastAPI, ui: bool = True):
     app.include_router(fleets.root_router)
     app.include_router(fleets.project_router)
     app.include_router(instances.root_router)
+    app.include_router(instances.project_router)
     app.include_router(repos.router)
     app.include_router(runs.root_router)
     app.include_router(runs.project_router)
+    app.include_router(gpus.project_router)
     app.include_router(metrics.router)
     app.include_router(logs.router)
     app.include_router(secrets.router)
@@ -197,20 +221,21 @@ def register_routes(app: FastAPI, ui: bool = True):
     app.include_router(service_proxy.router, prefix="/proxy/services", tags=["service-proxy"])
     app.include_router(model_proxy.router, prefix="/proxy/models", tags=["model-proxy"])
     app.include_router(prometheus.router)
+    app.include_router(files.router)
 
     @app.exception_handler(ForbiddenError)
     async def forbidden_error_handler(request: Request, exc: ForbiddenError):
         msg = "Access denied"
         if len(exc.args) > 0:
             msg = exc.args[0]
-        return JSONResponse(
+        return CustomORJSONResponse(
             status_code=status.HTTP_403_FORBIDDEN,
             content=error_detail(msg),
         )
 
     @app.exception_handler(ServerClientError)
     async def server_client_error_handler(request: Request, exc: ServerClientError):
-        return JSONResponse(
+        return CustomORJSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
             content={"detail": get_server_client_error_details(exc)},
         )
@@ -218,7 +243,7 @@ def register_routes(app: FastAPI, ui: bool = True):
     @app.exception_handler(OSError)
     async def os_error_handler(request, exc: OSError):
         if exc.errno in [36, 63]:
-            return JSONResponse(
+            return CustomORJSONResponse(
                 {"detail": "Filename too long"},
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
@@ -239,6 +264,23 @@ def register_routes(app: FastAPI, ui: bool = True):
             response.status_code,
         )
         return response
+
+    if settings.SERVER_PROFILING_ENABLED:
+        from pyinstrument import Profiler
+
+        @app.middleware("http")
+        async def profile_request(request: Request, call_next):
+            profiling = request.query_params.get("profile", False)
+            if profiling:
+                profiler = Profiler()
+                profiler.start()
+                respone = await call_next(request)
+                profiler.stop()
+                with open("profiling_results.html", "w+") as f:
+                    f.write(profiler.output_html())
+                return respone
+            else:
+                return await call_next(request)
 
     # this middleware must be defined after the log_request middleware
     @app.middleware("http")
@@ -287,7 +329,7 @@ def register_routes(app: FastAPI, ui: bool = True):
 
     @app.get("/healthcheck")
     async def healthcheck():
-        return JSONResponse(content={"status": "running"})
+        return CustomORJSONResponse(content={"status": "running"})
 
     if ui and Path(__file__).parent.joinpath("statics").exists():
         app.mount(
@@ -301,7 +343,7 @@ def register_routes(app: FastAPI, ui: bool = True):
                 or _is_proxy_request(request)
                 or _is_prometheus_request(request)
             ):
-                return JSONResponse(
+                return CustomORJSONResponse(
                     {"detail": exc.detail},
                     status_code=status.HTTP_404_NOT_FOUND,
                 )
@@ -335,6 +377,18 @@ def _is_prometheus_request(request: Request) -> bool:
     return request.url.path.startswith("/metrics")
 
 
+def _sentry_traces_sampler(sampling_context: SamplingContext) -> float:
+    parent_sampling_decision = sampling_context["parent_sampled"]
+    if parent_sampling_decision is not None:
+        return float(parent_sampling_decision)
+    transaction_context = sampling_context["transaction_context"]
+    name = transaction_context.get("name")
+    if name is not None:
+        if name.startswith("background."):
+            return settings.SENTRY_TRACES_BACKGROUND_SAMPLE_RATE
+    return settings.SENTRY_TRACES_SAMPLE_RATE
+
+
 def _print_dstack_logo():
     console.print(
         """[purple]╱╱╭╮╱╱╭╮╱╱╱╱╱╱╭╮
@@ -349,3 +403,7 @@ def _print_dstack_logo():
 ╰━━┻━━┻╯╱╰╯╰━━┻╯
 [/]"""
     )
+
+
+def _get_server_config_dir() -> str:
+    return str(SERVER_CONFIG_FILE_PATH).replace(os.path.expanduser("~"), "~", 1)

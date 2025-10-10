@@ -10,6 +10,8 @@
     "delete": "Delete",
     "remove": "Remove",
     "apply": "Apply",
+    "next": "Next",
+    "previous": "Back",
     "settings": "Settings",
     "match_count_with_value_one": "{{count}} match",
     "match_count_with_value_other": "{{count}} matches",
@@ -32,6 +34,7 @@
     "login_github": "Sign in with GitHub",
     "login_okta": "Sign in with Okta",
     "login_entra": "Sign in with EntraID",
+    "login_google": "Sign in with Google",
     "general": "General",
     "test": "Test",
     "local_storage_unavailable": "Local Storage is unavailable",
@@ -47,7 +50,8 @@
     "danger_zone": "Danger Zone",
     "control_plane": "Control plane",
     "refresh": "Refresh",
-    "quickstart": "Quickstart"
+    "quickstart": "Quickstart",
+    "ask_ai": "Ask AI"
   },
 
   "auth": {
@@ -67,7 +71,7 @@
     "runs": "Runs",
     "models": "Models",
     "fleets": "Fleets",
-    "project": "Project",
+    "project": "project",
     "project_other": "Projects",
     "general": "General",
     "users": "Users",
@@ -76,7 +80,8 @@
     "billing": "Billing",
     "resources": "Resources",
     "volumes": "Volumes",
-    "instances": "Instances"
+    "instances": "Instances",
+    "offers": "Offers"
   },
 
   "backend": {
@@ -172,15 +177,41 @@
     "runs": "Runs",
     "tags": "Tags",
     "settings": "Settings",
+    "join": "Join",
+    "leave_confirm_title": "Leave project",
+    "leave_confirm_message": "Are you sure you want to leave this project?",
+    "leave": "Leave",
+    "join_success": "Successfully joined the project",
+    "leave_success": "Successfully left the project",
+    "join_error": "Failed to join project",
+    "leave_error": "Failed to leave project",
     "card": {
       "backend": "Backend",
       "settings": "Settings"
+    },
+    "wizard": {
+      "submit": "Create"
     },
     "edit": {
       "general": "General",
       "project_name": "Project name",
       "owner": "Owner",
       "project_name_description": "Only latin characters, dashes, underscores, and digits",
+      "project_type": "Project type",
+      "project_type_description": "Choose which project type you want to create",
+      "backends": "Backends",
+      "base_backends_description": "dstack will automatically collect offers from the following providers. Deselect providers you don’t want to use.",
+      "backends_description": "The following backends can be configured with your own cloud credentials in the project settings after the project is created.",
+      "default_fleet": "Create default fleet",
+      "default_fleet_description": "You can create default fleet for project",
+      "fleet_name": "Fleet name",
+      "fleet_name_description": "Only latin characters, dashes, underscores, and digits",
+      "fleet_min_instances": "Min number of instances",
+      "fleet_min_instances_description": "Only digits",
+      "fleet_max_instances": "Max number of instances",
+      "fleet_max_instances_description": "Only digits",
+      "is_public": "Make project public",
+      "is_public_description": "Public projects can be accessed by any user without being a member",
       "backend": "Backend",
       "backend_config": "Backend config",
       "backend_config_description": "Specify the backend config in the YAML format. Click Info for examples.",
@@ -189,6 +220,13 @@
       "members_empty_message_title": "No members",
       "members_empty_message_text": "Select project's members",
       "update_members_success": "Members are updated",
+      "update_visibility_success": "Project visibility updated successfully",
+      "update_visibility_confirm_title": "Change project visibility",
+      "update_visibility_confirm_message": "Are you sure you want to change the project visibility? This will affect who can access this project.",
+      "change_visibility": "Change visibility",
+      "project_visibility": "Visibility",
+      "project_visibility_description": "Control who can access this project",
+      "make_project_public": "Make project public",
       "delete_project_confirm_title": "Delete project",
       "delete_project_confirm_message": "Are you sure you want to delete this project?",
       "delete_projects_confirm_title": "Delete projects",
@@ -279,9 +317,31 @@
         "name": "User name",
         "role": "Project role"
       },
+      "secrets": {
+        "section_title": "Secrets",
+        "empty_message_title": "No secrets",
+        "empty_message_text": "No secrets to display.",
+        "name": "Secret name",
+        "value": "Secret value",
+        "create_secret": "Create secret",
+        "update_secret": "Update secret",
+        "delete_confirm_title": "Delete secret",
+        "delete_confirm_message": "Are you sure you want to delete the {{name}} secret?",
+        "multiple_delete_confirm_title": "Delete secrets",
+        "multiple_delete_confirm_message": "Are you sure you want to delete {{count}} secrets?",
+        "not_permissions_title": "No permissions",
+        "not_permissions_description": "You don't have permissions for managing secrets",
+        "validation": {
+          "secret_name_format": "Invalid secret name"
+        }
+      },
       "error_notification": "Update project error",
       "validation": {
         "user_name_format": "Only letters, numbers, - or _"
+      },
+      "visibility": {
+        "private": "Private",
+        "public": "Public"
       }
     },
     "create": {
@@ -322,7 +382,7 @@
       "quickstart_message_text": "Check out the quickstart guide to get started with dstack",
       "nomatch_message_title": "No matches",
       "nomatch_message_text": "We can't find a match. Try to change project or clear filter",
-      "filter_property_placeholder": "Filter runs by properties",
+      "filter_property_placeholder": "Filter by properties",
       "project": "Project",
       "project_placeholder": "Filtering by project",
       "repo": "Repository",
@@ -405,6 +465,27 @@
       "size": "Size"
     }
   },
+  "offer": {
+    "title": "Offers",
+    "filter_property_placeholder": "Filter by properties",
+    "backend": "Backend",
+    "backend_plural": "Backends",
+    "availability": "Availability",
+    "groupBy": "Group by properties",
+    "region": "Region",
+    "count": "Count",
+    "price": "$/GPU",
+    "memory_mib": "Memory",
+    "spot": "Spot policy",
+    "empty_message_title_select_project": "Select a project",
+    "empty_message_text_select_project": "Use the filter above to select a project",
+    "empty_message_title_select_groupBy": "Select a group by",
+    "empty_message_text_select_groupBy": "Use the field above to select a group by",
+    "empty_message_title": "No offers",
+    "empty_message_text": "No offers to display.",
+    "nomatch_message_title": "No matches",
+    "nomatch_message_text": "We can't find a match."
+  },
 
   "models": {
     "model_name": "Name",
@@ -448,6 +529,7 @@
     "nomatch_message_text": "We can't find a match.",
     "nomatch_message_button_label": "Clear filter",
     "active_only": "Active fleets",
+    "filter_property_placeholder": "Filter by properties",
     "statuses": {
       "active": "Active",
       "submitted": "Submitted",
@@ -457,6 +539,7 @@
     },
     "instances": {
       "active_only": "Active instances",
+      "filter_property_placeholder": "Filter by properties",
       "title": "Instances",
       "empty_message_title": "No instances",
       "empty_message_text": "No instances to display.",
@@ -494,6 +577,7 @@
     "delete_volumes_confirm_title": "Delete volumes",
     "delete_volumes_confirm_message": "Are you sure you want to delete these volumes?",
     "active_only": "Active volumes",
+    "filter_property_placeholder": "Filter by properties",
 
     "name": "Name",
     "project": "Project name",

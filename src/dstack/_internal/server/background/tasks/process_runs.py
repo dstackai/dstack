@@ -1,18 +1,17 @@
 import asyncio
 import datetime
-import itertools
 from typing import List, Optional, Set, Tuple
 
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, selectinload
+from sqlalchemy.orm import joinedload, load_only, selectinload
 
-import dstack._internal.server.services.gateways as gateways
 import dstack._internal.server.services.services.autoscalers as autoscalers
 from dstack._internal.core.errors import ServerError
 from dstack._internal.core.models.profiles import RetryEvent, StopCriteria
 from dstack._internal.core.models.runs import (
     Job,
+    JobSpec,
     JobStatus,
     JobTerminationReason,
     Run,
@@ -20,26 +19,40 @@ from dstack._internal.core.models.runs import (
     RunStatus,
     RunTerminationReason,
 )
-from dstack._internal.server.db import get_session_ctx
-from dstack._internal.server.models import JobModel, ProjectModel, RunModel
+from dstack._internal.server.db import get_db, get_session_ctx
+from dstack._internal.server.models import (
+    FleetModel,
+    InstanceModel,
+    JobModel,
+    ProjectModel,
+    RunModel,
+    UserModel,
+)
 from dstack._internal.server.services.jobs import (
     find_job,
-    get_jobs_from_run_spec,
+    get_job_specs_from_run_spec,
     group_jobs_by_replica_latest,
 )
 from dstack._internal.server.services.locking import get_locker
+from dstack._internal.server.services.prometheus.client_metrics import run_metrics
 from dstack._internal.server.services.runs import (
-    create_job_model_for_new_submission,
     fmt,
+    is_replica_registered,
     process_terminating_run,
     retry_run_replica_jobs,
     run_model_to_run,
     scale_run_replicas,
 )
+from dstack._internal.server.services.secrets import get_project_secrets_mapping
+from dstack._internal.server.services.services import update_service_desired_replica_count
+from dstack._internal.server.utils import sentry_utils
 from dstack._internal.utils import common
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
+
+MIN_PROCESSING_INTERVAL = datetime.timedelta(seconds=5)
+ROLLING_DEPLOYMENT_MAX_SURGE = 1  # at most one extra replica during rolling deployment
 
 
 async def process_runs(batch_size: int = 1):
@@ -49,20 +62,54 @@ async def process_runs(batch_size: int = 1):
     await asyncio.gather(*tasks)
 
 
+@sentry_utils.instrument_background_task
 async def _process_next_run():
-    run_lock, run_lockset = get_locker().get_lockset(RunModel.__tablename__)
-    job_lock, job_lockset = get_locker().get_lockset(JobModel.__tablename__)
+    run_lock, run_lockset = get_locker(get_db().dialect_name).get_lockset(RunModel.__tablename__)
+    job_lock, job_lockset = get_locker(get_db().dialect_name).get_lockset(JobModel.__tablename__)
+    now = common.get_current_datetime()
     async with get_session_ctx() as session:
         async with run_lock, job_lock:
             res = await session.execute(
                 select(RunModel)
                 .where(
-                    RunModel.status.not_in(RunStatus.finished_statuses()),
                     RunModel.id.not_in(run_lockset),
+                    RunModel.last_processed_at < now - MIN_PROCESSING_INTERVAL,
+                    # Filter out runs that don't need to be processed.
+                    # This is only to reduce unnecessary commits.
+                    # Otherwise, we could fetch all active runs and filter them when processing.
+                    or_(
+                        # Active non-pending runs:
+                        RunModel.status.not_in(
+                            RunStatus.finished_statuses() + [RunStatus.PENDING]
+                        ),
+                        # Retrying runs:
+                        and_(
+                            RunModel.status == RunStatus.PENDING,
+                            RunModel.resubmission_attempt > 0,
+                        ),
+                        # Scheduled ready runs:
+                        and_(
+                            RunModel.status == RunStatus.PENDING,
+                            RunModel.resubmission_attempt == 0,
+                            RunModel.next_triggered_at.is_not(None),
+                            RunModel.next_triggered_at < now,
+                        ),
+                        # Scaled-to-zero runs:
+                        # Such runs cannot be scheduled, thus we check next_triggered_at.
+                        # If we allow scheduled services with downscaling to zero
+                        # This check won't pass.
+                        and_(
+                            RunModel.status == RunStatus.PENDING,
+                            RunModel.resubmission_attempt == 0,
+                            RunModel.next_triggered_at.is_(None),
+                        ),
+                    ),
                 )
+                .options(joinedload(RunModel.jobs).load_only(JobModel.id))
+                .options(load_only(RunModel.id))
                 .order_by(RunModel.last_processed_at.asc())
                 .limit(1)
-                .with_for_update(skip_locked=True)
+                .with_for_update(skip_locked=True, key_share=True, of=RunModel)
             )
             run_model = res.scalar()
             if run_model is None:
@@ -74,7 +121,7 @@ async def _process_next_run():
                     JobModel.id.not_in(job_lockset),
                 )
                 .order_by(JobModel.id)  # take locks in order
-                .with_for_update(skip_locked=True)
+                .with_for_update(skip_locked=True, key_share=True)
             )
             job_models = res.scalars().all()
             if len(run_model.jobs) != len(job_models):
@@ -83,8 +130,8 @@ async def _process_next_run():
             job_ids = [j.id for j in run_model.jobs]
             run_lockset.add(run_model.id)
             job_lockset.update(job_ids)
+        run_model_id = run_model.id
         try:
-            run_model_id = run_model.id
             await _process_run(session=session, run_model=run_model)
         finally:
             run_lockset.difference_update([run_model_id])
@@ -92,20 +139,23 @@ async def _process_next_run():
 
 
 async def _process_run(session: AsyncSession, run_model: RunModel):
-    logger.debug("%s: processing run", fmt(run_model))
     # Refetch to load related attributes.
-    # joinedload produces LEFT OUTER JOIN that can't be used with FOR UPDATE.
     res = await session.execute(
         select(RunModel)
         .where(RunModel.id == run_model.id)
         .execution_options(populate_existing=True)
-        .options(joinedload(RunModel.project).joinedload(ProjectModel.backends))
-        .options(joinedload(RunModel.user))
-        .options(joinedload(RunModel.repo))
-        .options(selectinload(RunModel.jobs).joinedload(JobModel.instance))
+        .options(joinedload(RunModel.project).load_only(ProjectModel.id, ProjectModel.name))
+        .options(joinedload(RunModel.user).load_only(UserModel.name))
+        .options(joinedload(RunModel.fleet).load_only(FleetModel.id, FleetModel.name))
+        .options(
+            selectinload(RunModel.jobs)
+            .joinedload(JobModel.instance)
+            .load_only(InstanceModel.fleet_id)
+        )
         .execution_options(populate_existing=True)
     )
     run_model = res.unique().scalar_one()
+    logger.debug("%s: processing run", fmt(run_model))
     try:
         if run_model.status == RunStatus.PENDING:
             await _process_pending_run(session, run_model)
@@ -129,56 +179,36 @@ async def _process_run(session: AsyncSession, run_model: RunModel):
 async def _process_pending_run(session: AsyncSession, run_model: RunModel):
     """Jobs are not created yet"""
     run = run_model_to_run(run_model)
-    if not _pending_run_ready_for_resubmission(run_model, run):
-        logger.debug("%s: pending run is not yet ready for resubmission", fmt(run_model))
+
+    # TODO: Do not select such runs in the first place to avoid redundant processing
+    if run_model.resubmission_attempt > 0 and not _retrying_run_ready_for_resubmission(
+        run_model, run
+    ):
+        logger.debug("%s: retrying run is not yet ready for resubmission", fmt(run_model))
         return
 
-    # TODO(egor-s) consolidate with `scale_run_replicas` if possible
-    replicas = 1
+    run_model.desired_replica_count = 1
     if run.run_spec.configuration.type == "service":
-        replicas = run.run_spec.configuration.replicas.min or 0  # new default
-        scaler = autoscalers.get_service_scaler(run.run_spec.configuration)
-        stats = None
-        if run_model.gateway_id is not None:
-            conn = await gateways.get_or_add_gateway_connection(session, run_model.gateway_id)
-            stats = await conn.get_stats(run_model.project.name, run_model.run_name)
-        # replicas info doesn't matter for now
-        replicas = scaler.scale([], stats)
-    if replicas == 0:
+        run_model.desired_replica_count = run.run_spec.configuration.replicas.min or 0
+        await update_service_desired_replica_count(
+            session,
+            run_model,
+            run.run_spec.configuration,
+            # does not matter for pending services, since 0->n scaling should happen without delay
+            last_scaled_at=None,
+        )
+
+    if run_model.desired_replica_count == 0:
         # stay zero scaled
         return
 
-    scheduled_replicas = 0
-    # Resubmit existing replicas
-    for replica_num, replica_jobs in itertools.groupby(
-        run.jobs, key=lambda j: j.job_spec.replica_num
-    ):
-        if scheduled_replicas >= replicas:
-            break
-        scheduled_replicas += 1
-        for job in replica_jobs:
-            new_job_model = create_job_model_for_new_submission(
-                run_model=run_model,
-                job=job,
-                status=JobStatus.SUBMITTED,
-            )
-            session.add(new_job_model)
-    # Create missing replicas
-    for replica_num in range(scheduled_replicas, replicas):
-        jobs = await get_jobs_from_run_spec(run.run_spec, replica_num=replica_num)
-        for job in jobs:
-            job_model = create_job_model_for_new_submission(
-                run_model=run_model,
-                job=job,
-                status=JobStatus.SUBMITTED,
-            )
-            session.add(job_model)
+    await scale_run_replicas(session, run_model, replicas_diff=run_model.desired_replica_count)
 
     run_model.status = RunStatus.SUBMITTED
     logger.info("%s: run status has changed PENDING -> SUBMITTED", fmt(run_model))
 
 
-def _pending_run_ready_for_resubmission(run_model: RunModel, run: Run) -> bool:
+def _retrying_run_ready_for_resubmission(run_model: RunModel, run: Run) -> bool:
     if run.latest_job_submission is None:
         # Should not be possible
         return True
@@ -215,7 +245,7 @@ async def _process_active_run(session: AsyncSession, run_model: RunModel):
     We handle fails, scaling, and status changes.
     """
     run = run_model_to_run(run_model)
-    run_spec = RunSpec.__response__.parse_raw(run_model.run_spec)
+    run_spec = run.run_spec
     retry_single_job = _can_retry_single_job(run_spec)
 
     run_statuses: Set[RunStatus] = set()
@@ -226,8 +256,8 @@ async def _process_active_run(session: AsyncSession, run_model: RunModel):
     for replica_num, job_models in group_jobs_by_replica_latest(run_model.jobs):
         replica_statuses: Set[RunStatus] = set()
         replica_needs_retry = False
-
         replica_active = True
+        jobs_done_num = 0
         for job_model in job_models:
             job = find_job(run.jobs, job_model.replica_num, job_model.job_num)
             if (
@@ -242,8 +272,7 @@ async def _process_active_run(session: AsyncSession, run_model: RunModel):
             ):
                 # the job is done or going to be done
                 replica_statuses.add(RunStatus.DONE)
-                # for some reason the replica is done, it's not active
-                replica_active = False
+                jobs_done_num += 1
             elif job_model.termination_reason == JobTerminationReason.SCALED_DOWN:
                 # the job was scaled down
                 replica_active = False
@@ -283,26 +312,14 @@ async def _process_active_run(session: AsyncSession, run_model: RunModel):
             if not replica_needs_retry or retry_single_job:
                 run_statuses.update(replica_statuses)
 
-        if replica_active:
-            # submitted_at = replica created
-            replicas_info.append(
-                autoscalers.ReplicaInfo(
-                    active=True,
-                    timestamp=min(job.submitted_at for job in job_models).replace(
-                        tzinfo=datetime.timezone.utc
-                    ),
-                )
-            )
-        else:
-            # last_processed_at = replica scaled down
-            replicas_info.append(
-                autoscalers.ReplicaInfo(
-                    active=False,
-                    timestamp=max(job.last_processed_at for job in job_models).replace(
-                        tzinfo=datetime.timezone.utc
-                    ),
-                )
-            )
+        if jobs_done_num == len(job_models):
+            # Consider replica inactive if all its jobs are done for some reason.
+            # If only some jobs are done, replica is considered active to avoid
+            # provisioning new replicas for partially done multi-node tasks.
+            replica_active = False
+
+        replica_info = _get_replica_info(job_models, replica_active)
+        replicas_info.append(replica_info)
 
     termination_reason: Optional[RunTerminationReason] = None
     if RunStatus.FAILED in run_statuses:
@@ -340,27 +357,11 @@ async def _process_active_run(session: AsyncSession, run_model: RunModel):
                     job_model.termination_reason = JobTerminationReason.TERMINATED_BY_SERVER
 
     if new_status not in {RunStatus.TERMINATING, RunStatus.PENDING}:
-        # No need to retry if the run is terminating,
+        # No need to retry, scale, or redeploy replicas if the run is terminating,
         # pending run will retry replicas in `process_pending_run`
-        for _, replica_jobs in replicas_to_retry:
-            await retry_run_replica_jobs(
-                session, run_model, replica_jobs, only_failed=retry_single_job
-            )
-
-        if run_spec.configuration.type == "service":
-            scaler = autoscalers.get_service_scaler(run_spec.configuration)
-            stats = None
-            if run_model.gateway_id is not None:
-                conn = await gateways.get_or_add_gateway_connection(session, run_model.gateway_id)
-                stats = await conn.get_stats(run_model.project.name, run_model.run_name)
-            # use replicas_info from before retrying
-            replicas_diff = scaler.scale(replicas_info, stats)
-            if replicas_diff != 0:
-                # FIXME: potentially long write transaction
-                # Why do we flush here?
-                await session.flush()
-                await session.refresh(run_model)
-                await scale_run_replicas(session, run_model, replicas_diff)
+        await _handle_run_replicas(
+            session, run_model, run_spec, replicas_to_retry, retry_single_job, replicas_info
+        )
 
     if run_model.status != new_status:
         logger.info(
@@ -369,6 +370,24 @@ async def _process_active_run(session: AsyncSession, run_model: RunModel):
             run_model.status.name,
             new_status.name,
         )
+        if run_model.status == RunStatus.SUBMITTED and new_status == RunStatus.PROVISIONING:
+            current_time = common.get_current_datetime()
+            submit_to_provision_duration = (current_time - run_model.submitted_at).total_seconds()
+            logger.info(
+                "%s: run took %.2f seconds from submission to provisioning.",
+                fmt(run_model),
+                submit_to_provision_duration,
+            )
+            project_name = run_model.project.name
+            run_metrics.log_submit_to_provision_duration(
+                submit_to_provision_duration, project_name, run_spec.configuration.type
+            )
+
+        if new_status == RunStatus.PENDING:
+            run_metrics.increment_pending_runs(run_model.project.name, run_spec.configuration.type)
+            # Unassign run from fleet so that the new fleet can be chosen when retrying
+            run_model.fleet = None
+
         run_model.status = new_status
         run_model.termination_reason = termination_reason
         # While a run goes to pending without provisioning, resubmission_attempt increases.
@@ -376,6 +395,163 @@ async def _process_active_run(session: AsyncSession, run_model: RunModel):
             run_model.resubmission_attempt = 0
         elif new_status == RunStatus.PENDING:
             run_model.resubmission_attempt += 1
+
+
+def _get_replica_info(
+    replica_job_models: list[JobModel],
+    replica_active: bool,
+) -> autoscalers.ReplicaInfo:
+    if replica_active:
+        # submitted_at = replica created
+        return autoscalers.ReplicaInfo(
+            active=True,
+            timestamp=min(job.submitted_at for job in replica_job_models),
+        )
+    # last_processed_at = replica scaled down
+    return autoscalers.ReplicaInfo(
+        active=False,
+        timestamp=max(job.last_processed_at for job in replica_job_models),
+    )
+
+
+async def _handle_run_replicas(
+    session: AsyncSession,
+    run_model: RunModel,
+    run_spec: RunSpec,
+    replicas_to_retry: list[tuple[int, list[JobModel]]],
+    retry_single_job: bool,
+    replicas_info: list[autoscalers.ReplicaInfo],
+) -> None:
+    """
+    Does ONE of:
+    - replica retry
+    - replica scaling
+    - replica rolling deployment
+
+    Does not do everything at once to avoid conflicts between the stages and long DB transactions.
+    """
+
+    if replicas_to_retry:
+        for _, replica_jobs in replicas_to_retry:
+            await retry_run_replica_jobs(
+                session, run_model, replica_jobs, only_failed=retry_single_job
+            )
+        return
+
+    if run_spec.configuration.type == "service":
+        await update_service_desired_replica_count(
+            session,
+            run_model,
+            run_spec.configuration,
+            # FIXME: should only include scaling events, not retries and deployments
+            last_scaled_at=max((r.timestamp for r in replicas_info), default=None),
+        )
+
+    max_replica_count = run_model.desired_replica_count
+    if _has_out_of_date_replicas(run_model):
+        # allow extra replicas when deployment is in progress
+        max_replica_count += ROLLING_DEPLOYMENT_MAX_SURGE
+
+    active_replica_count = sum(1 for r in replicas_info if r.active)
+    if active_replica_count not in range(run_model.desired_replica_count, max_replica_count + 1):
+        await scale_run_replicas(
+            session,
+            run_model,
+            replicas_diff=run_model.desired_replica_count - active_replica_count,
+        )
+        return
+
+    await _update_jobs_to_new_deployment_in_place(
+        session=session,
+        run_model=run_model,
+        run_spec=run_spec,
+    )
+    if _has_out_of_date_replicas(run_model):
+        assert run_spec.configuration.type == "service", (
+            "Rolling deployment is only supported for services"
+        )
+        non_terminated_replica_count = len(
+            {j.replica_num for j in run_model.jobs if not j.status.is_finished()}
+        )
+        # Avoid using too much hardware during a deployment - never have
+        # more than max_replica_count non-terminated replicas.
+        if non_terminated_replica_count < max_replica_count:
+            # Start more up-to-date replicas that will eventually replace out-of-date replicas.
+            await scale_run_replicas(
+                session,
+                run_model,
+                replicas_diff=max_replica_count - non_terminated_replica_count,
+            )
+
+        replicas_to_stop_count = 0
+        # stop any out-of-date replicas that are not registered
+        replicas_to_stop_count += sum(
+            any(j.deployment_num < run_model.deployment_num for j in jobs)
+            and any(
+                j.status not in [JobStatus.TERMINATING] + JobStatus.finished_statuses()
+                for j in jobs
+            )
+            and not is_replica_registered(jobs)
+            for _, jobs in group_jobs_by_replica_latest(run_model.jobs)
+        )
+        # stop excessive registered out-of-date replicas, except those that are already `terminating`
+        non_terminating_registered_replicas_count = sum(
+            is_replica_registered(jobs) and all(j.status != JobStatus.TERMINATING for j in jobs)
+            for _, jobs in group_jobs_by_replica_latest(run_model.jobs)
+        )
+        replicas_to_stop_count += max(
+            0, non_terminating_registered_replicas_count - run_model.desired_replica_count
+        )
+        if replicas_to_stop_count:
+            await scale_run_replicas(
+                session,
+                run_model,
+                replicas_diff=-replicas_to_stop_count,
+            )
+
+
+async def _update_jobs_to_new_deployment_in_place(
+    session: AsyncSession, run_model: RunModel, run_spec: RunSpec
+) -> None:
+    """
+    Bump deployment_num for jobs that do not require redeployment.
+    """
+    secrets = await get_project_secrets_mapping(
+        session=session,
+        project=run_model.project,
+    )
+    for replica_num, job_models in group_jobs_by_replica_latest(run_model.jobs):
+        if all(j.status.is_finished() for j in job_models):
+            continue
+        if all(j.deployment_num == run_model.deployment_num for j in job_models):
+            continue
+        # FIXME: Handle getting image configuration errors or skip it.
+        new_job_specs = await get_job_specs_from_run_spec(
+            run_spec=run_spec,
+            secrets=secrets,
+            replica_num=replica_num,
+        )
+        assert len(new_job_specs) == len(job_models), (
+            "Changing the number of jobs within a replica is not yet supported"
+        )
+        can_update_all_jobs = True
+        for old_job_model, new_job_spec in zip(job_models, new_job_specs):
+            old_job_spec = JobSpec.__response__.parse_raw(old_job_model.job_spec_data)
+            if new_job_spec != old_job_spec:
+                can_update_all_jobs = False
+                break
+        if can_update_all_jobs:
+            for job_model in job_models:
+                job_model.deployment_num = run_model.deployment_num
+
+
+def _has_out_of_date_replicas(run: RunModel) -> bool:
+    for job in run.jobs:
+        if job.deployment_num < run.deployment_num and not (
+            job.status.is_finished() or job.termination_reason == JobTerminationReason.SCALED_DOWN
+        ):
+            return True
+    return False
 
 
 def _should_retry_job(run: Run, job: Job, job_model: JobModel) -> Optional[datetime.timedelta]:
@@ -393,7 +569,8 @@ def _should_retry_job(run: Run, job: Job, job_model: JobModel) -> Optional[datet
             break
 
     if (
-        job_model.termination_reason == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
+        job_model.termination_reason is not None
+        and job_model.termination_reason.to_retry_event() == RetryEvent.NO_CAPACITY
         and last_provisioned_submission is None
         and RetryEvent.NO_CAPACITY in job.job_spec.retry.on_events
     ):
@@ -403,24 +580,9 @@ def _should_retry_job(run: Run, job: Job, job_model: JobModel) -> Optional[datet
         return None
 
     if (
-        last_provisioned_submission.termination_reason
-        == JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY
-        and RetryEvent.INTERRUPTION in job.job_spec.retry.on_events
-    ):
-        return common.get_current_datetime() - last_provisioned_submission.last_processed_at
-
-    if (
-        last_provisioned_submission.termination_reason
-        in [
-            JobTerminationReason.CONTAINER_EXITED_WITH_ERROR,
-            JobTerminationReason.CREATING_CONTAINER_ERROR,
-            JobTerminationReason.EXECUTOR_ERROR,
-            JobTerminationReason.GATEWAY_ERROR,
-            JobTerminationReason.WAITING_INSTANCE_LIMIT_EXCEEDED,
-            JobTerminationReason.WAITING_RUNNER_LIMIT_EXCEEDED,
-            JobTerminationReason.PORTS_BINDING_FAILED,
-        ]
-        and RetryEvent.ERROR in job.job_spec.retry.on_events
+        last_provisioned_submission.termination_reason is not None
+        and JobTerminationReason(last_provisioned_submission.termination_reason).to_retry_event()
+        in job.job_spec.retry.on_events
     ):
         return common.get_current_datetime() - last_provisioned_submission.last_processed_at
 

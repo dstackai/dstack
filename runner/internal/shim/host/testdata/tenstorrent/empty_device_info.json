@@ -1,0 +1,18 @@
+{
+	"time": "2025-06-20T12:10:28.926938",
+	"host_info": {
+		"OS": "Linux",
+		"Distro": "Ubuntu 20.04.6 LTS",
+		"Kernel": "5.15.0-138-generic",
+		"Hostname": "empty-system",
+		"Platform": "x86_64",
+		"Python": "3.8.10",
+		"Memory": "16.00 GB",
+		"Driver": "TT-KMD 1.33"
+	},
+	"host_sw_vers": {
+		"tt_smi": "3.0.15",
+		"pyluwen": "0.7.2"
+	},
+	"device_info": []
+} 

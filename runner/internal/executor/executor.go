@@ -10,7 +10,9 @@ import (
 	"os"
 	"os/exec"
 	osuser "os/user"
+	"path"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -18,21 +20,42 @@ import (
 	"time"
 
 	"github.com/creack/pty"
+	"github.com/dstackai/ansistrip"
 	"github.com/dstackai/dstack/runner/consts"
+	"github.com/dstackai/dstack/runner/internal/common"
 	"github.com/dstackai/dstack/runner/internal/connections"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/dstackai/dstack/runner/internal/schemas"
 	"github.com/dstackai/dstack/runner/internal/types"
 	"github.com/prometheus/procfs"
+	"golang.org/x/sys/unix"
 )
+
+// TODO: Tune these parameters for optimal experience/performance
+const (
+	// Output is flushed when the cursor doesn't move for this duration
+	AnsiStripFlushInterval = 500 * time.Millisecond
+
+	// Output is flushed regardless of cursor activity after this maximum delay
+	AnsiStripMaxDelay = 3 * time.Second
+
+	// Maximum buffer size for ansistrip
+	MaxBufferSize = 32 * 1024 // 32KB
+)
+
+type ConnectionTracker interface {
+	GetNoConnectionsSecs() int64
+	Track(ticker <-chan time.Time)
+	Stop()
+}
 
 type RunExecutor struct {
 	tempDir    string
 	homeDir    string
-	workingDir string
+	archiveDir string
 	sshPort    int
-	uid        uint32
+	currentUid uint32
 
 	run             schemas.Run
 	jobSpec         schemas.JobSpec
@@ -40,20 +63,33 @@ type RunExecutor struct {
 	clusterInfo     schemas.ClusterInfo
 	secrets         map[string]string
 	repoCredentials *schemas.RepoCredentials
+	repoDir         string
 	codePath        string
+	jobUid          int
+	jobGid          int
+	jobHomeDir      string
+	jobWorkingDir   string
 
 	mu              *sync.RWMutex
 	state           string
 	jobStateHistory []schemas.JobStateEvent
 	jobLogs         *appendWriter
+	jobWsLogs       *appendWriter
 	runnerLogs      *appendWriter
 	timestamp       *MonotonicTimestamp
 
 	killDelay         time.Duration
-	connectionTracker *connections.ConnectionTracker
+	connectionTracker ConnectionTracker
 }
 
-func NewRunExecutor(tempDir string, homeDir string, workingDir string, sshPort int) (*RunExecutor, error) {
+// stubConnectionTracker is a no-op implementation for when procfs is not available (only required for tests on darwin)
+type stubConnectionTracker struct{}
+
+func (s *stubConnectionTracker) GetNoConnectionsSecs() int64   { return 0 }
+func (s *stubConnectionTracker) Track(ticker <-chan time.Time) {}
+func (s *stubConnectionTracker) Stop()                         {}
+
+func NewRunExecutor(tempDir string, homeDir string, sshPort int) (*RunExecutor, error) {
 	mu := &sync.RWMutex{}
 	timestamp := NewMonotonicTimestamp()
 	user, err := osuser.Current()
@@ -64,26 +100,39 @@ func NewRunExecutor(tempDir string, homeDir string, workingDir string, sshPort i
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse current user uid: %w", err)
 	}
-	proc, err := procfs.NewDefaultFS()
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize procfs: %w", err)
+
+	// Try to initialize procfs, but don't fail if it's not available (e.g., on macOS)
+	var connectionTracker ConnectionTracker
+
+	if runtime.GOOS == "linux" {
+		proc, err := procfs.NewDefaultFS()
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize procfs: %w", err)
+		}
+		connectionTracker = connections.NewConnectionTracker(connections.ConnectionTrackerConfig{
+			Port:            uint64(sshPort),
+			MinConnDuration: 10 * time.Second, // shorter connections are likely from dstack-server
+			Procfs:          proc,
+		})
+	} else {
+		// Use stub connection tracker (only required for tests on darwin)
+		connectionTracker = &stubConnectionTracker{}
 	}
-	connectionTracker := connections.NewConnectionTracker(connections.ConnectionTrackerConfig{
-		Port:            uint64(sshPort),
-		MinConnDuration: 10 * time.Second, // shorter connections are likely from dstack-server
-		Procfs:          proc,
-	})
+
 	return &RunExecutor{
 		tempDir:    tempDir,
 		homeDir:    homeDir,
-		workingDir: workingDir,
+		archiveDir: filepath.Join(tempDir, "file_archives"),
 		sshPort:    sshPort,
-		uid:        uid,
+		currentUid: uid,
+		jobUid:     -1,
+		jobGid:     -1,
 
 		mu:              mu,
 		state:           WaitSubmit,
 		jobStateHistory: make([]schemas.JobStateEvent, 0),
 		jobLogs:         newAppendWriter(mu, timestamp),
+		jobWsLogs:       newAppendWriter(mu, timestamp),
 		runnerLogs:      newAppendWriter(mu, timestamp),
 		timestamp:       timestamp,
 
@@ -127,9 +176,36 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 		}
 	}()
 
-	logger := io.MultiWriter(runnerLogFile, os.Stdout, ex.runnerLogs)
+	stripper := ansistrip.NewWriter(ex.runnerLogs, AnsiStripFlushInterval, AnsiStripMaxDelay, MaxBufferSize)
+	defer stripper.Close()
+	logger := io.MultiWriter(runnerLogFile, os.Stdout, stripper)
 	ctx = log.WithLogger(ctx, log.NewEntry(logger, int(log.DefaultEntry.Logger.Level))) // todo loglevel
 	log.Info(ctx, "Run job", "log_level", log.GetLogger(ctx).Logger.Level.String())
+
+	if ex.jobSpec.User == nil {
+		ex.jobSpec.User = &schemas.User{Uid: &ex.currentUid}
+	}
+	if err := fillUser(ex.jobSpec.User); err != nil {
+		ex.SetJobStateWithTerminationReason(
+			ctx,
+			types.JobStateFailed,
+			types.TerminationReasonExecutorError,
+			fmt.Sprintf("Failed to fill in the job user fields (%s)", err),
+		)
+		return gerrors.Wrap(err)
+	}
+
+	ex.setJobCredentials(ctx)
+
+	if err := ex.prepareJobWorkingDir(ctx); err != nil {
+		ex.SetJobStateWithTerminationReason(
+			ctx,
+			types.JobStateFailed,
+			types.TerminationReasonExecutorError,
+			fmt.Sprintf("Failed to set up the working dir (%s)", err),
+		)
+		return gerrors.Wrap(err)
+	}
 
 	if err := ex.setupRepo(ctx); err != nil {
 		ex.SetJobStateWithTerminationReason(
@@ -140,6 +216,17 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 		)
 		return gerrors.Wrap(err)
 	}
+
+	if err := ex.setupFiles(ctx); err != nil {
+		ex.SetJobStateWithTerminationReason(
+			ctx,
+			types.JobStateFailed,
+			types.TerminationReasonExecutorError,
+			fmt.Sprintf("Failed to set up files (%s)", err),
+		)
+		return gerrors.Wrap(err)
+	}
+
 	cleanupCredentials, err := ex.setupCredentials(ctx)
 	if err != nil {
 		ex.SetJobState(ctx, types.JobStateFailed)
@@ -251,6 +338,55 @@ func (ex *RunExecutor) SetRunnerState(state string) {
 	ex.state = state
 }
 
+func (ex *RunExecutor) setJobCredentials(ctx context.Context) {
+	if ex.jobSpec.User.Uid != nil {
+		ex.jobUid = int(*ex.jobSpec.User.Uid)
+	}
+	if ex.jobSpec.User.Gid != nil {
+		ex.jobGid = int(*ex.jobSpec.User.Gid)
+	}
+	if ex.jobSpec.User.HomeDir != "" {
+		ex.jobHomeDir = ex.jobSpec.User.HomeDir
+	} else {
+		ex.jobHomeDir = "/"
+	}
+	log.Trace(ctx, "Job credentials", "uid", ex.jobUid, "gid", ex.jobGid, "home", ex.jobHomeDir)
+}
+
+func (ex *RunExecutor) prepareJobWorkingDir(ctx context.Context) error {
+	var err error
+	if ex.jobSpec.WorkingDir == nil {
+		ex.jobWorkingDir, err = os.Getwd()
+		if err != nil {
+			return gerrors.Wrap(err)
+		}
+	} else {
+		// We still support relative paths, as 0.19.27 server uses relative paths when possible
+		// for compatibility with pre-0.19.27 runners.
+		// Replace consts.LegacyRepoDir with "" eventually.
+		ex.jobWorkingDir, err = common.ExpandPath(*ex.jobSpec.WorkingDir, consts.LegacyRepoDir, ex.jobHomeDir)
+		if err != nil {
+			return gerrors.Wrap(err)
+		}
+		if !path.IsAbs(ex.jobWorkingDir) {
+			return fmt.Errorf("working_dir must be absolute: %s", ex.jobWorkingDir)
+		}
+	}
+	log.Trace(ctx, "Job working dir", "path", ex.jobWorkingDir)
+	if err := common.MkdirAll(ctx, ex.jobWorkingDir, ex.jobUid, ex.jobGid); err != nil {
+		return gerrors.Wrap(err)
+	}
+	return nil
+}
+
+func (ex *RunExecutor) getRepoData() schemas.RepoData {
+	if ex.jobSpec.RepoData == nil {
+		// jobs submitted before 0.19.17 do not have jobSpec.RepoData
+		return ex.run.RunSpec.RepoData
+	}
+	return *ex.jobSpec.RepoData
+}
+
 func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error {
 	node_rank := ex.jobSpec.JobNum
 	nodes_num := ex.jobSpec.JobsPerReplica
@@ -264,6 +400,8 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 		"DSTACK_JOB_ID":         ex.jobSubmission.Id,
 		"DSTACK_RUN_NAME":       ex.run.RunSpec.RunName,
 		"DSTACK_REPO_ID":        ex.run.RunSpec.RepoId,
+		"DSTACK_REPO_DIR":       ex.repoDir,
+		"DSTACK_WORKING_DIR":    ex.jobWorkingDir,
 		"DSTACK_NODES_IPS":      strings.Join(ex.clusterInfo.JobIPs, "\n"),
 		"DSTACK_MASTER_NODE_IP": ex.clusterInfo.MasterJobIP,
 		"DSTACK_NODE_RANK":      strconv.Itoa(node_rank),
@@ -289,49 +427,30 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 	}
 	cmd.WaitDelay = ex.killDelay // kills the process if it doesn't exit in time
 
-	cmd.Dir = ex.workingDir
-	if ex.jobSpec.WorkingDir != nil {
-		workingDir, err := joinRelPath(ex.workingDir, *ex.jobSpec.WorkingDir)
-		if err != nil {
-			return gerrors.Wrap(err)
-		}
-		cmd.Dir = workingDir
-	}
+	cmd.Dir = ex.jobWorkingDir
 
+	// User must be already set
 	user := ex.jobSpec.User
-	if user != nil {
-		if err := fillUser(user); err != nil {
-			return gerrors.Wrap(err)
-		}
+	// Strictly speaking, we need CAP_SETUID and CAP_GUID (for Cmd.Start()->
+	// Cmd.SysProcAttr.Credential) and CAP_CHOWN (for startCommand()->os.Chown()),
+	// but for the sake of simplicity we instead check if we are root or not
+	if ex.currentUid == 0 {
 		log.Trace(
 			ctx, "Using credentials",
 			"uid", *user.Uid, "gid", *user.Gid, "groups", user.GroupIds,
 			"username", user.GetUsername(), "groupname", user.GetGroupname(),
 			"home", user.HomeDir,
 		)
-		log.Trace(ctx, "Current user", "uid", ex.uid)
-
-		// 1. Ideally, We should check uid, gid, and supplementary groups mismatches,
-		// but, for the sake of simplicity, we only check uid. Unprivileged runner
-		// should not receive job requests where user credentials do not match the
-		// current user's ones in the first place (it should be handled by the server)
-		// 2. Strictly speaking, we need CAP_SETUID and CAP_GUID (for Cmd.Start()->
-		// Cmd.SysProcAttr.Credential) and CAP_CHOWN (for startCommand()->os.Chown()),
-		// but for the sake of simplicity we instead check if we are root or not
-		if *user.Uid != ex.uid && ex.uid != 0 {
-			return gerrors.Newf("cannot start job as %d, current uid is %d", *user.Uid, ex.uid)
-		}
-
 		if cmd.SysProcAttr == nil {
 			cmd.SysProcAttr = &syscall.SysProcAttr{}
 		}
-		// It's safe to setuid(2)/setgid(2)/setgroups(2) as unprivileged user if we use
-		// user's own credentials (basically, it's noop)
 		cmd.SysProcAttr.Credential = &syscall.Credential{
 			Uid:    *user.Uid,
 			Gid:    *user.Gid,
 			Groups: user.GroupIds,
 		}
+	} else {
+		log.Info(ctx, "Current user is not root, cannot set process credentials", "uid", ex.currentUid)
 	}
 
 	envMap := NewEnvMap(ParseEnvList(os.Environ()), jobEnvs, ex.secrets)
@@ -339,7 +458,7 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 	envMap.Update(ex.jobSpec.Env, false)
 
 	const profilePath = "/etc/profile"
-	const dstackProfilePath = "/tmp/dstack_profile"
+	const dstackProfilePath = "/dstack/profile"
 	if err := writeDstackProfile(envMap, dstackProfilePath); err != nil {
 		log.Warning(ctx, "failed to write dstack_profile", "path", dstackProfilePath, "err", err)
 	} else if err := includeDstackProfile(profilePath, dstackProfilePath); err != nil {
@@ -400,6 +519,21 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 
 	cmd.Env = envMap.Render()
 
+	// Configure process resource limits
+	// TODO: Make rlimits customizable in the run configuration. Currently, we only set max locked memory
+	// to unlimited to fix the issue with InfiniBand/RDMA: "Cannot allocate memory".
+	// See: https://github.com/ofiwg/libfabric/issues/6437
+	// See: https://github.com/openucx/ucx/issues/8229
+	// Note: we already set RLIMIT_MEMLOCK to unlimited in the shim if we've detected IB devices
+	// (see configureHpcNetworkingIfAvailable() function), but, as it's on the shim side, it only works
+	// with VM-based backends.
+	rlimitMemlock := unix.Rlimit{Cur: unix.RLIM_INFINITY, Max: unix.RLIM_INFINITY}
+	// TODO: Check if we have CAP_SYS_RESOURCE. In container environments, even root usually doesn't have
+	// this capability.
+	if err := unix.Setrlimit(unix.RLIMIT_MEMLOCK, &rlimitMemlock); err != nil {
+		log.Error(ctx, "Failed to set resource limits", "err", err)
+	}
+
 	log.Trace(ctx, "Starting exec", "cmd", cmd.String(), "working_dir", cmd.Dir, "env", cmd.Env)
 
 	ptm, err := startCommand(cmd)
@@ -409,7 +543,9 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 	defer func() { _ = ptm.Close() }()
 	defer func() { _ = cmd.Wait() }() // release resources if copy fails
 
-	logger := io.MultiWriter(jobLogFile, ex.jobLogs)
+	stripper := ansistrip.NewWriter(ex.jobLogs, AnsiStripFlushInterval, AnsiStripMaxDelay, MaxBufferSize)
+	defer stripper.Close()
+	logger := io.MultiWriter(jobLogFile, ex.jobWsLogs, stripper)
 	_, err = io.Copy(logger, ptm)
 	if err != nil && !isPtyError(err) {
 		return gerrors.Wrap(err)
@@ -732,8 +868,11 @@ func writeMpiHostfile(ctx context.Context, ips []string, gpus_per_node int, path
 	return nil
 }
 
-func writeDstackProfile(env map[string]string, path string) error {
-	file, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
+func writeDstackProfile(env map[string]string, pth string) error {
+	if err := os.MkdirAll(path.Dir(pth), 0o755); err != nil {
+		return err
+	}
+	file, err := os.OpenFile(pth, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
 	if err != nil {
 		return err
 	}
@@ -748,7 +887,10 @@ func writeDstackProfile(env map[string]string, path string) error {
 			return err
 		}
 	}
-	if err = os.Chmod(path, 0o644); err != nil {
+	if _, err = file.WriteString("cd \"$DSTACK_WORKING_DIR\"\n"); err != nil {
+		return err
+	}
+	if err = os.Chmod(pth, 0o644); err != nil {
 		return err
 	}
 	return nil

@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
@@ -5,18 +6,29 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 from freezegun import freeze_time
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
+from dstack._internal import settings
 from dstack._internal.core.errors import SSHError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import NetworkMode
-from dstack._internal.core.models.configurations import DevEnvironmentConfiguration
-from dstack._internal.core.models.instances import InstanceStatus
+from dstack._internal.core.models.configurations import (
+    DevEnvironmentConfiguration,
+    ProbeConfig,
+    ServiceConfiguration,
+)
+from dstack._internal.core.models.instances import InstanceStatus, InstanceType
 from dstack._internal.core.models.profiles import StartupOrder, UtilizationPolicy
+from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import (
+    JobProvisioningData,
     JobRuntimeData,
+    JobSpec,
     JobStatus,
     JobTerminationReason,
+    Requirements,
     RunStatus,
 )
 from dstack._internal.core.models.volumes import (
@@ -24,8 +36,12 @@ from dstack._internal.core.models.volumes import (
     VolumeMountPoint,
     VolumeStatus,
 )
-from dstack._internal.server import settings
-from dstack._internal.server.background.tasks.process_running_jobs import process_running_jobs
+from dstack._internal.server import settings as server_settings
+from dstack._internal.server.background.tasks.process_running_jobs import (
+    _patch_base_image_for_aws_efa,
+    process_running_jobs,
+)
+from dstack._internal.server.models import JobModel
 from dstack._internal.server.schemas.runner import (
     HealthcheckResponse,
     JobStateEvent,
@@ -42,6 +58,7 @@ from dstack._internal.server.testing.common import (
     create_instance,
     create_job,
     create_job_metrics_point,
+    create_probe,
     create_project,
     create_repo,
     create_run,
@@ -85,6 +102,12 @@ def runner_client_mock(monkeypatch: pytest.MonkeyPatch) -> Mock:
         "dstack._internal.server.services.runner.client.RunnerClient", Mock(return_value=mock)
     )
     return mock
+
+
+@dataclass
+class _ProbeSetup:
+    success_streak: int
+    ready_after: int
 
 
 class TestProcessRunningJobs:
@@ -216,12 +239,13 @@ class TestProcessRunningJobs:
             instance=instance,
             instance_assigned=True,
         )
+        last_processed_at = job.last_processed_at
         with (
             patch("dstack._internal.server.services.runner.ssh.SSHTunnel") as SSHTunnelMock,
             patch(
                 "dstack._internal.server.services.runner.client.RunnerClient"
             ) as RunnerClientMock,
-            patch.object(settings, "SERVER_DIR_PATH", tmp_path),
+            patch.object(server_settings, "SERVER_DIR_PATH", tmp_path),
         ):
             runner_client_mock = RunnerClientMock.return_value
             runner_client_mock.pull.return_value = PullResponse(
@@ -236,6 +260,8 @@ class TestProcessRunningJobs:
         assert job is not None
         assert job.status == JobStatus.RUNNING
         assert job.runner_timestamp == 1
+        job.last_processed_at = last_processed_at
+        await session.commit()
         with (
             patch("dstack._internal.server.services.runner.ssh.SSHTunnel") as SSHTunnelMock,
             patch(
@@ -330,7 +356,7 @@ class TestProcessRunningJobs:
             name="test-run-0-0",
             registry_username="",
             registry_password="",
-            image_name="dstackai/base:py3.13-0.9-cuda-12.1",
+            image_name=f"dstackai/base:{settings.DSTACK_BASE_IMAGE_VERSION}-base-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}",
             container_user="root",
             privileged=privileged,
             gpu=None,
@@ -768,6 +794,7 @@ class TestProcessRunningJobs:
             job_provisioning_data=get_job_provisioning_data(),
             instance=instance,
             instance_assigned=True,
+            last_processed_at=datetime(2023, 1, 1, 11, 30, tzinfo=timezone.utc),
         )
         for timestamp, gpu_util in samples:
             # two GPUs, the second one always 100% utilized
@@ -878,3 +905,325 @@ class TestProcessRunningJobs:
             await process_running_jobs()
         await session.refresh(master_job)
         assert master_job.status == JobStatus.RUNNING
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.parametrize("probe_count", [1, 2])
+    async def test_creates_probe_models_and_not_registers_service_replica(
+        self,
+        test_db,
+        probe_count: int,
+        session: AsyncSession,
+        ssh_tunnel_mock: Mock,
+        shim_client_mock: Mock,
+        runner_client_mock: Mock,
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_spec=get_run_spec(
+                run_name="test",
+                repo_id=repo.name,
+                configuration=ServiceConfiguration(
+                    port=80,
+                    image="ubuntu",
+                    probes=[ProbeConfig(type="http", url=f"/{i}") for i in range(probe_count)],
+                ),
+            ),
+        )
+        instance = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.BUSY,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.PULLING,
+            job_provisioning_data=get_job_provisioning_data(dockerized=True),
+            instance=instance,
+            instance_assigned=True,
+        )
+        shim_client_mock.get_task.return_value.status = TaskStatus.RUNNING
+
+        assert len(job.probes) == 0
+        await process_running_jobs()
+
+        await session.refresh(job)
+        job = (
+            await session.execute(
+                select(JobModel)
+                .where(JobModel.id == job.id)
+                .options(selectinload(JobModel.probes))
+            )
+        ).scalar_one()
+        assert job.status == JobStatus.RUNNING
+        assert [p.probe_num for p in job.probes] == list(range(probe_count))
+        assert not job.registered  # do not register, probes haven't passed yet
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_registers_service_replica_immediately_if_no_probes(
+        self,
+        test_db,
+        session: AsyncSession,
+        ssh_tunnel_mock: Mock,
+        shim_client_mock: Mock,
+        runner_client_mock: Mock,
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_spec=get_run_spec(
+                run_name="test",
+                repo_id=repo.name,
+                configuration=ServiceConfiguration(port=80, image="ubuntu"),
+            ),
+        )
+        instance = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.BUSY,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.PULLING,
+            job_provisioning_data=get_job_provisioning_data(dockerized=True),
+            instance=instance,
+            instance_assigned=True,
+        )
+        shim_client_mock.get_task.return_value.status = TaskStatus.RUNNING
+
+        await process_running_jobs()
+
+        await session.refresh(job)
+        assert job.status == JobStatus.RUNNING
+        assert job.registered
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.parametrize(
+        ("probes", "expect_to_register"),
+        [
+            (
+                [
+                    _ProbeSetup(success_streak=0, ready_after=1),
+                ],
+                False,
+            ),
+            (
+                [
+                    _ProbeSetup(success_streak=1, ready_after=1),
+                ],
+                True,
+            ),
+            (
+                [
+                    _ProbeSetup(success_streak=1, ready_after=1),
+                    _ProbeSetup(success_streak=1, ready_after=2),
+                ],
+                False,
+            ),
+            (
+                [
+                    _ProbeSetup(success_streak=1, ready_after=1),
+                    _ProbeSetup(success_streak=3, ready_after=2),
+                ],
+                True,
+            ),
+        ],
+    )
+    async def test_registers_service_replica_only_after_probes_pass(
+        self,
+        test_db,
+        session: AsyncSession,
+        ssh_tunnel_mock: Mock,
+        shim_client_mock: Mock,
+        runner_client_mock: Mock,
+        probes: list[_ProbeSetup],
+        expect_to_register: bool,
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_spec=get_run_spec(
+                run_name="test",
+                repo_id=repo.name,
+                configuration=ServiceConfiguration(
+                    port=80,
+                    image="ubuntu",
+                    probes=[
+                        ProbeConfig(type="http", url=f"/{i}", ready_after=p.ready_after)
+                        for i, p in enumerate(probes)
+                    ],
+                ),
+            ),
+        )
+        instance = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.BUSY,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            job_provisioning_data=get_job_provisioning_data(dockerized=True),
+            instance=instance,
+            instance_assigned=True,
+            registered=False,
+        )
+        for i, probe in enumerate(probes):
+            await create_probe(
+                session=session, job=job, probe_num=i, success_streak=probe.success_streak
+            )
+        runner_client_mock.pull.return_value = PullResponse(
+            job_states=[], job_logs=[], runner_logs=[], last_updated=0
+        )
+
+        await process_running_jobs()
+
+        await session.refresh(job)
+        assert job.registered == expect_to_register
+
+
+class TestPatchBaseImageForAwsEfa:
+    @staticmethod
+    def _create_job_spec(image_name: str) -> "JobSpec":
+        return JobSpec(
+            job_num=0,
+            job_name="test-job",
+            commands=["echo hello"],
+            env={},
+            image_name=image_name,
+            requirements=Requirements(resources=ResourcesSpec()),
+        )
+
+    @staticmethod
+    def _create_job_provisioning_data_with_instance_type(
+        backend: BackendType, instance_type: str
+    ) -> JobProvisioningData:
+        job_provisioning_data = get_job_provisioning_data(backend=backend)
+        job_provisioning_data.instance_type = InstanceType(
+            name=instance_type,
+            resources=job_provisioning_data.instance_type.resources,
+        )
+        return job_provisioning_data
+
+    @staticmethod
+    def _call_patch_base_image_for_aws_efa(
+        image_name: str, backend: BackendType, instance_type: str
+    ) -> str:
+        job_spec = TestPatchBaseImageForAwsEfa._create_job_spec(image_name)
+        job_provisioning_data = (
+            TestPatchBaseImageForAwsEfa._create_job_provisioning_data_with_instance_type(
+                backend, instance_type
+            )
+        )
+        return _patch_base_image_for_aws_efa(job_spec, job_provisioning_data)
+
+    @pytest.mark.parametrize(
+        "suffix,instance_type",
+        [
+            ("-base", "p6-b200.48xlarge"),
+            ("-devel", "p5.48xlarge"),
+        ],
+    )
+    def test_patch_aws_efa_instance_with_suffix(self, suffix: str, instance_type: str):
+        image_name = f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}{suffix}-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"
+        result = self._call_patch_base_image_for_aws_efa(
+            image_name, BackendType.AWS, instance_type
+        )
+        expected = f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}-devel-efa-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"
+        assert result == expected
+
+    @pytest.mark.parametrize("suffix", ["-base", "-devel"])
+    @pytest.mark.parametrize(
+        "instance_type",
+        [
+            "p5.48xlarge",
+            "p5e.48xlarge",
+            "p4d.24xlarge",
+            "p4de.24xlarge",
+            "g6.8xlarge",
+            "g6e.8xlarge",
+        ],
+    )
+    def test_patch_all_efa_instance_types(self, instance_type: str, suffix: str):
+        image_name = f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}{suffix}-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"
+        result = self._call_patch_base_image_for_aws_efa(
+            image_name, BackendType.AWS, instance_type
+        )
+        expected = f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}-devel-efa-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"
+        assert result == expected
+
+    @pytest.mark.parametrize("suffix", ["-base", "-devel"])
+    @pytest.mark.parametrize(
+        "backend",
+        [BackendType.GCP, BackendType.AZURE, BackendType.LAMBDA, BackendType.LOCAL],
+    )
+    @pytest.mark.parametrize(
+        "instance_type",
+        [
+            "standard-4",
+            "p5.xlarge",
+            "p6.2xlarge",
+            "g6.xlarge",
+        ],  # Mix of generic and EFA-named types
+    )
+    def test_no_patch_non_aws_backends(
+        self, backend: BackendType, suffix: str, instance_type: str
+    ):
+        image_name = f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}{suffix}-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"
+        result = self._call_patch_base_image_for_aws_efa(image_name, backend, instance_type)
+        assert result == image_name
+
+    @pytest.mark.parametrize("suffix", ["-base", "-devel"])
+    @pytest.mark.parametrize(
+        "instance_type",
+        ["t3.micro", "m5.large", "c5.xlarge", "r5.2xlarge", "m6i.large", "g6.xlarge"],
+    )
+    def test_no_patch_non_efa_aws_instances(self, instance_type: str, suffix: str):
+        image_name = f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}{suffix}"
+        result = self._call_patch_base_image_for_aws_efa(
+            image_name, BackendType.AWS, instance_type
+        )
+        assert result == image_name
+
+    @pytest.mark.parametrize(
+        "instance_type",
+        ["p5.xlarge", "p6.2xlarge", "t3.micro", "m5.large"],  # Mix of EFA and non-EFA instances
+    )
+    @pytest.mark.parametrize(
+        "image_name",
+        [
+            "ubuntu:20.04",
+            "nvidia/cuda:11.8-runtime-ubuntu20.04",
+            "python:3.9-slim",
+            "custom/image:latest",
+            f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}-custom",
+            f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}-devel-efa",
+            f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}",
+        ],
+    )
+    def test_no_patch_other_images(self, instance_type: str, image_name: str):
+        result = self._call_patch_base_image_for_aws_efa(
+            image_name, BackendType.AWS, instance_type
+        )
+        assert result == image_name

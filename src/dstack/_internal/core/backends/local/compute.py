@@ -3,6 +3,7 @@ from typing import List, Optional
 from dstack._internal.core.backends.base.compute import (
     Compute,
     ComputeWithCreateInstanceSupport,
+    ComputeWithPrivilegedSupport,
     ComputeWithVolumeSupport,
 )
 from dstack._internal.core.consts import DSTACK_RUNNER_SSH_PORT
@@ -25,12 +26,11 @@ logger = get_logger(__name__)
 
 class LocalCompute(
     ComputeWithCreateInstanceSupport,
+    ComputeWithPrivilegedSupport,
     ComputeWithVolumeSupport,
     Compute,
 ):
-    def get_offers(
-        self, requirements: Optional[Requirements] = None
-    ) -> List[InstanceOfferWithAvailability]:
+    def get_offers(self, requirements: Requirements) -> List[InstanceOfferWithAvailability]:
         return [
             InstanceOfferWithAvailability(
                 backend=BackendType.LOCAL,

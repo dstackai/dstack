@@ -1,7 +1,7 @@
 import argparse
 import time
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 
 from rich.table import Table
 
@@ -25,6 +25,7 @@ from dstack._internal.core.errors import (
     ServerClientError,
     URLNotFoundError,
 )
+from dstack._internal.core.models.common import ApplyAction
 from dstack._internal.core.models.configurations import ApplyConfigurationType
 from dstack._internal.core.models.fleets import (
     Fleet,
@@ -34,7 +35,7 @@ from dstack._internal.core.models.fleets import (
     InstanceGroupPlacement,
 )
 from dstack._internal.core.models.instances import InstanceAvailability, InstanceStatus, SSHKey
-from dstack._internal.core.models.repos.base import Repo
+from dstack._internal.core.services.diff import diff_models
 from dstack._internal.utils.common import local_time
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.ssh import convert_ssh_key_to_pem, generate_public_key, pkey_from_str
@@ -44,8 +45,8 @@ from dstack.api.utils import load_profile
 logger = get_logger(__name__)
 
 
-class FleetConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
-    TYPE: ApplyConfigurationType = ApplyConfigurationType.FLEET
+class FleetConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator[FleetConfiguration]):
+    TYPE = ApplyConfigurationType.FLEET
 
     def apply_configuration(
         self,
@@ -53,10 +54,8 @@ class FleetConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
         configuration_path: str,
         command_args: argparse.Namespace,
         configurator_args: argparse.Namespace,
-        unknown_args: List[str],
-        repo: Optional[Repo] = None,
     ):
-        self.apply_args(conf, configurator_args, unknown_args)
+        self.apply_args(conf, configurator_args)
         profile = load_profile(Path.cwd(), None)
         spec = FleetSpec(
             configuration=conf,
@@ -71,7 +70,14 @@ class FleetConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
                 spec=spec,
             )
         _print_plan_header(plan)
+        if plan.action is not None:
+            self._apply_plan(plan, command_args)
+        else:
+            # Old servers don't support spec update
+            self._apply_plan_on_old_server(plan, command_args)
 
+    def _apply_plan(self, plan: FleetPlan, command_args: argparse.Namespace):
+        delete_fleet_name: Optional[str] = None
         action_message = ""
         confirm_message = ""
         if plan.current_resource is None:
@@ -82,7 +88,115 @@ class FleetConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
             confirm_message += "Create the fleet?"
         else:
             action_message += f"Found fleet [code]{plan.spec.configuration.name}[/]."
-            if plan.current_resource.spec.configuration == plan.spec.configuration:
+            if plan.action == ApplyAction.CREATE:
+                delete_fleet_name = plan.current_resource.name
+                action_message += (
+                    " Configuration changes detected. Cannot update the fleet in-place"
+                )
+                confirm_message += "Re-create the fleet?"
+            elif plan.current_resource.spec == plan.effective_spec:
+                if command_args.yes and not command_args.force:
+                    # --force is required only with --yes,
+                    # otherwise we may ask for force apply interactively.
+                    console.print(
+                        "No configuration changes detected. Use --force to apply anyway."
+                    )
+                    return
+                delete_fleet_name = plan.current_resource.name
+                action_message += " No configuration changes detected."
+                confirm_message += "Re-create the fleet?"
+            else:
+                action_message += " Configuration changes detected."
+                confirm_message += "Update the fleet in-place?"
+
+        console.print(action_message)
+        if not command_args.yes and not confirm_ask(confirm_message):
+            console.print("\nExiting...")
+            return
+
+        if delete_fleet_name is not None:
+            with console.status("Deleting existing fleet..."):
+                self.api.client.fleets.delete(
+                    project_name=self.api.project, names=[delete_fleet_name]
+                )
+                # Fleet deletion is async. Wait for fleet to be deleted.
+                while True:
+                    try:
+                        self.api.client.fleets.get(
+                            project_name=self.api.project, name=delete_fleet_name
+                        )
+                    except ResourceNotExistsError:
+                        break
+                    else:
+                        time.sleep(1)
+
+        try:
+            with console.status("Applying plan..."):
+                fleet = self.api.client.fleets.apply_plan(project_name=self.api.project, plan=plan)
+        except ServerClientError as e:
+            raise CLIError(e.msg)
+        if command_args.detach:
+            console.print("Fleet configuration submitted. Exiting...")
+            return
+        try:
+            with MultiItemStatus(
+                f"Provisioning [code]{fleet.name}[/]...", console=console
+            ) as live:
+                while not _finished_provisioning(fleet):
+                    table = get_fleets_table([fleet])
+                    live.update(table)
+                    time.sleep(LIVE_TABLE_PROVISION_INTERVAL_SECS)
+                    fleet = self.api.client.fleets.get(self.api.project, fleet.name)
+        except KeyboardInterrupt:
+            if not command_args.yes and confirm_ask("Delete the fleet before exiting?"):
+                with console.status("Deleting fleet..."):
+                    self.api.client.fleets.delete(
+                        project_name=self.api.project, names=[fleet.name]
+                    )
+            else:
+                console.print("Exiting... Fleet provisioning will continue in the background.")
+            return
+        console.print(
+            get_fleets_table(
+                [fleet],
+                verbose=_fleet_has_failed_instances(fleet),
+                format_date=local_time,
+            )
+        )
+        if _fleet_has_failed_instances(fleet):
+            if _fleet_retrying(fleet):
+                console.print(
+                    "\n[error]Some instances failed. Provisioning will be retried in the background.[/]"
+                )
+            else:
+                console.print(
+                    "\n[error]Some instances failed. Check the table above for errors.[/]"
+                )
+            exit(1)
+
+    def _apply_plan_on_old_server(self, plan: FleetPlan, command_args: argparse.Namespace):
+        action_message = ""
+        confirm_message = ""
+        if plan.current_resource is None:
+            if plan.spec.configuration.name is not None:
+                action_message += (
+                    f"Fleet [code]{plan.spec.configuration.name}[/] does not exist yet."
+                )
+            confirm_message += "Create the fleet?"
+        else:
+            action_message += f"Found fleet [code]{plan.spec.configuration.name}[/]."
+            diff = diff_models(
+                old=plan.current_resource.spec.configuration,
+                new=plan.spec.configuration,
+                reset={
+                    "ssh_config": {
+                        "ssh_key": True,
+                        "proxy_jump": {"ssh_key"},
+                        "hosts": {"__all__": {"ssh_key": True, "proxy_jump": {"ssh_key"}}},
+                    }
+                },
+            )
+            if not diff:
                 if command_args.yes and not command_args.force:
                     # --force is required only with --yes,
                     # otherwise we may ask for force apply interactively.
@@ -146,11 +260,11 @@ class FleetConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
         console.print(
             get_fleets_table(
                 [fleet],
-                verbose=_failed_provisioning(fleet),
+                verbose=_fleet_has_failed_instances(fleet),
                 format_date=local_time,
             )
         )
-        if _failed_provisioning(fleet):
+        if _fleet_has_failed_instances(fleet):
             console.print("\n[error]Some instances failed. Check the table above for errors.[/]")
             exit(1)
 
@@ -201,7 +315,7 @@ class FleetConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
         )
         cls.register_env_args(configuration_group)
 
-    def apply_args(self, conf: FleetConfiguration, args: argparse.Namespace, unknown: List[str]):
+    def apply_args(self, conf: FleetConfiguration, args: argparse.Namespace):
         if args.name:
             conf.name = args.name
         self.apply_env_vars(conf.env, args)
@@ -355,11 +469,18 @@ def _finished_provisioning(fleet: Fleet) -> bool:
     return True
 
 
-def _failed_provisioning(fleet: Fleet) -> bool:
+def _fleet_has_failed_instances(fleet: Fleet) -> bool:
     for instance in fleet.instances:
         if instance.status == InstanceStatus.TERMINATED:
             return True
     return False
+
+
+def _fleet_retrying(fleet: Fleet) -> bool:
+    if fleet.spec.configuration.nodes is None:
+        return False
+    active_instances = [i for i in fleet.instances if i.status.is_active()]
+    return len(active_instances) < fleet.spec.configuration.nodes.min
 
 
 def _apply_plan(api: Client, plan: FleetPlan) -> Fleet:

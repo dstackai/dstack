@@ -124,7 +124,11 @@ Postgres has no such limitation and is recommended for production deployment.
 
 ### PostgreSQL
 
-To store the server state in Postgres, set the `DSTACK_DATABASE_URL` environment variable.
+To store the server state in Postgres, set the `DSTACK_DATABASE_URL` environment variable:
+
+```shell
+$ DSTACK_DATABASE_URL=postgresql+asyncpg://user:password@db-host:5432/dstack dstack server
+```
 
 ??? info "Migrate from SQLite to PostgreSQL"
     You can migrate the existing state from SQLite to PostgreSQL using `pgloader`:
@@ -220,7 +224,7 @@ To store logs using GCP Logging, set the `DSTACK_SERVER_GCP_LOGGING_PROJECT` env
 
 ## File storage
 
-When using [repos](../concepts/repos.md), the `dstack` CLI uploads uncommitted local files and diffs to the server so that you can have access to them within runs. By default, the files are stored in the DB and each upload is limited to 2MB. You can configure an object storage to be used for uploads and increase the default limit by setting the `DSTACK_SERVER_CODE_UPLOAD_LIMIT` environment variable
+When using  [files](../concepts/dev-environments.md#files) or [repos](../concepts/dev-environments.md#repos), `dstack` uploads local files and diffs to the server so that you can have access to them within runs. By default, the files are stored in the DB and each upload is limited to 2MB. You can configure an object storage to be used for uploads and increase the default limit by setting the `DSTACK_SERVER_CODE_UPLOAD_LIMIT` environment variable
 
 ### S3
 
@@ -381,8 +385,20 @@ A single `dstack` server replica can support:
 * Up to 150 active jobs.
 * Up to 150 active instances.
 
-Having more active resources can affect server performance.
+Having more active resources will work but can affect server performance.
 If you hit these limits, consider using Postgres with multiple server replicas.
+You can also increase processing rates of a replica by setting the `DSTACK_SERVER_BACKGROUND_PROCESSING_FACTOR` environment variable.
+You should also increase `DSTACK_DB_POOL_SIZE` and `DSTACK_DB_MAX_OVERFLOW` proportionally.
+For example, to increase processing rates 4 times, set:
+
+```
+export DSTACK_SERVER_BACKGROUND_PROCESSING_FACTOR=4
+export DSTACK_DB_POOL_SIZE=80
+export DSTACK_DB_MAX_OVERFLOW=80
+```
+
+You have to ensure your Postgres installation supports that many connections by
+configuring [`max_connections`](https://www.postgresql.org/docs/current/runtime-config-connection.html#GUC-MAX-CONNECTIONS) and/or using connection pooler.
 
 ## FAQs
 

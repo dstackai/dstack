@@ -7,32 +7,20 @@ repos:
         args: ['--fix']
       - id: ruff-format
   - repo: https://github.com/golangci/golangci-lint
-    rev: v1.62.0  # Should match .github/workflows/build.yml
+    rev: v1.62.0  # Should match .github/workflows/build-artifacts.yml
     hooks:
       - id: golangci-lint-full
-        language_version: 1.23.0  # Should match runner/go.mod
+        language_version: 1.23.8  # Should match runner/go.mod
         entry: bash -c 'cd runner && golangci-lint run'
         stages: [manual]
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:
       - id: end-of-file-fixer
-
-  # TODO(oleg): fix ESLint warnings
-  # - repo: https://github.com/pre-commit/mirrors-eslint
-  #   rev: 'v8.31.0'
-  #   hooks:
-  #     - id: eslint
-  #       name: ESLint
-  #       entry: eslint --fix --config frontend/.eslintrc --ignore-path frontend/.eslintignore
-  #       language: node
-  #       pass_filenames: false
-  #       cwd: "frontend/"
-  #       additional_dependencies:
-  #         - eslint@8.31.0
-  #         - eslint-config-prettier@8.10.0
-  #         - eslint-plugin-i18n@2.4.0
-  #         - eslint-plugin-prettier@4.2.1
-  #         - eslint-plugin-simple-import-sort@10.0.0
-  #         - '@typescript-eslint/eslint-plugin@5.48.1'
-  #         - '@typescript-eslint/parser@5.48.1'
+  - repo: local
+    hooks:
+      - id: frontend-pre-commit
+        name: frontend-pre-commit
+        entry: bash -c "cd frontend && npm install && npm run precommit"
+        language: system
+        pass_filenames: false

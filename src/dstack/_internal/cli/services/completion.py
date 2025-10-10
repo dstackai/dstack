@@ -75,6 +75,11 @@ class GatewayNameCompleter(BaseAPINameCompleter):
         return [r.name for r in api.client.gateways.list(api.project)]
 
 
+class SecretNameCompleter(BaseAPINameCompleter):
+    def fetch_resource_names(self, api: Client) -> Iterable[str]:
+        return [r.name for r in api.client.secrets.list(api.project)]
+
+
 class ProjectNameCompleter(BaseCompleter):
     """
     Completer for local project names.
@@ -82,5 +87,5 @@ class ProjectNameCompleter(BaseCompleter):
 
     def __call__(self, prefix: str, parsed_args: argparse.Namespace, **kwargs) -> List[str]:
         argcomplete.debug(f"{self.__class__.__name__}: Listing projects from ConfigManager")
-        projects = ConfigManager().list_projects()
-        return [p for p in projects if p.startswith(prefix)]
+        projects = ConfigManager().list_project_configs()
+        return [p.name for p in projects if p.name.startswith(prefix)]

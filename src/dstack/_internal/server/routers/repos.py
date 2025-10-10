@@ -16,6 +16,7 @@ from dstack._internal.server.security.permissions import ProjectMember
 from dstack._internal.server.services import repos
 from dstack._internal.server.settings import SERVER_CODE_UPLOAD_LIMIT
 from dstack._internal.server.utils.routers import (
+    CustomORJSONResponse,
     get_base_api_additional_responses,
     get_request_size,
 )
@@ -28,21 +29,21 @@ router = APIRouter(
 )
 
 
-@router.post("/list")
+@router.post("/list", response_model=List[RepoHead])
 async def list_repos(
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
-) -> List[RepoHead]:
+):
     _, project = user_project
-    return await repos.list_repos(session=session, project=project)
+    return CustomORJSONResponse(await repos.list_repos(session=session, project=project))
 
 
-@router.post("/get")
+@router.post("/get", response_model=RepoHeadWithCreds)
 async def get_repo(
     body: GetRepoRequest,
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
-) -> RepoHeadWithCreds:
+):
     user, project = user_project
     repo = await repos.get_repo(
         session=session,
@@ -53,7 +54,7 @@ async def get_repo(
     )
     if repo is None:
         raise ResourceNotExistsError()
-    return repo
+    return CustomORJSONResponse(repo)
 
 
 @router.post("/init")

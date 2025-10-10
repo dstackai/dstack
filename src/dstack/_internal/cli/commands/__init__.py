@@ -1,20 +1,23 @@
 import argparse
 import os
+import shlex
 from abc import ABC, abstractmethod
-from typing import List, Optional
+from typing import ClassVar, Optional
 
 from rich_argparse import RichHelpFormatter
 
 from dstack._internal.cli.services.completion import ProjectNameCompleter
 from dstack._internal.cli.utils.common import configure_logging
+from dstack._internal.core.errors import CLIError
 from dstack.api import Client
 
 
 class BaseCommand(ABC):
-    NAME: str = "name the command"
-    DESCRIPTION: str = "describe the command"
-    DEFAULT_HELP: bool = True
-    ALIASES: Optional[List[str]] = None
+    NAME: ClassVar[str] = "name the command"
+    DESCRIPTION: ClassVar[str] = "describe the command"
+    DEFAULT_HELP: ClassVar[bool] = True
+    ALIASES: ClassVar[Optional[list[str]]] = None
+    ACCEPT_EXTRA_ARGS: ClassVar[bool] = False
 
     def __init__(self, parser: argparse.ArgumentParser):
         self._parser = parser
@@ -50,11 +53,19 @@ class BaseCommand(ABC):
 
     @abstractmethod
     def _command(self, args: argparse.Namespace):
-        pass
+        self._configure_logging()
+        if not self.ACCEPT_EXTRA_ARGS and args.extra_args:
+            raise CLIError(f"Unrecognized arguments: {shlex.join(args.extra_args)}")
+
+    def _configure_logging(self) -> None:
+        """
+        Override this method to configure command-specific logging
+        """
+        configure_logging()
 
 
 class APIBaseCommand(BaseCommand):
-    api: Client = None
+    api: Client
 
     def _register(self):
         self._parser.add_argument(
@@ -62,8 +73,8 @@ class APIBaseCommand(BaseCommand):
             help="The name of the project. Defaults to [code]$DSTACK_PROJECT[/]",
             metavar="NAME",
             default=os.getenv("DSTACK_PROJECT"),
-        ).completer = ProjectNameCompleter()
+        ).completer = ProjectNameCompleter()  # type: ignore[attr-defined]
 
     def _command(self, args: argparse.Namespace):
-        configure_logging()
+        super()._command(args)
         self.api = Client.from_config(project_name=args.project)

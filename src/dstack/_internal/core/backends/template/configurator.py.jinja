@@ -7,7 +7,6 @@ from dstack._internal.core.backends.base.configurator import (
 )
 from dstack._internal.core.backends.{{ backend_name|lower }}.backend import {{ backend_name }}Backend
 from dstack._internal.core.backends.{{ backend_name|lower }}.models import (
-    Any{{ backend_name }}BackendConfig,
     Any{{ backend_name }}Creds,
     {{ backend_name }}BackendConfig,
     {{ backend_name }}BackendConfigWithCreds,
@@ -20,7 +19,12 @@ from dstack._internal.core.models.backends.base import (
 )
 
 
-class {{ backend_name }}Configurator(Configurator):
+class {{ backend_name }}Configurator(
+    Configurator[
+        {{ backend_name }}BackendConfig,
+        {{ backend_name }}BackendConfigWithCreds,
+    ]
+):
     TYPE = BackendType.{{ backend_name|upper }}
     BACKEND_CLASS = {{ backend_name }}Backend
 
@@ -40,12 +44,12 @@ class {{ backend_name }}Configurator(Configurator):
             auth={{ backend_name }}Creds.parse_obj(config.creds).json(),
         )
 
-    def get_backend_config(
-        self, record: BackendRecord, include_creds: bool
-    ) -> Any{{ backend_name }}BackendConfig:
+    def get_backend_config_with_creds(self, record: BackendRecord) -> {{ backend_name }}BackendConfigWithCreds:
         config = self._get_config(record)
-        if include_creds:
-            return {{ backend_name }}BackendConfigWithCreds.__response__.parse_obj(config)
+        return {{ backend_name }}BackendConfigWithCreds.__response__.parse_obj(config)
+
+    def get_backend_config_without_creds(self, record: BackendRecord) -> {{ backend_name }}BackendConfig:
+        config = self._get_config(record)
         return {{ backend_name }}BackendConfig.__response__.parse_obj(config)
 
     def get_backend(self, record: BackendRecord) -> {{ backend_name }}Backend:

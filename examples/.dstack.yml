@@ -1,16 +1,12 @@
 type: dev-environment
-# The name is optional, if not specified, generated randomly
-name: vscode
+name: cursor
 
-#python: "3.11"
+python: 3.12
+ide: cursor
 
-image: un1def/dstack-base:py3.12-dev-cuda-12.1
-
-ide: vscode
-
-# Use either spot or on-demand instances
-#spot_policy: auto
+# Mount the repo directory to `/workflow` (the default working directory)
+repos:
+  - ..
 
 resources:
-  cpu: x86:8..32
-  gpu: 24GB..:1
+ gpu: 1

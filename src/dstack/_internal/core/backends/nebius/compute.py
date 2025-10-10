@@ -3,7 +3,7 @@ import random
 import shlex
 import time
 from functools import cached_property
-from typing import List, Optional
+from typing import Callable, List, Optional
 
 from nebius.aio.operation import Operation as SDKOperation
 from nebius.aio.service_error import RequestError, StatusCode
@@ -12,13 +12,16 @@ from nebius.sdk import SDK
 
 from dstack._internal.core.backends.base.backend import Compute
 from dstack._internal.core.backends.base.compute import (
+    ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
     ComputeWithMultinodeSupport,
     ComputeWithPlacementGroupSupport,
+    ComputeWithPrivilegedSupport,
     generate_unique_instance_name,
     get_user_data,
+    merge_tags,
 )
-from dstack._internal.core.backends.base.offers import get_catalog_offers
+from dstack._internal.core.backends.base.offers import get_catalog_offers, get_offers_disk_modifier
 from dstack._internal.core.backends.nebius import resources
 from dstack._internal.core.backends.nebius.fabrics import get_suitable_infiniband_fabrics
 from dstack._internal.core.backends.nebius.models import NebiusConfig, NebiusServiceAccountCreds
@@ -59,13 +62,6 @@ DOCKER_DAEMON_CONFIG = {
     "exec-opts": ["native.cgroupdriver=cgroupfs"],
 }
 SETUP_COMMANDS = [
-    "ufw allow ssh",
-    "ufw allow from 10.0.0.0/8",
-    "ufw allow from 172.16.0.0/12",
-    "ufw allow from 192.168.0.0/16",
-    "ufw default deny incoming",
-    "ufw default allow outgoing",
-    "ufw enable",
     'sed -i "s/.*AllowTcpForwarding.*/AllowTcpForwarding yes/g" /etc/ssh/sshd_config',
     "service ssh restart",
     f"echo {shlex.quote(json.dumps(DOCKER_DAEMON_CONFIG))} > /etc/docker/daemon.json",
@@ -74,6 +70,7 @@ SETUP_COMMANDS = [
 SUPPORTED_PLATFORMS = [
     "gpu-h100-sxm",
     "gpu-h200-sxm",
+    "gpu-b200-sxm",
     "gpu-l40s-a",
     "gpu-l40s-d",
     "cpu-d3",
@@ -82,7 +79,9 @@ SUPPORTED_PLATFORMS = [
 
 
 class NebiusCompute(
+    ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
+    ComputeWithPrivilegedSupport,
     ComputeWithMultinodeSupport,
     ComputeWithPlacementGroupSupport,
     Compute,
@@ -112,15 +111,11 @@ class NebiusCompute(
             ).metadata.id
         return self._subnet_id_cache[region]
 
-    def get_offers(
-        self, requirements: Optional[Requirements] = None
-    ) -> List[InstanceOfferWithAvailability]:
+    def get_all_offers_with_availability(self) -> List[InstanceOfferWithAvailability]:
         offers = get_catalog_offers(
             backend=BackendType.NEBIUS,
             locations=list(self._region_to_project_id),
-            requirements=requirements,
             extra_filter=_supported_instances,
-            configurable_disk_size=CONFIGURABLE_DISK_SIZE,
         )
         return [
             InstanceOfferWithAvailability(
@@ -129,6 +124,11 @@ class NebiusCompute(
             )
             for offer in offers
         ]
+
+    def get_offers_modifier(
+        self, requirements: Requirements
+    ) -> Callable[[InstanceOfferWithAvailability], Optional[InstanceOfferWithAvailability]]:
+        return get_offers_disk_modifier(CONFIGURABLE_DISK_SIZE, requirements)
 
     def create_instance(
         self,
@@ -150,12 +150,29 @@ class NebiusCompute(
             )
             if backend_data.cluster is not None:
                 cluster_id = backend_data.cluster.id
+
+        labels = {
+            "owner": "dstack",
+            "dstack_project": instance_config.project_name.lower(),
+            "dstack_name": instance_config.instance_name,
+            "dstack_user": instance_config.user.lower(),
+        }
+        labels = merge_tags(
+            base_tags=labels,
+            backend_tags=self.config.tags,
+            resource_tags=instance_config.tags,
+        )
+        labels = resources.filter_invalid_labels(labels)
+        gpus = instance_offer.instance.resources.gpus
         create_disk_op = resources.create_disk(
             sdk=self._sdk,
             name=instance_name,
             project_id=self._region_to_project_id[instance_offer.region],
             size_mib=instance_offer.instance.resources.disk.size_mib,
-            image_family="ubuntu22.04-cuda12",
+            image_family="ubuntu24.04-cuda12"
+            if gpus and gpus[0].name == "B200"
+            else "ubuntu22.04-cuda12",
+            labels=labels,
         )
         create_instance_op = None
         try:
@@ -180,6 +197,8 @@ class NebiusCompute(
                 cluster_id=cluster_id,
                 disk_id=create_disk_op.resource_id,
                 subnet_id=self._get_subnet_id(instance_offer.region),
+                preemptible=instance_offer.instance.resources.spot,
+                labels=labels,
             )
             _wait_for_instance(self._sdk, create_instance_op)
         except BaseException:
@@ -292,10 +311,7 @@ class NebiusCompute(
         placement_group: PlacementGroup,
         instance_offer: InstanceOffer,
     ) -> bool:
-        if not (
-            placement_group.configuration.backend == BackendType.NEBIUS
-            and placement_group.configuration.region == instance_offer.region
-        ):
+        if placement_group.configuration.region != instance_offer.region:
             return False
         assert placement_group.provisioning_data is not None
         backend_data = NebiusPlacementGroupBackendData.load(
@@ -361,10 +377,10 @@ def _wait_for_instance(sdk: SDK, op: SDKOperation[Operation]) -> None:
         )
         time.sleep(WAIT_FOR_INSTANCE_UPDATE_INTERVAL)
         resources.LOOP.await_(
-            op.update(timeout=resources.REQUEST_TIMEOUT, metadata=resources.REQUEST_MD)
+            op.update(per_retry_timeout=resources.REQUEST_TIMEOUT, metadata=resources.REQUEST_MD)
         )
 
 
 def _supported_instances(offer: InstanceOffer) -> bool:
     platform, _ = offer.instance.name.split()
-    return platform in SUPPORTED_PLATFORMS and not offer.instance.resources.spot
+    return platform in SUPPORTED_PLATFORMS

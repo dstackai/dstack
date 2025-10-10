@@ -2,8 +2,12 @@ package api
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"io"
 	"math"
+	"mime"
+	"mime/multipart"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -54,6 +58,60 @@ func (s *Server) submitPostHandler(w http.ResponseWriter, r *http.Request) (inte
 
 	s.executor.SetJob(body)
 	s.jobBarrierCh <- nil // notify server that job submitted
+
+	return nil, nil
+}
+
+// uploadArchivePostHandler may be called 0 or more times, and must be called after submitPostHandler
+// and before uploadCodePostHandler
+func (s *Server) uploadArchivePostHandler(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+	s.executor.Lock()
+	defer s.executor.Unlock()
+	if s.executor.GetRunnerState() != executor.WaitCode {
+		return nil, &api.Error{Status: http.StatusConflict}
+	}
+
+	contentType := r.Header.Get("Content-Type")
+	if contentType == "" {
+		return nil, &api.Error{Status: http.StatusBadRequest, Msg: "missing content-type header"}
+	}
+	mediaType, params, err := mime.ParseMediaType(contentType)
+	if err != nil {
+		return nil, gerrors.Wrap(err)
+	}
+	if mediaType != "multipart/form-data" {
+		return nil, &api.Error{Status: http.StatusBadRequest, Msg: fmt.Sprintf("multipart/form-data expected, got %s", mediaType)}
+	}
+	boundary := params["boundary"]
+	if boundary == "" {
+		return nil, &api.Error{Status: http.StatusBadRequest, Msg: "missing boundary"}
+	}
+
+	formReader := multipart.NewReader(r.Body, boundary)
+	part, err := formReader.NextPart()
+	if errors.Is(err, io.EOF) {
+		return nil, &api.Error{Status: http.StatusBadRequest, Msg: "empty form"}
+	}
+	if err != nil {
+		return nil, gerrors.Wrap(err)
+	}
+	fieldName := part.FormName()
+	if fieldName == "" {
+		return nil, &api.Error{Status: http.StatusBadRequest, Msg: "missing field name"}
+	}
+	if fieldName != "archive" {
+		return nil, &api.Error{Status: http.StatusBadRequest, Msg: fmt.Sprintf("unexpected field %s", fieldName)}
+	}
+	archiveId := part.FileName()
+	if archiveId == "" {
+		return nil, &api.Error{Status: http.StatusBadRequest, Msg: "missing file name"}
+	}
+	if err := s.executor.AddFileArchive(archiveId, part); err != nil {
+		return nil, gerrors.Wrap(err)
+	}
+	if _, err := formReader.NextPart(); !errors.Is(err, io.EOF) {
+		return nil, &api.Error{Status: http.StatusBadRequest, Msg: "extra form field(s)"}
+	}
 
 	return nil, nil
 }

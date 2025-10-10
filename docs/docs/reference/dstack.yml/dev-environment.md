@@ -26,6 +26,14 @@ The `dev-environment` configuration type allows running [dev environments](../..
       type:
         required: true
 
+### `schedule`
+
+#SCHEMA# dstack._internal.core.models.profiles.Schedule
+    overrides:
+      show_root_heading: false
+      type:
+        required: true
+
 ### `resources`
 
 #SCHEMA# dstack._internal.core.models.resources.ResourcesSpec
@@ -90,4 +98,43 @@ The `dev-environment` configuration type allows running [dev environments](../..
     The short syntax for volumes is a colon-separated string in the form of `source:destination`
 
     * `volume-name:/container/path` for network volumes
-      * `/instance/path:/container/path` for instance volumes
+    * `/instance/path:/container/path` for instance volumes
+
+### `repos[n]` { #_repos data-toc-label="repos" }
+
+> Currently, a maximum of one repo is supported.
+
+> Either `local_path` or `url` must be specified.
+
+#SCHEMA# dstack._internal.core.models.configurations.RepoSpec
+    overrides:
+      show_root_heading: false
+      type:
+        required: true
+
+??? info "Short syntax"
+
+    The short syntax for repos is a colon-separated string in the form of `local_path_or_url:path`.
+
+    * `.:/repo`
+    * `..:repo`
+    * `~/repos/demo:~/repo`
+    * `https://github.com/org/repo:~/data/repo`
+    * `git@github.com:org/repo.git:data/repo`
+
+### `files[n]` { #_files data-toc-label="files" }
+
+#SCHEMA# dstack._internal.core.models.files.FilePathMapping
+    overrides:
+      show_root_heading: false
+      type:
+        required: true
+
+??? info "Short syntax"
+
+    The short syntax for files is a colon-separated string in the form of `local_path[:path]` where
+    `path` is optional and can be omitted if it's equal to `local_path`.
+
+    * `~/.bashrc`, same as `~/.bashrc:~/.bashrc`
+    * `/opt/myorg`, same as `/opt/myorg/` and `/opt/myorg:/opt/myorg`
+    * `libs/patched_libibverbs.so.1:/lib/x86_64-linux-gnu/libibverbs.so.1`

@@ -1,4 +1,5 @@
 import argparse
+from textwrap import dedent
 from typing import List, Optional, Tuple
 from unittest.mock import Mock
 
@@ -6,15 +7,22 @@ import pytest
 from gpuhunt import AcceleratorVendor
 
 from dstack._internal.cli.services.configurators import get_run_configurator_class
-from dstack._internal.cli.services.configurators.run import BaseRunConfigurator
+from dstack._internal.cli.services.configurators.run import (
+    BaseRunConfigurator,
+    render_run_spec_diff,
+)
 from dstack._internal.core.errors import ConfigurationError
+from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import RegistryAuth
 from dstack._internal.core.models.configurations import (
     BaseRunConfiguration,
+    DevEnvironmentConfiguration,
     PortMapping,
     TaskConfiguration,
 )
 from dstack._internal.core.models.envs import Env
+from dstack._internal.core.models.profiles import Profile
+from dstack._internal.server.testing.common import get_run_spec
 
 
 class TestApplyArgs:
@@ -26,9 +34,9 @@ class TestApplyArgs:
         configurator = configurator_class(Mock())
         configurator.register_args(parser)
         conf = conf.copy(deep=True)  # to avoid modifying the original configuration
-        known, unknown = parser.parse_known_args(args)
-        configurator.apply_args(conf, known, unknown)
-        return conf, known
+        parsed_args = parser.parse_args(args)
+        configurator.apply_args(conf, parsed_args)
+        return conf, parsed_args
 
     def test_env(self):
         conf = TaskConfiguration(commands=["whoami"])
@@ -99,7 +107,11 @@ class TestApplyArgs:
 
 class TestValidateGPUVendorAndImage:
     def prepare_conf(
-        self, *, image: Optional[str] = None, gpu_spec: Optional[str] = None
+        self,
+        *,
+        image: Optional[str] = None,
+        gpu_spec: Optional[str] = None,
+        docker: Optional[bool] = None,
     ) -> BaseRunConfiguration:
         conf_dict = {
             "type": "none",
@@ -110,6 +122,8 @@ class TestValidateGPUVendorAndImage:
             conf_dict["resources"] = {
                 "gpu": gpu_spec,
             }
+        if docker is not None:
+            conf_dict["docker"] = docker
         return BaseRunConfiguration.parse_obj(conf_dict)
 
     def validate(self, conf: BaseRunConfiguration) -> None:
@@ -199,6 +213,12 @@ class TestValidateGPUVendorAndImage:
         ):
             self.validate(conf)
 
+    @pytest.mark.parametrize("gpu_spec", ["AMD", "MI300X"])
+    def test_amd_vendor_docker_true_no_image(self, gpu_spec):
+        conf = self.prepare_conf(gpu_spec=gpu_spec, docker=True)
+        self.validate(conf)
+        assert conf.resources.gpu.vendor == AcceleratorVendor.AMD
+
     @pytest.mark.parametrize("gpu_spec", ["MI300X", "MI300x", "mi300x"])
     def test_amd_vendor_inferred_no_image(self, gpu_spec):
         conf = self.prepare_conf(gpu_spec=gpu_spec)
@@ -221,6 +241,12 @@ class TestValidateGPUVendorAndImage:
             ConfigurationError, match=r"`image` is required if `resources.gpu.vendor` is `amd`"
         ):
             self.validate(conf)
+
+    @pytest.mark.parametrize("gpu_spec", ["n150", "n300"])
+    def test_tenstorrent_docker_true_no_image(self, gpu_spec):
+        conf = self.prepare_conf(gpu_spec=gpu_spec, docker=True)
+        self.validate(conf)
+        assert conf.resources.gpu.vendor == AcceleratorVendor.TENSTORRENT
 
 
 class TestValidateCPUArchAndImage:
@@ -270,3 +296,87 @@ class TestValidateCPUArchAndImage:
     def test_x86(self, cpu_spec: str, image: Optional[str]):
         conf = self.prepare_conf(cpu_spec=cpu_spec, gpu_spec="H100", image=image)
         self.validate(conf)
+
+
+class TestRenderRunSpecDiff:
+    def test_diff(self):
+        old = get_run_spec(
+            run_name="test",
+            repo_id="test-1",
+            configuration_path="1.dstack.yml",
+            profile=Profile(
+                backends=[BackendType.AWS],
+                regions=["us-west-1"],
+                name="test",
+                default=True,
+            ),
+            configuration=DevEnvironmentConfiguration(
+                name="test",
+                ide="vscode",
+                inactivity_duration=60,
+            ),
+        )
+        new = get_run_spec(
+            run_name="test",
+            repo_id="test-2",
+            configuration_path="2.dstack.yml",
+            profile=Profile(
+                backends=[BackendType.AWS],
+                regions=["us-west-2"],
+                name="test",
+                default=True,
+            ),
+            configuration=DevEnvironmentConfiguration(
+                name="test",
+                ide="cursor",
+                inactivity_duration=None,
+            ),
+        )
+        assert (
+            render_run_spec_diff(old, new)
+            == dedent(
+                """
+                - Repo ID
+                - Configuration path
+                - Configuration properties:
+                  - ide
+                  - inactivity_duration
+                - Profile properties:
+                  - regions
+                """
+            ).lstrip()
+        )
+
+    def test_field_type_change(self):
+        old = get_run_spec(
+            run_name="test",
+            repo_id="test",
+            profile=Profile(name="test"),
+            configuration=DevEnvironmentConfiguration(
+                name="test",
+                ide="vscode",
+            ),
+        )
+        new = get_run_spec(
+            run_name="test",
+            repo_id="test",
+            profile=None,
+            configuration=TaskConfiguration(
+                name="test",
+                commands=["sleep infinity"],
+            ),
+        )
+        assert (
+            render_run_spec_diff(old, new)
+            == dedent(
+                """
+                - Configuration type
+                - Profile
+                """
+            ).lstrip()
+        )
+
+    def test_no_diff(self):
+        old = get_run_spec(run_name="test", repo_id="test")
+        new = get_run_spec(run_name="test", repo_id="test")
+        assert render_run_spec_diff(old, new) is None

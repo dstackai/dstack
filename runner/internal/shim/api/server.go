@@ -4,6 +4,7 @@ import (
 	"context"
 	"net"
 	"net/http"
+	"reflect"
 	"sync"
 
 	"github.com/dstackai/dstack/runner/internal/api"
@@ -18,7 +19,7 @@ type TaskRunner interface {
 	Remove(ctx context.Context, taskID string) error
 
 	Resources(context.Context) shim.Resources
-	TaskIDs() []string
+	TaskList() []*shim.TaskListItem
 	TaskInfo(taskID string) shim.TaskInfo
 }
 
@@ -29,11 +30,18 @@ type ShimServer struct {
 	runner TaskRunner
 
 	dcgmExporter *dcgm.DCGMExporter
+	dcgmWrapper  dcgm.DCGMWrapperInterface // interface with nil value normalized to plain nil
 
 	version string
 }
 
-func NewShimServer(ctx context.Context, address string, runner TaskRunner, dcgmExporter *dcgm.DCGMExporter, version string) *ShimServer {
+func NewShimServer(
+	ctx context.Context, address string, version string,
+	runner TaskRunner, dcgmExporter *dcgm.DCGMExporter, dcgmWrapper dcgm.DCGMWrapperInterface,
+) *ShimServer {
+	if dcgmWrapper != nil && reflect.ValueOf(dcgmWrapper).IsNil() {
+		dcgmWrapper = nil
+	}
 	r := api.NewRouter()
 	s := &ShimServer{
 		HttpServer: &http.Server{
@@ -45,12 +53,14 @@ func NewShimServer(ctx context.Context, address string, runner TaskRunner, dcgmE
 		runner: runner,
 
 		dcgmExporter: dcgmExporter,
+		dcgmWrapper:  dcgmWrapper,
 
 		version: version,
 	}
 
 	// The healthcheck endpoint should stay backward compatible, as it is used for negotiation
 	r.AddHandler("GET", "/api/healthcheck", s.HealthcheckHandler)
+	r.AddHandler("GET", "/api/instance/health", s.InstanceHealthHandler)
 	r.AddHandler("GET", "/api/tasks", s.TaskListHandler)
 	r.AddHandler("GET", "/api/tasks/{id}", s.TaskInfoHandler)
 	r.AddHandler("POST", "/api/tasks", s.TaskSubmitHandler)

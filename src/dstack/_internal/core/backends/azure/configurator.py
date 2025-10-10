@@ -24,7 +24,6 @@ from dstack._internal.core.backends.azure import auth, compute, resources
 from dstack._internal.core.backends.azure import utils as azure_utils
 from dstack._internal.core.backends.azure.backend import AzureBackend
 from dstack._internal.core.backends.azure.models import (
-    AnyAzureBackendConfig,
     AzureBackendConfig,
     AzureBackendConfigWithCreds,
     AzureClientCreds,
@@ -71,7 +70,12 @@ DEFAULT_LOCATIONS = LOCATION_VALUES
 MAIN_LOCATION = "eastus"
 
 
-class AzureConfigurator(Configurator):
+class AzureConfigurator(
+    Configurator[
+        AzureBackendConfig,
+        AzureBackendConfigWithCreds,
+    ]
+):
     TYPE = BackendType.AZURE
     BACKEND_CLASS = AzureBackend
 
@@ -130,12 +134,12 @@ class AzureConfigurator(Configurator):
             auth=AzureCreds.parse_obj(config.creds).__root__.json(),
         )
 
-    def get_backend_config(
-        self, record: BackendRecord, include_creds: bool
-    ) -> AnyAzureBackendConfig:
+    def get_backend_config_with_creds(self, record: BackendRecord) -> AzureBackendConfigWithCreds:
         config = self._get_config(record)
-        if include_creds:
-            return AzureBackendConfigWithCreds.__response__.parse_obj(config)
+        return AzureBackendConfigWithCreds.__response__.parse_obj(config)
+
+    def get_backend_config_without_creds(self, record: BackendRecord) -> AzureBackendConfig:
+        config = self._get_config(record)
         return AzureBackendConfig.__response__.parse_obj(config)
 
     def get_backend(self, record: BackendRecord) -> AzureBackend:

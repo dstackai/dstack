@@ -4,8 +4,8 @@ import (
 	"github.com/dstackai/dstack/runner/internal/schemas"
 )
 
-func (ex *RunExecutor) GetJobLogsHistory() []schemas.LogEvent {
-	return ex.jobLogs.history
+func (ex *RunExecutor) GetJobWsLogsHistory() []schemas.LogEvent {
+	return ex.jobWsLogs.history
 }
 
 func (ex *RunExecutor) GetHistory(timestamp int64) *schemas.PullResponse {

@@ -32,9 +32,11 @@ dependencies = [
     "python-multipart>=0.0.16",
     "filelock",
     "psutil",
-    "gpuhunt==0.1.6",
+    "gpuhunt==0.1.8",
     "argcomplete>=3.5.0",
     "ignore-python>=0.2.0",
+    "orjson",
+    "apscheduler<4",
 ]
 
 [project.urls]
@@ -76,6 +78,19 @@ pattern = '<picture>\s*|<source[^>]*>\s*|\s*</picture>|<video[^>]*>\s*|</video>\
 replacement = ''
 ignore-case = true
 
+[tool.pyright]
+include = [
+    "src/dstack/plugins",
+    "src/dstack/_internal/server",
+    "src/dstack/_internal/core/services",
+    "src/dstack/_internal/core/backends/kubernetes",
+    "src/dstack/_internal/cli/services/configurators",
+    "src/dstack/_internal/cli/commands",
+]
+ignore = [
+    "src/dstack/_internal/server/migrations/versions",
+]
+
 [dependency-groups]
 dev = [
     "httpx>=0.28.1",
@@ -91,6 +106,7 @@ dev = [
     "ruff==0.11.6",  # should match .pre-commit-config.yaml
     "testcontainers>=4.9.2",
     "pytest-xdist>=3.6.1",
+    "pyinstrument>=5.0.0",
 ]
 
 [project.optional-dependencies]
@@ -106,7 +122,7 @@ gateway = [
 server = [
     "fastapi",
     "starlette>=0.26.0",
-    "uvicorn",
+    "uvicorn[standard]",
     "aiorwlock",
     "aiocache",
     "httpx",
@@ -115,11 +131,10 @@ server = [
     "sqlalchemy[asyncio]>=2.0.0",
     "sqlalchemy_utils>=0.40.0",
     "alembic>=1.10.2",
-    "apscheduler<4",
     "aiosqlite",
     "docker>=6.0.0",
     "python-dxf==12.1.0",
-    "sentry-sdk[fastapi]",
+    "sentry-sdk[fastapi]>=2.27.0",
     "alembic-postgresql-enum",
     "asyncpg",
     "python-json-logger>=3.1.0",
@@ -174,7 +189,8 @@ oci = [
     "dstack[server]",
 ]
 nebius = [
-    "nebius>=0.2.19,<0.3; python_version >= '3.10'",
+    # 0.2.73 breaks sdk backward compatibility: https://github.com/dstackai/dstack/issues/3171
+    "nebius>=0.2.40,<=0.2.72; python_version >= '3.10'",
     "dstack[server]",
 ]
 all = [

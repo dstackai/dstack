@@ -5,7 +5,6 @@ description: "Exploring how the inference performance of Llama 3.1 405B varies o
 slug: amd-mi300x-inference-benchmark
 image: https://dstack.ai/static-assets/static-assets/images/dstack-hotaisle-amd-mi300x-prompt-v5.png
 categories:
-  - AMD
   - Benchmarks
 ---
 

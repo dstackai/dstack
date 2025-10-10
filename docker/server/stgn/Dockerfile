@@ -7,14 +7,13 @@ WORKDIR /dstack-server
 
 RUN apt-get update && apt-get install -y \
     curl \
-    software-properties-common \
     git \
     sqlite3 \
     && rm -rf /var/lib/apt/lists/*
 
-RUN if [ $(uname -m) = "aarch64" ]; then ARCH="arm64"; else ARCH="amd64"; fi && \
-    curl https://github.com/benbjohnson/litestream/releases/download/v0.3.9/litestream-v0.3.9-linux-$ARCH.deb -O -L && \
-    dpkg -i litestream-v0.3.9-linux-$ARCH.deb
+RUN if [ $(uname -m) = "aarch64" ]; then ARCH="arm64"; else ARCH="x86_64"; fi && \
+    curl https://github.com/benbjohnson/litestream/releases/download/v0.5.0/litestream-0.5.0-linux-$ARCH.deb -O -L && \
+    dpkg -i litestream-0.5.0-linux-$ARCH.deb
 
 ADD https://astral.sh/uv/install.sh /uv-installer.sh
 RUN sh /uv-installer.sh && rm /uv-installer.sh

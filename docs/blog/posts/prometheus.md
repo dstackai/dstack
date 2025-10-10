@@ -5,8 +5,7 @@ description: "TBA"
 slug: prometheus
 image: https://dstack.ai/static-assets/static-assets/images/dstack-prometheus-v3.png
 categories:
-  - Metrics
-  - NVIDIA
+  - Changelog
 ---
 
 # Exporting GPU, cost, and other metrics to Prometheus

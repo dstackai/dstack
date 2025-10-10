@@ -152,6 +152,8 @@ async def register_replica(
             )
 
         if old_service.find_replica(replica_id) is not None:
+            # NOTE: as of 0.19.25, the dstack server relies on the exact text of this error.
+            # See dstack._internal.server.services.services.register_replica
             raise ProxyError(f"Replica {replica_id} already exists in service {old_service.fmt()}")
 
         service = old_service.with_replicas(old_service.replicas + (replica,))

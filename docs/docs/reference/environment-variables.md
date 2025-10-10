@@ -116,10 +116,20 @@ For more details on the options below, refer to the [server deployment](../guide
 - `DSTACK_ENABLE_PROMETHEUS_METRICS`{ #DSTACK_ENABLE_PROMETHEUS_METRICS } — Enables Prometheus metrics collection and export.
 - `DSTACK_DEFAULT_SERVICE_CLIENT_MAX_BODY_SIZE`{ #DSTACK_DEFAULT_SERVICE_CLIENT_MAX_BODY_SIZE } – Request body size limit for services running with a gateway, in bytes. Defaults to 64 MiB.
 - `DSTACK_FORBID_SERVICES_WITHOUT_GATEWAY`{ #DSTACK_FORBID_SERVICES_WITHOUT_GATEWAY } – Forbids registering new services without a gateway if set to any value.
-- `DSTACK_SERVER_CODE_UPLOAD_LIMIT`{ #DSTACK_SERVER_CODE_UPLOAD_LIMIT } - The repo size limit when uploading diffs or local repos, in bytes. Set to 0 to disable size limits. Defaults to 2MiB.
+- `DSTACK_SERVER_CODE_UPLOAD_LIMIT`{ #DSTACK_SERVER_CODE_UPLOAD_LIMIT } - The repo size limit when uploading diffs or local repos, in bytes. Set to `0` to disable size limits. Defaults to `2MiB`.
 - `DSTACK_SERVER_S3_BUCKET`{ #DSTACK_SERVER_S3_BUCKET } - The bucket that repo diffs will be uploaded to if set. If unset, diffs are uploaded to the database.
 - `DSTACK_SERVER_S3_BUCKET_REGION`{ #DSTACK_SERVER_S3_BUCKET_REGION } - The region of the S3 Bucket.
-- `DSTACK_SERVER_GCS_BUCKET`{ #DSTACK_SERVER_GCD_BUCKET } - The bucket that repo diffs will be uploaded to if set. If unset, diffs are uploaded to the database.
+- `DSTACK_SERVER_GCS_BUCKET`{ #DSTACK_SERVER_GCS_BUCKET } - The bucket that repo diffs will be uploaded to if set. If unset, diffs are uploaded to the database.
+- `DSTACK_DB_POOL_SIZE`{ #DSTACK_DB_POOL_SIZE } - The client DB connections pool size. Defaults to `20`,
+- `DSTACK_DB_MAX_OVERFLOW`{ #DSTACK_DB_MAX_OVERFLOW } - The client DB connections pool allowed overflow. Defaults to `20`.
+- `DSTACK_SERVER_BACKGROUND_PROCESSING_FACTOR`{ #DSTACK_SERVER_BACKGROUND_PROCESSING_FACTOR } - The number of background jobs for processing server resources. Increase if you need to process more resources per server replica quickly. Defaults to `1`.
+- `DSTACK_SERVER_BACKGROUND_PROCESSING_DISABLED`{ #DSTACK_SERVER_BACKGROUND_PROCESSING_DISABLED } - Disables background processing if set to any value. Useful to run only web frontend and API server.
+- `DSTACK_SERVER_MAX_PROBES_PER_JOB`{ #DSTACK_SERVER_MAX_PROBES_PER_JOB } - Maximum number of probes allowed in a run configuration. Validated at apply time.
+- `DSTACK_SERVER_MAX_PROBE_TIMEOUT`{ #DSTACK_SERVER_MAX_PROBE_TIMEOUT } - Maximum allowed timeout for a probe. Validated at apply time.
+- `DSTACK_SERVER_METRICS_RUNNING_TTL_SECONDS`{ #DSTACK_SERVER_METRICS_RUNNING_TTL_SECONDS } – Maximum age of metrics samples for running jobs.
+- `DSTACK_SERVER_METRICS_FINISHED_TTL_SECONDS`{ #DSTACK_SERVER_METRICS_FINISHED_TTL_SECONDS } – Maximum age of metrics samples for finished jobs.
+- `DSTACK_SERVER_INSTANCE_HEALTH_TTL_SECONDS`{ #DSTACK_SERVER_INSTANCE_HEALTH_TTL_SECONDS } – Maximum age of instance health checks.
+- `DSTACK_SERVER_INSTANCE_HEALTH_MIN_COLLECT_INTERVAL_SECONDS`{ #DSTACK_SERVER_INSTANCE_HEALTH_MIN_COLLECT_INTERVAL_SECONDS } – Minimum time interval between consecutive health checks of the same instance.
 
 ??? info "Internal environment variables"
      The following environment variables are intended for development purposes:
@@ -141,7 +151,7 @@ For more details on the options below, refer to the [server deployment](../guide
 
 The following environment variables are supported by the CLI.
 
-- `DSTACK_CLI_LOG_LEVEL`{ #DSTACK_CLI_LOG_LEVEL } – Configures CLI logging level. Defaults to `INFO`.
+- `DSTACK_CLI_LOG_LEVEL`{ #DSTACK_CLI_LOG_LEVEL } – Sets the logging level for CLI output to stdout. Defaults to `INFO`.
 
 Example:
 
@@ -149,6 +159,19 @@ Example:
 
 ```shell
 $ DSTACK_CLI_LOG_LEVEL=debug dstack apply -f .dstack.yml
+```
+
+</div>
+
+- `DSTACK_CLI_FILE_LOG_LEVEL`{ #DSTACK_CLI_FILE_LOG_LEVEL } – Sets the logging level for CLI log files. Defaults to `DEBUG`.
+
+<div class="termy">
+
+```shell
+$ find ~/.dstack/logs/cli/
+
+ ~/.dstack/logs/cli/latest.log
+ ~/.dstack/logs/cli/2025-07-31.log
 ```
 
 </div>

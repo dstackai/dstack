@@ -96,7 +96,7 @@ class TestCollectPrometheusMetrics:
         )
         metrics = res.scalar_one()
         assert metrics.text == "# prom response"
-        assert metrics.collected_at == datetime(2023, 1, 2, 3, 5, 20)
+        assert metrics.collected_at == datetime(2023, 1, 2, 3, 5, 20, tzinfo=timezone.utc)
 
     @freeze_time(datetime(2023, 1, 2, 3, 5, 20, tzinfo=timezone.utc))
     async def test_updates_record(
@@ -121,7 +121,7 @@ class TestCollectPrometheusMetrics:
         )
         metrics = res.scalar_one()
         assert metrics.text == "# prom new response"
-        assert metrics.collected_at == datetime(2023, 1, 2, 3, 5, 20)
+        assert metrics.collected_at == datetime(2023, 1, 2, 3, 5, 20, tzinfo=timezone.utc)
 
     @freeze_time(datetime(2023, 1, 2, 3, 5, 20, tzinfo=timezone.utc))
     async def test_skips_recently_updated(
@@ -146,7 +146,7 @@ class TestCollectPrometheusMetrics:
         )
         metrics = res.scalar_one()
         assert metrics.text == "# prom old response"
-        assert metrics.collected_at == datetime(2023, 1, 2, 3, 5, 15)
+        assert metrics.collected_at == datetime(2023, 1, 2, 3, 5, 15, tzinfo=timezone.utc)
 
     @freeze_time(datetime(2023, 1, 2, 3, 5, 20, tzinfo=timezone.utc))
     @pytest.mark.dockerized(False)

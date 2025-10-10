@@ -2,13 +2,14 @@ from typing import List, Literal, Optional, Tuple, Union
 
 import gpuhunt
 
-from dstack._internal.core.backends import (
-    BACKENDS_WITH_CREATE_INSTANCE_SUPPORT,
-    BACKENDS_WITH_MULTINODE_SUPPORT,
-    BACKENDS_WITH_RESERVATION_SUPPORT,
-)
 from dstack._internal.core.backends.base.backend import Backend
 from dstack._internal.core.backends.base.compute import ComputeWithPlacementGroupSupport
+from dstack._internal.core.backends.features import (
+    BACKENDS_WITH_CREATE_INSTANCE_SUPPORT,
+    BACKENDS_WITH_MULTINODE_SUPPORT,
+    BACKENDS_WITH_PRIVILEGED_SUPPORT,
+    BACKENDS_WITH_RESERVATION_SUPPORT,
+)
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
@@ -49,6 +50,7 @@ async def get_offers_by_requirements(
     backend_types = profile.backends
     regions = profile.regions
     availability_zones = profile.availability_zones
+    instance_types = profile.instance_types
 
     if volumes:
         mount_point_volumes = volumes[0]
@@ -66,7 +68,12 @@ async def get_offers_by_requirements(
             backend_types = BACKENDS_WITH_MULTINODE_SUPPORT
         backend_types = [b for b in backend_types if b in BACKENDS_WITH_MULTINODE_SUPPORT]
 
-    if privileged or instance_mounts:
+    if privileged:
+        if backend_types is None:
+            backend_types = BACKENDS_WITH_PRIVILEGED_SUPPORT
+        backend_types = [b for b in backend_types if b in BACKENDS_WITH_PRIVILEGED_SUPPORT]
+
+    if instance_mounts:
         if backend_types is None:
             backend_types = BACKENDS_WITH_CREATE_INSTANCE_SUPPORT
         backend_types = [b for b in backend_types if b in BACKENDS_WITH_CREATE_INSTANCE_SUPPORT]
@@ -97,9 +104,43 @@ async def get_offers_by_requirements(
         exclude_not_available=exclude_not_available,
     )
 
-    # Filter offers again for backends since a backend
-    # can return offers of different backend types (e.g. BackendType.DSTACK).
-    # The first filter should remain as an optimization.
+    offers = filter_offers(
+        offers=offers,
+        # Double filtering by backends if backend returns offers for other backend.
+        backend_types=backend_types,
+        regions=regions,
+        availability_zones=availability_zones,
+        instance_types=instance_types,
+        placement_group=placement_group,
+    )
+
+    if blocks == 1:
+        return offers
+
+    shareable_offers = []
+    for backend, offer in offers:
+        resources = offer.instance.resources
+        cpu_count = resources.cpus
+        gpu_count = len(resources.gpus)
+        if gpu_count > 0 and resources.gpus[0].vendor == gpuhunt.AcceleratorVendor.GOOGLE:
+            # TPUs cannot be shared
+            gpu_count = 1
+        divisible, _blocks = is_divisible_into_blocks(cpu_count, gpu_count, blocks)
+        if not divisible:
+            continue
+        offer.total_blocks = _blocks
+        shareable_offers.append((backend, offer))
+    return shareable_offers
+
+
+def filter_offers(
+    offers: List[Tuple[Backend, InstanceOfferWithAvailability]],
+    backend_types: Optional[List[BackendType]] = None,
+    regions: Optional[List[str]] = None,
+    availability_zones: Optional[List[str]] = None,
+    instance_types: Optional[List[str]] = None,
+    placement_group: Optional[PlacementGroup] = None,
+) -> List[Tuple[Backend, InstanceOfferWithAvailability]]:
     if backend_types is not None:
         offers = [(b, o) for b, o in offers if o.backend in backend_types]
 
@@ -119,39 +160,21 @@ async def get_offers_by_requirements(
                     new_offers.append((b, new_offer))
         offers = new_offers
 
+    if instance_types is not None:
+        instance_types = [i.lower() for i in instance_types]
+        offers = [(b, o) for b, o in offers if o.instance.name.lower() in instance_types]
+
     if placement_group is not None:
         new_offers = []
         for b, o in offers:
-            for backend in backends:
-                compute = backend.compute()
-                if isinstance(
-                    compute, ComputeWithPlacementGroupSupport
-                ) and compute.is_suitable_placement_group(placement_group, o):
-                    new_offers.append((b, o))
-                    break
+            compute = b.compute()
+            if isinstance(
+                compute, ComputeWithPlacementGroupSupport
+            ) and compute.is_suitable_placement_group(placement_group, o):
+                new_offers.append((b, o))
         offers = new_offers
 
-    if profile.instance_types is not None:
-        instance_types = [i.lower() for i in profile.instance_types]
-        offers = [(b, o) for b, o in offers if o.instance.name.lower() in instance_types]
-
-    if blocks == 1:
-        return offers
-
-    shareable_offers = []
-    for backend, offer in offers:
-        resources = offer.instance.resources
-        cpu_count = resources.cpus
-        gpu_count = len(resources.gpus)
-        if gpu_count > 0 and resources.gpus[0].vendor == gpuhunt.AcceleratorVendor.GOOGLE:
-            # TPUs cannot be shared
-            gpu_count = 1
-        divisible, _blocks = is_divisible_into_blocks(cpu_count, gpu_count, blocks)
-        if not divisible:
-            continue
-        offer.total_blocks = _blocks
-        shareable_offers.append((backend, offer))
-    return shareable_offers
+    return offers
 
 
 def is_divisible_into_blocks(

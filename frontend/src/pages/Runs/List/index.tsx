@@ -48,7 +48,7 @@ export const RunList: React.FC = () => {
 
     const { data, isLoading, refreshList, isLoadingMore } = useInfiniteScroll<IRun, TRunsRequestParams>({
         useLazyQuery: useLazyGetRunsQuery,
-        args: { ...filteringRequestParams, limit: DEFAULT_TABLE_PAGE_SIZE },
+        args: { ...filteringRequestParams, limit: DEFAULT_TABLE_PAGE_SIZE, job_submissions_limit: 1 },
         getPaginationParams: (lastRun) => ({ prev_submitted_at: lastRun.submitted_at }),
     });
 

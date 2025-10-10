@@ -1,13 +1,12 @@
 import enum
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Callable, List, Optional, Union
 
 from sqlalchemy import (
     BigInteger,
     Boolean,
     DateTime,
-    Enum,
     Float,
     ForeignKey,
     Index,
@@ -25,9 +24,10 @@ from sqlalchemy_utils import UUIDType
 
 from dstack._internal.core.errors import DstackError
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.common import CoreModel
+from dstack._internal.core.models.common import CoreConfig, generate_dual_core_model
 from dstack._internal.core.models.fleets import FleetStatus
 from dstack._internal.core.models.gateways import GatewayStatus
+from dstack._internal.core.models.health import HealthStatus
 from dstack._internal.core.models.instances import InstanceStatus
 from dstack._internal.core.models.profiles import (
     DEFAULT_FLEET_TERMINATION_IDLE_TIME,
@@ -51,9 +51,10 @@ logger = get_logger(__name__)
 
 class NaiveDateTime(TypeDecorator):
     """
-    A custom type decorator that ensures datetime objects are offset-naive when stored in the database.
-    This is needed because we use datetimes in UTC only and store them as offset-naive.
-    Some databases (e.g. Postgres) throw an error if the timezone is set.
+    A custom type decorator that ensures datetime objects are offset-naive when stored in the database
+    and offset-aware with UTC timezone when loaded from the database.
+    This is because we use datetimes in UTC everywhere, and
+    some databases (e.g. Postgres) throw an error if the timezone is set.
     """
 
     impl = DateTime
@@ -65,10 +66,16 @@ class NaiveDateTime(TypeDecorator):
         return value
 
     def process_result_value(self, value, dialect):
-        return value
+        if value is None:
+            return None
+        return value.replace(tzinfo=timezone.utc)
 
 
-class DecryptedString(CoreModel):
+class DecryptedStringConfig(CoreConfig):
+    arbitrary_types_allowed = True
+
+
+class DecryptedString(generate_dual_core_model(DecryptedStringConfig)):
     """
     A type for representing plaintext strings encrypted with `EncryptedString`.
     Besides the string, stores information if the decryption was successful.
@@ -80,9 +87,6 @@ class DecryptedString(CoreModel):
     plaintext: Optional[str]
     decrypted: bool = True
     exc: Optional[Exception] = None
-
-    class Config:
-        arbitrary_types_allowed = True
 
     def get_plaintext_or_error(self) -> str:
         if self.decrypted and self.plaintext is not None:
@@ -182,7 +186,7 @@ class UserModel(BaseModel):
     token: Mapped[DecryptedString] = mapped_column(EncryptedString(200), unique=True)
     # token_hash is needed for fast search by token when stored token is encrypted
     token_hash: Mapped[str] = mapped_column(String(2000), unique=True)
-    global_role: Mapped[GlobalRole] = mapped_column(Enum(GlobalRole))
+    global_role: Mapped[GlobalRole] = mapped_column(EnumAsString(GlobalRole, 100))
     # deactivated users cannot access API
     active: Mapped[bool] = mapped_column(Boolean, default=True)
 
@@ -243,7 +247,7 @@ class MemberModel(BaseModel):
     project: Mapped["ProjectModel"] = relationship()
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     user: Mapped[UserModel] = relationship(lazy="joined")
-    project_role: Mapped[ProjectRole] = mapped_column(Enum(ProjectRole))
+    project_role: Mapped[ProjectRole] = mapped_column(EnumAsString(ProjectRole, 100))
     # member_num defines members ordering
     member_num: Mapped[Optional[int]] = mapped_column(Integer)
 
@@ -275,7 +279,7 @@ class RepoModel(BaseModel):
     project: Mapped["ProjectModel"] = relationship()
     # RepoModel.name stores repo_id
     name: Mapped[str] = mapped_column(String(100))
-    type: Mapped[RepoType] = mapped_column(Enum(RepoType))
+    type: Mapped[RepoType] = mapped_column(EnumAsString(RepoType, 100))
 
     info: Mapped[str] = mapped_column(Text)
 
@@ -315,6 +319,21 @@ class CodeModel(BaseModel):
     blob: Mapped[Optional[bytes]] = mapped_column(LargeBinary)  # None means blob is stored on s3
 
 
+class FileArchiveModel(BaseModel):
+    __tablename__ = "file_archives"
+    __table_args__ = (
+        UniqueConstraint("user_id", "blob_hash", name="uq_file_archives_user_id_blob_hash"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUIDType(binary=False), primary_key=True, default=uuid.uuid4
+    )
+    user_id: Mapped["UserModel"] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    user: Mapped["UserModel"] = relationship()
+    blob_hash: Mapped[str] = mapped_column(Text)
+    blob: Mapped[Optional[bytes]] = mapped_column(LargeBinary)  # None means blob is stored on s3
+
+
 class RunModel(BaseModel):
     __tablename__ = "runs"
 
@@ -340,9 +359,10 @@ class RunModel(BaseModel):
     run_name: Mapped[str] = mapped_column(String(100))
     submitted_at: Mapped[datetime] = mapped_column(NaiveDateTime)
     last_processed_at: Mapped[datetime] = mapped_column(NaiveDateTime)
-    status: Mapped[RunStatus] = mapped_column(Enum(RunStatus))
+    next_triggered_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
+    status: Mapped[RunStatus] = mapped_column(EnumAsString(RunStatus, 100), index=True)
     termination_reason: Mapped[Optional[RunTerminationReason]] = mapped_column(
-        Enum(RunTerminationReason)
+        EnumAsString(RunTerminationReason, 100)
     )
     # resubmission_attempt counts consecutive transitions to pending without provisioning.
     # Can be used to choose retry delay depending on the attempt number.
@@ -350,6 +370,8 @@ class RunModel(BaseModel):
     run_spec: Mapped[str] = mapped_column(Text)
     service_spec: Mapped[Optional[str]] = mapped_column(Text)
     priority: Mapped[int] = mapped_column(Integer, default=0)
+    deployment_num: Mapped[int] = mapped_column(Integer)
+    desired_replica_count: Mapped[int] = mapped_column(Integer)
 
     jobs: Mapped[List["JobModel"]] = relationship(
         back_populates="run", lazy="selectin", order_by="[JobModel.replica_num, JobModel.job_num]"
@@ -369,19 +391,27 @@ class JobModel(BaseModel):
     id: Mapped[uuid.UUID] = mapped_column(
         UUIDType(binary=False), primary_key=True, default=uuid.uuid4
     )
+
     project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
     project: Mapped["ProjectModel"] = relationship()
+
     run_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("runs.id", ondelete="CASCADE"))
     run: Mapped["RunModel"] = relationship()
+
+    # Jobs need to reference fleets because we may choose an optimal fleet for a master job
+    # but not yet create an instance for it.
+    fleet_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("fleets.id"))
+    fleet: Mapped[Optional["FleetModel"]] = relationship(back_populates="jobs")
+
     run_name: Mapped[str] = mapped_column(String(100))
     job_num: Mapped[int] = mapped_column(Integer)
     job_name: Mapped[str] = mapped_column(String(100))
     submission_num: Mapped[int] = mapped_column(Integer)
     submitted_at: Mapped[datetime] = mapped_column(NaiveDateTime)
     last_processed_at: Mapped[datetime] = mapped_column(NaiveDateTime)
-    status: Mapped[JobStatus] = mapped_column(Enum(JobStatus))
+    status: Mapped[JobStatus] = mapped_column(EnumAsString(JobStatus, 100), index=True)
     termination_reason: Mapped[Optional[JobTerminationReason]] = mapped_column(
-        Enum(JobTerminationReason)
+        EnumAsString(JobTerminationReason, 100)
     )
     termination_reason_message: Mapped[Optional[str]] = mapped_column(Text)
     # `disconnected_at` stores the first time of connectivity issues with the instance.
@@ -404,7 +434,14 @@ class JobModel(BaseModel):
     instance: Mapped[Optional["InstanceModel"]] = relationship(back_populates="jobs")
     used_instance_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUIDType(binary=False))
     replica_num: Mapped[int] = mapped_column(Integer)
+    deployment_num: Mapped[int] = mapped_column(Integer)
     job_runtime_data: Mapped[Optional[str]] = mapped_column(Text)
+    probes: Mapped[list["ProbeModel"]] = relationship(
+        back_populates="job", order_by="ProbeModel.probe_num"
+    )
+    # Whether the replica is registered to receive service requests.
+    # Always `False` for non-service runs.
+    registered: Mapped[bool] = mapped_column(Boolean, server_default=false())
 
 
 class GatewayModel(BaseModel):
@@ -420,7 +457,7 @@ class GatewayModel(BaseModel):
     # Use `get_gateway_configuration` to construct `configuration` for old gateways.
     configuration: Mapped[Optional[str]] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
-    status: Mapped[GatewayStatus] = mapped_column(Enum(GatewayStatus))
+    status: Mapped[GatewayStatus] = mapped_column(EnumAsString(GatewayStatus, 100))
     status_message: Mapped[Optional[str]] = mapped_column(Text)
     last_processed_at: Mapped[datetime] = mapped_column(NaiveDateTime)
 
@@ -506,13 +543,17 @@ class FleetModel(BaseModel):
     deleted: Mapped[bool] = mapped_column(Boolean, default=False)
     deleted_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
 
-    status: Mapped[FleetStatus] = mapped_column(Enum(FleetStatus))
+    status: Mapped[FleetStatus] = mapped_column(EnumAsString(FleetStatus, 100), index=True)
     status_message: Mapped[Optional[str]] = mapped_column(Text)
 
     spec: Mapped[str] = mapped_column(Text)
 
     runs: Mapped[List["RunModel"]] = relationship(back_populates="fleet")
+    jobs: Mapped[List["JobModel"]] = relationship(back_populates="fleet")
     instances: Mapped[List["InstanceModel"]] = relationship(back_populates="fleet")
+
+    consolidation_attempt: Mapped[int] = mapped_column(Integer, server_default="0")
+    last_consolidated_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
 
 
 class InstanceModel(BaseModel):
@@ -525,7 +566,6 @@ class InstanceModel(BaseModel):
 
     instance_num: Mapped[int] = mapped_column(Integer, default=0)
 
-    # instance
     created_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
     last_processed_at: Mapped[datetime] = mapped_column(
         NaiveDateTime, default=get_current_datetime
@@ -546,7 +586,7 @@ class InstanceModel(BaseModel):
     fleet_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("fleets.id"))
     fleet: Mapped[Optional["FleetModel"]] = relationship(back_populates="instances")
 
-    status: Mapped[InstanceStatus] = mapped_column(Enum(InstanceStatus))
+    status: Mapped[InstanceStatus] = mapped_column(EnumAsString(InstanceStatus, 100), index=True)
     unreachable: Mapped[bool] = mapped_column(Boolean)
 
     # VM
@@ -562,7 +602,6 @@ class InstanceModel(BaseModel):
     requirements: Mapped[Optional[str]] = mapped_column(Text)
     instance_configuration: Mapped[Optional[str]] = mapped_column(Text)
 
-    # temination policy
     termination_policy: Mapped[Optional[TerminationPolicy]] = mapped_column(String(100))
     # TODO: Suggestion: do not assign DEFAULT_FLEET_TERMINATION_IDLE_TIME as the default here
     # (make Optional instead; also instead of -1)
@@ -570,21 +609,24 @@ class InstanceModel(BaseModel):
         Integer, default=DEFAULT_FLEET_TERMINATION_IDLE_TIME
     )
 
-    # retry policy
-    last_retry_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
+    # Deprecated
+    last_retry_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime, deferred=True)
 
     # instance termination handling
     termination_deadline: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
     termination_reason: Mapped[Optional[str]] = mapped_column(String(4000))
+    # Deprecated since 0.19.22, not used
     health_status: Mapped[Optional[str]] = mapped_column(String(4000))
+    health: Mapped[HealthStatus] = mapped_column(
+        EnumAsString(HealthStatus, 100), default=HealthStatus.HEALTHY
+    )
     first_termination_retry_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
     last_termination_retry_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
 
-    # backend
     backend: Mapped[Optional[BackendType]] = mapped_column(EnumAsString(BackendType, 100))
     backend_data: Mapped[Optional[str]] = mapped_column(Text)
 
-    # offer
+    # Not set for cloud fleets that haven't been provisioning
     offer: Mapped[Optional[str]] = mapped_column(Text)
     region: Mapped[Optional[str]] = mapped_column(String(2000))
     price: Mapped[Optional[float]] = mapped_column(Float)
@@ -597,16 +639,31 @@ class InstanceModel(BaseModel):
     total_blocks: Mapped[Optional[int]] = mapped_column(Integer)
     busy_blocks: Mapped[int] = mapped_column(Integer, default=0)
 
-    jobs: Mapped[list["JobModel"]] = relationship(back_populates="instance", lazy="joined")
+    jobs: Mapped[list["JobModel"]] = relationship(back_populates="instance")
     last_job_processed_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
 
     volume_attachments: Mapped[List["VolumeAttachmentModel"]] = relationship(
         back_populates="instance",
         # Add delete-orphan option so that removing entries from volume_attachments
         # automatically marks them for deletion.
-        # SQLalchemy requires delete when using delete-orphan.
+        # SQLAlchemy requires delete when using delete-orphan.
         cascade="save-update, merge, delete-orphan, delete",
     )
+
+
+class InstanceHealthCheckModel(BaseModel):
+    __tablename__ = "instance_health_checks"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUIDType(binary=False), primary_key=True, default=uuid.uuid4
+    )
+
+    instance_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("instances.id"))
+    instance: Mapped["InstanceModel"] = relationship()
+
+    collected_at: Mapped[datetime] = mapped_column(NaiveDateTime)
+    status: Mapped[HealthStatus] = mapped_column(EnumAsString(HealthStatus, 100))
+    response: Mapped[str] = mapped_column(Text)
 
 
 class VolumeModel(BaseModel):
@@ -627,10 +684,11 @@ class VolumeModel(BaseModel):
     last_processed_at: Mapped[datetime] = mapped_column(
         NaiveDateTime, default=get_current_datetime
     )
+    last_job_processed_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
     deleted: Mapped[bool] = mapped_column(Boolean, default=False)
     deleted_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
 
-    status: Mapped[VolumeStatus] = mapped_column(Enum(VolumeStatus))
+    status: Mapped[VolumeStatus] = mapped_column(EnumAsString(VolumeStatus, 100), index=True)
     status_message: Mapped[Optional[str]] = mapped_column(Text)
 
     configuration: Mapped[str] = mapped_column(Text)
@@ -708,3 +766,39 @@ class JobPrometheusMetrics(BaseModel):
     collected_at: Mapped[datetime] = mapped_column(NaiveDateTime)
     # Raw Prometheus text response
     text: Mapped[str] = mapped_column(Text)
+
+
+class ProbeModel(BaseModel):
+    __tablename__ = "probes"
+    __table_args__ = (UniqueConstraint("job_id", "probe_num", name="uq_probes_job_id_probe_num"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUIDType(binary=False), primary_key=True, default=uuid.uuid4
+    )
+    name: Mapped[str] = mapped_column(String(100))
+
+    job_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("jobs.id"), primary_key=True)
+    job: Mapped["JobModel"] = relationship(back_populates="probes")
+
+    probe_num: Mapped[int] = mapped_column(Integer)  # index in JobSpec.probes
+    due: Mapped[datetime] = mapped_column(NaiveDateTime)
+    success_streak: Mapped[int] = mapped_column(BigInteger)
+    active: Mapped[bool] = mapped_column(Boolean)
+
+
+class SecretModel(BaseModel):
+    __tablename__ = "secrets"
+    __table_args__ = (UniqueConstraint("project_id", "name", name="uq_secrets_project_id_name"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUIDType(binary=False), primary_key=True, default=uuid.uuid4
+    )
+
+    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
+    project: Mapped["ProjectModel"] = relationship()
+
+    created_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
+    updated_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
+
+    name: Mapped[str] = mapped_column(String(200))
+    value: Mapped[DecryptedString] = mapped_column(EncryptedString())

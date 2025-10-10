@@ -1,0 +1,31 @@
+type: service
+name: gpt-oss-120b
+
+model: openai/gpt-oss-120b
+
+env:
+  - HF_TOKEN
+  - MODEL=openai/gpt-oss-120b
+  # To enable AITER, set below to 1. Otherwise, set it to 0.
+  - VLLM_ROCM_USE_AITER=1
+  # To enable AITER Triton unified attention
+  - VLLM_USE_AITER_UNIFIED_ATTENTION=1
+  # below is required in order to enable AITER unified attention by disabling AITER MHA
+  - VLLM_ROCM_USE_AITER_MHA=0
+image: rocm/vllm-dev:open-mi300-08052025
+commands:
+  - |
+    vllm serve $MODEL \
+      --tensor-parallel $DSTACK_GPUS_NUM \
+      --no-enable-prefix-caching \
+      --disable-log-requests \
+      --compilation-config '{"full_cuda_graph": true}'
+port: 8000
+
+volumes:
+  # Cache downloaded models
+  - /root/.cache/huggingface:/root/.cache/huggingface
+
+resources:
+  gpu: MI300X:8
+  shm_size: 32GB

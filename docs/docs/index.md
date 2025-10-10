@@ -1,17 +1,16 @@
 # What is dstack?
 
-`dstack` is a streamlined alternative to Kubernetes and Slurm, specifically designed for AI. It simplifies container orchestration
-for AI workloads both in the cloud and on-prem, speeding up the development, training, and deployment of AI models.
+`dstack` is a unified control plane for GPU provisioning and orchestration that works with any GPU cloud, Kubernetes, or on-prem clusters. 
 
-`dstack` is easy to use with any cloud providers as well as on-prem servers. 
+It streamlines development, training, and inference, and is compatible with any hardware, open-source tools, and frameworks.
 
-#### Accelerators
+#### Hardware
 
 `dstack` supports `NVIDIA`, `AMD`, `TPU`, `Intel Gaudi`, and `Tenstorrent` accelerators out of the box.
 
 ## How does it work?
 
-<img src="https://dstack.ai/static-assets/static-assets/images/dstack-architecture-diagram-v8.svg" />
+<img src="https://dstack.ai/static-assets/static-assets/images/dstack-architecture-diagram-v11.svg" />
 
 #### 1. Set up the server
 

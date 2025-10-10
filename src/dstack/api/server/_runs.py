@@ -4,7 +4,11 @@ from uuid import UUID
 
 from pydantic import parse_obj_as
 
-from dstack._internal.core.compatibility.runs import get_apply_plan_excludes, get_get_plan_excludes
+from dstack._internal.core.compatibility.runs import (
+    get_apply_plan_excludes,
+    get_get_plan_excludes,
+    get_list_runs_excludes,
+)
 from dstack._internal.core.models.runs import (
     ApplyRunPlanInput,
     Run,
@@ -33,18 +37,24 @@ class RunsAPIClient(APIClientGroup):
         prev_run_id: Optional[UUID] = None,
         limit: int = 100,
         ascending: bool = False,
+        include_jobs: bool = True,
+        job_submissions_limit: Optional[int] = None,
     ) -> List[Run]:
         body = ListRunsRequest(
             project_name=project_name,
             repo_id=repo_id,
             username=username,
             only_active=only_active,
+            include_jobs=include_jobs,
+            job_submissions_limit=job_submissions_limit,
             prev_submitted_at=prev_submitted_at,
             prev_run_id=prev_run_id,
             limit=limit,
             ascending=ascending,
         )
-        resp = self._request("/api/runs/list", body=body.json())
+        resp = self._request(
+            "/api/runs/list", body=body.json(exclude=get_list_runs_excludes(body))
+        )
         return parse_obj_as(List[Run.__response__], resp.json())
 
     def get(self, project_name: str, run_name: str) -> Run:

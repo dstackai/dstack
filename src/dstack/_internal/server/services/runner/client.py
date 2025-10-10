@@ -1,7 +1,6 @@
 import uuid
-from dataclasses import dataclass
 from http import HTTPStatus
-from typing import BinaryIO, Dict, List, Optional, TypeVar, Union
+from typing import BinaryIO, Dict, List, Literal, Optional, TypeVar, Union, overload
 
 import packaging.version
 import requests
@@ -14,9 +13,11 @@ from dstack._internal.core.models.repos.remote import RemoteRepoCreds
 from dstack._internal.core.models.resources import Memory
 from dstack._internal.core.models.runs import ClusterInfo, Job, Run
 from dstack._internal.core.models.volumes import InstanceMountPoint, Volume, VolumeMountPoint
+from dstack._internal.server.schemas.instances import InstanceCheck
 from dstack._internal.server.schemas.runner import (
     GPUDevice,
     HealthcheckResponse,
+    InstanceHealthResponse,
     LegacyPullResponse,
     LegacyStopBody,
     LegacySubmitBody,
@@ -25,6 +26,7 @@ from dstack._internal.server.schemas.runner import (
     ShimVolumeInfo,
     SubmitBody,
     TaskInfoResponse,
+    TaskListResponse,
     TaskSubmitRequest,
     TaskTerminateRequest,
 )
@@ -35,15 +37,6 @@ REQUEST_TIMEOUT = 9
 UPLOAD_CODE_REQUEST_TIMEOUT = 60
 
 logger = get_logger(__name__)
-
-
-@dataclass
-class HealthStatus:
-    healthy: bool
-    reason: str
-
-    def __str__(self) -> str:
-        return self.reason
 
 
 class RunnerClient:
@@ -106,6 +99,14 @@ class RunnerClient:
             data=body.json(),
             headers={"Content-Type": "application/json"},
             timeout=REQUEST_TIMEOUT,
+        )
+        resp.raise_for_status()
+
+    def upload_archive(self, id: uuid.UUID, file: Union[BinaryIO, bytes]):
+        resp = requests.post(
+            self._url("/api/upload_archive"),
+            files={"archive": (str(id), file)},
+            timeout=UPLOAD_CODE_REQUEST_TIMEOUT,
         )
         resp.raise_for_status()
 
@@ -185,6 +186,9 @@ class ShimClient:
     # API v1 (a.k.a. Legacy API) — `/api/{submit,pull,stop}`
     _API_V2_MIN_SHIM_VERSION = (0, 18, 34)
 
+    # `/api/instance/health`
+    _INSTANCE_HEALTH_MIN_SHIM_VERSION = (0, 19, 22)
+
     _shim_version: Optional["_Version"]
     _api_version: int
     _negotiated: bool = False
@@ -204,11 +208,25 @@ class ShimClient:
             self._negotiate()
         return self._api_version == 2
 
-    def healthcheck(self, unmask_exeptions: bool = False) -> Optional[HealthcheckResponse]:
+    def is_instance_health_supported(self) -> bool:
+        if not self._negotiated:
+            self._negotiate()
+        return (
+            self._shim_version is None
+            or self._shim_version >= self._INSTANCE_HEALTH_MIN_SHIM_VERSION
+        )
+
+    @overload
+    def healthcheck(self) -> Optional[HealthcheckResponse]: ...
+
+    @overload
+    def healthcheck(self, unmask_exceptions: Literal[True]) -> HealthcheckResponse: ...
+
+    def healthcheck(self, unmask_exceptions: bool = False) -> Optional[HealthcheckResponse]:
         try:
             resp = self._request("GET", "/api/healthcheck", raise_for_status=True)
         except requests.exceptions.RequestException:
-            if unmask_exeptions:
+            if unmask_exceptions:
                 raise
             return None
         if not self._negotiated:
@@ -216,6 +234,23 @@ class ShimClient:
         return self._response(HealthcheckResponse, resp)
 
     # API v2 methods
+
+    def get_instance_health(self) -> Optional[InstanceHealthResponse]:
+        if not self.is_instance_health_supported():
+            logger.debug("instance health is not supported: %s", self._shim_version)
+            return None
+        resp = self._request("GET", "/api/instance/health")
+        if resp.status_code == HTTPStatus.NOT_FOUND:
+            logger.warning("instance health: %s", resp.text)
+            return None
+        self._raise_for_status(resp)
+        return self._response(InstanceHealthResponse, resp)
+
+    def list_tasks(self) -> TaskListResponse:
+        if not self.is_api_v2_supported():
+            raise ShimAPIVersionError()
+        resp = self._request("GET", "/api/tasks", raise_for_status=True)
+        return self._response(TaskListResponse, resp)
 
     def get_task(self, task_id: "_TaskID") -> TaskInfoResponse:
         if not self.is_api_v2_supported():
@@ -410,14 +445,26 @@ class ShimClient:
         self._negotiated = True
 
 
-def health_response_to_health_status(data: HealthcheckResponse) -> HealthStatus:
-    if data.service == "dstack-shim":
-        return HealthStatus(healthy=True, reason="Service is OK")
-    else:
-        return HealthStatus(
-            healthy=False,
-            reason=f"Service name is {data.service}, service version: {data.version}",
+def healthcheck_response_to_instance_check(
+    response: HealthcheckResponse,
+    instance_health_response: Optional[InstanceHealthResponse] = None,
+) -> InstanceCheck:
+    if response.service == "dstack-shim":
+        message: Optional[str] = None
+        if (
+            instance_health_response is not None
+            and instance_health_response.dcgm is not None
+            and instance_health_response.dcgm.incidents
+        ):
+            message = instance_health_response.dcgm.incidents[0].error_message
+        return InstanceCheck(
+            reachable=True, health_response=instance_health_response, message=message
         )
+    return InstanceCheck(
+        reachable=False,
+        message=f"unexpected service: {response.service} version: {response.version}",
+        health_response=instance_health_response,
+    )
 
 
 def _volume_to_shim_volume_info(volume: Volume, instance_id: str) -> ShimVolumeInfo:

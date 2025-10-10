@@ -1,3 +1,4 @@
+import sys
 from pathlib import Path
 from typing import Dict, Optional, Tuple, Type
 
@@ -20,7 +21,12 @@ from dstack._internal.core.models.configurations import (
     parse_apply_configuration,
 )
 
-apply_configurators_mapping: Dict[ApplyConfigurationType, Type[BaseApplyConfigurator]] = {
+APPLY_STDIN_NAME = "-"
+
+
+apply_configurators_mapping: Dict[
+    ApplyConfigurationType, Type[BaseApplyConfigurator[AnyApplyConfiguration]]
+] = {
     cls.TYPE: cls
     for cls in [
         DevEnvironmentConfigurator,
@@ -43,7 +49,9 @@ run_configurators_mapping: Dict[ApplyConfigurationType, Type[BaseRunConfigurator
 }
 
 
-def get_apply_configurator_class(configurator_type: str) -> Type[BaseApplyConfigurator]:
+def get_apply_configurator_class(
+    configurator_type: str,
+) -> Type[BaseApplyConfigurator[AnyApplyConfiguration]]:
     return apply_configurators_mapping[ApplyConfigurationType(configurator_type)]
 
 
@@ -62,6 +70,8 @@ def load_apply_configuration(
             raise ConfigurationError(
                 "No configuration file specified via `-f` and no default .dstack.yml configuration found"
             )
+    elif configuration_file == APPLY_STDIN_NAME:
+        configuration_path = sys.stdin.fileno()
     else:
         configuration_path = Path(configuration_file)
         if not configuration_path.exists():
@@ -71,4 +81,6 @@ def load_apply_configuration(
             conf = parse_apply_configuration(yaml.safe_load(f))
     except OSError:
         raise ConfigurationError(f"Failed to load configuration from {configuration_path}")
+    if isinstance(configuration_path, int):
+        return APPLY_STDIN_NAME, conf
     return str(configuration_path.absolute().relative_to(Path.cwd())), conf

@@ -1,3 +1,5 @@
+import argparse
+
 import argcomplete
 
 from dstack._internal.cli.commands import BaseCommand
@@ -15,6 +17,6 @@ class CompletionCommand(BaseCommand):
             choices=["bash", "zsh"],
         )
 
-    def _command(self, args):
+    def _command(self, args: argparse.Namespace):
         super()._command(args)
-        print(argcomplete.shellcode(["dstack"], shell=args.shell))
+        print(argcomplete.shellcode(["dstack"], shell=args.shell))  # type: ignore[attr-defined]

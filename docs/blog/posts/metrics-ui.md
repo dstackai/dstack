@@ -5,9 +5,7 @@ description: "TBA"
 slug: metrics-ui
 image: https://dstack.ai/static-assets/static-assets/images/dstack-metrics-ui-v3-min.png
 categories:
-  - Metrics
-  - AMD
-  - NVIDIA
+  - Changelog
 ---
 
 # Built-in UI for monitoring essential GPU metrics

@@ -88,7 +88,7 @@ class TestCommands:
         ],
     )
     async def test_with_commands_no_image(self, shell: Optional[str], expected_shell: str):
-        configuration = TaskConfiguration(commands=["sleep inf"], shell=shell)
+        configuration = TaskConfiguration(python="3.12", commands=["sleep inf"], shell=shell)
         run_spec = get_run_spec(run_name="run", repo_id="id", configuration=configuration)
         configurator = TaskJobConfigurator(run_spec)
 
@@ -98,9 +98,9 @@ class TestCommands:
             expected_shell,
             "-i",
             "-c",
-            "uv venv --prompt workflow --seed /workflow/.venv > /dev/null 2>&1"
-            " && echo 'source /workflow/.venv/bin/activate' >> ~/.bashrc"
-            " && source /workflow/.venv/bin/activate"
+            "uv venv -q --prompt dstack -p 3.12 --seed /dstack/venv"
+            " && echo '. /dstack/venv/bin/activate' >> /dstack/profile"
+            " && . /dstack/venv/bin/activate"
             " && sleep inf",
         ]
 

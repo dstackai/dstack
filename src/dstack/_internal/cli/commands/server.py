@@ -1,5 +1,5 @@
+import argparse
 import os
-from argparse import Namespace
 
 from dstack._internal import settings
 from dstack._internal.cli.commands import BaseCommand
@@ -53,7 +53,7 @@ class ServerCommand(BaseCommand):
         )
         self._parser.add_argument("--token", type=str, help="The admin user token")
 
-    def _command(self, args: Namespace):
+    def _command(self, args: argparse.Namespace):
         super()._command(args)
 
         if not UVICORN_INSTALLED:
@@ -74,7 +74,7 @@ class ServerCommand(BaseCommand):
         uvicorn_log_level = os.getenv("DSTACK_SERVER_UVICORN_LOG_LEVEL", "ERROR").lower()
         reload_disabled = os.getenv("DSTACK_SERVER_RELOAD_DISABLED") is not None
 
-        uvicorn.run(
+        uvicorn.run(  # type: ignore[unbound-variable]
             "dstack._internal.server.main:app",
             host=args.host,
             port=args.port,
@@ -82,3 +82,8 @@ class ServerCommand(BaseCommand):
             log_level=uvicorn_log_level,
             workers=1,
         )
+
+    def _configure_logging(self) -> None:
+        # Server logging is configured in the FastAPI lifespan function.
+        # No need to configure CLI logging.
+        pass

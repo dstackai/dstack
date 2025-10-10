@@ -33,6 +33,10 @@ type CLIArgs struct {
 		Interval int // milliseconds
 	}
 
+	DCGM struct {
+		Address string
+	}
+
 	Docker struct {
 		ConcatinatedPublicSSHKeys string
 		Privileged                bool
@@ -98,6 +102,11 @@ type TaskConfig struct {
 	HostSshKeys []string    `json:"host_ssh_keys"`
 	// TODO: submit keys to runner, not to shim
 	ContainerSshKeys []string `json:"container_ssh_keys"`
+}
+
+type TaskListItem struct {
+	ID     string     `json:"id"`
+	Status TaskStatus `json:"status"`
 }
 
 type TaskInfo struct {

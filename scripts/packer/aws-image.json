@@ -4,7 +4,7 @@
     "aws_secret_key": "{{env `AWS_SECRET_ACCESS_KEY`}}",
     "region": "eu-west-1",
     "ssh_username": "ubuntu",
-    "base_ami": "ami-0cffefff2d52e0a23",
+    "base_ami": "ami-0bc691261a82b32bc",
     "instance_type": "c5.large",
     "subnet_id": "subnet-c39cb6a5",
     "docker_version": "",
@@ -71,14 +71,6 @@
         "cd /tmp",
         "chmod +x install-docker.sh",
         "./install-docker.sh --version {{user `docker_version`}}"]
-    },
-    {
-      "type": "shell",
-      "environment_vars": [
-        "IMAGE_REPO={{user `image_repo`}}",
-        "IMAGE_VERSION={{user `image_version`}}"
-      ],
-      "script": "provisioners/pull-docker-images.sh"
     }
   ]
 }

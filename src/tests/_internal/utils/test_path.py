@@ -2,7 +2,19 @@ from pathlib import PurePath
 
 import pytest
 
-from dstack._internal.utils.path import resolve_relative_path
+from dstack._internal.utils.path import normalize_path, resolve_relative_path
+
+
+class TestNormalizePath:
+    def test_escape_top(self):
+        with pytest.raises(ValueError):
+            normalize_path("dir/../..")
+
+    def test_normalize_rel(self):
+        assert normalize_path("dir/.///..///sibling") == PurePath("sibling")
+
+    def test_normalize_abs(self):
+        assert normalize_path("/dir/.///..///sibling") == PurePath("/sibling")
 
 
 class TestResolveRelativePath:

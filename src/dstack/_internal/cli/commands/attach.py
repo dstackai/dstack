@@ -52,9 +52,8 @@ class AttachCommand(APIBaseCommand):
         )
         self._parser.add_argument(
             "--replica",
-            help="The replica number. Defaults to 0.",
+            help="The replica number. Defaults to any running replica.",
             type=int,
-            default=0,
         )
         self._parser.add_argument(
             "--job",
@@ -62,7 +61,7 @@ class AttachCommand(APIBaseCommand):
             type=int,
             default=0,
         )
-        self._parser.add_argument("run_name").completer = RunNameCompleter()
+        self._parser.add_argument("run_name").completer = RunNameCompleter()  # type: ignore[attr-defined]
 
     def _command(self, args: argparse.Namespace):
         super()._command(args)
@@ -129,14 +128,15 @@ _IGNORED_PORTS = [DSTACK_RUNNER_HTTP_PORT]
 def _print_attached_message(
     run: Run,
     bind_address: Optional[str],
-    replica_num: int,
+    replica_num: Optional[int],
     job_num: int,
 ):
     if bind_address is None:
         bind_address = "localhost"
 
-    output = f"Attached to run [code]{run.name}[/] (replica={replica_num} job={job_num})\n"
     job = get_or_error(run._find_job(replica_num=replica_num, job_num=job_num))
+    replica_num = job.job_spec.replica_num
+    output = f"Attached to run [code]{run.name}[/] (replica={replica_num} job={job_num})\n"
     name = run.name
     if replica_num != 0 or job_num != 0:
         name = job.job_spec.job_name

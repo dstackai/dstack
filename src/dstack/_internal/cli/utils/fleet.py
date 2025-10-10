@@ -51,11 +51,11 @@ def get_fleets_table(
                 and total_blocks > 1
             ):
                 status = f"{busy_blocks}/{total_blocks} {InstanceStatus.BUSY.value}"
-            if (
-                instance.status in [InstanceStatus.IDLE, InstanceStatus.BUSY]
-                and instance.unreachable
-            ):
-                status += "\n(unreachable)"
+            if instance.status in [InstanceStatus.IDLE, InstanceStatus.BUSY]:
+                if instance.unreachable:
+                    status += "\n(unreachable)"
+                elif not instance.health_status.is_healthy():
+                    status += f"\n({instance.health_status.value})"
 
             backend = instance.backend or ""
             if backend == "remote":

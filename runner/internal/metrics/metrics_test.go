@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"runtime"
 	"testing"
 
 	"github.com/dstackai/dstack/runner/internal/schemas"
@@ -8,6 +9,9 @@ import (
 )
 
 func TestGetAMDGPUMetrics_OK(t *testing.T) {
+	if runtime.GOOS == "darwin" {
+		t.Skip("Skipping on macOS")
+	}
 	collector, err := NewMetricsCollector()
 	assert.NoError(t, err)
 
@@ -39,6 +43,9 @@ func TestGetAMDGPUMetrics_OK(t *testing.T) {
 }
 
 func TestGetAMDGPUMetrics_ErrorGPUUtilNA(t *testing.T) {
+	if runtime.GOOS == "darwin" {
+		t.Skip("Skipping on macOS")
+	}
 	collector, err := NewMetricsCollector()
 	assert.NoError(t, err)
 	metrics, err := collector.getAMDGPUMetrics("gpu,gfx,gfx_clock,vram_used,vram_total\n0,N/A,N/A,283,196300\n")

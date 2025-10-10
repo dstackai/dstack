@@ -10,7 +10,6 @@ from dstack._internal.core.backends.oci import resources
 from dstack._internal.core.backends.oci.backend import OCIBackend
 from dstack._internal.core.backends.oci.exceptions import any_oci_exception
 from dstack._internal.core.backends.oci.models import (
-    AnyOCIBackendConfig,
     OCIBackendConfig,
     OCIBackendConfigWithCreds,
     OCIConfig,
@@ -42,7 +41,12 @@ SUPPORTED_REGIONS = frozenset(
 )
 
 
-class OCIConfigurator(Configurator):
+class OCIConfigurator(
+    Configurator[
+        OCIBackendConfig,
+        OCIBackendConfigWithCreds,
+    ]
+):
     TYPE = BackendType.OCI
     BACKEND_CLASS = OCIBackend
 
@@ -83,12 +87,12 @@ class OCIConfigurator(Configurator):
             auth=OCICreds.parse_obj(config.creds).json(),
         )
 
-    def get_backend_config(
-        self, record: BackendRecord, include_creds: bool
-    ) -> AnyOCIBackendConfig:
+    def get_backend_config_with_creds(self, record: BackendRecord) -> OCIBackendConfigWithCreds:
         config = self._get_config(record)
-        if include_creds:
-            return OCIBackendConfigWithCreds.__response__.parse_obj(config)
+        return OCIBackendConfigWithCreds.__response__.parse_obj(config)
+
+    def get_backend_config_without_creds(self, record: BackendRecord) -> OCIBackendConfig:
+        config = self._get_config(record)
         return OCIBackendConfig.__response__.parse_obj(config)
 
     def get_backend(self, record: BackendRecord) -> OCIBackend:

@@ -1,8 +1,9 @@
 import shlex
 import sys
+import threading
 from abc import ABC, abstractmethod
 from pathlib import PurePosixPath
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional
 
 from cachetools import TTLCache, cached
 
@@ -10,10 +11,17 @@ from dstack._internal import settings
 from dstack._internal.core.errors import DockerRegistryError, ServerClientError
 from dstack._internal.core.models.common import RegistryAuth
 from dstack._internal.core.models.configurations import (
-    DEFAULT_REPO_DIR,
+    DEFAULT_PROBE_INTERVAL,
+    DEFAULT_PROBE_METHOD,
+    DEFAULT_PROBE_READY_AFTER,
+    DEFAULT_PROBE_TIMEOUT,
+    DEFAULT_PROBE_URL,
+    LEGACY_REPO_DIR,
     PortMapping,
+    ProbeConfig,
     PythonVersion,
     RunConfigurationType,
+    ServiceConfiguration,
 )
 from dstack._internal.core.models.profiles import (
     DEFAULT_STOP_DURATION,
@@ -24,6 +32,7 @@ from dstack._internal.core.models.runs import (
     AppSpec,
     JobSpec,
     JobSSHKey,
+    ProbeSpec,
     Requirements,
     Retry,
     RunSpec,
@@ -36,6 +45,14 @@ from dstack._internal.server.services.docker import ImageConfig, get_image_confi
 from dstack._internal.utils import crypto
 from dstack._internal.utils.common import run_async
 from dstack._internal.utils.interpolator import InterpolatorError, VariablesInterpolator
+from dstack._internal.utils.logging import get_logger
+from dstack._internal.utils.path import is_absolute_posix_path
+
+logger = get_logger(__name__)
+
+
+DSTACK_DIR = "/dstack"
+DSTACK_PROFILE_PATH = f"{DSTACK_DIR}/profile"
 
 
 def get_default_python_verison() -> str:
@@ -50,11 +67,15 @@ def get_default_python_verison() -> str:
         )
 
 
-def get_default_image(python_version: str, nvcc: bool = False) -> str:
-    suffix = ""
-    if nvcc:
-        suffix = "-devel"
-    return f"{settings.DSTACK_BASE_IMAGE}:py{python_version}-{settings.DSTACK_BASE_IMAGE_VERSION}-cuda-12.1{suffix}"
+def get_default_image(nvcc: bool = False) -> str:
+    """
+    Note: May be overridden by dstack (e.g., EFA-enabled version for AWS EFA-capable instances).
+    See `dstack._internal.server.background.tasks.process_running_jobs._patch_base_image_for_aws_efa` for details.
+
+    Args:
+        nvcc: If True, returns 'devel' variant, otherwise 'base'.
+    """
+    return f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}-{'devel' if nvcc else 'base'}-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"
 
 
 class JobConfigurator(ABC):
@@ -64,8 +85,13 @@ class JobConfigurator(ABC):
     # JobSSHKey should be shared for all jobs in a replica for inter-node communication.
     _job_ssh_key: Optional[JobSSHKey] = None
 
-    def __init__(self, run_spec: RunSpec):
+    def __init__(
+        self,
+        run_spec: RunSpec,
+        secrets: Optional[Dict[str, str]] = None,
+    ):
         self.run_spec = run_spec
+        self.secrets = secrets or {}
 
     async def get_job_specs(self, replica_num: int) -> List[JobSpec]:
         job_spec = await self._get_job_spec(replica_num=replica_num, job_num=0, jobs_per_replica=1)
@@ -94,10 +120,20 @@ class JobConfigurator(ABC):
     async def _get_image_config(self) -> ImageConfig:
         if self._image_config is not None:
             return self._image_config
+        interpolate = VariablesInterpolator({"secrets": self.secrets}).interpolate_or_error
+        registry_auth = self.run_spec.configuration.registry_auth
+        if registry_auth is not None:
+            try:
+                registry_auth = RegistryAuth(
+                    username=interpolate(registry_auth.username),
+                    password=interpolate(registry_auth.password),
+                )
+            except InterpolatorError as e:
+                raise ServerClientError(e.args[0])
         image_config = await run_async(
             _get_image_config,
             self._image_name(),
-            self.run_spec.configuration.registry_auth,
+            registry_auth,
         )
         self._image_config = image_config
         return image_config
@@ -130,6 +166,12 @@ class JobConfigurator(ABC):
             working_dir=self._working_dir(),
             volumes=self._volumes(job_num),
             ssh_key=self._ssh_key(jobs_per_replica),
+            repo_data=self.run_spec.repo_data,
+            repo_code_hash=self.run_spec.repo_code_hash,
+            repo_dir=self._repo_dir(),
+            file_archives=self.run_spec.file_archives,
+            service_port=self._service_port(),
+            probes=self._probes(),
         )
         return job_spec
 
@@ -146,6 +188,7 @@ class JobConfigurator(ABC):
 
     async def _commands(self) -> List[str]:
         if self.run_spec.configuration.entrypoint is not None:  # docker-like format
+            assert self.run_spec.configuration.type != "dev-environment"
             entrypoint = shlex.split(self.run_spec.configuration.entrypoint)
             commands = self.run_spec.configuration.commands
         elif shell_commands := self._shell_commands():
@@ -167,15 +210,25 @@ class JobConfigurator(ABC):
         return result
 
     def _dstack_image_commands(self) -> List[str]:
+        if self.run_spec.configuration.docker is True:
+            return ["start-dockerd"]
         if (
             self.run_spec.configuration.image is not None
             or self.run_spec.configuration.entrypoint is not None
         ):
             return []
         return [
-            f"uv venv --prompt workflow --seed {DEFAULT_REPO_DIR}/.venv > /dev/null 2>&1",
-            f"echo 'source {DEFAULT_REPO_DIR}/.venv/bin/activate' >> ~/.bashrc",
-            f"source {DEFAULT_REPO_DIR}/.venv/bin/activate",
+            # `uv` may emit:
+            # > warning: `VIRTUAL_ENV=/dstack/venv` does not match the project environment path
+            # > `.venv` and will be ignored; use `--active` to target the active environment
+            # > instead
+            # Safe to ignore, reusing dstack's venv for `uv` is discouraged (it should only be
+            # used for legacy `pip`-based configurations). `--no-active` suppresses the warning.
+            # Alternatively, the user can call `deactivate` once before using `uv`.
+            # If the user really wants to reuse dstack's venv, they must spefify `--active`.
+            f"uv venv -q --prompt dstack -p {self._python()} --seed {DSTACK_DIR}/venv",
+            f"echo '. {DSTACK_DIR}/venv/bin/activate' >> {DSTACK_PROFILE_PATH}",
+            f". {DSTACK_DIR}/venv/bin/activate",
         ]
 
     def _app_specs(self) -> List[AppSpec]:
@@ -197,9 +250,11 @@ class JobConfigurator(ABC):
         return self.run_spec.configuration.home_dir
 
     def _image_name(self) -> str:
-        if self.run_spec.configuration.image is not None:
+        if self.run_spec.configuration.docker is True:
+            return settings.DSTACK_DIND_IMAGE
+        elif self.run_spec.configuration.image is not None:
             return self.run_spec.configuration.image
-        return get_default_image(self._python(), nvcc=bool(self.run_spec.configuration.nvcc))
+        return get_default_image(nvcc=bool(self.run_spec.configuration.nvcc))
 
     async def _user(self) -> Optional[UnixUser]:
         user = self.run_spec.configuration.user
@@ -211,6 +266,8 @@ class JobConfigurator(ABC):
         return UnixUser.parse(user)
 
     def _privileged(self) -> bool:
+        if self.run_spec.configuration.docker is True:
+            return True
         return self.run_spec.configuration.privileged
 
     def _single_branch(self) -> bool:
@@ -219,19 +276,17 @@ class JobConfigurator(ABC):
         return self.run_spec.configuration.single_branch
 
     def _max_duration(self) -> Optional[int]:
-        if self.run_spec.merged_profile.max_duration in [None, True]:
+        if self.run_spec.merged_profile.max_duration is None:
             return self._default_max_duration()
-        if self.run_spec.merged_profile.max_duration in ["off", False]:
+        if self.run_spec.merged_profile.max_duration == "off":
             return None
-        # pydantic validator ensures this is int
         return self.run_spec.merged_profile.max_duration
 
     def _stop_duration(self) -> Optional[int]:
-        if self.run_spec.merged_profile.stop_duration in [None, True]:
+        if self.run_spec.merged_profile.stop_duration is None:
             return DEFAULT_STOP_DURATION
-        if self.run_spec.merged_profile.stop_duration in ["off", False]:
+        if self.run_spec.merged_profile.stop_duration == "off":
             return None
-        # pydantic validator ensures this is int
         return self.run_spec.merged_profile.stop_duration
 
     def _utilization_policy(self) -> Optional[UtilizationPolicy]:
@@ -252,11 +307,34 @@ class JobConfigurator(ABC):
     def _retry(self) -> Optional[Retry]:
         return get_retry(self.run_spec.merged_profile)
 
+    def _repo_dir(self) -> str:
+        """
+        Returns absolute or relative path
+        """
+        repo_dir = self.run_spec.repo_dir
+        if repo_dir is None:
+            return LEGACY_REPO_DIR
+        return repo_dir
+
     def _working_dir(self) -> Optional[str]:
         """
-        None means default working directory
+        Returns path or None
+
+        None means the default working directory taken from the image
+
+        Currently, for compatibility with pre-0.19.27 runners, the path may be relative.
+        Future versions should return only absolute paths
         """
-        return self.run_spec.working_dir
+        working_dir = self.run_spec.configuration.working_dir
+        if working_dir is None:
+            return working_dir
+        # Return a relative path if possible
+        if is_absolute_posix_path(working_dir):
+            try:
+                return str(PurePosixPath(working_dir).relative_to(LEGACY_REPO_DIR))
+            except ValueError:
+                pass
+        return working_dir
 
     def _python(self) -> str:
         if self.run_spec.configuration.python is not None:
@@ -277,9 +355,19 @@ class JobConfigurator(ABC):
             )
         return self._job_ssh_key
 
+    def _service_port(self) -> Optional[int]:
+        if isinstance(self.run_spec.configuration, ServiceConfiguration):
+            return self.run_spec.configuration.port.container_port
+        return None
+
+    def _probes(self) -> list[ProbeSpec]:
+        if isinstance(self.run_spec.configuration, ServiceConfiguration):
+            return list(map(_probe_config_to_spec, self.run_spec.configuration.probes))
+        return []
+
 
 def interpolate_job_volumes(
-    run_volumes: List[Union[MountPoint, str]],
+    run_volumes: List[MountPoint],
     job_num: int,
 ) -> List[MountPoint]:
     if len(run_volumes) == 0:
@@ -294,9 +382,6 @@ def interpolate_job_volumes(
     )
     job_volumes = []
     for mount_point in run_volumes:
-        if isinstance(mount_point, str):
-            # pydantic validator ensures strings are converted to MountPoint
-            continue
         if not isinstance(mount_point, VolumeMountPoint):
             job_volumes.append(mount_point.copy())
             continue
@@ -317,6 +402,19 @@ def interpolate_job_volumes(
     return job_volumes
 
 
+def _probe_config_to_spec(c: ProbeConfig) -> ProbeSpec:
+    return ProbeSpec(
+        type=c.type,
+        url=c.url if c.url is not None else DEFAULT_PROBE_URL,
+        timeout=c.timeout if c.timeout is not None else DEFAULT_PROBE_TIMEOUT,
+        interval=c.interval if c.interval is not None else DEFAULT_PROBE_INTERVAL,
+        ready_after=c.ready_after if c.ready_after is not None else DEFAULT_PROBE_READY_AFTER,
+        method=c.method if c.method is not None else DEFAULT_PROBE_METHOD,
+        headers=c.headers,
+        body=c.body,
+    )
+
+
 def _join_shell_commands(commands: List[str]) -> str:
     for i, cmd in enumerate(commands):
         cmd = cmd.strip()
@@ -326,7 +424,10 @@ def _join_shell_commands(commands: List[str]) -> str:
     return " && ".join(commands)
 
 
-@cached(TTLCache(maxsize=2048, ttl=80))
+@cached(
+    cache=TTLCache(maxsize=2048, ttl=80),
+    lock=threading.Lock(),
+)
 def _get_image_config(image: str, registry_auth: Optional[RegistryAuth]) -> ImageConfig:
     try:
         return get_image_config(image, registry_auth).config

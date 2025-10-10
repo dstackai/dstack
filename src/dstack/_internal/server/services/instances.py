@@ -1,20 +1,23 @@
+import operator
 import uuid
 from collections.abc import Container, Iterable
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Dict, List, Literal, Optional, Union
 
 import gpuhunt
 from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, load_only
 
-from dstack._internal.core.backends import BACKENDS_WITH_MULTINODE_SUPPORT
 from dstack._internal.core.backends.base.offers import (
     offer_to_catalog_item,
     requirements_to_query_filter,
 )
+from dstack._internal.core.backends.features import BACKENDS_WITH_MULTINODE_SUPPORT
+from dstack._internal.core.errors import ResourceNotExistsError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.envs import Env
+from dstack._internal.core.models.health import HealthCheck, HealthEvent, HealthStatus
 from dstack._internal.core.models.instances import (
     Instance,
     InstanceAvailability,
@@ -34,21 +37,77 @@ from dstack._internal.core.models.profiles import (
     TerminationPolicy,
 )
 from dstack._internal.core.models.runs import JobProvisioningData, Requirements
-from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.core.models.volumes import Volume
 from dstack._internal.core.services.profiles import get_termination
+from dstack._internal.server import settings as server_settings
 from dstack._internal.server.models import (
     FleetModel,
+    InstanceHealthCheckModel,
     InstanceModel,
     ProjectModel,
     UserModel,
 )
+from dstack._internal.server.schemas.health.dcgm import DCGMHealthResponse
+from dstack._internal.server.schemas.runner import InstanceHealthResponse, TaskStatus
+from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.offers import generate_shared_offer
-from dstack._internal.server.services.projects import list_project_models, list_user_project_models
+from dstack._internal.server.services.projects import list_user_project_models
+from dstack._internal.server.services.runner.client import ShimClient
 from dstack._internal.utils import common as common_utils
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
+
+
+async def get_instance_health_checks(
+    session: AsyncSession,
+    project: ProjectModel,
+    fleet_name: str,
+    instance_num: int,
+    after: Optional[datetime] = None,
+    before: Optional[datetime] = None,
+    limit: Optional[int] = None,
+) -> list[HealthCheck]:
+    """
+    Returns instance health checks ordered from the latest to the earliest.
+
+    Expected usage:
+        * limit=100 — get the latest 100 checks
+        * after=<now - 1 hour> — get checks for the last hour
+        * before=<earliest timestamp from the last batch>, limit=100 ­— paginate back in history
+    """
+    res = await session.execute(
+        select(InstanceModel)
+        .join(FleetModel)
+        .where(
+            ~InstanceModel.deleted,
+            InstanceModel.project_id == project.id,
+            InstanceModel.instance_num == instance_num,
+            FleetModel.name == fleet_name,
+        )
+        .options(load_only(InstanceModel.id))
+    )
+    instance = res.scalar_one_or_none()
+    if instance is None:
+        raise ResourceNotExistsError()
+
+    stmt = (
+        select(InstanceHealthCheckModel)
+        .where(InstanceHealthCheckModel.instance_id == instance.id)
+        .order_by(InstanceHealthCheckModel.collected_at.desc())
+    )
+    if after is not None:
+        stmt = stmt.where(InstanceHealthCheckModel.collected_at > after)
+    if before is not None:
+        stmt = stmt.where(InstanceHealthCheckModel.collected_at < before)
+    if limit is not None:
+        stmt = stmt.limit(limit)
+    health_checks: list[HealthCheck] = []
+    res = await session.execute(stmt)
+    for health_check_model in res.scalars():
+        health_check = instance_health_check_model_to_health_check(health_check_model)
+        health_checks.append(health_check)
+    return health_checks
 
 
 def instance_model_to_instance(instance_model: InstanceModel) -> Instance:
@@ -61,8 +120,9 @@ def instance_model_to_instance(instance_model: InstanceModel) -> Instance:
         instance_num=instance_model.instance_num,
         status=instance_model.status,
         unreachable=instance_model.unreachable,
+        health_status=instance_model.health,
         termination_reason=instance_model.termination_reason,
-        created=instance_model.created_at.replace(tzinfo=timezone.utc),
+        created=instance_model.created_at,
         total_blocks=instance_model.total_blocks,
         busy_blocks=instance_model.busy_blocks,
     )
@@ -80,6 +140,48 @@ def instance_model_to_instance(instance_model: InstanceModel) -> Instance:
         instance.availability_zone = jpd.availability_zone
 
     return instance
+
+
+def instance_health_check_model_to_health_check(model: InstanceHealthCheckModel) -> HealthCheck:
+    collected_at = model.collected_at
+    status = HealthStatus.HEALTHY
+    events: list[HealthEvent] = []
+    instance_health_response = get_instance_health_response(model)
+    if (dcgm := instance_health_response.dcgm) is not None:
+        dcgm_health_check = dcgm_health_response_to_health_check(dcgm, collected_at)
+        status = dcgm_health_check.status
+        events.extend(dcgm_health_check.events)
+    events.sort(key=operator.attrgetter("timestamp"), reverse=True)
+    return HealthCheck(
+        collected_at=collected_at,
+        status=status,
+        events=events,
+    )
+
+
+def dcgm_health_response_to_health_check(
+    response: DCGMHealthResponse, collected_at: datetime
+) -> HealthCheck:
+    events: list[HealthEvent] = []
+    for incident in response.incidents:
+        events.append(
+            HealthEvent(
+                timestamp=collected_at,
+                status=incident.health.to_health_status(),
+                message=incident.error_message,
+            )
+        )
+    return HealthCheck(
+        collected_at=collected_at,
+        status=response.overall_health.to_health_status(),
+        events=events,
+    )
+
+
+def get_instance_health_response(
+    instance_health_check_model: InstanceHealthCheckModel,
+) -> InstanceHealthResponse:
+    return InstanceHealthResponse.__response__.parse_raw(instance_health_check_model.response)
 
 
 def get_instance_provisioning_data(instance_model: InstanceModel) -> Optional[JobProvisioningData]:
@@ -104,6 +206,14 @@ def get_instance_profile(instance_model: InstanceModel) -> Profile:
 
 def get_instance_requirements(instance_model: InstanceModel) -> Requirements:
     return Requirements.__response__.parse_raw(instance_model.requirements)
+
+
+def get_instance_remote_connection_info(
+    instance_model: InstanceModel,
+) -> Optional[RemoteConnectionInfo]:
+    if instance_model.remote_connection_info is None:
+        return None
+    return RemoteConnectionInfo.__response__.parse_raw(instance_model.remote_connection_info)
 
 
 def get_instance_ssh_private_keys(instance_model: InstanceModel) -> tuple[str, Optional[str]]:
@@ -186,6 +296,8 @@ def filter_pool_instances(
         if fleet_model is not None and instance.fleet_id != fleet_model.id:
             continue
         if instance.unreachable:
+            continue
+        if instance.health.is_failure():
             continue
         fleet = instance.fleet
         if profile.fleets is not None and (fleet is None or fleet.name not in profile.fleets):
@@ -364,18 +476,15 @@ async def list_user_instances(
     limit: int,
     ascending: bool,
 ) -> List[Instance]:
-    if user.global_role == GlobalRole.ADMIN:
-        projects = await list_project_models(session=session)
-    else:
-        projects = await list_user_project_models(session=session, user=user)
-    if not projects:
-        return []
-
+    projects = await list_user_project_models(
+        session=session,
+        user=user,
+        only_names=True,
+    )
     if project_names is not None:
-        projects = [proj for proj in projects if proj.name in project_names]
+        projects = [p for p in projects if p.name in project_names]
         if len(projects) == 0:
             return []
-
     instance_models = await list_projects_instance_models(
         session=session,
         projects=projects,
@@ -404,10 +513,10 @@ async def list_active_remote_instances(
     return instance_models
 
 
-async def create_instance_model(
+def create_instance_model(
     session: AsyncSession,
     project: ProjectModel,
-    user: UserModel,
+    username: str,
     profile: Profile,
     requirements: Requirements,
     instance_name: str,
@@ -427,7 +536,7 @@ async def create_instance_model(
     instance_config = InstanceConfiguration(
         project_name=project.name,
         instance_name=instance_name,
-        user=user.name,
+        user=username,
         ssh_keys=[project_ssh_key],
         instance_id=str(instance_id),
         reservation=reservation,
@@ -527,3 +636,40 @@ async def create_ssh_instance_model(
         busy_blocks=0,
     )
     return im
+
+
+def remove_dangling_tasks_from_instance(shim_client: ShimClient, instance: InstanceModel) -> None:
+    if not shim_client.is_api_v2_supported():
+        return
+    assigned_to_instance_job_ids = {str(j.id) for j in instance.jobs}
+    task_list_response = shim_client.list_tasks()
+    tasks: list[tuple[str, Optional[TaskStatus]]]
+    if task_list_response.tasks is not None:
+        tasks = [(t.id, t.status) for t in task_list_response.tasks]
+    elif task_list_response.ids is not None:
+        # compatibility with pre-0.19.26 shim
+        tasks = [(t_id, None) for t_id in task_list_response.ids]
+    else:
+        raise ValueError("Unexpected task list response, neither `tasks` nor `ids` is set")
+    for task_id, task_status in tasks:
+        if task_id in assigned_to_instance_job_ids:
+            continue
+        should_terminate = task_status != TaskStatus.TERMINATED
+        should_remove = not server_settings.SERVER_KEEP_SHIM_TASKS
+        if not (should_terminate or should_remove):
+            continue
+        logger.warning(
+            "%s: dangling task found, id=%s, status=%s. Terminating and/or removing",
+            fmt(instance),
+            task_id,
+            task_status or "<unknown>",
+        )
+        if should_terminate:
+            shim_client.terminate_task(
+                task_id=task_id,
+                reason=None,
+                message=None,
+                timeout=0,
+            )
+        if should_remove:
+            shim_client.remove_task(task_id=task_id)

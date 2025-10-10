@@ -6,6 +6,7 @@ import requests
 from dstack._internal.core.backends.base.backend import Compute
 from dstack._internal.core.backends.base.compute import (
     ComputeWithCreateInstanceSupport,
+    ComputeWithPrivilegedSupport,
     generate_unique_instance_name,
     get_shim_commands,
 )
@@ -32,6 +33,7 @@ MAX_INSTANCE_NAME_LEN = 60
 
 class TensorDockCompute(
     ComputeWithCreateInstanceSupport,
+    ComputeWithPrivilegedSupport,
     Compute,
 ):
     def __init__(self, config: TensorDockConfig):
@@ -39,9 +41,7 @@ class TensorDockCompute(
         self.config = config
         self.api_client = TensorDockAPIClient(config.creds.api_key, config.creds.api_token)
 
-    def get_offers(
-        self, requirements: Optional[Requirements] = None
-    ) -> List[InstanceOfferWithAvailability]:
+    def get_offers(self, requirements: Requirements) -> List[InstanceOfferWithAvailability]:
         offers = get_catalog_offers(
             backend=BackendType.TENSORDOCK,
             requirements=requirements,

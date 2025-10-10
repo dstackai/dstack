@@ -14,6 +14,17 @@ DSTACK_USE_LATEST_FROM_BRANCH = os.getenv("DSTACK_USE_LATEST_FROM_BRANCH") is no
 
 DSTACK_BASE_IMAGE = os.getenv("DSTACK_BASE_IMAGE", "dstackai/base")
 DSTACK_BASE_IMAGE_VERSION = os.getenv("DSTACK_BASE_IMAGE_VERSION", version.base_image)
+DSTACK_BASE_IMAGE_UBUNTU_VERSION = os.getenv(
+    "DSTACK_BASE_IMAGE_UBUNTU_VERSION", version.base_image_ubuntu_version
+)
+DSTACK_DIND_IMAGE = os.getenv("DSTACK_DIND_IMAGE", "dstackai/dind")
+
+CLI_LOG_LEVEL = os.getenv("DSTACK_CLI_LOG_LEVEL", "INFO").upper()
+CLI_FILE_LOG_LEVEL = os.getenv("DSTACK_CLI_FILE_LOG_LEVEL", "DEBUG").upper()
+
+# Development settings
+
+LOCAL_BACKEND_ENABLED = os.getenv("DSTACK_LOCAL_BACKEND_ENABLED") is not None
 
 
 class FeatureFlags:

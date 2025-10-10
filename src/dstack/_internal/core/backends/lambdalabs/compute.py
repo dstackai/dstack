@@ -1,4 +1,5 @@
 import hashlib
+import shlex
 import subprocess
 import tempfile
 from threading import Thread
@@ -6,7 +7,9 @@ from typing import Dict, List, Optional
 
 from dstack._internal.core.backends.base.compute import (
     Compute,
+    ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
+    ComputeWithPrivilegedSupport,
     generate_unique_instance_name,
     get_shim_commands,
 )
@@ -21,13 +24,15 @@ from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
 )
 from dstack._internal.core.models.placement import PlacementGroup
-from dstack._internal.core.models.runs import JobProvisioningData, Requirements
+from dstack._internal.core.models.runs import JobProvisioningData
 
 MAX_INSTANCE_NAME_LEN = 60
 
 
 class LambdaCompute(
+    ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
+    ComputeWithPrivilegedSupport,
     Compute,
 ):
     def __init__(self, config: LambdaConfig):
@@ -35,13 +40,10 @@ class LambdaCompute(
         self.config = config
         self.api_client = LambdaAPIClient(config.creds.api_key)
 
-    def get_offers(
-        self, requirements: Optional[Requirements] = None
-    ) -> List[InstanceOfferWithAvailability]:
+    def get_all_offers_with_availability(self) -> List[InstanceOfferWithAvailability]:
         offers = get_catalog_offers(
             backend=BackendType.LAMBDA,
             locations=self.config.regions or None,
-            requirements=requirements,
         )
         offers_with_availability = self._get_offers_with_availability(offers)
         return offers_with_availability
@@ -98,7 +100,7 @@ class LambdaCompute(
                 arch=provisioning_data.instance_type.resources.cpu_arch,
             )
             # shim is assumed to be run under root
-            launch_command = "sudo sh -c '" + "&& ".join(commands) + "'"
+            launch_command = "sudo sh -c " + shlex.quote(" && ".join(commands))
             thread = Thread(
                 target=_start_runner,
                 kwargs={
@@ -205,10 +207,11 @@ def _launch_runner(
     ssh_private_key: str,
     launch_command: str,
 ):
+    daemonized_command = f"{launch_command.rstrip('&')} >/tmp/dstack-shim.log 2>&1 & disown"
     _run_ssh_command(
         hostname=hostname,
         ssh_private_key=ssh_private_key,
-        command=launch_command,
+        command=daemonized_command,
     )
 
 

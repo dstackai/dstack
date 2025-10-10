@@ -5,8 +5,7 @@ description: "dstack now supports Intel Gaudi accelerators with SSH fleets, simp
 slug: intel-gaudi
 image: https://dstack.ai/static-assets/static-assets/images/dstack-intel-gaudi-and-intel-tiber-cloud.png-v2
 categories:
-  - Intel Gaudi
-  - SSH fleets
+  - Changelog
 ---
 
 # Supporting Intel Gaudi AI accelerators with SSH fleets

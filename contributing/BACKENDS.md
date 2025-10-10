@@ -4,8 +4,8 @@ The guide below explains the steps required to extend `dstack` with support for 
 
 ## Overview of the process
 
-1. Add the cloud provider to [gpuhunt](https://https://github.com/dstackai/gpuhunt)
-2. Integrate the cloud provider into [dstack](https://https://github.com/dstackai/dstack)
+1. Add the cloud provider to [gpuhunt](https://github.com/dstackai/gpuhunt)
+2. Integrate the cloud provider into [dstack](https://github.com/dstackai/dstack)
 
 ## 1. Add a cloud provider to dstackai/gpuhunt
 
@@ -27,7 +27,7 @@ git clone https://github.com/dstackai/gpuhunt.git
 
 - **Offline providers** offer static machine configurations that are not frequently updated.
   `gpuhunt` collects offline providers' instance offers on an hourly basis.
-  Examples: `aws`, `gcp`, `azure`, etc. 
+  Examples: `aws`, `gcp`, `azure`, etc.
 - **Online providers** offer dynamic machine configurations that are available at the very moment
   when you fetch configurations (e.g., GPU marketplaces).
   `gpuhunt` collects online providers' instance offers each time a `dstack` user provisions a new instance.
@@ -35,7 +35,7 @@ git clone https://github.com/dstackai/gpuhunt.git
 
 ### 1.3. Create the provider class
 
-Create the provider class file under `src/gpuhunt/providers`. 
+Create the provider class file under `src/gpuhunt/providers`.
 
 Make sure your class extends the [`AbstractProvider`](https://github.com/dstackai/gpuhunt/blob/main/src/gpuhunt/providers/__init__.py)
 base class. See its docstrings for descriptions of the methods that your class should implement.
@@ -69,13 +69,13 @@ Refer to examples: [test_datacrunch.py](https://github.com/dstackai/gpuhunt/blob
 
 ### 1.6. Submit a pull request
 
-Once the cloud provider is added, submit a pull request. 
+Once the cloud provider is added, submit a pull request.
 
 > Anything unclear? Ask questions on the [Discord server](https://discord.gg/u8SmfwPpMd).
 
 ## 2. Integrate the cloud provider to dstackai/dstack
 
-Once the provider is added to `gpuhunt`, we can proceed with implementing 
+Once the provider is added to `gpuhunt`, we can proceed with implementing
 the corresponding backend with `dstack`. Follow the steps below.
 
 ### 2.1. Determine if you will implement a VM-based or a container-based backend
@@ -124,10 +124,10 @@ Then add these models to `AnyBackendConfig*` unions in [`src/dstack/_internal/co
 
 The script also generates `*BackendStoredConfig` that extends `*BackendConfig` to be able to store extra parameters in the DB. By the same logic, it generates `*Config` that extends `*BackendStoredConfig` with creds and uses it as the main `Backend` and `Compute` config instead of using `*BackendConfigWithCreds` directly.
 
-Refer to examples: 
-[datacrunch](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/datacrunch/models.py), 
-[aws](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/aws/models.py), 
-[gcp](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/gcp/models.py), 
+Refer to examples:
+[datacrunch](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/datacrunch/models.py),
+[aws](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/aws/models.py),
+[gcp](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/gcp/models.py),
 [azure](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/models.py), etc.
 
 ### 2.7. Implement the backend compute class
@@ -147,8 +147,8 @@ Go to `configurator.py` and implement custom `Configurator` logic. At minimum, y
 You may also need to validate other config parameters if there are any.
 
 Refer to examples: [datacrunch](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/datacrunch/configurator.py),
-[aws](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/aws/configurator.py), 
-[gcp](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/gcp/configurator.py), 
+[aws](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/aws/configurator.py),
+[gcp](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/gcp/configurator.py),
 [azure](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/azure/configurator.py), etc.
 
 Register configurator by appending it to `_CONFIGURATOR_CLASSES` in [`src/dstack/_internal/core/backends/configurators.py`](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/configurators.py).
@@ -180,6 +180,9 @@ The agent controls the VM and starts Docker containers for users' jobs.
 
 Since `dstack` controls the entire VM, VM-based backends can support more features,
 such as blocks, instance volumes, privileged containers, and reusable instances.
+
+Note, all VM-based backend `Compute`s should sublass the `ComputeWithPrivilegedSupport` mixin,
+as the `dstack-shim` agent provides this functionality OOTB.
 
 To support a VM-based backend, `dstack` expects the following:
 

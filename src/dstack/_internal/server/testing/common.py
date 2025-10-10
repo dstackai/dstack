@@ -1,5 +1,6 @@
 import json
 import uuid
+from collections.abc import Callable
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from typing import Dict, List, Literal, Optional, Union
@@ -15,6 +16,7 @@ from dstack._internal.core.backends.base.compute import (
     ComputeWithMultinodeSupport,
     ComputeWithPlacementGroupSupport,
     ComputeWithPrivateGatewaySupport,
+    ComputeWithPrivilegedSupport,
     ComputeWithReservationSupport,
     ComputeWithVolumeSupport,
 )
@@ -27,11 +29,15 @@ from dstack._internal.core.models.configurations import (
 from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.fleets import (
     FleetConfiguration,
+    FleetNodesSpec,
     FleetSpec,
     FleetStatus,
     InstanceGroupPlacement,
+    SSHHostParams,
+    SSHParams,
 )
 from dstack._internal.core.models.gateways import GatewayComputeConfiguration, GatewayStatus
+from dstack._internal.core.models.health import HealthStatus
 from dstack._internal.core.models.instances import (
     Disk,
     Gpu,
@@ -56,7 +62,7 @@ from dstack._internal.core.models.profiles import (
 )
 from dstack._internal.core.models.repos.base import RepoType
 from dstack._internal.core.models.repos.local import LocalRunRepoData
-from dstack._internal.core.models.resources import CPUSpec, Memory, Range, ResourcesSpec
+from dstack._internal.core.models.resources import CPUSpec, Memory, ResourcesSpec
 from dstack._internal.core.models.runs import (
     JobProvisioningData,
     JobRuntimeData,
@@ -65,6 +71,7 @@ from dstack._internal.core.models.runs import (
     Requirements,
     RunSpec,
     RunStatus,
+    RunTerminationReason,
 )
 from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.core.models.volumes import (
@@ -77,18 +84,22 @@ from dstack._internal.core.models.volumes import (
 from dstack._internal.server.models import (
     BackendModel,
     DecryptedString,
+    FileArchiveModel,
     FleetModel,
     GatewayComputeModel,
     GatewayModel,
+    InstanceHealthCheckModel,
     InstanceModel,
     JobMetricsPoint,
     JobModel,
     JobPrometheusMetrics,
     PlacementGroupModel,
+    ProbeModel,
     ProjectModel,
     RepoCredsModel,
     RepoModel,
     RunModel,
+    SecretModel,
     UserModel,
     VolumeAttachmentModel,
     VolumeModel,
@@ -232,21 +243,38 @@ async def create_repo_creds(
     return repo_creds
 
 
+async def create_file_archive(
+    session: AsyncSession,
+    user_id: UUID,
+    blob_hash: str = "blob_hash",
+    blob: bytes = b"blob_content",
+) -> FileArchiveModel:
+    archive = FileArchiveModel(
+        user_id=user_id,
+        blob_hash=blob_hash,
+        blob=blob,
+    )
+    session.add(archive)
+    await session.commit()
+    return archive
+
+
 def get_run_spec(
-    run_name: str,
     repo_id: str,
-    profile: Optional[Profile] = None,
+    run_name: str = "test-run",
+    configuration_path: str = "dstack.yaml",
+    profile: Union[Profile, Callable[[], Profile], None] = lambda: Profile(name="default"),
     configuration: Optional[AnyRunConfiguration] = None,
 ) -> RunSpec:
-    if profile is None:
-        profile = Profile(name="default")
+    if callable(profile):
+        profile = profile()
     return RunSpec(
         run_name=run_name,
         repo_id=repo_id,
         repo_data=LocalRunRepoData(repo_dir="/"),
         repo_code_hash=None,
-        working_dir=".",
-        configuration_path="dstack.yaml",
+        working_dir=None,
+        configuration_path=configuration_path,
         configuration=configuration or DevEnvironmentConfiguration(ide="vscode"),
         profile=profile,
         ssh_key_pub="user_ssh_key",
@@ -258,13 +286,18 @@ async def create_run(
     project: ProjectModel,
     repo: RepoModel,
     user: UserModel,
+    fleet: Optional[FleetModel] = None,
     run_name: str = "test-run",
     status: RunStatus = RunStatus.SUBMITTED,
+    termination_reason: Optional[RunTerminationReason] = None,
     submitted_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
     run_spec: Optional[RunSpec] = None,
     run_id: Optional[UUID] = None,
     deleted: bool = False,
     priority: int = 0,
+    deployment_num: int = 0,
+    resubmission_attempt: int = 0,
+    next_triggered_at: Optional[datetime] = None,
 ) -> RunModel:
     if run_spec is None:
         run_spec = get_run_spec(
@@ -279,13 +312,19 @@ async def create_run(
         project_id=project.id,
         repo_id=repo.id,
         user_id=user.id,
+        fleet_id=fleet.id if fleet else None,
         submitted_at=submitted_at,
         run_name=run_name,
         status=status,
+        termination_reason=termination_reason,
         run_spec=run_spec.json(),
         last_processed_at=submitted_at,
         jobs=[],
         priority=priority,
+        deployment_num=deployment_num,
+        desired_replica_count=1,
+        resubmission_attempt=resubmission_attempt,
+        next_triggered_at=next_triggered_at,
     )
     session.add(run)
     await session.commit()
@@ -295,6 +334,7 @@ async def create_run(
 async def create_job(
     session: AsyncSession,
     run: RunModel,
+    fleet: Optional[FleetModel] = None,
     submission_num: int = 0,
     status: JobStatus = JobStatus.SUBMITTED,
     submitted_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
@@ -305,19 +345,27 @@ async def create_job(
     instance: Optional[InstanceModel] = None,
     job_num: int = 0,
     replica_num: int = 0,
+    deployment_num: Optional[int] = None,
     instance_assigned: bool = False,
     disconnected_at: Optional[datetime] = None,
+    registered: bool = False,
 ) -> JobModel:
+    if deployment_num is None:
+        deployment_num = run.deployment_num
     run_spec = RunSpec.parse_raw(run.run_spec)
-    job_spec = (await get_job_specs_from_run_spec(run_spec, replica_num=replica_num))[0]
+    job_spec = (
+        await get_job_specs_from_run_spec(run_spec=run_spec, secrets={}, replica_num=replica_num)
+    )[0]
     job_spec.job_num = job_num
     job = JobModel(
         project_id=run.project_id,
+        fleet=fleet,
         run_id=run.id,
         run_name=run.run_name,
         job_num=job_num,
         job_name=run.run_name + f"-{job_num}-{replica_num}",
         replica_num=replica_num,
+        deployment_num=deployment_num,
         submission_num=submission_num,
         submitted_at=submitted_at,
         last_processed_at=last_processed_at,
@@ -330,6 +378,8 @@ async def create_job(
         instance_assigned=instance_assigned,
         used_instance_id=instance.id if instance is not None else None,
         disconnected_at=disconnected_at,
+        probes=[],
+        registered=registered,
     )
     session.add(job)
     await session.commit()
@@ -349,6 +399,7 @@ def get_job_provisioning_data(
     hostname: str = "127.0.0.4",
     internal_ip: Optional[str] = "127.0.0.4",
     price: float = 10.5,
+    instance_type: Optional[InstanceType] = None,
 ) -> JobProvisioningData:
     gpus = [
         Gpu(
@@ -357,14 +408,16 @@ def get_job_provisioning_data(
             vendor=gpuhunt.AcceleratorVendor.NVIDIA,
         )
     ] * gpu_count
-    return JobProvisioningData(
-        backend=backend,
-        instance_type=InstanceType(
+    if instance_type is None:
+        instance_type = InstanceType(
             name="instance",
             resources=Resources(
                 cpus=cpu_count, memory_mib=int(memory_gib * 1024), spot=spot, gpus=gpus
             ),
-        ),
+        )
+    return JobProvisioningData(
+        backend=backend,
+        instance_type=instance_type,
         instance_id="instance_id",
         hostname=hostname,
         internal_ip=internal_ip,
@@ -396,6 +449,26 @@ def get_job_runtime_data(
         offer=offer,
         volume_names=volume_names,
     )
+
+
+async def create_probe(
+    session: AsyncSession,
+    job: JobModel,
+    probe_num: int = 0,
+    due: datetime = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc),
+    success_streak: int = 0,
+) -> ProbeModel:
+    probe = ProbeModel(
+        name=f"{job.job_name}-{probe_num}",
+        job=job,
+        probe_num=probe_num,
+        due=due,
+        success_streak=success_streak,
+        active=True,
+    )
+    session.add(probe)
+    await session.commit()
+    return probe
 
 
 async def create_gateway(
@@ -473,6 +546,7 @@ async def create_fleet(
     status: FleetStatus = FleetStatus.ACTIVE,
     deleted: bool = False,
     name: Optional[str] = None,
+    last_processed_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
 ) -> FleetModel:
     if fleet_id is None:
         fleet_id = uuid.uuid4()
@@ -490,6 +564,7 @@ async def create_fleet(
         spec=spec.json(),
         instances=[],
         runs=[],
+        last_processed_at=last_processed_at,
     )
     session.add(fm)
     await session.commit()
@@ -502,18 +577,43 @@ def get_fleet_spec(conf: Optional[FleetConfiguration] = None) -> FleetSpec:
     return FleetSpec(
         configuration=conf,
         configuration_path="fleet.dstack.yml",
-        profile=Profile(name=""),
+        profile=Profile(),
     )
 
 
 def get_fleet_configuration(
     name: str = "test-fleet",
-    nodes: Range[int] = Range(min=1, max=1),
+    nodes: FleetNodesSpec = FleetNodesSpec(min=1, target=1, max=1),
     placement: Optional[InstanceGroupPlacement] = None,
 ) -> FleetConfiguration:
     return FleetConfiguration(
         name=name,
         nodes=nodes,
+        placement=placement,
+    )
+
+
+def get_ssh_fleet_configuration(
+    name: str = "test-fleet",
+    user: str = "ubuntu",
+    ssh_key: Optional[SSHKey] = None,
+    hosts: Optional[list[Union[SSHHostParams, str]]] = None,
+    network: Optional[str] = None,
+    placement: Optional[InstanceGroupPlacement] = None,
+) -> FleetConfiguration:
+    if ssh_key is None:
+        ssh_key = SSHKey(public="", private=get_private_key_string())
+    if hosts is None:
+        hosts = ["10.0.0.100"]
+    ssh_config = SSHParams(
+        user=user,
+        ssh_key=ssh_key,
+        hosts=hosts,
+        network=network,
+    )
+    return FleetConfiguration(
+        name=name,
+        ssh_config=ssh_config,
         placement=placement,
     )
 
@@ -524,6 +624,7 @@ async def create_instance(
     fleet: Optional[FleetModel] = None,
     status: InstanceStatus = InstanceStatus.IDLE,
     unreachable: bool = False,
+    health_status: HealthStatus = HealthStatus.HEALTHY,
     created_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
     finished_at: Optional[datetime] = None,
     spot: bool = False,
@@ -533,10 +634,10 @@ async def create_instance(
     instance_id: Optional[UUID] = None,
     job: Optional[JobModel] = None,
     instance_num: int = 0,
-    backend: Optional[BackendType] = BackendType.DATACRUNCH,
+    backend: BackendType = BackendType.DATACRUNCH,
     termination_policy: Optional[TerminationPolicy] = None,
     termination_idle_time: int = DEFAULT_FLEET_TERMINATION_IDLE_TIME,
-    region: Optional[str] = "eu-west",
+    region: str = "eu-west",
     remote_connection_info: Optional[RemoteConnectionInfo] = None,
     offer: Optional[Union[InstanceOfferWithAvailability, Literal["auto"]]] = "auto",
     job_provisioning_data: Optional[Union[JobProvisioningData, Literal["auto"]]] = "auto",
@@ -545,6 +646,7 @@ async def create_instance(
     name: str = "test_instance",
     volumes: Optional[List[VolumeModel]] = None,
     price: float = 1.0,
+    last_processed_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
 ) -> InstanceModel:
     if instance_id is None:
         instance_id = uuid.uuid4()
@@ -558,7 +660,9 @@ async def create_instance(
             internal_ip=None,
         )
     if offer == "auto":
-        offer = get_instance_offer_with_availability(backend=backend, region=region, spot=spot)
+        offer = get_instance_offer_with_availability(
+            backend=backend, region=region, spot=spot, price=price
+        )
     if profile is None:
         profile = Profile(name="test_name")
 
@@ -581,7 +685,9 @@ async def create_instance(
         fleet=fleet,
         project=project,
         status=status,
+        last_processed_at=last_processed_at,
         unreachable=unreachable,
+        health=health_status,
         created_at=created_at,
         started_at=created_at,
         finished_at=finished_at,
@@ -635,6 +741,7 @@ def get_instance_offer_with_availability(
     availability_zones: Optional[List[str]] = None,
     price: float = 1.0,
     instance_type: str = "instance",
+    availability: InstanceAvailability = InstanceAvailability.AVAILABLE,
 ):
     gpus = [
         Gpu(
@@ -658,7 +765,7 @@ def get_instance_offer_with_availability(
         ),
         region=region,
         price=price,
-        availability=InstanceAvailability.AVAILABLE,
+        availability=availability,
         availability_zones=availability_zones,
         blocks=blocks,
         total_blocks=total_blocks,
@@ -702,6 +809,24 @@ def get_ssh_key() -> SSHKey:
     )
 
 
+async def create_instance_health_check(
+    session: AsyncSession,
+    instance: InstanceModel,
+    collected_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+    status: HealthStatus = HealthStatus.HEALTHY,
+    response: str = "{}",
+) -> InstanceHealthCheckModel:
+    health_check = InstanceHealthCheckModel(
+        instance_id=instance.id,
+        collected_at=collected_at,
+        status=status,
+        response=response,
+    )
+    session.add(health_check)
+    await session.commit()
+    return health_check
+
+
 async def create_volume(
     session: AsyncSession,
     project: ProjectModel,
@@ -709,6 +834,7 @@ async def create_volume(
     status: VolumeStatus = VolumeStatus.SUBMITTED,
     created_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
     last_processed_at: Optional[datetime] = None,
+    last_job_processed_at: Optional[datetime] = None,
     configuration: Optional[VolumeConfiguration] = None,
     volume_provisioning_data: Optional[VolumeProvisioningData] = None,
     deleted_at: Optional[datetime] = None,
@@ -726,6 +852,7 @@ async def create_volume(
         status=status,
         created_at=created_at,
         last_processed_at=last_processed_at,
+        last_job_processed_at=last_job_processed_at,
         configuration=configuration.json(),
         volume_provisioning_data=volume_provisioning_data.json()
         if volume_provisioning_data
@@ -787,6 +914,7 @@ def get_volume_configuration(
     region: str = "eu-west-1",
     size: Optional[Memory] = Memory(100),
     volume_id: Optional[str] = None,
+    auto_cleanup_duration: Optional[Union[str, int]] = None,
 ) -> VolumeConfiguration:
     return VolumeConfiguration(
         name=name,
@@ -794,6 +922,7 @@ def get_volume_configuration(
         region=region,
         size=size,
         volume_id=volume_id,
+        auto_cleanup_duration=auto_cleanup_duration,
     )
 
 
@@ -910,6 +1039,22 @@ async def create_job_prometheus_metrics(
     return metrics
 
 
+async def create_secret(
+    session: AsyncSession,
+    project: ProjectModel,
+    name: str,
+    value: str,
+):
+    secret_model = SecretModel(
+        project=project,
+        name=name,
+        value=DecryptedString(plaintext=value),
+    )
+    session.add(secret_model)
+    await session.commit()
+    return secret_model
+
+
 def get_private_key_string() -> str:
     return """
 -----BEGIN RSA PRIVATE KEY-----
@@ -987,6 +1132,7 @@ class AsyncContextManager:
 class ComputeMockSpec(
     Compute,
     ComputeWithCreateInstanceSupport,
+    ComputeWithPrivilegedSupport,
     ComputeWithMultinodeSupport,
     ComputeWithReservationSupport,
     ComputeWithPlacementGroupSupport,
@@ -995,7 +1141,7 @@ class ComputeMockSpec(
     ComputeWithVolumeSupport,
 ):
     """
-    Can be used to create Compute mocks that pass all isinstance asserts.
+    Can be used to create Compute mocks that pass all `isinstance()` asserts.
     """
 
     pass

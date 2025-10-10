@@ -3,6 +3,7 @@ import json
 from nebius.aio.service_error import RequestError
 
 from dstack._internal.core.backends.base.configurator import (
+    TAGS_MAX_NUM,
     BackendRecord,
     Configurator,
     raise_invalid_credentials_error,
@@ -11,7 +12,6 @@ from dstack._internal.core.backends.nebius import resources
 from dstack._internal.core.backends.nebius.backend import NebiusBackend
 from dstack._internal.core.backends.nebius.fabrics import get_all_infiniband_fabrics
 from dstack._internal.core.backends.nebius.models import (
-    AnyNebiusBackendConfig,
     NebiusBackendConfig,
     NebiusBackendConfigWithCreds,
     NebiusConfig,
@@ -19,10 +19,16 @@ from dstack._internal.core.backends.nebius.models import (
     NebiusServiceAccountCreds,
     NebiusStoredConfig,
 )
+from dstack._internal.core.errors import BackendError, ServerClientError
 from dstack._internal.core.models.backends.base import BackendType
 
 
-class NebiusConfigurator(Configurator):
+class NebiusConfigurator(
+    Configurator[
+        NebiusBackendConfig,
+        NebiusBackendConfigWithCreds,
+    ]
+):
     TYPE = BackendType.NEBIUS
     BACKEND_CLASS = NebiusBackend
 
@@ -49,6 +55,19 @@ class NebiusConfigurator(Configurator):
                     f" some of the valid options: {sorted(valid_fabrics)}"
                 ),
             )
+        self._check_config_tags(config)
+
+    def _check_config_tags(self, config: NebiusBackendConfigWithCreds):
+        if not config.tags:
+            return
+        if len(config.tags) > TAGS_MAX_NUM:
+            raise ServerClientError(
+                f"Maximum number of tags exceeded. Up to {TAGS_MAX_NUM} tags is allowed."
+            )
+        try:
+            resources.validate_labels(config.tags)
+        except BackendError as e:
+            raise ServerClientError(e.args[0])
 
     def create_backend(
         self, project_name: str, config: NebiusBackendConfigWithCreds
@@ -60,12 +79,12 @@ class NebiusConfigurator(Configurator):
             auth=NebiusCreds.parse_obj(config.creds).json(),
         )
 
-    def get_backend_config(
-        self, record: BackendRecord, include_creds: bool
-    ) -> AnyNebiusBackendConfig:
+    def get_backend_config_with_creds(self, record: BackendRecord) -> NebiusBackendConfigWithCreds:
         config = self._get_config(record)
-        if include_creds:
-            return NebiusBackendConfigWithCreds.__response__.parse_obj(config)
+        return NebiusBackendConfigWithCreds.__response__.parse_obj(config)
+
+    def get_backend_config_without_creds(self, record: BackendRecord) -> NebiusBackendConfig:
+        config = self._get_config(record)
         return NebiusBackendConfig.__response__.parse_obj(config)
 
     def get_backend(self, record: BackendRecord) -> NebiusBackend:

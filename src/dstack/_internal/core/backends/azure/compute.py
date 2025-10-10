@@ -2,7 +2,7 @@ import base64
 import enum
 import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
 
 from azure.core.credentials import TokenCredential
 from azure.core.exceptions import ResourceExistsError, ResourceNotFoundError
@@ -39,16 +39,20 @@ from dstack._internal.core.backends.azure import utils as azure_utils
 from dstack._internal.core.backends.azure.models import AzureConfig
 from dstack._internal.core.backends.base.compute import (
     Compute,
+    ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
     ComputeWithGatewaySupport,
     ComputeWithMultinodeSupport,
+    ComputeWithPrivilegedSupport,
     generate_unique_gateway_instance_name,
     generate_unique_instance_name,
     get_gateway_user_data,
     get_user_data,
     merge_tags,
+    requires_nvidia_proprietary_kernel_modules,
 )
-from dstack._internal.core.backends.base.offers import get_catalog_offers
+from dstack._internal.core.backends.base.offers import get_catalog_offers, get_offers_disk_modifier
+from dstack._internal.core.consts import DSTACK_OS_IMAGE_WITH_PROPRIETARY_NVIDIA_KERNEL_MODULES
 from dstack._internal.core.errors import ComputeError, NoCapacityError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.gateways import (
@@ -73,7 +77,9 @@ CONFIGURABLE_DISK_SIZE = Range[Memory](min=Memory.parse("30GB"), max=Memory.pars
 
 
 class AzureCompute(
+    ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
+    ComputeWithPrivilegedSupport,
     ComputeWithMultinodeSupport,
     ComputeWithGatewaySupport,
     Compute,
@@ -89,14 +95,10 @@ class AzureCompute(
             credential=credential, subscription_id=config.subscription_id
         )
 
-    def get_offers(
-        self, requirements: Optional[Requirements] = None
-    ) -> List[InstanceOfferWithAvailability]:
+    def get_all_offers_with_availability(self) -> List[InstanceOfferWithAvailability]:
         offers = get_catalog_offers(
             backend=BackendType.AZURE,
             locations=self.config.regions,
-            requirements=requirements,
-            configurable_disk_size=CONFIGURABLE_DISK_SIZE,
             extra_filter=_supported_instances,
         )
         offers_with_availability = _get_offers_with_availability(
@@ -105,6 +107,11 @@ class AzureCompute(
             offers=offers,
         )
         return offers_with_availability
+
+    def get_offers_modifier(
+        self, requirements: Requirements
+    ) -> Callable[[InstanceOfferWithAvailability], Optional[InstanceOfferWithAvailability]]:
+        return get_offers_disk_modifier(CONFIGURABLE_DISK_SIZE, requirements)
 
     def create_instance(
         self,
@@ -369,6 +376,7 @@ def _parse_config_vpc_id(vpc_id: str) -> Tuple[str, str]:
 class VMImageVariant(enum.Enum):
     GRID = enum.auto()
     CUDA = enum.auto()
+    CUDA_WITH_PROPRIETARY_KERNEL_MODULES = enum.auto()
     STANDARD = enum.auto()
 
     @classmethod
@@ -376,18 +384,24 @@ class VMImageVariant(enum.Enum):
         if "_A10_v5" in instance.name:
             return cls.GRID
         elif len(instance.resources.gpus) > 0:
-            return cls.CUDA
+            if not requires_nvidia_proprietary_kernel_modules(instance.resources.gpus[0].name):
+                return cls.CUDA
+            else:
+                return cls.CUDA_WITH_PROPRIETARY_KERNEL_MODULES
         else:
             return cls.STANDARD
 
     def get_image_name(self) -> str:
-        name = "dstack-"
         if self is self.GRID:
-            name += "grid-"
+            return f"dstack-grid-{version.base_image}"
         elif self is self.CUDA:
-            name += "cuda-"
-        name += version.base_image
-        return name
+            return f"dstack-cuda-{version.base_image}"
+        elif self is self.CUDA_WITH_PROPRIETARY_KERNEL_MODULES:
+            return f"dstack-cuda-{DSTACK_OS_IMAGE_WITH_PROPRIETARY_NVIDIA_KERNEL_MODULES}"
+        elif self is self.STANDARD:
+            return f"dstack-{version.base_image}"
+        else:
+            raise ValueError(f"Unexpected image variant {self!r}")
 
 
 _SUPPORTED_VM_SERIES_PATTERNS = [

@@ -19,7 +19,7 @@ func main() {
 	App()
 }
 
-func start(tempDir string, homeDir string, workingDir string, httpPort int, sshPort int, logLevel int, version string) error {
+func start(tempDir string, homeDir string, httpPort int, sshPort int, logLevel int, version string) error {
 	if err := os.MkdirAll(tempDir, 0o755); err != nil {
 		return tracerr.Errorf("Failed to create temp directory: %w", err)
 	}
@@ -38,7 +38,7 @@ func start(tempDir string, homeDir string, workingDir string, httpPort int, sshP
 	log.DefaultEntry.Logger.SetOutput(io.MultiWriter(os.Stdout, defaultLogFile))
 	log.DefaultEntry.Logger.SetLevel(logrus.Level(logLevel))
 
-	server, err := api.NewServer(tempDir, homeDir, workingDir, fmt.Sprintf(":%d", httpPort), sshPort, version)
+	server, err := api.NewServer(tempDir, homeDir, fmt.Sprintf(":%d", httpPort), sshPort, version)
 	if err != nil {
 		return tracerr.Errorf("Failed to create server: %w", err)
 	}

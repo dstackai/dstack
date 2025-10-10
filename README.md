@@ -14,26 +14,28 @@
 
 </div>
 
-`dstack` is an open-source alternative to Kubernetes and Slurm, designed to simplify GPU allocation and AI workload
-orchestration for ML teams across top clouds and on-prem clusters.
+`dstack` is a unified control plane for GPU provisioning and orchestration that works with any GPU cloud, Kubernetes, or on-prem clusters. 
 
-#### Accelerators
+It streamlines development, training, and inference, and is compatible with any hardware, open-source tools, and frameworks.
+
+#### Hardware
 
 `dstack` supports `NVIDIA`, `AMD`, `Google TPU`, `Intel Gaudi`, and `Tenstorrent` accelerators out of the box.
 
 ## Latest news ✨
-
-- [2025/05] [dstack 0.19.8: Nebius clusters, GH200 on Lambda](https://github.com/dstackai/dstack/releases/tag/0.19.8)
-- [2025/04] [dstack 0.19.6: Tenstorrent, Plugins](https://github.com/dstackai/dstack/releases/tag/0.19.6)
-- [2025/04] [dstack 0.19.5: GCP A3 High clusters](https://github.com/dstackai/dstack/releases/tag/0.19.5)
-- [2025/04] [dstack 0.19.3: GCP A3 Mega clusters](https://github.com/dstackai/dstack/releases/tag/0.19.3)
-- [2025/03] [dstack 0.19.0: Prometheus](https://github.com/dstackai/dstack/releases/tag/0.19.0)
+- [2025/10] [dstack 0.19.31: Kubernetes, GCP A4 spot](https://github.com/dstackai/dstack/releases/tag/0.19.31)
+- [2025/08] [dstack 0.19.26: Repos](https://github.com/dstackai/dstack/releases/tag/0.19.26)
+- [2025/08] [dstack 0.19.22: Service probes, GPU health-checks, Tenstorrent Galaxy](https://github.com/dstackai/dstack/releases/tag/0.19.22)
+- [2025/07] [dstack 0.19.21: Scheduled tasks](https://github.com/dstackai/dstack/releases/tag/0.19.21)
+- [2025/07] [dstack 0.19.17: Secrets, Files, Rolling deployment](https://github.com/dstackai/dstack/releases/tag/0.19.17)
+- [2025/06] [dstack 0.19.16: Docker in Docker](https://github.com/dstackai/dstack/releases/tag/0.19.16)
+- [2025/06] [dstack 0.19.13: Default images with InfiniBand support](https://github.com/dstackai/dstack/releases/tag/0.19.13)
 
 ## How does it work?
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://dstack.ai/static-assets/static-assets/images/dstack-architecture-diagram-v8-dark.svg"/>
-  <img src="https://dstack.ai/static-assets/static-assets/images/dstack-architecture-diagram-v8.svg" width="750" />
+  <source media="(prefers-color-scheme: dark)" srcset="https://dstack.ai/static-assets/static-assets/images/dstack-architecture-diagram-v11-dark.svg"/>
+  <img src="https://dstack.ai/static-assets/static-assets/images/dstack-architecture-diagram-v11.svg" width="750" />
 </picture>
 
 ### Installation
@@ -42,15 +44,15 @@ orchestration for ML teams across top clouds and on-prem clusters.
 
 #### Set up the server
 
-##### (Optional) Configure backends
+##### Configure backends
 
-To use `dstack` with cloud providers, configure backends
-via the `~/.dstack/server/config.yml` file.
+To orchestrate compute across cloud providers or existing Kubernetes clusters, you need to configure backends.
 
-For more details on how to configure backends, check [Backends](https://dstack.ai/docs/concepts/backends).
+Backends can be set up in `~/.dstack/server/config.yml` or through the [project settings page](https://dstack.ai/docs/concepts/projects#backends) in the UI.
 
-> For using `dstack` with on-prem servers, create [SSH fleets](https://dstack.ai/docs/concepts/fleets#ssh) 
-> once the server is up.
+For more details, see [Backends](https://dstack.ai/docs/concepts/backends).
+
+> When using `dstack` with on-prem servers, backend configuration isn’t required. Simply create [SSH fleets](https://dstack.ai/docs/concepts/fleets#ssh) once the server is up.
 
 ##### Start the server
 

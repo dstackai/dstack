@@ -21,8 +21,23 @@ func (s *ShimServer) HealthcheckHandler(w http.ResponseWriter, r *http.Request) 
 	}, nil
 }
 
+func (s *ShimServer) InstanceHealthHandler(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+	ctx := r.Context()
+	response := InstanceHealthResponse{}
+	if s.dcgmWrapper != nil {
+		if dcgmHealth, err := s.dcgmWrapper.GetHealth(); err != nil {
+			log.Error(ctx, "failed to get health from DCGM", "err", err)
+		} else {
+			response.DCGM = &dcgmHealth
+		}
+	}
+
+	return &response, nil
+}
+
 func (s *ShimServer) TaskListHandler(w http.ResponseWriter, r *http.Request) (interface{}, error) {
-	return &TaskListResponse{IDs: s.runner.TaskIDs()}, nil
+	tasks := s.runner.TaskList()
+	return &TaskListResponse{tasks}, nil
 }
 
 func (s *ShimServer) TaskInfoHandler(w http.ResponseWriter, r *http.Request) (interface{}, error) {

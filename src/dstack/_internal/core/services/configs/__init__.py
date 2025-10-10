@@ -38,7 +38,10 @@ class ConfigManager:
             with open(self.config_filepath, "r") as f:
                 config = yaml.safe_load(f)
             self.config = GlobalConfig.parse_obj(config)
-        except (FileNotFoundError, ValidationError):
+        except FileNotFoundError:
+            self.config = GlobalConfig()
+        except ValidationError:
+            logger.error(f"Error in `{self.config_filepath}`", exc_info=True)
             self.config = GlobalConfig()
 
     def get_project_config(self, name: Optional[str] = None) -> Optional[ProjectConfig]:
@@ -65,25 +68,21 @@ class ConfigManager:
         if len(self.config.projects) == 1:
             self.config.projects[0].default = True
 
-    def list_projects(self):
-        return [project.name for project in self.config.projects]
+    def list_project_configs(self) -> list[ProjectConfig]:
+        return self.config.projects
 
     def delete_project(self, name: str):
         self.config.projects = [p for p in self.config.projects if p.name != name]
 
-    def save_repo_config(
-        self, repo_path: PathLike, repo_id: str, repo_type: RepoType, ssh_key_path: PathLike
-    ):
+    def save_repo_config(self, repo_path: PathLike, repo_id: str, repo_type: RepoType):
         self.config_filepath.parent.mkdir(parents=True, exist_ok=True)
         with filelock.FileLock(str(self.config_filepath) + ".lock"):
             self.load()
             repo_path = os.path.abspath(repo_path)
-            ssh_key_path = os.path.abspath(ssh_key_path)
             for repo in self.config.repos:
                 if repo.path == repo_path:
                     repo.repo_id = repo_id
                     repo.repo_type = repo_type
-                    repo.ssh_key_path = ssh_key_path
                     break
             else:
                 self.config.repos.append(
@@ -91,7 +90,6 @@ class ConfigManager:
                         path=repo_path,
                         repo_id=repo_id,
                         repo_type=repo_type,
-                        ssh_key_path=ssh_key_path,
                     )
                 )
             self.save()
@@ -109,6 +107,9 @@ class ConfigManager:
         if repo_config is not None:
             return repo_config
         raise DstackError("No repo config found")
+
+    def delete_repo_config(self, repo_id: str):
+        self.config.repos = [p for p in self.config.repos if p.repo_id != repo_id]
 
     @property
     def dstack_ssh_dir(self) -> Path:

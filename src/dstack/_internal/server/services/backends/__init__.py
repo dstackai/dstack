@@ -17,8 +17,8 @@ from dstack._internal.core.backends.configurators import (
 )
 from dstack._internal.core.backends.local.backend import LocalBackend
 from dstack._internal.core.backends.models import (
-    AnyBackendConfig,
     AnyBackendConfigWithCreds,
+    AnyBackendConfigWithoutCreds,
 )
 from dstack._internal.core.errors import (
     BackendError,
@@ -35,7 +35,7 @@ from dstack._internal.core.models.instances import (
 from dstack._internal.core.models.runs import Requirements
 from dstack._internal.server import settings
 from dstack._internal.server.models import BackendModel, DecryptedString, ProjectModel
-from dstack._internal.server.settings import LOCAL_BACKEND_ENABLED
+from dstack._internal.settings import LOCAL_BACKEND_ENABLED
 from dstack._internal.utils.common import run_async
 from dstack._internal.utils.logging import get_logger
 
@@ -126,19 +126,25 @@ async def get_backend_config(
             )
             continue
         if backend_model.type == backend_type:
-            return get_backend_config_from_backend_model(
-                configurator, backend_model, include_creds=True
-            )
+            return get_backend_config_with_creds_from_backend_model(configurator, backend_model)
     return None
 
 
-def get_backend_config_from_backend_model(
+def get_backend_config_with_creds_from_backend_model(
     configurator: Configurator,
     backend_model: BackendModel,
-    include_creds: bool,
-) -> AnyBackendConfig:
+) -> AnyBackendConfigWithCreds:
     backend_record = get_stored_backend_record(backend_model)
-    backend_config = configurator.get_backend_config(backend_record, include_creds=include_creds)
+    backend_config = configurator.get_backend_config_with_creds(backend_record)
+    return backend_config
+
+
+def get_backend_config_without_creds_from_backend_model(
+    configurator: Configurator,
+    backend_model: BackendModel,
+) -> AnyBackendConfigWithoutCreds:
+    backend_record = get_stored_backend_record(backend_model)
+    backend_config = configurator.get_backend_config_without_creds(backend_record)
     return backend_config
 
 
@@ -339,7 +345,7 @@ async def get_instance_offers(
     Returns list of instances satisfying minimal resource requirements sorted by price
     """
     logger.info("Requesting instance offers from backends: %s", [b.TYPE.value for b in backends])
-    tasks = [run_async(backend.compute().get_offers_cached, requirements) for backend in backends]
+    tasks = [run_async(backend.compute().get_offers, requirements) for backend in backends]
     offers_by_backend = []
     for backend, result in zip(backends, await asyncio.gather(*tasks, return_exceptions=True)):
         if isinstance(result, BackendError):

@@ -1,11 +1,12 @@
 import logging
+import re
 import time
 from collections import defaultdict
 from collections.abc import Container as ContainerT
 from collections.abc import Generator, Iterable, Sequence
 from contextlib import contextmanager
 from tempfile import NamedTemporaryFile
-from typing import Optional
+from typing import Dict, Optional
 
 from nebius.aio.authorization.options import options_to_metadata
 from nebius.aio.operation import Operation as SDKOperation
@@ -28,10 +29,12 @@ from nebius.api.nebius.compute.v1 import (
     GpuClusterSpec,
     Instance,
     InstanceGpuClusterSpec,
+    InstanceRecoveryPolicy,
     InstanceServiceClient,
     InstanceSpec,
     IPAddress,
     NetworkInterfaceSpec,
+    PreemptibleSpec,
     PublicIPAddress,
     ResourcesSpec,
     SourceImageFamily,
@@ -117,7 +120,7 @@ def wait_for_operation(
         if time.monotonic() + interval > deadline:
             raise TimeoutError(f"Operation {op.id} wait timeout")
         time.sleep(interval)
-        LOOP.await_(op.update(timeout=REQUEST_TIMEOUT, metadata=REQUEST_MD))
+        LOOP.await_(op.update(per_retry_timeout=REQUEST_TIMEOUT, metadata=REQUEST_MD))
 
 
 def get_region_to_project_id_map(
@@ -153,7 +156,7 @@ def validate_regions(configured: set[str], available: set[str]) -> None:
 def list_tenant_projects(sdk: SDK) -> Sequence[Container]:
     tenants = LOOP.await_(
         TenantServiceClient(sdk).list(
-            ListTenantsRequest(), timeout=REQUEST_TIMEOUT, metadata=REQUEST_MD
+            ListTenantsRequest(), per_retry_timeout=REQUEST_TIMEOUT, metadata=REQUEST_MD
         )
     )
     if len(tenants.items) != 1:
@@ -162,7 +165,7 @@ def list_tenant_projects(sdk: SDK) -> Sequence[Container]:
     projects = LOOP.await_(
         ProjectServiceClient(sdk).list(
             ListProjectsRequest(parent_id=tenant_id, page_size=999),
-            timeout=REQUEST_TIMEOUT,
+            per_retry_timeout=REQUEST_TIMEOUT,
             metadata=REQUEST_MD,
         )
     )
@@ -236,7 +239,7 @@ def get_default_subnet(sdk: SDK, project_id: str) -> Subnet:
     subnets = LOOP.await_(
         SubnetServiceClient(sdk).list(
             ListSubnetsRequest(parent_id=project_id, page_size=999),
-            timeout=REQUEST_TIMEOUT,
+            per_retry_timeout=REQUEST_TIMEOUT,
             metadata=REQUEST_MD,
         )
     )
@@ -247,13 +250,14 @@ def get_default_subnet(sdk: SDK, project_id: str) -> Subnet:
 
 
 def create_disk(
-    sdk: SDK, name: str, project_id: str, size_mib: int, image_family: str
+    sdk: SDK, name: str, project_id: str, size_mib: int, image_family: str, labels: Dict[str, str]
 ) -> SDKOperation[Operation]:
     client = DiskServiceClient(sdk)
     request = CreateDiskRequest(
         metadata=ResourceMetadata(
             name=name,
             parent_id=project_id,
+            labels=labels,
         ),
         spec=DiskSpec(
             size_mebibytes=size_mib,
@@ -262,13 +266,15 @@ def create_disk(
         ),
     )
     with wrap_capacity_errors():
-        return LOOP.await_(client.create(request, timeout=REQUEST_TIMEOUT, metadata=REQUEST_MD))
+        return LOOP.await_(
+            client.create(request, per_retry_timeout=REQUEST_TIMEOUT, metadata=REQUEST_MD)
+        )
 
 
 def delete_disk(sdk: SDK, disk_id: str) -> None:
     LOOP.await_(
         DiskServiceClient(sdk).delete(
-            DeleteDiskRequest(id=disk_id), timeout=REQUEST_TIMEOUT, metadata=REQUEST_MD
+            DeleteDiskRequest(id=disk_id), per_retry_timeout=REQUEST_TIMEOUT, metadata=REQUEST_MD
         )
     )
 
@@ -283,12 +289,15 @@ def create_instance(
     cluster_id: Optional[str],
     disk_id: str,
     subnet_id: str,
+    preemptible: bool,
+    labels: Dict[str, str],
 ) -> SDKOperation[Operation]:
     client = InstanceServiceClient(sdk)
     request = CreateInstanceRequest(
         metadata=ResourceMetadata(
             name=name,
             parent_id=project_id,
+            labels=labels,
         ),
         spec=InstanceSpec(
             cloud_init_user_data=user_data,
@@ -306,16 +315,26 @@ def create_instance(
                     public_ip_address=PublicIPAddress(static=True),
                 )
             ],
+            preemptible=PreemptibleSpec(
+                priority=1, on_preemption=PreemptibleSpec.PreemptionPolicy.STOP
+            )
+            if preemptible
+            else None,
+            recovery_policy=InstanceRecoveryPolicy.FAIL if preemptible else None,
         ),
     )
     with wrap_capacity_errors():
-        return LOOP.await_(client.create(request, timeout=REQUEST_TIMEOUT, metadata=REQUEST_MD))
+        return LOOP.await_(
+            client.create(request, per_retry_timeout=REQUEST_TIMEOUT, metadata=REQUEST_MD)
+        )
 
 
 def get_instance(sdk: SDK, instance_id: str) -> Instance:
     return LOOP.await_(
         InstanceServiceClient(sdk).get(
-            GetInstanceRequest(id=instance_id), timeout=REQUEST_TIMEOUT, metadata=REQUEST_MD
+            GetInstanceRequest(id=instance_id),
+            per_retry_timeout=REQUEST_TIMEOUT,
+            metadata=REQUEST_MD,
         )
     )
 
@@ -323,7 +342,9 @@ def get_instance(sdk: SDK, instance_id: str) -> Instance:
 def delete_instance(sdk: SDK, instance_id: str) -> SDKOperation[Operation]:
     return LOOP.await_(
         InstanceServiceClient(sdk).delete(
-            DeleteInstanceRequest(id=instance_id), timeout=REQUEST_TIMEOUT, metadata=REQUEST_MD
+            DeleteInstanceRequest(id=instance_id),
+            per_retry_timeout=REQUEST_TIMEOUT,
+            metadata=REQUEST_MD,
         )
     )
 
@@ -336,7 +357,7 @@ def create_cluster(sdk: SDK, name: str, project_id: str, fabric: str) -> SDKOper
                     metadata=ResourceMetadata(name=name, parent_id=project_id),
                     spec=GpuClusterSpec(infiniband_fabric=fabric),
                 ),
-                timeout=REQUEST_TIMEOUT,
+                per_retry_timeout=REQUEST_TIMEOUT,
                 metadata=REQUEST_MD,
             )
         )
@@ -345,6 +366,47 @@ def create_cluster(sdk: SDK, name: str, project_id: str, fabric: str) -> SDKOper
 def delete_cluster(sdk: SDK, cluster_id: str) -> None:
     return LOOP.await_(
         GpuClusterServiceClient(sdk).delete(
-            DeleteGpuClusterRequest(id=cluster_id), timeout=REQUEST_TIMEOUT, metadata=REQUEST_MD
+            DeleteGpuClusterRequest(id=cluster_id),
+            per_retry_timeout=REQUEST_TIMEOUT,
+            metadata=REQUEST_MD,
         )
     )
+
+
+def filter_invalid_labels(labels: Dict[str, str]) -> Dict[str, str]:
+    filtered_labels = {}
+    for k, v in labels.items():
+        if not _is_valid_label(k, v):
+            logger.warning("Skipping invalid label '%s: %s'", k, v)
+            continue
+        filtered_labels[k] = v
+    return filtered_labels
+
+
+def validate_labels(labels: Dict[str, str]):
+    for k, v in labels.items():
+        if not _is_valid_label(k, v):
+            raise BackendError("Invalid resource labels")
+
+
+def _is_valid_label(key: str, value: str) -> bool:
+    # TODO: [Nebius] current validation logic reuses GCP's approach.
+    #   There is no public information on Nebius labels restrictions.
+    return is_valid_resource_name(key) and is_valid_label_value(value)
+
+
+MAX_RESOURCE_NAME_LEN = 63
+NAME_PATTERN = re.compile(r"^[a-z][_\-a-z0-9]{0,62}$")
+LABEL_VALUE_PATTERN = re.compile(r"^[_\-a-z0-9]{0,63}$")
+
+
+def is_valid_resource_name(name: str) -> bool:
+    if len(name) < 1 or len(name) > MAX_RESOURCE_NAME_LEN:
+        return False
+    match = re.match(NAME_PATTERN, name)
+    return match is not None
+
+
+def is_valid_label_value(value: str) -> bool:
+    match = re.match(LABEL_VALUE_PATTERN, value)
+    return match is not None

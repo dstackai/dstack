@@ -6,8 +6,10 @@ import requests
 
 from dstack._internal.core.backends.base.backend import Compute
 from dstack._internal.core.backends.base.compute import (
+    ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
     ComputeWithMultinodeSupport,
+    ComputeWithPrivilegedSupport,
     generate_unique_instance_name,
     get_user_data,
 )
@@ -23,7 +25,7 @@ from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
 )
 from dstack._internal.core.models.placement import PlacementGroup
-from dstack._internal.core.models.runs import JobProvisioningData, Requirements
+from dstack._internal.core.models.runs import JobProvisioningData
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -32,7 +34,9 @@ MAX_INSTANCE_NAME_LEN = 64
 
 
 class VultrCompute(
+    ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
+    ComputeWithPrivilegedSupport,
     ComputeWithMultinodeSupport,
     Compute,
 ):
@@ -41,12 +45,10 @@ class VultrCompute(
         self.config = config
         self.api_client = VultrApiClient(config.creds.api_key)
 
-    def get_offers(
-        self, requirements: Optional[Requirements] = None
-    ) -> List[InstanceOfferWithAvailability]:
+    def get_all_offers_with_availability(self) -> List[InstanceOfferWithAvailability]:
         offers = get_catalog_offers(
             backend=BackendType.VULTR,
-            requirements=requirements,
+            requirements=None,
             locations=self.config.regions or None,
             extra_filter=_supported_instances,
         )
@@ -75,17 +77,13 @@ class VultrCompute(
         subnet = vpc["v4_subnet"]
         subnet_mask = vpc["v4_subnet_mask"]
 
-        setup_commands = [
-            f"sudo ufw allow from {subnet}/{subnet_mask}",
-            "sudo ufw reload",
-        ]
         instance_id = self.api_client.launch_instance(
             region=instance_offer.region,
             label=instance_name,
             plan=instance_offer.instance.name,
             user_data=get_user_data(
                 authorized_keys=instance_config.get_public_keys(),
-                backend_specific_commands=setup_commands,
+                firewall_allow_from_subnets=[f"{subnet}/{subnet_mask}"],
             ),
             vpc_id=vpc["id"],
         )

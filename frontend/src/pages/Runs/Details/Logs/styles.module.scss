@@ -1,5 +1,46 @@
 @use '@cloudscape-design/design-tokens/index' as awsui;
 
+.headerContainer {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    padding-top: 4px;
+
+    .headerTitle {
+        flex-shrink: 0;
+        margin-top: -4px;
+    }
+
+    .switchers {
+        margin-left: auto;
+        display: flex;
+        gap: 10px;
+
+        button {
+            width: 32px !important;
+        }
+    }
+}
+
+.loader {
+    position: relative;
+    height: 20px;
+    background-color: rgba(awsui.$color-background-container-content, .8);
+    color: #6e6e6e;
+}
+
+.mainLoader {
+    margin-top: auto;
+    margin-bottom: auto;
+    transform: translateY(-24px);
+}
+
+.logsPage {
+    flex-grow: 1;
+    min-height: 0;
+    max-height: calc(100vh - 258px);
+}
+
 .logs {
     display: flex;
     flex-direction: column;
@@ -39,25 +80,50 @@
                     }
                 }
 
-                .loader {
-                    pointer-events: none;
-                    position: absolute;
-                    left: 0;
-                    right: 0;
-                    top: -20px;
-                    height: 20px;
-                    background-color: rgba(awsui.$color-background-container-content, .8);
-                    transition: transform .3s ease;
-                    color: #6e6e6e;
-
-                    &:global(.show) {
-                        transform: translateY(100%);
-                    }
-                }
-
                 .terminal {
                     flex-grow: 1;
                     min-height: 0;
+                    height: 0;
+                    overflow-y: auto;
+                    background-color: awsui.$color-background-layout-main;
+
+                    code {
+                        color: awsui.$color-text-body-default !important;
+                    }
+
+                    .logItem {
+                        font-size: awsui.$font-size-body-s !important;
+                        line-height: awsui.$line-height-body-s !important;
+
+                        .toggleCollapse {
+                            position: relative;
+                            top: -3px;
+                            vertical-align: middle;
+                            cursor: pointer;
+
+                            &.hidden {
+                                opacity: 0;
+                                pointer-events: none;
+                            }
+                        }
+
+                        .timestamp {
+                            vertical-align: top;
+                            padding-right: 16px;
+                            white-space: nowrap;
+                        }
+
+                        .messageCol {
+                            vertical-align: top;
+                        }
+
+                        .message {
+                            overflow-y: hidden;
+                            &.collapsed {
+                                max-height: calc(awsui.$line-height-body-s * 2);
+                            }
+                        }
+                    }
                 }
 
                 .scroll {

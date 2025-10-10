@@ -5,6 +5,7 @@ from gpuhunt.providers.vastai import VastAIProvider
 
 from dstack._internal.core.backends.base.backend import Compute
 from dstack._internal.core.backends.base.compute import (
+    ComputeWithFilteredOffersCached,
     generate_unique_instance_name_for_job,
     get_docker_commands,
 )
@@ -30,7 +31,10 @@ logger = get_logger(__name__)
 MAX_INSTANCE_NAME_LEN = 60
 
 
-class VastAICompute(Compute):
+class VastAICompute(
+    ComputeWithFilteredOffersCached,
+    Compute,
+):
     def __init__(self, config: VastAIConfig):
         super().__init__()
         self.config = config
@@ -43,14 +47,14 @@ class VastAICompute(Compute):
                     "reliability2": {"gte": 0.9},
                     "inet_down": {"gt": 128},
                     "verified": {"eq": True},
-                    "cuda_max_good": {"gte": 12.1},
+                    "cuda_max_good": {"gte": 12.8},
                     "compute_cap": {"gte": 600},
                 }
             )
         )
 
-    def get_offers(
-        self, requirements: Optional[Requirements] = None
+    def get_offers_by_requirements(
+        self, requirements: Requirements
     ) -> List[InstanceOfferWithAvailability]:
         offers = get_catalog_offers(
             backend=BackendType.VASTAI,

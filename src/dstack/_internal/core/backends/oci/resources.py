@@ -23,10 +23,12 @@ import oci
 from oci.object_storage.models import CreatePreauthenticatedRequestDetails
 
 from dstack import version
+from dstack._internal.core.backends.base.compute import requires_nvidia_proprietary_kernel_modules
 from dstack._internal.core.backends.oci.region import OCIRegionClient
+from dstack._internal.core.consts import DSTACK_OS_IMAGE_WITH_PROPRIETARY_NVIDIA_KERNEL_MODULES
 from dstack._internal.core.errors import BackendError
 from dstack._internal.core.models.instances import InstanceOffer
-from dstack._internal.utils.common import split_chunks
+from dstack._internal.utils.common import batched
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -352,11 +354,14 @@ def terminate_instance_if_exists(client: oci.core.ComputeClient, instance_id: st
 
 
 def get_marketplace_listing_and_package(
-    cuda: bool, client: oci.marketplace.MarketplaceClient
+    gpu_name: Optional[str], client: oci.marketplace.MarketplaceClient
 ) -> Tuple[oci.marketplace.models.Listing, oci.marketplace.models.ImageListingPackage]:
     listing_name = f"dstack-{version.base_image}"
-    if cuda:
-        listing_name = f"dstack-cuda-{version.base_image}"
+    if gpu_name is not None:
+        if not requires_nvidia_proprietary_kernel_modules(gpu_name):
+            listing_name = f"dstack-cuda-{version.base_image}"
+        else:
+            listing_name = f"dstack-cuda-{DSTACK_OS_IMAGE_WITH_PROPRIETARY_NVIDIA_KERNEL_MODULES}"
 
     listing_summaries = list_marketplace_listings(listing_name, client)
     if len(listing_summaries) != 1:
@@ -667,21 +672,21 @@ def add_security_group_rules(
     security_group_id: str, rules: Iterable[SecurityRule], client: oci.core.VirtualNetworkClient
 ) -> None:
     rules_details = map(SecurityRule.to_sdk_add_rule_details, rules)
-    for chunk in split_chunks(rules_details, ADD_SECURITY_RULES_MAX_CHUNK_SIZE):
+    for batch in batched(rules_details, ADD_SECURITY_RULES_MAX_CHUNK_SIZE):
         client.add_network_security_group_security_rules(
             security_group_id,
-            oci.core.models.AddNetworkSecurityGroupSecurityRulesDetails(security_rules=chunk),
+            oci.core.models.AddNetworkSecurityGroupSecurityRulesDetails(security_rules=batch),
         )
 
 
 def remove_security_group_rules(
     security_group_id: str, rule_ids: Iterable[str], client: oci.core.VirtualNetworkClient
 ) -> None:
-    for chunk in split_chunks(rule_ids, REMOVE_SECURITY_RULES_MAX_CHUNK_SIZE):
+    for batch in batched(rule_ids, REMOVE_SECURITY_RULES_MAX_CHUNK_SIZE):
         client.remove_network_security_group_security_rules(
             security_group_id,
             oci.core.models.RemoveNetworkSecurityGroupSecurityRulesDetails(
-                security_rule_ids=chunk
+                security_rule_ids=batch
             ),
         )
 

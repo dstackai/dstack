@@ -111,33 +111,22 @@ utilization_policy:
 
 </div>
 
-## Docker and Docker Compose
+## Docker in Docker
 
-All backends except `runpod`, `vastai`, and `kubernetes` allow using Docker and Docker Compose 
-inside `dstack` runs. To do that, additional configuration steps are required:
-
-1. Set the `privileged` property to `true`.
-2. Set the `image` property to `dstackai/dind` (or another DinD image).
-3. For tasks and services, add `start-dockerd` as the first command. For dev environments, add `start-dockerd` as the first command
-   in the `init` property.
-
-Note, `start-dockerd` is a part of `dstackai/dind` image, if you use a different DinD image,
-replace it with a corresponding command to start Docker daemon.
+Set `docker` to `true` to enable the `docker` CLI in your dev environment, e.g., to run or build Docker images, or use Docker Compose.
 
 === "Dev environment"
     <div editor-title="examples/misc/docker-compose/.dstack.yml">
 
     ```yaml
     type: dev-environment
-    name: vscode-dind
+    name: vscode
 
-    privileged: true
-    image: dstackai/dind
+    docker: true
 
     ide: vscode
-
     init:
-      - start-dockerd
+      - docker run --gpus all nvidia/cuda:12.3.0-base-ubuntu22.04 nvidia-smi
     ```
 
     </div>
@@ -147,14 +136,15 @@ replace it with a corresponding command to start Docker daemon.
 
     ```yaml
     type: task
-    name: task-dind
+    name: docker-nvidia-smi
 
-    privileged: true
-    image: dstackai/dind
+    docker: true
 
     commands:
-      - start-dockerd
-      - docker compose up
+      - docker run --gpus all nvidia/cuda:12.3.0-base-ubuntu22.04 nvidia-smi
+
+    resources:
+      gpu: 1
     ```
 
     </div>
@@ -162,23 +152,36 @@ replace it with a corresponding command to start Docker daemon.
 ??? info "Volumes"
 
     To persist Docker data between runs (e.g. images, containers, volumes, etc), create a `dstack` [volume](../concepts/volumes.md)
-    and add attach it in your run configuration:
+    and add attach it in your run configuration.
+
+    === "Network volums"
     
-    ```yaml
-        type: dev-environment
-        name: vscode-dind
-    
-        privileged: true
-        image: dstackai/dind
-        ide: vscode
-    
-        init:
-          - start-dockerd
-    
-        volumes:
-          - name: docker-volume
-            path: /var/lib/docker
-    ```
+        ```yaml
+            type: dev-environment
+            name: vscode
+        
+            docker: true
+            ide: vscode
+        
+            volumes:
+              - name: docker-volume
+                path: /var/lib/docker
+        ```
+
+    === "Instance volumes"
+
+        ```yaml
+            type: dev-environment
+            name: vscode
+        
+            docker: true
+            ide: vscode
+        
+            volumes:
+              - name: /docker-volume
+                path: /var/lib/docker
+                optional: true
+        ```
 
 See more Docker examples [here](https://github.com/dstackai/dstack/tree/master/examples/misc/docker-compose).
 
@@ -296,6 +299,8 @@ By default, if `dstack` can't find available capacity, the run will fail.
 If you'd like `dstack` to automatically retry, configure the 
 [retry](../reference/dstack.yml/task.md#retry) property accordingly:
 
+<!-- TODO: Add a relevant example here -->
+
 <div editor-title=".dstack.yml">
 
 ```yaml
@@ -315,6 +320,33 @@ retry:
 ```
 
 </div>
+
+## Profiles
+
+Sometimes, you may want to reuse parameters across runs or set defaults so you don’t have to repeat them in every configuration. You can do this by defining a profile.
+
+??? info ".dstack/profiles.yml"
+    A profile file can be created either globally in `~/.dstack/profiles.yml` or locally in `.dstack/profiles.yml`:
+
+    ```yaml
+    profiles:
+      - name: my-profile
+        # If set to true, this profile will be applied automatically
+        default: true
+
+        # The spot pololicy can be "spot", "on-demand", or "auto"
+        spot_policy: auto
+        # Limit the maximum price of the instance per hour
+        max_price: 1.5
+        # Stop any run if it runs longer that this duration
+        max_duration: 1d
+        # Use only these backends
+        backends: [azure, lambda]
+    ```
+
+    Check [`.dstack/profiles.yml`](../reference/profiles.yml.md) to see what properties can be defined there.
+    
+A profile can be set as `default` to apply automatically to any run, or specified with `--profile NAME` in `dstack apply`.
 
 ## Projects
 
@@ -358,6 +390,8 @@ The general format is: `<vendor>:<comma-sparated names>:<memory range>:<quantity
 
 Each component is optional. 
 
+<!-- TODO: Mention, if count is not specified, it's set to `1..` -->
+
 Ranges can be:
 
 * **Closed** (e.g. `24GB..80GB` or `1..8`)
@@ -399,7 +433,7 @@ If you're not sure which offers (hardware configurations) are available with the
 <div class="termy">
 
 ```shell
-$ dstack offer --gpu H100:1.. --max-offers 10
+$ dstack offer --gpu H100 --max-offers 10
 Getting offers...
 ---> 100%
 
@@ -419,6 +453,36 @@ Getting offers...
 ```
 
 </div>
+
+??? info "Grouping offers"
+    Use `--group-by` to aggregate offers. Accepted values: `gpu`, `backend`, `region`, and `count`.
+
+    <div class="termy">
+
+    ```shell
+    dstack offer --gpu b200 --group-by gpu,backend,region
+    Project      main
+    User         admin
+    Resources    cpu=2.. mem=8GB.. disk=100GB.. b200:1..
+    Spot policy  auto
+    Max price    -
+    Reservation  -
+    Group by     gpu, backend, region
+
+    #   GPU              SPOT             $/GPU       BACKEND  REGION
+    1   B200:180GB:1..8  spot, on-demand  3.59..5.99  runpod   EU-RO-1
+    2   B200:180GB:1..8  spot, on-demand  3.59..5.99  runpod   US-CA-2
+    3   B200:180GB:8     on-demand        4.99        lambda   us-east-1
+    4   B200:180GB:8     on-demand        5.5         nebius   us-central1
+    ```
+
+    </div>
+
+    When using `--group-by`, `gpu` must always be `included`.
+    The `region` value can only be used together with `backend`.
+
+The `offer` command allows you to filter and group offers with various [advanced options](../reference/cli/dstack/offer.md#usage).
+
 
 ## Metrics
 
@@ -481,5 +545,3 @@ corresponding service quotas for each type of instance in each region.
 Note, for AWS, GCP, and Azure, service quota values are measured with the number of CPUs rather than GPUs.
 
 [//]: # (TODO: Mention spot policy)
-
-[//]: # (TODO: Mention retry policy)

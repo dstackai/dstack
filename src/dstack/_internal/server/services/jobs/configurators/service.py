@@ -9,6 +9,7 @@ class ServiceJobConfigurator(JobConfigurator):
     TYPE: RunConfigurationType = RunConfigurationType.SERVICE
 
     def _shell_commands(self) -> List[str]:
+        assert self.run_spec.configuration.type == "service"
         return self.run_spec.configuration.commands
 
     def _default_single_branch(self) -> bool:
@@ -22,6 +23,3 @@ class ServiceJobConfigurator(JobConfigurator):
 
     def _ports(self) -> List[PortMapping]:
         return []
-
-    def _working_dir(self) -> Optional[str]:
-        return None if not self._shell_commands() else super()._working_dir()

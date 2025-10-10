@@ -2,7 +2,7 @@ import type { RootState } from 'store';
 import { applyMode, Mode } from '@cloudscape-design/global-styles';
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 
-import { AUTH_DATA_STORAGE_KEY, MODE_STORAGE_KEY } from './constants';
+import { AUTH_DATA_STORAGE_KEY, MODE_STORAGE_KEY, TUTORIAL_SHOW_STARTUP_STORAGE_KEY } from './constants';
 import { getThemeMode } from './helpers';
 
 import { IAppState, ToolsTabs } from './types';
@@ -10,10 +10,23 @@ import { IAppState, ToolsTabs } from './types';
 const getInitialState = (): IAppState => {
     let authData = null;
     let storageData = null;
+    let hideStartUp: null | boolean = null;
     let activeMode = getThemeMode();
 
     try {
         storageData = localStorage.getItem(AUTH_DATA_STORAGE_KEY);
+    } catch (e) {
+        console.log(e);
+    }
+
+    try {
+        hideStartUp = (() => {
+            if (!localStorage.getItem(TUTORIAL_SHOW_STARTUP_STORAGE_KEY)) {
+                return null;
+            }
+
+            return localStorage.getItem(TUTORIAL_SHOW_STARTUP_STORAGE_KEY) === 'true';
+        })();
     } catch (e) {
         console.log(e);
     }
@@ -48,11 +61,13 @@ const getInitialState = (): IAppState => {
         },
 
         tutorialPanel: {
+            createProjectCompleted: false,
             billingCompleted: false,
             configureCLICompleted: false,
             discordCompleted: false,
             tallyCompleted: false,
             quickStartCompleted: false,
+            hideStartUp,
         },
     };
 };
@@ -138,6 +153,19 @@ export const appSlice = createSlice({
                 ...action.payload,
             };
         },
+
+        setHideAtStartup: (state, action: PayloadAction<boolean>) => {
+            state.tutorialPanel = {
+                ...state.tutorialPanel,
+                hideStartUp: action.payload,
+            };
+
+            try {
+                localStorage.setItem(TUTORIAL_SHOW_STARTUP_STORAGE_KEY, JSON.stringify(action.payload));
+            } catch (e) {
+                console.log(e);
+            }
+        },
     },
 });
 
@@ -152,6 +180,7 @@ export const {
     setToolsTab,
     openTutorialPanel,
     updateTutorialPanelState,
+    setHideAtStartup,
 } = appSlice.actions;
 export const selectUserData = (state: RootState) => state.app.userData;
 export const selectAuthToken = (state: RootState) => state.app.authData?.token;

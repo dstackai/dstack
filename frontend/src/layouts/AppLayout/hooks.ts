@@ -24,6 +24,7 @@ export const useSideNavigation = () => {
 
     const generalLinks = [
         { type: 'link', text: t('navigation.runs'), href: ROUTES.RUNS.LIST },
+        { type: 'link', text: t('navigation.offers'), href: ROUTES.OFFERS.LIST },
         { type: 'link', text: t('navigation.models'), href: ROUTES.MODELS.LIST },
         { type: 'link', text: t('navigation.fleets'), href: ROUTES.FLEETS.LIST },
         { type: 'link', text: t('navigation.instances'), href: ROUTES.INSTANCES.LIST },
@@ -43,15 +44,15 @@ export const useSideNavigation = () => {
             text: t('navigation.settings'),
             href: ROUTES.USER.DETAILS.FORMAT(userName),
         },
-        process.env.UI_VERSION === 'sky' && {
-            type: 'link',
-            text: t('navigation.billing'),
-            href: billingUrl,
-        },
         {
             type: 'link',
             text: t('users.projects'),
             href: userProjectsUrl,
+        },
+        process.env.UI_VERSION === 'sky' && {
+            type: 'link',
+            text: t('navigation.billing'),
+            href: billingUrl,
         },
     ].filter(Boolean);
 

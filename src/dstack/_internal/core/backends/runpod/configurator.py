@@ -8,7 +8,6 @@ from dstack._internal.core.backends.base.configurator import (
 from dstack._internal.core.backends.runpod import api_client
 from dstack._internal.core.backends.runpod.backend import RunpodBackend
 from dstack._internal.core.backends.runpod.models import (
-    AnyRunpodBackendConfig,
     RunpodBackendConfig,
     RunpodBackendConfigWithCreds,
     RunpodConfig,
@@ -18,7 +17,12 @@ from dstack._internal.core.backends.runpod.models import (
 from dstack._internal.core.models.backends.base import BackendType
 
 
-class RunpodConfigurator(Configurator):
+class RunpodConfigurator(
+    Configurator[
+        RunpodBackendConfig,
+        RunpodBackendConfigWithCreds,
+    ]
+):
     TYPE = BackendType.RUNPOD
     BACKEND_CLASS = RunpodBackend
 
@@ -35,12 +39,12 @@ class RunpodConfigurator(Configurator):
             auth=RunpodCreds.parse_obj(config.creds).json(),
         )
 
-    def get_backend_config(
-        self, record: BackendRecord, include_creds: bool
-    ) -> AnyRunpodBackendConfig:
+    def get_backend_config_with_creds(self, record: BackendRecord) -> RunpodBackendConfigWithCreds:
         config = self._get_config(record)
-        if include_creds:
-            return RunpodBackendConfigWithCreds.__response__.parse_obj(config)
+        return RunpodBackendConfigWithCreds.__response__.parse_obj(config)
+
+    def get_backend_config_without_creds(self, record: BackendRecord) -> RunpodBackendConfig:
+        config = self._get_config(record)
         return RunpodBackendConfig.__response__.parse_obj(config)
 
     def get_backend(self, record: BackendRecord) -> RunpodBackend:

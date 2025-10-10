@@ -1,12 +1,21 @@
 from enum import Enum
 from typing import Any, Dict, List, Optional, Union, overload
 
+import orjson
 from pydantic import Field, root_validator, validator
 from typing_extensions import Annotated, Literal
 
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.common import CoreModel, Duration
+from dstack._internal.core.models.common import (
+    CoreConfig,
+    CoreModel,
+    Duration,
+    generate_dual_core_model,
+)
 from dstack._internal.utils.common import list_enum_values_for_annotation
+from dstack._internal.utils.cron import validate_cron
+from dstack._internal.utils.json_schema import add_extra_schema_types
+from dstack._internal.utils.json_utils import pydantic_orjson_dumps_with_indent
 from dstack._internal.utils.tags import tags_validator
 
 DEFAULT_RETRY_DURATION = 3600
@@ -58,24 +67,31 @@ def parse_duration(v: Optional[Union[int, str]]) -> Optional[int]:
     return Duration.parse(v)
 
 
-def parse_max_duration(v: Optional[Union[int, str, bool]]) -> Optional[Union[str, int]]:
+def parse_max_duration(v: Optional[Union[int, str, bool]]) -> Optional[Union[Literal["off"], int]]:
     return parse_off_duration(v)
 
 
-def parse_stop_duration(v: Optional[Union[int, str, bool]]) -> Optional[Union[str, int]]:
+def parse_stop_duration(
+    v: Optional[Union[int, str, bool]],
+) -> Optional[Union[Literal["off"], int]]:
     return parse_off_duration(v)
 
 
-def parse_off_duration(v: Optional[Union[int, str, bool]]) -> Optional[Union[str, int]]:
+def parse_off_duration(v: Optional[Union[int, str, bool]]) -> Optional[Union[Literal["off"], int]]:
     if v == "off" or v is False:
         return "off"
-    if v is True:
+    if v is True or v is None:
         return None
-    return parse_duration(v)
+    duration = parse_duration(v)
+    if duration < 0:
+        raise ValueError("Duration cannot be negative")
+    return duration
 
 
-def parse_idle_duration(v: Optional[Union[int, str, bool]]) -> Optional[Union[str, int, bool]]:
-    if v is False:
+def parse_idle_duration(v: Optional[Union[int, str, bool]]) -> Optional[int]:
+    # Differs from `parse_off_duration` to accept negative durations as `off`
+    # for backward compatibility.
+    if v == "off" or v is False or v == -1:
         return -1
     if v is True:
         return None
@@ -108,7 +124,16 @@ class RetryEvent(str, Enum):
     ERROR = "error"
 
 
-class ProfileRetry(CoreModel):
+class ProfileRetryConfig(CoreConfig):
+    @staticmethod
+    def schema_extra(schema: Dict[str, Any]):
+        add_extra_schema_types(
+            schema["properties"]["duration"],
+            extra_types=[{"type": "string"}],
+        )
+
+
+class ProfileRetry(generate_dual_core_model(ProfileRetryConfig)):
     on_events: Annotated[
         Optional[List[RetryEvent]],
         Field(
@@ -120,7 +145,7 @@ class ProfileRetry(CoreModel):
         ),
     ] = None
     duration: Annotated[
-        Optional[Union[int, str]],
+        Optional[int],
         Field(description="The maximum period of retrying the run, e.g., `4h` or `1d`"),
     ] = None
 
@@ -134,7 +159,16 @@ class ProfileRetry(CoreModel):
         return values
 
 
-class UtilizationPolicy(CoreModel):
+class UtilizationPolicyConfig(CoreConfig):
+    @staticmethod
+    def schema_extra(schema: Dict[str, Any]):
+        add_extra_schema_types(
+            schema["properties"]["time_window"],
+            extra_types=[{"type": "string"}],
+        )
+
+
+class UtilizationPolicy(generate_dual_core_model(UtilizationPolicyConfig)):
     _min_time_window = "5m"
 
     min_gpu_utilization: Annotated[
@@ -150,7 +184,7 @@ class UtilizationPolicy(CoreModel):
         ),
     ]
     time_window: Annotated[
-        Union[int, str],
+        int,
         Field(
             description=(
                 "The time window of metric samples taking into account to measure utilization"
@@ -165,6 +199,60 @@ class UtilizationPolicy(CoreModel):
         if v < parse_duration(cls._min_time_window):
             raise ValueError(f"Minimum time_window is {cls._min_time_window}")
         return v
+
+
+class Schedule(CoreModel):
+    cron: Annotated[
+        Union[List[str], str],
+        Field(
+            description=(
+                "A cron expression or a list of cron expressions specifying the UTC time when the run needs to be started"
+            )
+        ),
+    ]
+
+    @validator("cron")
+    def _validate_cron(cls, v: Union[List[str], str]) -> List[str]:
+        if isinstance(v, str):
+            values = [v]
+        else:
+            values = v
+        if len(values) == 0:
+            raise ValueError("At least one cron expression must be specified")
+        for value in values:
+            validate_cron(value)
+        return values
+
+    @property
+    def crons(self) -> List[str]:
+        """
+        Access `cron` attribute as a list.
+        """
+        if isinstance(self.cron, str):
+            return [self.cron]
+        return self.cron
+
+
+class ProfileParamsConfig(CoreConfig):
+    @staticmethod
+    def schema_extra(schema: Dict[str, Any]):
+        del schema["properties"]["pool_name"]
+        del schema["properties"]["instance_name"]
+        del schema["properties"]["retry_policy"]
+        del schema["properties"]["termination_policy"]
+        del schema["properties"]["termination_idle_time"]
+        add_extra_schema_types(
+            schema["properties"]["max_duration"],
+            extra_types=[{"type": "boolean"}, {"type": "string"}],
+        )
+        add_extra_schema_types(
+            schema["properties"]["stop_duration"],
+            extra_types=[{"type": "boolean"}, {"type": "string"}],
+        )
+        add_extra_schema_types(
+            schema["properties"]["idle_duration"],
+            extra_types=[{"type": "string"}],
+        )
 
 
 class ProfileParams(CoreModel):
@@ -214,7 +302,7 @@ class ProfileParams(CoreModel):
         Field(description="The policy for resubmitting the run. Defaults to `false`"),
     ] = None
     max_duration: Annotated[
-        Optional[Union[Literal["off"], str, int, bool]],
+        Optional[Union[Literal["off"], int]],
         Field(
             description=(
                 "The maximum duration of a run (e.g., `2h`, `1d`, etc)."
@@ -224,7 +312,7 @@ class ProfileParams(CoreModel):
         ),
     ] = None
     stop_duration: Annotated[
-        Optional[Union[Literal["off"], str, int, bool]],
+        Optional[Union[Literal["off"], int]],
         Field(
             description=(
                 "The maximum duration of a run graceful stopping."
@@ -249,7 +337,7 @@ class ProfileParams(CoreModel):
         ),
     ] = None
     idle_duration: Annotated[
-        Optional[Union[Literal["off"], str, int, bool]],
+        Optional[int],
         Field(
             description=(
                 "Time to wait before terminating idle instances."
@@ -281,6 +369,10 @@ class ProfileParams(CoreModel):
             )
         ),
     ] = None
+    schedule: Annotated[
+        Optional[Schedule],
+        Field(description=("The schedule for starting the run at specified time")),
+    ] = None
     fleets: Annotated[
         Optional[list[str]], Field(description="The fleets considered for reuse")
     ] = None
@@ -302,15 +394,6 @@ class ProfileParams(CoreModel):
     termination_policy: Annotated[Optional[TerminationPolicy], Field(exclude=True)] = None
     termination_idle_time: Annotated[Optional[Union[str, int]], Field(exclude=True)] = None
 
-    class Config:
-        @staticmethod
-        def schema_extra(schema: Dict[str, Any]) -> None:
-            del schema["properties"]["pool_name"]
-            del schema["properties"]["instance_name"]
-            del schema["properties"]["retry_policy"]
-            del schema["properties"]["termination_policy"]
-            del schema["properties"]["termination_idle_time"]
-
     _validate_max_duration = validator("max_duration", pre=True, allow_reuse=True)(
         parse_max_duration
     )
@@ -329,21 +412,34 @@ class ProfileProps(CoreModel):
         Field(
             description="The name of the profile that can be passed as `--profile` to `dstack apply`"
         ),
-    ]
+    ] = ""
     default: Annotated[
         bool, Field(description="If set to true, `dstack apply` will use this profile by default.")
     ] = False
 
 
-class Profile(ProfileProps, ProfileParams):
+class ProfileConfig(ProfileParamsConfig):
+    @staticmethod
+    def schema_extra(schema: Dict[str, Any]):
+        ProfileParamsConfig.schema_extra(schema)
+
+
+class Profile(
+    ProfileProps,
+    ProfileParams,
+    generate_dual_core_model(ProfileConfig),
+):
     pass
 
 
-class ProfilesConfig(CoreModel):
-    profiles: List[Profile]
+class ProfilesConfigConfig(CoreConfig):
+    json_loads = orjson.loads
+    json_dumps = pydantic_orjson_dumps_with_indent
+    schema_extra = {"$schema": "http://json-schema.org/draft-07/schema#"}
 
-    class Config:
-        schema_extra = {"$schema": "http://json-schema.org/draft-07/schema#"}
+
+class ProfilesConfig(generate_dual_core_model(ProfilesConfigConfig)):
+    profiles: List[Profile]
 
     def default(self) -> Optional[Profile]:
         for p in self.profiles:

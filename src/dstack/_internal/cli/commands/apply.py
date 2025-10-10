@@ -1,17 +1,13 @@
 import argparse
-from pathlib import Path
+import shlex
 
-from argcomplete import FilesCompleter
+from argcomplete import FilesCompleter  # type: ignore[attr-defined]
 
 from dstack._internal.cli.commands import APIBaseCommand
 from dstack._internal.cli.services.configurators import (
+    APPLY_STDIN_NAME,
     get_apply_configurator_class,
     load_apply_configuration,
-)
-from dstack._internal.cli.services.repos import (
-    init_default_virtual_repo,
-    init_repo,
-    register_init_repo_args,
 )
 from dstack._internal.cli.utils.common import console
 from dstack._internal.core.errors import CLIError
@@ -24,6 +20,7 @@ class ApplyCommand(APIBaseCommand):
     NAME = "apply"
     DESCRIPTION = "Apply a configuration"
     DEFAULT_HELP = False
+    ACCEPT_EXTRA_ARGS = True
 
     def _register(self):
         super()._register()
@@ -40,11 +37,14 @@ class ApplyCommand(APIBaseCommand):
         self._parser.add_argument(
             "-f",
             "--file",
-            type=Path,
             metavar="FILE",
-            help="The path to the configuration file. Defaults to [code]$PWD/.dstack.yml[/]",
+            help=(
+                "The path to the configuration file."
+                " Specify [code]-[/] to read configuration from stdin."
+                " Defaults to [code]$PWD/.dstack.yml[/]"
+            ),
             dest="configuration_file",
-        ).completer = FilesCompleter(allowednames=["*.yml", "*.yaml"])
+        ).completer = FilesCompleter(allowednames=["*.yml", "*.yaml"])  # type: ignore[attr-defined]
         self._parser.add_argument(
             "-y",
             "--yes",
@@ -62,30 +62,6 @@ class ApplyCommand(APIBaseCommand):
             help="Exit immediately after submitting configuration",
             action="store_true",
         )
-        repo_group = self._parser.add_argument_group("Repo Options")
-        repo_group.add_argument(
-            "-P",
-            "--repo",
-            help=("The repo to use for the run. Can be a local path or a Git repo URL."),
-            dest="repo",
-        )
-        repo_group.add_argument(
-            "--repo-branch",
-            help="The repo branch to use for the run",
-            dest="repo_branch",
-        )
-        repo_group.add_argument(
-            "--repo-hash",
-            help="The hash of the repo commit to use for the run",
-            dest="repo_hash",
-        )
-        repo_group.add_argument(
-            "--no-repo",
-            help="Do not use any repo for the run",
-            dest="no_repo",
-            action="store_true",
-        )
-        register_init_repo_args(repo_group)
 
     def _command(self, args: argparse.Namespace):
         try:
@@ -104,34 +80,20 @@ class ApplyCommand(APIBaseCommand):
                 return
 
             super()._command(args)
-            if args.repo and args.no_repo:
-                raise CLIError("Either --repo or --no-repo can be specified")
-            repo = None
-            if args.repo:
-                repo = init_repo(
-                    api=self.api,
-                    repo_path=args.repo,
-                    repo_branch=args.repo_branch,
-                    repo_hash=args.repo_hash,
-                    local=args.local,
-                    git_identity_file=args.git_identity_file,
-                    oauth_token=args.gh_token,
-                    ssh_identity_file=args.ssh_identity_file,
-                )
-            elif args.no_repo:
-                repo = init_default_virtual_repo(api=self.api)
+            if not args.yes and args.configuration_file == APPLY_STDIN_NAME:
+                raise CLIError("Cannot read configuration from stdin if -y/--yes is not specified")
             configuration_path, configuration = load_apply_configuration(args.configuration_file)
             configurator_class = get_apply_configurator_class(configuration.type)
             configurator = configurator_class(api_client=self.api)
             configurator_parser = configurator.get_parser()
-            known, unknown = configurator_parser.parse_known_args(args.unknown)
+            configurator_args, unknown_args = configurator_parser.parse_known_args(args.extra_args)
+            if unknown_args:
+                raise CLIError(f"Unrecognized arguments: {shlex.join(unknown_args)}")
             configurator.apply_configuration(
                 conf=configuration,
                 configuration_path=configuration_path,
                 command_args=args,
-                configurator_args=known,
-                unknown_args=unknown,
-                repo=repo,
+                configurator_args=configurator_args,
             )
         except KeyboardInterrupt:
             console.print("\nOperation interrupted by user. Exiting...")

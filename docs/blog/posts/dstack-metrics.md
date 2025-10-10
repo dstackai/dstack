@@ -5,9 +5,7 @@ description: "dstack introduces a new CLI command (and API) for monitoring conta
 slug: dstack-metrics
 image: https://dstack.ai/static-assets/static-assets/images/dstack-stats-v2.png
 categories:
-  - AMD
-  - NVIDIA
-  - Metrics
+  - Changelog
 ---
 
 # Monitoring essential GPU metrics via CLI

@@ -1,17 +1,28 @@
 # Backends
 
-To use `dstack` with cloud providers, configure backends
-via the [`~/.dstack/server/config.yml`](../reference/server/config.yml.md) file.
-The server loads this file on startup. 
+Backends allow `dstack` to manage compute across various environments.
+They can be configured via `~/.dstack/server/config.yml` or through the [project settings page](../concepts/projects.md#backends) in the UI.
 
-Alternatively, you can configure backends on the [project settings page](../concepts/projects.md#backends) via UI.
+`dstack` supports three types of backends: 
 
-> For using `dstack` with on-prem servers, no backend configuration is required.
-> Use [SSH fleets](../concepts/fleets.md#ssh) instead once the server is up.
+  * [VM-based](#vm-based) – use `dstack`'s native integration with cloud providers to provision VMs, manage clusters, and orchestrate container-based runs.  
+  * [Container-based](#container-based) – use either `dstack`'s native integration with cloud providers or Kubernetes to orchestrate container-based runs; provisioning in this case is delegated to the cloud provider or Kubernetes.  
+  * [On-prem](#on-prem) – use `dstack`'s native support for on-prem servers without needing Kubernetes.  
 
-Below examples of how to configure backends via `~/.dstack/server/config.yml`.
+??? info "dstack Sky"
+    If you're using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"},  
+    you can either configure your own backends or use the pre-configured backend that gives you access to compute from the GPU marketplace.
 
-## Cloud providers
+See the examples of backend configuration below.
+
+## VM-based
+
+VM-based backends allow `dstack` users to manage clusters and orchestrate container-based runs across a wide range of cloud providers.  
+Under the hood, `dstack` uses native integrations with these providers to provision clusters on demand.  
+
+Compared to [container-based](#container-based) backends, this approach offers finer-grained, simpler control over cluster provisioning and eliminates the dependency on a Kubernetes layer.
+
+<!-- TODO: Mention how VM-based backends are better than Kubernetes -->
 
 ### AWS
 
@@ -247,6 +258,7 @@ There are two ways to configure AWS: using an access key or using the default cr
         * `user` with passwordless sudo access
         * Docker is installed
         * (For NVIDIA instances) NVIDIA/CUDA drivers and NVIDIA Container Toolkit are installed
+        * The firewall (`iptables`, `ufw`, etc.) must allow external traffic to port 22 and all traffic within the private subnet, and should forbid any other incoming external traffic.
 
 ### Azure
 
@@ -440,13 +452,42 @@ There are two ways to configure GCP: using a service account or using the defaul
     - name: main
       backends:
         - type: gcp
-          project_id: gcp-project-id
+          project_id: my-gcp-project
           creds:
             type: service_account
             filename: ~/.dstack/server/gcp-024ed630eab5.json
     ```
 
     </div>
+
+    ??? info "User interface"
+        If you are configuring the `gcp` backend on the [project settigns page](projects.md#backends), 
+        specify the contents of the JSON file in `data`:
+
+        <div editor-title="~/.dstack/server/config.yml">
+
+        ```yaml
+        type: gcp
+        project_id: my-gcp-project
+        creds:
+          type: service_account
+          data: |
+            {
+              "type": "service_account",
+              "project_id": "my-gcp-project",
+              "private_key_id": "abcd1234efgh5678ijkl9012mnop3456qrst7890",
+              "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEv...rest_of_key...IDAQAB\n-----END PRIVATE KEY-----\n",
+              "client_email": "my-service-account@my-gcp-project.iam.gserviceaccount.com",
+              "client_id": "123456789012345678901",
+              "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+              "token_uri": "https://oauth2.googleapis.com/token",
+              "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+              "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/my-service-account%40my-gcp-project.iam.gserviceaccount.com",
+              "universe_domain": "googleapis.com"
+            }
+        ```
+
+        </div>
 
 If you don't know your GCP project ID, use [Google Cloud CLI :material-arrow-top-right-thin:{ .external }](https://cloud.google.com/sdk/docs/install-sdk):
 
@@ -626,8 +667,33 @@ projects:
 
 </div>
 
-??? info "Configuring in the UI"
-    If you are configuring the backend in the `dstack` UI, specify the contents of the private key file in `private_key_content`.
+??? info "Credentials file"
+    It's also possible to configure the `nebius` backend using a credentials file [generated :material-arrow-top-right-thin:{ .external }](https://docs.nebius.com/iam/service-accounts/authorized-keys#create){:target="_blank"} by the `nebius` CLI:
+
+    <div class="termy">
+
+    ```shell
+    $ nebius iam auth-public-key generate \
+        --service-account-id <service account ID> \
+        --output ~/.nebius/sa-credentials.json
+    ```
+    
+    </div>
+
+  
+    ```yaml
+    projects:
+    - name: main
+      backends:
+      - type: nebius
+        creds:
+          type: service_account
+          filename: ~/.nebius/sa-credentials.json
+    ```
+
+??? info "User interface"
+    If you are configuring the `nebius` backend on the [project settigns page](projects.md#backends), 
+    specify the contents of the private key file in `private_key_content`:
 
     <div editor-title="~/.dstack/server/config.yml">
 
@@ -672,65 +738,6 @@ projects:
     Nebius is only supported if `dstack server` is running on Python 3.10 or higher.
 
 
-
-### RunPod
-
-Log into your [RunPod :material-arrow-top-right-thin:{ .external }](https://www.runpod.io/console/) console, click Settings in the sidebar, expand the `API Keys` section, and click
-the button to create a Read & Write key.
-
-Then proceed to configuring the backend.
-
-<div editor-title="~/.dstack/server/config.yml">
-
-```yaml
-projects:
-  - name: main
-    backends:
-      - type: runpod
-        creds:
-          type: api_key
-          api_key: US9XTPDIV8AR42MMINY8TCKRB8S4E7LNRQ6CAUQ9
-```
-
-</div>
-
-??? info "Community Cloud"
-    By default, `dstack` considers instance offers from both the Secure Cloud and the
-    [Community Cloud :material-arrow-top-right-thin:{ .external }](https://docs.runpod.io/references/faq/#secure-cloud-vs-community-cloud).
-
-    You can tell them apart by their regions.
-    Secure Cloud regions contain datacenter IDs such as `CA-MTL-3`.
-    Community Cloud regions contain country codes such as `CA`.
-
-    <div class="termy">
-
-    ```shell
-    $ dstack apply -f .dstack.yml -b runpod
-
-     #  BACKEND  REGION    INSTANCE               SPOT  PRICE
-     1  runpod   CA        NVIDIA A100 80GB PCIe  yes   $0.6
-     2  runpod   CA-MTL-3  NVIDIA A100 80GB PCIe  yes   $0.82
-    ```
-
-    </div>
-
-    If you don't want to use the Community Cloud, set `community_cloud: false` in the backend settings.
-
-    <div editor-title="~/.dstack/server/config.yml">
-
-    ```yaml
-    projects:
-      - name: main
-        backends:
-          - type: runpod
-            creds:
-              type: api_key
-              api_key: US9XTPDIV8AR42MMINY8TCKRB8S4E7LNRQ6CAUQ9
-            community_cloud: false
-    ```
-
-    </div>
-
 ### Vultr
 
 Log into your [Vultr :material-arrow-top-right-thin:{ .external }](https://www.vultr.com/) account, click `Account` in the sidebar, select `API`, find the `Personal Access Token` panel and click the `Enable API` button. In the `Access Control` panel, allow API requests from all addresses or from the subnet where your `dstack` server is deployed.
@@ -750,52 +757,6 @@ projects:
 ```
 
 </div>
-
-### Vast.ai
-
-Log into your [Vast.ai :material-arrow-top-right-thin:{ .external }](https://cloud.vast.ai/) account, click Account in the sidebar, and copy your
-API Key.
-
-Then, go ahead and configure the backend:
-
-<div editor-title="~/.dstack/server/config.yml">
-
-```yaml
-projects:
-- name: main
-  backends:
-    - type: vastai
-      creds:
-        type: api_key
-        api_key: d75789f22f1908e0527c78a283b523dd73051c8c7d05456516fc91e9d4efd8c5
-```
-
-</div>
-
-Also, the `vastai` backend supports on-demand instances only. Spot instance support coming soon.
-
-<!-- ### TensorDock
-
-Log into your [TensorDock :material-arrow-top-right-thin:{ .external }](https://dashboard.tensordock.com/) account, click Developers in the sidebar, and use the `Create an Authorization` section to create a new authorization key.
-
-Then, go ahead and configure the backend:
-
-<div editor-title="~/.dstack/server/config.yml">
-
-```yaml
-projects:
-  - name: main
-    backends:
-      - type: tensordock
-        creds:
-          type: api_key
-          api_key: 248e621d-9317-7494-dc1557fa5825b-98b
-          api_token: FyBI3YbnFEYXdth2xqYRnQI7hiusssBC
-```
-
-</div>
-
-The `tensordock` backend supports on-demand instances only. Spot instance support coming soon. -->
 
 ### CUDO
 
@@ -913,67 +874,219 @@ projects:
 
 </div>
 
-## On-prem servers
+### AMD Developer Cloud
+Log into your [AMD Developer Cloud :material-arrow-top-right-thin:{ .external }](https://amd.digitalocean.com/login) account. Click `API` in the sidebar and click the button `Generate New Token`. 
 
-### SSH fleets
+Then, go ahead and configure the backend:
 
-> For using `dstack` with on-prem servers, no backend configuration is required.
-> See [SSH fleets](fleets.md#ssh) for more details. 
+<div editor-title="~/.dstack/server/config.yml">
+
+```yaml
+projects:
+- name: main
+  backends:
+    - type: amddevcloud
+      project_name: my-amd-project
+      creds:
+        type: api_key
+        api_key: ...
+```
+
+</div>
+
+??? info "Project"
+    If `project_name` is not set, the default project will be used.
+
+??? info "Required permissions"
+    The API key must have the following scopes assigned:
+
+    * `account` - read
+    * `droplet` - create, read, update, delete, admin
+    * `project` - create, read, update, delete
+    * `regions` - read
+    * `sizes` - read
+    * `ssh_key` - create, read, update, delete
+
+
+### Digital Ocean
+Log into your [Digital Ocean :material-arrow-top-right-thin:{ .external }](https://cloud.digitalocean.com/login) account. Click `API` in the sidebar and click the button `Generate New Token`. 
+
+Then, go ahead and configure the backend:
+
+<div editor-title="~/.dstack/server/config.yml">
+
+```yaml
+projects:
+- name: main
+  backends:
+    - type: digitalocean
+      project_name: my-digital-ocean-project
+      creds:
+        type: api_key
+        api_key: ...
+```
+
+</div>
+
+??? info "Project"
+    If `project_name` is not set, the default project will be used.
+
+??? info "Required permissions"
+    The API key must have the following scopes assigned:
+
+    * `account` - read
+    * `droplet` - create, read, update, delete, admin
+    * `project` - create, read, update, delete
+    * `regions` - read
+    * `sizes` - read
+    * `ssh_key` - create, read, update,delete
+
+### Hot Aisle
+
+Log in to the SSH TUI as described in the [Hot Aisle Quick Start :material-arrow-top-right-thin:{ .external }](https://hotaisle.xyz/quick-start/).
+Create a new team and generate an API key for the member in the team.
+
+Then, go ahead and configure the backend:
+
+<div editor-title="~/.dstack/server/config.yml">
+
+```yaml
+projects:
+- name: main
+  backends:
+    - type: hotaisle
+      team_handle: hotaisle-team-handle
+      creds:
+        type: api_key
+        api_key: 9c27a4bb7a8e472fae12ab34.3f2e3c1db75b9a0187fd2196c6b3e56d2b912e1c439ba08d89e7b6fcd4ef1d3f
+```
+
+</div>
+
+??? info "Required permissions"
+    The API key must have the following roles assigned:
+
+    * **Owner role for the user** - Required for creating and managing SSH keys
+    * **Operator role for the team** - Required for managing virtual machines within the team
+
+
+### CloudRift
+
+Log into your [CloudRift :material-arrow-top-right-thin:{ .external }](https://console.cloudrift.ai/) console, click `API Keys` in the sidebar and click the button to create a new API key.
+
+Ensure you've created a project with CloudRift.
+
+Then proceed to configuring the backend.
+
+<div editor-title="~/.dstack/server/config.yml">
+
+```yaml
+projects:
+  - name: main
+    backends:
+      - type: cloudrift
+        creds:
+          type: api_key
+          api_key: rift_2prgY1d0laOrf2BblTwx2B2d1zcf1zIp4tZYpj5j88qmNgz38pxNlpX3vAo
+```
+
+</div>
+
+## Container-based
+
+Container-based backends allow `dstack` to orchestrate container-based runs either directly on cloud providers that support containers or on Kubernetes.  
+In this case, `dstack` delegates provisioning to the cloud provider or Kubernetes.
+
+Compared to [VM-based](#vm-based) backends, they offer less fine-grained control over provisioning but rely on the native logic of the underlying environment, whether that’s a cloud provider or Kubernetes.
+
+<!-- TODO: Explain what features aren't supported with container-based backends, such as idle_duration, min and target number of nodes when fleet provisioning, instance volumes, Docker-in-Docker, etc. -->
 
 ### Kubernetes
 
-To configure a Kubernetes backend, specify the path to the kubeconfig file,
-and the port that `dstack` can use for proxying SSH traffic.
-In case of a self-managed cluster, also specify the IP address of any node in the cluster.
+Regardless of whether it’s on-prem Kubernetes or managed, `dstack` can orchestrate container-based runs across your clusters.
 
-[//]: # (TODO: Mention that the Kind context has to be selected via `current-context` )
+To use the `kubernetes` backend with `dstack`, you need to configure it with the path to the kubeconfig file, the IP address of any node in the cluster, and the port that `dstack` will use for proxying SSH traffic. 
 
-=== "Self-managed"
+<div editor-title="~/.dstack/server/config.yml">
 
-    Here's how to configure the backend to use a self-managed cluster.
+```yaml
+projects:
+- name: main
+    backends:
+    - type: kubernetes
+      kubeconfig:
+        filename: ~/.kube/config
+      proxy_jump:
+        hostname: 204.12.171.137
+        port: 32000
+```
 
-    <div editor-title="~/.dstack/server/config.yml">
+</div>
 
-    ```yaml
-    projects:
-    - name: main
-      backends:
-        - type: kubernetes
-          kubeconfig:
-            filename: ~/.kube/config
-          networking:
-            ssh_host: localhost # The external IP address of any node
-            ssh_port: 32000 # Any port accessible outside of the cluster
+??? info "Proxy jump"
+    To allow the `dstack` server and CLI to access runs via SSH, `dstack` requires a node that acts as a jump host to proxy SSH traffic into containers.  
+
+    To configure this node, specify `hostname` and `port` under the `proxy_jump` property:  
+
+    - `hostname` — the IP address of any cluster node selected as the jump host. Both the `dstack` server and CLI must be able to reach it. This node can be either a GPU node or a CPU-only node — it makes no difference.  
+    - `port` — any accessible port on that node, which `dstack` uses to forward SSH traffic.  
+
+    No additional setup is required — `dstack` configures and manages the proxy automatically.
+
+??? info "NVIDIA GPU Operator"
+    For `dstack` to correctly detect GPUs in your Kubernetes cluster, the cluster must have the
+    [NVIDIA GPU Operator :material-arrow-top-right-thin:{ .external }](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/index.html){:target="_blank"} pre-installed.
+
+<!-- ??? info "Managed Kubernetes"
+    While `dstack` supports both managed and on-prem Kubernetes clusters, it can only run on pre-provisioned nodes.
+    Support for auto-scalable Kubernetes clusters is coming soon—you can track progress in the corresponding [issue :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/3126){:target="_blank"}.
+    
+    If on-demand provisioning is important, we recommend using [VM-based](#vm-based) backends as they already support auto-scaling. -->
+
+> To learn more, see the [Kubernetes](../guides/kubernetes.md) guide.
+
+### RunPod
+
+Log into your [RunPod :material-arrow-top-right-thin:{ .external }](https://www.runpod.io/console/) console, click Settings in the sidebar, expand the `API Keys` section, and click
+the button to create a Read & Write key.
+
+Then proceed to configuring the backend.
+
+<div editor-title="~/.dstack/server/config.yml">
+
+```yaml
+projects:
+  - name: main
+    backends:
+      - type: runpod
+        creds:
+          type: api_key
+          api_key: US9XTPDIV8AR42MMINY8TCKRB8S4E7LNRQ6CAUQ9
+```
+
+</div>
+
+??? info "Community Cloud"
+    By default, `dstack` considers instance offers from both the Secure Cloud and the
+    [Community Cloud :material-arrow-top-right-thin:{ .external }](https://docs.runpod.io/references/faq/#secure-cloud-vs-community-cloud).
+
+    You can tell them apart by their regions.
+    Secure Cloud regions contain datacenter IDs such as `CA-MTL-3`.
+    Community Cloud regions contain country codes such as `CA`.
+
+    <div class="termy">
+
+    ```shell
+    $ dstack apply -f .dstack.yml -b runpod
+
+     #  BACKEND  REGION    INSTANCE               SPOT  PRICE
+     1  runpod   CA        NVIDIA A100 80GB PCIe  yes   $0.6
+     2  runpod   CA-MTL-3  NVIDIA A100 80GB PCIe  yes   $0.82
     ```
 
     </div>
 
-    The port specified to `ssh_port` must be accessible outside of the cluster.
-
-    ??? info "Kind"
-        If you are using [Kind](https://kind.sigs.k8s.io/), make sure to make 
-        to set up `ssh_port` via `extraPortMappings` for proxying SSH traffic:
-    
-        ```yaml
-        kind: Cluster
-        apiVersion: kind.x-k8s.io/v1alpha4
-        nodes:
-          - role: control-plane
-            extraPortMappings:
-              - containerPort: 32000 # Must be same as `ssh_port`
-                hostPort: 32000 # Must be same as `ssh_port`
-        ```
-    
-        Go ahead and create the cluster like this: 
-
-        ```shell
-        kind create cluster --config examples/misc/kubernetes/kind-config.yml
-        ```
-
-[//]: # (TODO: Elaborate on the Kind's IP address on Linux)
-
-=== "Managed"
-    Here's how to configure the backend to use a managed cluster (AWS, GCP, Azure).
+    If you don't want to use the Community Cloud, set `community_cloud: false` in the backend settings.
 
     <div editor-title="~/.dstack/server/config.yml">
 
@@ -981,40 +1094,50 @@ In case of a self-managed cluster, also specify the IP address of any node in th
     projects:
       - name: main
         backends:
-          - type: kubernetes
-            kubeconfig:
-              filename: ~/.kube/config
-            networking:
-              ssh_port: 32000 # Any port accessible outside of the cluster
+          - type: runpod
+            creds:
+              type: api_key
+              api_key: US9XTPDIV8AR42MMINY8TCKRB8S4E7LNRQ6CAUQ9
+            community_cloud: false
     ```
 
     </div>
 
-    The port specified to `ssh_port` must be accessible outside of the cluster.
+### Vast.ai
 
-    ??? info "EKS"
-        For example, if you are using EKS, make sure to add it via an ingress rule
-        of the corresponding security group:
-    
-        ```shell
-        aws ec2 authorize-security-group-ingress --group-id <cluster-security-group-id> --protocol tcp --port 32000 --cidr 0.0.0.0/0
-        ```
+Log into your [Vast.ai :material-arrow-top-right-thin:{ .external }](https://cloud.vast.ai/) account, click Account in the sidebar, and copy your
+API Key.
 
-[//]: # (TODO: Elaborate on gateways, and what backends allow configuring them)
+Then, go ahead and configure the backend:
 
-[//]: # (TODO: Should we automatically detect ~/.kube/config)
+<div editor-title="~/.dstack/server/config.yml">
 
-??? info "NVIDIA GPU Operator"
-    To use GPUs with Kubernetes, the cluster must be installed with the
-    [NVIDIA GPU Operator :material-arrow-top-right-thin:{ .external }](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/index.html).
+```yaml
+projects:
+- name: main
+  backends:
+    - type: vastai
+      creds:
+        type: api_key
+        api_key: d75789f22f1908e0527c78a283b523dd73051c8c7d05456516fc91e9d4efd8c5
+```
 
-    [//]: # (TODO: Provide short yet clear instructions. Elaborate on whether it works with Kind.)
+</div>
 
-## dstack Sky
+Also, the `vastai` backend supports on-demand instances only. Spot instance support coming soon.
 
-If you're using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"},
-backends are pre-configured to use compute from `dstack`'s marketplace.
+## On-prem
 
-You can reconfigure backends via the UI, to use your own cloud accounts instead.
+In on-prem environments, the [Kubernetes](#kubernetes) backend can be used if a Kubernetes cluster is already set up and configured.  
+However, often [SSH fleets](../concepts/fleets.md#ssh) are a simpler and lighter alternative.
 
-[//]: # (TODO: Add link to the server config reference page)
+### SSH fleets
+
+SSH fleets require no backend configuration. 
+All you need to do is [provide hostnames and SSH credentials](../concepts/fleets.md#ssh), and `dstack` sets up a fleet that can orchestrate container-based runs on your servers.
+
+SSH fleets support the same features as [VM-based](#vm-based) backends.
+
+!!! info "What's next"
+    1. See the [`~/.dstack/server/config.yml`](../reference/server/config.yml.md) reference
+    2. Check [Projects](../concepts/projects.md)

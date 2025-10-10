@@ -16,7 +16,9 @@ class RepoConfig(CoreModel):
     path: str
     repo_id: str
     repo_type: RepoType
-    ssh_key_path: str
+    # Deprecated since 0.19.25, not used. Can be removed when most users update their `config.yml`
+    # (it's updated each time a project or repo is added)
+    ssh_key_path: Annotated[Optional[str], Field(exclude=True)] = None
 
 
 class GlobalConfig(CoreModel):

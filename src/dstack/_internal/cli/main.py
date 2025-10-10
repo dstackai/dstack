@@ -17,6 +17,7 @@ from dstack._internal.cli.commands.metrics import MetricsCommand
 from dstack._internal.cli.commands.offer import OfferCommand
 from dstack._internal.cli.commands.project import ProjectCommand
 from dstack._internal.cli.commands.ps import PsCommand
+from dstack._internal.cli.commands.secrets import SecretCommand
 from dstack._internal.cli.commands.server import ServerCommand
 from dstack._internal.cli.commands.stats import StatsCommand
 from dstack._internal.cli.commands.stop import StopCommand
@@ -40,8 +41,8 @@ def main():
 
     parser = argparse.ArgumentParser(
         description=(
-            "Not sure where to start? Call [code]dstack init[/].\n"
-            "Define a [code].dstack.yml[/] configuration file and run it via [code]dstack apply[/]\n"
+            "Not sure where to start?"
+            " Define a [code].dstack.yml[/] configuration file and run it via [code]dstack apply[/]\n"
         ),
         formatter_class=RichHelpFormatter,
         epilog=(
@@ -72,6 +73,7 @@ def main():
     MetricsCommand.register(subparsers)
     ProjectCommand.register(subparsers)
     PsCommand.register(subparsers)
+    SecretCommand.register(subparsers)
     ServerCommand.register(subparsers)
     StatsCommand.register(subparsers)
     StopCommand.register(subparsers)
@@ -81,7 +83,7 @@ def main():
     argcomplete.autocomplete(parser, always_complete_options=False)
 
     args, unknown_args = parser.parse_known_args()
-    args.unknown = unknown_args
+    args.extra_args = unknown_args
 
     try:
         check_for_updates()

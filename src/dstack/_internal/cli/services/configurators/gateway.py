@@ -1,6 +1,5 @@
 import argparse
 import time
-from typing import List, Optional
 
 from rich.table import Table
 
@@ -21,14 +20,13 @@ from dstack._internal.core.models.gateways import (
     GatewaySpec,
     GatewayStatus,
 )
-from dstack._internal.core.models.repos.base import Repo
 from dstack._internal.core.services.diff import diff_models
 from dstack._internal.utils.common import local_time
 from dstack.api._public import Client
 
 
-class GatewayConfigurator(BaseApplyConfigurator):
-    TYPE: ApplyConfigurationType = ApplyConfigurationType.GATEWAY
+class GatewayConfigurator(BaseApplyConfigurator[GatewayConfiguration]):
+    TYPE = ApplyConfigurationType.GATEWAY
 
     def apply_configuration(
         self,
@@ -36,10 +34,8 @@ class GatewayConfigurator(BaseApplyConfigurator):
         configuration_path: str,
         command_args: argparse.Namespace,
         configurator_args: argparse.Namespace,
-        unknown_args: List[str],
-        repo: Optional[Repo] = None,
     ):
-        self.apply_args(conf, configurator_args, unknown_args)
+        self.apply_args(conf, configurator_args)
         spec = GatewaySpec(
             configuration=conf,
             configuration_path=configuration_path,
@@ -121,7 +117,7 @@ class GatewayConfigurator(BaseApplyConfigurator):
                     time.sleep(LIVE_TABLE_PROVISION_INTERVAL_SECS)
                     gateway = self.api.client.gateways.get(self.api.project, gateway.name)
         except KeyboardInterrupt:
-            if confirm_ask("Delete the gateway before exiting?"):
+            if not command_args.yes and confirm_ask("Delete the gateway before exiting?"):
                 with console.status("Deleting gateway..."):
                     self.api.client.gateways.delete(
                         project_name=self.api.project,
@@ -181,7 +177,7 @@ class GatewayConfigurator(BaseApplyConfigurator):
             help="The gateway name",
         )
 
-    def apply_args(self, conf: GatewayConfiguration, args: argparse.Namespace, unknown: List[str]):
+    def apply_args(self, conf: GatewayConfiguration, args: argparse.Namespace):
         if args.name:
             conf.name = args.name
 

@@ -12,7 +12,6 @@ import 'ace-builds/css/ace.css';
 import 'ace-builds/css/theme/cloud_editor.css';
 import 'ace-builds/css/theme/cloud_editor_dark.css';
 import 'assets/css/index.css';
-import '@xterm/xterm/css/xterm.css';
 
 import 'locale';
 
@@ -20,7 +19,12 @@ const container = document.getElementById('root');
 
 const theme: Theme = {
     tokens: {
-        fontFamilyBase: "'Roboto', 'Open Sans', 'Helvetica Neue', Arial, sans-serif",
+        fontFamilyBase:
+            'metro-web, Metro, -apple-system, "system-ui", "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif',
+        fontSizeHeadingS: '15px',
+        fontSizeHeadingL: '19px',
+        fontSizeHeadingXl: '22px',
+        fontSizeDisplayL: '40px',
     },
 };
 

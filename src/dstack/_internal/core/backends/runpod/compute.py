@@ -1,10 +1,11 @@
 import json
 import uuid
 from datetime import timedelta
-from typing import List, Optional
+from typing import Callable, List, Optional
 
 from dstack._internal.core.backends.base.backend import Compute
 from dstack._internal.core.backends.base.compute import (
+    ComputeWithAllOffersCached,
     ComputeWithGroupProvisioningSupport,
     ComputeWithVolumeSupport,
     generate_unique_instance_name,
@@ -13,7 +14,7 @@ from dstack._internal.core.backends.base.compute import (
     get_job_instance_name,
 )
 from dstack._internal.core.backends.base.models import JobConfiguration
-from dstack._internal.core.backends.base.offers import get_catalog_offers
+from dstack._internal.core.backends.base.offers import get_catalog_offers, get_offers_disk_modifier
 from dstack._internal.core.backends.runpod.api_client import RunpodApiClient, RunpodApiClientError
 from dstack._internal.core.backends.runpod.models import RunpodConfig
 from dstack._internal.core.consts import DSTACK_RUNNER_SSH_PORT
@@ -29,6 +30,7 @@ from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
     SSHKey,
 )
+from dstack._internal.core.models.resources import Memory, Range
 from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
 from dstack._internal.core.models.volumes import Volume, VolumeProvisioningData
 from dstack._internal.utils.common import get_current_datetime
@@ -41,8 +43,12 @@ MAX_RESOURCE_NAME_LEN = 60
 
 CONTAINER_REGISTRY_AUTH_CLEANUP_INTERVAL = 60 * 60 * 24  # 24 hour
 
+# RunPod does not seem to have any limits on the disk size.
+CONFIGURABLE_DISK_SIZE = Range[Memory](min=Memory.parse("1GB"), max=None)
+
 
 class RunpodCompute(
+    ComputeWithAllOffersCached,
     ComputeWithVolumeSupport,
     ComputeWithGroupProvisioningSupport,
     Compute,
@@ -54,13 +60,11 @@ class RunpodCompute(
         self.config = config
         self.api_client = RunpodApiClient(config.creds.api_key)
 
-    def get_offers(
-        self, requirements: Optional[Requirements] = None
-    ) -> List[InstanceOfferWithAvailability]:
+    def get_all_offers_with_availability(self) -> List[InstanceOfferWithAvailability]:
         offers = get_catalog_offers(
             backend=BackendType.RUNPOD,
             locations=self.config.regions or None,
-            requirements=requirements,
+            requirements=None,
             extra_filter=lambda o: _is_secure_cloud(o.region) or self.config.allow_community_cloud,
         )
         offers = [
@@ -70,6 +74,11 @@ class RunpodCompute(
             for offer in offers
         ]
         return offers
+
+    def get_offers_modifier(
+        self, requirements: Requirements
+    ) -> Callable[[InstanceOfferWithAvailability], Optional[InstanceOfferWithAvailability]]:
+        return get_offers_disk_modifier(CONFIGURABLE_DISK_SIZE, requirements)
 
     def run_job(
         self,

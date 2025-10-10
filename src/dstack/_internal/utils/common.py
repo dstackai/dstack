@@ -222,28 +222,22 @@ def remove_prefix(text: str, prefix: str) -> str:
     return text
 
 
-T = TypeVar("T")
-
-
-def split_chunks(iterable: Iterable[T], chunk_size: int) -> Iterable[List[T]]:
+def has_duplicates(iterable: Iterable[Any]) -> bool:
     """
-    Splits an iterable into chunks of at most `chunk_size` items.
+    Checks if there are any duplicate items in the given iterable.
 
-    >>> list(split_chunks([1, 2, 3, 4, 5], 2))
-    [[1, 2], [3, 4], [5]]
+    O(n^2) implementation, but works with iterables with unhashable items.
+    For iterables with hashable items, prefer len(set(iterable)) != len(iterable).
     """
-
-    if chunk_size < 1:
-        raise ValueError(f"chunk_size should be a positive integer, not {chunk_size}")
-
-    chunk = []
+    seen = []
     for item in iterable:
-        chunk.append(item)
-        if len(chunk) == chunk_size:
-            yield chunk
-            chunk = []
-    if chunk:
-        yield chunk
+        if item in seen:
+            return True
+        seen.append(item)
+    return False
+
+
+T = TypeVar("T")
 
 
 MEMORY_UNITS = {
@@ -283,7 +277,17 @@ def get_or_error(v: Optional[T]) -> T:
     return v
 
 
+# TODO: drop after dropping Python 3.11
 def batched(seq: Iterable[T], n: int) -> Iterable[List[T]]:
+    """
+    Roughly equivalent to itertools.batched from Python 3.12.
+
+    >>> list(batched([1, 2, 3, 4, 5], 2))
+    [[1, 2], [3, 4], [5]]
+    """
+
+    if n < 1:
+        raise ValueError(f"n should be a positive integer, not {n}")
     it = iter(seq)
     return iter(lambda: list(itertools.islice(it, n)), [])
 
