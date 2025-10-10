@@ -552,6 +552,9 @@ def _generate_create_cluster_mutation(
     input_fields.append(f"type: {cluster_type}")
     input_fields.append(f"gpuCountPerPod: {gpu_count_per_pod}")
     input_fields.append(f'templateId: "{template_id}"')
+    # FIXME: Figure out what deployCost should be.
+    # If not specified, Runpod returns Insufficient resources error.
+    input_fields.append("deployCost: 68.928")
 
     # ------------------------------ Optional Fields ----------------------------- #
     if network_volume_id is not None:

@@ -10,7 +10,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import contains_eager, joinedload, load_only, noload, selectinload
 
 from dstack._internal.core.backends.base.backend import Backend
-from dstack._internal.core.backends.base.compute import ComputeWithVolumeSupport
+from dstack._internal.core.backends.base.compute import (
+    ComputeWithGroupProvisioningSupport,
+    ComputeWithVolumeSupport,
+)
+from dstack._internal.core.backends.base.models import JobConfiguration
 from dstack._internal.core.errors import BackendError, ServerClientError
 from dstack._internal.core.models.common import NetworkMode
 from dstack._internal.core.models.fleets import (
@@ -783,17 +787,21 @@ async def _run_job_on_new_instance(
             offer.region,
             offer.price,
         )
+        compute = backend.compute()
+        assert isinstance(compute, ComputeWithGroupProvisioningSupport)
         offer_volumes = _get_offer_volumes(volumes, offer)
+        job_configuration = JobConfiguration(job=job, volumes=offer_volumes)
+        job_configurations = [job_configuration, job_configuration]
         try:
-            job_provisioning_data = await common_utils.run_async(
-                backend.compute().run_job,
+            cgpd = await common_utils.run_async(
+                compute.run_jobs,
                 run,
-                job,
+                job_configurations,
                 offer,
                 project_ssh_public_key,
                 project_ssh_private_key,
-                offer_volumes,
             )
+            job_provisioning_data = cgpd.job_provisioning_datas[0]
             return job_provisioning_data, offer, profile, requirements
         except BackendError as e:
             logger.warning(
