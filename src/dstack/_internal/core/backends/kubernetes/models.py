@@ -50,7 +50,7 @@ class KubeconfigFileConfig(CoreModel):
         Optional[Union[str, dict]],
         Field(
             description=(
-                "The contents of the kubeconfig file."
+                "The contents of the kubeconfig file specified as yaml or a string."
                 " When configuring via `server/config.yml`, it's automatically filled from `filename`."
                 " When configuring via UI, it has to be specified explicitly"
             )
