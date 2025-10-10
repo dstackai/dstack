@@ -130,13 +130,19 @@ class GCPCompute(
         offer_keys_to_offers = {}
         offers_with_availability = []
         for offer in offers:
+            preview = False
+            if offer.instance.name.startswith("g4-standard-"):
+                if self.config.preview_features and "g4" in self.config.preview_features:
+                    preview = True
+                else:
+                    continue
             region = offer.region[:-2]  # strip zone
             key = (_unique_instance_name(offer.instance), region)
             if key in offer_keys_to_offers:
                 offer_keys_to_offers[key].availability_zones.append(offer.region)
                 continue
             availability = InstanceAvailability.NO_QUOTA
-            if _has_gpu_quota(quotas[region], offer.instance.resources):
+            if preview or _has_gpu_quota(quotas[region], offer.instance.resources):
                 availability = InstanceAvailability.UNKNOWN
             # todo quotas: cpu, memory, global gpu, tpu
             offer_with_availability = InstanceOfferWithAvailability(
