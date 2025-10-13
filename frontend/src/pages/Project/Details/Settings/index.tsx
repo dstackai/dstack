@@ -201,7 +201,7 @@ export const ProjectSettings: React.FC = () => {
                                     iconName="script"
                                     variant={expanded ? 'normal' : 'primary'}
                                     onClick={() => setExpanded((prev) => !prev)}
-                                ></Button>
+                                />
                             }
                             // headerInfo={<InfoLink onFollow={() => openHelpPanel(CLI_INFO)} />}
                         >
