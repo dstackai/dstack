@@ -13,6 +13,7 @@ from dstack._internal.core.backends.base.compute import (
     Compute,
     ComputeWithCreateInstanceSupport,
     ComputeWithGatewaySupport,
+    ComputeWithGroupProvisioningSupport,
     ComputeWithMultinodeSupport,
     ComputeWithPlacementGroupSupport,
     ComputeWithPrivateGatewaySupport,
@@ -22,6 +23,7 @@ from dstack._internal.core.backends.base.compute import (
 )
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import NetworkMode
+from dstack._internal.core.models.compute_groups import ComputeGroupProvisioningData
 from dstack._internal.core.models.configurations import (
     AnyRunConfiguration,
     DevEnvironmentConfiguration,
@@ -448,6 +450,22 @@ def get_job_runtime_data(
         ports=ports,
         offer=offer,
         volume_names=volume_names,
+    )
+
+
+def get_compute_group_provisioning_data(
+    compute_group_id: str = "test_compute_group",
+    compute_group_name: str = "test_compute_group",
+    job_provisioning_datas: Optional[list[JobProvisioningData]] = None,
+    backend_data: Optional[str] = None,
+) -> ComputeGroupProvisioningData:
+    if job_provisioning_datas is None:
+        job_provisioning_datas = []
+    return ComputeGroupProvisioningData(
+        compute_group_id=compute_group_id,
+        compute_group_name=compute_group_name,
+        job_provisioning_datas=job_provisioning_datas,
+        backend_data=backend_data,
     )
 
 
@@ -1132,6 +1150,7 @@ class AsyncContextManager:
 class ComputeMockSpec(
     Compute,
     ComputeWithCreateInstanceSupport,
+    ComputeWithGroupProvisioningSupport,
     ComputeWithPrivilegedSupport,
     ComputeWithMultinodeSupport,
     ComputeWithReservationSupport,

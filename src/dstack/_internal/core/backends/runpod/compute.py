@@ -7,6 +7,7 @@ from dstack._internal.core.backends.base.backend import Compute
 from dstack._internal.core.backends.base.compute import (
     ComputeWithAllOffersCached,
     ComputeWithGroupProvisioningSupport,
+    ComputeWithMultinodeSupport,
     ComputeWithVolumeSupport,
     generate_unique_instance_name,
     generate_unique_volume_name,
@@ -50,6 +51,7 @@ CONFIGURABLE_DISK_SIZE = Range[Memory](min=Memory.parse("1GB"), max=None)
 class RunpodCompute(
     ComputeWithAllOffersCached,
     ComputeWithVolumeSupport,
+    ComputeWithMultinodeSupport,
     ComputeWithGroupProvisioningSupport,
     Compute,
 ):

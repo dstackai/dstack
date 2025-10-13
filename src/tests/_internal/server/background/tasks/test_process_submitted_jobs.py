@@ -43,6 +43,7 @@ from dstack._internal.server.testing.common import (
     create_run,
     create_user,
     create_volume,
+    get_compute_group_provisioning_data,
     get_fleet_spec,
     get_instance_offer_with_availability,
     get_job_provisioning_data,
@@ -1114,6 +1115,69 @@ class TestProcessSubmittedJobs:
         assert job1.status == JobStatus.PROVISIONING
         await process_submitted_jobs()
         await session.refresh(job2)
+        assert job2.status == JobStatus.PROVISIONING
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_provisions_compute_group(self, test_db, session: AsyncSession):
+        project = await create_project(session)
+        user = await create_user(session)
+        repo = await create_repo(session=session, project_id=project.id)
+        fleet = await create_fleet(session=session, project=project)
+        run_name = "test-run"
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            run_name=run_name,
+        )
+        run_spec.configuration = TaskConfiguration(nodes=2, commands=["echo"])
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            fleet=fleet,
+            run_name=run_name,
+            run_spec=run_spec,
+        )
+        job1 = await create_job(
+            session=session,
+            run=run,
+            instance_assigned=True,
+            job_num=0,
+            status=JobStatus.SUBMITTED,
+        )
+        job2 = await create_job(
+            session=session,
+            run=run,
+            instance_assigned=False,
+            job_num=1,
+            status=JobStatus.SUBMITTED,
+        )
+        offer = get_instance_offer_with_availability(
+            backend=BackendType.RUNPOD,
+            availability=InstanceAvailability.AVAILABLE,
+        )
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            backend_mock = Mock()
+            compute_mock = Mock(spec=ComputeMockSpec)
+            backend_mock.compute.return_value = compute_mock
+            m.return_value = [backend_mock]
+            backend_mock.TYPE = BackendType.RUNPOD
+            compute_mock.get_offers.return_value = [offer]
+            jpds = [
+                get_job_provisioning_data(),
+                get_job_provisioning_data(),
+            ]
+            compute_mock.run_jobs.return_value = get_compute_group_provisioning_data(
+                job_provisioning_datas=jpds
+            )
+            await process_submitted_jobs()
+            m.assert_called_once()
+            compute_mock.get_offers.assert_called_once()
+            compute_mock.run_jobs.assert_called_once()
+        await session.refresh(job1)
+        await session.refresh(job2)
+        assert job1.status == JobStatus.PROVISIONING
         assert job2.status == JobStatus.PROVISIONING
 
 
