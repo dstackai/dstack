@@ -18,6 +18,7 @@ from dstack._internal.core.models.configurations import DevEnvironmentConfigurat
 from dstack._internal.core.models.files import FileArchiveMapping
 from dstack._internal.core.models.instances import (
     InstanceStatus,
+    InstanceTerminationReason,
     RemoteConnectionInfo,
     SSHConnectionParams,
 )
@@ -372,6 +373,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
                 job_model.status = JobStatus.TERMINATING
                 # job will be terminated and instance will be emptied by process_terminating_jobs
             else:
+                # job_model.instance.termination_reason
                 # No job_model.termination_reason set means ssh connection failed
                 if job_model.disconnected_at is None:
                     job_model.disconnected_at = common_utils.get_current_datetime()
@@ -383,7 +385,14 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
                     )
                     # TODO: Replace with JobTerminationReason.INSTANCE_UNREACHABLE in 0.20 or
                     # when CLI <= 0.19.8 is no longer supported
-                    job_model.termination_reason = JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY
+                    if (
+                        job_model.instance is not None
+                        and job_model.instance.termination_reason
+                        == InstanceTerminationReason.NO_BALANCE.value
+                    ):
+                        job_model.termination_reason = JobTerminationReason.NO_BALANCE
+                    else:
+                        job_model.termination_reason = JobTerminationReason.INSTANCE_UNREACHABLE
                     job_model.status = JobStatus.TERMINATING
                 else:
                     logger.warning(

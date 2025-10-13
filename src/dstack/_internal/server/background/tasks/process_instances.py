@@ -45,6 +45,7 @@ from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
     InstanceRuntime,
     InstanceStatus,
+    InstanceTerminationReason,
     RemoteConnectionInfo,
     SSHKey,
 )
@@ -240,7 +241,7 @@ def _check_and_mark_terminating_if_idle_duration_expired(instance: InstanceModel
     delta = datetime.timedelta(seconds=idle_seconds)
     if idle_duration > delta:
         instance.status = InstanceStatus.TERMINATING
-        instance.termination_reason = "Idle timeout"
+        instance.termination_reason = InstanceTerminationReason.IDLE_TIMEOUT.value
         logger.info(
             "Instance %s idle duration expired: idle time %ss. Terminating",
             instance.name,
@@ -262,7 +263,7 @@ async def _add_remote(instance: InstanceModel) -> None:
     retry_duration_deadline = instance.created_at + timedelta(seconds=PROVISIONING_TIMEOUT_SECONDS)
     if retry_duration_deadline < get_current_datetime():
         instance.status = InstanceStatus.TERMINATED
-        instance.termination_reason = "Provisioning timeout expired"
+        instance.termination_reason = InstanceTerminationReason.PROOVISIONING_TIMEOUT.value
         logger.warning(
             "Failed to start instance %s in %d seconds. Terminating...",
             instance.name,
@@ -285,7 +286,8 @@ async def _add_remote(instance: InstanceModel) -> None:
                 ssh_proxy_pkeys = None
         except (ValueError, PasswordRequiredException):
             instance.status = InstanceStatus.TERMINATED
-            instance.termination_reason = "Unsupported private SSH key type"
+            instance.termination_reason = InstanceTerminationReason.ERROR.value
+            instance.termination_reason_message = "Unsupported private SSH key type"
             logger.warning(
                 "Failed to add instance %s: unsupported private SSH key type",
                 instance.name,
@@ -343,7 +345,10 @@ async def _add_remote(instance: InstanceModel) -> None:
         )
     if instance_network is not None and internal_ip is None:
         instance.status = InstanceStatus.TERMINATED
-        instance.termination_reason = "Failed to locate internal IP address on the given network"
+        instance.termination_reason = InstanceTerminationReason.ERROR.value
+        instance.termination_reason_message = (
+            "Failed to locate internal IP address on the given network"
+        )
         logger.warning(
             "Failed to add instance %s: failed to locate internal IP address on the given network",
             instance.name,
@@ -356,7 +361,8 @@ async def _add_remote(instance: InstanceModel) -> None:
     if internal_ip is not None:
         if not is_ip_among_addresses(ip_address=internal_ip, addresses=host_network_addresses):
             instance.status = InstanceStatus.TERMINATED
-            instance.termination_reason = (
+            instance.termination_reason = InstanceTerminationReason.ERROR.value
+            instance.termination_reason_message = (
                 "Specified internal IP not found among instance interfaces"
             )
             logger.warning(
@@ -378,7 +384,8 @@ async def _add_remote(instance: InstanceModel) -> None:
         instance.total_blocks = blocks
     else:
         instance.status = InstanceStatus.TERMINATED
-        instance.termination_reason = "Cannot split into blocks"
+        instance.termination_reason = InstanceTerminationReason.ERROR.value
+        instance.termination_reason_message = "Cannot split into blocks"
         logger.warning(
             "Failed to add instance %s: cannot split into blocks",
             instance.name,
@@ -497,7 +504,8 @@ async def _create_instance(session: AsyncSession, instance: InstanceModel) -> No
         requirements = get_instance_requirements(instance)
     except ValidationError as e:
         instance.status = InstanceStatus.TERMINATED
-        instance.termination_reason = (
+        instance.termination_reason = InstanceTerminationReason.ERROR.value
+        instance.termination_reason_message = (
             f"Error to parse profile, requirements or instance_configuration: {e}"
         )
         logger.warning(
@@ -645,7 +653,7 @@ async def _create_instance(session: AsyncSession, instance: InstanceModel) -> No
             )
         return
 
-    _mark_terminated(instance, "All offers failed" if offers else "No offers found")
+    _mark_terminated(instance, InstanceTerminationReason.NO_OFFERS.value)
     if (
         instance.fleet
         and _is_fleet_master_instance(instance)
@@ -656,7 +664,7 @@ async def _create_instance(session: AsyncSession, instance: InstanceModel) -> No
         for sibling_instance in instance.fleet.instances:
             if sibling_instance.id == instance.id:
                 continue
-            _mark_terminated(sibling_instance, "Master instance failed to start")
+            _mark_terminated(sibling_instance, InstanceTerminationReason.MASTER_FAILED.value)
 
 
 def _mark_terminated(instance: InstanceModel, termination_reason: str) -> None:
@@ -681,7 +689,7 @@ async def _check_instance(session: AsyncSession, instance: InstanceModel) -> Non
     ):
         # A busy instance could have no active jobs due to this bug: https://github.com/dstackai/dstack/issues/2068
         instance.status = InstanceStatus.TERMINATING
-        instance.termination_reason = "Instance job finished"
+        instance.termination_reason = InstanceTerminationReason.JOB_FINISHED.value
         logger.info(
             "Detected busy instance %s with finished job. Marked as TERMINATING",
             instance.name,
@@ -810,7 +818,7 @@ async def _check_instance(session: AsyncSession, instance: InstanceModel) -> Non
         deadline = instance.termination_deadline
         if get_current_datetime() > deadline:
             instance.status = InstanceStatus.TERMINATING
-            instance.termination_reason = "Termination deadline"
+            instance.termination_reason = InstanceTerminationReason.TERMINATION_TIMEOUT.value
             logger.warning(
                 "Instance %s shim waiting timeout. Marked as TERMINATING",
                 instance.name,
@@ -839,7 +847,7 @@ async def _wait_for_instance_provisioning_data(
             "Instance %s failed because instance has not become running in time", instance.name
         )
         instance.status = InstanceStatus.TERMINATING
-        instance.termination_reason = "Instance has not become running in time"
+        instance.termination_reason = InstanceTerminationReason.STARTING_TIMEOUT.value
         return
 
     backend = await backends_services.get_project_backend_by_type(
@@ -852,7 +860,8 @@ async def _wait_for_instance_provisioning_data(
             instance.name,
         )
         instance.status = InstanceStatus.TERMINATING
-        instance.termination_reason = "Backend not available"
+        instance.termination_reason = InstanceTerminationReason.ERROR.value
+        instance.termination_reason_message = "Backend not available"
         return
     try:
         await run_async(
@@ -869,7 +878,8 @@ async def _wait_for_instance_provisioning_data(
             repr(e),
         )
         instance.status = InstanceStatus.TERMINATING
-        instance.termination_reason = "Error while waiting for instance to become running"
+        instance.termination_reason = InstanceTerminationReason.ERROR.value
+        instance.termination_reason_message = "Error while waiting for instance to become running"
     except Exception:
         logger.exception(
             "Got exception when updating instance %s provisioning data", instance.name

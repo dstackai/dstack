@@ -27,6 +27,7 @@ from dstack._internal.core.models.instances import (
     InstanceOffer,
     InstanceOfferWithAvailability,
     InstanceStatus,
+    InstanceTerminationReason,
     InstanceType,
     Resources,
 )
@@ -251,7 +252,7 @@ class TestCheckShim:
         assert instance is not None
         assert instance.status == InstanceStatus.TERMINATING
         assert instance.termination_deadline == termination_deadline_time
-        assert instance.termination_reason == "Termination deadline"
+        assert instance.termination_reason == InstanceTerminationReason.TERMINATION_TIMEOUT.value
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
@@ -510,7 +511,7 @@ class TestTerminateIdleTime:
         await session.refresh(instance)
         assert instance is not None
         assert instance.status == InstanceStatus.TERMINATING
-        assert instance.termination_reason == "Idle timeout"
+        assert instance.termination_reason == InstanceTerminationReason.IDLE_TIMEOUT.value
 
 
 class TestSSHInstanceTerminateProvisionTimeoutExpired:
@@ -531,7 +532,7 @@ class TestSSHInstanceTerminateProvisionTimeoutExpired:
 
         await session.refresh(instance)
         assert instance.status == InstanceStatus.TERMINATED
-        assert instance.termination_reason == "Provisioning timeout expired"
+        assert instance.termination_reason == InstanceTerminationReason.PROOVISIONING_TIMEOUT.value
 
 
 class TestTerminate:
@@ -800,7 +801,7 @@ class TestCreateInstance:
 
         await session.refresh(instance)
         assert instance.status == InstanceStatus.TERMINATED
-        assert instance.termination_reason == "All offers failed"
+        assert instance.termination_reason == InstanceTerminationReason.NO_OFFERS.value
 
     async def test_fails_if_no_offers(self, session: AsyncSession):
         project = await create_project(session=session)
@@ -813,19 +814,19 @@ class TestCreateInstance:
 
         await session.refresh(instance)
         assert instance.status == InstanceStatus.TERMINATED
-        assert instance.termination_reason == "No offers found"
+        assert instance.termination_reason == InstanceTerminationReason.NO_OFFERS.value
 
     @pytest.mark.parametrize(
         ("placement", "expected_termination_reasons"),
         [
             pytest.param(
                 InstanceGroupPlacement.CLUSTER,
-                {"No offers found": 1, "Master instance failed to start": 3},
+                {InstanceTerminationReason.NO_OFFERS.value: 1, InstanceTerminationReason.MASTER_FAILED.value: 3},
                 id="cluster",
             ),
             pytest.param(
                 None,
-                {"No offers found": 4},
+                {InstanceTerminationReason.NO_OFFERS.value: 4},
                 id="non-cluster",
             ),
         ],
