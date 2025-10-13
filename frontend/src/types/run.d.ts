@@ -14,14 +14,99 @@ declare type TGPUResources = IGPUSpecRequest & {
     name?: string | string[];
 };
 
+declare type TIde = 'cursor' | 'vscode';
+
+declare type TVolumeMountPointRequest = {
+    name: string | string[];
+    path: string;
+};
+
+declare type TInstanceMountPointRequest = {
+    instance_path: string;
+    path: string;
+    optional?: boolean;
+};
+
+declare type TEnvironmentConfigurationRepo = {
+    instance_path?: string;
+    url?: string;
+    path?: string;
+    branch?: string;
+    hash?: string;
+};
+
+declare type TFilePathMappingRequest = {
+    local_path: string;
+    path: string;
+};
+
+declare type ProfileRetryRequest = {
+    on_events?: string[];
+    duration?: string | number;
+};
+
 declare type TDevEnvironmentConfiguration = {
-    ide: string;
+    type?: 'dev-environment';
+    ide: TIde;
+    version?: string;
+    init?: string[];
+    inactivity_duration?: string | number | boolean | 'off';
+    ports?: number[] | string[];
+    name?: string;
+    image?: string;
+    user?: string;
+    privileged?: boolean;
+    entrypoint?: string;
+    working_dir?: string;
+    home_dir?: string;
+    registry_auth?: {
+        username: string;
+        password: string;
+    };
+    python?: string;
+    nvcc?: boolean;
+    single_branch?: boolean;
+    env?: string[];
+    shell?: string;
     resources?: {
         gpu?: TGPUResources | string | number;
-        cpu?: number | { min: number; max: number };
-        memory?: number | { min: number; max: number };
+        cpu?: string | number | { min?: number; max?: number };
+        memory?: string | number | { min?: number; max?: number };
+        shm_size?: string | number;
+        disk?:
+            | string
+            | number
+            | {
+                  size?: string | number | { min?: number; max?: number };
+              };
     };
+    priority?: number;
+    volumes?: Array<string | TVolumeMountPointRequest | TInstanceMountPointRequest>;
+    docker?: boolean;
+    repos?: TEnvironmentConfigurationRepo[];
+    files?: Array<TFilePathMappingRequest | string>;
+    setup?: string[];
     backends?: string[];
+    regions?: string[];
+    availability_zones?: string[];
+    instance_types?: string[];
+    reservation?: string;
+    spot_policy?: TSpotPolicy;
+    retry?: ProfileRetryRequest | string;
+    max_duration?: number | string | boolean;
+    stop_duration?: number | string | boolean;
+    max_price?: number;
+    creation_policy?: 'reuse' | 'reuse-or-create';
+    idle_duration?: number | string;
+    utilization_policy?: {
+        min_gpu_utilization: number;
+        time_window: string | number;
+    };
+    startup_order?: string;
+    stop_criteria?: string;
+    schedule?: { cron: string | string[] };
+    fleets?: string[];
+    tags?: object;
     ssh_key_pub: string;
 };
 

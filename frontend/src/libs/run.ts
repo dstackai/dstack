@@ -1,5 +1,4 @@
 import { get as _get } from 'lodash';
-import jsYaml from 'js-yaml';
 import { StatusIndicatorProps } from '@cloudscape-design/components';
 
 import { capitalize } from 'libs';
@@ -96,82 +95,4 @@ export const getExtendedModelFromRun = (run: IRun): IModelExtended | null => {
 
 export const getRepoNameFromRun = (run: IRun): string => {
     return _get(run.run_spec.repo_data, 'repo_name', _get(run.run_spec.repo_data, 'repo_dir', '-'));
-};
-
-const isMemory = (value: string) => /^\d+GB/.test(value);
-const isCount = (value: string) => /^\d+(?:\.\.)*(?:\d+)*$/.test(value);
-
-const parseRange = (rangeString: string) => {
-    const [min, max] = rangeString.split('..');
-
-    if (!min && !max) {
-        return rangeString;
-    }
-
-    return {
-        ...(min ? { min } : {}),
-        ...(max ? { max } : {}),
-    };
-};
-
-export const getRunSpecConfigurationResources = (json: unknown): TDevEnvironmentConfiguration['resources'] => {
-    const { gpu, ...otherFields } = (json ?? {}) as { [key: string]: unknown };
-
-    const [gpuName, gpuMemoryOrCount, gpuCount] = ((gpu as string) ?? '').split(':');
-
-    const gpuResources: TGPUResources = {};
-
-    if (gpuName) {
-        gpuResources.name = gpuName;
-    }
-
-    if (isMemory(gpuMemoryOrCount)) {
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-expect-error
-        gpuResources.memory = parseRange(gpuMemoryOrCount);
-    }
-
-    if (isCount(gpuMemoryOrCount)) {
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-expect-error
-        gpuResources.count = parseRange(gpuMemoryOrCount);
-    }
-
-    if (isCount(gpuCount)) {
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-expect-error
-        gpuResources.count = parseRange(gpuCount);
-    }
-
-    return {
-        gpu: gpuResources,
-        ...otherFields,
-    };
-};
-
-export const getRunSpecFromYaml = async (yaml: string) => {
-    const { name, ...otherFields } = await jsYaml.load(yaml);
-
-    const runSpec: TRunSpec = {
-        run_name: name as string,
-        configuration: {} as TDevEnvironmentConfiguration,
-    };
-
-    Object.keys(otherFields).forEach((key) => {
-        switch (key) {
-            case 'ide':
-                runSpec.configuration.ide = otherFields[key];
-                break;
-            case 'resources':
-                runSpec.configuration.resources = getRunSpecConfigurationResources(otherFields[key]);
-                break;
-            default:
-                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                // @ts-expect-error
-                runSpec.configuration[key] = otherFields[key];
-                return {};
-        }
-    });
-
-    return runSpec;
 };

@@ -11,12 +11,13 @@ import { Container, FormCodeEditor, FormField, FormInput, FormSelect, SpaceBetwe
 
 import { useBreadcrumbs, useNotifications } from 'hooks';
 import { getServerError } from 'libs';
-import { getRunSpecFromYaml } from 'libs/run';
 import { ROUTES } from 'routes';
 import { useApplyRunMutation } from 'services/run';
 
 import { OfferList } from 'pages/Offers/List';
 import { convertMiBToGB, renderRange, round } from 'pages/Offers/List/helpers';
+
+import { getRunSpecFromYaml } from './helpers/getRunSpecFromYaml';
 
 import { IRunEnvironmentFormValues } from './types';
 
@@ -147,6 +148,8 @@ export const CreateDevEnvironment: React.FC = () => {
             stepValidators[activeStepIndex]?.().then((isValid) => {
                 if (isValid) {
                     setActiveStepIndex(requestedStepIndex);
+                } else if (activeStepIndex == 0) {
+                    window.scrollTo(0, 0);
                 }
             });
         } else {
@@ -173,18 +176,34 @@ export const CreateDevEnvironment: React.FC = () => {
 
         const { config_yaml } = getValues();
 
+        let runSpec;
+
+        try {
+            runSpec = await getRunSpecFromYaml(config_yaml);
+        } catch (error) {
+            pushNotification({
+                type: 'error',
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                // @ts-expect-error
+                content: error?.message,
+            });
+
+            window.scrollTo(0, 0);
+
+            return;
+        }
+
         const requestParams: TRunApplyRequestParams = {
             project_name: selectedProject ?? '',
             plan: {
                 run_spec: {
-                    ...(await getRunSpecFromYaml(config_yaml)),
+                    ...runSpec,
                     ssh_key_pub: 'dummy',
                 },
             },
             force: false,
         };
 
-        // TODO fix params
         applyRun(requestParams)
             .unwrap()
             .then((data) => {
@@ -261,7 +280,9 @@ spot_policy: auto
                                 <FormField
                                     label={t('runs.dev_env.wizard.offer')}
                                     description={t('runs.dev_env.wizard.offer_description')}
+                                    errorText={formState.errors.offer?.message}
                                 />
+                                {formState.errors.offer?.message && <br />}
                                 <OfferList
                                     onChangeProjectName={(projectName) => setSelectedProject(projectName)}
                                     selectionType="single"
@@ -269,7 +290,6 @@ spot_policy: auto
                                     selectedItems={selectedOffers}
                                     onSelectionChange={onChangeOffer}
                                 />
-                                <FormField errorText={formState.errors.offer?.message} />
                             </>
                         ),
                     },
