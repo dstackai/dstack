@@ -16,7 +16,7 @@
     "test": "jest",
     "test:update-snapshots": "jest -u",
     "generate-api": "npx @rtk-query/codegen-openapi openapi-config.ts",
-    "precommit": "lint-staged"
+    "pre-commit": "lint-staged"
   },
   "devDependencies": {
     "@babel/cli": "^7.25.9",
