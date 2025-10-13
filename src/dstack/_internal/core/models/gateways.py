@@ -44,12 +44,14 @@ class GatewayCertificate(CoreModel):
     ]
 
 
+# https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/proxy/gateway/resources/nginx/service.jinja2
 class GatewayConfiguration(CoreModel):
     type: Literal["gateway"] = "gateway"
     name: Annotated[Optional[str], Field(description="The gateway name")] = None
     default: Annotated[bool, Field(description="Make the gateway default")] = False
     backend: Annotated[BackendType, Field(description="The gateway backend")]
     region: Annotated[str, Field(description="The gateway region")]
+    router: Annotated[Optional[str], Field(description="The router type, e.g. `sglang`")] = None
     domain: Annotated[
         Optional[str], Field(description="The gateway domain, e.g. `example.com`")
     ] = None

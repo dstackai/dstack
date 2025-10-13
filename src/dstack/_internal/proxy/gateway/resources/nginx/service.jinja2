@@ -5,7 +5,7 @@ limit_req_zone {{ zone.key }} zone={{ zone.name }}:10m rate={{ zone.rpm }}r/m;
 {% if replicas %}
 upstream {{ domain }}.upstream {
     {% for replica in replicas %}
-    server unix:{{ replica.socket }};  # replica {{ replica.id }}
+    server unix:{{ replica.socket }};  # replica {{ replica.id }} router={{ router }}
     {% endfor %}
 }
 {% else %}

@@ -13,8 +13,10 @@ from dstack._internal.proxy.gateway.schemas.registry import (
 from dstack._internal.proxy.gateway.services.nginx import Nginx
 from dstack._internal.proxy.lib.deps import get_service_connection_pool
 from dstack._internal.proxy.lib.services.service_connection import ServiceConnectionPool
+from dstack._internal.utils.logging import get_logger
 
 router = APIRouter(prefix="/{project_name}")
+logger = get_logger(__name__)
 
 
 @router.post("/services/register")
@@ -25,6 +27,7 @@ async def register_service(
     nginx: Annotated[Nginx, Depends(get_nginx)],
     service_conn_pool: Annotated[ServiceConnectionPool, Depends(get_service_connection_pool)],
 ) -> OkResponse:
+    logger.debug(f"[SglangRouterTesting] Gateway API Reception Router: {body.router}")
     await registry_services.register_service(
         project_name=project_name.lower(),
         run_name=body.run_name.lower(),
@@ -36,6 +39,7 @@ async def register_service(
         model=body.options.openai.model if body.options.openai is not None else None,
         ssh_private_key=body.ssh_private_key,
         repo=repo,
+        router=body.router,
         nginx=nginx,
         service_conn_pool=service_conn_pool,
     )

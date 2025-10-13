@@ -64,6 +64,7 @@ class ServiceConfig(SiteConfig):
     limit_req_zones: list[LimitReqZoneConfig]
     locations: list[LocationConfig]
     replicas: list[ReplicaConfig]
+    router: Optional[str] = None
 
 
 class ModelEntrypointConfig(SiteConfig):

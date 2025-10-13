@@ -44,6 +44,7 @@ class RegisterServiceRequest(BaseModel):
     options: Options
     ssh_private_key: str
     rate_limits: tuple[RateLimit, ...] = ()
+    router: Optional[str] = None
 
 
 class RegisterReplicaRequest(BaseModel):
