@@ -520,6 +520,7 @@ gcloud projects list --format="json(projectId)"
     compute.networks.updatePolicy
     compute.regions.get
     compute.regions.list
+    compute.reservations.list
     compute.resourcePolicies.create
     compute.resourcePolicies.delete
     compute.routers.list
@@ -542,6 +543,9 @@ gcloud projects list --format="json(projectId)"
 
     Also, the use of TPUs requires the `serviceAccountUser` role.
     For TPU VMs, dstack will use the default service account.
+
+    If you plan to use shared reservations, the `compute.reservations.list`
+    permission is required in the project that owns the reservations.
 
 ??? info "Required APIs"
     First, ensure the required APIs are enabled in your GCP `project_id`.

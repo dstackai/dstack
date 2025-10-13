@@ -29,6 +29,31 @@ supported_accelerators = [
 ]
 
 
+def find_accelerator_name(gpu_name: str, memory_mib: int) -> Optional[str]:
+    for acc in supported_accelerators:
+        if gpu_name == acc["gpu_name"] and memory_mib == acc["memory_mb"]:
+            return acc["accelerator_name"]
+    return None
+
+
+def sanitize_filter_value(value: str) -> str:
+    """
+    Escape characters that could break the Compute Engine API filter string.
+    """
+    return value.replace("\\", "\\\\").replace('"', '\\"')
+
+
+def get_resource_project(resource_url: str) -> str:
+    """
+    Extract the project ID from a URL like
+    https://www.googleapis.com/compute/v1/projects/proj-id/zones/us-central1-a/instances/vm-name
+    """
+    matches = re.findall(r"/projects/(?P<project_id>[a-z0-9-]+)/", resource_url)
+    if not matches:
+        raise BackendError(f"Invalid resource URL {resource_url}")
+    return matches[0]
+
+
 def get_availability_zones(
     regions_client: compute_v1.RegionsClient,
     project_id: str,
@@ -123,6 +148,7 @@ def create_instance_struct(
     roce_subnetworks: Optional[List[Tuple[str, str]]] = None,
     allocate_public_ip: bool = True,
     placement_policy: Optional[str] = None,
+    reservation: Optional[compute_v1.Reservation] = None,
 ) -> compute_v1.Instance:
     instance = compute_v1.Instance()
     instance.name = instance_name
@@ -147,6 +173,25 @@ def create_instance_struct(
         initialize_params.disk_type = f"zones/{zone}/diskTypes/hyperdisk-balanced"
     disk.initialize_params = initialize_params
     instance.disks = [disk]
+    if (
+        reservation is not None
+        and reservation.specific_reservation is not None
+        and reservation.specific_reservation.instance_properties is not None
+        and reservation.specific_reservation.instance_properties.local_ssds is not None
+    ):
+        for local_ssd in reservation.specific_reservation.instance_properties.local_ssds:
+            instance.disks.append(
+                compute_v1.AttachedDisk(
+                    auto_delete=True,
+                    boot=False,
+                    type_="SCRATCH",
+                    initialize_params=compute_v1.AttachedDiskInitializeParams(
+                        disk_type=f"zones/{zone}/diskTypes/local-ssd",
+                        disk_size_gb=local_ssd.disk_size_gb,
+                    ),
+                    interface=local_ssd.interface,
+                )
+            )
 
     if accelerators:
         instance.guest_accelerators = accelerators
@@ -162,6 +207,8 @@ def create_instance_struct(
 
     if placement_policy is not None:
         instance.resource_policies = [placement_policy]
+    elif reservation is not None and "placement" in reservation.resource_policies:
+        instance.resource_policies = [reservation.resource_policies["placement"]]
 
     if spot:
         instance.scheduling = compute_v1.Scheduling()
@@ -185,6 +232,17 @@ def create_instance_struct(
                 email=service_account,
                 scopes=["https://www.googleapis.com/auth/cloud-platform"],
             )
+        ]
+
+    if reservation is not None:
+        reservation_project = get_resource_project(reservation.self_link)
+        instance.reservation_affinity = compute_v1.ReservationAffinity()
+        instance.reservation_affinity.consume_reservation_type = (
+            compute_v1.ReservationAffinity.ConsumeReservationType.SPECIFIC_RESERVATION.name
+        )
+        instance.reservation_affinity.key = "compute.googleapis.com/reservation-name"
+        instance.reservation_affinity.values = [
+            f"projects/{reservation_project}/reservations/{reservation.name}"
         ]
 
     return instance
@@ -350,16 +408,38 @@ def get_accelerators(
         return []
     accelerator_config = compute_v1.AcceleratorConfig()
     accelerator_config.accelerator_count = len(gpus)
-    for acc in supported_accelerators:
-        if gpus[0].name == acc["gpu_name"] and gpus[0].memory_mib == acc["memory_mb"]:
-            accelerator_name = acc["accelerator_name"]
-            break
-    else:
+    accelerator_name = find_accelerator_name(gpus[0].name, gpus[0].memory_mib)
+    if accelerator_name is None:
         raise ValueError(f"Unsupported GPU: {gpus[0].name} {gpus[0].memory_mib} MiB")
     accelerator_config.accelerator_type = (
         f"projects/{project_id}/zones/{zone}/acceleratorTypes/{accelerator_name}"
     )
     return [accelerator_config]
+
+
+def find_reservation(
+    reservations_client: compute_v1.ReservationsClient,
+    project_id: str,
+    name: str,
+) -> dict[str, compute_v1.Reservation]:
+    request = compute_v1.AggregatedListReservationsRequest(
+        project=project_id,
+        filter=(
+            f'(name = "{sanitize_filter_value(name)}")'
+            ' AND (status = "READY")'
+            " AND (specificReservationRequired = true)"
+        ),
+    )
+    try:
+        aggregated_reservations = reservations_client.aggregated_list(request=request)
+    except (google.api_core.exceptions.NotFound, google.api_core.exceptions.Forbidden) as e:
+        logger.warning("Could not find reservation: %s", e)
+        return {}
+    zone_to_reservation = {}
+    for zone, zone_reservations in aggregated_reservations:
+        if zone_reservations.reservations:
+            zone_to_reservation[zone.split("/")[-1]] = zone_reservations.reservations[0]
+    return zone_to_reservation
 
 
 def filter_invalid_labels(labels: Dict[str, str]) -> Dict[str, str]:

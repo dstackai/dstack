@@ -558,10 +558,14 @@ async def _create_instance(session: AsyncSession, instance: InstanceModel) -> No
         if (
             _is_fleet_master_instance(instance)
             and instance_offer.backend in BACKENDS_WITH_PLACEMENT_GROUPS_SUPPORT
+            and isinstance(compute, ComputeWithPlacementGroupSupport)
+            and (
+                compute.are_placement_groups_compatible_with_reservations()
+                or instance_configuration.reservation is None
+            )
             and instance.fleet
             and _is_cloud_cluster(instance.fleet)
         ):
-            assert isinstance(compute, ComputeWithPlacementGroupSupport)
             placement_group_model = _find_suitable_placement_group(
                 placement_groups=placement_group_models,
                 instance_offer=instance_offer,

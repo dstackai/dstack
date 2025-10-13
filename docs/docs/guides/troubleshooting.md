@@ -111,7 +111,7 @@ one of these features, `dstack` will only select offers from the backends that s
   are only supported by the `aws`, `azure`, `gcp`, `nebius`, `oci`, and `vultr` backends,
   as well as SSH fleets.
 - [Reservations](../reference/dstack.yml/fleet.md#reservation)
-  are only supported by the `aws` backend.
+  are only supported by the `aws` and `gcp` backends.
 
 #### Cause 8: dstack Sky balance
 
