@@ -821,7 +821,10 @@ class TestCreateInstance:
         [
             pytest.param(
                 InstanceGroupPlacement.CLUSTER,
-                {InstanceTerminationReason.NO_OFFERS.value: 1, InstanceTerminationReason.MASTER_FAILED.value: 3},
+                {
+                    InstanceTerminationReason.NO_OFFERS.value: 1,
+                    InstanceTerminationReason.MASTER_FAILED.value: 3,
+                },
                 id="cluster",
             ),
             pytest.param(
