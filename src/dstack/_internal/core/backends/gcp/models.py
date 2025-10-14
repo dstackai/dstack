@@ -89,6 +89,13 @@ class GCPBackendConfig(CoreModel):
             description="The tags (labels) that will be assigned to resources created by `dstack`"
         ),
     ] = None
+    preview_features: Annotated[
+        Optional[List[Literal["g4"]]],
+        Field(
+            description=("The list of preview GCP features to enable. Supported values: `g4`"),
+            max_items=1,
+        ),
+    ] = None
 
 
 class GCPBackendConfigWithCreds(GCPBackendConfig):

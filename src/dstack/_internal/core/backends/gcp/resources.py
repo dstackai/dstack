@@ -26,6 +26,7 @@ supported_accelerators = [
     {"accelerator_name": "nvidia-tesla-t4", "gpu_name": "T4", "memory_mb": 1024 * 16},
     {"accelerator_name": "nvidia-tesla-v100", "gpu_name": "V100", "memory_mb": 1024 * 16},
     {"accelerator_name": "nvidia-tesla-p100", "gpu_name": "P100", "memory_mb": 1024 * 16},
+    {"accelerator_name": "nvidia-rtx-pro-6000", "gpu_name": "RTXPRO6000", "memory_mb": 1024 * 96},
 ]
 
 
@@ -499,5 +500,6 @@ def instance_type_supports_persistent_disk(instance_type_name: str) -> bool:
             "h3-",
             "v6e",
             "a4-",
+            "g4-",
         ]
     )
