@@ -1,8 +1,9 @@
 import base64
 import enum
 import re
+from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from azure.core.credentials import TokenCredential
 from azure.core.exceptions import ResourceExistsError, ResourceNotFoundError
@@ -51,7 +52,11 @@ from dstack._internal.core.backends.base.compute import (
     merge_tags,
     requires_nvidia_proprietary_kernel_modules,
 )
-from dstack._internal.core.backends.base.offers import get_catalog_offers, get_offers_disk_modifier
+from dstack._internal.core.backends.base.offers import (
+    OfferModifier,
+    get_catalog_offers,
+    get_offers_disk_modifier,
+)
 from dstack._internal.core.consts import DSTACK_OS_IMAGE_WITH_PROPRIETARY_NVIDIA_KERNEL_MODULES
 from dstack._internal.core.errors import ComputeError, NoCapacityError
 from dstack._internal.core.models.backends.base import BackendType
@@ -108,10 +113,8 @@ class AzureCompute(
         )
         return offers_with_availability
 
-    def get_offers_modifier(
-        self, requirements: Requirements
-    ) -> Callable[[InstanceOfferWithAvailability], Optional[InstanceOfferWithAvailability]]:
-        return get_offers_disk_modifier(CONFIGURABLE_DISK_SIZE, requirements)
+    def get_offers_modifiers(self, requirements: Requirements) -> Iterable[OfferModifier]:
+        return [get_offers_disk_modifier(CONFIGURABLE_DISK_SIZE, requirements)]
 
     def create_instance(
         self,

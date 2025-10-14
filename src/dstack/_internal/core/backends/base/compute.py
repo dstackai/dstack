@@ -17,12 +17,13 @@ from cachetools import TTLCache, cachedmethod
 from gpuhunt import CPUArchitecture
 
 from dstack._internal import settings
-from dstack._internal.core.backends.base.offers import filter_offers_by_requirements
+from dstack._internal.core.backends.base.offers import OfferModifier, filter_offers_by_requirements
 from dstack._internal.core.consts import (
     DSTACK_RUNNER_HTTP_PORT,
     DSTACK_RUNNER_SSH_PORT,
     DSTACK_SHIM_HTTP_PORT,
 )
+from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import LEGACY_REPO_DIR
 from dstack._internal.core.models.gateways import (
     GatewayComputeConfiguration,
@@ -168,17 +169,13 @@ class ComputeWithAllOffersCached(ABC):
         """
         pass
 
-    def get_offers_modifier(
-        self, requirements: Requirements
-    ) -> Optional[
-        Callable[[InstanceOfferWithAvailability], Optional[InstanceOfferWithAvailability]]
-    ]:
+    def get_offers_modifiers(self, requirements: Requirements) -> Iterable[OfferModifier]:
         """
-        Returns a modifier function that modifies offers before they are filtered by requirements.
-        Can return `None` to exclude the offer.
+        Returns functions that modify offers before they are filtered by requirements.
+        A modifier function can return `None` to exclude the offer.
         E.g. can be used to set appropriate disk size based on requirements.
         """
-        return None
+        return []
 
     def get_offers_post_filter(
         self, requirements: Requirements
@@ -191,14 +188,7 @@ class ComputeWithAllOffersCached(ABC):
 
     def get_offers(self, requirements: Requirements) -> List[InstanceOfferWithAvailability]:
         offers = self._get_all_offers_with_availability_cached()
-        modifier = self.get_offers_modifier(requirements)
-        if modifier is not None:
-            modified_offers = []
-            for o in offers:
-                modified_offer = modifier(o)
-                if modified_offer is not None:
-                    modified_offers.append(modified_offer)
-            offers = modified_offers
+        offers = self.__apply_modifiers(offers, self.get_offers_modifiers(requirements))
         offers = filter_offers_by_requirements(offers, requirements)
         post_filter = self.get_offers_post_filter(requirements)
         if post_filter is not None:
@@ -211,6 +201,20 @@ class ComputeWithAllOffersCached(ABC):
     )
     def _get_all_offers_with_availability_cached(self) -> List[InstanceOfferWithAvailability]:
         return self.get_all_offers_with_availability()
+
+    @staticmethod
+    def __apply_modifiers(
+        offers: Iterable[InstanceOfferWithAvailability], modifiers: Iterable[OfferModifier]
+    ) -> list[InstanceOfferWithAvailability]:
+        modified_offers = []
+        for offer in offers:
+            for modifier in modifiers:
+                offer = modifier(offer)
+                if offer is None:
+                    break
+            else:
+                modified_offers.append(offer)
+        return modified_offers
 
 
 class ComputeWithFilteredOffersCached(ABC):
@@ -341,6 +345,15 @@ class ComputeWithMultinodeSupport:
 class ComputeWithReservationSupport:
     """
     Must be subclassed to support provisioning from reservations.
+
+    The following is expected from a backend that supports reservations:
+
+    - `get_offers` respects `Requirements.reservation` if set, and only returns
+      offers that can be provisioned in the configured reservation. It can
+      adjust some offer properties such as `availability` and
+      `availability_zones` if necessary.
+    - `create_instance` respects `InstanceConfig.reservation` if set, and
+      provisions the instance in the configured reservation.
     """
 
     pass
@@ -390,6 +403,16 @@ class ComputeWithPlacementGroupSupport(ABC):
         Should return immediately, without performing API calls.
         """
         pass
+
+    def are_placement_groups_compatible_with_reservations(self, backend_type: BackendType) -> bool:
+        """
+        Whether placement groups can be used for instances provisioned in reservations.
+
+        Arguments:
+            backend_type: matches the backend type of this compute, unless this compute is a proxy
+                for other backends (dstack Sky)
+        """
+        return True
 
 
 class ComputeWithGatewaySupport(ABC):

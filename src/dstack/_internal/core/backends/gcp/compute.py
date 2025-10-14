@@ -1,7 +1,9 @@
 import concurrent.futures
 import json
+import re
 import threading
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Callable, Dict, List, Literal, Optional, Tuple
 
@@ -24,6 +26,7 @@ from dstack._internal.core.backends.base.compute import (
     ComputeWithPlacementGroupSupport,
     ComputeWithPrivateGatewaySupport,
     ComputeWithPrivilegedSupport,
+    ComputeWithReservationSupport,
     ComputeWithVolumeSupport,
     generate_unique_gateway_instance_name,
     generate_unique_instance_name,
@@ -35,6 +38,7 @@ from dstack._internal.core.backends.base.compute import (
     requires_nvidia_proprietary_kernel_modules,
 )
 from dstack._internal.core.backends.base.offers import (
+    OfferModifier,
     get_catalog_offers,
     get_offers_disk_modifier,
 )
@@ -78,8 +82,11 @@ logger = get_logger(__name__)
 # pd-balanced disks can be 10GB-64TB, but dstack images are 20GB and cannot grow larger
 # than 32TB because of filesystem settings
 CONFIGURABLE_DISK_SIZE = Range[Memory](min=Memory.parse("20GB"), max=Memory.parse("32TB"))
-
-
+# Pattern from https://cloud.google.com/compute/docs/instances/reservations-consume#consuming_instances_from_a_specific_reservation
+RESERVATION_PATTERN = re.compile(
+    r"projects/(?P<project_id>[a-z0-9-]+)/reservations/(?P<reservation_name>[a-z0-9-]+)"
+)
+RESOURCE_NAME_PATTERN = re.compile(r"[a-z0-9-]+")
 TPU_VERSIONS = [tpu.name for tpu in KNOWN_TPUS]
 
 
@@ -93,6 +100,7 @@ class GCPCompute(
     ComputeWithCreateInstanceSupport,
     ComputeWithPrivilegedSupport,
     ComputeWithMultinodeSupport,
+    ComputeWithReservationSupport,
     ComputeWithPlacementGroupSupport,
     ComputeWithGatewaySupport,
     ComputeWithPrivateGatewaySupport,
@@ -113,8 +121,12 @@ class GCPCompute(
         self.resource_policies_client = compute_v1.ResourcePoliciesClient(
             credentials=self.credentials
         )
+        self.reservations_client = compute_v1.ReservationsClient(credentials=self.credentials)
         self._usable_subnets_cache_lock = threading.Lock()
         self._usable_subnets_cache = TTLCache(maxsize=1, ttl=120)
+        self._find_reservation_cache_lock = threading.Lock()
+        # smaller TTL, since we check the reservation's in_use_count, which can change often
+        self._find_reservation_cache = TTLCache(maxsize=8, ttl=20)
 
     def get_all_offers_with_availability(self) -> List[InstanceOfferWithAvailability]:
         regions = get_or_error(self.config.regions)
@@ -155,10 +167,40 @@ class GCPCompute(
             offers_with_availability[-1].region = region
         return offers_with_availability
 
-    def get_offers_modifier(
-        self, requirements: Requirements
-    ) -> Callable[[InstanceOfferWithAvailability], Optional[InstanceOfferWithAvailability]]:
-        return get_offers_disk_modifier(CONFIGURABLE_DISK_SIZE, requirements)
+    def get_offers_modifiers(self, requirements: Requirements) -> Iterable[OfferModifier]:
+        modifiers = []
+
+        if requirements.reservation:
+            zone_to_reservation = self._find_reservation(requirements.reservation)
+
+            def reservation_modifier(
+                offer: InstanceOfferWithAvailability,
+            ) -> Optional[InstanceOfferWithAvailability]:
+                if offer.instance.resources.spot:
+                    return None
+                assert offer.availability_zones is not None
+                matching_zones = []
+                zones_with_capacity = []
+                for zone in offer.availability_zones:
+                    reservation = zone_to_reservation.get(zone)
+                    if reservation is not None and _offer_matches_reservation(offer, reservation):
+                        matching_zones.append(zone)
+                        if _reservation_has_capacity(reservation):
+                            zones_with_capacity.append(zone)
+                if not matching_zones:
+                    return None
+                offer = offer.copy(deep=True)
+                if zones_with_capacity:
+                    offer.availability_zones = zones_with_capacity
+                else:
+                    offer.availability_zones = matching_zones
+                    offer.availability = InstanceAvailability.NOT_AVAILABLE
+                return offer
+
+            modifiers.append(reservation_modifier)
+
+        modifiers.append(get_offers_disk_modifier(CONFIGURABLE_DISK_SIZE, requirements))
+        return modifiers
 
     def terminate_instance(
         self, instance_id: str, region: str, backend_data: Optional[str] = None
@@ -311,6 +353,16 @@ class GCPCompute(
         )
 
         for zone in zones:
+            reservation = None
+            if instance_config.reservation:
+                reservation = self._find_reservation(instance_config.reservation).get(zone)
+                if reservation is None:
+                    logger.warning(
+                        "Reservation %s no longer exists in zone %s",
+                        instance_config.reservation,
+                        zone,
+                    )
+                    continue
             request = compute_v1.InsertInstanceRequest()
             request.zone = zone
             request.project = self.config.project_id
@@ -341,6 +393,7 @@ class GCPCompute(
                 roce_subnetworks=roce_subnets,
                 allocate_public_ip=allocate_public_ip,
                 placement_policy=placement_policy,
+                reservation=reservation,
             )
             try:
                 # GCP needs some time to return an error in case of no capacity (< 30s).
@@ -480,6 +533,11 @@ class GCPCompute(
         instance_offer: InstanceOffer,
     ) -> bool:
         return placement_group.configuration.region == instance_offer.region
+
+    def are_placement_groups_compatible_with_reservations(self, backend_type: BackendType) -> bool:
+        # Cannot use our own placement policies when provisioning in a reservation.
+        # Instead, we use the placement policy defined in reservation settings.
+        return False
 
     def create_gateway(
         self,
@@ -886,6 +944,26 @@ class GCPCompute(
             usable_subnets=self._list_usable_subnets(),
         )
 
+    @cachedmethod(
+        cache=lambda self: self._find_reservation_cache,
+        lock=lambda self: self._find_reservation_cache_lock,
+    )
+    def _find_reservation(self, configured_name: str) -> dict[str, compute_v1.Reservation]:
+        if match := RESERVATION_PATTERN.fullmatch(configured_name):
+            project_id = match.group("project_id")
+            name = match.group("reservation_name")
+        elif RESOURCE_NAME_PATTERN.fullmatch(configured_name):
+            project_id = self.config.project_id
+            name = configured_name
+        else:
+            # misconfigured or non-GCP
+            return {}
+        return gcp_resources.find_reservation(
+            reservations_client=self.reservations_client,
+            project_id=project_id,
+            name=name,
+        )
+
 
 def _supported_instances_and_zones(
     regions: List[str],
@@ -937,6 +1015,52 @@ def _has_gpu_quota(quotas: Dict[str, float], resources: Resources) -> bool:
     if resources.spot:
         quota_name = "PREEMPTIBLE_" + quota_name
     return len(resources.gpus) <= quotas.get(quota_name, 0)
+
+
+def _offer_matches_reservation(
+    offer: InstanceOfferWithAvailability, reservation: compute_v1.Reservation
+) -> bool:
+    if (
+        reservation.specific_reservation is None
+        or reservation.specific_reservation.instance_properties is None
+    ):
+        return False
+    properties = reservation.specific_reservation.instance_properties
+    if properties.machine_type != offer.instance.name:
+        return False
+    accelerators = properties.guest_accelerators or []
+    if not accelerators and offer.instance.resources.gpus:
+        return False
+    if len(accelerators) > 1:
+        logger.warning(
+            "Expected 0 or 1 accelerator types per instance,"
+            f" but {properties.machine_type} has {len(accelerators)}."
+            f" Ignoring reservation {reservation.self_link}"
+        )
+        return False
+    if accelerators:
+        if accelerators[0].accelerator_count != len(offer.instance.resources.gpus):
+            return False
+        if (
+            offer.instance.resources.gpus
+            and gcp_resources.find_accelerator_name(
+                offer.instance.resources.gpus[0].name,
+                offer.instance.resources.gpus[0].memory_mib,
+            )
+            != accelerators[0].accelerator_type
+        ):
+            return False
+    return True
+
+
+def _reservation_has_capacity(reservation: compute_v1.Reservation) -> bool:
+    return (
+        reservation.specific_reservation is not None
+        and reservation.specific_reservation.in_use_count is not None
+        and reservation.specific_reservation.assured_count is not None
+        and reservation.specific_reservation.in_use_count
+        < reservation.specific_reservation.assured_count
+    )
 
 
 def _unique_instance_name(instance: InstanceType) -> str:

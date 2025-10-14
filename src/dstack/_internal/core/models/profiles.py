@@ -283,7 +283,7 @@ class ProfileParams(CoreModel):
         Field(
             description=(
                 "The existing reservation to use for instance provisioning."
-                " Supports AWS Capacity Reservations and Capacity Blocks"
+                " Supports AWS Capacity Reservations, AWS Capacity Blocks, and GCP reservations"
             )
         ),
     ] = None

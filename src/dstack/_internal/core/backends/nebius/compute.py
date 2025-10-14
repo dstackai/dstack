@@ -2,8 +2,9 @@ import json
 import random
 import shlex
 import time
+from collections.abc import Iterable
 from functools import cached_property
-from typing import Callable, List, Optional
+from typing import List, Optional
 
 from nebius.aio.operation import Operation as SDKOperation
 from nebius.aio.service_error import RequestError, StatusCode
@@ -21,7 +22,11 @@ from dstack._internal.core.backends.base.compute import (
     get_user_data,
     merge_tags,
 )
-from dstack._internal.core.backends.base.offers import get_catalog_offers, get_offers_disk_modifier
+from dstack._internal.core.backends.base.offers import (
+    OfferModifier,
+    get_catalog_offers,
+    get_offers_disk_modifier,
+)
 from dstack._internal.core.backends.nebius import resources
 from dstack._internal.core.backends.nebius.fabrics import get_suitable_infiniband_fabrics
 from dstack._internal.core.backends.nebius.models import NebiusConfig, NebiusServiceAccountCreds
@@ -125,10 +130,8 @@ class NebiusCompute(
             for offer in offers
         ]
 
-    def get_offers_modifier(
-        self, requirements: Requirements
-    ) -> Callable[[InstanceOfferWithAvailability], Optional[InstanceOfferWithAvailability]]:
-        return get_offers_disk_modifier(CONFIGURABLE_DISK_SIZE, requirements)
+    def get_offers_modifiers(self, requirements: Requirements) -> Iterable[OfferModifier]:
+        return [get_offers_disk_modifier(CONFIGURABLE_DISK_SIZE, requirements)]
 
     def create_instance(
         self,
