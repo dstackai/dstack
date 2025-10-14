@@ -93,6 +93,7 @@ class Nginx:
                 logger.debug(
                     f"[SglangRouterTesting] Starting sglang-router with {replicas} replicas"
                 )
+                await run_async(self.write_sglang_workers_conf, conf)
                 await run_async(self.start_sglang_router, replicas)
 
         logger.info("Registered %s domain %s", conf.type, conf.domain)
@@ -213,6 +214,21 @@ class Nginx:
     def write_global_conf(self) -> None:
         conf = read_package_resource("00-log-format.conf")
         self.write_conf(conf, "00-log-format.conf")
+
+    def write_sglang_workers_conf(self, conf: SiteConfig) -> None:
+        workers_config = generate_sglang_workers_config(conf)
+        workers_conf_name = f"sglang-workers.{conf.domain}.conf"
+        workers_conf_path = self._conf_dir / workers_conf_name
+        sudo_write(workers_conf_path, workers_config)
+        self.reload()
+
+
+def generate_sglang_workers_config(conf: SiteConfig) -> str:
+    template = read_package_resource("sglang_workers.jinja2")
+    return jinja2.Template(template).render(
+        replicas=conf.replicas,
+        proxy_port=PROXY_PORT_ON_GATEWAY,
+    )
 
 
 def read_package_resource(file: str) -> str:
