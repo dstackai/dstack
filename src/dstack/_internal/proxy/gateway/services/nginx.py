@@ -106,6 +106,7 @@ class Nginx:
         async with self._lock:
             await run_async(sudo_rm, conf_path)
             workers_conf_path = self._conf_dir / f"sglang-workers.{domain}.conf"
+            logger.debug(f"[SglangRouterTesting] Workers conf path: {workers_conf_path}")
             if workers_conf_path.exists():
                 await run_async(sudo_rm, workers_conf_path)
                 await run_async(self.stop_sglang_router)
