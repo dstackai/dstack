@@ -146,7 +146,16 @@ class Nginx:
                     "--worker-urls",
                 ]
                 + worker_urls
-                + ["--host", "0.0.0.0", "--port", "3000"]
+                + [
+                    "--host",
+                    "0.0.0.0",
+                    "--port",
+                    "3000",
+                    "--log-level",
+                    "debug",
+                    "--log-dir",
+                    "./router_logs",
+                ]
             )
             subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
