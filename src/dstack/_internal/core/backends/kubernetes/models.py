@@ -37,7 +37,7 @@ class KubernetesBackendConfigWithCreds(KubernetesBackendConfig):
 
 
 class KubeconfigFileConfig(CoreModel):
-    filename: Annotated[str, Field(description="The path to the kubeconfig file")]
+    filename: Annotated[str, Field(description="The path to the kubeconfig file")] = ""
     data: Annotated[
         Optional[str],
         Field(
@@ -50,7 +50,9 @@ class KubeconfigFileConfig(CoreModel):
     ] = None
 
     @root_validator
-    def fill_data(cls, values):
+    def fill_data(cls, values: dict) -> dict:
+        if values.get("filename") == "" and values.get("data") is None:
+            raise ValueError("filename or data must be specified")
         return fill_data(values)
 
 
