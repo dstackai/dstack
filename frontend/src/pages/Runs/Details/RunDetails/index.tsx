@@ -8,11 +8,12 @@ import { Box, ColumnLayout, Container, Header, Loader, NavigateLink, StatusIndic
 
 import { DATE_TIME_FORMAT } from 'consts';
 import { getRunError, getRunPriority, getRunStatusMessage, getStatusIconColor, getStatusIconType } from 'libs/run';
+import { ROUTES } from 'routes';
 import { useGetRunQuery } from 'services/run';
 
 import { finishedRunStatuses } from 'pages/Runs/constants';
+import { runIsStopped } from 'pages/Runs/utils';
 
-import { ROUTES } from '../../../../routes';
 import {
     getRunListItemBackend,
     getRunListItemInstanceId,
@@ -23,6 +24,7 @@ import {
     getRunListItemSpot,
 } from '../../List/helpers';
 import { JobList } from '../Jobs/List';
+import { ConnectToRunWithDevEnvConfiguration } from './ConnectToRunWithDevEnvConfiguration';
 
 export const RunDetails = () => {
     const { t } = useTranslation();
@@ -49,6 +51,7 @@ export const RunDetails = () => {
     const status = finishedRunStatuses.includes(runData.status)
         ? (runData.latest_job_submission?.status ?? runData.status)
         : runData.status;
+
     const terminationReason = finishedRunStatuses.includes(runData.status)
         ? runData.latest_job_submission?.termination_reason
         : null;
@@ -167,6 +170,10 @@ export const RunDetails = () => {
                     </ColumnLayout>
                 )}
             </Container>
+
+            {runData.run_spec.configuration.type === 'dev-environment' && !runIsStopped(runData.status) && (
+                <ConnectToRunWithDevEnvConfiguration run={runData} />
+            )}
 
             {runData.jobs.length > 1 && (
                 <JobList
