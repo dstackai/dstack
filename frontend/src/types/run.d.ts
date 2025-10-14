@@ -107,13 +107,12 @@ declare type TDevEnvironmentConfiguration = {
     schedule?: { cron: string | string[] };
     fleets?: string[];
     tags?: object;
-    ssh_key_pub: string;
 };
 
 declare type TRunSpec = {
     run_name: string;
     configuration: TDevEnvironmentConfiguration;
-    ssh_key_pub: string;
+    ssh_key_pub?: string;
 };
 declare type TRunApplyRequestParams = {
     project_name: string;
@@ -240,11 +239,6 @@ declare interface IJob {
     job_submissions: IJobSubmission[];
 }
 
-declare interface IDevEnvironmentConfiguration {
-    type: 'dev-environment';
-    priority?: number | null;
-}
-
 declare interface ITaskConfiguration {
     type: 'task';
     priority?: number | null;
@@ -256,7 +250,7 @@ declare interface IServiceConfiguration {
     priority?: number | null;
 }
 declare interface IRunSpec {
-    configuration: IDevEnvironmentConfiguration | ITaskConfiguration | IServiceConfiguration;
+    configuration: TDevEnvironmentConfiguration | ITaskConfiguration | IServiceConfiguration;
     configuration_path: string;
     repo_code_hash?: string;
     repo_id: string;

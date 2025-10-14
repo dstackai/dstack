@@ -24,7 +24,7 @@ import { IRunEnvironmentFormValues } from './types';
 import styles from './styles.module.scss';
 
 const requiredFieldError = 'This is required field';
-const namesFieldError = 'Only latin characters, dashes, underscores, and digits';
+const namesFieldError = 'Only latin characters, dashes, and digits';
 
 const ideOptions = [
     {
@@ -39,7 +39,7 @@ const ideOptions = [
 
 const envValidationSchema = yup.object({
     offer: yup.object().required(requiredFieldError),
-    name: yup.string().matches(/^[a-zA-Z0-9-_]+$/, namesFieldError),
+    name: yup.string().matches(/^[a-z][a-z0-9-]{1,40}$/, namesFieldError),
     ide: yup.string().required(requiredFieldError),
     config_yaml: yup.string().required(requiredFieldError),
 });
@@ -196,10 +196,7 @@ export const CreateDevEnvironment: React.FC = () => {
         const requestParams: TRunApplyRequestParams = {
             project_name: selectedProject ?? '',
             plan: {
-                run_spec: {
-                    ...runSpec,
-                    ssh_key_pub: 'dummy',
-                },
+                run_spec: runSpec,
             },
             force: false,
         };

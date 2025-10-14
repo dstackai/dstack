@@ -41,7 +41,7 @@ export const getRunSpecFromYaml = async (yaml: string) => {
 
     const { name, ...otherFields } = parsedYaml;
 
-    const runSpec: Omit<TRunSpec, 'ssh_key_pub'> = {
+    const runSpec: TRunSpec = {
         run_name: name as string,
         configuration: {} as TDevEnvironmentConfiguration,
     };
