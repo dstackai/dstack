@@ -59,6 +59,7 @@ from dstack._internal.server.services.instances import get_instance_ssh_private_
 from dstack._internal.server.services.jobs import (
     find_job,
     get_job_attached_volumes,
+    get_job_provisioning_data,
     get_job_runtime_data,
     job_model_to_job_submission,
 )
@@ -373,7 +374,6 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
                 job_model.status = JobStatus.TERMINATING
                 # job will be terminated and instance will be emptied by process_terminating_jobs
             else:
-                # job_model.instance.termination_reason
                 # No job_model.termination_reason set means ssh connection failed
                 if job_model.disconnected_at is None:
                     job_model.disconnected_at = common_utils.get_current_datetime()
@@ -383,16 +383,22 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
                         fmt(job_model),
                         job_submission.age,
                     )
-                    # TODO: Replace with JobTerminationReason.INSTANCE_UNREACHABLE in 0.20 or
-                    # when CLI <= 0.19.8 is no longer supported
                     if (
                         job_model.instance is not None
                         and job_model.instance.termination_reason
                         == InstanceTerminationReason.NO_BALANCE.value
                     ):
+                        # if instance was terminated due to no balance, set job termination reason accodingly
                         job_model.termination_reason = JobTerminationReason.NO_BALANCE
                     else:
-                        job_model.termination_reason = JobTerminationReason.INSTANCE_UNREACHABLE
+                        job_provisioning_data = get_job_provisioning_data(job_model)
+                        # use JobTerminationReason.INSTANCE_UNREACHABLE for on-demand instances only
+                        job_model.termination_reason = (
+                            JobTerminationReason.INSTANCE_UNREACHABLE
+                            if job_provisioning_data
+                            and not job_provisioning_data.instance_type.resources.spot
+                            else JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY
+                        )
                     job_model.status = JobStatus.TERMINATING
                 else:
                     logger.warning(
