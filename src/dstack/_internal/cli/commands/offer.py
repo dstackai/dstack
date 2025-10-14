@@ -105,6 +105,7 @@ class OfferCommand(APIBaseCommand):
         run_spec = RunSpec(
             configuration=conf,
             profile=profile,
+            ssh_key_pub="(dummy)",  # TODO: Remove since 0.19.40
         )
 
         if args.group_by:

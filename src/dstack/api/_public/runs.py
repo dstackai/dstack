@@ -79,12 +79,18 @@ class Run(ABC):
         project: str,
         run: RunModel,
         ports_lock: Optional[PortsLock] = None,
+        ssh_identity_file: Optional[PathLike] = None,
     ):
         self._api_client = api_client
         self._project = project
         self._run = run
         self._ports_lock: Optional[PortsLock] = ports_lock
         self._ssh_attach: Optional[SSHAttach] = None
+        if ssh_identity_file is not None:
+            warn(
+                "[code]ssh_identity_file[/code] in [code]Run[/code] is deprecated and ignored; will be removed"
+                " since 0.19.40"
+            )
 
     @property
     def name(self) -> str:
@@ -290,7 +296,7 @@ class Run(ABC):
                     f.write(user.ssh_private_key.encode())
             else:
                 if config_manager.dstack_key_path.exists():
-                    # TODO: Remove since 0.19.35
+                    # TODO: Remove since 0.19.40
                     warn(
                         f"Using legacy [code]{config_manager.dstack_key_path}[/code]."
                         " Future versions will use the user SSH key from the server.",
@@ -504,7 +510,7 @@ class RunCollection:
                 " Future versions will use the user SSH key from the server.",
             )
             ssh_key_pub = config_manager.dstack_key_path.with_suffix(".pub").read_text()
-            # TODO: Uncomment after 0.19.35
+            # TODO: Uncomment after 0.19.40
             # ssh_key_pub = None
         run_spec = RunSpec(
             run_name=configuration.name,
@@ -752,6 +758,13 @@ class RunCollection:
             creation_policy=creation_policy,
             idle_duration=idle_duration,  # type: ignore[assignment]
         )
+        config_manager = ConfigManager()
+        if not config_manager.dstack_key_path.exists():
+            generate_rsa_key_pair(private_key_path=config_manager.dstack_key_path)
+        warn(
+            f"Using legacy [code]{config_manager.dstack_key_path.with_suffix('.pub')}[/code]."
+            " Future versions will use the user SSH key from the server.",
+        )
         run_spec = RunSpec(
             run_name=run_name,
             repo_id=repo.repo_id,
@@ -761,6 +774,7 @@ class RunCollection:
             configuration_path=configuration_path,
             configuration=configuration,
             profile=profile,
+            ssh_key_pub=config_manager.dstack_key_path.with_suffix(".pub").read_text(),
         )
         logger.debug("Getting run plan")
         run_plan = self._api_client.runs.get_plan(self._project, run_spec)
