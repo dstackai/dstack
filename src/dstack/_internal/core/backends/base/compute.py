@@ -23,6 +23,7 @@ from dstack._internal.core.consts import (
     DSTACK_RUNNER_SSH_PORT,
     DSTACK_SHIM_HTTP_PORT,
 )
+from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import LEGACY_REPO_DIR
 from dstack._internal.core.models.gateways import (
     GatewayComputeConfiguration,
@@ -403,9 +404,13 @@ class ComputeWithPlacementGroupSupport(ABC):
         """
         pass
 
-    def are_placement_groups_compatible_with_reservations(self) -> bool:
+    def are_placement_groups_compatible_with_reservations(self, backend_type: BackendType) -> bool:
         """
         Whether placement groups can be used for instances provisioned in reservations.
+
+        Arguments:
+            backend_type: matches the backend type of this compute, unless this compute is a proxy
+                for other backends (dstack Sky)
         """
         return True
 

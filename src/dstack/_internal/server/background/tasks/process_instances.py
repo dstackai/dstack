@@ -560,7 +560,7 @@ async def _create_instance(session: AsyncSession, instance: InstanceModel) -> No
             and instance_offer.backend in BACKENDS_WITH_PLACEMENT_GROUPS_SUPPORT
             and isinstance(compute, ComputeWithPlacementGroupSupport)
             and (
-                compute.are_placement_groups_compatible_with_reservations()
+                compute.are_placement_groups_compatible_with_reservations(instance_offer.backend)
                 or instance_configuration.reservation is None
             )
             and instance.fleet
