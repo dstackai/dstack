@@ -25,12 +25,12 @@ import {
 import { DATE_TIME_FORMAT } from 'consts';
 import { copyToClipboard } from 'libs';
 import { getRunError, getRunPriority, getRunStatusMessage, getStatusIconColor, getStatusIconType } from 'libs/run';
+import { ROUTES } from 'routes';
 import { useGetRunQuery } from 'services/run';
 
 import { finishedRunStatuses } from 'pages/Runs/constants';
 import { runIsStopped } from 'pages/Runs/utils';
 
-import { ROUTES } from '../../../../routes';
 import {
     getRunListItemBackend,
     getRunListItemInstanceId,
@@ -43,6 +43,9 @@ import {
 import { JobList } from '../Jobs/List';
 
 import styles from './styles.module.scss';
+
+const UvInstallCommand = 'uv tool install dstack -U';
+const PipInstallCommand = 'pip install dstack -U';
 
 export const RunDetails = () => {
     const { t } = useTranslation();
@@ -94,6 +97,7 @@ export const RunDetails = () => {
     const status = finishedRunStatuses.includes(runData.status)
         ? (runData.latest_job_submission?.status ?? runData.status)
         : runData.status;
+
     const terminationReason = finishedRunStatuses.includes(runData.status)
         ? runData.latest_job_submission?.termination_reason
         : null;
@@ -233,15 +237,12 @@ export const RunDetails = () => {
                             }}
                             onNavigate={({ detail }) => setActiveStepIndex(detail.requestedStepIndex)}
                             activeStepIndex={activeStepIndex}
-                            onSubmit={() => {
-                                window.open(openInIDEUrl, '_blank');
-                            }}
+                            onSubmit={() => window.open(openInIDEUrl, '_blank')}
                             submitButtonText="Open in VS Code"
                             allowSkipTo={true}
                             steps={[
                                 {
                                     title: 'Attach',
-                                    // info: <InfoLink onFollow={() => openHelpPanel(CLI_INFO)} />,
                                     content: (
                                         <SpaceBetween size="s">
                                             <Box>To access this run, first you need to attach to it.</Box>
@@ -272,8 +273,9 @@ export const RunDetails = () => {
 
                                             <ExpandableSection headerText="No CLI installed?">
                                                 <SpaceBetween size="s">
-                                                    <Box></Box>
+                                                    <Box />
                                                     <Box>To use dstack, install the CLI on your local machine.</Box>
+
                                                     <Tabs
                                                         variant="container"
                                                         tabs={[
@@ -284,7 +286,7 @@ export const RunDetails = () => {
                                                                     <>
                                                                         <div className={styles.codeWrapper}>
                                                                             <Code className={styles.code}>
-                                                                                uv tool install dstack -U
+                                                                                {UvInstallCommand}
                                                                             </Code>
 
                                                                             <div className={styles.copy}>
@@ -304,9 +306,7 @@ export const RunDetails = () => {
                                                                                         iconName="copy"
                                                                                         variant="normal"
                                                                                         onClick={() =>
-                                                                                            copyToClipboard(
-                                                                                                'uv tool install dstack -U',
-                                                                                            )
+                                                                                            copyToClipboard(UvInstallCommand)
                                                                                         }
                                                                                     />
                                                                                 </Popover>
@@ -322,7 +322,7 @@ export const RunDetails = () => {
                                                                     <>
                                                                         <div className={styles.codeWrapper}>
                                                                             <Code className={styles.code}>
-                                                                                pip install dstack -U
+                                                                                {PipInstallCommand}
                                                                             </Code>
 
                                                                             <div className={styles.copy}>
@@ -342,9 +342,7 @@ export const RunDetails = () => {
                                                                                         iconName="copy"
                                                                                         variant="normal"
                                                                                         onClick={() =>
-                                                                                            copyToClipboard(
-                                                                                                'pip install dstack -U',
-                                                                                            )
+                                                                                            copyToClipboard(PipInstallCommand)
                                                                                         }
                                                                                     />
                                                                                 </Popover>
@@ -363,22 +361,20 @@ export const RunDetails = () => {
                                 },
                                 {
                                     title: 'Open',
-                                    // info: <InfoLink onFollow={() => openHelpPanel(CLI_INFO)} />,
                                     description: 'After the CLI is attached, you can open the dev environment in VS Code.',
                                     content: (
                                         <SpaceBetween size="s">
                                             <Button
                                                 variant="primary"
                                                 external={true}
-                                                onClick={() => {
-                                                    window.open(openInIDEUrl, '_blank');
-                                                }}
+                                                onClick={() => window.open(openInIDEUrl, '_blank')}
                                             >
                                                 Open in VS Code
                                             </Button>
+
                                             <ExpandableSection headerText="Need plain SSH?">
                                                 <SpaceBetween size="s">
-                                                    <Box></Box>
+                                                    <Box />
                                                     <div className={styles.codeWrapper}>
                                                         <Code className={styles.code}>{sshCommand}</Code>
 
@@ -415,7 +411,7 @@ export const RunDetails = () => {
 
                     {runData.status === 'running' && (
                         <SpaceBetween size="s">
-                            <Box></Box>
+                            <Box />
                             <Alert type="info">Waiting for the run to start.</Alert>
                         </SpaceBetween>
                     )}
