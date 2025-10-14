@@ -840,6 +840,7 @@ def get_gateway_user_data(authorized_key: str) -> str:
         packages=[
             "nginx",
             "python3.10-venv",
+            "python3-pip",  # Add pip for sglang-router installation
         ],
         snap={"commands": [["install", "--classic", "certbot"]]},
         runcmd=[
@@ -850,6 +851,8 @@ def get_gateway_user_data(authorized_key: str) -> str:
                 "s/# server_names_hash_bucket_size 64;/server_names_hash_bucket_size 128;/",
                 "/etc/nginx/nginx.conf",
             ],
+            # Install sglang-router system-wide. Can be conditionally installed in the future.
+            ["pip", "install", "sglang-router"],
             ["su", "ubuntu", "-c", " && ".join(get_dstack_gateway_commands())],
         ],
         ssh_authorized_keys=[authorized_key],

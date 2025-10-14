@@ -82,7 +82,7 @@ class Nginx:
     async def register(self, conf: SiteConfig, acme: ACMESettings) -> None:
         logger.debug("Registering %s domain %s", conf.type, conf.domain)
         conf_name = self.get_config_name(conf.domain)
-
+        logger.debug(f"[SglangRouterTesting] Register Conf object dict: {conf.dict()}")
         async with self._lock:
             if conf.https:
                 await run_async(self.run_certbot, conf.domain, acme)
@@ -106,6 +106,44 @@ class Nginx:
         r = subprocess.run(cmd, timeout=10)
         if r.returncode != 0:
             raise UnexpectedProxyError("Failed to reload nginx")
+
+    @staticmethod
+    def start_sglang_router(replicas: int) -> None:
+        """Start sglang-router service, killing existing one if running."""
+        try:
+            # Kill existing sglang-router if running
+            result = subprocess.run(
+                ["pgrep", "-f", "sglang_router.launch_router"], capture_output=True, timeout=5
+            )
+            if result.returncode == 0:
+                logger.info("Killing existing sglang-router...")
+                subprocess.run(["pkill", "-f", "sglang_router.launch_router"], timeout=5)
+                # Wait a moment for the process to terminate
+                import time
+
+                time.sleep(1)
+
+            # Generate worker URLs based on replica count
+            worker_urls = []
+            for i in range(1, replicas + 1):
+                worker_urls.append(f"http://127.0.0.1:{10000 + i}")
+
+            # Start sglang-router with system-wide installation
+            logger.info(f"Starting sglang-router with {replicas} replicas...")
+            cmd = (
+                [
+                    "python3",
+                    "-m",
+                    "sglang_router.launch_router",  # Use system python3
+                    "--worker-urls",
+                ]
+                + worker_urls
+                + ["--host", "0.0.0.0", "--port", "3000"]
+            )
+            subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+        except Exception as e:
+            logger.error(f"Failed to start sglang-router: {e}")
 
     def write_conf(self, conf: str, conf_name: str) -> None:
         """Update config and reload nginx. Rollback changes on error."""
