@@ -105,6 +105,10 @@ class Nginx:
             return
         async with self._lock:
             await run_async(sudo_rm, conf_path)
+            workers_conf_path = self._conf_dir / f"sglang-workers.{domain}.conf"
+            if workers_conf_path.exists():
+                await run_async(sudo_rm, workers_conf_path)
+                await run_async(self.stop_sglang_router)
             await run_async(self.reload)
         logger.info("Unregistered domain %s", domain)
 
@@ -161,6 +165,30 @@ class Nginx:
 
         except Exception as e:
             logger.error(f"Failed to start sglang-router: {e}")
+
+    @staticmethod
+    def stop_sglang_router() -> None:
+        try:
+            result = subprocess.run(
+                ["pgrep", "-f", "sglang_router.launch_router"], capture_output=True, timeout=5
+            )
+            if result.returncode == 0:
+                logger.info("Stopping sglang-router process...")
+                subprocess.run(["pkill", "-f", "sglang_router.launch_router"], timeout=5)
+            else:
+                logger.debug("No sglang-router process found to stop")
+
+            log_dir = Path("./router_logs")
+            if log_dir.exists():
+                logger.debug("Cleaning up router logs...")
+                import shutil
+
+                shutil.rmtree(log_dir, ignore_errors=True)
+            else:
+                logger.debug("No router logs directory found to clean up")
+
+        except Exception as e:
+            logger.error(f"Failed to stop sglang-router: {e}")
 
     def write_conf(self, conf: str, conf_name: str) -> None:
         """Update config and reload nginx. Rollback changes on error."""
