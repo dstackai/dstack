@@ -112,7 +112,6 @@ async def update_user(
     email: Optional[str] = None,
     active: bool = True,
 ) -> UserModel:
-    # TODO: Allow to update ssh_private_key and ssh_public_key
     await session.execute(
         update(UserModel)
         .where(UserModel.name == username)
