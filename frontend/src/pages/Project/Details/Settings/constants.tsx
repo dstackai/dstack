@@ -13,7 +13,7 @@ export const CLI_INFO = {
             </p>
             <p>
                 To learn how to install the CLI, refer to the{' '}
-                <a href={'https://dstack.ai/docs/cli/installation'} target="_blank">
+                <a href={'https://dstack.ai/docs/installation#set-up-the-cli'} target="_blank">
                     installation
                 </a>{' '}
                 guide.
