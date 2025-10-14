@@ -43,6 +43,7 @@ export const overlayI18nStrings: AnnotationContextProps.I18nStrings = {
 export enum HotspotIds {
     ADD_TOP_UP_BALANCE = 'billing-top-up-balance',
     PAYMENT_CONTINUE_BUTTON = 'billing-payment-continue-button',
+    INSTALL_CLI_COMMAND = 'install-cli-command',
     CONFIGURE_CLI_COMMAND = 'configure-cli-command',
     CREATE_FIRST_PROJECT = 'create-first-project',
 }
@@ -80,6 +81,7 @@ export const BILLING_TUTORIAL: TutorialPanelProps.Tutorial = {
 export const CONFIGURE_CLI_TUTORIAL: TutorialPanelProps.Tutorial = {
     completed: false,
     title: 'Set up the CLI',
+    prerequisitesAlert: 'Please, create a project before set up the CLI',
     description: (
         <>
             <Box variant="p" color="text-body-secondary" padding={{ top: 'n' }}>
@@ -92,6 +94,11 @@ export const CONFIGURE_CLI_TUTORIAL: TutorialPanelProps.Tutorial = {
         {
             title: 'Configure the CLI',
             steps: [
+                {
+                    title: 'Run the CLI install command',
+                    content: 'Run this command on your local machine to install the CLI.',
+                    hotspotId: HotspotIds.INSTALL_CLI_COMMAND,
+                },
                 {
                     title: 'Run the dstack project add command',
                     content: 'Run this command on your local machine to configure the dstack CLI.',

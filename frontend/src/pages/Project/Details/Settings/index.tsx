@@ -48,6 +48,7 @@ export const ProjectSettings: React.FC = () => {
     const params = useParams();
     const navigate = useNavigate();
     const paramProjectName = params.projectName ?? '';
+    const [isExpandedCliSection, setIsExpandedCliSection] = React.useState(false);
     const [configCliCommand, copyCliCommand] = useConfigProjectCliCommand({ projectName: paramProjectName });
 
     const { isAvailableDeletingPermission, isProjectManager, isProjectAdmin, isAvailableProjectManaging } =
@@ -60,6 +61,15 @@ export const ProjectSettings: React.FC = () => {
     const { data: currentUser } = useGetUserDataQuery({});
 
     const { data, isLoading, error } = useGetProjectQuery({ name: paramProjectName });
+
+    const { data: runsData } = useGetRunsQuery({
+        project_name: paramProjectName,
+        limit: 1,
+    });
+
+    useEffect(() => {
+        setIsExpandedCliSection(!runsData || runsData.length === 0);
+    }, [runsData]);
 
     useEffect(() => {
         if (error && 'status' in error && error.status === 404) {
@@ -170,15 +180,6 @@ export const ProjectSettings: React.FC = () => {
 
     const [activeStepIndex, setActiveStepIndex] = React.useState(0);
 
-    const { data: runsData } = useGetRunsQuery({
-        limit: 1,
-    });
-    const [expanded, setExpanded] = React.useState(false);
-
-    useEffect(() => {
-        setExpanded(!runsData || runsData.length === 0);
-    }, [runsData]);
-
     if (isLoadingPage)
         return (
             <Container>
@@ -194,13 +195,13 @@ export const ProjectSettings: React.FC = () => {
                         <ExpandableSection
                             variant="container"
                             headerText="CLI"
-                            expanded={expanded}
-                            onChange={({ detail }) => setExpanded(detail.expanded)}
+                            expanded={isExpandedCliSection}
+                            onChange={({ detail }) => setIsExpandedCliSection(detail.expanded)}
                             headerActions={
                                 <Button
                                     iconName="script"
-                                    variant={expanded ? 'normal' : 'primary'}
-                                    onClick={() => setExpanded((prev) => !prev)}
+                                    variant={isExpandedCliSection ? 'normal' : 'primary'}
+                                    onClick={() => setIsExpandedCliSection((prev) => !prev)}
                                 />
                             }
                             // headerInfo={<InfoLink onFollow={() => openHelpPanel(CLI_INFO)} />}
@@ -218,7 +219,7 @@ export const ProjectSettings: React.FC = () => {
                                 }}
                                 onNavigate={({ detail }) => setActiveStepIndex(detail.requestedStepIndex)}
                                 activeStepIndex={activeStepIndex}
-                                onSubmit={() => setExpanded(false)}
+                                onSubmit={() => setIsExpandedCliSection(false)}
                                 submitButtonText="Dismiss"
                                 allowSkipTo={true}
                                 steps={[
@@ -227,81 +228,87 @@ export const ProjectSettings: React.FC = () => {
                                         // info: <InfoLink onFollow={() => openHelpPanel(CLI_INFO)} />,
                                         description: 'To use dstack, install the CLI on your local machine.',
                                         content: (
-                                            <Tabs
-                                                variant="stacked"
-                                                tabs={[
-                                                    {
-                                                        label: 'uv',
-                                                        id: 'uv',
-                                                        content: (
-                                                            <>
-                                                                <div className={styles.codeWrapper}>
-                                                                    <Code className={styles.code}>
-                                                                        uv tool install dstack -U
-                                                                    </Code>
+                                            <Hotspot hotspotId={HotspotIds.INSTALL_CLI_COMMAND}>
+                                                <Tabs
+                                                    variant="stacked"
+                                                    tabs={[
+                                                        {
+                                                            label: 'uv',
+                                                            id: 'uv',
+                                                            content: (
+                                                                <>
+                                                                    <div className={styles.codeWrapper}>
+                                                                        <Code className={styles.code}>
+                                                                            uv tool install dstack -U
+                                                                        </Code>
 
-                                                                    <div className={styles.copy}>
-                                                                        <Popover
-                                                                            dismissButton={false}
-                                                                            position="top"
-                                                                            size="small"
-                                                                            triggerType="custom"
-                                                                            content={
-                                                                                <StatusIndicator type="success">
-                                                                                    {t('common.copied')}
-                                                                                </StatusIndicator>
-                                                                            }
-                                                                        >
-                                                                            <Button
-                                                                                formAction="none"
-                                                                                iconName="copy"
-                                                                                variant="normal"
-                                                                                onClick={() =>
-                                                                                    copyToClipboard('uv tool install dstack -U')
+                                                                        <div className={styles.copy}>
+                                                                            <Popover
+                                                                                dismissButton={false}
+                                                                                position="top"
+                                                                                size="small"
+                                                                                triggerType="custom"
+                                                                                content={
+                                                                                    <StatusIndicator type="success">
+                                                                                        {t('common.copied')}
+                                                                                    </StatusIndicator>
                                                                                 }
-                                                                            />
-                                                                        </Popover>
+                                                                            >
+                                                                                <Button
+                                                                                    formAction="none"
+                                                                                    iconName="copy"
+                                                                                    variant="normal"
+                                                                                    onClick={() =>
+                                                                                        copyToClipboard(
+                                                                                            'uv tool install dstack -U',
+                                                                                        )
+                                                                                    }
+                                                                                />
+                                                                            </Popover>
+                                                                        </div>
                                                                     </div>
-                                                                </div>
-                                                            </>
-                                                        ),
-                                                    },
-                                                    {
-                                                        label: 'pip',
-                                                        id: 'pip',
-                                                        content: (
-                                                            <>
-                                                                <div className={styles.codeWrapper}>
-                                                                    <Code className={styles.code}>pip install dstack -U</Code>
+                                                                </>
+                                                            ),
+                                                        },
+                                                        {
+                                                            label: 'pip',
+                                                            id: 'pip',
+                                                            content: (
+                                                                <>
+                                                                    <div className={styles.codeWrapper}>
+                                                                        <Code className={styles.code}>
+                                                                            pip install dstack -U
+                                                                        </Code>
 
-                                                                    <div className={styles.copy}>
-                                                                        <Popover
-                                                                            dismissButton={false}
-                                                                            position="top"
-                                                                            size="small"
-                                                                            triggerType="custom"
-                                                                            content={
-                                                                                <StatusIndicator type="success">
-                                                                                    {t('common.copied')}
-                                                                                </StatusIndicator>
-                                                                            }
-                                                                        >
-                                                                            <Button
-                                                                                formAction="none"
-                                                                                iconName="copy"
-                                                                                variant="normal"
-                                                                                onClick={() =>
-                                                                                    copyToClipboard('pip install dstack -U')
+                                                                        <div className={styles.copy}>
+                                                                            <Popover
+                                                                                dismissButton={false}
+                                                                                position="top"
+                                                                                size="small"
+                                                                                triggerType="custom"
+                                                                                content={
+                                                                                    <StatusIndicator type="success">
+                                                                                        {t('common.copied')}
+                                                                                    </StatusIndicator>
                                                                                 }
-                                                                            />
-                                                                        </Popover>
+                                                                            >
+                                                                                <Button
+                                                                                    formAction="none"
+                                                                                    iconName="copy"
+                                                                                    variant="normal"
+                                                                                    onClick={() =>
+                                                                                        copyToClipboard('pip install dstack -U')
+                                                                                    }
+                                                                                />
+                                                                            </Popover>
+                                                                        </div>
                                                                     </div>
-                                                                </div>
-                                                            </>
-                                                        ),
-                                                    },
-                                                ]}
-                                            />
+                                                                </>
+                                                            ),
+                                                        },
+                                                    ]}
+                                                />
+                                            </Hotspot>
                                         ),
                                         isOptional: true,
                                     },
