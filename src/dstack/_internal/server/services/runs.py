@@ -600,6 +600,7 @@ def create_job_model_for_new_submission(
         job_spec_data=job.job_spec.json(),
         job_provisioning_data=None,
         probes=[],
+        waiting_master_job=job.job_spec.job_num != 0,
     )
 
 

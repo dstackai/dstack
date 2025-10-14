@@ -1145,6 +1145,7 @@ class TestProcessSubmittedJobs:
             instance_assigned=True,
             job_num=0,
             status=JobStatus.SUBMITTED,
+            waiting_master_job=False,
         )
         job2 = await create_job(
             session=session,
@@ -1152,6 +1153,7 @@ class TestProcessSubmittedJobs:
             instance_assigned=False,
             job_num=1,
             status=JobStatus.SUBMITTED,
+            waiting_master_job=True,
         )
         offer = get_instance_offer_with_availability(
             backend=BackendType.RUNPOD,

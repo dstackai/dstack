@@ -442,7 +442,12 @@ class JobModel(BaseModel):
     # Whether the replica is registered to receive service requests.
     # Always `False` for non-service runs.
     registered: Mapped[bool] = mapped_column(Boolean, server_default=false())
-    # waiting_master_job: Mapped[Optional[bool]] = mapped_column(Boolean)
+    # `waiting_master_job` is `True` for non-master jobs that have to wait
+    # for master processing before they can be processed.
+    # This allows updating all replica jobs even when only master is locked,
+    # e.g. to provision instances for all jobs when processing master.
+    # If not set, all jobs should be processed only one-by-one.
+    waiting_master_job: Mapped[Optional[bool]] = mapped_column(Boolean)
 
 
 class GatewayModel(BaseModel):

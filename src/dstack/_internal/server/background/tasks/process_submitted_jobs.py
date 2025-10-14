@@ -138,7 +138,7 @@ async def _process_next_submitted_job():
                 .join(JobModel.run)
                 .where(
                     JobModel.status == JobStatus.SUBMITTED,
-                    # JobModel.waiting_master_job.is_(False),
+                    JobModel.waiting_master_job.is_not(True),
                     JobModel.id.not_in(lockset),
                 )
                 .options(load_only(JobModel.id))
@@ -197,6 +197,8 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
     run_spec = run.run_spec
     run_profile = run_spec.merged_profile
     job = find_job(run.jobs, job_model.replica_num, job_model.job_num)
+    replica_jobs = find_jobs(run.jobs, replica_num=job_model.replica_num)
+    replica_job_models = _get_job_models_for_jobs(run_model.jobs, replica_jobs)
     multinode = job.job_spec.jobs_per_replica > 1
 
     # Master job chooses fleet for the run.
@@ -352,16 +354,23 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
             await session.commit()
             return
 
-        replica_jobs = [job]
-        if multinode and job.job_spec.job_num == 0:
-            replica_jobs = find_jobs(run.jobs, replica_num=job.job_spec.replica_num)
+        jobs_to_provision = [job]
+        if (
+            multinode
+            and job.job_spec.job_num == 0
+            # job_model.waiting_master_job is not set for legacy jobs.
+            # In this case compute group provisioning not supported
+            # and jobs always provision one-by-one.
+            and job_model.waiting_master_job is not None
+        ):
+            jobs_to_provision = replica_jobs
 
-        run_job_result = await _run_replica_jobs_on_new_instances(
+        run_job_result = await _run_jobs_on_new_instances(
             project=project,
             fleet_model=fleet_model,
             job_model=job_model,
             run=run,
-            jobs=replica_jobs,
+            jobs=jobs_to_provision,
             project_ssh_public_key=project.ssh_public_key,
             project_ssh_private_key=project.ssh_private_key,
             master_job_provisioning_data=master_job_provisioning_data,
@@ -387,11 +396,16 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         if isinstance(provisioning_data, ComputeGroupProvisioningData):
             # TODO: Create compute group
             need_volume_attachment = False
-            provisioned_jobs = replica_jobs
+            provisioned_jobs = jobs_to_provision
             jpds = provisioning_data.job_provisioning_datas
         else:
             provisioned_jobs = [job]
             jpds = [provisioning_data]
+            if len(jobs_to_provision) > 1:
+                # Tried provisioning multiple jobs but provisioned only one.
+                # Allow other jobs to provision one-by-one.
+                for replica_job_model in replica_job_models:
+                    replica_job_model.waiting_master_job = False
 
         logger.info("%s: provisioned %s new instance(s)", fmt(job_model), len(provisioned_jobs))
         provisioned_job_models = _get_job_models_for_jobs(run_model.jobs, provisioned_jobs)
@@ -759,7 +773,7 @@ async def _assign_job_to_fleet_instance(
     return instance
 
 
-async def _run_replica_jobs_on_new_instances(
+async def _run_jobs_on_new_instances(
     project: ProjectModel,
     job_model: JobModel,
     run: Run,
