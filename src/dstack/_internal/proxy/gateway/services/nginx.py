@@ -87,6 +87,13 @@ class Nginx:
             if conf.https:
                 await run_async(self.run_certbot, conf.domain, acme)
             await run_async(self.write_conf, conf.render(), conf_name)
+            # Start sglang-router if router is sglang
+            if hasattr(conf, "router") and conf.router == "sglang":
+                replicas = len(conf.replicas) if hasattr(conf, "replicas") and conf.replicas else 1
+                logger.debug(
+                    f"[SglangRouterTesting] Starting sglang-router with {replicas} replicas"
+                )
+                await run_async(self.start_sglang_router, replicas)
 
         logger.info("Registered %s domain %s", conf.type, conf.domain)
 
