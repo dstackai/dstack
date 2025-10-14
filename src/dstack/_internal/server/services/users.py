@@ -225,6 +225,7 @@ def user_model_to_user(user_model: UserModel) -> User:
         email=user_model.email,
         active=user_model.active,
         permissions=get_user_permissions(user_model),
+        ssh_public_key=user_model.ssh_public_key,
     )
 
 
@@ -237,8 +238,8 @@ def user_model_to_user_with_creds(user_model: UserModel) -> UserWithCreds:
         email=user_model.email,
         active=user_model.active,
         permissions=get_user_permissions(user_model),
-        creds=UserTokenCreds(token=user_model.token.get_plaintext_or_error()),
         ssh_public_key=user_model.ssh_public_key,
+        creds=UserTokenCreds(token=user_model.token.get_plaintext_or_error()),
         ssh_private_key=user_model.ssh_private_key,
     )
 

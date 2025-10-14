@@ -48,6 +48,7 @@ class TestListUsers:
                 "permissions": {
                     "can_create_projects": True,
                 },
+                "ssh_public_key": None,
             },
             {
                 "id": str(other_user.id),
@@ -59,6 +60,7 @@ class TestListUsers:
                 "permissions": {
                     "can_create_projects": True,
                 },
+                "ssh_public_key": None,
             },
         ]
 
@@ -92,6 +94,7 @@ class TestListUsers:
                 "permissions": {
                     "can_create_projects": True,
                 },
+                "ssh_public_key": None,
             }
         ]
 
@@ -229,7 +232,9 @@ class TestCreateUser:
                 },
             )
         assert response.status_code == 200
-        assert response.json() == {
+        user_data = response.json()
+        ssh_public_key = user_data["ssh_public_key"]
+        assert user_data == {
             "id": "1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e",
             "username": "test",
             "created_at": "2023-01-02T03:04:00+00:00",
@@ -239,6 +244,7 @@ class TestCreateUser:
             "permissions": {
                 "can_create_projects": True,
             },
+            "ssh_public_key": ssh_public_key,
         }
         res = await session.execute(select(UserModel).where(UserModel.name == "test"))
         assert len(res.scalars().all()) == 1
@@ -264,7 +270,9 @@ class TestCreateUser:
                 },
             )
         assert response.status_code == 200
-        assert response.json() == {
+        user_data = response.json() 
+        ssh_public_key = user_data["ssh_public_key"]
+        assert user_data == {
             "id": "1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e",
             "username": "Test",
             "created_at": "2023-01-02T03:04:00+00:00",
@@ -274,6 +282,7 @@ class TestCreateUser:
             "permissions": {
                 "can_create_projects": True,
             },
+            "ssh_public_key": ssh_public_key,
         }
         # Username uniqueness check should be case insensitive
         for username in ["test", "Test", "TesT"]:

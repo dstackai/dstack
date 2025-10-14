@@ -30,6 +30,7 @@ class User(CoreModel):
     email: Optional[str]
     active: bool
     permissions: UserPermissions
+    ssh_public_key: Optional[str] = None
 
 
 class UserTokenCreds(CoreModel):
@@ -38,5 +39,4 @@ class UserTokenCreds(CoreModel):
 
 class UserWithCreds(User):
     creds: UserTokenCreds
-    ssh_public_key: Optional[str] = None
     ssh_private_key: Optional[str] = None
