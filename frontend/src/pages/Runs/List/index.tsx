@@ -137,7 +137,7 @@ export const RunList: React.FC = () => {
                             <ButtonDropdown
                                 items={[
                                     {
-                                        text: 'New dev environment',
+                                        text: 'Dev environment',
                                         id: 'dev_env',
                                         href: `${ROUTES.RUNS.CREATE_DEV_ENV}${
                                             filteringRequestParams.project_name

@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import cn from 'classnames';
 import * as yup from 'yup';
-import { WizardProps } from '@cloudscape-design/components';
+import { Box, Link, WizardProps } from '@cloudscape-design/components';
 import { CardsProps } from '@cloudscape-design/components/cards';
 
 import { Container, FormCodeEditor, FormField, FormInput, FormSelect, SpaceBetween, Wizard } from 'components';
@@ -28,11 +28,11 @@ const namesFieldError = 'Only latin characters, dashes, and digits';
 
 const ideOptions = [
     {
-        label: 'cursor',
+        label: 'Cursor',
         value: 'cursor',
     },
     {
-        label: 'vscode',
+        label: 'VS Code',
         value: 'vscode',
     },
 ];
@@ -271,7 +271,7 @@ spot_policy: auto
                 submitButtonText={t('runs.dev_env.wizard.submit')}
                 steps={[
                     {
-                        title: 'Select Offer',
+                        title: 'Resources',
                         content: (
                             <>
                                 <FormField
@@ -292,7 +292,7 @@ spot_policy: auto
                     },
 
                     {
-                        title: 'Name and IDE',
+                        title: 'Settings',
                         content: (
                             <Container>
                                 <SpaceBetween direction="vertical" size="l">
@@ -323,8 +323,19 @@ spot_policy: auto
                             <Container>
                                 <FormCodeEditor
                                     control={control}
-                                    label={t('runs.dev_env.wizard.config')}
-                                    description={t('runs.dev_env.wizard.config_description')}
+                                    description={
+                                        <Box>
+                                            Review the configuration file and adjust it if needed. See{' '}
+                                            <Link
+                                                href="https://docs.dstack.ai/docs/concepts/dev-environments"
+                                                target="_blank"
+                                                external
+                                            >
+                                                examples
+                                            </Link>
+                                            .
+                                        </Box>
+                                    }
                                     name="config_yaml"
                                     language="yaml"
                                     loading={loading}
