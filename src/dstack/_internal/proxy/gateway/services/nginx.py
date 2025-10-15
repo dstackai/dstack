@@ -147,7 +147,7 @@ class Nginx:
                 [
                     "python3",
                     "-m",
-                    "sglang_router.launch_router",  # Use system python3
+                    "sglang_router.launch_router",
                     "--worker-urls",
                 ]
                 + worker_urls
@@ -160,6 +160,8 @@ class Nginx:
                     "debug",
                     "--log-dir",
                     "./router_logs",
+                    "--request-timeout-secs",
+                    "1800",
                 ]
             )
             subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
