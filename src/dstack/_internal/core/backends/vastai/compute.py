@@ -56,46 +56,12 @@ class VastAICompute(
     def get_offers_by_requirements(
         self, requirements: Requirements
     ) -> List[InstanceOfferWithAvailability]:
-        def spot_filter(offer):
-            return not offer.instance.resources.spot
-
-        extra_filter = spot_filter
-
-        configured_regions = self.config.regions or []
-        if configured_regions:
-            normalized_exact_regions = {
-                r.strip() for r in configured_regions if isinstance(r, str) and r.strip()
-            }
-            iso_country_codes = {
-                r.strip().upper()
-                for r in configured_regions
-                if isinstance(r, str) and len(r.strip()) == 2 and r.strip().isalpha()
-            }
-
-            def region_accepts(offer):
-                region_value = (offer.region or "").strip()
-                if not region_value:
-                    return False
-                if region_value in normalized_exact_regions:
-                    return True
-                if "," in region_value:
-                    trailing_code = region_value.split(",")[-1].strip().upper()
-                    if trailing_code in iso_country_codes:
-                        return True
-                if len(region_value) == 2 and region_value.isalpha() and region_value.upper() in iso_country_codes:
-                    return True
-                return False
-
-            def combined_filter(offer):
-                return spot_filter(offer) and region_accepts(offer)
-
-            extra_filter = combined_filter
-
         offers = get_catalog_offers(
             backend=BackendType.VASTAI,
+            locations=self.config.regions or None,
             requirements=requirements,
             # TODO(egor-s): spots currently not supported
-            extra_filter=extra_filter,
+            extra_filter=lambda offer: not offer.instance.resources.spot,
             catalog=self.catalog,
         )
         offers = [
