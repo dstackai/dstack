@@ -12,6 +12,7 @@ from dstack._internal.core.errors import ResourceExistsError, ServerClientError
 from dstack._internal.core.models.users import (
     GlobalRole,
     User,
+    UserHookConfig,
     UserPermissions,
     UserTokenCreds,
     UserWithCreds,
@@ -79,6 +80,7 @@ async def create_user(
     email: Optional[str] = None,
     active: bool = True,
     token: Optional[str] = None,
+    config: Optional[UserHookConfig] = None,
 ) -> UserModel:
     validate_username(username)
     user_model = await get_user_model_by_name(session=session, username=username, ignore_case=True)
@@ -101,7 +103,7 @@ async def create_user(
     session.add(user)
     await session.commit()
     for func in _CREATE_USER_HOOKS:
-        await func(session, user)
+        await func(session, user, config)
     return user
 
 
@@ -267,7 +269,9 @@ def is_valid_username(username: str) -> bool:
 _CREATE_USER_HOOKS = []
 
 
-def register_create_user_hook(func: Callable[[AsyncSession, UserModel], Awaitable[None]]):
+def register_create_user_hook(
+    func: Callable[[AsyncSession, UserModel, Optional[UserHookConfig]], Awaitable[None]],
+):
     _CREATE_USER_HOOKS.append(func)
 
 
