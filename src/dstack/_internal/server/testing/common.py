@@ -23,7 +23,10 @@ from dstack._internal.core.backends.base.compute import (
 )
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import NetworkMode
-from dstack._internal.core.models.compute_groups import ComputeGroupProvisioningData
+from dstack._internal.core.models.compute_groups import (
+    ComputeGroupProvisioningData,
+    ComputeGroupStatus,
+)
 from dstack._internal.core.models.configurations import (
     AnyRunConfiguration,
     DevEnvironmentConfiguration,
@@ -85,6 +88,7 @@ from dstack._internal.core.models.volumes import (
 )
 from dstack._internal.server.models import (
     BackendModel,
+    ComputeGroupModel,
     DecryptedString,
     FileArchiveModel,
     FleetModel,
@@ -473,6 +477,28 @@ def get_compute_group_provisioning_data(
         job_provisioning_datas=job_provisioning_datas,
         backend_data=backend_data,
     )
+
+
+async def create_compute_group(
+    session: AsyncSession,
+    project: ProjectModel,
+    fleet: FleetModel,
+    status: ComputeGroupStatus = ComputeGroupStatus.RUNNING,
+    provisioning_data: Optional[ComputeGroupProvisioningData] = None,
+    last_processed_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+):
+    if provisioning_data is None:
+        provisioning_data = get_compute_group_provisioning_data()
+    compute_group = ComputeGroupModel(
+        project=project,
+        fleet=fleet,
+        status=status,
+        provisioning_data=provisioning_data.json(),
+        last_processed_at=last_processed_at,
+    )
+    session.add(compute_group)
+    await session.commit()
+    return compute_group
 
 
 async def create_probe(

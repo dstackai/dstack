@@ -2,6 +2,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
 from dstack._internal.server import settings
+from dstack._internal.server.background.tasks.process_compute_groups import process_compute_groups
 from dstack._internal.server.background.tasks.process_fleets import process_fleets
 from dstack._internal.server.background.tasks.process_gateways import (
     process_gateways,
@@ -120,6 +121,12 @@ def start_background_tasks() -> AsyncIOScheduler:
             process_instances,
             IntervalTrigger(seconds=4, jitter=2),
             kwargs={"batch_size": 5},
+            max_instances=2 if replica == 0 else 1,
+        )
+        _scheduler.add_job(
+            process_compute_groups,
+            IntervalTrigger(seconds=15, jitter=2),
+            kwargs={"batch_size": 1},
             max_instances=2 if replica == 0 else 1,
         )
     _scheduler.start()

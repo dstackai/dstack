@@ -1,3 +1,4 @@
+import enum
 import uuid
 from datetime import datetime
 from typing import List, Optional
@@ -5,6 +6,11 @@ from typing import List, Optional
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.runs import JobProvisioningData
+
+
+class ComputeGroupStatus(str, enum.Enum):
+    RUNNING = "running"
+    TERMINATED = "terminated"
 
 
 class ComputeGroupProvisioningData(CoreModel):
@@ -20,8 +26,14 @@ class ComputeGroupProvisioningData(CoreModel):
 
 
 class ComputeGroup(CoreModel):
+    """
+    Compute group is a group of instances managed as a single unit via the provider API,
+    i.e. instances are not created/deleted one-by-one but all at once.
+    """
+
     id: uuid.UUID
     name: str
     project_name: str
     created_at: datetime
-    provisioning_data: Optional[ComputeGroupProvisioningData] = None
+    status: ComputeGroupStatus
+    provisioning_data: ComputeGroupProvisioningData

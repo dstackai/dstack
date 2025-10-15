@@ -1,8 +1,8 @@
 """Add ComputeGroupModel
 
-Revision ID: 9d37f4423e26
+Revision ID: 8cf5c2af22fc
 Revises: a5bc4573781e
-Create Date: 2025-10-14 11:12:51.168276
+Create Date: 2025-10-15 14:44:41.537611
 
 """
 
@@ -13,7 +13,7 @@ from alembic import op
 import dstack._internal.server.models
 
 # revision identifiers, used by Alembic.
-revision = "9d37f4423e26"
+revision = "8cf5c2af22fc"
 down_revision = "a5bc4573781e"
 branch_labels = None
 depends_on = None
@@ -29,12 +29,23 @@ def upgrade() -> None:
         ),
         sa.Column("fleet_id", sqlalchemy_utils.types.uuid.UUIDType(binary=False), nullable=False),
         sa.Column("created_at", dstack._internal.server.models.NaiveDateTime(), nullable=False),
+        sa.Column("status", sa.String(length=100), nullable=False),
         sa.Column(
             "last_processed_at", dstack._internal.server.models.NaiveDateTime(), nullable=False
         ),
         sa.Column("deleted", sa.Boolean(), nullable=False),
         sa.Column("deleted_at", dstack._internal.server.models.NaiveDateTime(), nullable=True),
         sa.Column("provisioning_data", sa.Text(), nullable=False),
+        sa.Column(
+            "first_termination_retry_at",
+            dstack._internal.server.models.NaiveDateTime(),
+            nullable=True,
+        ),
+        sa.Column(
+            "last_termination_retry_at",
+            dstack._internal.server.models.NaiveDateTime(),
+            nullable=True,
+        ),
         sa.ForeignKeyConstraint(
             ["fleet_id"], ["fleets.id"], name=op.f("fk_compute_groups_fleet_id_fleets")
         ),

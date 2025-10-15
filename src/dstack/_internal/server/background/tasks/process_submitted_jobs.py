@@ -47,6 +47,7 @@ from dstack._internal.core.models.runs import (
 from dstack._internal.core.models.volumes import Volume
 from dstack._internal.core.services.profiles import get_termination
 from dstack._internal.server import settings
+from dstack._internal.server.background.tasks.process_compute_groups import ComputeGroupStatus
 from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import (
     ComputeGroupModel,
@@ -403,6 +404,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
                 id=uuid.uuid4(),
                 project=project,
                 fleet=fleet_model,
+                status=ComputeGroupStatus.RUNNING,
                 provisioning_data=provisioning_data.json(),
             )
             session.add(compute_group_model)

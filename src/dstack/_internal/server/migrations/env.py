@@ -6,7 +6,7 @@ from alembic import context
 from sqlalchemy import Connection, MetaData, text
 
 from dstack._internal.server.db import get_db
-from dstack._internal.server.models import BaseModel
+from dstack._internal.server.models import BaseModel, EnumAsString
 
 config = context.config
 
@@ -19,6 +19,14 @@ target_metadata = BaseModel.metadata
 def set_target_metadata(metadata: MetaData):
     global target_metadata
     target_metadata = metadata
+
+
+def render_item(type_, obj, autogen_context):
+    """Apply custom rendering for selected items."""
+    if type_ == "type" and isinstance(obj, EnumAsString):
+        return f"sa.String(length={obj.length})"
+    # default rendering for other objects
+    return False
 
 
 def run_migrations_offline():
@@ -35,8 +43,8 @@ def run_migrations_offline():
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        render_item=render_item,
     )
-
     with context.begin_transaction():
         context.run_migrations()
 
@@ -67,6 +75,7 @@ def run_migrations(connection: Connection):
         target_metadata=target_metadata,
         compare_type=True,
         render_as_batch=True,
+        render_item=render_item,
     )
     with context.begin_transaction():
         context.run_migrations()

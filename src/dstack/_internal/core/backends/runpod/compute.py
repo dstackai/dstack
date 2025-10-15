@@ -275,9 +275,6 @@ class RunpodCompute(
             raise
 
     def terminate_compute_group(self, compute_group: ComputeGroup):
-        if compute_group.provisioning_data is None:
-            logger.error("Missing ComputeGroupProvisioningData. Cluster will not be deleted")
-            return
         provisioning_data = compute_group.provisioning_data
         try:
             self.api_client.delete_cluster(provisioning_data.compute_group_id)

@@ -25,6 +25,7 @@ from sqlalchemy_utils import UUIDType
 from dstack._internal.core.errors import DstackError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import CoreConfig, generate_dual_core_model
+from dstack._internal.core.models.compute_groups import ComputeGroupStatus
 from dstack._internal.core.models.fleets import FleetStatus
 from dstack._internal.core.models.gateways import GatewayStatus
 from dstack._internal.core.models.health import HealthStatus
@@ -760,6 +761,7 @@ class ComputeGroupModel(BaseModel):
     fleet: Mapped["FleetModel"] = relationship(foreign_keys=[fleet_id])
 
     created_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
+    status: Mapped[ComputeGroupStatus] = mapped_column(EnumAsString(ComputeGroupStatus, 100))
     last_processed_at: Mapped[datetime] = mapped_column(
         NaiveDateTime, default=get_current_datetime
     )
@@ -767,6 +769,9 @@ class ComputeGroupModel(BaseModel):
     deleted_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
 
     provisioning_data: Mapped[str] = mapped_column(Text)
+
+    first_termination_retry_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
+    last_termination_retry_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
 
     instances: Mapped[List["InstanceModel"]] = relationship(back_populates="compute_group")
 
