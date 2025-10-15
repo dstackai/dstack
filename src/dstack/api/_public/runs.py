@@ -1,4 +1,6 @@
 import base64
+import hashlib
+import os
 import queue
 import tempfile
 import threading
@@ -15,6 +17,7 @@ from urllib.parse import urlparse
 from websocket import WebSocketApp
 
 import dstack.api as api
+from dstack._internal.cli.utils.common import warn
 from dstack._internal.core.consts import DSTACK_RUNNER_HTTP_PORT, DSTACK_RUNNER_SSH_PORT
 from dstack._internal.core.errors import ClientError, ConfigurationError, ResourceNotExistsError
 from dstack._internal.core.models.backends.base import BackendType
@@ -45,11 +48,13 @@ from dstack._internal.core.models.runs import (
     get_service_port,
 )
 from dstack._internal.core.models.runs import Run as RunModel
+from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.core.services.logs import URLReplacer
 from dstack._internal.core.services.ssh.attach import SSHAttach
 from dstack._internal.core.services.ssh.ports import PortsLock
 from dstack._internal.server.schemas.logs import PollLogsRequest
 from dstack._internal.utils.common import get_or_error, make_proxy_url
+from dstack._internal.utils.crypto import generate_rsa_key_pair
 from dstack._internal.utils.files import create_file_archive
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.path import PathLike, path_in_dir
@@ -72,16 +77,20 @@ class Run(ABC):
         self,
         api_client: APIClient,
         project: str,
-        ssh_identity_file: Optional[PathLike],
         run: RunModel,
         ports_lock: Optional[PortsLock] = None,
+        ssh_identity_file: Optional[PathLike] = None,
     ):
         self._api_client = api_client
         self._project = project
-        self._ssh_identity_file = ssh_identity_file
         self._run = run
         self._ports_lock: Optional[PortsLock] = ports_lock
         self._ssh_attach: Optional[SSHAttach] = None
+        if ssh_identity_file is not None:
+            warn(
+                "[code]ssh_identity_file[/code] in [code]Run[/code] is deprecated and ignored; will be removed"
+                " since 0.19.40"
+            )
 
     @property
     def name(self) -> str:
@@ -270,9 +279,33 @@ class Run(ABC):
         Raises:
             dstack.api.PortUsedError: If ports are in use or the run is attached by another process.
         """
-        ssh_identity_file = ssh_identity_file or self._ssh_identity_file
-        if ssh_identity_file is None:
-            raise ConfigurationError("SSH identity file is required to attach to the run")
+        if not ssh_identity_file:
+            user = self._api_client.users.get_my_user()
+            run_ssh_key_pub = self._run.run_spec.ssh_key_pub
+            config_manager = ConfigManager()
+            if user.ssh_public_key == run_ssh_key_pub:
+                token_hash = hashlib.sha1(user.creds.token.encode()).hexdigest()[:8]
+                config_manager.dstack_ssh_dir.mkdir(parents=True, exist_ok=True)
+                ssh_identity_file = config_manager.dstack_ssh_dir / token_hash
+
+                def key_opener(path, flags):
+                    return os.open(path, flags, 0o600)
+
+                with open(ssh_identity_file, "wb", opener=key_opener) as f:
+                    assert user.ssh_private_key
+                    f.write(user.ssh_private_key.encode())
+            else:
+                if config_manager.dstack_key_path.exists():
+                    # TODO: Remove since 0.19.40
+                    warn(
+                        f"Using legacy [code]{config_manager.dstack_key_path}[/code]."
+                        " Future versions will use the user SSH key from the server.",
+                    )
+                    ssh_identity_file = config_manager.dstack_key_path
+                else:
+                    raise ConfigurationError(
+                        f"User SSH key doen't match; default SSH key ({config_manager.dstack_key_path}) doesn't exist"
+                    )
         ssh_identity_file = str(ssh_identity_file)
 
         job = self._find_job(replica_num=replica_num, job_num=job_num)
@@ -434,6 +467,7 @@ class RunCollection:
         profile: Optional[Profile] = None,
         configuration_path: Optional[str] = None,
         repo_dir: Optional[str] = None,
+        ssh_identity_file: Optional[PathLike] = None,
     ) -> RunPlan:
         """
         Get a run plan.
@@ -465,6 +499,19 @@ class RunCollection:
         if repo_dir is None and configuration.repos:
             repo_dir = configuration.repos[0].path
 
+        if ssh_identity_file:
+            ssh_key_pub = Path(ssh_identity_file).with_suffix(".pub").read_text()
+        else:
+            config_manager = ConfigManager()
+            if not config_manager.dstack_key_path.exists():
+                generate_rsa_key_pair(private_key_path=config_manager.dstack_key_path)
+            warn(
+                f"Using legacy [code]{config_manager.dstack_key_path.with_suffix('.pub')}[/code]."
+                " Future versions will use the user SSH key from the server.",
+            )
+            ssh_key_pub = config_manager.dstack_key_path.with_suffix(".pub").read_text()
+            # TODO: Uncomment after 0.19.40
+            # ssh_key_pub = None
         run_spec = RunSpec(
             run_name=configuration.name,
             repo_id=repo.repo_id,
@@ -477,7 +524,7 @@ class RunCollection:
             configuration_path=configuration_path,
             configuration=configuration,
             profile=profile,
-            ssh_key_pub=Path(self._client.ssh_identity_file + ".pub").read_text().strip(),
+            ssh_key_pub=ssh_key_pub,
         )
         logger.debug("Getting run plan")
         run_plan = self._api_client.runs.get_plan(self._project, run_spec)
@@ -546,6 +593,7 @@ class RunCollection:
         profile: Optional[Profile] = None,
         configuration_path: Optional[str] = None,
         reserve_ports: bool = True,
+        ssh_identity_file: Optional[PathLike] = None,
     ) -> Run:
         """
         Apply the run configuration.
@@ -567,6 +615,7 @@ class RunCollection:
             repo=repo,
             profile=profile,
             configuration_path=configuration_path,
+            ssh_identity_file=ssh_identity_file,
         )
         run = self.apply_plan(
             run_plan=run_plan,
@@ -709,6 +758,13 @@ class RunCollection:
             creation_policy=creation_policy,
             idle_duration=idle_duration,  # type: ignore[assignment]
         )
+        config_manager = ConfigManager()
+        if not config_manager.dstack_key_path.exists():
+            generate_rsa_key_pair(private_key_path=config_manager.dstack_key_path)
+        warn(
+            f"Using legacy [code]{config_manager.dstack_key_path.with_suffix('.pub')}[/code]."
+            " Future versions will use the user SSH key from the server.",
+        )
         run_spec = RunSpec(
             run_name=run_name,
             repo_id=repo.repo_id,
@@ -718,7 +774,7 @@ class RunCollection:
             configuration_path=configuration_path,
             configuration=configuration,
             profile=profile,
-            ssh_key_pub=Path(self._client.ssh_identity_file + ".pub").read_text().strip(),
+            ssh_key_pub=config_manager.dstack_key_path.with_suffix(".pub").read_text(),
         )
         logger.debug("Getting run plan")
         run_plan = self._api_client.runs.get_plan(self._project, run_spec)
@@ -800,7 +856,6 @@ class RunCollection:
         return Run(
             self._api_client,
             self._project,
-            self._client.ssh_identity_file,
             run,
         )
 
@@ -808,7 +863,6 @@ class RunCollection:
         return Run(
             self._api_client,
             self._project,
-            self._client.ssh_identity_file,
             run,
             ports_lock,
         )
