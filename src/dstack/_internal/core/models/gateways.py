@@ -44,7 +44,6 @@ class GatewayCertificate(CoreModel):
     ]
 
 
-# https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/proxy/gateway/resources/nginx/service.jinja2
 class GatewayConfiguration(CoreModel):
     type: Literal["gateway"] = "gateway"
     name: Annotated[Optional[str], Field(description="The gateway name")] = None

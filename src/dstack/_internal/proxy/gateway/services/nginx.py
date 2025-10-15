@@ -82,17 +82,12 @@ class Nginx:
     async def register(self, conf: SiteConfig, acme: ACMESettings) -> None:
         logger.debug("Registering %s domain %s", conf.type, conf.domain)
         conf_name = self.get_config_name(conf.domain)
-        logger.debug(f"[SglangRouterTesting] Register Conf object dict: {conf.dict()}")
         async with self._lock:
             if conf.https:
                 await run_async(self.run_certbot, conf.domain, acme)
             await run_async(self.write_conf, conf.render(), conf_name)
-            # Start sglang-router if router is sglang
             if hasattr(conf, "router") and conf.router == "sglang":
                 replicas = len(conf.replicas) if hasattr(conf, "replicas") and conf.replicas else 1
-                logger.debug(
-                    f"[SglangRouterTesting] Starting sglang-router with {replicas} replicas"
-                )
                 await run_async(self.write_sglang_workers_conf, conf)
                 await run_async(self.start_sglang_router, replicas)
 
@@ -106,7 +101,6 @@ class Nginx:
         async with self._lock:
             await run_async(sudo_rm, conf_path)
             workers_conf_path = self._conf_dir / f"sglang-workers.{domain}.conf"
-            logger.debug(f"[SglangRouterTesting] Workers conf path: {workers_conf_path}")
             if workers_conf_path.exists():
                 await run_async(sudo_rm, workers_conf_path)
                 await run_async(self.stop_sglang_router)
@@ -122,26 +116,20 @@ class Nginx:
 
     @staticmethod
     def start_sglang_router(replicas: int) -> None:
-        """Start sglang-router service, killing existing one if running."""
         try:
-            # Kill existing sglang-router if running
             result = subprocess.run(
                 ["pgrep", "-f", "sglang::router"], capture_output=True, timeout=5
             )
             if result.returncode == 0:
-                logger.info("Killing existing sglang-router...")
+                logger.info("Stopping existing sglang-router...")
                 subprocess.run(["pkill", "-f", "sglang::router"], timeout=5)
-                # Wait a moment for the process to terminate
                 import time
 
                 time.sleep(1)
-
-            # Generate worker URLs based on replica count
             worker_urls = []
             for i in range(1, replicas + 1):
                 worker_urls.append(f"http://127.0.0.1:{10000 + i}")
 
-            # Start sglang-router with system-wide installation
             logger.info(f"Starting sglang-router with {replicas} replicas...")
             cmd = (
                 [
