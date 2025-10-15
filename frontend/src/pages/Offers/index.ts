@@ -1,1 +1,1 @@
-export { OfferList } from './List';
+export { ListPage as OfferList } from './ListPage';

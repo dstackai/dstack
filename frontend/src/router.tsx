@@ -17,7 +17,7 @@ import { ModelDetails } from 'pages/Models/Details';
 import { CreateProjectWizard, ProjectAdd, ProjectDetails, ProjectList, ProjectSettings } from 'pages/Project';
 import { BackendAdd, BackendEdit } from 'pages/Project/Backends';
 import { AddGateway, EditGateway } from 'pages/Project/Gateways';
-import { JobLogs, JobMetrics, RunDetails, RunDetailsPage, RunList } from 'pages/Runs';
+import { CreateDevEnvironment, JobLogs, JobMetrics, RunDetails, RunDetailsPage, RunList } from 'pages/Runs';
 import { JobDetailsPage } from 'pages/Runs/Details/Jobs/Details';
 import { CreditsHistoryAdd, UserAdd, UserDetails, UserEdit, UserList } from 'pages/User';
 import { UserBilling, UserProjects, UserSettings } from 'pages/User/Details';
@@ -142,6 +142,11 @@ export const router = createBrowserRouter([
             {
                 path: ROUTES.RUNS.LIST,
                 element: <RunList />,
+            },
+
+            {
+                path: ROUTES.RUNS.CREATE_DEV_ENV,
+                element: <CreateDevEnvironment />,
             },
 
             // Offers

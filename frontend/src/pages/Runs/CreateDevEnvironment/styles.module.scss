@@ -1,0 +1,14 @@
+@use '@cloudscape-design/design-tokens/index' as awsui;
+
+.wizardForm {
+  & [class^="awsui_wizard"] {
+    & [class^="awsui_footer"] {
+      position: sticky;
+      bottom: 0;
+      background-color: awsui.$color-background-layout-main;
+      margin-block-start: 0 !important;
+      padding-top: awsui.$space-scaled-l;
+      z-index: 100;
+    }
+  }
+}
