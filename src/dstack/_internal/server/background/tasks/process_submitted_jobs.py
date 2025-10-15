@@ -49,6 +49,7 @@ from dstack._internal.core.services.profiles import get_termination
 from dstack._internal.server import settings
 from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import (
+    ComputeGroupModel,
     FleetModel,
     InstanceModel,
     JobModel,
@@ -393,11 +394,18 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
             session.add(fleet_model)
 
         provisioning_data, offer, effective_profile, _ = run_job_result
+        compute_group_model = None
         if isinstance(provisioning_data, ComputeGroupProvisioningData):
-            # TODO: Create compute group
             need_volume_attachment = False
             provisioned_jobs = jobs_to_provision
             jpds = provisioning_data.job_provisioning_datas
+            compute_group_model = ComputeGroupModel(
+                id=uuid.uuid4(),
+                project=project,
+                fleet=fleet_model,
+                provisioning_data=provisioning_data.json(),
+            )
+            session.add(compute_group_model)
         else:
             provisioned_jobs = [job]
             jpds = [provisioning_data]
@@ -425,6 +433,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
             instance = _create_instance_model_for_job(
                 project=project,
                 fleet_model=fleet_model,
+                compute_group_model=compute_group_model,
                 job_model=provisioned_job_model,
                 job_provisioning_data=jpd,
                 offer=offer,
@@ -434,7 +443,6 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
             provisioned_job_model.job_runtime_data = _prepare_job_runtime_data(
                 offer, multinode
             ).json()
-            instance.fleet_id = fleet_model.id
             logger.info(
                 "Created a new instance %s for job %s",
                 instance.name,
@@ -986,6 +994,7 @@ async def _get_next_instance_num(session: AsyncSession, fleet_model: FleetModel)
 def _create_instance_model_for_job(
     project: ProjectModel,
     fleet_model: FleetModel,
+    compute_group_model: Optional[ComputeGroupModel],
     job_model: JobModel,
     job_provisioning_data: JobProvisioningData,
     offer: InstanceOfferWithAvailability,
@@ -1005,6 +1014,8 @@ def _create_instance_model_for_job(
         name=f"{fleet_model.name}-{instance_num}",
         instance_num=instance_num,
         project=project,
+        fleet=fleet_model,
+        compute_group=compute_group_model,
         created_at=common_utils.get_current_datetime(),
         started_at=common_utils.get_current_datetime(),
         status=InstanceStatus.PROVISIONING,

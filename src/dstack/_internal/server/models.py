@@ -592,6 +592,9 @@ class InstanceModel(BaseModel):
     fleet_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("fleets.id"))
     fleet: Mapped[Optional["FleetModel"]] = relationship(back_populates="instances")
 
+    compute_group_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("compute_groups.id"))
+    compute_group: Mapped[Optional["ComputeGroupModel"]] = relationship(back_populates="instances")
+
     status: Mapped[InstanceStatus] = mapped_column(EnumAsString(InstanceStatus, 100), index=True)
     unreachable: Mapped[bool] = mapped_column(Boolean)
 
@@ -741,6 +744,31 @@ class PlacementGroupModel(BaseModel):
 
     configuration: Mapped[str] = mapped_column(Text)
     provisioning_data: Mapped[Optional[str]] = mapped_column(Text)
+
+
+class ComputeGroupModel(BaseModel):
+    __tablename__ = "compute_groups"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUIDType(binary=False), primary_key=True, default=uuid.uuid4
+    )
+
+    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
+    project: Mapped["ProjectModel"] = relationship(foreign_keys=[project_id])
+
+    fleet_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("fleets.id"))
+    fleet: Mapped["FleetModel"] = relationship(foreign_keys=[fleet_id])
+
+    created_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
+    last_processed_at: Mapped[datetime] = mapped_column(
+        NaiveDateTime, default=get_current_datetime
+    )
+    deleted: Mapped[bool] = mapped_column(Boolean, default=False)
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
+
+    provisioning_data: Mapped[str] = mapped_column(Text)
+
+    instances: Mapped[List["InstanceModel"]] = relationship(back_populates="compute_group")
 
 
 class JobMetricsPoint(BaseModel):

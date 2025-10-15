@@ -31,7 +31,12 @@ from dstack._internal.server.background.tasks.process_submitted_jobs import (
     _prepare_job_runtime_data,
     process_submitted_jobs,
 )
-from dstack._internal.server.models import InstanceModel, JobModel, VolumeAttachmentModel
+from dstack._internal.server.models import (
+    ComputeGroupModel,
+    InstanceModel,
+    JobModel,
+    VolumeAttachmentModel,
+)
 from dstack._internal.server.settings import JobNetworkMode
 from dstack._internal.server.testing.common import (
     ComputeMockSpec,
@@ -1181,6 +1186,8 @@ class TestProcessSubmittedJobs:
         await session.refresh(job2)
         assert job1.status == JobStatus.PROVISIONING
         assert job2.status == JobStatus.PROVISIONING
+        res = await session.execute(select(ComputeGroupModel))
+        assert res.scalar() is not None
 
 
 @pytest.mark.parametrize(

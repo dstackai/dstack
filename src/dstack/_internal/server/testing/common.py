@@ -458,6 +458,8 @@ def get_job_runtime_data(
 def get_compute_group_provisioning_data(
     compute_group_id: str = "test_compute_group",
     compute_group_name: str = "test_compute_group",
+    backend: BackendType = BackendType.RUNPOD,
+    region: str = "US",
     job_provisioning_datas: Optional[list[JobProvisioningData]] = None,
     backend_data: Optional[str] = None,
 ) -> ComputeGroupProvisioningData:
@@ -466,6 +468,8 @@ def get_compute_group_provisioning_data(
     return ComputeGroupProvisioningData(
         compute_group_id=compute_group_id,
         compute_group_name=compute_group_name,
+        backend=backend,
+        region=region,
         job_provisioning_datas=job_provisioning_datas,
         backend_data=backend_data,
     )

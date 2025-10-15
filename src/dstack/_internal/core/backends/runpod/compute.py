@@ -258,6 +258,8 @@ class RunpodCompute(
         return ComputeGroupProvisioningData(
             compute_group_id=resp["id"],
             compute_group_name=resp["name"],
+            backend=BackendType.RUNPOD,
+            region=instance_offer.region,
             job_provisioning_datas=jpds,
         )
 
