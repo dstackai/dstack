@@ -126,11 +126,11 @@ class Nginx:
         try:
             # Kill existing sglang-router if running
             result = subprocess.run(
-                ["pgrep", "-f", "sglang_router.launch_router"], capture_output=True, timeout=5
+                ["pgrep", "-f", "sglang::router"], capture_output=True, timeout=5
             )
             if result.returncode == 0:
                 logger.info("Killing existing sglang-router...")
-                subprocess.run(["pkill", "-f", "sglang_router.launch_router"], timeout=5)
+                subprocess.run(["pkill", "-f", "sglang::router"], timeout=5)
                 # Wait a moment for the process to terminate
                 import time
 
@@ -173,11 +173,11 @@ class Nginx:
     def stop_sglang_router() -> None:
         try:
             result = subprocess.run(
-                ["pgrep", "-f", "sglang_router.launch_router"], capture_output=True, timeout=5
+                ["pgrep", "-f", "sglang::router"], capture_output=True, timeout=5
             )
             if result.returncode == 0:
                 logger.info("Stopping sglang-router process...")
-                subprocess.run(["pkill", "-f", "sglang_router.launch_router"], timeout=5)
+                subprocess.run(["pkill", "-f", "sglang::router"], timeout=5)
             else:
                 logger.debug("No sglang-router process found to stop")
 
