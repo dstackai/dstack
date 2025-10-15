@@ -427,7 +427,6 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
             # This is currently hard to fix without locking the fleet for entire provisioning duration.
             # Processing should be done in multiple steps so that
             # InstanceModel is created before provisioning.
-            # FIXME: Correct instance_num in case of multiple provisioned jobs
             instance_num = await _get_next_instance_num(
                 session=session,
                 fleet_model=fleet_model,
