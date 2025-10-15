@@ -18,6 +18,8 @@ import {
 
 import { copyToClipboard } from 'libs';
 
+import { useConfigProjectCliCommand } from 'pages/Project/hooks/useConfigProjectCliComand';
+
 import styles from './styles.module.scss';
 
 const UvInstallCommand = 'uv tool install dstack -U';
@@ -27,7 +29,7 @@ export const ConnectToRunWithDevEnvConfiguration: FC<{ run: IRun }> = ({ run }) 
     const { t } = useTranslation();
 
     const getAttachCommand = (runData: IRun) => {
-        const attachCommand = `dstack attach ${runData.run_spec.run_name}`;
+        const attachCommand = `dstack attach ${runData.run_spec.run_name} --logs`;
 
         const copyAttachCommand = () => {
             copyToClipboard(attachCommand);
@@ -51,6 +53,8 @@ export const ConnectToRunWithDevEnvConfiguration: FC<{ run: IRun }> = ({ run }) 
     const [sshCommand, copySSHCommand] = getSSHCommand(run);
 
     const openInIDEUrl = `${run.run_spec.configuration.ide}://vscode-remote/ssh-remote+${run.run_spec.run_name}/${run.run_spec.working_dir || 'workflow'}`;
+
+    const [configCliCommand, copyCliCommand] = useConfigProjectCliCommand({ projectName: run.project_name });
 
     return (
         <Container>
@@ -177,6 +181,33 @@ export const ConnectToRunWithDevEnvConfiguration: FC<{ run: IRun }> = ({ run }) 
                                                     },
                                                 ]}
                                             />
+
+                                            <Box>And then configure the project.</Box>
+
+                                            <div className={styles.codeWrapper}>
+                                                <Code className={styles.code}>{configCliCommand}</Code>
+
+                                                <div className={styles.copy}>
+                                                    <Popover
+                                                        dismissButton={false}
+                                                        position="top"
+                                                        size="small"
+                                                        triggerType="custom"
+                                                        content={
+                                                            <StatusIndicator type="success">
+                                                                {t('common.copied')}
+                                                            </StatusIndicator>
+                                                        }
+                                                    >
+                                                        <Button
+                                                            formAction="none"
+                                                            iconName="copy"
+                                                            variant="normal"
+                                                            onClick={copyCliCommand}
+                                                        />
+                                                    </Popover>
+                                                </div>
+                                            </div>
                                         </SpaceBetween>
                                     </ExpandableSection>
                                 </SpaceBetween>
@@ -233,7 +264,7 @@ export const ConnectToRunWithDevEnvConfiguration: FC<{ run: IRun }> = ({ run }) 
                 />
             )}
 
-            {run.status === 'running' && (
+            {run.status !== 'running' && (
                 <SpaceBetween size="s">
                     <Box />
                     <Alert type="info">Waiting for the run to start.</Alert>
