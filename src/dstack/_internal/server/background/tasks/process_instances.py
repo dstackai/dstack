@@ -166,7 +166,8 @@ async def _process_next_instance():
                             InstanceStatus.TERMINATING,
                         ]
                     ),
-                    # ...
+                    # Terminating instances belonging to a compute group
+                    # are handled by process_compute_groups.
                     not_(
                         and_(
                             InstanceModel.status == InstanceStatus.TERMINATING,

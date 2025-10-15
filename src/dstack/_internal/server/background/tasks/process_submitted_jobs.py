@@ -801,7 +801,7 @@ async def _run_jobs_on_new_instances(
     ]
 ]:
     """
-    Provisions an instances for a job or a compute group for multiple jobs and runs the jobs.
+    Provisions an instance for a job or a compute group for multiple jobs and runs the jobs.
     Even when multiple jobs are passes, it may still provision only one instance
     and run only the master job in case there are no offers supporting cluster groups.
     Other jobs should be provisioned one-by-one later.
