@@ -48,6 +48,7 @@ from dstack._internal.core.models.runs import (
     get_service_port,
 )
 from dstack._internal.core.models.runs import Run as RunModel
+from dstack._internal.core.models.users import UserWithCreds
 from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.core.services.logs import URLReplacer
 from dstack._internal.core.services.ssh.attach import SSHAttach
@@ -283,7 +284,7 @@ class Run(ABC):
             user = self._api_client.users.get_my_user()
             run_ssh_key_pub = self._run.run_spec.ssh_key_pub
             config_manager = ConfigManager()
-            if user.ssh_public_key == run_ssh_key_pub:
+            if isinstance(user, UserWithCreds) and user.ssh_public_key == run_ssh_key_pub:
                 token_hash = hashlib.sha1(user.creds.token.encode()).hexdigest()[:8]
                 config_manager.dstack_ssh_dir.mkdir(parents=True, exist_ok=True)
                 ssh_identity_file = config_manager.dstack_ssh_dir / token_hash
