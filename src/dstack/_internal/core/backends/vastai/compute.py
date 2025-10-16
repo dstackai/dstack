@@ -58,6 +58,7 @@ class VastAICompute(
     ) -> List[InstanceOfferWithAvailability]:
         offers = get_catalog_offers(
             backend=BackendType.VASTAI,
+            locations=self.config.regions or None,
             requirements=requirements,
             # TODO(egor-s): spots currently not supported
             extra_filter=lambda offer: not offer.instance.resources.spot,
