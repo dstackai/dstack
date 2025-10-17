@@ -1052,7 +1052,7 @@ projects:
 
     ```yaml
     apiVersion: rbac.authorization.k8s.io/v1
-    kind: ClusterRole # or Role
+    kind: ClusterRole
     metadata:
       name: dstack-backend
     rules:
@@ -1070,8 +1070,7 @@ projects:
       verbs: ["list"]
     ```
     
-    Ensure you've created a ClusterRoleBinding (or RoleBinding) to grant the role
-    to the user or the service account you're using.
+    Ensure you've created a ClusterRoleBinding to grant the role to the user or the service account you're using.
 
 > To learn more, see the [Kubernetes](../guides/kubernetes.md) guide.
 
