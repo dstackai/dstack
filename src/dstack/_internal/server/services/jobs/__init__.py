@@ -97,19 +97,28 @@ def find_job(jobs: List[Job], replica_num: int, job_num: int) -> Job:
 
 
 async def get_run_job_model(
-    session: AsyncSession, project: ProjectModel, run_name: str, replica_num: int, job_num: int
+    session: AsyncSession,
+    project: ProjectModel,
+    run_name: str,
+    run_id: Optional[UUID],
+    replica_num: int,
+    job_num: int,
 ) -> Optional[JobModel]:
+    filters = [
+        RunModel.project_id == project.id,
+        RunModel.run_name == run_name,
+        JobModel.replica_num == replica_num,
+        JobModel.job_num == job_num,
+    ]
+    if run_id is not None:
+        filters.append(RunModel.id == run_id)
+    else:
+        # Assuming run_name is unique for non-deleted runs
+        filters.append(RunModel.deleted == False)
     res = await session.execute(
         select(JobModel)
         .join(JobModel.run)
-        .where(
-            RunModel.project_id == project.id,
-            # assuming run_name is unique for non-deleted runs
-            RunModel.run_name == run_name,
-            RunModel.deleted == False,
-            JobModel.replica_num == replica_num,
-            JobModel.job_num == job_num,
-        )
+        .where(*filters)
         .order_by(JobModel.submission_num.desc())
         .limit(1)
     )
