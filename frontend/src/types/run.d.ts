@@ -240,9 +240,14 @@ declare interface IJob {
     job_submissions: IJobSubmission[];
 }
 
+declare interface ISchedule {
+    cron: string[];
+}
+
 declare interface ITaskConfiguration {
     type: 'task';
     priority?: number | null;
+    schedule?: ISchedule | null;
 }
 
 declare interface IServiceConfiguration {
@@ -250,6 +255,7 @@ declare interface IServiceConfiguration {
     gateway: string | null;
     priority?: number | null;
 }
+
 declare interface IRunSpec {
     configuration: TDevEnvironmentConfiguration | ITaskConfiguration | IServiceConfiguration;
     configuration_path: string;
@@ -286,6 +292,7 @@ declare interface IRun {
     cost: number;
     service: IRunService | null;
     status_message?: string | null;
+    next_triggered_at?: string | null;
 }
 
 declare interface IMetricsItem {
