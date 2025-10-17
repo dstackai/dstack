@@ -64,6 +64,7 @@ class ServiceConfig(SiteConfig):
     limit_req_zones: list[LimitReqZoneConfig]
     locations: list[LocationConfig]
     replicas: list[ReplicaConfig]
+    router: Optional[str] = None
 
 
 class ModelEntrypointConfig(SiteConfig):
@@ -81,11 +82,14 @@ class Nginx:
     async def register(self, conf: SiteConfig, acme: ACMESettings) -> None:
         logger.debug("Registering %s domain %s", conf.type, conf.domain)
         conf_name = self.get_config_name(conf.domain)
-
         async with self._lock:
             if conf.https:
                 await run_async(self.run_certbot, conf.domain, acme)
             await run_async(self.write_conf, conf.render(), conf_name)
+            if hasattr(conf, "router") and conf.router == "sglang":
+                replicas = len(conf.replicas) if hasattr(conf, "replicas") and conf.replicas else 1
+                await run_async(self.write_sglang_workers_conf, conf)
+                await run_async(self.start_sglang_router, replicas)
 
         logger.info("Registered %s domain %s", conf.type, conf.domain)
 
@@ -96,6 +100,10 @@ class Nginx:
             return
         async with self._lock:
             await run_async(sudo_rm, conf_path)
+            workers_conf_path = self._conf_dir / f"sglang-workers.{domain}.conf"
+            if workers_conf_path.exists():
+                await run_async(sudo_rm, workers_conf_path)
+                await run_async(self.stop_sglang_router)
             await run_async(self.reload)
         logger.info("Unregistered domain %s", domain)
 
@@ -105,6 +113,73 @@ class Nginx:
         r = subprocess.run(cmd, timeout=10)
         if r.returncode != 0:
             raise UnexpectedProxyError("Failed to reload nginx")
+
+    @staticmethod
+    def start_sglang_router(replicas: int) -> None:
+        try:
+            result = subprocess.run(
+                ["pgrep", "-f", "sglang::router"], capture_output=True, timeout=5
+            )
+            if result.returncode == 0:
+                logger.info("Stopping existing sglang-router...")
+                subprocess.run(["pkill", "-f", "sglang::router"], timeout=5)
+                import time
+
+                time.sleep(1)
+            worker_urls = []
+            for i in range(1, replicas + 1):
+                worker_urls.append(f"http://127.0.0.1:{10000 + i}")
+
+            logger.info(f"Starting sglang-router with {replicas} replicas...")
+            cmd = (
+                [
+                    "python3",
+                    "-m",
+                    "sglang_router.launch_router",
+                    "--worker-urls",
+                ]
+                + worker_urls
+                + [
+                    "--host",
+                    "0.0.0.0",
+                    "--port",
+                    "3000",
+                    "--log-level",
+                    "debug",
+                    "--log-dir",
+                    "./router_logs",
+                    "--request-timeout-secs",
+                    "1800",
+                ]
+            )
+            subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+        except Exception as e:
+            logger.error(f"Failed to start sglang-router: {e}")
+
+    @staticmethod
+    def stop_sglang_router() -> None:
+        try:
+            result = subprocess.run(
+                ["pgrep", "-f", "sglang::router"], capture_output=True, timeout=5
+            )
+            if result.returncode == 0:
+                logger.info("Stopping sglang-router process...")
+                subprocess.run(["pkill", "-f", "sglang::router"], timeout=5)
+            else:
+                logger.debug("No sglang-router process found to stop")
+
+            log_dir = Path("./router_logs")
+            if log_dir.exists():
+                logger.debug("Cleaning up router logs...")
+                import shutil
+
+                shutil.rmtree(log_dir, ignore_errors=True)
+            else:
+                logger.debug("No router logs directory found to clean up")
+
+        except Exception as e:
+            logger.error(f"Failed to stop sglang-router: {e}")
 
     def write_conf(self, conf: str, conf_name: str) -> None:
         """Update config and reload nginx. Rollback changes on error."""
@@ -167,6 +242,21 @@ class Nginx:
     def write_global_conf(self) -> None:
         conf = read_package_resource("00-log-format.conf")
         self.write_conf(conf, "00-log-format.conf")
+
+    def write_sglang_workers_conf(self, conf: SiteConfig) -> None:
+        workers_config = generate_sglang_workers_config(conf)
+        workers_conf_name = f"sglang-workers.{conf.domain}.conf"
+        workers_conf_path = self._conf_dir / workers_conf_name
+        sudo_write(workers_conf_path, workers_config)
+        self.reload()
+
+
+def generate_sglang_workers_config(conf: SiteConfig) -> str:
+    template = read_package_resource("sglang_workers.jinja2")
+    return jinja2.Template(template).render(
+        replicas=conf.replicas,
+        proxy_port=PROXY_PORT_ON_GATEWAY,
+    )
 
 
 def read_package_resource(file: str) -> str:
