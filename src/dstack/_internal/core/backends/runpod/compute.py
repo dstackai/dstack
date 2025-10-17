@@ -240,14 +240,13 @@ class RunpodCompute(
             volume_mount_path=volume_mount_path,
             env={"RUNPOD_POD_USER": "0"},
         )
-
         jpds = [
             JobProvisioningData(
                 backend=instance_offer.backend,
                 instance_type=instance_offer.instance,
                 instance_id=pod["id"],
                 hostname=None,
-                internal_ip=None,
+                internal_ip=pod["clusterIp"],
                 region=instance_offer.region,
                 price=instance_offer.price,
                 username="root",

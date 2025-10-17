@@ -349,6 +349,7 @@ def _generate_pod_query(pod_id: str) -> str:
     query pod {{
         pod(input: {{podId: "{pod_id}"}}) {{
             id
+            clusterIp
             containerDiskInGb
             costPerHr
             desiredStatus
@@ -604,6 +605,7 @@ def _generate_create_cluster_mutation(
             name
             pods {{
               id
+              clusterIp
               lastStatusChange
               imageName
               machine {{
