@@ -1047,6 +1047,32 @@ projects:
     
     If on-demand provisioning is important, we recommend using [VM-based](#vm-based) backends as they already support auto-scaling. -->
 
+??? info "Required permissions"
+    The following Kubernetes permissions are sufficient for `dstack` to work:
+
+    ```yaml
+    apiVersion: rbac.authorization.k8s.io/v1
+    kind: ClusterRole # or Role
+    metadata:
+      name: dstack-backend
+    rules:
+    - apiGroups: [""]
+      resources: ["namespaces"]
+      verbs: ["get", "create"]
+    - apiGroups: [""]
+      resources: ["pods"]
+      verbs: ["get", "create", "delete"]
+    - apiGroups: [""]
+      resources: ["services"]
+      verbs: ["get", "create", "delete"]
+    - apiGroups: [""]
+      resources: ["nodes"]
+      verbs: ["list"]
+    ```
+    
+    Ensure you've created a ClusterRoleBinding (or RoleBinding) to grant the role
+    to the user or the service account you're using.
+
 > To learn more, see the [Kubernetes](../guides/kubernetes.md) guide.
 
 ### RunPod
