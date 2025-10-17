@@ -517,6 +517,7 @@ def get_dev_env_run_dict(
         "termination_reason": None,
         "error": None,
         "deleted": deleted,
+        "next_triggered_at": None,
     }
 
 
@@ -665,6 +666,7 @@ class TestListRuns:
                 "termination_reason": None,
                 "error": None,
                 "deleted": False,
+                "next_triggered_at": None,
             },
             {
                 "id": str(run2.id),
@@ -687,6 +689,7 @@ class TestListRuns:
                 "termination_reason": None,
                 "error": None,
                 "deleted": False,
+                "next_triggered_at": None,
             },
         ]
 
@@ -853,6 +856,7 @@ class TestListRuns:
                 "termination_reason": None,
                 "error": None,
                 "deleted": False,
+                "next_triggered_at": None,
             },
         ]
 

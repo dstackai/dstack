@@ -417,6 +417,8 @@
       "backend": "Backend",
       "region": "Region",
       "instance_id": "Instance ID",
+      "schedule": "Schedule",
+      "next_run": "Next run",
       "resources": "Resources",
       "spot": "Spot",
       "termination_reason": "Termination reason",

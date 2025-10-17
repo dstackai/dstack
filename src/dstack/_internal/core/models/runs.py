@@ -553,6 +553,7 @@ class Run(CoreModel):
     deployment_num: int = 0  # default for compatibility with pre-0.19.14 servers
     error: Optional[str] = None
     deleted: Optional[bool] = None
+    next_triggered_at: Optional[datetime] = None
 
     def is_deployment_in_progress(self) -> bool:
         return any(

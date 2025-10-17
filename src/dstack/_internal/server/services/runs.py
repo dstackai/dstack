@@ -715,6 +715,9 @@ def run_model_to_run(
     status_message = _get_run_status_message(run_model)
     error = _get_run_error(run_model)
     fleet = _get_run_fleet(run_model)
+    next_triggered_at = None
+    if not run_model.status.is_finished():
+        next_triggered_at = _get_next_triggered_at(run_spec)
     run = Run(
         id=run_model.id,
         project_name=run_model.project.name,
@@ -734,6 +737,7 @@ def run_model_to_run(
         deployment_num=run_model.deployment_num,
         error=error,
         deleted=run_model.deleted,
+        next_triggered_at=next_triggered_at,
     )
     run.cost = _get_run_cost(run)
     return run

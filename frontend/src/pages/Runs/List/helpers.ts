@@ -14,7 +14,7 @@ export const getRunListItemResources = (run: IRun) => {
         return '-';
     }
 
-    return run.latest_job_submission?.job_provisioning_data?.instance_type?.resources?.description;
+    return run.latest_job_submission?.job_provisioning_data?.instance_type?.resources?.description ?? '-';
 };
 
 export const getRunListItemSpotLabelKey = (run: IRun) => {
@@ -31,7 +31,7 @@ export const getRunListItemSpotLabelKey = (run: IRun) => {
 
 export const getRunListItemSpot = (run: IRun) => {
     if (run.jobs.length > 1) {
-        return '';
+        return '-';
     }
 
     return run.latest_job_submission?.job_provisioning_data?.instance_type?.resources?.spot?.toString() ?? '-';
@@ -57,7 +57,7 @@ export const getRunListItemPrice = (run: IRun) => {
 
 export const getRunListItemInstance = (run: IRun) => {
     if (run.jobs.length > 1) {
-        return '';
+        return '-';
     }
 
     return run.latest_job_submission?.job_provisioning_data?.instance_type?.name;
@@ -65,7 +65,7 @@ export const getRunListItemInstance = (run: IRun) => {
 
 export const getRunListItemInstanceId = (run: IRun) => {
     if (run.jobs.length > 1) {
-        return '';
+        return '-';
     }
 
     return run.latest_job_submission?.job_provisioning_data?.instance_id ?? '-';
@@ -73,7 +73,7 @@ export const getRunListItemInstanceId = (run: IRun) => {
 
 export const getRunListItemRegion = (run: IRun) => {
     if (run.jobs.length > 1) {
-        return '';
+        return '-';
     }
 
     return run.latest_job_submission?.job_provisioning_data?.region ?? '-';
@@ -81,7 +81,7 @@ export const getRunListItemRegion = (run: IRun) => {
 
 export const getRunListItemBackend = (run: IRun) => {
     if (run.jobs.length > 1) {
-        return '';
+        return '-';
     }
 
     return run.latest_job_submission?.job_provisioning_data?.backend ?? '-';
@@ -91,4 +91,10 @@ export const getRunListItemServiceUrl = (run: IRun) => {
     const url = run.service?.url;
     if (!url) return null;
     return url.startsWith('/') ? `${getBaseUrl()}${url}` : url;
+};
+
+export const getRunListItemSchedule = (run: IRun) => {
+    if (run.run_spec.configuration.type != 'task' || !run.run_spec.configuration.schedule) return null;
+
+    return run.run_spec.configuration.schedule.cron.join(', ');
 };
