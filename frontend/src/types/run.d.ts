@@ -136,6 +136,7 @@ declare type TStopRunsRequestParams = {
 declare type TJobMetricsRequestParams = {
     project_name: IProject['project_name'];
     run_name: string;
+    run_id: string;
     replica_num?: number;
     job_num: number;
     limit?: number;
