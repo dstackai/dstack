@@ -43,6 +43,7 @@ def test_get_error_returns_expected_messages():
         JobTerminationReason.ABORTED_BY_USER,
         JobTerminationReason.TERMINATED_BY_SERVER,
         JobTerminationReason.CONTAINER_EXITED_WITH_ERROR,
+        JobTerminationReason.NO_BALANCE,
     ]
 
     for reason in JobTerminationReason:

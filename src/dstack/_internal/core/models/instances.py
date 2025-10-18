@@ -216,6 +216,18 @@ class InstanceStatus(str, Enum):
         return [cls.TERMINATING, cls.TERMINATED]
 
 
+class InstanceTerminationReason(str, Enum):
+    IDLE_TIMEOUT = "idle_timeout"
+    PROOVISIONING_TIMEOUT = "provisioning_timeout"
+    ERROR = "error"
+    JOB_FINISHED = "job_finished"
+    TERMINATION_TIMEOUT = "termination_timeout"
+    STARTING_TIMEOUT = "starting_timeout"
+    NO_OFFERS = "no_offers"
+    MASTER_FAILED = "master_failed"
+    NO_BALANCE = "no_balance"
+
+
 class Instance(CoreModel):
     id: UUID
     project_name: str
@@ -231,6 +243,7 @@ class Instance(CoreModel):
     unreachable: bool = False
     health_status: HealthStatus = HealthStatus.HEALTHY
     termination_reason: Optional[str] = None
+    termination_reason_message: Optional[str] = None
     created: datetime.datetime
     region: Optional[str] = None
     availability_zone: Optional[str] = None
