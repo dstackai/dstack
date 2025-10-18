@@ -30,6 +30,8 @@ from dstack._internal.core.models.instances import (
 )
 from dstack._internal.core.models.profiles import (
     CreationPolicy,
+    Profile,
+    ProfileParams,
     RetryEvent,
 )
 from dstack._internal.core.models.repos.virtual import DEFAULT_VIRTUAL_REPO_ID, VirtualRunRepoData
@@ -302,6 +304,45 @@ async def get_run_by_id(
     return run_model_to_run(run_model, return_in_api=True)
 
 
+def _get_job_profile(run_spec: RunSpec, replica_group_name: Optional[str]) -> Profile:
+    """
+    Get the profile for a job, including replica group overrides if applicable.
+
+    Args:
+        run_spec: The run specification
+        replica_group_name: Name of the replica group, or None for legacy jobs
+
+    Returns:
+        Profile with replica group overrides applied
+    """
+    base_profile = run_spec.merged_profile
+
+    # If no replica group, return base profile
+    if not replica_group_name:
+        return base_profile
+
+    # Find the replica group
+    if run_spec.configuration.type != "service":
+        return base_profile
+
+    from dstack._internal.core.models.runs import get_normalized_replica_groups
+
+    normalized_groups = get_normalized_replica_groups(run_spec.configuration)
+    replica_group = next((g for g in normalized_groups if g.name == replica_group_name), None)
+
+    if not replica_group:
+        return base_profile
+
+    # Clone base profile and apply group overrides
+    merged = Profile.parse_obj(base_profile.dict())
+    for field_name in ProfileParams.__fields__:
+        group_value = getattr(replica_group, field_name, None)
+        if group_value is not None:
+            setattr(merged, field_name, group_value)
+
+    return merged
+
+
 async def get_plan(
     session: AsyncSession,
     project: ProjectModel,
@@ -427,14 +468,17 @@ async def get_plan(
 
         job_offers.extend(matching_pool_offers)
 
+        # Get the correct profile for this job (with replica group overrides if applicable)
+        job_profile = _get_job_profile(effective_run_spec, job.job_spec.replica_group_name)
+
         # Use shared offers if all jobs are identical, otherwise fetch per-job
         if shared_offers:
             job_offers.extend(offer for _, offer in shared_offers)
         elif creation_policy == CreationPolicy.REUSE_OR_CREATE:
-            # Fetch offers specific to this job's requirements
+            # Fetch offers specific to this job's requirements with job-specific profile
             job_specific_offers = await get_offers_by_requirements(
                 project=project,
-                profile=profile,
+                profile=job_profile,
                 requirements=job.job_spec.requirements,
                 exclude_not_available=False,
                 multinode=job.job_spec.jobs_per_replica > 1,
@@ -1160,6 +1204,7 @@ _TYPE_SPECIFIC_CONF_UPDATABLE_FIELDS = {
     "service": [
         # in-place
         "replicas",
+        "replica_groups",  # Named replica groups (mutually exclusive with replicas)
         "scaling",
         # rolling deployment
         # NOTE: keep this list in sync with the "Rolling deployment" section in services.md

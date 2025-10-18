@@ -521,20 +521,49 @@ async def _update_jobs_to_new_deployment_in_place(
     """
     Bump deployment_num for jobs that do not require redeployment.
     """
+    from dstack._internal.core.models.runs import get_normalized_replica_groups
+
     secrets = await get_project_secrets_mapping(
         session=session,
         project=run_model.project,
     )
+
+    # Get replica groups from the new run_spec for matching
+    replica_group = None
+    if run_spec.configuration.type == "service":
+        normalized_groups = get_normalized_replica_groups(run_spec.configuration)
+    else:
+        normalized_groups = []
+
     for replica_num, job_models in group_jobs_by_replica_latest(run_model.jobs):
         if all(j.status.is_finished() for j in job_models):
             continue
         if all(j.deployment_num == run_model.deployment_num for j in job_models):
             continue
+
+        # Determine which replica group this job belongs to
+        # Use the old job's replica_group_name to find the matching group in new spec
+        old_job_spec = JobSpec.__response__.parse_raw(job_models[0].job_spec_data)
+        if old_job_spec.replica_group_name and normalized_groups:
+            replica_group = next(
+                (g for g in normalized_groups if g.name == old_job_spec.replica_group_name),
+                None,
+            )
+            if replica_group is None:
+                logger.warning(
+                    "Replica group '%s' from old job not found in new run_spec. "
+                    "Job will use base configuration.",
+                    old_job_spec.replica_group_name,
+                )
+        else:
+            replica_group = None
+
         # FIXME: Handle getting image configuration errors or skip it.
         new_job_specs = await get_job_specs_from_run_spec(
             run_spec=run_spec,
             secrets=secrets,
             replica_num=replica_num,
+            replica_group=replica_group,
         )
         assert len(new_job_specs) == len(job_models), (
             "Changing the number of jobs within a replica is not yet supported"

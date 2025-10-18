@@ -166,23 +166,64 @@ def print_run_plan(
 
     # For replica groups, show offers from all job plans
     if len(run_plan.job_plans) > 1:
-        # Multiple jobs - aggregate offers from all groups
-        all_offers = []
+        # Multiple jobs - ensure fair representation of all groups
         groups_with_no_offers = []
+        groups_with_offers = {}
         total_offers_count = 0
 
+        # Collect offers per group
         for jp in run_plan.job_plans:
             group_name = jp.job_spec.replica_group_name or "default"
             if jp.total_offers == 0:
                 groups_with_no_offers.append(group_name)
-            for offer in jp.offers[:max_offers] if max_offers else jp.offers:
-                all_offers.append((group_name, offer))
+            else:
+                groups_with_offers[group_name] = jp.offers
             total_offers_count += jp.total_offers
 
-        # Sort by price
-        all_offers.sort(key=lambda x: x[1].price)
-        if max_offers:
-            all_offers = all_offers[:max_offers]
+        # Strategy: Show at least min_per_group offers from each group, then fill with cheapest
+        num_groups = len(groups_with_offers)
+        if num_groups > 0 and max_offers:
+            min_per_group = max(
+                1, max_offers // (num_groups * 2)
+            )  # At least 1, aim for ~half distribution
+            remaining_slots = max_offers
+        else:
+            min_per_group = None
+            remaining_slots = None
+
+        selected_offers = []
+
+        # First pass: Take min_per_group from each group (cheapest from each)
+        if min_per_group:
+            for group_name, group_offers in groups_with_offers.items():
+                sorted_group_offers = sorted(group_offers, key=lambda x: x.price)
+                take_count = min(min_per_group, len(sorted_group_offers), remaining_slots)
+                for offer in sorted_group_offers[:take_count]:
+                    selected_offers.append((group_name, offer))
+                remaining_slots -= take_count
+
+        # Second pass: Fill remaining slots with cheapest offers globally
+        if remaining_slots and remaining_slots > 0:
+            all_remaining = []
+            for group_name, group_offers in groups_with_offers.items():
+                sorted_group_offers = sorted(group_offers, key=lambda x: x.price)
+                # Skip offers already selected
+                for offer in sorted_group_offers[min_per_group:]:
+                    all_remaining.append((group_name, offer))
+
+            # Sort remaining by price and take the cheapest
+            all_remaining.sort(key=lambda x: x[1].price)
+            selected_offers.extend(all_remaining[:remaining_slots])
+
+        # If no max_offers limit, show all
+        if not max_offers:
+            selected_offers = []
+            for group_name, group_offers in groups_with_offers.items():
+                for offer in group_offers:
+                    selected_offers.append((group_name, offer))
+
+        # Sort final selection by price for display
+        selected_offers.sort(key=lambda x: x[1].price)
 
         # Show groups with no offers FIRST
         for group_name in groups_with_no_offers:
@@ -197,8 +238,8 @@ def print_run_plan(
                 style="secondary",
             )
 
-        # Then show groups with offers
-        for i, (group_name, offer) in enumerate(all_offers, start=1):
+        # Then show selected offers
+        for i, (group_name, offer) in enumerate(selected_offers, start=1):
             r = offer.instance.resources
 
             availability = ""
@@ -226,7 +267,7 @@ def print_run_plan(
                 style=None if i == 1 or not include_run_properties else "secondary",
             )
 
-        if total_offers_count > len(all_offers):
+        if total_offers_count > len(selected_offers):
             offers.add_row("", "...", style="secondary")
     else:
         # Single job - original logic
@@ -272,13 +313,13 @@ def print_run_plan(
         console.print(offers)
         # Show summary for multi-job plans
         if len(run_plan.job_plans) > 1:
-            if total_offers_count > len(all_offers):
+            if total_offers_count > len(selected_offers):
                 max_price_overall = max(
                     (jp.max_price for jp in run_plan.job_plans if jp.max_price), default=None
                 )
                 if max_price_overall:
                     console.print(
-                        f"[secondary] Shown {len(all_offers)} of {total_offers_count} offers, "
+                        f"[secondary] Shown {len(selected_offers)} of {total_offers_count} offers, "
                         f"${max_price_overall:3f}".rstrip("0").rstrip(".")
                         + " max[/]"
                     )

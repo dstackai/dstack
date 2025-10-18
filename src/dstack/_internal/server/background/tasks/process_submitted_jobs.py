@@ -748,6 +748,11 @@ def _get_profile_for_job(run_spec: RunSpec, job: Job) -> Profile:
     group = next((g for g in normalized_groups if g.name == group_name), None)
 
     if not group:
+        logger.warning(
+            "Replica group '%s' not found in run_spec. Available groups: %s",
+            group_name,
+            [g.name for g in normalized_groups],
+        )
         return base_profile
 
     # Merge: group overrides base
@@ -756,6 +761,17 @@ def _get_profile_for_job(run_spec: RunSpec, job: Job) -> Profile:
         group_value = getattr(group, field_name, None)
         if group_value is not None:
             setattr(merged, field_name, group_value)
+
+    logger.debug(
+        "Profile for group '%s': regions=%s, backends=%s, spot_policy=%s (base had: regions=%s, backends=%s, spot_policy=%s)",
+        group_name,
+        merged.regions,
+        [b.value for b in merged.backends] if merged.backends else None,
+        merged.spot_policy,
+        base_profile.regions,
+        [b.value for b in base_profile.backends] if base_profile.backends else None,
+        base_profile.spot_policy,
+    )
 
     return merged
 
@@ -775,6 +791,29 @@ async def _run_job_on_new_instance(
         volumes = []
     profile = _get_profile_for_job(run.run_spec, job)
     requirements = job.job_spec.requirements  # Already has group resources baked in
+
+    # Debug logging for replica groups
+    replica_group_name = job.job_spec.replica_group_name
+    if replica_group_name:
+        logger.debug(
+            "%s: Provisioning replica group '%s' with profile: regions=%s, backends=%s, spot_policy=%s",
+            fmt(job_model),
+            replica_group_name,
+            profile.regions,
+            [b.value for b in profile.backends] if profile.backends else None,
+            profile.spot_policy,
+        )
+        gpu_req = (
+            requirements.resources.gpu.name
+            if requirements.resources and requirements.resources.gpu
+            else None
+        )
+        logger.debug(
+            "%s: GPU requirements for group '%s': %s",
+            fmt(job_model),
+            replica_group_name,
+            gpu_req,
+        )
     fleet = None
     if fleet_model is not None:
         fleet = fleet_model_to_fleet(fleet_model)
@@ -804,6 +843,16 @@ async def _run_job_on_new_instance(
         privileged=job.job_spec.privileged,
         instance_mounts=check_run_spec_requires_instance_mounts(run.run_spec),
     )
+
+    # Debug logging for offers
+    if replica_group_name and len(offers) > 0:
+        logger.debug(
+            "%s: Got %d offers for group '%s'. First 3: %s",
+            fmt(job_model),
+            len(offers),
+            replica_group_name,
+            [f"{o.instance.name} ({o.backend.value}/{o.region})" for _, o in offers[:3]],
+        )
     # Limit number of offers tried to prevent long-running processing
     # in case all offers fail.
     for backend, offer in offers[: settings.MAX_OFFERS_TRIED]:
