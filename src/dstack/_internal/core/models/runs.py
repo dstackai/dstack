@@ -1,10 +1,13 @@
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any, Dict, List, Literal, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional
 from urllib.parse import urlparse
 
 from pydantic import UUID4, Field, root_validator
 from typing_extensions import Annotated
+
+if TYPE_CHECKING:
+    from dstack._internal.core.models.configurations import ReplicaGroup, ServiceConfiguration
 
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import (
@@ -247,6 +250,7 @@ class ProbeSpec(CoreModel):
 
 class JobSpec(CoreModel):
     replica_num: int = 0  # default value for backward compatibility
+    replica_group_name: Optional[str] = None
     job_num: int
     job_name: str
     jobs_per_replica: int = 1  # default value for backward compatibility
@@ -618,3 +622,37 @@ def get_service_port(job_spec: JobSpec, configuration: ServiceConfiguration) -> 
     if job_spec.service_port is None:
         return configuration.port.container_port
     return job_spec.service_port
+
+
+def get_normalized_replica_groups(configuration: "ServiceConfiguration") -> List["ReplicaGroup"]:
+    """
+    Normalize service configuration to replica groups.
+    Converts legacy replicas field to a single "default" group for backward compatibility.
+    """
+    from dstack._internal.core.models.configurations import ReplicaGroup
+
+    if configuration.replica_groups:
+        return configuration.replica_groups
+
+    return [
+        ReplicaGroup(
+            name="default",
+            replicas=configuration.replicas,
+            resources=configuration.resources,
+            backends=configuration.backends,
+            regions=configuration.regions,
+            availability_zones=configuration.availability_zones,
+            instance_types=configuration.instance_types,
+            reservation=configuration.reservation,
+            spot_policy=configuration.spot_policy,
+            retry=configuration.retry,
+            max_duration=configuration.max_duration,
+            stop_duration=configuration.stop_duration,
+            max_price=configuration.max_price,
+            creation_policy=configuration.creation_policy,
+            idle_duration=configuration.idle_duration,
+            utilization_policy=configuration.utilization_policy,
+            startup_order=configuration.startup_order,
+            stop_criteria=configuration.stop_criteria,
+        )
+    ]

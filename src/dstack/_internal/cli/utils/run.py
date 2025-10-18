@@ -119,9 +119,55 @@ def print_run_plan(
     if include_run_properties:
         props.add_row(th("Configuration"), run_spec.configuration_path)
         props.add_row(th("Type"), run_spec.configuration.type)
-    props.add_row(th("Resources"), pretty_req)
-    props.add_row(th("Spot policy"), spot_policy)
-    props.add_row(th("Max price"), max_price)
+
+    from dstack._internal.core.models.configurations import ServiceConfiguration
+
+    has_replica_groups = (
+        include_run_properties
+        and isinstance(run_spec.configuration, ServiceConfiguration)
+        and run_spec.configuration.replica_groups
+    )
+
+    if has_replica_groups:
+        groups_info = []
+        for group in run_spec.configuration.replica_groups:
+            group_parts = [f"[cyan]{group.name}[/cyan]"]
+
+            # Replica count
+            if group.replicas.min == group.replicas.max:
+                group_parts.append(f"×{group.replicas.max}")
+            else:
+                group_parts.append(f"×{group.replicas.min}..{group.replicas.max}")
+                group_parts.append("[dim](autoscalable)[/dim]")
+
+            # Resources
+            group_parts.append(f"[dim]({group.resources.pretty_format()})[/dim]")
+
+            # Group-specific overrides
+            overrides = []
+            if group.spot_policy is not None:
+                overrides.append(f"spot={group.spot_policy.value}")
+            if group.regions:
+                regions_str = ",".join(group.regions[:2])  # Show first 2
+                if len(group.regions) > 2:
+                    regions_str += f",+{len(group.regions) - 2}"
+                overrides.append(f"regions={regions_str}")
+            if group.backends:
+                backends_str = ",".join([b.value for b in group.backends[:2]])
+                if len(group.backends) > 2:
+                    backends_str += f",+{len(group.backends) - 2}"
+                overrides.append(f"backends={backends_str}")
+
+            if overrides:
+                group_parts.append(f"[dim]({'; '.join(overrides)})[/dim]")
+
+            groups_info.append(" ".join(group_parts))
+
+        props.add_row(th("Replica groups"), "\n".join(groups_info))
+    else:
+        props.add_row(th("Resources"), pretty_req)
+        props.add_row(th("Spot policy"), spot_policy)
+        props.add_row(th("Max price"), max_price)
     if include_run_properties:
         props.add_row(th("Retry policy"), retry)
         props.add_row(th("Creation policy"), creation_policy)
@@ -139,44 +185,172 @@ def print_run_plan(
     offers.add_column("PRICE", style="grey58", ratio=1)
     offers.add_column()
 
-    job_plan.offers = job_plan.offers[:max_offers] if max_offers else job_plan.offers
+    # For replica groups, show offers from all job plans
+    if len(run_plan.job_plans) > 1:
+        # Multiple jobs - ensure fair representation of all groups
+        groups_with_no_offers = []
+        groups_with_offers = {}
+        total_offers_count = 0
 
-    for i, offer in enumerate(job_plan.offers, start=1):
-        r = offer.instance.resources
+        # Collect offers per group
+        for jp in run_plan.job_plans:
+            group_name = jp.job_spec.replica_group_name or "default"
+            if jp.total_offers == 0:
+                groups_with_no_offers.append(group_name)
+            else:
+                groups_with_offers[group_name] = jp.offers
+            total_offers_count += jp.total_offers
 
-        availability = ""
-        if offer.availability in {
-            InstanceAvailability.NOT_AVAILABLE,
-            InstanceAvailability.NO_QUOTA,
-            InstanceAvailability.IDLE,
-            InstanceAvailability.BUSY,
-        }:
-            availability = offer.availability.value.replace("_", " ").lower()
-        instance = offer.instance.name
-        if offer.total_blocks > 1:
-            instance += f" ({offer.blocks}/{offer.total_blocks})"
-        offers.add_row(
-            f"{i}",
-            offer.backend.replace("remote", "ssh") + " (" + offer.region + ")",
-            r.pretty_format(include_spot=True),
-            instance,
-            f"${offer.price:.4f}".rstrip("0").rstrip("."),
-            availability,
-            style=None if i == 1 or not include_run_properties else "secondary",
-        )
-    if job_plan.total_offers > len(job_plan.offers):
-        offers.add_row("", "...", style="secondary")
+        # Strategy: Show at least min_per_group offers from each group, then fill with cheapest
+        num_groups = len(groups_with_offers)
+        if num_groups > 0 and max_offers:
+            min_per_group = max(
+                1, max_offers // (num_groups * 2)
+            )  # At least 1, aim for ~half distribution
+            remaining_slots = max_offers
+        else:
+            min_per_group = None
+            remaining_slots = None
+
+        selected_offers = []
+
+        # First pass: Take min_per_group from each group (cheapest from each)
+        if min_per_group:
+            for group_name, group_offers in groups_with_offers.items():
+                sorted_group_offers = sorted(group_offers, key=lambda x: x.price)
+                take_count = min(min_per_group, len(sorted_group_offers), remaining_slots)
+                for offer in sorted_group_offers[:take_count]:
+                    selected_offers.append((group_name, offer))
+                remaining_slots -= take_count
+
+        # Second pass: Fill remaining slots with cheapest offers globally
+        if remaining_slots and remaining_slots > 0:
+            all_remaining = []
+            for group_name, group_offers in groups_with_offers.items():
+                sorted_group_offers = sorted(group_offers, key=lambda x: x.price)
+                # Skip offers already selected
+                for offer in sorted_group_offers[min_per_group:]:
+                    all_remaining.append((group_name, offer))
+
+            # Sort remaining by price and take the cheapest
+            all_remaining.sort(key=lambda x: x[1].price)
+            selected_offers.extend(all_remaining[:remaining_slots])
+
+        # If no max_offers limit, show all
+        if not max_offers:
+            selected_offers = []
+            for group_name, group_offers in groups_with_offers.items():
+                for offer in group_offers:
+                    selected_offers.append((group_name, offer))
+
+        # Sort final selection by price for display
+        selected_offers.sort(key=lambda x: x[1].price)
+
+        # Show groups with no offers FIRST
+        for group_name in groups_with_no_offers:
+            offers.add_row(
+                "",
+                f"[cyan]{group_name}[/cyan]:",
+                "[red]No matching instance offers available.[/red]\n"
+                "Possible reasons: https://dstack.ai/docs/guides/troubleshooting/#no-offers",
+                "",
+                "",
+                "",
+                style="secondary",
+            )
+
+        # Then show selected offers
+        for i, (group_name, offer) in enumerate(selected_offers, start=1):
+            r = offer.instance.resources
+
+            availability = ""
+            if offer.availability in {
+                InstanceAvailability.NOT_AVAILABLE,
+                InstanceAvailability.NO_QUOTA,
+                InstanceAvailability.IDLE,
+                InstanceAvailability.BUSY,
+            }:
+                availability = offer.availability.value.replace("_", " ").lower()
+            instance = offer.instance.name
+            if offer.total_blocks > 1:
+                instance += f" ({offer.blocks}/{offer.total_blocks})"
+
+            # Add group name prefix for multi-group display
+            backend_display = f"[cyan]{group_name}[/cyan]: {offer.backend.replace('remote', 'ssh')} ({offer.region})"
+
+            offers.add_row(
+                f"{i}",
+                backend_display,
+                r.pretty_format(include_spot=True),
+                instance,
+                f"${offer.price:.4f}".rstrip("0").rstrip("."),
+                availability,
+                style=None if i == 1 or not include_run_properties else "secondary",
+            )
+
+        if total_offers_count > len(selected_offers):
+            offers.add_row("", "...", style="secondary")
+    else:
+        # Single job - original logic
+        job_plan.offers = job_plan.offers[:max_offers] if max_offers else job_plan.offers
+
+        for i, offer in enumerate(job_plan.offers, start=1):
+            r = offer.instance.resources
+
+            availability = ""
+            if offer.availability in {
+                InstanceAvailability.NOT_AVAILABLE,
+                InstanceAvailability.NO_QUOTA,
+                InstanceAvailability.IDLE,
+                InstanceAvailability.BUSY,
+            }:
+                availability = offer.availability.value.replace("_", " ").lower()
+            instance = offer.instance.name
+            if offer.total_blocks > 1:
+                instance += f" ({offer.blocks}/{offer.total_blocks})"
+            offers.add_row(
+                f"{i}",
+                offer.backend.replace("remote", "ssh") + " (" + offer.region + ")",
+                r.pretty_format(include_spot=True),
+                instance,
+                f"${offer.price:.4f}".rstrip("0").rstrip("."),
+                availability,
+                style=None if i == 1 or not include_run_properties else "secondary",
+            )
+        if job_plan.total_offers > len(job_plan.offers):
+            offers.add_row("", "...", style="secondary")
 
     console.print(props)
     console.print()
-    if len(job_plan.offers) > 0:
+
+    # Check if we have offers to display
+    has_offers = False
+    if len(run_plan.job_plans) > 1:
+        has_offers = any(len(jp.offers) > 0 for jp in run_plan.job_plans)
+    else:
+        has_offers = len(job_plan.offers) > 0
+
+    if has_offers:
         console.print(offers)
-        if job_plan.total_offers > len(job_plan.offers):
-            console.print(
-                f"[secondary] Shown {len(job_plan.offers)} of {job_plan.total_offers} offers, "
-                f"${job_plan.max_price:3f}".rstrip("0").rstrip(".")
-                + "max[/]"
-            )
+        # Show summary for multi-job plans
+        if len(run_plan.job_plans) > 1:
+            if total_offers_count > len(selected_offers):
+                max_price_overall = max(
+                    (jp.max_price for jp in run_plan.job_plans if jp.max_price), default=None
+                )
+                if max_price_overall:
+                    console.print(
+                        f"[secondary] Shown {len(selected_offers)} of {total_offers_count} offers, "
+                        f"${max_price_overall:3f}".rstrip("0").rstrip(".")
+                        + " max[/]"
+                    )
+        else:
+            if job_plan.total_offers > len(job_plan.offers):
+                console.print(
+                    f"[secondary] Shown {len(job_plan.offers)} of {job_plan.total_offers} offers, "
+                    f"${job_plan.max_price:3f}".rstrip("0").rstrip(".")
+                    + " max[/]"
+                )
         console.print()
     else:
         console.print(NO_OFFERS_WARNING)
@@ -233,8 +407,14 @@ def get_runs_table(
             if verbose and latest_job_submission.inactivity_secs:
                 inactive_for = format_duration_multiunit(latest_job_submission.inactivity_secs)
                 status += f" (inactive for {inactive_for})"
+
+            job_name_parts = [f"  replica={job.job_spec.replica_num}"]
+            if job.job_spec.replica_group_name:
+                job_name_parts.append(f"[cyan]group={job.job_spec.replica_group_name}[/cyan]")
+            job_name_parts.append(f"job={job.job_spec.job_num}")
+
             job_row: Dict[Union[str, int], Any] = {
-                "NAME": f"  replica={job.job_spec.replica_num} job={job.job_spec.job_num}"
+                "NAME": " ".join(job_name_parts)
                 + (
                     f" deployment={latest_job_submission.deployment_num}"
                     if show_deployment_num
