@@ -273,7 +273,9 @@ def print_run_plan(
         # Show summary for multi-job plans
         if len(run_plan.job_plans) > 1:
             if total_offers_count > len(all_offers):
-                max_price_overall = max((jp.max_price for jp in run_plan.job_plans if jp.max_price), default=None)
+                max_price_overall = max(
+                    (jp.max_price for jp in run_plan.job_plans if jp.max_price), default=None
+                )
                 if max_price_overall:
                     console.print(
                         f"[secondary] Shown {len(all_offers)} of {total_offers_count} offers, "

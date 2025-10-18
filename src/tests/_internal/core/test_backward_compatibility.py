@@ -1,6 +1,5 @@
 """Test backward compatibility for replica_groups with older servers."""
 
-
 from dstack._internal.core.compatibility.runs import get_get_plan_excludes, get_run_spec_excludes
 from dstack._internal.core.models.configurations import ServiceConfiguration
 from dstack._internal.core.models.repos import LocalRunRepoData
@@ -126,4 +125,3 @@ class TestReplicaGroupsBackwardCompatibility:
         # replica_groups SHOULD appear in JSON
         assert "replica_groups" in json_str
         assert "gpu-group" in json_str
-

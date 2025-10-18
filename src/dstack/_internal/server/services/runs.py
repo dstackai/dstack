@@ -1113,6 +1113,7 @@ def _validate_run_spec_and_set_defaults(user: UserModel, run_spec: RunSpec):
         if run_spec.merged_profile.schedule:
             if run_spec.configuration.replica_groups:
                 from dstack._internal.core.models.runs import get_normalized_replica_groups
+
                 groups = get_normalized_replica_groups(run_spec.configuration)
                 if any(g.replicas.min == 0 for g in groups):
                     raise ServerClientError(
@@ -1351,7 +1352,9 @@ async def scale_run_replicas(
 
     if replicas_diff < 0:
         # SCALE DOWN: Only terminate from autoscalable groups while respecting group minimums
-        autoscalable_groups = {g.name for g in normalized_groups if g.replicas.min != g.replicas.max}
+        autoscalable_groups = {
+            g.name for g in normalized_groups if g.replicas.min != g.replicas.max
+        }
 
         # Count replicas per group
         group_counts = {}
@@ -1416,15 +1419,17 @@ async def scale_run_replicas(
 
         # First, identify groups below minimum (need to scale regardless of autoscalability)
         below_min_groups = [
-            g for g in normalized_groups
-            if group_counts.get(g.name, 0) < (g.replicas.min or 0)
+            g for g in normalized_groups if group_counts.get(g.name, 0) < (g.replicas.min or 0)
         ]
 
         # Then, identify autoscalable groups that can scale beyond minimum
         autoscalable_groups = [
-            g for g in normalized_groups
-            if g.replicas.min != g.replicas.max and (
-                allow_exceeding_max or group_counts.get(g.name, 0) < (g.replicas.max or float("inf"))
+            g
+            for g in normalized_groups
+            if g.replicas.min != g.replicas.max
+            and (
+                allow_exceeding_max
+                or group_counts.get(g.name, 0) < (g.replicas.max or float("inf"))
             )
         ]
 
@@ -1454,7 +1459,9 @@ async def scale_run_replicas(
             if replica_jobs:
                 group_name = replica_jobs[0].replica_group_name or "default"
                 if not normalized_groups or group_name in {g.name for g in eligible_groups}:
-                    await retry_run_replica_jobs(session, run_model, replica_jobs, only_failed=False)
+                    await retry_run_replica_jobs(
+                        session, run_model, replica_jobs, only_failed=False
+                    )
                     scheduled_replicas += 1
 
         # Create new replicas for remaining diff
@@ -1488,10 +1495,14 @@ async def scale_run_replicas(
                 scheduled_replicas += 1
 
                 # Remove from eligible if at max
-                if group_counts[selected_group.name] >= (selected_group.replicas.max or float("inf")):
+                if group_counts[selected_group.name] >= (
+                    selected_group.replicas.max or float("inf")
+                ):
                     eligible_groups = [g for g in eligible_groups if g.name != selected_group.name]
                     if not eligible_groups:
-                        logger.info("%s: all eligible groups reached maximum capacity", fmt(run_model))
+                        logger.info(
+                            "%s: all eligible groups reached maximum capacity", fmt(run_model)
+                        )
                         break
             else:
                 scheduled_replicas += 1

@@ -1,4 +1,5 @@
 """Integration tests for replica groups scaling functionality"""
+
 from typing import List
 
 import pytest
@@ -52,9 +53,7 @@ async def make_run_with_groups(
             ReplicaGroup(
                 name=group_cfg["name"],
                 replicas=parse_obj_as(Range[int], group_cfg["replicas_range"]),
-                resources=ResourcesSpec(
-                    gpu=GPUSpec(name=[group_cfg["gpu"]], count=1)
-                ),
+                resources=ResourcesSpec(gpu=GPUSpec(name=[group_cfg["gpu"]], count=1)),
             )
         )
 
@@ -323,7 +322,11 @@ class TestReplicaGroupsScaleUp:
                     "name": "group-b",
                     "replicas_range": "1..3",
                     "gpu": "RTX5090",
-                    "initial_jobs": [JobStatus.RUNNING, JobStatus.RUNNING, JobStatus.RUNNING],  # At max
+                    "initial_jobs": [
+                        JobStatus.RUNNING,
+                        JobStatus.RUNNING,
+                        JobStatus.RUNNING,
+                    ],  # At max
                 },
             ],
         )
@@ -390,4 +393,3 @@ class TestReplicaGroupsBackwardCompatibility:
         # New job should have "default" group name or None
         new_job = [j for j in run.jobs if j.replica_num == 1][0]
         assert new_job.replica_group_name in [None, "default"]
-

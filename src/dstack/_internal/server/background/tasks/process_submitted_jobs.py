@@ -613,6 +613,7 @@ def _get_nodes_required_num_for_run(run_spec: RunSpec) -> int:
         # Use groups if present
         if run_spec.configuration.replica_groups:
             from dstack._internal.core.models.runs import get_normalized_replica_groups
+
             groups = get_normalized_replica_groups(run_spec.configuration)
             nodes_required_num = sum(g.replicas.min or 0 for g in groups)
         elif run_spec.configuration.replicas.min is not None:

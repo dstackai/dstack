@@ -1,4 +1,5 @@
 """Tests for Named Replica Groups functionality"""
+
 import pytest
 
 from dstack._internal.core.errors import ConfigurationError
@@ -434,4 +435,3 @@ class TestBackwardCompatibility:
         assert group.instance_types == ["p4d.24xlarge"]
         assert group.spot_policy == "spot"
         assert group.max_price == 10.0
-

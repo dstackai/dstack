@@ -1,7 +1,5 @@
 """Test CLI display of run plans with replica groups."""
 
-
-
 from dstack._internal.cli.utils.run import print_run_plan
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import ServiceConfiguration
@@ -304,13 +302,17 @@ class TestReplicaGroupsDisplayInCLI:
 
         # Find lines that contain both a number and a group name (these are offer rows)
         offer_rows = [
-            line for line in lines
-            if ("cheap-group:" in line or "expensive-group:" in line) and line.strip().startswith(("1", "2", "3"))
+            line
+            for line in lines
+            if ("cheap-group:" in line or "expensive-group:" in line)
+            and line.strip().startswith(("1", "2", "3"))
         ]
 
         # The first offer row should be cheap-group (lower price)
         assert len(offer_rows) >= 2, "Should have at least 2 offer rows"
-        assert "cheap-group:" in offer_rows[0], "First offer should be cheap-group (sorted by price)"
+        assert "cheap-group:" in offer_rows[0], (
+            "First offer should be cheap-group (sorted by price)"
+        )
         assert "expensive-group:" in offer_rows[1], "Second offer should be expensive-group"
         assert "$0.3" in output  # Price displayed as $0.3
         assert "$3" in output  # Price displayed as $3
@@ -418,4 +420,3 @@ class TestReplicaGroupsDisplayInCLI:
         unavailable_pos = output.find("unavailable-group:")
         available_pos = output.find("available-group:")
         assert unavailable_pos < available_pos, "Group with no offers should appear first"
-

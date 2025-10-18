@@ -876,9 +876,7 @@ class ServiceConfigurationParams(CoreModel):
             # Check if any group has a range
             has_range = any(g.replicas.min != g.replicas.max for g in replica_groups)
             if has_range and not scaling:
-                raise ValueError(
-                    "When any replica group has a range, 'scaling' must be specified"
-                )
+                raise ValueError("When any replica group has a range, 'scaling' must be specified")
         elif replicas and replicas.min != replicas.max and not scaling:
             raise ValueError("When you set `replicas` to a range, ensure to specify `scaling`.")
         elif replicas and replicas.min == replicas.max and scaling:

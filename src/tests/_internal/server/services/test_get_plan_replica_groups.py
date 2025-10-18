@@ -1,6 +1,5 @@
 """Test get_plan() offer fetching logic for replica groups."""
 
-
 from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import Requirements
 
@@ -33,6 +32,7 @@ class TestGetPlanOfferFetchingLogic:
 
     def test_identical_requirements_detection_logic(self):
         """Test logic for detecting when all jobs have identical requirements."""
+
         # Simulate job specs with requirements
         class MockJobSpec:
             def __init__(self, gpu_name: str, gpu_count: int = 1):
@@ -94,9 +94,7 @@ class TestGetPlanOfferFetchingLogic:
         all_identical = all(
             job.job_spec.requirements == jobs[0].job_spec.requirements for job in jobs
         )
-        assert (
-            all_identical is False
-        ), "Different GPU types should trigger per-job offer fetch"
+        assert all_identical is False, "Different GPU types should trigger per-job offer fetch"
 
         # Scenario 2: Replica groups with same GPU -> shared fetch (optimization)
         jobs = [
@@ -116,9 +114,7 @@ class TestGetPlanOfferFetchingLogic:
         all_identical = all(
             job.job_spec.requirements == jobs[0].job_spec.requirements for job in jobs
         )
-        assert (
-            all_identical is True
-        ), "Legacy replicas with same GPU should use shared fetch"
+        assert all_identical is True, "Legacy replicas with same GPU should use shared fetch"
 
         # Scenario 4: Mixed groups (2 same + 1 different) -> per-job fetch
         jobs = [
@@ -129,9 +125,7 @@ class TestGetPlanOfferFetchingLogic:
         all_identical = all(
             job.job_spec.requirements == jobs[0].job_spec.requirements for job in jobs
         )
-        assert (
-            all_identical is False
-        ), "Mix of different GPUs should trigger per-job fetch for all"
+        assert all_identical is False, "Mix of different GPUs should trigger per-job fetch for all"
 
 
 class TestReplicaGroupOfferSearchIntegration:
@@ -210,4 +204,3 @@ class TestReplicaGroupOfferSearchIntegration:
 
         # Different CPU requirements
         assert req_low_cpu != req_high_cpu
-

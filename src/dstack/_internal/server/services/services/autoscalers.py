@@ -123,6 +123,7 @@ def get_service_scaler(conf: ServiceConfiguration) -> BaseServiceScaler:
     # Compute bounds from groups if present
     if conf.replica_groups:
         from dstack._internal.core.models.runs import get_normalized_replica_groups
+
         groups = get_normalized_replica_groups(conf)
         min_replicas = sum(g.replicas.min or 0 for g in groups)
         max_replicas = sum(g.replicas.max or 0 for g in groups)
