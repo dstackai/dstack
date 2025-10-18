@@ -637,3 +637,120 @@ class TestReplicaGroupsFairOfferDistribution:
         # Both should have at least one offer shown
         assert cheap_count >= 1, "Cheap group should have at least one offer"
         assert expensive_count >= 1, "Expensive group should have at least one offer"
+
+
+class TestReplicaGroupsProfileOverridesDisplay:
+    """Test that CLI correctly displays profile overrides for replica groups."""
+
+    def test_shows_group_specific_spot_policy_and_regions(self, capsys):
+        """Test that group-specific spot_policy, regions, backends are displayed."""
+
+        from dstack._internal.core.models.backends.base import BackendType
+
+        config = ServiceConfiguration(
+            type="service",
+            port=8000,
+            commands=["echo test"],
+            replica_groups=[
+                {
+                    "name": "h100-group",
+                    "replicas": "1",
+                    "resources": {"gpu": {"name": "H100", "count": 1}},
+                    "spot_policy": "spot",
+                    "regions": ["us-east-1", "us-west-2"],
+                    "backends": ["aws"],
+                },
+                {
+                    "name": "rtx5090-group",
+                    "replicas": "0..5",
+                    "resources": {"gpu": {"name": "RTX5090", "count": 1}},
+                    "spot_policy": "on-demand",
+                    "regions": ["jp-japan"],
+                    "backends": ["vastai", "runpod"],
+                },
+            ],
+            scaling={"metric": "rps", "target": 10},
+        )
+
+        run_spec = RunSpec(
+            run_name="test-run",
+            repo_id="test-repo",
+            repo_data=LocalRunRepoData(repo_dir="/tmp"),
+            configuration=config,
+            configuration_path=".dstack.yml",
+            profile=Profile(backends=[BackendType.AWS]),
+        )
+
+        # Create job plans
+        job_plan_h100 = JobPlan(
+            job_spec=JobSpec(
+                replica_num=0,
+                replica_group_name="h100-group",
+                job_num=0,
+                job_name="test-job-0",
+                image_name="dstackai/base",
+                commands=["echo test"],
+                env={},
+                working_dir="/workflow",
+                requirements=Requirements(
+                    resources=ResourcesSpec(gpu={"name": "H100", "count": 1})
+                ),
+            ),
+            offers=[create_test_offer(BackendType.AWS, "H100", 3.0)],
+            total_offers=1,
+            max_price=3.0,
+        )
+
+        job_plan_rtx = JobPlan(
+            job_spec=JobSpec(
+                replica_num=1,
+                replica_group_name="rtx5090-group",
+                job_num=1,
+                job_name="test-job-1",
+                image_name="dstackai/base",
+                commands=["echo test"],
+                env={},
+                working_dir="/workflow",
+                requirements=Requirements(
+                    resources=ResourcesSpec(gpu={"name": "RTX5090", "count": 1})
+                ),
+            ),
+            offers=[create_test_offer(BackendType.VASTAI, "RTX5090", 0.5)],
+            total_offers=1,
+            max_price=0.5,
+        )
+
+        run_plan = RunPlan(
+            project_name="test-project",
+            user="test-user",
+            run_spec=run_spec,
+            effective_run_spec=run_spec,
+            job_plans=[job_plan_h100, job_plan_rtx],
+            current_resource=None,
+            action=ApplyAction.CREATE,
+        )
+
+        # Print the plan
+        print_run_plan(run_plan, max_offers=10, include_run_properties=True)
+
+        # Capture output
+        captured = capsys.readouterr()
+        output = captured.out
+
+        # Verify group-specific overrides are shown
+        assert "h100-group" in output
+        assert "spot=spot" in output  # H100 group's spot policy
+        assert "regions=us-east-1,us-west-2" in output  # H100 group's regions
+        assert "backends=aws" in output  # H100 group's backend
+
+        assert "rtx5090-group" in output
+        assert "spot=on-demand" in output  # RTX5090 group's spot policy
+        assert "regions=jp-japan" in output  # RTX5090 group's region
+        assert "backends=vastai,runpod" in output  # RTX5090 group's backends
+
+        # Verify service-level "Spot policy" row is NOT shown (misleading with groups)
+        lines = output.split("\n")
+        spot_policy_lines = [line for line in lines if line.strip().startswith("Spot policy")]
+        assert len(spot_policy_lines) == 0, (
+            "Service-level 'Spot policy' should not be shown with replica_groups"
+        )

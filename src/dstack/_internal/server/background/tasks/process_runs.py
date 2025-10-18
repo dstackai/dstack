@@ -156,6 +156,10 @@ async def _process_run(session: AsyncSession, run_model: RunModel):
     )
     run_model = res.unique().scalar_one()
     logger.debug("%s: processing run", fmt(run_model))
+
+    # Migrate legacy jobs without replica_group_name (one-time fix)
+    await _migrate_legacy_job_replica_groups(session, run_model)
+
     try:
         if run_model.status == RunStatus.PENDING:
             await _process_pending_run(session, run_model)
@@ -174,6 +178,70 @@ async def _process_run(session: AsyncSession, run_model: RunModel):
 
     run_model.last_processed_at = common.get_current_datetime()
     await session.commit()
+
+
+async def _migrate_legacy_job_replica_groups(session: AsyncSession, run_model: RunModel):
+    """
+    Migrate jobs from old runs that don't have replica_group_name set.
+    This fixes jobs created before the replica_groups feature was added.
+    """
+    run_spec = RunSpec.__response__.parse_raw(run_model.run_spec)
+
+    # Only migrate service runs with replica_groups
+    if run_spec.configuration.type != "service":
+        return
+
+    # Check if run uses replica_groups
+    if not getattr(run_spec.configuration, "replica_groups", None):
+        return
+
+    from dstack._internal.core.models.runs import get_normalized_replica_groups
+
+    normalized_groups = get_normalized_replica_groups(run_spec.configuration)
+
+    # Check if any jobs need migration
+    needs_migration = any(job.replica_group_name is None for job in run_model.jobs)
+
+    if not needs_migration:
+        return
+
+    logger.info(
+        "%s: Migrating legacy jobs to assign replica_group_name",
+        fmt(run_model),
+    )
+
+    # Build a map of replica_num -> group_name based on how jobs were originally created
+    replica_num_to_group = {}
+    current_replica_num = 0
+
+    for group in normalized_groups:
+        group_min = group.replicas.min or 0
+        for _ in range(group_min):
+            replica_num_to_group[current_replica_num] = group.name
+            current_replica_num += 1
+
+    # Update jobs
+    migrated_count = 0
+    for job in run_model.jobs:
+        if job.replica_group_name is None:
+            expected_group = replica_num_to_group.get(job.replica_num)
+            if expected_group:
+                job.replica_group_name = expected_group
+                migrated_count += 1
+                logger.info(
+                    "%s: Migrated job replica_num=%d to group '%s'",
+                    fmt(run_model),
+                    job.replica_num,
+                    expected_group,
+                )
+
+    if migrated_count > 0:
+        await session.commit()
+        logger.info(
+            "%s: Migrated %d job(s) to replica groups",
+            fmt(run_model),
+            migrated_count,
+        )
 
 
 async def _process_pending_run(session: AsyncSession, run_model: RunModel):

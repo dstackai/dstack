@@ -122,31 +122,52 @@ def print_run_plan(
 
     from dstack._internal.core.models.configurations import ServiceConfiguration
 
-    if (
+    has_replica_groups = (
         include_run_properties
         and isinstance(run_spec.configuration, ServiceConfiguration)
         and run_spec.configuration.replica_groups
-    ):
+    )
+
+    if has_replica_groups:
         groups_info = []
         for group in run_spec.configuration.replica_groups:
             group_parts = [f"[cyan]{group.name}[/cyan]"]
 
+            # Replica count
             if group.replicas.min == group.replicas.max:
                 group_parts.append(f"×{group.replicas.max}")
             else:
                 group_parts.append(f"×{group.replicas.min}..{group.replicas.max}")
                 group_parts.append("[dim](autoscalable)[/dim]")
 
+            # Resources
             group_parts.append(f"[dim]({group.resources.pretty_format()})[/dim]")
+
+            # Group-specific overrides
+            overrides = []
+            if group.spot_policy is not None:
+                overrides.append(f"spot={group.spot_policy.value}")
+            if group.regions:
+                regions_str = ",".join(group.regions[:2])  # Show first 2
+                if len(group.regions) > 2:
+                    regions_str += f",+{len(group.regions) - 2}"
+                overrides.append(f"regions={regions_str}")
+            if group.backends:
+                backends_str = ",".join([b.value for b in group.backends[:2]])
+                if len(group.backends) > 2:
+                    backends_str += f",+{len(group.backends) - 2}"
+                overrides.append(f"backends={backends_str}")
+
+            if overrides:
+                group_parts.append(f"[dim]({'; '.join(overrides)})[/dim]")
 
             groups_info.append(" ".join(group_parts))
 
         props.add_row(th("Replica groups"), "\n".join(groups_info))
     else:
         props.add_row(th("Resources"), pretty_req)
-
-    props.add_row(th("Spot policy"), spot_policy)
-    props.add_row(th("Max price"), max_price)
+        props.add_row(th("Spot policy"), spot_policy)
+        props.add_row(th("Max price"), max_price)
     if include_run_properties:
         props.add_row(th("Retry policy"), retry)
         props.add_row(th("Creation policy"), creation_policy)

@@ -417,13 +417,36 @@ async def get_plan(
         job_num=0,
     )
 
-    pool_offers = await _get_pool_offers(
-        session=session,
-        project=project,
-        run_spec=effective_run_spec,
-        job=jobs[0],
-        volumes=volumes,
-    )
+    # For replica groups, we need pool offers for all GPU types, not just the first job's type
+    # So we fetch pool offers for each job separately and aggregate them
+    all_pool_offers = []
+    if len(jobs) > 1:
+        # Multiple jobs (likely replica groups) - get pool offers per job to include all GPU types
+        for job in jobs:
+            job_pool_offers = await _get_pool_offers(
+                session=session,
+                project=project,
+                run_spec=effective_run_spec,
+                job=job,
+                volumes=volumes,
+            )
+            all_pool_offers.extend(job_pool_offers)
+        # Deduplicate by (backend, instance_name, region) tuple
+        seen_offers = set()
+        pool_offers = []
+        for offer in all_pool_offers:
+            offer_key = (offer.backend, offer.instance.name, offer.region)
+            if offer_key not in seen_offers:
+                seen_offers.add(offer_key)
+                pool_offers.append(offer)
+    else:
+        pool_offers = await _get_pool_offers(
+            session=session,
+            project=project,
+            run_spec=effective_run_spec,
+            job=jobs[0],
+            volumes=volumes,
+        )
     effective_run_spec.run_name = "dry-run"  # will regenerate jobs on submission
 
     # Check if all jobs have identical requirements (optimization for single-type jobs)
@@ -1561,10 +1584,29 @@ async def retry_run_replica_jobs(
         session=session,
         project=run_model.project,
     )
+
+    # Determine which replica group this job belongs to
+    run_spec = RunSpec.__response__.parse_raw(run_model.run_spec)
+    replica_group = None
+    if run_spec.configuration.type == "service" and latest_jobs:
+        from dstack._internal.core.models.runs import get_normalized_replica_groups
+
+        group_name = latest_jobs[0].replica_group_name
+        if group_name:
+            normalized_groups = get_normalized_replica_groups(run_spec.configuration)
+            replica_group = next((g for g in normalized_groups if g.name == group_name), None)
+            if replica_group:
+                logger.info(
+                    "%s: retrying job from replica group '%s'",
+                    fmt(run_model),
+                    replica_group.name,
+                )
+
     new_jobs = await get_jobs_from_run_spec(
-        run_spec=RunSpec.__response__.parse_raw(run_model.run_spec),
+        run_spec=run_spec,
         secrets=secrets,
         replica_num=latest_jobs[0].replica_num,
+        replica_group=replica_group,
     )
     assert len(new_jobs) == len(latest_jobs), (
         "Changing the number of jobs within a replica is not yet supported"

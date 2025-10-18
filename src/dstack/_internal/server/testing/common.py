@@ -354,8 +354,19 @@ async def create_job(
     if deployment_num is None:
         deployment_num = run.deployment_num
     run_spec = RunSpec.parse_raw(run.run_spec)
+
+    # Look up replica group if specified
+    replica_group = None
+    if replica_group_name and run_spec.configuration.type == "service":
+        from dstack._internal.core.models.runs import get_normalized_replica_groups
+
+        normalized_groups = get_normalized_replica_groups(run_spec.configuration)
+        replica_group = next((g for g in normalized_groups if g.name == replica_group_name), None)
+
     job_spec = (
-        await get_job_specs_from_run_spec(run_spec=run_spec, secrets={}, replica_num=replica_num)
+        await get_job_specs_from_run_spec(
+            run_spec=run_spec, secrets={}, replica_num=replica_num, replica_group=replica_group
+        )
     )[0]
     job_spec.job_num = job_num
     job = JobModel(

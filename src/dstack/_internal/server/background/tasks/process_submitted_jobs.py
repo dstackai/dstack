@@ -740,11 +740,23 @@ def _get_profile_for_job(run_spec: RunSpec, job: Job) -> Profile:
     base_profile = run_spec.merged_profile
 
     group_name = job.job_spec.replica_group_name
+    logger.info(
+        "Getting profile for job %s: replica_group_name=%s, config_type=%s",
+        job.job_spec.job_name,
+        group_name,
+        run_spec.configuration.type,
+    )
+
     if not group_name or run_spec.configuration.type != "service":
+        logger.info("Using base profile (no group_name or not a service)")
         return base_profile
 
     # Find the group
     normalized_groups = get_normalized_replica_groups(run_spec.configuration)
+    logger.info(
+        "Normalized groups: %s",
+        [f"{g.name} (regions={g.regions})" for g in normalized_groups],
+    )
     group = next((g for g in normalized_groups if g.name == group_name), None)
 
     if not group:
@@ -762,7 +774,7 @@ def _get_profile_for_job(run_spec: RunSpec, job: Job) -> Profile:
         if group_value is not None:
             setattr(merged, field_name, group_value)
 
-    logger.debug(
+    logger.info(
         "Profile for group '%s': regions=%s, backends=%s, spot_policy=%s (base had: regions=%s, backends=%s, spot_policy=%s)",
         group_name,
         merged.regions,
@@ -832,6 +844,21 @@ async def _run_job_on_new_instance(
     multinode = job.job_spec.jobs_per_replica > 1 or (
         fleet is not None and fleet.spec.configuration.placement == InstanceGroupPlacement.CLUSTER
     )
+
+    # Log the requirements and profile being used
+    gpu_requirement = (
+        requirements.resources.gpu.name
+        if requirements.resources and requirements.resources.gpu
+        else None
+    )
+    logger.info(
+        "%s: Fetching offers with GPU=%s, regions=%s, backends=%s",
+        fmt(job_model),
+        gpu_requirement,
+        profile.regions,
+        [b.value for b in profile.backends] if profile.backends else None,
+    )
+
     offers = await get_offers_by_requirements(
         project=project,
         profile=profile,
@@ -845,14 +872,12 @@ async def _run_job_on_new_instance(
     )
 
     # Debug logging for offers
-    if replica_group_name and len(offers) > 0:
-        logger.debug(
-            "%s: Got %d offers for group '%s'. First 3: %s",
-            fmt(job_model),
-            len(offers),
-            replica_group_name,
-            [f"{o.instance.name} ({o.backend.value}/{o.region})" for _, o in offers[:3]],
-        )
+    logger.info(
+        "%s: Got %d offers. First 3: %s",
+        fmt(job_model),
+        len(offers),
+        [f"{o.instance.name} ({o.backend.value}/{o.region})" for _, o in offers[:3]],
+    )
     # Limit number of offers tried to prevent long-running processing
     # in case all offers fail.
     for backend, offer in offers[: settings.MAX_OFFERS_TRIED]:
