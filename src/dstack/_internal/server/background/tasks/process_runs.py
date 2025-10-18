@@ -189,7 +189,10 @@ async def _process_pending_run(session: AsyncSession, run_model: RunModel):
 
     run_model.desired_replica_count = 1
     if run.run_spec.configuration.type == "service":
-        run_model.desired_replica_count = run.run_spec.configuration.replicas.min or 0
+        from dstack._internal.core.models.runs import get_normalized_replica_groups
+
+        normalized_groups = get_normalized_replica_groups(run.run_spec.configuration)
+        run_model.desired_replica_count = sum(g.replicas.min or 0 for g in normalized_groups)
         await update_service_desired_replica_count(
             session,
             run_model,

@@ -10,6 +10,22 @@ The `service` configuration type allows running [services](../../concepts/servic
       type:
         required: true
 
+### `replica_groups`
+
+Define multiple replica groups with different configurations within a single service.
+
+> **Note:** Cannot be used together with `replicas`.
+
+#### `replica_groups[n]`
+
+#SCHEMA# dstack._internal.core.models.configurations.ReplicaGroup
+    overrides:
+      show_root_heading: false
+      type:
+        required: true
+
+Each replica group inherits from [ProfileParams](../profiles.yml.md) and can override any profile parameter including `backends`, `regions`, `instance_types`, `spot_policy`, etc.
+
 ### `model` { data-toc-label="model" }
 
 === "OpenAI"

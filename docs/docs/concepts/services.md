@@ -160,6 +160,66 @@ Setting the minimum number of replicas to `0` allows the service to scale down t
 
 > The `scaling` property requires creating a [gateway](gateways.md).
 
+### Replica Groups (Advanced)
+
+For advanced use cases, you can define multiple **replica groups** with different instance types, resources, and configurations within a single service. This is useful when you want to:
+
+- Run different GPU types in the same service (e.g., H100 for primary, RTX5090 for overflow)
+- Configure different backends or regions per replica type
+- Set different autoscaling behavior per group
+
+<div editor-title="service.dstack.yml"> 
+
+```yaml
+type: service
+name: llama31-service
+
+python: 3.12
+env:
+  - HF_TOKEN
+commands:
+  - uv pip install vllm
+  - vllm serve meta-llama/Meta-Llama-3.1-8B-Instruct --max-model-len 4096
+port: 8000
+
+# Define multiple replica groups with different configurations
+replica_groups:
+  - name: primary
+    replicas: 1              # Always 1 H100 (fixed)
+    resources:
+      gpu: H100:1
+    backends: [aws]
+    regions: [us-west-2]
+  
+  - name: overflow
+    replicas: 0..5           # Autoscales 0-5 RTX5090s
+    resources:
+      gpu: RTX5090:1
+    backends: [runpod]
+
+scaling:
+  metric: rps
+  target: 10
+```
+
+</div>
+
+In this example:
+
+- The `primary` group always runs 1 H100 replica on AWS (fixed, never scaled)
+- The `overflow` group scales 0-5 RTX5090 replicas on RunPod based on load
+- Scale operations only affect groups with autoscaling ranges (min != max)
+
+Each replica group can override any [profile parameter](../reference/profiles.yml.md) including `backends`, `regions`, `instance_types`, `spot_policy`, etc. Group-level settings override service-level settings.
+
+> **Note:** When using `replica_groups`, you cannot use the simple `replicas` field. They are mutually exclusive.
+
+**When to use replica groups:**
+
+- You need different GPU types in the same service
+- Different replicas should run in different regions or clouds
+- Some replicas should be fixed while others autoscale
+
 ### Model
 
 If the service is running a chat model with an OpenAI-compatible interface,

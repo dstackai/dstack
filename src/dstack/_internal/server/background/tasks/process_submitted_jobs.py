@@ -609,11 +609,14 @@ def _get_nodes_required_num_for_run(run_spec: RunSpec) -> int:
     nodes_required_num = 1
     if run_spec.configuration.type == "task":
         nodes_required_num = run_spec.configuration.nodes
-    elif (
-        run_spec.configuration.type == "service"
-        and run_spec.configuration.replicas.min is not None
-    ):
-        nodes_required_num = run_spec.configuration.replicas.min
+    elif run_spec.configuration.type == "service":
+        # Use groups if present
+        if run_spec.configuration.replica_groups:
+            from dstack._internal.core.models.runs import get_normalized_replica_groups
+            groups = get_normalized_replica_groups(run_spec.configuration)
+            nodes_required_num = sum(g.replicas.min or 0 for g in groups)
+        elif run_spec.configuration.replicas.min is not None:
+            nodes_required_num = run_spec.configuration.replicas.min
     return nodes_required_num
 
 
@@ -728,6 +731,34 @@ async def _assign_job_to_fleet_instance(
     return instance
 
 
+def _get_profile_for_job(run_spec: RunSpec, job: Job) -> Profile:
+    """Get merged profile with group overrides for this job."""
+    from dstack._internal.core.models.profiles import Profile, ProfileParams
+    from dstack._internal.core.models.runs import get_normalized_replica_groups
+
+    base_profile = run_spec.merged_profile
+
+    group_name = job.job_spec.replica_group_name
+    if not group_name or run_spec.configuration.type != "service":
+        return base_profile
+
+    # Find the group
+    normalized_groups = get_normalized_replica_groups(run_spec.configuration)
+    group = next((g for g in normalized_groups if g.name == group_name), None)
+
+    if not group:
+        return base_profile
+
+    # Merge: group overrides base
+    merged = Profile.parse_obj(base_profile.dict())
+    for field_name in ProfileParams.__fields__:
+        group_value = getattr(group, field_name, None)
+        if group_value is not None:
+            setattr(merged, field_name, group_value)
+
+    return merged
+
+
 async def _run_job_on_new_instance(
     project: ProjectModel,
     job_model: JobModel,
@@ -741,8 +772,8 @@ async def _run_job_on_new_instance(
 ) -> Optional[tuple[JobProvisioningData, InstanceOfferWithAvailability, Profile, Requirements]]:
     if volumes is None:
         volumes = []
-    profile = run.run_spec.merged_profile
-    requirements = job.job_spec.requirements
+    profile = _get_profile_for_job(run.run_spec, job)
+    requirements = job.job_spec.requirements  # Already has group resources baked in
     fleet = None
     if fleet_model is not None:
         fleet = fleet_model_to_fleet(fleet_model)
@@ -822,7 +853,9 @@ def _get_run_profile_and_requirements_in_fleet(
     run_spec: RunSpec,
     fleet: Fleet,
 ) -> tuple[Profile, Requirements]:
-    profile = combine_fleet_and_run_profiles(fleet.spec.merged_profile, run_spec.merged_profile)
+    # Use group-merged profile instead of run-level
+    job_profile = _get_profile_for_job(run_spec, job)
+    profile = combine_fleet_and_run_profiles(fleet.spec.merged_profile, job_profile)
     if profile is None:
         raise ValueError("Cannot combine fleet profile")
     fleet_requirements = get_fleet_requirements(fleet.spec)

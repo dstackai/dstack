@@ -11,6 +11,8 @@
 - STEP 7: `scale_run_replicas` terminates or starts replicas.
     - `SUBMITTED` and `PROVISIONING` replicas get terminated before `RUNNING`.
     - Replicas are terminated by descending `replica_num` and launched by ascending `replica_num`.
+    - For services with `replica_groups`, only groups with autoscaling ranges (min != max) participate in scaling.
+    - Scale operations respect per-group minimum and maximum constraints.
 
 ## RPSAutoscaler
 

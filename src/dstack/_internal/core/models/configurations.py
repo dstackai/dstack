@@ -685,6 +685,52 @@ class TaskConfiguration(
     type: Literal["task"] = "task"
 
 
+class ReplicaGroupConfig(ProfileParamsConfig):
+    @staticmethod
+    def schema_extra(schema: Dict[str, Any]):
+        ProfileParamsConfig.schema_extra(schema)
+        add_extra_schema_types(
+            schema["properties"]["replicas"],
+            extra_types=[{"type": "integer"}, {"type": "string"}],
+        )
+
+
+class ReplicaGroup(ProfileParams, generate_dual_core_model(ReplicaGroupConfig)):
+    """
+    A replica group defines a set of service replicas with specific resource requirements
+    and provisioning parameters.
+    """
+
+    name: Annotated[str, Field(description="Group name (must be unique within the service)")]
+    replicas: Annotated[
+        Range[int],
+        Field(
+            description="Number of replicas. Can be a fixed number (e.g., `2`) or a range (`1..3`). "
+            "If it's a range, the group can be autoscaled"
+        ),
+    ]
+    resources: Annotated[
+        ResourcesSpec,
+        Field(description="Resource requirements for replicas in this group"),
+    ]
+
+    @validator("name")
+    def validate_name(cls, v):
+        if not v or not v.strip():
+            raise ValueError("Group name cannot be empty")
+        return v
+
+    @validator("replicas")
+    def convert_replicas(cls, v: Range[int]) -> Range[int]:
+        if v.max is None:
+            raise ValueError("The maximum number of replicas is required")
+        if v.min is None:
+            v.min = 0
+        if v.min < 0:
+            raise ValueError("The minimum number of replicas must be greater than or equal to 0")
+        return v
+
+
 class ServiceConfigurationParamsConfig(CoreConfig):
     @staticmethod
     def schema_extra(schema: Dict[str, Any]):
@@ -754,6 +800,13 @@ class ServiceConfigurationParams(CoreModel):
         list[ProbeConfig],
         Field(description="List of probes used to determine job health"),
     ] = []
+    replica_groups: Annotated[
+        Optional[List[ReplicaGroup]],
+        Field(
+            description="Define multiple replica groups with different configurations. "
+            "Cannot be used together with 'replicas'"
+        ),
+    ] = None
 
     @validator("port")
     def convert_port(cls, v) -> PortMapping:
@@ -790,13 +843,47 @@ class ServiceConfigurationParams(CoreModel):
         return v
 
     @root_validator()
+    def validate_replica_groups_xor_replicas(cls, values):
+        replica_groups = values.get("replica_groups")
+        replicas = values.get("replicas")
+        
+        # Check if user specified both
+        has_groups = replica_groups is not None
+        has_replicas = replicas != Range[int](min=1, max=1)
+        
+        if has_groups and has_replicas:
+            raise ValueError("Cannot specify both 'replicas' and 'replica_groups'")
+        
+        if has_groups:
+            # Validate unique names
+            names = [g.name for g in replica_groups]
+            if len(names) != len(set(names)):
+                raise ValueError("Replica group names must be unique")
+            
+            # Validate at least one group
+            if not replica_groups:
+                raise ValueError("replica_groups cannot be empty")
+        
+        return values
+
+    @root_validator()
     def validate_scaling(cls, values):
         scaling = values.get("scaling")
         replicas = values.get("replicas")
-        if replicas and replicas.min != replicas.max and not scaling:
+        replica_groups = values.get("replica_groups")
+        
+        if replica_groups:
+            # Check if any group has a range
+            has_range = any(g.replicas.min != g.replicas.max for g in replica_groups)
+            if has_range and not scaling:
+                raise ValueError(
+                    "When any replica group has a range, 'scaling' must be specified"
+                )
+        elif replicas and replicas.min != replicas.max and not scaling:
             raise ValueError("When you set `replicas` to a range, ensure to specify `scaling`.")
-        if replicas and replicas.min == replicas.max and scaling:
+        elif replicas and replicas.min == replicas.max and scaling:
             raise ValueError("To use `scaling`, `replicas` must be set to a range.")
+        
         return values
 
     @validator("rate_limits")

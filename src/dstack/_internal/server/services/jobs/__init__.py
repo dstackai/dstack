@@ -1,8 +1,11 @@
 import itertools
 import json
 from datetime import timedelta
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Tuple
 from uuid import UUID
+
+if TYPE_CHECKING:
+    from dstack._internal.core.models.configurations import ReplicaGroup
 
 import requests
 from sqlalchemy import select
@@ -67,7 +70,10 @@ logger = get_logger(__name__)
 
 
 async def get_jobs_from_run_spec(
-    run_spec: RunSpec, secrets: Dict[str, str], replica_num: int
+    run_spec: RunSpec,
+    secrets: Dict[str, str],
+    replica_num: int,
+    replica_group: Optional["ReplicaGroup"] = None,
 ) -> List[Job]:
     return [
         Job(job_spec=s, job_submissions=[])
@@ -75,14 +81,19 @@ async def get_jobs_from_run_spec(
             run_spec=run_spec,
             secrets=secrets,
             replica_num=replica_num,
+            replica_group=replica_group,
         )
     ]
 
 
 async def get_job_specs_from_run_spec(
-    run_spec: RunSpec, secrets: Dict[str, str], replica_num: int
+    run_spec: RunSpec,
+    secrets: Dict[str, str],
+    replica_num: int,
+    replica_group: Optional["ReplicaGroup"] = None,
 ) -> List[JobSpec]:
     job_configurator = _get_job_configurator(run_spec=run_spec, secrets=secrets)
+    job_configurator.replica_group = replica_group
     job_specs = await job_configurator.get_job_specs(replica_num=replica_num)
     return job_specs
 

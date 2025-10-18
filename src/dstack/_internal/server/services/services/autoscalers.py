@@ -120,18 +120,28 @@ class RPSAutoscaler(BaseServiceScaler):
 
 
 def get_service_scaler(conf: ServiceConfiguration) -> BaseServiceScaler:
-    assert conf.replicas.min is not None
-    assert conf.replicas.max is not None
+    # Compute bounds from groups if present
+    if conf.replica_groups:
+        from dstack._internal.core.models.runs import get_normalized_replica_groups
+        groups = get_normalized_replica_groups(conf)
+        min_replicas = sum(g.replicas.min or 0 for g in groups)
+        max_replicas = sum(g.replicas.max or 0 for g in groups)
+    else:
+        assert conf.replicas.min is not None
+        assert conf.replicas.max is not None
+        min_replicas = conf.replicas.min
+        max_replicas = conf.replicas.max
+    
     if conf.scaling is None:
         return ManualScaler(
-            min_replicas=conf.replicas.min,
-            max_replicas=conf.replicas.max,
+            min_replicas=min_replicas,
+            max_replicas=max_replicas,
         )
     if conf.scaling.metric == "rps":
         return RPSAutoscaler(
             # replicas count validated by configuration model
-            min_replicas=conf.replicas.min,
-            max_replicas=conf.replicas.max,
+            min_replicas=min_replicas,
+            max_replicas=max_replicas,
             target=conf.scaling.target,
             scale_up_delay=conf.scaling.scale_up_delay,
             scale_down_delay=conf.scaling.scale_down_delay,

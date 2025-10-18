@@ -151,6 +151,9 @@ def get_run_spec_excludes(run_spec: RunSpec) -> IncludeExcludeDictType:
         configuration_excludes["schedule"] = True
     if profile is not None and profile.schedule is None:
         profile_excludes.add("schedule")
+    # Exclude replica_groups for backward compatibility with older servers
+    if isinstance(configuration, ServiceConfiguration) and configuration.replica_groups is None:
+        configuration_excludes["replica_groups"] = True
     configuration_excludes["repos"] = True
 
     if configuration_excludes:

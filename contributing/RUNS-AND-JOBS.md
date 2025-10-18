@@ -13,7 +13,7 @@ Runs are created from run configurations. There are three types of run configura
 2. `task` — runs the user's bash script until completion.
 3. `service` — runs the user's bash script and exposes a port through [dstack-proxy](PROXY.md).
 
-A run can spawn one or multiple jobs, depending on the configuration. A task that specifies multiple `nodes` spawns a job for every node (a multi-node task). A service that specifies multiple `replicas` spawns a job for every replica. A job submission is always assigned to one particular instance. If a job fails and the configuration allows retrying, the server creates a new job submission for the job.
+A run can spawn one or multiple jobs, depending on the configuration. A task that specifies multiple `nodes` spawns a job for every node (a multi-node task). A service that specifies multiple `replicas` or `replica_groups` spawns a job for every replica. Each job in a replica group is tagged with `replica_group_name` to track which group it belongs to. A job submission is always assigned to one particular instance. If a job fails and the configuration allows retrying, the server creates a new job submission for the job.
 
 ## Run's Lifecycle
 
