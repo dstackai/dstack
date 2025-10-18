@@ -7,11 +7,15 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from dstack._internal.core.models.configurations import ReplicaGroup, ScalingSpec, ServiceConfiguration
+from dstack._internal.core.models.configurations import (
+    ReplicaGroup,
+    ScalingSpec,
+    ServiceConfiguration,
+)
 from dstack._internal.core.models.profiles import Profile
 from dstack._internal.core.models.resources import GPUSpec, Range, ResourcesSpec
 from dstack._internal.core.models.runs import JobStatus, JobTerminationReason
-from dstack._internal.server.models import JobModel, RunModel
+from dstack._internal.server.models import RunModel
 from dstack._internal.server.services.runs import scale_run_replicas
 from dstack._internal.server.testing.common import (
     create_job,
@@ -40,7 +44,7 @@ async def make_run_with_groups(
     project = await create_project(session=session)
     user = await create_user(session=session)
     repo = await create_repo(session=session, project_id=project.id)
-    
+
     # Build replica groups
     replica_groups = []
     for group_cfg in groups_config:
@@ -53,7 +57,7 @@ async def make_run_with_groups(
                 ),
             )
         )
-    
+
     profile = Profile(name="test-profile")
     run_spec = get_run_spec(
         repo_id=repo.name,
@@ -66,7 +70,7 @@ async def make_run_with_groups(
             scaling=ScalingSpec(metric="rps", target=10),
         ),
     )
-    
+
     run = await create_run(
         session=session,
         project=project,
@@ -75,7 +79,7 @@ async def make_run_with_groups(
         run_name="test-run",
         run_spec=run_spec,
     )
-    
+
     # Create initial jobs
     replica_num = 0
     for group_cfg in groups_config:
@@ -89,9 +93,9 @@ async def make_run_with_groups(
             )
             run.jobs.append(job)
             replica_num += 1
-    
+
     await session.commit()
-    
+
     # Reload with jobs and project
     res = await session.execute(
         select(RunModel)
@@ -124,15 +128,15 @@ class TestReplicaGroupsScaleDown:
                 },
             ],
         )
-        
+
         # Scale down by 1 (should only affect scalable group)
         await scale_wrapper(session, run, -1)
-        
+
         # Check: fixed group should still have 1 running job
         fixed_jobs = [j for j in run.jobs if j.replica_group_name == "fixed-h100"]
         assert len(fixed_jobs) == 1
         assert fixed_jobs[0].status == JobStatus.RUNNING
-        
+
         # Check: scalable group should have 1 terminated, 1 running
         scalable_jobs = [j for j in run.jobs if j.replica_group_name == "scalable-rtx"]
         assert len(scalable_jobs) == 2
@@ -160,14 +164,14 @@ class TestReplicaGroupsScaleDown:
                 },
             ],
         )
-        
+
         # Try to scale down by 2
         await scale_wrapper(session, run, -2)
-        
+
         # Group A should still have 1 (at minimum)
         group_a_jobs = [j for j in run.jobs if j.replica_group_name == "group-a"]
         assert len([j for j in group_a_jobs if j.status == JobStatus.RUNNING]) == 1
-        
+
         # Group B should have terminated 1 (3 -> 2, which is minimum)
         group_b_jobs = [j for j in run.jobs if j.replica_group_name == "group-b"]
         terminating = [j for j in group_b_jobs if j.status == JobStatus.TERMINATING]
@@ -193,12 +197,12 @@ class TestReplicaGroupsScaleDown:
                 },
             ],
         )
-        
+
         initial_count = len(run.jobs)
-        
+
         # Try to scale down
         await scale_wrapper(session, run, -1)
-        
+
         # No jobs should be terminated (all groups are fixed)
         assert len(run.jobs) == initial_count
         assert all(j.status == JobStatus.RUNNING for j in run.jobs)
@@ -227,15 +231,15 @@ class TestReplicaGroupsScaleUp:
                 },
             ],
         )
-        
+
         initial_count = len(run.jobs)
-        
+
         # Scale up by 1
         await scale_wrapper(session, run, 1)
-        
+
         # Should have one more job
         assert len(run.jobs) == initial_count + 1
-        
+
         # New job should be in scalable group
         new_jobs = [j for j in run.jobs if j.replica_num == initial_count]
         assert len(new_jobs) == 1
@@ -262,14 +266,14 @@ class TestReplicaGroupsScaleUp:
                 },
             ],
         )
-        
+
         # Try to scale up by 2
         await scale_wrapper(session, run, 2)
-        
+
         # Small group should still have 2 (at max)
         small_jobs = [j for j in run.jobs if j.replica_group_name == "small-group"]
         assert len(small_jobs) == 2
-        
+
         # Large group should have grown by 2
         large_jobs = [j for j in run.jobs if j.replica_group_name == "large-group"]
         assert len(large_jobs) == 3
@@ -294,12 +298,12 @@ class TestReplicaGroupsScaleUp:
                 },
             ],
         )
-        
+
         initial_count = len(run.jobs)
-        
+
         # Try to scale up
         await scale_wrapper(session, run, 2)
-        
+
         # Should not have added any jobs
         assert len(run.jobs) == initial_count
 
@@ -323,12 +327,12 @@ class TestReplicaGroupsScaleUp:
                 },
             ],
         )
-        
+
         initial_count = len(run.jobs)
-        
+
         # Try to scale up
         await scale_wrapper(session, run, 1)
-        
+
         # Should not have added any jobs (all at max)
         assert len(run.jobs) == initial_count
 
@@ -342,7 +346,7 @@ class TestReplicaGroupsBackwardCompatibility:
         project = await create_project(session=session)
         user = await create_user(session=session)
         repo = await create_repo(session=session, project_id=project.id)
-        
+
         # Use legacy format (no replica_groups)
         profile = Profile(name="test-profile")
         run_spec = get_run_spec(
@@ -356,7 +360,7 @@ class TestReplicaGroupsBackwardCompatibility:
                 scaling=ScalingSpec(metric="rps", target=10),
             ),
         )
-        
+
         run = await create_run(
             session=session,
             project=project,
@@ -365,7 +369,7 @@ class TestReplicaGroupsBackwardCompatibility:
             run_name="test-run",
             run_spec=run_spec,
         )
-        
+
         # Add initial job (no group name)
         job = await create_job(
             session=session,
@@ -376,13 +380,13 @@ class TestReplicaGroupsBackwardCompatibility:
         )
         run.jobs.append(job)
         await session.commit()
-        
+
         # Scale up should work
         await scale_wrapper(session, run, 1)
-        
+
         # Should have 2 jobs now
         assert len(run.jobs) == 2
-        
+
         # New job should have "default" group name or None
         new_job = [j for j in run.jobs if j.replica_num == 1][0]
         assert new_job.replica_group_name in [None, "default"]

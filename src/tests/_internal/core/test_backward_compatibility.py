@@ -1,6 +1,5 @@
 """Test backward compatibility for replica_groups with older servers."""
 
-import pytest
 
 from dstack._internal.core.compatibility.runs import get_get_plan_excludes, get_run_spec_excludes
 from dstack._internal.core.models.configurations import ServiceConfiguration
@@ -20,7 +19,7 @@ class TestReplicaGroupsBackwardCompatibility:
             commands=["echo test"],
             replicas={"min": 1, "max": 1},
         )
-        
+
         run_spec = RunSpec(
             run_name="test-run",
             repo_id="test-repo",
@@ -28,10 +27,10 @@ class TestReplicaGroupsBackwardCompatibility:
             configuration=config,
             profile=None,
         )
-        
+
         # Get excludes
         excludes = get_run_spec_excludes(run_spec)
-        
+
         # replica_groups should be in excludes
         assert "configuration" in excludes
         assert "replica_groups" in excludes["configuration"]
@@ -52,7 +51,7 @@ class TestReplicaGroupsBackwardCompatibility:
             ],
             scaling={"metric": "rps", "target": 10},
         )
-        
+
         run_spec = RunSpec(
             run_name="test-run",
             repo_id="test-repo",
@@ -60,10 +59,10 @@ class TestReplicaGroupsBackwardCompatibility:
             configuration=config,
             profile=None,
         )
-        
+
         # Get excludes
         excludes = get_run_spec_excludes(run_spec)
-        
+
         # replica_groups should NOT be in excludes (or be False)
         if "configuration" in excludes and "replica_groups" in excludes["configuration"]:
             assert excludes["configuration"]["replica_groups"] is not True
@@ -76,7 +75,7 @@ class TestReplicaGroupsBackwardCompatibility:
             commands=["echo test"],
             replicas={"min": 1, "max": 1},
         )
-        
+
         run_spec = RunSpec(
             run_name="test-run",
             repo_id="test-repo",
@@ -84,13 +83,13 @@ class TestReplicaGroupsBackwardCompatibility:
             configuration=config,
             profile=None,
         )
-        
+
         request = GetRunPlanRequest(run_spec=run_spec, max_offers=None)
         excludes = get_get_plan_excludes(request)
-        
+
         # Serialize with excludes
         json_str = request.json(exclude=excludes)
-        
+
         # replica_groups should not appear in JSON
         assert "replica_groups" not in json_str
 
@@ -109,7 +108,7 @@ class TestReplicaGroupsBackwardCompatibility:
             ],
             scaling={"metric": "rps", "target": 10},
         )
-        
+
         run_spec = RunSpec(
             run_name="test-run",
             repo_id="test-repo",
@@ -117,13 +116,13 @@ class TestReplicaGroupsBackwardCompatibility:
             configuration=config,
             profile=None,
         )
-        
+
         request = GetRunPlanRequest(run_spec=run_spec, max_offers=None)
         excludes = get_get_plan_excludes(request)
-        
+
         # Serialize with excludes
         json_str = request.json(exclude=excludes)
-        
+
         # replica_groups SHOULD appear in JSON
         assert "replica_groups" in json_str
         assert "gpu-group" in json_str

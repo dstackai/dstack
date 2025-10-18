@@ -119,9 +119,9 @@ def print_run_plan(
     if include_run_properties:
         props.add_row(th("Configuration"), run_spec.configuration_path)
         props.add_row(th("Type"), run_spec.configuration.type)
-    
+
     from dstack._internal.core.models.configurations import ServiceConfiguration
-    
+
     if (
         include_run_properties
         and isinstance(run_spec.configuration, ServiceConfiguration)
@@ -130,21 +130,21 @@ def print_run_plan(
         groups_info = []
         for group in run_spec.configuration.replica_groups:
             group_parts = [f"[cyan]{group.name}[/cyan]"]
-            
+
             if group.replicas.min == group.replicas.max:
                 group_parts.append(f"×{group.replicas.max}")
             else:
                 group_parts.append(f"×{group.replicas.min}..{group.replicas.max}")
                 group_parts.append("[dim](autoscalable)[/dim]")
-            
+
             group_parts.append(f"[dim]({group.resources.pretty_format()})[/dim]")
-            
+
             groups_info.append(" ".join(group_parts))
-        
+
         props.add_row(th("Replica groups"), "\n".join(groups_info))
     else:
         props.add_row(th("Resources"), pretty_req)
-    
+
     props.add_row(th("Spot policy"), spot_policy)
     props.add_row(th("Max price"), max_price)
     if include_run_properties:
@@ -163,14 +163,14 @@ def print_run_plan(
     offers.add_column("INSTANCE TYPE", style="grey58", no_wrap=True, ratio=2)
     offers.add_column("PRICE", style="grey58", ratio=1)
     offers.add_column()
-    
+
     # For replica groups, show offers from all job plans
     if len(run_plan.job_plans) > 1:
         # Multiple jobs - aggregate offers from all groups
         all_offers = []
         groups_with_no_offers = []
         total_offers_count = 0
-        
+
         for jp in run_plan.job_plans:
             group_name = jp.job_spec.replica_group_name or "default"
             if jp.total_offers == 0:
@@ -178,12 +178,12 @@ def print_run_plan(
             for offer in jp.offers[:max_offers] if max_offers else jp.offers:
                 all_offers.append((group_name, offer))
             total_offers_count += jp.total_offers
-        
+
         # Sort by price
         all_offers.sort(key=lambda x: x[1].price)
         if max_offers:
             all_offers = all_offers[:max_offers]
-        
+
         # Show groups with no offers FIRST
         for group_name in groups_with_no_offers:
             offers.add_row(
@@ -196,7 +196,7 @@ def print_run_plan(
                 "",
                 style="secondary",
             )
-        
+
         # Then show groups with offers
         for i, (group_name, offer) in enumerate(all_offers, start=1):
             r = offer.instance.resources
@@ -212,10 +212,10 @@ def print_run_plan(
             instance = offer.instance.name
             if offer.total_blocks > 1:
                 instance += f" ({offer.blocks}/{offer.total_blocks})"
-            
+
             # Add group name prefix for multi-group display
             backend_display = f"[cyan]{group_name}[/cyan]: {offer.backend.replace('remote', 'ssh')} ({offer.region})"
-            
+
             offers.add_row(
                 f"{i}",
                 backend_display,
@@ -225,7 +225,7 @@ def print_run_plan(
                 availability,
                 style=None if i == 1 or not include_run_properties else "secondary",
             )
-        
+
         if total_offers_count > len(all_offers):
             offers.add_row("", "...", style="secondary")
     else:
@@ -260,14 +260,14 @@ def print_run_plan(
 
     console.print(props)
     console.print()
-    
+
     # Check if we have offers to display
     has_offers = False
     if len(run_plan.job_plans) > 1:
         has_offers = any(len(jp.offers) > 0 for jp in run_plan.job_plans)
     else:
         has_offers = len(job_plan.offers) > 0
-    
+
     if has_offers:
         console.print(offers)
         # Show summary for multi-job plans
@@ -343,12 +343,12 @@ def get_runs_table(
             if verbose and latest_job_submission.inactivity_secs:
                 inactive_for = format_duration_multiunit(latest_job_submission.inactivity_secs)
                 status += f" (inactive for {inactive_for})"
-            
+
             job_name_parts = [f"  replica={job.job_spec.replica_num}"]
             if job.job_spec.replica_group_name:
                 job_name_parts.append(f"[cyan]group={job.job_spec.replica_group_name}[/cyan]")
             job_name_parts.append(f"job={job.job_spec.job_num}")
-            
+
             job_row: Dict[Union[str, int], Any] = {
                 "NAME": " ".join(job_name_parts)
                 + (

@@ -484,6 +484,7 @@ async def _handle_run_replicas(
                 session,
                 run_model,
                 replicas_diff=max_replica_count - non_terminated_replica_count,
+                allow_exceeding_max=True,  # Allow exceeding max for rolling deployments
             )
 
         replicas_to_stop_count = 0
@@ -510,6 +511,7 @@ async def _handle_run_replicas(
                 session,
                 run_model,
                 replicas_diff=-replicas_to_stop_count,
+                allow_exceeding_max=True,  # Allow terminating out-of-date replicas during rolling deployment
             )
 
 

@@ -6,7 +6,7 @@ from dstack._internal.core.models.configurations import (
     ServiceConfiguration,
     parse_run_configuration,
 )
-from dstack._internal.core.models.resources import CPUSpec, GPUSpec, Range, ResourcesSpec
+from dstack._internal.core.models.resources import Range
 from dstack._internal.core.models.runs import get_normalized_replica_groups
 
 
@@ -32,17 +32,17 @@ class TestReplicaGroupConfiguration:
                 },
             ],
         }
-        
+
         parsed = parse_run_configuration(conf)
         assert isinstance(parsed, ServiceConfiguration)
         assert parsed.replica_groups is not None
         assert len(parsed.replica_groups) == 2
-        
+
         # Check first group
         assert parsed.replica_groups[0].name == "h100-group"
         assert parsed.replica_groups[0].replicas == Range(min=1, max=1)
         assert parsed.replica_groups[0].resources.gpu.name == ["H100"]
-        
+
         # Check second group
         assert parsed.replica_groups[1].name == "rtx5090-group"
         assert parsed.replica_groups[1].replicas == Range(min=2, max=2)
@@ -71,14 +71,14 @@ class TestReplicaGroupConfiguration:
                 "target": 10,
             },
         }
-        
+
         parsed = parse_run_configuration(conf)
         assert parsed.replica_groups is not None
         assert len(parsed.replica_groups) == 2
-        
+
         # Fixed group
         assert parsed.replica_groups[0].replicas == Range(min=1, max=1)
-        
+
         # Scalable group
         assert parsed.replica_groups[1].replicas == Range(min=1, max=3)
 
@@ -108,13 +108,13 @@ class TestReplicaGroupConfiguration:
                 },
             ],
         }
-        
+
         parsed = parse_run_configuration(conf)
-        
+
         # First group inherits from service (doesn't specify backends/regions)
         assert parsed.replica_groups[0].backends is None
         assert parsed.replica_groups[0].regions is None
-        
+
         # Second group overrides
         assert parsed.replica_groups[1].backends == ["runpod"]
         assert parsed.replica_groups[1].regions == ["eu-west-1"]
@@ -134,7 +134,7 @@ class TestReplicaGroupConfiguration:
                 }
             ],
         }
-        
+
         with pytest.raises(
             ConfigurationError,
             match="Cannot specify both 'replicas' and 'replica_groups'",
@@ -160,7 +160,7 @@ class TestReplicaGroupConfiguration:
                 },
             ],
         }
-        
+
         with pytest.raises(
             ConfigurationError,
             match="Replica group names must be unique",
@@ -181,7 +181,7 @@ class TestReplicaGroupConfiguration:
                 }
             ],
         }
-        
+
         with pytest.raises(
             ConfigurationError,
             match="Group name cannot be empty",
@@ -203,7 +203,7 @@ class TestReplicaGroupConfiguration:
             ],
             # Missing scaling!
         }
-        
+
         with pytest.raises(
             ConfigurationError,
             match="When any replica group has a range, 'scaling' must be specified",
@@ -218,7 +218,7 @@ class TestReplicaGroupConfiguration:
             "port": 8000,
             "replica_groups": [],  # Empty list
         }
-        
+
         with pytest.raises(
             ConfigurationError,
             match="replica_groups cannot be empty",
@@ -248,10 +248,10 @@ class TestReplicaGroupNormalization:
                 },
             ],
         }
-        
+
         parsed = parse_run_configuration(conf)
         normalized = get_normalized_replica_groups(parsed)
-        
+
         assert len(normalized) == 2
         assert normalized[0].name == "group1"
         assert normalized[1].name == "group2"
@@ -267,16 +267,16 @@ class TestReplicaGroupNormalization:
             "backends": ["aws"],
             "regions": ["us-west-2"],
         }
-        
+
         parsed = parse_run_configuration(conf)
         normalized = get_normalized_replica_groups(parsed)
-        
+
         # Should create single "default" group
         assert len(normalized) == 1
         assert normalized[0].name == "default"
         assert normalized[0].replicas == Range(min=3, max=3)
         assert normalized[0].resources.gpu.name == ["H100"]
-        
+
         # Should inherit profile params
         assert normalized[0].backends == ["aws"]
         assert normalized[0].regions == ["us-west-2"]
@@ -294,10 +294,10 @@ class TestReplicaGroupNormalization:
                 "target": 10,
             },
         }
-        
+
         parsed = parse_run_configuration(conf)
         normalized = get_normalized_replica_groups(parsed)
-        
+
         assert len(normalized) == 1
         assert normalized[0].name == "default"
         assert normalized[0].replicas == Range(min=1, max=5)
@@ -329,12 +329,12 @@ class TestReplicaGroupAutoscaling:
                 "target": 10,
             },
         }
-        
+
         parsed = parse_run_configuration(conf)
-        
+
         # Fixed group: min == max
         assert parsed.replica_groups[0].replicas.min == parsed.replica_groups[0].replicas.max
-        
+
         # Scalable group: min != max
         assert parsed.replica_groups[1].replicas.min != parsed.replica_groups[1].replicas.max
 
@@ -361,9 +361,9 @@ class TestReplicaGroupAutoscaling:
                 "target": 10,
             },
         }
-        
+
         parsed = parse_run_configuration(conf)
-        
+
         # Both are autoscalable
         assert parsed.replica_groups[0].replicas.min != parsed.replica_groups[0].replicas.max
         assert parsed.replica_groups[1].replicas.min != parsed.replica_groups[1].replicas.max
@@ -381,9 +381,9 @@ class TestBackwardCompatibility:
             "replicas": 2,
             "resources": {"gpu": "A100:1"},
         }
-        
+
         parsed = parse_run_configuration(conf)
-        
+
         # Should parse successfully
         assert isinstance(parsed, ServiceConfiguration)
         assert parsed.replicas == Range(min=2, max=2)
@@ -402,9 +402,9 @@ class TestBackwardCompatibility:
                 "target": 10,
             },
         }
-        
+
         parsed = parse_run_configuration(conf)
-        
+
         # Should parse successfully
         assert parsed.replicas == Range(min=0, max=5)
         assert parsed.scaling is not None
@@ -423,10 +423,10 @@ class TestBackwardCompatibility:
             "spot_policy": "spot",
             "max_price": 10.0,
         }
-        
+
         parsed = parse_run_configuration(conf)
         normalized = get_normalized_replica_groups(parsed)
-        
+
         # Check all fields are copied
         group = normalized[0]
         assert group.backends == ["aws"]

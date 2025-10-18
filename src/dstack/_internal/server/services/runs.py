@@ -340,7 +340,7 @@ async def get_plan(
                 action = ApplyAction.UPDATE
 
     secrets = await get_project_secrets_mapping(session=session, project=project)
-    
+
     # For services with replica groups, create jobs for all groups during planning
     jobs = []
     if (
@@ -407,12 +407,12 @@ async def get_plan(
     job_plans = []
     for job in jobs:
         job_offers: List[InstanceOfferWithAvailability] = []
-        
+
         # Filter pool offers to match this job's GPU requirements
         gpu_req = None
         if job.job_spec.requirements.resources and job.job_spec.requirements.resources.gpu:
             gpu_req = job.job_spec.requirements.resources.gpu.name
-        
+
         matching_pool_offers = []
         for pool_offer in pool_offers:
             offer_gpus = pool_offer.instance.resources.gpus
@@ -424,9 +424,9 @@ async def get_plan(
             elif not gpu_req:
                 # No GPU requirement, include all pool offers
                 matching_pool_offers.append(pool_offer)
-        
+
         job_offers.extend(matching_pool_offers)
-        
+
         # Use shared offers if all jobs are identical, otherwise fetch per-job
         if shared_offers:
             job_offers.extend(offer for _, offer in shared_offers)
@@ -443,7 +443,7 @@ async def get_plan(
                 instance_mounts=check_run_spec_requires_instance_mounts(effective_run_spec),
             )
             job_offers.extend(offer for _, offer in job_specific_offers)
-        
+
         job_offers.sort(key=lambda offer: not offer.availability.is_available())
 
         job_spec = job.job_spec
@@ -1287,7 +1287,21 @@ async def process_terminating_run(session: AsyncSession, run_model: RunModel):
         )
 
 
-async def scale_run_replicas(session: AsyncSession, run_model: RunModel, replicas_diff: int):
+async def scale_run_replicas(
+    session: AsyncSession,
+    run_model: RunModel,
+    replicas_diff: int,
+    allow_exceeding_max: bool = False,
+):
+    """
+    Scale run replicas up or down.
+
+    Args:
+        session: Database session
+        run_model: The run to scale
+        replicas_diff: Number of replicas to add (positive) or remove (negative)
+        allow_exceeding_max: If True, allow scaling beyond configured max (for rolling deployments)
+    """
     if replicas_diff == 0:
         # nothing to do
         return
@@ -1349,9 +1363,10 @@ async def scale_run_replicas(session: AsyncSession, run_model: RunModel, replica
         # Get group minimums
         group_mins = {g.name: g.replicas.min for g in normalized_groups}
 
-        # Terminate from end (reversed), but skip if group not autoscalable or at minimum
+        # Terminate from end (reversed)
+        # For rolling deployments (allow_exceeding_max), prioritize terminating out-of-date replicas
         terminated_count = 0
-        for _, _, _, replica_jobs in reversed(active_replicas):
+        for _, is_out_of_date, _, replica_jobs in reversed(active_replicas):
             if terminated_count >= abs(replicas_diff):
                 break
 
@@ -1360,7 +1375,19 @@ async def scale_run_replicas(session: AsyncSession, run_model: RunModel, replica
 
             group_name = replica_jobs[0].replica_group_name or "default"
 
-            # Skip if not autoscalable
+            # For rolling deployment, allow terminating any out-of-date replica
+            if allow_exceeding_max and is_out_of_date:
+                # Terminate this replica (out-of-date during rolling deployment)
+                for job in replica_jobs:
+                    if not job.status.is_finished() and job.status != JobStatus.TERMINATING:
+                        job.status = JobStatus.TERMINATING
+                        job.termination_reason = JobTerminationReason.SCALED_DOWN
+
+                group_counts[group_name] -= 1
+                terminated_count += 1
+                continue
+
+            # For normal scaling, skip if not autoscalable
             if normalized_groups and group_name not in autoscalable_groups:
                 continue
 
@@ -1379,29 +1406,42 @@ async def scale_run_replicas(session: AsyncSession, run_model: RunModel, replica
             group_counts[group_name] -= 1
             terminated_count += 1
     else:
-        # SCALE UP: Choose from autoscalable groups
-        autoscalable_groups = [g for g in normalized_groups if g.replicas.min != g.replicas.max]
-
-        if normalized_groups and not autoscalable_groups:
-            # No autoscalable groups, cannot scale
-            logger.info("%s: no autoscalable groups available for scaling up", fmt(run_model))
-            return
-
-        # Count current replicas per group to respect maximums
+        # SCALE UP
+        # Count current replicas per group
         group_counts = {}
         for _, _, _, replica_jobs in active_replicas:
             if replica_jobs:
                 group_name = replica_jobs[0].replica_group_name or "default"
                 group_counts[group_name] = group_counts.get(group_name, 0) + 1
 
-        # Filter groups that haven't reached maximum
-        eligible_groups = [
-            g for g in autoscalable_groups if group_counts.get(g.name, 0) < (g.replicas.max or float("inf"))
-        ] if normalized_groups else normalized_groups
+        # First, identify groups below minimum (need to scale regardless of autoscalability)
+        below_min_groups = [
+            g for g in normalized_groups
+            if group_counts.get(g.name, 0) < (g.replicas.min or 0)
+        ]
+
+        # Then, identify autoscalable groups that can scale beyond minimum
+        autoscalable_groups = [
+            g for g in normalized_groups
+            if g.replicas.min != g.replicas.max and (
+                allow_exceeding_max or group_counts.get(g.name, 0) < (g.replicas.max or float("inf"))
+            )
+        ]
+
+        # Eligible groups are: below-min groups + autoscalable groups
+        eligible_groups = []
+        if below_min_groups:
+            eligible_groups.extend(below_min_groups)
+        elif autoscalable_groups:
+            # Only use autoscalable groups if no groups are below minimum
+            eligible_groups.extend(autoscalable_groups)
+        elif allow_exceeding_max and normalized_groups:
+            # For rolling deployments, allow exceeding max even for fixed groups
+            eligible_groups.extend(normalized_groups)
 
         if normalized_groups and not eligible_groups:
-            # All groups at maximum
-            logger.info("%s: all autoscalable groups at maximum capacity", fmt(run_model))
+            # All groups at their limits
+            logger.info("%s: all replica groups at their limits (min/max)", fmt(run_model))
             return
 
         scheduled_replicas = 0
@@ -1410,10 +1450,10 @@ async def scale_run_replicas(session: AsyncSession, run_model: RunModel, replica
         for _, _, _, replica_jobs in inactive_replicas:
             if scheduled_replicas == replicas_diff:
                 break
-            # Only reuse if from autoscalable group
+            # Only reuse if from eligible group
             if replica_jobs:
                 group_name = replica_jobs[0].replica_group_name or "default"
-                if not normalized_groups or group_name in {g.name for g in autoscalable_groups}:
+                if not normalized_groups or group_name in {g.name for g in eligible_groups}:
                     await retry_run_replica_jobs(session, run_model, replica_jobs, only_failed=False)
                     scheduled_replicas += 1
 

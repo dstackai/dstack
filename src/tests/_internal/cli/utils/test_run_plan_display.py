@@ -1,9 +1,6 @@
 """Test CLI display of run plans with replica groups."""
 
-from io import StringIO
-from unittest.mock import MagicMock, patch
 
-import pytest
 
 from dstack._internal.cli.utils.run import print_run_plan
 from dstack._internal.core.models.backends.base import BackendType
@@ -16,7 +13,7 @@ from dstack._internal.core.models.instances import (
 )
 from dstack._internal.core.models.profiles import Profile
 from dstack._internal.core.models.repos import LocalRunRepoData
-from dstack._internal.core.models.resources import ResourcesSpec, Range
+from dstack._internal.core.models.resources import Range, ResourcesSpec
 from dstack._internal.core.models.runs import (
     ApplyAction,
     InstanceOfferWithAvailability,
@@ -304,13 +301,13 @@ class TestReplicaGroupsDisplayInCLI:
 
         # Split output to find the offers table (after the header section)
         lines = output.split("\n")
-        
+
         # Find lines that contain both a number and a group name (these are offer rows)
         offer_rows = [
-            line for line in lines 
+            line for line in lines
             if ("cheap-group:" in line or "expensive-group:" in line) and line.strip().startswith(("1", "2", "3"))
         ]
-        
+
         # The first offer row should be cheap-group (lower price)
         assert len(offer_rows) >= 2, "Should have at least 2 offer rows"
         assert "cheap-group:" in offer_rows[0], "First offer should be cheap-group (sorted by price)"
@@ -416,7 +413,7 @@ class TestReplicaGroupsDisplayInCLI:
         assert "offers available" in output
         assert "Possible reasons:" in output
         assert "dstack.ai/docs" in output  # URL may be truncated in table
-        
+
         # Verify unavailable group appears BEFORE available group (at top)
         unavailable_pos = output.find("unavailable-group:")
         available_pos = output.find("available-group:")

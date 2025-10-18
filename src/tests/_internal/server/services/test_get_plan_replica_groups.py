@@ -1,6 +1,5 @@
 """Test get_plan() offer fetching logic for replica groups."""
 
-import pytest
 
 from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import Requirements

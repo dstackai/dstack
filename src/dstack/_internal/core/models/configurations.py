@@ -846,24 +846,24 @@ class ServiceConfigurationParams(CoreModel):
     def validate_replica_groups_xor_replicas(cls, values):
         replica_groups = values.get("replica_groups")
         replicas = values.get("replicas")
-        
+
         # Check if user specified both
         has_groups = replica_groups is not None
         has_replicas = replicas != Range[int](min=1, max=1)
-        
+
         if has_groups and has_replicas:
             raise ValueError("Cannot specify both 'replicas' and 'replica_groups'")
-        
+
         if has_groups:
             # Validate unique names
             names = [g.name for g in replica_groups]
             if len(names) != len(set(names)):
                 raise ValueError("Replica group names must be unique")
-            
+
             # Validate at least one group
             if not replica_groups:
                 raise ValueError("replica_groups cannot be empty")
-        
+
         return values
 
     @root_validator()
@@ -871,7 +871,7 @@ class ServiceConfigurationParams(CoreModel):
         scaling = values.get("scaling")
         replicas = values.get("replicas")
         replica_groups = values.get("replica_groups")
-        
+
         if replica_groups:
             # Check if any group has a range
             has_range = any(g.replicas.min != g.replicas.max for g in replica_groups)
@@ -883,7 +883,7 @@ class ServiceConfigurationParams(CoreModel):
             raise ValueError("When you set `replicas` to a range, ensure to specify `scaling`.")
         elif replicas and replicas.min == replicas.max and scaling:
             raise ValueError("To use `scaling`, `replicas` must be set to a range.")
-        
+
         return values
 
     @validator("rate_limits")

@@ -131,7 +131,7 @@ def get_service_scaler(conf: ServiceConfiguration) -> BaseServiceScaler:
         assert conf.replicas.max is not None
         min_replicas = conf.replicas.min
         max_replicas = conf.replicas.max
-    
+
     if conf.scaling is None:
         return ManualScaler(
             min_replicas=min_replicas,
