@@ -2,6 +2,7 @@ import importlib.resources
 import json
 import subprocess
 import tempfile
+import urllib.parse
 from asyncio import Lock
 from pathlib import Path
 from typing import Optional
@@ -213,12 +214,12 @@ class Nginx:
                     logger.warning("Failed to add worker %s, continuing with others", worker_url)
 
             # Remove old workers
-            # for worker_url in sorted(workers_to_remove):
-            #     success = Nginx.remove_sglang_router_worker(worker_url)
-            #     if not success:
-            #         logger.warning(
-            #             "Failed to remove worker %s, continuing with others", worker_url
-            #         )
+            for worker_url in sorted(workers_to_remove):
+                success = Nginx.remove_sglang_router_worker(worker_url)
+                if not success:
+                    logger.warning(
+                        "Failed to remove worker %s, continuing with others", worker_url
+                    )
 
         except Exception as e:
             logger.error(f"Error updating sglang router workers: {e}")
@@ -255,6 +256,34 @@ class Nginx:
                 return False
         except Exception as e:
             logger.error(f"Error adding worker {worker_url}: {e}")
+            return False
+
+    @staticmethod
+    def remove_sglang_router_worker(worker_url: str) -> bool:
+        """Remove a single worker from sglang router"""
+        try:
+            # URL encode the worker URL for the DELETE request
+            encoded_url = urllib.parse.quote(worker_url, safe="")
+
+            result = subprocess.run(
+                ["curl", "-X", "DELETE", f"http://localhost:3000/workers/{encoded_url}"],
+                capture_output=True,
+                timeout=5,
+            )
+
+            if result.returncode == 0:
+                response = json.loads(result.stdout.decode())
+                if response.get("status") == "accepted":
+                    logger.info("Removed worker %s from sglang router (queued)", worker_url)
+                    return True
+                else:
+                    logger.error("Failed to remove worker %s: %s", worker_url, response)
+                    return False
+            else:
+                logger.error("Failed to remove worker %s: %s", worker_url, result.stderr.decode())
+                return False
+        except Exception as e:
+            logger.error(f"Error removing worker {worker_url}: {e}")
             return False
 
     @staticmethod
