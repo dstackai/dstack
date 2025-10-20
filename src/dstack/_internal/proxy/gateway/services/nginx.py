@@ -89,7 +89,7 @@ class Nginx:
             if hasattr(conf, "router") and conf.router == "sglang":
                 replicas = len(conf.replicas) if hasattr(conf, "replicas") and conf.replicas else 1
                 await run_async(self.write_sglang_workers_conf, conf)
-                await run_async(self.start_sglang_router, replicas)
+                await run_async(self.start_or_update_sglang_router, replicas)
 
         logger.info("Registered %s domain %s", conf.type, conf.domain)
 
@@ -115,17 +115,30 @@ class Nginx:
             raise UnexpectedProxyError("Failed to reload nginx")
 
     @staticmethod
+    def start_or_update_sglang_router(replicas: int) -> None:
+        """Start the sglang router if not running; otherwise update workers via HTTP API."""
+        # Start router (without workers) if it's not running, then sync workers
+        if not Nginx.is_sglang_router_running():
+            logger.info("Sglang router not running, starting with %d replicas", replicas)
+            Nginx.start_sglang_router(replicas)
+
+    @staticmethod
+    def is_sglang_router_running() -> bool:
+        result = subprocess.run(["pgrep", "-f", "sglang::router"], capture_output=True, timeout=5)
+        return result.returncode == 0
+
+    @staticmethod
     def start_sglang_router(replicas: int) -> None:
         try:
-            result = subprocess.run(
-                ["pgrep", "-f", "sglang::router"], capture_output=True, timeout=5
-            )
-            if result.returncode == 0:
-                logger.info("Stopping existing sglang-router...")
-                subprocess.run(["pkill", "-f", "sglang::router"], timeout=5)
-                import time
+            # result = subprocess.run(
+            #     ["pgrep", "-f", "sglang::router"], capture_output=True, timeout=5
+            # )
+            # if result.returncode == 0:
+            #     logger.info("Stopping existing sglang-router...")
+            #     subprocess.run(["pkill", "-f", "sglang::router"], timeout=5)
+            #     import time
 
-                time.sleep(1)
+            #     time.sleep(1)
             worker_urls = []
             for i in range(1, replicas + 1):
                 worker_urls.append(f"http://127.0.0.1:{10000 + i}")
@@ -148,8 +161,6 @@ class Nginx:
                     "debug",
                     "--log-dir",
                     "./router_logs",
-                    "--request-timeout-secs",
-                    "1800",
                 ]
             )
             subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
