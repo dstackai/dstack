@@ -983,6 +983,7 @@ def get_dstack_gateway_wheel(build: str) -> str:
         build = r.text.strip()
         logger.debug("Found the latest gateway build: %s", build)
     # return f"{base_url}/dstack_gateway-{build}-py3-none-any.whl"
+    logger.debug("Using temp wheel")
     return "https://bihan-test-bucket.s3.eu-west-1.amazonaws.com/dstack_gateway-0.0.0-py3-none-any.whl"
 
 
