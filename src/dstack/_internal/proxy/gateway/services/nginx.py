@@ -122,7 +122,7 @@ class Nginx:
         if not Nginx.is_sglang_router_running():
             logger.info("Sglang router not running, starting with %d replicas", replicas)
             Nginx.start_only_sglang_router()
-            Nginx.update_sglang_router_workers(replicas)
+        Nginx.update_sglang_router_workers(replicas)
 
     @staticmethod
     def is_sglang_router_running() -> bool:
