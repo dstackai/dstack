@@ -89,7 +89,7 @@ class Nginx:
                 await run_async(self.run_certbot, conf.domain, acme)
             await run_async(self.write_conf, conf.render(), conf_name)
             if hasattr(conf, "router") and conf.router == "sglang":
-                replicas = len(conf.replicas) if hasattr(conf, "replicas") and conf.replicas else 1
+                replicas = len(conf.replicas)
                 await run_async(self.write_sglang_workers_conf, conf)
                 await run_async(self.start_or_update_sglang_router, replicas)
 
