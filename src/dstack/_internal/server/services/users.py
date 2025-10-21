@@ -12,6 +12,7 @@ from dstack._internal.core.errors import ResourceExistsError, ServerClientError
 from dstack._internal.core.models.users import (
     GlobalRole,
     User,
+    UserHookConfig,
     UserPermissions,
     UserTokenCreds,
     UserWithCreds,
@@ -19,6 +20,8 @@ from dstack._internal.core.models.users import (
 from dstack._internal.server.models import DecryptedString, UserModel
 from dstack._internal.server.services.permissions import get_default_permissions
 from dstack._internal.server.utils.routers import error_forbidden
+from dstack._internal.utils.common import run_async
+from dstack._internal.utils.crypto import generate_rsa_key_pair_bytes
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -77,6 +80,7 @@ async def create_user(
     email: Optional[str] = None,
     active: bool = True,
     token: Optional[str] = None,
+    config: Optional[UserHookConfig] = None,
 ) -> UserModel:
     validate_username(username)
     user_model = await get_user_model_by_name(session=session, username=username, ignore_case=True)
@@ -84,6 +88,7 @@ async def create_user(
         raise ResourceExistsError()
     if token is None:
         token = str(uuid.uuid4())
+    private_bytes, public_bytes = await run_async(generate_rsa_key_pair_bytes, username)
     user = UserModel(
         id=uuid.uuid4(),
         name=username,
@@ -92,11 +97,13 @@ async def create_user(
         token_hash=get_token_hash(token),
         email=email,
         active=active,
+        ssh_private_key=private_bytes.decode(),
+        ssh_public_key=public_bytes.decode(),
     )
     session.add(user)
     await session.commit()
     for func in _CREATE_USER_HOOKS:
-        await func(session, user)
+        await func(session, user, config)
     return user
 
 
@@ -118,6 +125,27 @@ async def update_user(
     )
     await session.commit()
     return await get_user_model_by_name_or_error(session=session, username=username)
+
+
+async def refresh_ssh_key(
+    session: AsyncSession,
+    user: UserModel,
+    username: str,
+) -> Optional[UserModel]:
+    logger.debug("Refreshing SSH key for user [code]%s[/code]", username)
+    if user.global_role != GlobalRole.ADMIN and user.name != username:
+        raise error_forbidden()
+    private_bytes, public_bytes = await run_async(generate_rsa_key_pair_bytes, username)
+    await session.execute(
+        update(UserModel)
+        .where(UserModel.name == username)
+        .values(
+            ssh_private_key=private_bytes.decode(),
+            ssh_public_key=public_bytes.decode(),
+        )
+    )
+    await session.commit()
+    return await get_user_model_by_name(session=session, username=username)
 
 
 async def refresh_user_token(
@@ -199,6 +227,7 @@ def user_model_to_user(user_model: UserModel) -> User:
         email=user_model.email,
         active=user_model.active,
         permissions=get_user_permissions(user_model),
+        ssh_public_key=user_model.ssh_public_key,
     )
 
 
@@ -211,7 +240,9 @@ def user_model_to_user_with_creds(user_model: UserModel) -> UserWithCreds:
         email=user_model.email,
         active=user_model.active,
         permissions=get_user_permissions(user_model),
+        ssh_public_key=user_model.ssh_public_key,
         creds=UserTokenCreds(token=user_model.token.get_plaintext_or_error()),
+        ssh_private_key=user_model.ssh_private_key,
     )
 
 
@@ -238,7 +269,9 @@ def is_valid_username(username: str) -> bool:
 _CREATE_USER_HOOKS = []
 
 
-def register_create_user_hook(func: Callable[[AsyncSession, UserModel], Awaitable[None]]):
+def register_create_user_hook(
+    func: Callable[[AsyncSession, UserModel, Optional[UserHookConfig]], Awaitable[None]],
+):
     _CREATE_USER_HOOKS.append(func)
 
 

@@ -1,14 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Cards, CardsProps, Header, Link, MultiselectCSD, PropertyFilter, StatusIndicator } from 'components';
+import { Cards, CardsProps, Link, MultiselectCSD, PropertyFilter, StatusIndicator } from 'components';
 
-import { useBreadcrumbs, useCollection } from 'hooks';
+import { useCollection } from 'hooks';
 import { useGetGpusListQuery } from 'services/gpu';
 
 import { useEmptyMessages } from './hooks/useEmptyMessages';
 import { useFilters } from './hooks/useFilters';
-import { ROUTES } from '../../../routes';
 import { convertMiBToGB, rangeToObject, renderRange, round } from './helpers';
 
 import styles from './styles.module.scss';
@@ -67,17 +66,14 @@ const getRequestParams = ({
     };
 };
 
-export const OfferList = () => {
+type OfferListProps = Pick<CardsProps, 'variant' | 'header' | 'onSelectionChange' | 'selectedItems' | 'selectionType'> & {
+    withSearchParams?: boolean;
+    onChangeProjectName?: (value: string) => void;
+};
+
+export const OfferList: React.FC<OfferListProps> = ({ withSearchParams, onChangeProjectName, ...props }) => {
     const { t } = useTranslation();
     const [requestParams, setRequestParams] = useState<TGpusListQueryParams | undefined>();
-
-    useBreadcrumbs([
-        {
-            text: t('offer.title'),
-            href: ROUTES.OFFERS.LIST,
-        },
-    ]);
-
     const { data, isLoading, isFetching } = useGetGpusListQuery(
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-expect-error
@@ -97,7 +93,7 @@ export const OfferList = () => {
         groupBy,
         groupByOptions,
         onChangeGroupBy,
-    } = useFilters({ gpus: data?.gpus ?? [] });
+    } = useFilters({ gpus: data?.gpus ?? [], withSearchParams });
 
     useEffect(() => {
         setRequestParams(
@@ -109,6 +105,10 @@ export const OfferList = () => {
             }),
         );
     }, [JSON.stringify(filteringRequestParams), groupBy]);
+
+    useEffect(() => {
+        onChangeProjectName?.(filteringRequestParams.project_name ?? '');
+    }, [filteringRequestParams.project_name]);
 
     const { renderEmptyMessage, renderNoMatchMessage } = useEmptyMessages({
         clearFilter,
@@ -188,6 +188,7 @@ export const OfferList = () => {
     return (
         <Cards
             {...collectionProps}
+            {...props}
             items={items}
             cardDefinition={{
                 header: (gpu) => <Link>{gpu.name}</Link>,
@@ -196,8 +197,6 @@ export const OfferList = () => {
             loading={isLoading || isFetching}
             loadingText={t('common.loading')}
             stickyHeader={true}
-            header={<Header variant="awsui-h1-sticky">{t('offer.title')}</Header>}
-            variant="full-page"
             filter={
                 <div className={styles.selectFilters}>
                     <div className={styles.propertyFilter}>

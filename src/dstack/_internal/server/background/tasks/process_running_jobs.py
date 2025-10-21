@@ -243,6 +243,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
                 job_submission.age,
             )
             ssh_user = job_provisioning_data.username
+            assert run.run_spec.ssh_key_pub is not None
             user_ssh_key = run.run_spec.ssh_key_pub.strip()
             public_keys = [project.ssh_public_key.strip(), user_ssh_key]
             if job_provisioning_data.backend == BackendType.LOCAL:

@@ -23,6 +23,7 @@ SUPPORTED_GPUHUNT_FLAGS = [
     "oci-spot",
     "lambda-arm",
     "gcp-a4",
+    "gcp-g4-preview",
 ]
 
 
@@ -199,9 +200,12 @@ def choose_disk_size_mib(
     return round(disk_size_gib * 1024)
 
 
+OfferModifier = Callable[[InstanceOfferWithAvailability], Optional[InstanceOfferWithAvailability]]
+
+
 def get_offers_disk_modifier(
     configurable_disk_size: Range[Memory], requirements: Requirements
-) -> Callable[[InstanceOfferWithAvailability], Optional[InstanceOfferWithAvailability]]:
+) -> OfferModifier:
     """
     Returns a func that modifies offers disk by setting min value that satisfies both
     `configurable_disk_size` and `requirements`.

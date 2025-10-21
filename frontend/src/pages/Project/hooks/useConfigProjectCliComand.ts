@@ -9,7 +9,7 @@ type Args = {
 export const useConfigProjectCliCommand = ({ projectName }: Args) => {
     const currentUserToken = useAppSelector(selectAuthToken);
 
-    const cliCommand = `dstack project add --name ${projectName} --url ${location.origin} --token ${currentUserToken}`;
+    const cliCommand = `dstack project add \\\n  --url ${location.origin} \\\n  --name ${projectName} \\\n  --token ${currentUserToken}`;
 
     const copyCliCommand = () => {
         copyToClipboard(cliCommand);

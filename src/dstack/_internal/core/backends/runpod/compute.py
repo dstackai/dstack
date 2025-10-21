@@ -1,7 +1,8 @@
 import json
 import uuid
+from collections.abc import Iterable
 from datetime import timedelta
-from typing import Callable, List, Optional
+from typing import List, Optional
 
 from dstack._internal.core.backends.base.backend import Compute
 from dstack._internal.core.backends.base.compute import (
@@ -15,7 +16,11 @@ from dstack._internal.core.backends.base.compute import (
     get_job_instance_name,
 )
 from dstack._internal.core.backends.base.models import JobConfiguration
-from dstack._internal.core.backends.base.offers import get_catalog_offers, get_offers_disk_modifier
+from dstack._internal.core.backends.base.offers import (
+    OfferModifier,
+    get_catalog_offers,
+    get_offers_disk_modifier,
+)
 from dstack._internal.core.backends.runpod.api_client import RunpodApiClient, RunpodApiClientError
 from dstack._internal.core.backends.runpod.models import RunpodConfig
 from dstack._internal.core.consts import DSTACK_RUNNER_SSH_PORT
@@ -77,10 +82,8 @@ class RunpodCompute(
         ]
         return offers
 
-    def get_offers_modifier(
-        self, requirements: Requirements
-    ) -> Callable[[InstanceOfferWithAvailability], Optional[InstanceOfferWithAvailability]]:
-        return get_offers_disk_modifier(CONFIGURABLE_DISK_SIZE, requirements)
+    def get_offers_modifiers(self, requirements: Requirements) -> Iterable[OfferModifier]:
+        return [get_offers_disk_modifier(CONFIGURABLE_DISK_SIZE, requirements)]
 
     def run_job(
         self,
@@ -91,6 +94,7 @@ class RunpodCompute(
         project_ssh_private_key: str,
         volumes: List[Volume],
     ) -> JobProvisioningData:
+        assert run.run_spec.ssh_key_pub is not None
         instance_config = InstanceConfiguration(
             project_name=run.project_name,
             instance_name=get_job_instance_name(run, job),

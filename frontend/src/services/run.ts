@@ -57,6 +57,18 @@ export const runApi = createApi({
             providesTags: (result) => (result ? [{ type: 'Runs' as const, id: result?.id }] : []),
         }),
 
+        applyRun: builder.mutation<{ id: string; project_name: string }, TRunApplyRequestParams>({
+            query: ({ project_name, ...body }) => {
+                return {
+                    url: API.PROJECTS.RUNS_APPLY(project_name ?? ''),
+                    method: 'POST',
+                    body,
+                };
+            },
+
+            // providesTags: (result) => (result ? [{ type: 'Runs' as const, id: result?.id }] : []),
+        }),
+
         stopRuns: builder.mutation<void, TStopRunsRequestParams>({
             query: ({ project_name, ...body }) => ({
                 url: API.PROJECTS.RUNS_STOP(project_name),
@@ -169,6 +181,7 @@ export const {
     useGetRunsQuery,
     useLazyGetRunsQuery,
     useGetRunQuery,
+    useApplyRunMutation,
     useStopRunsMutation,
     useDeleteRunsMutation,
     useLazyGetModelsQuery,

@@ -77,6 +77,7 @@ class TestListProjects:
                     "permissions": {
                         "can_create_projects": True,
                     },
+                    "ssh_public_key": None,
                 },
                 "created_at": "2023-01-02T03:04:00+00:00",
                 "backends": [],
@@ -244,6 +245,7 @@ class TestCreateProject:
                 "permissions": {
                     "can_create_projects": True,
                 },
+                "ssh_public_key": user.ssh_public_key,
             },
             "created_at": "2023-01-02T03:04:00+00:00",
             "backends": [],
@@ -259,6 +261,7 @@ class TestCreateProject:
                         "permissions": {
                             "can_create_projects": True,
                         },
+                        "ssh_public_key": user.ssh_public_key,
                     },
                     "project_role": ProjectRole.ADMIN,
                     "permissions": {
@@ -693,6 +696,7 @@ class TestGetProject:
                 "permissions": {
                     "can_create_projects": True,
                 },
+                "ssh_public_key": None,
             },
             "created_at": "2023-01-02T03:04:00+00:00",
             "backends": [],
@@ -708,6 +712,7 @@ class TestGetProject:
                         "permissions": {
                             "can_create_projects": True,
                         },
+                        "ssh_public_key": None,
                     },
                     "project_role": ProjectRole.ADMIN,
                     "permissions": {
@@ -937,6 +942,7 @@ class TestSetProjectMembers:
                     "permissions": {
                         "can_create_projects": True,
                     },
+                    "ssh_public_key": admin.ssh_public_key,
                 },
                 "project_role": ProjectRole.ADMIN,
                 "permissions": {
@@ -954,6 +960,7 @@ class TestSetProjectMembers:
                     "permissions": {
                         "can_create_projects": True,
                     },
+                    "ssh_public_key": user1.ssh_public_key,
                 },
                 "project_role": ProjectRole.ADMIN,
                 "permissions": {
@@ -971,6 +978,7 @@ class TestSetProjectMembers:
                     "permissions": {
                         "can_create_projects": True,
                     },
+                    "ssh_public_key": user2.ssh_public_key,
                 },
                 "project_role": ProjectRole.USER,
                 "permissions": {
@@ -1027,6 +1035,7 @@ class TestSetProjectMembers:
                     "permissions": {
                         "can_create_projects": True,
                     },
+                    "ssh_public_key": user1.ssh_public_key,
                 },
                 "project_role": ProjectRole.ADMIN,
                 "permissions": {

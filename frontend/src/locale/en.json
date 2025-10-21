@@ -51,7 +51,8 @@
     "control_plane": "Control plane",
     "refresh": "Refresh",
     "quickstart": "Quickstart",
-    "ask_ai": "Ask AI"
+    "ask_ai": "Ask AI",
+    "new": "New"
   },
 
   "auth": {
@@ -416,6 +417,8 @@
       "backend": "Backend",
       "region": "Region",
       "instance_id": "Instance ID",
+      "schedule": "Schedule",
+      "next_run": "Next run",
       "resources": "Resources",
       "spot": "Spot",
       "termination_reason": "Termination reason",
@@ -463,6 +466,24 @@
       "name": "Name",
       "type": "Type",
       "size": "Size"
+    }
+  },
+  "runs": {
+    "dev_env": {
+      "wizard": {
+        "title": "New dev environment",
+        "submit": "Apply",
+        "offer": "Offer",
+        "offer_description": "Select an offer for the dev environment.",
+        "name": "Name",
+        "name_description": "The name of the run. If not specified, the name will be generated automatically.",
+        "name_placeholder": "Optional",
+        "ide": "IDE",
+        "ide_description": "Select which IDE would you like to use with the dev environment.",
+        "config": "Configuration file",
+        "config_description": "Review the configuration file and adjust it if needed. Click Info for examples.",
+        "success_notification": "The run is submitted!"
+      }
     }
   },
   "offer": {

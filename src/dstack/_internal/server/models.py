@@ -191,6 +191,9 @@ class UserModel(BaseModel):
     # deactivated users cannot access API
     active: Mapped[bool] = mapped_column(Boolean, default=True)
 
+    ssh_private_key: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    ssh_public_key: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
     email: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
 
     projects_quota: Mapped[int] = mapped_column(

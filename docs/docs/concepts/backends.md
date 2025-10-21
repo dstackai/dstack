@@ -520,6 +520,7 @@ gcloud projects list --format="json(projectId)"
     compute.networks.updatePolicy
     compute.regions.get
     compute.regions.list
+    compute.reservations.list
     compute.resourcePolicies.create
     compute.resourcePolicies.delete
     compute.routers.list
@@ -542,6 +543,9 @@ gcloud projects list --format="json(projectId)"
 
     Also, the use of TPUs requires the `serviceAccountUser` role.
     For TPU VMs, dstack will use the default service account.
+
+    If you plan to use shared reservations, the `compute.reservations.list`
+    permission is required in the project that owns the reservations.
 
 ??? info "Required APIs"
     First, ensure the required APIs are enabled in your GCP `project_id`.
@@ -1042,6 +1046,31 @@ projects:
     Support for auto-scalable Kubernetes clusters is coming soon—you can track progress in the corresponding [issue :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/3126){:target="_blank"}.
     
     If on-demand provisioning is important, we recommend using [VM-based](#vm-based) backends as they already support auto-scaling. -->
+
+??? info "Required permissions"
+    The following Kubernetes permissions are sufficient for `dstack` to work:
+
+    ```yaml
+    apiVersion: rbac.authorization.k8s.io/v1
+    kind: ClusterRole
+    metadata:
+      name: dstack-backend
+    rules:
+    - apiGroups: [""]
+      resources: ["namespaces"]
+      verbs: ["get", "create"]
+    - apiGroups: [""]
+      resources: ["pods"]
+      verbs: ["get", "create", "delete"]
+    - apiGroups: [""]
+      resources: ["services"]
+      verbs: ["get", "create", "delete"]
+    - apiGroups: [""]
+      resources: ["nodes"]
+      verbs: ["list"]
+    ```
+    
+    Ensure you've created a ClusterRoleBinding to grant the role to the user or the service account you're using.
 
 > To learn more, see the [Kubernetes](../guides/kubernetes.md) guide.
 
