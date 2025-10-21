@@ -24,6 +24,7 @@ SUPPORTED_GPUHUNT_FLAGS = [
     "lambda-arm",
     "gcp-a4",
     "gcp-g4-preview",
+    "gcp-dws-calendar-mode",
 ]
 
 
@@ -94,6 +95,7 @@ def catalog_item_to_offer(
         ),
         region=item.location,
         price=item.price,
+        backend_data=item.provider_data,
     )
 
 
