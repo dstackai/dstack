@@ -1,6 +1,6 @@
 import datetime
 from enum import Enum
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 import gpuhunt
@@ -184,6 +184,7 @@ class InstanceOffer(CoreModel):
     instance: InstanceType
     region: str
     price: float
+    backend_data: dict[str, Any] = {}
 
 
 class InstanceOfferWithAvailability(InstanceOffer):

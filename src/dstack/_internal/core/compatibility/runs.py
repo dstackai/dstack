@@ -49,10 +49,20 @@ def get_apply_plan_excludes(plan: ApplyRunPlanInput) -> Optional[IncludeExcludeD
             job_submissions_excludes["job_provisioning_data"] = {
                 "instance_type": {"resources": {"cpu_arch"}}
             }
+        jrd_offer_excludes = {}
+        if any(
+            js.job_runtime_data and js.job_runtime_data.offer for js in job_submissions
+        ) and all(
+            not js.job_runtime_data
+            or not js.job_runtime_data.offer
+            or not js.job_runtime_data.offer.backend_data
+            for js in job_submissions
+        ):
+            jrd_offer_excludes["backend_data"] = True
         if all(map(_should_exclude_job_submission_jrd_cpu_arch, job_submissions)):
-            job_submissions_excludes["job_runtime_data"] = {
-                "offer": {"instance": {"resources": {"cpu_arch"}}}
-            }
+            jrd_offer_excludes["instance"] = {"resources": {"cpu_arch"}}
+        if jrd_offer_excludes:
+            job_submissions_excludes["job_runtime_data"] = {"offer": jrd_offer_excludes}
         if all(js.exit_status is None for js in job_submissions):
             job_submissions_excludes["exit_status"] = True
         if all(js.status_message == "" for js in job_submissions):
@@ -71,9 +81,18 @@ def get_apply_plan_excludes(plan: ApplyRunPlanInput) -> Optional[IncludeExcludeD
                 latest_job_submission_excludes["job_provisioning_data"] = {
                     "instance_type": {"resources": {"cpu_arch"}}
                 }
+            latest_job_submission_jrd_offer_excludes = {}
+            if (
+                latest_job_submission.job_runtime_data
+                and latest_job_submission.job_runtime_data.offer
+                and not latest_job_submission.job_runtime_data.offer.backend_data
+            ):
+                latest_job_submission_jrd_offer_excludes["backend_data"] = True
             if _should_exclude_job_submission_jrd_cpu_arch(latest_job_submission):
+                latest_job_submission_jrd_offer_excludes["instance"] = {"resources": {"cpu_arch"}}
+            if latest_job_submission_jrd_offer_excludes:
                 latest_job_submission_excludes["job_runtime_data"] = {
-                    "offer": {"instance": {"resources": {"cpu_arch"}}}
+                    "offer": latest_job_submission_jrd_offer_excludes
                 }
             if latest_job_submission.exit_status is None:
                 latest_job_submission_excludes["exit_status"] = True
