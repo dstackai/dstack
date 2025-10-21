@@ -90,6 +90,10 @@ RESOURCE_NAME_PATTERN = re.compile(r"[a-z0-9-]+")
 TPU_VERSIONS = [tpu.name for tpu in KNOWN_TPUS]
 
 
+class GCPOfferBackendData(CoreModel):
+    is_dws_calendar_mode: bool = False
+
+
 class GCPVolumeDiskBackendData(CoreModel):
     type: Literal["disk"] = "disk"
     disk_type: str
@@ -201,6 +205,23 @@ class GCPCompute(
 
         modifiers.append(get_offers_disk_modifier(CONFIGURABLE_DISK_SIZE, requirements))
         return modifiers
+
+    def get_offers_post_filter(
+        self, requirements: Requirements
+    ) -> Optional[Callable[[InstanceOfferWithAvailability], bool]]:
+        if requirements.reservation is None:
+
+            def reserved_offers_filter(offer: InstanceOfferWithAvailability) -> bool:
+                """Remove reserved-only offers"""
+                if GCPOfferBackendData.__response__.parse_obj(
+                    offer.backend_data
+                ).is_dws_calendar_mode:
+                    return False
+                return True
+
+            return reserved_offers_filter
+
+        return None
 
     def terminate_instance(
         self, instance_id: str, region: str, backend_data: Optional[str] = None
