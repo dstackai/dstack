@@ -63,6 +63,7 @@ def combine_fleet_and_run_requirements(
             reservation=_get_single_value_optional(
                 fleet_requirements.reservation, run_requirements.reservation
             ),
+            multinode=fleet_requirements.multinode or run_requirements.multinode,
         )
     except CombineError:
         return None

@@ -607,10 +607,9 @@ async def _find_optimal_fleet_with_offers(
         except ValueError:
             fleet_backend_offers = []
         else:
-            multinode = (
-                candidate_fleet.spec.configuration.placement == InstanceGroupPlacement.CLUSTER
-                or job.job_spec.jobs_per_replica > 1
-            )
+            # Handle multinode for old jobs that don't have requirements.multinode set.
+            # TODO: Drop multinode param.
+            multinode = requirements.multinode or job.job_spec.jobs_per_replica > 1
             fleet_backend_offers = await get_offers_by_requirements(
                 project=project,
                 profile=profile,
@@ -826,16 +825,12 @@ async def _run_jobs_on_new_instances(
             return None
         # TODO: Respect fleet provisioning properties such as tags
 
-    multinode = job.job_spec.jobs_per_replica > 1 or (
-        fleet is not None and fleet.spec.configuration.placement == InstanceGroupPlacement.CLUSTER
-    )
+    multinode = requirements.multinode or job.job_spec.jobs_per_replica > 1
     offers = await get_offers_by_requirements(
         project=project,
         profile=profile,
         requirements=requirements,
         exclude_not_available=True,
-        # TODO: Introduce multinode/cluster offers as some backend offers
-        # may support multinode and others may not (e.g. Runpod clusters).
         multinode=multinode,
         master_job_provisioning_data=master_job_provisioning_data,
         volumes=volumes,

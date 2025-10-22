@@ -2,7 +2,7 @@ import json
 import uuid
 from collections.abc import Iterable
 from datetime import timedelta
-from typing import List, Optional
+from typing import Callable, List, Optional
 
 from dstack._internal.core.backends.base.backend import Compute
 from dstack._internal.core.backends.base.compute import (
@@ -84,6 +84,18 @@ class RunpodCompute(
 
     def get_offers_modifiers(self, requirements: Requirements) -> Iterable[OfferModifier]:
         return [get_offers_disk_modifier(CONFIGURABLE_DISK_SIZE, requirements)]
+
+    def get_offers_post_filter(
+        self, requirements: Requirements
+    ) -> Optional[Callable[[InstanceOfferWithAvailability], bool]]:
+        def offers_post_filter(offer: InstanceOfferWithAvailability) -> bool:
+            pod_counts = offer.backend_data.get("pod_counts", [])
+            is_cluster_offer = len(pod_counts) > 0 and any(pc != 1 for pc in pod_counts)
+            if requirements.multinode:
+                return is_cluster_offer
+            return not is_cluster_offer
+
+        return offers_post_filter
 
     def run_job(
         self,
