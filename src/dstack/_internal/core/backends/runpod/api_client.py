@@ -106,7 +106,9 @@ class RunpodApiClient:
         image_name: str,
         container_disk_in_gb: int,
         container_registry_auth_id: str,
-        volume_in_gb: int = 0,
+        # Default pod volume is 20GB.
+        # RunPod errors if it's not specified for podEditJob.
+        volume_in_gb: int = 20,
     ) -> str:
         resp = self._make_request(
             {

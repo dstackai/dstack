@@ -172,6 +172,8 @@ class RunpodCompute(
 
         instance_id = resp["id"]
 
+        # Call edit_pod to pass container_registry_auth_id.
+        # Expect a long time (~5m) for the pod to pick up the creds.
         # TODO: remove editPod once createPod supports docker's username and password
         # editPod is temporary solution to set container_registry_auth_id because createPod does not
         # support it currently. This will be removed once createPod supports container_registry_auth_id
@@ -217,7 +219,8 @@ class RunpodCompute(
     ) -> ComputeGroupProvisioningData:
         master_job_configuration = job_configurations[0]
         master_job = master_job_configuration.job
-        volumes = master_job_configuration.volumes
+        master_job_volumes = master_job_configuration.volumes
+        all_volumes_names = set(v.name for jc in job_configurations for v in jc.volumes)
         instance_config = InstanceConfiguration(
             project_name=run.project_name,
             instance_name=get_job_instance_name(run, master_job),
@@ -234,10 +237,14 @@ class RunpodCompute(
 
         network_volume_id = None
         volume_mount_path = None
-        if len(volumes) > 1:
+        if len(master_job_volumes) > 1:
             raise ComputeError("Mounting more than one network volume is not supported in runpod")
-        if len(volumes) == 1:
-            network_volume_id = volumes[0].volume_id
+        if len(all_volumes_names) > 1:
+            raise ComputeError(
+                "Mounting different volumes to different jobs is not supported in runpod"
+            )
+        if len(master_job_volumes) == 1:
+            network_volume_id = master_job_volumes[0].volume_id
             volume_mount_path = run.run_spec.configuration.volumes[0].path
 
         offer_pod_counts = _get_offer_pod_counts(instance_offer)
@@ -250,6 +257,9 @@ class RunpodCompute(
                 f"Failed to provision {pod_count} pods. Available pod counts: {offer_pod_counts}"
             )
 
+        container_registry_auth_id = self._generate_container_registry_auth_id(
+            master_job.job_spec.registry_auth
+        )
         resp = self.api_client.create_cluster(
             cluster_name=pod_name,
             gpu_type_id=instance_offer.instance.name,
@@ -268,6 +278,17 @@ class RunpodCompute(
             volume_mount_path=volume_mount_path,
             env={"RUNPOD_POD_USER": "0"},
         )
+
+        # An "edit pod" trick to pass container registry creds.
+        if container_registry_auth_id is not None:
+            for pod in resp["pods"]:
+                self.api_client.edit_pod(
+                    pod_id=pod["id"],
+                    image_name=master_job.job_spec.image_name,
+                    container_disk_in_gb=disk_size,
+                    container_registry_auth_id=container_registry_auth_id,
+                )
+
         jpds = [
             JobProvisioningData(
                 backend=instance_offer.backend,
@@ -374,14 +395,12 @@ class RunpodCompute(
     ) -> Optional[str]:
         if registry_auth is None:
             return None
-
         return self.api_client.add_container_registry_auth(
             uuid.uuid4().hex, registry_auth.username, registry_auth.password
         )
 
     def _clean_stale_container_registry_auths(self) -> None:
         container_registry_auths = self.api_client.get_container_registry_auths()
-
         # Container_registry_auths sorted by creation time so try to delete the oldest first
         # when we reach container_registry_auths that is still in use, we stop
         for container_registry_auth in container_registry_auths:
