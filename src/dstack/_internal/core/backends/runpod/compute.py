@@ -28,7 +28,7 @@ from dstack._internal.core.errors import (
     ComputeError,
 )
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.common import RegistryAuth
+from dstack._internal.core.models.common import CoreModel, RegistryAuth
 from dstack._internal.core.models.compute_groups import ComputeGroup, ComputeGroupProvisioningData
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
@@ -39,7 +39,7 @@ from dstack._internal.core.models.instances import (
 from dstack._internal.core.models.resources import Memory, Range
 from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
 from dstack._internal.core.models.volumes import Volume, VolumeProvisioningData
-from dstack._internal.utils.common import get_current_datetime
+from dstack._internal.utils.common import get_current_datetime, get_or_error
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -51,6 +51,10 @@ CONTAINER_REGISTRY_AUTH_CLEANUP_INTERVAL = 60 * 60 * 24  # 24 hour
 
 # RunPod does not seem to have any limits on the disk size.
 CONFIGURABLE_DISK_SIZE = Range[Memory](min=Memory.parse("1GB"), max=None)
+
+
+class RunpodOfferBackendData(CoreModel):
+    pod_counts: Optional[list[int]] = None
 
 
 class RunpodCompute(
@@ -89,7 +93,7 @@ class RunpodCompute(
         self, requirements: Requirements
     ) -> Optional[Callable[[InstanceOfferWithAvailability], bool]]:
         def offers_post_filter(offer: InstanceOfferWithAvailability) -> bool:
-            pod_counts = offer.backend_data.get("pod_counts", [])
+            pod_counts = _get_offer_pod_counts(offer)
             is_cluster_offer = len(pod_counts) > 0 and any(pc != 1 for pc in pod_counts)
             if requirements.multinode:
                 return is_cluster_offer
@@ -218,7 +222,7 @@ class RunpodCompute(
             project_name=run.project_name,
             instance_name=get_job_instance_name(run, master_job),
             ssh_keys=[
-                SSHKey(public=run.run_spec.ssh_key_pub.strip()),
+                SSHKey(public=get_or_error(run.run_spec.ssh_key_pub).strip()),
                 SSHKey(public=project_ssh_public_key.strip()),
             ],
             user=run.user,
@@ -236,17 +240,25 @@ class RunpodCompute(
             network_volume_id = volumes[0].volume_id
             volume_mount_path = run.run_spec.configuration.volumes[0].path
 
+        offer_pod_counts = _get_offer_pod_counts(instance_offer)
         pod_count = len(job_configurations)
         gpu_count = len(instance_offer.instance.resources.gpus)
         data_center_id = instance_offer.region
+
+        if pod_count not in offer_pod_counts:
+            raise ComputeError(
+                f"Failed to provision {pod_count} pods. Available pod counts: {offer_pod_counts}"
+            )
 
         resp = self.api_client.create_cluster(
             cluster_name=pod_name,
             gpu_type_id=instance_offer.instance.name,
             pod_count=pod_count,
             gpu_count_per_pod=gpu_count,
+            deploy_cost=f"{instance_offer.price * pod_count:.2f}",
             image_name=master_job.job_spec.image_name,
-            template_id="runpod-torch-v21",  # FIXME
+            # TODO: Remove hardcoded template_id when Runpod makes it optional
+            template_id="runpod-torch-v21",
             cluster_type="TRAINING",
             data_center_id=data_center_id,
             container_disk_in_gb=disk_size,
@@ -321,7 +333,9 @@ class RunpodCompute(
                 provisioning_data.ssh_port = port["publicPort"]
 
     def register_volume(self, volume: Volume) -> VolumeProvisioningData:
-        volume_data = self.api_client.get_network_volume(volume_id=volume.configuration.volume_id)
+        volume_data = self.api_client.get_network_volume(
+            volume_id=get_or_error(volume.configuration.volume_id)
+        )
         if volume_data is None:
             raise ComputeError(f"Volume {volume.configuration.volume_id} not found")
         size_gb = volume_data["size"]
@@ -397,3 +411,11 @@ def _is_secure_cloud(region: str) -> bool:
     Community cloud regions are country codes: CA, NL, etc.
     """
     return "-" in region
+
+
+def _get_offer_pod_counts(offer: InstanceOfferWithAvailability) -> list[int]:
+    backend_data: RunpodOfferBackendData = RunpodOfferBackendData.__response__.parse_obj(
+        offer.backend_data
+    )
+    pod_counts = backend_data.pod_counts or []
+    return pod_counts

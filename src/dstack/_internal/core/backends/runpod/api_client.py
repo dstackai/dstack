@@ -255,6 +255,7 @@ class RunpodApiClient:
         pod_count: int,
         gpu_count_per_pod: int,
         image_name: str,
+        deploy_cost: str,
         template_id: str,
         cluster_type: str = "TRAINING",
         network_volume_id: Optional[str] = None,
@@ -280,6 +281,7 @@ class RunpodApiClient:
                     gpu_count_per_pod=gpu_count_per_pod,
                     image_name=image_name,
                     cluster_type=cluster_type,
+                    deploy_cost=deploy_cost,
                     template_id=template_id,
                     network_volume_id=network_volume_id,
                     volume_in_gb=volume_in_gb,
@@ -526,6 +528,7 @@ def _generate_create_cluster_mutation(
     image_name: str,
     cluster_type: str,
     template_id: str,
+    deploy_cost: str,
     network_volume_id: Optional[str] = None,
     volume_in_gb: Optional[int] = None,
     throughput: Optional[int] = None,
@@ -553,9 +556,8 @@ def _generate_create_cluster_mutation(
     input_fields.append(f"type: {cluster_type}")
     input_fields.append(f"gpuCountPerPod: {gpu_count_per_pod}")
     input_fields.append(f'templateId: "{template_id}"')
-    # FIXME: Figure out what deployCost should be.
-    # If not specified, Runpod returns Insufficient resources error.
-    input_fields.append("deployCost: 68.928")
+    # If deploy_cost is not specified, Runpod returns Insufficient resources error.
+    input_fields.append(f"deployCost: {deploy_cost}")
 
     # ------------------------------ Optional Fields ----------------------------- #
     if network_volume_id is not None:
