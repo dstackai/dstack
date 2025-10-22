@@ -131,6 +131,8 @@ class TestGetMyUser:
         user = await create_user(
             session=session,
             created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+            ssh_public_key="public-key",
+            ssh_private_key="private-key",
         )
         response = await client.post(
             "/api/users/get_my_user", headers=get_auth_headers(user.token)
@@ -147,9 +149,32 @@ class TestGetMyUser:
             "permissions": {
                 "can_create_projects": True,
             },
-            "ssh_private_key": None,
-            "ssh_public_key": None,
+            "ssh_private_key": "private-key",
+            "ssh_public_key": "public-key",
         }
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_generates_ssh_key_if_missing(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(
+            session=session,
+            ssh_public_key=None,
+            ssh_private_key=None,
+        )
+        with patch("dstack._internal.utils.crypto.generate_rsa_key_pair_bytes") as gen_mock:
+            gen_mock.return_value = (b"private-key", b"ssh-rsa AAA.public-key user\n")
+            response = await client.post(
+                "/api/users/get_my_user", headers=get_auth_headers(user.token)
+            )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["ssh_private_key"] == "private-key"
+        assert data["ssh_public_key"] == "ssh-rsa AAA.public-key user\n"
+        await session.refresh(user)
+        assert user.ssh_private_key == data["ssh_private_key"]
+        assert user.ssh_public_key == data["ssh_public_key"]
 
 
 class TestGetUser:

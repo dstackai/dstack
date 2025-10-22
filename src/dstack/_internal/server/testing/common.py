@@ -126,6 +126,8 @@ async def create_user(
     global_role: GlobalRole = GlobalRole.ADMIN,
     token: Optional[str] = None,
     email: Optional[str] = None,
+    ssh_public_key: Optional[str] = None,
+    ssh_private_key: Optional[str] = None,
     active: bool = True,
 ) -> UserModel:
     if token is None:
@@ -137,6 +139,8 @@ async def create_user(
         token=DecryptedString(plaintext=token),
         token_hash=get_token_hash(token),
         email=email,
+        ssh_public_key=ssh_public_key,
+        ssh_private_key=ssh_private_key,
         active=active,
     )
     session.add(user)

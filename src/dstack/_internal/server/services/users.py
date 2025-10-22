@@ -20,8 +20,8 @@ from dstack._internal.core.models.users import (
 from dstack._internal.server.models import DecryptedString, UserModel
 from dstack._internal.server.services.permissions import get_default_permissions
 from dstack._internal.server.utils.routers import error_forbidden
+from dstack._internal.utils import crypto
 from dstack._internal.utils.common import run_async
-from dstack._internal.utils.crypto import generate_rsa_key_pair_bytes
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -88,7 +88,7 @@ async def create_user(
         raise ResourceExistsError()
     if token is None:
         token = str(uuid.uuid4())
-    private_bytes, public_bytes = await run_async(generate_rsa_key_pair_bytes, username)
+    private_bytes, public_bytes = await run_async(crypto.generate_rsa_key_pair_bytes, username)
     user = UserModel(
         id=uuid.uuid4(),
         name=username,
@@ -135,7 +135,7 @@ async def refresh_ssh_key(
     logger.debug("Refreshing SSH key for user [code]%s[/code]", username)
     if user.global_role != GlobalRole.ADMIN and user.name != username:
         raise error_forbidden()
-    private_bytes, public_bytes = await run_async(generate_rsa_key_pair_bytes, username)
+    private_bytes, public_bytes = await run_async(crypto.generate_rsa_key_pair_bytes, username)
     await session.execute(
         update(UserModel)
         .where(UserModel.name == username)
