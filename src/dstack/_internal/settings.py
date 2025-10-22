@@ -33,3 +33,7 @@ class FeatureFlags:
     large features. This class may be empty if there are no such features in
     development. Feature flags are environment variables of the form DSTACK_FF_*
     """
+
+    RUNPOD_CLUSTER_OFFERS_ENABLED = (
+        os.getenv("DSTACK_FF_RUNPOD_CLUSTER_OFFERS_ENABLED") is not None
+    )

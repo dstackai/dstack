@@ -15,6 +15,7 @@ from dstack._internal.core.models.instances import (
 )
 from dstack._internal.core.models.resources import DEFAULT_DISK, CPUSpec, Memory, Range
 from dstack._internal.core.models.runs import Requirements
+from dstack._internal.settings import FeatureFlags
 from dstack._internal.utils.common import get_or_error
 
 # Offers not supported by all dstack versions are hidden behind one or more flags.
@@ -25,8 +26,10 @@ SUPPORTED_GPUHUNT_FLAGS = [
     "gcp-a4",
     "gcp-g4-preview",
     "gcp-dws-calendar-mode",
-    "runpod-cluster",
 ]
+
+if FeatureFlags.RUNPOD_CLUSTER_OFFERS_ENABLED:
+    SUPPORTED_GPUHUNT_FLAGS.append("runpod-cluster")
 
 
 def get_catalog_offers(

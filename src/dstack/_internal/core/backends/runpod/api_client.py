@@ -16,7 +16,7 @@ class RunpodApiClientError(BackendError):
 
     def __init__(self, errors: List[Dict]):
         self.errors = errors
-        return super().__init__(errors)
+        super().__init__(errors)
 
 
 class RunpodApiClient:
