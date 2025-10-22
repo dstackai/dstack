@@ -146,19 +146,13 @@ class GCPCompute(
         offer_keys_to_offers = {}
         offers_with_availability = []
         for offer in offers:
-            preview = False
-            if offer.instance.name.startswith("g4-standard-"):
-                if self.config.preview_features and "g4" in self.config.preview_features:
-                    preview = True
-                else:
-                    continue
             region = offer.region[:-2]  # strip zone
             key = (_unique_instance_name(offer.instance), region)
             if key in offer_keys_to_offers:
                 offer_keys_to_offers[key].availability_zones.append(offer.region)
                 continue
             availability = InstanceAvailability.NO_QUOTA
-            if preview or _has_gpu_quota(quotas[region], offer.instance.resources):
+            if _has_gpu_quota(quotas[region], offer.instance.resources):
                 availability = InstanceAvailability.UNKNOWN
             # todo quotas: cpu, memory, global gpu, tpu
             offer_with_availability = InstanceOfferWithAvailability(
@@ -1027,8 +1021,8 @@ def _has_gpu_quota(quotas: Dict[str, float], resources: Resources) -> bool:
     gpu = resources.gpus[0]
     if _is_tpu(gpu.name):
         return True
-    if gpu.name in ["B200", "H100"]:
-        # B200, H100 and H100_MEGA quotas are not returned by `regions_client.list`
+    if gpu.name in ["B200", "H100", "RTXPRO6000"]:
+        # B200, H100, H100_MEGA, and RTXPRO6000 quotas are not returned by `regions_client.list`
         return True
     quota_name = f"NVIDIA_{gpu.name}_GPUS"
     if gpu.name == "A100" and gpu.memory_mib == 80 * 1024:
