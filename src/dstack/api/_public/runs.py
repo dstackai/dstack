@@ -1,6 +1,4 @@
 import base64
-import hashlib
-import os
 import queue
 import tempfile
 import threading
@@ -17,7 +15,6 @@ from urllib.parse import urlparse
 from websocket import WebSocketApp
 
 import dstack.api as api
-from dstack._internal.cli.utils.common import warn
 from dstack._internal.core.consts import DSTACK_RUNNER_HTTP_PORT, DSTACK_RUNNER_SSH_PORT
 from dstack._internal.core.errors import ClientError, ConfigurationError, ResourceNotExistsError
 from dstack._internal.core.models.backends.base import BackendType
@@ -48,10 +45,10 @@ from dstack._internal.core.models.runs import (
     get_service_port,
 )
 from dstack._internal.core.models.runs import Run as RunModel
-from dstack._internal.core.models.users import UserWithCreds
 from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.core.services.logs import URLReplacer
 from dstack._internal.core.services.ssh.attach import SSHAttach
+from dstack._internal.core.services.ssh.key_manager import UserSSHKeyManager
 from dstack._internal.core.services.ssh.ports import PortsLock
 from dstack._internal.server.schemas.logs import PollLogsRequest
 from dstack._internal.utils.common import get_or_error, make_proxy_url
@@ -88,7 +85,7 @@ class Run(ABC):
         self._ports_lock: Optional[PortsLock] = ports_lock
         self._ssh_attach: Optional[SSHAttach] = None
         if ssh_identity_file is not None:
-            warn(
+            logger.warning(
                 "[code]ssh_identity_file[/code] in [code]Run[/code] is deprecated and ignored; will be removed"
                 " since 0.19.40"
             )
@@ -281,31 +278,20 @@ class Run(ABC):
             dstack.api.PortUsedError: If ports are in use or the run is attached by another process.
         """
         if not ssh_identity_file:
-            user = self._api_client.users.get_my_user()
-            run_ssh_key_pub = self._run.run_spec.ssh_key_pub
             config_manager = ConfigManager()
-            if isinstance(user, UserWithCreds) and user.ssh_public_key == run_ssh_key_pub:
-                token_hash = hashlib.sha1(user.creds.token.encode()).hexdigest()[:8]
-                config_manager.dstack_ssh_dir.mkdir(parents=True, exist_ok=True)
-                ssh_identity_file = config_manager.dstack_ssh_dir / token_hash
-
-                def key_opener(path, flags):
-                    return os.open(path, flags, 0o600)
-
-                with open(ssh_identity_file, "wb", opener=key_opener) as f:
-                    assert user.ssh_private_key
-                    f.write(user.ssh_private_key.encode())
+            key_manager = UserSSHKeyManager(self._api_client, config_manager.dstack_ssh_dir)
+            if (
+                user_key := key_manager.get_user_key()
+            ) and user_key.public_key == self._run.run_spec.ssh_key_pub:
+                ssh_identity_file = user_key.private_key_path
             else:
                 if config_manager.dstack_key_path.exists():
                     # TODO: Remove since 0.19.40
-                    warn(
-                        f"Using legacy [code]{config_manager.dstack_key_path}[/code]."
-                        " Future versions will use the user SSH key from the server.",
-                    )
+                    logger.debug(f"Using legacy [code]{config_manager.dstack_key_path}[/code].")
                     ssh_identity_file = config_manager.dstack_key_path
                 else:
                     raise ConfigurationError(
-                        f"User SSH key doen't match; default SSH key ({config_manager.dstack_key_path}) doesn't exist"
+                        f"User SSH key doesn't match; default SSH key ({config_manager.dstack_key_path}) doesn't exist"
                     )
         ssh_identity_file = str(ssh_identity_file)
 
@@ -504,15 +490,19 @@ class RunCollection:
             ssh_key_pub = Path(ssh_identity_file).with_suffix(".pub").read_text()
         else:
             config_manager = ConfigManager()
-            if not config_manager.dstack_key_path.exists():
-                generate_rsa_key_pair(private_key_path=config_manager.dstack_key_path)
-            warn(
-                f"Using legacy [code]{config_manager.dstack_key_path.with_suffix('.pub')}[/code]."
-                " Future versions will use the user SSH key from the server.",
-            )
-            ssh_key_pub = config_manager.dstack_key_path.with_suffix(".pub").read_text()
-            # TODO: Uncomment after 0.19.40
-            # ssh_key_pub = None
+            key_manager = UserSSHKeyManager(self._api_client, config_manager.dstack_ssh_dir)
+            if key_manager.get_user_key():
+                ssh_key_pub = None  # using the server-managed user key
+            else:
+                if not config_manager.dstack_key_path.exists():
+                    generate_rsa_key_pair(private_key_path=config_manager.dstack_key_path)
+                logger.warning(
+                    f"Using legacy [code]{config_manager.dstack_key_path.with_suffix('.pub')}[/code]."
+                    " You will only be able to attach to the run from this client."
+                    " Update the [code]dstack[/] server to [code]0.19.34[/]+ to switch to user keys"
+                    " automatically replicated to all clients.",
+                )
+                ssh_key_pub = config_manager.dstack_key_path.with_suffix(".pub").read_text()
         run_spec = RunSpec(
             run_name=configuration.name,
             repo_id=repo.repo_id,
@@ -760,12 +750,19 @@ class RunCollection:
             idle_duration=idle_duration,  # type: ignore[assignment]
         )
         config_manager = ConfigManager()
-        if not config_manager.dstack_key_path.exists():
-            generate_rsa_key_pair(private_key_path=config_manager.dstack_key_path)
-        warn(
-            f"Using legacy [code]{config_manager.dstack_key_path.with_suffix('.pub')}[/code]."
-            " Future versions will use the user SSH key from the server.",
-        )
+        key_manager = UserSSHKeyManager(self._api_client, config_manager.dstack_ssh_dir)
+        if key_manager.get_user_key():
+            ssh_key_pub = None  # using the server-managed user key
+        else:
+            if not config_manager.dstack_key_path.exists():
+                generate_rsa_key_pair(private_key_path=config_manager.dstack_key_path)
+            logger.warning(
+                f"Using legacy [code]{config_manager.dstack_key_path.with_suffix('.pub')}[/code]."
+                " You will only be able to attach to the run from this client."
+                " Update the [code]dstack[/] server to [code]0.19.34[/]+ to switch to user keys"
+                " automatically replicated to all clients.",
+            )
+            ssh_key_pub = config_manager.dstack_key_path.with_suffix(".pub").read_text()
         run_spec = RunSpec(
             run_name=run_name,
             repo_id=repo.repo_id,
@@ -775,7 +772,7 @@ class RunCollection:
             configuration_path=configuration_path,
             configuration=configuration,
             profile=profile,
-            ssh_key_pub=config_manager.dstack_key_path.with_suffix(".pub").read_text(),
+            ssh_key_pub=ssh_key_pub,
         )
         logger.debug("Getting run plan")
         run_plan = self._api_client.runs.get_plan(self._project, run_spec)

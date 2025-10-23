@@ -1,3 +1,4 @@
+import hashlib
 import os
 import pprint
 import time
@@ -120,6 +121,9 @@ class APIClient:
     @property
     def files(self) -> FilesAPIClient:
         return FilesAPIClient(self._request, self._logger)
+
+    def get_token_hash(self) -> str:
+        return hashlib.sha1(self._token.encode()).hexdigest()[:8]
 
     def _request(
         self,
