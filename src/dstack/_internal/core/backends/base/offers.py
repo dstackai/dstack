@@ -23,6 +23,7 @@ SUPPORTED_GPUHUNT_FLAGS = [
     "oci-spot",
     "lambda-arm",
     "gcp-a4",
+    "gcp-g4",
     "gcp-dws-calendar-mode",
 ]
 
