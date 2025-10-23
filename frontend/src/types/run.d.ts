@@ -228,6 +228,7 @@ declare interface IJobSubmission {
     submission_num: number;
     status: TJobStatus;
     submitted_at: number;
+    finished_at: string | null;
     termination_reason?: string | null;
     termination_reason_message?: string | null;
     exit_status?: number | null;
@@ -283,7 +284,6 @@ declare interface IRun {
     project_name: string;
     user: string;
     submitted_at: string;
-    terminated_at: string | null;
     status: TJobStatus;
     error?: string | null;
     jobs: IJob[];

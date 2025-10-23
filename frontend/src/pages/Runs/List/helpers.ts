@@ -98,3 +98,10 @@ export const getRunListItemSchedule = (run: IRun) => {
 
     return run.run_spec.configuration.schedule.cron.join(', ');
 };
+
+export const getRunListFinishedAt = (run: IRun) => {
+    if (!run.latest_job_submission || !run.latest_job_submission.finished_at) {
+        return null;
+    }
+    return run.latest_job_submission.finished_at;
+};
