@@ -2,7 +2,7 @@ import { groupBy as _groupBy } from 'lodash';
 
 import { getBaseUrl } from 'App/helpers';
 
-import { finishedJobs } from '../constants';
+import { finishedJobs, finishedRunStatuses } from '../constants';
 import { getJobStatus } from '../Details/Jobs/List/helpers';
 
 export const getGroupedRunsByProjectAndRepoID = (runs: IRun[]) => {
@@ -97,4 +97,11 @@ export const getRunListItemSchedule = (run: IRun) => {
     if (run.run_spec.configuration.type != 'task' || !run.run_spec.configuration.schedule) return null;
 
     return run.run_spec.configuration.schedule.cron.join(', ');
+};
+
+export const getRunListFinishedAt = (run: IRun) => {
+    if (!run.latest_job_submission || !run.latest_job_submission.finished_at || !finishedRunStatuses.includes(run.status)) {
+        return null;
+    }
+    return run.latest_job_submission.finished_at;
 };
