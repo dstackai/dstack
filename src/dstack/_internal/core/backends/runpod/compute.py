@@ -232,9 +232,12 @@ class RunpodCompute(
     def create_volume(self, volume: Volume) -> VolumeProvisioningData:
         volume_name = generate_unique_volume_name(volume, max_length=MAX_RESOURCE_NAME_LEN)
         size_gb = volume.configuration.size_gb
+        # Runpod regions must be uppercase.
+        # Lowercase regions are accepted in the API but they break Runpod in several ways.
+        region = volume.configuration.region.upper()
         volume_id = self.api_client.create_network_volume(
             name=volume_name,
-            region=volume.configuration.region,
+            region=region,
             size=size_gb,
         )
         return VolumeProvisioningData(
