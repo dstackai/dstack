@@ -535,12 +535,12 @@ func unmountVolumes(ctx context.Context, taskConfig TaskConfig) error {
 	var failed []string
 	for _, volume := range taskConfig.Volumes {
 		mountPoint := getVolumeMountPoint(volume.Name)
-		cmd := exec.Command("mountpoint", mountPoint)
+		cmd := exec.CommandContext(ctx, "mountpoint", mountPoint)
 		if output, err := cmd.CombinedOutput(); err != nil {
 			log.Info(ctx, "skipping", "mountpoint", mountPoint, "output", output)
 			continue
 		}
-		cmd = exec.Command("umount", "-qf", mountPoint)
+		cmd = exec.CommandContext(ctx, "umount", "-qf", mountPoint)
 		if output, err := cmd.CombinedOutput(); err != nil {
 			log.Error(ctx, "failed to unmount", "mountpoint", mountPoint, "output", output)
 			failed = append(failed, mountPoint)
@@ -559,7 +559,7 @@ func formatAndMountVolume(ctx context.Context, volume VolumeInfo) error {
 	if err != nil {
 		return tracerr.Wrap(err)
 	}
-	deviceName, err := backend.GetRealDeviceName(volume.VolumeId, volume.DeviceName)
+	deviceName, err := backend.GetRealDeviceName(ctx, volume.VolumeId, volume.DeviceName)
 	if err != nil {
 		return tracerr.Wrap(err)
 	}
@@ -618,7 +618,7 @@ func prepareInstanceMountPoints(taskConfig TaskConfig) error {
 // Returns true if the file system is created.
 func initFileSystem(ctx context.Context, deviceName string, errorIfNotExists bool) (bool, error) {
 	// Run the lsblk command to get filesystem type
-	cmd := exec.Command("lsblk", "-no", "FSTYPE", deviceName)
+	cmd := exec.CommandContext(ctx, "lsblk", "-no", "FSTYPE", deviceName)
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	if err := cmd.Run(); err != nil {
@@ -636,7 +636,7 @@ func initFileSystem(ctx context.Context, deviceName string, errorIfNotExists boo
 	}
 
 	log.Debug(ctx, "formatting disk with ext4 filesystem...", "device", deviceName)
-	cmd = exec.Command("mkfs.ext4", "-F", deviceName)
+	cmd = exec.CommandContext(ctx, "mkfs.ext4", "-F", deviceName)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return false, fmt.Errorf("failed to format disk: %w, output: %s", err, string(output))
 	}
@@ -655,7 +655,7 @@ func mountDisk(ctx context.Context, deviceName, mountPoint string, fsRootPerms o
 
 	// Mount the disk to the mount point
 	log.Debug(ctx, "mounting disk...", "device", deviceName, "mountpoint", mountPoint)
-	cmd := exec.Command("mount", deviceName, mountPoint)
+	cmd := exec.CommandContext(ctx, "mount", deviceName, mountPoint)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to mount disk: %w, output: %s", err, string(output))
 	}

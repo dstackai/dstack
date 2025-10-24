@@ -1,6 +1,7 @@
 package backends
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -15,7 +16,7 @@ func NewGCPBackend() *GCPBackend {
 }
 
 // GetRealDeviceName resolves device names according to https://cloud.google.com/compute/docs/disks/disk-symlinks
-func (e *GCPBackend) GetRealDeviceName(volumeID, deviceName string) (string, error) {
+func (e *GCPBackend) GetRealDeviceName(ctx context.Context, volumeID, deviceName string) (string, error) {
 	// Try resolving first partition or external volumes
 	realDeviceName, err := os.Readlink(fmt.Sprintf("/dev/disk/by-id/google-%s-part1", deviceName))
 	if err != nil {
