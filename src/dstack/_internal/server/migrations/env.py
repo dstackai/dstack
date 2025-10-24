@@ -36,7 +36,6 @@ def run_migrations_offline():
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
     )
-
     with context.begin_transaction():
         context.run_migrations()
 
@@ -61,12 +60,21 @@ def run_migrations(connection: Connection):
     # https://alembic.sqlalchemy.org/en/latest/batch.html#dealing-with-referencing-foreign-keys
     if connection.dialect.name == "sqlite":
         connection.execute(text("PRAGMA foreign_keys=OFF;"))
+    elif connection.dialect.name == "postgresql":
+        # lock_timeout is needed so that migrations that acquire locks
+        # do not wait for locks forever, blocking live queries.
+        # Better to fail and retry a deployment.
+        connection.execute(text("SET lock_timeout='10s';"))
     connection.commit()
     context.configure(
         connection=connection,
         target_metadata=target_metadata,
         compare_type=True,
         render_as_batch=True,
+        # Running each migration in a separate transaction.
+        # Running all migrations in one transaction may lead to deadlocks in HA deployments
+        # because lock ordering is not respected across all migrations.
+        transaction_per_migration=True,
     )
     with context.begin_transaction():
         context.run_migrations()
