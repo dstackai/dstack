@@ -379,9 +379,7 @@ def _wait_for_instance(sdk: SDK, op: SDKOperation[Operation]) -> None:
             op.status(),
         )
         time.sleep(WAIT_FOR_INSTANCE_UPDATE_INTERVAL)
-        resources.LOOP.await_(
-            op.update(per_retry_timeout=resources.REQUEST_TIMEOUT, metadata=resources.REQUEST_MD)
-        )
+        resources.LOOP.await_(op.update(per_retry_timeout=resources.REQUEST_TIMEOUT))
 
 
 def _supported_instances(offer: InstanceOffer) -> bool:

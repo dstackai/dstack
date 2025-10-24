@@ -8,7 +8,6 @@ from contextlib import contextmanager
 from tempfile import NamedTemporaryFile
 from typing import Dict, Optional
 
-from nebius.aio.authorization.options import options_to_metadata
 from nebius.aio.operation import Operation as SDKOperation
 from nebius.aio.service_error import RequestError, StatusCode
 from nebius.aio.token.renewable import OPTION_RENEW_REQUEST_TIMEOUT, OPTION_RENEW_SYNCHRONOUS
@@ -66,13 +65,11 @@ from dstack._internal.utils.logging import get_logger
 LOOP = DaemonEventLoop()
 # Pass a timeout to all methods to avoid infinite waiting
 REQUEST_TIMEOUT = 10
-# Pass REQUEST_MD to all methods to avoid infinite retries in case of invalid credentials
-REQUEST_MD = options_to_metadata(
-    {
-        OPTION_RENEW_SYNCHRONOUS: "true",
-        OPTION_RENEW_REQUEST_TIMEOUT: "5",
-    }
-)
+# Pass REQUEST_AUTH_OPTIONS to all methods to avoid infinite retries in case of invalid credentials
+REQUEST_AUTH_OPTIONS = {
+    OPTION_RENEW_SYNCHRONOUS: "true",
+    OPTION_RENEW_REQUEST_TIMEOUT: "5",
+}
 
 # disables log messages about errors such as invalid creds or expired timeouts
 logging.getLogger("nebius").setLevel(logging.CRITICAL)
@@ -120,7 +117,7 @@ def wait_for_operation(
         if time.monotonic() + interval > deadline:
             raise TimeoutError(f"Operation {op.id} wait timeout")
         time.sleep(interval)
-        LOOP.await_(op.update(per_retry_timeout=REQUEST_TIMEOUT, metadata=REQUEST_MD))
+        LOOP.await_(op.update(per_retry_timeout=REQUEST_TIMEOUT))
 
 
 def get_region_to_project_id_map(
@@ -156,7 +153,9 @@ def validate_regions(configured: set[str], available: set[str]) -> None:
 def list_tenant_projects(sdk: SDK) -> Sequence[Container]:
     tenants = LOOP.await_(
         TenantServiceClient(sdk).list(
-            ListTenantsRequest(), per_retry_timeout=REQUEST_TIMEOUT, metadata=REQUEST_MD
+            ListTenantsRequest(),
+            per_retry_timeout=REQUEST_TIMEOUT,
+            auth_options=REQUEST_AUTH_OPTIONS,
         )
     )
     if len(tenants.items) != 1:
@@ -166,7 +165,7 @@ def list_tenant_projects(sdk: SDK) -> Sequence[Container]:
         ProjectServiceClient(sdk).list(
             ListProjectsRequest(parent_id=tenant_id, page_size=999),
             per_retry_timeout=REQUEST_TIMEOUT,
-            metadata=REQUEST_MD,
+            auth_options=REQUEST_AUTH_OPTIONS,
         )
     )
     return projects.items
@@ -240,7 +239,7 @@ def get_default_subnet(sdk: SDK, project_id: str) -> Subnet:
         SubnetServiceClient(sdk).list(
             ListSubnetsRequest(parent_id=project_id, page_size=999),
             per_retry_timeout=REQUEST_TIMEOUT,
-            metadata=REQUEST_MD,
+            auth_options=REQUEST_AUTH_OPTIONS,
         )
     )
     for subnet in subnets.items:
@@ -267,14 +266,18 @@ def create_disk(
     )
     with wrap_capacity_errors():
         return LOOP.await_(
-            client.create(request, per_retry_timeout=REQUEST_TIMEOUT, metadata=REQUEST_MD)
+            client.create(
+                request, per_retry_timeout=REQUEST_TIMEOUT, auth_options=REQUEST_AUTH_OPTIONS
+            )
         )
 
 
 def delete_disk(sdk: SDK, disk_id: str) -> None:
     LOOP.await_(
         DiskServiceClient(sdk).delete(
-            DeleteDiskRequest(id=disk_id), per_retry_timeout=REQUEST_TIMEOUT, metadata=REQUEST_MD
+            DeleteDiskRequest(id=disk_id),
+            per_retry_timeout=REQUEST_TIMEOUT,
+            auth_options=REQUEST_AUTH_OPTIONS,
         )
     )
 
@@ -325,7 +328,9 @@ def create_instance(
     )
     with wrap_capacity_errors():
         return LOOP.await_(
-            client.create(request, per_retry_timeout=REQUEST_TIMEOUT, metadata=REQUEST_MD)
+            client.create(
+                request, per_retry_timeout=REQUEST_TIMEOUT, auth_options=REQUEST_AUTH_OPTIONS
+            )
         )
 
 
@@ -334,7 +339,7 @@ def get_instance(sdk: SDK, instance_id: str) -> Instance:
         InstanceServiceClient(sdk).get(
             GetInstanceRequest(id=instance_id),
             per_retry_timeout=REQUEST_TIMEOUT,
-            metadata=REQUEST_MD,
+            auth_options=REQUEST_AUTH_OPTIONS,
         )
     )
 
@@ -344,7 +349,7 @@ def delete_instance(sdk: SDK, instance_id: str) -> SDKOperation[Operation]:
         InstanceServiceClient(sdk).delete(
             DeleteInstanceRequest(id=instance_id),
             per_retry_timeout=REQUEST_TIMEOUT,
-            metadata=REQUEST_MD,
+            auth_options=REQUEST_AUTH_OPTIONS,
         )
     )
 
@@ -358,17 +363,17 @@ def create_cluster(sdk: SDK, name: str, project_id: str, fabric: str) -> SDKOper
                     spec=GpuClusterSpec(infiniband_fabric=fabric),
                 ),
                 per_retry_timeout=REQUEST_TIMEOUT,
-                metadata=REQUEST_MD,
+                auth_options=REQUEST_AUTH_OPTIONS,
             )
         )
 
 
 def delete_cluster(sdk: SDK, cluster_id: str) -> None:
-    return LOOP.await_(
+    LOOP.await_(
         GpuClusterServiceClient(sdk).delete(
             DeleteGpuClusterRequest(id=cluster_id),
             per_retry_timeout=REQUEST_TIMEOUT,
-            metadata=REQUEST_MD,
+            auth_options=REQUEST_AUTH_OPTIONS,
         )
     )
 

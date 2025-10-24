@@ -189,8 +189,7 @@ oci = [
     "dstack[server]",
 ]
 nebius = [
-    # 0.2.73 breaks sdk backward compatibility: https://github.com/dstackai/dstack/issues/3171
-    "nebius>=0.2.40,<=0.2.72; python_version >= '3.10'",
+    "nebius>=0.3.0,<0.4; python_version >= '3.10'",
     "dstack[server]",
 ]
 all = [
