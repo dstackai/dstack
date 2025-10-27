@@ -24,7 +24,6 @@ import (
 	"github.com/dstackai/dstack/runner/consts"
 	"github.com/dstackai/dstack/runner/internal/common"
 	"github.com/dstackai/dstack/runner/internal/connections"
-	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/dstackai/dstack/runner/internal/schemas"
 	"github.com/dstackai/dstack/runner/internal/types"
@@ -146,14 +145,14 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 	runnerLogFile, err := log.CreateAppendFile(filepath.Join(ex.tempDir, consts.RunnerLogFileName))
 	if err != nil {
 		ex.SetJobState(ctx, types.JobStateFailed)
-		return gerrors.Wrap(err)
+		return fmt.Errorf("create runner log file: %w", err)
 	}
 	defer func() { _ = runnerLogFile.Close() }()
 
 	jobLogFile, err := log.CreateAppendFile(filepath.Join(ex.tempDir, consts.RunnerJobLogFileName))
 	if err != nil {
 		ex.SetJobState(ctx, types.JobStateFailed)
-		return gerrors.Wrap(err)
+		return fmt.Errorf("create job log file: %w", err)
 	}
 	defer func() { _ = jobLogFile.Close() }()
 
@@ -162,7 +161,7 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 		if r := recover(); r != nil {
 			log.Error(ctx, "Executor PANIC", "err", r)
 			ex.SetJobState(ctx, types.JobStateFailed)
-			err = gerrors.Newf("recovered: %v", r)
+			err = fmt.Errorf("recovered: %v", r)
 		}
 		// no more logs will be written after this
 		ex.mu.Lock()
@@ -192,7 +191,7 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 			types.TerminationReasonExecutorError,
 			fmt.Sprintf("Failed to fill in the job user fields (%s)", err),
 		)
-		return gerrors.Wrap(err)
+		return fmt.Errorf("fill user: %w", err)
 	}
 
 	ex.setJobCredentials(ctx)
@@ -204,7 +203,7 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 			types.TerminationReasonExecutorError,
 			fmt.Sprintf("Failed to set up the working dir (%s)", err),
 		)
-		return gerrors.Wrap(err)
+		return fmt.Errorf("prepare job working dir: %w", err)
 	}
 
 	if err := ex.setupRepo(ctx); err != nil {
@@ -214,7 +213,7 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 			types.TerminationReasonContainerExitedWithError,
 			fmt.Sprintf("Failed to set up the repo (%s)", err),
 		)
-		return gerrors.Wrap(err)
+		return fmt.Errorf("setup repo: %w", err)
 	}
 
 	if err := ex.setupFiles(ctx); err != nil {
@@ -224,13 +223,13 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 			types.TerminationReasonExecutorError,
 			fmt.Sprintf("Failed to set up files (%s)", err),
 		)
-		return gerrors.Wrap(err)
+		return fmt.Errorf("setup files: %w", err)
 	}
 
 	cleanupCredentials, err := ex.setupCredentials(ctx)
 	if err != nil {
 		ex.SetJobState(ctx, types.JobStateFailed)
-		return gerrors.Wrap(err)
+		return fmt.Errorf("setup credentials: %w", err)
 	}
 	defer cleanupCredentials()
 
@@ -250,7 +249,7 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 		case <-ctx.Done():
 			log.Error(ctx, "Job canceled")
 			ex.SetJobState(ctx, types.JobStateTerminated)
-			return gerrors.Wrap(err)
+			return fmt.Errorf("job canceled: %w", err)
 		default:
 		}
 
@@ -263,7 +262,7 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 				types.TerminationReasonMaxDurationExceeded,
 				"Max duration exceeded",
 			)
-			return gerrors.Wrap(err)
+			return fmt.Errorf("max duration exceeded: %w", err)
 		default:
 		}
 
@@ -275,7 +274,7 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 		} else {
 			ex.SetJobState(ctx, types.JobStateFailed)
 		}
-		return gerrors.Wrap(err)
+		return fmt.Errorf("exec job failed: %w", err)
 	}
 
 	ex.SetJobStateWithExitStatus(ctx, types.JobStateDone, 0)
@@ -358,7 +357,7 @@ func (ex *RunExecutor) prepareJobWorkingDir(ctx context.Context) error {
 	if ex.jobSpec.WorkingDir == nil {
 		ex.jobWorkingDir, err = os.Getwd()
 		if err != nil {
-			return gerrors.Wrap(err)
+			return fmt.Errorf("get working directory: %w", err)
 		}
 	} else {
 		// We still support relative paths, as 0.19.27 server uses relative paths when possible
@@ -366,7 +365,7 @@ func (ex *RunExecutor) prepareJobWorkingDir(ctx context.Context) error {
 		// Replace consts.LegacyRepoDir with "" eventually.
 		ex.jobWorkingDir, err = common.ExpandPath(*ex.jobSpec.WorkingDir, consts.LegacyRepoDir, ex.jobHomeDir)
 		if err != nil {
-			return gerrors.Wrap(err)
+			return fmt.Errorf("expand working dir path: %w", err)
 		}
 		if !path.IsAbs(ex.jobWorkingDir) {
 			return fmt.Errorf("working_dir must be absolute: %s", ex.jobWorkingDir)
@@ -374,7 +373,7 @@ func (ex *RunExecutor) prepareJobWorkingDir(ctx context.Context) error {
 	}
 	log.Trace(ctx, "Job working dir", "path", ex.jobWorkingDir)
 	if err := common.MkdirAll(ctx, ex.jobWorkingDir, ex.jobUid, ex.jobGid); err != nil {
-		return gerrors.Wrap(err)
+		return fmt.Errorf("create working directory: %w", err)
 	}
 	return nil
 }
@@ -423,7 +422,7 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 	cmd := exec.CommandContext(ctx, ex.jobSpec.Commands[0], ex.jobSpec.Commands[1:]...)
 	cmd.Cancel = func() error {
 		// returns error on Windows
-		return gerrors.Wrap(cmd.Process.Signal(os.Interrupt))
+		return fmt.Errorf("send interrupt signal: %w", cmd.Process.Signal(os.Interrupt))
 	}
 	cmd.WaitDelay = ex.killDelay // kills the process if it doesn't exit in time
 
@@ -538,7 +537,7 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 
 	ptm, err := startCommand(cmd)
 	if err != nil {
-		return gerrors.Wrap(err)
+		return fmt.Errorf("start command: %w", err)
 	}
 	defer func() { _ = ptm.Close() }()
 	defer func() { _ = cmd.Wait() }() // release resources if copy fails
@@ -548,9 +547,9 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 	logger := io.MultiWriter(jobLogFile, ex.jobWsLogs, stripper)
 	_, err = io.Copy(logger, ptm)
 	if err != nil && !isPtyError(err) {
-		return gerrors.Wrap(err)
+		return fmt.Errorf("copy command output: %w", err)
 	}
-	return gerrors.Wrap(cmd.Wait())
+	return fmt.Errorf("wait for command: %w", cmd.Wait())
 }
 
 func (ex *RunExecutor) setupCredentials(ctx context.Context) (func(), error) {
@@ -560,18 +559,18 @@ func (ex *RunExecutor) setupCredentials(ctx context.Context) (func(), error) {
 	switch ex.repoCredentials.GetProtocol() {
 	case "ssh":
 		if ex.repoCredentials.PrivateKey == nil {
-			return nil, gerrors.New("private key is missing")
+			return nil, fmt.Errorf("private key is missing")
 		}
 		keyPath := filepath.Join(ex.homeDir, ".ssh/id_rsa")
 		if _, err := os.Stat(keyPath); err == nil {
-			return nil, gerrors.New("private key already exists")
+			return nil, fmt.Errorf("private key already exists")
 		}
 		if err := os.MkdirAll(filepath.Dir(keyPath), 0o700); err != nil {
-			return nil, gerrors.Wrap(err)
+			return nil, fmt.Errorf("create ssh directory: %w", err)
 		}
 		log.Info(ctx, "Writing private key", "path", keyPath)
 		if err := os.WriteFile(keyPath, []byte(*ex.repoCredentials.PrivateKey), 0o600); err != nil {
-			return nil, gerrors.Wrap(err)
+			return nil, fmt.Errorf("write private key: %w", err)
 		}
 		return func() {
 			log.Info(ctx, "Removing private key", "path", keyPath)
@@ -583,26 +582,26 @@ func (ex *RunExecutor) setupCredentials(ctx context.Context) (func(), error) {
 		}
 		hostsPath := filepath.Join(ex.homeDir, ".config/gh/hosts.yml")
 		if _, err := os.Stat(hostsPath); err == nil {
-			return nil, gerrors.New("hosts.yml file already exists")
+			return nil, fmt.Errorf("hosts.yml file already exists")
 		}
 		if err := os.MkdirAll(filepath.Dir(hostsPath), 0o700); err != nil {
-			return nil, gerrors.Wrap(err)
+			return nil, fmt.Errorf("create gh config directory: %w", err)
 		}
 		log.Info(ctx, "Writing OAuth token", "path", hostsPath)
 		cloneURL, err := url.Parse(ex.repoCredentials.CloneURL)
 		if err != nil {
-			return nil, gerrors.Wrap(err)
+			return nil, fmt.Errorf("parse clone URL: %w", err)
 		}
 		ghHost := fmt.Sprintf("%s:\n  oauth_token: \"%s\"\n", cloneURL.Hostname(), *ex.repoCredentials.OAuthToken)
 		if err := os.WriteFile(hostsPath, []byte(ghHost), 0o600); err != nil {
-			return nil, gerrors.Wrap(err)
+			return nil, fmt.Errorf("write OAuth token: %w", err)
 		}
 		return func() {
 			log.Info(ctx, "Removing OAuth token", "path", hostsPath)
 			_ = os.Remove(hostsPath)
 		}, nil
 	}
-	return nil, gerrors.Newf("unknown protocol %s", ex.repoCredentials.GetProtocol())
+	return nil, fmt.Errorf("unknown protocol %s", ex.repoCredentials.GetProtocol())
 }
 
 func isPtyError(err error) bool {
