@@ -267,8 +267,6 @@ class RunpodCompute(
             gpu_count_per_pod=gpu_count,
             deploy_cost=f"{instance_offer.price * pod_count:.2f}",
             image_name=master_job.job_spec.image_name,
-            # TODO: Remove hardcoded template_id when Runpod makes it optional
-            template_id="runpod-torch-v21",
             cluster_type="TRAINING",
             data_center_id=data_center_id,
             container_disk_in_gb=disk_size,
