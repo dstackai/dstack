@@ -9,14 +9,13 @@ import (
 	"path/filepath"
 	"slices"
 
-	"github.com/ztrue/tracerr"
 	"golang.org/x/crypto/ssh"
 )
 
 func PublicKeyFingerprint(key string) (string, error) {
 	pk, _, _, _, err := ssh.ParseAuthorizedKey([]byte(key))
 	if err != nil {
-		return "", tracerr.Wrap(err)
+		return "", fmt.Errorf("parse authorized key: %w", err)
 	}
 	keyFingerprint := ssh.FingerprintSHA256(pk)
 	return keyFingerprint, nil
@@ -74,7 +73,7 @@ func (ak AuthorizedKeys) read(r io.Reader) ([]string, error) {
 		lines = append(lines, text)
 	}
 	if err := scanner.Err(); err != nil {
-		return []string{}, tracerr.Wrap(err)
+		return []string{}, fmt.Errorf("scan authorized keys: %w", err)
 	}
 	return lines, nil
 }
@@ -84,7 +83,7 @@ func (ak AuthorizedKeys) write(w io.Writer, lines []string) error {
 	for _, line := range lines {
 		_, err := fmt.Fprintln(wr, line)
 		if err != nil {
-			return tracerr.Wrap(err)
+			return fmt.Errorf("write line: %w", err)
 		}
 	}
 	return wr.Flush()
@@ -109,40 +108,40 @@ func (ak AuthorizedKeys) GetAuthorizedKeysPath() (string, error) {
 func (ak AuthorizedKeys) transformAuthorizedKeys(transform func([]string, []string) []string, publicKeys []string) error {
 	authorizedKeysPath, err := ak.GetAuthorizedKeysPath()
 	if err != nil {
-		return tracerr.Wrap(err)
+		return fmt.Errorf("get authorized keys path: %w", err)
 	}
 
 	info, err := os.Stat(authorizedKeysPath)
 	if err != nil {
-		return tracerr.Wrap(err)
+		return fmt.Errorf("stat authorized keys: %w", err)
 	}
 	fileMode := info.Mode().Perm()
 
 	authorizedKeysFile, err := os.OpenFile(authorizedKeysPath, os.O_RDWR, fileMode)
 	if err != nil {
-		return tracerr.Wrap(err)
+		return fmt.Errorf("open authorized keys: %w", err)
 	}
 	defer authorizedKeysFile.Close()
 
 	lines, err := ak.read(authorizedKeysFile)
 	if err != nil {
-		return tracerr.Wrap(err)
+		return fmt.Errorf("read authorized keys: %w", err)
 	}
 
 	// write backup
 	authorizedKeysPath, err = ak.GetAuthorizedKeysPath()
 	if err != nil {
-		return tracerr.Wrap(err)
+		return fmt.Errorf("get authorized keys path: %w", err)
 	}
 
 	authorizedKeysPathBackup := authorizedKeysPath + ".bak"
 	authorizedKeysBackup, err := os.OpenFile(authorizedKeysPathBackup, os.O_RDWR|os.O_CREATE|os.O_TRUNC, fileMode)
 	if err != nil {
-		return tracerr.Wrap(err)
+		return fmt.Errorf("open authorized keys backup: %w", err)
 	}
 	defer authorizedKeysBackup.Close()
 	if err := ak.write(authorizedKeysBackup, lines); err != nil {
-		return tracerr.Wrap(err)
+		return fmt.Errorf("write authorized keys backup: %w", err)
 	}
 
 	// transform lines
@@ -150,13 +149,13 @@ func (ak AuthorizedKeys) transformAuthorizedKeys(transform func([]string, []stri
 
 	// write authorized_keys
 	if err := authorizedKeysFile.Truncate(0); err != nil {
-		return tracerr.Wrap(err)
+		return fmt.Errorf("truncate authorized keys: %w", err)
 	}
 	if _, err := authorizedKeysFile.Seek(0, 0); err != nil {
-		return tracerr.Wrap(err)
+		return fmt.Errorf("seek authorized keys: %w", err)
 	}
 	if err := ak.write(authorizedKeysFile, newLines); err != nil {
-		return tracerr.Wrap(err)
+		return fmt.Errorf("write authorized keys: %w", err)
 	}
 
 	return nil

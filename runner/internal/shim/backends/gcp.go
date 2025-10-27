@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-
-	"github.com/ztrue/tracerr"
 )
 
 type GCPBackend struct{}
@@ -26,7 +24,7 @@ func (e *GCPBackend) GetRealDeviceName(volumeID, deviceName string) (string, err
 	}
 	realDeviceName, err = filepath.Abs(filepath.Join("/dev/disk/by-id/", realDeviceName))
 	if err != nil {
-		return "", tracerr.Wrap(err)
+		return "", fmt.Errorf("get device absolute path: %w", err)
 	}
 	return realDeviceName, nil
 }
