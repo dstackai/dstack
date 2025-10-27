@@ -33,7 +33,7 @@ func (s *Server) metricsGetHandler(w http.ResponseWriter, r *http.Request) (inte
 	if err != nil {
 		return nil, &api.Error{Status: http.StatusInternalServerError, Err: err}
 	}
-	metrics, err := metricsCollector.GetSystemMetrics()
+	metrics, err := metricsCollector.GetSystemMetrics(r.Context())
 	if err != nil {
 		return nil, &api.Error{Status: http.StatusInternalServerError, Err: err}
 	}
