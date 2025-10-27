@@ -156,6 +156,10 @@ async def _process_run(session: AsyncSession, run_model: RunModel):
     )
     run_model = res.unique().scalar_one()
     logger.debug("%s: processing run", fmt(run_model))
+
+    # Migrate legacy jobs without replica_group_name (one-time fix)
+    await _migrate_legacy_job_replica_groups(session, run_model)
+
     try:
         if run_model.status == RunStatus.PENDING:
             await _process_pending_run(session, run_model)
@@ -176,6 +180,70 @@ async def _process_run(session: AsyncSession, run_model: RunModel):
     await session.commit()
 
 
+async def _migrate_legacy_job_replica_groups(session: AsyncSession, run_model: RunModel):
+    """
+    Migrate jobs from old runs that don't have replica_group_name set.
+    This fixes jobs created before the replica_groups feature was added.
+    """
+    run_spec = RunSpec.__response__.parse_raw(run_model.run_spec)
+
+    # Only migrate service runs with replica_groups
+    if run_spec.configuration.type != "service":
+        return
+
+    # Check if run uses replica_groups
+    if not getattr(run_spec.configuration, "replica_groups", None):
+        return
+
+    from dstack._internal.core.models.runs import get_normalized_replica_groups
+
+    normalized_groups = get_normalized_replica_groups(run_spec.configuration)
+
+    # Check if any jobs need migration
+    needs_migration = any(job.replica_group_name is None for job in run_model.jobs)
+
+    if not needs_migration:
+        return
+
+    logger.info(
+        "%s: Migrating legacy jobs to assign replica_group_name",
+        fmt(run_model),
+    )
+
+    # Build a map of replica_num -> group_name based on how jobs were originally created
+    replica_num_to_group = {}
+    current_replica_num = 0
+
+    for group in normalized_groups:
+        group_min = group.replicas.min or 0
+        for _ in range(group_min):
+            replica_num_to_group[current_replica_num] = group.name
+            current_replica_num += 1
+
+    # Update jobs
+    migrated_count = 0
+    for job in run_model.jobs:
+        if job.replica_group_name is None:
+            expected_group = replica_num_to_group.get(job.replica_num)
+            if expected_group:
+                job.replica_group_name = expected_group
+                migrated_count += 1
+                logger.info(
+                    "%s: Migrated job replica_num=%d to group '%s'",
+                    fmt(run_model),
+                    job.replica_num,
+                    expected_group,
+                )
+
+    if migrated_count > 0:
+        await session.commit()
+        logger.info(
+            "%s: Migrated %d job(s) to replica groups",
+            fmt(run_model),
+            migrated_count,
+        )
+
+
 async def _process_pending_run(session: AsyncSession, run_model: RunModel):
     """Jobs are not created yet"""
     run = run_model_to_run(run_model)
@@ -189,7 +257,10 @@ async def _process_pending_run(session: AsyncSession, run_model: RunModel):
 
     run_model.desired_replica_count = 1
     if run.run_spec.configuration.type == "service":
-        run_model.desired_replica_count = run.run_spec.configuration.replicas.min or 0
+        from dstack._internal.core.models.runs import get_normalized_replica_groups
+
+        normalized_groups = get_normalized_replica_groups(run.run_spec.configuration)
+        run_model.desired_replica_count = sum(g.replicas.min or 0 for g in normalized_groups)
         await update_service_desired_replica_count(
             session,
             run_model,
@@ -481,6 +552,7 @@ async def _handle_run_replicas(
                 session,
                 run_model,
                 replicas_diff=max_replica_count - non_terminated_replica_count,
+                allow_exceeding_max=True,  # Allow exceeding max for rolling deployments
             )
 
         replicas_to_stop_count = 0
@@ -507,6 +579,7 @@ async def _handle_run_replicas(
                 session,
                 run_model,
                 replicas_diff=-replicas_to_stop_count,
+                allow_exceeding_max=True,  # Allow terminating out-of-date replicas during rolling deployment
             )
 
 
@@ -516,20 +589,49 @@ async def _update_jobs_to_new_deployment_in_place(
     """
     Bump deployment_num for jobs that do not require redeployment.
     """
+    from dstack._internal.core.models.runs import get_normalized_replica_groups
+
     secrets = await get_project_secrets_mapping(
         session=session,
         project=run_model.project,
     )
+
+    # Get replica groups from the new run_spec for matching
+    replica_group = None
+    if run_spec.configuration.type == "service":
+        normalized_groups = get_normalized_replica_groups(run_spec.configuration)
+    else:
+        normalized_groups = []
+
     for replica_num, job_models in group_jobs_by_replica_latest(run_model.jobs):
         if all(j.status.is_finished() for j in job_models):
             continue
         if all(j.deployment_num == run_model.deployment_num for j in job_models):
             continue
+
+        # Determine which replica group this job belongs to
+        # Use the old job's replica_group_name to find the matching group in new spec
+        old_job_spec = JobSpec.__response__.parse_raw(job_models[0].job_spec_data)
+        if old_job_spec.replica_group_name and normalized_groups:
+            replica_group = next(
+                (g for g in normalized_groups if g.name == old_job_spec.replica_group_name),
+                None,
+            )
+            if replica_group is None:
+                logger.warning(
+                    "Replica group '%s' from old job not found in new run_spec. "
+                    "Job will use base configuration.",
+                    old_job_spec.replica_group_name,
+                )
+        else:
+            replica_group = None
+
         # FIXME: Handle getting image configuration errors or skip it.
         new_job_specs = await get_job_specs_from_run_spec(
             run_spec=run_spec,
             secrets=secrets,
             replica_num=replica_num,
+            replica_group=replica_group,
         )
         assert len(new_job_specs) == len(job_models), (
             "Changing the number of jobs within a replica is not yet supported"

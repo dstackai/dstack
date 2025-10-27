@@ -3,7 +3,11 @@ import sys
 import threading
 from abc import ABC, abstractmethod
 from pathlib import PurePosixPath
-from typing import Dict, List, Optional
+from typing import TYPE_CHECKING, Dict, List, Optional
+
+if TYPE_CHECKING:
+    from dstack._internal.core.models.configurations import ReplicaGroup
+    from dstack._internal.core.models.profiles import Profile
 
 from cachetools import TTLCache, cached
 
@@ -84,6 +88,7 @@ class JobConfigurator(ABC):
     _image_config: Optional[ImageConfig] = None
     # JobSSHKey should be shared for all jobs in a replica for inter-node communication.
     _job_ssh_key: Optional[JobSSHKey] = None
+    replica_group: Optional["ReplicaGroup"] = None
 
     def __init__(
         self,
@@ -146,6 +151,7 @@ class JobConfigurator(ABC):
     ) -> JobSpec:
         job_spec = JobSpec(
             replica_num=replica_num,  # TODO(egor-s): add to env variables in the runner
+            replica_group_name=self.replica_group.name if self.replica_group else None,
             job_num=job_num,
             job_name=f"{self.run_spec.run_name}-{job_num}-{replica_num}",
             jobs_per_replica=jobs_per_replica,
@@ -295,13 +301,40 @@ class JobConfigurator(ABC):
     def _registry_auth(self) -> Optional[RegistryAuth]:
         return self.run_spec.configuration.registry_auth
 
+    def _get_merged_profile(self) -> "Profile":
+        """Get profile with group overrides applied."""
+        from dstack._internal.core.models.profiles import Profile, ProfileParams
+
+        base = self.run_spec.merged_profile
+
+        if not self.replica_group:
+            return base
+
+        # Clone and apply group overrides
+        merged = Profile.parse_obj(base.dict())
+        for field_name in ProfileParams.__fields__:
+            group_value = getattr(self.replica_group, field_name, None)
+            if group_value is not None:
+                setattr(merged, field_name, group_value)
+
+        return merged
+
     def _requirements(self) -> Requirements:
-        spot_policy = self._spot_policy()
+        # Use group resources if available, else fall back to config
+        if self.replica_group:
+            resources = self.replica_group.resources
+        else:
+            resources = self.run_spec.configuration.resources
+
+        # Get merged profile for spot/price/reservation
+        profile = self._get_merged_profile()
+        spot_policy = profile.spot_policy or SpotPolicy.ONDEMAND
+
         return Requirements(
-            resources=self.run_spec.configuration.resources,
-            max_price=self.run_spec.merged_profile.max_price,
+            resources=resources,
+            max_price=profile.max_price,
             spot=None if spot_policy == SpotPolicy.AUTO else (spot_policy == SpotPolicy.SPOT),
-            reservation=self.run_spec.merged_profile.reservation,
+            reservation=profile.reservation,
         )
 
     def _retry(self) -> Optional[Retry]:

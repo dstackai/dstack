@@ -30,6 +30,8 @@ from dstack._internal.core.models.instances import (
 )
 from dstack._internal.core.models.profiles import (
     CreationPolicy,
+    Profile,
+    ProfileParams,
     RetryEvent,
 )
 from dstack._internal.core.models.repos.virtual import DEFAULT_VIRTUAL_REPO_ID, VirtualRunRepoData
@@ -303,6 +305,45 @@ async def get_run_by_id(
     return run_model_to_run(run_model, return_in_api=True)
 
 
+def _get_job_profile(run_spec: RunSpec, replica_group_name: Optional[str]) -> Profile:
+    """
+    Get the profile for a job, including replica group overrides if applicable.
+
+    Args:
+        run_spec: The run specification
+        replica_group_name: Name of the replica group, or None for legacy jobs
+
+    Returns:
+        Profile with replica group overrides applied
+    """
+    base_profile = run_spec.merged_profile
+
+    # If no replica group, return base profile
+    if not replica_group_name:
+        return base_profile
+
+    # Find the replica group
+    if run_spec.configuration.type != "service":
+        return base_profile
+
+    from dstack._internal.core.models.runs import get_normalized_replica_groups
+
+    normalized_groups = get_normalized_replica_groups(run_spec.configuration)
+    replica_group = next((g for g in normalized_groups if g.name == replica_group_name), None)
+
+    if not replica_group:
+        return base_profile
+
+    # Clone base profile and apply group overrides
+    merged = Profile.parse_obj(base_profile.dict())
+    for field_name in ProfileParams.__fields__:
+        group_value = getattr(replica_group, field_name, None)
+        if group_value is not None:
+            setattr(merged, field_name, group_value)
+
+    return merged
+
+
 async def get_plan(
     session: AsyncSession,
     project: ProjectModel,
@@ -346,11 +387,34 @@ async def get_plan(
                 action = ApplyAction.UPDATE
 
     secrets = await get_project_secrets_mapping(session=session, project=project)
-    jobs = await get_jobs_from_run_spec(
-        run_spec=effective_run_spec,
-        secrets=secrets,
-        replica_num=0,
-    )
+
+    # For services with replica groups, create jobs for all groups during planning
+    jobs = []
+    if (
+        effective_run_spec.configuration.type == "service"
+        and effective_run_spec.configuration.replica_groups
+    ):
+        from dstack._internal.core.models.runs import get_normalized_replica_groups
+
+        normalized_groups = get_normalized_replica_groups(effective_run_spec.configuration)
+        replica_num = 0
+        for group in normalized_groups:
+            # Create one job per group for planning (minimum replicas)
+            group_jobs = await get_jobs_from_run_spec(
+                run_spec=effective_run_spec,
+                secrets=secrets,
+                replica_num=replica_num,
+                replica_group=group,
+            )
+            jobs.extend(group_jobs)
+            replica_num += 1
+    else:
+        # Legacy: single job for planning
+        jobs = await get_jobs_from_run_spec(
+            run_spec=effective_run_spec,
+            secrets=secrets,
+            replica_num=0,
+        )
 
     volumes = await get_job_configured_volumes(
         session=session,
@@ -359,19 +423,47 @@ async def get_plan(
         job_num=0,
     )
 
-    pool_offers = await _get_pool_offers(
-        session=session,
-        project=project,
-        run_spec=effective_run_spec,
-        job=jobs[0],
-        volumes=volumes,
-    )
+    # For replica groups, we need pool offers for all GPU types, not just the first job's type
+    # So we fetch pool offers for each job separately and aggregate them
+    all_pool_offers = []
+    if len(jobs) > 1:
+        # Multiple jobs (likely replica groups) - get pool offers per job to include all GPU types
+        for job in jobs:
+            job_pool_offers = await _get_pool_offers(
+                session=session,
+                project=project,
+                run_spec=effective_run_spec,
+                job=job,
+                volumes=volumes,
+            )
+            all_pool_offers.extend(job_pool_offers)
+        # Deduplicate by (backend, instance_name, region) tuple
+        seen_offers = set()
+        pool_offers = []
+        for offer in all_pool_offers:
+            offer_key = (offer.backend, offer.instance.name, offer.region)
+            if offer_key not in seen_offers:
+                seen_offers.add(offer_key)
+                pool_offers.append(offer)
+    else:
+        pool_offers = await _get_pool_offers(
+            session=session,
+            project=project,
+            run_spec=effective_run_spec,
+            job=jobs[0],
+            volumes=volumes,
+        )
     effective_run_spec.run_name = "dry-run"  # will regenerate jobs on submission
 
-    # Get offers once for all jobs
-    offers = []
-    if creation_policy == CreationPolicy.REUSE_OR_CREATE:
-        offers = await get_offers_by_requirements(
+    # Check if all jobs have identical requirements (optimization for single-type jobs)
+    all_requirements_identical = all(
+        job.job_spec.requirements == jobs[0].job_spec.requirements for job in jobs
+    )
+
+    # Get offers once if all jobs are identical, otherwise get per-job
+    shared_offers = []
+    if creation_policy == CreationPolicy.REUSE_OR_CREATE and all_requirements_identical:
+        shared_offers = await get_offers_by_requirements(
             project=project,
             profile=profile,
             requirements=jobs[0].job_spec.requirements,
@@ -385,8 +477,46 @@ async def get_plan(
     job_plans = []
     for job in jobs:
         job_offers: List[InstanceOfferWithAvailability] = []
-        job_offers.extend(pool_offers)
-        job_offers.extend(offer for _, offer in offers)
+
+        # Filter pool offers to match this job's GPU requirements
+        gpu_req = None
+        if job.job_spec.requirements.resources and job.job_spec.requirements.resources.gpu:
+            gpu_req = job.job_spec.requirements.resources.gpu.name
+
+        matching_pool_offers = []
+        for pool_offer in pool_offers:
+            offer_gpus = pool_offer.instance.resources.gpus
+            if offer_gpus and gpu_req:
+                # Check if offer's GPU matches job's requirement
+                offer_gpu_names = [gpu.name for gpu in offer_gpus]
+                if any(req_gpu in offer_gpu_names for req_gpu in gpu_req):
+                    matching_pool_offers.append(pool_offer)
+            elif not gpu_req:
+                # No GPU requirement, include all pool offers
+                matching_pool_offers.append(pool_offer)
+
+        job_offers.extend(matching_pool_offers)
+
+        # Get the correct profile for this job (with replica group overrides if applicable)
+        job_profile = _get_job_profile(effective_run_spec, job.job_spec.replica_group_name)
+
+        # Use shared offers if all jobs are identical, otherwise fetch per-job
+        if shared_offers:
+            job_offers.extend(offer for _, offer in shared_offers)
+        elif creation_policy == CreationPolicy.REUSE_OR_CREATE:
+            # Fetch offers specific to this job's requirements with job-specific profile
+            job_specific_offers = await get_offers_by_requirements(
+                project=project,
+                profile=job_profile,
+                requirements=job.job_spec.requirements,
+                exclude_not_available=False,
+                multinode=job.job_spec.jobs_per_replica > 1,
+                volumes=volumes,
+                privileged=job.job_spec.privileged,
+                instance_mounts=check_run_spec_requires_instance_mounts(effective_run_spec),
+            )
+            job_offers.extend(offer for _, offer in job_specific_offers)
+
         job_offers.sort(key=lambda offer: not offer.availability.is_available())
 
         job_spec = job.job_spec
@@ -566,19 +696,47 @@ async def submit_run(
         if run_spec.configuration.type == "service":
             await services.register_service(session, run_model, run_spec)
 
-        for replica_num in range(initial_replicas):
-            jobs = await get_jobs_from_run_spec(
-                run_spec=run_spec,
-                secrets=secrets,
-                replica_num=replica_num,
-            )
-            for job in jobs:
-                job_model = create_job_model_for_new_submission(
-                    run_model=run_model,
-                    job=job,
-                    status=JobStatus.SUBMITTED,
+            from dstack._internal.core.models.runs import get_normalized_replica_groups
+
+            normalized_groups = get_normalized_replica_groups(run_spec.configuration)
+
+            # Set initial desired count (sum of all group minimums)
+            run_model.desired_replica_count = sum(g.replicas.min or 0 for g in normalized_groups)
+
+            # Create jobs by iterating over groups
+            replica_num = 0  # Global counter across all groups
+            for group in normalized_groups:
+                group_min = group.replicas.min or 0
+                for _ in range(group_min):
+                    jobs = await get_jobs_from_run_spec(
+                        run_spec=run_spec,
+                        secrets=secrets,
+                        replica_num=replica_num,
+                        replica_group=group,  # Pass group context
+                    )
+                    for job in jobs:
+                        job_model = create_job_model_for_new_submission(
+                            run_model=run_model,
+                            job=job,
+                            status=JobStatus.SUBMITTED,
+                        )
+                        session.add(job_model)
+                    replica_num += 1
+        else:
+            # Non-service runs (tasks, dev environments)
+            for replica_num in range(initial_replicas):
+                jobs = await get_jobs_from_run_spec(
+                    run_spec=run_spec,
+                    secrets=secrets,
+                    replica_num=replica_num,
                 )
-                session.add(job_model)
+                for job in jobs:
+                    job_model = create_job_model_for_new_submission(
+                        run_model=run_model,
+                        job=job,
+                        status=JobStatus.SUBMITTED,
+                    )
+                    session.add(job_model)
         await session.commit()
         await session.refresh(run_model)
 
@@ -600,6 +758,7 @@ def create_job_model_for_new_submission(
         job_num=job.job_spec.job_num,
         job_name=f"{job.job_spec.job_name}",
         replica_num=job.job_spec.replica_num,
+        replica_group_name=job.job_spec.replica_group_name,
         deployment_num=run_model.deployment_num,
         submission_num=len(job.job_submissions),
         submitted_at=now,
@@ -1028,10 +1187,20 @@ def _validate_run_spec_and_set_defaults(
             f"Maximum utilization_policy.time_window is {settings.SERVER_METRICS_RUNNING_TTL_SECONDS}s"
         )
     if isinstance(run_spec.configuration, ServiceConfiguration):
-        if run_spec.merged_profile.schedule and run_spec.configuration.replicas.min == 0:
-            raise ServerClientError(
-                "Scheduled services with autoscaling to zero are not supported"
-            )
+        # Check all groups for min=0 with schedule
+        if run_spec.merged_profile.schedule:
+            if run_spec.configuration.replica_groups:
+                from dstack._internal.core.models.runs import get_normalized_replica_groups
+
+                groups = get_normalized_replica_groups(run_spec.configuration)
+                if any(g.replicas.min == 0 for g in groups):
+                    raise ServerClientError(
+                        "Scheduled services with autoscaling to zero are not supported"
+                    )
+            elif run_spec.configuration.replicas.min == 0:
+                raise ServerClientError(
+                    "Scheduled services with autoscaling to zero are not supported"
+                )
         if len(run_spec.configuration.probes) > settings.MAX_PROBES_PER_JOB:
             raise ServerClientError(
                 f"Cannot configure more than {settings.MAX_PROBES_PER_JOB} probes"
@@ -1071,6 +1240,7 @@ _TYPE_SPECIFIC_CONF_UPDATABLE_FIELDS = {
     "service": [
         # in-place
         "replicas",
+        "replica_groups",  # Named replica groups (mutually exclusive with replicas)
         "scaling",
         # rolling deployment
         # NOTE: keep this list in sync with the "Rolling deployment" section in services.md
@@ -1199,7 +1369,21 @@ async def process_terminating_run(session: AsyncSession, run_model: RunModel):
         )
 
 
-async def scale_run_replicas(session: AsyncSession, run_model: RunModel, replicas_diff: int):
+async def scale_run_replicas(
+    session: AsyncSession,
+    run_model: RunModel,
+    replicas_diff: int,
+    allow_exceeding_max: bool = False,
+):
+    """
+    Scale run replicas up or down.
+
+    Args:
+        session: Database session
+        run_model: The run to scale
+        replicas_diff: Number of replicas to add (positive) or remove (negative)
+        allow_exceeding_max: If True, allow scaling beyond configured max (for rolling deployments)
+    """
     if replicas_diff == 0:
         # nothing to do
         return
@@ -1239,38 +1423,144 @@ async def scale_run_replicas(session: AsyncSession, run_model: RunModel, replica
     active_replicas.sort(key=lambda r: (r[1], -r[0], r[2]))
     run_spec = RunSpec.__response__.parse_raw(run_model.run_spec)
 
+    from dstack._internal.core.models.runs import get_normalized_replica_groups
+
+    normalized_groups = (
+        get_normalized_replica_groups(run_spec.configuration)
+        if run_spec.configuration.type == "service"
+        else []
+    )
+
     if replicas_diff < 0:
-        for _, _, _, replica_jobs in reversed(active_replicas[-abs(replicas_diff) :]):
-            # scale down the less important replicas first
+        # SCALE DOWN: Only terminate from autoscalable groups while respecting group minimums
+        autoscalable_groups = {
+            g.name for g in normalized_groups if g.replicas.min != g.replicas.max
+        }
+
+        # Count replicas per group
+        group_counts = {}
+        for _, _, _, replica_jobs in active_replicas:
+            if replica_jobs:
+                group_name = replica_jobs[0].replica_group_name or "default"
+                group_counts[group_name] = group_counts.get(group_name, 0) + 1
+
+        # Get group minimums
+        group_mins = {g.name: g.replicas.min for g in normalized_groups}
+
+        # Terminate from end (reversed)
+        # For rolling deployments (allow_exceeding_max), prioritize terminating out-of-date replicas
+        terminated_count = 0
+        for _, is_out_of_date, _, replica_jobs in reversed(active_replicas):
+            if terminated_count >= abs(replicas_diff):
+                break
+
+            if not replica_jobs:
+                continue
+
+            group_name = replica_jobs[0].replica_group_name or "default"
+
+            # For rolling deployment, allow terminating any out-of-date replica
+            if allow_exceeding_max and is_out_of_date:
+                # Terminate this replica (out-of-date during rolling deployment)
+                for job in replica_jobs:
+                    if not job.status.is_finished() and job.status != JobStatus.TERMINATING:
+                        job.status = JobStatus.TERMINATING
+                        job.termination_reason = JobTerminationReason.SCALED_DOWN
+
+                group_counts[group_name] -= 1
+                terminated_count += 1
+                continue
+
+            # For normal scaling, skip if not autoscalable
+            if normalized_groups and group_name not in autoscalable_groups:
+                continue
+
+            # Skip if at minimum
+            current_count = group_counts.get(group_name, 0)
+            min_count = group_mins.get(group_name, 0)
+            if current_count <= min_count:
+                continue
+
+            # Terminate this replica
             for job in replica_jobs:
-                if job.status.is_finished() or job.status == JobStatus.TERMINATING:
-                    continue
-                job.status = JobStatus.TERMINATING
-                job.termination_reason = JobTerminationReason.SCALED_DOWN
-                # background task will process the job later
+                if not job.status.is_finished() and job.status != JobStatus.TERMINATING:
+                    job.status = JobStatus.TERMINATING
+                    job.termination_reason = JobTerminationReason.SCALED_DOWN
+
+            group_counts[group_name] -= 1
+            terminated_count += 1
     else:
+        # SCALE UP
+        # Count current replicas per group
+        group_counts = {}
+        for _, _, _, replica_jobs in active_replicas:
+            if replica_jobs:
+                group_name = replica_jobs[0].replica_group_name or "default"
+                group_counts[group_name] = group_counts.get(group_name, 0) + 1
+
+        # First, identify groups below minimum (need to scale regardless of autoscalability)
+        below_min_groups = [
+            g for g in normalized_groups if group_counts.get(g.name, 0) < (g.replicas.min or 0)
+        ]
+
+        # Then, identify autoscalable groups that can scale beyond minimum
+        autoscalable_groups = [
+            g
+            for g in normalized_groups
+            if g.replicas.min != g.replicas.max
+            and (
+                allow_exceeding_max
+                or group_counts.get(g.name, 0) < (g.replicas.max or float("inf"))
+            )
+        ]
+
+        # Eligible groups are: below-min groups + autoscalable groups
+        eligible_groups = []
+        if below_min_groups:
+            eligible_groups.extend(below_min_groups)
+        elif autoscalable_groups:
+            # Only use autoscalable groups if no groups are below minimum
+            eligible_groups.extend(autoscalable_groups)
+        elif allow_exceeding_max and normalized_groups:
+            # For rolling deployments, allow exceeding max even for fixed groups
+            eligible_groups.extend(normalized_groups)
+
+        if normalized_groups and not eligible_groups:
+            # All groups at their limits
+            logger.info("%s: all replica groups at their limits (min/max)", fmt(run_model))
+            return
+
         scheduled_replicas = 0
 
-        # rerun inactive replicas
+        # Reuse inactive replicas first (existing logic)
         for _, _, _, replica_jobs in inactive_replicas:
             if scheduled_replicas == replicas_diff:
                 break
-            await retry_run_replica_jobs(session, run_model, replica_jobs, only_failed=False)
-            scheduled_replicas += 1
+            # Only reuse if from eligible group
+            if replica_jobs:
+                group_name = replica_jobs[0].replica_group_name or "default"
+                if not normalized_groups or group_name in {g.name for g in eligible_groups}:
+                    await retry_run_replica_jobs(
+                        session, run_model, replica_jobs, only_failed=False
+                    )
+                    scheduled_replicas += 1
 
-        secrets = await get_project_secrets_mapping(
-            session=session,
-            project=run_model.project,
-        )
+        # Create new replicas for remaining diff
+        secrets = await get_project_secrets_mapping(session=session, project=run_model.project)
 
-        for replica_num in range(
-            len(active_replicas) + scheduled_replicas, len(active_replicas) + replicas_diff
-        ):
+        for _ in range(replicas_diff - scheduled_replicas):
+            # Pick group for new replica
+            # v1: Simple heuristic - pick first eligible group (round-robin in future)
+            selected_group = eligible_groups[0] if eligible_groups else None
+
+            replica_num = len(active_replicas) + scheduled_replicas
+
             # FIXME: Handle getting image configuration errors or skip it.
             jobs = await get_jobs_from_run_spec(
                 run_spec=run_spec,
                 secrets=secrets,
                 replica_num=replica_num,
+                replica_group=selected_group,
             )
             for job in jobs:
                 job_model = create_job_model_for_new_submission(
@@ -1279,6 +1569,24 @@ async def scale_run_replicas(session: AsyncSession, run_model: RunModel, replica
                     status=JobStatus.SUBMITTED,
                 )
                 session.add(job_model)
+
+            # Update count
+            if selected_group:
+                group_counts[selected_group.name] = group_counts.get(selected_group.name, 0) + 1
+                scheduled_replicas += 1
+
+                # Remove from eligible if at max
+                if group_counts[selected_group.name] >= (
+                    selected_group.replicas.max or float("inf")
+                ):
+                    eligible_groups = [g for g in eligible_groups if g.name != selected_group.name]
+                    if not eligible_groups:
+                        logger.info(
+                            "%s: all eligible groups reached maximum capacity", fmt(run_model)
+                        )
+                        break
+            else:
+                scheduled_replicas += 1
 
 
 async def retry_run_replica_jobs(
@@ -1289,10 +1597,29 @@ async def retry_run_replica_jobs(
         session=session,
         project=run_model.project,
     )
+
+    # Determine which replica group this job belongs to
+    run_spec = RunSpec.__response__.parse_raw(run_model.run_spec)
+    replica_group = None
+    if run_spec.configuration.type == "service" and latest_jobs:
+        from dstack._internal.core.models.runs import get_normalized_replica_groups
+
+        group_name = latest_jobs[0].replica_group_name
+        if group_name:
+            normalized_groups = get_normalized_replica_groups(run_spec.configuration)
+            replica_group = next((g for g in normalized_groups if g.name == group_name), None)
+            if replica_group:
+                logger.info(
+                    "%s: retrying job from replica group '%s'",
+                    fmt(run_model),
+                    replica_group.name,
+                )
+
     new_jobs = await get_jobs_from_run_spec(
-        run_spec=RunSpec.__response__.parse_raw(run_model.run_spec),
+        run_spec=run_spec,
         secrets=secrets,
         replica_num=latest_jobs[0].replica_num,
+        replica_group=replica_group,
     )
     assert len(new_jobs) == len(latest_jobs), (
         "Changing the number of jobs within a replica is not yet supported"
