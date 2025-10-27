@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -67,12 +66,12 @@ func (m *Manager) Checkout() error {
 	log.Info(m.ctx, "git checkout", "auth", fmt.Sprintf("%T", (&m.clo).Auth))
 	ref, err := git.PlainClone(m.localPath, false, &m.clo)
 	if err != nil {
-		return gerrors.Wrap(err)
+		return fmt.Errorf("clone repo: %w", err)
 	}
 	if ref != nil {
 		branchRef, err := ref.Reference(m.clo.ReferenceName, true)
 		if err != nil {
-			return gerrors.Wrap(err)
+			return fmt.Errorf("get branch reference: %w", err)
 		}
 		var cho git.CheckoutOptions
 		if m.hash == "" || m.hash == branchRef.Hash().String() {
@@ -82,11 +81,11 @@ func (m *Manager) Checkout() error {
 		}
 		workTree, err := ref.Worktree()
 		if err != nil {
-			return gerrors.Wrap(err)
+			return fmt.Errorf("get worktree: %w", err)
 		}
 		err = workTree.Checkout(&cho)
 		if err != nil {
-			return gerrors.Wrap(err)
+			return fmt.Errorf("checkout: %w", err)
 		}
 	} else {
 		log.Warning(m.ctx, "git clone ref==nil")
@@ -102,16 +101,16 @@ func (m *Manager) URL() string {
 func (m *Manager) SetConfig(name, email string) error {
 	repo, err := git.PlainOpen(m.localPath)
 	if err != nil {
-		return gerrors.Wrap(err)
+		return fmt.Errorf("open repo: %w", err)
 	}
 	config, err := repo.Config()
 	if err != nil {
-		return gerrors.Wrap(err)
+		return fmt.Errorf("get repo config: %w", err)
 	}
 	config.User.Name = name
 	config.User.Email = email
 	if err := repo.SetConfig(config); err != nil {
-		return gerrors.Wrap(err)
+		return fmt.Errorf("set repo config: %w", err)
 	}
 	return nil
 }
