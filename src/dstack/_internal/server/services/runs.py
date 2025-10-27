@@ -34,6 +34,7 @@ from dstack._internal.core.models.profiles import (
 )
 from dstack._internal.core.models.repos.virtual import DEFAULT_VIRTUAL_REPO_ID, VirtualRunRepoData
 from dstack._internal.core.models.runs import (
+    LEGACY_REPO_DIR,
     ApplyRunPlanInput,
     Job,
     JobPlan,
@@ -308,6 +309,7 @@ async def get_plan(
     user: UserModel,
     run_spec: RunSpec,
     max_offers: Optional[int],
+    legacy_default_working_dir: bool = False,
 ) -> RunPlan:
     # Spec must be copied by parsing to calculate merged_profile
     effective_run_spec = RunSpec.parse_obj(run_spec.dict())
@@ -317,7 +319,11 @@ async def get_plan(
         spec=effective_run_spec,
     )
     effective_run_spec = RunSpec.parse_obj(effective_run_spec.dict())
-    _validate_run_spec_and_set_defaults(user, effective_run_spec)
+    _validate_run_spec_and_set_defaults(
+        user=user,
+        run_spec=effective_run_spec,
+        legacy_default_working_dir=legacy_default_working_dir,
+    )
 
     profile = effective_run_spec.merged_profile
     creation_policy = profile.creation_policy
@@ -413,6 +419,7 @@ async def apply_plan(
     project: ProjectModel,
     plan: ApplyRunPlanInput,
     force: bool,
+    legacy_default_working_dir: bool = False,
 ) -> Run:
     run_spec = plan.run_spec
     run_spec = await apply_plugin_policies(
@@ -422,7 +429,9 @@ async def apply_plan(
     )
     # Spec must be copied by parsing to calculate merged_profile
     run_spec = RunSpec.parse_obj(run_spec.dict())
-    _validate_run_spec_and_set_defaults(user, run_spec)
+    _validate_run_spec_and_set_defaults(
+        user=user, run_spec=run_spec, legacy_default_working_dir=legacy_default_working_dir
+    )
     if run_spec.run_name is None:
         return await submit_run(
             session=session,
@@ -985,7 +994,9 @@ def _get_job_submission_cost(job_submission: JobSubmission) -> float:
     return job_submission.job_provisioning_data.price * duration_hours
 
 
-def _validate_run_spec_and_set_defaults(user: UserModel, run_spec: RunSpec):
+def _validate_run_spec_and_set_defaults(
+    user: UserModel, run_spec: RunSpec, legacy_default_working_dir: bool = False
+):
     # This function may set defaults for null run_spec values,
     # although most defaults are resolved when building job_spec
     # so that we can keep both the original user-supplied value (null in run_spec)
@@ -1040,6 +1051,8 @@ def _validate_run_spec_and_set_defaults(user: UserModel, run_spec: RunSpec):
             run_spec.ssh_key_pub = user.ssh_public_key
         else:
             raise ServerClientError("ssh_key_pub must be set if the user has no ssh_public_key")
+    if run_spec.configuration.working_dir is None and legacy_default_working_dir:
+        run_spec.configuration.working_dir = LEGACY_REPO_DIR
 
 
 _UPDATABLE_SPEC_FIELDS = ["configuration_path", "configuration"]
