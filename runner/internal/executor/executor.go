@@ -422,7 +422,10 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 	cmd := exec.CommandContext(ctx, ex.jobSpec.Commands[0], ex.jobSpec.Commands[1:]...)
 	cmd.Cancel = func() error {
 		// returns error on Windows
-		return fmt.Errorf("send interrupt signal: %w", cmd.Process.Signal(os.Interrupt))
+		if err = cmd.Process.Signal(os.Interrupt); err != nil {
+			return fmt.Errorf("send interrupt signal: %w", err)
+		}
+		return nil
 	}
 	cmd.WaitDelay = ex.killDelay // kills the process if it doesn't exit in time
 
@@ -549,7 +552,10 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 	if err != nil && !isPtyError(err) {
 		return fmt.Errorf("copy command output: %w", err)
 	}
-	return fmt.Errorf("wait for command: %w", cmd.Wait())
+	if err = cmd.Wait(); err != nil {
+		return fmt.Errorf("wait for command: %w", err)
+	}
+	return nil
 }
 
 func (ex *RunExecutor) setupCredentials(ctx context.Context) (func(), error) {
