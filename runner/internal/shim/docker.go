@@ -540,7 +540,7 @@ func unmountVolumes(ctx context.Context, taskConfig TaskConfig) error {
 			log.Info(ctx, "skipping", "mountpoint", mountPoint, "output", output)
 			continue
 		}
-		cmd = exec.CommandContext(ctx, "umount", "-qf", mountPoint)
+		cmd = exec.CommandContext(context.TODO(), "umount", "-qf", mountPoint)
 		if output, err := cmd.CombinedOutput(); err != nil {
 			log.Error(ctx, "failed to unmount", "mountpoint", mountPoint, "output", output)
 			failed = append(failed, mountPoint)
