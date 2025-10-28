@@ -44,12 +44,12 @@ func (ex *RunExecutor) setupRepo(ctx context.Context) error {
 		return gerrors.Wrap(err)
 	}
 	defer func() { _ = os.RemoveAll(tmpRepoDir) }()
-	err = ex.moveRepoDir(tmpRepoDir)
+	err = ex.moveRepoDir(ctx, tmpRepoDir)
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
 	defer func() {
-		err_ := ex.restoreRepoDir(tmpRepoDir)
+		err_ := ex.restoreRepoDir(ctx, tmpRepoDir)
 		if err == nil {
 			err = gerrors.Wrap(err_)
 		}
@@ -171,23 +171,23 @@ func (ex *RunExecutor) shouldCheckout(ctx context.Context) (bool, error) {
 	return false, nil
 }
 
-func (ex *RunExecutor) moveRepoDir(tmpDir string) error {
-	if err := moveDir(ex.repoDir, tmpDir); err != nil {
+func (ex *RunExecutor) moveRepoDir(ctx context.Context, tmpDir string) error {
+	if err := moveDir(ctx, ex.repoDir, tmpDir); err != nil {
 		return gerrors.Wrap(err)
 	}
 	return nil
 }
 
-func (ex *RunExecutor) restoreRepoDir(tmpDir string) error {
-	if err := moveDir(tmpDir, ex.repoDir); err != nil {
+func (ex *RunExecutor) restoreRepoDir(ctx context.Context, tmpDir string) error {
+	if err := moveDir(ctx, tmpDir, ex.repoDir); err != nil {
 		return gerrors.Wrap(err)
 	}
 	return nil
 }
 
-func moveDir(srcDir, dstDir string) error {
+func moveDir(ctx context.Context, srcDir, dstDir string) error {
 	// We cannot just move/rename files because with volumes they'll be on different devices
-	cmd := exec.Command("cp", "-a", srcDir+"/.", dstDir)
+	cmd := exec.CommandContext(ctx, "cp", "-a", srcDir+"/.", dstDir)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to cp: %w, output: %s", err, string(output))
 	}

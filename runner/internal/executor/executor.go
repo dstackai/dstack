@@ -412,7 +412,7 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 	}
 
 	// Call buildLDLibraryPathEnv and update jobEnvs if no error occurs
-	newLDPath, err := buildLDLibraryPathEnv()
+	newLDPath, err := buildLDLibraryPathEnv(ctx)
 	if err != nil {
 		log.Info(ctx, "Continuing without updating LD_LIBRARY_PATH")
 	} else {
@@ -611,9 +611,9 @@ func isPtyError(err error) bool {
 	return errors.As(err, &e) && errors.Is(e.Err, syscall.EIO)
 }
 
-func buildLDLibraryPathEnv() (string, error) {
+func buildLDLibraryPathEnv(ctx context.Context) (string, error) {
 	// Execute shell command to get Python prefix
-	cmd := exec.Command("bash", "-i", "-c", "python3-config --prefix")
+	cmd := exec.CommandContext(ctx, "bash", "-i", "-c", "python3-config --prefix")
 	output, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("error executing command: %w", err)
