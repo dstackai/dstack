@@ -50,11 +50,14 @@ from nebius.api.nebius.vpc.v1 import ListSubnetsRequest, Subnet, SubnetServiceCl
 from nebius.sdk import SDK
 
 from dstack._internal.core.backends.base.configurator import raise_invalid_credentials_error
+from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.nebius.models import (
     DEFAULT_PROJECT_NAME_PREFIX,
+    NebiusOfferBackendData,
     NebiusServiceAccountCreds,
 )
 from dstack._internal.core.errors import BackendError, NoCapacityError
+from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.utils.event_loop import DaemonEventLoop
 from dstack._internal.utils.logging import get_logger
 
@@ -247,6 +250,17 @@ def get_default_subnet(sdk: SDK, project_id: str) -> Subnet:
         if subnet.metadata.name.startswith("default-subnet"):
             return subnet
     raise BackendError(f"Could not find default subnet in project {project_id}")
+
+
+def get_all_infiniband_fabrics() -> set[str]:
+    offers = get_catalog_offers(backend=BackendType.NEBIUS)
+    result = set()
+    for offer in offers:
+        backend_data: NebiusOfferBackendData = NebiusOfferBackendData.__response__.parse_obj(
+            offer.backend_data
+        )
+        result |= backend_data.fabrics
+    return result
 
 
 def create_disk(
