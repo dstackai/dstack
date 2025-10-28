@@ -15,6 +15,7 @@ from dstack._internal.core.backends.base.compute import (
     ComputeWithVolumeSupport,
 )
 from dstack._internal.core.backends.base.models import JobConfiguration
+from dstack._internal.core.backends.features import BACKENDS_WITH_GROUP_PROVISIONING_SUPPORT
 from dstack._internal.core.errors import BackendError, ServerClientError
 from dstack._internal.core.models.common import NetworkMode
 from dstack._internal.core.models.compute_groups import ComputeGroupProvisioningData
@@ -852,7 +853,8 @@ async def _run_jobs_on_new_instances(
         job_configurations = [JobConfiguration(job=j, volumes=offer_volumes) for j in jobs]
         compute = backend.compute()
         try:
-            if len(jobs) > 1 and isinstance(compute, ComputeWithGroupProvisioningSupport):
+            if len(jobs) > 1 and offer.backend in BACKENDS_WITH_GROUP_PROVISIONING_SUPPORT:
+                assert isinstance(compute, ComputeWithGroupProvisioningSupport)
                 cgpd = await common_utils.run_async(
                     compute.run_jobs,
                     run,
