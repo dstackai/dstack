@@ -252,9 +252,9 @@ func start(ctx context.Context, args shim.CLIArgs, serviceMode bool) (err error)
 	if serviceMode {
 		if err := shim.WriteHostInfo(shimHomeDir, dockerRunner.Resources(ctx)); err != nil {
 			if errors.Is(err, os.ErrExist) {
-				log.Error(ctx, "cannot write host info: file already exists")
+				log.Error(ctx, "write host info: file already exists")
 			} else {
-				return err
+				return fmt.Errorf("write host info: %w", err)
 			}
 		}
 	}
