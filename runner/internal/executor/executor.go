@@ -106,7 +106,7 @@ func NewRunExecutor(tempDir string, homeDir string, sshPort int) (*RunExecutor, 
 	if runtime.GOOS == "linux" {
 		proc, err := procfs.NewDefaultFS()
 		if err != nil {
-			return nil, fmt.Errorf("failed to initialize procfs: %w", err)
+			return nil, fmt.Errorf("initialize procfs: %w", err)
 		}
 		connectionTracker = connections.NewConnectionTracker(connections.ConnectionTrackerConfig{
 			Port:            uint64(sshPort),
@@ -516,7 +516,7 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 
 	err = writeMpiHostfile(ctx, ex.clusterInfo.JobIPs, gpus_per_node_num, mpiHostfilePath)
 	if err != nil {
-		return err
+		return fmt.Errorf("write MPI hostfile: %w", err)
 	}
 
 	cmd.Env = envMap.Render()
@@ -743,7 +743,7 @@ func parseStringId(stringId string) (uint32, error) {
 		return 0, err
 	}
 	if id < 0 {
-		return 0, fmt.Errorf("negative value: %d", id)
+		return 0, fmt.Errorf("negative id value: %d", id)
 	}
 	return uint32(id), nil
 }
@@ -755,7 +755,7 @@ func parseStringId(stringId string) (uint32, error) {
 func startCommand(cmd *exec.Cmd) (*os.File, error) {
 	ptm, pts, err := pty.Open()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("open pty: %w", err)
 	}
 	defer func() { _ = pts.Close() }()
 
@@ -780,13 +780,13 @@ func startCommand(cmd *exec.Cmd) (*os.File, error) {
 		uid := cmd.SysProcAttr.Credential.Uid
 		if err := os.Chown(pts.Name(), int(uid), -1); err != nil {
 			_ = ptm.Close()
-			return nil, err
+			return nil, fmt.Errorf("chown pty slave: %w", err)
 		}
 	}
 
 	if err := cmd.Start(); err != nil {
 		_ = ptm.Close()
-		return nil, err
+		return nil, fmt.Errorf("start command: %w", err)
 	}
 	return ptm, nil
 }
@@ -830,28 +830,28 @@ func prepareSSHDir(uid int, gid int, homeDir string) (string, error) {
 			return "", fmt.Errorf("not a directory: %s", sshDir)
 		}
 		if err = os.Chmod(sshDir, 0o700); err != nil {
-			return "", err
+			return "", fmt.Errorf("chmod ssh dir: %w", err)
 		}
 	} else if errors.Is(err, os.ErrNotExist) {
 		if err = os.MkdirAll(sshDir, 0o700); err != nil {
-			return "", err
+			return "", fmt.Errorf("create ssh dir: %w", err)
 		}
 	} else {
 		return "", err
 	}
 	if err = os.Chown(sshDir, uid, gid); err != nil {
-		return "", err
+		return "", fmt.Errorf("chown ssh dir: %w", err)
 	}
 	return sshDir, nil
 }
 
 func writeMpiHostfile(ctx context.Context, ips []string, gpus_per_node int, path string) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
+		return fmt.Errorf("create MPI hostfile directory: %w", err)
 	}
 	file, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
 	if err != nil {
-		return err
+		return fmt.Errorf("open MPI hostfile: %w", err)
 	}
 	defer file.Close()
 	nonEmptyIps := []string{}
@@ -864,7 +864,7 @@ func writeMpiHostfile(ctx context.Context, ips []string, gpus_per_node int, path
 		for _, ip := range nonEmptyIps {
 			line := fmt.Sprintf("%s slots=%d\n", ip, gpus_per_node)
 			if _, err = file.WriteString(line); err != nil {
-				return err
+				return fmt.Errorf("write MPI hostfile line: %w", err)
 			}
 		}
 	} else {
@@ -875,11 +875,11 @@ func writeMpiHostfile(ctx context.Context, ips []string, gpus_per_node int, path
 
 func writeDstackProfile(env map[string]string, pth string) error {
 	if err := os.MkdirAll(path.Dir(pth), 0o755); err != nil {
-		return err
+		return fmt.Errorf("create dstack profile directory: %w", err)
 	}
 	file, err := os.OpenFile(pth, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
 	if err != nil {
-		return err
+		return fmt.Errorf("open dstack profile: %w", err)
 	}
 	defer file.Close()
 	for key, value := range env {
@@ -889,14 +889,14 @@ func writeDstackProfile(env map[string]string, pth string) error {
 		}
 		line := fmt.Sprintf("export %s='%s'\n", key, strings.ReplaceAll(value, `'`, `'"'"'`))
 		if _, err = file.WriteString(line); err != nil {
-			return err
+			return fmt.Errorf("write dstack profile: %w", err)
 		}
 	}
 	if _, err = file.WriteString("cd \"$DSTACK_WORKING_DIR\"\n"); err != nil {
-		return err
+		return fmt.Errorf("write dstack profile: %w", err)
 	}
 	if err = os.Chmod(pth, 0o644); err != nil {
-		return err
+		return fmt.Errorf("chmod dstack profile: %w", err)
 	}
 	return nil
 }
@@ -904,14 +904,14 @@ func writeDstackProfile(env map[string]string, pth string) error {
 func includeDstackProfile(profilePath string, dstackProfilePath string) error {
 	file, err := os.OpenFile(profilePath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
 	if err != nil {
-		return err
+		return fmt.Errorf("open profile file: %w", err)
 	}
 	defer file.Close()
 	if _, err = file.WriteString(fmt.Sprintf("\n. '%s'\n", dstackProfilePath)); err != nil {
-		return err
+		return fmt.Errorf("write profile include: %w", err)
 	}
 	if err = os.Chmod(profilePath, 0o644); err != nil {
-		return err
+		return fmt.Errorf("chmod profile file: %w", err)
 	}
 	return nil
 }
@@ -920,37 +920,37 @@ func configureSSH(private string, public string, ips []string, port int, uid int
 	privatePath := filepath.Join(sshDir, "dstack_job")
 	privateFile, err := os.OpenFile(privatePath, os.O_TRUNC|os.O_WRONLY|os.O_CREATE, 0o600)
 	if err != nil {
-		return err
+		return fmt.Errorf("open private key file: %w", err)
 	}
 	defer privateFile.Close()
 	if err := os.Chown(privatePath, uid, gid); err != nil {
-		return err
+		return fmt.Errorf("chown private key: %w", err)
 	}
 	if _, err := privateFile.WriteString(private); err != nil {
-		return err
+		return fmt.Errorf("write private key: %w", err)
 	}
 
 	akPath := filepath.Join(sshDir, "authorized_keys")
 	akFile, err := os.OpenFile(akPath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0o600)
 	if err != nil {
-		return err
+		return fmt.Errorf("open authorized_keys: %w", err)
 	}
 	defer akFile.Close()
 	if err := os.Chown(akPath, uid, gid); err != nil {
-		return err
+		return fmt.Errorf("chown authorized_keys: %w", err)
 	}
 	if _, err := akFile.WriteString(public); err != nil {
-		return err
+		return fmt.Errorf("write public key: %w", err)
 	}
 
 	configPath := filepath.Join(sshDir, "config")
 	configFile, err := os.OpenFile(configPath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0o600)
 	if err != nil {
-		return err
+		return fmt.Errorf("open SSH config: %w", err)
 	}
 	defer configFile.Close()
 	if err := os.Chown(configPath, uid, gid); err != nil {
-		return err
+		return fmt.Errorf("chown SSH config: %w", err)
 	}
 	var configBuffer bytes.Buffer
 	for _, ip := range ips {
@@ -961,7 +961,7 @@ func configureSSH(private string, public string, ips []string, port int, uid int
 		configBuffer.WriteString(fmt.Sprintf("    IdentityFile %s\n", privatePath))
 	}
 	if _, err := configFile.Write(configBuffer.Bytes()); err != nil {
-		return err
+		return fmt.Errorf("write SSH config: %w", err)
 	}
 	return nil
 }
@@ -973,7 +973,7 @@ func configureSSH(private string, public string, ips []string, port int, uid int
 func copyAuthorizedKeys(srcPath string, uid int, gid int, dstPath string) error {
 	srcFile, err := os.Open(srcPath)
 	if err != nil {
-		return err
+		return fmt.Errorf("open source authorized_keys: %w", err)
 	}
 	defer srcFile.Close()
 
@@ -985,29 +985,29 @@ func copyAuthorizedKeys(srcPath string, uid int, gid int, dstPath string) error 
 			return fmt.Errorf("is a directory: %s", dstPath)
 		}
 		if err = os.Chmod(dstPath, 0o600); err != nil {
-			return err
+			return fmt.Errorf("chmod destination authorized_keys: %w", err)
 		}
 	} else if !errors.Is(err, os.ErrNotExist) {
-		return err
+		return fmt.Errorf("stat destination authorized_keys: %w", err)
 	}
 
 	dstFile, err := os.OpenFile(dstPath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0o600)
 	if err != nil {
-		return err
+		return fmt.Errorf("open destination authorized_keys: %w", err)
 	}
 	defer dstFile.Close()
 
 	if dstExists {
 		// visually separate our keys from existing ones
 		if _, err := dstFile.WriteString("\n\n"); err != nil {
-			return err
+			return fmt.Errorf("write separator to authorized_keys: %w", err)
 		}
 	}
 	if _, err := io.Copy(dstFile, srcFile); err != nil {
-		return err
+		return fmt.Errorf("copy authorized_keys: %w", err)
 	}
 	if err = os.Chown(dstPath, uid, gid); err != nil {
-		return err
+		return fmt.Errorf("chown destination authorized_keys: %w", err)
 	}
 
 	return nil
