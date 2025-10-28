@@ -207,6 +207,9 @@ class Requirements(CoreModel):
     max_price: Optional[float] = None
     spot: Optional[bool] = None
     reservation: Optional[str] = None
+    # Backends can use `multinode` to filter out offers if
+    # some offers support multinode and some do not.
+    multinode: Optional[bool] = None
 
     def pretty_format(self, resources_only: bool = False):
         res = self.resources.pretty_format()

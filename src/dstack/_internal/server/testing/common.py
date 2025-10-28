@@ -13,6 +13,7 @@ from dstack._internal.core.backends.base.compute import (
     Compute,
     ComputeWithCreateInstanceSupport,
     ComputeWithGatewaySupport,
+    ComputeWithGroupProvisioningSupport,
     ComputeWithMultinodeSupport,
     ComputeWithPlacementGroupSupport,
     ComputeWithPrivateGatewaySupport,
@@ -22,6 +23,10 @@ from dstack._internal.core.backends.base.compute import (
 )
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import NetworkMode
+from dstack._internal.core.models.compute_groups import (
+    ComputeGroupProvisioningData,
+    ComputeGroupStatus,
+)
 from dstack._internal.core.models.configurations import (
     AnyRunConfiguration,
     DevEnvironmentConfiguration,
@@ -83,6 +88,7 @@ from dstack._internal.core.models.volumes import (
 )
 from dstack._internal.server.models import (
     BackendModel,
+    ComputeGroupModel,
     DecryptedString,
     FileArchiveModel,
     FleetModel,
@@ -353,6 +359,7 @@ async def create_job(
     instance_assigned: bool = False,
     disconnected_at: Optional[datetime] = None,
     registered: bool = False,
+    waiting_master_job: Optional[bool] = None,
 ) -> JobModel:
     if deployment_num is None:
         deployment_num = run.deployment_num
@@ -384,6 +391,7 @@ async def create_job(
         disconnected_at=disconnected_at,
         probes=[],
         registered=registered,
+        waiting_master_job=waiting_master_job,
     )
     session.add(job)
     await session.commit()
@@ -453,6 +461,48 @@ def get_job_runtime_data(
         offer=offer,
         volume_names=volume_names,
     )
+
+
+def get_compute_group_provisioning_data(
+    compute_group_id: str = "test_compute_group",
+    compute_group_name: str = "test_compute_group",
+    backend: BackendType = BackendType.RUNPOD,
+    region: str = "US",
+    job_provisioning_datas: Optional[list[JobProvisioningData]] = None,
+    backend_data: Optional[str] = None,
+) -> ComputeGroupProvisioningData:
+    if job_provisioning_datas is None:
+        job_provisioning_datas = []
+    return ComputeGroupProvisioningData(
+        compute_group_id=compute_group_id,
+        compute_group_name=compute_group_name,
+        backend=backend,
+        region=region,
+        job_provisioning_datas=job_provisioning_datas,
+        backend_data=backend_data,
+    )
+
+
+async def create_compute_group(
+    session: AsyncSession,
+    project: ProjectModel,
+    fleet: FleetModel,
+    status: ComputeGroupStatus = ComputeGroupStatus.RUNNING,
+    provisioning_data: Optional[ComputeGroupProvisioningData] = None,
+    last_processed_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+):
+    if provisioning_data is None:
+        provisioning_data = get_compute_group_provisioning_data()
+    compute_group = ComputeGroupModel(
+        project=project,
+        fleet=fleet,
+        status=status,
+        provisioning_data=provisioning_data.json(),
+        last_processed_at=last_processed_at,
+    )
+    session.add(compute_group)
+    await session.commit()
+    return compute_group
 
 
 async def create_probe(
@@ -1136,6 +1186,7 @@ class AsyncContextManager:
 class ComputeMockSpec(
     Compute,
     ComputeWithCreateInstanceSupport,
+    ComputeWithGroupProvisioningSupport,
     ComputeWithPrivilegedSupport,
     ComputeWithMultinodeSupport,
     ComputeWithReservationSupport,
