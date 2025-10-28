@@ -15,6 +15,7 @@ import { finishedRunStatuses } from 'pages/Runs/constants';
 import { runIsStopped } from 'pages/Runs/utils';
 
 import {
+    getRunListFinishedAt,
     getRunListItemBackend,
     getRunListItemInstanceId,
     getRunListItemPrice,
@@ -59,6 +60,8 @@ export const RunDetails = () => {
         ? runData.latest_job_submission?.termination_reason
         : null;
 
+    const finishedAt = getRunListFinishedAt(runData);
+
     return (
         <>
             <Container header={<Header variant="h2">{t('common.general')}</Header>}>
@@ -101,7 +104,7 @@ export const RunDetails = () => {
 
                     <div>
                         <Box variant="awsui-key-label">{t('projects.run.finished_at')}</Box>
-                        <div>{runData.terminated_at ? format(new Date(runData.terminated_at), DATE_TIME_FORMAT) : '-'}</div>
+                        <div>{finishedAt ? format(new Date(finishedAt), DATE_TIME_FORMAT) : '-'}</div>
                     </div>
 
                     <div>

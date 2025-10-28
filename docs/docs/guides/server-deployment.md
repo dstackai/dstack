@@ -400,6 +400,28 @@ export DSTACK_DB_MAX_OVERFLOW=80
 You have to ensure your Postgres installation supports that many connections by
 configuring [`max_connections`](https://www.postgresql.org/docs/current/runtime-config-connection.html#GUC-MAX-CONNECTIONS) and/or using connection pooler.
 
+## Server upgrades
+
+When upgrading the `dstack` server, follow these guidelines to ensure a smooth transition and minimize downtime.
+
+### Before upgrading
+
+1. **Check the changelog**: Review the [release notes :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/releases){:target="_blank"} for breaking changes, new features, and migration notes.
+2. **Review backward compatibility**: Understand the [backward compatibility](#backward-compatibility) policy.
+3. **Back up your data**: Ensure you always create a backup before upgrading.
+
+### Best practices
+
+- **Test in staging**: Always test upgrades in a non-production environment first.
+- **Monitor logs**: Watch server logs during and after the upgrade for any errors or warnings.
+- **Keep backups**: Retain backups for at least a few days after a successful upgrade.
+
+### Troubleshooting
+
+**Deadlock when upgrading a multi-replica PostgreSQL deployment**
+
+If a deployment is stuck due to a deadlock when applying DB migrations, try scaling server replicas to 1 and retry the deployment multiple times. Some releases may not support rolling deployments, which is always noted in the release notes. If you think there is a bug, please [file an issue](https://github.com/dstackai/dstack/issues).
+
 ## FAQs
 
 ??? info "Can I run multiple replicas of dstack server?"

@@ -1,6 +1,6 @@
-from typing import List, Tuple
+from typing import Annotated, List, Optional, Tuple, cast
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.errors import ResourceNotExistsError
@@ -33,6 +33,11 @@ project_router = APIRouter(
     tags=["runs"],
     responses=get_base_api_additional_responses(),
 )
+
+
+def use_legacy_default_working_dir(request: Request) -> bool:
+    client_release = cast(Optional[tuple[int, ...]], request.state.client_release)
+    return client_release is not None and client_release < (0, 19, 27)
 
 
 @root_router.post(
@@ -103,8 +108,9 @@ async def get_run(
 )
 async def get_plan(
     body: GetRunPlanRequest,
-    session: AsyncSession = Depends(get_session),
-    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
+    session: Annotated[AsyncSession, Depends(get_session)],
+    user_project: Annotated[tuple[UserModel, ProjectModel], Depends(ProjectMember())],
+    legacy_default_working_dir: Annotated[bool, Depends(use_legacy_default_working_dir)],
 ):
     """
     Returns a run plan for the given run spec.
@@ -119,6 +125,7 @@ async def get_plan(
         user=user,
         run_spec=body.run_spec,
         max_offers=body.max_offers,
+        legacy_default_working_dir=legacy_default_working_dir,
     )
     return CustomORJSONResponse(run_plan)
 
@@ -129,8 +136,9 @@ async def get_plan(
 )
 async def apply_plan(
     body: ApplyRunPlanRequest,
-    session: AsyncSession = Depends(get_session),
-    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
+    session: Annotated[AsyncSession, Depends(get_session)],
+    user_project: Annotated[tuple[UserModel, ProjectModel], Depends(ProjectMember())],
+    legacy_default_working_dir: Annotated[bool, Depends(use_legacy_default_working_dir)],
 ):
     """
     Creates a new run or updates an existing run.
@@ -148,6 +156,7 @@ async def apply_plan(
             project=project,
             plan=body.plan,
             force=body.force,
+            legacy_default_working_dir=legacy_default_working_dir,
         )
     )
 

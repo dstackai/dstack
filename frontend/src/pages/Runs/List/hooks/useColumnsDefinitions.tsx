@@ -18,6 +18,7 @@ import { ROUTES } from 'routes';
 import { finishedRunStatuses } from 'pages/Runs/constants';
 
 import {
+    getRunListFinishedAt,
     getRunListItemBackend,
     getRunListItemInstance,
     getRunListItemPrice,
@@ -68,7 +69,10 @@ export const useColumnsDefinitions = () => {
         {
             id: 'finished_at',
             header: t('projects.run.finished_at'),
-            cell: (item: IRun) => (item.terminated_at ? format(new Date(item.terminated_at), DATE_TIME_FORMAT) : null),
+            cell: (item: IRun) => {
+                const finishedAt = getRunListFinishedAt(item);
+                return finishedAt ? format(new Date(finishedAt), DATE_TIME_FORMAT) : '-';
+            },
         },
         {
             id: 'status',

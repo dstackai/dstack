@@ -5,7 +5,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Awaitable, Callable, List
+from typing import Awaitable, Callable, List, Optional
 
 import sentry_sdk
 from fastapi import FastAPI, Request, Response, status
@@ -62,6 +62,7 @@ from dstack._internal.server.utils.routers import (
     CustomORJSONResponse,
     check_client_server_compatibility,
     error_detail,
+    get_client_version,
     get_server_client_error_details,
 )
 from dstack._internal.settings import DSTACK_VERSION
@@ -319,8 +320,19 @@ def register_routes(app: FastAPI, ui: bool = True):
             or request.url.path in _NO_API_VERSION_CHECK_ROUTES
         ):
             return await call_next(request)
+        try:
+            client_version = get_client_version(request)
+        except ValueError as e:
+            return CustomORJSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content={"detail": [error_detail(str(e))]},
+            )
+        client_release: Optional[tuple[int, ...]] = None
+        if client_version is not None:
+            client_release = client_version.release
+        request.state.client_release = client_release
         response = check_client_server_compatibility(
-            client_version=request.headers.get("x-api-version"),
+            client_version=client_version,
             server_version=DSTACK_VERSION,
         )
         if response is not None:

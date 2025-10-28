@@ -191,6 +191,9 @@ class UserModel(BaseModel):
     # deactivated users cannot access API
     active: Mapped[bool] = mapped_column(Boolean, default=True)
 
+    # SSH keys can be null for users created before 0.19.33.
+    # Keys for those users are being gradually generated on /get_my_user calls.
+    # TODO: make keys required in a future version.
     ssh_private_key: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     ssh_public_key: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 

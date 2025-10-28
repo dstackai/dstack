@@ -35,7 +35,7 @@ If you make a non-trivial change to `dstack`, we recommend you learn about `dsta
 * Bug fixes that address a clearly defined bug. Include steps to reproduce in the linked issue or the PR.
 * New features. Before submitting a feature PR, create an issue with a proposal to discuss it with the core team and other interested parties.
 * Minor fixes such as typos.
-* [Examples](examples/README.md).
+* [Examples](examples).
 
 ### Before pushing your changes
 

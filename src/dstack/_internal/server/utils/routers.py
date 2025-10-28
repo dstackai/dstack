@@ -1,12 +1,13 @@
 from typing import Any, Dict, List, Optional
 
 import orjson
+import packaging.version
 from fastapi import HTTPException, Request, Response, status
-from packaging import version
 
 from dstack._internal.core.errors import ServerClientError, ServerClientErrorCode
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.utils.json_utils import get_orjson_default_options, orjson_default
+from dstack._internal.utils.version import parse_version
 
 
 class CustomORJSONResponse(Response):
@@ -122,8 +123,15 @@ def get_request_size(request: Request) -> int:
     return int(request.headers["content-length"])
 
 
+def get_client_version(request: Request) -> Optional[packaging.version.Version]:
+    version = request.headers.get("x-api-version")
+    if version is None:
+        return None
+    return parse_version(version)
+
+
 def check_client_server_compatibility(
-    client_version: Optional[str],
+    client_version: Optional[packaging.version.Version],
     server_version: Optional[str],
 ) -> Optional[CustomORJSONResponse]:
     """
@@ -132,28 +140,18 @@ def check_client_server_compatibility(
     """
     if client_version is None or server_version is None:
         return None
-    parsed_server_version = version.parse(server_version)
-    # latest allows client to bypass compatibility check (e.g. frontend)
-    if client_version == "latest":
+    parsed_server_version = parse_version(server_version)
+    if parsed_server_version is None:
         return None
-    try:
-        parsed_client_version = version.parse(client_version)
-    except version.InvalidVersion:
-        return CustomORJSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={
-                "detail": get_server_client_error_details(
-                    ServerClientError("Bad API version specified")
-                )
-            },
-        )
     # We preserve full client backward compatibility across patch releases.
     # Server is always partially backward-compatible (so no check).
-    if parsed_client_version > parsed_server_version and (
-        parsed_client_version.major > parsed_server_version.major
-        or parsed_client_version.minor > parsed_server_version.minor
+    if client_version > parsed_server_version and (
+        client_version.major > parsed_server_version.major
+        or client_version.minor > parsed_server_version.minor
     ):
-        return error_incompatible_versions(client_version, server_version, ask_cli_update=False)
+        return error_incompatible_versions(
+            str(client_version), server_version, ask_cli_update=False
+        )
     return None
 
 
