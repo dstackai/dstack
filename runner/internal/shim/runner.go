@@ -45,6 +45,8 @@ func downloadRunner(ctx context.Context, url string, path string, force bool) er
 			log.Info(ctx, "dstack-runner binary exists, skipping download", "path", path)
 			return nil
 		}
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("check dstack-runner exists: %w", err)
 	}
 	tempFile, err := os.CreateTemp(filepath.Dir(path), "dstack-runner")
 	if err != nil {
