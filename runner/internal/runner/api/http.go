@@ -15,7 +15,6 @@ import (
 
 	"github.com/dstackai/dstack/runner/internal/api"
 	"github.com/dstackai/dstack/runner/internal/executor"
-	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/dstackai/dstack/runner/internal/metrics"
 	"github.com/dstackai/dstack/runner/internal/schemas"
@@ -77,7 +76,7 @@ func (s *Server) uploadArchivePostHandler(w http.ResponseWriter, r *http.Request
 	}
 	mediaType, params, err := mime.ParseMediaType(contentType)
 	if err != nil {
-		return nil, gerrors.Wrap(err)
+		return nil, fmt.Errorf("parse request content-type: %w", err)
 	}
 	if mediaType != "multipart/form-data" {
 		return nil, &api.Error{Status: http.StatusBadRequest, Msg: fmt.Sprintf("multipart/form-data expected, got %s", mediaType)}
@@ -93,7 +92,7 @@ func (s *Server) uploadArchivePostHandler(w http.ResponseWriter, r *http.Request
 		return nil, &api.Error{Status: http.StatusBadRequest, Msg: "empty form"}
 	}
 	if err != nil {
-		return nil, gerrors.Wrap(err)
+		return nil, fmt.Errorf("read multipart form: %w", err)
 	}
 	fieldName := part.FormName()
 	if fieldName == "" {
@@ -107,7 +106,7 @@ func (s *Server) uploadArchivePostHandler(w http.ResponseWriter, r *http.Request
 		return nil, &api.Error{Status: http.StatusBadRequest, Msg: "missing file name"}
 	}
 	if err := s.executor.AddFileArchive(archiveId, part); err != nil {
-		return nil, gerrors.Wrap(err)
+		return nil, fmt.Errorf("add file archive: %w", err)
 	}
 	if _, err := formReader.NextPart(); !errors.Is(err, io.EOF) {
 		return nil, &api.Error{Status: http.StatusBadRequest, Msg: "extra form field(s)"}
@@ -127,14 +126,14 @@ func (s *Server) uploadCodePostHandler(w http.ResponseWriter, r *http.Request) (
 	codePath := filepath.Join(s.tempDir, "code") // todo random name?
 	file, err := os.Create(codePath)
 	if err != nil {
-		return nil, gerrors.Wrap(err)
+		return nil, fmt.Errorf("create code file: %w", err)
 	}
 	defer func() { _ = file.Close() }()
 	if _, err = io.Copy(file, r.Body); err != nil {
 		if err.Error() == "http: request body too large" {
 			return nil, &api.Error{Status: http.StatusRequestEntityTooLarge}
 		}
-		return nil, gerrors.Wrap(err)
+		return nil, fmt.Errorf("copy request body: %w", err)
 	}
 
 	s.executor.SetCodePath(codePath)

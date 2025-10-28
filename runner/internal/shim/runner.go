@@ -3,6 +3,7 @@ package shim
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -11,7 +12,6 @@ import (
 	"time"
 
 	"github.com/dstackai/dstack/runner/consts"
-	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"github.com/dstackai/dstack/runner/internal/log"
 )
 
@@ -21,7 +21,7 @@ func (c *CLIArgs) DownloadRunner(ctx context.Context) error {
 	}
 	err := downloadRunner(ctx, c.Runner.DownloadURL, c.Runner.BinaryPath, false)
 	if err != nil {
-		return gerrors.Wrap(err)
+		return fmt.Errorf("download runner from %s: %w", c.Runner.DownloadURL, err)
 	}
 	return nil
 }
@@ -45,10 +45,12 @@ func downloadRunner(ctx context.Context, url string, path string, force bool) er
 			log.Info(ctx, "dstack-runner binary exists, skipping download", "path", path)
 			return nil
 		}
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("check dstack-runner exists: %w", err)
 	}
 	tempFile, err := os.CreateTemp(filepath.Dir(path), "dstack-runner")
 	if err != nil {
-		return gerrors.Wrap(err)
+		return fmt.Errorf("create temp file for runner: %w", err)
 	}
 	defer func() {
 		err := tempFile.Close()
@@ -63,13 +65,14 @@ func downloadRunner(ctx context.Context, url string, path string, force bool) er
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return gerrors.Wrap(err)
+		return fmt.Errorf("create download request: %w", err)
 	}
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return gerrors.Wrap(err)
+		return fmt.Errorf("execute download request: %w", err)
 	}
+
 	defer func() {
 		err := resp.Body.Close()
 		if err != nil {
@@ -78,12 +81,12 @@ func downloadRunner(ctx context.Context, url string, path string, force bool) er
 	}()
 
 	if resp.StatusCode != http.StatusOK {
-		return gerrors.Newf("unexpected status code: %s", resp.Status)
+		return fmt.Errorf("unexpected status code %s downloading runner from %s", resp.Status, url)
 	}
 
 	written, err := io.Copy(tempFile, resp.Body)
 	if err != nil {
-		return gerrors.Wrap(err)
+		return fmt.Errorf("copy runner binary: %w", err)
 	}
 
 	select {
@@ -91,18 +94,18 @@ func downloadRunner(ctx context.Context, url string, path string, force bool) er
 		err := ctx.Err()
 		if errors.Is(err, context.DeadlineExceeded) {
 			log.Error(ctx, "downloadRunner error", "err", err, "bytes", written, "total", resp.ContentLength)
-			return gerrors.Newf("Cannot download runner %w", err)
+			return fmt.Errorf("download runner timeout after %d/%d bytes: %w", written, resp.ContentLength, err)
 		}
 	default:
 		log.Info(ctx, "the runner was downloaded successfully", "bytes", written)
 	}
 
 	if err := tempFile.Chmod(0o755); err != nil {
-		return gerrors.Wrap(err)
+		return fmt.Errorf("chmod runner binary: %w", err)
 	}
 
 	if err := os.Rename(tempFile.Name(), path); err != nil {
-		return gerrors.Wrap(err)
+		return fmt.Errorf("move runner binary to %s: %w", path, err)
 	}
 
 	return nil
