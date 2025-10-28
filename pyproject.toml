@@ -32,7 +32,8 @@ dependencies = [
     "python-multipart>=0.0.16",
     "filelock",
     "psutil",
-    "gpuhunt==0.1.11",
+    # TODO: release and pin new version
+    "gpuhunt @ https://github.com/dstackai/gpuhunt/archive/refs/heads/hotaisle_store_specs_in_provider_data.zip",
     "argcomplete>=3.5.0",
     "ignore-python>=0.2.0",
     "orjson",
@@ -66,6 +67,9 @@ artifacts = [
 artifacts = [
     "src/dstack/_internal/server/statics/**",
 ]
+
+[tool.hatch.metadata]
+allow-direct-references = true  # TODO: unset
 
 [tool.hatch.metadata.hooks.fancy-pypi-readme]
 content-type = "text/markdown"
