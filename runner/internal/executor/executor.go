@@ -196,16 +196,6 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 
 	ex.setJobCredentials(ctx)
 
-	if err := ex.prepareJobWorkingDir(ctx); err != nil {
-		ex.SetJobStateWithTerminationReason(
-			ctx,
-			types.JobStateFailed,
-			types.TerminationReasonExecutorError,
-			fmt.Sprintf("Failed to set up the working dir (%s)", err),
-		)
-		return fmt.Errorf("prepare job working dir: %w", err)
-	}
-
 	if err := ex.setupRepo(ctx); err != nil {
 		ex.SetJobStateWithTerminationReason(
 			ctx,
@@ -224,6 +214,16 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 			fmt.Sprintf("Failed to set up files (%s)", err),
 		)
 		return fmt.Errorf("setup files: %w", err)
+	}
+
+	if err := ex.prepareJobWorkingDir(ctx); err != nil {
+		ex.SetJobStateWithTerminationReason(
+			ctx,
+			types.JobStateFailed,
+			types.TerminationReasonExecutorError,
+			fmt.Sprintf("Failed to set up the working dir (%s)", err),
+		)
+		return fmt.Errorf("prepare job working dir: %w", err)
 	}
 
 	cleanupCredentials, err := ex.setupCredentials(ctx)
