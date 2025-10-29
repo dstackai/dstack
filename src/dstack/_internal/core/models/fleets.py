@@ -309,7 +309,12 @@ class InstanceGroupParams(CoreModel):
     idle_duration: Annotated[
         Optional[int],
         Field(
-            description="Time to wait before terminating idle instances. Defaults to `5m` for runs and `3d` for fleets. Use `off` for unlimited duration"
+            description=(
+                "Time to wait before terminating idle instances."
+                " Instances are not terminated if the fleet is already at `nodes.min`."
+                " Defaults to `5m` for runs and `3d` for fleets."
+                " Use `off` for unlimited duration"
+            )
         ),
     ] = None
 
